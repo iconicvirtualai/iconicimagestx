@@ -2,6 +2,7 @@ import PromoBar from "@/components/PromoBar";
 import Header from "@/components/Header";
 import HeroSection from "@/components/HeroSection";
 import MediaCarousel from "@/components/MediaCarousel";
+import SolutionSection from "@/components/SolutionSection";
 import ValueProposition from "@/components/ValueProposition";
 import FeaturedServices from "@/components/FeaturedServices";
 import PartnershipCTA from "@/components/PartnershipCTA";
@@ -22,6 +23,7 @@ export default function Index() {
       <main className="flex-1">
         <HeroSection />
         <MediaCarousel />
+        <SolutionSection />
         <ValueProposition />
         <FeaturedServices />
         <PartnershipCTA />
