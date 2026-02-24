@@ -2,7 +2,7 @@ import { Play } from "lucide-react";
 
 export default function SolutionSection() {
   return (
-    <section className="bg-white py-24 md:py-32">
+    <section className="bg-white pt-12 pb-24 md:pt-16 md:pb-32">
       <div className="container mx-auto px-4 text-center">
         {/* Badge */}
         <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#f0fdfa] border border-[#ccfbf1] mb-8">

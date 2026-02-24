@@ -6,37 +6,37 @@ export default function MediaCarousel() {
     {
       id: 1,
       image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80",
-      type: "luxury estate",
+      video: "https://videos.pexels.com/video-files/6007440/6007440-sd_426_240_24fps.mp4",
       aspect: "16/9",
     },
     {
       id: 2,
       image: "https://images.unsplash.com/photo-1600607687940-47a0f9259017?w=1200&q=80",
-      type: "modern interior",
+      video: "https://videos.pexels.com/video-files/31548166/13445880_360_640_30fps.mp4",
       aspect: "9/16",
     },
     {
       id: 3,
       image: "https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?w=1200&q=80",
-      type: "designer kitchen",
+      video: "https://videos.pexels.com/video-files/19403229/19403229-hd_1280_720_25fps.mp4",
       aspect: "16/9",
     },
     {
       id: 4,
       image: "https://images.unsplash.com/photo-1600585154526-990dcea4db0d?w=1200&q=80",
-      type: "prime suite",
+      video: "https://videos.pexels.com/video-files/34236991/14509265_360_640_24fps.mp4",
       aspect: "9/16",
     },
     {
       id: 5,
       image: "https://images.unsplash.com/photo-1600573472591-ee6b68d14c68?w=1200&q=80",
-      type: "living space",
+      video: "https://videos.pexels.com/video-files/6007440/6007440-sd_426_240_24fps.mp4",
       aspect: "16/9",
     },
     {
       id: 6,
       image: "https://images.unsplash.com/photo-1600607687644-c7171b42498f?w=1200&q=80",
-      type: "premium bath",
+      video: "https://videos.pexels.com/video-files/31548166/13445880_360_640_30fps.mp4",
       aspect: "9/16",
     },
   ];
@@ -55,16 +55,22 @@ export default function MediaCarousel() {
               : "w-[76px] h-[135px] md:w-[126px] md:h-[225px]"
           }`}
         >
-          <img
-            src={item.image}
-            alt={item.type}
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute bottom-3 left-3 md:bottom-4 md:left-4">
-            <div className="bg-black/30 backdrop-blur-xl px-3 py-1 rounded-full text-[10px] font-bold text-white uppercase tracking-[0.1em] border border-white/20 scale-75 md:scale-100 origin-bottom-left">
-              {item.type}
-            </div>
-          </div>
+          {isAfter ? (
+            <video
+              src={item.video}
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <img
+              src={item.image}
+              alt="Raw capture"
+              className="w-full h-full object-cover"
+            />
+          )}
         </div>
       ))}
     </div>
@@ -78,13 +84,13 @@ export default function MediaCarousel() {
 
       {/* Before/After Label */}
       <div className="flex items-center justify-center gap-4 text-gray-400 text-xs font-bold uppercase tracking-[0.2em] mb-2">
-        <span>Raw Content</span>
+        <span>RAW</span>
         <div className="flex items-center gap-1">
            <div className="w-1.5 h-1.5 rounded-full bg-gray-200"></div>
            <div className="w-8 h-px bg-gray-200"></div>
            <div className="w-1.5 h-1.5 rounded-full bg-teal-500"></div>
         </div>
-        <span className="text-gray-900">Iconic Edit</span>
+        <span className="text-gray-900">ICONIC</span>
       </div>
 
       {/* Track Layers Container */}
@@ -113,9 +119,9 @@ export default function MediaCarousel() {
       </div>
 
       {/* Pricing CTA */}
-      <div className="flex justify-center mt-4 pb-2 relative z-40">
+      <div className="flex justify-center mt-12 pb-8 relative z-40">
         <Link to="/pricing">
-          <Button className="bg-[#0f766e] text-white hover:bg-[#0d9488] font-bold text-base px-6 py-5 rounded-lg shadow-lg shadow-teal-100 transition-all hover:scale-105">
+          <Button className="bg-[#0f766e] text-white hover:bg-[#0d9488] font-bold text-xl px-12 py-8 rounded-2xl shadow-xl shadow-teal-100/50 transition-all hover:scale-105 active:scale-95">
             View Pricing
           </Button>
         </Link>
@@ -123,8 +129,8 @@ export default function MediaCarousel() {
 
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes scroll {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
+          0% { transform: translateX(-50%); }
+          100% { transform: translateX(0); }
         }
         .animate-scroll {
           animation: scroll 25s linear infinite;
