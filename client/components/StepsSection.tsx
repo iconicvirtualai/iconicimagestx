@@ -55,27 +55,27 @@ export default function StepsSection() {
         </div>
 
         {/* Steps Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8 max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
           {steps.map((item, index) => (
-            <div 
-              key={index} 
-              className="bg-white rounded-[2rem] p-8 border border-gray-100 shadow-sm flex flex-col h-full hover:shadow-xl transition-all duration-300 group"
+            <div
+              key={index}
+              className="bg-white rounded-[2.5rem] p-10 border border-gray-100 shadow-sm flex flex-col md:flex-row gap-8 items-center hover:shadow-xl transition-all duration-300 group"
             >
-              <div className="mb-6">
+              <div className="flex-1 order-2 md:order-1 text-left">
                 <span className="text-[10px] font-bold tracking-widest text-gray-400 uppercase block mb-3">
                   {item.step}
                 </span>
-                <h3 className="text-xl font-bold text-black mb-4 leading-tight group-hover:text-[#0d9488] transition-colors">
+                <h3 className="text-2xl font-bold text-black mb-4 leading-tight group-hover:text-[#0d9488] transition-colors">
                   {item.title}
                 </h3>
-                <p className="text-sm text-gray-500 leading-relaxed mb-8">
+                <p className="text-base text-gray-500 leading-relaxed">
                   {item.description}
                 </p>
               </div>
-              
-              <div className="mt-auto relative rounded-2xl overflow-hidden aspect-square md:aspect-[4/3] bg-gray-50 border border-gray-50">
-                <img 
-                  src={item.image} 
+
+              <div className="w-full md:w-48 lg:w-56 shrink-0 order-1 md:order-2 relative rounded-3xl overflow-hidden aspect-[4/3] md:aspect-square bg-gray-50 border border-gray-50">
+                <img
+                  src={item.image}
                   alt={item.title}
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                 />

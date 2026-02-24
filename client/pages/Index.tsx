@@ -5,6 +5,7 @@ import MediaCarousel from "@/components/MediaCarousel";
 import SolutionSection from "@/components/SolutionSection";
 import StatsBar from "@/components/StatsBar";
 import StepsSection from "@/components/StepsSection";
+import AudienceSection from "@/components/AudienceSection";
 import ValueProposition from "@/components/ValueProposition";
 import FeaturedServices from "@/components/FeaturedServices";
 import PartnershipCTA from "@/components/PartnershipCTA";
@@ -28,6 +29,7 @@ export default function Index() {
         <SolutionSection />
         <StatsBar />
         <StepsSection />
+        <AudienceSection />
         <ValueProposition />
         <FeaturedServices />
         <PartnershipCTA />
