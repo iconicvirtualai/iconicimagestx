@@ -45,7 +45,7 @@ export default function About() {
                   { img: "https://images.unsplash.com/photo-1626544823126-bb212353394c?w=800&q=80", label: "Elite" },
                   { img: "https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&q=80", label: "Market Lead" },
                 ].map((item, i) => (
-                  <div key={i} className="flex-shrink-0 mx-2 w-[240px] h-[240px] md:w-[350px] md:h-[350px] bg-gray-900 rounded-2xl border border-white/10 flex items-center justify-center relative overflow-hidden group">
+                  <div key={i} className="flex-shrink-0 mx-2 w-[204px] h-[204px] md:w-[298px] md:h-[298px] bg-gray-900 rounded-2xl border border-white/10 flex items-center justify-center relative overflow-hidden group">
                     <img src={item.img} className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-110 group-hover:opacity-60 transition-all duration-700" alt={item.label} />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
                     <span className="absolute bottom-6 left-6 z-10 text-[10px] font-bold text-white uppercase tracking-widest opacity-80 group-hover:opacity-100 transition-opacity">
@@ -160,14 +160,14 @@ export default function About() {
               We aren't just vendors; we are your <span className="text-[#0d9488] font-bold">Growth Partners</span>. Every frame we shoot and every reel we edit is designed with one goal in mind: Getting you your next listing.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-6 md:gap-12 mb-16">
-              {["The Woodlands", "Spring", "Conroe", "Houston"].map((loc) => (
+              {["The Woodlands", "Spring", "Conroe", "Greater Houston Area", "Cypress", "Livingston"].map((loc) => (
                 <div key={loc} className="flex items-center gap-2 text-gray-400 font-bold uppercase tracking-widest text-sm">
                   <MapPin className="w-4 h-4 text-[#0d9488]" />
                   {loc}
                 </div>
               ))}
             </div>
-            <div className="space-y-4">
+            <div className="space-y-8">
               <p className="text-2xl font-bold text-black uppercase tracking-tight">Join the elite. Own the market.</p>
               <Link to="/book">
                 <Button className="bg-black text-white hover:bg-gray-900 font-bold text-lg px-12 py-8 rounded-2xl transition-all hover:scale-105 shadow-xl">
