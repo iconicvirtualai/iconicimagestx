@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Menu, X, User } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function Header() {
@@ -55,15 +55,29 @@ export default function Header() {
         </nav>
 
         {/* Right side buttons */}
-        <div className="hidden lg:flex items-center gap-4">
+        <div className="hidden lg:flex items-center gap-6">
+          <Link 
+            to="/login" 
+            className="text-gray-600 hover:text-black transition-colors text-[15px] font-medium"
+          >
+            Log in
+          </Link>
           <Link to="/book">
-            <Button className="bg-[#0f766e] text-white hover:bg-[#0d9488] rounded-lg px-6 font-semibold shadow-sm transition-all">
-              Book Now
+            <Button className="bg-[#0f766e] text-white hover:bg-[#0d9488] rounded-lg px-6 font-semibold shadow-sm transition-all flex items-center gap-2">
+              Start for free
+              <svg 
+                className="w-4 h-4" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              >
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
             </Button>
           </Link>
-          <div className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors cursor-pointer border border-gray-200">
-            <User className="w-5 h-5" />
-          </div>
         </div>
 
         {/* Mobile Menu Button */}
@@ -95,17 +109,14 @@ export default function Header() {
               </Link>
             ))}
             <div className="pt-4 border-t border-gray-100 flex flex-col gap-4">
+              <Link to="/login" onClick={() => setIsMenuOpen(false)}>
+                <span className="text-gray-600 font-medium py-2 text-lg block">Log in</span>
+              </Link>
               <Link to="/book" onClick={() => setIsMenuOpen(false)}>
                 <Button className="w-full bg-[#0f766e] text-white hover:bg-[#0d9488] font-semibold py-6 text-lg">
-                  Book Now
+                  Start for free
                 </Button>
               </Link>
-              <div className="flex items-center gap-3 py-2">
-                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-500">
-                  <User className="w-6 h-6" />
-                </div>
-                <span className="font-medium">My Account</span>
-              </div>
             </div>
           </nav>
         </div>

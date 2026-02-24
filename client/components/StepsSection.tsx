@@ -35,7 +35,7 @@ export default function StepsSection() {
   return (
     <section className="bg-[#e0f7f6]/40 py-24 md:py-32 relative overflow-hidden">
       <div className="container mx-auto px-4 relative z-10">
-        <div className="text-center mb-20">
+        <div className="text-center mb-16">
           {/* Badge */}
           <div className="inline-flex items-center px-4 py-1.5 rounded-md bg-white border border-[#ccfbf1] mb-8 shadow-sm">
             <span className="text-[12px] font-bold tracking-wider text-[#0d9488] uppercase">
@@ -54,33 +54,35 @@ export default function StepsSection() {
           </p>
         </div>
 
-        {/* Steps Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
+        {/* Steps Grid - Updated to 4 columns as per screenshot */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-4 max-w-[1400px] mx-auto">
           {steps.map((item, index) => (
             <div
               key={index}
-              className="bg-white rounded-[2.5rem] p-10 border border-gray-100 shadow-sm flex flex-col md:flex-row gap-8 items-center hover:shadow-xl transition-all duration-300 group"
+              className="bg-white rounded-[1.5rem] p-6 border border-gray-100 shadow-sm flex flex-col h-full hover:shadow-xl transition-all duration-300 group"
             >
-              <div className="flex-1 order-2 md:order-1 text-left">
-                <span className="text-[10px] font-bold tracking-widest text-gray-400 uppercase block mb-3">
+              <div className="mb-6">
+                <span className="text-[10px] font-bold tracking-widest text-gray-400 uppercase block mb-2">
                   {item.step}
                 </span>
-                <h3 className="text-2xl font-bold text-black mb-4 leading-tight group-hover:text-[#0d9488] transition-colors">
+                <h3 className="text-lg font-bold text-black mb-3 leading-tight group-hover:text-[#0d9488] transition-colors">
                   {item.title}
                 </h3>
-                <p className="text-base text-gray-500 leading-relaxed">
+                <p className="text-sm text-gray-500 leading-relaxed min-h-[60px]">
                   {item.description}
                 </p>
               </div>
 
-              <div className="w-full md:w-48 lg:w-56 shrink-0 order-1 md:order-2 relative rounded-3xl overflow-hidden aspect-[4/3] md:aspect-square bg-gray-50 border border-gray-50">
+              <div className="mt-auto relative rounded-xl overflow-hidden aspect-[4/3] bg-gray-50 border border-gray-50">
                 <img
                   src={item.image}
                   alt={item.title}
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                 />
-                <div className="absolute top-4 right-4 w-10 h-10 bg-white/80 backdrop-blur-md rounded-xl flex items-center justify-center shadow-sm border border-white/40">
-                  {item.icon}
+                <div className="absolute top-3 right-3 w-8 h-8 bg-white/80 backdrop-blur-md rounded-lg flex items-center justify-center shadow-sm border border-white/40">
+                  <div className="scale-75">
+                    {item.icon}
+                  </div>
                 </div>
               </div>
             </div>
