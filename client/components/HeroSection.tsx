@@ -1,62 +1,83 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Star } from "lucide-react";
 
 export default function HeroSection() {
   return (
-    <section className="relative bg-black text-white py-20 md:py-32 lg:py-40">
-      <div className="container mx-auto px-4">
-        <div className="max-w-4xl">
-          {/* Main Headline */}
-          <h1 className="text-4xl md:text-5xl lg:text-7xl font-bold mb-6 leading-tight tracking-tight">
-            Creative Media Partners for Modern Brands
-          </h1>
+    <section className="relative overflow-hidden bg-white pt-20 pb-12">
+      {/* Background Glow */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-full -z-10 pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[#ccfbf1] rounded-full blur-[120px] opacity-40"></div>
+        <div className="absolute top-[-5%] right-[-5%] w-[35%] h-[35%] bg-[#ecfeff] rounded-full blur-[100px] opacity-30"></div>
+      </div>
 
-          {/* Subheading */}
-          <p className="text-lg md:text-xl text-gray-300 mb-8 max-w-2xl leading-relaxed">
-            We've transformed from photographers to creative media partners. 
-            Elevate your brand with cutting-edge content production and strategic 
-            visual storytelling that resonates.
-          </p>
+      <div className="container mx-auto px-4 text-center">
+        {/* Badge */}
+        <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#f0fdfa] border border-[#ccfbf1] mb-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <span className="text-[12px] font-bold tracking-wider text-[#0f766e] uppercase">
+            #1 Media Partner for Growing Brands
+          </span>
+        </div>
 
-          {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-16">
-            <Link to="/book">
-              <Button className="w-full sm:w-auto bg-white text-black hover:bg-gray-100 font-semibold text-lg px-8 py-6">
-                Book Now
-              </Button>
-            </Link>
-            <Link to="/services">
-              <Button
-                variant="outline"
-                className="w-full sm:w-auto border-white text-white hover:bg-white/10 font-semibold text-lg px-8 py-6"
+        {/* Headline */}
+        <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 leading-[1.1] tracking-tight text-black max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
+          Create Stunning Brand Media{" "}
+          <span className="text-[#0d9488]">Instantly</span> with Iconic
+        </h1>
+
+        {/* Subheadline */}
+        <p className="text-lg md:text-xl text-gray-500 mb-10 max-w-2xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-6 duration-900">
+          Transforming your vision into high-impact media content. Join the top
+          brands leveraging strategic visual storytelling to dominate their market.
+        </p>
+
+        {/* Main CTA */}
+        <div className="mb-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+          <Link to="/book">
+            <Button className="bg-[#0f766e] text-white hover:bg-[#0d9488] font-bold text-lg px-12 py-7 rounded-xl shadow-lg shadow-teal-100 transition-all hover:scale-105">
+              Book a Consultation
+            </Button>
+          </Link>
+        </div>
+
+        {/* Social Proof */}
+        <div className="flex flex-col items-center gap-4 mb-16 animate-in fade-in slide-in-from-bottom-10 duration-1100">
+          <div className="flex -space-x-3">
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="w-10 h-10 rounded-full border-2 border-white overflow-hidden bg-gray-200"
               >
-                Explore Services
-              </Button>
-            </Link>
+                <img
+                  src={`https://i.pravatar.cc/150?u=${i}`}
+                  alt="User avatar"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ))}
           </div>
-
-          {/* Trust Indicators */}
-          <div className="pt-8 border-t border-gray-700">
-            <p className="text-gray-400 text-sm font-medium mb-4">
-              TRUSTED BY LEADING BRANDS
-            </p>
-            <div className="flex flex-wrap gap-6 items-center">
-              <div className="text-gray-500 text-sm">
-                100+ Successful Projects
-              </div>
-              <div className="text-gray-500 text-sm">
-                15+ Years Experience
-              </div>
-              <div className="text-gray-500 text-sm">
-                Global Creative Team
-              </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-0.5">
+              <Star className="w-5 h-5 fill-[#22c55e] text-[#22c55e]" />
+              <span className="font-bold text-lg ml-1">4.9</span>
+            </div>
+            <div className="flex gap-1">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="w-5 h-5 bg-[#22c55e] rounded-[2px] flex items-center justify-center">
+                  <Star className="w-3 h-3 text-white fill-white" />
+                </div>
+              ))}
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Subtle Background Accent */}
-      <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-gray-900 to-transparent opacity-30 -z-10"></div>
+        {/* Label for Carousel */}
+        <div className="flex items-center justify-center gap-2 text-gray-400 text-sm font-medium">
+          <span>Before</span>
+          <div className="w-4 h-px bg-gray-200"></div>
+          <span className="text-gray-600 font-semibold">After</span>
+        </div>
+      </div>
     </section>
   );
 }
