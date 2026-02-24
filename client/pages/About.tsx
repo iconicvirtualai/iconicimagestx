@@ -23,23 +23,36 @@ export default function About() {
               Cheers to <span className="text-[#0d9488]">10 Years!!</span>
             </h1>
 
-            {/* Video/Photo Placeholders */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-5xl mx-auto mt-8">
-              <div className="aspect-square bg-gray-900 rounded-2xl border border-white/10 flex items-center justify-center relative overflow-hidden group">
-                <img src="https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600&q=80" className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-110 transition-transform duration-500" alt="Behind the scenes" />
-                <span className="relative z-10 text-[10px] font-bold text-white/50 uppercase tracking-widest">Est. 2014</span>
-              </div>
-              <div className="aspect-square bg-gray-900 rounded-2xl border border-white/10 flex items-center justify-center relative overflow-hidden group">
-                <img src="https://images.unsplash.com/photo-1492691523567-61723c275df1?w=600&q=80" className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-110 transition-transform duration-500" alt="Camera gear" />
-                <span className="relative z-10 text-[10px] font-bold text-white/50 uppercase tracking-widest">Video Reel</span>
-              </div>
-              <div className="aspect-square bg-gray-900 rounded-2xl border border-white/10 flex items-center justify-center relative overflow-hidden group">
-                <img src="https://images.unsplash.com/photo-1626544823126-bb212353394c?w=600&q=80" className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-110 transition-transform duration-500" alt="Drone view" />
-                <span className="relative z-10 text-[10px] font-bold text-white/50 uppercase tracking-widest">Woodlands Sky</span>
-              </div>
-              <div className="aspect-square bg-gray-900 rounded-2xl border border-white/10 flex items-center justify-center relative overflow-hidden group">
-                <img src="https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=600&q=80" className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-110 transition-transform duration-500" alt="Studio" />
-                <span className="relative z-10 text-[10px] font-bold text-white/50 uppercase tracking-widest">Growth</span>
+            {/* Moving Photo Carousel */}
+            <div className="relative w-full overflow-hidden py-12">
+              <div className="flex animate-scroll whitespace-nowrap">
+                {[
+                  { img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80", label: "Est. 2014" },
+                  { img: "https://images.unsplash.com/photo-1492691523567-61723c275df1?w=800&q=80", label: "Video Reel" },
+                  { img: "https://images.unsplash.com/photo-1626544823126-bb212353394c?w=800&q=80", label: "Woodlands Sky" },
+                  { img: "https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&q=80", label: "Growth" },
+                  { img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80", label: "Legacy" },
+                  { img: "https://images.unsplash.com/photo-1492691523567-61723c275df1?w=800&q=80", label: "Cinematic" },
+                  { img: "https://images.unsplash.com/photo-1626544823126-bb212353394c?w=800&q=80", label: "Elite" },
+                  { img: "https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&q=80", label: "Market Lead" },
+                  // Repeat for seamless loop
+                  { img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80", label: "Est. 2014" },
+                  { img: "https://images.unsplash.com/photo-1492691523567-61723c275df1?w=800&q=80", label: "Video Reel" },
+                  { img: "https://images.unsplash.com/photo-1626544823126-bb212353394c?w=800&q=80", label: "Woodlands Sky" },
+                  { img: "https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&q=80", label: "Growth" },
+                  { img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80", label: "Legacy" },
+                  { img: "https://images.unsplash.com/photo-1492691523567-61723c275df1?w=800&q=80", label: "Cinematic" },
+                  { img: "https://images.unsplash.com/photo-1626544823126-bb212353394c?w=800&q=80", label: "Elite" },
+                  { img: "https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&q=80", label: "Market Lead" },
+                ].map((item, i) => (
+                  <div key={i} className="flex-shrink-0 mx-2 w-[240px] h-[240px] md:w-[350px] md:h-[350px] bg-gray-900 rounded-2xl border border-white/10 flex items-center justify-center relative overflow-hidden group">
+                    <img src={item.img} className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-110 group-hover:opacity-60 transition-all duration-700" alt={item.label} />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                    <span className="absolute bottom-6 left-6 z-10 text-[10px] font-bold text-white uppercase tracking-widest opacity-80 group-hover:opacity-100 transition-opacity">
+                      {item.label}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -167,6 +180,19 @@ export default function About() {
       </main>
 
       <Footer />
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes scroll {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .animate-scroll {
+          animation: scroll 40s linear infinite;
+        }
+        .animate-scroll:hover {
+          animation-play-state: paused;
+        }
+      `}} />
     </div>
   );
 }
