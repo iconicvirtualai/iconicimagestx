@@ -2,11 +2,23 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Check, X, ArrowRight, Star } from "lucide-react";
-import { useState } from "react";
+import { Check, X, ArrowRight, Star, ChevronLeft, ChevronRight } from "lucide-react";
+import { useState, useRef } from "react";
 
 export default function Pricing() {
   const [isYearly, setIsYearly] = useState(true);
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const scrollTestimonials = (direction: 'left' | 'right') => {
+    if (scrollContainerRef.current) {
+      const scrollAmount = 400;
+      scrollContainerRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  };
 
   const plans = [
     {
@@ -254,9 +266,170 @@ export default function Pricing() {
             </div>
           </div>
         </div>
+
+        {/* Testimonials */}
+        <section className="bg-[#e0f7f6]/40 py-24 md:py-32 overflow-hidden mt-20">
+          <div className="container mx-auto px-4 text-center">
+            <div className="inline-flex items-center px-3 py-1 rounded bg-white border border-[#ccfbf1] mb-8 shadow-sm">
+              <span className="text-[10px] font-bold tracking-wider text-[#0d9488] uppercase">
+                TESTIMONIALS
+              </span>
+            </div>
+
+            <h2 className="text-4xl md:text-5xl font-bold mb-6 text-black">
+              What our users are saying
+            </h2>
+            <p className="text-gray-500 max-w-2xl mx-auto mb-16">
+              Real estate media businesses, photographers, and agents are using Iconic
+              every day to boost their video marketing.
+            </p>
+
+            <div className="relative group">
+              <div
+                ref={scrollContainerRef}
+                className="flex gap-6 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-12"
+              >
+                {[
+                  {
+                    name: "Mark Shepherd",
+                    role: "MD & Founder, Apollo3D Ltd, UK",
+                    content: "Iconic has enhanced our video and 3D tour services uniquely. The team behind the app is super responsive and is always looking to improve the product and its capabilities.",
+                    avatar: "https://i.pravatar.cc/150?u=mark"
+                  },
+                  {
+                    name: "Kerry Riordan",
+                    role: "Director, Blue Lemonade Photography",
+                    content: "The future is here! Iconic surpasses the rest in terms of quality and accuracy. The generations look authentic, with subtle movements and tasteful add-ons.",
+                    avatar: "https://i.pravatar.cc/150?u=kerry"
+                  },
+                  {
+                    name: "Ron Potts",
+                    role: "Owner, Advanced Virtual Imaging",
+                    content: "This is truly an amazing product, turning photos into video. If you're looking for short video ads or property videos, consider Iconic!",
+                    avatar: "https://i.pravatar.cc/150?u=ron"
+                  },
+                  {
+                    name: "Nick Ptak",
+                    role: "The PTK Alliance Team at Compass",
+                    content: "It's 10 times less expensive and up to 100 times faster than marketing agencies, producing high-quality videos on demand 24/7/365.",
+                    avatar: "https://i.pravatar.cc/150?u=nick"
+                  },
+                  {
+                    name: "John Rudy",
+                    role: "Founder, Rudy Media Group",
+                    content: "Iconic saves a huge amount of time and money. I'm using it for a wide range of real estate.",
+                    avatar: "https://i.pravatar.cc/150?u=john"
+                  },
+                  {
+                    name: "Kim Lindsey",
+                    role: "Owner, Kim Lindsey Photography",
+                    content: "Groundbreaking tool. They are committed to improving the services with new updates often.",
+                    avatar: "https://i.pravatar.cc/150?u=kim"
+                  }
+                ].map((t, i) => (
+                  <div key={i} className="flex-shrink-0 w-[350px] md:w-[400px] snap-center">
+                    <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm text-left h-full flex flex-col">
+                      <div className="flex items-center gap-4 mb-6">
+                        <img src={t.avatar} alt={t.name} className="w-12 h-12 rounded-full border border-gray-100" />
+                        <div>
+                          <h4 className="font-bold text-black text-sm">{t.name}</h4>
+                          <p className="text-gray-400 text-[10px] font-medium uppercase tracking-tight">{t.role}</p>
+                        </div>
+                      </div>
+                      <p className="text-gray-600 text-sm leading-relaxed mb-6 italic flex-1">
+                        "{t.content}"
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Navigation Controls */}
+              <div className="flex items-center justify-center gap-4">
+                <button
+                  onClick={() => scrollTestimonials('left')}
+                  className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#0d9488] hover:border-[#0d9488] transition-all"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map((p) => (
+                    <div key={p} className={`w-1.5 h-1.5 rounded-full ${p === 1 ? "bg-[#0d9488]" : "bg-gray-200"}`}></div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => scrollTestimonials('right')}
+                  className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#0d9488] hover:border-[#0d9488] transition-all"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* FAQ Section */}
+        <section className="bg-white py-24 md:py-32">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-16">
+              <div className="inline-flex items-center px-3 py-1 rounded bg-[#f0fdfa] border border-[#ccfbf1] mb-8">
+                <span className="text-[10px] font-bold tracking-wider text-[#0d9488] uppercase">
+                  FAQ
+                </span>
+              </div>
+              <h2 className="text-4xl md:text-5xl font-bold mb-6 text-black">
+                Got questions? We've got <span className="text-[#0d9488]">answers</span>.
+              </h2>
+              <p className="text-gray-500 max-w-2xl mx-auto">
+                Everything you need to know about Iconic in a nutshell.
+              </p>
+            </div>
+
+            <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[
+                { q: "How long does video processing take?", a: "Typically, our high-end media assets are delivered within 24 hours of capture. Our rapid post-production workflow is optimized for social media timelines." },
+                { q: "Does Iconic support portrait mode?", a: "Yes, we specialize in both cinematic landscape and scroll-stopping vertical content optimized for Reels, TikTok, and Shorts." },
+                { q: "How many images can I use per video?", a: "Our standard cinematic reel utilizes between 15-25 of the best property shots, but this can be customized based on your specific project needs." },
+                { q: "How long is each video?", a: "Most property reels are between 30-60 seconds, which is the 'sweet spot' for high engagement across modern social platforms." },
+                { q: "Is there a free trial?", a: "Yes! We offer a 7-day free trial on our Starter, Leader, and Dominator plans so you can experience the full power of Iconic media." },
+                { q: "Do I need a credit card to sign up?", a: "No credit card is required to book a strategy session. A card is only needed to start a free trial of our premium packages." },
+                { q: "Is there a file size limit for images?", a: "We support high-resolution uploads up to 25MB per image to ensure the highest quality cinematic output." },
+                { q: "How do I get rid of the watermark in the video?", a: "Watermarks are automatically removed on all paid plans (Starter, Leader, and Dominator)." },
+                { q: "What makes Iconic a better real estate video editor than generic editing tools?", a: "Iconic is built specifically for real estate. Our AI understands property flow, lighting, and cinematic composition, delivering luxury-quality edits in a fraction of the time." },
+                { q: "My question isn't answered here. How can I get help?", a: "We're here to help! You can reach out to our support team via the contact page or book a strategy session for personalized guidance." }
+              ].map((faq, i) => (
+                <div
+                  key={i}
+                  className="bg-white border border-gray-100 rounded-xl px-6 py-5 cursor-pointer hover:bg-gray-50 transition-colors group"
+                  onClick={() => setOpenFaqIndex(openFaqIndex === i ? null : i)}
+                >
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-bold text-gray-700">{faq.q}</h4>
+                    <ChevronRight className={`w-4 h-4 text-gray-300 transition-transform ${openFaqIndex === i ? 'rotate-90' : ''}`} />
+                  </div>
+                  {openFaqIndex === i && (
+                    <div className="mt-4 text-xs text-gray-500 leading-relaxed animate-in fade-in slide-in-from-top-1 duration-200">
+                      {faq.a}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
       </main>
 
       <Footer />
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}} />
     </div>
   );
 }
