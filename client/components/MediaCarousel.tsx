@@ -1,3 +1,6 @@
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+
 export default function MediaCarousel() {
   const mediaItems = [
     {
@@ -93,10 +96,18 @@ export default function MediaCarousel() {
           <CarouselTrack isAfter={false} />
         </div>
 
-        {/* After Layer (Top) */}
         <div className="absolute inset-0 z-20 pointer-events-none" style={{ clipPath: "inset(0 0 0 50.1%)" }}>
           <CarouselTrack isAfter={true} />
         </div>
+      </div>
+
+      {/* Pricing CTA */}
+      <div className="flex justify-center pb-12 relative z-40">
+        <Link to="/pricing">
+          <Button className="bg-[#0f766e] text-white hover:bg-[#0d9488] font-bold text-lg px-8 py-6 rounded-xl shadow-lg shadow-teal-100 transition-all hover:scale-105">
+            View Pricing
+          </Button>
+        </Link>
       </div>
 
       <style dangerouslySetInnerHTML={{ __html: `
