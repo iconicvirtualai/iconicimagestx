@@ -71,13 +71,13 @@ export default function MediaCarousel() {
   );
 
   return (
-    <div className="relative w-full overflow-hidden bg-white py-8">
+    <div className="relative w-full overflow-hidden bg-white py-4 md:py-6">
       {/* Gradient Mask for edges */}
       <div className="absolute inset-y-0 left-0 w-32 md:w-64 bg-gradient-to-r from-white via-white/80 to-transparent z-[35] pointer-events-none"></div>
       <div className="absolute inset-y-0 right-0 w-32 md:w-64 bg-gradient-to-l from-white via-white/80 to-transparent z-[35] pointer-events-none"></div>
 
       {/* Before/After Label */}
-      <div className="flex items-center justify-center gap-4 text-gray-400 text-xs font-bold uppercase tracking-[0.2em] mb-4">
+      <div className="flex items-center justify-center gap-4 text-gray-400 text-xs font-bold uppercase tracking-[0.2em] mb-2">
         <span>Raw Content</span>
         <div className="flex items-center gap-1">
            <div className="w-1.5 h-1.5 rounded-full bg-gray-200"></div>
@@ -113,7 +113,7 @@ export default function MediaCarousel() {
       </div>
 
       {/* Pricing CTA */}
-      <div className="flex justify-center mt-8 pb-4 relative z-40">
+      <div className="flex justify-center mt-4 pb-2 relative z-40">
         <Link to="/pricing">
           <Button className="bg-[#0f766e] text-white hover:bg-[#0d9488] font-bold text-base px-6 py-5 rounded-lg shadow-lg shadow-teal-100 transition-all hover:scale-105">
             View Pricing

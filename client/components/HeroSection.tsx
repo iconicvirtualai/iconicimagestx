@@ -4,7 +4,7 @@ import { Star } from "lucide-react";
 
 export default function HeroSection() {
   return (
-    <section className="relative overflow-hidden bg-white pt-20 pb-12">
+    <section className="relative overflow-hidden bg-white pt-12 pb-6">
       {/* Background Grid & Layered Glows */}
       <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
         {/* Subtle Grid Pattern */}
@@ -32,26 +32,26 @@ export default function HeroSection() {
 
       <div className="container mx-auto px-4 text-center">
         {/* Badge */}
-        <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#f0fdfa] border border-[#ccfbf1] mb-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#f0fdfa] border border-[#ccfbf1] mb-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <span className="text-[12px] font-bold tracking-wider text-[#0f766e] uppercase">
             #1 Media Partner for Growing Brands
           </span>
         </div>
 
         {/* Headline */}
-        <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 leading-[1.1] tracking-tight text-black max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-4 leading-[1.1] tracking-tight text-black max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
           Create Stunning Brand Media{" "}
           <span className="text-[#0d9488]">Instantly</span> with Iconic
         </h1>
 
         {/* Subheadline */}
-        <p className="text-lg md:text-xl text-gray-500 mb-10 max-w-2xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-6 duration-900">
+        <p className="text-lg md:text-xl text-gray-500 mb-6 max-w-2xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-6 duration-900">
           Transforming your vision into high-impact media content. Join the top
           brands leveraging strategic visual storytelling to dominate their market.
         </p>
 
         {/* Main CTA */}
-        <div className="mb-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+        <div className="mb-6 animate-in fade-in slide-in-from-bottom-8 duration-1000">
           <Link to="/book">
             <Button className="bg-[#0f766e] text-white hover:bg-[#0d9488] font-bold text-lg px-12 py-7 rounded-xl shadow-lg shadow-teal-100 transition-all hover:scale-105">
               Book a Consultation
@@ -60,7 +60,7 @@ export default function HeroSection() {
         </div>
 
         {/* Social Proof */}
-        <div className="flex flex-col items-center gap-4 mb-16 animate-in fade-in slide-in-from-bottom-10 duration-1100">
+        <div className="flex flex-col items-center gap-4 mb-4 animate-in fade-in slide-in-from-bottom-10 duration-1100">
           <div className="flex -space-x-3">
             {[1, 2, 3, 4].map((i) => (
               <div
