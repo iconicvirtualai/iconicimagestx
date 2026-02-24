@@ -90,12 +90,6 @@ export default function HeroSection() {
           </div>
         </div>
 
-        {/* Label for Carousel */}
-        <div className="flex items-center justify-center gap-2 text-gray-400 text-sm font-medium">
-          <span>Before</span>
-          <div className="w-4 h-px bg-gray-200"></div>
-          <span className="text-gray-600 font-semibold">After</span>
-        </div>
       </div>
     </section>
   );

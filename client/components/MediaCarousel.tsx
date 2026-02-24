@@ -2,72 +2,101 @@ export default function MediaCarousel() {
   const mediaItems = [
     {
       id: 1,
-      image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80",
-      type: "real-estate",
+      image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80",
+      type: "luxury estate",
     },
     {
       id: 2,
-      image: "https://images.unsplash.com/photo-1600607687940-47a0f9259017?w=800&q=80",
-      type: "interior",
+      image: "https://images.unsplash.com/photo-1600607687940-47a0f9259017?w=1200&q=80",
+      type: "modern interior",
     },
     {
       id: 3,
-      image: "https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?w=800&q=80",
-      type: "kitchen",
+      image: "https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?w=1200&q=80",
+      type: "designer kitchen",
     },
     {
       id: 4,
-      image: "https://images.unsplash.com/photo-1600585154526-990dcea4db0d?w=800&q=80",
-      type: "bedroom",
+      image: "https://images.unsplash.com/photo-1600585154526-990dcea4db0d?w=1200&q=80",
+      type: "prime suite",
     },
     {
       id: 5,
-      image: "https://images.unsplash.com/photo-1600573472591-ee6b68d14c68?w=800&q=80",
-      type: "living-room",
+      image: "https://images.unsplash.com/photo-1600573472591-ee6b68d14c68?w=1200&q=80",
+      type: "living space",
     },
     {
       id: 6,
-      image: "https://images.unsplash.com/photo-1600607687644-c7171b42498f?w=800&q=80",
-      type: "bathroom",
+      image: "https://images.unsplash.com/photo-1600607687644-c7171b42498f?w=1200&q=80",
+      type: "premium bath",
     },
   ];
 
   // Double the items for seamless loop
   const displayItems = [...mediaItems, ...mediaItems];
 
-  return (
-    <div className="relative w-full overflow-hidden bg-white py-12">
-      {/* Gradient Mask for edges */}
-      <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none"></div>
-      <div className="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none"></div>
-
-      <div className="flex animate-scroll whitespace-nowrap">
-        {displayItems.map((item, index) => (
-          <div
-            key={`${item.id}-${index}`}
-            className="flex-shrink-0 w-72 h-48 md:w-96 md:h-64 mx-3 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer relative group"
-          >
-            <img
-              src={item.image}
-              alt={item.type}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-            />
-            {/* Split screen effect for some items to mimic "Before/After" */}
-            {index % 3 === 0 && (
-              <div className="absolute inset-0 flex">
-                <div className="w-1/2 h-full border-r border-white/50 relative">
-                   <div className="absolute inset-0 bg-black/10"></div>
-                </div>
-                <div className="w-1/2 h-full"></div>
-              </div>
-            )}
-            <div className="absolute bottom-4 left-4">
-               <div className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold text-white uppercase tracking-wider border border-white/30">
-                 {item.type.replace("-", " ")}
-               </div>
+  const CarouselTrack = ({ isAfter }: { isAfter: boolean }) => (
+    <div className={`flex animate-scroll whitespace-nowrap py-12 md:py-16 ${!isAfter ? "grayscale brightness-75 opacity-70" : ""}`}>
+      {displayItems.map((item, index) => (
+        <div
+          key={`${item.id}-${index}`}
+          className="flex-shrink-0 w-[300px] h-[200px] md:w-[600px] md:h-[400px] mx-3 md:mx-4 rounded-[30px] md:rounded-[40px] overflow-hidden shadow-2xl relative group bg-gray-900 border border-gray-100"
+        >
+          <img
+            src={item.image}
+            alt={item.type}
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute bottom-8 left-8">
+            <div className="bg-black/30 backdrop-blur-xl px-5 py-2 rounded-full text-[12px] font-bold text-white uppercase tracking-[0.15em] border border-white/20">
+              {item.type}
             </div>
           </div>
-        ))}
+        </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="relative w-full overflow-hidden bg-white">
+      {/* Gradient Mask for edges */}
+      <div className="absolute inset-y-0 left-0 w-64 bg-gradient-to-r from-white via-white/80 to-transparent z-[35] pointer-events-none"></div>
+      <div className="absolute inset-y-0 right-0 w-64 bg-gradient-to-l from-white via-white/80 to-transparent z-[35] pointer-events-none"></div>
+
+      {/* Middle Bar (Visual) */}
+      <div className="absolute left-1/2 top-0 bottom-0 w-px bg-teal-500/30 z-[40] -translate-x-1/2 flex items-center justify-center pointer-events-none">
+        <div className="w-[2px] h-full bg-gradient-to-b from-transparent via-teal-500/50 to-transparent"></div>
+        <div className="absolute top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-[0_0_20px_rgba(20,184,166,0.3)] border border-teal-500/20">
+           <div className="flex gap-1">
+              <div className="w-1 h-3 bg-teal-500 rounded-full opacity-40"></div>
+              <div className="w-1 h-3 bg-teal-500 rounded-full"></div>
+              <div className="w-1 h-3 bg-teal-500 rounded-full opacity-40"></div>
+           </div>
+        </div>
+      </div>
+
+      {/* Before/After Label */}
+      <div className="flex items-center justify-center gap-4 text-gray-400 text-xs font-bold uppercase tracking-[0.2em] mb-4">
+        <span className={!true ? "text-teal-600" : ""}>Raw Content</span>
+        <div className="flex items-center gap-1">
+           <div className="w-1.5 h-1.5 rounded-full bg-gray-200"></div>
+           <div className="w-8 h-px bg-gray-200"></div>
+           <div className="w-1.5 h-1.5 rounded-full bg-teal-500"></div>
+        </div>
+        <span className="text-gray-900">Iconic Edit</span>
+      </div>
+
+      {/* Track Layers Container */}
+      <div className="relative">
+        {/* Before Layer (Bottom) */}
+        <div className="relative z-10">
+          <CarouselTrack isAfter={false} />
+        </div>
+
+        {/* After Layer (Top) */}
+        <div className="absolute inset-0 z-20 pointer-events-none" style={{ clipPath: "inset(0 0 0 50.1%)" }}>
+          <CarouselTrack isAfter={true} />
+        </div>
       </div>
 
       <style dangerouslySetInnerHTML={{ __html: `
@@ -76,7 +105,7 @@ export default function MediaCarousel() {
           100% { transform: translateX(-50%); }
         }
         .animate-scroll {
-          animation: scroll 40s linear infinite;
+          animation: scroll 15s linear infinite;
         }
         .animate-scroll:hover {
           animation-play-state: paused;
