@@ -3,6 +3,8 @@ import Header from "@/components/Header";
 import HeroSection from "@/components/HeroSection";
 import MediaCarousel from "@/components/MediaCarousel";
 import SolutionSection from "@/components/SolutionSection";
+import StatsBar from "@/components/StatsBar";
+import StepsSection from "@/components/StepsSection";
 import ValueProposition from "@/components/ValueProposition";
 import FeaturedServices from "@/components/FeaturedServices";
 import PartnershipCTA from "@/components/PartnershipCTA";
@@ -24,6 +26,8 @@ export default function Index() {
         <HeroSection />
         <MediaCarousel />
         <SolutionSection />
+        <StatsBar />
+        <StepsSection />
         <ValueProposition />
         <FeaturedServices />
         <PartnershipCTA />
