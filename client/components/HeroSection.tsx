@@ -4,7 +4,7 @@ import { Star } from "lucide-react";
 
 export default function HeroSection() {
   return (
-    <section className="relative overflow-hidden bg-white pt-12 pb-6">
+    <section className="relative overflow-hidden bg-white pt-32 pb-6">
       {/* Background Grid & Layered Glows */}
       <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
         {/* Subtle Grid Pattern */}
