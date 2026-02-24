@@ -10,7 +10,7 @@ import AudienceDetails from "@/components/AudienceDetails";
 import FeaturesSection from "@/components/FeaturesSection";
 import TestimonialsSection from "@/components/TestimonialsSection";
 import FAQSection from "@/components/FAQSection";
-import FinalCTA from "@/components/FinalCTA";
+import PartnershipCTA from "@/components/PartnershipCTA";
 import Footer from "@/components/Footer";
 
 export default function Index() {
@@ -36,7 +36,7 @@ export default function Index() {
         <FeaturesSection />
         <TestimonialsSection />
         <FAQSection />
-        <FinalCTA />
+        <PartnershipCTA />
       </main>
 
       <Footer />
