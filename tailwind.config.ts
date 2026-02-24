@@ -64,6 +64,10 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       keyframes: {
+        "pulse-slow": {
+          "0%, 100%": { opacity: "0.3" },
+          "50%": { opacity: "0.6" },
+        },
         "accordion-down": {
           from: {
             height: "0",
@@ -82,6 +86,7 @@ export default {
         },
       },
       animation: {
+        "pulse-slow": "pulse-slow 8s ease-in-out infinite",
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
       },

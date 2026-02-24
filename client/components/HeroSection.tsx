@@ -5,10 +5,29 @@ import { Star } from "lucide-react";
 export default function HeroSection() {
   return (
     <section className="relative overflow-hidden bg-white pt-20 pb-12">
-      {/* Background Glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-full -z-10 pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[#ccfbf1] rounded-full blur-[120px] opacity-40"></div>
-        <div className="absolute top-[-5%] right-[-5%] w-[35%] h-[35%] bg-[#ecfeff] rounded-full blur-[100px] opacity-30"></div>
+      {/* Background Grid & Layered Glows */}
+      <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
+        {/* Subtle Grid Pattern */}
+        <div
+          className="absolute inset-0 opacity-[0.05]"
+          style={{
+            backgroundImage: `radial-gradient(#0f766e 0.5px, transparent 0.5px)`,
+            backgroundSize: '32px 32px'
+          }}
+        ></div>
+
+        {/* Layered Interactive-feeling Glows */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-full">
+          <div className="absolute top-[-15%] left-[-20%] w-[60%] h-[60%] bg-[#ccfbf1] rounded-full blur-[140px] opacity-40 animate-pulse-slow"></div>
+          <div className="absolute top-[-10%] right-[-15%] w-[55%] h-[55%] bg-[#ecfeff] rounded-full blur-[120px] opacity-30 animate-pulse-slow" style={{ animationDelay: '2s' }}></div>
+          <div className="absolute bottom-[10%] left-[15%] w-[40%] h-[40%] bg-[#f0fdfa] rounded-full blur-[100px] opacity-20 animate-pulse-slow" style={{ animationDelay: '4s' }}></div>
+        </div>
+
+        {/* Very subtle linear gradient for depth */}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/50 to-white"></div>
+
+        {/* Subtle Noise Texture Overlay */}
+        <div className="absolute inset-0 opacity-[0.015] mix-blend-overlay" style={{ backgroundImage: `url("https://www.transparenttextures.com/patterns/carbon-fibre.png")` }}></div>
       </div>
 
       <div className="container mx-auto px-4 text-center">
