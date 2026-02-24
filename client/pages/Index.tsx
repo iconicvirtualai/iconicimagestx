@@ -6,9 +6,11 @@ import SolutionSection from "@/components/SolutionSection";
 import StatsBar from "@/components/StatsBar";
 import StepsSection from "@/components/StepsSection";
 import AudienceSection from "@/components/AudienceSection";
-import ValueProposition from "@/components/ValueProposition";
-import FeaturedServices from "@/components/FeaturedServices";
-import PartnershipCTA from "@/components/PartnershipCTA";
+import AudienceDetails from "@/components/AudienceDetails";
+import FeaturesSection from "@/components/FeaturesSection";
+import TestimonialsSection from "@/components/TestimonialsSection";
+import FAQSection from "@/components/FAQSection";
+import FinalCTA from "@/components/FinalCTA";
 import Footer from "@/components/Footer";
 
 export default function Index() {
@@ -30,9 +32,11 @@ export default function Index() {
         <StatsBar />
         <StepsSection />
         <AudienceSection />
-        <ValueProposition />
-        <FeaturedServices />
-        <PartnershipCTA />
+        <AudienceDetails />
+        <FeaturesSection />
+        <TestimonialsSection />
+        <FAQSection />
+        <FinalCTA />
       </main>
 
       <Footer />
