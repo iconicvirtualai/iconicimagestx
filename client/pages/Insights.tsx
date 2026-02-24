@@ -33,7 +33,7 @@ export default function Insights() {
         {/* Hero Section */}
         <section className="pt-16 pb-12">
           <div className="container mx-auto px-4">
-            <h1 className="text-4xl md:text-5xl font-bold text-black mb-4">Blog</h1>
+            <h1 className="text-4xl md:text-5xl font-bold text-black mb-4">Iconic Insights</h1>
             <p className="text-gray-500 text-lg">Insights, guides, and tips for creating stunning real estate videos.</p>
           </div>
         </section>
@@ -103,7 +103,7 @@ export default function Insights() {
         {/* Grid Posts */}
         <section className="pb-24">
           <div className="container mx-auto px-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
               {[
                 {
                   title: "Introducing AI Photo Edits: Create \"Show-Ready\" Photos Without Leaving Iconic",
@@ -143,10 +143,10 @@ export default function Insights() {
                 }
               ].map((post, i) => (
                 <div key={i} className="group cursor-pointer">
-                  <div className="relative aspect-square overflow-hidden rounded-[2rem] bg-gray-900 mb-6">
-                    <img 
-                      src={post.image} 
-                      alt={post.title} 
+                  <div className="relative aspect-[9/16] overflow-hidden rounded-[2rem] bg-gray-900 mb-6">
+                    <img
+                      src={post.image}
+                      alt={post.title}
                       className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-500"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
