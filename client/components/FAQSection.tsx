@@ -1,9 +1,4 @@
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import * as React from "react";
 
 export default function FAQSection() {
   const faqs = [
@@ -25,6 +20,8 @@ export default function FAQSection() {
     },
   ];
 
+  const [openIndex, setOpenIndex] = React.useState<number | null>(null);
+
   return (
     <section className="bg-white py-24 md:py-32">
       <div className="container mx-auto px-4">
@@ -43,20 +40,29 @@ export default function FAQSection() {
           </p>
         </div>
 
-        {/* Accordion */}
+        {/* Manual Accordion to avoid Radix issues for now */}
         <div className="max-w-5xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
             {faqs.map((faq, index) => (
-              <Accordion key={index} type="single" collapsible className="w-full">
-                <AccordionItem value={`item-${index}`} className="border-none mb-4 bg-gray-50 rounded-2xl px-8 hover:bg-gray-100 transition-colors">
-                  <AccordionTrigger className="text-left py-6 hover:no-underline font-bold text-black text-lg">
-                    {faq.question}
-                  </AccordionTrigger>
-                  <AccordionContent className="text-gray-500 pb-6 leading-relaxed">
+              <div
+                key={index}
+                className="mb-4 bg-gray-50 rounded-2xl px-8 hover:bg-gray-100 transition-colors cursor-pointer"
+                onClick={() => setOpenIndex(openIndex === index ? null : index)}
+              >
+                <div className="flex items-center justify-between py-6">
+                  <h3 className="font-bold text-black text-lg">{faq.question}</h3>
+                  <span className={`transition-transform duration-300 ${openIndex === index ? 'rotate-180' : ''}`}>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="19 9l-7 7-7-7" />
+                    </svg>
+                  </span>
+                </div>
+                {openIndex === index && (
+                  <div className="text-gray-500 pb-6 leading-relaxed animate-in fade-in slide-in-from-top-2 duration-300">
                     {faq.answer}
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         </div>
