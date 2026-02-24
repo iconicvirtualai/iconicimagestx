@@ -169,6 +169,7 @@ export default function About() {
             </div>
             <div className="space-y-12">
               <p className="text-2xl font-bold text-black uppercase tracking-tight">Join the elite. Own the market.</p>
+              <div className="w-24 h-1 bg-[#0d9488] mx-auto rounded-full opacity-20"></div>
               <Link to="/book">
                 <Button className="bg-black text-white hover:bg-gray-900 font-bold text-lg px-12 py-8 rounded-2xl transition-all hover:scale-105 shadow-xl">
                   Book Your Evolution &rarr;
