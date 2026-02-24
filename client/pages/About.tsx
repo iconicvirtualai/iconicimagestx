@@ -14,17 +14,17 @@ export default function About() {
           <div className="absolute inset-0 opacity-20 pointer-events-none">
             <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-teal-500/20 via-transparent to-transparent"></div>
           </div>
-          <div className="container mx-auto px-4 py-16 md:py-24 relative z-10 text-center">
+          <div className="container mx-auto px-4 py-12 md:py-16 relative z-10 text-center">
             <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-400 font-bold text-xs tracking-widest uppercase mb-6 animate-pulse">
               <Award className="w-4 h-4" />
               Decade of Excellence
             </div>
-            <h1 className="text-5xl md:text-8xl font-black mb-8 tracking-tighter italic">
+            <h1 className="text-4xl md:text-6xl font-bold mb-8 tracking-tight">
               Cheers to <span className="text-[#0d9488]">10 Years!!</span>
             </h1>
-            
+
             {/* Video/Photo Placeholders */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-6xl mx-auto mt-12">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-5xl mx-auto mt-8">
               <div className="aspect-square bg-gray-900 rounded-2xl border border-white/10 flex items-center justify-center relative overflow-hidden group">
                 <img src="https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600&q=80" className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-110 transition-transform duration-500" alt="Behind the scenes" />
                 <span className="relative z-10 text-[10px] font-bold text-white/50 uppercase tracking-widest">Est. 2014</span>
@@ -140,9 +140,9 @@ export default function About() {
         </section>
 
         {/* Final CTA / Location */}
-        <section className="py-24 md:py-32 bg-white text-center">
+        <section className="py-20 md:py-24 bg-white text-center">
           <div className="container mx-auto px-4">
-            <h2 className="text-5xl md:text-7xl font-black text-black mb-8 italic">STAY ICONIC.</h2>
+            <h2 className="text-4xl md:text-6xl font-bold text-black mb-8 tracking-tight uppercase">BE ICONIC.</h2>
             <p className="text-xl md:text-2xl text-gray-500 max-w-3xl mx-auto leading-relaxed mb-12 font-medium">
               We aren't just vendors; we are your <span className="text-[#0d9488] font-bold">Growth Partners</span>. Every frame we shoot and every reel we edit is designed with one goal in mind: Getting you your next listing.
             </p>
