@@ -17,8 +17,8 @@ export default function AudienceSection() {
 
         {/* Description */}
         <p className="text-gray-500 mb-8 max-w-2xl mx-auto leading-relaxed text-base">
-          Iconic simplifies property video creation for all real estate professionals —
-          helping you showcase listings and grow your business.
+          Iconic simplifies media creation for real estate professionals, builders,
+          and business owners — helping you showcase your vision and grow your presence.
         </p>
       </div>
     </section>
