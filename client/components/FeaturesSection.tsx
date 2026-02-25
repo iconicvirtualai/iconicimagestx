@@ -1,19 +1,36 @@
-import { Play, ArrowRight, Instagram, Facebook, Linkedin, Youtube, Twitter } from "lucide-react";
+import { Play, ArrowRight, Instagram, Facebook, Linkedin, Youtube, Twitter, MousePointer2, Link as LinkIcon } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect } from "react";
 
 const FeatureCard = ({
   title,
   description,
   children,
   colSpan = "col-span-1",
+  ctaText,
+  ctaLink,
 }: {
   title: string;
   description: string;
   children: React.ReactNode;
   colSpan?: string;
+  ctaText?: string;
+  ctaLink?: string;
 }) => (
-  <div className={`bg-[#f8fdff] rounded-2xl border border-dashed border-[#ccfbf1] p-6 flex flex-col ${colSpan}`}>
+  <div className={`bg-[#f8fdff] rounded-2xl border border-dashed border-[#ccfbf1] p-6 flex flex-col ${colSpan} relative group`}>
     <div className="flex-1 mb-6">
-      <h3 className="text-lg font-bold text-black mb-2">{title}</h3>
+      <div className="flex justify-between items-start mb-2">
+        <h3 className="text-lg font-bold text-black">{title}</h3>
+        {ctaLink && (
+          <Link to={ctaLink}>
+            <Button size="sm" className="bg-[#0d9488] hover:bg-[#0f766e] text-white text-[10px] h-7 px-3 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+              {ctaText || "TRY NOW"}
+            </Button>
+          </Link>
+        )}
+      </div>
       <p className="text-gray-500 text-[11px] leading-relaxed">
         {description}
       </p>
@@ -21,8 +38,105 @@ const FeatureCard = ({
     <div className="relative rounded-xl overflow-hidden bg-white border border-gray-100 shadow-sm h-48">
       {children}
     </div>
+    {ctaLink && (
+       <div className="mt-4 md:hidden">
+         <Link to={ctaLink}>
+            <Button size="sm" className="w-full bg-[#0d9488] hover:bg-[#0f766e] text-white text-[10px] h-8 rounded-lg">
+              {ctaText || "TRY NOW"}
+            </Button>
+          </Link>
+       </div>
+    )}
   </div>
 );
+
+const VirtualStagingSnippet = () => {
+  const [isStaged, setIsStaged] = useState(false);
+  const [step, setStep] = useState(0); // 0: initial, 1: dragging, 2: processing, 3: result
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setStep((prev) => (prev + 1) % 4);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (step === 3) setIsStaged(true);
+    else if (step === 0) setIsStaged(false);
+  }, [step]);
+
+  return (
+    <div className="relative h-full w-full bg-gray-50 flex items-center justify-center overflow-hidden">
+      {/* Background Room */}
+      <AnimatePresence mode="wait">
+        {!isStaged ? (
+          <motion.img
+            key="empty"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            src="https://images.unsplash.com/photo-1600607687940-47a0f9259017?w=400&q=225&fit=crop"
+            className="absolute inset-0 w-full h-full object-cover"
+            alt="Empty Room"
+          />
+        ) : (
+          <motion.img
+            key="staged"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&q=225&fit=crop"
+            className="absolute inset-0 w-full h-full object-cover"
+            alt="Staged Room"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Animation Overlay */}
+      <div className="absolute inset-0 z-20 pointer-events-none">
+        {/* Cursor & Photo Icon */}
+        {step === 1 && (
+          <motion.div
+            initial={{ x: -100, y: 100, opacity: 0 }}
+            animate={{ x: 0, y: 0, opacity: 1 }}
+            transition={{ duration: 1, ease: "easeOut" }}
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
+          >
+            <div className="bg-white p-2 rounded-lg shadow-xl border border-gray-100 rotate-6 mb-2">
+              <div className="w-12 h-12 bg-[#f0fdfa] rounded flex items-center justify-center">
+                <LinkIcon className="w-6 h-6 text-[#0d9488]" />
+              </div>
+            </div>
+            <MousePointer2 className="w-6 h-6 text-black fill-black" />
+          </motion.div>
+        )}
+
+        {/* Processing State */}
+        {step === 2 && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-[2px]"
+          >
+            <div className="bg-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+              <div className="w-4 h-4 border-2 border-[#0d9488] border-t-transparent rounded-full animate-spin"></div>
+              <span className="text-[10px] font-bold text-gray-700">AI STAGING...</span>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Labels */}
+        <div className="absolute bottom-3 left-3 flex gap-2">
+           <div className="bg-white/90 backdrop-blur-md px-2 py-1 rounded-md text-[8px] font-bold shadow-sm flex items-center gap-1 border border-gray-100">
+            <div className={`w-1 h-1 rounded-full ${isStaged ? "bg-[#0d9488]" : "bg-gray-300"}`}></div>
+            {isStaged ? "STAGED RESULT" : "EMPTY SPACE"}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default function FeaturesSection() {
   return (
@@ -88,14 +202,10 @@ export default function FeaturesSection() {
           <FeatureCard 
             title="AI Virtual Staging"
             description="Instantly furnish empty rooms with realistic AI staging to showcase your property's full potential."
+            ctaText="TRY NOW"
+            ctaLink="/services/virtual-staging"
           >
-            <div className="relative h-full">
-              <img src="https://images.unsplash.com/photo-1600607687940-47a0f9259017?w=400&q=225&fit=crop" className="w-full h-full object-cover" alt="Staging" />
-              <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-md px-2 py-1 rounded-md text-[8px] font-bold shadow-sm flex items-center gap-1 border border-gray-100">
-                <div className="w-1 h-1 rounded-full bg-[#0d9488]"></div>
-                Luxury Furniture
-              </div>
-            </div>
+            <VirtualStagingSnippet />
           </FeatureCard>
 
           {/* AI Photo Edits */}

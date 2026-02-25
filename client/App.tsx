@@ -14,6 +14,7 @@ import Book from "./pages/Book";
 import Pricing from "./pages/Pricing";
 import PricingV1 from "./pages/PricingV1";
 import Insights from "./pages/Insights";
+import VirtualStaging from "./pages/VirtualStaging";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/pricing-v1" element={<PricingV1 />} />
           <Route path="/insights" element={<Insights />} />
+          <Route path="/services/virtual-staging" element={<VirtualStaging />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
