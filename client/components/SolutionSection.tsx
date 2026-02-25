@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Play, Pause, Volume2, VolumeX, ChevronLeft, ChevronRight } from "lucide-react";
+import { Play, Volume2, VolumeX, ChevronLeft, ChevronRight } from "lucide-react";
 
 export default function SolutionSection() {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -48,6 +48,8 @@ export default function SolutionSection() {
     }
   }, [currentIndex]);
 
+  const currentVideo = videos[currentIndex];
+
   return (
     <section className="bg-white pt-12 pb-24 md:pt-16 md:pb-32">
       <div className="container mx-auto px-4 text-center">
@@ -72,27 +74,21 @@ export default function SolutionSection() {
         </p>
 
         {/* Carousel Container */}
-        <div className="relative max-w-5xl mx-auto">
-          <div className="relative rounded-[2rem] md:rounded-[3rem] overflow-hidden shadow-2xl shadow-teal-100/50 border-[8px] border-[#f0fdfa] aspect-video bg-black group">
+        <div className="relative flex flex-col items-center">
+          <div 
+            className={`relative rounded-[2rem] md:rounded-[3rem] overflow-hidden shadow-2xl shadow-teal-100/50 border-[6px] md:border-[8px] border-[#f0fdfa] bg-black group transition-all duration-700 ease-in-out ${
+              currentVideo.aspect === "16/9" 
+                ? "w-full max-w-5xl aspect-video" 
+                : "w-full max-w-[320px] md:max-w-[360px] aspect-[9/16]"
+            }`}
+          >
             {/* Active Video */}
             <div className="absolute inset-0 flex items-center justify-center">
-              {/* If it's 9/16, we might want a blurred background for the landscape container */}
-              {videos[currentIndex].aspect === "9/16" && (
-                <div className="absolute inset-0 scale-110 blur-2xl opacity-30 pointer-events-none">
-                   <video
-                    src={videos[currentIndex].url}
-                    className="w-full h-full object-cover"
-                    muted
-                    loop
-                  />
-                </div>
-              )}
-              
               <video
-                key={videos[currentIndex].id}
+                key={currentVideo.id}
                 ref={videoRef}
-                src={videos[currentIndex].url}
-                className={`h-full ${videos[currentIndex].aspect === "16/9" ? "w-full" : "w-auto max-w-full"} object-contain md:object-cover relative z-10`}
+                src={currentVideo.url}
+                className="w-full h-full object-cover"
                 autoPlay
                 loop
                 muted={isMuted}
@@ -103,24 +99,24 @@ export default function SolutionSection() {
             {/* Mute Toggle */}
             <button 
               onClick={() => setIsMuted(!isMuted)}
-              className="absolute top-6 right-6 md:top-8 md:right-8 z-30 w-10 h-10 md:w-12 md:h-12 bg-black/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 text-white transition-all hover:bg-black/40"
+              className="absolute top-4 right-4 md:top-8 md:right-8 z-30 w-8 h-8 md:w-12 md:h-12 bg-black/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 text-white transition-all hover:bg-black/40"
             >
-              {isMuted ? <VolumeX className="w-5 h-5 md:w-6 md:h-6" /> : <Volume2 className="w-5 h-5 md:w-6 md:h-6" />}
+              {isMuted ? <VolumeX className="w-4 h-4 md:w-6 md:h-6" /> : <Volume2 className="w-4 h-4 md:w-6 md:h-6" />}
             </button>
 
             {/* Branding Overlay */}
-            <div className="absolute bottom-6 left-6 md:bottom-10 md:left-10 z-30">
-               <div className="bg-white/10 backdrop-blur-xl px-4 py-2 md:px-6 md:py-3 rounded-xl md:rounded-2xl border border-white/20 flex items-center gap-3">
-                  <div className="w-6 h-6 md:w-8 md:h-8 bg-[#0d9488] rounded-lg flex items-center justify-center text-white">
-                    <Play className="w-3 h-3 md:w-4 md:h-4 fill-white translate-x-0.5" />
+            <div className="absolute bottom-4 left-4 md:bottom-10 md:left-10 z-30">
+               <div className="bg-white/10 backdrop-blur-xl px-3 py-1.5 md:px-6 md:py-3 rounded-lg md:rounded-2xl border border-white/20 flex items-center gap-2 md:gap-3">
+                  <div className="w-5 h-5 md:w-8 md:h-8 bg-[#0d9488] rounded-md md:rounded-lg flex items-center justify-center text-white">
+                    <Play className="w-2.5 h-2.5 md:w-4 md:h-4 fill-white translate-x-0.5" />
                   </div>
-                  <span className="text-white font-bold tracking-tight text-sm md:text-base">Iconic Media</span>
+                  <span className="text-white font-bold tracking-tight text-[10px] md:text-base">Iconic Media</span>
                </div>
             </div>
           </div>
 
           {/* Navigation Controls */}
-          <div className="flex items-center justify-center mt-8 gap-8">
+          <div className="flex items-center justify-center mt-8 gap-6 md:gap-8">
             <button 
               onClick={prevSlide}
               className="p-2 text-gray-400 hover:text-[#0d9488] transition-colors"
