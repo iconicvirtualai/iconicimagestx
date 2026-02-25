@@ -7,6 +7,7 @@ import StatsBar from "@/components/StatsBar";
 import StepsSection from "@/components/StepsSection";
 import AudienceSection from "@/components/AudienceSection";
 import AudienceDetails from "@/components/AudienceDetails";
+import TestimonialVideoCarousel from "@/components/TestimonialVideoCarousel";
 import FeaturesSection from "@/components/FeaturesSection";
 import TestimonialsSection from "@/components/TestimonialsSection";
 import FAQSection from "@/components/FAQSection";
@@ -33,6 +34,7 @@ export default function Index() {
         <StepsSection />
         <AudienceSection />
         <AudienceDetails />
+        <TestimonialVideoCarousel />
         <FeaturesSection />
         <TestimonialsSection />
         <FAQSection />
