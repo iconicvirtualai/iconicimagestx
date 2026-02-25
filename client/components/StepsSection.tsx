@@ -1,4 +1,6 @@
-import { Calendar, Camera, Scissors, Rocket } from "lucide-react";
+import { Calendar, Camera, Scissors, Rocket, ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 
 export default function StepsSection() {
   const steps = [
@@ -87,6 +89,16 @@ export default function StepsSection() {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* CTA Button */}
+        <div className="mt-16 text-center">
+          <Link to="/book">
+            <Button className="bg-[#0d9488] hover:bg-[#0f766e] text-white font-bold text-lg px-8 py-7 rounded-2xl shadow-xl shadow-teal-100 transition-all hover:scale-105 active:scale-95 group">
+              BOOK YOUR SESSION
+              <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            </Button>
+          </Link>
         </div>
       </div>
 
