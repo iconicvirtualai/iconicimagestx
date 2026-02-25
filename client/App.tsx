@@ -15,6 +15,9 @@ import Pricing from "./pages/Pricing";
 import PricingV1 from "./pages/PricingV1";
 import Insights from "./pages/Insights";
 import VirtualStaging from "./pages/VirtualStaging";
+import VirtualStagingSelection from "./pages/VirtualStagingSelection";
+import VirtualStagingAITool from "./pages/VirtualStagingAITool";
+import VirtualStagingProOrder from "./pages/VirtualStagingProOrder";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +39,9 @@ const App = () => (
           <Route path="/pricing-v1" element={<PricingV1 />} />
           <Route path="/insights" element={<Insights />} />
           <Route path="/services/virtual-staging" element={<VirtualStaging />} />
+          <Route path="/services/virtual-staging/select" element={<VirtualStagingSelection />} />
+          <Route path="/services/virtual-staging/ai-tool" element={<VirtualStagingAITool />} />
+          <Route path="/services/virtual-staging/pro-order" element={<VirtualStagingProOrder />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
