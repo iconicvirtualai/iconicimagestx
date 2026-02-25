@@ -1,7 +1,6 @@
 import { Play, ArrowRight, Instagram, Facebook, Linkedin, Youtube, Twitter, MousePointer2, Link as LinkIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 
 const FeatureCard = ({
@@ -25,7 +24,7 @@ const FeatureCard = ({
         <h3 className="text-lg font-bold text-black">{title}</h3>
         {ctaLink && (
           <Link to={ctaLink}>
-            <Button size="sm" className="bg-[#0d9488] hover:bg-[#0f766e] text-white text-[10px] h-7 px-3 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button size="sm" className="bg-[#0d9488] hover:bg-[#0f766e] text-white text-[10px] h-7 px-3 rounded-lg md:opacity-0 md:group-hover:opacity-100 transition-opacity">
               {ctaText || "TRY NOW"}
             </Button>
           </Link>
@@ -51,7 +50,6 @@ const FeatureCard = ({
 );
 
 const VirtualStagingSnippet = () => {
-  const [isStaged, setIsStaged] = useState(false);
   const [step, setStep] = useState(0); // 0: initial, 1: dragging, 2: processing, 3: result
 
   useEffect(() => {
@@ -61,76 +59,55 @@ const VirtualStagingSnippet = () => {
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    if (step === 3) setIsStaged(true);
-    else if (step === 0) setIsStaged(false);
-  }, [step]);
-
   return (
     <div className="relative h-full w-full bg-gray-50 flex items-center justify-center overflow-hidden">
-      {/* Background Room */}
-      <AnimatePresence mode="wait">
-        {!isStaged ? (
-          <motion.img
-            key="empty"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            src="https://images.unsplash.com/photo-1600607687940-47a0f9259017?w=400&q=225&fit=crop"
-            className="absolute inset-0 w-full h-full object-cover"
-            alt="Empty Room"
-          />
-        ) : (
-          <motion.img
-            key="staged"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&q=225&fit=crop"
-            className="absolute inset-0 w-full h-full object-cover"
-            alt="Staged Room"
-          />
-        )}
-      </AnimatePresence>
+      {/* Background Room - Empty */}
+      <img
+        src="https://images.unsplash.com/photo-1600607687940-47a0f9259017?w=400&q=225&fit=crop"
+        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${step === 3 ? 'opacity-0' : 'opacity-100'}`}
+        alt="Empty Room"
+      />
+      
+      {/* Background Room - Staged */}
+      <img
+        src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&q=225&fit=crop"
+        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${step === 3 ? 'opacity-100' : 'opacity-0'}`}
+        alt="Staged Room"
+      />
 
       {/* Animation Overlay */}
       <div className="absolute inset-0 z-20 pointer-events-none">
-        {/* Cursor & Photo Icon */}
-        {step === 1 && (
-          <motion.div
-            initial={{ x: -100, y: 100, opacity: 0 }}
-            animate={{ x: 0, y: 0, opacity: 1 }}
-            transition={{ duration: 1, ease: "easeOut" }}
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
-          >
-            <div className="bg-white p-2 rounded-lg shadow-xl border border-gray-100 rotate-6 mb-2">
-              <div className="w-12 h-12 bg-[#f0fdfa] rounded flex items-center justify-center">
-                <LinkIcon className="w-6 h-6 text-[#0d9488]" />
-              </div>
+        {/* Cursor & Photo Icon - Using standard CSS transitions/classes */}
+        <div 
+          className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center transition-all duration-700 ${
+            step === 1 ? 'opacity-100 translate-y-0 translate-x-0' : 'opacity-0 translate-y-12 translate-x-12'
+          }`}
+        >
+          <div className="bg-white p-2 rounded-lg shadow-xl border border-gray-100 rotate-6 mb-2">
+            <div className="w-10 h-10 bg-[#f0fdfa] rounded flex items-center justify-center">
+              <LinkIcon className="w-5 h-5 text-[#0d9488]" />
             </div>
-            <MousePointer2 className="w-6 h-6 text-black fill-black" />
-          </motion.div>
-        )}
+          </div>
+          <MousePointer2 className="w-5 h-5 text-black fill-black" />
+        </div>
 
         {/* Processing State */}
-        {step === 2 && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-[2px]"
-          >
-            <div className="bg-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
-              <div className="w-4 h-4 border-2 border-[#0d9488] border-t-transparent rounded-full animate-spin"></div>
-              <span className="text-[10px] font-bold text-gray-700">AI STAGING...</span>
-            </div>
-          </motion.div>
-        )}
+        <div 
+          className={`absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[1px] transition-opacity duration-500 ${
+            step === 2 ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          <div className="bg-white px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2">
+            <div className="w-3 h-3 border-2 border-[#0d9488] border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-[9px] font-bold text-gray-700">AI STAGING...</span>
+          </div>
+        </div>
 
         {/* Labels */}
         <div className="absolute bottom-3 left-3 flex gap-2">
            <div className="bg-white/90 backdrop-blur-md px-2 py-1 rounded-md text-[8px] font-bold shadow-sm flex items-center gap-1 border border-gray-100">
-            <div className={`w-1 h-1 rounded-full ${isStaged ? "bg-[#0d9488]" : "bg-gray-300"}`}></div>
-            {isStaged ? "STAGED RESULT" : "EMPTY SPACE"}
+            <div className={`w-1 h-1 rounded-full transition-colors duration-500 ${step === 3 ? "bg-[#0d9488]" : "bg-gray-300"}`}></div>
+            {step === 3 ? "STAGED RESULT" : "EMPTY SPACE"}
           </div>
         </div>
       </div>
