@@ -18,6 +18,7 @@ import VirtualStaging from "./pages/VirtualStaging";
 import VirtualStagingSelection from "./pages/VirtualStagingSelection";
 import VirtualStagingAITool from "./pages/VirtualStagingAITool";
 import VirtualStagingProOrder from "./pages/VirtualStagingProOrder";
+import VirtualStagingCheckout from "./pages/VirtualStagingCheckout";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,6 +43,7 @@ const App = () => (
           <Route path="/services/virtual-staging/select" element={<VirtualStagingSelection />} />
           <Route path="/services/virtual-staging/ai-tool" element={<VirtualStagingAITool />} />
           <Route path="/services/virtual-staging/pro-order" element={<VirtualStagingProOrder />} />
+          <Route path="/services/virtual-staging/checkout" element={<VirtualStagingCheckout />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

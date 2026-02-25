@@ -1,22 +1,43 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
-import { Upload, Camera, ChevronDown, Check, RefreshCw, ShoppingCart, Sparkles, Image as ImageIcon } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Upload, Camera, ChevronDown, Check, RefreshCw, ShoppingCart, Sparkles, Image as ImageIcon, MousePointer2, Link as LinkIcon } from "lucide-react";
+
+interface Variation {
+  id: string;
+  url: string;
+  style: string;
+  roomType: string;
+}
 
 export default function VirtualStagingAITool() {
+  const navigate = useNavigate();
   const [file, setFile] = useState<File | null>(null);
   const [isRendering, setIsRendering] = useState(false);
   const [isDone, setIsDone] = useState(false);
   const [style, setStyle] = useState("Modern");
   const [roomType, setRoomType] = useState("Living Room");
   const [sliderPos, setSliderPos] = useState(50);
+  const [variations, setVariations] = useState<Variation[]>([]);
+  const [selectedVariationIndex, setSelectedVariationIndex] = useState(0);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Mock staged images for variations
+  const mockStagedImages = [
+    "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80",
+    "https://images.unsplash.com/photo-1600607687940-47a0f9259017?w=1200&q=80",
+    "https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?w=1200&q=80",
+    "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=1200&q=80",
+  ];
 
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
+      setVariations([]); // Reset variations on new file
+      setIsDone(false);
     }
   };
 
@@ -25,13 +46,24 @@ export default function VirtualStagingAITool() {
     setTimeout(() => {
       setIsRendering(false);
       setIsDone(true);
-    }, 4000);
+      
+      const newVariation: Variation = {
+        id: Math.random().toString(36).substr(2, 9),
+        url: mockStagedImages[variations.length % mockStagedImages.length],
+        style,
+        roomType
+      };
+      
+      setVariations(prev => [...prev, newVariation]);
+      setSelectedVariationIndex(variations.length); // Select the newest one
+    }, 3000);
   };
 
   const reset = () => {
     setFile(null);
     setIsDone(false);
     setIsRendering(false);
+    setVariations([]);
   };
 
   const styles = ["Modern", "Contemporary", "Traditional", "Industrial", "Luxury", "Minimalist"];
@@ -152,7 +184,7 @@ export default function VirtualStagingAITool() {
 
                 <Button 
                   onClick={startRender}
-                  disabled={!file || isRendering || isDone}
+                  disabled={!file || isRendering}
                   className="w-full bg-[#0d9488] hover:bg-[#0f766e] text-white py-8 rounded-2xl font-bold text-lg shadow-xl shadow-teal-100 disabled:bg-gray-200 disabled:shadow-none transition-all"
                 >
                   {isRendering ? (
@@ -160,13 +192,8 @@ export default function VirtualStagingAITool() {
                       <RefreshCw className="w-6 h-6 animate-spin" />
                       Rendering...
                     </div>
-                  ) : isDone ? (
-                    <div className="flex items-center gap-2">
-                      <Check className="w-6 h-6" />
-                      Rendering Complete
-                    </div>
                   ) : (
-                    "Render Photo"
+                    variations.length > 0 ? "Regenerate Variation" : "Render Photo"
                   )}
                 </Button>
               </div>
@@ -201,7 +228,7 @@ export default function VirtualStagingAITool() {
                   )}
 
                   {/* Results: Slider View */}
-                  {isDone && (
+                  {isDone && variations.length > 0 && (
                     <div className="absolute inset-0 z-10 select-none">
                       {/* Before (Original) */}
                       <img 
@@ -216,7 +243,7 @@ export default function VirtualStagingAITool() {
                         style={{ clipPath: `inset(0 ${100 - sliderPos}% 0 0)` }}
                       >
                          <img 
-                          src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80" 
+                          src={variations[selectedVariationIndex].url} 
                           className="absolute inset-0 w-full h-full object-cover"
                           alt="Staged"
                         />
@@ -247,28 +274,52 @@ export default function VirtualStagingAITool() {
 
                       {/* Labels */}
                       <div className="absolute top-6 left-6 z-40 bg-white/80 backdrop-blur-md px-3 py-1 rounded-lg text-[10px] font-bold uppercase border border-white/40">Before</div>
-                      <div className="absolute top-6 right-6 z-40 bg-[#0d9488]/80 backdrop-blur-md px-3 py-1 rounded-lg text-[10px] font-bold uppercase text-white border border-[#0d9488]/20">After: {style}</div>
+                      <div className="absolute top-6 right-6 z-40 bg-[#0d9488]/80 backdrop-blur-md px-3 py-1 rounded-lg text-[10px] font-bold uppercase text-white border border-[#0d9488]/20">
+                        After: {variations[selectedVariationIndex].style}
+                      </div>
                     </div>
                   )}
                 </div>
 
+                {/* Variations Bar */}
+                {variations.length > 1 && (
+                  <div className="mt-6 flex flex-col gap-3">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Choose Variation</label>
+                    <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+                      {variations.map((v, idx) => (
+                        <button
+                          key={v.id}
+                          onClick={() => setSelectedVariationIndex(idx)}
+                          className={`flex-shrink-0 w-24 h-16 rounded-xl overflow-hidden border-2 transition-all ${
+                            selectedVariationIndex === idx ? 'border-[#0d9488] scale-105 shadow-lg shadow-teal-100' : 'border-transparent opacity-60 hover:opacity-100'
+                          }`}
+                        >
+                          <img src={v.url} className="w-full h-full object-cover" alt={`Variation ${idx + 1}`} />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Bottom Actions */}
-                {isDone && (
+                {isDone && variations.length > 0 && (
                   <div className="mt-8 flex flex-col sm:flex-row gap-4">
                     <Button 
-                      onClick={() => { setIsDone(false); startRender(); }}
+                      onClick={startRender}
                       variant="outline"
-                      className="flex-1 py-7 rounded-2xl border-2 border-gray-100 font-bold flex items-center justify-center gap-2"
+                      className="flex-1 py-7 rounded-2xl border-2 border-gray-100 font-bold flex items-center justify-center gap-2 hover:bg-gray-50"
                     >
                       <RefreshCw className="w-5 h-5" />
                       Regenerate
                     </Button>
-                    <Button 
-                      className="flex-[2] bg-black text-white hover:bg-gray-800 py-7 rounded-2xl font-bold text-lg flex items-center justify-center gap-2"
-                    >
-                      <ShoppingCart className="w-6 h-6" />
-                      Purchase Full-Res Result
-                    </Button>
+                    <Link to="/services/virtual-staging/checkout" className="flex-[2]">
+                      <Button 
+                        className="w-full bg-black text-white hover:bg-gray-800 py-7 rounded-2xl font-bold text-lg flex items-center justify-center gap-2"
+                      >
+                        <ShoppingCart className="w-6 h-6" />
+                        Purchase Full-Res Result
+                      </Button>
+                    </Link>
                   </div>
                 )}
               </div>
