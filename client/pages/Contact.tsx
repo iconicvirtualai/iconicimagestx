@@ -1,9 +1,12 @@
+import { useState } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import ChatWidget from "@/components/ChatWidget";
 import { Button } from "@/components/ui/button";
-import { Quote, MessageCircle, ArrowRight } from "lucide-react";
+import { Quote, MessageCircle, ArrowRight, Phone } from "lucide-react";
 
 export default function Contact() {
+  const [isChatOpen, setIsChatOpen] = useState(false);
   return (
     <div className="flex flex-col min-h-screen bg-white">
       <Header />
@@ -27,21 +30,35 @@ export default function Contact() {
                     message and we'll respond as soon as possible.
                   </p>
 
-                  {/* Chat Option */}
-                  <div className="pt-8">
-                    <a
-                      href="https://www.twilio.com/" // Placeholder for the actual Twilio app link
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-4 p-5 bg-[#f0fdfa] border border-[#ccfbf1] rounded-2xl group hover:border-[#0d9488] transition-all duration-300 shadow-sm hover:shadow-md"
+                  {/* Chat & Call Options */}
+                  <div className="pt-8 flex flex-wrap gap-4">
+                    <button
+                      onClick={() => setIsChatOpen(true)}
+                      className="flex items-center gap-4 p-5 bg-[#f0fdfa] border border-[#ccfbf1] rounded-2xl group hover:border-[#0d9488] transition-all duration-300 shadow-sm hover:shadow-md text-left"
                     >
-                      <div className="bg-[#0d9488] p-3 rounded-xl text-white group-hover:scale-110 transition-transform">
+                      <div className="bg-[#0d9488] p-3 rounded-xl text-white group-hover:scale-110 transition-transform flex-shrink-0">
                         <MessageCircle className="w-6 h-6" />
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-[140px]">
                         <div className="text-[10px] font-bold tracking-widest text-[#0d9488] uppercase mb-1">LIVE CHAT</div>
                         <div className="text-lg font-bold text-black group-hover:text-[#0d9488] transition-colors flex items-center gap-2">
-                          Chat with us on Twilio
+                          Start Chat
+                          <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0" />
+                        </div>
+                      </div>
+                    </button>
+
+                    <a
+                      href="tel:281-356-0965"
+                      className="flex items-center gap-4 p-5 bg-[#fdf2f2] border border-[#fee2e2] rounded-2xl group hover:border-[#ef4444] transition-all duration-300 shadow-sm hover:shadow-md text-left"
+                    >
+                      <div className="bg-[#ef4444] p-3 rounded-xl text-white group-hover:scale-110 transition-transform flex-shrink-0">
+                        <Phone className="w-6 h-6" />
+                      </div>
+                      <div className="flex-1 min-w-[140px]">
+                        <div className="text-[10px] font-bold tracking-widest text-[#ef4444] uppercase mb-1">CALL US</div>
+                        <div className="text-lg font-bold text-black group-hover:text-[#ef4444] transition-colors flex items-center gap-2">
+                          281-356-0965
                           <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0" />
                         </div>
                       </div>
@@ -136,6 +153,8 @@ export default function Contact() {
       </main>
 
       <Footer />
+
+      <ChatWidget isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
     </div>
   );
 }
