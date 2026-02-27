@@ -27,12 +27,12 @@ export default function Header() {
   ];
 
   return (
-    <header className="fixed top-6 left-0 right-0 z-50 px-6 transition-all duration-300">
+    <header className="fixed top-[44px] left-0 right-0 z-50 px-6 transition-all duration-300">
       <div
-        className={`mx-auto max-w-[1000px] rounded-full border border-gray-100/50 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] transition-all duration-500 py-2 px-8 flex items-center justify-between gap-4 ${
+        className={`mx-auto max-w-[1200px] rounded-full border border-gray-100/50 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] transition-all duration-500 px-8 flex items-center gap-4 ${
           scrolled
-            ? "bg-white/80 backdrop-blur-xl py-1.5 shadow-lg border-white/50"
-            : "bg-white py-3 shadow-md"
+            ? "bg-white/80 backdrop-blur-xl py-1 shadow-lg border-white/50"
+            : "bg-white py-2 shadow-md"
         }`}
       >
         {/* Logo */}
@@ -56,8 +56,8 @@ export default function Header() {
           </span>
         </Link>
 
-        {/* Desktop Navigation (Centered) */}
-        <nav className="hidden lg:flex items-center gap-10">
+        {/* Desktop Navigation (Left Aligned) */}
+        <nav className="hidden lg:flex items-center gap-8 ml-8 flex-1">
           {menuItems.map((item) => (
             <Link
               key={item.href}
