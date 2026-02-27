@@ -14,6 +14,7 @@ import Book from "./pages/Book";
 import Pricing from "./pages/Pricing";
 import PricingV1 from "./pages/PricingV1";
 import AIPricingAssistant from "./pages/AIPricingAssistant";
+import AdminLogin from "./pages/AdminLogin";
 import Insights from "./pages/Insights";
 import Socials from "./pages/Socials";
 import VirtualStaging from "./pages/VirtualStaging";
@@ -42,6 +43,7 @@ const App = () => (
           <Route path="/pricing/ai-assistant" element={<AIPricingAssistant />} />
           <Route path="/pricing-v1" element={<PricingV1 />} />
           <Route path="/socials" element={<Socials />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/insights" element={<Insights />} />
           <Route path="/services/virtual-staging" element={<VirtualStaging />} />
           <Route path="/services/virtual-staging/select" element={<VirtualStagingSelection />} />
