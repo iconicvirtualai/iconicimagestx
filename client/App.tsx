@@ -15,6 +15,7 @@ import Pricing from "./pages/Pricing";
 import PricingV1 from "./pages/PricingV1";
 import AIPricingAssistant from "./pages/AIPricingAssistant";
 import Insights from "./pages/Insights";
+import Socials from "./pages/Socials";
 import VirtualStaging from "./pages/VirtualStaging";
 import VirtualStagingSelection from "./pages/VirtualStagingSelection";
 import VirtualStagingAITool from "./pages/VirtualStagingAITool";
@@ -40,6 +41,7 @@ const App = () => (
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/pricing/ai-assistant" element={<AIPricingAssistant />} />
           <Route path="/pricing-v1" element={<PricingV1 />} />
+          <Route path="/socials" element={<Socials />} />
           <Route path="/insights" element={<Insights />} />
           <Route path="/services/virtual-staging" element={<VirtualStaging />} />
           <Route path="/services/virtual-staging/select" element={<VirtualStagingSelection />} />
