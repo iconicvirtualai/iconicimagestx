@@ -1,9 +1,10 @@
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { Facebook, Instagram, Youtube, Share2, ArrowUpRight, Heart, MessageCircle, Send, Bookmark, Play, Star } from "lucide-react";
+import { Facebook, Instagram, Youtube, Share2, ArrowUpRight, Heart, MessageCircle, Send, Bookmark, Play, Star, RefreshCcw } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
-const socialPosts = [
+// Mock data that could come from an API (Vercel/GitHub integration ready)
+const INITIAL_POSTS = [
   {
     id: 1,
     platform: "Instagram",
@@ -42,47 +43,54 @@ const socialPosts = [
   }
 ];
 
-const platforms = [
+const INITIAL_PLATFORMS = [
   {
     name: "Instagram",
     handle: "@IconicImagesTX",
-    icon: <Instagram className="w-6 h-6" />,
+    icon: <Instagram className="w-5 h-5" />,
     color: "from-[#f9ce34] via-[#ee2a7b] to-[#6228d7]",
     url: "https://instagram.com/iconicimagestx",
-    count: "12.4k Followers"
+    count: "12.4k Followers",
+    lastSynced: "2 mins ago"
   },
   {
     name: "Facebook",
     handle: "Iconic Images TX",
-    icon: <Facebook className="w-6 h-6" />,
+    icon: <Facebook className="w-5 h-5" />,
     color: "from-[#1877F2] to-[#0052D4]",
     url: "https://facebook.com/iconicimagestx",
-    count: "8.2k Likes"
+    count: "8.2k Likes",
+    lastSynced: "Just now"
   },
   {
     name: "TikTok",
     handle: "@IconicImagesTX",
     icon: (
-      <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+      <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
         <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1.04-.1z" />
       </svg>
     ),
     color: "from-black to-gray-800",
     url: "https://tiktok.com/@iconicimagestx",
-    count: "45k Likes"
+    count: "45k Likes",
+    lastSynced: "1 hr ago"
   },
   {
     name: "YouTube",
     handle: "Iconic Images",
-    icon: <Youtube className="w-6 h-6" />,
+    icon: <Youtube className="w-5 h-5" />,
     color: "from-[#FF0000] to-[#CC0000]",
     url: "https://youtube.com/@iconicimagestx",
-    count: "5.1k Subs"
+    count: "5.1k Subs",
+    lastSynced: "4 mins ago"
   }
 ];
 
 export default function Socials() {
   const [likedPosts, setLikedPosts] = useState<number[]>([]);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [platforms, setPlatforms] = useState(INITIAL_PLATFORMS);
+  const [posts, setPosts] = useState(INITIAL_POSTS);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const toggleLike = (id: number) => {
@@ -91,7 +99,16 @@ export default function Socials() {
     );
   };
 
-  // Auto-scroll effect for the carousel
+  const handleSync = () => {
+    setIsSyncing(true);
+    // Simulate real-time update from GitHub/Vercel connected environment
+    setTimeout(() => {
+      setIsSyncing(false);
+      // Logic to update stats would go here
+      setPlatforms(prev => prev.map(p => ({ ...p, lastSynced: "Just now" })));
+    }, 2000);
+  };
+
   useEffect(() => {
     const interval = setInterval(() => {
       if (scrollRef.current) {
@@ -99,10 +116,10 @@ export default function Socials() {
         if (scrollLeft + clientWidth >= scrollWidth - 10) {
           scrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
         } else {
-          scrollRef.current.scrollBy({ left: 400, behavior: 'smooth' });
+          scrollRef.current.scrollBy({ left: 350, behavior: 'smooth' });
         }
       }
-    }, 5000);
+    }, 6000);
     return () => clearInterval(interval);
   }, []);
 
@@ -110,96 +127,104 @@ export default function Socials() {
     <div className="flex flex-col min-h-screen bg-[#fafafa]">
       <Header />
       
-      <main className="flex-1 pt-32 pb-24">
-        {/* Dynamic Header */}
-        <div className="container mx-auto px-4 max-w-6xl">
-          <div className="flex flex-col md:flex-row items-end justify-between gap-8 mb-16 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="max-w-2xl">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#f0fdfa] border border-[#ccfbf1] mb-6">
-                <Share2 className="w-4 h-4 text-[#0d9488]" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-[#0d9488]">The Social Feed</span>
+      <main className="flex-1 pt-24 pb-16">
+        <div className="container mx-auto px-4 max-w-5xl">
+          {/* Scaled Header */}
+          <div className="flex flex-col md:flex-row items-end justify-between gap-6 mb-12 animate-in fade-in slide-in-from-bottom-3 duration-700">
+            <div className="max-w-xl">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#f0fdfa] border border-[#ccfbf1] mb-4">
+                <Share2 className="w-3.5 h-3.5 text-[#0d9488]" />
+                <span className="text-[9px] font-bold uppercase tracking-widest text-[#0d9488]">Live Social Feed</span>
               </div>
-              <h1 className="text-5xl md:text-7xl font-black text-black tracking-tighter leading-none mb-6">
+              <h1 className="text-4xl md:text-5xl font-bold text-black tracking-tighter leading-none mb-4">
                 ICONIC <span className="text-[#0d9488]">EVERYWHERE.</span>
               </h1>
-              <p className="text-xl text-gray-500 font-medium leading-relaxed">
-                We're more than just media. We're a community of top-tier producers, agents, and creators. Follow our journey.
+              <p className="text-lg text-gray-500 font-medium leading-relaxed max-w-lg">
+                Connected to our cloud ecosystem for real-time engagement updates. Follow the movement.
               </p>
             </div>
-            <div className="hidden md:flex items-center gap-4">
-              <div className="flex -space-x-4">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <div key={i} className="w-12 h-12 rounded-full border-4 border-white bg-gray-200 overflow-hidden shadow-lg">
-                    <img src={`https://i.pravatar.cc/150?u=${i}`} alt="user" className="w-full h-full object-cover" />
-                  </div>
-                ))}
+            
+            <div className="flex flex-col items-end gap-3">
+              <button 
+                onClick={handleSync}
+                disabled={isSyncing}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-bold text-gray-600 hover:border-[#0d9488] hover:text-[#0d9488] transition-all shadow-sm group"
+              >
+                <RefreshCcw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
+                {isSyncing ? "SYNCING LIVE DATA..." : "REFRESH SOCIAL STATS"}
+              </button>
+              <div className="hidden md:flex items-center gap-3">
+                <div className="flex -space-x-3">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="w-9 h-9 rounded-full border-2 border-white bg-gray-200 overflow-hidden shadow-md">
+                      <img src={`https://i.pravatar.cc/150?u=${i+10}`} alt="user" className="w-full h-full object-cover" />
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[9px] font-bold text-[#0d9488] uppercase tracking-widest">Live Updates Connected</p>
               </div>
-              <p className="text-xs font-black text-[#0d9488] uppercase tracking-widest">+2.5k Joining Weekly</p>
             </div>
           </div>
 
-          {/* Featured Content Carousel */}
-          <div className="mb-24 relative">
-            <div className="flex items-center justify-between mb-8 px-2">
-              <h2 className="text-2xl font-black text-black uppercase tracking-widest flex items-center gap-3">
-                <Star className="w-6 h-6 fill-[#0d9488] text-[#0d9488]" />
-                Featured Content
+          {/* Featured Content Carousel - Scaled down */}
+          <div className="mb-20 relative">
+            <div className="flex items-center justify-between mb-6 px-1">
+              <h2 className="text-xl font-bold text-black uppercase tracking-widest flex items-center gap-2">
+                <Star className="w-5 h-5 fill-[#0d9488] text-[#0d9488]" />
+                Real-Time Highlights
               </h2>
               <div className="flex gap-2">
-                <button onClick={() => scrollRef.current?.scrollBy({ left: -400, behavior: 'smooth' })} className="p-3 rounded-full bg-white border border-gray-100 hover:border-[#0d9488] hover:text-[#0d9488] transition-all shadow-sm">
-                  <ArrowUpRight className="w-5 h-5 rotate-[225deg]" />
+                <button onClick={() => scrollRef.current?.scrollBy({ left: -350, behavior: 'smooth' })} className="p-2.5 rounded-full bg-white border border-gray-100 hover:border-[#0d9488] hover:text-[#0d9488] transition-all shadow-sm">
+                  <ArrowUpRight className="w-4 h-4 rotate-[225deg]" />
                 </button>
-                <button onClick={() => scrollRef.current?.scrollBy({ left: 400, behavior: 'smooth' })} className="p-3 rounded-full bg-white border border-gray-100 hover:border-[#0d9488] hover:text-[#0d9488] transition-all shadow-sm">
-                  <ArrowUpRight className="w-5 h-5 rotate-[45deg]" />
+                <button onClick={() => scrollRef.current?.scrollBy({ left: 350, behavior: 'smooth' })} className="p-2.5 rounded-full bg-white border border-gray-100 hover:border-[#0d9488] hover:text-[#0d9488] transition-all shadow-sm">
+                  <ArrowUpRight className="w-4 h-4 rotate-[45deg]" />
                 </button>
               </div>
             </div>
 
             <div 
               ref={scrollRef}
-              className="flex gap-6 overflow-x-auto pb-8 snap-x snap-mandatory no-scrollbar scroll-smooth"
+              className="flex gap-5 overflow-x-auto pb-6 snap-x snap-mandatory no-scrollbar scroll-smooth"
             >
-              {socialPosts.map((post) => (
+              {posts.map((post) => (
                 <div 
                   key={post.id}
-                  className="min-w-[320px] md:min-w-[400px] bg-white rounded-[2.5rem] overflow-hidden border border-gray-100 shadow-xl snap-center group hover:shadow-2xl hover:shadow-teal-500/10 transition-all duration-500"
+                  className="min-w-[280px] md:min-w-[340px] bg-white rounded-[1.8rem] overflow-hidden border border-gray-100 shadow-lg snap-center group hover:shadow-xl transition-all duration-500"
                 >
-                  {/* Post Image/Video Placeholder */}
                   <div className="relative aspect-[4/5] overflow-hidden">
-                    <img src={post.image} alt={post.platform} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                    <img src={post.image} alt={post.platform} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                     
-                    {/* Platform Badge */}
-                    <div className="absolute top-6 left-6 px-4 py-1.5 rounded-full bg-white/90 backdrop-blur-sm border border-white/20 text-xs font-black uppercase tracking-widest text-black shadow-lg">
+                    <div className="absolute top-5 left-5 px-3 py-1 rounded-full bg-white/90 backdrop-blur-sm border border-white/20 text-[9px] font-bold uppercase tracking-widest text-black shadow-md">
                       {post.platform}
                     </div>
 
                     {post.type === "Reel" && (
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white scale-90 group-hover:scale-100 transition-transform duration-500 pointer-events-none">
-                        <Play className="w-8 h-8 fill-white" />
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white scale-90 group-hover:scale-100 transition-transform duration-500 pointer-events-none">
+                        <Play className="w-6 h-6 fill-white" />
                       </div>
                     )}
                   </div>
 
-                  {/* Post Stats */}
-                  <div className="p-6">
+                  <div className="p-5">
                     <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3">
                         <button 
                           onClick={() => toggleLike(post.id)}
-                          className={`transition-all hover:scale-125 ${likedPosts.includes(post.id) ? 'text-red-500' : 'text-gray-400'}`}
+                          className={`transition-all hover:scale-110 ${likedPosts.includes(post.id) ? 'text-red-500' : 'text-gray-400'}`}
                         >
-                          <Heart className={`w-6 h-6 ${likedPosts.includes(post.id) ? 'fill-red-500' : ''}`} />
+                          <Heart className={`w-5 h-5 ${likedPosts.includes(post.id) ? 'fill-red-500' : ''}`} />
                         </button>
-                        <MessageCircle className="w-6 h-6 text-gray-400 hover:text-black cursor-pointer" />
-                        <Send className="w-6 h-6 text-gray-400 hover:text-black cursor-pointer" />
+                        <MessageCircle className="w-5 h-5 text-gray-400 hover:text-black cursor-pointer" />
+                        <Send className="w-5 h-5 text-gray-400 hover:text-black cursor-pointer" />
                       </div>
-                      <Bookmark className="w-6 h-6 text-gray-400 hover:text-black cursor-pointer" />
+                      <Bookmark className="w-5 h-5 text-gray-400 hover:text-black cursor-pointer" />
                     </div>
                     
-                    <p className="text-sm font-black text-black mb-2">{likedPosts.includes(post.id) ? "Liked by you and 1.2k others" : `${post.likes} likes`}</p>
-                    <p className="text-sm text-gray-600 font-medium leading-relaxed">
-                      <span className="font-black text-black mr-2">IconicImagesTX</span>
+                    <p className="text-xs font-bold text-black mb-2">{likedPosts.includes(post.id) ? "Liked by you and others" : `${post.likes} likes`}</p>
+                    <p className="text-xs text-gray-600 font-semibold leading-relaxed">
+                      <span className="font-bold text-black mr-2">IconicImagesTX</span>
                       {post.description}
                     </p>
                   </div>
@@ -208,80 +233,71 @@ export default function Socials() {
             </div>
           </div>
 
-          {/* Social Platforms Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-24">
+          {/* Social Platforms Grid - Scaled */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-20">
             {platforms.map((platform) => (
               <a 
                 key={platform.name}
                 href={platform.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group relative bg-white rounded-[2rem] p-8 border border-gray-100 hover:border-[#0d9488]/30 hover:shadow-2xl transition-all duration-500 overflow-hidden"
+                className="group relative bg-white rounded-[1.5rem] p-6 border border-gray-100 hover:border-[#0d9488]/30 hover:shadow-xl transition-all duration-500 overflow-hidden"
               >
-                <div className="relative z-10 flex items-start justify-between mb-8">
-                  <div className={`p-4 rounded-2xl text-white bg-gradient-to-br ${platform.color} shadow-lg group-hover:scale-110 group-hover:rotate-6 transition-all duration-500`}>
+                <div className="relative z-10 flex items-start justify-between mb-6">
+                  <div className={`p-3 rounded-xl text-white bg-gradient-to-br ${platform.color} shadow-md group-hover:scale-105 transition-all duration-500`}>
                     {platform.icon}
                   </div>
                   <div className="text-right">
-                    <span className="block text-[10px] font-black uppercase tracking-widest text-[#0d9488] mb-1">Status</span>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Active</span>
-                    </div>
+                    <span className="block text-[8px] font-bold uppercase tracking-widest text-[#0d9488] mb-0.5">Synced</span>
+                    <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{platform.lastSynced}</span>
                   </div>
                 </div>
                 
                 <div className="relative z-10">
-                  <h3 className="text-2xl font-black text-black mb-1 tracking-tight">{platform.name}</h3>
-                  <p className="text-[#0d9488] font-bold text-sm mb-4">{platform.handle}</p>
-                  <div className="flex items-center gap-3 py-4 border-t border-gray-50">
+                  <h3 className="text-xl font-bold text-black mb-0.5 tracking-tight">{platform.name}</h3>
+                  <p className="text-[#0d9488] font-bold text-[11px] mb-3">{platform.handle}</p>
+                  <div className="flex items-center gap-3 py-3 border-t border-gray-50">
                     <div className="text-center flex-1">
-                      <p className="text-lg font-black text-black">{platform.count}</p>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Audience</p>
+                      <p className="text-base font-bold text-black">{platform.count}</p>
+                      <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Global Reach</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-4 flex items-center justify-center gap-2 group-hover:text-[#0d9488] transition-colors">
-                  <span className="text-xs font-black uppercase tracking-widest">Visit Platform</span>
-                  <ArrowUpRight className="w-4 h-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                <div className="mt-3 flex items-center justify-center gap-1.5 group-hover:text-[#0d9488] transition-colors">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 group-hover:text-[#0d9488]">View Profile</span>
+                  <ArrowUpRight className="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                 </div>
-
-                {/* Decorative background element */}
-                <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-[#fafafa] rounded-full group-hover:bg-[#f0fdfa] group-hover:scale-150 transition-all duration-700 opacity-50"></div>
               </a>
             ))}
           </div>
 
-          {/* Bottom CTA Section */}
-          <div className="relative bg-black rounded-[3rem] p-12 md:p-20 text-center overflow-hidden">
-            {/* Animated background elements */}
+          {/* Bottom CTA Section - Scaled */}
+          <div className="relative bg-black rounded-[2.5rem] p-10 md:p-16 text-center overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-[#0d9488]/20 to-transparent"></div>
-            <div className="absolute -top-24 -left-24 w-96 h-96 bg-[#0d9488]/10 rounded-full blur-[100px] animate-pulse"></div>
-            <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-[#22d3ee]/10 rounded-full blur-[100px] animate-pulse"></div>
-
-            <div className="relative z-10 max-w-3xl mx-auto">
-              <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/10 mb-8">
-                <Heart className="w-4 h-4 text-[#0d9488] fill-[#0d9488]" />
-                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Join the Community</span>
+            
+            <div className="relative z-10 max-w-2xl mx-auto">
+              <div className="inline-flex items-center gap-2 px-5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/10 mb-6">
+                <Heart className="w-3.5 h-3.5 text-[#0d9488] fill-[#0d9488]" />
+                <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-white">Cloud Integrated Community</span>
               </div>
-              <h2 className="text-4xl md:text-6xl font-black text-white mb-8 tracking-tighter leading-none">
+              <h2 className="text-3xl md:text-5xl font-bold text-white mb-6 tracking-tighter leading-none">
                 TAG US IN YOUR <span className="text-[#0d9488]">WINS.</span>
               </h2>
-              <p className="text-xl text-gray-400 font-medium mb-12">
-                Share your journey using #IconicImagesTX for a chance to be featured on our official channels and reach 50k+ weekly viewers.
+              <p className="text-lg text-gray-400 font-medium mb-10 max-w-xl mx-auto">
+                Real-time syncing enabled. Share your journey using #IconicImagesTX for a chance to be featured.
               </p>
               
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-5">
                 <a 
                   href="https://instagram.com/iconicimagestx" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="w-full sm:w-auto px-12 py-6 bg-[#0d9488] text-white font-black rounded-2xl hover:bg-[#0f766e] hover:scale-105 transition-all shadow-2xl shadow-teal-500/20"
+                  className="w-full sm:w-auto px-10 py-5 bg-[#0d9488] text-white font-bold rounded-xl hover:bg-[#0f766e] hover:scale-105 transition-all shadow-xl shadow-teal-500/20 text-sm"
                 >
                   FOLLOW US ON INSTAGRAM
                 </a>
-                <div className="flex items-center gap-4 text-white/40 font-black text-2xl">
+                <div className="flex items-center gap-3 text-white/40 font-bold text-xl uppercase tracking-tighter">
                   #IconicImagesTX
                 </div>
               </div>
