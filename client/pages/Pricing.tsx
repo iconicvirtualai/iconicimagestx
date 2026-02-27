@@ -89,7 +89,7 @@ export default function Pricing() {
       period: "per listing",
       description: "Dominate the market with complete media saturation.",
       icon: <Box className="w-6 h-6 text-[#0d9488]" />,
-      badge: "Only 5 slots available per zip code",
+      badge: "Only 4 slots left in your zip code",
       buttonText: "Secure My Zip Code",
       ctaSubtext: "Your reel is ready before the sign is up.",
       tooltip: "For top producers who want to own their local market and provide unmatched seller value.",
@@ -193,7 +193,7 @@ export default function Pricing() {
         "Conversion-Focused Copywriting",
         "Goal: High Engagement & DMs"
       ],
-      buttonText: "Start My Consistency",
+      buttonText: "Grow My Consistency",
       isPopular: true
     }
   ];
@@ -244,6 +244,36 @@ export default function Pricing() {
         "Email/SMS Blast Integration"
       ],
       buttonText: "Build My Empire"
+    },
+    {
+      name: 'THE "STANDARD" MARKETING',
+      price: "2,000",
+      period: "per month",
+      tagline: '"The Consistent Presence"',
+      description: "Balanced social and direct-to-SOI marketing.",
+      features: [
+        "12 Edited Reels + Captions",
+        "1 Monthly 'Featured Insight' Email",
+        "Repurposing best Reel of the month",
+        "1 Monthly 'Check Inbox' Nudge Text",
+        "Direct-to-Sphere engagement"
+      ],
+      buttonText: "Secure My Zip Code"
+    },
+    {
+      name: 'THE "ELITE" MARKETING',
+      price: "3,200",
+      period: "per month",
+      tagline: '"The Authority Engine"',
+      description: "High-frequency content and deep SOI penetration.",
+      features: [
+        "20+ Reels + Pro-Filming Session",
+        "Bi-weekly Updates (Listings + Pulse)",
+        "Bi-weekly Direct-Response Texts",
+        "High-Impact pro production",
+        "Full Management & Automation"
+      ],
+      buttonText: "Build My Empire"
     }
   ];
 
@@ -260,7 +290,7 @@ export default function Pricing() {
             </span>
           </div>
           <h1 className="text-4xl md:text-6xl font-bold text-black mb-6 tracking-tight leading-[1.1]">
-            Choose the <span className="text-[#0d9488]">perfect</span> plan for your needs
+            Pick the Perfect Price for Your <span className="text-[#0d9488]">Presence</span>
           </h1>
           <p className="text-lg text-gray-500 mb-10 max-w-2xl mx-auto">
             Scale your brand, dominate your market, and reclaim your time with Iconic's strategic media solutions.
@@ -292,7 +322,7 @@ export default function Pricing() {
                   <Sparkles className="w-6 h-6 text-[#0d9488]" />
                 </div>
                 <div className="text-left flex-1">
-                  <h3 className="text-lg font-bold text-black mb-1">Not sure where to start?</h3>
+                  <h3 className="text-lg font-bold text-black mb-1">Our AI Can Help!</h3>
                   <div className="flex items-center gap-2 text-[#0d9488] font-bold text-xs">
                     Launch AI Strategist <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                   </div>
@@ -314,7 +344,7 @@ export default function Pricing() {
               {/* Door 1 */}
               <div
                 onClick={() => scrollToSection('phase1')}
-                className="group relative bg-[#fafafa] border-2 border-dashed border-gray-200 rounded-[2.5rem] p-10 text-center hover:border-[#0d9488] hover:bg-[#f0fdfa] transition-all duration-500 overflow-hidden cursor-pointer"
+                className="group relative bg-white border border-gray-200 rounded-[2.5rem] p-10 text-center hover:border-[#0d9488] hover:shadow-2xl hover:shadow-teal-500/10 transition-all duration-500 overflow-hidden cursor-pointer shadow-xl shadow-gray-200/50"
               >
                 <div className="absolute top-0 right-0 p-6 opacity-[0.05] group-hover:scale-110 transition-transform">
                   <Clock className="w-24 h-24" />
@@ -336,7 +366,7 @@ export default function Pricing() {
               {/* Door 2 */}
               <div
                 onClick={() => scrollToSection('phase2')}
-                className="group relative bg-[#fafafa] border-2 border-dashed border-gray-200 rounded-[2.5rem] p-10 text-center hover:border-[#0d9488] hover:bg-[#f0fdfa] transition-all duration-500 overflow-hidden cursor-pointer"
+                className="group relative bg-white border border-gray-200 rounded-[2.5rem] p-10 text-center hover:border-[#0d9488] hover:shadow-2xl hover:shadow-teal-500/10 transition-all duration-500 overflow-hidden cursor-pointer shadow-xl shadow-gray-200/50"
               >
                 <div className="absolute top-0 right-0 p-6 opacity-[0.05] group-hover:scale-110 transition-transform">
                   <DollarSign className="w-24 h-24" />
@@ -362,10 +392,6 @@ export default function Pricing() {
         <section id="listings" className="py-24 bg-white">
           <div className="max-w-[1400px] mx-auto px-4">
             <div className="text-center mb-20 max-w-3xl mx-auto">
-              <div className="flex items-center justify-center gap-3 text-[#0d9488] mb-4">
-                <Layout className="w-6 h-6" />
-                <span className="text-sm font-black uppercase tracking-widest">Section 1</span>
-              </div>
               <h2 className="text-4xl md:text-5xl font-bold text-black mb-6 tracking-tight">
                 Listing Domination <span className="text-gray-300">(The Property)</span>
               </h2>
@@ -412,9 +438,9 @@ export default function Pricing() {
                       <div key={j} className="flex items-start gap-3">
                         <div className="mt-1 shrink-0">
                           <Check className="w-3.5 h-3.5 text-[#0d9488] stroke-[3]" />
-                        </div>
-                        <span className="text-[11px] font-medium text-gray-600 leading-tight">{feature}</span>
                       </div>
+                      <span className="text-sm font-medium text-gray-600 leading-tight">{feature}</span>
+                    </div>
                     ))}
                   </div>
 
@@ -506,10 +532,6 @@ export default function Pricing() {
         <section id="branding" className="py-24 bg-white">
           <div className="max-w-[1400px] mx-auto px-4">
             <div className="text-center mb-20 max-w-3xl mx-auto">
-              <div className="flex items-center justify-center gap-3 text-[#0d9488] mb-4">
-                <Users className="w-6 h-6" />
-                <span className="text-sm font-black uppercase tracking-widest">Section 2</span>
-              </div>
               <h2 className="text-4xl md:text-5xl font-bold text-black mb-6 tracking-tight">
                 Iconic Branding <span className="text-gray-300">(The Agent)</span>
               </h2>
@@ -550,9 +572,9 @@ export default function Pricing() {
                       <div key={j} className="flex items-start gap-3">
                         <div className="mt-1 shrink-0">
                           <Check className="w-3.5 h-3.5 text-[#0d9488] stroke-[3]" />
-                        </div>
-                        <span className="text-[11px] font-medium text-gray-600 leading-tight">{feature}</span>
                       </div>
+                      <span className="text-sm font-medium text-gray-600 leading-tight">{feature}</span>
+                    </div>
                     ))}
                   </div>
 
@@ -584,16 +606,12 @@ export default function Pricing() {
           </div>
         </section>
 
-        {/* Section 3: Social Domination */}
+        {/* Section 3: Social Monopoly */}
         <section id="social" className="py-24 bg-[#fafafa]">
           <div className="max-w-[1400px] mx-auto px-4">
             <div className="text-center mb-20 max-w-3xl mx-auto">
-              <div className="flex items-center justify-center gap-3 text-[#0d9488] mb-4">
-                <Rocket className="w-6 h-6" />
-                <span className="text-sm font-black uppercase tracking-widest">Section 3</span>
-              </div>
-              <h2 className="text-4xl md:text-5xl font-bold text-black mb-6 tracking-tight">
-                Social Domination <span className="text-gray-300">(The Management)</span>
+              <h2 className="text-4xl md:text-5xl font-bold text-black mb-6 tracking-tight flex items-center justify-center gap-4">
+                Social Monopoly <span className="text-gray-300">(The Management)</span>
               </h2>
               <p className="text-lg text-gray-500 leading-relaxed">
                 Transitioning from "Content Creation" to "Market Ownership." 
@@ -622,8 +640,8 @@ export default function Pricing() {
                     <div className="space-y-4 mb-10">
                       {tier.features.map((feature, j) => (
                         <div key={j} className="flex items-start gap-3">
-                          <Check className="w-4 h-4 text-[#0d9488] stroke-[3] mt-0.5" />
-                          <span className="text-sm text-gray-600">{feature}</span>
+                      <Check className="w-4 h-4 text-[#0d9488] stroke-[3] mt-0.5" />
+                      <span className="text-sm font-medium text-gray-600">{feature}</span>
                         </div>
                       ))}
                     </div>
@@ -687,7 +705,7 @@ export default function Pricing() {
                 <span className="text-sm font-black uppercase tracking-widest underline underline-offset-8">NEED A BRAND?</span>
               </div>
               <h2 className="text-4xl md:text-5xl font-bold text-black mb-6 tracking-tight">
-                The "Iconic" Strategic Pricing
+                The "Iconic" Strategic Plan
               </h2>
             </div>
 
@@ -696,7 +714,6 @@ export default function Pricing() {
               <div className="bg-[#fafafa] rounded-[2.5rem] p-10 border border-gray-100 group hover:border-[#0d9488]/30 transition-all duration-500">
                 <div className="mb-6 flex justify-between items-start">
                   <h3 className="text-2xl font-black text-black">THE FOUNDATION</h3>
-                  <div className="text-3xl font-black text-[#0d9488]">$1,500</div>
                 </div>
                 <p className="text-gray-500 text-sm mb-8">Essential visual assets and strategic core for a professional presence.</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
@@ -725,7 +742,6 @@ export default function Pricing() {
               <div className="bg-[#fafafa] rounded-[2.5rem] p-10 border border-gray-100 group hover:border-[#0d9488]/30 transition-all duration-500">
                 <div className="mb-6 flex justify-between items-start">
                   <h3 className="text-2xl font-black text-black">THE EVOLUTION</h3>
-                  <div className="text-3xl font-black text-[#0d9488]">$1,500</div>
                 </div>
                 <p className="text-gray-500 text-sm mb-8">Cutting-edge AI integration to automate your content and reach.</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
@@ -748,6 +764,45 @@ export default function Pricing() {
                     Start My Evolution →
                   </Link>
                 </Button>
+              </div>
+            </div>
+
+            {/* Iconic Bundle Box */}
+            <div className="mb-12 p-1 bg-gradient-to-r from-black via-gray-800 to-black rounded-[3rem] shadow-2xl">
+              <div className="bg-white rounded-[2.9rem] p-10 md:p-16 text-center relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-12 opacity-[0.02] pointer-events-none">
+                  <Sparkles className="w-64 h-64" />
+                </div>
+                <div className="relative z-10">
+                  <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-black text-white mb-8">
+                    <Star className="w-4 h-4 fill-white" />
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em]">The Ultimate Package</span>
+                  </div>
+                  <h3 className="text-4xl md:text-6xl font-black text-black mb-6 tracking-tighter">THE ICONIC STRATEGIC BUNDLE</h3>
+                  <p className="text-xl text-gray-500 mb-10 max-w-3xl mx-auto font-medium">
+                    Foundation + Evolution. Total brand immersion, AI automation, and strategic identity design in one cohesive execution.
+                  </p>
+                  <div className="flex flex-col md:flex-row items-center justify-center gap-6 mb-12">
+                    <Button asChild className="bg-black text-white hover:bg-[#0d9488] font-black px-12 py-8 text-xl rounded-2xl transition-all shadow-2xl hover:scale-105 active:scale-95">
+                      <Link to="/book">Secure My Strategic Plan →</Link>
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto">
+                    {[
+                      { icon: <Palette className="w-5 h-5" />, label: "Visual Identity" },
+                      { icon: <Rocket className="w-5 h-5" />, label: "Market Launch" },
+                      { icon: <Sparkles className="w-5 h-5" />, label: "AI Integration" },
+                      { icon: <Users className="w-5 h-5" />, label: "Social Authority" }
+                    ].map((item, idx) => (
+                      <div key={idx} className="flex flex-col items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400">
+                          {item.icon}
+                        </div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{item.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
