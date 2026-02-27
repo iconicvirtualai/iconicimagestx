@@ -2,7 +2,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Check, X, ArrowRight, Star, ChevronLeft, ChevronRight, Info, Sparkles, Zap, Trophy, Crown, Camera, Video, Layout, Box, Users } from "lucide-react";
+import { Check, X, ArrowRight, Star, ChevronLeft, ChevronRight, Info, Sparkles, Zap, Trophy, Crown, Camera, Video, Layout, Box, Users, Clock, DollarSign, Palette, Rocket } from "lucide-react";
 import { useState, useRef } from "react";
 
 export default function Pricing() {
@@ -10,12 +10,15 @@ export default function Pricing() {
   const [brandingSliderPos, setBrandingSliderPos] = useState(50);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const scrollTestimonials = (direction: 'left' | 'right') => {
-    if (scrollContainerRef.current) {
-      const scrollAmount = 400;
-      scrollContainerRef.current.scrollBy({
-        left: direction === 'left' ? -scrollAmount : scrollAmount,
-        behavior: 'smooth'
+  const scrollToSection = (id: string) => {
+    const element = document.getElementById(id);
+    if (element) {
+      const offset = 100;
+      const elementPosition = element.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - offset;
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth"
       });
     }
   };
@@ -161,42 +164,137 @@ export default function Pricing() {
     }
   ];
 
+  const phase1Tiers = [
+    {
+      name: "THE CONTENT STARTER",
+      price: "500",
+      period: "per month",
+      tagline: '"The Leverage Entry"',
+      description: 'The Vibe: You film it, we make it "Iconic."',
+      features: [
+        "8 Professionally Edited Reels (2/week)",
+        "Signature 2026 Editing Style",
+        "Trending Audio Integration",
+        "Iconic Branding Application",
+        "Goal: Professionalism on a budget"
+      ],
+      buttonText: "Start My Consistency"
+    },
+    {
+      name: "THE CONTENT PRO",
+      price: "850",
+      period: "per month",
+      tagline: '"The Growth Engine"',
+      description: "The Vibe: Consistency is your new best friend.",
+      features: [
+        "12 Professionally Edited Reels (3/week)",
+        "Caption & Hashtag Suite",
+        "Scroll-Stopping Hooks",
+        "Conversion-Focused Copywriting",
+        "Goal: High Engagement & DMs"
+      ],
+      buttonText: "Start My Consistency",
+      isPopular: true
+    }
+  ];
+
+  const phase2Tiers = [
+    {
+      name: "THE STARTER DOMINATOR",
+      price: "1,500",
+      period: "per month",
+      tagline: '"The Visual Foundation"',
+      description: "For the producer too busy to worry about 'the grid.'",
+      features: [
+        "12 Reels per month (3/week)",
+        "Scheduling to IG/FB/TikTok",
+        "Custom Captions & Hashtags",
+        "60min Active Engagement",
+        "Algorithm 'Warm-up' Service"
+      ],
+      buttonText: "Secure My Zip Code"
+    },
+    {
+      name: "THE LEADER DOMINATOR",
+      price: "2,800",
+      period: "per month",
+      tagline: '"The Active Presence"',
+      description: "Total hands-off authority. You show up, we do the rest.",
+      features: [
+        "20 Reels/month (Daily M-F)",
+        "1 Monthly Branding/Field Shoot",
+        "DM Lead Capture & Flagging",
+        "Dedicated Hook Strategy Sessions",
+        "Full Management across platforms"
+      ],
+      buttonText: "Build My Empire",
+      isPopular: true
+    },
+    {
+      name: "THE ICONIC DOMINATOR",
+      price: "4,500",
+      period: "per month",
+      tagline: '"The Total Market Takeover"',
+      description: "A full-scale media agency in your pocket.",
+      features: [
+        "Unlimited Reels Production",
+        "2 Monthly Field Shoots",
+        "GHL Lead Automation",
+        "Listing Bombs (Ad Management)",
+        "Email/SMS Blast Integration"
+      ],
+      buttonText: "Build My Empire"
+    }
+  ];
+
   return (
     <div className="flex flex-col min-h-screen bg-[#fafafa]">
       <Header />
       
       <main className="flex-1 pb-20">
-        {/* Hero Section */}
+        {/* Hero Section - Reverted Style */}
         <div className="pt-32 pb-16 text-center px-4 max-w-5xl mx-auto">
           <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#f0fdfa] border border-[#ccfbf1] mb-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <span className="text-[12px] font-bold tracking-wider text-[#0d9488] uppercase">
               Pricing & Packages
             </span>
           </div>
-          <h1 className="text-5xl md:text-7xl font-bold text-black mb-6 tracking-tight leading-[1.1]">
-            Pick the <span className="text-[#0d9488]">poison</span>:
+          <h1 className="text-4xl md:text-6xl font-bold text-black mb-6 tracking-tight leading-[1.1]">
+            Choose the <span className="text-[#0d9488]">perfect</span> plan for your needs
           </h1>
-          <p className="text-xl md:text-2xl text-gray-400 font-medium mb-12">
-            For Listings. For Branding. For Business.
+          <p className="text-lg text-gray-500 mb-10 max-w-2xl mx-auto">
+            Scale your brand, dominate your market, and reclaim your time with Iconic's strategic media solutions.
           </p>
 
-          {/* AI Assistant CTA */}
-          <div className="mt-12 p-1 bg-gradient-to-r from-[#0d9488] via-[#22d3ee] to-[#0d9488] rounded-[2.5rem] shadow-xl shadow-teal-500/10 max-w-2xl mx-auto transform hover:scale-[1.02] transition-transform duration-500">
-            <Link to="/pricing/ai-assistant" className="block bg-white rounded-[2.4rem] p-8 md:p-10 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity">
-                <Sparkles className="w-32 h-32" />
-              </div>
-              <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
-                <div className="w-20 h-20 rounded-[2rem] bg-[#f0fdfa] border border-[#ccfbf1] flex items-center justify-center shrink-0">
-                  <Sparkles className="w-10 h-10 text-[#0d9488] animate-pulse" />
+          {/* Hyperlink Bubbles */}
+          <div className="flex flex-wrap justify-center gap-4 mb-16">
+            {[
+              { label: "For Listings", id: "listings" },
+              { label: "For Branding", id: "branding" },
+              { label: "For Business", id: "social" },
+              { label: "For Growth", id: "brand-identity" }
+            ].map((bubble) => (
+              <button
+                key={bubble.id}
+                onClick={() => scrollToSection(bubble.id)}
+                className="px-8 py-3 rounded-full border border-gray-200 bg-white text-sm font-bold text-gray-600 hover:border-[#0d9488] hover:text-[#0d9488] hover:shadow-lg transition-all"
+              >
+                {bubble.label}
+              </button>
+            ))}
+          </div>
+
+          {/* AI Assistant CTA - Smaller */}
+          <div className="mt-8 p-0.5 bg-gradient-to-r from-[#0d9488] via-[#22d3ee] to-[#0d9488] rounded-[2rem] shadow-lg shadow-teal-500/5 max-w-lg mx-auto transform hover:scale-[1.01] transition-transform duration-500">
+            <Link to="/pricing/ai-assistant" className="block bg-white rounded-[1.9rem] p-6 relative overflow-hidden group">
+              <div className="relative z-10 flex items-center gap-6">
+                <div className="w-12 h-12 rounded-[1rem] bg-[#f0fdfa] border border-[#ccfbf1] flex items-center justify-center shrink-0">
+                  <Sparkles className="w-6 h-6 text-[#0d9488]" />
                 </div>
                 <div className="text-left flex-1">
-                  <h3 className="text-2xl font-bold text-black mb-2">Not sure where to start?</h3>
-                  <p className="text-gray-500 text-sm leading-relaxed mb-4">
-                    Take our 60-second Q&A with our AI strategist to determine what kind of service or package best suits your specific business goals.
-                  </p>
-                  <div className="flex items-center gap-2 text-[#0d9488] font-bold text-sm">
-                    Launch AI Assistant <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <h3 className="text-lg font-bold text-black mb-1">Not sure where to start?</h3>
+                  <div className="flex items-center gap-2 text-[#0d9488] font-bold text-xs">
+                    Launch AI Strategist <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                   </div>
                 </div>
               </div>
@@ -204,23 +302,77 @@ export default function Pricing() {
           </div>
         </div>
 
-        {/* Section 1: Listing Domination */}
-        <section className="py-20 bg-white">
-          <div className="max-w-[1400px] mx-auto px-4">
-            <div className="flex flex-col md:flex-row items-end justify-between gap-6 mb-16">
-              <div className="max-w-2xl">
-                <div className="flex items-center gap-3 text-[#0d9488] mb-4">
-                  <Layout className="w-6 h-6" />
-                  <span className="text-sm font-black uppercase tracking-widest">Section 1</span>
+        {/* Choose Your Path UX - The Doors */}
+        <section className="py-16 bg-white border-y border-gray-50">
+          <div className="max-w-5xl mx-auto px-4">
+            <div className="text-center mb-12">
+              <h2 className="text-2xl font-black text-black uppercase tracking-widest mb-2">Do you have...</h2>
+              <div className="w-20 h-1 bg-[#0d9488] mx-auto rounded-full"></div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Door 1 */}
+              <button 
+                onClick={() => scrollToSection('phase1')}
+                className="group relative bg-[#fafafa] border-2 border-dashed border-gray-200 rounded-[2.5rem] p-10 text-center hover:border-[#0d9488] hover:bg-[#f0fdfa] transition-all duration-500 overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 p-6 opacity-[0.05] group-hover:scale-110 transition-transform">
+                  <Clock className="w-24 h-24" />
                 </div>
-                <h2 className="text-4xl md:text-5xl font-bold text-black mb-6 tracking-tight">
-                  Listing Domination <span className="text-gray-300">(The Property)</span>
-                </h2>
-                <p className="text-lg text-gray-500 leading-relaxed">
-                  Targeting the listing lifecycle: Pre-launch buzz, active sale, and post-close legacy. 
-                  Every package now includes a Listing Reel as the core deliverable. <span className="font-bold text-black">We don't just shoot; we trend.</span>
-                </p>
+                <div className="relative z-10">
+                  <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm border border-gray-100 group-hover:scale-110 transition-transform">
+                    <Clock className="w-8 h-8 text-[#0d9488]" />
+                  </div>
+                  <h3 className="text-2xl font-black text-black mb-4">MORE TIME THAN MONEY</h3>
+                  <p className="text-gray-500 text-sm mb-8 leading-relaxed">
+                    I’m ready to hustle, I just need the tools and the professional polish to win.
+                  </p>
+                  <Button className="bg-white border-2 border-black text-black hover:bg-black hover:text-white font-bold px-8 py-6 rounded-xl transition-all">
+                    I'm ready to hustle →
+                  </Button>
+                </div>
+              </button>
+
+              {/* Door 2 */}
+              <button 
+                onClick={() => scrollToSection('phase2')}
+                className="group relative bg-[#fafafa] border-2 border-dashed border-gray-200 rounded-[2.5rem] p-10 text-center hover:border-[#0d9488] hover:bg-[#f0fdfa] transition-all duration-500 overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 p-6 opacity-[0.05] group-hover:scale-110 transition-transform">
+                  <DollarSign className="w-24 h-24" />
+                </div>
+                <div className="relative z-10">
+                  <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm border border-gray-100 group-hover:scale-110 transition-transform">
+                    <DollarSign className="w-8 h-8 text-[#0d9488]" />
+                  </div>
+                  <h3 className="text-2xl font-black text-black mb-4">MORE MONEY THAN TIME</h3>
+                  <p className="text-gray-500 text-sm mb-8 leading-relaxed">
+                    I’m ready to scale, I need my time back and my brand on autopilot.
+                  </p>
+                  <Button className="bg-[#0d9488] text-white hover:bg-[#0f766e] font-bold px-8 py-6 rounded-xl transition-all shadow-lg shadow-teal-100">
+                    I'm ready to scale →
+                  </Button>
+                </div>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Section 1: Listing Domination */}
+        <section id="listings" className="py-24 bg-white">
+          <div className="max-w-[1400px] mx-auto px-4">
+            <div className="text-center mb-20 max-w-3xl mx-auto">
+              <div className="flex items-center justify-center gap-3 text-[#0d9488] mb-4">
+                <Layout className="w-6 h-6" />
+                <span className="text-sm font-black uppercase tracking-widest">Section 1</span>
               </div>
+              <h2 className="text-4xl md:text-5xl font-bold text-black mb-6 tracking-tight">
+                Listing Domination <span className="text-gray-300">(The Property)</span>
+              </h2>
+              <p className="text-lg text-gray-500 leading-relaxed">
+                Targeting the listing lifecycle: Pre-launch buzz, active sale, and post-close legacy. 
+                Every package now includes a Listing Reel as the core deliverable. <span className="font-bold text-black">We don't just shoot; we trend.</span>
+              </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -241,11 +393,6 @@ export default function Pricing() {
                     <div className="p-3 bg-[#f0fdfa] rounded-2xl">
                       {tier.icon}
                     </div>
-                    {tier.isPopular && (
-                      <span className="text-[10px] font-black text-[#0d9488] uppercase tracking-widest px-3 py-1 bg-[#ccfbf1] rounded-full">
-                        Popular Choice
-                      </span>
-                    )}
                   </div>
 
                   <h3 className="text-xl font-black text-black mb-1">{tier.name}</h3>
@@ -299,21 +446,21 @@ export default function Pricing() {
           </div>
         </section>
 
-        {/* Branding Before & After Slider */}
+        {/* Branding Before & After Slider - Smaller */}
         <section className="py-24 bg-[#fafafa]">
-          <div className="max-w-6xl mx-auto px-4 text-center">
-            <h2 className="text-4xl font-bold text-black mb-4">Elevate Your Personal Brand</h2>
-            <p className="text-gray-500 mb-12 max-w-2xl mx-auto">See the difference between a standard corporate headshot and an Iconic Lifestyle Portrait.</p>
+          <div className="max-w-4xl mx-auto px-4 text-center">
+            <h2 className="text-3xl font-bold text-black mb-4">Elevate Your Personal Brand</h2>
+            <p className="text-gray-500 mb-12 max-w-xl mx-auto text-sm">See the difference between a standard corporate headshot and an Iconic Lifestyle Portrait.</p>
             
-            <div className="relative max-w-4xl mx-auto aspect-[16/9] rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-white">
+            <div className="relative max-w-2xl mx-auto aspect-[16/9] rounded-[2rem] overflow-hidden shadow-xl border-4 border-white">
               {/* After (Iconic) */}
               <img 
-                src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1600&q=80" 
+                src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1200&q=80" 
                 className="absolute inset-0 w-full h-full object-cover"
                 alt="Iconic Lifestyle"
               />
-              <div className="absolute inset-0 flex flex-col justify-end p-8 text-white z-10 text-right pointer-events-none">
-                <div className="bg-[#0d9488] px-4 py-2 rounded-full inline-block self-end text-sm font-black uppercase tracking-widest shadow-lg">Iconic Lifestyle</div>
+              <div className="absolute inset-0 flex flex-col justify-end p-6 text-white z-10 text-right pointer-events-none">
+                <div className="bg-[#0d9488] px-3 py-1.5 rounded-full inline-block self-end text-[10px] font-black uppercase tracking-widest shadow-lg">Iconic Lifestyle</div>
               </div>
 
               {/* Before (Standard) */}
@@ -322,12 +469,12 @@ export default function Pricing() {
                 style={{ clipPath: `inset(0 ${100 - brandingSliderPos}% 0 0)` }}
               >
                 <img 
-                  src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1600&q=80" 
+                  src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1200&q=80" 
                   className="absolute inset-0 w-full h-full object-cover grayscale brightness-[0.8]"
                   alt="Standard Corporate"
                 />
-                <div className="absolute inset-0 flex flex-col justify-end p-8 text-white z-10 text-left pointer-events-none">
-                  <div className="bg-gray-800/80 px-4 py-2 rounded-full inline-block self-start text-sm font-black uppercase tracking-widest">Standard Corporate</div>
+                <div className="absolute inset-0 flex flex-col justify-end p-6 text-white z-10 text-left pointer-events-none">
+                  <div className="bg-gray-800/80 px-3 py-1.5 rounded-full inline-block self-start text-[10px] font-black uppercase tracking-widest">Standard Corporate</div>
                 </div>
               </div>
 
@@ -336,10 +483,10 @@ export default function Pricing() {
                 className="absolute inset-y-0 z-20 pointer-events-none"
                 style={{ left: `${brandingSliderPos}%` }}
               >
-                <div className="absolute inset-y-0 -left-[1.5px] w-[3px] bg-white shadow-xl"></div>
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 bg-[#0d9488] rounded-full flex items-center justify-center text-white border-4 border-white shadow-2xl">
-                  <ChevronLeft className="w-4 h-4" />
-                  <ChevronRight className="w-4 h-4" />
+                <div className="absolute inset-y-0 -left-[1px] w-[2px] bg-white shadow-xl"></div>
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-[#0d9488] rounded-full flex items-center justify-center text-white border-4 border-white shadow-2xl">
+                  <ChevronLeft className="w-3 h-3" />
+                  <ChevronRight className="w-3 h-3" />
                 </div>
               </div>
 
@@ -356,22 +503,20 @@ export default function Pricing() {
         </section>
 
         {/* Section 2: Iconic Branding */}
-        <section className="py-24 bg-white">
+        <section id="branding" className="py-24 bg-white">
           <div className="max-w-[1400px] mx-auto px-4">
-            <div className="flex flex-col md:flex-row items-end justify-between gap-6 mb-16">
-              <div className="max-w-2xl">
-                <div className="flex items-center gap-3 text-[#0d9488] mb-4">
-                  <Users className="w-6 h-6" />
-                  <span className="text-sm font-black uppercase tracking-widest">Section 2</span>
-                </div>
-                <h2 className="text-4xl md:text-5xl font-bold text-black mb-6 tracking-tight">
-                  Iconic Branding <span className="text-gray-300">(The Agent)</span>
-                </h2>
-                <p className="text-lg text-gray-500 leading-relaxed">
-                  Targeting the human brand: Life, business, and local authority. 
-                  We don't just capture portraits; we build ecosystems of authority.
-                </p>
+            <div className="text-center mb-20 max-w-3xl mx-auto">
+              <div className="flex items-center justify-center gap-3 text-[#0d9488] mb-4">
+                <Users className="w-6 h-6" />
+                <span className="text-sm font-black uppercase tracking-widest">Section 2</span>
               </div>
+              <h2 className="text-4xl md:text-5xl font-bold text-black mb-6 tracking-tight">
+                Iconic Branding <span className="text-gray-300">(The Agent)</span>
+              </h2>
+              <p className="text-lg text-gray-500 leading-relaxed">
+                Targeting the human brand: Life, business, and local authority. 
+                We don't just capture portraits; we build ecosystems of authority.
+              </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -439,6 +584,193 @@ export default function Pricing() {
           </div>
         </section>
 
+        {/* Section 3: Social Domination */}
+        <section id="social" className="py-24 bg-[#fafafa]">
+          <div className="max-w-[1400px] mx-auto px-4">
+            <div className="text-center mb-20 max-w-3xl mx-auto">
+              <div className="flex items-center justify-center gap-3 text-[#0d9488] mb-4">
+                <Rocket className="w-6 h-6" />
+                <span className="text-sm font-black uppercase tracking-widest">Section 3</span>
+              </div>
+              <h2 className="text-4xl md:text-5xl font-bold text-black mb-6 tracking-tight">
+                Social Domination <span className="text-gray-300">(The Management)</span>
+              </h2>
+              <p className="text-lg text-gray-500 leading-relaxed">
+                Transitioning from "Content Creation" to "Market Ownership." 
+                These are your recurring revenue "Social Manager" packages designed to build your empire.
+              </p>
+            </div>
+
+            {/* Phase 1: Time Over Money */}
+            <div id="phase1" className="mb-24">
+              <div className="flex items-center gap-4 mb-10">
+                <div className="h-[2px] flex-1 bg-gradient-to-r from-transparent to-gray-200"></div>
+                <h3 className="text-lg font-black text-gray-400 uppercase tracking-[0.3em] whitespace-nowrap">PHASE 1: THE "TIME OVER MONEY" TRACK</h3>
+                <div className="h-[2px] flex-1 bg-gradient-to-l from-transparent to-gray-200"></div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+                {phase1Tiers.map((tier, i) => (
+                  <div key={i} className={`bg-white rounded-[2rem] p-10 border transition-all duration-500 hover:shadow-xl ${tier.isPopular ? 'border-[#0d9488]' : 'border-gray-100'}`}>
+                    <h4 className="text-xl font-black text-black mb-1">{tier.name}</h4>
+                    <p className="text-[#0d9488] font-bold text-xs uppercase tracking-widest mb-6">{tier.tagline}</p>
+                    <div className="mb-6 flex items-baseline gap-1">
+                      <span className="text-4xl font-black text-black">${tier.price}</span>
+                      <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">{tier.period}</span>
+                    </div>
+                    <p className="text-sm font-bold text-gray-700 mb-8 italic">{tier.description}</p>
+                    <div className="space-y-4 mb-10">
+                      {tier.features.map((feature, j) => (
+                        <div key={j} className="flex items-start gap-3">
+                          <Check className="w-4 h-4 text-[#0d9488] stroke-[3] mt-0.5" />
+                          <span className="text-sm text-gray-600">{feature}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <Button className="w-full py-6 rounded-xl bg-black hover:bg-gray-800 text-white font-bold transition-all shadow-lg">{tier.buttonText}</Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Phase 2: Money Over Time */}
+            <div id="phase2">
+              <div className="flex items-center gap-4 mb-10">
+                <div className="h-[2px] flex-1 bg-gradient-to-r from-transparent to-[#0d9488]/20"></div>
+                <h3 className="text-lg font-black text-[#0d9488] uppercase tracking-[0.3em] whitespace-nowrap">PHASE 2: THE "MONEY OVER TIME" TRACK</h3>
+                <div className="h-[2px] flex-1 bg-gradient-to-l from-transparent to-[#0d9488]/20"></div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {phase2Tiers.map((tier, i) => (
+                  <div key={i} className={`relative bg-white rounded-[2rem] p-8 border transition-all duration-500 hover:shadow-2xl ${tier.isPopular ? 'border-[#0d9488] scale-105 z-10 shadow-xl' : 'border-gray-100'}`}>
+                    {tier.isPopular && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#0d9488] text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest">Active Presence</div>
+                    )}
+                    <h4 className="text-xl font-black text-black mb-1">{tier.name}</h4>
+                    <p className="text-[#0d9488] font-bold text-xs uppercase tracking-widest mb-6">{tier.tagline}</p>
+                    <div className="mb-6 flex items-baseline gap-1">
+                      <span className="text-4xl font-black text-black">${tier.price}</span>
+                      <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">{tier.period}</span>
+                    </div>
+                    <p className="text-xs text-gray-500 leading-relaxed mb-8 h-12 overflow-hidden">{tier.description}</p>
+                    <div className="space-y-4 mb-10">
+                      {tier.features.map((feature, j) => (
+                        <div key={j} className="flex items-start gap-3">
+                          <Check className="w-3.5 h-3.5 text-[#0d9488] stroke-[3] mt-0.5" />
+                          <span className="text-[11px] font-medium text-gray-600 leading-tight">{feature}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <Button className={`w-full py-6 rounded-xl font-bold transition-all ${tier.isPopular ? 'bg-[#0d9488] text-white' : 'bg-black text-white'}`}>{tier.buttonText}</Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Need a Brand? Section */}
+        <section id="brand-identity" className="py-24 bg-white">
+          <div className="max-w-6xl mx-auto px-4">
+            <div className="text-center mb-16">
+              <div className="inline-flex items-center gap-3 text-[#0d9488] mb-4">
+                <Palette className="w-6 h-6" />
+                <span className="text-sm font-black uppercase tracking-widest underline underline-offset-8">NEED A BRAND?</span>
+              </div>
+              <h2 className="text-4xl md:text-5xl font-bold text-black mb-6 tracking-tight">
+                The "Iconic" Strategic Pricing
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-20">
+              {/* Foundation */}
+              <div className="bg-[#fafafa] rounded-[2.5rem] p-10 border border-gray-100 group hover:border-[#0d9488]/30 transition-all duration-500">
+                <div className="mb-6 flex justify-between items-start">
+                  <h3 className="text-2xl font-black text-black">THE FOUNDATION</h3>
+                  <div className="text-3xl font-black text-[#0d9488]">$1,500</div>
+                </div>
+                <p className="text-gray-500 text-sm mb-8">Essential visual assets and strategic core for a professional presence.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                  {[
+                    "Logos Suite",
+                    "Signature Style Guide",
+                    "Hex Color Palettes",
+                    "Canva Brand Hub Setup",
+                    "Marketing Templates",
+                    "Digital Business Card"
+                  ].map((item, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-[#0d9488]" />
+                      <span className="text-xs font-bold text-gray-600">{item}</span>
+                    </div>
+                  ))}
+                </div>
+                <Button className="w-full py-6 rounded-xl bg-black text-white hover:bg-[#0d9488] transition-all">Start My Foundation →</Button>
+              </div>
+
+              {/* Evolution */}
+              <div className="bg-[#fafafa] rounded-[2.5rem] p-10 border border-gray-100 group hover:border-[#0d9488]/30 transition-all duration-500">
+                <div className="mb-6 flex justify-between items-start">
+                  <h3 className="text-2xl font-black text-black">THE EVOLUTION</h3>
+                  <div className="text-3xl font-black text-[#0d9488]">$1,500</div>
+                </div>
+                <p className="text-gray-500 text-sm mb-8">Cutting-edge AI integration to automate your content and reach.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                  {[
+                    "AI Voice Clone Setup",
+                    "AI Video Avatar Creation",
+                    "Automated Updates Suite",
+                    "Voice Synthesis Training",
+                    "Likeness Protection",
+                    "Vision Pro Readiness"
+                  ].map((item, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-[#0d9488]" />
+                      <span className="text-xs font-bold text-gray-600">{item}</span>
+                    </div>
+                  ))}
+                </div>
+                <Button className="w-full py-6 rounded-xl bg-black text-white hover:bg-[#0d9488] transition-all">Start My Evolution →</Button>
+              </div>
+            </div>
+
+            {/* Detailed Feature List */}
+            <div className="bg-black rounded-[3rem] p-12 text-white relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-12 opacity-10">
+                <Palette className="w-64 h-64" />
+              </div>
+              <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
+                <div>
+                  <h4 className="text-xl font-bold mb-4 text-[#0d9488]">Iconic Logo Suite</h4>
+                  <p className="text-gray-400 text-sm leading-relaxed">High-res custom logos for agent/team in PNG, Vector, and Social Square formats.</p>
+                </div>
+                <div>
+                  <h4 className="text-xl font-bold mb-4 text-[#0d9488]">Signature Style Guide</h4>
+                  <p className="text-gray-400 text-sm leading-relaxed">Curated Font Kits and Hex Color Palettes to ensure every piece of content looks cohesive.</p>
+                </div>
+                <div>
+                  <h4 className="text-xl font-bold mb-4 text-[#0d9488]">Brand Hub Setup</h4>
+                  <p className="text-gray-400 text-sm leading-relaxed">We build your Brand Kit directly into your Canva or marketing platform for instant access.</p>
+                </div>
+                <div>
+                  <h4 className="text-xl font-bold mb-4 text-[#0d9488]">Marketing Templates</h4>
+                  <p className="text-gray-400 text-sm leading-relaxed">10+ "Plug & Play" templates for Just Listed/Sold, Open House, and Market Updates.</p>
+                </div>
+                <div>
+                  <h4 className="text-xl font-bold mb-4 text-[#0d9488]">Premium Business Cards</h4>
+                  <p className="text-gray-400 text-sm leading-relaxed">Custom heavy-stock physical card design + Digital QR Card for instant lead capture.</p>
+                </div>
+                <div className="flex items-center">
+                  <div className="p-6 border-2 border-[#0d9488] rounded-2xl">
+                    <p className="text-sm font-bold text-white uppercase tracking-widest">Dominate with Identity</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* FAQ Section */}
         <section className="bg-white py-24 md:py-32">
           <div className="container mx-auto px-4">
@@ -487,8 +819,8 @@ export default function Pricing() {
         input[type=range]::-webkit-slider-thumb {
           -webkit-appearance: none;
           appearance: none;
-          width: 48px;
-          height: 48px;
+          width: 40px;
+          height: 40px;
           cursor: ew-resize;
         }
       `}} />
