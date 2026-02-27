@@ -25,21 +25,31 @@ import {
   History,
   FilePlus,
   CreditCard,
-  UserPlus
+  UserPlus,
+  ChevronRight,
+  Layout,
+  Lock,
+  MoreVertical,
+  CheckCircle2,
+  AlertCircle
 } from "lucide-react";
 import { useState } from "react";
 
 export default function AdminListingFile() {
   const { id } = useParams();
+  const [activeTab, setActiveTab] = useState("media");
   const [isAuditLogOpen, setIsAuditLogOpen] = useState(false);
 
   const listing = {
-    address: "1245 Willow Creek Dr, Spring, TX 77380",
+    id: id || "8245",
+    address: "1245 Willow Creek Dr",
+    city: "Spring, TX 77380",
     status: "Delivered",
     paymentStatus: "Paid",
     agent: "Sarah Jenkins",
     team: "The Jenkins Group",
-    price: "$549,000"
+    price: "$549,000",
+    date: "Oct 24, 2024"
   };
 
   const auditLogs = [
@@ -51,220 +61,305 @@ export default function AdminListingFile() {
   ];
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#fafafa]">
+    <div className="flex flex-col min-h-screen bg-[#f8fafc]">
       <Header />
       
-      <main className="flex-1 pt-32 pb-24 px-4">
-        <div className="container mx-auto max-w-6xl">
-          
-          {/* Header Section */}
-          <div className="flex flex-col md:flex-row justify-between items-start gap-6 mb-12">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-4">
-                <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                  listing.status === 'Delivered' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'
-                }`}>
-                  {listing.status} — {listing.paymentStatus}
-                </div>
-                <button className="p-2 rounded-full hover:bg-gray-100 transition-colors">
-                  <Settings className="w-5 h-5 text-gray-400" />
-                </button>
-              </div>
-              <h1 className="text-3xl md:text-4xl font-black text-black tracking-tight flex items-center gap-3">
-                <MapPin className="w-8 h-8 text-[#0d9488]" />
-                {listing.address}
-              </h1>
+      <main className="flex-1 pt-24 pb-12">
+        {/* Compact Sub-Header / Breadcrumbs */}
+        <div className="bg-white border-b border-slate-200 sticky top-[72px] z-30 px-6 py-3">
+          <div className="max-w-[1600px] mx-auto flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 text-slate-400">
+              <Link to="/admin/dashboard" className="hover:text-black transition-colors">
+                <Layout className="w-4 h-4" />
+              </Link>
+              <ChevronRight className="w-3 h-3" />
+              <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">Orders</span>
+              <ChevronRight className="w-3 h-3" />
+              <span className="text-xs font-medium truncate max-w-[150px]">{listing.address}</span>
             </div>
-
-            <div className="flex flex-wrap gap-3">
-              <Button className="bg-[#0d9488] hover:bg-[#0f766e] text-white font-bold rounded-xl px-6 flex items-center gap-2">
-                <Send className="w-4 h-4" /> Deliver Listing
+            
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-bold text-slate-400 italic mr-2">Auto-saved at 2:45 PM</span>
+              <Button size="sm" variant="outline" className="h-9 rounded-lg border-slate-200 text-slate-600 font-bold text-xs">
+                <Download className="w-3.5 h-3.5 mr-2" /> Download Content
               </Button>
-              <Button variant="outline" className="border-gray-200 text-gray-600 hover:bg-gray-50 rounded-xl px-6 flex items-center gap-2">
-                <Download className="w-4 h-4" /> Download All
+              <Button size="sm" className="h-9 bg-black hover:bg-slate-800 text-white font-bold text-xs rounded-lg px-5">
+                <Send className="w-3.5 h-3.5 mr-2" /> Deliver Media
               </Button>
             </div>
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="max-w-[1600px] mx-auto px-6 mt-8">
+          <div className="flex flex-col lg:flex-row gap-8">
             
-            {/* Main Content Area */}
-            <div className="lg:col-span-2 space-y-8">
+            {/* Main Workspace (Left) */}
+            <div className="flex-1 min-w-0 space-y-6">
               
-              {/* Media Section: Images */}
-              <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm">
-                <div className="flex items-center justify-between mb-8">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-50 rounded-lg">
-                      <ImageIcon className="w-5 h-5 text-blue-500" />
-                    </div>
-                    <h2 className="text-xl font-black text-black uppercase">Images</h2>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="rounded-lg text-[10px] font-bold uppercase">Arrange</Button>
-                    <Button variant="outline" size="sm" className="rounded-lg text-[10px] font-bold uppercase">Add Photos</Button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <div key={i} className="group relative aspect-square rounded-2xl overflow-hidden bg-gray-100 border border-gray-100 cursor-move">
-                      <img src={`https://images.unsplash.com/photo-${1600585154340 + i}-be6161a56a0c?w=400&q=80`} className="w-full h-full object-cover" alt="listing" />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                        <button className="p-2 bg-white rounded-lg text-black hover:text-[#0d9488] transition-colors"><Edit3 className="w-4 h-4" /></button>
-                        <button className="p-2 bg-white rounded-lg text-black hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
-                      </div>
-                      <div className="absolute top-2 left-2 p-1 bg-white/80 backdrop-blur-sm rounded-md opacity-0 group-hover:opacity-100 transition-opacity">
-                        <GripVertical className="w-3 h-3 text-gray-500" />
-                      </div>
-                    </div>
-                  ))}
-                  <button className="aspect-square rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-2 text-gray-400 hover:border-[#0d9488] hover:text-[#0d9488] transition-all">
-                    <Plus className="w-6 h-6" />
-                    <span className="text-[10px] font-bold uppercase tracking-widest">Add More</span>
+              {/* Tabs Navigation */}
+              <div className="flex items-center gap-1 bg-slate-200/50 p-1 rounded-xl w-fit">
+                {["media", "3d content", "files", "audit log"].map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
+                      activeTab === tab 
+                        ? "bg-white text-black shadow-sm" 
+                        : "text-slate-500 hover:text-black"
+                    }`}
+                  >
+                    {tab}
                   </button>
-                </div>
+                ))}
               </div>
 
-              {/* Videos & Reels */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm">
-                  <h3 className="text-sm font-black text-black uppercase mb-6 flex items-center gap-2">
-                    <Video className="w-4 h-4 text-orange-500" /> Videos
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="p-4 bg-[#fafafa] rounded-xl border border-dashed border-gray-200 text-center">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase mb-3 tracking-widest">Add Horizontal Video</p>
+              {/* Media Content Tab */}
+              {activeTab === "media" && (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                  {/* Images Section */}
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                      <div className="flex items-center gap-3">
+                        <ImageIcon className="w-4 h-4 text-blue-500" />
+                        <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight">Listing Images (42)</h2>
+                      </div>
                       <div className="flex gap-2">
-                        <Button variant="outline" className="flex-1 text-[10px] h-8 font-bold">ADD FILE</Button>
-                        <Button variant="outline" className="flex-1 text-[10px] h-8 font-bold">ADD LINK</Button>
+                        <button className="text-[10px] font-bold text-slate-400 hover:text-black uppercase tracking-wider">Arrange</button>
+                        <div className="w-[1px] h-3 bg-slate-200 mx-1 self-center" />
+                        <button className="text-[10px] font-bold text-[#0d9488] hover:underline uppercase tracking-wider flex items-center gap-1">
+                          <Plus className="w-3 h-3" /> Add Batch
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="p-6">
+                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                          <div key={i} className="group relative aspect-square rounded-xl overflow-hidden bg-slate-100 border border-slate-100 cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-all">
+                            <img 
+                              src={`https://images.unsplash.com/photo-${1600585154340 + i}-be6161a56a0c?w=300&q=80`} 
+                              className="w-full h-full object-cover" 
+                              alt="listing" 
+                            />
+                            <div className="absolute top-1.5 right-1.5 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button title="Archive" className="p-1.5 bg-white/90 backdrop-blur-sm rounded-md shadow-sm text-slate-400 hover:text-blue-500"><Archive className="w-3.5 h-3.5" /></button>
+                              <button title="Hide" className="p-1.5 bg-white/90 backdrop-blur-sm rounded-md shadow-sm text-slate-400 hover:text-orange-500"><EyeOff className="w-3.5 h-3.5" /></button>
+                              <button title="Delete" className="p-1.5 bg-white/90 backdrop-blur-sm rounded-md shadow-sm text-slate-400 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
+                            </div>
+                            <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5">
+                              <button className="px-2 py-1 bg-white/20 backdrop-blur-sm hover:bg-white/40 text-white rounded text-[8px] font-black uppercase">Edit</button>
+                              <button className="px-2 py-1 bg-white/20 backdrop-blur-sm hover:bg-white/40 text-white rounded text-[8px] font-black uppercase">Staging</button>
+                            </div>
+                            <div className="absolute top-1.5 left-1.5 p-1 bg-slate-900/40 backdrop-blur-sm rounded text-[8px] text-white font-bold">{i}</div>
+                          </div>
+                        ))}
+                        <button className="aspect-square rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-[#0d9488] hover:text-[#0d9488] hover:bg-[#f0fdfa]/50 transition-all group">
+                          <Plus className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                          <span className="text-[9px] font-bold uppercase tracking-widest">Upload</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Videos & Reels Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                      <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                        <div className="flex items-center gap-3">
+                          <Video className="w-4 h-4 text-orange-500" />
+                          <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight">Horizontal Video</h2>
+                        </div>
+                        <button className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors"><MoreVertical className="w-4 h-4 text-slate-400" /></button>
+                      </div>
+                      <div className="p-6">
+                        <div className="border-2 border-dashed border-slate-100 rounded-xl p-8 text-center bg-slate-50/30">
+                          <Video className="w-8 h-8 text-slate-200 mx-auto mb-3" />
+                          <div className="flex gap-2 justify-center">
+                            <Button size="sm" variant="outline" className="h-8 text-[10px] font-black uppercase px-4 border-slate-200">Add File</Button>
+                            <Button size="sm" variant="outline" className="h-8 text-[10px] font-black uppercase px-4 border-slate-200">Add Link</Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                      <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                        <div className="flex items-center gap-3">
+                          <Smartphone className="w-4 h-4 text-purple-500" />
+                          <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight">Vertical Reels</h2>
+                        </div>
+                        <button className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors"><MoreVertical className="w-4 h-4 text-slate-400" /></button>
+                      </div>
+                      <div className="p-6">
+                        <div className="border-2 border-dashed border-slate-100 rounded-xl p-8 text-center bg-slate-50/30">
+                          <Smartphone className="w-8 h-8 text-slate-200 mx-auto mb-3" />
+                          <div className="flex gap-2 justify-center">
+                            <Button size="sm" variant="outline" className="h-8 text-[10px] font-black uppercase px-4 border-slate-200">Add File</Button>
+                            <Button size="sm" variant="outline" className="h-8 text-[10px] font-black uppercase px-4 border-slate-200">Add Link</Button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-                <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm">
-                  <h3 className="text-sm font-black text-black uppercase mb-6 flex items-center gap-2">
-                    <Smartphone className="w-4 h-4 text-purple-500" /> Reels
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="p-4 bg-[#fafafa] rounded-xl border border-dashed border-gray-200 text-center">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase mb-3 tracking-widest">Add Vertical Content</p>
-                      <div className="flex gap-2">
-                        <Button variant="outline" className="flex-1 text-[10px] h-8 font-bold">ADD FILE</Button>
-                        <Button variant="outline" className="flex-1 text-[10px] h-8 font-bold">ADD LINK</Button>
+              )}
+
+              {/* 3D Content Tab */}
+              {activeTab === "3d content" && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in slide-in-from-top-2">
+                  <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                    <div className="flex items-center gap-3">
+                      <Globe className="w-4 h-4 text-teal-500" />
+                      <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight">Interactive Content</h2>
+                    </div>
+                  </div>
+                  <div className="p-8 max-w-2xl space-y-6">
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Provider</label>
+                        <select className="w-full h-11 px-4 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-bold focus:ring-2 focus:ring-[#0d9488]/20 outline-none">
+                          <option>Matterport</option>
+                          <option>Zillow 3D Home</option>
+                          <option>iGuide</option>
+                          <option>Direct Embed</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Visibility</label>
+                        <select className="w-full h-11 px-4 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-bold focus:ring-2 focus:ring-[#0d9488]/20 outline-none">
+                          <option>Show Branded</option>
+                          <option>Show Unbranded</option>
+                          <option>Both (Side-by-side)</option>
+                          <option>Auto-detect</option>
+                        </select>
                       </div>
                     </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 3D Content Section */}
-              <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm">
-                <div className="flex items-center gap-3 mb-8">
-                  <div className="p-2 bg-teal-50 rounded-lg">
-                    <Globe className="w-5 h-5 text-[#0d9488]" />
-                  </div>
-                  <h2 className="text-xl font-black text-black uppercase tracking-tight">3D Content</h2>
-                </div>
-                
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Tour Provider</label>
-                      <select className="w-full px-4 py-3 rounded-xl border border-gray-100 bg-[#fafafa] focus:border-[#0d9488] outline-none text-xs font-bold uppercase tracking-tight">
-                        <option>Matterport</option>
-                        <option>Zillow 3D Home</option>
-                        <option>iGuide</option>
-                        <option>Other Provider</option>
-                      </select>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Tour URL</label>
+                      <input type="url" placeholder="https://..." className="w-full h-11 px-4 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-medium focus:ring-2 focus:ring-[#0d9488]/20 outline-none" />
                     </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Display Type</label>
-                      <select className="w-full px-4 py-3 rounded-xl border border-gray-100 bg-[#fafafa] focus:border-[#0d9488] outline-none text-xs font-bold uppercase tracking-tight">
-                        <option>Automatically Select</option>
-                        <option>Branded</option>
-                        <option>Unbranded</option>
-                        <option>Both</option>
-                      </select>
+                    <Button className="bg-[#0d9488] text-white font-black uppercase text-[10px] tracking-widest h-11 px-8 rounded-xl">Save 3D Tour</Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Files Tab */}
+              {activeTab === "files" && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in slide-in-from-top-2">
+                  <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                    <div className="flex items-center gap-3">
+                      <FileText className="w-4 h-4 text-slate-400" />
+                      <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight">Attachments</h2>
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Tour Title</label>
-                    <input type="text" placeholder="e.g. Matterport 3D Tour" className="w-full px-4 py-3 rounded-xl border border-gray-100 bg-[#fafafa] focus:border-[#0d9488] outline-none text-xs font-medium" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Paste Tour Link</label>
-                    <input type="url" placeholder="https://my.matterport.com/show/..." className="w-full px-4 py-3 rounded-xl border border-gray-100 bg-[#fafafa] focus:border-[#0d9488] outline-none text-xs font-medium" />
+                  <div className="p-12">
+                    <div className="border-2 border-dashed border-slate-100 rounded-[2rem] p-16 text-center hover:border-[#0d9488] hover:bg-[#f0fdfa]/30 transition-all cursor-pointer group">
+                      <FilePlus className="w-10 h-10 text-slate-200 mx-auto mb-4 group-hover:text-[#0d9488] transition-colors" />
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Drag and drop files here</p>
+                      <p className="text-[10px] text-slate-300 font-medium italic">Support for PDF, PNG, JPG, and DOCX (Max 100MB)</p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* Misc Files */}
-              <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm">
-                <h3 className="text-sm font-black text-black uppercase mb-6 flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-gray-400" /> Attachments & Files
-                </h3>
-                <div className="border-2 border-dashed border-gray-100 rounded-2xl p-12 text-center hover:border-[#0d9488] transition-colors cursor-pointer group">
-                  <FilePlus className="w-8 h-8 text-gray-300 mx-auto mb-4 group-hover:scale-110 transition-transform" />
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Drop PDFs or Misc Files Here</p>
+              {/* Audit Log Content (If integrated here) */}
+              {activeTab === "audit log" && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in slide-in-from-top-2">
+                  <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                    <div className="flex items-center gap-3">
+                      <History className="w-4 h-4 text-slate-400" />
+                      <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight">Full System Audit</h2>
+                    </div>
+                  </div>
+                  <div className="divide-y divide-slate-50">
+                    {auditLogs.map((log, idx) => (
+                      <div key={idx} className="px-8 py-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
+                        <div className="flex items-center gap-4">
+                          <div className="w-2 h-2 rounded-full bg-slate-200" />
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-slate-900">{log.action}</span>
+                            <span className="text-[10px] text-slate-400 font-medium">By {log.user}</span>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-300 uppercase">{log.time}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
             </div>
 
-            {/* Sidebar: Customer & Invoice */}
-            <div className="space-y-8">
+            {/* Sidebar (Right) */}
+            <div className="w-full lg:w-[380px] space-y-6">
               
-              {/* Customer Management */}
-              <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm">
+              {/* Listing Card */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-sm font-black text-black uppercase tracking-tight">Customer</h3>
-                  <Link to="/admin/customers" className="text-[10px] font-bold text-[#0d9488] uppercase hover:underline">Manage Center</Link>
+                  <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-[#f0fdfa] border border-[#ccfbf1]">
+                    <CheckCircle2 className="w-3 h-3 text-[#0d9488]" />
+                    <span className="text-[10px] font-black text-[#0d9488] uppercase tracking-wider">{listing.status}</span>
+                  </div>
+                  <button className="p-2 hover:bg-slate-50 rounded-lg transition-colors border border-slate-100"><Settings className="w-4 h-4 text-slate-400" /></button>
                 </div>
                 
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="w-12 h-12 rounded-full bg-[#166534] flex items-center justify-center text-white font-bold">SJ</div>
+                <h3 className="text-lg font-black text-slate-900 tracking-tight leading-tight mb-1">{listing.address}</h3>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">{listing.city}</p>
+                
+                <div className="grid grid-cols-2 gap-4 py-4 border-y border-slate-50 mb-6">
                   <div>
-                    <p className="font-bold text-black">{listing.agent}</p>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{listing.team}</p>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">List Price</p>
+                    <p className="text-sm font-black text-slate-900">{listing.price}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Created</p>
+                    <p className="text-sm font-black text-slate-900">{listing.date}</p>
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <Button variant="outline" className="w-full py-5 rounded-xl border-gray-100 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2">
-                    <UserPlus className="w-3 h-3" /> Reassign Customer
-                  </Button>
-                  <Button variant="outline" className="w-full py-5 rounded-xl border-gray-100 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2">
-                    <Edit3 className="w-3 h-3" /> Edit Preferences
-                  </Button>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-white text-[10px] font-black">SJ</div>
+                      <div>
+                        <p className="text-xs font-black text-slate-900 leading-none mb-1">{listing.agent}</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">{listing.team}</p>
+                      </div>
+                    </div>
+                    <Link to="/admin/customers" className="p-2 text-[#0d9488] hover:bg-teal-50 rounded-lg transition-all"><UserPlus className="w-4 h-4" /></Link>
+                  </div>
                 </div>
               </div>
 
-              {/* Invoice Section */}
-              <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm">
-                <h3 className="text-sm font-black text-black uppercase tracking-tight mb-6 flex items-center gap-2">
-                  <CreditCard className="w-4 h-4 text-[#0d9488]" /> Billing
-                </h3>
-                <div className="p-4 bg-[#f0fdfa] rounded-2xl border border-[#ccfbf1] mb-6">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Total Invoice</span>
-                    <span className="text-lg font-black text-[#0d9488]">$1,249.00</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-white rounded-full overflow-hidden">
-                    <div className="w-full h-full bg-[#0d9488]"></div>
-                  </div>
+              {/* Billing Compact */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <CreditCard className="w-4 h-4 text-blue-500" />
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Invoicing</h3>
                 </div>
-                <Button className="w-full py-6 bg-black text-white font-bold rounded-xl flex items-center justify-center gap-2">
-                  <FileText className="w-4 h-4" /> View Invoice
-                </Button>
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Balance Due</p>
+                  <p className="text-lg font-black text-slate-900">$0.00</p>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg text-[10px] font-bold">
+                    <span className="text-slate-500">INV-8245-01</span>
+                    <span className="text-[#0d9488]">PAID</span>
+                  </div>
+                  <Button variant="outline" className="w-full h-10 text-[10px] font-black uppercase tracking-widest border-slate-200">View Statement</Button>
+                </div>
               </div>
 
-              {/* System Integration Settings */}
-              <div className="bg-black rounded-[2.5rem] p-8 text-white relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-6 opacity-[0.05] pointer-events-none">
-                  <Settings className="w-24 h-24" />
+              {/* Access Controls Section */}
+              <div className="bg-slate-900 rounded-2xl p-6 text-white overflow-hidden relative">
+                <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none">
+                  <Lock className="w-24 h-24" />
                 </div>
-                <h3 className="text-sm font-bold uppercase tracking-widest mb-6 relative z-10">Access Controls</h3>
+                <div className="flex items-center gap-3 mb-6 relative z-10">
+                  <Lock className="w-4 h-4 text-[#0d9488]" />
+                  <h3 className="text-xs font-black uppercase tracking-[0.2em]">Listing Security</h3>
+                </div>
+                
                 <div className="space-y-4 relative z-10">
                   {[
                     { label: "Lock Media Downloads", checked: true },
@@ -273,10 +368,26 @@ export default function AdminListingFile() {
                     { label: "Require Payment for DL", checked: true }
                   ].map((control, idx) => (
                     <div key={idx} className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{control.label}</span>
-                      <div className={`w-8 h-4 rounded-full relative transition-colors ${control.checked ? 'bg-[#0d9488]' : 'bg-gray-800'}`}>
-                        <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${control.checked ? 'right-0.5' : 'left-0.5'}`}></div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{control.label}</span>
+                      <div className={`w-7 h-3.5 rounded-full relative transition-colors ${control.checked ? 'bg-[#0d9488]' : 'bg-slate-700'}`}>
+                        <div className={`absolute top-0.5 w-2.5 h-2.5 bg-white rounded-full transition-all ${control.checked ? 'right-0.5' : 'left-0.5'}`}></div>
                       </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Audit Log (Compact Side) */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <History className="w-4 h-4 text-slate-400" />
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Quick Log</h3>
+                </div>
+                <div className="space-y-3">
+                  {auditLogs.slice(0, 3).map((log, idx) => (
+                    <div key={idx} className="flex flex-col">
+                      <span className="text-[10px] font-bold text-slate-900 truncate">{log.action}</span>
+                      <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">{log.time}</span>
                     </div>
                   ))}
                 </div>
@@ -284,37 +395,6 @@ export default function AdminListingFile() {
 
             </div>
           </div>
-
-          {/* Audit Log Section */}
-          <div className="mt-12">
-            <button 
-              onClick={() => setIsAuditLogOpen(!isAuditLogOpen)}
-              className="w-full bg-white rounded-2xl p-6 border border-gray-100 shadow-sm flex items-center justify-between group"
-            >
-              <div className="flex items-center gap-3 text-gray-400 group-hover:text-black transition-colors">
-                <History className="w-5 h-5" />
-                <span className="text-sm font-black uppercase tracking-widest">System Audit Log</span>
-              </div>
-              <ChevronDown className={`w-5 h-5 text-gray-300 transition-transform ${isAuditLogOpen ? 'rotate-180' : ''}`} />
-            </button>
-            
-            {isAuditLogOpen && (
-              <div className="mt-4 bg-white rounded-[2rem] border border-gray-100 p-8 shadow-inner animate-in slide-in-from-top-2 duration-300">
-                <div className="space-y-4">
-                  {auditLogs.map((log, idx) => (
-                    <div key={idx} className="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
-                      <div className="flex flex-col">
-                        <span className="text-xs font-bold text-black">{log.action}</span>
-                        <span className="text-[10px] text-gray-400 font-medium tracking-tight">Performed by {log.user}</span>
-                      </div>
-                      <span className="text-[10px] font-bold text-gray-300 uppercase">{log.time}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
         </div>
       </main>
 
