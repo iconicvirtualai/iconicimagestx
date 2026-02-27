@@ -109,7 +109,11 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {recentOrders.map((order) => (
-                        <tr key={order.id} className="group hover:bg-[#fafafa] transition-colors">
+                        <tr
+                          key={order.id}
+                          className="group hover:bg-[#fafafa] transition-colors cursor-pointer"
+                          onClick={() => navigate(`/admin/listing/${order.id.replace('#', '')}`)}
+                        >
                           <td className="py-4 text-sm font-bold text-black">{order.id}</td>
                           <td className="py-4">
                             <p className="text-sm font-bold text-black">{order.agent}</p>
