@@ -13,6 +13,7 @@ import Contact from "./pages/Contact";
 import Book from "./pages/Book";
 import Pricing from "./pages/Pricing";
 import PricingV1 from "./pages/PricingV1";
+import AIPricingAssistant from "./pages/AIPricingAssistant";
 import Insights from "./pages/Insights";
 import VirtualStaging from "./pages/VirtualStaging";
 import VirtualStagingSelection from "./pages/VirtualStagingSelection";
@@ -37,6 +38,7 @@ const App = () => (
           <Route path="/contact" element={<Contact />} />
           <Route path="/book" element={<Book />} />
           <Route path="/pricing" element={<Pricing />} />
+          <Route path="/pricing/ai-assistant" element={<AIPricingAssistant />} />
           <Route path="/pricing-v1" element={<PricingV1 />} />
           <Route path="/insights" element={<Insights />} />
           <Route path="/services/virtual-staging" element={<VirtualStaging />} />

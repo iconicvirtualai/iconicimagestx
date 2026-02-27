@@ -2,12 +2,12 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Check, X, ArrowRight, Star, ChevronLeft, ChevronRight } from "lucide-react";
+import { Check, X, ArrowRight, Star, ChevronLeft, ChevronRight, Info, Sparkles, Zap, Trophy, Crown, Camera, Video, Layout, Box, Users } from "lucide-react";
 import { useState, useRef } from "react";
 
 export default function Pricing() {
-  const [isYearly, setIsYearly] = useState(true);
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
+  const [brandingSliderPos, setBrandingSliderPos] = useState(50);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const scrollTestimonials = (direction: 'left' | 'right') => {
@@ -20,350 +20,421 @@ export default function Pricing() {
     }
   };
 
-  const plans = [
+  const listingTiers = [
     {
-      name: "FREE",
-      description: "For agents who want to see the Iconic difference.",
-      metrics: "1 Strategy",
-      metricsUnit: "/month",
-      monthlyPrice: 0,
-      yearlyPrice: 0,
-      pricePerUnit: 0,
-      unitName: "session",
-      buttonText: "Book Now →",
+      name: "THE ESSENTIALS",
+      tagline: "The High-Speed Starter.",
+      price: "249",
+      period: "per listing",
+      description: "Fast-paced content to get your listing live with impact.",
+      icon: <Zap className="w-6 h-6 text-[#0d9488]" />,
+      buttonText: "Start My Consistency",
+      ctaSubtext: "Your reel is ready before the sign is up.",
+      tooltip: "Ideal for fast-moving residential listings where speed and social presence are key.",
       features: [
-        { text: "1 Strategy Session/month", included: true },
-        { text: "Content Audit", included: true },
-        { text: "Growth Roadmap", included: true },
-        { text: "Cinematic Media", included: false },
-        { text: "Next-Day Delivery", included: false },
-        { text: "Social Media Kits", included: false },
-        { text: "Drone Photography", included: false },
-        { text: "Priority Support", included: false },
+        "30 Ultra-HDR Photos",
+        "The 'Snap' Reel (15s vertical montage)",
+        "Trending Audio Integration",
+        "High-Energy Social Trailer",
+        "Pre-Launch Delivery"
       ]
     },
     {
-      name: "STARTER",
-      description: "For individuals ready to upgrade their listing game.",
-      metrics: "1 Package",
-      metricsUnit: isYearly ? "/year" : "/month",
-      monthlyPrice: 299,
-      yearlyPrice: 239,
-      originalMonthlyPrice: 349,
-      originalYearlyPrice: 299,
-      pricePerUnit: 299,
-      unitName: "listing",
-      discount: "20% OFF",
-      buttonText: "Start Free Trial →",
-      trialText: "7-day free trial – cancel anytime*",
-      features: [
-        { text: "1 Full Listing Package/month", included: true },
-        { text: "25 High-Def Photos", included: true },
-        { text: "Digital Floorplan", included: true },
-        { text: "1 Vertical Cinematic Reel", included: true },
-        { text: "Next Day Delivery", included: true },
-        { text: "Unlimited AI photo edits", included: true },
-        { text: "Drone Photography", included: false },
-        { text: "Priority Support", included: false },
-      ]
-    },
-    {
-      name: "LEADER",
-      description: "For growing teams scaling their market presence.",
-      metrics: "2 Packages",
-      metricsUnit: isYearly ? "/year" : "/month",
-      monthlyPrice: 599,
-      yearlyPrice: 479,
-      originalMonthlyPrice: 749,
-      originalYearlyPrice: 599,
-      pricePerUnit: 240,
-      unitName: "listing",
-      discount: "20% OFF",
+      name: "THE SHOWCASE",
+      tagline: "The Market Mover.",
+      price: "549",
+      period: "per listing",
+      description: "Complete visual story with drone and AI enhancements.",
+      icon: <Trophy className="w-6 h-6 text-[#0d9488]" />,
       isPopular: true,
-      buttonText: "Start Free Trial →",
-      trialText: "7-day free trial – cancel anytime*",
+      buttonText: "Start My Consistency",
+      ctaSubtext: "Your reel is ready before the sign is up.",
+      tooltip: "Best for standard to mid-range listings needing a professional cinematic edge.",
       features: [
-        { text: "2 Full Listing Packages/month", included: true },
-        { text: "40 High-Def Photos", included: true },
-        { text: "Aerial Drone Photography", included: true },
-        { text: "9:16 Vertical Video Trailer", included: true },
-        { text: "Predictive Twilight Staging", included: true },
-        { text: "'Just Listed' Social Kit", included: true },
-        { text: "Unlimited AI photo edits", included: true },
-        { text: "Priority Support", included: true },
+        "50 Ultra-HDR Photos",
+        "5 Drone Aerials",
+        "The 'Cinematic' Reel (30-60s vertical film)",
+        "Smooth transitions & Speed ramps",
+        "AI Twilight 'Glow' (2 Exterior shots)",
+        "2D Floorplan"
       ]
     },
     {
-      name: "DOMINATOR",
-      description: "For top producers and agencies dominating the area.",
-      metrics: "Unlimited",
-      metricsUnit: isYearly ? "/year" : "/month",
-      monthlyPrice: 1499,
-      yearlyPrice: 1199,
-      originalMonthlyPrice: 1899,
-      originalYearlyPrice: 1499,
-      pricePerUnit: 199,
-      unitName: "listing",
-      discount: "20% OFF",
-      buttonText: "Start Free Trial →",
-      trialText: "7-day free trial – cancel anytime*",
+      name: "THE LEGACY",
+      tagline: "For luxury estates.",
+      price: "899",
+      period: "per listing",
+      description: "Luxury-tier production for high-value properties.",
+      icon: <Crown className="w-6 h-6 text-[#0d9488]" />,
+      buttonText: "Start My Consistency",
+      ctaSubtext: "Your reel is ready before the sign is up.",
+      tooltip: "Engineered for luxury listings and high-value neighborhoods where image is everything.",
       features: [
-        { text: "Unlimited Listing Packages", included: true },
-        { text: "1 Personal Brand Shoot/mo", included: true },
-        { text: "Weekly Social Media Content", included: true },
-        { text: "The 'Sold' Legacy Blast", included: true },
-        { text: "Neighborhood Domination Maps", included: true },
-        { text: "Dedicated Creative Partner", included: true },
-        { text: "AI Digital Twin Access", included: true },
-        { text: "24/7 Priority Support", included: true },
+        "The Full Media Suite (All Photos + Drone)",
+        "10 AI Twilight Renders",
+        "90s Cinematic Property Film (4K Landscape)",
+        "Professional Color Grading",
+        "Licensed Music",
+        "Agent-on-camera Intro/Outro",
+        "The 'Iconic' Animated Reel (60s Vertical)"
+      ]
+    },
+    {
+      name: "THE MARKET LEADER",
+      tagline: "The Full-Scale Production.",
+      price: "1599",
+      period: "per listing",
+      description: "Dominate the market with complete media saturation.",
+      icon: <Box className="w-6 h-6 text-[#0d9488]" />,
+      badge: "Only 5 slots available per zip code",
+      buttonText: "Secure My Zip Code",
+      ctaSubtext: "Your reel is ready before the sign is up.",
+      tooltip: "For top producers who want to own their local market and provide unmatched seller value.",
+      features: [
+        "The Full Media Suite (Max Possible Assets)",
+        "Max AI Twilight Renders",
+        "90s Cinematic Property Film (4K)",
+        "The 'Iconic' Animated Reel (60s Vertical)",
+        "3D Motion Graphics & Spatial Effects",
+        "Spatial VR / Matterport (Vision Pro Ready)",
+        "2D Floorplan",
+        "Post-Sale Marketing: 'Success Story' Interview"
+      ]
+    }
+  ];
+
+  const brandingTiers = [
+    {
+      name: "THE REFRESH",
+      tagline: "The modern headshot replacement.",
+      price: "349",
+      period: "session",
+      description: "Upgrade your professional image with high-end lifestyle content.",
+      icon: <Camera className="w-6 h-6 text-[#0d9488]" />,
+      buttonText: "Start My Consistency",
+      ctaSubtext: "You sell homes; we’ll handle the fame.",
+      tooltip: "Perfect for agents needing a quick but high-end update to their social and professional profiles.",
+      features: [
+        "60-Minute Session",
+        "10 High-End 'Lifestyle' Portraits",
+        "The Woodlands/Spring Locations",
+        "AI Digital Twin Lite Setup",
+        "Voice and Likeness Cloning"
+      ]
+    },
+    {
+      name: "THE AUTHORITY",
+      tagline: "Content department on autopilot.",
+      price: "999",
+      period: "per month",
+      description: "Monthly strategic content production for consistent brand growth.",
+      icon: <Video className="w-6 h-6 text-[#0d9488]" />,
+      isPopular: true,
+      buttonText: "Build My Empire",
+      ctaSubtext: "You sell homes; we’ll handle the fame.",
+      tooltip: "Designed for agents who want to dominate social media without the stress of filming or editing.",
+      features: [
+        "The 'Value Bomb' Session: 2hrs Filming/mo",
+        "We provide the Scripts",
+        "20 Custom Reels/TikToks",
+        "Edited with 2026 Trends",
+        "Trending Audio & AI Mascot Branding"
+      ]
+    },
+    {
+      name: "THE LOCAL LEGEND",
+      tagline: "Complete brand reinvention.",
+      price: "2499",
+      period: "session/campaign",
+      description: "Become the go-to authority in your specific local neighborhood.",
+      icon: <Users className="w-6 h-6 text-[#0d9488]" />,
+      buttonText: "Build My Empire",
+      ctaSubtext: "You sell homes; we’ll handle the fame.",
+      tooltip: "For agents aiming for 'Neighborhood Mayor' status and total local authority.",
+      features: [
+        "6-8hr 'Day in the Life' Production",
+        "90-Second Bio-Film",
+        "Neighborhood Mayor Series (5 Videos)",
+        "Cinematic Hotspot Highlights",
+        "Complete Brand Transformation"
       ]
     }
   ];
 
   return (
-    <div className="flex flex-col min-h-screen bg-white">
+    <div className="flex flex-col min-h-screen bg-[#fafafa]">
       <Header />
       
       <main className="flex-1 pb-20">
-        {/* Hero */}
-        <div className="pt-20 pb-12 text-center px-4">
-          <h1 className="text-4xl md:text-6xl font-bold text-black mb-4">
-            Choose the <span className="text-[#0d9488]">perfect</span> plan for your needs
+        {/* Hero Section */}
+        <div className="pt-32 pb-16 text-center px-4 max-w-5xl mx-auto">
+          <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#f0fdfa] border border-[#ccfbf1] mb-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <span className="text-[12px] font-bold tracking-wider text-[#0d9488] uppercase">
+              Pricing & Packages
+            </span>
+          </div>
+          <h1 className="text-5xl md:text-7xl font-bold text-black mb-6 tracking-tight leading-[1.1]">
+            Pick the <span className="text-[#0d9488]">poison</span>:
           </h1>
-          <p className="text-gray-500 text-lg">
-            Start for free, upgrade when you <span className="text-[#0d9488]">❤</span> love it.
+          <p className="text-xl md:text-2xl text-gray-400 font-medium mb-12">
+            For Listings. For Branding. For Business.
           </p>
 
-          {/* Billing Toggle */}
-          <div className="mt-10 flex items-center justify-center gap-4">
-            <span className={`text-sm font-medium ${!isYearly ? 'text-black' : 'text-gray-400'}`}>Monthly</span>
-            <button 
-              onClick={() => setIsYearly(!isYearly)}
-              className="relative w-14 h-7 bg-[#0d9488] rounded-full p-1 transition-colors"
-            >
-              <div className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow-sm transform transition-transform ${isYearly ? 'translate-x-7' : 'translate-x-0'}`}></div>
-            </button>
-            <div className="flex items-center gap-2">
-              <span className={`text-sm font-medium ${isYearly ? 'text-black' : 'text-gray-400'}`}>Yearly</span>
-              <span className="bg-[#ccfbf1] text-[#0d9488] text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tight">
-                up to 30% off
-              </span>
-            </div>
+          {/* AI Assistant CTA */}
+          <div className="mt-12 p-1 bg-gradient-to-r from-[#0d9488] via-[#22d3ee] to-[#0d9488] rounded-[2.5rem] shadow-xl shadow-teal-500/10 max-w-2xl mx-auto transform hover:scale-[1.02] transition-transform duration-500">
+            <Link to="/pricing/ai-assistant" className="block bg-white rounded-[2.4rem] p-8 md:p-10 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity">
+                <Sparkles className="w-32 h-32" />
+              </div>
+              <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
+                <div className="w-20 h-20 rounded-[2rem] bg-[#f0fdfa] border border-[#ccfbf1] flex items-center justify-center shrink-0">
+                  <Sparkles className="w-10 h-10 text-[#0d9488] animate-pulse" />
+                </div>
+                <div className="text-left flex-1">
+                  <h3 className="text-2xl font-bold text-black mb-2">Not sure where to start?</h3>
+                  <p className="text-gray-500 text-sm leading-relaxed mb-4">
+                    Take our 60-second Q&A with our AI strategist to determine what kind of service or package best suits your specific business goals.
+                  </p>
+                  <div className="flex items-center gap-2 text-[#0d9488] font-bold text-sm">
+                    Launch AI Assistant <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+              </div>
+            </Link>
           </div>
         </div>
 
-        {/* Pricing Grid */}
-        <div className="max-w-[1400px] mx-auto px-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {plans.map((plan, i) => (
-            <div 
-              key={i} 
-              className={`relative bg-white rounded-2xl p-6 border transition-all duration-300 flex flex-col ${
-                plan.isPopular ? 'border-[#0d9488] ring-1 ring-[#0d9488] shadow-lg scale-105 z-10' : 'border-gray-100 hover:border-gray-200'
-              }`}
-            >
-              {plan.isPopular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#0d9488] text-white text-[10px] font-bold px-4 py-1 rounded-full uppercase tracking-widest whitespace-nowrap">
-                  Most Popular
+        {/* Section 1: Listing Domination */}
+        <section className="py-20 bg-white">
+          <div className="max-w-[1400px] mx-auto px-4">
+            <div className="flex flex-col md:flex-row items-end justify-between gap-6 mb-16">
+              <div className="max-w-2xl">
+                <div className="flex items-center gap-3 text-[#0d9488] mb-4">
+                  <Layout className="w-6 h-6" />
+                  <span className="text-sm font-black uppercase tracking-widest">Section 1</span>
                 </div>
-              )}
-
-              <div className="flex justify-between items-start mb-2">
-                <h3 className="text-xl font-bold text-[#0d9488] tracking-tight">{plan.name}</h3>
-                {plan.discount && (
-                  <div className="flex items-center gap-1 bg-[#f0f9ff] text-[#0ea5e9] text-[10px] font-bold px-2 py-1 rounded-md">
-                    <Star className="w-3 h-3 fill-current" />
-                    {plan.discount}
-                  </div>
-                )}
-              </div>
-              <p className="text-xs text-gray-400 mb-6 leading-relaxed h-8">{plan.description}</p>
-
-              <div className="mb-6">
-                <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-bold text-black">{plan.metrics}</span>
-                  <span className="text-gray-400 text-xs">{plan.metricsUnit}</span>
-                </div>
-                
-                <div className="mt-4 flex gap-2">
-                  <div className="bg-gray-50 rounded-lg px-3 py-1.5 flex-1">
-                    <p className="text-[10px] font-bold text-black">${isYearly ? plan.yearlyPrice : plan.monthlyPrice} <span className="text-gray-400 font-normal">/month</span></p>
-                    {isYearly && (
-                      <p className="text-[8px] text-gray-300 line-through">${plan.originalYearlyPrice} /month</p>
-                    )}
-                  </div>
-                  <div className="bg-gray-50 rounded-lg px-3 py-1.5 flex-1">
-                    <p className="text-[10px] font-bold text-black">${plan.pricePerUnit} <span className="text-gray-400 font-normal">/{plan.unitName}</span></p>
-                    {isYearly && (
-                      <p className="text-[8px] text-gray-300 line-through">${plan.pricePerUnit + 5} /{plan.unitName}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <Link to="/book" className="mb-2">
-                <Button className={`w-full py-5 rounded-lg font-bold text-sm ${
-                  plan.isPopular ? 'bg-[#0d9488] hover:bg-[#0f766e] text-white' : 'bg-[#22d3ee] hover:bg-[#0891b2] text-white'
-                }`}>
-                  {plan.buttonText}
-                </Button>
-              </Link>
-              {plan.trialText && (
-                <p className="text-[10px] text-gray-400 text-center mb-6 italic">{plan.trialText}</p>
-              )}
-
-              <div className="mt-auto pt-6 border-t border-gray-50 space-y-3">
-                {plan.features.map((feature, j) => (
-                  <div key={j} className="flex items-center gap-3">
-                    {feature.included ? (
-                      <div className="w-4 h-4 rounded-full bg-[#ccfbf1] flex items-center justify-center shrink-0">
-                        <Check className="w-2.5 h-2.5 text-[#0d9488] stroke-[3]" />
-                      </div>
-                    ) : (
-                      <div className="w-4 h-4 rounded-full bg-red-50 flex items-center justify-center shrink-0">
-                        <X className="w-2.5 h-2.5 text-red-400 stroke-[3]" />
-                      </div>
-                    )}
-                    <span className={`text-[11px] ${feature.included ? 'text-gray-600' : 'text-gray-300'}`}>
-                      {feature.text}
-                    </span>
-                  </div>
-                ))}
+                <h2 className="text-4xl md:text-5xl font-bold text-black mb-6 tracking-tight">
+                  Listing Domination <span className="text-gray-300">(The Property)</span>
+                </h2>
+                <p className="text-lg text-gray-500 leading-relaxed">
+                  Targeting the listing lifecycle: Pre-launch buzz, active sale, and post-close legacy. 
+                  Every package now includes a Listing Reel as the core deliverable. <span className="font-bold text-black">We don't just shoot; we trend.</span>
+                </p>
               </div>
             </div>
-          ))}
-        </div>
 
-        {/* Enterprise Section */}
-        <div className="max-w-[1400px] mx-auto px-4 mt-12">
-          <div className="bg-white border border-gray-100 rounded-2xl p-8 flex flex-col md:flex-row items-center justify-between gap-8">
-            <div className="flex-1">
-              <h3 className="text-2xl font-bold text-[#0d9488] mb-2 uppercase tracking-tight">Enterprise / API Access</h3>
-              <p className="text-gray-500 text-sm">Need more? Get in touch for custom plans for your business needs.</p>
-            </div>
-            <div className="flex-1 flex flex-col md:flex-row gap-8">
-              <div className="grid grid-cols-2 gap-x-8 gap-y-3">
-                {[
-                  "100+ videos/month included",
-                  "20+ images per video",
-                  "60+ seconds per video",
-                  "Custom billing cycles",
-                  "Early access to new features",
-                  "API access"
-                ].map((item, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded-full bg-[#ccfbf1] flex items-center justify-center shrink-0">
-                      <Check className="w-2.5 h-2.5 text-[#0d9488] stroke-[3]" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {listingTiers.map((tier, i) => (
+                <div 
+                  key={i}
+                  className={`relative group bg-white rounded-[2rem] p-8 border transition-all duration-500 flex flex-col ${
+                    tier.isPopular ? 'border-[#0d9488] shadow-2xl shadow-teal-500/10 scale-105 z-10' : 'border-gray-100 hover:border-[#0d9488]/30 hover:shadow-xl'
+                  }`}
+                >
+                  {tier.badge && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-red-500 text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest whitespace-nowrap shadow-lg">
+                      {tier.badge}
                     </div>
-                    <span className="text-[11px] text-gray-600">{item}</span>
+                  )}
+
+                  <div className="mb-6 flex items-center justify-between">
+                    <div className="p-3 bg-[#f0fdfa] rounded-2xl">
+                      {tier.icon}
+                    </div>
+                    {tier.isPopular && (
+                      <span className="text-[10px] font-black text-[#0d9488] uppercase tracking-widest px-3 py-1 bg-[#ccfbf1] rounded-full">
+                        Popular Choice
+                      </span>
+                    )}
                   </div>
-                ))}
-              </div>
-              <Link to="/contact">
-                <Button variant="outline" className="border-[#0d9488] text-[#0d9488] hover:bg-[#f0fdfa] font-bold px-8 py-6 rounded-lg whitespace-nowrap">
-                  Contact Us →
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
 
-        {/* Testimonials */}
-        <section className="bg-[#e0f7f6]/40 py-24 md:py-32 overflow-hidden mt-20">
-          <div className="container mx-auto px-4 text-center">
-            <div className="inline-flex items-center px-3 py-1 rounded bg-white border border-[#ccfbf1] mb-8 shadow-sm">
-              <span className="text-[10px] font-bold tracking-wider text-[#0d9488] uppercase">
-                TESTIMONIALS
-              </span>
-            </div>
+                  <h3 className="text-xl font-black text-black mb-1">{tier.name}</h3>
+                  <p className="text-[#0d9488] font-bold text-xs uppercase tracking-wider mb-6">{tier.tagline}</p>
 
-            <h2 className="text-4xl md:text-5xl font-bold mb-6 text-black">
-              What our users are saying
-            </h2>
-            <p className="text-gray-500 max-w-2xl mx-auto mb-16">
-              Real estate media businesses, photographers, and agents are using Iconic
-              every day to boost their video marketing.
-            </p>
+                  <div className="mb-6 flex items-baseline gap-1">
+                    <span className="text-4xl font-black text-black">${tier.price}</span>
+                    <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">{tier.period}</span>
+                  </div>
 
-            <div className="relative group">
-              <div
-                ref={scrollContainerRef}
-                className="flex gap-6 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-12"
-              >
-                {[
-                  {
-                    name: "Mark Shepherd",
-                    role: "MD & Founder, Apollo3D Ltd, UK",
-                    content: "Iconic has enhanced our video and 3D tour services uniquely. The team behind the app is super responsive and is always looking to improve the product and its capabilities.",
-                    avatar: "https://i.pravatar.cc/150?u=mark"
-                  },
-                  {
-                    name: "Kerry Riordan",
-                    role: "Director, Blue Lemonade Photography",
-                    content: "The future is here! Iconic surpasses the rest in terms of quality and accuracy. The generations look authentic, with subtle movements and tasteful add-ons.",
-                    avatar: "https://i.pravatar.cc/150?u=kerry"
-                  },
-                  {
-                    name: "Ron Potts",
-                    role: "Owner, Advanced Virtual Imaging",
-                    content: "This is truly an amazing product, turning photos into video. If you're looking for short video ads or property videos, consider Iconic!",
-                    avatar: "https://i.pravatar.cc/150?u=ron"
-                  },
-                  {
-                    name: "Nick Ptak",
-                    role: "The PTK Alliance Team at Compass",
-                    content: "It's 10 times less expensive and up to 100 times faster than marketing agencies, producing high-quality videos on demand 24/7/365.",
-                    avatar: "https://i.pravatar.cc/150?u=nick"
-                  },
-                  {
-                    name: "John Rudy",
-                    role: "Founder, Rudy Media Group",
-                    content: "Iconic saves a huge amount of time and money. I'm using it for a wide range of real estate.",
-                    avatar: "https://i.pravatar.cc/150?u=john"
-                  },
-                  {
-                    name: "Kim Lindsey",
-                    role: "Owner, Kim Lindsey Photography",
-                    content: "Groundbreaking tool. They are committed to improving the services with new updates often.",
-                    avatar: "https://i.pravatar.cc/150?u=kim"
-                  }
-                ].map((t, i) => (
-                  <div key={i} className="flex-shrink-0 w-[350px] md:w-[400px] snap-center">
-                    <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm text-left h-full flex flex-col">
-                      <div className="flex items-center gap-4 mb-6">
-                        <img src={t.avatar} alt={t.name} className="w-12 h-12 rounded-full border border-gray-100" />
-                        <div>
-                          <h4 className="font-bold text-black text-sm">{t.name}</h4>
-                          <p className="text-gray-400 text-[10px] font-medium uppercase tracking-tight">{t.role}</p>
+                  <p className="text-xs text-gray-500 leading-relaxed mb-8 min-h-[48px]">
+                    {tier.description}
+                  </p>
+
+                  <div className="space-y-4 mb-10">
+                    {tier.features.map((feature, j) => (
+                      <div key={j} className="flex items-start gap-3">
+                        <div className="mt-1 shrink-0">
+                          <Check className="w-3.5 h-3.5 text-[#0d9488] stroke-[3]" />
                         </div>
+                        <span className="text-[11px] font-medium text-gray-600 leading-tight">{feature}</span>
                       </div>
-                      <p className="text-gray-600 text-sm leading-relaxed mb-6 italic flex-1">
-                        "{t.content}"
-                      </p>
+                    ))}
+                  </div>
+
+                  <div className="mt-auto space-y-4">
+                    <Link to="/book" className="block">
+                      <Button className={`w-full py-6 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] ${
+                        tier.isPopular ? 'bg-[#0d9488] hover:bg-[#0f766e] text-white shadow-lg shadow-teal-100' : 'bg-black hover:bg-gray-800 text-white shadow-lg'
+                      }`}>
+                        {tier.buttonText}
+                      </Button>
+                    </Link>
+                    <p className="text-[10px] text-gray-400 text-center font-medium italic">{tier.ctaSubtext}</p>
+                    
+                    {/* Tooltip Simulation */}
+                    <div className="pt-4 border-t border-gray-50 flex items-center justify-center group/tooltip relative">
+                      <div className="flex items-center gap-2 text-[10px] font-bold text-gray-300 group-hover/tooltip:text-[#0d9488] cursor-help transition-colors">
+                        <Info className="w-3 h-3" />
+                        Which is for me?
+                      </div>
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 w-[200px] bg-black text-white p-3 rounded-xl text-[10px] font-medium leading-relaxed opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-300 shadow-2xl z-20 pointer-events-none">
+                        {tier.tooltip}
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-black"></div>
+                      </div>
                     </div>
                   </div>
-                ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Branding Before & After Slider */}
+        <section className="py-24 bg-[#fafafa]">
+          <div className="max-w-6xl mx-auto px-4 text-center">
+            <h2 className="text-4xl font-bold text-black mb-4">Elevate Your Personal Brand</h2>
+            <p className="text-gray-500 mb-12 max-w-2xl mx-auto">See the difference between a standard corporate headshot and an Iconic Lifestyle Portrait.</p>
+            
+            <div className="relative max-w-4xl mx-auto aspect-[16/9] rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-white">
+              {/* After (Iconic) */}
+              <img 
+                src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1600&q=80" 
+                className="absolute inset-0 w-full h-full object-cover"
+                alt="Iconic Lifestyle"
+              />
+              <div className="absolute inset-0 flex flex-col justify-end p-8 text-white z-10 text-right pointer-events-none">
+                <div className="bg-[#0d9488] px-4 py-2 rounded-full inline-block self-end text-sm font-black uppercase tracking-widest shadow-lg">Iconic Lifestyle</div>
               </div>
 
-              {/* Navigation Controls */}
-              <div className="flex items-center justify-center gap-4">
-                <button
-                  onClick={() => scrollTestimonials('left')}
-                  className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#0d9488] hover:border-[#0d9488] transition-all"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                <div className="flex gap-2">
-                  {[1, 2, 3, 4, 5].map((p) => (
-                    <div key={p} className={`w-1.5 h-1.5 rounded-full ${p === 1 ? "bg-[#0d9488]" : "bg-gray-200"}`}></div>
-                  ))}
+              {/* Before (Standard) */}
+              <div 
+                className="absolute inset-0 overflow-hidden"
+                style={{ clipPath: `inset(0 ${100 - brandingSliderPos}% 0 0)` }}
+              >
+                <img 
+                  src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1600&q=80" 
+                  className="absolute inset-0 w-full h-full object-cover grayscale brightness-[0.8]"
+                  alt="Standard Corporate"
+                />
+                <div className="absolute inset-0 flex flex-col justify-end p-8 text-white z-10 text-left pointer-events-none">
+                  <div className="bg-gray-800/80 px-4 py-2 rounded-full inline-block self-start text-sm font-black uppercase tracking-widest">Standard Corporate</div>
                 </div>
-                <button
-                  onClick={() => scrollTestimonials('right')}
-                  className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#0d9488] hover:border-[#0d9488] transition-all"
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </button>
               </div>
+
+              {/* Slider Control */}
+              <div 
+                className="absolute inset-y-0 z-20 pointer-events-none"
+                style={{ left: `${brandingSliderPos}%` }}
+              >
+                <div className="absolute inset-y-0 -left-[1.5px] w-[3px] bg-white shadow-xl"></div>
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 bg-[#0d9488] rounded-full flex items-center justify-center text-white border-4 border-white shadow-2xl">
+                  <ChevronLeft className="w-4 h-4" />
+                  <ChevronRight className="w-4 h-4" />
+                </div>
+              </div>
+
+              <input 
+                type="range" 
+                min="0" 
+                max="100" 
+                value={brandingSliderPos}
+                onChange={(e) => setBrandingSliderPos(parseInt(e.target.value))}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-30"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Section 2: Iconic Branding */}
+        <section className="py-24 bg-white">
+          <div className="max-w-[1400px] mx-auto px-4">
+            <div className="flex flex-col md:flex-row items-end justify-between gap-6 mb-16">
+              <div className="max-w-2xl">
+                <div className="flex items-center gap-3 text-[#0d9488] mb-4">
+                  <Users className="w-6 h-6" />
+                  <span className="text-sm font-black uppercase tracking-widest">Section 2</span>
+                </div>
+                <h2 className="text-4xl md:text-5xl font-bold text-black mb-6 tracking-tight">
+                  Iconic Branding <span className="text-gray-300">(The Agent)</span>
+                </h2>
+                <p className="text-lg text-gray-500 leading-relaxed">
+                  Targeting the human brand: Life, business, and local authority. 
+                  We don't just capture portraits; we build ecosystems of authority.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {brandingTiers.map((tier, i) => (
+                <div 
+                  key={i}
+                  className={`relative group bg-white rounded-[2rem] p-8 border transition-all duration-500 flex flex-col ${
+                    tier.isPopular ? 'border-[#0d9488] shadow-2xl shadow-teal-500/10 scale-105 z-10' : 'border-gray-100 hover:border-[#0d9488]/30 hover:shadow-xl'
+                  }`}
+                >
+                  <div className="mb-6 flex items-center justify-between">
+                    <div className="p-3 bg-[#f0fdfa] rounded-2xl">
+                      {tier.icon}
+                    </div>
+                  </div>
+
+                  <h3 className="text-xl font-black text-black mb-1">{tier.name}</h3>
+                  <p className="text-[#0d9488] font-bold text-xs uppercase tracking-wider mb-6">{tier.tagline}</p>
+
+                  <div className="mb-6 flex items-baseline gap-1">
+                    <span className="text-4xl font-black text-black">${tier.price}</span>
+                    <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">{tier.period}</span>
+                  </div>
+
+                  <p className="text-xs text-gray-500 leading-relaxed mb-8 min-h-[48px]">
+                    {tier.description}
+                  </p>
+
+                  <div className="space-y-4 mb-10">
+                    {tier.features.map((feature, j) => (
+                      <div key={j} className="flex items-start gap-3">
+                        <div className="mt-1 shrink-0">
+                          <Check className="w-3.5 h-3.5 text-[#0d9488] stroke-[3]" />
+                        </div>
+                        <span className="text-[11px] font-medium text-gray-600 leading-tight">{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-auto space-y-4">
+                    <Link to="/book" className="block">
+                      <Button className={`w-full py-6 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] ${
+                        tier.isPopular ? 'bg-[#0d9488] hover:bg-[#0f766e] text-white shadow-lg shadow-teal-100' : 'bg-black hover:bg-gray-800 text-white shadow-lg'
+                      }`}>
+                        {tier.buttonText}
+                      </Button>
+                    </Link>
+                    <p className="text-[10px] text-gray-400 text-center font-medium italic">{tier.ctaSubtext}</p>
+                    
+                    {/* Tooltip Simulation */}
+                    <div className="pt-4 border-t border-gray-50 flex items-center justify-center group/tooltip relative">
+                      <div className="flex items-center gap-2 text-[10px] font-bold text-gray-300 group-hover/tooltip:text-[#0d9488] cursor-help transition-colors">
+                        <Info className="w-3 h-3" />
+                        Which is for me?
+                      </div>
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 w-[200px] bg-black text-white p-3 rounded-xl text-[10px] font-medium leading-relaxed opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-300 shadow-2xl z-20 pointer-events-none">
+                        {tier.tooltip}
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-black"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </section>
@@ -380,23 +451,14 @@ export default function Pricing() {
               <h2 className="text-4xl md:text-5xl font-bold mb-6 text-black">
                 Got questions? We've got <span className="text-[#0d9488]">answers</span>.
               </h2>
-              <p className="text-gray-500 max-w-2xl mx-auto">
-                Everything you need to know about Iconic in a nutshell.
-              </p>
             </div>
 
             <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
-                { q: "How long does video processing take?", a: "Typically, our high-end media assets are delivered within 24 hours of capture. Our rapid post-production workflow is optimized for social media timelines." },
-                { q: "Does Iconic support portrait mode?", a: "Yes, we specialize in both cinematic landscape and scroll-stopping vertical content optimized for Reels, TikTok, and Shorts." },
-                { q: "How many images can I use per video?", a: "Our standard cinematic reel utilizes between 15-25 of the best property shots, but this can be customized based on your specific project needs." },
-                { q: "How long is each video?", a: "Most property reels are between 30-60 seconds, which is the 'sweet spot' for high engagement across modern social platforms." },
-                { q: "Is there a free trial?", a: "Yes! We offer a 7-day free trial on our Starter, Leader, and Dominator plans so you can experience the full power of Iconic media." },
-                { q: "Do I need a credit card to sign up?", a: "No credit card is required to book a strategy session. A card is only needed to start a free trial of our premium packages." },
-                { q: "Is there a file size limit for images?", a: "We support high-resolution uploads up to 25MB per image to ensure the highest quality cinematic output." },
-                { q: "How do I get rid of the watermark in the video?", a: "Watermarks are automatically removed on all paid plans (Starter, Leader, and Dominator)." },
-                { q: "What makes Iconic a better real estate video editor than generic editing tools?", a: "Iconic is built specifically for real estate. Our AI understands property flow, lighting, and cinematic composition, delivering luxury-quality edits in a fraction of the time." },
-                { q: "My question isn't answered here. How can I get help?", a: "We're here to help! You can reach out to our support team via the contact page or book a strategy session for personalized guidance." }
+                { q: "How long does video processing take?", a: "Listing media is delivered within 24 hours. Branding content depends on the package but typically within 48-72 hours." },
+                { q: "What is an AI Digital Twin?", a: "It's a clone of your voice and likeness that allows you to generate market updates and content without sitting in front of a camera every day." },
+                { q: "Can I cancel a monthly subscription?", a: "Yes, our monthly plans like THE AUTHORITY are contract-free. Cancel anytime with 30 days notice." },
+                { q: "Do you shoot in 4K?", a: "Yes, all cinematic films and reels are delivered in 4K resolution optimized for social media platforms." }
               ].map((faq, i) => (
                 <div
                   key={i}
@@ -422,12 +484,12 @@ export default function Pricing() {
       <Footer />
 
       <style dangerouslySetInnerHTML={{ __html: `
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
+        input[type=range]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 48px;
+          height: 48px;
+          cursor: ew-resize;
         }
       `}} />
     </div>
