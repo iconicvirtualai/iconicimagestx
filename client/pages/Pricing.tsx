@@ -494,25 +494,43 @@ export default function Pricing() {
                         </div>
                       ))}
                     </div>
-                    <div className="pt-4 space-y-2">
-                      <div className="flex items-center gap-2 text-[11px] font-bold text-gray-400">
-                        <Check className="w-3 h-3 text-[#0d9488]" />
-                        <span>Lite Edits, No Grass</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-[11px] font-bold text-gray-400">
-                        <Check className="w-3 h-3 text-[#0d9488]" />
-                        <span>Next Day Turn Around</span>
-                      </div>
+                    <div className="pt-4 space-y-3">
+                      {[
+                        { label: "Basic Edits", included: true },
+                        { label: "Color Balance", included: true },
+                        { label: "Clear Windows", included: true },
+                        { label: "Sky Replacement", included: true },
+                        { label: "Next Day Turn Around", included: true },
+                        { label: "Reflection/Mirror Removal", included: true },
+                        { label: "Grass Replacement", included: false },
+                        { label: "Firepits, Fireplaces", included: false },
+                        { label: "Extra love in Iconic Edits", included: false }
+                      ].map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          {item.included ? (
+                            <Check className="w-3.5 h-3.5 text-[#0d9488] stroke-[3]" />
+                          ) : (
+                            <X className="w-3.5 h-3.5 text-red-400 stroke-[3]" />
+                          )}
+                          <span className={`text-[13px] font-bold ${item.included ? 'text-gray-600' : 'text-gray-400 line-through decoration-gray-300'}`}>
+                            {item.label}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
                   {/* Add-Ons */}
                   <div className="lg:col-span-1 space-y-6">
-                    <h4 className="text-[#0d9488] font-black text-xs uppercase tracking-widest mb-6">Add-Ons</h4>
+                    <div>
+                      <h4 className="text-[#0d9488] font-black text-xs uppercase tracking-widest mb-1">Add-Ons</h4>
+                      <p className="text-[10px] text-gray-400 font-bold italic mb-6">(Must already be on site doing a full service shoot)</p>
+                    </div>
                     <div className="space-y-4">
                       {[
                         { label: "Aerial Add Ons", price: "99" },
                         { label: "Reel Add On", price: "125" },
+                        { label: "3D Matterport", price: "200+" },
                         { label: "Video Add On", price: "350-500+" }
                       ].map((addon, idx) => (
                         <div key={idx} className="flex items-center justify-between p-4 bg-white/50 rounded-xl border border-gray-100">
