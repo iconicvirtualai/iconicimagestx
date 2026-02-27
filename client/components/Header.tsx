@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function Header() {
+  const location = useLocation();
+  const isHome = location.pathname === "/";
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -27,7 +29,7 @@ export default function Header() {
   ];
 
   return (
-    <header className="fixed top-[44px] left-0 right-0 z-50 px-6 transition-all duration-300">
+    <header className={`fixed ${isHome ? "top-[44px]" : "top-4"} left-0 right-0 z-50 px-6 transition-all duration-300`}>
       <div
         className={`mx-auto max-w-[1200px] rounded-full border border-gray-100/50 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] transition-all duration-500 px-8 flex items-center gap-4 ${
           scrolled
