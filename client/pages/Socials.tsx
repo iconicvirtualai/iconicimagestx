@@ -153,6 +153,7 @@ export default function Socials() {
     }, 2000);
   };
 
+  // Auto-scroll effect for the carousels
   useEffect(() => {
     const interval = setInterval(() => {
       if (scrollRef.current) {
@@ -161,6 +162,15 @@ export default function Socials() {
           scrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
         } else {
           scrollRef.current.scrollBy({ left: 350, behavior: 'smooth' });
+        }
+      }
+
+      if (marketScrollRef.current) {
+        const { scrollLeft, scrollWidth, clientWidth } = marketScrollRef.current;
+        if (scrollLeft + clientWidth >= scrollWidth - 10) {
+          marketScrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+        } else {
+          marketScrollRef.current.scrollBy({ left: 380, behavior: 'smooth' });
         }
       }
     }, 6000);
@@ -354,7 +364,7 @@ export default function Socials() {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity"></div>
 
                     <div className="absolute top-5 left-5 flex gap-2">
-                      <div className="px-3 py-1 rounded-full bg-white/95 backdrop-blur-sm text-[9px] font-black uppercase tracking-widest text-black shadow-lg">
+                      <div className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest text-white shadow-lg ${property.platform === 'Zillow' ? 'bg-[#006AFF]' : 'bg-[#00508F]'}`}>
                         {property.platform}
                       </div>
                       <div className={`px-3 py-1 rounded-full backdrop-blur-sm text-[9px] font-black uppercase tracking-widest text-white shadow-lg ${property.status === 'Active' ? 'bg-green-500/80' : 'bg-orange-500/80'}`}>
