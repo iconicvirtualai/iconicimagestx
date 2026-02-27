@@ -123,6 +123,18 @@ export default function AdminListingFile() {
     toast.error(`Item deleted from ${type}`);
   };
 
+  const listing = {
+    id: id || "8245",
+    address: "1245 Willow Creek Dr",
+    city: "Spring, TX 77380",
+    status: "Delivered",
+    paymentStatus: "Paid",
+    agent: "Sarah Jenkins",
+    team: "The Jenkins Group",
+    price: listingInfo.listPrice,
+    date: listingInfo.apptDate
+  };
+
   const auditLogs = [
     { action: "Listing Delivered", user: "System", time: "2 hrs ago" },
     { action: "Media Lock Enabled", user: "Admin (Cadi)", time: "3 hrs ago" },
