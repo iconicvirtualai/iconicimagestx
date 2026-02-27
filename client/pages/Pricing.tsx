@@ -312,9 +312,9 @@ export default function Pricing() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* Door 1 */}
-              <button 
+              <div
                 onClick={() => scrollToSection('phase1')}
-                className="group relative bg-[#fafafa] border-2 border-dashed border-gray-200 rounded-[2.5rem] p-10 text-center hover:border-[#0d9488] hover:bg-[#f0fdfa] transition-all duration-500 overflow-hidden"
+                className="group relative bg-[#fafafa] border-2 border-dashed border-gray-200 rounded-[2.5rem] p-10 text-center hover:border-[#0d9488] hover:bg-[#f0fdfa] transition-all duration-500 overflow-hidden cursor-pointer"
               >
                 <div className="absolute top-0 right-0 p-6 opacity-[0.05] group-hover:scale-110 transition-transform">
                   <Clock className="w-24 h-24" />
@@ -331,12 +331,12 @@ export default function Pricing() {
                     I'm ready to hustle →
                   </Button>
                 </div>
-              </button>
+              </div>
 
               {/* Door 2 */}
-              <button 
+              <div
                 onClick={() => scrollToSection('phase2')}
-                className="group relative bg-[#fafafa] border-2 border-dashed border-gray-200 rounded-[2.5rem] p-10 text-center hover:border-[#0d9488] hover:bg-[#f0fdfa] transition-all duration-500 overflow-hidden"
+                className="group relative bg-[#fafafa] border-2 border-dashed border-gray-200 rounded-[2.5rem] p-10 text-center hover:border-[#0d9488] hover:bg-[#f0fdfa] transition-all duration-500 overflow-hidden cursor-pointer"
               >
                 <div className="absolute top-0 right-0 p-6 opacity-[0.05] group-hover:scale-110 transition-transform">
                   <DollarSign className="w-24 h-24" />
@@ -353,7 +353,7 @@ export default function Pricing() {
                     I'm ready to scale →
                   </Button>
                 </div>
-              </button>
+              </div>
             </div>
           </div>
         </section>
@@ -419,13 +419,13 @@ export default function Pricing() {
                   </div>
 
                   <div className="mt-auto space-y-4">
-                    <Link to="/book" className="block">
-                      <Button className={`w-full py-6 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] ${
-                        tier.isPopular ? 'bg-[#0d9488] hover:bg-[#0f766e] text-white shadow-lg shadow-teal-100' : 'bg-black hover:bg-gray-800 text-white shadow-lg'
-                      }`}>
+                    <Button asChild className={`w-full py-6 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] ${
+                      tier.isPopular ? 'bg-[#0d9488] hover:bg-[#0f766e] text-white shadow-lg shadow-teal-100' : 'bg-black hover:bg-gray-800 text-white shadow-lg'
+                    }`}>
+                      <Link to="/book">
                         {tier.buttonText}
-                      </Button>
-                    </Link>
+                      </Link>
+                    </Button>
                     <p className="text-[10px] text-gray-400 text-center font-medium italic">{tier.ctaSubtext}</p>
                     
                     {/* Tooltip Simulation */}
@@ -557,13 +557,13 @@ export default function Pricing() {
                   </div>
 
                   <div className="mt-auto space-y-4">
-                    <Link to="/book" className="block">
-                      <Button className={`w-full py-6 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] ${
-                        tier.isPopular ? 'bg-[#0d9488] hover:bg-[#0f766e] text-white shadow-lg shadow-teal-100' : 'bg-black hover:bg-gray-800 text-white shadow-lg'
-                      }`}>
+                    <Button asChild className={`w-full py-6 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] ${
+                      tier.isPopular ? 'bg-[#0d9488] hover:bg-[#0f766e] text-white shadow-lg shadow-teal-100' : 'bg-black hover:bg-gray-800 text-white shadow-lg'
+                    }`}>
+                      <Link to="/book">
                         {tier.buttonText}
-                      </Button>
-                    </Link>
+                      </Link>
+                    </Button>
                     <p className="text-[10px] text-gray-400 text-center font-medium italic">{tier.ctaSubtext}</p>
                     
                     {/* Tooltip Simulation */}
@@ -627,7 +627,11 @@ export default function Pricing() {
                         </div>
                       ))}
                     </div>
-                    <Button className="w-full py-6 rounded-xl bg-black hover:bg-gray-800 text-white font-bold transition-all shadow-lg">{tier.buttonText}</Button>
+                    <Button asChild className="w-full py-6 rounded-xl bg-black hover:bg-gray-800 text-white font-bold transition-all shadow-lg">
+                      <Link to="/book">
+                        {tier.buttonText}
+                      </Link>
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -662,7 +666,11 @@ export default function Pricing() {
                         </div>
                       ))}
                     </div>
-                    <Button className={`w-full py-6 rounded-xl font-bold transition-all ${tier.isPopular ? 'bg-[#0d9488] text-white' : 'bg-black text-white'}`}>{tier.buttonText}</Button>
+                    <Button asChild className={`w-full py-6 rounded-xl font-bold transition-all ${tier.isPopular ? 'bg-[#0d9488] text-white' : 'bg-black text-white'}`}>
+                      <Link to="/book">
+                        {tier.buttonText}
+                      </Link>
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -706,7 +714,11 @@ export default function Pricing() {
                     </div>
                   ))}
                 </div>
-                <Button className="w-full py-6 rounded-xl bg-black text-white hover:bg-[#0d9488] transition-all">Start My Foundation →</Button>
+                <Button asChild className="w-full py-6 rounded-xl bg-black text-white hover:bg-[#0d9488] transition-all">
+                  <Link to="/book">
+                    Start My Foundation →
+                  </Link>
+                </Button>
               </div>
 
               {/* Evolution */}
@@ -731,7 +743,11 @@ export default function Pricing() {
                     </div>
                   ))}
                 </div>
-                <Button className="w-full py-6 rounded-xl bg-black text-white hover:bg-[#0d9488] transition-all">Start My Evolution →</Button>
+                <Button asChild className="w-full py-6 rounded-xl bg-black text-white hover:bg-[#0d9488] transition-all">
+                  <Link to="/book">
+                    Start My Evolution →
+                  </Link>
+                </Button>
               </div>
             </div>
 
