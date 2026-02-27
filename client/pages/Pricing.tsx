@@ -403,7 +403,7 @@ export default function Pricing() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {listingTiers.map((tier, i) => (
-                <div 
+                <div
                   key={i}
                   className={`relative group bg-white rounded-[2rem] p-8 border transition-all duration-500 flex flex-col ${
                     tier.isPopular ? 'border-[#0d9488] shadow-2xl shadow-teal-500/10 scale-105 z-10' : 'border-gray-100 hover:border-[#0d9488]/30 hover:shadow-xl'
@@ -453,7 +453,7 @@ export default function Pricing() {
                       </Link>
                     </Button>
                     <p className="text-[10px] text-gray-400 text-center font-medium italic">{tier.ctaSubtext}</p>
-                    
+
                     {/* Tooltip Simulation */}
                     <div className="pt-4 border-t border-gray-50 flex items-center justify-center group/tooltip relative">
                       <div className="flex items-center gap-2 text-[10px] font-bold text-gray-300 group-hover/tooltip:text-[#0d9488] cursor-help transition-colors">
@@ -468,6 +468,96 @@ export default function Pricing() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* The Basics Section */}
+            <div className="mt-20 pt-20 border-t border-gray-100">
+              <div className="text-center mb-12">
+                <h3 className="text-2xl font-black text-black uppercase tracking-widest mb-4">Choose the Basics</h3>
+                <p className="text-gray-500 text-sm font-medium">Fast, efficient, and essential media for every listing.</p>
+              </div>
+
+              <div className="bg-[#fafafa] rounded-[2.5rem] p-8 md:p-12 border border-gray-100">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                  {/* Photo Packages */}
+                  <div className="lg:col-span-1 space-y-6">
+                    <h4 className="text-[#0d9488] font-black text-xs uppercase tracking-widest mb-6">Photo Packages</h4>
+                    <div className="space-y-4">
+                      {[
+                        { label: "20 Photos", price: "99" },
+                        { label: "35 Photos", price: "150" },
+                        { label: "50 Photos", price: "200" }
+                      ].map((pkg, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-4 bg-white rounded-xl border border-gray-100 shadow-sm">
+                          <span className="font-bold text-gray-700">{pkg.label}</span>
+                          <span className="text-xl font-black text-black">${pkg.price}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="pt-4 space-y-2">
+                      <div className="flex items-center gap-2 text-[11px] font-bold text-gray-400">
+                        <Check className="w-3 h-3 text-[#0d9488]" />
+                        <span>Lite Edits, No Grass</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px] font-bold text-gray-400">
+                        <Check className="w-3 h-3 text-[#0d9488]" />
+                        <span>Next Day Turn Around</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Add-Ons */}
+                  <div className="lg:col-span-1 space-y-6">
+                    <h4 className="text-[#0d9488] font-black text-xs uppercase tracking-widest mb-6">Add-Ons</h4>
+                    <div className="space-y-4">
+                      {[
+                        { label: "Aerial Add Ons", price: "99" },
+                        { label: "Reel Add On", price: "125" },
+                        { label: "Video Add On", price: "350-500+" }
+                      ].map((addon, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-4 bg-white/50 rounded-xl border border-gray-100">
+                          <span className="font-bold text-gray-600 text-sm">{addon.label}</span>
+                          <span className="font-black text-black">${addon.price}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* ICONIC Edits */}
+                  <div className="lg:col-span-1">
+                    <div className="h-full bg-black rounded-3xl p-8 text-white relative overflow-hidden group hover:scale-[1.02] transition-transform duration-500">
+                      <div className="absolute top-0 right-0 p-6 opacity-10">
+                        <Palette className="w-24 h-24" />
+                      </div>
+                      <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-6">
+                          <h4 className="text-[#0d9488] font-black text-xs uppercase tracking-widest">Premium Upgrade</h4>
+                          <span className="text-2xl font-black text-white">$55</span>
+                        </div>
+                        <h3 className="text-xl font-black mb-4">ICONIC EDITS</h3>
+                        <div className="grid grid-cols-1 gap-3">
+                          {[
+                            "Add Grass",
+                            "Clean Driveway",
+                            "Remove Cords",
+                            "Add Fire to Fireplaces",
+                            "Add TV Screens",
+                            "Digital Curb Appeal"
+                          ].map((edit, idx) => (
+                            <div key={idx} className="flex items-center gap-2">
+                              <Sparkles className="w-3 h-3 text-[#0d9488]" />
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{edit}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <Button asChild className="w-full mt-8 bg-[#0d9488] hover:bg-[#0f766e] text-white font-black py-6 rounded-xl transition-all shadow-lg shadow-teal-900/20">
+                          <Link to="/book">Upgrade My Photos</Link>
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
