@@ -86,12 +86,56 @@ const INITIAL_PLATFORMS = [
   }
 ];
 
+const FEATURED_PROPERTIES = [
+  {
+    id: 1,
+    address: "1245 Willow Creek Dr",
+    location: "Spring, TX",
+    platform: "Zillow",
+    image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80",
+    price: "$549,000",
+    status: "Active",
+    daysOnMarket: "4 days"
+  },
+  {
+    id: 2,
+    address: "882 High Meadow Ln",
+    location: "The Woodlands, TX",
+    platform: "HAR.com",
+    image: "https://images.unsplash.com/photo-1600607687940-4e524cb35a3a?w=800&q=80",
+    price: "$1,250,000",
+    status: "Active",
+    daysOnMarket: "12 days"
+  },
+  {
+    id: 3,
+    address: "552 Oak Forest Ct",
+    location: "Conroe, TX",
+    platform: "Zillow",
+    image: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&q=80",
+    price: "$425,000",
+    status: "Pending",
+    daysOnMarket: "24 days"
+  },
+  {
+    id: 4,
+    address: "210 River Walk Way",
+    location: "Humble, TX",
+    platform: "HAR.com",
+    image: "https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?w=800&q=80",
+    price: "$685,000",
+    status: "Active",
+    daysOnMarket: "8 days"
+  }
+];
+
 export default function Socials() {
   const [likedPosts, setLikedPosts] = useState<number[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [platforms, setPlatforms] = useState(INITIAL_PLATFORMS);
   const [posts, setPosts] = useState(INITIAL_POSTS);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const marketScrollRef = useRef<HTMLDivElement>(null);
 
   const toggleLike = (id: number) => {
     setLikedPosts(prev => 
@@ -236,7 +280,7 @@ export default function Socials() {
           {/* Social Platforms Grid - Scaled */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-20">
             {platforms.map((platform) => (
-              <a 
+              <a
                 key={platform.name}
                 href={platform.url}
                 target="_blank"
@@ -252,7 +296,7 @@ export default function Socials() {
                     <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{platform.lastSynced}</span>
                   </div>
                 </div>
-                
+
                 <div className="relative z-10">
                   <h3 className="text-xl font-bold text-black mb-0.5 tracking-tight">{platform.name}</h3>
                   <p className="text-[#0d9488] font-bold text-[11px] mb-3">{platform.handle}</p>
@@ -270,6 +314,94 @@ export default function Socials() {
                 </div>
               </a>
             ))}
+          </div>
+
+          {/* Featured Properties Carousel */}
+          <div className="mb-24 relative animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-300">
+            <div className="flex flex-col md:flex-row items-start md:items-end justify-between mb-8 px-1 gap-4">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#f0f9ff] border border-[#e0f2fe] mb-3">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#0ea5e9] animate-pulse"></div>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-[#0ea5e9]">Live on Market</span>
+                </div>
+                <h2 className="text-2xl font-bold text-black uppercase tracking-tight">Iconic Featured Properties</h2>
+                <p className="text-xs text-gray-400 font-medium mt-1 uppercase tracking-widest">Recently Marketed • Last 120 Days</p>
+              </div>
+              <div className="flex gap-2">
+                <div className="hidden md:flex items-center gap-4 mr-4 text-[9px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100 pr-4">
+                  <span>Synced with Zillow & HAR</span>
+                </div>
+                <button onClick={() => marketScrollRef.current?.scrollBy({ left: -380, behavior: 'smooth' })} className="p-2.5 rounded-full bg-white border border-gray-100 hover:border-[#0d9488] hover:text-[#0d9488] transition-all shadow-sm">
+                  <ArrowUpRight className="w-4 h-4 rotate-[225deg]" />
+                </button>
+                <button onClick={() => marketScrollRef.current?.scrollBy({ left: 380, behavior: 'smooth' })} className="p-2.5 rounded-full bg-white border border-gray-100 hover:border-[#0d9488] hover:text-[#0d9488] transition-all shadow-sm">
+                  <ArrowUpRight className="w-4 h-4 rotate-[45deg]" />
+                </button>
+              </div>
+            </div>
+
+            <div
+              ref={marketScrollRef}
+              className="flex gap-6 overflow-x-auto pb-8 snap-x snap-mandatory no-scrollbar scroll-smooth"
+            >
+              {FEATURED_PROPERTIES.map((property) => (
+                <div
+                  key={property.id}
+                  className="min-w-[300px] md:min-w-[380px] bg-white rounded-[2rem] overflow-hidden border border-gray-100 shadow-xl snap-center group hover:shadow-2xl hover:-translate-y-1 transition-all duration-500"
+                >
+                  <div className="relative aspect-[16/10] overflow-hidden">
+                    <img src={property.image} alt={property.address} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity"></div>
+
+                    <div className="absolute top-5 left-5 flex gap-2">
+                      <div className="px-3 py-1 rounded-full bg-white/95 backdrop-blur-sm text-[9px] font-black uppercase tracking-widest text-black shadow-lg">
+                        {property.platform}
+                      </div>
+                      <div className={`px-3 py-1 rounded-full backdrop-blur-sm text-[9px] font-black uppercase tracking-widest text-white shadow-lg ${property.status === 'Active' ? 'bg-green-500/80' : 'bg-orange-500/80'}`}>
+                        {property.status}
+                      </div>
+                    </div>
+
+                    <div className="absolute bottom-5 left-6 right-6">
+                      <p className="text-[10px] font-bold text-teal-400 uppercase tracking-[0.2em] mb-1">Recent Masterpiece</p>
+                      <h3 className="text-xl font-bold text-white tracking-tight leading-tight">{property.address}</h3>
+                      <p className="text-xs text-white/80 font-medium">{property.location}</p>
+                    </div>
+                  </div>
+
+                  <div className="p-6">
+                    <div className="flex items-center justify-between mb-4 pb-4 border-b border-gray-50">
+                      <div>
+                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">List Price</p>
+                        <p className="text-lg font-black text-black">{property.price}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Market Pulse</p>
+                        <p className="text-xs font-bold text-[#0d9488]">{property.daysOnMarket} on Market</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex -space-x-2">
+                        {[1, 2, 3].map((i) => (
+                          <div key={i} className="w-7 h-7 rounded-full border-2 border-white bg-gray-100 flex items-center justify-center">
+                            <Star className="w-3 h-3 text-[#0d9488] fill-[#0d9488]" />
+                          </div>
+                        ))}
+                      </div>
+                      <a
+                        href={property.platform === 'Zillow' ? "https://zillow.com" : "https://har.com"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 hover:text-black transition-colors uppercase tracking-widest"
+                      >
+                        View Listing <ArrowUpRight className="w-3 h-3" />
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Bottom CTA Section - Scaled */}
