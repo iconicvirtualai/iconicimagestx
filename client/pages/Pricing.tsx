@@ -290,10 +290,10 @@ export default function Pricing() {
             </span>
           </div>
           <h1 className="text-4xl md:text-6xl font-bold text-black mb-6 tracking-tight leading-[1.1]">
-            Pick the Perfect Price for Your <span className="text-[#0d9488]">Presence</span>
+            Pick the <span className="text-[#0d9488]">Perfect Price</span> for Your Presence
           </h1>
-          <p className="text-lg text-gray-500 mb-10 max-w-2xl mx-auto">
-            Scale your brand, dominate your market, and reclaim your time with Iconic's strategic media solutions.
+          <p className="text-lg text-gray-500 mb-10 max-w-2xl mx-auto font-medium">
+            Not sure where to start?
           </p>
 
           {/* Hyperlink Bubbles */}
@@ -322,9 +322,9 @@ export default function Pricing() {
                   <Sparkles className="w-6 h-6 text-[#0d9488]" />
                 </div>
                 <div className="text-left flex-1">
-                  <h3 className="text-lg font-bold text-black mb-1">Our AI Can Help!</h3>
+                  <h3 className="text-lg font-bold text-black mb-1">Our AI Can Help</h3>
                   <div className="flex items-center gap-2 text-[#0d9488] font-bold text-xs">
-                    Launch AI Strategist <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                    Our AI Can Help <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                   </div>
                 </div>
               </div>
@@ -609,12 +609,12 @@ export default function Pricing() {
         {/* Section 3: Social Monopoly */}
         <section id="social" className="py-24 bg-[#fafafa]">
           <div className="max-w-[1400px] mx-auto px-4">
-            <div className="text-center mb-20 max-w-3xl mx-auto">
-              <h2 className="text-4xl md:text-5xl font-bold text-black mb-6 tracking-tight flex items-center justify-center gap-4">
-                Social Monopoly <span className="text-gray-300">(The Management)</span>
+            <div className="text-center mb-20 max-w-4xl mx-auto">
+              <h2 className="text-4xl md:text-5xl font-bold text-black mb-6 tracking-tight">
+                Social Monopoly (The Management)
               </h2>
               <p className="text-lg text-gray-500 leading-relaxed">
-                Transitioning from "Content Creation" to "Market Ownership." 
+                Transitioning from "Content Creation" to "Market Ownership."
                 These are your recurring revenue "Social Manager" packages designed to build your empire.
               </p>
             </div>
@@ -663,9 +663,9 @@ export default function Pricing() {
                 <div className="h-[2px] flex-1 bg-gradient-to-l from-transparent to-[#0d9488]/20"></div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {phase2Tiers.map((tier, i) => (
-                  <div key={i} className={`relative bg-white rounded-[2rem] p-8 border transition-all duration-500 hover:shadow-2xl ${tier.isPopular ? 'border-[#0d9488] scale-105 z-10 shadow-xl' : 'border-gray-100'}`}>
+              <div className="flex flex-wrap justify-center gap-8">
+                {phase2Tiers.slice(0, 3).map((tier, i) => (
+                  <div key={i} className={`relative bg-white rounded-[2rem] p-8 border transition-all duration-500 hover:shadow-2xl w-full md:w-[calc(33.333%-1.5rem)] ${tier.isPopular ? 'border-[#0d9488] scale-105 z-10 shadow-xl' : 'border-gray-100'}`}>
                     {tier.isPopular && (
                       <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#0d9488] text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest">Active Presence</div>
                     )}
@@ -691,6 +691,34 @@ export default function Pricing() {
                     </Button>
                   </div>
                 ))}
+
+                {/* Centered Second Row for New Tiers */}
+                <div className="w-full flex flex-wrap justify-center gap-8 mt-4">
+                  {phase2Tiers.slice(3).map((tier, i) => (
+                    <div key={i} className="relative bg-white rounded-[2rem] p-8 border border-gray-100 transition-all duration-500 hover:shadow-2xl w-full md:w-[calc(33.333%-1.5rem)]">
+                      <h4 className="text-xl font-black text-black mb-1">{tier.name}</h4>
+                      <p className="text-[#0d9488] font-bold text-xs uppercase tracking-widest mb-6">{tier.tagline}</p>
+                      <div className="mb-6 flex items-baseline gap-1">
+                        <span className="text-4xl font-black text-black">${tier.price}</span>
+                        <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">{tier.period}</span>
+                      </div>
+                      <p className="text-xs text-gray-500 leading-relaxed mb-8 h-12 overflow-hidden">{tier.description}</p>
+                      <div className="space-y-4 mb-10">
+                        {tier.features.map((feature, j) => (
+                          <div key={j} className="flex items-start gap-3">
+                            <Check className="w-3.5 h-3.5 text-[#0d9488] stroke-[3] mt-0.5" />
+                            <span className="text-[11px] font-medium text-gray-600 leading-tight">{feature}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <Button asChild className="w-full py-6 rounded-xl bg-black text-white font-bold transition-all">
+                        <Link to="/book">
+                          {tier.buttonText}
+                        </Link>
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -767,40 +795,78 @@ export default function Pricing() {
               </div>
             </div>
 
-            {/* Iconic Bundle Box */}
-            <div className="mb-12 p-1 bg-gradient-to-r from-black via-gray-800 to-black rounded-[3rem] shadow-2xl">
-              <div className="bg-white rounded-[2.9rem] p-10 md:p-16 text-center relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-12 opacity-[0.02] pointer-events-none">
-                  <Sparkles className="w-64 h-64" />
+            {/* Redesigned Bundle Box */}
+            <div className="bg-[#fafafa] rounded-[2.5rem] p-10 md:p-16 border border-gray-100 group hover:border-[#0d9488]/30 transition-all duration-500 mb-20 relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-12 opacity-[0.03] pointer-events-none">
+                <Sparkles className="w-64 h-64" />
+              </div>
+              <div className="relative z-10">
+                <div className="flex flex-col md:flex-row justify-between items-start gap-8 mb-12">
+                  <div className="max-w-2xl">
+                    <h3 className="text-3xl font-black text-black mb-4">THE BUNDLE</h3>
+                    <p className="text-gray-500 text-lg leading-relaxed">
+                      Foundation + Evolution. Total brand immersion, AI automation, and strategic identity design in one cohesive execution. Everything you need to own your market and automate your growth.
+                    </p>
+                  </div>
+                  <Button asChild className="bg-black text-white hover:bg-[#0d9488] font-black px-12 py-8 text-xl rounded-2xl transition-all shadow-xl hover:scale-105 active:scale-95 shrink-0">
+                    <Link to="/book">Let's Chat</Link>
+                  </Button>
                 </div>
-                <div className="relative z-10">
-                  <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-black text-white mb-8">
-                    <Star className="w-4 h-4 fill-white" />
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em]">The Ultimate Package</span>
-                  </div>
-                  <h3 className="text-4xl md:text-6xl font-black text-black mb-6 tracking-tighter">THE ICONIC STRATEGIC BUNDLE</h3>
-                  <p className="text-xl text-gray-500 mb-10 max-w-3xl mx-auto font-medium">
-                    Foundation + Evolution. Total brand immersion, AI automation, and strategic identity design in one cohesive execution.
-                  </p>
-                  <div className="flex flex-col md:flex-row items-center justify-center gap-6 mb-12">
-                    <Button asChild className="bg-black text-white hover:bg-[#0d9488] font-black px-12 py-8 text-xl rounded-2xl transition-all shadow-2xl hover:scale-105 active:scale-95">
-                      <Link to="/book">Secure My Strategic Plan →</Link>
-                    </Button>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto">
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  <div className="space-y-4">
+                    <h4 className="text-[#0d9488] font-black text-xs uppercase tracking-widest mb-4">Core Brand Foundation</h4>
                     {[
-                      { icon: <Palette className="w-5 h-5" />, label: "Visual Identity" },
-                      { icon: <Rocket className="w-5 h-5" />, label: "Market Launch" },
-                      { icon: <Sparkles className="w-5 h-5" />, label: "AI Integration" },
-                      { icon: <Users className="w-5 h-5" />, label: "Social Authority" }
-                    ].map((item, idx) => (
-                      <div key={idx} className="flex flex-col items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400">
-                          {item.icon}
-                        </div>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{item.label}</span>
+                      "Logos Suite & Visual Identity",
+                      "Signature Style Guide",
+                      "Hex Color Palettes",
+                      "Canva Brand Hub Setup",
+                      "Marketing Templates",
+                      "Digital Business Card"
+                    ].map((item, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <Check className="w-4 h-4 text-[#0d9488]" />
+                        <span className="text-sm font-bold text-gray-600">{item}</span>
                       </div>
                     ))}
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="text-[#0d9488] font-black text-xs uppercase tracking-widest mb-4">AI & Automation Suite</h4>
+                    {[
+                      "AI Voice Clone Setup",
+                      "AI Video Avatar Creation",
+                      "Automated Updates Suite",
+                      "Voice Synthesis Training",
+                      "Likeness Protection",
+                      "Vision Pro Readiness"
+                    ].map((item, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <Check className="w-4 h-4 text-[#0d9488]" />
+                        <span className="text-sm font-bold text-gray-600">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="bg-white/50 rounded-2xl p-6 border border-gray-100 flex flex-col justify-center gap-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#f0fdfa] flex items-center justify-center">
+                        <Star className="w-5 h-5 text-[#0d9488] fill-[#0d9488]" />
+                      </div>
+                      <span className="text-sm font-black text-black">Total Brand Immersion</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#f0fdfa] flex items-center justify-center">
+                        <Rocket className="w-5 h-5 text-[#0d9488]" />
+                      </div>
+                      <span className="text-sm font-black text-black">Instant Market Authority</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#f0fdfa] flex items-center justify-center">
+                        <Users className="w-5 h-5 text-[#0d9488]" />
+                      </div>
+                      <span className="text-sm font-black text-black">Strategic SOI Penetration</span>
+                    </div>
                   </div>
                 </div>
               </div>
