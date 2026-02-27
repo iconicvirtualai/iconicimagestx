@@ -1,7 +1,7 @@
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Quote } from "lucide-react";
+import { Quote, MessageCircle, ArrowRight } from "lucide-react";
 
 export default function Contact() {
   return (
@@ -23,9 +23,30 @@ export default function Contact() {
                     We'd love to <span className="text-[#0d9488]">hear from you</span>
                   </h1>
                   <p className="text-gray-500 text-lg leading-relaxed max-w-xl">
-                    Have a question or feedback? We'd love to hear from you. Send us a 
+                    Have a question or feedback? We'd love to hear from you. Send us a
                     message and we'll respond as soon as possible.
                   </p>
+
+                  {/* Chat Option */}
+                  <div className="pt-8">
+                    <a
+                      href="https://www.twilio.com/" // Placeholder for the actual Twilio app link
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-4 p-5 bg-[#f0fdfa] border border-[#ccfbf1] rounded-2xl group hover:border-[#0d9488] transition-all duration-300 shadow-sm hover:shadow-md"
+                    >
+                      <div className="bg-[#0d9488] p-3 rounded-xl text-white group-hover:scale-110 transition-transform">
+                        <MessageCircle className="w-6 h-6" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-[10px] font-bold tracking-widest text-[#0d9488] uppercase mb-1">LIVE CHAT</div>
+                        <div className="text-lg font-bold text-black group-hover:text-[#0d9488] transition-colors flex items-center gap-2">
+                          Chat with us on Twilio
+                          <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0" />
+                        </div>
+                      </div>
+                    </a>
+                  </div>
                 </div>
 
                 <div className="pt-12 border-t border-gray-100">
