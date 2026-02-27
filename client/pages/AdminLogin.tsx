@@ -1,19 +1,19 @@
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Lock, User, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 
 export default function AdminLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const navigate = useNavigate();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // Simulate login for now
-    console.log("Admin Login Attempt:", { email, password });
-    alert("Admin login is currently in simulation mode. Access pending cloud database integration.");
+    navigate("/admin/dashboard");
   };
 
   return (
