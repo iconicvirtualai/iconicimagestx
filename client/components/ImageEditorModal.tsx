@@ -1,3 +1,4 @@
+import * as React from "react";
 import {
   X,
   Download,
@@ -21,7 +22,7 @@ import {
   Flame,
   Edit3
 } from "lucide-react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -36,13 +37,17 @@ interface ImageEditorModalProps {
 }
 
 export default function ImageEditorModal({ isOpen, onClose, imageUrl }: ImageEditorModalProps) {
-  const [activeTab, setActiveTab] = useState("adjust");
-  const [activeStyle, setActiveStyle] = useState("signature");
+  const [activeTab, setActiveTab] = React.useState("adjust");
+  const [activeStyle, setActiveStyle] = React.useState("signature");
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-[100vw] w-screen h-screen p-0 border-none bg-black/95 gap-0 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-300">
-        
+        <div className="sr-only">
+          <DialogTitle>Photo Editor</DialogTitle>
+          <DialogDescription>Edit and enhance listing photos with AI tools and manual adjustments.</DialogDescription>
+        </div>
+
         {/* Top Header */}
         <div className="h-16 flex items-center justify-between px-6 bg-white border-b border-slate-100 z-50">
           <div className="flex items-center gap-4">
