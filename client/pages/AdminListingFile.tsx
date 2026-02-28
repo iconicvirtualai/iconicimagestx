@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { useState, useRef } from "react";
 import { toast } from "sonner";
+import ImageEditorModal from "@/components/ImageEditorModal";
 
 export default function AdminListingFile() {
   const { id } = useParams();
@@ -65,18 +66,27 @@ export default function AdminListingFile() {
 
   const [mediaItems, setMediaItems] = useState({
     images: [
-      { id: 1, src: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=300&q=80" },
-      { id: 2, src: "https://images.unsplash.com/photo-1600585154341-be6161a56a0c?w=300&q=80" },
-      { id: 3, src: "https://images.unsplash.com/photo-1600585154342-be6161a56a0c?w=300&q=80" },
-      { id: 4, src: "https://images.unsplash.com/photo-1600585154343-be6161a56a0c?w=300&q=80" },
-      { id: 5, src: "https://images.unsplash.com/photo-1600585154344-be6161a56a0c?w=300&q=80" },
-      { id: 6, src: "https://images.unsplash.com/photo-1600585154345-be6161a56a0c?w=300&q=80" },
-      { id: 7, src: "https://images.unsplash.com/photo-1600585154346-be6161a56a0c?w=300&q=80" },
-      { id: 8, src: "https://images.unsplash.com/photo-1600585154347-be6161a56a0c?w=300&q=80" },
+      { id: 1, src: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80" },
+      { id: 2, src: "https://images.unsplash.com/photo-1600585154341-be6161a56a0c?w=1200&q=80" },
+      { id: 3, src: "https://images.unsplash.com/photo-1600585154342-be6161a56a0c?w=1200&q=80" },
+      { id: 4, src: "https://images.unsplash.com/photo-1600585154343-be6161a56a0c?w=1200&q=80" },
+      { id: 5, src: "https://images.unsplash.com/photo-1600585154344-be6161a56a0c?w=1200&q=80" },
+      { id: 6, src: "https://images.unsplash.com/photo-1600585154345-be6161a56a0c?w=1200&q=80" },
+      { id: 7, src: "https://images.unsplash.com/photo-1600585154346-be6161a56a0c?w=1200&q=80" },
+      { id: 8, src: "https://images.unsplash.com/photo-1600585154347-be6161a56a0c?w=1200&q=80" },
     ],
     videos: [],
     reels: []
   });
+
+  const [editorState, setEditorState] = useState<{ isOpen: boolean; imageUrl: string }>({
+    isOpen: false,
+    imageUrl: ""
+  });
+
+  const openEditor = (url: string) => {
+    setEditorState({ isOpen: true, imageUrl: url });
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -218,11 +228,12 @@ export default function AdminListingFile() {
                     <div className="p-6">
                       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                         {mediaItems.images.map((item, i) => (
-                          <div key={item.id} className="group relative aspect-square rounded-xl overflow-hidden bg-slate-100 border border-slate-100 cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-all">
+                          <div key={item.id} className="group relative aspect-square rounded-xl overflow-hidden bg-slate-100 border border-slate-100 cursor-zoom-in shadow-sm hover:shadow-md transition-all">
                             <img
                               src={item.src}
                               className="w-full h-full object-cover"
                               alt="listing"
+                              onClick={() => openEditor(item.src)}
                             />
                             <div className="absolute top-1.5 right-1.5 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button onClick={() => handleAction('Archive')} title="Archive" className="p-1.5 bg-white/90 backdrop-blur-sm rounded-md shadow-sm text-slate-400 hover:text-blue-500"><Archive className="w-3.5 h-3.5" /></button>
@@ -230,8 +241,8 @@ export default function AdminListingFile() {
                               <button onClick={() => handleDelete('images', item.id)} title="Delete" className="p-1.5 bg-white/90 backdrop-blur-sm rounded-md shadow-sm text-slate-400 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
                             </div>
                             <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5">
-                              <button onClick={() => handleAction('Edit')} className="px-2 py-1 bg-white/20 backdrop-blur-sm hover:bg-white/40 text-white rounded text-[8px] font-black uppercase">Edit</button>
-                              <button onClick={() => handleAction('AI Staging')} className="px-2 py-1 bg-white/20 backdrop-blur-sm hover:bg-white/40 text-white rounded text-[8px] font-black uppercase">Staging</button>
+                              <button onClick={() => openEditor(item.src)} className="px-2 py-1 bg-white/20 backdrop-blur-sm hover:bg-white/40 text-white rounded text-[8px] font-black uppercase">Edit</button>
+                              <button onClick={() => openEditor(item.src)} className="px-2 py-1 bg-white/20 backdrop-blur-sm hover:bg-white/40 text-white rounded text-[8px] font-black uppercase">Staging</button>
                             </div>
                             <div className="absolute top-1.5 left-1.5 p-1 bg-slate-900/40 backdrop-blur-sm rounded text-[8px] text-white font-bold">{i + 1}</div>
                           </div>
@@ -705,6 +716,12 @@ export default function AdminListingFile() {
       </main>
 
       <Footer />
+
+      <ImageEditorModal
+        isOpen={editorState.isOpen}
+        onClose={() => setEditorState({ ...editorState, isOpen: false })}
+        imageUrl={editorState.imageUrl}
+      />
     </div>
   );
 }
