@@ -1,17 +1,17 @@
 import * as React from "react";
-import {
-  X,
-  Download,
-  Archive,
-  Send,
-  Settings2,
-  Moon,
-  Layout,
-  RotateCcw,
-  Eye,
-  Plus,
-  Crop,
-  Maximize,
+import { 
+  X, 
+  Download, 
+  Archive, 
+  Send, 
+  Settings2, 
+  Moon, 
+  Layout, 
+  RotateCcw, 
+  Eye, 
+  Plus, 
+  Crop, 
+  Maximize, 
   Sparkles,
   Smartphone,
   Video,
@@ -28,7 +28,6 @@ import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
-import { useState } from "react";
 
 interface ImageEditorModalProps {
   isOpen: boolean;
@@ -47,7 +46,7 @@ export default function ImageEditorModal({ isOpen, onClose, imageUrl }: ImageEdi
           <DialogTitle>Photo Editor</DialogTitle>
           <DialogDescription>Edit and enhance listing photos with AI tools and manual adjustments.</DialogDescription>
         </div>
-
+        
         {/* Top Header */}
         <div className="h-16 flex items-center justify-between px-6 bg-white border-b border-slate-100 z-50">
           <div className="flex items-center gap-4">
