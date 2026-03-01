@@ -44,58 +44,68 @@ export default function HeroSection() {
         {/* Badge */}
         <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#f0fdfa] border border-[#ccfbf1] mb-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <span className="text-[12px] font-bold tracking-wider uppercase" style={{ color: settings.global.primaryColor }}>
-            #1 Media Partner for Growing Brands
+            ICONIC® #1 Media Partner for Growing Brands
           </span>
         </div>
 
         {/* Headline */}
         <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-4 leading-[1.1] tracking-tight text-black max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 whitespace-pre-line">
-          {settings.homepage.heroTitle}
+          We Turn <span style={{ color: settings.global.primaryColor }}>Ordinary</span> Into Iconic.
         </h1>
 
         {/* Subheadline */}
-        <p className="text-lg md:text-xl text-gray-500 mb-6 max-w-2xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-6 duration-900">
-          {settings.homepage.heroSubtitle}
+        <p className="text-lg md:text-xl text-gray-500 mb-8 max-w-2xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-6 duration-900">
+          Scroll-stopping visuals. Smart marketing. Media that moves.
         </p>
 
         {/* Main CTA */}
-        <div className="mb-6 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+        <div className="flex flex-col items-center gap-4 mb-10 animate-in fade-in slide-in-from-bottom-8 duration-1000">
           <Link to="/book">
             <Button className="text-white font-bold text-lg px-12 py-7 rounded-xl shadow-lg shadow-teal-100 transition-all hover:scale-105" style={{ backgroundColor: settings.global.primaryColor }}>
-              Book a Consultation
+              Let’s Make It Iconic
             </Button>
           </Link>
+          <div className="flex flex-wrap justify-center gap-3">
+            <Button variant="outline" className="rounded-xl px-6 py-6 border-2 font-semibold hover:bg-gray-50 transition-all active:scale-95">
+              I'm in Real Estate
+            </Button>
+            <Button variant="outline" className="rounded-xl px-6 py-6 border-2 font-semibold hover:bg-gray-50 transition-all active:scale-95">
+              I Own a Business
+            </Button>
+          </div>
         </div>
 
         {/* Social Proof */}
-        <div className="flex flex-col items-center gap-4 mb-4 animate-in fade-in slide-in-from-bottom-10 duration-1100">
-          <div className="flex -space-x-3">
-            {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="w-10 h-10 rounded-full border-2 border-white overflow-hidden bg-gray-200"
-              >
-                <img
-                  src={`https://i.pravatar.cc/150?u=${i}`}
-                  alt="User avatar"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-0.5">
-              <Star className="w-5 h-5 fill-[#22c55e] text-[#22c55e]" />
-              <span className="font-bold text-lg ml-1">4.9</span>
-            </div>
-            <div className="flex gap-1">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="w-5 h-5 bg-[#22c55e] rounded-[2px] flex items-center justify-center">
-                  <Star className="w-3 h-3 text-white fill-white" />
+        <div className="flex flex-col items-center gap-3 mb-4 animate-in fade-in slide-in-from-bottom-10 duration-1100">
+          <div className="flex items-center gap-4">
+            <div className="flex -space-x-3">
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="w-10 h-10 rounded-full border-2 border-white overflow-hidden bg-gray-200"
+                >
+                  <img
+                    src={`https://i.pravatar.cc/150?u=${i}`}
+                    alt="User avatar"
+                    className="w-full h-full object-cover"
+                  />
                 </div>
               ))}
             </div>
+            <div className="flex items-center gap-1">
+              <div className="flex gap-0.5">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Star key={i} className="w-5 h-5 fill-[#22c55e] text-[#22c55e]" />
+                ))}
+              </div>
+              <span className="font-bold text-lg ml-1">4.9</span>
+            </div>
           </div>
+          <p className="text-gray-500 text-sm md:text-base max-w-lg mx-auto leading-relaxed">
+            ⭐ 4.9 on Google
+            <br />
+            Loved by agents, founders, and brands who refuse to blend in.
+          </p>
         </div>
 
       </div>

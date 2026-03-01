@@ -121,12 +121,15 @@ export default function MediaCarousel() {
       </div>
 
       {/* Pricing CTA */}
-      <div className="flex justify-center mt-12 pb-8 relative z-40">
+      <div className="flex flex-col items-center justify-center mt-12 pb-8 relative z-40">
         <Link to="/pricing">
           <Button className="text-white font-bold text-xl px-12 py-8 rounded-2xl shadow-xl shadow-teal-100/50 transition-all hover:scale-105 active:scale-95" style={{ backgroundColor: settings.global.primaryColor }}>
             View Pricing
           </Button>
         </Link>
+        <p className="mt-6 text-gray-900 font-bold text-lg md:text-xl tracking-tight animate-in fade-in slide-in-from-bottom-4 duration-1000">
+          We’re not competing. <span style={{ color: settings.global.primaryColor }}>We’re setting the pace.</span>
+        </p>
       </div>
 
       <style dangerouslySetInnerHTML={{ __html: `

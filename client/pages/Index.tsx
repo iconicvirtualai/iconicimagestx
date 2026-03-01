@@ -9,6 +9,9 @@ import AudienceSection from "@/components/AudienceSection";
 import AudienceDetails from "@/components/AudienceDetails";
 import TestimonialVideoCarousel from "@/components/TestimonialVideoCarousel";
 import FeaturesSection from "@/components/FeaturesSection";
+import RaisingTheStandard from "@/components/RaisingTheStandard";
+import ThisIsOurMarket from "@/components/ThisIsOurMarket";
+import TheNetwork from "@/components/TheNetwork";
 import TestimonialsSection from "@/components/TestimonialsSection";
 import FAQSection from "@/components/FAQSection";
 import PartnershipCTA from "@/components/PartnershipCTA";
@@ -31,10 +34,17 @@ export default function Index() {
 
       <main className="flex-1">
         <HeroSection />
-        {settings.homepage.showBeforeAfter && <MediaCarousel />}
+        {settings.homepage.showBeforeAfter && (
+          <>
+            <MediaCarousel />
+            <RaisingTheStandard />
+            <ThisIsOurMarket />
+          </>
+        )}
         {settings.homepage.showAIToolsSection && <SolutionSection />}
         <StatsBar />
         <StepsSection />
+        <TheNetwork />
         {settings.homepage.showAudienceSection && (
           <>
             <AudienceSection />
