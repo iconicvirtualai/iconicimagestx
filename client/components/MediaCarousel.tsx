@@ -1,7 +1,9 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 export default function MediaCarousel() {
+  const settings = useSiteSettings();
   const mediaItems = [
     {
       id: 1,
@@ -88,7 +90,7 @@ export default function MediaCarousel() {
         <div className="flex items-center gap-1">
            <div className="w-1.5 h-1.5 rounded-full bg-gray-200"></div>
            <div className="w-8 h-px bg-gray-200"></div>
-           <div className="w-1.5 h-1.5 rounded-full bg-teal-500"></div>
+           <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: settings.global.primaryColor }}></div>
         </div>
         <span className="text-gray-900">ICONIC</span>
       </div>
@@ -96,13 +98,13 @@ export default function MediaCarousel() {
       {/* Track Layers Container */}
       <div className="relative">
         {/* Middle Bar (Visual) - Constrained to Media height */}
-        <div className="absolute left-1/2 top-8 bottom-8 w-px bg-teal-500/30 z-[40] -translate-x-1/2 flex items-center justify-center pointer-events-none">
-          <div className="w-[2px] h-full bg-gradient-to-b from-transparent via-teal-500/50 to-transparent"></div>
-          <div className="absolute top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-[0_0_15px_rgba(20,184,166,0.3)] border border-teal-500/20">
+        <div className="absolute left-1/2 top-8 bottom-8 w-px z-[40] -translate-x-1/2 flex items-center justify-center pointer-events-none" style={{ backgroundColor: `${settings.global.primaryColor}4D` }}>
+          <div className="w-[2px] h-full" style={{ backgroundImage: `linear-gradient(to bottom, transparent, ${settings.global.primaryColor}80, transparent)` }}></div>
+          <div className="absolute top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-lg border" style={{ borderColor: `${settings.global.primaryColor}33` }}>
              <div className="flex gap-0.5">
-                <div className="w-0.5 h-2 bg-teal-500 rounded-full opacity-40"></div>
-                <div className="w-0.5 h-2 bg-teal-500 rounded-full"></div>
-                <div className="w-0.5 h-2 bg-teal-500 rounded-full opacity-40"></div>
+                <div className="w-0.5 h-2 rounded-full opacity-40" style={{ backgroundColor: settings.global.primaryColor }}></div>
+                <div className="w-0.5 h-2 rounded-full" style={{ backgroundColor: settings.global.primaryColor }}></div>
+                <div className="w-0.5 h-2 rounded-full opacity-40" style={{ backgroundColor: settings.global.primaryColor }}></div>
              </div>
           </div>
         </div>
@@ -121,7 +123,7 @@ export default function MediaCarousel() {
       {/* Pricing CTA */}
       <div className="flex justify-center mt-12 pb-8 relative z-40">
         <Link to="/pricing">
-          <Button className="bg-[#0f766e] text-white hover:bg-[#0d9488] font-bold text-xl px-12 py-8 rounded-2xl shadow-xl shadow-teal-100/50 transition-all hover:scale-105 active:scale-95">
+          <Button className="text-white font-bold text-xl px-12 py-8 rounded-2xl shadow-xl shadow-teal-100/50 transition-all hover:scale-105 active:scale-95" style={{ backgroundColor: settings.global.primaryColor }}>
             View Pricing
           </Button>
         </Link>

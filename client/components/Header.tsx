@@ -79,7 +79,7 @@ export default function Header() {
 
         {/* Right side buttons */}
         <div className="hidden lg:flex items-center gap-4">
-          <Button asChild className="bg-[#22d3ee] hover:bg-[#06b6d4] text-white rounded-xl px-6 h-10 font-bold shadow-sm transition-all text-sm">
+          <Button asChild className="text-white rounded-xl px-6 h-10 font-bold shadow-sm transition-all text-sm" style={{ backgroundColor: settings.global.secondaryColor }}>
             <Link to="/admin/login">
               Dashboard
             </Link>
@@ -118,7 +118,7 @@ export default function Header() {
               </Link>
             ))}
             <div className="pt-8 border-t border-gray-100 flex flex-col gap-5">
-              <Button asChild className="w-full bg-[#22d3ee] text-white hover:bg-[#06b6d4] font-bold py-7 text-xl rounded-2xl shadow-lg">
+              <Button asChild className="w-full text-white font-bold py-7 text-xl rounded-2xl shadow-lg" style={{ backgroundColor: settings.global.secondaryColor }}>
                 <Link to="/admin/login" onClick={() => setIsMenuOpen(false)}>
                   Dashboard
                 </Link>

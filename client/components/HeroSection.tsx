@@ -43,7 +43,7 @@ export default function HeroSection() {
       <div className="container mx-auto px-4 text-center">
         {/* Badge */}
         <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#f0fdfa] border border-[#ccfbf1] mb-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
-          <span className="text-[12px] font-bold tracking-wider text-[#0f766e] uppercase">
+          <span className="text-[12px] font-bold tracking-wider uppercase" style={{ color: settings.global.primaryColor }}>
             #1 Media Partner for Growing Brands
           </span>
         </div>
@@ -61,7 +61,7 @@ export default function HeroSection() {
         {/* Main CTA */}
         <div className="mb-6 animate-in fade-in slide-in-from-bottom-8 duration-1000">
           <Link to="/book">
-            <Button className="bg-[#0f766e] text-white hover:bg-[#0d9488] font-bold text-lg px-12 py-7 rounded-xl shadow-lg shadow-teal-100 transition-all hover:scale-105">
+            <Button className="text-white font-bold text-lg px-12 py-7 rounded-xl shadow-lg shadow-teal-100 transition-all hover:scale-105" style={{ backgroundColor: settings.global.primaryColor }}>
               Book a Consultation
             </Button>
           </Link>

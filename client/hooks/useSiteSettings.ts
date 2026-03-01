@@ -16,13 +16,23 @@ export function useSiteSettings() {
       }
     };
 
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "site_customization") {
+        fetchSettings();
+      }
+    };
+
     fetchSettings();
 
-    // Listen for updates from the customizer
+    // Listen for updates from the customizer (same tab)
     window.addEventListener('site-settings-updated', fetchSettings);
-    
+
+    // Listen for updates from other tabs
+    window.addEventListener('storage', handleStorageChange);
+
     return () => {
       window.removeEventListener('site-settings-updated', fetchSettings);
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 

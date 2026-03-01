@@ -7,7 +7,14 @@ export default function PromoBar() {
   if (!settings.global.showPromoBar) return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[60] bg-[#f0f9ff] text-[#0ea5e9] py-1.5 px-4 text-center text-sm font-medium border-b border-[#e0f2fe] flex items-center justify-center gap-2 transition-all">
+    <div
+      className="fixed top-0 left-0 right-0 z-[60] py-1.5 px-4 text-center text-sm font-bold border-b flex items-center justify-center gap-2 transition-all uppercase tracking-widest"
+      style={{
+        backgroundColor: `${settings.global.secondaryColor}10`,
+        color: settings.global.secondaryColor,
+        borderColor: `${settings.global.secondaryColor}20`
+      }}
+    >
       <span>{settings.global.promoBarText}</span>
       <ArrowRight className="w-4 h-4" />
     </div>

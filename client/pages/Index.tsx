@@ -31,7 +31,7 @@ export default function Index() {
 
       <main className="flex-1">
         <HeroSection />
-        <MediaCarousel />
+        {settings.homepage.showBeforeAfter && <MediaCarousel />}
         {settings.homepage.showAIToolsSection && <SolutionSection />}
         <StatsBar />
         <StepsSection />
@@ -43,7 +43,7 @@ export default function Index() {
         )}
         <TestimonialVideoCarousel />
         <FeaturesSection />
-        {settings.homepage.showBeforeAfter && <TestimonialsSection />}
+        <TestimonialsSection />
         <FAQSection />
         <PartnershipCTA />
       </main>
