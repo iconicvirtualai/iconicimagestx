@@ -1,12 +1,22 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Star } from "lucide-react";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 export default function HeroSection() {
+  const settings = useSiteSettings();
+
   return (
     <section className="relative overflow-hidden bg-white pt-32 pb-6">
       {/* Background Grid & Layered Glows */}
       <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
+        {/* Hero Background Image if provided in customizer */}
+        {settings.homepage.heroImage && (
+          <div className="absolute inset-0 opacity-[0.03] grayscale mix-blend-multiply">
+            <img src={settings.homepage.heroImage} className="w-full h-full object-cover" alt="" />
+          </div>
+        )}
+
         {/* Subtle Grid Pattern */}
         <div
           className="absolute inset-0 opacity-[0.05]"
@@ -39,15 +49,13 @@ export default function HeroSection() {
         </div>
 
         {/* Headline */}
-        <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-4 leading-[1.1] tracking-tight text-black max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
-          Create Stunning Brand Media{" "}
-          <span className="text-[#0d9488]">Instantly</span> with Iconic
+        <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-4 leading-[1.1] tracking-tight text-black max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 whitespace-pre-line">
+          {settings.homepage.heroTitle}
         </h1>
 
         {/* Subheadline */}
         <p className="text-lg md:text-xl text-gray-500 mb-6 max-w-2xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-6 duration-900">
-          Transforming your vision into high-impact media content. Join the top
-          brands leveraging strategic visual storytelling to dominate their market.
+          {settings.homepage.heroSubtitle}
         </p>
 
         {/* Main CTA */}

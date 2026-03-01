@@ -1,36 +1,38 @@
 import { Calendar, Camera, Scissors, Rocket, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 export default function StepsSection() {
+  const settings = useSiteSettings();
   const steps = [
     {
       step: "STEP 1",
       title: "Book your session",
       description: "Select your creative service and schedule a time through our seamless partnership portal in just a few clicks.",
       image: "https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=800&q=80", // Calendar/Planning
-      icon: <Calendar className="w-5 h-5 text-[#0d9488]" />,
+      icon: <Calendar className="w-5 h-5" style={{ color: settings.global.primaryColor }} />,
     },
     {
       step: "STEP 2",
       title: "We capture the vision",
       description: "Our professional creative team arrives on-site with state-of-the-art equipment to capture high-impact raw media.",
       image: "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=800&q=80", // Camera/Shooting
-      icon: <Camera className="w-5 h-5 text-[#0d9488]" />,
+      icon: <Camera className="w-5 h-5" style={{ color: settings.global.primaryColor }} />,
     },
     {
       step: "STEP 3",
       title: "Rapid post-production",
       description: "Our expert editors transform raw clips into polished, cinematic masterpieces that perfectly align with your brand.",
       image: "https://images.unsplash.com/photo-1536240478700-b869070f9279?w=800&q=80", // Editing
-      icon: <Scissors className="w-5 h-5 text-[#0d9488]" />,
+      icon: <Scissors className="w-5 h-5" style={{ color: settings.global.primaryColor }} />,
     },
     {
       step: "STEP 4",
       title: "Delivery & launch",
       description: "Receive your ready-to-post assets within 24 hours. Download, publish, and dominate your social feed instantly.",
       image: "https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=800&q=80", // Social/Launch
-      icon: <Rocket className="w-5 h-5 text-[#0d9488]" />,
+      icon: <Rocket className="w-5 h-5" style={{ color: settings.global.primaryColor }} />,
     },
   ];
 
@@ -40,7 +42,7 @@ export default function StepsSection() {
         <div className="text-center mb-16">
           {/* Badge */}
           <div className="inline-flex items-center px-4 py-1.5 rounded-md bg-white border border-[#ccfbf1] mb-8 shadow-sm">
-            <span className="text-[12px] font-bold tracking-wider text-[#0d9488] uppercase">
+            <span className="text-[12px] font-bold tracking-wider uppercase" style={{ color: settings.global.primaryColor }}>
               4 STEPS TO RESULTS
             </span>
           </div>
@@ -48,7 +50,7 @@ export default function StepsSection() {
           {/* Headline */}
           <h2 className="text-4xl md:text-5xl lg:text-7xl font-bold mb-8 leading-[1.1] tracking-tight text-black max-w-5xl mx-auto">
             From vision to viral in <br className="hidden md:block" />
-            <span className="text-[#0d9488]">minutes</span>, not days
+            <span style={{ color: settings.global.primaryColor }}>minutes</span>, not days
           </h2>
 
           <p className="text-lg md:text-xl text-gray-500 max-w-2xl mx-auto leading-relaxed">
@@ -67,7 +69,7 @@ export default function StepsSection() {
                 <span className="text-[10px] font-bold tracking-widest text-gray-400 uppercase block mb-2">
                   {item.step}
                 </span>
-                <h3 className="text-lg font-bold text-black mb-3 leading-tight group-hover:text-[#0d9488] transition-colors">
+                <h3 className="text-lg font-bold text-black mb-3 leading-tight transition-colors" onMouseEnter={(e) => e.currentTarget.style.color = settings.global.primaryColor} onMouseLeave={(e) => e.currentTarget.style.color = 'black'}>
                   {item.title}
                 </h3>
                 <p className="text-sm text-gray-500 leading-relaxed min-h-[60px]">
@@ -94,7 +96,7 @@ export default function StepsSection() {
         {/* CTA Button */}
         <div className="mt-16 text-center">
           <Link to="/book">
-            <Button className="bg-[#0d9488] hover:bg-[#0f766e] text-white font-bold text-lg px-8 py-7 rounded-2xl shadow-xl shadow-teal-100 transition-all hover:scale-105 active:scale-95 group">
+            <Button className="text-white font-bold text-lg px-8 py-7 rounded-2xl shadow-xl shadow-teal-100 transition-all hover:scale-105 active:scale-95 group" style={{ backgroundColor: settings.global.primaryColor }}>
               BOOK YOUR SESSION
               <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Button>

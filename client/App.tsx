@@ -18,6 +18,7 @@ import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminListingFile from "./pages/AdminListingFile";
 import AdminCustomerCenter from "./pages/AdminCustomerCenter";
+import AdminSiteCustomizer from "./pages/AdminSiteCustomizer";
 import Insights from "./pages/Insights";
 import Socials from "./pages/Socials";
 import VirtualStaging from "./pages/VirtualStaging";
@@ -50,6 +51,7 @@ const App = () => (
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/admin/listing/:id" element={<AdminListingFile />} />
           <Route path="/admin/customers" element={<AdminCustomerCenter />} />
+          <Route path="/admin/edit-site" element={<AdminSiteCustomizer />} />
           <Route path="/insights" element={<Insights />} />
           <Route path="/services/virtual-staging" element={<VirtualStaging />} />
           <Route path="/services/virtual-staging/select" element={<VirtualStagingSelection />} />

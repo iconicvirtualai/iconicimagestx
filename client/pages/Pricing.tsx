@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Check, X, ArrowRight, Star, ChevronLeft, ChevronRight, Info, Sparkles, Zap, Trophy, Crown, Camera, Video, Layout, Box, Users, Clock, DollarSign, Palette, Rocket } from "lucide-react";
 import { useState, useRef } from "react";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 export default function Pricing() {
+  const settings = useSiteSettings();
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
   const [brandingSliderPos, setBrandingSliderPos] = useState(50);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -30,7 +32,7 @@ export default function Pricing() {
       price: "249",
       period: "per listing",
       description: "Fast-paced content to get your listing live with impact.",
-      icon: <Zap className="w-6 h-6 text-[#0d9488]" />,
+      icon: <Zap className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
       buttonText: "Start My Consistency",
       ctaSubtext: "Your reel is ready before the sign is up.",
       tooltip: "Ideal for fast-moving residential listings where speed and social presence are key.",
@@ -48,7 +50,7 @@ export default function Pricing() {
       price: "549",
       period: "per listing",
       description: "Complete visual story with drone and AI enhancements.",
-      icon: <Trophy className="w-6 h-6 text-[#0d9488]" />,
+      icon: <Trophy className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
       isPopular: true,
       buttonText: "Start My Consistency",
       ctaSubtext: "Your reel is ready before the sign is up.",
@@ -68,7 +70,7 @@ export default function Pricing() {
       price: "899",
       period: "per listing",
       description: "Luxury-tier production for high-value properties.",
-      icon: <Crown className="w-6 h-6 text-[#0d9488]" />,
+      icon: <Crown className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
       buttonText: "Start My Consistency",
       ctaSubtext: "Your reel is ready before the sign is up.",
       tooltip: "Engineered for luxury listings and high-value neighborhoods where image is everything.",
@@ -88,7 +90,7 @@ export default function Pricing() {
       price: "1599",
       period: "per listing",
       description: "Dominate the market with complete media saturation.",
-      icon: <Box className="w-6 h-6 text-[#0d9488]" />,
+      icon: <Box className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
       badge: "Only 4 slots left in your zip code",
       buttonText: "Secure My Zip Code",
       ctaSubtext: "Your reel is ready before the sign is up.",
@@ -113,7 +115,7 @@ export default function Pricing() {
       price: "349",
       period: "session",
       description: "Upgrade your professional image with high-end lifestyle content.",
-      icon: <Camera className="w-6 h-6 text-[#0d9488]" />,
+      icon: <Camera className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
       buttonText: "Start My Consistency",
       ctaSubtext: "You sell homes; we’ll handle the fame.",
       tooltip: "Perfect for agents needing a quick but high-end update to their social and professional profiles.",
@@ -131,7 +133,7 @@ export default function Pricing() {
       price: "999",
       period: "per month",
       description: "Monthly strategic content production for consistent brand growth.",
-      icon: <Video className="w-6 h-6 text-[#0d9488]" />,
+      icon: <Video className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
       isPopular: true,
       buttonText: "Build My Empire",
       ctaSubtext: "You sell homes; we’ll handle the fame.",
@@ -150,7 +152,7 @@ export default function Pricing() {
       price: "2499",
       period: "session/campaign",
       description: "Become the go-to authority in your specific local neighborhood.",
-      icon: <Users className="w-6 h-6 text-[#0d9488]" />,
+      icon: <Users className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
       buttonText: "Build My Empire",
       ctaSubtext: "You sell homes; we’ll handle the fame.",
       tooltip: "For agents aiming for 'Neighborhood Mayor' status and total local authority.",
@@ -280,20 +282,20 @@ export default function Pricing() {
   return (
     <div className="flex flex-col min-h-screen bg-[#fafafa]">
       <Header />
-      
+
       <main className="flex-1 pb-20">
         {/* Hero Section - Reverted Style */}
         <div className="pt-32 pb-16 text-center px-4 max-w-5xl mx-auto">
           <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#f0fdfa] border border-[#ccfbf1] mb-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <span className="text-[12px] font-bold tracking-wider text-[#0d9488] uppercase">
+            <span className="text-[12px] font-bold tracking-wider uppercase" style={{ color: settings.global.primaryColor }}>
               Pricing & Packages
             </span>
           </div>
           <h1 className="text-4xl md:text-6xl font-bold text-black mb-6 tracking-tight leading-[1.1]">
-            Pick the <span className="text-[#0d9488]">Perfect Price</span> for Your Presence
+            {settings.pricing.title}
           </h1>
           <p className="text-lg text-gray-500 mb-10 max-w-2xl mx-auto font-medium">
-            Not sure where to start?
+            {settings.pricing.subtitle}
           </p>
 
           {/* Hyperlink Bubbles */}
@@ -307,7 +309,10 @@ export default function Pricing() {
               <button
                 key={bubble.id}
                 onClick={() => scrollToSection(bubble.id)}
-                className="px-8 py-3 rounded-full border border-gray-200 bg-white text-sm font-bold text-gray-600 hover:border-[#0d9488] hover:text-[#0d9488] hover:shadow-lg transition-all"
+                className="px-8 py-3 rounded-full border border-gray-200 bg-white text-sm font-bold text-gray-600 hover:text-white transition-all hover:border-transparent"
+                style={{ backgroundColor: 'transparent' }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = settings.global.primaryColor; e.currentTarget.style.color = 'white'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.color = 'rgb(75 85 99)'; }}
               >
                 {bubble.label}
               </button>
@@ -319,11 +324,11 @@ export default function Pricing() {
             <Link to="/pricing/ai-assistant" className="block bg-white rounded-[1.9rem] p-6 relative overflow-hidden group">
               <div className="relative z-10 flex items-center gap-6">
                 <div className="w-12 h-12 rounded-[1rem] bg-[#f0fdfa] border border-[#ccfbf1] flex items-center justify-center shrink-0">
-                  <Sparkles className="w-6 h-6 text-[#0d9488]" />
+                  <Sparkles className="w-6 h-6" style={{ color: settings.global.primaryColor }} />
                 </div>
                 <div className="text-left flex-1">
                   <h3 className="text-lg font-bold text-black mb-1">Our AI Can Help</h3>
-                  <div className="flex items-center gap-2 text-[#0d9488] font-bold text-xs">
+                  <div className="flex items-center gap-2 font-bold text-xs" style={{ color: settings.global.primaryColor }}>
                     Our AI Can Help <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                   </div>
                 </div>
@@ -337,21 +342,24 @@ export default function Pricing() {
           <div className="max-w-5xl mx-auto px-4">
             <div className="text-center mb-12">
               <h2 className="text-2xl font-black text-black uppercase tracking-widest mb-2">Do you have...</h2>
-              <div className="w-20 h-1 bg-[#0d9488] mx-auto rounded-full"></div>
+              <div className="w-20 h-1 mx-auto rounded-full" style={{ backgroundColor: settings.global.primaryColor }}></div>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* Door 1 */}
               <div
                 onClick={() => scrollToSection('phase1')}
-                className="group relative bg-white border border-gray-200 rounded-[2.5rem] p-10 text-center hover:border-[#0d9488] hover:shadow-2xl hover:shadow-teal-500/10 transition-all duration-500 overflow-hidden cursor-pointer shadow-xl shadow-gray-200/50"
+                className="group relative bg-white border border-gray-200 rounded-[2.5rem] p-10 text-center transition-all duration-500 overflow-hidden cursor-pointer shadow-xl shadow-gray-200/50 hover:shadow-2xl"
+                style={{ borderColor: 'transparent' }}
+                onMouseEnter={(e) => e.currentTarget.style.borderColor = settings.global.primaryColor}
+                onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgb(229 231 235)'}
               >
                 <div className="absolute top-0 right-0 p-6 opacity-[0.05] group-hover:scale-110 transition-transform">
                   <Clock className="w-24 h-24" />
                 </div>
                 <div className="relative z-10">
                   <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm border border-gray-100 group-hover:scale-110 transition-transform">
-                    <Clock className="w-8 h-8 text-[#0d9488]" />
+                    <Clock className="w-8 h-8" style={{ color: settings.global.primaryColor }} />
                   </div>
                   <h3 className="text-2xl font-black text-black mb-4">MORE TIME THAN MONEY</h3>
                   <p className="text-gray-500 text-sm mb-8 leading-relaxed">
@@ -366,20 +374,23 @@ export default function Pricing() {
               {/* Door 2 */}
               <div
                 onClick={() => scrollToSection('phase2')}
-                className="group relative bg-white border border-gray-200 rounded-[2.5rem] p-10 text-center hover:border-[#0d9488] hover:shadow-2xl hover:shadow-teal-500/10 transition-all duration-500 overflow-hidden cursor-pointer shadow-xl shadow-gray-200/50"
+                className="group relative bg-white border border-gray-200 rounded-[2.5rem] p-10 text-center transition-all duration-500 overflow-hidden cursor-pointer shadow-xl shadow-gray-200/50 hover:shadow-2xl"
+                style={{ borderColor: 'transparent' }}
+                onMouseEnter={(e) => e.currentTarget.style.borderColor = settings.global.primaryColor}
+                onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgb(229 231 235)'}
               >
                 <div className="absolute top-0 right-0 p-6 opacity-[0.05] group-hover:scale-110 transition-transform">
                   <DollarSign className="w-24 h-24" />
                 </div>
                 <div className="relative z-10">
                   <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm border border-gray-100 group-hover:scale-110 transition-transform">
-                    <DollarSign className="w-8 h-8 text-[#0d9488]" />
+                    <DollarSign className="w-8 h-8" style={{ color: settings.global.primaryColor }} />
                   </div>
                   <h3 className="text-2xl font-black text-black mb-4">MORE MONEY THAN TIME</h3>
                   <p className="text-gray-500 text-sm mb-8 leading-relaxed">
                     I’m ready to scale, I need my time back and my brand on autopilot.
                   </p>
-                  <Button className="bg-[#0d9488] text-white hover:bg-[#0f766e] font-bold px-8 py-6 rounded-xl transition-all shadow-lg shadow-teal-100">
+                  <Button className="text-white font-bold px-8 py-6 rounded-xl transition-all shadow-lg" style={{ backgroundColor: settings.global.primaryColor }}>
                     I'm ready to scale →
                   </Button>
                 </div>
@@ -396,7 +407,7 @@ export default function Pricing() {
                 Listing Domination <span className="text-gray-300">(The Property)</span>
               </h2>
               <p className="text-lg text-gray-500 leading-relaxed">
-                Targeting the listing lifecycle: Pre-launch buzz, active sale, and post-close legacy. 
+                Targeting the listing lifecycle: Pre-launch buzz, active sale, and post-close legacy.
                 Every package now includes a Listing Reel as the core deliverable. <span className="font-bold text-black">We don't just shoot; we trend.</span>
               </p>
             </div>
@@ -406,8 +417,9 @@ export default function Pricing() {
                 <div
                   key={i}
                   className={`relative group bg-white rounded-[2rem] p-8 border transition-all duration-500 flex flex-col ${
-                    tier.isPopular ? 'border-[#0d9488] shadow-2xl shadow-teal-500/10 scale-105 z-10' : 'border-gray-100 hover:border-[#0d9488]/30 hover:shadow-xl'
+                    tier.isPopular ? 'shadow-2xl scale-105 z-10' : 'border-gray-100 hover:shadow-xl'
                   }`}
+                  style={{ borderColor: tier.isPopular ? settings.global.primaryColor : undefined }}
                 >
                   {tier.badge && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-red-500 text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest whitespace-nowrap shadow-lg">
@@ -422,7 +434,7 @@ export default function Pricing() {
                   </div>
 
                   <h3 className="text-xl font-black text-black mb-1">{tier.name}</h3>
-                  <p className="text-[#0d9488] font-bold text-xs uppercase tracking-wider mb-6">{tier.tagline}</p>
+                  <p className="font-bold text-xs uppercase tracking-wider mb-6" style={{ color: settings.global.primaryColor }}>{tier.tagline}</p>
 
                   <div className="mb-6 flex items-baseline gap-1">
                     <span className="text-4xl font-black text-black">${tier.price}</span>
@@ -437,7 +449,7 @@ export default function Pricing() {
                     {tier.features.map((feature, j) => (
                       <div key={j} className="flex items-start gap-3">
                         <div className="mt-1 shrink-0">
-                          <Check className="w-3.5 h-3.5 text-[#0d9488] stroke-[3]" />
+                          <Check className="w-3.5 h-3.5 stroke-[3]" style={{ color: settings.global.primaryColor }} />
                       </div>
                       <span className="text-sm font-medium text-gray-600 leading-tight">{feature}</span>
                     </div>
@@ -446,8 +458,8 @@ export default function Pricing() {
 
                   <div className="mt-auto space-y-4">
                     <Button asChild className={`w-full py-6 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] ${
-                      tier.isPopular ? 'bg-[#0d9488] hover:bg-[#0f766e] text-white shadow-lg shadow-teal-100' : 'bg-black hover:bg-gray-800 text-white shadow-lg'
-                    }`}>
+                      tier.isPopular ? 'text-white shadow-lg' : 'bg-black hover:bg-gray-800 text-white shadow-lg'
+                    }`} style={{ backgroundColor: tier.isPopular ? settings.global.primaryColor : undefined }}>
                       <Link to="/book">
                         {tier.buttonText}
                       </Link>
@@ -456,7 +468,7 @@ export default function Pricing() {
 
                     {/* Tooltip Simulation */}
                     <div className="pt-4 border-t border-gray-50 flex items-center justify-center group/tooltip relative">
-                      <div className="flex items-center gap-2 text-[10px] font-bold text-gray-300 group-hover/tooltip:text-[#0d9488] cursor-help transition-colors">
+                      <div className="flex items-center gap-2 text-[10px] font-bold text-gray-300 group-hover/tooltip:text-[#0d9488] cursor-help transition-colors" style={{ color: undefined }} onMouseEnter={(e) => e.currentTarget.style.color = settings.global.primaryColor} onMouseLeave={(e) => e.currentTarget.style.color = '#d1d5db'}>
                         <Info className="w-3 h-3" />
                         Which is for me?
                       </div>
@@ -471,112 +483,114 @@ export default function Pricing() {
             </div>
 
             {/* The Basics Section */}
-            <div className="mt-20 pt-20 border-t border-gray-100">
-              <div className="text-center mb-12">
-                <h3 className="text-2xl font-black text-black uppercase tracking-widest mb-4">Choose the Basics</h3>
-                <p className="text-gray-500 text-sm font-medium">Fast, efficient, and essential media for every listing.</p>
-              </div>
+            {settings.pricing.showBasics && (
+              <div className="mt-20 pt-20 border-t border-gray-100">
+                <div className="text-center mb-12">
+                  <h3 className="text-2xl font-black text-black uppercase tracking-widest mb-4">Choose the Basics</h3>
+                  <p className="text-gray-500 text-sm font-medium">Fast, efficient, and essential media for every listing.</p>
+                </div>
 
-              <div className="bg-[#fafafa] rounded-[2.5rem] p-8 md:p-12 border border-gray-100">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-                  {/* Photo Packages */}
-                  <div className="lg:col-span-1 space-y-6">
-                    <h4 className="text-[#0d9488] font-black text-xs uppercase tracking-widest mb-6">Photo Packages</h4>
-                    <div className="space-y-4">
-                      {[
-                        { label: "20 Photos", price: "99" },
-                        { label: "35 Photos", price: "150" },
-                        { label: "50 Photos", price: "200" }
-                      ].map((pkg, idx) => (
-                        <div key={idx} className="flex items-center justify-between p-4 bg-white rounded-xl border border-gray-100 shadow-sm">
-                          <span className="font-bold text-gray-700">{pkg.label}</span>
-                          <span className="text-xl font-black text-black">${pkg.price}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="pt-4 space-y-3">
-                      {[
-                        { label: "Basic Edits", included: true },
-                        { label: "Color Balance", included: true },
-                        { label: "Clear Windows", included: true },
-                        { label: "Sky Replacement", included: true },
-                        { label: "Next Day Turn Around", included: true },
-                        { label: "Reflection/Mirror Removal", included: true },
-                        { label: "Grass Replacement", included: false },
-                        { label: "Firepits, Fireplaces", included: false },
-                        { label: "Extra love in Iconic Edits", included: false }
-                      ].map((item, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
-                          {item.included ? (
-                            <Check className="w-3.5 h-3.5 text-[#0d9488] stroke-[3]" />
-                          ) : (
-                            <X className="w-3.5 h-3.5 text-red-400 stroke-[3]" />
-                          )}
-                          <span className={`text-[13px] font-bold ${item.included ? 'text-gray-600' : 'text-gray-400 line-through decoration-gray-300'}`}>
-                            {item.label}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Add-Ons */}
-                  <div className="lg:col-span-1 space-y-6">
-                    <div>
-                      <h4 className="text-[#0d9488] font-black text-xs uppercase tracking-widest mb-1">Add-Ons</h4>
-                      <p className="text-[10px] text-gray-400 font-bold italic mb-6">(Must already be on site doing a full service shoot)</p>
-                    </div>
-                    <div className="space-y-4">
-                      {[
-                        { label: "Aerial Add Ons", price: "99" },
-                        { label: "Reel Add On", price: "125" },
-                        { label: "3D Matterport", price: "200+" },
-                        { label: "Video Add On", price: "350-500+" }
-                      ].map((addon, idx) => (
-                        <div key={idx} className="flex items-center justify-between p-4 bg-white/50 rounded-xl border border-gray-100">
-                          <span className="font-bold text-gray-600 text-sm">{addon.label}</span>
-                          <span className="font-black text-black">${addon.price}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* ICONIC Edits */}
-                  <div className="lg:col-span-1">
-                    <div className="h-full bg-black rounded-3xl p-8 text-white relative overflow-hidden group hover:scale-[1.02] transition-transform duration-500">
-                      <div className="absolute top-0 right-0 p-6 opacity-10">
-                        <Palette className="w-24 h-24" />
+                <div className="bg-[#fafafa] rounded-[2.5rem] p-8 md:p-12 border border-gray-100">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                    {/* Photo Packages */}
+                    <div className="lg:col-span-1 space-y-6">
+                      <h4 className="font-black text-xs uppercase tracking-widest mb-6" style={{ color: settings.global.primaryColor }}>Photo Packages</h4>
+                      <div className="space-y-4">
+                        {[
+                          { label: "20 Photos", price: "99" },
+                          { label: "35 Photos", price: "150" },
+                          { label: "50 Photos", price: "200" }
+                        ].map((pkg, idx) => (
+                          <div key={idx} className="flex items-center justify-between p-4 bg-white rounded-xl border border-gray-100 shadow-sm">
+                            <span className="font-bold text-gray-700">{pkg.label}</span>
+                            <span className="text-xl font-black text-black">${pkg.price}</span>
+                          </div>
+                        ))}
                       </div>
-                      <div className="relative z-10">
-                        <div className="flex items-center justify-between mb-6">
-                          <h4 className="text-[#0d9488] font-black text-xs uppercase tracking-widest">Premium Upgrade</h4>
-                          <span className="text-2xl font-black text-white">$55</span>
+                      <div className="pt-4 space-y-3">
+                        {[
+                          { label: "Basic Edits", included: true },
+                          { label: "Color Balance", included: true },
+                          { label: "Clear Windows", included: true },
+                          { label: "Sky Replacement", included: true },
+                          { label: "Next Day Turn Around", included: true },
+                          { label: "Reflection/Mirror Removal", included: true },
+                          { label: "Grass Replacement", included: false },
+                          { label: "Firepits, Fireplaces", included: false },
+                          { label: "Extra love in Iconic Edits", included: false }
+                        ].map((item, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            {item.included ? (
+                              <Check className="w-3.5 h-3.5 stroke-[3]" style={{ color: settings.global.primaryColor }} />
+                            ) : (
+                              <X className="w-3.5 h-3.5 text-red-400 stroke-[3]" />
+                            )}
+                            <span className={`text-[13px] font-bold ${item.included ? 'text-gray-600' : 'text-gray-400 line-through decoration-gray-300'}`}>
+                              {item.label}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Add-Ons */}
+                    <div className="lg:col-span-1 space-y-6">
+                      <div>
+                        <h4 className="font-black text-xs uppercase tracking-widest mb-1" style={{ color: settings.global.primaryColor }}>Add-Ons</h4>
+                        <p className="text-[10px] text-gray-400 font-bold italic mb-6">(Must already be on site doing a full service shoot)</p>
+                      </div>
+                      <div className="space-y-4">
+                        {[
+                          { label: "Aerial Add Ons", price: "99" },
+                          { label: "Reel Add On", price: "125" },
+                          { label: "3D Matterport", price: "200+" },
+                          { label: "Video Add On", price: "350-500+" }
+                        ].map((addon, idx) => (
+                          <div key={idx} className="flex items-center justify-between p-4 bg-white/50 rounded-xl border border-gray-100">
+                            <span className="font-bold text-gray-600 text-sm">{addon.label}</span>
+                            <span className="font-black text-black">${addon.price}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* ICONIC Edits */}
+                    <div className="lg:col-span-1">
+                      <div className="h-full bg-black rounded-3xl p-8 text-white relative overflow-hidden group hover:scale-[1.02] transition-transform duration-500">
+                        <div className="absolute top-0 right-0 p-6 opacity-10">
+                          <Palette className="w-24 h-24" />
                         </div>
-                        <h3 className="text-xl font-black mb-4">ICONIC EDITS</h3>
-                        <div className="grid grid-cols-1 gap-3">
-                          {[
-                            "Add Grass",
-                            "Clean Driveway",
-                            "Remove Cords",
-                            "Add Fire to Fireplaces",
-                            "Add TV Screens",
-                            "Digital Curb Appeal"
-                          ].map((edit, idx) => (
-                            <div key={idx} className="flex items-center gap-2">
-                              <Sparkles className="w-3 h-3 text-[#0d9488]" />
-                              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{edit}</span>
-                            </div>
-                          ))}
+                        <div className="relative z-10">
+                          <div className="flex items-center justify-between mb-6">
+                            <h4 className="font-black text-xs uppercase tracking-widest" style={{ color: settings.global.primaryColor }}>Premium Upgrade</h4>
+                            <span className="text-2xl font-black text-white">$55</span>
+                          </div>
+                          <h3 className="text-xl font-black mb-4">ICONIC EDITS</h3>
+                          <div className="grid grid-cols-1 gap-3">
+                            {[
+                              "Add Grass",
+                              "Clean Driveway",
+                              "Remove Cords",
+                              "Add Fire to Fireplaces",
+                              "Add TV Screens",
+                              "Digital Curb Appeal"
+                            ].map((edit, idx) => (
+                              <div key={idx} className="flex items-center gap-2">
+                                <Sparkles className="w-3 h-3" style={{ color: settings.global.primaryColor }} />
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{edit}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <Button asChild className="w-full mt-8 text-white font-black py-6 rounded-xl transition-all shadow-lg shadow-teal-900/20" style={{ backgroundColor: settings.global.primaryColor }}>
+                            <Link to="/book">Upgrade My Photos</Link>
+                          </Button>
                         </div>
-                        <Button asChild className="w-full mt-8 bg-[#0d9488] hover:bg-[#0f766e] text-white font-black py-6 rounded-xl transition-all shadow-lg shadow-teal-900/20">
-                          <Link to="/book">Upgrade My Photos</Link>
-                        </Button>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </section>
 
@@ -585,25 +599,25 @@ export default function Pricing() {
           <div className="max-w-4xl mx-auto px-4 text-center">
             <h2 className="text-3xl font-bold text-black mb-4">Elevate Your Personal Brand</h2>
             <p className="text-gray-500 mb-12 max-w-xl mx-auto text-sm">See the difference between a standard corporate headshot and an Iconic Lifestyle Portrait.</p>
-            
+
             <div className="relative max-w-2xl mx-auto aspect-[16/9] rounded-[2rem] overflow-hidden shadow-xl border-4 border-white">
               {/* After (Iconic) */}
-              <img 
-                src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1200&q=80" 
+              <img
+                src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1200&q=80"
                 className="absolute inset-0 w-full h-full object-cover"
                 alt="Iconic Lifestyle"
               />
               <div className="absolute inset-0 flex flex-col justify-end p-6 text-white z-10 text-right pointer-events-none">
-                <div className="bg-[#0d9488] px-3 py-1.5 rounded-full inline-block self-end text-[10px] font-black uppercase tracking-widest shadow-lg">Iconic Lifestyle</div>
+                <div className="px-3 py-1.5 rounded-full inline-block self-end text-[10px] font-black uppercase tracking-widest shadow-lg" style={{ backgroundColor: settings.global.primaryColor }}>Iconic Lifestyle</div>
               </div>
 
               {/* Before (Standard) */}
-              <div 
+              <div
                 className="absolute inset-0 overflow-hidden"
                 style={{ clipPath: `inset(0 ${100 - brandingSliderPos}% 0 0)` }}
               >
-                <img 
-                  src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1200&q=80" 
+                <img
+                  src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1200&q=80"
                   className="absolute inset-0 w-full h-full object-cover grayscale brightness-[0.8]"
                   alt="Standard Corporate"
                 />
@@ -613,21 +627,21 @@ export default function Pricing() {
               </div>
 
               {/* Slider Control */}
-              <div 
+              <div
                 className="absolute inset-y-0 z-20 pointer-events-none"
                 style={{ left: `${brandingSliderPos}%` }}
               >
                 <div className="absolute inset-y-0 -left-[1px] w-[2px] bg-white shadow-xl"></div>
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-[#0d9488] rounded-full flex items-center justify-center text-white border-4 border-white shadow-2xl">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center text-white border-4 border-white shadow-2xl" style={{ backgroundColor: settings.global.primaryColor }}>
                   <ChevronLeft className="w-3 h-3" />
                   <ChevronRight className="w-3 h-3" />
                 </div>
               </div>
 
-              <input 
-                type="range" 
-                min="0" 
-                max="100" 
+              <input
+                type="range"
+                min="0"
+                max="100"
                 value={brandingSliderPos}
                 onChange={(e) => setBrandingSliderPos(parseInt(e.target.value))}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-30"
@@ -644,18 +658,19 @@ export default function Pricing() {
                 Iconic Branding <span className="text-gray-300">(The Agent)</span>
               </h2>
               <p className="text-lg text-gray-500 leading-relaxed">
-                Targeting the human brand: Life, business, and local authority. 
+                Targeting the human brand: Life, business, and local authority.
                 We don't just capture portraits; we build ecosystems of authority.
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {brandingTiers.map((tier, i) => (
-                <div 
+                <div
                   key={i}
                   className={`relative group bg-white rounded-[2rem] p-8 border transition-all duration-500 flex flex-col ${
-                    tier.isPopular ? 'border-[#0d9488] shadow-2xl shadow-teal-500/10 scale-105 z-10' : 'border-gray-100 hover:border-[#0d9488]/30 hover:shadow-xl'
+                    tier.isPopular ? 'shadow-2xl scale-105 z-10' : 'border-gray-100 hover:shadow-xl'
                   }`}
+                  style={{ borderColor: tier.isPopular ? settings.global.primaryColor : undefined }}
                 >
                   <div className="mb-6 flex items-center justify-between">
                     <div className="p-3 bg-[#f0fdfa] rounded-2xl">
@@ -664,7 +679,7 @@ export default function Pricing() {
                   </div>
 
                   <h3 className="text-xl font-black text-black mb-1">{tier.name}</h3>
-                  <p className="text-[#0d9488] font-bold text-xs uppercase tracking-wider mb-6">{tier.tagline}</p>
+                  <p className="font-bold text-xs uppercase tracking-wider mb-6" style={{ color: settings.global.primaryColor }}>{tier.tagline}</p>
 
                   <div className="mb-6 flex items-baseline gap-1">
                     <span className="text-4xl font-black text-black">${tier.price}</span>
@@ -679,7 +694,7 @@ export default function Pricing() {
                     {tier.features.map((feature, j) => (
                       <div key={j} className="flex items-start gap-3">
                         <div className="mt-1 shrink-0">
-                          <Check className="w-3.5 h-3.5 text-[#0d9488] stroke-[3]" />
+                          <Check className="w-3.5 h-3.5 stroke-[3]" style={{ color: settings.global.primaryColor }} />
                       </div>
                       <span className="text-sm font-medium text-gray-600 leading-tight">{feature}</span>
                     </div>
@@ -688,17 +703,17 @@ export default function Pricing() {
 
                   <div className="mt-auto space-y-4">
                     <Button asChild className={`w-full py-6 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] ${
-                      tier.isPopular ? 'bg-[#0d9488] hover:bg-[#0f766e] text-white shadow-lg shadow-teal-100' : 'bg-black hover:bg-gray-800 text-white shadow-lg'
-                    }`}>
+                      tier.isPopular ? 'text-white shadow-lg' : 'bg-black hover:bg-gray-800 text-white shadow-lg'
+                    }`} style={{ backgroundColor: tier.isPopular ? settings.global.primaryColor : undefined }}>
                       <Link to="/book">
                         {tier.buttonText}
                       </Link>
                     </Button>
                     <p className="text-[10px] text-gray-400 text-center font-medium italic">{tier.ctaSubtext}</p>
-                    
+
                     {/* Tooltip Simulation */}
                     <div className="pt-4 border-t border-gray-50 flex items-center justify-center group/tooltip relative">
-                      <div className="flex items-center gap-2 text-[10px] font-bold text-gray-300 group-hover/tooltip:text-[#0d9488] cursor-help transition-colors">
+                      <div className="flex items-center gap-2 text-[10px] font-bold text-gray-300 cursor-help transition-colors" onMouseEnter={(e) => e.currentTarget.style.color = settings.global.primaryColor} onMouseLeave={(e) => e.currentTarget.style.color = '#d1d5db'}>
                         <Info className="w-3 h-3" />
                         Which is for me?
                       </div>
@@ -737,9 +752,9 @@ export default function Pricing() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
                 {phase1Tiers.map((tier, i) => (
-                  <div key={i} className={`bg-white rounded-[2rem] p-10 border transition-all duration-500 hover:shadow-xl ${tier.isPopular ? 'border-[#0d9488]' : 'border-gray-100'}`}>
+                  <div key={i} className={`bg-white rounded-[2rem] p-10 border transition-all duration-500 hover:shadow-xl ${tier.isPopular ? '' : 'border-gray-100'}`} style={{ borderColor: tier.isPopular ? settings.global.primaryColor : undefined }}>
                     <h4 className="text-xl font-black text-black mb-1">{tier.name}</h4>
-                    <p className="text-[#0d9488] font-bold text-xs uppercase tracking-widest mb-6">{tier.tagline}</p>
+                    <p className="font-bold text-xs uppercase tracking-widest mb-6" style={{ color: settings.global.primaryColor }}>{tier.tagline}</p>
                     <div className="mb-6 flex items-baseline gap-1">
                       <span className="text-4xl font-black text-black">${tier.price}</span>
                       <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">{tier.period}</span>
@@ -748,7 +763,7 @@ export default function Pricing() {
                     <div className="space-y-4 mb-10">
                       {tier.features.map((feature, j) => (
                         <div key={j} className="flex items-start gap-3">
-                      <Check className="w-4 h-4 text-[#0d9488] stroke-[3] mt-0.5" />
+                      <Check className="w-4 h-4 stroke-[3] mt-0.5" style={{ color: settings.global.primaryColor }} />
                       <span className="text-sm font-medium text-gray-600">{feature}</span>
                         </div>
                       ))}
@@ -764,48 +779,22 @@ export default function Pricing() {
             </div>
 
             {/* Phase 2: Money Over Time */}
-            <div id="phase2">
-              <div className="flex items-center gap-4 mb-10">
-                <div className="h-[2px] flex-1 bg-gradient-to-r from-transparent to-[#0d9488]/20"></div>
-                <h3 className="text-lg font-black text-[#0d9488] uppercase tracking-[0.3em] whitespace-nowrap">PHASE 2: THE "MONEY OVER TIME" TRACK</h3>
-                <div className="h-[2px] flex-1 bg-gradient-to-l from-transparent to-[#0d9488]/20"></div>
-              </div>
+            {settings.pricing.showPhase2 && (
+              <div id="phase2">
+                <div className="flex items-center gap-4 mb-10">
+                  <div className="h-[2px] flex-1" style={{ backgroundImage: `linear-gradient(to right, transparent, ${settings.global.primaryColor}33)` }}></div>
+                  <h3 className="text-lg font-black uppercase tracking-[0.3em] whitespace-nowrap" style={{ color: settings.global.primaryColor }}>PHASE 2: THE "MONEY OVER TIME" TRACK</h3>
+                  <div className="h-[2px] flex-1" style={{ backgroundImage: `linear-gradient(to left, transparent, ${settings.global.primaryColor}33)` }}></div>
+                </div>
 
-              <div className="flex flex-wrap justify-center gap-8">
-                {phase2Tiers.slice(0, 3).map((tier, i) => (
-                  <div key={i} className={`relative bg-white rounded-[2rem] p-8 border transition-all duration-500 hover:shadow-2xl w-full md:w-[calc(33.333%-1.5rem)] ${tier.isPopular ? 'border-[#0d9488] scale-105 z-10 shadow-xl' : 'border-gray-100'}`}>
-                    {tier.isPopular && (
-                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#0d9488] text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest">Active Presence</div>
-                    )}
-                    <h4 className="text-xl font-black text-black mb-1">{tier.name}</h4>
-                    <p className="text-[#0d9488] font-bold text-xs uppercase tracking-widest mb-6">{tier.tagline}</p>
-                    <div className="mb-6 flex items-baseline gap-1">
-                      <span className="text-4xl font-black text-black">${tier.price}</span>
-                      <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">{tier.period}</span>
-                    </div>
-                    <p className="text-xs text-gray-500 leading-relaxed mb-8 h-12 overflow-hidden">{tier.description}</p>
-                    <div className="space-y-4 mb-10">
-                      {tier.features.map((feature, j) => (
-                        <div key={j} className="flex items-start gap-3">
-                          <Check className="w-3.5 h-3.5 text-[#0d9488] stroke-[3] mt-0.5" />
-                          <span className="text-[11px] font-medium text-gray-600 leading-tight">{feature}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <Button asChild className={`w-full py-6 rounded-xl font-bold transition-all ${tier.isPopular ? 'bg-[#0d9488] text-white' : 'bg-black text-white'}`}>
-                      <Link to="/book">
-                        {tier.buttonText}
-                      </Link>
-                    </Button>
-                  </div>
-                ))}
-
-                {/* Centered Second Row for New Tiers */}
-                <div className="w-full flex flex-wrap justify-center gap-8 mt-4">
-                  {phase2Tiers.slice(3).map((tier, i) => (
-                    <div key={i} className="relative bg-white rounded-[2rem] p-8 border border-gray-100 transition-all duration-500 hover:shadow-2xl w-full md:w-[calc(33.333%-1.5rem)]">
+                <div className="flex flex-wrap justify-center gap-8">
+                  {phase2Tiers.slice(0, 3).map((tier, i) => (
+                    <div key={i} className={`relative bg-white rounded-[2rem] p-8 border transition-all duration-500 hover:shadow-2xl w-full md:w-[calc(33.333%-1.5rem)] ${tier.isPopular ? 'scale-105 z-10 shadow-xl' : 'border-gray-100'}`} style={{ borderColor: tier.isPopular ? settings.global.primaryColor : undefined }}>
+                      {tier.isPopular && (
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest" style={{ backgroundColor: settings.global.primaryColor }}>Active Presence</div>
+                      )}
                       <h4 className="text-xl font-black text-black mb-1">{tier.name}</h4>
-                      <p className="text-[#0d9488] font-bold text-xs uppercase tracking-widest mb-6">{tier.tagline}</p>
+                      <p className="font-bold text-xs uppercase tracking-wider mb-6" style={{ color: settings.global.primaryColor }}>{tier.tagline}</p>
                       <div className="mb-6 flex items-baseline gap-1">
                         <span className="text-4xl font-black text-black">${tier.price}</span>
                         <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">{tier.period}</span>
@@ -814,21 +803,49 @@ export default function Pricing() {
                       <div className="space-y-4 mb-10">
                         {tier.features.map((feature, j) => (
                           <div key={j} className="flex items-start gap-3">
-                            <Check className="w-3.5 h-3.5 text-[#0d9488] stroke-[3] mt-0.5" />
+                            <Check className="w-3.5 h-3.5 stroke-[3] mt-0.5" style={{ color: settings.global.primaryColor }} />
                             <span className="text-[11px] font-medium text-gray-600 leading-tight">{feature}</span>
                           </div>
                         ))}
                       </div>
-                      <Button asChild className="w-full py-6 rounded-xl bg-black text-white font-bold transition-all">
+                      <Button asChild className={`w-full py-6 rounded-xl font-bold transition-all ${tier.isPopular ? 'text-white' : 'bg-black text-white'}`} style={{ backgroundColor: tier.isPopular ? settings.global.primaryColor : undefined }}>
                         <Link to="/book">
                           {tier.buttonText}
                         </Link>
                       </Button>
                     </div>
                   ))}
+
+                  {/* Centered Second Row for New Tiers */}
+                  <div className="w-full flex flex-wrap justify-center gap-8 mt-4">
+                    {phase2Tiers.slice(3).map((tier, i) => (
+                      <div key={i} className="relative bg-white rounded-[2rem] p-8 border border-gray-100 transition-all duration-500 hover:shadow-2xl w-full md:w-[calc(33.333%-1.5rem)]">
+                        <h4 className="text-xl font-black text-black mb-1">{tier.name}</h4>
+                        <p className="font-bold text-xs uppercase tracking-wider mb-6" style={{ color: settings.global.primaryColor }}>{tier.tagline}</p>
+                        <div className="mb-6 flex items-baseline gap-1">
+                          <span className="text-4xl font-black text-black">${tier.price}</span>
+                          <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">{tier.period}</span>
+                        </div>
+                        <p className="text-xs text-gray-500 leading-relaxed mb-8 h-12 overflow-hidden">{tier.description}</p>
+                        <div className="space-y-4 mb-10">
+                          {tier.features.map((feature, j) => (
+                            <div key={j} className="flex items-start gap-3">
+                              <Check className="w-3.5 h-3.5 stroke-[3] mt-0.5" style={{ color: settings.global.primaryColor }} />
+                              <span className="text-[11px] font-medium text-gray-600 leading-tight">{feature}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <Button asChild className="w-full py-6 rounded-xl bg-black text-white font-bold transition-all">
+                          <Link to="/book">
+                            {tier.buttonText}
+                          </Link>
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </section>
 
@@ -836,7 +853,7 @@ export default function Pricing() {
         <section id="brand-identity" className="py-24 bg-white">
           <div className="max-w-6xl mx-auto px-4">
             <div className="text-center mb-16">
-              <div className="inline-flex items-center gap-3 text-[#0d9488] mb-4">
+              <div className="inline-flex items-center gap-3 mb-4" style={{ color: settings.global.primaryColor }}>
                 <Palette className="w-6 h-6" />
                 <span className="text-sm font-black uppercase tracking-widest underline underline-offset-8">NEED A BRAND?</span>
               </div>
@@ -847,7 +864,7 @@ export default function Pricing() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-20">
               {/* Foundation */}
-              <div className="bg-[#fafafa] rounded-[2.5rem] p-10 border border-gray-100 group hover:border-[#0d9488]/30 transition-all duration-500">
+              <div className="bg-[#fafafa] rounded-[2.5rem] p-10 border border-gray-100 transition-all duration-500" onMouseEnter={(e) => e.currentTarget.style.borderColor = settings.global.primaryColor + '4D'} onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgb(243 244 246)'}>
                 <div className="mb-6 flex justify-between items-start">
                   <h3 className="text-2xl font-black text-black">THE FOUNDATION</h3>
                 </div>
@@ -862,12 +879,12 @@ export default function Pricing() {
                     "Digital Business Card"
                   ].map((item, i) => (
                     <div key={i} className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-[#0d9488]" />
+                      <Check className="w-4 h-4" style={{ color: settings.global.primaryColor }} />
                       <span className="text-xs font-bold text-gray-600">{item}</span>
                     </div>
                   ))}
                 </div>
-                <Button asChild className="w-full py-6 rounded-xl bg-black text-white hover:bg-[#0d9488] transition-all">
+                <Button asChild className="w-full py-6 rounded-xl bg-black text-white hover:text-white transition-all" onMouseEnter={(e) => e.currentTarget.style.backgroundColor = settings.global.primaryColor} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'black'}>
                   <Link to="/book">
                     Start My Foundation →
                   </Link>
@@ -875,7 +892,7 @@ export default function Pricing() {
               </div>
 
               {/* Evolution */}
-              <div className="bg-[#fafafa] rounded-[2.5rem] p-10 border border-gray-100 group hover:border-[#0d9488]/30 transition-all duration-500">
+              <div className="bg-[#fafafa] rounded-[2.5rem] p-10 border border-gray-100 transition-all duration-500" onMouseEnter={(e) => e.currentTarget.style.borderColor = settings.global.primaryColor + '4D'} onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgb(243 244 246)'}>
                 <div className="mb-6 flex justify-between items-start">
                   <h3 className="text-2xl font-black text-black">THE EVOLUTION</h3>
                 </div>
@@ -890,12 +907,12 @@ export default function Pricing() {
                     "Vision Pro Readiness"
                   ].map((item, i) => (
                     <div key={i} className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-[#0d9488]" />
+                      <Check className="w-4 h-4" style={{ color: settings.global.primaryColor }} />
                       <span className="text-xs font-bold text-gray-600">{item}</span>
                     </div>
                   ))}
                 </div>
-                <Button asChild className="w-full py-6 rounded-xl bg-black text-white hover:bg-[#0d9488] transition-all">
+                <Button asChild className="w-full py-6 rounded-xl bg-black text-white hover:text-white transition-all" onMouseEnter={(e) => e.currentTarget.style.backgroundColor = settings.global.primaryColor} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'black'}>
                   <Link to="/book">
                     Start My Evolution →
                   </Link>
@@ -904,7 +921,7 @@ export default function Pricing() {
             </div>
 
             {/* Redesigned Bundle Box */}
-            <div className="bg-[#fafafa] rounded-[2.5rem] p-10 md:p-16 border border-gray-100 group hover:border-[#0d9488]/30 transition-all duration-500 mb-20 relative overflow-hidden">
+            <div className="bg-[#fafafa] rounded-[2.5rem] p-10 md:p-16 border border-gray-100 transition-all duration-500 mb-20 relative overflow-hidden" onMouseEnter={(e) => e.currentTarget.style.borderColor = settings.global.primaryColor + '4D'} onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgb(243 244 246)'}>
               <div className="absolute top-0 right-0 p-12 opacity-[0.03] pointer-events-none">
                 <Sparkles className="w-64 h-64" />
               </div>
@@ -916,14 +933,14 @@ export default function Pricing() {
                       Foundation + Evolution. Total brand immersion, AI automation, and strategic identity design in one cohesive execution. Everything you need to own your market and automate your growth.
                     </p>
                   </div>
-                  <Button asChild className="bg-black text-white hover:bg-[#0d9488] font-black px-12 py-8 text-xl rounded-2xl transition-all shadow-xl hover:scale-105 active:scale-95 shrink-0">
+                  <Button asChild className="text-white font-black px-12 py-8 text-xl rounded-2xl transition-all shadow-xl hover:scale-105 active:scale-95 shrink-0" style={{ backgroundColor: settings.global.primaryColor }}>
                     <Link to="/book">Let's Chat</Link>
                   </Button>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                   <div className="space-y-4">
-                    <h4 className="text-[#0d9488] font-black text-xs uppercase tracking-widest mb-4">Core Brand Foundation</h4>
+                    <h4 className="font-black text-xs uppercase tracking-widest mb-4" style={{ color: settings.global.primaryColor }}>Core Brand Foundation</h4>
                     {[
                       "Logos Suite & Visual Identity",
                       "Signature Style Guide",
@@ -933,14 +950,14 @@ export default function Pricing() {
                       "Digital Business Card"
                     ].map((item, i) => (
                       <div key={i} className="flex items-center gap-3">
-                        <Check className="w-4 h-4 text-[#0d9488]" />
+                        <Check className="w-4 h-4" style={{ color: settings.global.primaryColor }} />
                         <span className="text-sm font-bold text-gray-600">{item}</span>
                       </div>
                     ))}
                   </div>
 
                   <div className="space-y-4">
-                    <h4 className="text-[#0d9488] font-black text-xs uppercase tracking-widest mb-4">AI & Automation Suite</h4>
+                    <h4 className="font-black text-xs uppercase tracking-widest mb-4" style={{ color: settings.global.primaryColor }}>AI & Automation Suite</h4>
                     {[
                       "AI Voice Clone Setup",
                       "AI Video Avatar Creation",
@@ -950,7 +967,7 @@ export default function Pricing() {
                       "Vision Pro Readiness"
                     ].map((item, i) => (
                       <div key={i} className="flex items-center gap-3">
-                        <Check className="w-4 h-4 text-[#0d9488]" />
+                        <Check className="w-4 h-4" style={{ color: settings.global.primaryColor }} />
                         <span className="text-sm font-bold text-gray-600">{item}</span>
                       </div>
                     ))}
@@ -959,19 +976,19 @@ export default function Pricing() {
                   <div className="bg-white/50 rounded-2xl p-6 border border-gray-100 flex flex-col justify-center gap-6">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-[#f0fdfa] flex items-center justify-center">
-                        <Star className="w-5 h-5 text-[#0d9488] fill-[#0d9488]" />
+                        <Star className="w-5 h-5 fill-current" style={{ color: settings.global.primaryColor }} />
                       </div>
                       <span className="text-sm font-black text-black">Total Brand Immersion</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-[#f0fdfa] flex items-center justify-center">
-                        <Rocket className="w-5 h-5 text-[#0d9488]" />
+                        <Rocket className="w-5 h-5" style={{ color: settings.global.primaryColor }} />
                       </div>
                       <span className="text-sm font-black text-black">Instant Market Authority</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-[#f0fdfa] flex items-center justify-center">
-                        <Users className="w-5 h-5 text-[#0d9488]" />
+                        <Users className="w-5 h-5" style={{ color: settings.global.primaryColor }} />
                       </div>
                       <span className="text-sm font-black text-black">Strategic SOI Penetration</span>
                     </div>
@@ -987,27 +1004,27 @@ export default function Pricing() {
               </div>
               <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
                 <div>
-                  <h4 className="text-xl font-bold mb-4 text-[#0d9488]">Iconic Logo Suite</h4>
+                  <h4 className="text-xl font-bold mb-4" style={{ color: settings.global.primaryColor }}>Iconic Logo Suite</h4>
                   <p className="text-gray-400 text-sm leading-relaxed">High-res custom logos for agent/team in PNG, Vector, and Social Square formats.</p>
                 </div>
                 <div>
-                  <h4 className="text-xl font-bold mb-4 text-[#0d9488]">Signature Style Guide</h4>
+                  <h4 className="text-xl font-bold mb-4" style={{ color: settings.global.primaryColor }}>Signature Style Guide</h4>
                   <p className="text-gray-400 text-sm leading-relaxed">Curated Font Kits and Hex Color Palettes to ensure every piece of content looks cohesive.</p>
                 </div>
                 <div>
-                  <h4 className="text-xl font-bold mb-4 text-[#0d9488]">Brand Hub Setup</h4>
+                  <h4 className="text-xl font-bold mb-4" style={{ color: settings.global.primaryColor }}>Brand Hub Setup</h4>
                   <p className="text-gray-400 text-sm leading-relaxed">We build your Brand Kit directly into your Canva or marketing platform for instant access.</p>
                 </div>
                 <div>
-                  <h4 className="text-xl font-bold mb-4 text-[#0d9488]">Marketing Templates</h4>
+                  <h4 className="text-xl font-bold mb-4" style={{ color: settings.global.primaryColor }}>Marketing Templates</h4>
                   <p className="text-gray-400 text-sm leading-relaxed">10+ "Plug & Play" templates for Just Listed/Sold, Open House, and Market Updates.</p>
                 </div>
                 <div>
-                  <h4 className="text-xl font-bold mb-4 text-[#0d9488]">Premium Business Cards</h4>
+                  <h4 className="text-xl font-bold mb-4" style={{ color: settings.global.primaryColor }}>Premium Business Cards</h4>
                   <p className="text-gray-400 text-sm leading-relaxed">Custom heavy-stock physical card design + Digital QR Card for instant lead capture.</p>
                 </div>
                 <div className="flex items-center">
-                  <div className="p-6 border-2 border-[#0d9488] rounded-2xl">
+                  <div className="p-6 border-2 rounded-2xl" style={{ borderColor: settings.global.primaryColor }}>
                     <p className="text-sm font-bold text-white uppercase tracking-widest">Dominate with Identity</p>
                   </div>
                 </div>
@@ -1021,12 +1038,12 @@ export default function Pricing() {
           <div className="container mx-auto px-4">
             <div className="text-center mb-16">
               <div className="inline-flex items-center px-3 py-1 rounded bg-[#f0fdfa] border border-[#ccfbf1] mb-8">
-                <span className="text-[10px] font-bold tracking-wider text-[#0d9488] uppercase">
+                <span className="text-[10px] font-bold tracking-wider uppercase" style={{ color: settings.global.primaryColor }}>
                   FAQ
                 </span>
               </div>
               <h2 className="text-4xl md:text-5xl font-bold mb-6 text-black">
-                Got questions? We've got <span className="text-[#0d9488]">answers</span>.
+                Got questions? We've got <span style={{ color: settings.global.primaryColor }}>answers</span>.
               </h2>
             </div>
 

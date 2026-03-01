@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 export default function Header() {
+  const settings = useSiteSettings();
   const location = useLocation();
   const isHome = location.pathname === "/";
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -40,7 +42,10 @@ export default function Header() {
       >
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2 flex-shrink-0 group">
-          <div className="w-9 h-9 bg-teal-500 rounded-xl flex items-center justify-center text-white shadow-sm transition-transform group-hover:scale-105">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-sm transition-transform group-hover:scale-105"
+            style={{ backgroundColor: settings.global.primaryColor }}
+          >
             <svg
               className="w-5 h-5"
               viewBox="0 0 24 24"
@@ -54,8 +59,8 @@ export default function Header() {
               <circle cx="12" cy="13" r="3" />
             </svg>
           </div>
-          <span className="text-[17px] font-bold tracking-tight text-gray-900">
-            Iconic
+          <span className="text-[17px] font-bold tracking-tight text-gray-900 uppercase">
+            {settings.global.logoText}
           </span>
         </Link>
 

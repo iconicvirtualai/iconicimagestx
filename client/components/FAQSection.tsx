@@ -1,6 +1,8 @@
 import * as React from "react";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 export default function FAQSection() {
+  const settings = useSiteSettings();
   const faqs = [
     {
       question: "How long does video processing take?",
@@ -28,12 +30,12 @@ export default function FAQSection() {
         {/* Section Header */}
         <div className="text-center mb-20">
           <div className="inline-flex items-center px-4 py-1.5 rounded-md bg-[#f0fdfa] border border-[#ccfbf1] mb-8">
-            <span className="text-[12px] font-bold tracking-wider text-[#0d9488] uppercase">
+            <span className="text-[12px] font-bold tracking-wider uppercase" style={{ color: settings.global.primaryColor }}>
               FAQ
             </span>
           </div>
           <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-8 leading-[1.2] tracking-tight text-black max-w-4xl mx-auto">
-            Got questions? We've got <span className="text-[#0d9488]">answers</span>.
+            Got questions? We've got <span style={{ color: settings.global.primaryColor }}>answers</span>.
           </h2>
           <p className="text-lg md:text-xl text-gray-500 max-w-2xl mx-auto leading-relaxed">
             Everything you need to know about Iconic in a nutshell.

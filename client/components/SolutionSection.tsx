@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { Play, Volume2, VolumeX, ChevronLeft, ChevronRight } from "lucide-react";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 export default function SolutionSection() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const settings = useSiteSettings();
 
   const videos = [
     {
@@ -55,14 +57,14 @@ export default function SolutionSection() {
       <div className="container mx-auto px-4 text-center">
         {/* Badge */}
         <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#f0fdfa] border border-[#ccfbf1] mb-8">
-          <span className="text-[12px] font-bold tracking-wider text-[#0f766e] uppercase">
+          <span className="text-[12px] font-bold tracking-wider uppercase" style={{ color: settings.global.primaryColor }}>
             Built for Creative Excellence
           </span>
         </div>
 
         {/* Headline */}
         <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-8 leading-[1.2] tracking-tight text-black max-w-4xl mx-auto">
-          Your All-in-One <span className="text-[#0d9488]">Solution</span> for <br className="hidden md:block" />
+          Your All-in-One <span style={{ color: settings.global.primaryColor }}>Solution</span> for <br className="hidden md:block" />
           High-Impact Media Content
         </h2>
 
@@ -107,7 +109,7 @@ export default function SolutionSection() {
             {/* Branding Overlay */}
             <div className="absolute bottom-4 left-4 md:bottom-10 md:left-10 z-30">
                <div className="bg-white/10 backdrop-blur-xl px-3 py-1.5 md:px-6 md:py-3 rounded-lg md:rounded-2xl border border-white/20 flex items-center gap-2 md:gap-3">
-                  <div className="w-5 h-5 md:w-8 md:h-8 bg-[#0d9488] rounded-md md:rounded-lg flex items-center justify-center text-white">
+                  <div className="w-5 h-5 md:w-8 md:h-8 rounded-md md:rounded-lg flex items-center justify-center text-white" style={{ backgroundColor: settings.global.primaryColor }}>
                     <Play className="w-2.5 h-2.5 md:w-4 md:h-4 fill-white translate-x-0.5" />
                   </div>
                   <span className="text-white font-bold tracking-tight text-[10px] md:text-base">Iconic Media</span>
@@ -117,9 +119,11 @@ export default function SolutionSection() {
 
           {/* Navigation Controls */}
           <div className="flex items-center justify-center mt-8 gap-6 md:gap-8">
-            <button 
+            <button
               onClick={prevSlide}
-              className="p-2 text-gray-400 hover:text-[#0d9488] transition-colors"
+              className="p-2 text-gray-400 transition-colors"
+              onMouseEnter={(e) => e.currentTarget.style.color = settings.global.primaryColor}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'rgb(156 163 175)'}
             >
               <ChevronLeft className="w-6 h-6" />
             </button>
@@ -131,17 +135,20 @@ export default function SolutionSection() {
                   key={idx}
                   onClick={() => setCurrentIndex(idx)}
                   className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                    idx === currentIndex 
-                      ? "bg-[#0d9488] w-6" 
+                    idx === currentIndex
+                      ? "w-6"
                       : "bg-gray-200 hover:bg-gray-300"
                   }`}
+                  style={{ backgroundColor: idx === currentIndex ? settings.global.primaryColor : undefined }}
                 />
               ))}
             </div>
 
-            <button 
+            <button
               onClick={nextSlide}
-              className="p-2 text-gray-400 hover:text-[#0d9488] transition-colors"
+              className="p-2 text-gray-400 transition-colors"
+              onMouseEnter={(e) => e.currentTarget.style.color = settings.global.primaryColor}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'rgb(156 163 175)'}
             >
               <ChevronRight className="w-6 h-6" />
             </button>

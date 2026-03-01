@@ -2,6 +2,7 @@ import { Play, ArrowRight, Instagram, Facebook, Linkedin, Youtube, Twitter, Mous
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 const FeatureCard = ({
   title,
@@ -17,40 +18,44 @@ const FeatureCard = ({
   colSpan?: string;
   ctaText?: string;
   ctaLink?: string;
-}) => (
-  <div className={`bg-[#f8fdff] rounded-2xl border border-dashed border-[#ccfbf1] p-6 flex flex-col ${colSpan} relative group`}>
-    <div className="flex-1 mb-6">
-      <div className="flex justify-between items-start mb-2">
-        <h3 className="text-lg font-bold text-black">{title}</h3>
-        {ctaLink && (
-          <Link to={ctaLink}>
-            <Button size="sm" className="bg-[#0d9488] hover:bg-[#0f766e] text-white text-[10px] h-7 px-3 rounded-lg md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-              {ctaText || "TRY NOW"}
-            </Button>
-          </Link>
-        )}
+}) => {
+  const settings = useSiteSettings();
+  return (
+    <div className={`bg-[#f8fdff] rounded-2xl border border-dashed border-[#ccfbf1] p-6 flex flex-col ${colSpan} relative group`}>
+      <div className="flex-1 mb-6">
+        <div className="flex justify-between items-start mb-2">
+          <h3 className="text-lg font-bold text-black">{title}</h3>
+          {ctaLink && (
+            <Link to={ctaLink}>
+              <Button size="sm" className="text-white text-[10px] h-7 px-3 rounded-lg md:opacity-0 md:group-hover:opacity-100 transition-opacity" style={{ backgroundColor: settings.global.primaryColor }}>
+                {ctaText || "TRY NOW"}
+              </Button>
+            </Link>
+          )}
+        </div>
+        <p className="text-gray-500 text-[11px] leading-relaxed">
+          {description}
+        </p>
       </div>
-      <p className="text-gray-500 text-[11px] leading-relaxed">
-        {description}
-      </p>
+      <div className="relative rounded-xl overflow-hidden bg-white border border-gray-100 shadow-sm h-48">
+        {children}
+      </div>
+      {ctaLink && (
+         <div className="mt-4 md:hidden">
+           <Link to={ctaLink}>
+              <Button size="sm" className="w-full text-white text-[10px] h-8 rounded-lg" style={{ backgroundColor: settings.global.primaryColor }}>
+                {ctaText || "TRY NOW"}
+              </Button>
+            </Link>
+         </div>
+      )}
     </div>
-    <div className="relative rounded-xl overflow-hidden bg-white border border-gray-100 shadow-sm h-48">
-      {children}
-    </div>
-    {ctaLink && (
-       <div className="mt-4 md:hidden">
-         <Link to={ctaLink}>
-            <Button size="sm" className="w-full bg-[#0d9488] hover:bg-[#0f766e] text-white text-[10px] h-8 rounded-lg">
-              {ctaText || "TRY NOW"}
-            </Button>
-          </Link>
-       </div>
-    )}
-  </div>
-);
+  );
+};
 
 const VirtualStagingSnippet = () => {
   const [step, setStep] = useState(0); // 0: initial, 1: dragging, 2: processing, 3: result
+  const settings = useSiteSettings();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -67,7 +72,7 @@ const VirtualStagingSnippet = () => {
         className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${step === 3 ? 'opacity-0' : 'opacity-100'}`}
         alt="Empty Room"
       />
-      
+
       {/* Background Room - Staged */}
       <img
         src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&q=225&fit=crop"
@@ -78,27 +83,27 @@ const VirtualStagingSnippet = () => {
       {/* Animation Overlay */}
       <div className="absolute inset-0 z-20 pointer-events-none">
         {/* Cursor & Photo Icon - Using standard CSS transitions/classes */}
-        <div 
+        <div
           className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center transition-all duration-700 ${
             step === 1 ? 'opacity-100 translate-y-0 translate-x-0' : 'opacity-0 translate-y-12 translate-x-12'
           }`}
         >
           <div className="bg-white p-2 rounded-lg shadow-xl border border-gray-100 rotate-6 mb-2">
             <div className="w-10 h-10 bg-[#f0fdfa] rounded flex items-center justify-center">
-              <LinkIcon className="w-5 h-5 text-[#0d9488]" />
+              <LinkIcon className="w-5 h-5" style={{ color: settings.global.primaryColor }} />
             </div>
           </div>
           <MousePointer2 className="w-5 h-5 text-black fill-black" />
         </div>
 
         {/* Processing State */}
-        <div 
+        <div
           className={`absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[1px] transition-opacity duration-500 ${
             step === 2 ? 'opacity-100' : 'opacity-0'
           }`}
         >
           <div className="bg-white px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2">
-            <div className="w-3 h-3 border-2 border-[#0d9488] border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-3 h-3 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: settings.global.primaryColor, borderTopColor: 'transparent' }}></div>
             <span className="text-[9px] font-bold text-gray-700">AI STAGING...</span>
           </div>
         </div>
@@ -106,7 +111,7 @@ const VirtualStagingSnippet = () => {
         {/* Labels */}
         <div className="absolute bottom-3 left-3 flex gap-2">
            <div className="bg-white/90 backdrop-blur-md px-2 py-1 rounded-md text-[8px] font-bold shadow-sm flex items-center gap-1 border border-gray-100">
-            <div className={`w-1 h-1 rounded-full transition-colors duration-500 ${step === 3 ? "bg-[#0d9488]" : "bg-gray-300"}`}></div>
+            <div className={`w-1 h-1 rounded-full transition-colors duration-500`} style={{ backgroundColor: step === 3 ? settings.global.primaryColor : 'rgb(209 213 219)' }}></div>
             {step === 3 ? "STAGED RESULT" : "EMPTY SPACE"}
           </div>
         </div>
@@ -116,42 +121,43 @@ const VirtualStagingSnippet = () => {
 };
 
 export default function FeaturesSection() {
+  const settings = useSiteSettings();
   return (
     <section className="bg-white py-20 md:py-24">
       <div className="container mx-auto px-4">
         {/* Section Header */}
         <div className="text-center mb-16">
           <div className="inline-flex items-center px-3 py-1 rounded-md bg-[#f0fdfa] border border-[#ccfbf1] mb-6">
-            <span className="text-[10px] font-bold tracking-wider text-[#0d9488] uppercase">
+            <span className="text-[10px] font-bold tracking-wider uppercase" style={{ color: settings.global.primaryColor }}>
               ADDITIONAL FEATURES
             </span>
           </div>
           <h2 className="text-3xl md:text-5xl font-bold mb-6 text-black max-w-4xl mx-auto tracking-tight">
-            Go beyond basic editing with <span className="text-[#0d9488]">powerful</span> add-on tools
+            Go beyond basic editing with <span style={{ color: settings.global.primaryColor }}>powerful</span> add-on tools
           </h2>
           <p className="text-gray-500 max-w-2xl mx-auto text-sm leading-relaxed">
-            Iconic isn't just about reels — enhance your content with smart AI tools 
+            Iconic isn't just about reels — enhance your content with smart AI tools
             designed to polish, extend, and personalize every video.
           </p>
         </div>
 
         {/* Features Bento Grid (3-Column Layout) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
-          
+
           {/* Image to Video */}
-          <FeatureCard 
+          <FeatureCard
             title="Image to Video"
             description="Effortlessly convert your property still images into captivating video tours that highlight key features and create immersive experiences for potential buyers."
             colSpan="md:col-span-2"
           >
             <div className="flex h-full items-center justify-center p-4 gap-4">
               <img src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&q=225&fit=crop" className="w-1/2 h-full object-cover rounded-lg border border-gray-100" alt="Before" />
-              <ArrowRight className="w-6 h-6 text-[#0d9488] shrink-0" />
+              <ArrowRight className="w-6 h-6 shrink-0" style={{ color: settings.global.primaryColor }} />
               <div className="w-1/2 h-full relative rounded-lg overflow-hidden border border-gray-100">
                 <img src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&q=225&fit=crop" className="w-full h-full object-cover" alt="After" />
                 <div className="absolute inset-0 flex items-center justify-center bg-black/10">
                   <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-lg">
-                    <Play className="w-3 h-3 text-[#0d9488] fill-[#0d9488] translate-x-0.5" />
+                    <Play className="w-3 h-3 translate-x-0.5" style={{ color: settings.global.primaryColor, fill: settings.global.primaryColor }} />
                   </div>
                 </div>
               </div>
@@ -159,7 +165,7 @@ export default function FeaturesSection() {
           </FeatureCard>
 
           {/* One Click Import */}
-          <FeatureCard 
+          <FeatureCard
             title="One Click Import"
             description="Pull listing photos directly from Realtor.com or Zillow to start your video in seconds."
           >
@@ -169,14 +175,14 @@ export default function FeaturesSection() {
                 <div className="w-10 h-10 bg-white rounded-lg shadow-sm border border-gray-100 flex items-center justify-center font-bold text-blue-600 text-xs">Z</div>
               </div>
               <div className="bg-white px-4 py-2 rounded-lg border border-gray-100 shadow-md text-[10px] font-medium flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-[#0ea5e9]"></div>
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: settings.global.secondaryColor }}></div>
                 Importing Listing...
               </div>
             </div>
           </FeatureCard>
 
           {/* AI Virtual Staging */}
-          <FeatureCard 
+          <FeatureCard
             title="AI Virtual Staging"
             description="Instantly furnish empty rooms with realistic AI staging to showcase your property's full potential."
             ctaText="TRY NOW"
@@ -186,7 +192,7 @@ export default function FeaturesSection() {
           </FeatureCard>
 
           {/* AI Photo Edits */}
-          <FeatureCard 
+          <FeatureCard
             title="AI Photo Edits"
             description="Make your listing photos stand out with AI-powered enhancements — like twilights, lawn repairs, and other edits that instantly elevate any property."
             colSpan="md:col-span-2"
@@ -198,7 +204,7 @@ export default function FeaturesSection() {
               </div>
               <div className="w-1/2 h-full relative">
                 <img src="https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?w=400&q=225&fit=crop" className="w-full h-full object-cover" alt="After" />
-                <span className="absolute top-3 right-3 bg-[#0d9488]/80 backdrop-blur-md text-white text-[8px] font-bold px-2 py-0.5 rounded uppercase">After</span>
+                <span className="absolute top-3 right-3 backdrop-blur-md text-white text-[8px] font-bold px-2 py-0.5 rounded uppercase" style={{ backgroundColor: `${settings.global.primaryColor}CC` }}>After</span>
               </div>
               <div className="absolute left-1/2 top-0 bottom-0 w-[2px] bg-white z-10 flex items-center justify-center -translate-x-1/2">
                 <div className="w-4 h-4 bg-white rounded-full shadow-lg border border-gray-100 flex items-center justify-center">
@@ -212,7 +218,7 @@ export default function FeaturesSection() {
           </FeatureCard>
 
           {/* Studio */}
-          <FeatureCard 
+          <FeatureCard
             title="Studio"
             description="Iconic's built-in editor that allows you to customize your videos with templates, music, captions, branding, and even your own photos or clips."
             colSpan="md:col-span-2"
@@ -226,7 +232,7 @@ export default function FeaturesSection() {
                       <Play className="w-4 h-4 text-white" />
                     </div>
                   </div>
-                  <div className="mt-2 h-1 bg-[#0d9488] rounded-full w-2/3"></div>
+                  <div className="mt-2 h-1 rounded-full w-2/3" style={{ backgroundColor: settings.global.primaryColor }}></div>
                 </div>
                 <div className="w-24 flex flex-col gap-2">
                   <div className="h-4 bg-gray-50 rounded border border-gray-100"></div>
@@ -242,13 +248,13 @@ export default function FeaturesSection() {
           </FeatureCard>
 
           {/* AI Voiceovers */}
-          <FeatureCard 
+          <FeatureCard
             title="AI Voiceovers"
             description="Instantly generate natural-sounding narrations from a wide range of voices."
           >
             <div className="flex flex-col h-full p-4 items-center justify-center gap-4 bg-[#f0fdfa]/30">
               <div className="w-full bg-white border border-gray-100 rounded-lg p-3 shadow-md flex items-center gap-3">
-                <div className="w-6 h-6 bg-[#0d9488] rounded-full flex items-center justify-center">
+                <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: settings.global.primaryColor }}>
                   <Play className="w-2 h-2 text-white fill-white ml-0.5" />
                 </div>
                 <div className="flex-1 flex gap-1 items-center">
@@ -264,7 +270,7 @@ export default function FeaturesSection() {
           </FeatureCard>
 
           {/* Social Media Captions */}
-          <FeatureCard 
+          <FeatureCard
             title="Social Media Captions"
             description="Automatically create captions optimized for Instagram, Facebook, LinkedIn, YouTube, and X."
           >
@@ -283,14 +289,14 @@ export default function FeaturesSection() {
           </FeatureCard>
 
           {/* AI Avatars */}
-          <FeatureCard 
+          <FeatureCard
             title="AI Avatars"
             description="Create professional video presentations with AI-generated avatars for a personal touch."
             colSpan="md:col-span-2"
           >
             <div className="flex h-full items-center justify-center p-4 gap-6">
               {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="w-16 h-16 md:w-20 md:h-20 rounded-xl border-2 border-white shadow-lg overflow-hidden bg-gray-100 flex-shrink-0 first:border-[#0d9488] first:ring-2 first:ring-[#0d9488]/20">
+                <div key={i} className="w-16 h-16 md:w-20 md:h-20 rounded-xl border-2 border-white shadow-lg overflow-hidden bg-gray-100 flex-shrink-0 first:ring-2" style={{ borderLeftColor: i === 1 ? settings.global.primaryColor : 'white', ringColor: i === 1 ? `${settings.global.primaryColor}33` : undefined }}>
                   <img src={`https://i.pravatar.cc/150?u=${i+10}`} className="w-full h-full object-cover" alt="Avatar" />
                 </div>
               ))}

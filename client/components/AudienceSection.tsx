@@ -1,10 +1,13 @@
+import { useSiteSettings } from "@/hooks/useSiteSettings";
+
 export default function AudienceSection() {
+  const settings = useSiteSettings();
   return (
     <section className="bg-white pt-20 md:pt-24 pb-12">
       <div className="container mx-auto px-4 text-center">
         {/* Badge */}
         <div className="inline-flex items-center px-4 py-1.5 rounded-md bg-[#f0fdfa] border border-[#ccfbf1] mb-8">
-          <span className="text-[12px] font-bold tracking-wider text-[#0d9488] uppercase">
+          <span className="text-[12px] font-bold tracking-wider uppercase" style={{ color: settings.global.primaryColor }}>
             WHO IT'S FOR
           </span>
         </div>
@@ -12,7 +15,7 @@ export default function AudienceSection() {
         {/* Headline */}
         <h2 className="text-3xl md:text-5xl font-bold mb-6 leading-[1.2] tracking-tight text-black max-w-4xl mx-auto">
           Tailored for real estate and visual <br className="hidden md:block" />
-          <span className="text-[#0d9488]">storytelling</span> professionals
+          <span style={{ color: settings.global.primaryColor }}>storytelling</span> professionals
         </h2>
 
         {/* Description */}

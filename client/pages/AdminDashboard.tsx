@@ -8,11 +8,12 @@ import {
   DollarSign, 
   Image as ImageIcon, 
   LayoutDashboard, 
-  Settings, 
-  LogOut, 
+  Settings,
+  LogOut,
   Search,
   Plus,
-  ArrowUpRight
+  ArrowUpRight,
+  Palette
 } from "lucide-react";
 
 const stats = [
@@ -150,13 +151,28 @@ export default function AdminDashboard() {
                       <p className="text-[9px] text-gray-400 uppercase tracking-widest">Upload new masterpieces</p>
                     </div>
                   </button>
-                  <button className="flex items-center gap-3 p-4 bg-[#fafafa] rounded-xl border border-gray-50 hover:border-[#0d9488] group transition-all text-left">
+                  <button
+                    onClick={() => navigate("/admin/edit-site")}
+                    className="flex items-center gap-3 p-4 bg-[#fafafa] rounded-xl border border-gray-50 hover:border-[#0d9488] group transition-all text-left"
+                  >
                     <div className="p-2 bg-white rounded-lg border border-gray-100 group-hover:bg-[#0d9488] group-hover:text-white transition-all">
                       <Settings className="w-4 h-4" />
                     </div>
                     <div>
                       <p className="text-xs font-bold text-black">Site Settings</p>
                       <p className="text-[9px] text-gray-400 uppercase tracking-widest">Manage prices & tiers</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => navigate("/admin/edit-site")}
+                    className="flex items-center gap-3 p-4 bg-teal-50/30 rounded-xl border border-teal-100/50 hover:border-[#0d9488] group transition-all text-left"
+                  >
+                    <div className="p-2 bg-white rounded-lg border border-gray-100 group-hover:bg-[#0d9488] group-hover:text-white transition-all">
+                      <Palette className="w-4 h-4 text-[#0d9488] group-hover:text-white" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-black">Edit Site</p>
+                      <p className="text-[9px] text-[#0d9488] font-black uppercase tracking-widest">Visual Customizer</p>
                     </div>
                   </button>
                 </div>

@@ -1,11 +1,13 @@
 import { Link } from "react-router-dom";
 import { Facebook, Instagram, Youtube } from "lucide-react";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
+  const settings = useSiteSettings();
 
   return (
-    <footer className="bg-[#0d9488] text-white py-12">
+    <footer className="text-white py-12" style={{ backgroundColor: settings.global.primaryColor }}>
       <div className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row items-center justify-between gap-8 text-center md:text-left">
           {/* Copyright & Brand */}
