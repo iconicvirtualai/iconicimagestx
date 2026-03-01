@@ -33,7 +33,7 @@ export const DEFAULT_SITE_SETTINGS = {
   },
   homepage: {
     heroTitle: "ELEVATE YOUR LISTINGS WITH MEDIA THAT SELLS",
-    heroSubtitle: "Your Creative Media Partners for Real Estate Professionals.",
+    heroSubtitle: "Your Creative Media Partners for Real Estate & Business Professionals.",
     heroImage: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1600&q=80",
     showAudienceSection: true,
     showAIToolsSection: true,
