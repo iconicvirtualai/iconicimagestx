@@ -103,7 +103,7 @@ const VirtualStagingSnippet = () => {
           }`}
         >
           <div className="bg-white px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2">
-            <div className="w-3 h-3 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: settings.global.primaryColor, borderTopColor: 'transparent' }}></div>
+            <div className="w-3 h-3 border-2 rounded-full animate-spin" style={{ borderBottomColor: settings.global.primaryColor, borderLeftColor: settings.global.primaryColor, borderRightColor: settings.global.primaryColor, borderTopColor: 'transparent' }}></div>
             <span className="text-[9px] font-bold text-gray-700">AI STAGING...</span>
           </div>
         </div>
@@ -296,7 +296,7 @@ export default function FeaturesSection() {
           >
             <div className="flex h-full items-center justify-center p-4 gap-6">
               {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="w-16 h-16 md:w-20 md:h-20 rounded-xl border-2 border-white shadow-lg overflow-hidden bg-gray-100 flex-shrink-0 first:ring-2" style={{ borderLeftColor: i === 1 ? settings.global.primaryColor : 'white', ringColor: i === 1 ? `${settings.global.primaryColor}33` : undefined }}>
+                <div key={i} className="w-16 h-16 md:w-20 md:h-20 rounded-xl border-2 border-white shadow-lg overflow-hidden bg-gray-100 flex-shrink-0 first:ring-2" style={{ borderLeftColor: i === 1 ? settings.global.primaryColor : 'white', boxShadow: i === 1 ? `0 0 0 2px ${settings.global.primaryColor}33, 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)` : undefined }}>
                   <img src={`https://i.pravatar.cc/150?u=${i+10}`} className="w-full h-full object-cover" alt="Avatar" />
                 </div>
               ))}
