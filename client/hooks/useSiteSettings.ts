@@ -5,11 +5,25 @@ export function useSiteSettings() {
   const [settings, setSettings] = useState(DEFAULT_SITE_SETTINGS);
 
   useEffect(() => {
-    const fetchSettings = () => {
+    const fetchSettings = async () => {
+      // First try to see if we have them in the server (the persistent ones)
+      try {
+        const res = await fetch("/api/settings");
+        if (res.ok) {
+          const serverSettings = await res.json();
+          setSettings(serverSettings);
+        }
+      } catch (e) {
+        console.warn("Failed to fetch settings from server, using local/default", e);
+      }
+
+      // Check for drafting in local storage
       const saved = localStorage.getItem("site_customization");
       if (saved) {
         try {
-          setSettings(JSON.parse(saved));
+          const localSettings = JSON.parse(saved);
+          // Only use local settings if they are different/newer or if server settings failed
+          setSettings(prev => ({ ...prev, ...localSettings }));
         } catch (e) {
           console.error("Failed to parse settings", e);
         }

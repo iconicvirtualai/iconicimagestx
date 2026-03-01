@@ -6,16 +6,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
-  Palette, 
-  Home, 
-  Tag, 
-  Share2, 
-  Globe, 
-  Save, 
-  Image as ImageIcon, 
-  Eye, 
-  Layout, 
+import { Link } from "react-router-dom";
+import {
+  Palette,
+  Home,
+  Tag,
+  Share2,
+  Globe,
+  Save,
+  Image as ImageIcon,
+  Eye,
+  Layout,
   Type,
   Component,
   Plus
@@ -51,32 +52,72 @@ export default function AdminSiteCustomizer() {
   const [settings, setSettings] = React.useState(DEFAULT_SITE_SETTINGS);
 
   React.useEffect(() => {
-    const saved = localStorage.getItem("site_customization");
-    if (saved) {
+    const fetchSettings = async () => {
+      // First try server
       try {
-        setSettings(JSON.parse(saved));
+        const res = await fetch("/api/settings");
+        if (res.ok) {
+          const serverSettings = await res.json();
+          setSettings(serverSettings);
+        }
       } catch (e) {
-        console.error("Failed to parse settings", e);
+        console.warn("Failed to fetch from server", e);
       }
-    }
+
+      // Then override with local draft if it exists
+      const saved = localStorage.getItem("site_customization");
+      if (saved) {
+        try {
+          const localSettings = JSON.parse(saved);
+          setSettings(prev => ({ ...prev, ...localSettings }));
+        } catch (e) {
+          console.error("Failed to parse settings", e);
+        }
+      }
+    };
+
+    fetchSettings();
   }, []);
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    // Save locally for immediate feedback in this tab
     localStorage.setItem("site_customization", JSON.stringify(settings));
-    toast.success("Site customization saved successfully!");
-    // In a real app, we might trigger a revalidation or update a global context
-    window.dispatchEvent(new Event('site-settings-updated'));
+
+    // Save to server for persistence and "publish preview"
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      });
+
+      if (res.ok) {
+        toast.success("Site customization published successfully!");
+        window.dispatchEvent(new Event('site-settings-updated'));
+      } else {
+        throw new Error("Failed to save to server");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to publish changes to the live site.");
+    }
   };
 
   const updateSetting = (section: string, key: string, value: any) => {
-    setSettings(prev => ({
-      ...prev,
-      [section]: {
-        //@ts-ignore
-        ...prev[section],
-        [key]: value
-      }
-    }));
+    setSettings(prev => {
+      const next = {
+        ...prev,
+        [section]: {
+          //@ts-ignore
+          ...prev[section],
+          [key]: value
+        }
+      };
+      // Save locally on every change for real-time preview in other tabs/iframes
+      localStorage.setItem("site_customization", JSON.stringify(next));
+      window.dispatchEvent(new Event('site-settings-updated'));
+      return next;
+    });
   };
 
   return (
@@ -98,11 +139,13 @@ export default function AdminSiteCustomizer() {
             </div>
             
             <div className="flex items-center gap-3">
-              <Button variant="outline" size="sm" className="h-9 rounded-xl border-slate-200 text-slate-600 font-bold text-xs">
-                <Eye className="w-3.5 h-3.5 mr-2" /> Preview Site
+              <Button asChild variant="outline" size="sm" className="h-9 rounded-xl border-slate-200 text-slate-600 font-bold text-xs">
+                <Link to="/" target="_blank">
+                  <Eye className="w-3.5 h-3.5 mr-2" /> Preview Live Site
+                </Link>
               </Button>
               <Button onClick={handleSave} size="sm" className="h-9 bg-[#0d9488] hover:bg-[#0f766e] text-white font-bold text-xs rounded-xl px-6">
-                <Save className="w-3.5 h-3.5 mr-2" /> Save Changes
+                <Save className="w-3.5 h-3.5 mr-2" /> Publish Changes
               </Button>
             </div>
           </div>
