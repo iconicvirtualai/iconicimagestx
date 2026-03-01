@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 
 export default function FinalCTA() {
   return (
@@ -15,12 +16,14 @@ export default function FinalCTA() {
               media today
             </h2>
             <p className="text-xl md:text-2xl text-white/80 mb-12 max-w-3xl mx-auto leading-relaxed">
-              Iconic helps creators, marketers, and real estate pros turn raw 
+              Iconic helps creators, marketers, and real estate pros turn raw
               content into polished, platform-ready assets in minutes.
             </p>
-            <Button className="bg-white text-[#0d9488] hover:bg-white/90 font-bold text-xl px-12 py-8 rounded-2xl transition-all hover:scale-105 shadow-xl shadow-black/10">
-              Create your free video &rarr;
-            </Button>
+            <Link to="/book">
+              <Button className="bg-white text-[#0d9488] hover:bg-white/90 font-bold text-xl px-12 py-8 rounded-2xl transition-all hover:scale-105 shadow-xl shadow-black/10">
+                Create your free video &rarr;
+              </Button>
+            </Link>
           </div>
         </div>
       </div>

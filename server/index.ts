@@ -35,6 +35,16 @@ export function createServer() {
     }
   });
 
+  app.post("/api/bookings", async (req, res) => {
+    try {
+      // Mock booking success
+      console.log("New Booking Received:", req.body);
+      res.json({ success: true, message: "Booking confirmed" });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to process booking" });
+    }
+  });
+
   // Example API routes
   app.get("/api/ping", (_req, res) => {
     const ping = process.env.PING_MESSAGE ?? "ping";
