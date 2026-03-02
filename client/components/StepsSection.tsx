@@ -37,23 +37,23 @@ export default function StepsSection() {
   ];
 
   return (
-    <section className="bg-[#e0f7f6]/40 py-24 md:py-32 relative overflow-hidden">
-      <div className="container mx-auto px-4 relative z-10">
-        <div className="text-center mb-16">
+    <section className="bg-[#e0f7f6]/40 py-20 md:py-24 relative overflow-hidden">
+      <div className="container mx-auto px-4 relative z-10 max-w-6xl">
+        <div className="text-center mb-12">
           {/* Badge */}
-          <div className="inline-flex items-center px-4 py-1.5 rounded-md bg-white border border-[#ccfbf1] mb-8 shadow-sm">
+          <div className="inline-flex items-center px-4 py-1.5 rounded-md bg-white border border-[#ccfbf1] mb-6 shadow-sm">
             <span className="text-[12px] font-bold tracking-wider uppercase" style={{ color: settings.global.primaryColor }}>
               4 STEPS TO RESULTS
             </span>
           </div>
 
           {/* Headline */}
-          <h2 className="text-4xl md:text-5xl lg:text-7xl font-bold mb-8 leading-[1.1] tracking-tight text-black max-w-5xl mx-auto">
+          <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-6 leading-[1.1] tracking-tight text-black max-w-5xl mx-auto">
             From vision to viral in <br className="hidden md:block" />
             <span style={{ color: settings.global.primaryColor }}>minutes</span>, not days
           </h2>
 
-          <p className="text-lg md:text-xl text-gray-500 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-base md:text-lg text-gray-500 max-w-2xl mx-auto leading-relaxed">
             Placing an order with Iconic is as simple as it gets. We handle the heavy lifting so you can focus on growth.
           </p>
         </div>

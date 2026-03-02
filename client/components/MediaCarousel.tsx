@@ -128,8 +128,8 @@ export default function MediaCarousel() {
           </Button>
         </Link>
         <div className="mt-8 text-center animate-in fade-in slide-in-from-bottom-4 duration-1000">
-          <h3 className="text-3xl md:text-4xl font-black tracking-tighter text-black mb-2 italic">
-            Why Iconic Hits Different
+          <h3 className="text-3xl md:text-4xl font-black tracking-tighter text-black mb-10 uppercase">
+            WHY ICONIC HITS DIFFERENT
           </h3>
           <p className="text-gray-900 font-bold text-lg md:text-xl tracking-tight">
             We’re not competing. <span style={{ color: settings.global.primaryColor }}>We’re setting the pace.</span>

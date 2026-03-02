@@ -66,10 +66,10 @@ export default function HeroSection() {
             </Button>
           </Link>
           <div className="flex flex-wrap justify-center gap-4">
-            <Button className="rounded-2xl px-10 py-7 font-bold transition-all active:scale-95 shadow-xl text-white" style={{ backgroundColor: settings.global.primaryColor }}>
+            <Button className="rounded-2xl px-10 py-7 font-bold transition-all active:scale-95 shadow-sm bg-transparent border border-black text-black hover:bg-black hover:text-white">
               I'm in Real Estate
             </Button>
-            <Button className="rounded-2xl px-10 py-7 font-bold transition-all active:scale-95 shadow-xl text-white" style={{ backgroundColor: settings.global.secondaryColor }}>
+            <Button className="rounded-2xl px-10 py-7 font-bold transition-all active:scale-95 shadow-sm bg-transparent border border-gray-300 text-gray-600 hover:bg-gray-50">
               I Own a Business
             </Button>
           </div>
@@ -98,22 +98,18 @@ export default function HeroSection() {
                   <Star key={i} className="w-5 h-5 fill-[#22c55e] text-[#22c55e]" />
                 ))}
               </div>
-              <span className="font-bold text-lg ml-1 text-black">Loved by agents, founders, and brands who refuse to blend in.</span>
+            <span className="text-lg ml-1 text-black font-normal">Loved by agents, founders, and brands who refuse to blend in.</span>
             </div>
           </div>
         </div>
 
         {/* New Divider Section */}
-        <div className="flex flex-wrap items-center justify-center gap-3 md:gap-6 text-[10px] md:text-xs font-bold tracking-[0.15em] uppercase text-gray-400 py-6 border-t border-gray-100 max-w-5xl mx-auto animate-in fade-in duration-1000">
+        <div className="flex flex-wrap items-center justify-center gap-3 md:gap-8 text-[11px] md:text-sm font-medium tracking-tight text-gray-500 py-6 border-t border-gray-100 max-w-5xl mx-auto animate-in fade-in duration-1000">
           <span>Same or Next Day Delivery</span>
-          <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: settings.global.primaryColor }}></div>
+          <div className="w-1.5 h-1.5 rounded-full bg-black"></div>
           <span>Next Day Scheduling</span>
-          <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: settings.global.primaryColor }}></div>
+          <div className="w-1.5 h-1.5 rounded-full bg-black"></div>
           <span>High Volume Capacity</span>
-          <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: settings.global.primaryColor }}></div>
-          <span>Unmatched Marketing Tools</span>
-          <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: settings.global.primaryColor }}></div>
-          <span>Business Growth Partners for Life</span>
         </div>
 
       </div>

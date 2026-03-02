@@ -37,7 +37,7 @@ export default function TheNetwork() {
               <p className="pt-4 text-lg md:text-xl font-normal text-gray-400">
                 We are the ecosystem supporting aspiring creatives and growing producers to shape what modern media should look like — for the benefit of all.
               </p>
-              <p className="pt-8 text-2xl md:text-3xl font-bold tracking-tight text-black italic">
+              <p className="pt-8 text-2xl md:text-3xl font-bold tracking-tight text-black">
                 When the standard rises, <span style={{ color: settings.global.primaryColor }}>everyone rises.</span>
               </p>
             </div>

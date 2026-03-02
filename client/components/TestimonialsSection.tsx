@@ -24,8 +24,8 @@ export default function TestimonialsSection() {
   ];
 
   return (
-    <section className="bg-[#e0f7f6]/40 py-24 md:py-32 overflow-hidden">
-      <div className="container mx-auto px-4 text-center">
+    <section className="bg-[#e0f7f6]/40 py-20 md:py-24 overflow-hidden">
+      <div className="container mx-auto px-4 text-center max-w-6xl">
         {/* Badge */}
         <div className="inline-flex items-center px-4 py-1.5 rounded-md bg-white border border-[#ccfbf1] mb-8 shadow-sm">
           <span className="text-[12px] font-bold tracking-wider text-[#0d9488] uppercase">
@@ -34,11 +34,11 @@ export default function TestimonialsSection() {
         </div>
 
         {/* Headline */}
-        <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-8 leading-[1.2] tracking-tight text-black max-w-4xl mx-auto">
-          What our users are saying
+        <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6 leading-[1.2] tracking-tight text-black max-w-4xl mx-auto">
+          What our people are saying
         </h2>
-        <p className="text-lg md:text-xl text-gray-500 mb-12 max-w-3xl mx-auto leading-relaxed">
-          Media companies, photographers, and agents are using Iconic 
+        <p className="text-base md:text-lg text-gray-500 mb-10 max-w-3xl mx-auto leading-relaxed">
+          Media companies, photographers, and agents are using Iconic
           every day to boost their visual marketing and scale their impact.
         </p>
 

@@ -3,7 +3,7 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 export default function AudienceSection() {
   const settings = useSiteSettings();
   return (
-    <section className="bg-white pt-20 md:pt-24 pb-12">
+    <section className="bg-white pt-10 md:pt-12 pb-12">
       <div className="container mx-auto px-4 text-center">
         {/* Badge */}
         <div className="inline-flex items-center px-4 py-1.5 rounded-md bg-[#f0fdfa] border border-[#ccfbf1] mb-8">

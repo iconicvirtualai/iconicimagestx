@@ -19,26 +19,30 @@ export default function About() {
               <Award className="w-4 h-4" />
               Decade of Excellence
             </div>
-            <h1 className="text-4xl md:text-6xl font-bold mb-8 tracking-tight">
-              Cheers to <span className="text-[#0d9488]">10 Years!!</span>
+            <h1 className="text-4xl md:text-6xl font-bold mb-4 tracking-tight">
+              A Decade of <span className="text-[#0d9488]">Setting the Standard.</span>
             </h1>
+            <p className="text-lg md:text-xl text-gray-300 font-medium max-w-2xl mx-auto leading-relaxed">
+              Est. 2016<br />
+              10 Years. Thousands of Listings. Millions in Commission Generated for our Partners.
+            </p>
 
             {/* Moving Photo Carousel */}
             <div className="relative w-full overflow-hidden py-12">
               <div className="flex animate-scroll whitespace-nowrap">
                 {[
-                  { img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80", label: "Est. 2014" },
-                  { img: "https://images.unsplash.com/photo-1492691523567-61723c275df1?w=800&q=80", label: "Video Reel" },
-                  { img: "https://images.unsplash.com/photo-1626544823126-bb212353394c?w=800&q=80", label: "Woodlands Sky" },
+                  { img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80", label: "Est. 2016" },
+                  { img: "https://images.unsplash.com/photo-1492691523567-61723c275df1?w=800&q=80", label: "The Engine" },
+                  { img: "https://images.unsplash.com/photo-1626544823126-bb212353394c?w=800&q=80", label: "Scale" },
                   { img: "https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&q=80", label: "Growth" },
                   { img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80", label: "Legacy" },
                   { img: "https://images.unsplash.com/photo-1492691523567-61723c275df1?w=800&q=80", label: "Cinematic" },
                   { img: "https://images.unsplash.com/photo-1626544823126-bb212353394c?w=800&q=80", label: "Elite" },
                   { img: "https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&q=80", label: "Market Lead" },
                   // Repeat for seamless loop
-                  { img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80", label: "Est. 2014" },
-                  { img: "https://images.unsplash.com/photo-1492691523567-61723c275df1?w=800&q=80", label: "Video Reel" },
-                  { img: "https://images.unsplash.com/photo-1626544823126-bb212353394c?w=800&q=80", label: "Woodlands Sky" },
+                  { img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80", label: "Est. 2016" },
+                  { img: "https://images.unsplash.com/photo-1492691523567-61723c275df1?w=800&q=80", label: "The Engine" },
+                  { img: "https://images.unsplash.com/photo-1626544823126-bb212353394c?w=800&q=80", label: "Scale" },
                   { img: "https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&q=80", label: "Growth" },
                   { img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80", label: "Legacy" },
                   { img: "https://images.unsplash.com/photo-1492691523567-61723c275df1?w=800&q=80", label: "Cinematic" },
@@ -69,7 +73,7 @@ export default function About() {
                   At <span className="text-black font-bold">Iconic Images</span>, we don’t just capture real estate; we engineer market ownership.
                 </p>
                 <p>
-                  Based in the heart of The Woodlands - Houston-Spring-Conroe corridor, we’ve built a reputation as the "secret weapon" for the region's top-producing agents. We realized long ago that in a world of infinite scrolling, "pretty pictures" are the bare minimum. To win in 2026, you need a catapult.
+                  In a world of infinite scrolling, 'pretty pictures' are the bare minimum. We built the Iconic Engine—a proprietary fusion of Hollywood-grade cinematography and high-velocity marketing tech—to ensure your brand isn't just seen; it's unavoidable.
                 </p>
               </div>
             </div>
@@ -89,7 +93,7 @@ export default function About() {
                       <Zap className="w-5 h-5 text-[#0d9488]" />
                     </div>
                     <div>
-                      <p className="font-bold text-black">The 4-Hour Standard</p>
+                      <p className="font-bold text-black">The Same-Day Standard</p>
                       <p className="text-sm text-gray-500">In the North Houston market, speed is currency. We deliver your "Just Listed" kits while the ink on the contract is still wet.</p>
                     </div>
                   </div>
@@ -108,7 +112,7 @@ export default function About() {
                     </div>
                     <div>
                       <p className="font-bold text-black">Futuristic Integration</p>
-                      <p className="text-sm text-gray-500">We are the first in Texas to bridge the gap between traditional photography and Spatial VR / AI Twin branding.</p>
+                      <p className="text-sm text-gray-500">Speed is the only unfair advantage. Iconic is the first in our region to bridge the gap between traditional photography and AI Twin branding at this magnitude.</p>
                     </div>
                   </div>
                 </div>
@@ -133,18 +137,23 @@ export default function About() {
               </div>
               <div className="space-y-8">
                 <div className="text-[#0d9488] font-bold tracking-wider text-xs uppercase">
-                  MEET THE FACE OF THE FUTURE
+                  THE ARCHITECT OF THE ICON
                 </div>
                 <h2 className="text-4xl md:text-6xl font-bold text-black leading-tight tracking-tight">CADI</h2>
                 <div className="space-y-6 text-gray-600 leading-relaxed text-lg">
                   <p>
-                    Iconic is led by <span className="text-black font-bold">Cadi</span>, a visionary creator who obsessed over one question: <span className="italic">How do we make agents more money with less effort?</span>
+                    Cadi didn't just start a photography studio; she engineered a media powerhouse. Obsessed with the friction agents face daily, she built Iconic to solve one problem: <span className="text-black font-bold">How to make agents more money with less effort.</span>
                   </p>
                   <p>
-                    Cadi has transformed Iconic from a local photography studio into a Media Powerhouse. By mirroring her high-energy hustle into our AI-driven workflows, she ensures that every client receives a "Celebrity Agent" experience.
+                    She doesn't just direct the operation; she directs the strategy. By mirroring her high-energy hustle into our AI-driven workflows, she ensures that every client receives a "Celebrity Agent" experience.
                   </p>
-                  <p>
-                    Whether she’s on-site directing a cinematic drone sweep or in the lab perfecting our AI Twilight renders, Cadi’s goal remains the same: <span className="text-black font-bold">Your growth is our only metric of success.</span>
+                </div>
+
+                {/* New Block: The Infrastructure of Success */}
+                <div className="pt-8 border-t border-gray-100">
+                  <h3 className="text-2xl font-bold text-black mb-4 uppercase tracking-tight">THE INFRASTRUCTURE OF SUCCESS</h3>
+                  <p className="text-gray-600 leading-relaxed">
+                    Our proprietary Marketing Studio and AI Editing Tools allow us to handle 40+ shoots a week without losing an ounce of quality. This proves the "Decade of Excellence" isn't just a claim—it's backed by a system that scales with your ambition.
                   </p>
                 </div>
               </div>
