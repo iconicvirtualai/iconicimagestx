@@ -151,10 +151,16 @@ export default function About() {
 
                 {/* New Block: The Infrastructure of Success */}
                 <div className="pt-8 border-t border-gray-100">
-                  <h3 className="text-2xl font-bold text-black mb-4 uppercase tracking-tight">THE INFRASTRUCTURE OF SUCCESS</h3>
-                  <p className="text-gray-600 leading-relaxed">
-                    Our proprietary Marketing Studio and AI Editing Tools allow us to handle 40+ shoots a week without losing an ounce of quality. This proves the "Decade of Excellence" isn't just a claim—it's backed by a system that scales with your ambition.
-                  </p>
+                  <h3 className="text-2xl font-bold text-black mb-1 uppercase tracking-tight">THE INFRASTRUCTURE OF SUCCESS</h3>
+                  <p className="text-[#0d9488] font-bold text-sm uppercase tracking-wider mb-4">Propelling your brand while the world sleeps.</p>
+                  <div className="space-y-4 text-gray-600 leading-relaxed">
+                    <p>
+                      Our proprietary Marketing Studio and AI Editing Tools are the unfair advantage. We’ve engineered a high-velocity backend that allows us to absorb massive workloads and deliver surgical-grade precision at scale. Our custom infrastructure empowers agents to leverage high-end, custom edits in seconds, saving thousands in production costs without compromising quality.
+                    </p>
+                    <p>
+                      While you sleep, our systems are awake. The Iconic Infrastructure is custom-built to automatically integrate new features, master emerging AI trends, and update your content strategy in real-time. We don't just keep up with the market; we stay on top of it.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
