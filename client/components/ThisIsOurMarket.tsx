@@ -59,8 +59,8 @@ export default function ThisIsOurMarket() {
                 transition={{ duration: 0.8 }}
                 className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[400px] md:w-[350px] md:h-[450px] rounded-3xl overflow-hidden shadow-2xl z-20 border-8 border-white"
               >
-                <img 
-                  src="https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&q=80" 
+                <img
+                  src="https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&q=80&fm=webp"
                   alt="Creative team at work"
                   className="w-full h-full object-cover grayscale brightness-90 group-hover:grayscale-0 transition-all duration-700"
                 />
@@ -74,8 +74,8 @@ export default function ThisIsOurMarket() {
                 transition={{ duration: 0.8, delay: 0.2 }}
                 className="absolute top-[10%] -right-10 w-[200px] h-[260px] rounded-2xl overflow-hidden shadow-2xl z-30 border-4 border-white"
               >
-                <img 
-                  src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&q=80" 
+                <img
+                  src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&q=80&fm=webp"
                   alt="High end property visuals"
                   className="w-full h-full object-cover"
                 />

@@ -25,9 +25,8 @@ export default function Header() {
 
   const menuItems = [
     { label: "About", href: "/about" },
-    { label: "Insights", href: "/insights" },
+    { label: "Resources", href: "/insights" },
     { label: "Pricing", href: "/pricing" },
-    { label: "Socials", href: "/socials" },
     { label: "Contact Us", href: "/contact" },
   ];
 
@@ -79,7 +78,7 @@ export default function Header() {
 
         {/* Right side buttons */}
         <div className="hidden lg:flex items-center gap-4">
-          <Button asChild className="text-white rounded-xl px-6 h-10 font-bold shadow-sm transition-all text-sm" style={{ backgroundColor: settings.global.secondaryColor }}>
+          <Button asChild variant="outline" className="rounded-xl px-6 h-10 font-bold border-2 transition-all text-sm bg-transparent" style={{ borderColor: settings.global.secondaryColor, color: settings.global.secondaryColor }}>
             <Link to="/admin/login">
               Dashboard
             </Link>
@@ -118,7 +117,7 @@ export default function Header() {
               </Link>
             ))}
             <div className="pt-8 border-t border-gray-100 flex flex-col gap-5">
-              <Button asChild className="w-full text-white font-bold py-7 text-xl rounded-2xl shadow-lg" style={{ backgroundColor: settings.global.secondaryColor }}>
+              <Button asChild variant="outline" className="w-full font-bold py-7 text-xl rounded-2xl border-2 bg-transparent" style={{ borderColor: settings.global.secondaryColor, color: settings.global.secondaryColor }}>
                 <Link to="/admin/login" onClick={() => setIsMenuOpen(false)}>
                   Dashboard
                 </Link>

@@ -7,37 +7,37 @@ export default function MediaCarousel() {
   const mediaItems = [
     {
       id: 1,
-      image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80",
+      image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80&fm=webp",
       video: "https://videos.pexels.com/video-files/6007440/6007440-sd_426_240_24fps.mp4",
       aspect: "16/9",
     },
     {
       id: 2,
-      image: "https://images.unsplash.com/photo-1600607687940-47a0f9259017?w=1200&q=80",
+      image: "https://images.unsplash.com/photo-1600607687940-47a0f9259017?w=1200&q=80&fm=webp",
       video: "https://videos.pexels.com/video-files/31548166/13445880_360_640_30fps.mp4",
       aspect: "9/16",
     },
     {
       id: 3,
-      image: "https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?w=1200&q=80",
+      image: "https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?w=1200&q=80&fm=webp",
       video: "https://videos.pexels.com/video-files/19403229/19403229-hd_1280_720_25fps.mp4",
       aspect: "16/9",
     },
     {
       id: 4,
-      image: "https://images.unsplash.com/photo-1600585154526-990dcea4db0d?w=1200&q=80",
+      image: "https://images.unsplash.com/photo-1600585154526-990dcea4db0d?w=1200&q=80&fm=webp",
       video: "https://videos.pexels.com/video-files/34236991/14509265_360_640_24fps.mp4",
       aspect: "9/16",
     },
     {
       id: 5,
-      image: "https://images.unsplash.com/photo-1600573472591-ee6b68d14c68?w=1200&q=80",
+      image: "https://images.unsplash.com/photo-1600573472591-ee6b68d14c68?w=1200&q=80&fm=webp",
       video: "https://videos.pexels.com/video-files/6007440/6007440-sd_426_240_24fps.mp4",
       aspect: "16/9",
     },
     {
       id: 6,
-      image: "https://images.unsplash.com/photo-1600607687644-c7171b42498f?w=1200&q=80",
+      image: "https://images.unsplash.com/photo-1600607687644-c7171b42498f?w=1200&q=80&fm=webp",
       video: "https://videos.pexels.com/video-files/31548166/13445880_360_640_30fps.mp4",
       aspect: "9/16",
     },
@@ -127,9 +127,17 @@ export default function MediaCarousel() {
             View Pricing
           </Button>
         </Link>
-        <p className="mt-6 text-gray-900 font-bold text-lg md:text-xl tracking-tight animate-in fade-in slide-in-from-bottom-4 duration-1000">
-          We’re not competing. <span style={{ color: settings.global.primaryColor }}>We’re setting the pace.</span>
-        </p>
+        <div className="mt-8 text-center animate-in fade-in slide-in-from-bottom-4 duration-1000">
+          <h3 className="text-3xl md:text-4xl font-black tracking-tighter text-black mb-2 italic">
+            Why Iconic Hits Different
+          </h3>
+          <p className="text-gray-900 font-bold text-lg md:text-xl tracking-tight">
+            We’re not competing. <span style={{ color: settings.global.primaryColor }}>We’re setting the pace.</span>
+          </p>
+          <p className="text-gray-400 font-medium text-sm md:text-base mt-1 uppercase tracking-widest">
+            As the industry grows, it grows to the standard we’ve set.
+          </p>
+        </div>
       </div>
 
       <style dangerouslySetInnerHTML={{ __html: `

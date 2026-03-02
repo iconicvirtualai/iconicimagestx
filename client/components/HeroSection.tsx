@@ -13,7 +13,7 @@ export default function HeroSection() {
         {/* Hero Background Image if provided in customizer */}
         {settings.homepage.heroImage && (
           <div className="absolute inset-0 opacity-[0.03] grayscale mix-blend-multiply">
-            <img src={settings.homepage.heroImage} className="w-full h-full object-cover" alt="" />
+            <img src={`${settings.homepage.heroImage}${settings.homepage.heroImage.includes('unsplash.com') && !settings.homepage.heroImage.includes('fm=webp') ? '&fm=webp' : ''}`} className="w-full h-full object-cover" alt="" />
           </div>
         )}
 
@@ -55,28 +55,28 @@ export default function HeroSection() {
 
         {/* Subheadline */}
         <p className="text-lg md:text-xl text-gray-500 mb-8 max-w-2xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-6 duration-900">
-          Scroll-stopping visuals. Smart marketing. Media that moves.
+          Scroll-stopping visuals. Smart marketing. Brands people remember.
         </p>
 
         {/* Main CTA */}
-        <div className="flex flex-col items-center gap-4 mb-10 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+        <div className="flex flex-col items-center gap-6 mb-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
           <Link to="/book">
-            <Button className="text-white font-bold text-lg px-12 py-7 rounded-xl shadow-lg shadow-teal-100 transition-all hover:scale-105" style={{ backgroundColor: settings.global.primaryColor }}>
+            <Button className="text-white font-bold text-xl px-14 py-8 rounded-2xl shadow-xl shadow-teal-100 transition-all hover:scale-105" style={{ backgroundColor: settings.global.primaryColor }}>
               Let’s Make It Iconic
             </Button>
           </Link>
-          <div className="flex flex-wrap justify-center gap-3">
-            <Button variant="outline" className="rounded-xl px-6 py-6 border-2 font-semibold hover:bg-gray-50 transition-all active:scale-95">
+          <div className="flex flex-wrap justify-center gap-4">
+            <Button className="rounded-2xl px-10 py-7 font-bold transition-all active:scale-95 shadow-xl text-white" style={{ backgroundColor: settings.global.primaryColor }}>
               I'm in Real Estate
             </Button>
-            <Button variant="outline" className="rounded-xl px-6 py-6 border-2 font-semibold hover:bg-gray-50 transition-all active:scale-95">
+            <Button className="rounded-2xl px-10 py-7 font-bold transition-all active:scale-95 shadow-xl text-white" style={{ backgroundColor: settings.global.secondaryColor }}>
               I Own a Business
             </Button>
           </div>
         </div>
 
         {/* Social Proof */}
-        <div className="flex flex-col items-center gap-3 mb-4 animate-in fade-in slide-in-from-bottom-10 duration-1100">
+        <div className="flex flex-col items-center gap-3 mb-8 animate-in fade-in slide-in-from-bottom-10 duration-1100">
           <div className="flex items-center gap-4">
             <div className="flex -space-x-3">
               {[1, 2, 3, 4].map((i) => (
@@ -98,14 +98,22 @@ export default function HeroSection() {
                   <Star key={i} className="w-5 h-5 fill-[#22c55e] text-[#22c55e]" />
                 ))}
               </div>
-              <span className="font-bold text-lg ml-1">4.9</span>
+              <span className="font-bold text-lg ml-1 text-black">Loved by agents, founders, and brands who refuse to blend in.</span>
             </div>
           </div>
-          <p className="text-gray-500 text-sm md:text-base max-w-lg mx-auto leading-relaxed">
-            ⭐ 4.9 on Google
-            <br />
-            Loved by agents, founders, and brands who refuse to blend in.
-          </p>
+        </div>
+
+        {/* New Divider Section */}
+        <div className="flex flex-wrap items-center justify-center gap-3 md:gap-6 text-[10px] md:text-xs font-bold tracking-[0.15em] uppercase text-gray-400 py-6 border-t border-gray-100 max-w-5xl mx-auto animate-in fade-in duration-1000">
+          <span>Same or Next Day Delivery</span>
+          <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: settings.global.primaryColor }}></div>
+          <span>Next Day Scheduling</span>
+          <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: settings.global.primaryColor }}></div>
+          <span>High Volume Capacity</span>
+          <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: settings.global.primaryColor }}></div>
+          <span>Unmatched Marketing Tools</span>
+          <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: settings.global.primaryColor }}></div>
+          <span>Business Growth Partners for Life</span>
         </div>
 
       </div>
