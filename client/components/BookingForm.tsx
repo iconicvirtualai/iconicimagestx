@@ -497,6 +497,8 @@ export default function BookingForm() {
   const [selectedDetailItem, setSelectedDetailItem] = useState<any>(null);
   const [showIconicPopup, setShowIconicPopup] = useState(false);
   const [showVirtualStagingPopup, setShowVirtualStagingPopup] = useState(false);
+  const [promoInput, setPromoInput] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState<{ code: string; discount: number } | null>(null);
 
   const [expandedCategories, setExpandedCategories] = useState<string[]>(["listings"]);
   const [showBasics, setShowBasics] = useState(false);
@@ -724,7 +726,23 @@ export default function BookingForm() {
     if (formData.premiumUpgrade) total += 65;
     if (formData.virtualStagingCredits > 0) total += formData.virtualStagingCredits * 35;
 
+    if (appliedPromo) {
+      total = Math.max(0, total - appliedPromo.discount);
+    }
+
     return total;
+  };
+
+  const handleApplyPromo = () => {
+    if (promoInput.toUpperCase() === "ICONICAI") {
+      setAppliedPromo({ code: "ICONICAI", discount: 35 }); // $35 off (1 free virtual staging)
+      toast.success("Promo code 'ICONICAI' applied! ($35 discount)");
+    } else if (promoInput.toUpperCase() === "NEWYEAR") {
+      setAppliedPromo({ code: "NEWYEAR", discount: 50 });
+      toast.success("Promo code applied!");
+    } else {
+      toast.error("Invalid promo code");
+    }
   };
 
   const renderSummarySidebar = () => (
@@ -785,7 +803,34 @@ export default function BookingForm() {
              <span className="font-bold text-black">{formData.serviceTime}</span>
           </div>
         )}
+
+        {/* Applied Promo Display */}
+        {appliedPromo && (
+          <div className="pt-2 mt-2 border-t border-dashed border-teal-100 flex justify-between items-center text-[11px]">
+             <span className="text-teal-600 font-bold flex items-center gap-1.5"><Sparkles className="w-3 h-3" /> PROMO: {appliedPromo.code}</span>
+             <span className="font-black text-teal-600">-${appliedPromo.discount}</span>
+          </div>
+        )}
       </div>
+
+      {/* Promo Code Input Section */}
+      <div className="mb-6">
+        <div className="flex gap-2">
+          <Input
+            placeholder="PROMO CODE"
+            className="h-10 text-[10px] font-black uppercase tracking-widest border-gray-100 rounded-xl px-4"
+            value={promoInput}
+            onChange={(e) => setPromoInput(e.target.value)}
+          />
+          <Button
+            onClick={handleApplyPromo}
+            className="h-10 px-4 bg-gray-100 hover:bg-black hover:text-white text-black font-black text-[10px] uppercase tracking-widest rounded-xl transition-all"
+          >
+            Apply
+          </Button>
+        </div>
+      </div>
+
       <div className="pt-4 border-t border-dashed border-gray-200">
         <div className="flex justify-between items-center mb-4">
           <span className="text-[10px] font-black uppercase text-gray-400">Total Estimate</span>
