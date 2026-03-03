@@ -101,7 +101,7 @@ export default function Pricing() {
     },
     {
       name: "THE MARKET LEADER",
-      tagline: "(The Total Takeover)",
+      tagline: "The Total Takeover",
       subheadline: "Your Full-Cycle Media Partner",
       price: "1599",
       period: "per listing",
@@ -438,7 +438,7 @@ export default function Pricing() {
                   key={i}
                   className={`relative group rounded-[2rem] p-8 border transition-all duration-500 flex flex-col ${
                     tier.isVIP
-                      ? 'bg-[#1a1a1a] border-teal-900/50 shadow-2xl scale-105 z-10'
+                      ? 'bg-[#262626] border-teal-900/50 shadow-2xl scale-105 z-10'
                       : tier.isPopular ? 'bg-white shadow-2xl scale-105 z-10' : 'bg-white border-gray-100 hover:shadow-xl'
                   }`}
                   style={{ borderColor: tier.isVIP ? settings.global.primaryColor : tier.isPopular ? settings.global.primaryColor : undefined }}
@@ -460,7 +460,7 @@ export default function Pricing() {
                   <h3 className={`text-xl font-black mb-1 ${tier.isVIP ? 'text-white' : 'text-black'}`}>{tier.name}</h3>
                   <p className="font-bold text-xs uppercase tracking-wider mb-2" style={{ color: settings.global.primaryColor }}>{tier.tagline}</p>
                   {tier.subheadline && (
-                    <p className={`text-[10px] font-bold uppercase tracking-tight mb-6 ${tier.isVIP ? 'text-teal-400' : 'text-gray-400'}`}>{tier.subheadline}</p>
+                    <p className={`text-[10px] font-bold uppercase tracking-tight mb-6 ${tier.isVIP ? 'text-white/80' : 'text-gray-400'}`}>{tier.subheadline}</p>
                   )}
 
                   <div className="mb-6 flex items-baseline gap-1">
@@ -477,13 +477,13 @@ export default function Pricing() {
                       <div key={j} className="flex items-start gap-3">
                         <div className="mt-1 shrink-0">
                           {feature.icon === "zap" ? (
-                            <Zap className="w-3.5 h-3.5 fill-current" style={{ color: settings.global.primaryColor }} />
+                            <Zap className="w-3.5 h-3.5 fill-current" style={{ color: tier.isVIP ? '#ffffff' : settings.global.primaryColor }} />
                           ) : feature.icon === "video" ? (
-                            <Video className="w-3.5 h-3.5" style={{ color: settings.global.primaryColor }} />
+                            <Video className="w-3.5 h-3.5" style={{ color: tier.isVIP ? '#ffffff' : settings.global.primaryColor }} />
                           ) : feature.icon === "mic" ? (
-                            <Mic className="w-3.5 h-3.5" style={{ color: settings.global.primaryColor }} />
+                            <Mic className="w-3.5 h-3.5" style={{ color: tier.isVIP ? '#ffffff' : settings.global.primaryColor }} />
                           ) : (
-                            <Check className="w-3.5 h-3.5 stroke-[3]" style={{ color: settings.global.primaryColor }} />
+                            <Check className="w-3.5 h-3.5 stroke-[3]" style={{ color: tier.isVIP ? '#ffffff' : settings.global.primaryColor }} />
                           )}
                       </div>
                       <span className={`text-sm font-medium leading-tight ${tier.isVIP ? 'text-gray-300' : 'text-gray-600'}`}>{feature.text}</span>
@@ -494,12 +494,12 @@ export default function Pricing() {
                   <div className="mt-auto space-y-4">
                     {tier.disclaimer && (
                       <div className="text-center mb-2 px-2">
-                        <p className={`text-[11px] font-bold uppercase tracking-tight leading-none mb-1 ${tier.isVIP ? 'text-teal-400' : 'text-black'}`}>{tier.disclaimer.title}</p>
+                        <p className={`text-[11px] font-bold uppercase tracking-tight leading-none mb-1 ${tier.isVIP ? 'text-white' : 'text-black'}`}>{tier.disclaimer.title}</p>
                         <p className="text-[9px] text-gray-500 leading-tight italic">{tier.disclaimer.text}</p>
                       </div>
                     )}
                     <Button asChild className={`w-full py-6 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] ${
-                      tier.isVIP ? 'bg-white text-black hover:bg-gray-100' : tier.isPopular ? 'text-white shadow-lg' : 'bg-black hover:bg-gray-800 text-white shadow-lg'
+                      tier.isVIP ? 'bg-white text-black hover:bg-gray-100 border-2 border-[#FFD700]' : tier.isPopular ? 'text-white shadow-lg' : 'bg-black hover:bg-gray-800 text-white shadow-lg'
                     }`} style={{ backgroundColor: tier.isVIP ? undefined : tier.isPopular ? settings.global.primaryColor : undefined }}>
                       <Link to={`/book?package=${tier.name === 'THE ESSENTIALS' ? 'essentials' : tier.name === 'THE SHOWCASE' ? 'showcase' : tier.name === 'THE LEGACY' ? 'legacy' : 'market-leader'}`}>
                         {tier.buttonText}
