@@ -69,7 +69,6 @@ export default function AdminSiteCustomizer() {
           }
         } catch (fetchError) {
           // If fetch fails (network error, abort), we just fall back
-          console.log("AdminSiteCustomizer: Server settings not available (fetch error)");
         }
 
         // Check for drafting in local storage
@@ -84,7 +83,6 @@ export default function AdminSiteCustomizer() {
         }
       } catch (e) {
         // Catch-all to prevent any uncaught errors
-        console.warn("AdminSiteCustomizer: Silent fallback to defaults", e);
       }
     };
 
