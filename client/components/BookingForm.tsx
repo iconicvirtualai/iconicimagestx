@@ -18,7 +18,9 @@ const packages = [
   { id: "market-leader", name: "The Market Leader", price: 1599, description: "Total market saturation strategy. We handle the narrative from Coming Soon to Sold success story." },
   { id: "refresh", name: "The Refresh", price: 349, description: "The Modern Portrait. Approachable, professional, and uniquely you." },
   { id: "content-partner", name: "The Content Partner", price: 999, description: "30 days of content in 2 hours. Never wonder what to post again." },
-  { id: "local-legend", name: "The Local Legend", price: 2499, description: "The Market Takeover Campaign. Your Story, Told Cinematically." }
+  { id: "local-legend", name: "The Local Legend", price: 2499, description: "The Market Takeover Campaign. Your Story, Told Cinematically." },
+  { id: "content-starter", name: "The Baseline", price: 500, description: "The Professional Foundation. Establish consistency with 8 edited reels per month." },
+  { id: "content-pro", name: "The Growth Engine", price: 850, description: "Turning Views into Conversations. 12 edited reels with high-conversion hooks." }
 ];
 
 export default function BookingForm() {

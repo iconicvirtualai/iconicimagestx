@@ -187,114 +187,108 @@ export default function Pricing() {
 
   const phase1Tiers = [
     {
-      name: "THE CONTENT STARTER",
+      name: "THE BASELINE",
       price: "500",
       period: "per month",
-      tagline: '"The Leverage Entry"',
-      description: 'The Vibe: You film it, we make it "Iconic."',
+      tagline: "The Professional Foundation.",
+      description: "Stop ghosting your audience. We take your raw footage and turn it into a consistent, professional brand presence.",
       features: [
         "8 Professionally Edited Reels (2/week)",
-        "Signature 2026 Editing Style",
-        "Trending Audio Integration",
-        "Iconic Branding Application",
-        "Goal: Professionalism on a budget"
+        "Signature \"Iconic\" 2026 Editing Style",
+        "Trending Audio & Brand Integration"
       ],
-      buttonText: "Start My Consistency"
+      buttonText: "SIMPLIFY MY SOCIAL",
+      ctaSubtext: "The Goal: Established Consistency.",
+      packageId: "content-starter"
     },
     {
-      name: "THE CONTENT PRO",
+      name: "THE GROWTH ENGINE",
       price: "850",
       period: "per month",
-      tagline: '"The Growth Engine"',
-      description: "The Vibe: Consistency is your new best friend.",
+      tagline: "Turning Views into Conversations.",
+      description: "For the creator ready to start conversations. We don’t just post; we write the hooks that make people stop scrolling and start typing.",
       features: [
         "12 Professionally Edited Reels (3/week)",
-        "Caption & Hashtag Suite",
-        "Scroll-Stopping Hooks",
-        "Conversion-Focused Copywriting",
-        "Goal: High Engagement & DMs"
+        "The Hook Suite: High-conversion captions & strategic hashtags.",
+        "Scroll-Stopping Visual Flow.",
+        "Conversion-Focused Copywriting"
       ],
-      buttonText: "Grow My Consistency",
-      isPopular: true
+      buttonText: "UNLOCK MY GROWTH",
+      ctaSubtext: "The Goal: High Engagement & Inbound DMs.",
+      isPopular: true,
+      packageId: "content-pro"
     }
   ];
 
   const phase2Tiers = [
     {
-      name: "THE STARTER DOMINATOR",
+      name: "THE PROFESSIONAL SUITE",
       price: "1,500",
       period: "per month",
-      tagline: '"The Visual Foundation"',
-      description: "For the producer too busy to worry about 'the grid.'",
+      tagline: "Your Digital Storefront, Fully Managed.",
+      description: "Total hands-off management for your professional presence.",
       features: [
-        "12 Reels per month (3/week)",
-        "Scheduling to IG/FB/TikTok",
-        "Custom Captions & Hashtags",
-        "60min Active Engagement",
-        "Algorithm 'Warm-up' Service"
+        "12 Reels + Full Scheduling & Posting",
+        "Multi-Platform Deployment (IG/FB/TikTok)",
+        "Algorithm \"Warm-up\" & Manual Engagement"
       ],
-      buttonText: "Secure My Zip Code"
+      buttonText: "SECURE MY SUITE"
     },
     {
-      name: "THE LEADER DOMINATOR",
+      name: "THE SIGNATURE TIER",
       price: "2,800",
       period: "per month",
-      tagline: '"The Active Presence"',
+      tagline: "The High-Volume Authority.",
       description: "Total hands-off authority. You show up, we do the rest.",
       features: [
-        "20 Reels/month (Daily M-F)",
-        "1 Monthly Branding/Field Shoot",
-        "DM Lead Capture & Flagging",
-        "Dedicated Hook Strategy Sessions",
-        "Full Management across platforms"
+        "20 Reels/month (Daily M-F Presence)",
+        "1 Monthly In-Person Branding/Field Shoot",
+        "Lead Flagging (We notify you who to call)"
       ],
-      buttonText: "Build My Empire",
+      buttonText: "ELEVATE MY BRAND",
       isPopular: true
     },
     {
-      name: "THE ICONIC DOMINATOR",
+      name: "THE ICONIC PARTNERSHIP",
       price: "4,500",
       period: "per month",
-      tagline: '"The Total Market Takeover"',
+      tagline: "Your Personal Media Agency.",
       description: "A full-scale media agency in your pocket.",
       features: [
-        "Unlimited Reels Production",
-        "2 Monthly Field Shoots",
-        "GHL Lead Automation",
-        "Listing Bombs (Ad Management)",
-        "Email/SMS Blast Integration"
+        "Unlimited Reel Production",
+        "2 Monthly Professional Field Shoots",
+        "Full CRM & Lead Automation Integration",
+        "The Iconic Polish: All Premium Editing Included"
       ],
-      buttonText: "Build My Empire"
+      buttonText: "PARTNER WITH ICONIC"
     },
     {
-      name: 'THE "STANDARD" MARKETING',
+      name: "THE CONNECTED CORE",
       price: "2,000",
       period: "per month",
-      tagline: '"The Consistent Presence"',
+      tagline: "Social + Database Penetration.",
       description: "Balanced social and direct-to-SOI marketing.",
       features: [
-        "12 Edited Reels + Captions",
-        "1 Monthly 'Featured Insight' Email",
-        "Repurposing best Reel of the month",
-        "1 Monthly 'Check Inbox' Nudge Text",
-        "Direct-to-Sphere engagement"
+        "12 Edited Reels + Management",
+        "Monthly 'Featured Insight' Email Blast",
+        "Repurposed Content for your Newsletter",
+        "Direct-to-Sphere Engagement"
       ],
-      buttonText: "Secure My Zip Code"
+      buttonText: "REACH MY DATABASE"
     },
     {
-      name: 'THE "ELITE" MARKETING',
+      name: "THE AUTHORITY STACK",
       price: "3,200",
       period: "per month",
-      tagline: '"The Authority Engine"',
+      tagline: "Total Audience Ownership.",
       description: "High-frequency content and deep SOI penetration.",
       features: [
-        "20+ Reels + Pro-Filming Session",
-        "Bi-weekly Updates (Listings + Pulse)",
-        "Bi-weekly Direct-Response Texts",
-        "High-Impact pro production",
-        "Full Management & Automation"
+        "20+ Reels + Monthly Pro-Filming Session",
+        "Bi-Weekly SMS & Email Campaign Updates",
+        "Full Automation of Social & Direct Outreach",
+        "High-Impact Omni-channel Production"
       ],
-      buttonText: "Build My Empire"
+      buttonText: "BECOME OMNIPRESENT"
     }
   ];
 
@@ -798,19 +792,26 @@ export default function Pricing() {
           <div className="max-w-[1400px] mx-auto px-4">
             <div className="text-center mb-20 max-w-4xl mx-auto">
               <h2 className="text-4xl md:text-5xl font-bold text-black mb-6 tracking-tight">
-                Social Monopoly (The Management)
+                Social Monopoly <span className="text-gray-400 font-medium">(The Partnership)</span>
               </h2>
-              <p className="text-lg text-gray-500 leading-relaxed">
-                Transitioning from "Content Creation" to "Market Ownership."
-                These are your recurring revenue "Social Manager" packages designed to build your empire.
+              <p className="text-lg text-gray-500 leading-relaxed mb-8">
+                Stop fighting the algorithm and start growing your business. We handle the technical "heavy lifting" so you can stay focused on the face-to-face.
               </p>
+              <div className="space-y-4 max-w-2xl mx-auto">
+                <p className="text-sm font-bold text-gray-400 uppercase tracking-widest italic">
+                  "We don't just post for you; we protect your time. From editing to strategy, we ensure your business stays relevant while you stay focused on your work."
+                </p>
+                <p className="text-xl font-black text-black uppercase tracking-tight">
+                  "You be the face; we’ll be the hands."
+                </p>
+              </div>
             </div>
 
-            {/* Phase 1: Time Over Money */}
+            {/* Phase 1: The 7-Tier Lifecycle Management */}
             <div id="phase1" className="mb-24">
               <div className="flex items-center gap-4 mb-10">
                 <div className="h-[2px] flex-1 bg-gradient-to-r from-transparent to-gray-200"></div>
-                <h3 className="text-lg font-black text-gray-400 uppercase tracking-[0.3em] whitespace-nowrap">PHASE 1: THE "TIME OVER MONEY" TRACK</h3>
+                <h3 className="text-lg font-black text-gray-400 uppercase tracking-[0.3em] whitespace-nowrap">THE 7-TIER LIFECYCLE MANAGEMENT</h3>
                 <div className="h-[2px] flex-1 bg-gradient-to-l from-transparent to-gray-200"></div>
               </div>
 
@@ -833,10 +834,13 @@ export default function Pricing() {
                       ))}
                     </div>
                     <Button asChild className="w-full py-6 rounded-xl bg-black hover:bg-gray-800 text-white font-bold transition-all shadow-lg">
-                      <Link to="/book">
+                      <Link to={`/book?package=${tier.packageId || ''}`}>
                         {tier.buttonText}
                       </Link>
                     </Button>
+                    {tier.ctaSubtext && (
+                      <p className="mt-4 text-[10px] text-center font-bold text-gray-400 uppercase tracking-widest">{tier.ctaSubtext}</p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -854,9 +858,6 @@ export default function Pricing() {
                 <div className="flex flex-wrap justify-center gap-8">
                   {phase2Tiers.slice(0, 3).map((tier, i) => (
                     <div key={i} className={`relative bg-white rounded-[2rem] p-8 border transition-all duration-500 hover:shadow-2xl w-full md:w-[calc(33.333%-1.5rem)] ${tier.isPopular ? 'scale-105 z-10 shadow-xl' : 'border-gray-100'}`} style={{ borderColor: tier.isPopular ? settings.global.primaryColor : undefined }}>
-                      {tier.isPopular && (
-                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest" style={{ backgroundColor: settings.global.primaryColor }}>Active Presence</div>
-                      )}
                       <h4 className="text-xl font-black text-black mb-1">{tier.name}</h4>
                       <p className="font-bold text-xs uppercase tracking-wider mb-6" style={{ color: settings.global.primaryColor }}>{tier.tagline}</p>
                       <div className="mb-6 flex items-baseline gap-1">
@@ -910,6 +911,19 @@ export default function Pricing() {
                 </div>
               </div>
             )}
+
+            {/* The 90/10 Rule Callout */}
+            <div className="mt-24 bg-black rounded-[3rem] p-12 text-white relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-12 opacity-[0.05] group-hover:scale-110 transition-transform duration-700">
+                <Info className="w-64 h-64" />
+              </div>
+              <div className="relative z-10 max-w-3xl">
+                <h3 className="text-3xl font-black mb-6 uppercase tracking-widest" style={{ color: settings.global.primaryColor }}>The 90/10 Rule</h3>
+                <p className="text-xl text-gray-300 leading-relaxed font-medium">
+                  Filming your content is only 10% of the battle. The other 90% is the Algorithm War: Meta/TikTok SEO, Metadata tagging, shadow-ban protection, and 24/7 engagement. Most clients start at The Baseline and quickly realize their time is worth more than fighting an algorithm. Our higher tiers don’t just give you "more videos"—they give you your life back.
+                </p>
+              </div>
+            </div>
           </div>
         </section>
 
