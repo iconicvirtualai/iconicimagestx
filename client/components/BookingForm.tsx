@@ -30,9 +30,10 @@ import {
   Check, Mail, Phone, MapPin, Maximize, Calendar as CalendarIcon,
   ArrowRight, ArrowLeft, Sparkles, Wand2, Clock, ChevronDown,
   ChevronUp, Zap, Video, Camera, Star, Info, MessageSquare,
-  Users, Key, HelpCircle, User, Layout, MessageCircle
+  Users, Key, HelpCircle, User, Layout, MessageCircle,
+  Plus, Minus, Boxes
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay } from "date-fns";
 import { toast } from "sonner";
 
 type Step = 1 | 2 | 3 | 4 | 5 | "success";
@@ -495,9 +496,18 @@ export default function BookingForm() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [selectedDetailItem, setSelectedDetailItem] = useState<any>(null);
   const [showIconicPopup, setShowIconicPopup] = useState(false);
+  const [showVirtualStagingPopup, setShowVirtualStagingPopup] = useState(false);
 
   const [expandedCategories, setExpandedCategories] = useState<string[]>(["listings", "business"]);
   const [showBasics, setShowBasics] = useState(false);
+
+  // Scheduling helpers
+  const currentMonth = formData.serviceDate ? startOfMonth(formData.serviceDate) : startOfMonth(new Date());
+  const months = Array.from({ length: 12 }, (_, i) => addMonths(startOfMonth(new Date()), i));
+  const daysInMonth = eachDayOfInterval({
+    start: startOfMonth(currentMonth),
+    end: endOfMonth(currentMonth)
+  }).filter(date => date >= new Date(new Date().setHours(0,0,0,0)));
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -517,7 +527,8 @@ export default function BookingForm() {
     lockboxCode: "",
     supraCode: "",
     propertyStatus: "Vacant", // Vacant or Occupied
-    furnishingStatus: "Unfurnished", // Furnished or Unfurnished
+    furnishingStatus: "Furnished", // Furnished or Unfurnished
+    virtualStagingCredits: 0,
     vibeNote: "",
     teaserMonthContent: false,
     teaserPersonalBrand: false,
@@ -706,7 +717,8 @@ export default function BookingForm() {
     });
 
     if (formData.premiumUpgrade) total += 65;
-    
+    if (formData.virtualStagingCredits > 0) total += formData.virtualStagingCredits * 35;
+
     return total;
   };
 
@@ -737,6 +749,12 @@ export default function BookingForm() {
           <div className="flex justify-between items-center text-[11px]">
             <span className="text-gray-500 italic">✨ Iconic Finish (Premium) (Next Day Delivery)</span>
             <span className="font-bold text-black">$65</span>
+          </div>
+        )}
+        {formData.virtualStagingCredits > 0 && (
+          <div className="flex justify-between items-center text-[11px]">
+            <span className="text-gray-500 italic">🏠 Virtual Staging ({formData.virtualStagingCredits} credits)</span>
+            <span className="font-bold text-black">${formData.virtualStagingCredits * 35}</span>
           </div>
         )}
         {formData.selectedAddOns.length > 0 && (
@@ -955,9 +973,9 @@ export default function BookingForm() {
                          {formData.premiumUpgrade ? <Check className="w-5 h-5 stroke-[3]" /> : <Star className="w-4 h-4" />}
                       </div>
                       <div className="flex-1">
-                        <div className="flex justify-between items-center mb-0.5">
-                           <span className="text-[13px] font-black uppercase tracking-widest">Yes, Add Premium Editing (Next Day Delivery)</span>
-                           <span className="text-sm font-black text-teal-400">+$65</span>
+                        <div className="flex justify-between items-center gap-2 mb-0.5">
+                           <span className="text-[11px] md:text-[13px] font-black uppercase tracking-widest leading-tight">Yes, Add Premium Editing (Next Day Delivery)</span>
+                           <span className="text-sm font-black text-teal-400 whitespace-nowrap">+$65</span>
                         </div>
                         <p className="text-[10px] text-gray-400 leading-relaxed">
                           The ultimate digital polish. Remove dirt, debris, reflections, and add flawless landscaping.
@@ -1116,7 +1134,12 @@ export default function BookingForm() {
                       {["Furnished", "Unfurnished"].map((status) => (
                         <button
                           key={status}
-                          onClick={() => updateFormData({ furnishingStatus: status })}
+                          onClick={() => {
+                            updateFormData({ furnishingStatus: status });
+                            if (status === "Unfurnished") {
+                              setShowVirtualStagingPopup(true);
+                            }
+                          }}
                           className={`flex-1 py-3 rounded-lg text-[9px] font-black uppercase tracking-widest border-2 transition-all ${
                             formData.furnishingStatus === status ? 'border-black bg-gray-50' : 'border-gray-50 bg-white text-gray-400'
                           }`}
@@ -1156,44 +1179,69 @@ export default function BookingForm() {
             </div>
 
             <div className="max-w-xl mx-auto space-y-8">
-               {/* Date Picker Dropdown */}
-               <div className="space-y-4">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2 px-1">
-                    <CalendarIcon className="w-3.5 h-3.5" /> 1. Select Your Date
-                  </label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={`w-full h-16 rounded-[1.25rem] border-2 px-6 justify-between text-left font-black transition-all group ${
-                          formData.serviceDate ? 'border-black text-black' : 'border-gray-100 text-gray-400 hover:border-gray-200'
-                        }`}
-                      >
-                        <span className="flex items-center gap-3">
-                           {formData.serviceDate ? format(formData.serviceDate, "PPP") : "Choose a date..."}
-                        </span>
-                        <ChevronDown className={`w-5 h-5 transition-transform duration-300 group-data-[state=open]:rotate-180`} />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 rounded-[2rem] border-none shadow-2xl overflow-hidden" align="center">
-                      <Calendar
-                        mode="single"
-                        numberOfMonths={1}
-                        weekStartsOn={1}
-                        selected={formData.serviceDate}
-                        onSelect={(date) => updateFormData({ serviceDate: date })}
-                        disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))}
-                        className="p-4"
-                      />
-                    </PopoverContent>
-                  </Popover>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Month Selection */}
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2 px-1">
+                      <CalendarIcon className="w-3.5 h-3.5" /> 1. Select Month
+                    </label>
+                    <Select
+                      value={format(currentMonth, "yyyy-MM")}
+                      onValueChange={(val) => {
+                        const [year, month] = val.split("-").map(Number);
+                        const newDate = new Date(year, month - 1, 1);
+                        // If current selected date is in the same month, keep it, otherwise reset date but keep month
+                        if (formData.serviceDate && isSameMonth(formData.serviceDate, newDate)) {
+                          // keep as is
+                        } else {
+                          updateFormData({ serviceDate: newDate < new Date() ? new Date() : newDate });
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-16 rounded-[1.25rem] border-2 px-6 font-black text-black border-black bg-white focus:ring-0">
+                        <SelectValue placeholder="Select Month" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl border-none shadow-2xl p-2 max-h-[300px]">
+                        {months.map((m) => (
+                          <SelectItem key={format(m, "yyyy-MM")} value={format(m, "yyyy-MM")} className="rounded-xl py-3 font-bold cursor-pointer focus:bg-gray-50">
+                            {format(m, "MMMM yyyy")}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Date Selection */}
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2 px-1">
+                      <Layout className="w-3.5 h-3.5" /> 2. Select Date
+                    </label>
+                    <Select
+                      value={formData.serviceDate ? format(formData.serviceDate, "yyyy-MM-dd") : ""}
+                      onValueChange={(val) => {
+                        const [year, month, day] = val.split("-").map(Number);
+                        updateFormData({ serviceDate: new Date(year, month - 1, day) });
+                      }}
+                    >
+                      <SelectTrigger className="h-16 rounded-[1.25rem] border-2 px-6 font-black text-black border-black bg-white focus:ring-0">
+                        <SelectValue placeholder="Select Date" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl border-none shadow-2xl p-2 max-h-[300px]">
+                        {daysInMonth.map((d) => (
+                          <SelectItem key={format(d, "yyyy-MM-dd")} value={format(d, "yyyy-MM-dd")} className="rounded-xl py-3 font-bold cursor-pointer focus:bg-gray-50">
+                            {format(d, "EEEE, do")}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                </div>
 
                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   {/* Time Picker Dropdown */}
                   <div className="space-y-4">
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2 px-1">
-                      <Clock className="w-3.5 h-3.5" /> 2. Preferred Time
+                      <Clock className="w-3.5 h-3.5" /> 3. Preferred Time
                     </label>
                     <Select
                       value={formData.serviceTime}
@@ -1215,7 +1263,7 @@ export default function BookingForm() {
                   {/* Photographer Dropdown */}
                   <div className="space-y-4">
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2 px-1">
-                      <Users className="w-3.5 h-3.5" /> 3. Photographer
+                      <Users className="w-3.5 h-3.5" /> 4. Photographer
                     </label>
                     <Select
                       value={formData.preferredPhotographer}
@@ -1553,6 +1601,73 @@ export default function BookingForm() {
       </Dialog>
 
       {/* Detail Pop-out Modal */}
+      <Dialog open={showVirtualStagingPopup} onOpenChange={setShowVirtualStagingPopup}>
+        <DialogContent className="max-w-xl rounded-[2.5rem] p-0 overflow-hidden border-none bg-white shadow-2xl">
+          <div className="bg-black p-10 text-white relative overflow-hidden text-center">
+             <div className="absolute top-0 right-0 p-10 opacity-10">
+                <Layout className="w-32 h-32" />
+             </div>
+             <div className="relative z-10 space-y-4">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-400/20 text-teal-400 text-[10px] font-black uppercase tracking-widest border border-teal-400/30">
+                  <Sparkles className="w-3 h-3" /> Property is Unfurnished
+                </div>
+                <DialogHeader className="space-y-4">
+                  <DialogTitle className="text-4xl font-black uppercase tracking-tight leading-none text-white text-center">
+                    Add Virtual <br />Staging?
+                  </DialogTitle>
+                  <DialogDescription className="text-gray-400 text-sm font-medium max-w-xs mx-auto text-center">
+                    Unfurnished homes take 2x longer to sell. Add high-end furniture to your photos and help buyers visualize the space.
+                  </DialogDescription>
+                </DialogHeader>
+             </div>
+          </div>
+          <div className="p-10 space-y-8">
+             <div className="bg-gray-50 rounded-2xl p-6 flex items-center justify-between border border-gray-100">
+                <div className="space-y-1">
+                   <h4 className="text-xs font-black uppercase text-black tracking-widest">Staging Credits</h4>
+                   <p className="text-[10px] text-gray-400 font-bold">$35 Per Image</p>
+                </div>
+                <div className="flex items-center gap-4">
+                   <button
+                    onClick={() => updateFormData({ virtualStagingCredits: Math.max(0, formData.virtualStagingCredits - 1) })}
+                    className="w-10 h-10 rounded-xl bg-white border border-gray-200 flex items-center justify-center hover:border-black transition-all"
+                   >
+                      <Minus className="w-4 h-4 text-black" />
+                   </button>
+                   <span className="text-xl font-black text-black w-6 text-center">{formData.virtualStagingCredits}</span>
+                   <button
+                    onClick={() => updateFormData({ virtualStagingCredits: formData.virtualStagingCredits + 1 })}
+                    className="w-10 h-10 rounded-xl bg-black flex items-center justify-center hover:scale-105 transition-all"
+                   >
+                      <Plus className="w-4 h-4 text-white" />
+                   </button>
+                </div>
+             </div>
+
+             <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                   <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center text-teal-500">
+                      <Zap className="w-4 h-4" />
+                   </div>
+                   <p className="text-[11px] font-bold text-gray-700 leading-tight">
+                     <span className="text-black">Post-Delivery Access:</span> You'll receive a direct link to our <span className="text-teal-600">AI Virtual Staging Lab</span> once your media is delivered to stage even more.
+                   </p>
+                </div>
+             </div>
+
+             <div className="flex flex-col gap-3">
+                <Button
+                  onClick={() => setShowVirtualStagingPopup(false)}
+                  className="bg-black hover:bg-gray-800 text-white font-black py-8 text-sm rounded-2xl transition-all shadow-xl group"
+                >
+                   {formData.virtualStagingCredits > 0 ? `ADD ${formData.virtualStagingCredits} STAGING CREDITS` : 'CONTINUE WITHOUT STAGING'}
+                   <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                </Button>
+             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!selectedDetailItem} onOpenChange={(open) => !open && setSelectedDetailItem(null)}>
         <DialogContent className="max-w-xl rounded-[2rem] p-0 overflow-hidden border-none bg-white shadow-2xl">
           <div className="bg-black p-8 text-white relative overflow-hidden">
