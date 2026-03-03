@@ -1,23 +1,26 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
-import { Check, Mail, Phone, MapPin, Maximize, Calendar as CalendarIcon, ArrowRight, ArrowLeft, Sparkles } from "lucide-react";
+import { Check, Mail, Phone, MapPin, Maximize, Calendar as CalendarIcon, ArrowRight, ArrowLeft, Sparkles, Wand2 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
 type Step = 1 | 2 | 3 | 4 | "success";
 
 const packages = [
-  { id: "micro", name: "The Micro", price: 99, description: "Fast-paced content to get your listing live with impact." },
-  { id: "standard", name: "The Standard", price: 150, description: "Complete visual story with drone and AI enhancements." },
-  { id: "showcase", name: "The Showcase", price: 200, description: "Luxury-tier production for high-value properties." }
+  { id: "essentials", name: "The Essentials", price: 249, description: "Clean, bright, and ready to post. Perfect for quick turnarounds." },
+  { id: "showcase", name: "The Showcase", price: 549, description: "Complete visual story with drone and AI enhancements." },
+  { id: "legacy", name: "The Legacy", price: 899, description: "Luxury-tier production for high-value properties." },
+  { id: "market-leader", name: "The Market Leader", price: 1599, description: "Dominate the market with complete media saturation." }
 ];
 
 export default function BookingForm() {
   const settings = useSiteSettings();
+  const [searchParams] = useSearchParams();
   const [step, setStep] = useState<Step>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -26,9 +29,19 @@ export default function BookingForm() {
     phone: "",
     address: "",
     sqft: "",
-    packageId: "standard",
+    packageId: "essentials",
+    premiumEditing: false,
     date: undefined as Date | undefined,
   });
+
+  useEffect(() => {
+    const pkg = searchParams.get("package");
+    const premium = searchParams.get("premium") === "true";
+    if (pkg && packages.find(p => p.id === pkg)) {
+      setFormData(prev => ({ ...prev, packageId: pkg, premiumEditing: premium }));
+      setStep(3); // Skip to package selection if pre-selected? Or just stay at 1. Usually stay at 1 for contact info.
+    }
+  }, [searchParams]);
 
   const updateFormData = (data: Partial<typeof formData>) => {
     setFormData(prev => ({ ...prev, ...data }));
@@ -203,6 +216,29 @@ export default function BookingForm() {
                   </div>
                 </button>
               ))}
+            </div>
+
+            {/* Premium Editing Toggle */}
+            <div
+              className="mt-8 p-6 rounded-[2.5rem] border-2 border-dashed transition-all cursor-pointer flex items-center justify-between group"
+              style={{
+                borderColor: formData.premiumEditing ? settings.global.primaryColor : '#e5e7eb',
+                backgroundColor: formData.premiumEditing ? `${settings.global.primaryColor}05` : 'transparent'
+              }}
+              onClick={() => updateFormData({ premiumEditing: !formData.premiumEditing })}
+            >
+              <div className="flex items-center gap-4">
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${formData.premiumEditing ? 'text-white' : 'text-gray-400 bg-gray-50'}`} style={{ backgroundColor: formData.premiumEditing ? settings.global.primaryColor : undefined }}>
+                  <Wand2 className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-black">Premium Editing Upgrade</h4>
+                  <p className="text-xs text-gray-500">Expert retouching, sky replacements & more (Next Day Delivery)</p>
+                </div>
+              </div>
+              <div className={`w-12 h-6 rounded-full relative transition-all ${formData.premiumEditing ? '' : 'bg-gray-200'}`} style={{ backgroundColor: formData.premiumEditing ? settings.global.primaryColor : undefined }}>
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${formData.premiumEditing ? 'left-7' : 'left-1'}`}></div>
+              </div>
             </div>
           </motion.div>
         );

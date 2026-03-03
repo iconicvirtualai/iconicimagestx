@@ -28,20 +28,24 @@ export default function Pricing() {
   const listingTiers = [
     {
       name: "THE ESSENTIALS",
-      tagline: "The High-Speed Starter.",
+      tagline: "The Fast & Fresh.",
       price: "249",
       period: "per listing",
-      description: "Fast-paced content to get your listing live with impact.",
+      description: "Clean, bright, and ready to post. Perfect for quick turnarounds and keeping your feed active.",
       icon: <Zap className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
-      buttonText: "Start My Consistency",
+      buttonText: "Start My Momentum",
       ctaSubtext: "Your reel is ready before the sign is up.",
       tooltip: "Ideal for fast-moving residential listings where speed and social presence are key.",
+      disclaimer: {
+        title: "Same Day Delivery",
+        text: "Photos, Twilight Render and Snap Reel by 7PM with Basic Edits, premium edits upgrades next day"
+      },
       features: [
-        "30 Ultra-HDR Photos",
-        "The 'Snap' Reel (15s vertical montage)",
-        "Trending Audio Integration",
-        "High-Energy Social Trailer",
-        "Pre-Launch Delivery"
+        "30 Images",
+        "The 'Snap' Reel (15s)",
+        "Trending Audio",
+        "Pre-Launch Delivery Packet",
+        "1 Iconic Twilight Render"
       ]
     },
     {
@@ -457,10 +461,16 @@ export default function Pricing() {
                   </div>
 
                   <div className="mt-auto space-y-4">
+                    {tier.disclaimer && (
+                      <div className="text-center mb-2 px-2">
+                        <p className="text-[11px] font-bold text-black uppercase tracking-tight leading-none mb-1">{tier.disclaimer.title}</p>
+                        <p className="text-[9px] text-gray-500 leading-tight italic">{tier.disclaimer.text}</p>
+                      </div>
+                    )}
                     <Button asChild className={`w-full py-6 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] ${
                       tier.isPopular ? 'text-white shadow-lg' : 'bg-black hover:bg-gray-800 text-white shadow-lg'
                     }`} style={{ backgroundColor: tier.isPopular ? settings.global.primaryColor : undefined }}>
-                      <Link to="/book">
+                      <Link to={`/book?package=${tier.name === 'THE ESSENTIALS' ? 'essentials' : tier.name === 'THE SHOWCASE' ? 'showcase' : tier.name === 'THE LEGACY' ? 'legacy' : 'market-leader'}`}>
                         {tier.buttonText}
                       </Link>
                     </Button>
@@ -702,10 +712,16 @@ export default function Pricing() {
                   </div>
 
                   <div className="mt-auto space-y-4">
+                    {tier.disclaimer && (
+                      <div className="text-center mb-2 px-2">
+                        <p className="text-[11px] font-bold text-black uppercase tracking-tight leading-none mb-1">{tier.disclaimer.title}</p>
+                        <p className="text-[9px] text-gray-500 leading-tight italic">{tier.disclaimer.text}</p>
+                      </div>
+                    )}
                     <Button asChild className={`w-full py-6 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] ${
                       tier.isPopular ? 'text-white shadow-lg' : 'bg-black hover:bg-gray-800 text-white shadow-lg'
                     }`} style={{ backgroundColor: tier.isPopular ? settings.global.primaryColor : undefined }}>
-                      <Link to="/book">
+                      <Link to={`/book?package=${tier.name === 'THE ESSENTIALS' ? 'essentials' : tier.name === 'THE SHOWCASE' ? 'showcase' : tier.name === 'THE LEGACY' ? 'legacy' : 'market-leader'}`}>
                         {tier.buttonText}
                       </Link>
                     </Button>
