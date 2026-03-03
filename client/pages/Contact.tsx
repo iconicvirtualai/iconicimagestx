@@ -50,14 +50,14 @@ export default function Contact() {
 
                     <a
                       href="tel:281-356-0965"
-                      className="flex items-center gap-4 p-4 bg-[#f0f9ff] border border-[#e0f2fe] rounded-2xl group hover:border-[#0ea5e9] transition-all duration-300 shadow-sm hover:shadow-md text-left"
+                      className="flex items-center gap-4 p-4 bg-black border border-black rounded-2xl group hover:border-gray-800 transition-all duration-300 shadow-sm hover:shadow-md text-left"
                     >
-                      <div className="bg-[#0ea5e9] p-2.5 rounded-xl text-white group-hover:scale-110 transition-transform flex-shrink-0">
+                      <div className="bg-gray-800 p-2.5 rounded-xl text-white group-hover:scale-110 transition-transform flex-shrink-0">
                         <Phone className="w-5 h-5" />
                       </div>
                       <div className="flex-1 min-w-[120px]">
-                        <div className="text-[9px] font-bold tracking-widest text-[#0ea5e9] uppercase mb-0.5">CALL US</div>
-                        <div className="text-base font-bold text-black group-hover:text-[#0ea5e9] transition-colors flex items-center gap-2">
+                        <div className="text-[9px] font-bold tracking-widest text-gray-400 uppercase mb-0.5">CALL US</div>
+                        <div className="text-base font-bold text-white group-hover:text-white transition-colors flex items-center gap-2">
                           281-356-0965
                           <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0" />
                         </div>
@@ -141,7 +141,7 @@ export default function Contact() {
                     ></textarea>
                   </div>
 
-                  <Button className="w-full bg-[#22d3ee] hover:bg-[#0891b2] text-white font-bold py-5 text-base rounded-xl transition-all shadow-lg shadow-cyan-100">
+                  <Button className="w-full bg-black hover:bg-gray-900 text-white font-bold py-5 text-base rounded-xl transition-all shadow-lg shadow-gray-200">
                     Send
                   </Button>
                 </form>
