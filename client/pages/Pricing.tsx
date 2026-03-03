@@ -50,22 +50,27 @@ export default function Pricing() {
     },
     {
       name: "THE SHOWCASE",
-      tagline: "The Market Mover.",
+      tagline: "The Full Story.",
       price: "549",
       period: "per listing",
-      description: "Complete visual story with drone and AI enhancements.",
+      description: "A complete visual deep-dive. We capture the details, the angles, and the atmosphere that makes your space unique.",
       icon: <Trophy className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
       isPopular: true,
-      buttonText: "Start My Consistency",
+      buttonText: "Tell the Full Story",
       ctaSubtext: "Your reel is ready before the sign is up.",
       tooltip: "Best for standard to mid-range listings needing a professional cinematic edge.",
+      disclaimer: {
+        title: "Same Day Delivery",
+        text: "Photos, Aerials, Twilight Renders by 7PM with Basic Edits - Reel, premium edits and 2D Floorplan Next Day"
+      },
       features: [
-        "50 Ultra-HDR Photos",
-        "5 Drone Aerials",
-        "The 'Cinematic' Reel (30-60s vertical film)",
-        "Smooth transitions & Speed ramps",
-        "AI Twilight 'Glow' (2 Exterior shots)",
-        "2D Floorplan"
+        "50 Images",
+        "5 Aerials",
+        "The 'Snap' Reel (15s)",
+        "1 'Iconic' 3D Animated Reel (60s Vert)",
+        "2D Floorplan",
+        "Pre-Launch Delivery Packet",
+        "2 Iconic Twilight Renders"
       ]
     },
     {

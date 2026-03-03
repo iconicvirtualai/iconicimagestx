@@ -13,7 +13,7 @@ type Step = 1 | 2 | 3 | 4 | "success";
 
 const packages = [
   { id: "essentials", name: "The Essentials", price: 249, description: "Clean, bright, and ready to post. Perfect for quick turnarounds." },
-  { id: "showcase", name: "The Showcase", price: 549, description: "Complete visual story with drone and AI enhancements." },
+  { id: "showcase", name: "The Showcase", price: 549, description: "A complete visual deep-dive. We capture the details, the angles, and the atmosphere." },
   { id: "legacy", name: "The Legacy", price: 899, description: "Luxury-tier production for high-value properties." },
   { id: "market-leader", name: "The Market Leader", price: 1599, description: "Dominate the market with complete media saturation." }
 ];
