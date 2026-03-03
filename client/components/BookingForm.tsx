@@ -694,14 +694,14 @@ export default function BookingForm() {
             </div>
 
             <div className="space-y-10">
-               <div className="bg-white p-6 rounded-[3rem] border border-gray-50 shadow-lg overflow-hidden flex justify-center">
+               <div className="bg-white p-10 rounded-[3rem] border border-gray-50 shadow-lg overflow-hidden flex justify-center w-full max-w-2xl mx-auto">
                   <Calendar
                     mode="single"
                     numberOfMonths={1}
                     weekStartsOn={1}
                     selected={formData.serviceDate}
                     onSelect={(date) => updateFormData({ serviceDate: date })}
-                    className="rounded-2xl"
+                    className="w-full"
                     disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))}
                   />
                </div>
