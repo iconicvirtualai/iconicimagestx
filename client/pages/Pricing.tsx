@@ -75,22 +75,28 @@ export default function Pricing() {
     },
     {
       name: "THE LEGACY",
-      tagline: "For luxury estates.",
+      tagline: "The Signature Production.",
       price: "899",
       period: "per listing",
-      description: "Luxury-tier production for high-value properties.",
+      description: "Our highest level of care. We create a cinematic experience that tells people exactly why your brand (or your home) is the one to choose.",
       icon: <Crown className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
-      buttonText: "Start My Consistency",
+      buttonText: "Build my Legacy",
       ctaSubtext: "Your reel is ready before the sign is up.",
       tooltip: "Engineered for luxury listings and high-value neighborhoods where image is everything.",
+      disclaimer: {
+        title: "Same Day Delivery",
+        text: "Photos, Aerials, Twilight Renders Same day (Basic Edits) Premium Edits, Video, Reel Next Day"
+      },
       features: [
-        "The Full Media Suite (All Photos + Drone)",
-        "10 AI Twilight Renders",
-        "90s Cinematic Property Film (4K Landscape)",
-        "Professional Color Grading",
-        "Licensed Music",
-        "Agent-on-camera Intro/Outro",
-        "The 'Iconic' Animated Reel (60s Vertical)"
+        "Full Images",
+        "Full Aerials",
+        "The 'Snap' Reel (15s)",
+        "1 'Iconic' 3D Animated Reel (60s Vert)",
+        "90s 4K Cinematic Property Video (with Aerial)",
+        "Pre-Launch Delivery Packet",
+        "5 Iconic Twilight Renders",
+        "Agent On Camera Intro/Outro",
+        "3D Motion Graphics and Animations"
       ]
     },
     {
