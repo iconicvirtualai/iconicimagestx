@@ -851,7 +851,7 @@ export default function BookingForm() {
                                   </div>
                                   <div className="mt-3 flex items-end justify-between">
                                      <div className="text-sm font-black text-black">
-                                       {s.price > 0 ? `$${s.price}` : "TBD"}
+                                       {s.price > 0 ? `$${s.price}` : ""}
                                      </div>
                                      {formData.selectedService === s.id && (
                                        <div className="w-5 h-5 rounded-full bg-black flex items-center justify-center">
@@ -1465,12 +1465,12 @@ export default function BookingForm() {
                 </div>
              )}
              <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
-                <div className="space-y-0.5">
-                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Investment</p>
-                   <p className="text-2xl font-black text-black">
-                     {selectedDetailItem?.price > 0 ? `$${selectedDetailItem.price}` : "TBD"}
-                   </p>
-                </div>
+                {selectedDetailItem?.price > 0 ? (
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Investment</p>
+                    <p className="text-2xl font-black text-black">${selectedDetailItem.price}</p>
+                  </div>
+                ) : <div />}
                 <Button
                   onClick={() => setSelectedDetailItem(null)}
                   className="bg-black hover:bg-gray-800 text-white font-black px-8 h-14 rounded-2xl transition-all shadow-lg"
