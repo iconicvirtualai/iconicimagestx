@@ -36,7 +36,7 @@ import {
 import { format, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay } from "date-fns";
 import { toast } from "sonner";
 
-type Step = 1 | 2 | 3 | 4 | 5 | "success";
+type Step = 1 | 2 | 3 | 4 | 5 | 6 | "success";
 
 interface Service {
   id: string;
@@ -487,6 +487,34 @@ const photographers = [
   "Available (Auto-Assign)",
 ];
 
+const consultQuestions = [
+  {
+    id: "marketingDoing",
+    question: "What kind of marketing are you doing?",
+    options: ["Posting", "Boosting", "Ads & Targeting", "Strategizing & Consistency", "Throwin Darts & Hopin' for the best"]
+  },
+  {
+    id: "resultsBothering",
+    question: "What's bothering you about your results?",
+    options: ["Not growing fast enough", "Not enough business", "Not as many followers as I want", "Not as much engagement as I want", "Everything"]
+  },
+  {
+    id: "perfectBusiness",
+    question: "In a perfect world, what does your perfect business look like?",
+    options: ["Consistent flow of random revenue", "Solid sphere of clientele", "Revolving revenue of repeat clients", "Lots of little deals", "Little bit of Big deals"]
+  },
+  {
+    id: "businessSource",
+    question: "Where does business usually come from?",
+    options: ["Streets", "Friends & Family", "Social Media", "Signage/Advertisements", "Couldn't Tell Ya."]
+  },
+  {
+    id: "investmentWilling",
+    question: "How much are you willing to invest in yourself and your business with?",
+    options: ["0-$500/mo", "$500-$1000/mo", "$1000-$2500/mo", "$2500-5000/mo", "$5000+"]
+  }
+];
+
 export default function BookingForm() {
   const settings = useSiteSettings();
   const isMobile = useIsMobile();
@@ -528,6 +556,11 @@ export default function BookingForm() {
     teaserPersonalBrand: false,
     teaserSocialConsult: false,
     socialMarketingPermission: true,
+    marketingDoing: "",
+    resultsBothering: "",
+    perfectBusiness: "",
+    businessSource: "",
+    investmentWilling: "",
   });
 
   // Scheduling helpers
@@ -668,6 +701,11 @@ export default function BookingForm() {
 
     // Check if we should show the Iconic Finish popup
     if (step === 1) {
+      if (isConsultationPath) {
+        setStep(4); // Jump to scheduling
+        return;
+      }
+
       const selectedService = services.find(s => s.id === formData.selectedService);
       const isListing = selectedService?.category === "listings";
       const isMarketLeader = formData.selectedService === "listing-market-leader";
@@ -681,12 +719,44 @@ export default function BookingForm() {
       }
     }
 
-    if (typeof step === 'number' && step < 5) {
+    if (step === 4) {
+      if (isConsultationPath) {
+        setStep(5); // Questionnaire
+      } else {
+        setStep(6); // Final Form
+      }
+      return;
+    }
+
+    if (step === 5) {
+      // Validate questionnaire
+      const unanswered = consultQuestions.find(q => !formData[q.id as keyof typeof formData]);
+      if (unanswered) {
+        toast.error("Please answer all questions before proceeding");
+        return;
+      }
+      setStep(6);
+      return;
+    }
+
+    if (typeof step === 'number' && step < 6) {
       setStep((step + 1) as Step);
     }
   };
 
   const prevStep = () => {
+    if (step === 4 && isConsultationPath) {
+      setStep(1);
+      return;
+    }
+    if (step === 6) {
+      if (isConsultationPath) {
+        setStep(5);
+      } else {
+        setStep(4);
+      }
+      return;
+    }
     if (typeof step === 'number' && step > 1) {
       setStep((step - 1) as Step);
     }
@@ -696,6 +766,10 @@ export default function BookingForm() {
     setIsSubmitting(true);
     try {
       // Mock API call
+      // Twilio Integration Intent:
+      // 1. Send SMS to Twilio Notify (Iconic Team) about new inquiry
+      // 2. Trigger automated SMS/Email sequence to customer (Welcome/Strategy)
+
       await new Promise(resolve => setTimeout(resolve, 1500));
       setStep("success");
     } catch (error) {
@@ -706,7 +780,8 @@ export default function BookingForm() {
   };
 
   const selectedServiceData = services.find(s => s.id === formData.selectedService);
-  
+  const isConsultationPath = selectedServiceData && ["branding", "business", "growth"].includes(selectedServiceData.category);
+
   const calculateTotal = () => {
     let total = 0;
     if (selectedServiceData) total += selectedServiceData.price;
@@ -1223,8 +1298,12 @@ export default function BookingForm() {
             className="space-y-12"
           >
              <div className="text-center space-y-2">
-               <h3 className="text-3xl font-black uppercase text-black tracking-tight">Scheduling</h3>
-               <p className="text-[11px] text-gray-400 font-bold uppercase tracking-[0.2em]">Reserve your iconic launch date (CST Timezone)</p>
+               <h3 className="text-3xl font-black uppercase text-black tracking-tight">
+                 {isConsultationPath ? "RESERVE YOUR 30 MIN. ICONIC CONSULTATION CALL" : "Scheduling"}
+               </h3>
+               <p className="text-[11px] text-gray-400 font-bold uppercase tracking-[0.2em]">
+                 {isConsultationPath ? "Choose your session details (CST Timezone)" : "Reserve your iconic launch date (CST Timezone)"}
+               </p>
             </div>
 
             <div className="max-w-xl mx-auto space-y-8">
@@ -1239,9 +1318,8 @@ export default function BookingForm() {
                       onValueChange={(val) => {
                         const [year, month] = val.split("-").map(Number);
                         const newDate = new Date(year, month - 1, 1);
-                        // If current selected date is in the same month, keep it, otherwise reset date but keep month
                         if (formData.serviceDate && isSameMonth(formData.serviceDate, newDate)) {
-                          // keep as is
+                          // keep
                         } else {
                           updateFormData({ serviceDate: newDate < new Date() ? new Date() : newDate });
                         }
@@ -1309,27 +1387,28 @@ export default function BookingForm() {
                     </Select>
                   </div>
 
-                  {/* Photographer Dropdown */}
-                  <div className="space-y-4">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2 px-1">
-                      <Users className="w-3.5 h-3.5" /> 4. Photographer
-                    </label>
-                    <Select
-                      value={formData.preferredPhotographer}
-                      onValueChange={(val) => updateFormData({ preferredPhotographer: val })}
-                    >
-                      <SelectTrigger className="h-16 rounded-[1.25rem] border-2 px-6 font-black text-black border-black bg-white focus:ring-0">
-                        <SelectValue placeholder="Select Photographer" />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-2xl border-none shadow-2xl p-2">
-                        {photographers.map((p) => (
-                          <SelectItem key={p} value={p} className="rounded-xl py-3 font-bold cursor-pointer focus:bg-gray-50">
-                            {p}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {!isConsultationPath && (
+                    <div className="space-y-4">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2 px-1">
+                        <Users className="w-3.5 h-3.5" /> 4. Photographer
+                      </label>
+                      <Select
+                        value={formData.preferredPhotographer}
+                        onValueChange={(val) => updateFormData({ preferredPhotographer: val })}
+                      >
+                        <SelectTrigger className="h-16 rounded-[1.25rem] border-2 px-6 font-black text-black border-black bg-white focus:ring-0">
+                          <SelectValue placeholder="Select Photographer" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-2xl border-none shadow-2xl p-2">
+                          {photographers.map((p) => (
+                            <SelectItem key={p} value={p} className="rounded-xl py-3 font-bold cursor-pointer focus:bg-gray-50">
+                              {p}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                </div>
             </div>
           </motion.div>
@@ -1337,21 +1416,61 @@ export default function BookingForm() {
 
       case 5:
         return (
-          <motion.div 
-            initial={{ opacity: 0, x: 20 }} 
-            animate={{ opacity: 1, x: 0 }} 
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
             className="space-y-10"
           >
             <div className="text-center space-y-1.5">
-               <h3 className="text-2xl font-black uppercase text-black tracking-tight">Secure Your Iconic Launch</h3>
-               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Complete your production request</p>
+               <h3 className="text-2xl font-black uppercase text-black tracking-tight">Strategy Questionnaire</h3>
+               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Help us prepare for our session</p>
+            </div>
+
+            <div className="space-y-8 max-w-2xl mx-auto">
+               {consultQuestions.map((q) => (
+                 <div key={q.id} className="space-y-4">
+                    <label className="text-xs font-black uppercase tracking-widest text-black flex items-center gap-2">
+                      <MessageSquare className="w-3.5 h-3.5" /> {q.question}
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                       {q.options.map((opt) => (
+                         <button
+                          key={opt}
+                          onClick={() => updateFormData({ [q.id]: opt })}
+                          className={`p-4 rounded-xl text-[11px] font-bold text-left border-2 transition-all flex items-center justify-between ${
+                            formData[q.id as keyof typeof formData] === opt ? 'border-black bg-gray-50' : 'border-gray-50 bg-white hover:border-gray-200'
+                          }`}
+                         >
+                           {opt}
+                           {formData[q.id as keyof typeof formData] === opt && <Check className="w-3.5 h-3.5" />}
+                         </button>
+                       ))}
+                    </div>
+                 </div>
+               ))}
+            </div>
+          </motion.div>
+        );
+
+      case 6:
+        return (
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="space-y-10"
+          >
+            <div className="text-center space-y-1.5">
+               <h3 className="text-2xl font-black uppercase text-black tracking-tight">
+                 {isConsultationPath ? "Secure Your Consultation" : "Secure Your Iconic Launch"}
+               </h3>
+               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Complete your request</p>
             </div>
 
             <div className="space-y-8 max-w-lg mx-auto">
                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">First Name</label>
-                    <Input 
+                    <Input
                       placeholder="John"
                       className="h-14 rounded-xl border-2 focus:border-black px-5"
                       value={formData.firstName}
@@ -1360,7 +1479,7 @@ export default function BookingForm() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Last Name</label>
-                    <Input 
+                    <Input
                       placeholder="Doe"
                       className="h-14 rounded-xl border-2 focus:border-black px-5"
                       value={formData.lastName}
@@ -1371,7 +1490,7 @@ export default function BookingForm() {
                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Email Address</label>
-                    <Input 
+                    <Input
                       type="email"
                       placeholder="john@example.com"
                       className="h-14 rounded-xl border-2 focus:border-black px-5"
@@ -1381,7 +1500,7 @@ export default function BookingForm() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Phone Number</label>
-                    <Input 
+                    <Input
                       type="tel"
                       placeholder="(555) 000-0000"
                       className="h-14 rounded-xl border-2 focus:border-black px-5"
@@ -1391,42 +1510,46 @@ export default function BookingForm() {
                   </div>
                </div>
 
-               {/* Marketing Permission Toggle */}
-               <div className="bg-gray-50 p-6 rounded-2xl space-y-4">
-                  <div className="flex items-center justify-between">
-                     <div className="space-y-0.5">
-                        <h4 className="text-[11px] font-black uppercase tracking-widest text-black">Marketing Permission</h4>
-                        <p className="text-[9px] text-gray-500 leading-relaxed max-w-[280px]">I give permission for Iconic Images to market my listing via social media and other online channels.</p>
-                     </div>
-                     <div 
-                      onClick={() => updateFormData({ socialMarketingPermission: !formData.socialMarketingPermission })}
-                      className={`w-12 h-6 rounded-full relative transition-all cursor-pointer ${formData.socialMarketingPermission ? 'bg-black' : 'bg-gray-200'}`}
-                     >
-                        <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${formData.socialMarketingPermission ? 'left-7' : 'left-1'}`}></div>
-                     </div>
-                  </div>
-               </div>
+               {!isConsultationPath && (
+                 <>
+                   {/* Marketing Permission Toggle */}
+                   <div className="bg-gray-50 p-6 rounded-2xl space-y-4">
+                      <div className="flex items-center justify-between">
+                         <div className="space-y-0.5">
+                            <h4 className="text-[11px] font-black uppercase tracking-widest text-black">Marketing Permission</h4>
+                            <p className="text-[9px] text-gray-500 leading-relaxed max-w-[280px]">I give permission for Iconic Images to market my listing via social media and other online channels.</p>
+                         </div>
+                         <div
+                          onClick={() => updateFormData({ socialMarketingPermission: !formData.socialMarketingPermission })}
+                          className={`w-12 h-6 rounded-full relative transition-all cursor-pointer ${formData.socialMarketingPermission ? 'bg-black' : 'bg-gray-200'}`}
+                         >
+                            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${formData.socialMarketingPermission ? 'left-7' : 'left-1'}`}></div>
+                         </div>
+                      </div>
+                   </div>
 
-               {/* Teaser Section */}
-               <div className="space-y-4 pt-6">
-                  <div className="space-y-3">
-                     {[
-                       { id: "teaserMonthContent", label: "I want to turn this listing into a month of content." },
-                       { id: "teaserPersonalBrand", label: "I need to update my personal brand. (Add a \"Refresh\" or \"Content Partner\" session to this shoot)" },
-                       { id: "teaserSocialConsult", label: "I’m interested in having Iconic manage my social media. (Free consultation)" },
-                     ].map((t) => (
-                       <label key={t.id} className="flex items-center gap-3 cursor-pointer group">
-                          <div 
-                            onClick={() => updateFormData({ [t.id]: !formData[t.id as keyof typeof formData] })}
-                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${formData[t.id as keyof typeof formData] ? 'border-black bg-black' : 'border-gray-200 bg-white'}`}
-                          >
-                             {formData[t.id as keyof typeof formData] && <Check className="w-3 h-3 text-white stroke-[4]" />}
-                          </div>
-                          <span className="text-[10px] font-bold text-gray-600 group-hover:text-black transition-colors">{t.label}</span>
-                       </label>
-                     ))}
-                  </div>
-               </div>
+                   {/* Teaser Section */}
+                   <div className="space-y-4 pt-6">
+                      <div className="space-y-3">
+                         {[
+                           { id: "teaserMonthContent", label: "I want to turn this listing into a month of content." },
+                           { id: "teaserPersonalBrand", label: "I need to update my personal brand. (Add a \"Refresh\" or \"Content Partner\" session to this shoot)" },
+                           { id: "teaserSocialConsult", label: "I’m interested in having Iconic manage my social media. (Free consultation)" },
+                         ].map((t) => (
+                           <label key={t.id} className="flex items-center gap-3 cursor-pointer group">
+                              <div
+                                onClick={() => updateFormData({ [t.id]: !formData[t.id as keyof typeof formData] })}
+                                className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${formData[t.id as keyof typeof formData] ? 'border-black bg-black' : 'border-gray-200 bg-white'}`}
+                              >
+                                 {formData[t.id as keyof typeof formData] && <Check className="w-3 h-3 text-white stroke-[4]" />}
+                              </div>
+                              <span className="text-[10px] font-bold text-gray-600 group-hover:text-black transition-colors">{t.label}</span>
+                           </label>
+                         ))}
+                      </div>
+                   </div>
+                 </>
+               )}
             </div>
           </motion.div>
         );
@@ -1505,15 +1628,23 @@ export default function BookingForm() {
         <div className="flex-1 space-y-8">
            {/* Progress Steps */}
            <div className="flex items-center gap-2">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="flex-1 h-1.5 rounded-full transition-all duration-700 bg-gray-100 relative overflow-hidden">
-                   <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: (step as number) >= i ? "100%" : "0%" }}
-                    className="absolute inset-0 bg-black"
-                   />
-                </div>
-              ))}
+              {[1, 2, 3, 4, 5, 6].map((i) => {
+                const isCurrentOrPast = (step as number) >= i;
+                const isStepConsultationIgnored = isConsultationPath && [2, 3].includes(i);
+                const isStepStandardIgnored = !isConsultationPath && i === 5;
+
+                if (isStepConsultationIgnored || isStepStandardIgnored) return null;
+
+                return (
+                  <div key={i} className="flex-1 h-1.5 rounded-full transition-all duration-700 bg-gray-100 relative overflow-hidden">
+                     <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: isCurrentOrPast ? "100%" : "0%" }}
+                      className="absolute inset-0 bg-black"
+                     />
+                  </div>
+                );
+              })}
            </div>
 
            <div className="min-h-[550px] bg-white rounded-[3rem] border border-gray-50 p-10 shadow-sm relative overflow-hidden">
@@ -1527,23 +1658,23 @@ export default function BookingForm() {
 
            <div className="flex gap-4">
               {step > 1 && (
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={prevStep}
                   className="h-16 px-8 rounded-2xl border-gray-100 bg-white text-gray-500 font-black uppercase tracking-widest text-[10px] hover:bg-gray-50 transition-all group"
                 >
                   <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform mr-2" /> Back
                 </Button>
               )}
-              {step < 5 ? (
-                <Button 
+              {step < 6 ? (
+                <Button
                   onClick={nextStep}
                   className="flex-1 h-16 bg-black hover:bg-gray-800 text-white font-black uppercase tracking-[0.15em] text-[11px] rounded-2xl shadow-xl transition-all hover:scale-[1.005] group"
                 >
                   Next Stage <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform ml-2" />
                 </Button>
               ) : (
-                <Button 
+                <Button
                   onClick={handleBookNow}
                   disabled={isSubmitting}
                   className="flex-1 h-16 bg-black hover:bg-gray-900 text-white font-black uppercase tracking-[0.15em] text-[11px] rounded-2xl shadow-xl transition-all hover:scale-[1.005] group"
@@ -1556,7 +1687,7 @@ export default function BookingForm() {
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4" /> BOOK MY CAMPAIGN
+                      <Sparkles className="w-4 h-4" /> {isConsultationPath ? "BOOK MY CONSULTATION" : "BOOK MY CAMPAIGN"}
                     </div>
                   )}
                 </Button>
