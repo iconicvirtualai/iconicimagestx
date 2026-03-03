@@ -128,7 +128,7 @@ export default function About() {
               <div className="relative">
                 <div className="absolute -top-10 -left-10 w-40 h-40 bg-teal-500/10 rounded-full blur-3xl"></div>
                 <div className="relative rounded-[2.5rem] overflow-hidden shadow-2xl bg-gray-900 aspect-square md:aspect-[4/5]">
-                  <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=800&q=80" className="w-full h-full object-cover mix-blend-luminosity hover:mix-blend-normal transition-all duration-700" alt="Cadi - Visionary Creator" />
+                  <img src="https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fb694584c91da4099bb13e517f9890e59?format=webp&width=800&height=1200" className="w-full h-full object-cover mix-blend-luminosity hover:mix-blend-normal transition-all duration-700" alt="Cadi - Visionary Creator" />
                   <div className="absolute bottom-0 left-0 w-full p-8 bg-gradient-to-t from-black via-black/40 to-transparent">
                     <p className="text-teal-400 font-bold tracking-widest text-xs uppercase mb-1">Visionary Creator</p>
                     <h4 className="text-white text-3xl font-bold">CADI</h4>
