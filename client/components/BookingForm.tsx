@@ -880,21 +880,19 @@ export default function BookingForm() {
                      <button
                       key={b.id}
                       onClick={() => toggleBasic(b.id)}
-                      className={`p-6 rounded-2xl border-2 transition-all text-left flex justify-between items-center bg-white ${
+                      className={`p-6 rounded-2xl border-2 transition-all text-left bg-white relative ${
                         formData.selectedBasics.includes(b.id) ? 'border-black bg-white scale-[1.01] shadow-lg' : 'border-gray-100 bg-white hover:border-gray-200'
                       }`}
                      >
-                       <div className="space-y-0.5">
+                       <div className="space-y-1">
                           <h4 className="font-black text-black uppercase text-sm">{b.name}</h4>
+                          <span className="text-sm font-black text-black block">${b.price}</span>
                        </div>
-                       <div className="flex items-center gap-3">
-                          <span className="text-sm font-black text-black">${b.price}</span>
-                          {formData.selectedBasics.includes(b.id) && (
-                            <div className="w-5 h-5 rounded-full bg-black flex items-center justify-center">
-                              <Check className="w-2.5 h-2.5 text-white stroke-[4]" />
-                            </div>
-                          )}
-                       </div>
+                       {formData.selectedBasics.includes(b.id) && (
+                         <div className="absolute top-4 right-4 w-5 h-5 rounded-full bg-black flex items-center justify-center">
+                           <Check className="w-2.5 h-2.5 text-white stroke-[4]" />
+                         </div>
+                       )}
                      </button>
                    ))}
                 </div>
