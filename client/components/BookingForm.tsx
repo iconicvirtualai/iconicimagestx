@@ -697,7 +697,8 @@ export default function BookingForm() {
                <div className="bg-white p-6 rounded-[3rem] border border-gray-50 shadow-lg overflow-hidden flex justify-center">
                   <Calendar
                     mode="single"
-                    numberOfMonths={isMobile ? 1 : 2}
+                    numberOfMonths={1}
+                    weekStartsOn={1}
                     selected={formData.serviceDate}
                     onSelect={(date) => updateFormData({ serviceDate: date })}
                     className="rounded-2xl"
