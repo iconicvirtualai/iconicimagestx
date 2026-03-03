@@ -1495,10 +1495,14 @@ export default function BookingForm() {
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-400/20 text-teal-400 text-[10px] font-black uppercase tracking-widest border border-teal-400/30">
                   <Sparkles className="w-3 h-3" /> Limited Time Opportunity
                 </div>
-                <h2 className="text-4xl font-black uppercase tracking-tight leading-none">Make it <br />"Magazine Ready"</h2>
-                <p className="text-gray-400 text-sm font-medium max-w-xs mx-auto">
-                  The ultimate digital polish for your listing. We touch up every detail to ensure it stands out.
-                </p>
+                <DialogHeader className="space-y-4 text-center sm:text-center">
+                  <DialogTitle className="text-4xl font-black uppercase tracking-tight leading-none text-white">
+                    Make it <br />"Magazine Ready"
+                  </DialogTitle>
+                  <DialogDescription className="text-gray-400 text-sm font-medium max-w-xs mx-auto text-center">
+                    The ultimate digital polish for your listing. We touch up every detail to ensure it stands out.
+                  </DialogDescription>
+                </DialogHeader>
              </div>
           </div>
           <div className="p-10 space-y-8">
