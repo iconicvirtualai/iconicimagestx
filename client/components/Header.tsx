@@ -78,11 +78,6 @@ export default function Header() {
 
         {/* Right side buttons */}
         <div className="hidden lg:flex items-center gap-4">
-          <Button asChild variant="outline" className="rounded-xl px-6 h-10 font-bold border-2 transition-all text-sm bg-transparent" style={{ borderColor: settings.global.secondaryColor, color: settings.global.secondaryColor }}>
-            <Link to="/admin/login">
-              Dashboard
-            </Link>
-          </Button>
           <div className="w-10 h-10 rounded-full bg-[#166534] border-2 border-white shadow-md flex items-center justify-center text-white font-bold text-[15px] cursor-pointer hover:scale-105 transition-transform flex-shrink-0">
             C
           </div>
@@ -116,13 +111,6 @@ export default function Header() {
                 {item.label}
               </Link>
             ))}
-            <div className="pt-8 border-t border-gray-100 flex flex-col gap-5">
-              <Button asChild variant="outline" className="w-full font-bold py-7 text-xl rounded-2xl border-2 bg-transparent" style={{ borderColor: settings.global.secondaryColor, color: settings.global.secondaryColor }}>
-                <Link to="/admin/login" onClick={() => setIsMenuOpen(false)}>
-                  Dashboard
-                </Link>
-              </Button>
-            </div>
           </nav>
         </div>
       )}
