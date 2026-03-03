@@ -2,7 +2,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Check, X, ArrowRight, Star, ChevronLeft, ChevronRight, Info, Sparkles, Zap, Trophy, Crown, Camera, Video, Layout, Box, Users, Clock, DollarSign, Palette, Rocket } from "lucide-react";
+import { Check, X, ArrowRight, Star, ChevronLeft, ChevronRight, Info, Sparkles, Zap, Trophy, Crown, Camera, Video, Layout, Box, Users, Clock, DollarSign, Palette, Rocket, Mic } from "lucide-react";
 import { useState, useRef } from "react";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 
@@ -41,11 +41,11 @@ export default function Pricing() {
         text: "Photos, Twilight Render and Snap Reel by 7PM with Basic Edits, premium edits upgrades next day"
       },
       features: [
-        "30 Images",
-        "The 'Snap' Reel (15s)",
-        "Trending Audio",
-        "Pre-Launch Delivery Packet",
-        "1 Iconic Twilight Render"
+        { text: "30 Images" },
+        { text: "The 'Snap' Reel (15s)" },
+        { text: "Trending Audio" },
+        { text: "Pre-Launch Delivery Packet" },
+        { text: "1 Iconic Twilight Render" }
       ]
     },
     {
@@ -64,13 +64,13 @@ export default function Pricing() {
         text: "Photos, Aerials, Twilight Renders by 7PM with Basic Edits - Reel, premium edits and 2D Floorplan Next Day"
       },
       features: [
-        "50 Images",
-        "5 Aerials",
-        "The 'Snap' Reel (15s)",
-        "1 'Iconic' 3D Animated Reel (60s Vert)",
-        "2D Floorplan",
-        "Pre-Launch Delivery Packet",
-        "2 Iconic Twilight Renders"
+        { text: "50 Images" },
+        { text: "5 Aerials" },
+        { text: "The 'Snap' Reel (15s)" },
+        { text: "1 'Iconic' 3D Animated Reel (60s Vert)" },
+        { text: "2D Floorplan" },
+        { text: "Pre-Launch Delivery Packet" },
+        { text: "2 Iconic Twilight Renders" }
       ]
     },
     {
@@ -88,37 +88,42 @@ export default function Pricing() {
         text: "Photos, Aerials, Twilight Renders Same day (Basic Edits) Premium Edits, Video, Reel Next Day"
       },
       features: [
-        "Full Images",
-        "Full Aerials",
-        "The 'Snap' Reel (15s)",
-        "1 'Iconic' 3D Animated Reel (60s Vert)",
-        "90s 4K Cinematic Property Video (with Aerial)",
-        "Pre-Launch Delivery Packet",
-        "5 Iconic Twilight Renders",
-        "Agent On Camera Intro/Outro",
-        "3D Motion Graphics and Animations"
+        { text: "Full Images" },
+        { text: "Full Aerials" },
+        { text: "The 'Snap' Reel (15s)" },
+        { text: "1 'Iconic' 3D Animated Reel (60s Vert)" },
+        { text: "90s 4K Cinematic Property Video (with Aerial)" },
+        { text: "Pre-Launch Delivery Packet" },
+        { text: "5 Iconic Twilight Renders" },
+        { text: "Agent On Camera Intro/Outro" },
+        { text: "3D Motion Graphics and Animations" }
       ]
     },
     {
       name: "THE MARKET LEADER",
-      tagline: "The Full-Scale Production.",
+      tagline: "(The Total Takeover)",
+      subheadline: "Your Full-Cycle Media Partner",
       price: "1599",
       period: "per listing",
-      description: "Dominate the market with complete media saturation.",
+      description: "This isn't just a shoot; it’s a market saturation strategy. We handle the narrative from the first \"Coming Soon\" teaser to the final \"Sold\" success story, ensuring you stay top-of-mind at every stage of the deal.",
       icon: <Box className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
-      badge: "Only 4 slots left in your zip code",
-      buttonText: "Secure My Zip Code",
-      ctaSubtext: "Your reel is ready before the sign is up.",
+      badge: "VIP PRIORITY ACCESS",
+      isVIP: true,
+      buttonText: "Order VIP Access",
+      ctaSubtext: "Full Campaign Delivery: 24-36 Hours",
       tooltip: "For top producers who want to own their local market and provide unmatched seller value.",
       features: [
-        "The Full Media Suite (Max Possible Assets)",
-        "Max AI Twilight Renders",
-        "90s Cinematic Property Film (4K)",
-        "The 'Iconic' Animated Reel (60s Vertical)",
-        "3D Motion Graphics & Spatial Effects",
-        "Spatial VR / Matterport (Vision Pro Ready)",
-        "2D Floorplan",
-        "Post-Sale Marketing: 'Success Story' Interview"
+        { text: "Full Images (Next-Day)" },
+        { text: "Full Aerials (Same-Day by 7PM)", icon: "zap" },
+        { text: "The 'Snap' Reel (15s) (Same-Day by 7PM)", icon: "zap" },
+        { text: "1 'Iconic' Animated Reel (60s Vert) (Next-Day)", icon: "video" },
+        { text: "2D Floorplan (Next-Day)" },
+        { text: "Pre-Launch Delivery Packet (Same-Day by 7PM)", icon: "zap" },
+        { text: "5 Iconic Twilight Renders (Same-Day by 7PM)", icon: "zap" },
+        { text: "90s 4K Cinematic Video (with Aerial, Agent Intro/Outro, 3D Animations & Motion Graphics) (Next-Day)", icon: "video" },
+        { text: "VR / Matterport (Vision Pro Ready) & 2D Floorplan (Next-Day)" },
+        { text: "The Iconic Finish - Complimentary Premium Editing" },
+        { text: "Post-Sale Marketing Package (Scheduled)", icon: "mic" }
       ]
     }
   ];
@@ -431,32 +436,39 @@ export default function Pricing() {
               {listingTiers.map((tier, i) => (
                 <div
                   key={i}
-                  className={`relative group bg-white rounded-[2rem] p-8 border transition-all duration-500 flex flex-col ${
-                    tier.isPopular ? 'shadow-2xl scale-105 z-10' : 'border-gray-100 hover:shadow-xl'
+                  className={`relative group rounded-[2rem] p-8 border transition-all duration-500 flex flex-col ${
+                    tier.isVIP
+                      ? 'bg-[#1a1a1a] border-teal-900/50 shadow-2xl scale-105 z-10'
+                      : tier.isPopular ? 'bg-white shadow-2xl scale-105 z-10' : 'bg-white border-gray-100 hover:shadow-xl'
                   }`}
-                  style={{ borderColor: tier.isPopular ? settings.global.primaryColor : undefined }}
+                  style={{ borderColor: tier.isVIP ? settings.global.primaryColor : tier.isPopular ? settings.global.primaryColor : undefined }}
                 >
                   {tier.badge && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-red-500 text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest whitespace-nowrap shadow-lg">
+                    <div className={`absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest whitespace-nowrap shadow-lg ${
+                      tier.isVIP ? 'bg-[#FFD700] text-black' : 'bg-red-500 text-white'
+                    }`}>
                       {tier.badge}
                     </div>
                   )}
 
                   <div className="mb-6 flex items-center justify-between">
-                    <div className="p-3 bg-[#f0fdfa] rounded-2xl">
+                    <div className={`p-3 rounded-2xl ${tier.isVIP ? 'bg-teal-950/50' : 'bg-[#f0fdfa]'}`}>
                       {tier.icon}
                     </div>
                   </div>
 
-                  <h3 className="text-xl font-black text-black mb-1">{tier.name}</h3>
-                  <p className="font-bold text-xs uppercase tracking-wider mb-6" style={{ color: settings.global.primaryColor }}>{tier.tagline}</p>
+                  <h3 className={`text-xl font-black mb-1 ${tier.isVIP ? 'text-white' : 'text-black'}`}>{tier.name}</h3>
+                  <p className="font-bold text-xs uppercase tracking-wider mb-2" style={{ color: settings.global.primaryColor }}>{tier.tagline}</p>
+                  {tier.subheadline && (
+                    <p className={`text-[10px] font-bold uppercase tracking-tight mb-6 ${tier.isVIP ? 'text-teal-400' : 'text-gray-400'}`}>{tier.subheadline}</p>
+                  )}
 
                   <div className="mb-6 flex items-baseline gap-1">
-                    <span className="text-4xl font-black text-black">${tier.price}</span>
+                    <span className={`text-4xl font-black ${tier.isVIP ? 'text-white' : 'text-black'}`}>${tier.price}</span>
                     <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">{tier.period}</span>
                   </div>
 
-                  <p className="text-xs text-gray-500 leading-relaxed mb-8 min-h-[48px]">
+                  <p className={`text-xs leading-relaxed mb-8 min-h-[48px] ${tier.isVIP ? 'text-gray-400' : 'text-gray-500'}`}>
                     {tier.description}
                   </p>
 
@@ -464,9 +476,17 @@ export default function Pricing() {
                     {tier.features.map((feature, j) => (
                       <div key={j} className="flex items-start gap-3">
                         <div className="mt-1 shrink-0">
-                          <Check className="w-3.5 h-3.5 stroke-[3]" style={{ color: settings.global.primaryColor }} />
+                          {feature.icon === "zap" ? (
+                            <Zap className="w-3.5 h-3.5 fill-current" style={{ color: settings.global.primaryColor }} />
+                          ) : feature.icon === "video" ? (
+                            <Video className="w-3.5 h-3.5" style={{ color: settings.global.primaryColor }} />
+                          ) : feature.icon === "mic" ? (
+                            <Mic className="w-3.5 h-3.5" style={{ color: settings.global.primaryColor }} />
+                          ) : (
+                            <Check className="w-3.5 h-3.5 stroke-[3]" style={{ color: settings.global.primaryColor }} />
+                          )}
                       </div>
-                      <span className="text-sm font-medium text-gray-600 leading-tight">{feature}</span>
+                      <span className={`text-sm font-medium leading-tight ${tier.isVIP ? 'text-gray-300' : 'text-gray-600'}`}>{feature.text}</span>
                     </div>
                     ))}
                   </div>
@@ -474,13 +494,13 @@ export default function Pricing() {
                   <div className="mt-auto space-y-4">
                     {tier.disclaimer && (
                       <div className="text-center mb-2 px-2">
-                        <p className="text-[11px] font-bold text-black uppercase tracking-tight leading-none mb-1">{tier.disclaimer.title}</p>
+                        <p className={`text-[11px] font-bold uppercase tracking-tight leading-none mb-1 ${tier.isVIP ? 'text-teal-400' : 'text-black'}`}>{tier.disclaimer.title}</p>
                         <p className="text-[9px] text-gray-500 leading-tight italic">{tier.disclaimer.text}</p>
                       </div>
                     )}
                     <Button asChild className={`w-full py-6 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] ${
-                      tier.isPopular ? 'text-white shadow-lg' : 'bg-black hover:bg-gray-800 text-white shadow-lg'
-                    }`} style={{ backgroundColor: tier.isPopular ? settings.global.primaryColor : undefined }}>
+                      tier.isVIP ? 'bg-white text-black hover:bg-gray-100' : tier.isPopular ? 'text-white shadow-lg' : 'bg-black hover:bg-gray-800 text-white shadow-lg'
+                    }`} style={{ backgroundColor: tier.isVIP ? undefined : tier.isPopular ? settings.global.primaryColor : undefined }}>
                       <Link to={`/book?package=${tier.name === 'THE ESSENTIALS' ? 'essentials' : tier.name === 'THE SHOWCASE' ? 'showcase' : tier.name === 'THE LEGACY' ? 'legacy' : 'market-leader'}`}>
                         {tier.buttonText}
                       </Link>
