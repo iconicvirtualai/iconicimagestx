@@ -15,6 +15,18 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Check, Mail, Phone, MapPin, Maximize, Calendar as CalendarIcon,
   ArrowRight, ArrowLeft, Sparkles, Wand2, Clock, ChevronDown,
   ChevronUp, Zap, Video, Camera, Star, Info, MessageSquare,
@@ -482,6 +494,7 @@ export default function BookingForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [selectedDetailItem, setSelectedDetailItem] = useState<any>(null);
+  const [showIconicPopup, setShowIconicPopup] = useState(false);
 
   const [expandedCategories, setExpandedCategories] = useState<string[]>(["listings", "business"]);
   const [showBasics, setShowBasics] = useState(false);
@@ -634,7 +647,22 @@ export default function BookingForm() {
       toast.error("Please select a Campaign Tier or Basics package");
       return;
     }
-    
+
+    // Check if we should show the Iconic Finish popup
+    if (step === 1) {
+      const selectedService = services.find(s => s.id === formData.selectedService);
+      const isListing = selectedService?.category === "listings";
+      const isMarketLeader = formData.selectedService === "listing-market-leader";
+      const isBasics = formData.selectedBasics.length > 0;
+
+      if ((isListing && !isMarketLeader) || isBasics) {
+        if (!formData.premiumUpgrade) {
+          setShowIconicPopup(true);
+          return;
+        }
+      }
+    }
+
     if (typeof step === 'number' && step < 5) {
       setStep((step + 1) as Step);
     }
@@ -903,19 +931,22 @@ export default function BookingForm() {
 
       case 2:
         return (
-          <motion.div 
-            initial={{ opacity: 0, x: 20 }} 
-            animate={{ opacity: 1, x: 0 }} 
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
             className="space-y-10"
           >
             {/* Iconic Upgrade Section */}
-            {selectedServiceData && selectedServiceData.id !== "listing-market-leader" && (
+            {((selectedServiceData && selectedServiceData.id !== "listing-market-leader") || formData.selectedBasics.length > 0) && (
               <div className="bg-black rounded-[2rem] p-8 text-white relative overflow-hidden">
                  <div className="absolute top-0 right-0 p-8 opacity-10">
                     <Sparkles className="w-24 h-24" />
                  </div>
                  <div className="relative z-10 space-y-4">
-                    <h2 className="text-xl font-black uppercase tracking-tight">✨ Level up to the "Iconic" Finish? (Next Day Delivery)</h2>
+                    <div className="flex items-center gap-3">
+                      <Sparkles className="w-5 h-5 text-teal-400" />
+                      <h2 className="text-xl font-black uppercase tracking-tight">Make it "Magazine Ready"</h2>
+                    </div>
                     <div
                       onClick={togglePremium}
                       className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex items-center gap-4 ${formData.premiumUpgrade ? 'border-teal-400 bg-teal-900/20' : 'border-gray-800 bg-gray-900/50 hover:border-gray-600'}`}
@@ -929,7 +960,7 @@ export default function BookingForm() {
                            <span className="text-sm font-black text-teal-400">+$65</span>
                         </div>
                         <p className="text-[10px] text-gray-400 leading-relaxed">
-                          Includes full digital curb appeal, grass, fire, tvs, clean driveways, and more.
+                          The ultimate digital polish. Remove dirt, debris, reflections, and add flawless landscaping.
                         </p>
                       </div>
                     </div>
@@ -1114,65 +1145,93 @@ export default function BookingForm() {
 
       case 4:
         return (
-          <motion.div 
-            initial={{ opacity: 0, x: 20 }} 
-            animate={{ opacity: 1, x: 0 }} 
-            className="space-y-10"
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="space-y-12"
           >
-             <div className="text-center space-y-1.5">
-               <h3 className="text-2xl font-black uppercase text-black tracking-tight">Scheduling</h3>
-               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Reserve your iconic launch date (CST Timezone)</p>
+             <div className="text-center space-y-2">
+               <h3 className="text-3xl font-black uppercase text-black tracking-tight">Scheduling</h3>
+               <p className="text-[11px] text-gray-400 font-bold uppercase tracking-[0.2em]">Reserve your iconic launch date (CST Timezone)</p>
             </div>
 
-            <div className="space-y-10">
-               <div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-xl overflow-hidden w-full max-w-2xl mx-auto">
-                  <Calendar
-                    mode="single"
-                    numberOfMonths={1}
-                    weekStartsOn={1}
-                    selected={formData.serviceDate}
-                    onSelect={(date) => updateFormData({ serviceDate: date })}
-                    className="w-full"
-                    disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))}
-                  />
+            <div className="max-w-xl mx-auto space-y-8">
+               {/* Date Picker Dropdown */}
+               <div className="space-y-4">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2 px-1">
+                    <CalendarIcon className="w-3.5 h-3.5" /> 1. Select Your Date
+                  </label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={`w-full h-16 rounded-[1.25rem] border-2 px-6 justify-between text-left font-black transition-all group ${
+                          formData.serviceDate ? 'border-black text-black' : 'border-gray-100 text-gray-400 hover:border-gray-200'
+                        }`}
+                      >
+                        <span className="flex items-center gap-3">
+                           {formData.serviceDate ? format(formData.serviceDate, "PPP") : "Choose a date..."}
+                        </span>
+                        <ChevronDown className={`w-5 h-5 transition-transform duration-300 group-data-[state=open]:rotate-180`} />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 rounded-[2rem] border-none shadow-2xl overflow-hidden" align="center">
+                      <Calendar
+                        mode="single"
+                        numberOfMonths={1}
+                        weekStartsOn={1}
+                        selected={formData.serviceDate}
+                        onSelect={(date) => updateFormData({ serviceDate: date })}
+                        disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))}
+                        className="p-4"
+                      />
+                    </PopoverContent>
+                  </Popover>
                </div>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                      <Clock className="w-3 h-3" /> Preferred Time (CST)
+
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Time Picker Dropdown */}
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2 px-1">
+                      <Clock className="w-3.5 h-3.5" /> 2. Preferred Time
                     </label>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {["9:00 AM", "11:00 AM", "1:00 PM", "3:00 PM", "5:00 PM"].map((t) => (
-                        <button
-                          key={t}
-                          onClick={() => updateFormData({ serviceTime: t })}
-                          className={`py-3 rounded-lg text-xs font-black border-2 transition-all ${
-                            formData.serviceTime === t ? 'border-black bg-black text-white' : 'border-gray-50 bg-white text-gray-400'
-                          }`}
-                        >
-                          {t}
-                        </button>
-                      ))}
-                    </div>
+                    <Select
+                      value={formData.serviceTime}
+                      onValueChange={(val) => updateFormData({ serviceTime: val })}
+                    >
+                      <SelectTrigger className="h-16 rounded-[1.25rem] border-2 px-6 font-black text-black border-black bg-white focus:ring-0">
+                        <SelectValue placeholder="Select Time" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl border-none shadow-2xl p-2">
+                        {["9:00 AM", "11:00 AM", "1:00 PM", "3:00 PM", "5:00 PM"].map((t) => (
+                          <SelectItem key={t} value={t} className="rounded-xl py-3 font-bold cursor-pointer focus:bg-gray-50">
+                            {t}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                      <Users className="w-3 h-3" /> Preferred Photographer
+
+                  {/* Photographer Dropdown */}
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2 px-1">
+                      <Users className="w-3.5 h-3.5" /> 3. Photographer
                     </label>
-                    <div className="space-y-1.5">
-                      {photographers.map((p) => (
-                        <button
-                          key={p}
-                          onClick={() => updateFormData({ preferredPhotographer: p })}
-                          className={`w-full p-3 rounded-lg text-[10px] font-bold text-left border-2 transition-all flex items-center justify-between ${
-                            formData.preferredPhotographer === p ? 'border-black bg-gray-50' : 'border-gray-50 bg-white'
-                          }`}
-                        >
-                          {p}
-                          {formData.preferredPhotographer === p && <Check className="w-3.5 h-3.5" />}
-                        </button>
-                      ))}
-                    </div>
+                    <Select
+                      value={formData.preferredPhotographer}
+                      onValueChange={(val) => updateFormData({ preferredPhotographer: val })}
+                    >
+                      <SelectTrigger className="h-16 rounded-[1.25rem] border-2 px-6 font-black text-black border-black bg-white focus:ring-0">
+                        <SelectValue placeholder="Select Photographer" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl border-none shadow-2xl p-2">
+                        {photographers.map((p) => (
+                          <SelectItem key={p} value={p} className="rounded-xl py-3 font-bold cursor-pointer focus:bg-gray-50">
+                            {p}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                </div>
             </div>
@@ -1424,6 +1483,70 @@ export default function BookingForm() {
         </div>
       </div>
       <ChatWidget isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+
+      {/* Iconic Upgrade Popup */}
+      <Dialog open={showIconicPopup} onOpenChange={setShowIconicPopup}>
+        <DialogContent className="max-w-xl rounded-[2.5rem] p-0 overflow-hidden border-none bg-white shadow-2xl">
+          <div className="bg-black p-10 text-white relative overflow-hidden">
+             <div className="absolute top-0 right-0 p-10 opacity-10">
+                <Sparkles className="w-32 h-32" />
+             </div>
+             <div className="relative z-10 text-center space-y-4">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-400/20 text-teal-400 text-[10px] font-black uppercase tracking-widest border border-teal-400/30">
+                  <Sparkles className="w-3 h-3" /> Limited Time Opportunity
+                </div>
+                <h2 className="text-4xl font-black uppercase tracking-tight leading-none">Make it <br />"Magazine Ready"</h2>
+                <p className="text-gray-400 text-sm font-medium max-w-xs mx-auto">
+                  The ultimate digital polish for your listing. We touch up every detail to ensure it stands out.
+                </p>
+             </div>
+          </div>
+          <div className="p-10 space-y-8">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[
+                  "Remove Dirt & Debris",
+                  "Remove Reflections",
+                  "Clear Cords & Lines",
+                  "Clean Driveways",
+                  "Lush Green Grass",
+                  "Sky Replacement",
+                  "Digital Staging Lite",
+                  "Night/Twilight Renders"
+                ].map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-3">
+                    <div className="w-5 h-5 rounded-full bg-teal-50 flex items-center justify-center">
+                       <Check className="w-3 h-3 text-teal-500 stroke-[3]" />
+                    </div>
+                    <span className="text-[11px] font-bold text-gray-700">{item}</span>
+                  </div>
+                ))}
+             </div>
+
+             <div className="flex flex-col gap-3">
+                <Button
+                  onClick={() => {
+                    updateFormData({ premiumUpgrade: true });
+                    setShowIconicPopup(false);
+                    setStep(2);
+                  }}
+                  className="bg-black hover:bg-gray-800 text-white font-black py-8 text-sm rounded-2xl transition-all shadow-xl group"
+                >
+                   UPGRADE TO ICONIC FINISH (+$65)
+                   <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                </Button>
+                <button
+                  onClick={() => {
+                    setShowIconicPopup(false);
+                    setStep(2);
+                  }}
+                  className="py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors"
+                >
+                   No thanks, I'll stick with basics
+                </button>
+             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Detail Pop-out Modal */}
       <Dialog open={!!selectedDetailItem} onOpenChange={(open) => !open && setSelectedDetailItem(null)}>
