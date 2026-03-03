@@ -147,7 +147,7 @@ export default function Pricing() {
         { text: "5 Iconic Twilight Renders (Same-Day by 7PM)", icon: "zap" },
         { text: "90s 4K Cinematic Video (with Aerial, Agent Intro/Outro, 3D Animations & Motion Graphics) (Next-Day)", icon: "video" },
         { text: "VR / Matterport (Vision Pro Ready) & 2D Floorplan (Next-Day)" },
-        { text: "The Iconic Finish - Complimentary Premium Editing" },
+        { text: "The Iconic Finish - Complimentary Premium Editing (Next Day Delivery)" },
         { text: "Post-Sale Marketing Package (Scheduled)", icon: "mic" }
       ]
     }
@@ -283,7 +283,7 @@ export default function Pricing() {
         "Unlimited Reel Production",
         "2 Monthly Professional Field Shoots",
         "Full CRM & Lead Automation Integration",
-        "The Iconic Polish: All Premium Editing Included"
+        "The Iconic Polish: All Premium Editing Included (Next Day Delivery)"
       ],
       buttonText: "PARTNER WITH ICONIC"
     },
@@ -672,11 +672,11 @@ export default function Pricing() {
                         <div className="relative z-10">
                           <div className="flex flex-col mb-6">
                             <div className="flex items-center justify-between mb-2">
-                              <h4 className="font-black text-xs uppercase tracking-widest" style={{ color: settings.global.primaryColor }}>THE ICONIC POLISH $65</h4>
+                              <h4 className="font-black text-xs uppercase tracking-widest" style={{ color: settings.global.primaryColor }}>THE ICONIC POLISH $65 (Next Day Delivery)</h4>
                               <span className="text-2xl font-black text-white">$65</span>
                             </div>
-                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">(Premium Upgrade)</p>
-                            <p className="text-[11px] font-bold text-gray-100 mt-2">Standard on Market Leader | $65 Add-on for all other packages</p>
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">(Premium Upgrade) (Next Day Delivery)</p>
+                            <p className="text-[11px] font-bold text-gray-100 mt-2">Standard on Market Leader | $65 Add-on for all other packages (Next Day Delivery)</p>
                           </div>
                           <div className="grid grid-cols-1 gap-3">
                             {[
@@ -698,7 +698,7 @@ export default function Pricing() {
                             ))}
                           </div>
                           <Button asChild className="w-full mt-8 text-white font-black py-6 rounded-xl transition-all shadow-lg shadow-teal-900/20 bg-[#0d9488] hover:bg-[#0f766e]">
-                            <Link to={getBasicsBookingUrl(true)}>UPGRADE MY EDITS</Link>
+                            <Link to={getBasicsBookingUrl(true)}>UPGRADE MY EDITS (Next Day Delivery)</Link>
                           </Button>
                         </div>
                       </div>

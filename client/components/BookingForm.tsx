@@ -59,12 +59,6 @@ const basicsList = [
   { id: "photos-20", name: "20 Photos", price: 99 },
   { id: "photos-35", name: "35 Photos", price: 150 },
   { id: "photos-50", name: "50 Photos", price: 200 },
-  { id: "aerial-addon-b", name: "Aerial Add-On", price: 99 },
-  { id: "reel-addon-b", name: "Reel Add-On", price: 125 },
-  { id: "video-addon-b", name: "Video Add-On", price: 350 },
-  { id: "matterport-b", name: "3D Matterport", price: 200 },
-  { id: "floorplan-addon-b", name: "2D Floorplan Add-On", price: 99 },
-  { id: "amenity-addon-b", name: "Amenity Add-On", price: 50 },
 ];
 
 const addOns = [
@@ -109,7 +103,7 @@ export default function BookingForm() {
     address: "",
     sqft: "",
     serviceDate: undefined as Date | undefined,
-    serviceTime: "09:00",
+    serviceTime: "9:00 AM",
     preferredPhotographer: "Available (Auto-Assign)",
     selectedService: "" as string,
     selectedBasics: [] as string[],
@@ -278,7 +272,7 @@ export default function BookingForm() {
         )}
         {formData.premiumUpgrade && (
           <div className="flex justify-between items-center text-[11px]">
-            <span className="text-gray-500 italic">✨ Iconic Finish (Premium)</span>
+            <span className="text-gray-500 italic">✨ Iconic Finish (Premium) (Next Day Delivery)</span>
             <span className="font-bold text-black">$65</span>
           </div>
         )}
@@ -297,6 +291,12 @@ export default function BookingForm() {
                  </div>
                ) : null;
              })}
+          </div>
+        )}
+        {formData.serviceDate && (
+          <div className="pt-2 mt-2 border-t border-gray-100 flex justify-between items-center text-[11px]">
+             <span className="text-gray-500 italic flex items-center gap-1.5"><CalendarIcon className="w-3 h-3" /> {format(formData.serviceDate, "PPP")}</span>
+             <span className="font-bold text-black">{formData.serviceTime}</span>
           </div>
         )}
       </div>
@@ -440,20 +440,20 @@ export default function BookingForm() {
                 ))
               ) : (
                 // Basics View
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                    {basicsList.map((b) => (
                      <button
                       key={b.id}
                       onClick={() => toggleBasic(b.id)}
-                      className={`p-4 rounded-2xl border-2 transition-all text-left flex justify-between items-center bg-white ${
+                      className={`p-6 rounded-2xl border-2 transition-all text-left flex justify-between items-center bg-white ${
                         formData.selectedBasics.includes(b.id) ? 'border-black bg-white scale-[1.01] shadow-lg' : 'border-gray-100 bg-white hover:border-gray-200'
                       }`}
                      >
                        <div className="space-y-0.5">
-                          <h4 className="font-black text-black uppercase text-[11px]">{b.name}</h4>
+                          <h4 className="font-black text-black uppercase text-sm">{b.name}</h4>
                        </div>
                        <div className="flex items-center gap-3">
-                          <span className="text-xs font-black text-black">${b.price}</span>
+                          <span className="text-sm font-black text-black">${b.price}</span>
                           {formData.selectedBasics.includes(b.id) && (
                             <div className="w-5 h-5 rounded-full bg-black flex items-center justify-center">
                               <Check className="w-2.5 h-2.5 text-white stroke-[4]" />
@@ -482,7 +482,7 @@ export default function BookingForm() {
                     <Sparkles className="w-24 h-24" />
                  </div>
                  <div className="relative z-10 space-y-4">
-                    <h2 className="text-xl font-black uppercase tracking-tight">✨ Level up to the "Iconic" Finish?</h2>
+                    <h2 className="text-xl font-black uppercase tracking-tight">✨ Level up to the "Iconic" Finish? (Next Day Delivery)</h2>
                     <div 
                       onClick={() => updateFormData({ premiumUpgrade: !formData.premiumUpgrade })}
                       className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex items-center gap-4 ${formData.premiumUpgrade ? 'border-teal-400 bg-teal-900/20' : 'border-gray-800 bg-gray-900/50 hover:border-gray-600'}`}
@@ -492,7 +492,7 @@ export default function BookingForm() {
                       </div>
                       <div className="flex-1">
                         <div className="flex justify-between items-center mb-0.5">
-                           <span className="text-[13px] font-black uppercase tracking-widest">Yes, Add Premium Editing</span>
+                           <span className="text-[13px] font-black uppercase tracking-widest">Yes, Add Premium Editing (Next Day Delivery)</span>
                            <span className="text-sm font-black text-teal-400">+$65</span>
                         </div>
                         <p className="text-[10px] text-gray-400 leading-relaxed">
@@ -707,7 +707,7 @@ export default function BookingForm() {
                       <Clock className="w-3 h-3" /> Preferred Time (CST)
                     </label>
                     <div className="grid grid-cols-3 gap-1.5">
-                      {["09:00", "11:00", "13:00", "15:00", "17:00"].map((t) => (
+                      {["9:00 AM", "11:00 AM", "1:00 PM", "3:00 PM", "5:00 PM"].map((t) => (
                         <button
                           key={t}
                           onClick={() => updateFormData({ serviceTime: t })}
