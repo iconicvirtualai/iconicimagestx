@@ -8,9 +8,29 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 export default function Pricing() {
   const settings = useSiteSettings();
-  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
-  const [brandingSliderPos, setBrandingSliderPos] = useState(50);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [selectedPhotoPkg, setSelectedPhotoPkg] = useState<string | null>(null);
+  const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
+  const [isPremiumUpgrade, setIsPremiumUpgrade] = useState(false);
+
+  const toggleAddOn = (addon: string) => {
+    setSelectedAddOns(prev =>
+      prev.includes(addon) ? prev.filter(a => a !== addon) : [...prev, addon]
+    );
+  };
+
+  const getBasicsBookingUrl = (premium = false) => {
+    const items = [
+      selectedPhotoPkg,
+      ...selectedAddOns
+    ].filter(Boolean);
+
+    if (items.length === 0) return "/book";
+
+    const params = new URLSearchParams();
+    params.set("items", items.join(","));
+    if (premium) params.set("premium", "true");
+    return `/book?${params.toString()}`;
+  };
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -45,7 +65,8 @@ export default function Pricing() {
         { text: "The 'Snap' Reel (15s)" },
         { text: "Trending Audio" },
         { text: "Pre-Launch Delivery Packet" },
-        { text: "1 Iconic Twilight Render" }
+        { text: "1 Iconic Twilight Render" },
+        { text: "Same Day Delivery*", emphasized: true }
       ]
     },
     {
@@ -70,7 +91,8 @@ export default function Pricing() {
         { text: "1 'Iconic' 3D Animated Reel (60s Vert)" },
         { text: "2D Floorplan" },
         { text: "Pre-Launch Delivery Packet" },
-        { text: "2 Iconic Twilight Renders" }
+        { text: "2 Iconic Twilight Renders" },
+        { text: "Same Day Delivery*", emphasized: true }
       ]
     },
     {
@@ -96,7 +118,8 @@ export default function Pricing() {
         { text: "Pre-Launch Delivery Packet" },
         { text: "5 Iconic Twilight Renders" },
         { text: "Agent On Camera Intro/Outro" },
-        { text: "3D Motion Graphics and Animations" }
+        { text: "3D Motion Graphics and Animations" },
+        { text: "Same Day Delivery*", emphasized: true }
       ]
     },
     {
@@ -496,12 +519,15 @@ export default function Pricing() {
                             <Check className="w-3.5 h-3.5 stroke-[3]" style={{ color: tier.isVIP ? '#ffffff' : settings.global.primaryColor }} />
                           )}
                       </div>
-                      <span className={`text-sm font-medium leading-tight ${tier.isVIP ? 'text-gray-300' : 'text-gray-600'}`}>{feature.text}</span>
+                      <span className={`text-sm font-medium leading-tight ${tier.isVIP ? 'text-gray-300' : 'text-gray-600'} ${feature.emphasized ? 'font-black' : ''}`} style={{ color: feature.emphasized ? settings.global.primaryColor : undefined }}>{feature.text}</span>
                     </div>
                     ))}
                   </div>
 
                   <div className="mt-auto space-y-4">
+                    {!tier.isVIP && (
+                      <p className="text-[10px] text-gray-400 font-bold italic text-center">* Same Day Delivery by 7PM (Snap Reel & Photos Only)</p>
+                    )}
                     {tier.disclaimer && (
                       <div className="text-center mb-2 px-2">
                         <p className={`text-[11px] font-bold uppercase tracking-tight leading-none mb-1 ${tier.isVIP ? 'text-white' : 'text-black'}`}>{tier.disclaimer.title}</p>
@@ -511,7 +537,7 @@ export default function Pricing() {
                     <Button asChild className={`w-full py-6 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] ${
                       tier.isVIP ? 'bg-white text-black hover:bg-gray-100 border-2 border-[#FFD700]' : tier.isPopular ? 'text-white shadow-lg' : 'bg-black hover:bg-gray-800 text-white shadow-lg'
                     }`} style={{ backgroundColor: tier.isVIP ? undefined : tier.isPopular ? settings.global.primaryColor : undefined }}>
-                      <Link to={`/book?package=${tier.name === 'THE ESSENTIALS' ? 'essentials' : tier.name === 'THE SHOWCASE' ? 'showcase' : tier.name === 'THE LEGACY' ? 'legacy' : 'market-leader'}`}>
+                      <Link to={`/book?service=${tier.name === 'THE ESSENTIALS' ? 'listing-essentials' : tier.name === 'THE SHOWCASE' ? 'listing-showcase' : tier.name === 'THE LEGACY' ? 'listing-legacy' : 'listing-market-leader'}`}>
                         {tier.buttonText}
                       </Link>
                     </Button>
@@ -557,11 +583,19 @@ export default function Pricing() {
                       <h4 className="font-black text-xs uppercase tracking-widest mb-6" style={{ color: settings.global.primaryColor }}>Photo Packages</h4>
                       <div className="space-y-4">
                         {[
-                          { label: "20 Photos", price: "99" },
-                          { label: "35 Photos", price: "150" },
-                          { label: "50 Photos", price: "200" }
-                        ].map((pkg, idx) => (
-                          <div key={idx} className="flex items-center justify-between p-4 bg-white rounded-xl border border-gray-100 shadow-sm">
+                          { label: "20 Photos", price: "99", id: "photos-20" },
+                          { label: "35 Photos", price: "150", id: "photos-35" },
+                          { label: "50 Photos", price: "200", id: "photos-50" }
+                        ].map((pkg) => (
+                          <div
+                            key={pkg.id}
+                            onClick={() => setSelectedPhotoPkg(selectedPhotoPkg === pkg.id ? null : pkg.id)}
+                            className="flex items-center justify-between p-4 bg-white rounded-xl border transition-all cursor-pointer hover:shadow-md"
+                            style={{
+                              borderColor: selectedPhotoPkg === pkg.id ? settings.global.primaryColor : '#f3f4f6',
+                              backgroundColor: selectedPhotoPkg === pkg.id ? `${settings.global.primaryColor}05` : 'white'
+                            }}
+                          >
                             <span className="font-bold text-gray-700">{pkg.label}</span>
                             <span className="text-xl font-black text-black">${pkg.price}</span>
                           </div>
@@ -601,19 +635,30 @@ export default function Pricing() {
                       </div>
                       <div className="space-y-4">
                         {[
-                          { label: "Aerial Add-On", price: "99" },
-                          { label: "Reel Add-On", price: "125" },
-                          { label: "Video Add-On", price: "350-500+" },
-                          { label: "3D Matterport", price: "200+" },
-                          { label: "2D Floorplan Add-On", price: "99" },
-                          { label: "Amenity Add-On", price: "50" }
-                        ].map((addon, idx) => (
-                          <div key={idx} className="flex items-center justify-between p-4 bg-white/50 rounded-xl border border-gray-100">
+                          { label: "Aerial Add-On", price: "99", id: "aerial-addon" },
+                          { label: "Reel Add-On", price: "125", id: "reel-addon" },
+                          { label: "Video Add-On", price: "350-500+", id: "video-addon" },
+                          { label: "3D Matterport", price: "200+", id: "matterport" },
+                          { label: "2D Floorplan Add-On", price: "99", id: "floorplan-addon" },
+                          { label: "Amenity Add-On", price: "50", id: "amenity-addon" }
+                        ].map((addon) => (
+                          <div
+                            key={addon.id}
+                            onClick={() => toggleAddOn(addon.id)}
+                            className="flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer hover:shadow-md"
+                            style={{
+                              borderColor: selectedAddOns.includes(addon.id) ? settings.global.primaryColor : '#f3f4f6',
+                              backgroundColor: selectedAddOns.includes(addon.id) ? `${settings.global.primaryColor}05` : 'rgba(255,255,255,0.5)'
+                            }}
+                          >
                             <span className="font-bold text-gray-600 text-sm">{addon.label}</span>
                             <span className="font-black text-black">${addon.price}</span>
                           </div>
                         ))}
                       </div>
+                      <Button asChild className="w-full mt-4 bg-black hover:bg-gray-800 text-white font-bold py-6 rounded-xl transition-all shadow-lg" disabled={!selectedPhotoPkg && selectedAddOns.length === 0}>
+                        <Link to={getBasicsBookingUrl()}>ORDER BASICS</Link>
+                      </Button>
                     </div>
 
                     {/* ICONIC Edits */}
@@ -651,7 +696,7 @@ export default function Pricing() {
                             ))}
                           </div>
                           <Button asChild className="w-full mt-8 text-white font-black py-6 rounded-xl transition-all shadow-lg shadow-teal-900/20 bg-[#0d9488] hover:bg-[#0f766e]">
-                            <Link to="/book">UPGRADE MY EDITS</Link>
+                            <Link to={getBasicsBookingUrl(true)}>UPGRADE MY EDITS</Link>
                           </Button>
                         </div>
                       </div>
@@ -780,7 +825,7 @@ export default function Pricing() {
                     <Button asChild className={`w-full py-6 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] ${
                       tier.isPopular ? 'text-white shadow-lg' : 'bg-black hover:bg-gray-800 text-white shadow-lg'
                     }`} style={{ backgroundColor: tier.isPopular ? settings.global.primaryColor : undefined }}>
-                      <Link to={`/book?package=${tier.name === 'THE REFRESH' ? 'refresh' : tier.name === 'THE CONTENT PARTNER' ? 'content-partner' : tier.name === 'THE LOCAL LEGEND' ? 'local-legend' : ''}`}>
+                      <Link to={`/book?service=${tier.name === 'THE REFRESH' ? 'branding-refresh' : tier.name === 'THE CONTENT PARTNER' ? 'branding-content-partner' : 'branding-local-legend'}`}>
                         {tier.buttonText}
                       </Link>
                     </Button>
@@ -851,7 +896,7 @@ export default function Pricing() {
                       ))}
                     </div>
                     <Button asChild className="w-full py-6 rounded-xl bg-black hover:bg-gray-800 text-white font-bold transition-all shadow-lg">
-                      <Link to={`/book?package=${tier.packageId || ''}`}>
+                      <Link to={`/book?service=${tier.packageId === 'content-starter' ? 'business-baseline' : 'business-growth-engine'}`}>
                         {tier.buttonText}
                       </Link>
                     </Button>
@@ -891,7 +936,7 @@ export default function Pricing() {
                         ))}
                       </div>
                       <Button asChild className={`w-full py-6 rounded-xl font-bold transition-all ${tier.isPopular ? 'text-white' : 'bg-black text-white'}`} style={{ backgroundColor: tier.isPopular ? settings.global.primaryColor : undefined }}>
-                        <Link to="/book">
+                        <Link to={`/book?service=${tier.name === 'THE PROFESSIONAL SUITE' ? 'business-professional-suite' : tier.name === 'THE SIGNATURE TIER' ? 'business-signature-tier' : tier.name === 'THE ICONIC PARTNERSHIP' ? 'business-iconic-partnership' : tier.name === 'THE CONNECTED CORE' ? 'business-connected-core' : 'business-authority-stack'}`}>
                           {tier.buttonText}
                         </Link>
                       </Button>
@@ -918,7 +963,7 @@ export default function Pricing() {
                           ))}
                         </div>
                         <Button asChild className="w-full py-6 rounded-xl bg-black text-white font-bold transition-all">
-                          <Link to="/book">
+                          <Link to={`/book?service=${tier.name === 'THE PROFESSIONAL SUITE' ? 'business-professional-suite' : tier.name === 'THE SIGNATURE TIER' ? 'business-signature-tier' : tier.name === 'THE ICONIC PARTNERSHIP' ? 'business-iconic-partnership' : tier.name === 'THE CONNECTED CORE' ? 'business-connected-core' : 'business-authority-stack'}`}>
                             {tier.buttonText}
                           </Link>
                         </Button>
@@ -980,7 +1025,7 @@ export default function Pricing() {
                   ))}
                 </div>
                 <Button asChild className="w-full py-6 rounded-xl bg-black text-white hover:text-white transition-all" onMouseEnter={(e) => e.currentTarget.style.backgroundColor = settings.global.primaryColor} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'black'}>
-                  <Link to="/book">
+                  <Link to="/book?service=growth-foundation">
                     START MY FOUNDATION →
                   </Link>
                 </Button>
@@ -1008,7 +1053,7 @@ export default function Pricing() {
                   ))}
                 </div>
                 <Button asChild className="w-full py-6 rounded-xl bg-black text-white hover:text-white transition-all" onMouseEnter={(e) => e.currentTarget.style.backgroundColor = settings.global.primaryColor} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'black'}>
-                  <Link to="/book">
+                  <Link to="/book?service=growth-evolution">
                     START MY EVOLUTION →
                   </Link>
                 </Button>
@@ -1029,7 +1074,7 @@ export default function Pricing() {
                     </p>
                   </div>
                   <Button asChild className="text-white font-black px-12 py-8 text-xl rounded-2xl transition-all shadow-xl hover:scale-105 active:scale-95 shrink-0" style={{ backgroundColor: settings.global.primaryColor }}>
-                    <Link to="/book">LET'S CHAT</Link>
+                    <Link to="/book?service=growth-bundle">LET'S CHAT</Link>
                   </Button>
                 </div>
 
