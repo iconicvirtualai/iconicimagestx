@@ -292,10 +292,10 @@ export default function Pricing() {
             </span>
           </div>
           <h1 className="text-4xl md:text-6xl font-bold text-black mb-6 tracking-tight leading-[1.1]">
-            {settings.pricing.title}
+            The Perfect <span style={{ color: settings.global.primaryColor }}>Price</span> for Your Presence
           </h1>
           <p className="text-lg text-gray-500 mb-10 max-w-2xl mx-auto font-medium">
-            {settings.pricing.subtitle}
+            Media that moves as fast as you do.
           </p>
 
           {/* Hyperlink Bubbles */}
@@ -320,16 +320,16 @@ export default function Pricing() {
           </div>
 
           {/* AI Assistant CTA - Smaller */}
-          <div className="mt-8 p-0.5 bg-gradient-to-r from-[#0d9488] via-[#22d3ee] to-[#0d9488] rounded-[2rem] shadow-lg shadow-teal-500/5 max-w-lg mx-auto transform hover:scale-[1.01] transition-transform duration-500">
+          <div className="mt-8 p-px bg-black rounded-[2rem] shadow-lg max-w-lg mx-auto transform hover:scale-[1.01] transition-transform duration-500">
             <Link to="/pricing/ai-assistant" className="block bg-white rounded-[1.9rem] p-6 relative overflow-hidden group">
               <div className="relative z-10 flex items-center gap-6">
                 <div className="w-12 h-12 rounded-[1rem] bg-[#f0fdfa] border border-[#ccfbf1] flex items-center justify-center shrink-0">
                   <Sparkles className="w-6 h-6" style={{ color: settings.global.primaryColor }} />
                 </div>
                 <div className="text-left flex-1">
-                  <h3 className="text-lg font-bold text-black mb-1">Our AI Can Help</h3>
+                  <h3 className="text-lg font-bold text-black mb-1">Not sure where to start?</h3>
                   <div className="flex items-center gap-2 font-bold text-xs" style={{ color: settings.global.primaryColor }}>
-                    Our AI Can Help <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                    Let our AI guide you <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                   </div>
                 </div>
               </div>
@@ -404,7 +404,7 @@ export default function Pricing() {
           <div className="max-w-[1400px] mx-auto px-4">
             <div className="text-center mb-20 max-w-3xl mx-auto">
               <h2 className="text-4xl md:text-5xl font-bold text-black mb-6 tracking-tight">
-                Listing Domination <span className="text-gray-300">(The Property)</span>
+                Listings & Spaces <span className="text-gray-300">(The Property)</span>
               </h2>
               <p className="text-lg text-gray-500 leading-relaxed">
                 Targeting the listing lifecycle: Pre-launch buzz, active sale, and post-close legacy.
