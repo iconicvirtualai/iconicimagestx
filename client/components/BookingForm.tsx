@@ -501,14 +501,6 @@ export default function BookingForm() {
   const [expandedCategories, setExpandedCategories] = useState<string[]>(["listings", "business"]);
   const [showBasics, setShowBasics] = useState(false);
 
-  // Scheduling helpers
-  const currentMonth = formData.serviceDate ? startOfMonth(formData.serviceDate) : startOfMonth(new Date());
-  const months = Array.from({ length: 12 }, (_, i) => addMonths(startOfMonth(new Date()), i));
-  const daysInMonth = eachDayOfInterval({
-    start: startOfMonth(currentMonth),
-    end: endOfMonth(currentMonth)
-  }).filter(date => date >= new Date(new Date().setHours(0,0,0,0)));
-
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -535,6 +527,14 @@ export default function BookingForm() {
     teaserSocialConsult: false,
     socialMarketingPermission: true,
   });
+
+  // Scheduling helpers
+  const currentMonth = formData.serviceDate ? startOfMonth(formData.serviceDate) : startOfMonth(new Date());
+  const months = Array.from({ length: 12 }, (_, i) => addMonths(startOfMonth(new Date()), i));
+  const daysInMonth = eachDayOfInterval({
+    start: startOfMonth(currentMonth),
+    end: endOfMonth(currentMonth)
+  }).filter(date => date >= new Date(new Date().setHours(0,0,0,0)));
 
   // Check for pre-filled service from pricing page
   useEffect(() => {
