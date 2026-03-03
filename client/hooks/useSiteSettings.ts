@@ -6,27 +6,38 @@ export function useSiteSettings() {
 
   useEffect(() => {
     const fetchSettings = async () => {
-      // First try to see if we have them in the server (the persistent ones)
       try {
-        const res = await fetch("/api/settings");
-        if (res.ok) {
-          const serverSettings = await res.json();
-          setSettings(serverSettings);
+        // First try to see if we have them in the server (the persistent ones)
+        // Using a short timeout to avoid long waits on network issues
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), 3000);
+
+        try {
+          const res = await fetch("/api/settings", { signal: controller.signal });
+          clearTimeout(id);
+
+          if (res && res.ok) {
+            const serverSettings = await res.json();
+            setSettings(serverSettings);
+          }
+        } catch (fetchError) {
+          // If fetch fails (network error, abort), we just fall back
+          console.log("useSiteSettings: Server settings not available (fetch error)");
+        }
+
+        // Check for drafting in local storage
+        const saved = localStorage.getItem("site_customization");
+        if (saved) {
+          try {
+            const localSettings = JSON.parse(saved);
+            setSettings(prev => ({ ...prev, ...localSettings }));
+          } catch (e) {
+            // Ignore parse errors from local storage
+          }
         }
       } catch (e) {
-        console.warn("Failed to fetch settings from server, using local/default", e);
-      }
-
-      // Check for drafting in local storage
-      const saved = localStorage.getItem("site_customization");
-      if (saved) {
-        try {
-          const localSettings = JSON.parse(saved);
-          // Only use local settings if they are different/newer or if server settings failed
-          setSettings(prev => ({ ...prev, ...localSettings }));
-        } catch (e) {
-          console.error("Failed to parse settings", e);
-        }
+        // Catch-all to prevent any uncaught errors in the hook
+        console.warn("useSiteSettings: Silent fallback to defaults", e);
       }
     };
 
