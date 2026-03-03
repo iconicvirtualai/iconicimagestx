@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useSearchParams } from "react-router-dom";
+import ChatWidget from "@/components/ChatWidget";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
@@ -93,6 +94,7 @@ export default function BookingForm() {
   const [searchParams] = useSearchParams();
   const [step, setStep] = useState<Step>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   const [expandedCategories, setExpandedCategories] = useState<string[]>(["listings", "business"]);
   const [showBasics, setShowBasics] = useState(false);
@@ -969,22 +971,21 @@ export default function BookingForm() {
                 Our production team is standing by to help you choose the perfect tier.
               </p>
               <div className="pt-3 border-t border-gray-800 space-y-3">
-                 <a 
-                  href="https://voice.google.com/u/0/messages" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 group"
+                 <button
+                  onClick={() => setIsChatOpen(true)}
+                  className="flex items-center gap-3 group w-full text-left"
                  >
                     <div className="w-8 h-8 rounded-lg bg-teal-400/10 flex items-center justify-center text-teal-400 group-hover:bg-teal-400 group-hover:text-black transition-all">
                        <MessageCircle className="w-4 h-4" />
                     </div>
                     <span className="text-[10px] font-black uppercase tracking-widest group-hover:text-teal-400 transition-colors">Chat Support</span>
-                 </a>
+                 </button>
                  <p className="text-sm font-black text-teal-400">(281) 555-ICON</p>
               </div>
            </div>
         </div>
       </div>
+      <ChatWidget isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
     </div>
   );
 }
