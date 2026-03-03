@@ -22,31 +22,7 @@ import {
   Plus
 } from "lucide-react";
 import { toast } from "sonner";
-
-// Default Site Settings Schema
-export const DEFAULT_SITE_SETTINGS = {
-  global: {
-    primaryColor: "#0d9488",
-    secondaryColor: "#0ea5e9",
-    logoText: "ICONIC",
-    showPromoBar: true,
-    promoBarText: "FREE AI STAGING ON YOUR FIRST ORDER - CODE: ICONICAI",
-  },
-  homepage: {
-    heroTitle: "ELEVATE YOUR LISTINGS WITH MEDIA THAT SELLS",
-    heroSubtitle: "Your Creative Media Partners for Real Estate & Business Professionals.",
-    heroImage: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1600&q=80",
-    showAudienceSection: true,
-    showAIToolsSection: true,
-    showBeforeAfter: true,
-  },
-  pricing: {
-    title: "Pick the Perfect Price for Your Presence",
-    subtitle: "Transparent pricing for every stage of your real estate career.",
-    showBasics: true,
-    showPhase2: true,
-  }
-};
+import { DEFAULT_SITE_SETTINGS } from "@/hooks/useSiteSettings";
 
 export default function AdminSiteCustomizer() {
   const [settings, setSettings] = React.useState(DEFAULT_SITE_SETTINGS);
