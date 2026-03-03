@@ -20,6 +20,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminListingFile from "./pages/AdminListingFile";
 import AdminCustomerCenter from "./pages/AdminCustomerCenter";
 import AdminSiteCustomizer from "./pages/AdminSiteCustomizer";
+import AgentLandingPage from "./pages/AgentLandingPage";
 import Insights from "./pages/Insights";
 import Socials from "./pages/Socials";
 import VirtualStaging from "./pages/VirtualStaging";
@@ -48,6 +49,7 @@ const App = () => (
           <Route path="/pricing/ai-assistant" element={<AIPricingAssistant />} />
           <Route path="/pricing-v1" element={<PricingV1 />} />
           <Route path="/socials" element={<Socials />} />
+          <Route path="/agents" element={<AgentLandingPage />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/admin/listing/:id" element={<AdminListingFile />} />

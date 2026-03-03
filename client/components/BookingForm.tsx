@@ -515,7 +515,12 @@ const consultQuestions = [
   }
 ];
 
-export default function BookingForm() {
+interface BookingFormProps {
+  initialServiceId?: string;
+  initialCategoryId?: string;
+}
+
+export default function BookingForm({ initialServiceId, initialCategoryId }: BookingFormProps = {}) {
   const settings = useSiteSettings();
   const isMobile = useIsMobile();
   const [searchParams] = useSearchParams();
@@ -528,7 +533,7 @@ export default function BookingForm() {
   const [promoInput, setPromoInput] = useState("");
   const [appliedPromo, setAppliedPromo] = useState<{ code: string; discount: number } | null>(null);
 
-  const [expandedCategories, setExpandedCategories] = useState<string[]>(["listings"]);
+  const [expandedCategories, setExpandedCategories] = useState<string[]>(initialCategoryId ? [initialCategoryId] : ["listings"]);
   const [showBasics, setShowBasics] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -541,7 +546,7 @@ export default function BookingForm() {
     serviceDate: undefined as Date | undefined,
     serviceTime: "9:00 AM",
     preferredPhotographer: "Available (Auto-Assign)",
-    selectedService: "" as string,
+    selectedService: initialServiceId || "" as string,
     selectedBasics: [] as string[],
     selectedAddOns: [] as string[],
     premiumUpgrade: false,
@@ -561,21 +566,19 @@ export default function BookingForm() {
     perfectBusiness: "",
     businessSource: "",
     investmentWilling: "",
+    leadSource: "", // UTM tracking
   });
 
-  // Scheduling helpers
-  const currentMonth = formData.serviceDate ? startOfMonth(formData.serviceDate) : startOfMonth(new Date());
-  const months = Array.from({ length: 12 }, (_, i) => addMonths(startOfMonth(new Date()), i));
-  const daysInMonth = eachDayOfInterval({
-    start: startOfMonth(currentMonth),
-    end: endOfMonth(currentMonth)
-  }).filter(date => date >= new Date(new Date().setHours(0,0,0,0)));
-
-  // Check for pre-filled service from pricing page
+  // Check for pre-filled service from pricing page or props
   useEffect(() => {
-    const serviceParam = searchParams.get("service");
+    const serviceParam = searchParams.get("service") || initialServiceId;
     const itemsParam = searchParams.get("items");
     const premiumParam = searchParams.get("premium") === "true";
+    const utmSource = searchParams.get("utm_source");
+
+    if (utmSource) {
+      setFormData(prev => ({ ...prev, leadSource: utmSource }));
+    }
 
     if (serviceParam) {
       setFormData(prev => ({
@@ -592,14 +595,14 @@ export default function BookingForm() {
 
     if (itemsParam) {
       const items = itemsParam.split(",");
-      setFormData(prev => ({ 
-        ...prev, 
+      setFormData(prev => ({
+        ...prev,
         selectedBasics: items,
         premiumUpgrade: premiumParam
       }));
       setShowBasics(true);
     }
-  }, [searchParams]);
+  }, [searchParams, initialServiceId]);
 
   const updateFormData = (data: Partial<typeof formData>) => {
     setFormData(prev => ({ ...prev, ...data }));
