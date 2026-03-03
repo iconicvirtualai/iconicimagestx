@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,6 +89,7 @@ const photographers = [
 
 export default function BookingForm() {
   const settings = useSiteSettings();
+  const isMobile = useIsMobile();
   const [searchParams] = useSearchParams();
   const [step, setStep] = useState<Step>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -691,17 +693,18 @@ export default function BookingForm() {
                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Reserve your iconic launch date (CST Timezone)</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-               <div className="bg-white p-4 rounded-[2rem] border border-gray-50 shadow-lg">
+            <div className="space-y-10">
+               <div className="bg-white p-6 rounded-[3rem] border border-gray-50 shadow-lg overflow-hidden flex justify-center">
                   <Calendar
                     mode="single"
+                    numberOfMonths={isMobile ? 1 : 2}
                     selected={formData.serviceDate}
                     onSelect={(date) => updateFormData({ serviceDate: date })}
-                    className="rounded-2xl mx-auto"
+                    className="rounded-2xl"
                     disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))}
                   />
                </div>
-               <div className="space-y-8">
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                   <div className="space-y-3">
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
                       <Clock className="w-3 h-3" /> Preferred Time (CST)
