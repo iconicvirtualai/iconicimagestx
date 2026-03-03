@@ -33,7 +33,7 @@ export default function Pricing() {
       period: "per listing",
       description: "Clean, bright, and ready to post. Perfect for quick turnarounds and keeping your feed active.",
       icon: <Zap className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
-      buttonText: "Start My Momentum",
+      buttonText: "START MY MOMENTUM",
       ctaSubtext: "Your reel is ready before the sign is up.",
       tooltip: "Ideal for fast-moving residential listings where speed and social presence are key.",
       disclaimer: {
@@ -56,7 +56,7 @@ export default function Pricing() {
       description: "A complete visual deep-dive. We capture the details, the angles, and the atmosphere that makes your space unique.",
       icon: <Trophy className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
       isPopular: true,
-      buttonText: "Tell the Full Story",
+      buttonText: "TELL THE FULL STORY",
       ctaSubtext: "Your reel is ready before the sign is up.",
       tooltip: "Best for standard to mid-range listings needing a professional cinematic edge.",
       disclaimer: {
@@ -80,7 +80,7 @@ export default function Pricing() {
       period: "per listing",
       description: "Our highest level of care. We create a cinematic experience that tells people exactly why your brand (or your home) is the one to choose.",
       icon: <Crown className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
-      buttonText: "Build my Legacy",
+      buttonText: "BUILD MY LEGACY",
       ctaSubtext: "Your reel is ready before the sign is up.",
       tooltip: "Engineered for luxury listings and high-value neighborhoods where image is everything.",
       disclaimer: {
@@ -103,13 +103,13 @@ export default function Pricing() {
       name: "THE MARKET LEADER",
       tagline: "The Total Takeover",
       subheadline: "Your Full-Cycle Media Partner",
-      price: "1599",
+      price: "1,599",
       period: "per listing",
       description: "This isn't just a shoot; it’s a market saturation strategy. We handle the narrative from the first \"Coming Soon\" teaser to the final \"Sold\" success story, ensuring you stay top-of-mind at every stage of the deal.",
       icon: <Box className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
       badge: "VIP PRIORITY ACCESS",
       isVIP: true,
-      buttonText: "Order VIP Access",
+      buttonText: "ORDER VIP ACCESS",
       ctaSubtext: "Full Campaign Delivery: 24-36 Hours",
       tooltip: "For top producers who want to own their local market and provide unmatched seller value.",
       features: [
@@ -136,7 +136,7 @@ export default function Pricing() {
       period: "PER SESSION",
       description: "Forget the stiff corporate headshot. We capture you in your element—approachable, professional, and uniquely you.",
       icon: <Camera className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
-      buttonText: "Upgrade my Image",
+      buttonText: "UPGRADE MY IMAGE",
       ctaSubtext: "You sell homes; we’ll handle the fame.",
       tooltip: "Perfect for agents needing a quick but high-end update to their social and professional profiles.",
       features: [
@@ -172,7 +172,7 @@ export default function Pricing() {
       period: "PER SESSION/CAMPAIGN",
       description: "We spend a full day in your world to build a \"Day in the Life\" cinematic library that makes you the undisputed go-to authority in your chosen neighborhood.",
       icon: <Users className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
-      buttonText: "Build My Empire",
+      buttonText: "BUILD MY EMPIRE",
       ctaSubtext: "Result: Undisputed status as the local expert.",
       tooltip: "For agents aiming for 'Neighborhood Mayor' status and total local authority.",
       features: [
@@ -298,7 +298,22 @@ export default function Pricing() {
 
       <main className="flex-1 pb-20">
         {/* Hero Section - Reverted Style */}
-        <div className="pt-32 pb-16 text-center px-4 max-w-5xl mx-auto">
+        <div className="relative overflow-hidden">
+          {/* Background Video */}
+          <div className="absolute inset-0 z-0 pointer-events-none">
+            <video
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="w-full h-full object-cover opacity-[0.15]"
+            >
+              <source src="https://videos.pexels.com/video-files/32821434/13990151_640_360_30fps.mp4" type="video/mp4" />
+            </video>
+            <div className="absolute inset-0 bg-gradient-to-b from-[#fafafa] via-transparent to-[#fafafa]"></div>
+          </div>
+
+          <div className="relative z-10 pt-32 pb-16 text-center px-4 max-w-5xl mx-auto">
           <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#f0fdfa] border border-[#ccfbf1] mb-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <span className="text-[12px] font-bold tracking-wider uppercase" style={{ color: settings.global.primaryColor }}>
               Pricing & Packages
@@ -314,10 +329,10 @@ export default function Pricing() {
           {/* Hyperlink Bubbles */}
           <div className="flex flex-wrap justify-center gap-4 mb-16">
             {[
-              { label: "For Listings", id: "listings" },
-              { label: "For Branding", id: "branding" },
-              { label: "For Business", id: "social" },
-              { label: "For Growth", id: "brand-identity" }
+              { label: "FOR LISTINGS", id: "listings" },
+              { label: "FOR BRANDING", id: "branding" },
+              { label: "FOR BUSINESS", id: "social" },
+              { label: "FOR GROWTH", id: "brand-identity" }
             ].map((bubble) => (
               <button
                 key={bubble.id}
@@ -350,6 +365,8 @@ export default function Pricing() {
           </div>
         </div>
 
+        </div>
+
         {/* Choose Your Path UX - The Doors */}
         <section className="py-16 bg-white border-y border-gray-50">
           <div className="max-w-5xl mx-auto px-4">
@@ -379,7 +396,7 @@ export default function Pricing() {
                     I’m ready to hustle, I just need the tools and the professional polish to win.
                   </p>
                   <Button className="bg-white border-2 border-black text-black hover:bg-black hover:text-white font-bold px-8 py-6 rounded-xl transition-all">
-                    I'm ready to hustle →
+                    I'M READY TO HUSTLE →
                   </Button>
                 </div>
               </div>
@@ -404,7 +421,7 @@ export default function Pricing() {
                     I’m ready to scale, I need my time back and my brand on autopilot.
                   </p>
                   <Button className="text-white font-bold px-8 py-6 rounded-xl transition-all shadow-lg" style={{ backgroundColor: settings.global.primaryColor }}>
-                    I'm ready to scale →
+                    I'M READY TO SCALE →
                   </Button>
                 </div>
               </div>
@@ -634,7 +651,7 @@ export default function Pricing() {
                             ))}
                           </div>
                           <Button asChild className="w-full mt-8 text-white font-black py-6 rounded-xl transition-all shadow-lg shadow-teal-900/20 bg-[#0d9488] hover:bg-[#0f766e]">
-                            <Link to="/book">Upgrade my Edits</Link>
+                            <Link to="/book">UPGRADE MY EDITS</Link>
                           </Button>
                         </div>
                       </div>
@@ -964,7 +981,7 @@ export default function Pricing() {
                 </div>
                 <Button asChild className="w-full py-6 rounded-xl bg-black text-white hover:text-white transition-all" onMouseEnter={(e) => e.currentTarget.style.backgroundColor = settings.global.primaryColor} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'black'}>
                   <Link to="/book">
-                    Start My Foundation →
+                    START MY FOUNDATION →
                   </Link>
                 </Button>
               </div>
@@ -992,7 +1009,7 @@ export default function Pricing() {
                 </div>
                 <Button asChild className="w-full py-6 rounded-xl bg-black text-white hover:text-white transition-all" onMouseEnter={(e) => e.currentTarget.style.backgroundColor = settings.global.primaryColor} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'black'}>
                   <Link to="/book">
-                    Start My Evolution →
+                    START MY EVOLUTION →
                   </Link>
                 </Button>
               </div>
@@ -1012,7 +1029,7 @@ export default function Pricing() {
                     </p>
                   </div>
                   <Button asChild className="text-white font-black px-12 py-8 text-xl rounded-2xl transition-all shadow-xl hover:scale-105 active:scale-95 shrink-0" style={{ backgroundColor: settings.global.primaryColor }}>
-                    <Link to="/book">Let's Chat</Link>
+                    <Link to="/book">LET'S CHAT</Link>
                   </Button>
                 </div>
 
@@ -1103,7 +1120,7 @@ export default function Pricing() {
                 </div>
                 <div className="flex items-center">
                   <div className="p-6 border-2 rounded-2xl" style={{ borderColor: settings.global.primaryColor }}>
-                    <p className="text-sm font-bold text-white uppercase tracking-widest">Dominate with Identity</p>
+                    <p className="text-sm font-bold text-white uppercase tracking-widest">DOMINATE WITH IDENTITY</p>
                   </div>
                 </div>
               </div>
