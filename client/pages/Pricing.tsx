@@ -131,12 +131,12 @@ export default function Pricing() {
   const brandingTiers = [
     {
       name: "THE REFRESH",
-      tagline: "The modern headshot replacement.",
+      tagline: "The Modern Portrait.",
       price: "349",
       period: "session",
-      description: "Upgrade your professional image with high-end lifestyle content.",
+      description: "Forget the stiff corporate headshot. We capture you in your element—approachable, professional, and uniquely you.",
       icon: <Camera className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
-      buttonText: "Start My Consistency",
+      buttonText: "UPGRADE MY IMAGE",
       ctaSubtext: "You sell homes; we’ll handle the fame.",
       tooltip: "Perfect for agents needing a quick but high-end update to their social and professional profiles.",
       features: [
@@ -149,39 +149,37 @@ export default function Pricing() {
     },
     {
       name: "THE AUTHORITY",
-      tagline: "Content department on autopilot.",
+      tagline: "Your Personal Content Department",
       price: "999",
       period: "per month",
-      description: "Monthly strategic content production for consistent brand growth.",
+      description: "You show up for two hours; we feed your social media for the entire month. This is for the pro who is ready to stop \"trying\" to post and start dominating.",
       icon: <Video className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
       isPopular: true,
-      buttonText: "Build My Empire",
+      buttonText: "DELEGATE MY CONTENT",
       ctaSubtext: "You sell homes; we’ll handle the fame.",
       tooltip: "Designed for agents who want to dominate social media without the stress of filming or editing.",
       features: [
-        "The 'Value Bomb' Session: 2hrs Filming/mo",
-        "We provide the Scripts",
-        "20 Custom Reels/TikToks",
-        "Edited with 2026 Trends",
-        "Trending Audio & AI Mascot Branding"
+        "The 'Value Bomb' Session: 2hrs of filming per month.",
+        "Full Strategy & Scripting: We tell you exactly what to say to convert followers into leads.",
+        "20 Custom Reels/TikToks: Hand-edited with 2026 trends, speed ramps, and captions.",
+        "Trending Audio & Personal Branding: Every video feels like you, only better."
       ]
     },
     {
       name: "THE LOCAL LEGEND",
-      tagline: "Complete brand reinvention.",
+      tagline: "The Market Takeover Campaign",
       price: "2499",
       period: "session/campaign",
-      description: "Become the go-to authority in your specific local neighborhood.",
+      description: "We spend a full day in your world to build a \"Day in the Life\" cinematic library that makes you the undisputed go-to authority in your neighborhood.",
       icon: <Users className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
-      buttonText: "Build My Empire",
+      buttonText: "Build my Empire",
       ctaSubtext: "You sell homes; we’ll handle the fame.",
       tooltip: "For agents aiming for 'Neighborhood Mayor' status and total local authority.",
       features: [
-        "6-8hr 'Day in the Life' Production",
-        "90-Second Bio-Film",
-        "Neighborhood Mayor Series (5 Videos)",
-        "Cinematic Hotspot Highlights",
-        "Complete Brand Transformation"
+        "6-8hr Signature Production: Cinematic \"Day in the Life\" coverage.",
+        "The 90-Second Bio-Film: Your \"Why\" story, told with Hollywood-level production.",
+        "Neighborhood Mayor Series: 5 High-impact videos highlighting local hotspots (perfect for B2B networking).",
+        "The Total Brand Transformation: Every asset you need to own the local conversation."
       ]
     }
   ];
@@ -536,7 +534,7 @@ export default function Pricing() {
               <div className="mt-20 pt-20 border-t border-gray-100">
                 <div className="text-center mb-12">
                   <p className="text-sm font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Or</p>
-                  <h3 className="text-6xl md:text-8xl font-black text-black uppercase tracking-tight mb-6">Choose the Basics</h3>
+                  <h3 className="text-5xl md:text-7xl font-black text-black uppercase tracking-tight mb-6">Choose the Basics</h3>
                   <p className="text-gray-500 text-lg font-medium">Fast, efficient, and essential media for every listing.</p>
                 </div>
 
@@ -615,11 +613,11 @@ export default function Pricing() {
                         <div className="relative z-10">
                           <div className="flex flex-col mb-6">
                             <div className="flex items-center justify-between mb-2">
-                              <h4 className="font-black text-[10px] uppercase tracking-widest" style={{ color: settings.global.primaryColor }}>THE ICONIC POLISH (PREMIUM UPGRADE)</h4>
+                              <h4 className="font-black text-xs uppercase tracking-widest" style={{ color: settings.global.primaryColor }}>THE ICONIC POLISH (PREMIUM UPGRADE)</h4>
                               <span className="text-2xl font-black text-white">$65</span>
                             </div>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Make it Magazine Ready</p>
-                            <p className="text-[9px] text-gray-500 mt-2">Standard on Market Leader | $65 Add-on for all other packages</p>
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Make it Magazine Ready</p>
+                            <p className="text-[8px] text-gray-500 mt-2">Standard on Market Leader | $65 Add-on for all other packages</p>
                           </div>
                           <div className="grid grid-cols-1 gap-3">
                             {[
@@ -656,7 +654,7 @@ export default function Pricing() {
         {/* Branding Before & After Slider - Smaller */}
         <section className="py-24 bg-[#fafafa]">
           <div className="max-w-4xl mx-auto px-4 text-center">
-            <h2 className="text-6xl md:text-8xl font-black text-black mb-8 tracking-tight">Elevate Your Personal Brand</h2>
+            <h2 className="text-5xl md:text-7xl font-black text-black mb-8 tracking-tight">Elevate Your Personal Brand</h2>
             <p className="text-lg text-gray-500 mb-12 max-w-xl mx-auto font-medium">See the difference between a standard corporate headshot and an Iconic Lifestyle Portrait.</p>
 
             <div className="relative max-w-2xl mx-auto aspect-[16/9] rounded-[2rem] overflow-hidden shadow-xl border-4 border-white">
@@ -714,7 +712,7 @@ export default function Pricing() {
           <div className="max-w-[1400px] mx-auto px-4">
             <div className="text-center mb-20 max-w-3xl mx-auto">
               <h2 className="text-4xl md:text-5xl font-bold text-black mb-6 tracking-tight">
-                Iconic Branding <span className="text-gray-300">(The Agent)</span>
+                The Human Brand <span className="text-gray-300">(The Agent)</span>
               </h2>
               <p className="text-lg text-gray-500 leading-relaxed">
                 Targeting the human brand: Life, business, and local authority.
