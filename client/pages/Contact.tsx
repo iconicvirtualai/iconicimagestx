@@ -50,12 +50,13 @@ export default function Contact() {
 
                     <a
                       href="tel:281-356-0965"
-                      className="flex items-center gap-4 p-4 bg-black border border-black rounded-2xl group hover:border-gray-800 transition-all duration-300 shadow-sm hover:shadow-md text-left"
+                      className="flex items-center gap-4 p-4 bg-black border border-gray-800 rounded-2xl group hover:border-gray-700 transition-all duration-300 shadow-xl hover:shadow-2xl text-left relative overflow-hidden"
                     >
-                      <div className="bg-gray-800 p-2.5 rounded-xl text-white group-hover:scale-110 transition-transform flex-shrink-0">
+                      <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none" />
+                      <div className="bg-gray-800 p-2.5 rounded-xl text-white group-hover:scale-110 transition-transform flex-shrink-0 shadow-inner">
                         <Phone className="w-5 h-5" />
                       </div>
-                      <div className="flex-1 min-w-[120px]">
+                      <div className="flex-1 min-w-[120px] relative z-10">
                         <div className="text-[9px] font-bold tracking-widest text-gray-400 uppercase mb-0.5">CALL US</div>
                         <div className="text-base font-bold text-white group-hover:text-white transition-colors flex items-center gap-2">
                           281-356-0965
@@ -141,7 +142,7 @@ export default function Contact() {
                     ></textarea>
                   </div>
 
-                  <Button className="w-full bg-black hover:bg-gray-900 text-white font-bold py-5 text-base rounded-xl transition-all shadow-lg shadow-gray-200">
+                  <Button className="w-full bg-black hover:bg-gray-900 text-white font-bold py-5 text-base rounded-xl transition-all shadow-[0_10px_30px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.1)] border border-gray-800 hover:border-gray-700">
                     Send
                   </Button>
                 </form>
