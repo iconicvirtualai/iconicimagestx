@@ -61,17 +61,21 @@ export default function HeroSection() {
         {/* Main CTA */}
         <div className="flex flex-col items-center gap-6 mb-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
           <Link to="/book">
-            <Button className="text-white font-bold text-xl px-14 py-8 rounded-2xl shadow-xl shadow-teal-100 transition-all hover:scale-105" style={{ backgroundColor: settings.global.primaryColor }}>
-              Let’s Make It Iconic
+            <Button className="text-white font-bold text-xl px-14 py-8 rounded-2xl shadow-xl shadow-teal-100 transition-all hover:scale-105 bg-black hover:bg-gray-900">
+              Make it Iconic
             </Button>
           </Link>
-          <div className="flex flex-wrap justify-center gap-4">
-            <Button className="rounded-2xl px-10 py-7 font-bold transition-all active:scale-95 shadow-sm bg-transparent border border-black text-black hover:bg-black hover:text-white">
-              I'm in Real Estate
-            </Button>
-            <Button className="rounded-2xl px-10 py-7 font-bold transition-all active:scale-95 shadow-sm bg-transparent border border-gray-300 text-gray-600 hover:bg-gray-50">
-              I Own a Business
-            </Button>
+          <div className="flex flex-wrap justify-center gap-4 mt-2">
+            <Link to="/pricing#listings">
+              <Button className="rounded-2xl px-8 py-5 text-sm font-bold transition-all active:scale-95 shadow-sm bg-transparent border border-black text-black hover:bg-black hover:text-white">
+                I'm in Real Estate
+              </Button>
+            </Link>
+            <Link to="/pricing#branding">
+              <Button className="rounded-2xl px-8 py-5 text-sm font-bold transition-all active:scale-95 shadow-sm bg-transparent border border-gray-300 text-gray-600 hover:bg-gray-50">
+                I Own a Business
+              </Button>
+            </Link>
           </div>
         </div>
 
@@ -92,7 +96,8 @@ export default function HeroSection() {
                 </div>
               ))}
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xl font-black text-black">4.98</span>
               <div className="flex gap-0.5">
                 {[1, 2, 3, 4, 5].map((i) => (
                   <Star key={i} className="w-5 h-5 fill-[#22c55e] text-[#22c55e]" />

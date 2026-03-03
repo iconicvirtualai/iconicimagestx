@@ -1167,7 +1167,7 @@ export default function Pricing() {
                 </div>
                 <div className="flex items-center">
                   <div className="p-6 border-2 rounded-2xl" style={{ borderColor: settings.global.primaryColor }}>
-                    <p className="text-sm font-bold text-white uppercase tracking-widest">DOMINATE WITH IDENTITY</p>
+                    <p className="text-sm font-bold text-white uppercase tracking-widest">CULTIVATE YOUR INFLUENCE</p>
                   </div>
                 </div>
               </div>
