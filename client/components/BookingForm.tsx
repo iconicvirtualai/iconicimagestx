@@ -970,17 +970,26 @@ export default function BookingForm() {
               <p className="text-[10px] text-gray-400 leading-relaxed font-medium">
                 Our production team is standing by to help you choose the perfect tier.
               </p>
-              <div className="pt-3 border-t border-gray-800 space-y-3">
+              <div className="pt-4 border-t border-gray-800 flex flex-wrap items-center gap-x-6 gap-y-3">
                  <button
                   onClick={() => setIsChatOpen(true)}
-                  className="flex items-center gap-3 group w-full text-left"
+                  className="flex items-center gap-2.5 group transition-colors"
                  >
-                    <div className="w-8 h-8 rounded-lg bg-teal-400/10 flex items-center justify-center text-teal-400 group-hover:bg-teal-400 group-hover:text-black transition-all">
+                    <div className="w-8 h-8 rounded-lg bg-teal-400/10 flex items-center justify-center text-teal-400 group-hover:bg-teal-400 group-hover:text-black transition-all shadow-sm">
                        <MessageCircle className="w-4 h-4" />
                     </div>
-                    <span className="text-[10px] font-black uppercase tracking-widest group-hover:text-teal-400 transition-colors">Chat Support</span>
+                    <span className="text-[9px] font-black uppercase tracking-widest group-hover:text-teal-400 transition-colors whitespace-nowrap">Chat Support</span>
                  </button>
-                 <p className="text-sm font-black text-teal-400">(281) 555-ICON</p>
+
+                 <a
+                  href="tel:281-356-0965"
+                  className="flex items-center gap-2.5 group transition-colors"
+                 >
+                    <div className="w-8 h-8 rounded-lg bg-teal-400/10 flex items-center justify-center text-teal-400 group-hover:bg-teal-400 group-hover:text-black transition-all shadow-sm">
+                       <Phone className="w-4 h-4" />
+                    </div>
+                    <span className="text-[9px] font-black uppercase tracking-widest group-hover:text-teal-400 transition-colors whitespace-nowrap">281.356.0965</span>
+                 </a>
               </div>
            </div>
         </div>
