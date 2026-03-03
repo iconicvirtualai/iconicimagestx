@@ -523,12 +523,21 @@ export default function Pricing() {
               ))}
             </div>
 
+            {/* The Iconic Standard Section */}
+            <div className="mt-24 max-w-4xl mx-auto text-center">
+              <h3 className="text-3xl font-black text-black uppercase tracking-widest mb-6">"The Iconic Standard"</h3>
+              <p className="text-lg text-gray-500 leading-relaxed font-medium">
+                We’ve spent a decade learning what makes people stop scrolling. It’s not just a fancy camera; it’s the hand-polished finish. Every image and video we deliver is checked by our team to ensure it hits our standards for color, clarity, and impact. We treat your business like it’s our own.
+              </p>
+            </div>
+
             {/* The Basics Section */}
             {settings.pricing.showBasics && (
               <div className="mt-20 pt-20 border-t border-gray-100">
                 <div className="text-center mb-12">
-                  <h3 className="text-2xl font-black text-black uppercase tracking-widest mb-4">Choose the Basics</h3>
-                  <p className="text-gray-500 text-sm font-medium">Fast, efficient, and essential media for every listing.</p>
+                  <p className="text-sm font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Or</p>
+                  <h3 className="text-6xl md:text-8xl font-black text-black uppercase tracking-tight mb-6">Choose the Basics</h3>
+                  <p className="text-gray-500 text-lg font-medium">Fast, efficient, and essential media for every listing.</p>
                 </div>
 
                 <div className="bg-[#fafafa] rounded-[2.5rem] p-8 md:p-12 border border-gray-100">
@@ -577,15 +586,17 @@ export default function Pricing() {
                     {/* Add-Ons */}
                     <div className="lg:col-span-1 space-y-6">
                       <div>
-                        <h4 className="font-black text-xs uppercase tracking-widest mb-1" style={{ color: settings.global.primaryColor }}>Add-Ons</h4>
+                        <h4 className="font-black text-xs uppercase tracking-widest mb-1" style={{ color: settings.global.primaryColor }}>Add-Ons & Stand-Alone Services</h4>
                         <p className="text-[10px] text-gray-400 font-bold italic mb-6">(Must already be on site doing a full service shoot)</p>
                       </div>
                       <div className="space-y-4">
                         {[
-                          { label: "Aerial Add Ons", price: "99" },
-                          { label: "Reel Add On", price: "125" },
+                          { label: "Aerial Add-On", price: "99" },
+                          { label: "Reel Add-On", price: "125" },
+                          { label: "Video Add-On", price: "350-500+" },
                           { label: "3D Matterport", price: "200+" },
-                          { label: "Video Add On", price: "350-500+" }
+                          { label: "2D Floorplan Add-On", price: "99" },
+                          { label: "Amenity Add-On", price: "50" }
                         ].map((addon, idx) => (
                           <div key={idx} className="flex items-center justify-between p-4 bg-white/50 rounded-xl border border-gray-100">
                             <span className="font-bold text-gray-600 text-sm">{addon.label}</span>
@@ -602,19 +613,26 @@ export default function Pricing() {
                           <Palette className="w-24 h-24" />
                         </div>
                         <div className="relative z-10">
-                          <div className="flex items-center justify-between mb-6">
-                            <h4 className="font-black text-xs uppercase tracking-widest" style={{ color: settings.global.primaryColor }}>Premium Upgrade</h4>
-                            <span className="text-2xl font-black text-white">$55</span>
+                          <div className="flex flex-col mb-6">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-black text-[10px] uppercase tracking-widest" style={{ color: settings.global.primaryColor }}>THE ICONIC POLISH (PREMIUM UPGRADE)</h4>
+                              <span className="text-2xl font-black text-white">$65</span>
+                            </div>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Make it Magazine Ready</p>
+                            <p className="text-[9px] text-gray-500 mt-2">Standard on Market Leader | $65 Add-on for all other packages</p>
                           </div>
-                          <h3 className="text-xl font-black mb-4">ICONIC EDITS</h3>
                           <div className="grid grid-cols-1 gap-3">
                             {[
+                              "Remove Dirt & Debris",
+                              "Remove Reflections and Harsh Shadows",
+                              "Remove Cords & Powerlines",
+                              "Clean Driveways",
+                              "Clean Roads & Sidewalks",
                               "Add Grass",
-                              "Clean Driveway",
-                              "Remove Cords",
-                              "Add Fire to Fireplaces",
-                              "Add TV Screens",
-                              "Digital Curb Appeal"
+                              "Add Curb Appeal",
+                              "Add Landscaping",
+                              "Add TVs & Screens",
+                              "Add Fire to Pits and Places"
                             ].map((edit, idx) => (
                               <div key={idx} className="flex items-center gap-2">
                                 <Sparkles className="w-3 h-3" style={{ color: settings.global.primaryColor }} />
@@ -638,8 +656,8 @@ export default function Pricing() {
         {/* Branding Before & After Slider - Smaller */}
         <section className="py-24 bg-[#fafafa]">
           <div className="max-w-4xl mx-auto px-4 text-center">
-            <h2 className="text-3xl font-bold text-black mb-4">Elevate Your Personal Brand</h2>
-            <p className="text-gray-500 mb-12 max-w-xl mx-auto text-sm">See the difference between a standard corporate headshot and an Iconic Lifestyle Portrait.</p>
+            <h2 className="text-6xl md:text-8xl font-black text-black mb-8 tracking-tight">Elevate Your Personal Brand</h2>
+            <p className="text-lg text-gray-500 mb-12 max-w-xl mx-auto font-medium">See the difference between a standard corporate headshot and an Iconic Lifestyle Portrait.</p>
 
             <div className="relative max-w-2xl mx-auto aspect-[16/9] rounded-[2rem] overflow-hidden shadow-xl border-4 border-white">
               {/* After (Iconic) */}
