@@ -7,10 +7,17 @@ import ChatWidget from "@/components/ChatWidget";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
-import { 
-  Check, Mail, Phone, MapPin, Maximize, Calendar as CalendarIcon, 
-  ArrowRight, ArrowLeft, Sparkles, Wand2, Clock, ChevronDown, 
-  ChevronUp, Zap, Video, Camera, Star, Info, MessageSquare, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  Check, Mail, Phone, MapPin, Maximize, Calendar as CalendarIcon,
+  ArrowRight, ArrowLeft, Sparkles, Wand2, Clock, ChevronDown,
+  ChevronUp, Zap, Video, Camera, Star, Info, MessageSquare,
   Users, Key, HelpCircle, User, Layout, MessageCircle
 } from "lucide-react";
 import { format } from "date-fns";
@@ -28,56 +35,435 @@ interface Service {
   isPopular?: boolean;
   phase?: 1 | 2;
   highlights?: string;
+  features?: string[];
 }
 
 const services: Service[] = [
   // Listings
-  { id: "listing-essentials", name: "The Essentials", category: "listings", price: 249, description: "Clean, bright, and ready to post. Perfect for quick turnarounds." },
-  { id: "listing-showcase", name: "The Showcase", category: "listings", price: 549, description: "A complete visual deep-dive. We capture the details, the angles, and the atmosphere.", isPopular: true },
-  { id: "listing-legacy", name: "The Legacy", category: "listings", price: 899, description: "Our highest level of care. We create a cinematic experience." },
-  { id: "listing-market-leader", name: "The Market Leader", category: "listings", price: 1599, description: "Total market saturation strategy. Full-cycle media partner." },
-  
+  {
+    id: "listing-essentials",
+    name: "The Essentials",
+    category: "listings",
+    price: 249,
+    description: "Clean, bright, and ready to post. Perfect for quick turnarounds.",
+    features: [
+      "30 Images",
+      "The 'Snap' Reel (15s)",
+      "Trending Audio",
+      "Pre-Launch Delivery Packet",
+      "1 Iconic Twilight Render",
+      "Same Day Delivery*"
+    ]
+  },
+  {
+    id: "listing-showcase",
+    name: "The Showcase",
+    category: "listings",
+    price: 549,
+    description: "A complete visual deep-dive. We capture the details, the angles, and the atmosphere.",
+    isPopular: true,
+    features: [
+      "50 Images",
+      "5 Aerials",
+      "The 'Snap' Reel (15s)",
+      "1 'Iconic' 3D Animated Reel (60s Vert)",
+      "2D Floorplan",
+      "Pre-Launch Delivery Packet",
+      "2 Iconic Twilight Renders",
+      "Same Day Delivery*"
+    ]
+  },
+  {
+    id: "listing-legacy",
+    name: "The Legacy",
+    category: "listings",
+    price: 899,
+    description: "Our highest level of care. We create a cinematic experience.",
+    features: [
+      "Full Images",
+      "Full Aerials",
+      "The 'Snap' Reel (15s)",
+      "1 'Iconic' 3D Animated Reel (60s Vert)",
+      "90s 4K Cinematic Property Video (with Aerial)",
+      "Pre-Launch Delivery Packet",
+      "5 Iconic Twilight Renders",
+      "Agent On Camera Intro/Outro",
+      "3D Motion Graphics and Animations",
+      "Same Day Delivery*"
+    ]
+  },
+  {
+    id: "listing-market-leader",
+    name: "The Market Leader",
+    category: "listings",
+    price: 1599,
+    description: "Total market saturation strategy. Full-cycle media partner.",
+    features: [
+      "Full Images (Next-Day)",
+      "Full Aerials (Same-Day by 7PM)",
+      "The 'Snap' Reel (15s) (Same-Day by 7PM)",
+      "1 'Iconic' Animated Reel (60s Vert) (Next-Day)",
+      "2D Floorplan (Next-Day)",
+      "Pre-Launch Delivery Packet (Same-Day by 7PM)",
+      "5 Iconic Twilight Renders (Same-Day by 7PM)",
+      "90s 4K Cinematic Video (Next-Day)",
+      "VR / Matterport (Vision Pro Ready) & 2D Floorplan (Next-Day)",
+      "The Iconic Finish - Complimentary Premium Editing",
+      "Post-Sale Marketing Package (Scheduled)"
+    ]
+  },
+
   // Branding
-  { id: "branding-refresh", name: "The Refresh", category: "branding", price: 349, description: "The Modern Portrait. Approachable, professional, and uniquely you." },
-  { id: "branding-content-partner", name: "The Content Partner", category: "branding", price: 999, description: "30 days of content in 2 hours. Never wonder what to post again." },
-  { id: "branding-local-legend", name: "The Local Legend", category: "branding", price: 2499, description: "The Market Takeover Campaign. Your Story, Told Cinematically." },
-  
+  {
+    id: "branding-refresh",
+    name: "The Refresh",
+    category: "branding",
+    price: 349,
+    description: "The Modern Portrait. Approachable, professional, and uniquely you.",
+    features: [
+      "60-Minute Session",
+      "10 High-End 'Lifestyle' Portraits",
+      "The Woodlands/Spring Locations",
+      "AI Digital Twin Lite Setup",
+      "Voice and Likeness Cloning"
+    ]
+  },
+  {
+    id: "branding-content-partner",
+    name: "The Content Partner",
+    category: "branding",
+    price: 999,
+    description: "30 days of content in 2 hours. Never wonder what to post again.",
+    isPopular: true,
+    features: [
+      "2-Hour Monthly Filming Session",
+      "Full Strategy, Scripting & Direction",
+      "20 Custom Reels for Socials",
+      "Trending Audio & Personal Branding"
+    ]
+  },
+  {
+    id: "branding-local-legend",
+    name: "The Local Legend",
+    category: "branding",
+    price: 2499,
+    description: "The Market Takeover Campaign. Your Story, Told Cinematically.",
+    features: [
+      "6-8 Hour Signature Production Day",
+      "90-Second 4K Bio Film",
+      "5 \"Local Authority\" Neighborhood Spotlights",
+      "Pre-Production \"Vibe Check\" and Professional Scripting",
+      "Post-Production Guidance and Marketing Review"
+    ]
+  },
+
   // Business (Social Monopoly)
-  { id: "business-baseline", name: "The Baseline", category: "business", price: 500, description: "The Professional Foundation. Establish consistency with 8 edited reels per month.", phase: 1 },
-  { id: "business-growth-engine", name: "The Growth Engine", category: "business", price: 850, description: "Turning Views into Conversations. 12 edited reels with high-conversion hooks.", phase: 1 },
-  { id: "business-professional-suite", name: "The Professional Suite", category: "business", price: 1500, description: "Total hands-off management for your professional presence.", phase: 2 },
-  { id: "business-signature-tier", name: "The Signature Tier", category: "business", price: 2800, description: "The High-Volume Authority. Total hands-off authority.", phase: 2 },
-  { id: "business-iconic-partnership", name: "The Iconic Partnership", category: "business", price: 4500, description: "Your Personal Media Agency. A full-scale media agency in your pocket.", phase: 2 },
-  { id: "business-connected-core", name: "The Connected Core", category: "business", price: 2000, description: "Social + Database Penetration. Balanced social and direct-to-SOI marketing.", phase: 2, highlights: "Full Stack Email & Database Marketing" },
-  { id: "business-authority-stack", name: "The Authority Stack", category: "business", price: 3200, description: "Total Audience Ownership. High-frequency content and deep SOI penetration.", phase: 2, highlights: "Full Stack Email & Database Marketing" },
-  
+  {
+    id: "business-baseline",
+    name: "The Baseline",
+    category: "business",
+    price: 500,
+    description: "The Professional Foundation. Establish consistency with 8 edited reels per month.",
+    phase: 1,
+    features: [
+      "8 Professionally Edited Reels (2/week)",
+      "Signature \"Iconic\" 2026 Editing Style",
+      "Trending Audio & Brand Integration"
+    ]
+  },
+  {
+    id: "business-growth-engine",
+    name: "The Growth Engine",
+    category: "business",
+    price: 850,
+    description: "Turning Views into Conversations. 12 edited reels with high-conversion hooks.",
+    phase: 1,
+    isPopular: true,
+    features: [
+      "12 Professionally Edited Reels (3/week)",
+      "The Hook Suite: High-conversion captions & strategic hashtags.",
+      "Scroll-Stopping Visual Flow.",
+      "Conversion-Focused Copywriting"
+    ]
+  },
+  {
+    id: "business-professional-suite",
+    name: "The Professional Suite",
+    category: "business",
+    price: 1500,
+    description: "Total hands-off management for your professional presence.",
+    phase: 2,
+    features: [
+      "12 Reels + Full Scheduling & Posting",
+      "Multi-Platform Deployment (IG/FB/TikTok)",
+      "Algorithm \"Warm-up\" & Manual Engagement"
+    ]
+  },
+  {
+    id: "business-signature-tier",
+    name: "The Signature Tier",
+    category: "business",
+    price: 2800,
+    description: "The High-Volume Authority. Total hands-off authority.",
+    phase: 2,
+    features: [
+      "20 Reels/month (Daily M-F Presence)",
+      "1 Monthly In-Person Branding/Field Shoot",
+      "Lead Flagging (We notify you who to call)"
+    ]
+  },
+  {
+    id: "business-iconic-partnership",
+    name: "The Iconic Partnership",
+    category: "business",
+    price: 4500,
+    description: "Your Personal Media Agency. A full-scale media agency in your pocket.",
+    phase: 2,
+    features: [
+      "Unlimited Reel Production",
+      "2 Monthly Professional Field Shoots",
+      "Full CRM & Lead Automation Integration",
+      "The Iconic Polish: All Premium Editing Included"
+    ]
+  },
+  {
+    id: "business-connected-core",
+    name: "The Connected Core",
+    category: "business",
+    price: 2000,
+    description: "Social + Database Penetration. Balanced social and direct-to-SOI marketing.",
+    phase: 2,
+    highlights: "Full Stack Email & Database Marketing",
+    features: [
+      "12 Edited Reels + Management",
+      "Monthly 'Featured Insight' Email Blast",
+      "Repurposed Content for your Newsletter",
+      "Direct-to-Sphere Engagement"
+    ]
+  },
+  {
+    id: "business-authority-stack",
+    name: "The Authority Stack",
+    category: "business",
+    price: 3200,
+    description: "Total Audience Ownership. High-frequency content and deep SOI penetration.",
+    phase: 2,
+    highlights: "Full Stack Email & Database Marketing",
+    features: [
+      "20+ Reels + Monthly Pro-Filming Session",
+      "Bi-Weekly SMS & Email Campaign Updates",
+      "Full Automation of Social & Direct Outreach",
+      "High-Impact Omni-channel Production"
+    ]
+  },
+
   // Growth / Brand Strategy
-  { id: "growth-foundation", name: "The Foundation", category: "growth", price: 0, description: "Essential visual assets and strategic core for a professional presence." },
-  { id: "growth-evolution", name: "The Evolution", category: "growth", price: 0, description: "Cutting-edge AI integration to automate your content and reach." },
-  { id: "growth-bundle", name: "The Bundle", category: "growth", price: 0, description: "Foundation + Evolution. Total brand immersion and strategic identity design." },
+  {
+    id: "growth-foundation",
+    name: "The Foundation",
+    category: "growth",
+    price: 0,
+    description: "Essential visual assets and strategic core for a professional presence.",
+    features: [
+      "Logos Suite",
+      "Signature Style Guide",
+      "Hex Color Palettes",
+      "Canva Brand Hub Setup",
+      "Marketing Templates",
+      "Digital Business Card"
+    ]
+  },
+  {
+    id: "growth-evolution",
+    name: "The Evolution",
+    category: "growth",
+    price: 0,
+    description: "Cutting-edge AI integration to automate your content and reach.",
+    features: [
+      "AI Voice Clone Setup",
+      "AI Video Avatar Creation",
+      "Automated Updates Suite",
+      "Voice Synthesis Training",
+      "Likeness Protection",
+      "Vision Pro Readiness"
+    ]
+  },
+  {
+    id: "growth-bundle",
+    name: "The Bundle",
+    category: "growth",
+    price: 0,
+    description: "Foundation + Evolution. Total brand immersion and strategic identity design.",
+    features: [
+      "Logos Suite & Visual Identity",
+      "Signature Style Guide",
+      "Hex Color Palettes",
+      "Canva Brand Hub Setup",
+      "Marketing Templates",
+      "Digital Business Card",
+      "AI Voice Clone Setup",
+      "AI Video Avatar Creation",
+      "Automated Updates Suite",
+      "Voice Synthesis Training",
+      "Likeness Protection",
+      "Vision Pro Readiness"
+    ]
+  },
 ];
 
 const basicsList = [
-  { id: "photos-20", name: "20 Photos", price: 99 },
-  { id: "photos-35", name: "35 Photos", price: 150 },
-  { id: "photos-50", name: "50 Photos", price: 200 },
+  {
+    id: "photos-20",
+    name: "20 Photos",
+    price: 99,
+    description: "Essential photo package for smaller listings.",
+    features: [
+      "20 High-End Photos",
+      "Basic Edits",
+      "Color Balance",
+      "Clear Windows",
+      "Sky Replacement",
+      "Next Day Turn Around",
+      "Reflection/Mirror Removal"
+    ]
+  },
+  {
+    id: "photos-35",
+    name: "35 Photos",
+    price: 150,
+    description: "Standard photo package for most residential listings.",
+    features: [
+      "35 High-End Photos",
+      "Basic Edits",
+      "Color Balance",
+      "Clear Windows",
+      "Sky Replacement",
+      "Next Day Turn Around",
+      "Reflection/Mirror Removal"
+    ]
+  },
+  {
+    id: "photos-50",
+    name: "50 Photos",
+    price: 200,
+    description: "Complete photo package for large homes and detailed spaces.",
+    features: [
+      "50 High-End Photos",
+      "Basic Edits",
+      "Color Balance",
+      "Clear Windows",
+      "Sky Replacement",
+      "Next Day Turn Around",
+      "Reflection/Mirror Removal"
+    ]
+  },
 ];
 
 const addOns = [
   { category: "Speed & Social", items: [
-    { id: "same-day", name: "Same-Day Delivery", price: 50 },
-    { id: "basic-reel", name: "Basic Reel", price: 125 },
+    {
+      id: "same-day",
+      name: "Same-Day Delivery",
+      price: 50,
+      description: "Photos, Twilight Render and Snap Reel by 7PM (Basic Edits).",
+      features: [
+        "Photos by 7PM",
+        "Snap Reel by 7PM",
+        "Twilight Renders by 7PM"
+      ]
+    },
+    {
+      id: "basic-reel",
+      name: "Basic Reel",
+      price: 125,
+      description: "A high-impact 15s vertical video optimized for social media.",
+      features: [
+        "15-Second Vertical Video",
+        "Trending Audio Integration",
+        "Fast-Paced Editing Style"
+      ]
+    },
   ]},
   { category: "The Space", items: [
-    { id: "aerial-drone", name: "Aerial Drone Stills", price: 99 },
-    { id: "matterport-3d", name: "Matterport 3D Tour", price: 200 },
-    { id: "basic-video", name: "Basic Video", price: 300 },
-    { id: "aerial-premium", name: "Aerial Premium Video", price: 550 },
-    { id: "floorplan-2d", name: "2D Floor Plan", price: 75 },
-    { id: "amenity-addon", name: "Amenity", price: 50 },
+    {
+      id: "aerial-drone",
+      name: "Aerial Drone Stills",
+      price: 99,
+      description: "Capture the property and its surroundings from a unique perspective.",
+      features: [
+        "5 High-Res Aerial Photos",
+        "Neighborhood Context Shots",
+        "Professional Color Grading"
+      ]
+    },
+    {
+      id: "matterport-3d",
+      name: "Matterport 3D Tour",
+      price: 200,
+      description: "A fully immersive 3D walkthrough experience for remote buyers.",
+      features: [
+        "Full 3D Interior Model",
+        "Dollhouse View",
+        "Interactive Floor Navigation"
+      ]
+    },
+    {
+      id: "basic-video",
+      name: "Basic Video",
+      price: 300,
+      description: "A professional cinematic walkthrough of the property interior.",
+      features: [
+        "60-Second 4K Video",
+        "Interior & Exterior Highlights",
+        "Licensed Background Music"
+      ]
+    },
+    {
+      id: "aerial-premium",
+      name: "Aerial Premium Video",
+      price: 550,
+      description: "The ultimate drone experience with cinematic sweeps and tracking shots.",
+      features: [
+        "90-Second 4K Aerial Film",
+        "Dynamic Tracking Shots",
+        "Advanced Neighborhood Highlights"
+      ]
+    },
+    {
+      id: "floorplan-2d",
+      name: "2D Floor Plan",
+      price: 75,
+      description: "Accurate dimensions and layout visualization for buyers.",
+      features: [
+        "Precise Room Measurements",
+        "Clean Schematic Layout",
+        "PDF & JPG Deliverables"
+      ]
+    },
+    {
+      id: "amenity-addon",
+      name: "Amenity",
+      price: 50,
+      description: "Capture the shared spaces and community features that add value.",
+      features: [
+        "Pool & Clubhouse Shots",
+        "Parks & Shared Spaces",
+        "Community Context"
+      ]
+    },
   ]},
   { category: "The Brand", items: [
-    { id: "agent-intro", name: "Agent Intro/Outro", price: 75 },
+    {
+      id: "agent-intro",
+      name: "Agent Intro/Outro",
+      price: 75,
+      description: "Put a face to the brand with a professional on-camera introduction.",
+      features: [
+        "On-Camera Greeting",
+        "Professional Audio Setup",
+        "Call-to-Action Closing"
+      ]
+    },
   ]}
 ];
 
@@ -95,6 +481,7 @@ export default function BookingForm() {
   const [step, setStep] = useState<Step>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [selectedDetailItem, setSelectedDetailItem] = useState<any>(null);
 
   const [expandedCategories, setExpandedCategories] = useState<string[]>(["listings", "business"]);
   const [showBasics, setShowBasics] = useState(false);
@@ -161,30 +548,45 @@ export default function BookingForm() {
   };
 
   const toggleService = (id: string) => {
+    const isSelecting = formData.selectedService !== id;
     setFormData(prev => ({
       ...prev,
       selectedService: prev.selectedService === id ? "" : id,
       selectedBasics: [] // Deselect basics if a campaign tier is chosen
     }));
+
+    if (isSelecting) {
+      const service = services.find(s => s.id === id);
+      if (service) setSelectedDetailItem(service);
+    }
   };
 
   const toggleAddOn = (id: string) => {
+    const isSelecting = !formData.selectedAddOns.includes(id);
     setFormData(prev => ({
       ...prev,
       selectedAddOns: prev.selectedAddOns.includes(id)
         ? prev.selectedAddOns.filter(a => a !== id)
         : [...prev.selectedAddOns, id]
     }));
+
+    if (isSelecting) {
+      addOns.forEach(cat => {
+        const item = cat.items.find(x => x.id === id);
+        if (item) setSelectedDetailItem(item);
+      });
+    }
   };
 
   const toggleBasic = (id: string) => {
+    const isSelecting = !formData.selectedBasics.includes(id);
     // If it's a photo package, only one at a time
     if (id.startsWith("photos-")) {
       setFormData(prev => ({
         ...prev,
         selectedService: "", // Deselect campaign tiers if a basic is chosen
-        selectedBasics: prev.selectedBasics.includes(id) 
-          ? prev.selectedBasics.filter(b => b !== id) 
+        selectedBasics: prev.selectedBasics.includes(id)
+          ? prev.selectedBasics.filter(b => b !== id)
           : [id, ...prev.selectedBasics.filter(b => !b.startsWith("photos-"))]
       }));
     } else {
@@ -195,6 +597,35 @@ export default function BookingForm() {
           ? prev.selectedBasics.filter(b => b !== id)
           : [...prev.selectedBasics, id]
       }));
+    }
+
+    if (isSelecting) {
+      const basic = basicsList.find(b => b.id === id);
+      if (basic) setSelectedDetailItem(basic);
+    }
+  };
+
+  const togglePremium = () => {
+    const isSelecting = !formData.premiumUpgrade;
+    updateFormData({ premiumUpgrade: isSelecting });
+    if (isSelecting) {
+      setSelectedDetailItem({
+        name: "✨ Iconic Finish (Premium)",
+        description: "The ultimate digital polish for your listing. We touch up every detail to ensure it stands out in the crowd.",
+        price: 65,
+        features: [
+          "Remove Dirt & Debris",
+          "Remove Reflections and Harsh Shadows",
+          "Remove Cords & Powerlines",
+          "Clean Driveways",
+          "Clean Roads & Sidewalks",
+          "Add Grass",
+          "Add Curb Appeal",
+          "Add Landscaping",
+          "Add TVs & Screens",
+          "Add Fire to Pits and Places"
+        ]
+      });
     }
   };
 
@@ -487,8 +918,8 @@ export default function BookingForm() {
                  </div>
                  <div className="relative z-10 space-y-4">
                     <h2 className="text-xl font-black uppercase tracking-tight">✨ Level up to the "Iconic" Finish? (Next Day Delivery)</h2>
-                    <div 
-                      onClick={() => updateFormData({ premiumUpgrade: !formData.premiumUpgrade })}
+                    <div
+                      onClick={togglePremium}
                       className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex items-center gap-4 ${formData.premiumUpgrade ? 'border-teal-400 bg-teal-900/20' : 'border-gray-800 bg-gray-900/50 hover:border-gray-600'}`}
                     >
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${formData.premiumUpgrade ? 'bg-teal-400 text-black' : 'bg-gray-800 text-gray-500'}`}>
@@ -995,6 +1426,63 @@ export default function BookingForm() {
         </div>
       </div>
       <ChatWidget isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+
+      {/* Detail Pop-out Modal */}
+      <Dialog open={!!selectedDetailItem} onOpenChange={(open) => !open && setSelectedDetailItem(null)}>
+        <DialogContent className="max-w-xl rounded-[2rem] p-0 overflow-hidden border-none bg-white shadow-2xl">
+          <div className="bg-black p-8 text-white relative overflow-hidden">
+             <div className="absolute top-0 right-0 p-8 opacity-10">
+                <Sparkles className="w-24 h-24" />
+             </div>
+             <div className="relative z-10">
+                <DialogHeader>
+                   <div className="flex items-center gap-3 mb-2">
+                      <div className="px-3 py-1 rounded-full bg-teal-400/20 text-teal-400 text-[10px] font-black uppercase tracking-widest border border-teal-400/30">
+                         Product Details
+                      </div>
+                   </div>
+                   <DialogTitle className="text-3xl font-black uppercase tracking-tight text-white mb-2">
+                      {selectedDetailItem?.name}
+                   </DialogTitle>
+                   <DialogDescription className="text-gray-400 text-sm font-medium leading-relaxed">
+                      {selectedDetailItem?.description}
+                   </DialogDescription>
+                </DialogHeader>
+             </div>
+          </div>
+          <div className="p-8 space-y-6">
+             {selectedDetailItem?.features && (
+                <div className="space-y-4">
+                   <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 flex items-center gap-2">
+                      <Check className="w-3 h-3 text-teal-500" /> WHAT'S ALL INCLUDED
+                   </h4>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {selectedDetailItem.features.map((feature: string, idx: number) => (
+                         <div key={idx} className="flex items-start gap-3 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                            <Check className="w-3.5 h-3.5 text-teal-500 mt-0.5 shrink-0" />
+                            <span className="text-[11px] font-bold text-gray-700 leading-tight">{feature}</span>
+                         </div>
+                      ))}
+                   </div>
+                </div>
+             )}
+             <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
+                <div className="space-y-0.5">
+                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Investment</p>
+                   <p className="text-2xl font-black text-black">
+                     {selectedDetailItem?.price > 0 ? `$${selectedDetailItem.price}` : "TBD"}
+                   </p>
+                </div>
+                <Button
+                  onClick={() => setSelectedDetailItem(null)}
+                  className="bg-black hover:bg-gray-800 text-white font-black px-8 h-14 rounded-2xl transition-all shadow-lg"
+                >
+                   GOT IT
+                </Button>
+             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
