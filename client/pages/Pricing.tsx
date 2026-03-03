@@ -136,7 +136,7 @@ export default function Pricing() {
       period: "session",
       description: "Forget the stiff corporate headshot. We capture you in your element—approachable, professional, and uniquely you.",
       icon: <Camera className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
-      buttonText: "UPGRADE MY IMAGE",
+      buttonText: "Upgrade my Image",
       ctaSubtext: "You sell homes; we’ll handle the fame.",
       tooltip: "Perfect for agents needing a quick but high-end update to their social and professional profiles.",
       features: [
@@ -148,38 +148,37 @@ export default function Pricing() {
       ]
     },
     {
-      name: "THE AUTHORITY",
-      tagline: "Your Personal Content Department",
+      name: "THE CONTENT PARTNER",
+      tagline: "30 days of content in 2 hours.",
       price: "999",
       period: "per month",
-      description: "You show up for two hours; we feed your social media for the entire month. This is for the pro who is ready to stop \"trying\" to post and start dominating.",
+      description: "You show up; we build the brand. 30 days of content in 2 hours.",
       icon: <Video className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
       isPopular: true,
-      buttonText: "DELEGATE MY CONTENT",
-      ctaSubtext: "You sell homes; we’ll handle the fame.",
+      buttonText: "CREATE MY CONTENT",
+      ctaSubtext: "Result: Never wonder \"what to post\" again.",
       tooltip: "Designed for agents who want to dominate social media without the stress of filming or editing.",
       features: [
-        "The 'Value Bomb' Session: 2hrs of filming per month.",
-        "Full Strategy & Scripting: We tell you exactly what to say to convert followers into leads.",
-        "20 Custom Reels/TikToks: Hand-edited with 2026 trends, speed ramps, and captions.",
-        "Trending Audio & Personal Branding: Every video feels like you, only better."
+        "2-Hour Monthly Filming Session",
+        "Full Strategy, Scripting & Direction",
+        "20 Custom Reels for Socials",
+        "Trending Audio & Personal Branding"
       ]
     },
     {
       name: "THE LOCAL LEGEND",
-      tagline: "The Market Takeover Campaign",
-      price: "2499",
+      tagline: "THE MARKET TAKEOVER CAMPAIGN",
+      price: "2,499",
       period: "session/campaign",
-      description: "We spend a full day in your world to build a \"Day in the Life\" cinematic library that makes you the undisputed go-to authority in your neighborhood.",
+      description: "Vibe: Your Story, Told Cinematically.",
       icon: <Users className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
-      buttonText: "Build my Empire",
-      ctaSubtext: "You sell homes; we’ll handle the fame.",
+      buttonText: "Build My Empire",
+      ctaSubtext: "Result: Undisputed status as the local expert.",
       tooltip: "For agents aiming for 'Neighborhood Mayor' status and total local authority.",
       features: [
-        "6-8hr Signature Production: Cinematic \"Day in the Life\" coverage.",
-        "The 90-Second Bio-Film: Your \"Why\" story, told with Hollywood-level production.",
-        "Neighborhood Mayor Series: 5 High-impact videos highlighting local hotspots (perfect for B2B networking).",
-        "The Total Brand Transformation: Every asset you need to own the local conversation."
+        "6-8 Hour Signature Production Day",
+        "90-Second 4K Bio Film",
+        "5 \"Local Authority\" Neighborhood Spotlights"
       ]
     }
   ];
@@ -584,7 +583,7 @@ export default function Pricing() {
                     {/* Add-Ons */}
                     <div className="lg:col-span-1 space-y-6">
                       <div>
-                        <h4 className="font-black text-xs uppercase tracking-widest mb-1" style={{ color: settings.global.primaryColor }}>Add-Ons & Stand-Alone Services</h4>
+                        <h4 className="font-black text-xs uppercase tracking-widest mb-1" style={{ color: settings.global.primaryColor }}>Add-On Services</h4>
                         <p className="text-[10px] text-gray-400 font-bold italic mb-6">(Must already be on site doing a full service shoot)</p>
                       </div>
                       <div className="space-y-4">
@@ -613,11 +612,11 @@ export default function Pricing() {
                         <div className="relative z-10">
                           <div className="flex flex-col mb-6">
                             <div className="flex items-center justify-between mb-2">
-                              <h4 className="font-black text-xs uppercase tracking-widest" style={{ color: settings.global.primaryColor }}>THE ICONIC POLISH (PREMIUM UPGRADE)</h4>
+                              <h4 className="font-black text-xs uppercase tracking-widest" style={{ color: settings.global.primaryColor }}>THE ICONIC POLISH $65</h4>
                               <span className="text-2xl font-black text-white">$65</span>
                             </div>
-                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Make it Magazine Ready</p>
-                            <p className="text-[8px] text-gray-500 mt-2">Standard on Market Leader | $65 Add-on for all other packages</p>
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">(Premium Upgrade)</p>
+                            <p className="text-[11px] font-bold text-gray-100 mt-2">Standard on Market Leader | $65 Add-on for all other packages</p>
                           </div>
                           <div className="grid grid-cols-1 gap-3">
                             {[
@@ -638,8 +637,8 @@ export default function Pricing() {
                               </div>
                             ))}
                           </div>
-                          <Button asChild className="w-full mt-8 text-white font-black py-6 rounded-xl transition-all shadow-lg shadow-teal-900/20" style={{ backgroundColor: settings.global.primaryColor }}>
-                            <Link to="/book">Upgrade My Photos</Link>
+                          <Button asChild className="w-full mt-8 text-white font-black py-6 rounded-xl transition-all shadow-lg shadow-teal-900/20 bg-[#0d9488] hover:bg-[#0f766e]">
+                            <Link to="/book">Upgrade my Edits</Link>
                           </Button>
                         </div>
                       </div>
@@ -654,7 +653,7 @@ export default function Pricing() {
         {/* Branding Before & After Slider - Smaller */}
         <section className="py-24 bg-[#fafafa]">
           <div className="max-w-4xl mx-auto px-4 text-center">
-            <h2 className="text-5xl md:text-7xl font-black text-black mb-8 tracking-tight">Elevate Your Personal Brand</h2>
+            <h2 className="text-4xl md:text-6xl font-black text-black mb-8 tracking-tight">Elevate Your Personal Brand</h2>
             <p className="text-lg text-gray-500 mb-12 max-w-xl mx-auto font-medium">See the difference between a standard corporate headshot and an Iconic Lifestyle Portrait.</p>
 
             <div className="relative max-w-2xl mx-auto aspect-[16/9] rounded-[2rem] overflow-hidden shadow-xl border-4 border-white">
@@ -768,7 +767,7 @@ export default function Pricing() {
                     <Button asChild className={`w-full py-6 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] ${
                       tier.isPopular ? 'text-white shadow-lg' : 'bg-black hover:bg-gray-800 text-white shadow-lg'
                     }`} style={{ backgroundColor: tier.isPopular ? settings.global.primaryColor : undefined }}>
-                      <Link to={`/book?package=${tier.name === 'THE ESSENTIALS' ? 'essentials' : tier.name === 'THE SHOWCASE' ? 'showcase' : tier.name === 'THE LEGACY' ? 'legacy' : 'market-leader'}`}>
+                      <Link to={`/book?package=${tier.name === 'THE REFRESH' ? 'refresh' : tier.name === 'THE CONTENT PARTNER' ? 'content-partner' : tier.name === 'THE LOCAL LEGEND' ? 'local-legend' : ''}`}>
                         {tier.buttonText}
                       </Link>
                     </Button>
