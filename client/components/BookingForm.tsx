@@ -498,7 +498,7 @@ export default function BookingForm() {
   const [showIconicPopup, setShowIconicPopup] = useState(false);
   const [showVirtualStagingPopup, setShowVirtualStagingPopup] = useState(false);
 
-  const [expandedCategories, setExpandedCategories] = useState<string[]>(["listings", "business"]);
+  const [expandedCategories, setExpandedCategories] = useState<string[]>(["listings"]);
   const [showBasics, setShowBasics] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -543,11 +543,16 @@ export default function BookingForm() {
     const premiumParam = searchParams.get("premium") === "true";
 
     if (serviceParam) {
-      setFormData(prev => ({ 
-        ...prev, 
+      setFormData(prev => ({
+        ...prev,
         selectedService: serviceParam,
         premiumUpgrade: premiumParam
       }));
+      // Expand only the category of the selected service
+      const service = services.find(s => s.id === serviceParam);
+      if (service) {
+        setExpandedCategories([service.category]);
+      }
     }
 
     if (itemsParam) {
@@ -788,7 +793,6 @@ export default function BookingForm() {
             ${calculateTotal()}
           </span>
         </div>
-        <p className="text-[9px] text-gray-400 font-medium italic text-center">No hidden fees. Instant transparency.</p>
       </div>
     </div>
   );
@@ -1413,9 +1417,29 @@ export default function BookingForm() {
                 We're sharpening the lenses and checking the weather. Expect a confirmation text shortly.
               </p>
             </div>
-            <Button asChild className="bg-black hover:bg-gray-800 text-white font-black px-10 py-6 text-sm rounded-2xl transition-all shadow-xl hover:scale-105 active:scale-95">
-              <a href="/">Back to Dashboard</a>
-            </Button>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Button asChild className="bg-black hover:bg-gray-800 text-white font-black px-10 py-6 text-sm rounded-2xl transition-all shadow-xl hover:scale-105 active:scale-95 w-full sm:w-auto">
+                <a href="/">Back to Home</a>
+              </Button>
+              <Button
+                onClick={() => {
+                  setStep(1);
+                  setExpandedCategories(["listings"]);
+                  setFormData(prev => ({
+                    ...prev,
+                    selectedService: "",
+                    selectedBasics: [],
+                    selectedAddOns: [],
+                    premiumUpgrade: false,
+                    virtualStagingCredits: 0
+                  }));
+                }}
+                variant="outline"
+                className="border-2 border-black text-black font-black px-10 py-6 text-sm rounded-2xl transition-all shadow-md hover:scale-105 active:scale-95 w-full sm:w-auto"
+              >
+                Book Another Service
+              </Button>
+            </div>
           </motion.div>
         );
     }
@@ -1541,7 +1565,7 @@ export default function BookingForm() {
              </div>
              <div className="relative z-10 text-center space-y-4">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-400/20 text-teal-400 text-[10px] font-black uppercase tracking-widest border border-teal-400/30">
-                  <Sparkles className="w-3 h-3" /> Limited Time Opportunity
+                  <Sparkles className="w-3 h-3" /> UPGRADE OPPORTUNITY
                 </div>
                 <DialogHeader className="space-y-4 text-center sm:text-center">
                   <DialogTitle className="text-4xl font-black uppercase tracking-tight leading-none text-white">
@@ -1554,16 +1578,18 @@ export default function BookingForm() {
              </div>
           </div>
           <div className="p-10 space-y-8">
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
                 {[
                   "Remove Dirt & Debris",
-                  "Remove Reflections",
-                  "Clear Cords & Lines",
+                  "Remove Reflections and Harsh Shadows",
+                  "Remove Cords & Powerlines",
                   "Clean Driveways",
-                  "Lush Green Grass",
-                  "Sky Replacement",
-                  "Digital Staging Lite",
-                  "Night/Twilight Renders"
+                  "Clean Roads & Sidewalks",
+                  "Add Grass",
+                  "Add Curb Appeal",
+                  "Add Landscaping",
+                  "Add TVs & Screens",
+                  "Add Fire to Pits and Places"
                 ].map((item, idx) => (
                   <div key={idx} className="flex items-center gap-3">
                     <div className="w-5 h-5 rounded-full bg-teal-50 flex items-center justify-center">
