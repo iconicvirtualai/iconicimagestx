@@ -50,15 +50,14 @@ export default function Contact() {
 
                     <a
                       href="tel:281-356-0965"
-                      className="flex items-center gap-4 p-4 bg-black border border-gray-800 rounded-2xl group hover:border-gray-700 transition-all duration-300 shadow-xl hover:shadow-2xl text-left relative overflow-hidden"
+                      className="flex items-center gap-4 p-4 bg-gray-100/50 border border-black rounded-2xl group hover:bg-gray-200/50 transition-all duration-300 shadow-xl hover:shadow-2xl text-left relative overflow-hidden"
                     >
-                      <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none" />
-                      <div className="bg-gray-800 p-2.5 rounded-xl text-white group-hover:scale-110 transition-transform flex-shrink-0 shadow-inner">
+                      <div className="bg-black p-2.5 rounded-xl text-white group-hover:scale-110 transition-transform flex-shrink-0 shadow-sm">
                         <Phone className="w-5 h-5" />
                       </div>
                       <div className="flex-1 min-w-[120px] relative z-10">
-                        <div className="text-[9px] font-bold tracking-widest text-gray-400 uppercase mb-0.5">CALL US</div>
-                        <div className="text-base font-bold text-white group-hover:text-white transition-colors flex items-center gap-2">
+                        <div className="text-[9px] font-bold tracking-widest text-gray-500 uppercase mb-0.5">CALL US</div>
+                        <div className="text-base font-bold text-black group-hover:text-black transition-colors flex items-center gap-2">
                           281-356-0965
                           <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0" />
                         </div>
