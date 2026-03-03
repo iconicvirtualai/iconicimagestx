@@ -133,7 +133,7 @@ export default function Pricing() {
       name: "THE REFRESH",
       tagline: "The Modern Portrait.",
       price: "349",
-      period: "session",
+      period: "PER SESSION",
       description: "Forget the stiff corporate headshot. We capture you in your element—approachable, professional, and uniquely you.",
       icon: <Camera className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
       buttonText: "Upgrade my Image",
@@ -152,7 +152,7 @@ export default function Pricing() {
       tagline: "30 days of content in 2 hours.",
       price: "999",
       period: "per month",
-      description: "You show up; we build the brand. 30 days of content in 2 hours.",
+      description: "You show up; we build the brand.",
       icon: <Video className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
       isPopular: true,
       buttonText: "CREATE MY CONTENT",
@@ -169,8 +169,8 @@ export default function Pricing() {
       name: "THE LOCAL LEGEND",
       tagline: "THE MARKET TAKEOVER CAMPAIGN",
       price: "2,499",
-      period: "session/campaign",
-      description: "Vibe: Your Story, Told Cinematically.",
+      period: "PER SESSION/CAMPAIGN",
+      description: "We spend a full day in your world to build a \"Day in the Life\" cinematic library that makes you the undisputed go-to authority in your chosen neighborhood.",
       icon: <Users className="w-6 h-6" style={{ color: settings.global.primaryColor }} />,
       buttonText: "Build My Empire",
       ctaSubtext: "Result: Undisputed status as the local expert.",
@@ -178,7 +178,9 @@ export default function Pricing() {
       features: [
         "6-8 Hour Signature Production Day",
         "90-Second 4K Bio Film",
-        "5 \"Local Authority\" Neighborhood Spotlights"
+        "5 \"Local Authority\" Neighborhood Spotlights",
+        "Pre-Production \"Vibe Check\" and Professional Scripting",
+        "Post-Production Guidance and Marketing Review"
       ]
     }
   ];
