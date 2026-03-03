@@ -50,7 +50,7 @@ export default function Contact() {
 
                     <a
                       href="tel:281-356-0965"
-                      className="flex items-center gap-4 p-4 bg-gray-400/50 border border-black rounded-2xl group hover:bg-gray-400/60 transition-all duration-300 shadow-xl hover:shadow-2xl text-left relative overflow-hidden"
+                      className="flex items-center gap-4 p-4 bg-gray-100/50 border border-black rounded-2xl group hover:bg-gray-200/50 transition-all duration-300 shadow-xl hover:shadow-2xl text-left relative overflow-hidden"
                     >
                       <div className="bg-black p-2.5 rounded-xl text-white group-hover:scale-110 transition-transform flex-shrink-0 shadow-sm">
                         <Phone className="w-5 h-5" />
