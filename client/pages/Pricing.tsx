@@ -8,6 +8,8 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 export default function Pricing() {
   const settings = useSiteSettings();
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
+  const [brandingSliderPos, setBrandingSliderPos] = useState(50);
   const [selectedPhotoPkg, setSelectedPhotoPkg] = useState<string | null>(null);
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
   const [isPremiumUpgrade, setIsPremiumUpgrade] = useState(false);
