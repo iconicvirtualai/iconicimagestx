@@ -920,6 +920,14 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     </div>
   );
 
+  // Scheduling helpers (used in the Scheduling step)
+  const currentMonth = formData.serviceDate ? startOfMonth(formData.serviceDate) : startOfMonth(new Date());
+  const months = Array.from({ length: 12 }, (_, i) => addMonths(startOfMonth(new Date()), i));
+  const daysInMonth = eachDayOfInterval({
+    start: startOfMonth(currentMonth),
+    end: endOfMonth(currentMonth)
+  }).filter(date => date >= new Date(new Date().setHours(0,0,0,0)));
+
   const renderStep = () => {
     switch (step) {
       case 1:
