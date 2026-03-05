@@ -64,19 +64,16 @@ const fetchSettingsSingleton = async (force = false) => {
   lastFetchTime = now;
 
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    // Use Promise.race to implement a timeout without relying on AbortController
+    const fetchPromise = fetch("/api/settings", { cache: 'no-cache' }).catch(() => null);
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000));
 
-    try {
-      const res = await fetch("/api/settings", { 
-        signal: controller.signal,
-        cache: 'no-cache' // Ensure we get fresh data
-      });
-      clearTimeout(timeoutId);
+    const res = await Promise.race([fetchPromise, timeoutPromise]);
 
-      if (res && res.ok) {
-        const serverSettings = await res.json();
-        
+    if (res && (res as Response).ok) {
+      try {
+        const serverSettings = await (res as Response).json();
+
         // Merge server settings with any local drafts (drafts take priority)
         const currentLocal = localStorage.getItem("site_customization");
         let merged = serverSettings;
@@ -90,9 +87,9 @@ const fetchSettingsSingleton = async (force = false) => {
           globalSettings = merged;
           notifyListeners();
         }
+      } catch (parseErr) {
+        // ignore JSON parse errors
       }
-    } catch (fetchError) {
-      // Catch fetch errors (network down, abort) completely silently to avoid stack traces in console
     }
   } catch (e) {
     // Silent catch-all
