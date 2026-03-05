@@ -17,14 +17,14 @@ export default function StepsSection() {
       step: "STEP 2",
       title: "We capture the vision",
       description: "Our professional creative team arrives on-site with state-of-the-art equipment to capture high-impact raw media.",
-      image: "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=800&q=80", // Camera/Shooting
+      image: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Ff9bbfe449cbd41bda1969183f92dae43", // Camera/Shooting
       icon: <Camera className="w-5 h-5" style={{ color: settings.global.primaryColor }} />,
     },
     {
       step: "STEP 3",
       title: "Rapid post-production",
       description: "Our expert editors transform raw clips into polished, cinematic masterpieces that perfectly align with your brand.",
-      image: "https://images.unsplash.com/photo-1536240478700-b869070f9279?w=800&q=80", // Editing
+      image: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F7cc17ef433b7405db1939d36b6ef6266", // Editing
       icon: <Scissors className="w-5 h-5" style={{ color: settings.global.primaryColor }} />,
     },
     {
