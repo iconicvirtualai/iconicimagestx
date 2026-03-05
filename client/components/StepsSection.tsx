@@ -31,7 +31,7 @@ export default function StepsSection() {
       step: "STEP 4",
       title: "Delivery & launch",
       description: "Receive your ready-to-post assets within 24 hours. Download, publish, and dominate your social feed instantly.",
-      image: "https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=800&q=80", // Social/Launch
+      image: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fd71c845602824dcf8f5c696217f1c217", // Social/Launch
       icon: <Rocket className="w-5 h-5" style={{ color: settings.global.primaryColor }} />,
     },
   ];
