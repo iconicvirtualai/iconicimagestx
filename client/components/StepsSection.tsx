@@ -10,7 +10,7 @@ export default function StepsSection() {
       step: "STEP 1",
       title: "Book your session",
       description: "Select your creative service and schedule a time through our seamless partnership portal in just a few clicks.",
-      image: "https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=800&q=80", // Calendar/Planning
+      image: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F72c9fbb7ba5e4993ae8e72ee6060f07a", // Calendar/Planning
       icon: <Calendar className="w-5 h-5" style={{ color: settings.global.primaryColor }} />,
     },
     {
