@@ -18,7 +18,7 @@ export default function AudienceDetails() {
     {
       title: "Developers & Builders",
       description: "Showcase new construction and development projects with cinematic fly-throughs.",
-      image: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fd3d433b441104f608c53e0ad02f0d5e9",
+      image: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F3c860cce026648ed89033acda9e01478",
     },
     {
       title: "Small Business Owners",
