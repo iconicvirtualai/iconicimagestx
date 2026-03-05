@@ -3,7 +3,7 @@ export default function AudienceDetails() {
     {
       title: "Realtors & Brokers",
       description: "Attract leads, close faster, and win more listings with engaging property videos.",
-      image: "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=400&h=400&fit=crop",
+      image: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F4250f70a1a8a4ece8cf324f7cbcd7fbc",
     },
     {
       title: "Photographers",
@@ -13,12 +13,12 @@ export default function AudienceDetails() {
     {
       title: "Real Estate Media Companies",
       description: "Scale your business and stay competitive with AI property videos — no extra overhead.",
-      image: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&h=400&fit=crop",
+      image: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F3c473a3b6e4d461bac1599f7231d3d2d",
     },
     {
       title: "Developers & Builders",
       description: "Showcase new construction and development projects with cinematic fly-throughs.",
-      image: "https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=400&h=400&fit=crop",
+      image: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fd3d433b441104f608c53e0ad02f0d5e9",
     },
     {
       title: "Small Business Owners",
