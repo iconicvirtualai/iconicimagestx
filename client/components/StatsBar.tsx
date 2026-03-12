@@ -1,4 +1,7 @@
+import { useSiteSettings } from "@/hooks/useSiteSettings";
+
 export default function StatsBar() {
+  const settings = useSiteSettings();
   const stats = [
     {
       value: "100,000+",
@@ -23,7 +26,10 @@ export default function StatsBar() {
               <span className="text-4xl md:text-5xl lg:text-6xl font-bold accent-text-bordered transition-transform group-hover:scale-105 duration-300">
                 {stat.value}
               </span>
-              <span className="text-sm md:text-base text-gray-400 font-medium uppercase tracking-wider">
+              <span
+                className="text-sm md:text-base font-bold uppercase tracking-wider transition-colors duration-300"
+                style={{ color: settings.global.primaryColor }}
+              >
                 {stat.label}
               </span>
               
