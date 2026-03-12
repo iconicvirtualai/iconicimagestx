@@ -52,11 +52,11 @@ export default function VirtualStagingProOrder() {
             
             {/* Header */}
             <div className="text-center mb-16">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black text-white mb-6">
-                <UserCheck className="w-4 h-4 text-[#0d9488]" />
-                <span className="text-[10px] font-bold tracking-widest uppercase">Professional Staging</span>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black text-white mb-6 shadow-lg border border-black">
+                <UserCheck className="w-4 h-4 text-white" />
+                <span className="text-[10px] font-bold tracking-widest uppercase accent-text-bordered">Professional Staging</span>
               </div>
-              <h1 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight">Submit to <span className="text-[#0d9488]">Iconic Professionals</span></h1>
+              <h1 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight">Submit to <span className="accent-text-bordered">Iconic Professionals</span></h1>
               <p className="text-gray-500 max-w-2xl mx-auto text-lg">Our design team will manually stage your photos for the highest possible quality and realism.</p>
             </div>
 
@@ -181,15 +181,15 @@ export default function VirtualStagingProOrder() {
                     </div>
                     <div className="flex justify-between items-center text-gray-400">
                       <span>Style Match</span>
-                      <span className="text-[#0d9488] font-bold">Included</span>
+                      <span className="accent-text-bordered font-bold">Included</span>
                     </div>
                     <div className="flex justify-between items-center text-gray-400">
                       <span>Revision Protection</span>
-                      <span className="text-[#0d9488] font-bold">Included</span>
+                      <span className="accent-text-bordered font-bold">Included</span>
                     </div>
                     <div className="pt-6 border-t border-white/10 flex justify-between items-center">
                       <span className="text-lg font-bold">Total Cost</span>
-                      <span className="text-3xl font-bold text-[#0d9488]">${photos.length * 25}</span>
+                      <span className="text-3xl font-bold accent-text-bordered">${photos.length * 25}</span>
                     </div>
                   </div>
 

@@ -102,11 +102,11 @@ export default function AgentLandingPage() {
             className="space-y-8"
           >
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-black text-white text-xs font-black uppercase tracking-widest shadow-lg">
-              <Sparkles className="w-3 h-3 text-teal-400" /> Exclusive Offer for Real Estate Agents
+              <Sparkles className="w-3 h-3 text-white" /> Exclusive Offer for Real Estate Agents
             </div>
-            
+
             <h1 className="text-5xl lg:text-7xl font-black uppercase leading-[0.9] tracking-tighter text-black">
-              Get <span className="text-teal-600">10X More Eyes</span> On Your Listings
+              Get <span className="accent-text-bordered">10X More Eyes</span> On Your Listings
             </h1>
             
             <p className="text-lg lg:text-xl text-gray-600 max-w-xl font-medium">
@@ -186,7 +186,7 @@ export default function AgentLandingPage() {
       <section className="py-24 px-6 bg-gray-50">
         <div className="max-w-7xl mx-auto">
           <div className="text-center space-y-4 mb-20">
-            <h2 className="text-3xl lg:text-5xl font-black uppercase tracking-tight">Why Agents Choose <span className="text-teal-600">Iconic</span></h2>
+            <h2 className="text-3xl lg:text-5xl font-black uppercase tracking-tight">Why Agents Choose <span className="accent-text-bordered">Iconic</span></h2>
             <p className="text-gray-500 font-bold uppercase tracking-widest text-xs">The gold standard in real estate marketing</p>
           </div>
           
@@ -230,7 +230,7 @@ export default function AgentLandingPage() {
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div className="space-y-8">
               <h2 className="text-4xl lg:text-6xl font-black uppercase tracking-tighter leading-[0.9]">
-                Hear it from <span className="text-teal-600">The Experts</span>
+                Hear it from <span className="accent-text-bordered">The Experts</span>
               </h2>
               <div className="space-y-6">
                 {testimonials.map((t, i) => (
@@ -274,7 +274,7 @@ export default function AgentLandingPage() {
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-teal-600 text-white text-xs font-black uppercase tracking-widest">
               Success Blueprint
             </div>
-            <h2 className="text-4xl lg:text-5xl font-black uppercase tracking-tight">How To Prepare For Your <span className="text-teal-400">Iconic Shoot</span></h2>
+            <h2 className="text-4xl lg:text-5xl font-black uppercase tracking-tight">How To Prepare For Your <span className="accent-text-bordered">Iconic Shoot</span></h2>
             <p className="text-gray-400 font-medium text-lg">
               We don't just show up. We partner with you to ensure the property looks its absolute best. 
             </p>
@@ -332,7 +332,7 @@ export default function AgentLandingPage() {
       <section id="booking-section" className="py-32 px-6 bg-white scroll-mt-20">
         <div className="max-w-5xl mx-auto space-y-16">
           <div className="text-center space-y-4">
-            <h2 className="text-4xl lg:text-6xl font-black uppercase tracking-tighter">Secure Your <span className="text-teal-600">Iconic Launch</span></h2>
+            <h2 className="text-4xl lg:text-6xl font-black uppercase tracking-tighter">Secure Your <span className="accent-text-bordered">Iconic Launch</span></h2>
             <p className="text-gray-500 font-bold uppercase tracking-widest text-sm italic">
               "The best investment I make in every listing." — Top Agent
             </p>

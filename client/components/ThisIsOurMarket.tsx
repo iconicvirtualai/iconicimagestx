@@ -26,7 +26,7 @@ export default function ThisIsOurMarket() {
               <div className="space-y-6 text-xl md:text-2xl text-gray-500 leading-relaxed font-medium">
                 <p>
                   Iconic was <span className="text-black font-bold">built here.</span><br />
-                  We’ve <span style={{ color: settings.global.primaryColor }} className="font-bold">invested here.</span><br />
+                  We’ve <span className="font-bold accent-text-bordered">invested here.</span><br />
                   We’ve <span className="text-black font-bold">shaped here.</span>
                 </p>
                 
@@ -42,7 +42,7 @@ export default function ThisIsOurMarket() {
 
                 <p className="pt-8 text-2xl md:text-3xl font-bold tracking-tight text-black">
                   Winning brands don’t <span className="text-gray-300">chase.</span><br />
-                  They <span style={{ color: settings.global.primaryColor }}>choose Iconic.</span>
+                  They <span className="accent-text-bordered">choose Iconic.</span>
                 </p>
               </div>
             </motion.div>

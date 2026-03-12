@@ -16,7 +16,7 @@ const PillarCard = ({
   <div className="bg-white rounded-[2.5rem] p-8 md:p-12 border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300">
     <div className="mb-8">
       <h3 className="text-3xl font-bold text-black mb-2">{title}</h3>
-      <p className="text-[#0d9488] font-semibold uppercase tracking-widest text-sm">{subtitle}</p>
+      <p className="font-semibold uppercase tracking-widest text-sm accent-text-bordered">{subtitle}</p>
     </div>
     <div className="space-y-8">
       {items.map((item, i) => (
@@ -59,7 +59,7 @@ const PackageCard = ({
         <span className="text-4xl font-bold text-black">{price}</span>
         {price !== "Custom" && price !== "TBD" && <span className="text-gray-400">/mo</span>}
       </div>
-      <p className="mt-4 text-[#0d9488] font-bold text-sm italic">"{hook}"</p>
+      <p className="mt-4 font-bold text-sm italic accent-text-bordered">"{hook}"</p>
     </div>
     <ul className="space-y-4 mb-10 flex-1">
       {features.map((feature, i) => (
@@ -89,12 +89,12 @@ export default function Pricing() {
           
           <div className="container mx-auto px-4 text-center">
             <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#f0fdfa] border border-[#ccfbf1] mb-8">
-              <span className="text-[12px] font-bold tracking-wider text-[#0d9488] uppercase">
+              <span className="text-[12px] font-bold tracking-wider uppercase accent-text-bordered">
                 2026 MEDIA SUITE
               </span>
             </div>
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-8 leading-[1.1] tracking-tight text-black max-w-5xl mx-auto">
-              The <span className="text-[#0d9488]">Iconic Domination</span> Menu
+              The <span className="accent-text-bordered">Iconic Domination</span> Menu
             </h1>
             <p className="text-xl text-gray-500 max-w-2xl mx-auto leading-relaxed">
               A futuristic suite of content products designed to dominate the 2026 real estate landscape. 

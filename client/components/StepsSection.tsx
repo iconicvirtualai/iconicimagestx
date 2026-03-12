@@ -41,8 +41,8 @@ export default function StepsSection() {
       <div className="container mx-auto px-4 relative z-10 max-w-6xl">
         <div className="text-center mb-12">
           {/* Badge */}
-          <div className="inline-flex items-center px-4 py-1.5 rounded-md bg-white border border-[#ccfbf1] mb-6 shadow-sm">
-            <span className="text-[12px] font-bold tracking-wider uppercase" style={{ color: settings.global.primaryColor }}>
+          <div className="inline-flex items-center px-4 py-1.5 rounded-md bg-black border border-black mb-6 shadow-sm">
+            <span className="text-[12px] font-bold tracking-wider uppercase accent-text-bordered">
               4 STEPS TO RESULTS
             </span>
           </div>
@@ -50,7 +50,7 @@ export default function StepsSection() {
           {/* Headline */}
           <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-6 leading-[1.1] tracking-tight text-black max-w-5xl mx-auto">
             From vision to viral in <br className="hidden md:block" />
-            <span style={{ color: settings.global.primaryColor }}>minutes</span>, not days
+            <span className="accent-text-bordered">minutes</span>, not days
           </h2>
 
           <p className="text-base md:text-lg text-gray-500 max-w-2xl mx-auto leading-relaxed">
@@ -69,7 +69,7 @@ export default function StepsSection() {
                 <span className="text-[10px] font-bold tracking-widest text-gray-400 uppercase block mb-2">
                   {item.step}
                 </span>
-                <h3 className="text-lg font-bold text-black mb-3 leading-tight transition-colors" onMouseEnter={(e) => e.currentTarget.style.color = settings.global.primaryColor} onMouseLeave={(e) => e.currentTarget.style.color = 'black'}>
+                <h3 className="text-lg font-bold text-black mb-3 leading-tight transition-all" onMouseEnter={(e) => { e.currentTarget.classList.add('accent-text-bordered'); }} onMouseLeave={(e) => { e.currentTarget.classList.remove('accent-text-bordered'); }}>
                   {item.title}
                 </h3>
                 <p className="text-sm text-gray-500 leading-relaxed min-h-[60px]">

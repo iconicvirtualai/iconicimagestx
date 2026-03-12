@@ -186,12 +186,12 @@ export default function Socials() {
           {/* Scaled Header */}
           <div className="flex flex-col md:flex-row items-end justify-between gap-6 mb-12 animate-in fade-in slide-in-from-bottom-3 duration-700">
             <div className="max-w-xl">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#f0fdfa] border border-[#ccfbf1] mb-4">
-                <Share2 className="w-3.5 h-3.5 text-[#0d9488]" />
-                <span className="text-[9px] font-bold uppercase tracking-widest text-[#0d9488]">Live Social Feed</span>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black border border-black mb-4 shadow-lg">
+                <Share2 className="w-3.5 h-3.5 text-white" />
+                <span className="text-[9px] font-bold uppercase tracking-widest accent-text-bordered">Live Social Feed</span>
               </div>
               <h1 className="text-4xl md:text-5xl font-bold text-black tracking-tighter leading-none mb-4">
-                ICONIC <span className="text-[#0d9488]">EVERYWHERE.</span>
+                ICONIC <span className="accent-text-bordered">EVERYWHERE.</span>
               </h1>
               <p className="text-lg text-gray-500 font-medium leading-relaxed max-w-lg">
                 Connected to our cloud ecosystem for real-time engagement updates. Follow the movement.
@@ -215,7 +215,7 @@ export default function Socials() {
                     </div>
                   ))}
                 </div>
-                <p className="text-[9px] font-bold text-[#0d9488] uppercase tracking-widest">Live Updates Connected</p>
+                <p className="text-[9px] font-bold accent-text-bordered uppercase tracking-widest">Live Updates Connected</p>
               </div>
             </div>
           </div>
@@ -224,7 +224,7 @@ export default function Socials() {
           <div className="mb-20 relative">
             <div className="flex items-center justify-between mb-6 px-1">
               <h2 className="text-xl font-bold text-black uppercase tracking-widest flex items-center gap-2">
-                <Star className="w-5 h-5 fill-[#0d9488] text-[#0d9488]" />
+                <Star className="w-5 h-5 fill-black text-white" />
                 Real-Time Highlights
               </h2>
               <div className="flex gap-2">
@@ -302,14 +302,14 @@ export default function Socials() {
                     {platform.icon}
                   </div>
                   <div className="text-right">
-                    <span className="block text-[8px] font-bold uppercase tracking-widest text-[#0d9488] mb-0.5">Synced</span>
+                    <span className="block text-[8px] font-bold uppercase tracking-widest accent-text-bordered mb-0.5">Synced</span>
                     <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{platform.lastSynced}</span>
                   </div>
                 </div>
 
                 <div className="relative z-10">
                   <h3 className="text-xl font-bold text-black mb-0.5 tracking-tight">{platform.name}</h3>
-                  <p className="text-[#0d9488] font-bold text-[11px] mb-3">{platform.handle}</p>
+                  <p className="accent-text-bordered font-bold text-[11px] mb-3">{platform.handle}</p>
                   <div className="flex items-center gap-3 py-3 border-t border-gray-50">
                     <div className="text-center flex-1">
                       <p className="text-base font-bold text-black">{platform.count}</p>
@@ -424,7 +424,7 @@ export default function Socials() {
                 <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-white">Cloud Integrated Community</span>
               </div>
               <h2 className="text-3xl md:text-5xl font-bold text-white mb-6 tracking-tighter leading-none">
-                TAG US IN YOUR <span className="text-[#0d9488]">WINS.</span>
+                TAG US IN YOUR <span className="accent-text-bordered">WINS.</span>
               </h2>
               <p className="text-lg text-gray-400 font-medium mb-10 max-w-xl mx-auto">
                 Real-time syncing enabled. Share your journey using #IconicImagesTX for a chance to be featured.

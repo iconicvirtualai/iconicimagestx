@@ -45,11 +45,11 @@ export default function RaisingTheStandard() {
               <div className="space-y-6 text-xl md:text-2xl text-gray-500 leading-relaxed font-medium">
                 <p>
                   We don’t follow <span className="text-black font-bold">trends.</span><br />
-                  We break <span style={{ color: settings.global.primaryColor }} className="font-bold">patterns.</span>
+                  We break <span className="font-bold accent-text-bordered">patterns.</span>
                 </p>
                 <p>
                   We don’t <span className="text-black font-bold">undercut.</span><br />
-                  We <span style={{ color: settings.global.primaryColor }} className="font-bold">outperform.</span>
+                  We <span className="font-bold accent-text-bordered">outperform.</span>
                 </p>
                 <p className="pt-4 text-lg md:text-xl font-normal border-t border-gray-100">
                   As the industry grows, it grows to the standard we’ve set.
@@ -63,7 +63,7 @@ export default function RaisingTheStandard() {
                   "Iconic didn't just give us a video; they gave us a completely new way to represent our properties. Their standard is levels above anything else we've tried."
                 </p>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center font-bold text-teal-700" style={{ backgroundColor: `${settings.global.primaryColor}20`, color: settings.global.primaryColor }}>
+                  <div className="w-10 h-10 rounded-full bg-black flex items-center justify-center font-bold accent-text-bordered shadow-lg" style={{ backgroundColor: 'black' }}>
                     JD
                   </div>
                   <div>

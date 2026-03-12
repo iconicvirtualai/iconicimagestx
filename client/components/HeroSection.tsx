@@ -43,14 +43,14 @@ export default function HeroSection() {
       <div className="container mx-auto px-4 text-center">
         {/* Badge */}
         <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#f0fdfa] border border-[#ccfbf1] mb-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
-          <span className="text-[12px] font-bold tracking-wider uppercase" style={{ color: settings.global.primaryColor }}>
+          <span className="text-[12px] font-bold tracking-wider uppercase accent-text-bordered">
             ICONIC® #1 Media Partner for Growing Brands
           </span>
         </div>
 
         {/* Headline */}
         <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-4 leading-[1.1] tracking-tight text-black max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 whitespace-pre-line">
-          We Turn <span style={{ color: settings.global.primaryColor }}>Ordinary</span> Into Iconic.
+          We Turn <span className="accent-text-bordered">Ordinary</span> Into Iconic.
         </h1>
 
         {/* Subheadline */}

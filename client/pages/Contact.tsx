@@ -19,11 +19,11 @@ export default function Contact() {
               {/* Left Side: Content & Testimonial */}
               <div className="space-y-10">
                 <div>
-                  <div className="text-[#0d9488] font-bold tracking-wider text-xs uppercase mb-5">
+                  <div className="font-bold tracking-wider text-xs uppercase mb-5 accent-text-bordered">
                     CONTACT US
                   </div>
                   <h1 className="text-4xl md:text-6xl font-bold text-black mb-6 leading-[1.1] tracking-tight">
-                    We'd love to <span className="text-[#0d9488]">hear from you</span>
+                    We'd love to <span className="accent-text-bordered">hear from you</span>
                   </h1>
                   <p className="text-gray-500 text-base leading-relaxed max-w-xl">
                     Have a question or feedback? We'd love to hear from you. Send us a
@@ -40,8 +40,8 @@ export default function Contact() {
                         <MessageCircle className="w-5 h-5" />
                       </div>
                       <div className="flex-1 min-w-[120px]">
-                        <div className="text-[9px] font-bold tracking-widest text-[#0d9488] uppercase mb-0.5">LIVE CHAT</div>
-                        <div className="text-base font-bold text-black group-hover:text-[#0d9488] transition-colors flex items-center gap-2">
+                        <div className="text-[9px] font-bold tracking-widest accent-text-bordered uppercase mb-0.5">LIVE CHAT</div>
+                        <div className="text-base font-bold text-black group-hover:accent-text-bordered transition-colors flex items-center gap-2">
                           Start Chat
                           <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0" />
                         </div>

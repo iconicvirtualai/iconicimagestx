@@ -339,13 +339,13 @@ export default function Pricing() {
           </div>
 
           <div className="relative z-10 pt-32 pb-16 text-center px-4 max-w-5xl mx-auto">
-          <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#f0fdfa] border border-[#ccfbf1] mb-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <span className="text-[12px] font-bold tracking-wider uppercase" style={{ color: settings.global.primaryColor }}>
+          <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-black border border-black mb-6 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <span className="text-[12px] font-bold tracking-wider uppercase accent-text-bordered">
               Pricing & Packages
             </span>
           </div>
           <h1 className="text-4xl md:text-6xl font-bold text-black mb-6 tracking-tight leading-[1.1]">
-            The Perfect <span style={{ color: settings.global.primaryColor }}>Price</span> for Your Presence
+            The Perfect <span className="accent-text-bordered">Price</span> for Your Presence
           </h1>
           <p className="text-lg text-gray-500 mb-10 max-w-2xl mx-auto font-medium">
             Media that moves as fast as you do.
@@ -381,7 +381,7 @@ export default function Pricing() {
                 </div>
                 <div className="text-left flex-1">
                   <h3 className="text-lg font-bold text-black mb-1">Not sure where to start?</h3>
-                  <div className="flex items-center gap-2 font-bold text-xs" style={{ color: settings.global.primaryColor }}>
+                  <div className="flex items-center gap-2 font-bold text-xs accent-text-bordered">
                     Let our AI guide you <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                   </div>
                 </div>
@@ -493,7 +493,7 @@ export default function Pricing() {
                   </div>
 
                   <h3 className={`text-xl font-black mb-1 ${tier.isVIP ? 'text-white' : 'text-black'}`}>{tier.name}</h3>
-                  <p className="font-bold text-xs uppercase tracking-wider mb-2" style={{ color: settings.global.primaryColor }}>{tier.tagline}</p>
+                  <p className="font-bold text-xs uppercase tracking-wider mb-2 accent-text-bordered">{tier.tagline}</p>
                   {tier.subheadline && (
                     <p className={`text-[10px] font-bold uppercase tracking-tight mb-6 ${tier.isVIP ? 'text-white/80' : 'text-gray-400'}`}>{tier.subheadline}</p>
                   )}
@@ -1179,13 +1179,13 @@ export default function Pricing() {
         <section className="bg-white py-24 md:py-32">
           <div className="container mx-auto px-4">
             <div className="text-center mb-16">
-              <div className="inline-flex items-center px-3 py-1 rounded bg-[#f0fdfa] border border-[#ccfbf1] mb-8">
-                <span className="text-[10px] font-bold tracking-wider uppercase" style={{ color: settings.global.primaryColor }}>
+                      <div className="inline-flex items-center px-3 py-1 rounded bg-black border border-black mb-8 shadow-lg">
+                <span className="text-[10px] font-bold tracking-wider uppercase accent-text-bordered">
                   FAQ
                 </span>
               </div>
               <h2 className="text-4xl md:text-5xl font-bold mb-6 text-black">
-                Got questions? We've got <span style={{ color: settings.global.primaryColor }}>answers</span>.
+                Got questions? We've got <span className="accent-text-bordered">answers</span>.
               </h2>
             </div>
 

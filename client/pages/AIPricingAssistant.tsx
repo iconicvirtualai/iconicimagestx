@@ -77,14 +77,14 @@ export default function AIPricingAssistant() {
         <div className="max-w-4xl mx-auto">
           {/* Header */}
           <div className="text-center mb-12">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#f0fdfa] border border-[#ccfbf1] mb-6">
-              <Sparkles className="w-4 h-4 text-[#0d9488]" />
-              <span className="text-[12px] font-bold tracking-wider text-[#0d9488] uppercase">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-black border border-black mb-6 shadow-lg">
+              <Sparkles className="w-4 h-4 text-white" />
+              <span className="text-[12px] font-bold tracking-wider uppercase accent-text-bordered">
                 AI Media Strategist
               </span>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold text-black mb-4 tracking-tight">
-              Find your <span className="text-[#0d9488]">perfect match</span>
+              Find your <span className="accent-text-bordered">perfect match</span>
             </h1>
             <p className="text-gray-500 text-lg max-w-2xl mx-auto">
               Answer a few questions and our AI will determine which service or package best suits your specific business goals.

@@ -56,15 +56,15 @@ export default function SolutionSection() {
     <section className="bg-white pt-12 pb-24 md:pt-16 md:pb-32">
       <div className="container mx-auto px-4 text-center">
         {/* Badge */}
-        <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#f0fdfa] border border-[#ccfbf1] mb-8">
-          <span className="text-[12px] font-bold tracking-wider uppercase" style={{ color: settings.global.primaryColor }}>
+        <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-black border border-black mb-8 shadow-lg">
+          <span className="text-[12px] font-bold tracking-wider uppercase accent-text-bordered">
             Built for Creative Excellence
           </span>
         </div>
 
         {/* Headline */}
         <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-8 leading-[1.2] tracking-tight text-black max-w-4xl mx-auto">
-          Your All-in-One <span style={{ color: settings.global.primaryColor }}>Solution</span> for <br className="hidden md:block" />
+          Your All-in-One <span className="accent-text-bordered">Solution</span> for <br className="hidden md:block" />
           High-Impact Media Content
         </h2>
 

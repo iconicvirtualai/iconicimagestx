@@ -127,13 +127,13 @@ export default function FeaturesSection() {
       <div className="container mx-auto px-4">
         {/* Section Header */}
         <div className="text-center mb-16">
-          <div className="inline-flex items-center px-3 py-1 rounded-md bg-[#f0fdfa] border border-[#ccfbf1] mb-6">
-            <span className="text-[10px] font-bold tracking-wider uppercase" style={{ color: settings.global.primaryColor }}>
+          <div className="inline-flex items-center px-3 py-1 rounded-md bg-black border border-black mb-6 shadow-lg">
+            <span className="text-[10px] font-bold tracking-wider uppercase accent-text-bordered">
               ADDITIONAL FEATURES
             </span>
           </div>
           <h2 className="text-3xl md:text-5xl font-bold mb-6 text-black max-w-4xl mx-auto tracking-tight">
-            Go beyond basic editing with <span style={{ color: settings.global.primaryColor }}>powerful</span> add-on tools
+            Go beyond basic editing with <span className="accent-text-bordered">powerful</span> add-on tools
           </h2>
           <p className="text-gray-500 max-w-2xl mx-auto text-sm leading-relaxed">
             Iconic isn't just about reels — enhance your content with smart AI tools
