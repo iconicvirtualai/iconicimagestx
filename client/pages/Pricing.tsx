@@ -671,8 +671,9 @@ export default function Pricing() {
                         </div>
                         <div className="relative z-10">
                           <div className="flex flex-col mb-6">
-                            <div className="flex items-center justify-between mb-4">
-                              <h4 className="font-black text-xs uppercase tracking-widest accent-text-bordered">THE ICONIC POLISH (Premium Upgrade) $65</h4>
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-black text-xs uppercase tracking-widest accent-text-bordered">THE ICONIC POLISH (Premium Upgrade)</h4>
+                              <span className="text-3xl font-black text-white">$65</span>
                             </div>
                             <p className="text-[11px] font-bold text-gray-100">Standard on Market Leader | $65 Add-on for all other packages (Next Day Delivery)</p>
                           </div>
