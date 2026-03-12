@@ -364,17 +364,17 @@ export default function Pricing() {
                 onClick={() => scrollToSection(bubble.id)}
                 className="px-8 py-3 rounded-full border transition-all shadow-sm text-sm font-bold"
                 style={{
-                  backgroundColor: 'white',
-                  color: settings.global.primaryColor,
+                  backgroundColor: settings.global.primaryColor,
+                  color: 'white',
                   borderColor: settings.global.primaryColor
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = settings.global.primaryColor;
-                  e.currentTarget.style.color = 'white';
-                }}
-                onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = 'white';
                   e.currentTarget.style.color = settings.global.primaryColor;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = settings.global.primaryColor;
+                  e.currentTarget.style.color = 'white';
                 }}
               >
                 {bubble.label}
