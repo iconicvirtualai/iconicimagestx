@@ -362,10 +362,20 @@ export default function Pricing() {
               <button
                 key={bubble.id}
                 onClick={() => scrollToSection(bubble.id)}
-                className="px-8 py-3 rounded-full border border-gray-200 bg-white text-sm font-bold text-gray-600 hover:text-white transition-all hover:border-transparent"
-                style={{ backgroundColor: 'transparent' }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = settings.global.primaryColor; e.currentTarget.style.color = 'white'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.color = 'rgb(75 85 99)'; }}
+                className="px-8 py-3 rounded-full border transition-all shadow-sm text-sm font-bold"
+                style={{
+                  backgroundColor: 'white',
+                  color: settings.global.primaryColor,
+                  borderColor: settings.global.primaryColor
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = settings.global.primaryColor;
+                  e.currentTarget.style.color = 'white';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'white';
+                  e.currentTarget.style.color = settings.global.primaryColor;
+                }}
               >
                 {bubble.label}
               </button>
