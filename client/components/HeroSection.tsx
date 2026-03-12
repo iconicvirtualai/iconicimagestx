@@ -41,9 +41,8 @@ export default function HeroSection() {
       </div>
 
       <div className="container mx-auto px-4 text-center">
-        {/* Badge */}
         <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#f0fdfa] border border-[#ccfbf1] mb-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
-          <span className="text-[12px] font-bold tracking-wider uppercase accent-text-bordered">
+          <span className="text-[12px] font-bold tracking-wider uppercase" style={{ color: settings.global.primaryColor }}>
             ICONIC® #1 Media Partner for Growing Brands
           </span>
         </div>

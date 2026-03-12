@@ -671,12 +671,10 @@ export default function Pricing() {
                         </div>
                         <div className="relative z-10">
                           <div className="flex flex-col mb-6">
-                            <div className="flex items-center justify-between mb-2">
-                              <h4 className="font-black text-xs uppercase tracking-widest" style={{ color: settings.global.primaryColor }}>THE ICONIC POLISH $65 (Next Day Delivery)</h4>
-                              <span className="text-2xl font-black text-white">$65</span>
+                            <div className="flex items-center justify-between mb-4">
+                              <h4 className="font-black text-xs uppercase tracking-widest accent-text-bordered">THE ICONIC POLISH (Premium Upgrade) $65</h4>
                             </div>
-                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">(Premium Upgrade) (Next Day Delivery)</p>
-                            <p className="text-[11px] font-bold text-gray-100 mt-2">Standard on Market Leader | $65 Add-on for all other packages (Next Day Delivery)</p>
+                            <p className="text-[11px] font-bold text-gray-100">Standard on Market Leader | $65 Add-on for all other packages (Next Day Delivery)</p>
                           </div>
                           <div className="grid grid-cols-1 gap-3">
                             {[
@@ -698,7 +696,7 @@ export default function Pricing() {
                             ))}
                           </div>
                           <Button asChild className="w-full mt-8 text-white font-black py-6 rounded-xl transition-all shadow-lg shadow-teal-900/20 bg-[#0d9488] hover:bg-[#0f766e]">
-                            <Link to={getBasicsBookingUrl(true)}>UPGRADE MY EDITS (Next Day Delivery)</Link>
+                            <Link to={getBasicsBookingUrl(true)}>UPGRADE MY EDITS</Link>
                           </Button>
                         </div>
                       </div>
@@ -713,7 +711,7 @@ export default function Pricing() {
         {/* Branding Before & After Slider - Smaller */}
         <section className="py-24 bg-[#fafafa]">
           <div className="max-w-4xl mx-auto px-4 text-center">
-            <h2 className="text-4xl md:text-6xl font-black text-black mb-8 tracking-tight">Elevate Your Personal Brand</h2>
+            <h2 className="text-4xl md:text-6xl font-black text-black mb-8 tracking-tight">Elevate Your <span className="accent-text-bordered">Personal Brand</span></h2>
             <p className="text-lg text-gray-500 mb-12 max-w-xl mx-auto font-medium">See the difference between a standard corporate headshot and an Iconic Lifestyle Portrait.</p>
 
             <div className="relative max-w-2xl mx-auto aspect-[16/9] rounded-[2rem] overflow-hidden shadow-xl border-4 border-white">

@@ -26,7 +26,7 @@ export default function TheNetwork() {
             transition={{ duration: 0.8 }}
           >
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-8 tracking-tight text-black">
-              Built Bigger Than <span style={{ color: settings.global.primaryColor }}>One Brand</span>
+              Built Bigger Than <span className="accent-text-bordered">One Brand</span>
             </h2>
             
             <div className="space-y-6 text-xl md:text-2xl text-gray-500 leading-relaxed font-medium">
