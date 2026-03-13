@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { createOrder } from "@/client/lib/createOrder";
+import { createOrder } from "@/lib/createOrder";
 import { useSearchParams } from "react-router-dom";
 import ChatWidget from "@/components/ChatWidget";
 import { Button } from "@/components/ui/button";
@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 import { format, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay } from "date-fns";
 import { toast } from "sonner";
-import { testWrite } from "@/client/lib/testWrite";
+import { testWrite } from "@/lib/testWrite";
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6 | "success";
 

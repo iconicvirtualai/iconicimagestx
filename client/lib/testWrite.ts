@@ -1,5 +1,5 @@
 import { addDoc, collection } from "firebase/firestore"
-import { db } from "@/client/lib/firebase"
+import { db } from "@/lib/firebase"
 
 export async function testWrite() {
 
