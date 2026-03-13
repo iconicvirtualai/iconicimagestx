@@ -24,6 +24,7 @@ interface CreateOrderData {
 export async function createOrder(formData: CreateOrderData) {
   try {
     // 1. Create a document in the 'appointments' collection
+    console.log("STEP 3: creating appointment")
     const appointmentData = {
       startTime: formData.serviceDate ? `${formData.serviceDate.toISOString().split('T')[0]} ${formData.serviceTime}` : "",
       endTime: "", // Left empty per instructions
@@ -39,9 +40,11 @@ export async function createOrder(formData: CreateOrderData) {
     };
 
     const appointmentRef = await addDoc(collection(db, "appointments"), appointmentData);
+    console.log("STEP 4: appointment created", appointmentRef.id)
     const appointmentId = appointmentRef.id;
 
     // 2. Create a document in the 'orders' collection
+    console.log("STEP 5: creating order")
     const orderData = {
       appointmentId,
       clientName: `${formData.firstName} ${formData.lastName}`,
@@ -56,10 +59,11 @@ export async function createOrder(formData: CreateOrderData) {
     };
 
     const orderRef = await addDoc(collection(db, "orders"), orderData);
+    console.log("STEP 6: order created", orderRef.id)
 
     return { appointmentId, orderId: orderRef.id };
   } catch (error) {
-    console.error("Error creating order/appointment in Firestore:", error);
+    console.error("ORDER ERROR:", error);
     throw error;
   }
 }
