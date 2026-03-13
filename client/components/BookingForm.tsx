@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { createOrder } from "@/lib/createOrder";
+import { createOrder } from "@/client/lib/createOrder";
 import { useSearchParams } from "react-router-dom";
 import ChatWidget from "@/components/ChatWidget";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { format, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay } from "date-fns";
 import { toast } from "sonner";
+import { testWrite } from "@/client/lib/testWrite";
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6 | "success";
 
@@ -1634,6 +1635,13 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
 
   return (
     <div className="max-w-[1300px] mx-auto px-4 py-8">
+      <button
+        type="button"
+        onClick={() => testWrite()}
+        className="mb-4 bg-red-500 text-white px-4 py-2 rounded-lg font-bold"
+      >
+        TEST FIRESTORE
+      </button>
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Main Form Area */}
         <div className="flex-1 space-y-8">
