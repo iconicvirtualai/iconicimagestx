@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { createOrder } from "@/lib/createOrder";
 import { useSearchParams } from "react-router-dom";
 import ChatWidget from "@/components/ChatWidget";
 import { Button } from "@/components/ui/button";
@@ -765,17 +766,14 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     }
   };
 
-  const handleBookNow = async () => {
+  const handleBookNow = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setIsSubmitting(true);
     try {
-      // Mock API call
-      // Twilio Integration Intent:
-      // 1. Send SMS to Twilio Notify (Iconic Team) about new inquiry
-      // 2. Trigger automated SMS/Email sequence to customer (Welcome/Strategy)
-
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await createOrder(formData);
       setStep("success");
     } catch (error) {
+      console.error("Firestore write failed:", error);
       toast.error("An error occurred. Please try again.");
     } finally {
       setIsSubmitting(false);
@@ -1591,7 +1589,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                ></motion.div>
             </div>
             <div className="space-y-3">
-              <h2 className="text-4xl font-black tracking-tight uppercase text-black">You're in.</h2>
+              <h2 className="text-4xl font-black tracking-tight uppercase text-black">Booking received</h2>
               <p className="text-gray-500 font-medium max-w-sm mx-auto leading-relaxed text-sm">
                 We're sharpening the lenses and checking the weather. Expect a confirmation text shortly.
               </p>
