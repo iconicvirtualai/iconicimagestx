@@ -1,0 +1,1 @@
+export { onOrderCreated } from "./orderAutomation"
