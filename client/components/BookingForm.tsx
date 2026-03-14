@@ -863,7 +863,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
         )}
         {formData.specializedPhotography !== "mls" && (
           <div className="flex justify-between items-center text-[11px]">
-            <span className="text-gray-500 italic">📸 Specialized: {formData.specializedPhotography === "social" ? "Pinterest/Social Style" : "MLS + Social Style"}</span>
+            <span className="text-gray-500 italic">📸 Specialized: {formData.specializedPhotography === "social" ? "Social Media Optimized" : "MLS + Social Media Optimized"}</span>
             <span className="font-bold text-black">${formData.specializedPhotography === "social" ? 85 : 125}</span>
           </div>
         )}
@@ -1147,8 +1147,8 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {[
                     { id: "mls", name: "Standard MLS", price: 0, description: "Optimized for MLS (Free/Standard)" },
-                    { id: "social", name: "Social/Pinterest", price: 85, description: "Vertical / detailed pinterest style" },
-                    { id: "both", name: "Both Styles", price: 125, description: "MLS + Social Media coverage" }
+                    { id: "social", name: "Social Media Optimized", price: 85, description: "vertical, detailed, and lifestyle" },
+                    { id: "both", name: "Both Styles", price: 125, description: "MLS + Social Media Optimized" }
                   ].map((style) => (
                     <button
                       key={style.id}
