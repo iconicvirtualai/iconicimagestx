@@ -569,6 +569,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     businessSource: "",
     investmentWilling: "",
     leadSource: "", // UTM tracking
+    specializedPhotography: "mls" as "mls" | "social" | "both",
   });
 
   // Check for pre-filled service from pricing page or props
@@ -597,10 +598,14 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
 
     if (itemsParam) {
       const items = itemsParam.split(",");
+      const specializedSocial = items.includes("specialized-social");
+      const specializedBoth = items.includes("specialized-both");
+
       setFormData(prev => ({
         ...prev,
-        selectedBasics: items,
-        premiumUpgrade: premiumParam
+        selectedBasics: items.filter(i => i !== "specialized-social" && i !== "specialized-both"),
+        premiumUpgrade: premiumParam,
+        specializedPhotography: specializedBoth ? "both" : specializedSocial ? "social" : prev.specializedPhotography
       }));
       setShowBasics(true);
     }
@@ -805,6 +810,9 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     if (formData.premiumUpgrade) total += 65;
     if (formData.virtualStagingCredits > 0) total += formData.virtualStagingCredits * 35;
 
+    if (formData.specializedPhotography === "social") total += 85;
+    if (formData.specializedPhotography === "both") total += 125;
+
     if (appliedPromo) {
       total = Math.max(0, total - appliedPromo.discount);
     }
@@ -851,6 +859,12 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
           <div className="flex justify-between items-center text-[11px]">
             <span className="text-gray-500 italic">✨ Iconic Finish (Premium) (Next Day Delivery)</span>
             <span className="font-bold text-black">$65</span>
+          </div>
+        )}
+        {formData.specializedPhotography !== "mls" && (
+          <div className="flex justify-between items-center text-[11px]">
+            <span className="text-gray-500 italic">📸 Specialized: {formData.specializedPhotography === "social" ? "Pinterest/Social Style" : "MLS + Social Style"}</span>
+            <span className="font-bold text-black">${formData.specializedPhotography === "social" ? 85 : 125}</span>
           </div>
         )}
         {formData.virtualStagingCredits > 0 && (
@@ -1119,6 +1133,45 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                       </div>
                     </div>
                  </div>
+              </div>
+            )}
+
+            {/* Specialized Photography Section */}
+            {(selectedServiceData?.category === "listings" || formData.selectedBasics.some(b => b.startsWith("photos-"))) && (
+              <div className="space-y-6">
+                <div className="text-center space-y-1.5">
+                  <h3 className="text-xl font-black uppercase text-black">Specialized Photography Style</h3>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Choose the aesthetic for your shoot</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {[
+                    { id: "mls", name: "Standard MLS", price: 0, description: "Optimized for MLS (Free/Standard)" },
+                    { id: "social", name: "Social/Pinterest", price: 85, description: "Vertical / detailed pinterest style" },
+                    { id: "both", name: "Both Styles", price: 125, description: "MLS + Social Media coverage" }
+                  ].map((style) => (
+                    <button
+                      key={style.id}
+                      onClick={() => updateFormData({ specializedPhotography: style.id as any })}
+                      className={`p-4 rounded-xl border-2 text-left transition-all relative flex flex-col justify-between h-full ${
+                        formData.specializedPhotography === style.id ? 'border-black bg-white shadow-lg scale-[1.02]' : 'border-gray-100 bg-white hover:border-gray-200'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex justify-between items-start mb-1">
+                          <span className="text-[11px] font-black uppercase text-black">{style.name}</span>
+                          {style.price > 0 && <span className="text-[10px] font-black text-teal-500">+${style.price}</span>}
+                        </div>
+                        <p className="text-[9px] text-gray-500 leading-tight">{style.description}</p>
+                      </div>
+                      {formData.specializedPhotography === style.id && (
+                        <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-black flex items-center justify-center">
+                          <Check className="w-2.5 h-2.5 text-white stroke-[4]" />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 

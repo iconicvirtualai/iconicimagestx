@@ -652,7 +652,9 @@ export default function Pricing() {
                           { label: "Video Add-On", price: "350-500+", id: "video-addon" },
                           { label: "3D Matterport", price: "200+", id: "matterport" },
                           { label: "2D Floorplan Add-On", price: "99", id: "floorplan-addon" },
-                          { label: "Amenity Add-On", price: "50", id: "amenity-addon" }
+                          { label: "Amenity Add-On", price: "50", id: "amenity-addon" },
+                          { label: "Social Media Style Shoot", price: "85", id: "specialized-social" },
+                          { label: "MLS + Social Style", price: "125", id: "specialized-both" }
                         ].map((addon) => (
                           <div
                             key={addon.id}

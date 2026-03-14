@@ -18,6 +18,7 @@ interface CreateOrderData {
   selectedBasics: string[];
   selectedAddOns: string[];
   premiumUpgrade: boolean;
+  specializedPhotography?: "mls" | "social" | "both";
   vibeNote?: string;
 }
 
@@ -32,6 +33,7 @@ export async function createOrder(formData: CreateOrderData) {
       propertyAddress: formData.address,
       services: formData.selectedService ? [formData.selectedService] : formData.selectedBasics,
       addons: formData.selectedAddOns,
+      specializedPhotography: formData.specializedPhotography || "mls",
       notes: formData.vibeNote || "",
       status: "new",
       createdAt: serverTimestamp(),
