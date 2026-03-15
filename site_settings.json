@@ -12,7 +12,45 @@
     "heroImage": "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1600&q=80",
     "showAudienceSection": true,
     "showAIToolsSection": true,
-    "showBeforeAfter": true
+    "showBeforeAfter": true,
+    "mediaCarousel": [
+      {
+        "id": 1,
+        "before": { "type": "image", "url": "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80&fm=webp" },
+        "after": { "type": "video", "url": "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Ff966becf9e3e405892b232aed47984ff%2Fcompressed?apiKey=0ed22311ac6a4dbebeda1b4230c2746c&token=f966becf9e3e405892b232aed47984ff&alt=media&optimized=true" },
+        "aspect": "16/9"
+      },
+      {
+        "id": 2,
+        "before": { "type": "image", "url": "https://images.unsplash.com/photo-1600607687940-47a0f9259017?w=1200&q=80&fm=webp" },
+        "after": { "type": "video", "url": "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fc9583aaa79194175962ace8746b84930%2Fcompressed?apiKey=0ed22311ac6a4dbebeda1b4230c2746c&token=c9583aaa79194175962ace8746b84930&alt=media&optimized=true" },
+        "aspect": "9/16"
+      },
+      {
+        "id": 3,
+        "before": { "type": "image", "url": "https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?w=1200&q=80&fm=webp" },
+        "after": { "type": "video", "url": "https://videos.pexels.com/video-files/19403229/19403229-hd_1280_720_25fps.mp4" },
+        "aspect": "16/9"
+      },
+      {
+        "id": 4,
+        "before": { "type": "image", "url": "https://images.unsplash.com/photo-1600585154526-990dcea4db0d?w=1200&q=80&fm=webp" },
+        "after": { "type": "video", "url": "https://videos.pexels.com/video-files/34236991/14509265_360_640_24fps.mp4" },
+        "aspect": "9/16"
+      },
+      {
+        "id": 5,
+        "before": { "type": "video", "url": "https://videos.pexels.com/video-files/34236991/14509265_360_640_24fps.mp4" },
+        "after": { "type": "video", "url": "https://videos.pexels.com/video-files/6007440/6007440-sd_426_240_24fps.mp4" },
+        "aspect": "16/9"
+      },
+      {
+        "id": 6,
+        "before": { "type": "image", "url": "https://images.unsplash.com/photo-1600607687644-c7171b42498f?w=1200&q=80&fm=webp" },
+        "after": { "type": "image", "url": "https://images.unsplash.com/photo-1600573472591-ee6b68d14c68?w=1200&q=80&fm=webp" },
+        "aspect": "16/9"
+      }
+    ]
   },
   "pricing": {
     "title": "Pick the Perfect Price for Your Presence",

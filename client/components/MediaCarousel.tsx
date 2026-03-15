@@ -5,10 +5,10 @@ import BeforeAfterTile from "./BeforeAfterTile";
 
 export default function MediaCarousel() {
   const settings = useSiteSettings();
-  
+
   // Media items with before/after sources
   // We explicitly define before/after as either image or video
-  const mediaPairs = [
+  const mediaPairs = settings.homepage.mediaCarousel || [
     {
       id: 1,
       before: { type: 'image' as const, url: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80&fm=webp" },
