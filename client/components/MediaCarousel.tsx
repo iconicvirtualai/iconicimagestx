@@ -1,152 +1,124 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import BeforeAfterTile from "./BeforeAfterTile";
 
 export default function MediaCarousel() {
   const settings = useSiteSettings();
-  const mediaItems = [
+  
+  // Media items with before/after sources
+  // We explicitly define before/after as either image or video
+  const mediaPairs = [
     {
       id: 1,
-      image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80&fm=webp",
-      video: "https://videos.pexels.com/video-files/6007440/6007440-sd_426_240_24fps.mp4",
-      aspect: "16/9",
+      before: { type: 'image' as const, url: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80&fm=webp" },
+      after: { type: 'video' as const, url: "https://videos.pexels.com/video-files/6007440/6007440-sd_426_240_24fps.mp4" },
+      aspect: "16/9" as const,
     },
     {
       id: 2,
-      image: "https://images.unsplash.com/photo-1600607687940-47a0f9259017?w=1200&q=80&fm=webp",
-      video: "https://videos.pexels.com/video-files/31548166/13445880_360_640_30fps.mp4",
-      aspect: "9/16",
+      before: { type: 'image' as const, url: "https://images.unsplash.com/photo-1600607687940-47a0f9259017?w=1200&q=80&fm=webp" },
+      after: { type: 'video' as const, url: "https://videos.pexels.com/video-files/31548166/13445880_360_640_30fps.mp4" },
+      aspect: "9/16" as const,
     },
     {
       id: 3,
-      image: "https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?w=1200&q=80&fm=webp",
-      video: "https://videos.pexels.com/video-files/19403229/19403229-hd_1280_720_25fps.mp4",
-      aspect: "16/9",
+      before: { type: 'image' as const, url: "https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?w=1200&q=80&fm=webp" },
+      after: { type: 'video' as const, url: "https://videos.pexels.com/video-files/19403229/19403229-hd_1280_720_25fps.mp4" },
+      aspect: "16/9" as const,
     },
     {
       id: 4,
-      image: "https://images.unsplash.com/photo-1600585154526-990dcea4db0d?w=1200&q=80&fm=webp",
-      video: "https://videos.pexels.com/video-files/34236991/14509265_360_640_24fps.mp4",
-      aspect: "9/16",
+      before: { type: 'image' as const, url: "https://images.unsplash.com/photo-1600585154526-990dcea4db0d?w=1200&q=80&fm=webp" },
+      after: { type: 'video' as const, url: "https://videos.pexels.com/video-files/34236991/14509265_360_640_24fps.mp4" },
+      aspect: "9/16" as const,
     },
     {
       id: 5,
-      image: "https://images.unsplash.com/photo-1600573472591-ee6b68d14c68?w=1200&q=80&fm=webp",
-      video: "https://videos.pexels.com/video-files/6007440/6007440-sd_426_240_24fps.mp4",
-      aspect: "16/9",
+      before: { type: 'video' as const, url: "https://videos.pexels.com/video-files/34236991/14509265_360_640_24fps.mp4" },
+      after: { type: 'video' as const, url: "https://videos.pexels.com/video-files/6007440/6007440-sd_426_240_24fps.mp4" },
+      aspect: "16/9" as const,
     },
     {
       id: 6,
-      image: "https://images.unsplash.com/photo-1600607687644-c7171b42498f?w=1200&q=80&fm=webp",
-      video: "https://videos.pexels.com/video-files/31548166/13445880_360_640_30fps.mp4",
-      aspect: "9/16",
+      before: { type: 'image' as const, url: "https://images.unsplash.com/photo-1600607687644-c7171b42498f?w=1200&q=80&fm=webp" },
+      after: { type: 'image' as const, url: "https://images.unsplash.com/photo-1600573472591-ee6b68d14c68?w=1200&q=80&fm=webp" },
+      aspect: "16/9" as const,
     },
   ];
 
   // Double the items for seamless loop
-  const displayItems = [...mediaItems, ...mediaItems];
-
-  const CarouselTrack = ({ isAfter }: { isAfter: boolean }) => (
-    <div className={`flex animate-scroll whitespace-nowrap py-8 ${!isAfter ? "grayscale brightness-75 opacity-70" : ""}`}>
-      {displayItems.map((item, index) => (
-        <div
-          key={`${item.id}-${index}`}
-          className={`flex-shrink-0 mx-2 md:mx-3 rounded-[20px] md:rounded-[24px] overflow-hidden shadow-xl relative group bg-gray-900 border border-gray-100 ${
-            item.aspect === "16/9" 
-              ? "w-[240px] h-[135px] md:w-[400px] md:h-[225px]" 
-              : "w-[76px] h-[135px] md:w-[126px] md:h-[225px]"
-          }`}
-        >
-          {isAfter ? (
-            <video
-              src={item.video}
-              autoPlay
-              loop
-              muted
-              playsInline
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <img
-              src={item.image}
-              alt="Raw capture"
-              className="w-full h-full object-cover"
-            />
-          )}
-        </div>
-      ))}
-    </div>
-  );
+  const displayPairs = [...mediaPairs, ...mediaPairs];
 
   return (
-    <div className="relative w-full overflow-hidden bg-white py-4 md:py-6">
-      {/* Gradient Mask for edges */}
-      <div className="absolute inset-y-0 left-0 w-32 md:w-64 bg-gradient-to-r from-white via-white/80 to-transparent z-[35] pointer-events-none"></div>
-      <div className="absolute inset-y-0 right-0 w-32 md:w-64 bg-gradient-to-l from-white via-white/80 to-transparent z-[35] pointer-events-none"></div>
+    <div className="relative w-full overflow-hidden bg-white py-12 md:py-20 border-y border-gray-50">
+      {/* Edge Gradient Mask */}
+      <div className="absolute inset-y-0 left-0 w-32 md:w-96 bg-gradient-to-r from-white via-white/80 to-transparent z-[35] pointer-events-none"></div>
+      <div className="absolute inset-y-0 right-0 w-32 md:w-96 bg-gradient-to-l from-white via-white/80 to-transparent z-[35] pointer-events-none"></div>
 
-      {/* Before/After Label */}
-      <div className="flex items-center justify-center gap-4 text-gray-400 text-xs font-bold uppercase tracking-[0.2em] mb-2">
-        <span>RAW</span>
-        <div className="flex items-center gap-1">
-           <div className="w-1.5 h-1.5 rounded-full bg-gray-200"></div>
-           <div className="w-8 h-px bg-gray-200"></div>
-           <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: settings.global.primaryColor }}></div>
-        </div>
-        <span className="text-gray-900">ICONIC</span>
+      {/* Section Labels */}
+      <div className="flex flex-col items-center justify-center gap-4 mb-12">
+         <div className="flex items-center gap-8 text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-gray-400">
+           <span>RAW / BEFORE</span>
+           <div className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-gray-200"></div>
+              <div className="w-12 h-px bg-gray-100"></div>
+              <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: settings.global.primaryColor }}></div>
+           </div>
+           <span className="text-black">ICONIC / AFTER</span>
+         </div>
+         <h2 className="text-2xl md:text-4xl font-black text-black tracking-tighter uppercase text-center max-w-2xl px-4">
+            Side by Side. No <span style={{ color: settings.global.primaryColor }}>Comparison</span>.
+         </h2>
       </div>
 
-      {/* Track Layers Container */}
-      <div className="relative">
-        {/* Middle Bar (Visual) - Constrained to Media height */}
-        <div className="absolute left-1/2 top-8 bottom-8 w-px z-[40] -translate-x-1/2 flex items-center justify-center pointer-events-none" style={{ backgroundColor: `${settings.global.primaryColor}4D` }}>
-          <div className="w-[2px] h-full" style={{ backgroundImage: `linear-gradient(to bottom, transparent, ${settings.global.primaryColor}80, transparent)` }}></div>
-          <div className="absolute top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-lg border" style={{ borderColor: `${settings.global.primaryColor}33` }}>
-             <div className="flex gap-0.5">
-                <div className="w-0.5 h-2 rounded-full opacity-40" style={{ backgroundColor: settings.global.primaryColor }}></div>
-                <div className="w-0.5 h-2 rounded-full" style={{ backgroundColor: settings.global.primaryColor }}></div>
-                <div className="w-0.5 h-2 rounded-full opacity-40" style={{ backgroundColor: settings.global.primaryColor }}></div>
-             </div>
-          </div>
-        </div>
-
-        {/* Before Layer (Bottom) */}
-        <div className="relative z-10">
-          <CarouselTrack isAfter={false} />
-        </div>
-
-        {/* After Layer (Top) */}
-        <div className="absolute inset-0 z-20 pointer-events-none" style={{ clipPath: "inset(0 0 0 50.1%)" }}>
-          <CarouselTrack isAfter={true} />
+      {/* Main Carousel Track - Single Layer, Side-by-Side Pairs */}
+      <div className="relative overflow-hidden group/track">
+        <div className="flex animate-scroll whitespace-nowrap py-4">
+          {displayPairs.map((pair, index) => (
+            <BeforeAfterTile 
+              key={`${pair.id}-${index}`}
+              before={pair.before}
+              after={pair.after}
+              aspect={pair.aspect}
+              primaryColor={settings.global.primaryColor}
+            />
+          ))}
         </div>
       </div>
 
-      {/* Pricing CTA */}
-      <div className="flex flex-col items-center justify-center mt-12 pb-8 relative z-40">
+      {/* Call to Action Section */}
+      <div className="mt-16 text-center px-4 relative z-40">
         <Link to="/pricing">
-          <Button className="text-white font-bold text-xl px-12 py-8 rounded-2xl shadow-xl shadow-teal-100/50 transition-all hover:scale-105 active:scale-95" style={{ backgroundColor: settings.global.primaryColor }}>
-            View Pricing
+          <Button 
+            className="group text-white font-bold text-lg md:text-xl px-12 py-8 rounded-2xl shadow-2xl transition-all hover:scale-105 active:scale-95 overflow-hidden relative" 
+            style={{ backgroundColor: settings.global.primaryColor }}
+          >
+            <span className="relative z-10 uppercase">Upgrade My Media</span>
+            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
           </Button>
         </Link>
-        <div className="mt-8 text-center animate-in fade-in slide-in-from-bottom-4 duration-1000">
-          <h3 className="text-3xl md:text-4xl font-black tracking-tighter text-black mb-10 uppercase">
-            WHY ICONIC HITS DIFFERENT
-          </h3>
-          <p className="text-gray-900 font-bold text-lg md:text-xl tracking-tight">
-            We’re not competing. <span style={{ color: settings.global.primaryColor }}>We’re setting the pace.</span>
-          </p>
-          <p className="text-gray-400 font-medium text-sm md:text-base mt-1 uppercase tracking-widest">
-            As the industry grows, it grows to the standard we’ve set.
-          </p>
+        
+        <div className="mt-8 flex flex-col gap-2">
+           <p className="text-black font-black text-xl md:text-2xl uppercase tracking-tighter">
+              The <span style={{ color: settings.global.primaryColor }}>Iconic</span> Finish
+           </p>
+           <p className="text-gray-400 text-[10px] md:text-xs font-bold uppercase tracking-widest max-w-md mx-auto leading-relaxed px-6">
+              Standard photos tell a story. Iconic media builds an empire. 
+              Stop settling for basic.
+           </p>
         </div>
       </div>
 
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes scroll {
-          0% { transform: translateX(-50%); }
-          100% { transform: translateX(0); }
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
         }
         .animate-scroll {
-          animation: scroll 25s linear infinite;
+          animation: scroll 60s linear infinite;
+          display: flex;
+          width: fit-content;
         }
         .animate-scroll:hover {
           animation-play-state: paused;
