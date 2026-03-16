@@ -1,10 +1,10 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-import twilio from "twilio";
+import * as twilio from "twilio";
 
 admin.initializeApp();
 
-const client = twilio(
+const client = twilio.default(
   process.env.TWILIO_ACCOUNT_SID,
   process.env.TWILIO_AUTH_TOKEN
 );
