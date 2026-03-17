@@ -27,6 +27,7 @@ import VirtualStagingSelection from "./pages/VirtualStagingSelection";
 import VirtualStagingAITool from "./pages/VirtualStagingAITool";
 import VirtualStagingProOrder from "./pages/VirtualStagingProOrder";
 import VirtualStagingCheckout from "./pages/VirtualStagingCheckout";
+import AdminEmailTemplates from "./pages/AdminEmailTemplates";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -54,6 +55,7 @@ const App = () => (
           <Route path="/admin/listing/:id" element={<AdminListingFile />} />
           <Route path="/admin/customers" element={<AdminCustomerCenter />} />
           <Route path="/admin/edit-site" element={<AdminSiteCustomizer />} />
+          <Route path="/admin/email-templates" element={<AdminEmailTemplates />} />
           <Route path="/insights" element={<Insights />} />
           <Route path="/services/virtual-staging" element={<VirtualStaging />} />
           <Route path="/services/virtual-staging/select" element={<VirtualStagingSelection />} />
