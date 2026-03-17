@@ -60,9 +60,16 @@ export default function AdminEmailTemplates() {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [configError, setConfigError] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
+    // Basic check for Firebase configuration
+    const isConfigMissing = !db.app.options.apiKey || !db.app.options.projectId || db.app.options.projectId.includes("__");
+    if (isConfigMissing) {
+      setConfigError(true);
+    }
+
     async function fetchTemplates() {
       try {
         const docIds = ["clientConfirmation", "ownerNotification", "appointmentReminders"];
@@ -70,14 +77,25 @@ export default function AdminEmailTemplates() {
 
         for (const id of docIds) {
           const docRef = doc(db, "emailTemplates", id);
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
+          let docSnap;
+          try {
+            docSnap = await getDoc(docRef);
+          } catch (error: any) {
+            console.error(`Error fetching template ${id}:`, error);
+            // If offline error, we still want to show default templates if they exist
+            if (error.code === 'unavailable' || error.message?.includes('offline')) {
+               toast.error(`Firestore connection issues: ${id} could not be fetched.`);
+            }
+            throw error; // Let the outer catch handle it
+          }
+
+          if (docSnap && docSnap.exists()) {
             fetchedTemplates[id] = docSnap.data() as EmailTemplate;
           } else {
             // Default templates if they don't exist
             fetchedTemplates[id] = {
-              subject: id === "clientConfirmation" ? "Booking Confirmed: {{selectedService}}" : 
-                       id === "ownerNotification" ? "New Booking: {{propertyAddress}}" : 
+              subject: id === "clientConfirmation" ? "Booking Confirmed: {{selectedService}}" :
+                       id === "ownerNotification" ? "New Booking: {{propertyAddress}}" :
                        "Reminder: Your shoot at {{propertyAddress}} is tomorrow!",
               body: id === "clientConfirmation" ? "Hi {{clientName}},\n\nYour booking is confirmed for {{serviceDate}} at {{serviceTime}}.\n\nAddress: {{propertyAddress}}\nService: {{selectedService}}\nTotal: {{totalEstimate}}\n\nSee you then!" :
                     id === "ownerNotification" ? "New booking received from {{clientName}}.\n\nProperty: {{propertyAddress}}\nDate: {{serviceDate}} at {{serviceTime}}\nOrder ID: {{orderId}}" :
@@ -87,9 +105,9 @@ export default function AdminEmailTemplates() {
           }
         }
         setTemplates(fetchedTemplates);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error fetching templates:", error);
-        toast.error("Failed to load templates");
+        toast.error(`Error fetching templates: ${error.message || 'Check Firebase connection'}`);
       } finally {
         setLoading(false);
       }
@@ -170,20 +188,27 @@ export default function AdminEmailTemplates() {
               </div>
               <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">Manage Automated Communications</p>
             </div>
-            
-            <Button 
-              onClick={saveTemplate} 
-              disabled={saving}
-              className="bg-[#0d9488] hover:bg-[#0f766e] text-white font-bold rounded-xl px-8 py-6 h-auto shadow-lg shadow-[#0d9488]/20 transition-all hover:scale-[1.02] active:scale-95"
-            >
-              {saving ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              ) : (
-                <>
-                  <Save className="w-5 h-5 mr-2" /> Save Template
-                </>
+
+            <div className="flex flex-col items-end gap-2">
+              <Button
+                onClick={saveTemplate}
+                disabled={saving || configError}
+                className="bg-[#0d9488] hover:bg-[#0f766e] text-white font-bold rounded-xl px-8 py-6 h-auto shadow-lg shadow-[#0d9488]/20 transition-all hover:scale-[1.02] active:scale-95"
+              >
+                {saving ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5 mr-2" /> Save Template
+                  </>
+                )}
+              </Button>
+              {configError && (
+                <div className="flex items-center gap-1.5 text-red-500 font-bold text-[9px] uppercase tracking-widest bg-red-50 px-3 py-1.5 rounded-lg border border-red-100">
+                  <AlertCircle className="w-3 h-3" /> Firebase Not Configured
+                </div>
               )}
-            </Button>
+            </div>
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
