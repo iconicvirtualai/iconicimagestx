@@ -118,11 +118,14 @@ export default function AdminEmailTemplates() {
     if (!template) return;
 
     try {
-      await setDoc(doc(db, "emailTemplates", id), template);
-      toast.success(`Template '${id}' saved successfully!`);
+      await setDoc(doc(db, "emailTemplates", id), {
+        subject: template.subject,
+        body: template.body
+      }, { merge: true });
+      toast.success("Template saved!");
     } catch (error) {
       console.error(error);
-      toast.error("Failed to save template.");
+      toast.error("Error saving template. Please try again.");
     }
   };
 
