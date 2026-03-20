@@ -163,6 +163,18 @@ export default function AdminDashboard() {
                       <p className="text-[9px] text-gray-400 uppercase tracking-widest">Manage prices & tiers</p>
                     </div>
                   </button>
+                  <button
+                    onClick={() => navigate("/admin/email-templates")}
+                    className="flex items-center gap-3 p-4 bg-[#fafafa] rounded-xl border border-gray-50 hover:border-[#0d9488] group transition-all text-left"
+                  >
+                    <div className="p-2 bg-white rounded-lg border border-gray-100 group-hover:bg-[#0d9488] group-hover:text-white transition-all">
+                      <Mail className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-black">Email Templates</p>
+                      <p className="text-[9px] text-gray-400 uppercase tracking-widest">Manage automation</p>
+                    </div>
+                  </button>
                 </div>
               </div>
 
