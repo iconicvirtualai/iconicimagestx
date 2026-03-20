@@ -19,7 +19,8 @@ import {
   Layout,
   Type,
   Component,
-  Plus
+  Plus,
+  Mail
 } from "lucide-react";
 import { toast } from "sonner";
 import { DEFAULT_SITE_SETTINGS } from "@/hooks/useSiteSettings";
@@ -150,6 +151,7 @@ export default function AdminSiteCustomizer() {
                   <CustomizerNavItem active={false} icon={<Tag className="w-4 h-4" />} label="Pricing" />
                   <CustomizerNavItem active={false} icon={<Share2 className="w-4 h-4" />} label="Socials" />
                   <CustomizerNavItem active={false} icon={<Component className="w-4 h-4" />} label="Shared Blocks" />
+                  <CustomizerNavItem active={false} icon={<Mail className="w-4 h-4" />} label="Email Templates" href="/admin/email-templates" />
                 </div>
                 
                 <div className="mt-8 pt-8 border-t border-slate-100 px-4">
@@ -361,13 +363,30 @@ export default function AdminSiteCustomizer() {
   );
 }
 
-function CustomizerNavItem({ icon, label, active }: { icon: React.ReactNode, label: string, active: boolean }) {
-  return (
-    <button className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-300 ${active ? 'bg-slate-50 text-[#0d9488]' : 'text-slate-500 hover:bg-slate-50/50 hover:text-slate-900'}`}>
+function CustomizerNavItem({ icon, label, active, href }: { icon: React.ReactNode, label: string, active: boolean, href?: string }) {
+  const content = (
+    <>
       <div className={`p-2 rounded-xl ${active ? 'bg-white shadow-sm text-[#0d9488]' : 'text-slate-400'}`}>
         {icon}
       </div>
       <span className="text-[11px] font-black uppercase tracking-widest">{label}</span>
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link
+        to={href}
+        className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-300 ${active ? 'bg-slate-50 text-[#0d9488]' : 'text-slate-500 hover:bg-slate-50/50 hover:text-slate-900'}`}
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <button className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-300 ${active ? 'bg-slate-50 text-[#0d9488]' : 'text-slate-500 hover:bg-slate-50/50 hover:text-slate-900'}`}>
+      {content}
     </button>
   );
 }
