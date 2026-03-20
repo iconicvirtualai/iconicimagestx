@@ -8,18 +8,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent } from "@/components/ui/card";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, setDoc, collection, onSnapshot } from "firebase/firestore";
+import { doc, setDoc, collection, onSnapshot } from "firebase/firestore";
 import { Mail, Save, Code, Eye, Info, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
-
-interface EmailTemplate {
-  id: string;
-  label: string;
-  trigger: string;
-  subject: string;
-  body: string;
-}
 
 const TEMPLATE_METADATA = [
   {
@@ -76,7 +68,7 @@ const SAMPLE_DATA: Record<string, string> = {
   "{status}": "confirmed"
 };
 
-export default function AdminEmailTemplates() {
+function AdminEmailTemplates() {
   const [templates, setTemplates] = React.useState<Record<string, { subject: string; body: string }>>({});
   const [loading, setLoading] = React.useState(true);
 
@@ -334,3 +326,5 @@ export default function AdminEmailTemplates() {
     </div>
   );
 }
+
+export default AdminEmailTemplates;
