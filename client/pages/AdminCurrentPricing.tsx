@@ -2,6 +2,7 @@ import * as React from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Link } from "react-router-dom";
@@ -60,6 +61,34 @@ const pricingData: PricingRow[] = [
 ];
 
 export default function AdminCurrentPricing() {
+  const [filters, setFilters] = React.useState<Partial<Record<keyof PricingRow, string>>>({});
+
+  const filteredData = React.useMemo(() => {
+    return pricingData.filter((row) => {
+      return Object.entries(filters).every(([key, value]) => {
+        if (!value) return true;
+        const rowValue = String(row[key as keyof PricingRow]).toLowerCase();
+        return rowValue.includes(value.toLowerCase());
+      });
+    });
+  }, [filters]);
+
+  const handleFilterChange = (key: keyof PricingRow, value: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+
+  const FilterInput = ({ column }: { column: keyof PricingRow }) => (
+    <Input
+      placeholder={`Filter...`}
+      value={filters[column] || ""}
+      onChange={(e) => handleFilterChange(column, e.target.value)}
+      className="h-7 text-[10px] px-2 rounded-md border-slate-200 mt-2 font-medium"
+    />
+  );
+
   return (
     <div className="flex flex-col min-h-screen bg-[#f8fafc]">
       <Header />
@@ -97,19 +126,46 @@ export default function AdminCurrentPricing() {
                 <Table>
                   <TableHeader className="bg-slate-50/50">
                     <TableRow className="border-b border-slate-100">
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">ID</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">Name</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">Price</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">PriceMax</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">PriceType</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">Category</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">Active</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">Description</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">BillingNote</TableHead>
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
+                        ID
+                        <FilterInput column="id" />
+                      </TableHead>
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
+                        Name
+                        <FilterInput column="name" />
+                      </TableHead>
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
+                        Price
+                        <FilterInput column="price" />
+                      </TableHead>
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
+                        PriceMax
+                        <FilterInput column="priceMax" />
+                      </TableHead>
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
+                        PriceType
+                        <FilterInput column="priceType" />
+                      </TableHead>
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
+                        Category
+                        <FilterInput column="category" />
+                      </TableHead>
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
+                        Active
+                        <FilterInput column="active" />
+                      </TableHead>
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
+                        Description
+                        <FilterInput column="description" />
+                      </TableHead>
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
+                        BillingNote
+                        <FilterInput column="billingNote" />
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {pricingData.map((row) => (
+                    {filteredData.map((row) => (
                       <TableRow key={row.id} className="border-b border-slate-50 hover:bg-slate-50/30 transition-colors">
                         <TableCell className="py-4 px-6 font-mono text-[11px] text-[#0d9488] font-bold">{row.id}</TableCell>
                         <TableCell className="py-4 px-6 text-xs font-black text-slate-900 uppercase tracking-tight">{row.name}</TableCell>
