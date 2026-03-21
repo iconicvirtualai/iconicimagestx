@@ -148,7 +148,7 @@ export default function AdminSiteCustomizer() {
                 <div className="space-y-1">
                   <CustomizerNavItem active={true} icon={<Globe className="w-4 h-4" />} label="Global Styles" />
                   <CustomizerNavItem active={false} icon={<Home className="w-4 h-4" />} label="Homepage" />
-                  <CustomizerNavItem active={false} icon={<Tag className="w-4 h-4" />} label="Pricing" />
+                  <CustomizerNavItem active={false} icon={<Tag className="w-4 h-4" />} label="Current Pricing" href="/admin/current-pricing" />
                   <CustomizerNavItem active={false} icon={<Share2 className="w-4 h-4" />} label="Socials" />
                   <CustomizerNavItem active={false} icon={<Component className="w-4 h-4" />} label="Shared Blocks" />
                   <CustomizerNavItem active={false} icon={<Mail className="w-4 h-4" />} label="Email Templates" href="/admin/email-templates" />

@@ -20,6 +20,7 @@ import AdminListingFile from "./pages/AdminListingFile";
 import AdminCustomerCenter from "./pages/AdminCustomerCenter";
 import AdminSiteCustomizer from "./pages/AdminSiteCustomizer";
 import AdminEmailTemplates from "./pages/AdminEmailTemplates";
+import AdminCurrentPricing from "./pages/AdminCurrentPricing";
 import AgentLandingPage from "./pages/AgentLandingPage";
 import Insights from "./pages/Insights";
 import Socials from "./pages/Socials";
@@ -56,6 +57,7 @@ const App = () => (
           <Route path="/admin/customers" element={<AdminCustomerCenter />} />
           <Route path="/admin/edit-site" element={<AdminSiteCustomizer />} />
           <Route path="/admin/email-templates" element={<AdminEmailTemplates />} />
+          <Route path="/admin/current-pricing" element={<AdminCurrentPricing />} />
           <Route path="/insights" element={<Insights />} />
           <Route path="/services/virtual-staging" element={<VirtualStaging />} />
           <Route path="/services/virtual-staging/select" element={<VirtualStagingSelection />} />
