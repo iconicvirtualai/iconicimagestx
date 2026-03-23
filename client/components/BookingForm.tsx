@@ -1998,3 +1998,9 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     </div>
   );
 }
+    });
+
+  } catch (error) {
+    console.error("ORDER ERROR:", error);
+  }
+}
