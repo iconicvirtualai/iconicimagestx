@@ -778,15 +778,17 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     setIsSubmitting(true);
     try {
       console.log("STEP 2: calling createOrder")
-      await createOrder(formData);
-      setStep("success");
-    } catch (error) {
-      console.error("ORDER ERROR:", error);
-      toast.error("An error occurred. Please try again.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+await createOrder({
+  ...formData,
+
+  // 🔥 THIS IS THE FIX
+  selectedServicesDetailed: orderSummaryItems,
+
+  selectedAddOnsDetailed: orderSummaryAddOns,
+
+  subtotal: totalEstimate,   // or whatever your variable is
+  total: totalEstimate
+});
 
   const selectedServiceData = services.find(s => s.id === formData.selectedService);
   const isConsultationPath = selectedServiceData && ["branding", "business", "growth"].includes(selectedServiceData.category);

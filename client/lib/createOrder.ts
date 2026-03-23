@@ -22,22 +22,48 @@ interface CreateOrderData {
   vibeNote?: string;
 }
 
-export async function createOrder(formData: CreateOrderData) {
-  try {
-    // 1️⃣ Create the order first
-    console.log("STEP 3: creating order")
-    const orderData = {
-      clientName: `${formData.firstName} ${formData.lastName}`,
-      clientEmail: formData.email,
-      clientPhone: formData.phone,
-      propertyAddress: formData.address,
-      services: formData.selectedService ? [formData.selectedService] : formData.selectedBasics,
-      addons: formData.selectedAddOns,
-      specializedPhotography: formData.specializedPhotography || "mls",
-      notes: formData.vibeNote || "",
-      status: "new",
-      createdAt: serverTimestamp(),
-    };
+const orderData = {
+  clientName: `${formData.firstName} ${formData.lastName}`,
+  clientEmail: formData.email,
+  clientPhone: formData.phone,
+
+  propertyAddress: formData.address,
+  sqft: formData.sqft,
+
+  // ORIGINAL SELECTIONS (keep for reference)
+  services: formData.selectedService
+    ? [formData.selectedService]
+    : formData.selectedBasics,
+
+  addons: formData.selectedAddOns,
+
+  // 🔥 NEW — CLEAN LINE ITEMS FOR EMAIL + UI
+  lineItems: [
+    ...(formData.selectedService
+      ? [{ name: formData.selectedService, price: 0 }]
+      : (formData.selectedBasics || []).map((s: string) => ({
+          name: s,
+          price: 0,
+        }))),
+
+    ...(formData.selectedAddOns || []).map((a: string) => ({
+      name: a,
+      price: 0,
+    })),
+  ],
+
+  // 🔥 NEW — PRICING (we’ll fix real numbers next if needed)
+  pricing: {
+    subtotal: formData.subtotal || 0,
+    total: formData.total || 0,
+  },
+
+  specializedPhotography: formData.specializedPhotography || "mls",
+  notes: formData.vibeNote || "",
+
+  status: "new",
+  createdAt: serverTimestamp(),
+};
 
     const orderRef = await addDoc(collection(db, "orders"), orderData);
     const orderId = orderRef.id;

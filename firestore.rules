@@ -12,7 +12,7 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
     match /emailTemplates/{templateId} {
-      allow read, write: if false;
+      allow read, write: if true;
     }
     match /{document=**} {
       allow read, write: if false;
