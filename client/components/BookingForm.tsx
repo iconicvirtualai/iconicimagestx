@@ -2005,4 +2005,3 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     </div>
   );
 }
-    });
