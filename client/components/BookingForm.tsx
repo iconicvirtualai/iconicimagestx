@@ -776,16 +776,37 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   if (e) e.preventDefault();
   console.log("STEP 1: submit clicked");
   setIsSubmitting(true);
+const selectedServiceData = services.find(s => s.id === formData.selectedService);
 
+const lineItems = [
+  ...(selectedServiceData ? [{
+    name: selectedServiceData.name,
+    price: selectedServiceData.price
+  }] : []),
+
+  ...formData.selectedBasics.map(id => {
+    const b = basicsList.find(x => x.id === id);
+    return b ? { name: b.name, price: b.price } : null;
+  }).filter(Boolean),
+
+  ...formData.selectedAddOns.map(id => {
+    let found;
+    addOns.forEach(cat => {
+      const a = cat.items.find(x => x.id === id);
+      if (a) found = a;
+    });
+    return found ? { name: found.name, price: found.price } : null;
+  }).filter(Boolean)
+];
   try {
     await createOrder({
       ...formData,
+      
+lineItems: lineItems,
 
-      selectedServicesDetailed: orderSummaryItems,
-      selectedAddOnsDetailed: orderSummaryAddOns,
-
-      subtotal: calculateTotal(),
-      total: calculateTotal()
+subtotal: calculateTotal(),
+total: calculateTotal()
+      
     });
 
     setStep("success");
