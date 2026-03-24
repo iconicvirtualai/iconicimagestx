@@ -31,6 +31,8 @@ export const onOrderCreated = functions.firestore
 
     const clientTemplate = clientTemplateDoc.data();
     const lineItemsText = (order.lineItems || [])
+      console.log("LINE ITEMS TEXT:", lineItemsText);
+console.log("TAG DATA:", tagData);
   .map((item: any) => `• ${item.name} — $${item.price}`)
   .join('\n');
     const ownerTemplate = ownerTemplateDoc.data();
