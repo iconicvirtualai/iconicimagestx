@@ -773,23 +773,30 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   };
 
   const handleBookNow = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    console.log("STEP 1: submit clicked")
-    setIsSubmitting(true);
-    try {
-  await createOrder({
-    ...formData,
+  if (e) e.preventDefault();
+  console.log("STEP 1: submit clicked");
+  setIsSubmitting(true);
 
-    selectedServicesDetailed: orderSummaryItems,
-    selectedAddOnsDetailed: orderSummaryAddOns,
+  try {
+    await createOrder({
+      ...formData,
 
-    subtotal: totalEstimate,
-    total: totalEstimate
-  });
+      selectedServicesDetailed: orderSummaryItems,
+      selectedAddOnsDetailed: orderSummaryAddOns,
 
-} catch (error) {
-  console.error("ORDER ERROR:", error);
-}
+      subtotal: calculateTotal(),
+      total: calculateTotal()
+    });
+
+    setStep("success");
+
+  } catch (error) {
+    console.error("ORDER ERROR:", error);
+    toast.error("Something went wrong. Please try again.");
+  } finally {
+    setIsSubmitting(false);
+  }
+};
   const selectedServiceData = services.find(s => s.id === formData.selectedService);
   const isConsultationPath = selectedServiceData && ["branding", "business", "growth"].includes(selectedServiceData.category);
 
@@ -1999,8 +2006,3 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   );
 }
     });
-
-  } catch (error) {
-    console.error("ORDER ERROR:", error);
-  }
-}
