@@ -20,57 +20,64 @@ interface CreateOrderData {
   premiumUpgrade: boolean;
   specializedPhotography?: "mls" | "social" | "both";
   vibeNote?: string;
+
+  // NEW
+  subtotal?: number;
+  total?: number;
 }
 
-const orderData = {
-  clientName: `${formData.firstName} ${formData.lastName}`,
-  clientEmail: formData.email,
-  clientPhone: formData.phone,
+export async function createOrder(formData: CreateOrderData) {
+  try {
+    console.log("STEP 3: creating order");
 
-  propertyAddress: formData.address,
-  sqft: formData.sqft,
+    const orderData = {
+      clientName: `${formData.firstName} ${formData.lastName}`,
+      clientEmail: formData.email,
+      clientPhone: formData.phone,
 
-  // ORIGINAL SELECTIONS (keep for reference)
-  services: formData.selectedService
-    ? [formData.selectedService]
-    : formData.selectedBasics,
+      propertyAddress: formData.address,
+      sqft: formData.sqft,
 
-  addons: formData.selectedAddOns,
+      services: formData.selectedService
+        ? [formData.selectedService]
+        : formData.selectedBasics,
 
-  // 🔥 NEW — CLEAN LINE ITEMS FOR EMAIL + UI
-  lineItems: [
-    ...(formData.selectedService
-      ? [{ name: formData.selectedService, price: 0 }]
-      : (formData.selectedBasics || []).map((s: string) => ({
-          name: s,
+      addons: formData.selectedAddOns,
+
+      // 🔥 LINE ITEMS
+      lineItems: [
+        ...(formData.selectedService
+          ? [{ name: formData.selectedService, price: 0 }]
+          : (formData.selectedBasics || []).map((s: string) => ({
+              name: s,
+              price: 0,
+            }))),
+
+        ...(formData.selectedAddOns || []).map((a: string) => ({
+          name: a,
           price: 0,
-        }))),
+        })),
+      ],
 
-    ...(formData.selectedAddOns || []).map((a: string) => ({
-      name: a,
-      price: 0,
-    })),
-  ],
+      // 🔥 PRICING
+      pricing: {
+        subtotal: formData.subtotal || 0,
+        total: formData.total || 0,
+      },
 
-  // 🔥 NEW — PRICING (we’ll fix real numbers next if needed)
-  pricing: {
-    subtotal: formData.subtotal || 0,
-    total: formData.total || 0,
-  },
+      specializedPhotography: formData.specializedPhotography || "mls",
+      notes: formData.vibeNote || "",
 
-  specializedPhotography: formData.specializedPhotography || "mls",
-  notes: formData.vibeNote || "",
-
-  status: "new",
-  createdAt: serverTimestamp(),
-};
+      status: "new",
+      createdAt: serverTimestamp(),
+    };
 
     const orderRef = await addDoc(collection(db, "orders"), orderData);
     const orderId = orderRef.id;
-    console.log("STEP 4: order created", orderId)
 
-    // 2️⃣ Create the appointment linked to that order
-    console.log("STEP 5: creating appointment")
+    console.log("STEP 4: order created", orderId);
+
+    // CREATE APPOINTMENT
     const appointmentData = {
       orderId: orderId,
       startTime: formData.serviceDate
@@ -89,13 +96,14 @@ const orderData = {
     };
 
     const appointmentRef = await addDoc(collection(db, "appointments"), appointmentData);
-    console.log("STEP 6: appointment created", appointmentRef.id)
 
-    // 3️⃣ Return both ids
+    console.log("STEP 6: appointment created", appointmentRef.id);
+
     return {
       orderId: orderRef.id,
       appointmentId: appointmentRef.id,
     };
+
   } catch (error) {
     console.error("ORDER ERROR:", error);
     throw error;
