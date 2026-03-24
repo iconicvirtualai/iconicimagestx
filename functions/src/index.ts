@@ -30,6 +30,9 @@ export const onOrderCreated = functions.firestore
     const ownerTemplateDoc = await db.collection("emailTemplates").doc("ownerNotification").get();
 
     const clientTemplate = clientTemplateDoc.data();
+    const lineItemsText = (order.lineItems || [])
+  .map((item: any) => `• ${item.name} — $${item.price}`)
+  .join('\n');
     const ownerTemplate = ownerTemplateDoc.data();
 
     if (!clientTemplate || !ownerTemplate) {
@@ -39,15 +42,24 @@ export const onOrderCreated = functions.firestore
 
     // Build merge tag data
     const tagData: Record<string, string> = {
-      clientName: order.clientName || "",
-      clientEmail: order.clientEmail || "",
-      clientPhone: order.clientPhone || "",
-      propertyAddress: order.propertyAddress || "",
-      services: Array.isArray(order.services) ? order.services.join(", ") : order.services || "",
-      notes: order.notes || "",
-      orderId: orderId,
-      status: order.status || "",
-    };
+  clientName: order.clientName || "",
+  clientEmail: order.clientEmail || "",
+  clientPhone: order.clientPhone || "",
+  propertyAddress: order.propertyAddress || "",
+
+  // OLD (keep if you want fallback)
+  services: Array.isArray(order.services)
+    ? order.services.join(", ")
+    : order.services || "",
+
+  // 🔥 NEW (THIS IS THE FIX)
+  lineItems: lineItemsText,
+  total: String(order.pricing?.total || 0),
+
+  notes: order.notes || "",
+  orderId: orderId,
+  status: order.status || "",
+};
 
     const clientSubject = replaceTags(clientTemplate.subject, tagData);
     const clientBody = replaceTags(clientTemplate.body, tagData);
