@@ -13,7 +13,8 @@ import {
   Search,
   Plus,
   ArrowUpRight,
-  Palette
+  Palette,
+  Mail
 } from "lucide-react";
 
 const stats = [
