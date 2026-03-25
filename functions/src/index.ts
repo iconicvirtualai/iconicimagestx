@@ -6,6 +6,7 @@ admin.initializeApp();
 
 const db = admin.firestore();
 
+// 🔹 Tag replacement helper
 function replaceTags(template: string, data: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (match, key) => data[key] || match);
 }
@@ -16,66 +17,111 @@ export const onOrderCreated = functions.firestore
     const order = snap.data();
     const orderId = context.params.orderId;
 
-    const auth = new google.auth.JWT({
-      email: process.env.GOOGLE_CLIENT_EMAIL,
-      key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-      scopes: ["https://www.googleapis.com/auth/gmail.send"],
-      subject: "orders@iconicimagestx.com",
-    });
+    try {
+      // 🔹 Gmail Auth
+      const auth = new google.auth.JWT({
+        email: process.env.GOOGLE_CLIENT_EMAIL,
+        key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+        scopes: ["https://www.googleapis.com/auth/gmail.send"],
+        subject: "orders@iconicimagestx.com",
+      });
 
-    const gmail = google.gmail({ version: "v1", auth });
+      const gmail = google.gmail({ version: "v1", auth });
 
-    // Fetch templates from Firestore
-    const clientTemplateDoc = await db.collection("emailTemplates").doc("clientConfirmation").get();
-    const ownerTemplateDoc = await db.collection("emailTemplates").doc("ownerNotification").get();
+      // 🔹 Fetch email templates
+      const clientTemplateDoc = await db.collection("emailTemplates").doc("clientConfirmation").get();
+      const ownerTemplateDoc = await db.collection("emailTemplates").doc("ownerNotification").get();
 
-    const clientTemplate = clientTemplateDoc.data();
-    const ownerTemplate = ownerTemplateDoc.data();
+      const clientTemplate = clientTemplateDoc.data();
+      const ownerTemplate = ownerTemplateDoc.data();
 
-    if (!clientTemplate || !ownerTemplate) {
-      console.error("Email templates not found in Firestore");
-      return;
+      if (!clientTemplate || !ownerTemplate) {
+        console.error("Email templates not found in Firestore");
+        return;
+      }
+
+      // 🔥 BUILD LINE ITEMS STRING
+      const lineItemsText = (order.lineItems || [])
+        .map((item: any) => `• ${item.name} — $${item.price}`)
+        .join("\n");
+
+      console.log("LINE ITEMS TEXT:", lineItemsText);
+
+      // 🔥 BUILD TAG DATA
+      const tagData: Record<string, string> = {
+        clientName: order.clientName || "",
+        clientEmail: order.clientEmail || "",
+        clientPhone: order.clientPhone || "",
+        propertyAddress: order.propertyAddress || "",
+
+        // fallback (optional)
+        services: Array.isArray(order.services)
+          ? order.services.join(", ")
+          : order.services || "",
+
+        // 🔥 NEW VARIABLES
+        lineItems: lineItemsText,
+        total: String(order.pricing?.total || 0),
+
+        notes: order.notes || "",
+        orderId: orderId,
+        status: order.status || "",
+      };
+
+      console.log("TAG DATA:", tagData);
+
+      // 🔹 Replace template tags
+      const clientSubject = replaceTags(clientTemplate.subject, tagData);
+     let clientBody = clientTemplate.body;
+
+Object.entries(tagData).forEach(([key, value]) => {
+  const regex = new RegExp(`\\{${key}\\}`, "g");
+  clientBody = clientBody.replace(regex, value);
+});
+
+      const ownerSubject = replaceTags(ownerTemplate.subject, tagData);
+     let ownerBody = ownerTemplate.body;
+
+Object.entries(tagData).forEach(([key, value]) => {
+  const regex = new RegExp(`\\{${key}\\}`, "g");
+  ownerBody = ownerBody.replace(regex, value);
+});
+
+      // 🔹 Email encoding
+      const encodeEmail = (to: string, subject: string, body: string) => {
+        const message = [
+          `To: ${to}`,
+          `From: orders@iconicimagestx.com`,
+          `Subject: ${subject}`,
+          ``,
+          body,
+        ].join("\n");
+
+        return Buffer.from(message)
+          .toString("base64")
+          .replace(/\+/g, "-")
+          .replace(/\//g, "_");
+      };
+
+      // 🔹 Send client email
+      await gmail.users.messages.send({
+        userId: "me",
+        requestBody: {
+          raw: encodeEmail(order.clientEmail, clientSubject, clientBody),
+        },
+      });
+
+      // 🔹 Send owner email
+      await gmail.users.messages.send({
+        userId: "me",
+        requestBody: {
+          raw: encodeEmail("orders@iconicimagestx.com", ownerSubject, ownerBody),
+        },
+      });
+
+      console.log("Emails sent successfully");
+
+    } catch (error) {
+      console.error("EMAIL FUNCTION ERROR:", error);
     }
-
-    // Build merge tag data
-    const tagData: Record<string, string> = {
-      clientName: order.clientName || "",
-      clientEmail: order.clientEmail || "",
-      clientPhone: order.clientPhone || "",
-      propertyAddress: order.propertyAddress || "",
-      services: Array.isArray(order.services) ? order.services.join(", ") : order.services || "",
-      notes: order.notes || "",
-      orderId: orderId,
-      status: order.status || "",
-    };
-
-    const clientSubject = replaceTags(clientTemplate.subject, tagData);
-    const clientBody = replaceTags(clientTemplate.body, tagData);
-    const ownerSubject = replaceTags(ownerTemplate.subject, tagData);
-    const ownerBody = replaceTags(ownerTemplate.body, tagData);
-
-    const encodeEmail = (to: string, subject: string, body: string) => {
-      const message = [
-        `To: ${to}`,
-        `From: orders@iconicimagestx.com`,
-        `Subject: ${subject}`,
-        ``,
-        body,
-      ].join("\n");
-      return Buffer.from(message).toString("base64").replace(/\+/g, "-").replace(/\//g, "_");
-    };
-
-    await gmail.users.messages.send({
-      userId: "me",
-      requestBody: { raw: encodeEmail(order.clientEmail, clientSubject, clientBody) },
-    });
-
-    await gmail.users.messages.send({
-      userId: "me",
-      requestBody: { raw: encodeEmail("orders@iconicimagestx.com", ownerSubject, ownerBody) },
-    });
-
-    console.log("Emails sent successfully");
   });
-
-// updated Wed Mar 18 12:36:42 AM UTC 2026

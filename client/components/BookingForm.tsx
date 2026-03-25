@@ -772,21 +772,51 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   };
 
   const handleBookNow = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    console.log("STEP 1: submit clicked")
-    setIsSubmitting(true);
-    try {
-      console.log("STEP 2: calling createOrder")
-      await createOrder(formData);
-      setStep("success");
-    } catch (error) {
-      console.error("ORDER ERROR:", error);
-      toast.error("An error occurred. Please try again.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  if (e) e.preventDefault();
+  console.log("STEP 1: submit clicked");
+  setIsSubmitting(true);
+const selectedServiceData = services.find(s => s.id === formData.selectedService);
 
+const lineItems = [
+  ...(selectedServiceData ? [{
+    name: selectedServiceData.name,
+    price: selectedServiceData.price
+  }] : []),
+
+  ...formData.selectedBasics.map(id => {
+    const b = basicsList.find(x => x.id === id);
+    return b ? { name: b.name, price: b.price } : null;
+  }).filter(Boolean),
+
+  ...formData.selectedAddOns.map(id => {
+    let found;
+    addOns.forEach(cat => {
+      const a = cat.items.find(x => x.id === id);
+      if (a) found = a;
+    });
+    return found ? { name: found.name, price: found.price } : null;
+  }).filter(Boolean)
+];
+  try {
+    await createOrder({
+      ...formData,
+      
+lineItems: lineItems,
+
+subtotal: calculateTotal(),
+total: calculateTotal()
+      
+    });
+
+    setStep("success");
+
+  } catch (error) {
+    console.error("ORDER ERROR:", error);
+    toast.error("Something went wrong. Please try again.");
+  } finally {
+    setIsSubmitting(false);
+  }
+};
   const selectedServiceData = services.find(s => s.id === formData.selectedService);
   const isConsultationPath = selectedServiceData && ["branding", "business", "growth"].includes(selectedServiceData.category);
 
