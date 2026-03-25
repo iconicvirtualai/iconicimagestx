@@ -5,13 +5,16 @@ service cloud.firestore {
       allow create: if request.resource.data.keys().hasAll([
         'clientName', 'clientEmail', 'clientPhone', 'propertyAddress', 'services', 'status', 'createdAt'
       ]);
-      allow read, update, delete: if false;
+      allow read, update, delete: if true;
     }
     match /appointments/{appointmentId} {
       allow create: if request.resource.data.keys().hasAll(['orderId', 'status', 'createdAt']);
-      allow read, update, delete: if false;
+      allow read, update, delete: if true;
     }
     match /emailTemplates/{templateId} {
+      allow read, write: if true;
+    }
+    match /orderRequests/{requestId} {
       allow read, write: if true;
     }
     match /{document=**} {
