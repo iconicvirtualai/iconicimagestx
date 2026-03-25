@@ -36,7 +36,6 @@ import {
 } from "lucide-react";
 import { format, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay } from "date-fns";
 import { toast } from "sonner";
-import { testWrite } from "../lib/testWrite";
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6 | "success";
 
@@ -1688,9 +1687,6 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
 
   return (
     <div className="max-w-[1300px] mx-auto px-4 py-8">
-      <button type="button" onClick={testWrite}>
-        TEST FIRESTORE
-      </button>
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Main Form Area */}
         <div className="flex-1 space-y-8">

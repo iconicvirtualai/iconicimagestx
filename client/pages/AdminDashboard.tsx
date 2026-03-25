@@ -1,38 +1,57 @@
+import React from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
-import { 
-  Users, 
-  ShoppingBag, 
-  DollarSign, 
-  Image as ImageIcon, 
-  LayoutDashboard, 
+import {
+  Users,
+  ShoppingBag,
+  DollarSign,
+  Image as ImageIcon,
+  LayoutDashboard,
   Settings,
   LogOut,
   Search,
   Plus,
   ArrowUpRight,
   Palette,
-  Mail
+  Mail,
+  Calendar,
+  ClipboardList,
+  AlertCircle
 } from "lucide-react";
-
-const stats = [
-  { label: "Active Listings", value: "48", icon: <ImageIcon className="w-5 h-5" />, color: "bg-blue-500" },
-  { label: "Pending Orders", value: "12", icon: <ShoppingBag className="w-5 h-5" />, color: "bg-[#0d9488]" },
-  { label: "New Leads", value: "156", icon: <Users className="w-5 h-5" />, color: "bg-purple-500" },
-  { label: "Monthly Revenue", value: "$12,450", icon: <DollarSign className="w-5 h-5" />, color: "bg-orange-500" }
-];
-
-const recentOrders = [
-  { id: "#8245", agent: "Sarah Jenkins", property: "1245 Willow Creek Dr", status: "Delivered", date: "2 hrs ago" },
-  { id: "#8244", agent: "Mark Thompson", property: "882 High Meadow Ln", status: "Processing", date: "5 hrs ago" },
-  { id: "#8243", agent: "Lisa Ray", property: "552 Oak Forest Ct", status: "Scheduled", date: "1 day ago" },
-  { id: "#8242", agent: "David Wilson", property: "210 River Walk Way", status: "Delivered", date: "2 days ago" }
-];
+import { db } from "@/lib/firebase";
+import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
+import { toast } from "sonner";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const [orderRequests, setOrderRequests] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const q = query(collection(db, "orderRequests"), orderBy("submittedAt", "desc"));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setOrderRequests(docs);
+      setLoading(false);
+    }, (error) => {
+      console.error("Firestore Error:", error);
+      toast.error("Failed to load order requests");
+    });
+
+    return () => unsub();
+  }, []);
+
+  const stats = [
+    { label: "Order Requests", value: orderRequests.length.toString(), icon: <ClipboardList className="w-5 h-5" />, color: "bg-red-500" },
+    { label: "Scheduled", value: "8", icon: <Calendar className="w-5 h-5" />, color: "bg-[#0d9488]" },
+    { label: "Active Listings", value: "48", icon: <ImageIcon className="w-5 h-5" />, color: "bg-blue-500" },
+    { label: "Revenue", value: "$12,450", icon: <DollarSign className="w-5 h-5" />, color: "bg-orange-500" }
+  ];
 
   const handleLogout = () => {
     // In a real app, clear tokens here
@@ -84,16 +103,21 @@ export default function AdminDashboard() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Recent Orders Table */}
+            {/* Order Requests Section */}
             <div className="lg:col-span-2">
               <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm">
                 <div className="flex items-center justify-between mb-8">
-                  <h2 className="text-xl font-black text-black uppercase tracking-tight">Recent Orders</h2>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-red-50 rounded-lg">
+                      <AlertCircle className="w-5 h-5 text-red-500" />
+                    </div>
+                    <h2 className="text-xl font-black text-black uppercase tracking-tight">Order Requests</h2>
+                  </div>
                   <div className="relative">
                     <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input 
-                      type="text" 
-                      placeholder="Search orders..." 
+                    <input
+                      type="text"
+                      placeholder="Search requests..."
                       className="pl-9 pr-4 py-2 rounded-lg border border-gray-100 bg-[#fafafa] focus:border-[#0d9488] outline-none text-xs font-medium w-48"
                     />
                   </div>
@@ -104,32 +128,39 @@ export default function AdminDashboard() {
                     <thead>
                       <tr className="border-b border-gray-50 text-left">
                         <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Order ID</th>
-                        <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Agent</th>
-                        <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
-                        <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Time</th>
+                        <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Client</th>
+                        <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Service</th>
+                        <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date Submitted</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {recentOrders.map((order) => (
+                      {loading ? (
+                        <tr>
+                          <td colSpan={4} className="py-8 text-center text-gray-400 text-xs font-bold uppercase tracking-widest">Loading requests...</td>
+                        </tr>
+                      ) : orderRequests.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="py-8 text-center text-gray-400 text-xs font-bold uppercase tracking-widest">No requests found</td>
+                        </tr>
+                      ) : orderRequests.map((request) => (
                         <tr
-                          key={order.id}
+                          key={request.id}
                           className="group hover:bg-[#fafafa] transition-colors cursor-pointer"
-                          onClick={() => navigate(`/admin/listing/${order.id.replace('#', '')}`)}
+                          onClick={() => navigate(`/admin/order-request/${request.id}`)}
                         >
-                          <td className="py-4 text-sm font-bold text-black">{order.id}</td>
+                          <td className="py-4 text-sm font-mono text-red-500 font-bold">{request.orderId.substring(0, 8)}...</td>
                           <td className="py-4">
-                            <p className="text-sm font-bold text-black">{order.agent}</p>
-                            <p className="text-[10px] text-gray-400">{order.property}</p>
+                            <p className="text-sm font-bold text-black">{request.clientName}</p>
+                            <p className="text-[10px] text-gray-400">{request.address || "Consultation"}</p>
                           </td>
                           <td className="py-4">
-                            <span className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest ${
-                              order.status === 'Delivered' ? 'bg-green-50 text-green-600' : 
-                              order.status === 'Processing' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'
-                            }`}>
-                              {order.status}
+                            <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold uppercase tracking-widest">
+                              {request.selectedService || "Custom"}
                             </span>
                           </td>
-                          <td className="py-4 text-xs text-gray-400 font-medium">{order.date}</td>
+                          <td className="py-4 text-xs text-gray-400 font-medium">
+                            {request.submittedAt?.toDate ? request.submittedAt.toDate().toLocaleDateString() : 'Just now'}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
