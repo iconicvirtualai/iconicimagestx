@@ -28,7 +28,22 @@ interface CreateOrderData {
 
 export async function createOrder(formData: any) {
   try {
-    console.log("STEP 3: creating order");
+    console.log("[createOrder] STEP 1: Validating form data...");
+
+    // Basic validation
+    if (!formData.firstName || !formData.lastName || !formData.email) {
+      const error = new Error("Missing required client information (first name, last name, or email)");
+      console.error("[createOrder] Validation failed:", error.message);
+      throw error;
+    }
+
+    if (!formData.address) {
+      const error = new Error("Property address is required");
+      console.error("[createOrder] Validation failed:", error.message);
+      throw error;
+    }
+
+    console.log("[createOrder] STEP 2: Preparing order record...");
 
     const orderData = {
       clientName: `${formData.firstName} ${formData.lastName}`,
@@ -72,12 +87,14 @@ export async function createOrder(formData: any) {
       createdAt: serverTimestamp(),
     };
 
+    console.log("[createOrder] STEP 3: Writing order to database...");
     const orderRef = await addDoc(collection(db, "orders"), orderData);
     const orderId = orderRef.id;
 
-    console.log("STEP 4: order created", orderId);
+    console.log("[createOrder] STEP 4: Order created successfully with ID:", orderId);
 
     // CREATE APPOINTMENT
+    console.log("[createOrder] STEP 5: Preparing appointment record...");
     const appointmentData = {
       orderId: orderId,
       startTime: formData.serviceDate
@@ -95,15 +112,17 @@ export async function createOrder(formData: any) {
       createdAt: serverTimestamp(),
     };
 
+    console.log("[createOrder] STEP 6: Writing appointment to database...");
     const appointmentRef = await addDoc(collection(db, "appointments"), appointmentData);
-    console.log("STEP 6: appointment created", appointmentRef.id);
+    const appointmentId = appointmentRef.id;
+    console.log("[createOrder] STEP 7: Appointment created successfully with ID:", appointmentId);
 
     // 3️⃣ Create the Order Request document with ALL fields
-    console.log("STEP 7: creating order request record")
+    console.log("[createOrder] STEP 8: Preparing order request record with all fields...");
     const orderRequestData = {
       ...formData,
       orderId: orderId,
-      appointmentId: appointmentRef.id,
+      appointmentId: appointmentId,
       clientName: `${formData.firstName} ${formData.lastName}`,
       submittedAt: serverTimestamp(),
       status: "needs scheduled"
@@ -114,15 +133,19 @@ export async function createOrder(formData: any) {
       orderRequestData.serviceDate = orderRequestData.serviceDate.toISOString();
     }
 
+    console.log("[createOrder] STEP 9: Writing comprehensive order request to database...");
     await addDoc(collection(db, "orderRequests"), orderRequestData);
+    console.log("[createOrder] SUCCESS: All records created successfully!");
 
     return {
-      orderId: orderRef.id,
-      appointmentId: appointmentRef.id,
+      orderId: orderId,
+      appointmentId: appointmentId,
     };
 
-  } catch (error) {
-    console.error("ORDER ERROR:", error);
-    throw error;
+  } catch (error: any) {
+    console.error("[createOrder] CRITICAL ERROR:", error);
+    const customError = new Error(error?.message || "An unexpected error occurred during order creation.");
+    (customError as any).originalError = error;
+    throw customError;
   }
 }
