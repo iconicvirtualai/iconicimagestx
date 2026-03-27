@@ -525,7 +525,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   const settings = useSiteSettings();
   const isMobile = useIsMobile();
   const [searchParams] = useSearchParams();
-  const [step, setStep] = useState<Step>(1);
+  const [step, setStep] = useState<Step>("success");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [selectedDetailItem, setSelectedDetailItem] = useState<any>(null);
