@@ -810,9 +810,10 @@ total: calculateTotal()
 
     setStep("success");
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("ORDER ERROR:", error);
-    toast.error("Something went wrong. Please try again.");
+    const message = error?.message || "Something went wrong. Please try again.";
+    toast.error(message);
   } finally {
     setIsSubmitting(false);
   }
@@ -1674,7 +1675,7 @@ total: calculateTotal()
                ></motion.div>
             </div>
             <div className="space-y-3">
-              <h2 className="text-4xl font-black tracking-tight uppercase text-black">Booking received</h2>
+              <h2 className="text-4xl font-black tracking-tight uppercase text-black">YOU'RE IN</h2>
               <p className="text-gray-500 font-medium max-w-sm mx-auto leading-relaxed text-sm">
                 We're sharpening the lenses and checking the weather. Expect a confirmation text shortly.
               </p>

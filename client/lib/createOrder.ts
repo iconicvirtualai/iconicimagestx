@@ -5,6 +5,27 @@ import {
   serverTimestamp
 } from "firebase/firestore";
 
+/**
+ * Clean data for Firestore by removing undefined values
+ */
+function clean(data: any) {
+  if (data === null || data === undefined) return null;
+  if (data instanceof Date) return data.toISOString();
+  if (Array.isArray(data)) return data.map(item => clean(item));
+  if (typeof data === 'object') {
+    // Don't recurse into special Firestore FieldValues or other non-plain objects
+    if (data.constructor && data.constructor.name !== 'Object') {
+      return data;
+    }
+    const result: any = {};
+    Object.keys(data).forEach(key => {
+      result[key] = clean(data[key]);
+    });
+    return result;
+  }
+  return data;
+}
+
 interface CreateOrderData {
   firstName: string;
   lastName: string;
@@ -88,7 +109,7 @@ export async function createOrder(formData: any) {
     };
 
     console.log("[createOrder] STEP 3: Writing order to database...");
-    const orderRef = await addDoc(collection(db, "orders"), orderData);
+    const orderRef = await addDoc(collection(db, "orders"), clean(orderData));
     const orderId = orderRef.id;
 
     console.log("[createOrder] STEP 4: Order created successfully with ID:", orderId);
@@ -113,12 +134,14 @@ export async function createOrder(formData: any) {
     };
 
     console.log("[createOrder] STEP 6: Writing appointment to database...");
-    const appointmentRef = await addDoc(collection(db, "appointments"), appointmentData);
+    const appointmentRef = await addDoc(collection(db, "appointments"), clean(appointmentData));
     const appointmentId = appointmentRef.id;
     console.log("[createOrder] STEP 7: Appointment created successfully with ID:", appointmentId);
 
     // 3️⃣ Create the Order Request document with ALL fields
     console.log("[createOrder] STEP 8: Preparing order request record with all fields...");
+
+    // Create the Order Request document with ALL fields
     const orderRequestData = {
       ...formData,
       orderId: orderId,
@@ -128,13 +151,8 @@ export async function createOrder(formData: any) {
       status: "needs scheduled"
     };
 
-    // Ensure serviceDate is serializable if it's a Date object
-    if (orderRequestData.serviceDate instanceof Date) {
-      orderRequestData.serviceDate = orderRequestData.serviceDate.toISOString();
-    }
-
     console.log("[createOrder] STEP 9: Writing comprehensive order request to database...");
-    await addDoc(collection(db, "orderRequests"), orderRequestData);
+    await addDoc(collection(db, "orderRequests"), clean(orderRequestData));
     console.log("[createOrder] SUCCESS: All records created successfully!");
 
     return {
