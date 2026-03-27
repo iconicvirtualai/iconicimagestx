@@ -1,4 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import usePlacesAutocomplete, {
+  getGeocode,
+  getLatLng,
+} from "use-places-autocomplete";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -525,7 +529,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   const settings = useSiteSettings();
   const isMobile = useIsMobile();
   const [searchParams] = useSearchParams();
-  const [step, setStep] = useState<Step>("success");
+  const [step, setStep] = useState<Step>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [selectedDetailItem, setSelectedDetailItem] = useState<any>(null);
@@ -570,6 +574,59 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     leadSource: "", // UTM tracking
     specializedPhotography: "mls" as "mls" | "social" | "both",
   });
+
+  const {
+    ready,
+    value: addressSearchValue,
+    suggestions: { status: addressStatus, data: addressSuggestions },
+    setValue: setAddressSearchValue,
+    clearSuggestions: clearAddressSuggestions,
+    init
+  } = usePlacesAutocomplete({
+    initOnMount: false,
+    debounce: 300,
+    requestOptions: {
+      componentRestrictions: { country: "us" },
+    }
+  });
+
+  useEffect(() => {
+    const loadGoogleMaps = () => {
+      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || import.meta.env.VITE_PUBLIC_GOOGLE_MAPS_API_KEY;
+      if (!apiKey || apiKey === "YOUR_GOOGLE_MAPS_API_KEY_HERE") {
+        console.warn("Google Maps API Key is missing. Address autocomplete will not work.");
+        return;
+      }
+
+      if (typeof window !== "undefined" && !window.google && !document.getElementById("google-maps-script")) {
+        const script = document.createElement("script");
+        script.id = "google-maps-script";
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+        script.async = true;
+        script.onload = () => {
+          if (init) init();
+        };
+        document.head.appendChild(script);
+      } else if (window.google && init) {
+        init();
+      }
+    };
+
+    loadGoogleMaps();
+  }, [init]);
+
+  const handleSelectAddress = (description: string) => {
+    setAddressSearchValue(description, false);
+    clearAddressSuggestions();
+    updateFormData({ address: description });
+  };
+
+  // Sync addressSearchValue with formData.address
+  useEffect(() => {
+    if (formData.address && addressSearchValue !== formData.address) {
+      setAddressSearchValue(formData.address, false);
+    }
+  }, [formData.address, setAddressSearchValue]);
 
   // Check for pre-filled service from pricing page or props
   useEffect(() => {
@@ -1261,13 +1318,32 @@ total: calculateTotal()
                   <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
                     <MapPin className="w-3 h-3" /> Property Address
                   </label>
-                  <Input 
-                    type="text" 
-                    placeholder="123 Luxury Lane, Houston, TX"
-                    className="h-14 rounded-xl border-gray-100 focus:border-black text-[15px] px-5"
-                    value={formData.address}
-                    onChange={(e) => updateFormData({ address: e.target.value })}
-                  />
+                  <div className="relative">
+                    <Input
+                      type="text"
+                      placeholder="123 Luxury Lane, Houston, TX"
+                      className="h-14 rounded-xl border-gray-100 focus:border-black text-[15px] px-5 w-full"
+                      value={addressSearchValue || formData.address}
+                      onChange={(e) => {
+                        setAddressSearchValue(e.target.value);
+                        updateFormData({ address: e.target.value });
+                      }}
+                      disabled={!ready}
+                    />
+                    {addressStatus === "OK" && (
+                      <div className="absolute z-[100] left-0 right-0 top-full mt-2 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden max-h-60 overflow-y-auto">
+                        {addressSuggestions.map(({ place_id, description }) => (
+                          <button
+                            key={place_id}
+                            onClick={() => handleSelectAddress(description)}
+                            className="w-full px-5 py-3 text-left text-[13px] hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-none group"
+                          >
+                            <p className="font-bold text-black group-hover:text-teal-600 transition-colors">{description}</p>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                </div>
 
                <div className="grid grid-cols-2 gap-6">
@@ -1275,12 +1351,16 @@ total: calculateTotal()
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
                       <Maximize className="w-3 h-3" /> Square Footage
                     </label>
-                    <Input 
-                      type="number" 
+                    <Input
+                      type="text"
+                      inputMode="numeric"
                       placeholder="2500"
                       className="h-14 rounded-xl border-gray-100 focus:border-black text-[15px] px-5"
                       value={formData.sqft}
-                      onChange={(e) => updateFormData({ sqft: e.target.value })}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, "");
+                        updateFormData({ sqft: val });
+                      }}
                     />
                   </div>
                   <div className="space-y-3">
