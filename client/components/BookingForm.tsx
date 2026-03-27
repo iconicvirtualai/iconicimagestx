@@ -1,8 +1,4 @@
 import React, { useState, useEffect, useRef } from "react";
-import usePlacesAutocomplete, {
-  getGeocode,
-  getLatLng,
-} from "use-places-autocomplete";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -575,20 +571,11 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     specializedPhotography: "mls" as "mls" | "social" | "both",
   });
 
-  const {
-    ready,
-    value: addressSearchValue,
-    suggestions: { status: addressStatus, data: addressSuggestions },
-    setValue: setAddressSearchValue,
-    clearSuggestions: clearAddressSuggestions,
-    init
-  } = usePlacesAutocomplete({
-    initOnMount: false,
-    debounce: 300,
-    requestOptions: {
-      componentRestrictions: { country: "us" },
-    }
-  });
+  // Dynamic Google Maps loading and Autocomplete Service
+  const [isMapsReady, setIsMapsReady] = useState(false);
+  const [addressSearchValue, setAddressSearchValue] = useState("");
+  const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
+  const autocompleteService = useRef<any>(null);
 
   useEffect(() => {
     const loadGoogleMaps = () => {
@@ -604,29 +591,58 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
         script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
         script.async = true;
         script.onload = () => {
-          if (init) init();
+          setIsMapsReady(true);
         };
         document.head.appendChild(script);
-      } else if (window.google && init) {
-        init();
+      } else if (window.google) {
+        setIsMapsReady(true);
       }
     };
 
     loadGoogleMaps();
-  }, [init]);
+  }, []);
+
+  useEffect(() => {
+    if (isMapsReady && window.google && !autocompleteService.current) {
+      autocompleteService.current = new window.google.maps.places.AutocompleteService();
+    }
+  }, [isMapsReady]);
+
+  // Handle address input and suggestions
+  useEffect(() => {
+    if (!addressSearchValue || !autocompleteService.current) {
+      setAddressSuggestions([]);
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      autocompleteService.current.getPlacePredictions(
+        { input: addressSearchValue, componentRestrictions: { country: "us" } },
+        (predictions: any, status: any) => {
+          if (status === "OK" && predictions) {
+            setAddressSuggestions(predictions);
+          } else {
+            setAddressSuggestions([]);
+          }
+        }
+      );
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [addressSearchValue]);
 
   const handleSelectAddress = (description: string) => {
-    setAddressSearchValue(description, false);
-    clearAddressSuggestions();
+    setAddressSearchValue(description);
+    setAddressSuggestions([]);
     updateFormData({ address: description });
   };
 
   // Sync addressSearchValue with formData.address
   useEffect(() => {
     if (formData.address && addressSearchValue !== formData.address) {
-      setAddressSearchValue(formData.address, false);
+      setAddressSearchValue(formData.address);
     }
-  }, [formData.address, setAddressSearchValue]);
+  }, [formData.address]);
 
   // Check for pre-filled service from pricing page or props
   useEffect(() => {
@@ -1328,9 +1344,9 @@ total: calculateTotal()
                         setAddressSearchValue(e.target.value);
                         updateFormData({ address: e.target.value });
                       }}
-                      disabled={!ready}
+                      disabled={!isMapsReady}
                     />
-                    {addressStatus === "OK" && (
+                    {addressSuggestions.length > 0 && (
                       <div className="absolute z-[100] left-0 right-0 top-full mt-2 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden max-h-60 overflow-y-auto">
                         {addressSuggestions.map(({ place_id, description }) => (
                           <button
