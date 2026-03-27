@@ -1344,7 +1344,6 @@ total: calculateTotal()
                         setAddressSearchValue(e.target.value);
                         updateFormData({ address: e.target.value });
                       }}
-                      disabled={!isMapsReady}
                     />
                     {addressSuggestions.length > 0 && (
                       <div className="absolute z-[100] left-0 right-0 top-full mt-2 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden max-h-60 overflow-y-auto">
