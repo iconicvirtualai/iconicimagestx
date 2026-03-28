@@ -871,6 +871,15 @@ const lineItems = [
   }).filter(Boolean)
 ];
   try {
+    console.log("FINAL ORDER PAYLOAD", {
+      clientName: `${formData.firstName} ${formData.lastName}`,
+      clientEmail: formData.email,
+      clientPhone: formData.phone,
+      propertyAddress: formData.address,
+      lineItems: lineItems,
+      total: calculateTotal(),
+      createdAt: new Date()
+    });
     await createOrder({
       ...formData,
 
