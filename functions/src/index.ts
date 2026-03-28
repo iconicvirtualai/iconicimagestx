@@ -51,7 +51,7 @@ export const onOrderCreated = functions.firestore
         .map((item: any) => `• ${item.name} — $${item.price}`)
         .join("\n");
 
-      console.log("LINE ITEMS TEXT:", lineItemsText);
+      console.log("RAW TEMPLATE:", JSON.stringify(clientTemplate.body));
 
       // 🔥 BUILD TAG DATA
       const tagData: Record<string, string> = {
