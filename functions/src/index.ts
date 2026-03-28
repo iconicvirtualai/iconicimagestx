@@ -70,22 +70,23 @@ export const onOrderCreated = functions.firestore
 
       console.log("TAG DATA:", tagData);
 
+      const replaceTags = (template: string, data: Record<string, string>) => {
+  let result = template;
+
+  Object.entries(data).forEach(([key, value]) => {
+    const regex = new RegExp(`\\{\\s*${key}\\s*\\}`, "g");
+    result = result.replace(regex, value ?? "");
+  });
+
+  return result;
+};
+      
       // 🔹 Replace template tags
       const clientSubject = replaceTags(clientTemplate.subject, tagData);
-     let clientBody = clientTemplate.body;
-
-Object.entries(tagData).forEach(([key, value]) => {
-  const regex = new RegExp(`\\{${key}\\}`, "g");
-  clientBody = clientBody.replace(regex, value);
-});
+     const clientBody = replaceTags(clientTemplate.body, tagData);
 
       const ownerSubject = replaceTags(ownerTemplate.subject, tagData);
-     let ownerBody = ownerTemplate.body;
-
-Object.entries(tagData).forEach(([key, value]) => {
-  const regex = new RegExp(`\\{${key}\\}`, "g");
-  ownerBody = ownerBody.replace(regex, value);
-});
+     const ownerBody = replaceTags(ownerTemplate.body, tagData);
 
       // 🔹 Email encoding
       const encodeEmail = (to: string, subject: string, body: string) => {
