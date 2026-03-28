@@ -6,9 +6,15 @@ admin.initializeApp();
 
 const db = admin.firestore();
 
-// 🔹 Tag replacement helper
 function replaceTags(template: string, data: Record<string, string>): string {
-  return template.replace(/\{(\w+)\}/g, (match, key) => data[key] || match);
+  let result = template;
+
+  Object.entries(data).forEach(([key, value]) => {
+    const regex = new RegExp(`\\{\\s*${key}\\s*\\}`, "gi");
+    result = result.replace(regex, value ?? "");
+  });
+
+  return result;
 }
 
 export const onOrderCreated = functions.firestore
