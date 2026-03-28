@@ -873,12 +873,13 @@ const lineItems = [
   try {
     await createOrder({
       ...formData,
-      
+
 lineItems: lineItems,
 
 subtotal: calculateTotal(),
-total: calculateTotal()
-      
+total: calculateTotal(),
+createdAt: new Date()
+
     });
 
     setStep("success");
