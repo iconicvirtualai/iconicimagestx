@@ -871,11 +871,11 @@ const lineItems = [
   }).filter(Boolean)
 ];
   try {
-    console.log("FINAL ORDER PAYLOAD", {
+    console.log("PAYLOAD DEBUG", {
       clientName: `${formData.firstName} ${formData.lastName}`,
       clientEmail: formData.email,
       clientPhone: formData.phone,
-      propertyAddress: formData.address,
+      propertyAddress: formData.propertyAddress,
       lineItems: lineItems,
       total: calculateTotal(),
       createdAt: new Date()
