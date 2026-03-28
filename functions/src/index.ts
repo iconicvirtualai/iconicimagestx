@@ -61,7 +61,7 @@ export const onOrderCreated = functions.firestore
 
         // 🔥 NEW VARIABLES
         lineItems: lineItemsText,
-        total: String(order.pricing?.total || 0),
+      total: String(order.total || order.pricing?.total || 0),
 
         notes: order.notes || "",
         orderId: orderId,
