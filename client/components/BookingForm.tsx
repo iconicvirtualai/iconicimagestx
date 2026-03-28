@@ -870,6 +870,8 @@ const lineItems = [
     return found ? { name: found.name, price: found.price } : null;
   }).filter(Boolean)
 ];
+  const total = calculateTotal();
+
   try {
     console.log("PAYLOAD DEBUG", {
       clientName: `${formData.firstName} ${formData.lastName}`,
@@ -877,7 +879,7 @@ const lineItems = [
       clientPhone: formData.phone,
       propertyAddress: formData.propertyAddress,
       lineItems: lineItems,
-      total: calculateTotal(),
+      total: total,
       createdAt: new Date()
     });
     await createOrder({
@@ -885,8 +887,8 @@ const lineItems = [
 
 lineItems: lineItems,
 
-subtotal: calculateTotal(),
-total: calculateTotal(),
+subtotal: total,
+total: total,
 createdAt: new Date()
 
     });
