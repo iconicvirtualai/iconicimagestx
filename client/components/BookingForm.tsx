@@ -868,7 +868,32 @@ const lineItems = [
       if (a) found = a;
     });
     return found ? { name: found.name, price: found.price } : null;
-  }).filter(Boolean)
+  }).filter(Boolean),
+
+  ...(formData.premiumUpgrade ? [{
+    name: "Iconic Finish (Premium Upgrade)",
+    price: 65
+  }] : []),
+
+  ...(formData.virtualStagingCredits > 0 ? [{
+    name: `Virtual Staging (${formData.virtualStagingCredits} credits)`,
+    price: formData.virtualStagingCredits * 35
+  }] : []),
+
+  ...(formData.specializedPhotography === "social" ? [{
+    name: "Social Media Optimized Photography",
+    price: 85
+  }] : []),
+
+  ...(formData.specializedPhotography === "both" ? [{
+    name: "MLS + Social Media Optimized Photography",
+    price: 125
+  }] : []),
+
+  ...(appliedPromo ? [{
+    name: `Promo Code: ${appliedPromo.code}`,
+    price: -appliedPromo.discount
+  }] : [])
 ];
   const total = calculateTotal();
 

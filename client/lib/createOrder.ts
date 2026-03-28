@@ -81,19 +81,7 @@ export async function createOrder(formData: any) {
       addons: formData.selectedAddOns,
 
       // 🔥 LINE ITEMS
-      lineItems: [
-        ...(formData.selectedService
-          ? [{ name: formData.selectedService, price: 0 }]
-          : (formData.selectedBasics || []).map((s: string) => ({
-              name: s,
-              price: 0,
-            }))),
-
-        ...(formData.selectedAddOns || []).map((a: string) => ({
-          name: a,
-          price: 0,
-        })),
-      ],
+      lineItems: formData.lineItems || [],
 
       // 🔥 PRICING
       pricing: {
