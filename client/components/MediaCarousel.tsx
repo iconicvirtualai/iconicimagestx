@@ -12,19 +12,19 @@ export default function MediaCarousel() {
     : [
         {
           id: 1,
-          before: { type: 'image' as const, url: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Faecac2467163410db0180e8fdd8a98f7?format=webp&width=800&height=1200" },
+          before: { type: 'image' as const, url: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F7b6f0520916943fbb79cd44614a1ab77?format=webp&width=800&height=1200" },
           after: { type: 'video' as const, url: "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F4ea5feebdab84ee585ffaa811d803379?alt=media&token=dda6499e-44a2-47a4-a456-1cacb39b6ae4&apiKey=0ed22311ac6a4dbebeda1b4230c2746c" },
           aspect: "16/9" as const,
         },
         {
           id: 2,
-          before: { type: 'image' as const, url: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fe7a04734046e4171bfccc96600f0870f?format=webp&width=800&height=1200" },
+          before: { type: 'image' as const, url: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F72b1daa259ee41fca399923cfd811959?format=webp&width=800&height=1200" },
           after: { type: 'video' as const, url: "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fba0e88982aa140c2bd2a033055391c4a?alt=media&token=2faaf53d-9e02-4887-aa85-08c6f971cee4&apiKey=0ed22311ac6a4dbebeda1b4230c2746c" },
           aspect: "9/16" as const,
         },
         {
           id: 3,
-          before: { type: 'image' as const, url: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F1bc44dc912bd4cd4848b7cbe64db7001?format=webp&width=800&height=1200" },
+          before: { type: 'image' as const, url: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F28ba4cca4f9a4fc3bc259e984c8012fd?format=webp&width=800&height=1200" },
           after: { type: 'video' as const, url: "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F4203b3fa6d2046f6b3aebe85986706ad?alt=media&token=60e7a23a-12d3-45d9-8063-8fa212dc4c4c&apiKey=0ed22311ac6a4dbebeda1b4230c2746c" },
           aspect: "16/9" as const,
         },
@@ -67,10 +67,10 @@ export default function MediaCarousel() {
         </div>
       </div>
 
-      <div className="relative overflow-hidden group/track">
+      <div className="relative overflow-hidden group/track h-[232px] md:h-[352px]">
         {/* Before Track (Photo) - Clipped to left side */}
-        <div 
-          className="w-full"
+        <div
+          className="absolute inset-0"
           style={{ clipPath: 'inset(0 50% 0 0)' }}
         >
           {renderTrack('before')}
@@ -86,12 +86,12 @@ export default function MediaCarousel() {
       </div>
 
       <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes scrollRight {
-          0% { transform: translateX(-33.333%); }
-          100% { transform: translateX(0); }
+        @keyframes scrollLeft {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-33.333%); }
         }
         .animate-scroll {
-          animation: scrollRight 35s linear infinite;
+          animation: scrollLeft 35s linear infinite;
           display: flex;
           width: max-content;
         }
