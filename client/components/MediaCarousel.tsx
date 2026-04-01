@@ -46,14 +46,21 @@ export default function MediaCarousel() {
 
   const renderTrack = (type: 'before' | 'after') => (
     <div className="flex animate-scroll whitespace-nowrap py-4">
-      {displayPairs.map((pair, index) => (
-        <BeforeAfterTile
-          key={`${pair.id}-${index}`}
-          media={type === 'before' ? pair.before : pair.after}
-          aspect={pair.aspect}
-          isGrayscale={type === 'before'}
-        />
-      ))}
+      {displayPairs.map((pair, index) => {
+        const media = type === 'before' ? pair.before : pair.after;
+        if (!media) {
+          console.warn(`[MediaCarousel] Missing media for track ${type} at index ${index}`, pair);
+          return null;
+        }
+        return (
+          <BeforeAfterTile
+            key={`${pair.id}-${index}-${type}`}
+            media={media}
+            aspect={pair.aspect}
+            isGrayscale={type === 'before'}
+          />
+        );
+      })}
     </div>
   );
 

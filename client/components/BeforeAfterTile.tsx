@@ -12,6 +12,7 @@ interface BeforeAfterTileProps {
 }
 
 function MediaContent({ media, className }: { media: MediaSource; className?: string }) {
+  if (!media) return null;
   if (media.type === 'video') {
     return (
       <video
@@ -34,6 +35,7 @@ function MediaContent({ media, className }: { media: MediaSource; className?: st
 }
 
 export default function BeforeAfterTile({ media, aspect, isGrayscale }: BeforeAfterTileProps) {
+  if (!media) return null;
   // Respect the aspect ratio for width, while maintaining a consistent height level
   const widthClass = aspect === "16/9"
     ? "w-[250px] md:w-[568px]"
