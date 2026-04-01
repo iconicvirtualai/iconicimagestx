@@ -26,27 +26,6 @@ function clean(data: any) {
   return data;
 }
 
-interface CreateOrderData {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  address: string;
-  sqft: string;
-  serviceDate?: Date;
-  serviceTime: string;
-  selectedService: string;
-  selectedBasics: string[];
-  selectedAddOns: string[];
-  premiumUpgrade: boolean;
-  specializedPhotography?: "mls" | "social" | "both";
-  vibeNote?: string;
-
-  // NEW
-  subtotal?: number;
-  total?: number;
-}
-
 export async function createOrder(formData: any) {
   try {
     console.log("[createOrder] STEP 1: Validating form data...");
@@ -64,88 +43,40 @@ export async function createOrder(formData: any) {
       throw error;
     }
 
-    console.log("[createOrder] STEP 2: Preparing order record...");
+    console.log("[createOrder] STEP 2: Preparing order request record...");
 
-    const orderData = {
+    // Construct the document exactly as requested
+    const orderRequestData = {
       clientName: `${formData.firstName} ${formData.lastName}`,
       clientEmail: formData.email,
       clientPhone: formData.phone,
-
       propertyAddress: formData.address,
       sqft: formData.sqft,
-
       services: formData.selectedService
         ? [formData.selectedService]
-        : formData.selectedBasics,
-
-      addons: formData.selectedAddOns,
-
-      // 🔥 LINE ITEMS
+        : (formData.selectedBasics || []),
+      addons: formData.selectedAddOns || [],
       lineItems: formData.lineItems || [],
-
-      // 🔥 PRICING
       pricing: {
         subtotal: formData.subtotal || 0,
         total: formData.total || 0,
       },
-
-      specializedPhotography: formData.specializedPhotography || "mls",
+      total: formData.total || 0,
       notes: formData.vibeNote || "",
-
-      status: "new",
-      createdAt: serverTimestamp(),
-    };
-
-    console.log("[createOrder] STEP 3: Writing order to database...");
-    const orderRef = await addDoc(collection(db, "orders"), clean(orderData));
-    const orderId = orderRef.id;
-
-    console.log("[createOrder] STEP 4: Order created successfully with ID:", orderId);
-
-    // CREATE APPOINTMENT
-    console.log("[createOrder] STEP 5: Preparing appointment record...");
-    const appointmentData = {
-      orderId: orderId,
-      startTime: formData.serviceDate
-        ? `${formData.serviceDate instanceof Date ? formData.serviceDate.toISOString().split('T')[0] : formData.serviceDate} ${formData.serviceTime}`
-        : "",
-      endTime: "",
-      location: {
-        addressLine: formData.address,
-        city: "",
-        state: "",
-        zip: "",
-      },
-      photographerId: "",
-      status: "pending",
-      createdAt: serverTimestamp(),
-    };
-
-    console.log("[createOrder] STEP 6: Writing appointment to database...");
-    const appointmentRef = await addDoc(collection(db, "appointments"), clean(appointmentData));
-    const appointmentId = appointmentRef.id;
-    console.log("[createOrder] STEP 7: Appointment created successfully with ID:", appointmentId);
-
-    // 3️⃣ Create the Order Request document with ALL fields
-    console.log("[createOrder] STEP 8: Preparing order request record with all fields...");
-
-    // Create the Order Request document with ALL fields
-    const orderRequestData = {
-      ...formData,
-      orderId: orderId,
-      appointmentId: appointmentId,
-      clientName: `${formData.firstName} ${formData.lastName}`,
+      specializedPhotography: formData.specializedPhotography || "mls",
       submittedAt: serverTimestamp(),
       status: "needs scheduled"
     };
 
-    console.log("[createOrder] STEP 9: Writing comprehensive order request to database...");
-    await addDoc(collection(db, "orderRequests"), clean(orderRequestData));
-    console.log("[createOrder] SUCCESS: All records created successfully!");
+    console.log("[createOrder] STEP 3: Writing order request to database...");
+    const requestRef = await addDoc(collection(db, "orderRequests"), clean(orderRequestData));
+    const requestId = requestRef.id;
 
+    console.log("[createOrder] SUCCESS: Order request created successfully with ID:", requestId);
+
+    // Return the ID as orderId for compatibility with the frontend
     return {
-      orderId: orderId,
-      appointmentId: appointmentId,
+      orderId: requestId,
     };
 
   } catch (error: any) {

@@ -148,10 +148,10 @@ export default function AdminDashboard() {
                           className="group hover:bg-[#fafafa] transition-colors cursor-pointer"
                           onClick={() => navigate(`/admin/order-request/${request.id}`)}
                         >
-                          <td className="py-4 text-sm font-mono text-red-500 font-bold">{request.orderId.substring(0, 8)}...</td>
+                          <td className="py-4 text-sm font-mono text-red-500 font-bold">{request.id.substring(0, 8)}...</td>
                           <td className="py-4">
                             <p className="text-sm font-bold text-black">{request.clientName}</p>
-                            <p className="text-[10px] text-gray-400">{request.address || "Consultation"}</p>
+                            <p className="text-[10px] text-gray-400">{request.propertyAddress || "Consultation"}</p>
                           </td>
                           <td className="py-4">
                             <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-[9px] font-bold uppercase tracking-widest">

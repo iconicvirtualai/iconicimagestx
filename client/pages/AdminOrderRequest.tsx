@@ -112,11 +112,11 @@ export default function AdminOrderRequest() {
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <Hash className="w-4 h-4 text-red-500" />
-                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Order ID: {request.orderId}</span>
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Order ID: {request.id}</span>
                   </div>
                   <h1 className="text-3xl font-black uppercase tracking-tight mb-2">{request.clientName}</h1>
                   <p className="text-gray-400 font-medium flex items-center gap-2">
-                    <MapPin className="w-4 h-4" /> {request.address || "No address provided (Consultation)"}
+                    <MapPin className="w-4 h-4" /> {request.propertyAddress || "No address provided (Consultation)"}
                   </p>
                 </div>
                 <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 min-w-[200px]">
@@ -265,7 +265,7 @@ export default function AdminOrderRequest() {
                 <div className="flex gap-3">
                   <Button variant="outline" className="rounded-xl font-bold px-8 h-12">Archive Request</Button>
                   <Button asChild className="bg-black hover:bg-gray-800 text-white font-bold rounded-xl px-8 h-12">
-                    <Link to={`/admin/listing/${request.orderId}`}>Create/Manage Listing</Link>
+                    <Link to={`/admin/listing/${request.id}`}>Create/Manage Listing</Link>
                   </Button>
                 </div>
               </section>
