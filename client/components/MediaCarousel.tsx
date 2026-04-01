@@ -12,31 +12,19 @@ export default function MediaCarousel() {
     {
       id: 1,
       before: { type: 'image' as const, url: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Faecac2467163410db0180e8fdd8a98f7?format=webp&width=800&height=1200" },
-      after: { type: 'video' as const, url: "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fba0e88982aa140c2bd2a033055391c4a?alt=media&token=2faaf53d-9e02-4887-aa85-08c6f971cee4&apiKey=0ed22311ac6a4dbebeda1b4230c2746c" },
+      after: { type: 'video' as const, url: "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F4ea5feebdab84ee585ffaa811d803379?alt=media&token=dda6499e-44a2-47a4-a456-1cacb39b6ae4&apiKey=0ed22311ac6a4dbebeda1b4230c2746c" },
       aspect: "16/9" as const,
     },
     {
       id: 2,
       before: { type: 'image' as const, url: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fe7a04734046e4171bfccc96600f0870f?format=webp&width=800&height=1200" },
-      after: { type: 'video' as const, url: "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F4ea5feebdab84ee585ffaa811d803379?alt=media&token=dda6499e-44a2-47a4-a456-1cacb39b6ae4&apiKey=0ed22311ac6a4dbebeda1b4230c2746c" },
+      after: { type: 'video' as const, url: "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fba0e88982aa140c2bd2a033055391c4a?alt=media&token=2faaf53d-9e02-4887-aa85-08c6f971cee4&apiKey=0ed22311ac6a4dbebeda1b4230c2746c" },
       aspect: "9/16" as const,
     },
     {
       id: 3,
       before: { type: 'image' as const, url: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F1bc44dc912bd4cd4848b7cbe64db7001?format=webp&width=800&height=1200" },
-      after: { type: 'video' as const, url: "https://videos.pexels.com/video-files/32821434/13990151_640_360_30fps.mp4" },
-      aspect: "16/9" as const,
-    },
-    {
-      id: 4,
-      before: { type: 'image' as const, url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=1200&q=80" },
-      after: { type: 'video' as const, url: "https://videos.pexels.com/video-files/34236991/14509265_360_640_24fps.mp4" },
-      aspect: "9/16" as const,
-    },
-    {
-      id: 5,
-      before: { type: 'image' as const, url: "https://images.unsplash.com/photo-1600566752355-35792bedca5d?w=1200&q=80" },
-      after: { type: 'video' as const, url: "https://videos.pexels.com/video-files/32821434/13990151_640_360_30fps.mp4" },
+      after: { type: 'video' as const, url: "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F4203b3fa6d2046f6b3aebe85986706ad?alt=media&token=60e7a23a-12d3-45d9-8063-8fa212dc4c4c&apiKey=0ed22311ac6a4dbebeda1b4230c2746c" },
       aspect: "16/9" as const,
     },
   ];
