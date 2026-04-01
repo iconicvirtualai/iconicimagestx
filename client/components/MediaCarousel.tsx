@@ -11,7 +11,7 @@ export default function MediaCarousel() {
   const mediaPairs = [
     {
       id: 1,
-      before: { type: 'image' as const, url: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80" },
+      before: { type: 'image' as const, url: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F1bc44dc912bd4cd4848b7cbe64db7001?format=webp&width=800&height=1200" },
       after: { type: 'video' as const, url: "https://videos.pexels.com/video-files/32821434/13990151_640_360_30fps.mp4" },
       aspect: "16/9" as const,
     },
