@@ -42,10 +42,15 @@ export default function Header() {
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2 flex-shrink-0 group">
           <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-sm transition-transform group-hover:scale-105"
+            className="w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105"
             style={{ backgroundColor: settings.global.primaryColor }}
           >
-            <Zap className="w-5 h-5 fill-white" />
+            <img
+              src="https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fc64073babcd04fcf966feeaacd4c903c?format=webp&width=800&height=1200"
+              alt="Logo"
+              className="w-6 h-6 object-contain"
+              style={{ filter: 'invert(1)' }}
+            />
           </div>
           <span className="text-[17px] font-bold tracking-tight text-white uppercase">
             {settings.global.logoText}
@@ -111,5 +116,3 @@ export default function Header() {
     </header>
   );
 }
-
-import { Zap } from "lucide-react";
