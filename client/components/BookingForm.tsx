@@ -850,72 +850,59 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   setIsSubmitting(true);
 const selectedServiceData = services.find(s => s.id === formData.selectedService);
 
-const lineItems = [
-  ...(selectedServiceData ? [{
-    name: selectedServiceData.name,
-    price: selectedServiceData.price
-  }] : []),
+  const lineItems = [
+    ...(selectedServiceData ? [{
+      name: selectedServiceData.name,
+      price: selectedServiceData.price
+    }] : []),
 
-  ...formData.selectedBasics.map(id => {
-    const b = basicsList.find(x => x.id === id);
-    return b ? { name: b.name, price: b.price } : null;
-  }).filter(Boolean),
+    ...formData.selectedBasics.map(id => {
+      const b = basicsList.find(x => x.id === id);
+      return b ? { name: b.name, price: b.price } : null;
+    }).filter(Boolean),
 
-  ...formData.selectedAddOns.map(id => {
-    let found;
-    addOns.forEach(cat => {
-      const a = cat.items.find(x => x.id === id);
-      if (a) found = a;
-    });
-    return found ? { name: found.name, price: found.price } : null;
-  }).filter(Boolean),
+    ...formData.selectedAddOns.map(id => {
+      let found;
+      addOns.forEach(cat => {
+        const a = cat.items.find(x => x.id === id);
+        if (a) found = a;
+      });
+      return found ? { name: found.name, price: found.price } : null;
+    }).filter(Boolean),
 
-  ...(formData.premiumUpgrade ? [{
-    name: "Iconic Finish (Premium Upgrade)",
-    price: 65
-  }] : []),
+    ...(formData.premiumUpgrade ? [{
+      name: "Iconic Finish (Premium Upgrade)",
+      price: 65
+    }] : []),
 
-  ...(formData.virtualStagingCredits > 0 ? [{
-    name: `Virtual Staging (${formData.virtualStagingCredits} credits)`,
-    price: formData.virtualStagingCredits * 35
-  }] : []),
+    ...(formData.virtualStagingCredits > 0 ? [{
+      name: `Virtual Staging (${formData.virtualStagingCredits} credits)`,
+      price: formData.virtualStagingCredits * 35
+    }] : []),
 
-  ...(formData.specializedPhotography === "social" ? [{
-    name: "Social Media Optimized Photography",
-    price: 85
-  }] : []),
+    ...(formData.specializedPhotography === "social" ? [{
+      name: "Social Media Optimized Photography",
+      price: 85
+    }] : []),
 
-  ...(formData.specializedPhotography === "both" ? [{
-    name: "MLS + Social Media Optimized Photography",
-    price: 125
-  }] : []),
+    ...(formData.specializedPhotography === "both" ? [{
+      name: "MLS + Social Media Optimized Photography",
+      price: 125
+    }] : []),
 
-  ...(appliedPromo ? [{
-    name: `Promo Code: ${appliedPromo.code}`,
-    price: -appliedPromo.discount
-  }] : [])
-];
-  const total = calculateTotal();
+    ...(appliedPromo ? [{
+      name: `Promo Code: ${appliedPromo.code}`,
+      price: -appliedPromo.discount
+    }] : [])
+  ] as { name: string; price: number }[];
+
+  const total = lineItems.reduce((sum, item) => sum + item.price, 0);
 
   try {
-    console.log("PAYLOAD DEBUG", {
-      clientName: `${formData.firstName} ${formData.lastName}`,
-      clientEmail: formData.email,
-      clientPhone: formData.phone,
-      propertyAddress: formData.propertyAddress,
-      lineItems: lineItems,
-      total: total,
-      createdAt: new Date()
-    });
     await createOrder({
       ...formData,
-
-lineItems: lineItems,
-
-subtotal: total,
-total: total,
-createdAt: new Date()
-
+      lineItems,
+      total
     });
 
     setStep("success");

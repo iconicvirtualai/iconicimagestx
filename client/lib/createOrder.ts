@@ -2,7 +2,6 @@ import { db } from "@/lib/firebase";
 import {
   collection,
   addDoc,
-  serverTimestamp
 } from "firebase/firestore";
 
 /**
@@ -10,10 +9,9 @@ import {
  */
 function clean(data: any) {
   if (data === null || data === undefined) return null;
-  if (data instanceof Date) return data.toISOString();
+  if (data instanceof Date) return data; // Keep Date objects for Firestore
   if (Array.isArray(data)) return data.map(item => clean(item));
   if (typeof data === 'object') {
-    // Don't recurse into special Firestore FieldValues or other non-plain objects
     if (data.constructor && data.constructor.name !== 'Object') {
       return data;
     }
@@ -28,61 +26,43 @@ function clean(data: any) {
 
 export async function createOrder(formData: any) {
   try {
-    console.log("[createOrder] STEP 1: Validating form data...");
+    const lineItems = formData.lineItems || [];
+    const total = formData.total || 0;
 
-    // Basic validation
-    if (!formData.firstName || !formData.lastName || !formData.email) {
-      const error = new Error("Missing required client information (first name, last name, or email)");
-      console.error("[createOrder] Validation failed:", error.message);
-      throw error;
-    }
+    console.log("FINAL ORDER PAYLOAD:", {
+      ...formData,
+      lineItems,
+      total
+    });
 
-    if (!formData.address) {
-      const error = new Error("Property address is required");
-      console.error("[createOrder] Validation failed:", error.message);
-      throw error;
-    }
-
-    console.log("[createOrder] STEP 2: Preparing order request record...");
-
-    // Construct the document exactly as requested
-    const orderRequestData = {
-      clientName: `${formData.firstName} ${formData.lastName}`,
-      clientEmail: formData.email,
-      clientPhone: formData.phone,
-      propertyAddress: formData.address,
-      sqft: formData.sqft,
-      services: formData.selectedService
-        ? [formData.selectedService]
-        : (formData.selectedBasics || []),
-      addons: formData.selectedAddOns || [],
-      lineItems: formData.lineItems || [],
+    const docData = {
+      firstName: formData.firstName || "",
+      lastName: formData.lastName || "",
+      clientName: (formData.firstName || "") + " " + (formData.lastName || ""),
+      email: formData.email || "",
+      phone: formData.phone || "",
+      address: formData.address || "",
+      lineItems: lineItems,
       pricing: {
-        subtotal: formData.subtotal || 0,
-        total: formData.total || 0,
+        subtotal: total,
+        total: total
       },
-      total: formData.total || 0,
-      notes: formData.vibeNote || "",
-      specializedPhotography: formData.specializedPhotography || "mls",
-      submittedAt: serverTimestamp(),
-      status: "needs scheduled"
+      total: total,
+      vibeNote: formData.vibeNote || formData.notes || "",
+      status: "new",
+      createdAt: new Date()
     };
 
-    console.log("[createOrder] STEP 3: Writing order request to database...");
-    const requestRef = await addDoc(collection(db, "orderRequests"), clean(orderRequestData));
-    const requestId = requestRef.id;
+    await addDoc(collection(db, "orderRequests"), clean(docData));
+    
+    console.log("ORDER WRITTEN SUCCESSFULLY");
 
-    console.log("[createOrder] SUCCESS: Order request created successfully with ID:", requestId);
-
-    // Return the ID as orderId for compatibility with the frontend
     return {
-      orderId: requestId,
+      success: true
     };
 
   } catch (error: any) {
-    console.error("[createOrder] CRITICAL ERROR:", error);
-    const customError = new Error(error?.message || "An unexpected error occurred during order creation.");
-    (customError as any).originalError = error;
-    throw customError;
+    console.error("ORDER ERROR:", error);
+    throw error;
   }
 }
