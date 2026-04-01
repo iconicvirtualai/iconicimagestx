@@ -7,7 +7,10 @@ export default function MediaCarousel() {
   const settings = useSiteSettings();
 
   // Updated media items with mix of 16:9 and 9:16
-  // Before is always photo, After is always video
+  // Pair 1 - horizontal 07303325 & clip 20
+  // Pair 2 - vertical - MLU 07265 and Clip 14
+  // Pair 3 - horizontal - DG 52 & download
+  // Pair 4 - vertical - DVA08227 & download 2
   const mediaPairs = [
     {
       id: 1,
@@ -27,6 +30,12 @@ export default function MediaCarousel() {
       after: { type: 'video' as const, url: "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F4203b3fa6d2046f6b3aebe85986706ad?alt=media&token=60e7a23a-12d3-45d9-8063-8fa212dc4c4c&apiKey=0ed22311ac6a4dbebeda1b4230c2746c" },
       aspect: "16/9" as const,
     },
+    {
+      id: 4,
+      before: { type: 'image' as const, url: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F54911d726f0a43b684406564dac1e5e8?format=webp&width=800&height=1200" },
+      after: { type: 'video' as const, url: "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F4be86e27da6548d59c567aa0bdfc66e9?alt=media&token=927f0df1-6342-47f7-809f-131e4df074d6&apiKey=0ed22311ac6a4dbebeda1b4230c2746c" },
+      aspect: "9/16" as const,
+    },
   ];
 
   // Double the items for seamless loop
@@ -36,16 +45,12 @@ export default function MediaCarousel() {
     <div className="flex animate-scroll whitespace-nowrap py-4">
       {displayPairs.map((pair, index) => {
         const media = type === 'before' ? pair.before : pair.after;
-        if (!media) {
-          console.warn(`[MediaCarousel] Missing media for track ${type} at index ${index}`, pair);
-          return null;
-        }
+        if (!media) return null;
         return (
           <BeforeAfterTile
             key={`${pair.id}-${index}-${type}`}
             media={media}
             aspect={pair.aspect}
-            isGrayscale={type === 'before'}
           />
         );
       })}
@@ -65,12 +70,15 @@ export default function MediaCarousel() {
       </div>
 
       <div className="relative overflow-hidden group/track">
-        {/* Before Track (Photo) */}
-        <div className="w-full">
+        {/* Before Track (Photo) - Clipped to left side */}
+        <div 
+          className="w-full"
+          style={{ clipPath: 'inset(0 50% 0 0)' }}
+        >
           {renderTrack('before')}
         </div>
 
-        {/* After Track (Video) - Clipped to show only on right side */}
+        {/* After Track (Video) - Clipped to right side */}
         <div
           className="absolute inset-0 z-10 select-none pointer-events-none"
           style={{ clipPath: 'inset(0 0 0 50%)' }}
@@ -81,13 +89,13 @@ export default function MediaCarousel() {
 
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes scrollRight {
-          0% { transform: translateX(-33.33%); }
+          0% { transform: translateX(-33.333%); }
           100% { transform: translateX(0); }
         }
         .animate-scroll {
-          animation: scrollRight 40s linear infinite;
+          animation: scrollRight 35s linear infinite;
           display: flex;
-          width: fit-content;
+          width: max-content;
         }
         .animate-scroll:hover {
           animation-play-state: paused;

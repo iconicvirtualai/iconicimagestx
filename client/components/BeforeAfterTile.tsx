@@ -8,7 +8,6 @@ interface MediaSource {
 interface BeforeAfterTileProps {
   media: MediaSource;
   aspect: "16/9" | "9/16";
-  isGrayscale?: boolean;
 }
 
 function MediaContent({ media, className }: { media: MediaSource; className?: string }) {
@@ -34,7 +33,7 @@ function MediaContent({ media, className }: { media: MediaSource; className?: st
   );
 }
 
-export default function BeforeAfterTile({ media, aspect, isGrayscale }: BeforeAfterTileProps) {
+export default function BeforeAfterTile({ media, aspect }: BeforeAfterTileProps) {
   if (!media) return null;
   // Respect the aspect ratio for width, while maintaining a consistent height level
   const widthClass = aspect === "16/9"
@@ -44,9 +43,7 @@ export default function BeforeAfterTile({ media, aspect, isGrayscale }: BeforeAf
   return (
     <div className={`flex-shrink-0 mx-2 md:mx-3 ${widthClass}`}>
       <div
-        className={`relative w-full h-[200px] md:h-[320px] rounded-[24px] md:rounded-[40px] overflow-hidden bg-gray-900 shadow-2xl transition-all duration-500 ${
-          isGrayscale ? "grayscale brightness-75 opacity-80" : ""
-        }`}
+        className="relative w-full h-[200px] md:h-[320px] rounded-[24px] md:rounded-[40px] overflow-hidden bg-gray-900 shadow-2xl transition-all duration-500"
       >
         <MediaContent media={media} />
       </div>
