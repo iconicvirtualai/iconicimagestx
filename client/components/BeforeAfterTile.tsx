@@ -35,56 +35,34 @@ function MediaContent({ media, className }: { media: MediaSource; className?: st
 }
 
 export default function BeforeAfterTile({ before, after, aspect, primaryColor }: BeforeAfterTileProps) {
-  const isHorizontal = aspect === "16/9";
-
+  // We'll ignore the passed aspect and force a compact vertical card style for the AutoReel look
   return (
-    <div className="flex-shrink-0 mx-3 md:mx-4 group">
-      <div className="flex flex-col gap-3">
-        {/* Main Side-by-Side Container */}
-        <div
-          className={`flex gap-1.5 md:gap-2 p-1.5 bg-white border border-gray-100 rounded-[28px] md:rounded-[32px] shadow-xl transition-all duration-500 hover:shadow-2xl hover:scale-[1.01] overflow-hidden ${
-            isHorizontal
-              ? "w-[320px] h-[100px] md:w-[720px] md:h-[220px]"
-              : "w-[160px] h-[160px] md:w-[360px] md:h-[360px]"
-          }`}
+    <div className="flex-shrink-0 mx-2 md:mx-3 group">
+      <div className="relative w-[140px] h-[200px] md:w-[220px] md:h-[320px] rounded-[32px] md:rounded-[48px] overflow-hidden bg-gray-900 border-4 border-white/5 shadow-2xl transition-all duration-500 hover:scale-[1.02] hover:border-white/10">
+        {/* Before Layer (Always visible, but potentially masked) */}
+        <div className="absolute inset-0 grayscale brightness-75">
+          <MediaContent media={before} />
+        </div>
+
+        {/* After Layer (Sliding effect mimicking the screenshot) */}
+        <motion.div
+          initial={{ width: "50%" }}
+          whileHover={{ width: "100%" }}
+          transition={{ duration: 0.5, ease: "easeInOut" }}
+          className="absolute inset-0 z-10 border-l border-white/30 overflow-hidden"
         >
-          {/* Before Column */}
-          <div className="relative flex-1 rounded-[22px] md:rounded-[26px] overflow-hidden bg-gray-900 group/before">
-            <div className="absolute inset-0 grayscale brightness-75 opacity-90 transition-all duration-500 group-hover/before:grayscale-0 group-hover/before:brightness-100 group-hover/before:opacity-100">
-               <MediaContent media={before} />
-            </div>
-            
-            {/* Label Overlay */}
-            <div className="absolute top-4 left-4 z-10">
-              <div className="px-2.5 py-1 bg-black/60 backdrop-blur-md rounded-lg border border-white/10 flex items-center gap-2">
-                 <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
-                 <span className="text-[10px] font-black text-white uppercase tracking-widest">RAW</span>
-              </div>
-            </div>
-          </div>
-
-          {/* After Column */}
-          <div className="relative flex-1 rounded-[22px] md:rounded-[26px] overflow-hidden bg-gray-900 group/after">
+          <div className="absolute inset-0 w-[140px] h-[200px] md:w-[220px] md:h-[320px]">
             <MediaContent media={after} />
-            
-            {/* Label Overlay */}
-            <div className="absolute top-4 right-4 z-10">
-              <div 
-                className="px-2.5 py-1 backdrop-blur-md rounded-lg border border-white/10 flex items-center gap-2"
-                style={{ backgroundColor: `${primaryColor || '#0d9488'}99` }}
-              >
-                 <span className="text-[10px] font-black text-white uppercase tracking-widest">ICONIC</span>
-                 <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
-              </div>
-            </div>
           </div>
-        </div>
+        </motion.div>
 
-        {/* Optional: Subtle comparison line indicator */}
-        <div className="h-1 w-full flex gap-1 px-8 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-           <div className="flex-1 h-full rounded-full bg-gray-100"></div>
-           <div className="flex-1 h-full rounded-full" style={{ backgroundColor: primaryColor || '#0d9488' }}></div>
-        </div>
+        {/* Decorative Divider Line */}
+        <motion.div
+          initial={{ left: "50%" }}
+          whileHover={{ left: "100%" }}
+          transition={{ duration: 0.5, ease: "easeInOut" }}
+          className="absolute inset-y-0 z-20 w-px bg-white/50"
+        />
       </div>
     </div>
   );

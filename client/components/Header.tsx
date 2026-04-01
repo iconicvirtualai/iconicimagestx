@@ -33,10 +33,10 @@ export default function Header() {
   return (
     <header className={`fixed ${isHome ? "top-[44px]" : "top-4"} left-0 right-0 z-50 px-6 transition-all duration-300`}>
       <div
-        className={`mx-auto max-w-[1200px] rounded-full border border-gray-100/50 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] transition-all duration-500 px-8 flex items-center gap-4 ${
+        className={`mx-auto max-w-[1200px] rounded-full border border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.5)] transition-all duration-500 px-8 flex items-center gap-4 ${
           scrolled
-            ? "bg-white/80 backdrop-blur-xl py-1 shadow-lg border-white/50"
-            : "bg-white py-2 shadow-md"
+            ? "bg-black/80 backdrop-blur-xl py-1 border-white/20"
+            : "bg-white/5 backdrop-blur-md py-2 border-white/10"
         }`}
       >
         {/* Logo */}
@@ -45,20 +45,9 @@ export default function Header() {
             className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-sm transition-transform group-hover:scale-105"
             style={{ backgroundColor: settings.global.primaryColor }}
           >
-            <svg
-              className="w-5 h-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-              <circle cx="12" cy="13" r="3" />
-            </svg>
+            <Zap className="w-5 h-5 fill-white" />
           </div>
-          <span className="text-[17px] font-bold tracking-tight text-gray-900 uppercase">
+          <span className="text-[17px] font-bold tracking-tight text-white uppercase">
             {settings.global.logoText}
           </span>
         </Link>
@@ -69,7 +58,7 @@ export default function Header() {
             <Link
               key={item.href}
               to={item.href}
-              className="text-gray-500 hover:text-black transition-colors text-[14px] font-semibold"
+              className="text-gray-400 hover:text-white transition-colors text-[14px] font-semibold"
             >
               {item.label}
             </Link>
@@ -78,14 +67,19 @@ export default function Header() {
 
         {/* Right side buttons */}
         <div className="hidden lg:flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-[#166534] border-2 border-white shadow-md flex items-center justify-center text-white font-bold text-[15px] cursor-pointer hover:scale-105 transition-transform flex-shrink-0">
-            C
-          </div>
+          <Link to="/admin/login">
+            <span className="text-sm font-bold text-gray-400 hover:text-white cursor-pointer transition-colors">Log in</span>
+          </Link>
+          <Link to="/book">
+            <Button className="rounded-xl px-6 py-2 h-10 text-xs font-black uppercase tracking-widest bg-white text-black hover:bg-gray-200">
+              Start for free
+            </Button>
+          </Link>
         </div>
 
         {/* Mobile Menu Button */}
         <button
-          className="lg:hidden p-2 text-gray-600 hover:text-black transition-colors"
+          className="lg:hidden p-2 text-gray-400 hover:text-white transition-colors"
           onClick={toggleMenu}
           aria-label="Toggle menu"
         >
@@ -99,13 +93,13 @@ export default function Header() {
 
       {/* Mobile Navigation */}
       {isMenuOpen && (
-        <div className="mt-4 mx-auto max-w-[400px] bg-white/95 backdrop-blur-xl border border-gray-100 rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+        <div className="mt-4 mx-auto max-w-[400px] bg-black/95 backdrop-blur-xl border border-white/10 rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
           <nav className="px-8 py-10 flex flex-col gap-6">
             {menuItems.map((item) => (
               <Link
                 key={item.href}
                 to={item.href}
-                className="text-gray-600 hover:text-black transition-colors font-bold py-1 text-xl"
+                className="text-gray-400 hover:text-white transition-colors font-bold py-1 text-xl"
                 onClick={() => setIsMenuOpen(false)}
               >
                 {item.label}
@@ -117,3 +111,5 @@ export default function Header() {
     </header>
   );
 }
+
+import { Zap } from "lucide-react";

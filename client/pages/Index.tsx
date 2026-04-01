@@ -22,11 +22,11 @@ export default function Index() {
   const settings = useSiteSettings();
 
   return (
-    <div className="flex flex-col min-h-screen relative bg-[#fafafa]">
+    <div className="flex flex-col min-h-screen relative bg-black text-white">
       {/* Overall Background Dimension - Very Subtle Glow */}
       <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
-        <div className="absolute top-[20%] right-[-10%] w-[40vw] h-[40vw] bg-[#ecfeff] rounded-full blur-[150px] opacity-10" style={{ backgroundColor: `${settings.global.primaryColor}10` }}></div>
-        <div className="absolute bottom-[-10%] left-[-10%] w-[35vw] h-[35vw] bg-[#f0fdfa] rounded-full blur-[120px] opacity-15" style={{ backgroundColor: `${settings.global.secondaryColor}15` }}></div>
+        <div className="absolute top-[20%] right-[-10%] w-[40vw] h-[40vw] bg-[#0d9488]/10 rounded-full blur-[150px] opacity-20"></div>
+        <div className="absolute bottom-[-10%] left-[-10%] w-[35vw] h-[35vw] bg-[#0d9488]/15 rounded-full blur-[120px] opacity-20"></div>
       </div>
 
       <PromoBar />
