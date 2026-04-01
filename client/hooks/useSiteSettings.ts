@@ -22,6 +22,9 @@ export const DEFAULT_SITE_SETTINGS = {
     subtitle: "Transparent pricing for every stage of your real estate career.",
     showBasics: true,
     showPhase2: true,
+    showAIAssistant: true,
+    aiAssistantTitle: "Not sure where to start?",
+    aiAssistantSubtitle: "Let our AI guide you",
   }
 };
 

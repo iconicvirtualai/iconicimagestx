@@ -338,17 +338,46 @@ export default function AdminSiteCustomizer() {
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <VisibilityToggle 
-                          label="Show 'The Basics' Section" 
+                        <VisibilityToggle
+                          label="Show 'The Basics' Section"
                           checked={settings.pricing.showBasics}
                           onChange={(val) => updateSetting('pricing', 'showBasics', val)}
                         />
-                        <VisibilityToggle 
-                          label="Show 'Phase 2' Tiers" 
+                        <VisibilityToggle
+                          label="Show 'Phase 2' Tiers"
                           checked={settings.pricing.showPhase2}
                           onChange={(val) => updateSetting('pricing', 'showPhase2', val)}
                         />
+                        <VisibilityToggle
+                          label="Show AI Pricing Assistant"
+                          checked={settings.pricing.showAIAssistant}
+                          onChange={(val) => updateSetting('pricing', 'showAIAssistant', val)}
+                        />
                       </div>
+
+                      {settings.pricing.showAIAssistant && (
+                        <div className="pt-8 border-t border-slate-50 space-y-6 animate-in slide-in-from-top-2">
+                           <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight">AI Assistant Messaging</h4>
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                              <div className="space-y-3">
+                                 <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Assistant Title</Label>
+                                 <Input
+                                    value={settings.pricing.aiAssistantTitle}
+                                    onChange={(e) => updateSetting('pricing', 'aiAssistantTitle', e.target.value)}
+                                    className="rounded-xl border-slate-200 font-bold"
+                                 />
+                              </div>
+                              <div className="space-y-3">
+                                 <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Assistant Subtitle</Label>
+                                 <Input
+                                    value={settings.pricing.aiAssistantSubtitle}
+                                    onChange={(e) => updateSetting('pricing', 'aiAssistantSubtitle', e.target.value)}
+                                    className="rounded-xl border-slate-200"
+                                 />
+                              </div>
+                           </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </TabsContent>

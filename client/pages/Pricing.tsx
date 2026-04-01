@@ -383,21 +383,23 @@ export default function Pricing() {
           </div>
 
           {/* AI Assistant CTA - Smaller */}
-          <div className="mt-8 p-px bg-black rounded-[2rem] shadow-lg max-w-lg mx-auto transform hover:scale-[1.01] transition-transform duration-500">
-            <Link to="/pricing/ai-assistant" className="block bg-white rounded-[1.9rem] p-6 relative overflow-hidden group">
-              <div className="relative z-10 flex items-center gap-6">
-                <div className="w-12 h-12 rounded-[1rem] bg-[#f0fdfa] border border-[#ccfbf1] flex items-center justify-center shrink-0">
-                  <Sparkles className="w-6 h-6" style={{ color: settings.global.primaryColor }} />
-                </div>
-                <div className="text-left flex-1">
-                  <h3 className="text-lg font-bold text-black mb-1">Not sure where to start?</h3>
-                  <div className="flex items-center gap-2 font-bold text-xs accent-text-bordered">
-                    Let our AI guide you <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+          {settings.pricing.showAIAssistant && (
+            <div className="mt-8 p-px bg-black rounded-[2rem] shadow-lg max-w-lg mx-auto transform hover:scale-[1.01] transition-transform duration-500">
+              <Link to="/pricing/ai-assistant" className="block bg-white rounded-[1.9rem] p-6 relative overflow-hidden group">
+                <div className="relative z-10 flex items-center gap-6">
+                  <div className="w-12 h-12 rounded-[1rem] bg-[#f0fdfa] border border-[#ccfbf1] flex items-center justify-center shrink-0">
+                    <Sparkles className="w-6 h-6" style={{ color: settings.global.primaryColor }} />
+                  </div>
+                  <div className="text-left flex-1">
+                    <h3 className="text-lg font-bold text-black mb-1">{settings.pricing.aiAssistantTitle}</h3>
+                    <div className="flex items-center gap-2 font-bold text-xs accent-text-bordered">
+                      {settings.pricing.aiAssistantSubtitle} <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Link>
-          </div>
+              </Link>
+            </div>
+          )}
         </div>
 
         </div>

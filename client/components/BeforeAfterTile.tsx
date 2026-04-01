@@ -38,7 +38,7 @@ export default function BeforeAfterTile({ before, after, aspect, primaryColor }:
   // We'll ignore the passed aspect and force a compact vertical card style for the AutoReel look
   return (
     <div className="flex-shrink-0 mx-2 md:mx-3 group">
-      <div className="relative w-[140px] h-[200px] md:w-[220px] md:h-[320px] rounded-[32px] md:rounded-[48px] overflow-hidden bg-gray-900 border-4 border-white/5 shadow-2xl transition-all duration-500 hover:scale-[1.02] hover:border-white/10">
+      <div className="relative w-[140px] h-[200px] md:w-[220px] md:h-[320px] rounded-[32px] md:rounded-[48px] overflow-hidden bg-gray-900 shadow-2xl transition-all duration-500 hover:scale-[1.02]">
         {/* Before Layer (Always visible, but potentially masked) */}
         <div className="absolute inset-0 grayscale brightness-75">
           <MediaContent media={before} />

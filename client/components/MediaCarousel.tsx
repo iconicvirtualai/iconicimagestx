@@ -44,7 +44,7 @@ export default function MediaCarousel() {
   const displayPairs = [...mediaPairs, ...mediaPairs, ...mediaPairs];
 
   return (
-    <div className="relative w-full overflow-hidden bg-black pb-24">
+    <div className="relative w-full overflow-hidden bg-black pb-12">
       {/* Main Carousel Track */}
       <div className="relative overflow-hidden group/track">
         <div className="flex animate-scroll whitespace-nowrap py-4">
