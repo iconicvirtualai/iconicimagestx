@@ -6,10 +6,9 @@ interface MediaSource {
 }
 
 interface BeforeAfterTileProps {
-  before: MediaSource;
-  after: MediaSource;
+  media: MediaSource;
   aspect: "16/9" | "9/16";
-  primaryColor?: string;
+  isGrayscale?: boolean;
 }
 
 function MediaContent({ media, className }: { media: MediaSource; className?: string }) {
@@ -34,35 +33,20 @@ function MediaContent({ media, className }: { media: MediaSource; className?: st
   );
 }
 
-export default function BeforeAfterTile({ before, after, aspect, primaryColor }: BeforeAfterTileProps) {
-  // We'll ignore the passed aspect and force a compact vertical card style for the AutoReel look
+export default function BeforeAfterTile({ media, aspect, isGrayscale }: BeforeAfterTileProps) {
+  // Respect the aspect ratio for width, while maintaining a consistent height level
+  const widthClass = aspect === "16/9"
+    ? "w-[250px] md:w-[568px]"
+    : "w-[112px] md:w-[180px]";
+
   return (
-    <div className="flex-shrink-0 mx-2 md:mx-3 group">
-      <div className="relative w-[140px] h-[200px] md:w-[220px] md:h-[320px] rounded-[32px] md:rounded-[48px] overflow-hidden bg-gray-900 shadow-2xl transition-all duration-500 hover:scale-[1.02]">
-        {/* Before Layer (Always visible, but potentially masked) */}
-        <div className="absolute inset-0 grayscale brightness-75">
-          <MediaContent media={before} />
-        </div>
-
-        {/* After Layer (Sliding effect mimicking the screenshot) */}
-        <motion.div
-          initial={{ width: "50%" }}
-          whileHover={{ width: "100%" }}
-          transition={{ duration: 0.5, ease: "easeInOut" }}
-          className="absolute inset-0 z-10 border-l border-white/30 overflow-hidden"
-        >
-          <div className="absolute inset-0 w-[140px] h-[200px] md:w-[220px] md:h-[320px]">
-            <MediaContent media={after} />
-          </div>
-        </motion.div>
-
-        {/* Decorative Divider Line */}
-        <motion.div
-          initial={{ left: "50%" }}
-          whileHover={{ left: "100%" }}
-          transition={{ duration: 0.5, ease: "easeInOut" }}
-          className="absolute inset-y-0 z-20 w-px bg-white/50"
-        />
+    <div className={`flex-shrink-0 mx-2 md:mx-3 ${widthClass}`}>
+      <div
+        className={`relative w-full h-[200px] md:h-[320px] rounded-[24px] md:rounded-[40px] overflow-hidden bg-gray-900 shadow-2xl transition-all duration-500 ${
+          isGrayscale ? "grayscale brightness-75 opacity-80" : ""
+        }`}
+      >
+        <MediaContent media={media} />
       </div>
     </div>
   );

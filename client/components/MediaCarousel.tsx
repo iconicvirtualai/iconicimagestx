@@ -6,67 +6,91 @@ import BeforeAfterTile from "./BeforeAfterTile";
 export default function MediaCarousel() {
   const settings = useSiteSettings();
 
-  // Media items with before/after sources
-  const mediaPairs = settings.homepage.mediaCarousel || [
+  // Updated media items with mix of 16:9 and 9:16
+  // Before is always photo, After is always video
+  const mediaPairs = [
     {
       id: 1,
-      before: { type: 'image' as const, url: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80&fm=webp" },
-      after: { type: 'image' as const, url: "https://images.unsplash.com/photo-1600573472591-ee6b68d14c68?w=1200&q=80&fm=webp" },
-      aspect: "9/16" as const,
+      before: { type: 'image' as const, url: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80" },
+      after: { type: 'video' as const, url: "https://videos.pexels.com/video-files/32821434/13990151_640_360_30fps.mp4" },
+      aspect: "16/9" as const,
     },
     {
       id: 2,
-      before: { type: 'image' as const, url: "https://images.unsplash.com/photo-1600607687940-47a0f9259017?w=1200&q=80&fm=webp" },
-      after: { type: 'image' as const, url: "https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?w=1200&q=80&fm=webp" },
+      before: { type: 'image' as const, url: "https://images.unsplash.com/photo-1600607687940-47a0f9259017?w=1200&q=80" },
+      after: { type: 'video' as const, url: "https://videos.pexels.com/video-files/34236991/14509265_360_640_24fps.mp4" },
       aspect: "9/16" as const,
     },
     {
       id: 3,
-      before: { type: 'image' as const, url: "https://images.unsplash.com/photo-1600585154526-990dcea4db0d?w=1200&q=80&fm=webp" },
-      after: { type: 'image' as const, url: "https://images.unsplash.com/photo-1600047522568-f1d200d034c4?w=1200&q=80&fm=webp" },
-      aspect: "9/16" as const,
+      before: { type: 'image' as const, url: "https://images.unsplash.com/photo-1600585154526-990dcea4db0d?w=1200&q=80" },
+      after: { type: 'video' as const, url: "https://videos.pexels.com/video-files/32821434/13990151_640_360_30fps.mp4" },
+      aspect: "16/9" as const,
     },
     {
       id: 4,
-      before: { type: 'image' as const, url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=1200&q=80&fm=webp" },
-      after: { type: 'image' as const, url: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80&fm=webp" },
+      before: { type: 'image' as const, url: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=1200&q=80" },
+      after: { type: 'video' as const, url: "https://videos.pexels.com/video-files/34236991/14509265_360_640_24fps.mp4" },
       aspect: "9/16" as const,
     },
     {
       id: 5,
-      before: { type: 'image' as const, url: "https://images.unsplash.com/photo-1600566752355-35792bedca5d?w=1200&q=80&fm=webp" },
-      after: { type: 'image' as const, url: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80&fm=webp" },
-      aspect: "9/16" as const,
+      before: { type: 'image' as const, url: "https://images.unsplash.com/photo-1600566752355-35792bedca5d?w=1200&q=80" },
+      after: { type: 'video' as const, url: "https://videos.pexels.com/video-files/32821434/13990151_640_360_30fps.mp4" },
+      aspect: "16/9" as const,
     },
   ];
 
   // Double the items for seamless loop
   const displayPairs = [...mediaPairs, ...mediaPairs, ...mediaPairs];
 
+  const renderTrack = (type: 'before' | 'after') => (
+    <div className="flex animate-scroll whitespace-nowrap py-4">
+      {displayPairs.map((pair, index) => (
+        <BeforeAfterTile
+          key={`${pair.id}-${index}`}
+          media={type === 'before' ? pair.before : pair.after}
+          aspect={pair.aspect}
+          isGrayscale={type === 'before'}
+        />
+      ))}
+    </div>
+  );
+
   return (
     <div className="relative w-full overflow-hidden bg-black pb-12">
-      {/* Main Carousel Track */}
+      {/* Separation Bar - Fixed in Center */}
+      <div className="absolute top-0 bottom-0 left-1/2 w-1.5 bg-white/20 backdrop-blur-xl z-50 pointer-events-none -translate-x-1/2 shadow-[0_0_20px_rgba(255,255,255,0.3)]">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-lg border border-gray-200">
+          <div className="flex gap-1">
+            <div className="w-[1px] h-3 bg-gray-300"></div>
+            <div className="w-[1px] h-3 bg-gray-300"></div>
+          </div>
+        </div>
+      </div>
+
       <div className="relative overflow-hidden group/track">
-        <div className="flex animate-scroll whitespace-nowrap py-4">
-          {displayPairs.map((pair, index) => (
-            <BeforeAfterTile
-              key={`${pair.id}-${index}`}
-              before={pair.before}
-              after={pair.after}
-              aspect={pair.aspect}
-              primaryColor={settings.global.primaryColor}
-            />
-          ))}
+        {/* Before Track (Photo) */}
+        <div className="w-full">
+          {renderTrack('before')}
+        </div>
+
+        {/* After Track (Video) - Clipped to show only on right side */}
+        <div
+          className="absolute inset-0 z-10 select-none pointer-events-none"
+          style={{ clipPath: 'inset(0 0 0 50%)' }}
+        >
+          {renderTrack('after')}
         </div>
       </div>
 
       <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes scroll {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-33.33%); }
+        @keyframes scrollRight {
+          0% { transform: translateX(-33.33%); }
+          100% { transform: translateX(0); }
         }
         .animate-scroll {
-          animation: scroll 40s linear infinite;
+          animation: scrollRight 40s linear infinite;
           display: flex;
           width: fit-content;
         }
