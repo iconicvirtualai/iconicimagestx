@@ -6,37 +6,35 @@ import BeforeAfterTile from "./BeforeAfterTile";
 export default function MediaCarousel() {
   const settings = useSiteSettings();
 
-  // Updated media items with mix of 16:9 and 9:16
-  // Pair 1 - horizontal 07303325 & clip 20
-  // Pair 2 - vertical - MLU 07265 and Clip 14
-  // Pair 3 - horizontal - DG 52 & download
-  // Pair 4 - vertical - DVA08227 & download 2
-  const mediaPairs = [
-    {
-      id: 1,
-      before: { type: 'image' as const, url: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Faecac2467163410db0180e8fdd8a98f7?format=webp&width=800&height=1200" },
-      after: { type: 'video' as const, url: "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F4ea5feebdab84ee585ffaa811d803379?alt=media&token=dda6499e-44a2-47a4-a456-1cacb39b6ae4&apiKey=0ed22311ac6a4dbebeda1b4230c2746c" },
-      aspect: "16/9" as const,
-    },
-    {
-      id: 2,
-      before: { type: 'image' as const, url: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fe7a04734046e4171bfccc96600f0870f?format=webp&width=800&height=1200" },
-      after: { type: 'video' as const, url: "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fba0e88982aa140c2bd2a033055391c4a?alt=media&token=2faaf53d-9e02-4887-aa85-08c6f971cee4&apiKey=0ed22311ac6a4dbebeda1b4230c2746c" },
-      aspect: "9/16" as const,
-    },
-    {
-      id: 3,
-      before: { type: 'image' as const, url: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F1bc44dc912bd4cd4848b7cbe64db7001?format=webp&width=800&height=1200" },
-      after: { type: 'video' as const, url: "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F4203b3fa6d2046f6b3aebe85986706ad?alt=media&token=60e7a23a-12d3-45d9-8063-8fa212dc4c4c&apiKey=0ed22311ac6a4dbebeda1b4230c2746c" },
-      aspect: "16/9" as const,
-    },
-    {
-      id: 4,
-      before: { type: 'image' as const, url: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F54911d726f0a43b684406564dac1e5e8?format=webp&width=800&height=1200" },
-      after: { type: 'video' as const, url: "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F4be86e27da6548d59c567aa0bdfc66e9?alt=media&token=927f0df1-6342-47f7-809f-131e4df074d6&apiKey=0ed22311ac6a4dbebeda1b4230c2746c" },
-      aspect: "9/16" as const,
-    },
-  ];
+  // Use settings from site_settings.json if available, otherwise fallback to these defaults
+  const mediaPairs = settings.homepage.mediaCarousel?.length > 0
+    ? settings.homepage.mediaCarousel
+    : [
+        {
+          id: 1,
+          before: { type: 'image' as const, url: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Faecac2467163410db0180e8fdd8a98f7?format=webp&width=800&height=1200" },
+          after: { type: 'video' as const, url: "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F4ea5feebdab84ee585ffaa811d803379?alt=media&token=dda6499e-44a2-47a4-a456-1cacb39b6ae4&apiKey=0ed22311ac6a4dbebeda1b4230c2746c" },
+          aspect: "16/9" as const,
+        },
+        {
+          id: 2,
+          before: { type: 'image' as const, url: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fe7a04734046e4171bfccc96600f0870f?format=webp&width=800&height=1200" },
+          after: { type: 'video' as const, url: "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fba0e88982aa140c2bd2a033055391c4a?alt=media&token=2faaf53d-9e02-4887-aa85-08c6f971cee4&apiKey=0ed22311ac6a4dbebeda1b4230c2746c" },
+          aspect: "9/16" as const,
+        },
+        {
+          id: 3,
+          before: { type: 'image' as const, url: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F1bc44dc912bd4cd4848b7cbe64db7001?format=webp&width=800&height=1200" },
+          after: { type: 'video' as const, url: "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F4203b3fa6d2046f6b3aebe85986706ad?alt=media&token=60e7a23a-12d3-45d9-8063-8fa212dc4c4c&apiKey=0ed22311ac6a4dbebeda1b4230c2746c" },
+          aspect: "16/9" as const,
+        },
+        {
+          id: 4,
+          before: { type: 'image' as const, url: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F54911d726f0a43b684406564dac1e5e8?format=webp&width=800&height=1200" },
+          after: { type: 'video' as const, url: "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F4be86e27da6548d59c567aa0bdfc66e9?alt=media&token=927f0df1-6342-47f7-809f-131e4df074d6&apiKey=0ed22311ac6a4dbebeda1b4230c2746c" },
+          aspect: "9/16" as const,
+        },
+      ];
 
   // Double the items for seamless loop
   const displayPairs = [...mediaPairs, ...mediaPairs, ...mediaPairs];
@@ -97,7 +95,7 @@ export default function MediaCarousel() {
           display: flex;
           width: max-content;
         }
-        .animate-scroll:hover {
+        .group\\/track:hover .animate-scroll {
           animation-play-state: paused;
         }
       `}} />

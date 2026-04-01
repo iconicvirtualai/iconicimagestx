@@ -16,6 +16,7 @@ export const DEFAULT_SITE_SETTINGS = {
     showAudienceSection: true,
     showAIToolsSection: true,
     showBeforeAfter: true,
+    mediaCarousel: [] as any[],
   },
   pricing: {
     title: "Pick the Perfect Price for Your Presence",
