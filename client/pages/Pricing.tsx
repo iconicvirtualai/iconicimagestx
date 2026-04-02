@@ -335,8 +335,9 @@ export default function Pricing() {
             >
               <source src="https://videos.pexels.com/video-files/32821434/13990151_640_360_30fps.mp4" type="video/mp4" />
             </video>
-            <div className="absolute inset-0 bg-gradient-to-b from-[#fafafa] via-[#fafafa]/20 to-[#fafafa] opacity-90"></div>
-            <div className="absolute inset-0 bg-gradient-to-t from-[#fafafa] via-transparent to-transparent opacity-100"></div>
+            {/* Simplified Gradient Overlays for better visibility */}
+            <div className="absolute inset-0 bg-gradient-to-b from-[#fafafa] via-transparent to-[#fafafa]"></div>
+            <div className="absolute inset-0 bg-[#fafafa]/40"></div>
           </div>
 
           <div className="relative z-10 pt-32 pb-16 text-center px-4 max-w-5xl mx-auto">
@@ -370,12 +371,14 @@ export default function Pricing() {
                   borderColor: 'black'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = settings.global.primaryColor;
-                  e.currentTarget.style.borderColor = settings.global.primaryColor;
+                  e.currentTarget.style.backgroundColor = 'white';
+                  e.currentTarget.style.borderColor = 'black';
+                  e.currentTarget.style.color = 'black';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = 'black';
                   e.currentTarget.style.borderColor = 'black';
+                  e.currentTarget.style.color = 'white';
                 }}
               >
                 {bubble.label}
