@@ -136,7 +136,7 @@ export default function AIPricingAssistant() {
   return (
     <Layout>
       <div className="bg-[#fafafa] text-black">
-        <main className="flex-1 pt-32 pb-20 px-4">
+        <main className="flex-1 pt-12 pb-20 px-4">
           <div className="max-w-4xl mx-auto">
             {/* Header */}
             <div className="text-center mb-12">

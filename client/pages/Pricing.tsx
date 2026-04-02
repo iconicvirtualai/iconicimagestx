@@ -338,7 +338,7 @@ export default function Pricing() {
               <div className="absolute inset-0 bg-[#fafafa]/40"></div>
             </div>
 
-            <div className="relative z-10 pt-32 pb-16 text-center px-4 max-w-5xl mx-auto">
+            <div className="relative z-10 pt-16 pb-16 text-center px-4 max-w-5xl mx-auto">
             <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-black border border-black mb-6 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-500">
               <span className="text-[12px] font-bold tracking-wider uppercase accent-text-bordered">
                 Pricing & Packages

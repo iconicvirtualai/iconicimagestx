@@ -29,7 +29,7 @@ export default function Insights() {
       <div className="bg-white">
         <main className="flex-1">
         {/* Hero Section */}
-        <section className="pt-16 pb-12">
+        <section className="pt-8 pb-12">
           <div className="container mx-auto px-4">
             <h1 className="text-4xl md:text-5xl font-bold text-black mb-4">Iconic Insights</h1>
             <p className="text-gray-500 text-lg">Insights, guides, and tips for creating stunning real estate videos.</p>

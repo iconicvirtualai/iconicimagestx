@@ -21,7 +21,7 @@ export default function VirtualStagingCheckout() {
     return (
       <Layout>
         <div className="bg-white">
-          <main className="flex-1 flex items-center justify-center pt-32 pb-24 px-4">
+          <main className="flex-1 flex items-center justify-center pt-12 pb-24 px-4">
           <div className="max-w-md w-full text-center">
             <div className="w-20 h-20 bg-[#f0fdfa] rounded-full flex items-center justify-center mx-auto mb-8">
               <CheckCircle2 className="w-10 h-10 text-[#0d9488]" />
@@ -50,7 +50,7 @@ export default function VirtualStagingCheckout() {
   return (
     <Layout>
       <div className="bg-white">
-        <main className="flex-1 pt-32 pb-24">
+        <main className="flex-1 pt-12 pb-24">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto">
             

@@ -10,7 +10,7 @@ export default function Contact() {
     <Layout>
       <div className="bg-white">
         <main className="flex-1">
-        <section className="py-16 md:py-24">
+        <section className="py-8 md:py-16">
           <div className="container mx-auto px-4 max-w-6xl">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
 

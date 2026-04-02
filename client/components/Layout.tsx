@@ -2,6 +2,7 @@ import React from "react";
 import Header from "./Header";
 import Footer from "./Footer";
 import PromoBar from "./PromoBar";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -9,6 +10,9 @@ interface LayoutProps {
 }
 
 export default function Layout({ children, showFooter = true }: LayoutProps) {
+  const settings = useSiteSettings();
+  const showPromo = settings.global.showPromoBar;
+
   return (
     <div className="flex flex-col min-h-screen relative bg-black text-white">
       {/* Overall Background Dimension - Very Subtle Glow */}
@@ -19,6 +23,10 @@ export default function Layout({ children, showFooter = true }: LayoutProps) {
 
       <PromoBar />
       <Header />
+
+      {/* Spacer to push content below fixed header */}
+      <div className={showPromo ? "h-[120px]" : "h-[80px]"} />
+
       <main className="flex-1">
         {children}
       </main>
