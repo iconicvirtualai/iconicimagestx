@@ -1,14 +1,12 @@
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
+import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Star, Zap, Rocket, MapPin, Quote, Award } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export default function About() {
   return (
-    <div className="flex flex-col min-h-screen bg-white">
-      <Header />
-      
-      <main className="flex-1">
+    <Layout>
+      <div className="bg-white text-black">
         {/* 10 Years Banner */}
         <section className="bg-black text-white overflow-hidden relative">
           <div className="absolute inset-0 opacity-20 pointer-events-none">
@@ -193,9 +191,7 @@ export default function About() {
             </div>
           </div>
         </section>
-      </main>
-
-      <Footer />
+      </div>
 
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes scroll {
@@ -209,9 +205,6 @@ export default function About() {
           animation-play-state: paused;
         }
       `}} />
-    </div>
+    </Layout>
   );
 }
-
-// Helper component for internal links
-import { Link } from "react-router-dom";

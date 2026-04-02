@@ -1,6 +1,5 @@
 import { useState } from "react";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
+import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { CreditCard, ShieldCheck, ShoppingCart, ArrowLeft, Plus, CheckCircle2, Lock } from "lucide-react";
@@ -20,9 +19,9 @@ export default function VirtualStagingCheckout() {
 
   if (isSuccess) {
     return (
-      <div className="flex flex-col min-h-screen bg-white">
-        <Header />
-        <main className="flex-1 flex items-center justify-center pt-32 pb-24 px-4">
+      <Layout>
+        <div className="bg-white">
+          <main className="flex-1 flex items-center justify-center pt-32 pb-24 px-4">
           <div className="max-w-md w-full text-center">
             <div className="w-20 h-20 bg-[#f0fdfa] rounded-full flex items-center justify-center mx-auto mb-8">
               <CheckCircle2 className="w-10 h-10 text-[#0d9488]" />
@@ -43,16 +42,15 @@ export default function VirtualStagingCheckout() {
             </div>
           </div>
         </main>
-        <Footer />
       </div>
+    </Layout>
     );
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-white">
-      <Header />
-      
-      <main className="flex-1 pt-32 pb-24">
+    <Layout>
+      <div className="bg-white">
+        <main className="flex-1 pt-32 pb-24">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto">
             
@@ -179,7 +177,7 @@ export default function VirtualStagingCheckout() {
         </div>
       </main>
 
-      <Footer />
-    </div>
+      </div>
+    </Layout>
   );
 }

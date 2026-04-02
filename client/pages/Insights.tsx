@@ -1,5 +1,4 @@
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
+import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, useRef } from "react";
@@ -26,10 +25,9 @@ export default function Insights() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-white">
-      <Header />
-      
-      <main className="flex-1">
+    <Layout>
+      <div className="bg-white">
+        <main className="flex-1">
         {/* Hero Section */}
         <section className="pt-16 pb-12">
           <div className="container mx-auto px-4">
@@ -284,7 +282,7 @@ export default function Insights() {
         </section>
       </main>
 
-      <Footer />
+      </div>
 
       <style dangerouslySetInnerHTML={{ __html: `
         .scrollbar-hide::-webkit-scrollbar {
@@ -295,6 +293,6 @@ export default function Insights() {
           scrollbar-width: none;
         }
       `}} />
-    </div>
+    </Layout>
   );
 }

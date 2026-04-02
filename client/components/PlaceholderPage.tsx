@@ -1,8 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
+import Layout from "./Layout";
 
 interface PlaceholderPageProps {
   title: string;
@@ -14,10 +13,9 @@ export default function PlaceholderPage({
   description = "This page is currently under development. We're crafting something special!",
 }: PlaceholderPageProps) {
   return (
-    <div className="flex flex-col min-h-screen">
-      <Header />
-
-      <main className="flex-1 bg-white py-20 md:py-32">
+    <Layout>
+      <div className="bg-white">
+        <main className="flex-1 py-20 md:py-32">
         <div className="container mx-auto px-4">
           <div className="max-w-2xl mx-auto text-center">
             {/* Icon */}
@@ -56,7 +54,7 @@ export default function PlaceholderPage({
         </div>
       </main>
 
-      <Footer />
-    </div>
+      </div>
+    </Layout>
   );
 }

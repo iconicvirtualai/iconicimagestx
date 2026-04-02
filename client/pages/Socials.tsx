@@ -1,5 +1,4 @@
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
+import Layout from "@/components/Layout";
 import { Facebook, Instagram, Youtube, Share2, ArrowUpRight, Heart, MessageCircle, Send, Bookmark, Play, Star, RefreshCcw } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
@@ -178,10 +177,9 @@ export default function Socials() {
   }, []);
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#fafafa]">
-      <Header />
-      
-      <main className="flex-1 pt-24 pb-16">
+    <Layout>
+      <div className="bg-[#fafafa] text-black">
+        <main className="flex-1 pt-24 pb-16">
         <div className="container mx-auto px-4 max-w-5xl">
           {/* Scaled Header */}
           <div className="flex flex-col md:flex-row items-end justify-between gap-6 mb-12 animate-in fade-in slide-in-from-bottom-3 duration-700">
@@ -448,8 +446,6 @@ export default function Socials() {
         </div>
       </main>
 
-      <Footer />
-
       <style dangerouslySetInnerHTML={{ __html: `
         .no-scrollbar::-webkit-scrollbar {
           display: none;
@@ -460,5 +456,6 @@ export default function Socials() {
         }
       `}} />
     </div>
+  </Layout>
   );
 }

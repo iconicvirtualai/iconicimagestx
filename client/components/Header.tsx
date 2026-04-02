@@ -7,7 +7,7 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 export default function Header() {
   const settings = useSiteSettings();
   const location = useLocation();
-  const isHome = location.pathname === "/";
+  const showPromo = settings.global.showPromoBar;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -31,13 +31,9 @@ export default function Header() {
   ];
 
   return (
-    <header className={`fixed ${isHome ? "top-[44px]" : "top-4"} left-0 right-0 z-50 px-6 transition-all duration-300`}>
+    <header className={`fixed ${showPromo ? "top-[44px]" : "top-4"} left-0 right-0 z-50 px-6 transition-all duration-300`}>
       <div
-        className={`mx-auto max-w-[1200px] rounded-full border border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.5)] transition-all duration-500 px-8 flex items-center gap-4 ${
-          scrolled
-            ? "bg-black/80 backdrop-blur-xl py-1 border-white/20"
-            : "bg-white/5 backdrop-blur-md py-2 border-white/10"
-        }`}
+        className="mx-auto max-w-[1200px] rounded-full border border-white/20 bg-black/80 backdrop-blur-xl shadow-[0_4px_30px_rgba(0,0,0,0.5)] transition-all duration-500 px-8 py-2 flex items-center gap-4"
       >
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2 flex-shrink-0 group">
@@ -63,7 +59,7 @@ export default function Header() {
             <Link
               key={item.href}
               to={item.href}
-              className="text-gray-400 hover:text-white transition-colors text-[14px] font-semibold"
+              className="text-white/70 hover:text-white transition-colors text-[14px] font-semibold"
             >
               {item.label}
             </Link>
@@ -73,7 +69,7 @@ export default function Header() {
         {/* Right side buttons */}
         <div className="hidden lg:flex items-center gap-4">
           <Link to="/admin/login">
-            <span className="text-sm font-bold text-gray-400 hover:text-white cursor-pointer transition-colors">Log in</span>
+            <span className="text-sm font-bold text-white/70 hover:text-white cursor-pointer transition-colors">Log in</span>
           </Link>
           <Link to="/book">
             <Button className="rounded-xl px-6 py-2 h-10 text-xs font-black uppercase tracking-widest bg-white text-black hover:bg-gray-200">
@@ -84,7 +80,7 @@ export default function Header() {
 
         {/* Mobile Menu Button */}
         <button
-          className="lg:hidden p-2 text-gray-400 hover:text-white transition-colors"
+          className="lg:hidden p-2 text-white/70 hover:text-white transition-colors"
           onClick={toggleMenu}
           aria-label="Toggle menu"
         >

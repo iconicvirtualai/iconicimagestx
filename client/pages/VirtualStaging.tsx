@@ -1,15 +1,13 @@
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
+import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { CheckCircle2, ArrowRight, Sparkles, UserCheck } from "lucide-react";
 
 export default function VirtualStaging() {
   return (
-    <div className="flex flex-col min-h-screen bg-white">
-      <Header />
-      
-      <main className="flex-1 pt-32">
+    <Layout>
+      <div className="bg-white text-black">
+        <main className="flex-1 pt-32">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center mb-16">
             <h1 className="text-4xl md:text-6xl font-bold mb-6 tracking-tight">
@@ -193,7 +191,7 @@ export default function VirtualStaging() {
         </div>
       </main>
 
-      <Footer />
-    </div>
+      </div>
+    </Layout>
   );
 }
