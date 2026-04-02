@@ -71,7 +71,7 @@ export default function VirtualStagingAITool() {
   return (
     <Layout>
       <div className="bg-white">
-        <main className="flex-1 pt-12 pb-24">
+        <main className="flex-1 pt-24 pb-24">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto">
             

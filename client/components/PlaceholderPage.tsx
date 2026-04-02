@@ -15,7 +15,7 @@ export default function PlaceholderPage({
   return (
     <Layout>
       <div className="bg-white">
-        <main className="flex-1 py-12 md:py-20">
+        <main className="flex-1 py-24 md:py-32">
         <div className="container mx-auto px-4">
           <div className="max-w-2xl mx-auto text-center">
             {/* Icon */}

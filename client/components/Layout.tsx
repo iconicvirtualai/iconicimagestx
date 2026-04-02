@@ -24,9 +24,6 @@ export default function Layout({ children, showFooter = true }: LayoutProps) {
       <PromoBar />
       <Header />
 
-      {/* Spacer to push content below fixed header */}
-      <div className={showPromo ? "h-[120px]" : "h-[80px]"} />
-
       <main className="flex-1">
         {children}
       </main>

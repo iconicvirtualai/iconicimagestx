@@ -90,7 +90,7 @@ export default function AgentLandingPage() {
       <div className="bg-white text-black font-sans">
         <main className="flex-1">
           {/* Hero Section */}
-          <section className="relative pt-12 pb-20 px-6 lg:pt-24 lg:pb-32 overflow-hidden">
+          <section className="relative pt-24 pb-20 px-6 lg:pt-32 lg:pb-32 overflow-hidden">
             <div className="absolute top-0 right-0 -z-10 w-1/2 h-full bg-gradient-to-l from-teal-50/50 to-transparent blur-3xl opacity-50" />
             
             <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center">

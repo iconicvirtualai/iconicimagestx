@@ -7,7 +7,7 @@ export default function VirtualStaging() {
   return (
     <Layout>
       <div className="bg-white text-black">
-        <main className="flex-1 pt-12">
+        <main className="flex-1 pt-24">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center mb-16">
             <h1 className="text-4xl md:text-6xl font-bold mb-6 tracking-tight">
