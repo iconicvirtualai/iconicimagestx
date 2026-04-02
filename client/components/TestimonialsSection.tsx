@@ -24,7 +24,7 @@ export default function TestimonialsSection() {
   ];
 
   return (
-    <section className="bg-[#e0f7f6]/40 py-20 md:py-24 overflow-hidden">
+    <section className="bg-gray-50 py-20 md:py-24 overflow-hidden">
       <div className="container mx-auto px-4 text-center max-w-6xl">
         {/* Badge */}
         <div className="inline-flex items-center px-4 py-1.5 rounded-md bg-white border border-[#ccfbf1] mb-8 shadow-sm">

@@ -37,7 +37,7 @@ export default function StepsSection() {
   ];
 
   return (
-    <section className="bg-[#e0f7f6]/40 py-20 md:py-24 relative overflow-hidden">
+    <section className="bg-gray-50 py-20 md:py-24 relative overflow-hidden">
       <div className="container mx-auto px-4 relative z-10 max-w-6xl">
         <div className="text-center mb-12">
           {/* Badge */}

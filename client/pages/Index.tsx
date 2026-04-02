@@ -51,7 +51,6 @@ export default function Index() {
             <AudienceDetails />
           </>
         )}
-        <TestimonialVideoCarousel />
         <FeaturesSection />
         <TestimonialsSection />
         <FAQSection />

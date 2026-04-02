@@ -177,7 +177,7 @@ export default function Insights() {
         </section>
 
         {/* Testimonials */}
-        <section className="bg-[#e0f7f6]/40 py-24 md:py-32 overflow-hidden">
+        <section className="bg-gray-50 py-24 md:py-32 overflow-hidden">
           <div className="container mx-auto px-4 text-center">
             <div className="inline-flex items-center px-3 py-1 rounded bg-white border border-[#ccfbf1] mb-8 shadow-sm">
               <span className="text-[10px] font-bold tracking-wider text-[#0d9488] uppercase">
