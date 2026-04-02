@@ -77,7 +77,7 @@ export default function Header() {
           </Link>
           <Link to="/book">
             <Button className="rounded-xl px-6 py-2 h-10 text-xs font-black uppercase tracking-widest bg-white text-black hover:bg-gray-200">
-              Start for free
+              Book Now
             </Button>
           </Link>
         </div>
