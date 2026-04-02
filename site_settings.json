@@ -1,15 +1,15 @@
 {
   "global": {
-    "primaryColor": "#000",
+    "primaryColor": "#0d9488",
     "secondaryColor": "#0ea5e9",
     "logoText": "ICONIC",
     "showPromoBar": true,
     "promoBarText": "FREE AI STAGING ON YOUR FIRST ORDER - CODE: ICONICAI"
   },
   "homepage": {
-    "heroTitle": "ELEVATE YOUR LISTINGS WITH MEDIA THAT SELLS",
-    "heroSubtitle": "Your Creative Media Partners for Real Estate & Business Professionals.",
-    "heroImage": "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1600&q=80",
+    "heroTitle": "YOUR BRAND, MADE ICONIC",
+    "heroSubtitle": "Media Production. Virtual Staging. Content Management. ICONIC is the dedicated creative crew for businesses and agents who demand more than \"good enough\".",
+    "heroImage": "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F6529795874414a1e9fe845f3eb948e94?format=webp&width=1600&height=900",
     "showAudienceSection": true,
     "showAIToolsSection": true,
     "showBeforeAfter": true,

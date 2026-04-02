@@ -37,13 +37,13 @@ export default function BeforeAfterTile({ media, aspect }: BeforeAfterTileProps)
   if (!media) return null;
   // Respect the aspect ratio for width, while maintaining a consistent height level
   const widthClass = aspect === "16/9"
-    ? "w-[240px] md:w-[480px]"
-    : "w-[130px] md:w-[220px]";
+    ? "w-[200px] md:w-[400px]"
+    : "w-[100px] md:w-[160px]";
 
   return (
-    <div className={`flex-shrink-0 mx-2 md:mx-3 ${widthClass}`}>
+    <div className={`flex-shrink-0 mx-1 md:mx-2 ${widthClass}`}>
       <div
-        className="relative w-full h-[200px] md:h-[320px] rounded-[24px] md:rounded-[40px] overflow-hidden bg-gray-900 shadow-2xl transition-all duration-500"
+        className="relative w-full h-[160px] md:h-[260px] rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden bg-gray-900 shadow-2xl transition-all duration-500"
       >
         <MediaContent media={media} />
       </div>

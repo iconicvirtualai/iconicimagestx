@@ -56,18 +56,25 @@ export default function MediaCarousel() {
   );
 
   return (
-    <div className="relative w-full overflow-hidden bg-black pb-12">
+    <div className="relative w-full overflow-hidden bg-black pb-24">
+      {/* Before / After Centered Indicator Above Tracks */}
+      <div className="flex items-center justify-center gap-6 mb-12 animate-pulse-slow">
+        <span className="text-[10px] md:text-[12px] font-black uppercase tracking-[0.5em] text-gray-500">Before</span>
+        <div className="w-16 h-[1px] bg-white/10"></div>
+        <span className="text-[10px] md:text-[12px] font-black uppercase tracking-[0.5em] text-white">After</span>
+      </div>
+
       {/* Separation Bar - Fixed in Center */}
-      <div className="absolute top-0 bottom-0 left-1/2 w-1.5 bg-white/20 backdrop-blur-xl z-50 pointer-events-none -translate-x-1/2 shadow-[0_0_20px_rgba(255,255,255,0.3)]">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-lg border border-gray-200">
-          <div className="flex gap-1">
-            <div className="w-[1px] h-3 bg-gray-300"></div>
-            <div className="w-[1px] h-3 bg-gray-300"></div>
+      <div className="absolute top-24 bottom-24 left-1/2 w-[2px] bg-white/30 backdrop-blur-3xl z-50 pointer-events-none -translate-x-1/2 shadow-[0_0_30px_rgba(255,255,255,0.4)]">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/95 flex items-center justify-center shadow-2xl border border-white">
+          <div className="flex gap-1.5">
+            <div className="w-[1.5px] h-4 bg-black/30 rounded-full"></div>
+            <div className="w-[1.5px] h-4 bg-black/30 rounded-full"></div>
           </div>
         </div>
       </div>
 
-      <div className="relative overflow-hidden group/track h-[232px] md:h-[352px]">
+      <div className="relative overflow-hidden group/track h-[180px] md:h-[280px]">
         {/* Before Track (Photo) - Clipped to left side */}
         <div
           className="absolute inset-0"
