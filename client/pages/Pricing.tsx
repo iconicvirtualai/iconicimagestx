@@ -687,9 +687,9 @@ export default function Pricing() {
                           <div className="flex flex-col mb-6">
                             <div className="flex items-center justify-between mb-2">
                               <h4 className="font-black text-xs uppercase tracking-widest accent-text-bordered">THE ICONIC POLISH (Premium Upgrade)</h4>
-                              <span className="text-3xl font-black text-white">$65</span>
+                              <span className="text-3xl font-black text-white">$75</span>
                             </div>
-                            <p className="text-[11px] font-bold text-gray-100">Standard on Market Leader | $65 Add-on for all other packages (Next Day Delivery)</p>
+                            <p className="text-[11px] font-bold text-gray-100">Standard on Market Leader | $75 Add-on for all other packages (Next Day Delivery)</p>
                           </div>
                           <div className="grid grid-cols-1 gap-3">
                             {[
@@ -724,7 +724,7 @@ export default function Pricing() {
         </section>
 
         {/* Branding Before & After Slider - Smaller */}
-        <section className="py-24 bg-[#fafafa]">
+        <section id="branding-personal" className="py-24 bg-[#fafafa]">
           <div className="max-w-4xl mx-auto px-4 text-center">
             <h2 className="text-4xl md:text-6xl font-black text-black mb-8 tracking-tight">Elevate Your <span className="accent-text-bordered">Personal Brand</span></h2>
             <p className="text-lg text-gray-500 mb-12 max-w-xl mx-auto font-medium">See the difference between a standard corporate headshot and an Iconic Lifestyle Portrait.</p>

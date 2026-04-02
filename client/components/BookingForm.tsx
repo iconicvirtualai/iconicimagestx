@@ -473,7 +473,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
       setSelectedDetailItem({
         name: "✨ Iconic Finish (Premium)",
         description: "The ultimate digital polish for your listing. We touch up every detail to ensure it stands out in the crowd.",
-        price: 65,
+        price: 75,
         features: [
           "Remove Dirt & Debris",
           "Remove Reflections and Harsh Shadows",
@@ -587,7 +587,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
 
     ...(formData.premiumUpgrade ? [{
       name: "Iconic Finish (Premium Upgrade)",
-      price: 65
+      price: 75
     }] : []),
 
     ...(formData.virtualStagingCredits > 0 ? [{
@@ -649,7 +649,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
       });
     });
 
-    if (formData.premiumUpgrade) total += 65;
+    if (formData.premiumUpgrade) total += 75;
     if (formData.virtualStagingCredits > 0) total += formData.virtualStagingCredits * 35;
 
     if (formData.specializedPhotography === "social") total += 85;
@@ -700,7 +700,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
         {formData.premiumUpgrade && (
           <div className="flex justify-between items-center text-[11px]">
             <span className="text-gray-500 italic">✨ Iconic Finish (Premium) (Next Day Delivery)</span>
-            <span className="font-bold text-black">$65</span>
+            <span className="font-bold text-black">$75</span>
           </div>
         )}
         {formData.specializedPhotography !== "mls" && (
@@ -1714,7 +1714,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                   }}
                   className="bg-black hover:bg-gray-800 text-white font-black py-8 text-sm rounded-2xl transition-all shadow-xl group"
                 >
-                   UPGRADE TO ICONIC FINISH (+$65)
+                   UPGRADE TO ICONIC FINISH (+$75)
                    <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Button>
                 <button

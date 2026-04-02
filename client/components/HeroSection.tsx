@@ -7,7 +7,7 @@ const CAPABILITIES = [
   "Cinematic Filmmakers",
   "Social Architects",
   "REEL Producers",
-  "Your Private Editing Studio",
+  "Private Editing Studio",
   "Content Managers",
   "Personal Production Team"
 ];
@@ -56,7 +56,7 @@ export default function HeroSection() {
 
           {/* Auto-scrolling Capabilities */}
           <div className="flex items-center gap-3 mb-10 h-8 animate-in fade-in slide-in-from-left-8 duration-1000">
-            <span className="text-sm font-black uppercase tracking-widest text-teal-400 shrink-0">We Are:</span>
+            <span className="text-sm font-black uppercase tracking-widest text-teal-400 shrink-0">WE ARE YOUR:</span>
             <div className="relative h-full flex-1 overflow-hidden">
               {CAPABILITIES.map((capability, index) => (
                 <span
@@ -75,12 +75,12 @@ export default function HeroSection() {
 
           {/* CTA Buttons from Screenshot */}
           <div className="flex flex-wrap items-center gap-4 animate-in fade-in slide-in-from-bottom-8 duration-1100">
-            <Link to="/book?type=real-estate">
+            <Link to="/pricing#listings">
               <Button className="bg-white text-black hover:bg-gray-100 font-bold text-sm px-8 py-6 rounded-full transition-all hover:scale-105 border-none shadow-xl">
                 I'm in Real Estate
               </Button>
             </Link>
-            <Link to="/book?type=business">
+            <Link to="/pricing#branding-personal">
               <Button className="bg-white text-black hover:bg-gray-100 font-bold text-sm px-8 py-6 rounded-full transition-all hover:scale-105 border-none shadow-xl">
                 I own a Business
               </Button>
