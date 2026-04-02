@@ -967,7 +967,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                       <div className="flex-1">
                         <div className="flex justify-between items-center gap-2 mb-0.5">
                            <span className="text-[11px] md:text-[13px] font-black uppercase tracking-widest leading-tight">Yes, Add Premium Editing (Next Day Delivery)</span>
-                           <span className="text-sm font-black text-teal-400 whitespace-nowrap">+$65</span>
+                           <span className="text-sm font-black text-teal-400 whitespace-nowrap">+$75</span>
                         </div>
                         <p className="text-[10px] text-gray-400 leading-relaxed">
                           The ultimate digital polish. Remove dirt, debris, reflections, and add flawless landscaping.
