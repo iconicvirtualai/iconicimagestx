@@ -1,18 +1,196 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /orders/{orderId} {
-      allow read, write: if true;
+
+    // ─── Helper Functions ───────────────────────────────────────────────────
+
+    function isAuthenticated() {
+      return request.auth != null;
     }
-    match /appointments/{appointmentId} {
-      allow read, write: if true;
+
+    function isStaff() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/staff/$(request.auth.uid));
     }
-    match /emailTemplates/{templateId} {
-      allow read, write: if true;
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role == 'admin';
     }
+
+    function isCoordinator() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role in ['admin', 'coordinator'];
+    }
+
+    function isPhotographer() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role in ['admin', 'coordinator', 'photographer'];
+    }
+
+    function isClientOwner(clientId) {
+      return isAuthenticated() && request.auth.uid == clientId;
+    }
+
+    function isOrderClient(orderId) {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/orders/$(orderId)).data.clientId == request.auth.uid;
+    }
+
+    // ─── Public Write Collections ────────────────────────────────────────────
+
+    // Order requests: anyone can submit (booking form — no login required)
     match /orderRequests/{requestId} {
-      allow read, write: if true;
+      allow create: if true;
+      allow read, update, delete: if isCoordinator();
     }
+
+    // ─── Client Collections ──────────────────────────────────────────────────
+
+    // Clients: staff can read/write, client can read their own record
+    match /clients/{clientId} {
+      allow read: if isStaff() || isClientOwner(clientId);
+      allow create, update: if isCoordinator();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Staff Collections ───────────────────────────────────────────────────
+
+    match /staff/{staffId} {
+      allow read: if isStaff();
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Orders ──────────────────────────────────────────────────────────────
+
+    match /orders/{orderId} {
+      allow read: if isStaff() || isOrderClient(orderId);
+      allow create, update: if isCoordinator();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Appointments ────────────────────────────────────────────────────────
+
+    match /appointments/{appointmentId} {
+      allow read: if isStaff() ||
+        (isAuthenticated() &&
+          get(/databases/$(database)/documents/appointments/$(appointmentId)).data.clientId == request.auth.uid);
+      allow create, update: if isCoordinator();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Galleries ───────────────────────────────────────────────────────────
+
+    match /galleries/{galleryId} {
+      // Client can read their own gallery once delivered
+      allow read: if isStaff() ||
+        (isAuthenticated() &&
+          get(/databases/$(database)/documents/galleries/$(galleryId)).data.clientId == request.auth.uid &&
+          get(/databases/$(database)/documents/galleries/$(galleryId)).data.status in ['delivered', 'approved']);
+      allow create, update: if isPhotographer();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Invoices ────────────────────────────────────────────────────────────
+
+    match /invoices/{invoiceId} {
+      allow read: if isCoordinator() ||
+        (isAuthenticated() &&
+          get(/databases/$(database)/documents/invoices/$(invoiceId)).data.clientId == request.auth.uid);
+      allow create, update: if isCoordinator();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Transactions ────────────────────────────────────────────────────────
+
+    match /transactions/{transactionId} {
+      allow read: if isCoordinator();
+      allow create: if isAuthenticated(); // payment webhooks write here
+      allow update: if isCoordinator();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Messages ────────────────────────────────────────────────────────────
+
+    match /messages/{messageId} {
+      // Client can read/write messages on their own orders
+      allow read: if isStaff() ||
+        (isAuthenticated() &&
+          get(/databases/$(database)/documents/messages/$(messageId)).data.senderId == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update: if isStaff(); // mark as read
+      allow delete: if isAdmin();
+    }
+
+    // ─── Edit Requests ───────────────────────────────────────────────────────
+
+    match /editRequests/{requestId} {
+      allow read: if isStaff() ||
+        (isAuthenticated() &&
+          get(/databases/$(database)/documents/editRequests/$(requestId)).data.clientId == request.auth.uid);
+      allow create: if isAuthenticated(); // clients submit
+      allow update: if isCoordinator();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Packages / Pricing ──────────────────────────────────────────────────
+
+    match /packages/{packageId} {
+      allow read: if true; // public — needed for booking form
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ─── Email Templates ─────────────────────────────────────────────────────
+
+    match /emailTemplates/{templateId} {
+      allow read: if isStaff();
+      allow create, update: if isCoordinator();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Campaigns ───────────────────────────────────────────────────────────
+
+    match /campaigns/{campaignId} {
+      allow read, write: if isCoordinator();
+      allow delete: if isAdmin();
+    }
+
+    // ─── AI Agent Logs ───────────────────────────────────────────────────────
+
+    match /agentLogs/{logId} {
+      allow read: if isStaff();
+      allow create: if isAuthenticated(); // agents write via service account
+      allow update: if isCoordinator(); // mark reviewed
+      allow delete: if isAdmin();
+    }
+
+    // ─── Virtual Staging Jobs ────────────────────────────────────────────────
+
+    match /vsaiJobs/{jobId} {
+      allow read: if isStaff() ||
+        (isAuthenticated() &&
+          get(/databases/$(database)/documents/vsaiJobs/$(jobId)).data.userId == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated(); // polling updates
+      allow delete: if isAdmin();
+    }
+
+    // ─── Site Settings ───────────────────────────────────────────────────────
+
+    match /siteSettings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ─── Promo Codes ─────────────────────────────────────────────────────────
+
+    match /promoCodes/{codeId} {
+      allow read: if true; // booking form validates these
+      allow write: if isAdmin();
+    }
+
+    // ─── Catch-all: deny everything else ─────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;
     }

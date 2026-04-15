@@ -29,7 +29,8 @@
     "googleapis": "^171.4.0",
     "nodemailer": "^8.0.2",
     "twilio": "^5.13.0",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "stripe": "^16.0.0"
   },
   "devDependencies": {
     "@hookform/resolvers": "^5.2.1",
