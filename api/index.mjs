@@ -1155,12 +1155,19 @@ router$5.post("/create", requireAuth, async (req, res) => {
     } catch {
       return res.status(500).json({ error: "Invalid VSAI response format." });
     }
+    const vsaiRenderId = vsaiData.id || vsaiData.render_id || vsaiData.renderId || null;
+    if (!vsaiRenderId) {
+      console.error("[VSAI] No render ID in response:", vsaiData);
+      return res.status(500).json({
+        error: `VSAI returned no render ID. Response: ${responseText}`
+      });
+    }
     const jobRef = await db$5().collection("vsaiJobs").add({
       userId,
       imageUrl,
       roomType,
       style,
-      vsaiRenderId: vsaiData.id,
+      vsaiRenderId,
       status: "processing",
       isPaid: false,
       resultUrl: null,
@@ -1168,10 +1175,10 @@ router$5.post("/create", requireAuth, async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    console.log(`[VSAI] Job created: ${jobRef.id} → vsaiRenderId: ${vsaiData.id}`);
+    console.log(`[VSAI] Job created: ${jobRef.id} → vsaiRenderId: ${vsaiRenderId}`);
     return res.status(200).json({
       jobId: jobRef.id,
-      vsaiRenderId: vsaiData.id,
+      vsaiRenderId,
       status: "processing"
     });
   } catch (err) {
@@ -1290,12 +1297,16 @@ router$5.post("/variation", requireAuth, async (req, res) => {
       });
     }
     const vsaiData = JSON.parse(responseText);
+    const vsaiRenderId = vsaiData.id || vsaiData.render_id || vsaiData.renderId || null;
+    if (!vsaiRenderId) {
+      return res.status(500).json({ error: `VSAI returned no render ID: ${responseText}` });
+    }
     const variationRef = await db$5().collection("vsaiJobs").add({
       userId: req.user.uid,
       imageUrl: job.imageUrl,
       roomType: newRoomType,
       style: newStyle,
-      vsaiRenderId: vsaiData.id,
+      vsaiRenderId,
       status: "processing",
       isPaid: false,
       parentJobId: jobId,
@@ -1306,7 +1317,7 @@ router$5.post("/variation", requireAuth, async (req, res) => {
     });
     return res.json({
       jobId: variationRef.id,
-      vsaiRenderId: vsaiData.id,
+      vsaiRenderId,
       status: "processing"
     });
   } catch (err) {
@@ -2006,6 +2017,9 @@ if (!admin.apps.length) {
     console.warn(
       "[Server] WARNING: No Firebase service account configured. Set FIREBASE_SERVICE_ACCOUNT env var with your service account JSON."
     );
+  }
+  if (admin.apps.length) {
+    admin.firestore().settings({ ignoreUndefinedProperties: true });
   }
 }
 function createServer() {

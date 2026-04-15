@@ -69,11 +69,25 @@ router.post("/create", requireAuth, async (req: AuthenticatedRequest, res) => {
       });
     }
 
-    let vsaiData: { id: string; status: string };
+    // Parse response — VSAI may use "id", "render_id", or "renderId"
+    let vsaiData: Record<string, unknown>;
     try {
       vsaiData = JSON.parse(responseText);
     } catch {
       return res.status(500).json({ error: "Invalid VSAI response format." });
+    }
+
+    const vsaiRenderId =
+      (vsaiData.id as string) ||
+      (vsaiData.render_id as string) ||
+      (vsaiData.renderId as string) ||
+      null;
+
+    if (!vsaiRenderId) {
+      console.error("[VSAI] No render ID in response:", vsaiData);
+      return res.status(500).json({
+        error: `VSAI returned no render ID. Response: ${responseText}`,
+      });
     }
 
     const jobRef = await db().collection("vsaiJobs").add({
@@ -81,7 +95,7 @@ router.post("/create", requireAuth, async (req: AuthenticatedRequest, res) => {
       imageUrl,
       roomType,
       style,
-      vsaiRenderId: vsaiData.id,
+      vsaiRenderId,
       status: "processing",
       isPaid: false,
       resultUrl: null,
@@ -90,11 +104,11 @@ router.post("/create", requireAuth, async (req: AuthenticatedRequest, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    console.log(`[VSAI] Job created: ${jobRef.id} → vsaiRenderId: ${vsaiData.id}`);
+    console.log(`[VSAI] Job created: ${jobRef.id} → vsaiRenderId: ${vsaiRenderId}`);
 
     return res.status(200).json({
       jobId: jobRef.id,
-      vsaiRenderId: vsaiData.id,
+      vsaiRenderId,
       status: "processing",
     });
   } catch (err) {
@@ -271,14 +285,23 @@ router.post("/variation", requireAuth, async (req: AuthenticatedRequest, res) =>
       });
     }
 
-    const vsaiData: { id: string } = JSON.parse(responseText);
+    const vsaiData: Record<string, unknown> = JSON.parse(responseText);
+    const vsaiRenderId =
+      (vsaiData.id as string) ||
+      (vsaiData.render_id as string) ||
+      (vsaiData.renderId as string) ||
+      null;
+
+    if (!vsaiRenderId) {
+      return res.status(500).json({ error: `VSAI returned no render ID: ${responseText}` });
+    }
 
     const variationRef = await db().collection("vsaiJobs").add({
       userId: req.user!.uid,
       imageUrl: job.imageUrl,
       roomType: newRoomType,
       style: newStyle,
-      vsaiRenderId: vsaiData.id,
+      vsaiRenderId,
       status: "processing",
       isPaid: false,
       parentJobId: jobId,
@@ -290,7 +313,7 @@ router.post("/variation", requireAuth, async (req: AuthenticatedRequest, res) =>
 
     return res.json({
       jobId: variationRef.id,
-      vsaiRenderId: vsaiData.id,
+      vsaiRenderId,
       status: "processing",
     });
   } catch (err) {

@@ -49,6 +49,11 @@ if (!admin.apps.length) {
       "Set FIREBASE_SERVICE_ACCOUNT env var with your service account JSON."
     );
   }
+
+  // Allow undefined fields to be silently omitted rather than throwing
+  if (admin.apps.length) {
+    admin.firestore().settings({ ignoreUndefinedProperties: true });
+  }
 }
 
 // ─── Server Factory ───────────────────────────────────────────────────────────
