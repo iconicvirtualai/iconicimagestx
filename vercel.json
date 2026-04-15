@@ -1,12 +1,6 @@
 {
   "rewrites": [
-    {
-      "source": "/(api|static|assets)/(.*)",
-      "destination": "/$1/$2"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
+    { "source": "/api/(.*)", "dest": "/api/index" },
+    { "source": "/(.*)",     "dest": "/index.html" }
   ]
 }
