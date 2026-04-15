@@ -831,7 +831,7 @@ router$7.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
 });
 const router$6 = Router();
 const db$6 = () => admin.firestore();
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
+const stripe$1 = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
 });
 router$6.post("/create-intent", requireAuth, async (req, res) => {
@@ -848,7 +848,7 @@ router$6.post("/create-intent", requireAuth, async (req, res) => {
       const clientDoc = await db$6().collection("clients").doc(invoice.clientId).get();
       const client = clientDoc.data();
       if (client) {
-        const customer = await stripe.customers.create({
+        const customer = await stripe$1.customers.create({
           email: invoice.clientEmail,
           name: invoice.clientName,
           metadata: {
@@ -863,7 +863,7 @@ router$6.post("/create-intent", requireAuth, async (req, res) => {
         });
       }
     }
-    const paymentIntent = await stripe.paymentIntents.create({
+    const paymentIntent = await stripe$1.paymentIntents.create({
       amount: Math.round(amount * 100),
       // cents
       currency,
@@ -952,7 +952,7 @@ router$6.post(
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
     let event;
     try {
-      event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+      event = stripe$1.webhooks.constructEvent(req.body, sig, webhookSecret);
     } catch (err) {
       console.error("[Payments] Webhook signature verification failed:", err);
       return res.status(400).json({ error: "Invalid webhook signature." });
@@ -1107,55 +1107,68 @@ const router$5 = Router();
 const db$5 = () => admin.firestore();
 const VSAI_API_BASE = "https://api.virtualstagingai.app/v1";
 const VSAI_API_KEY = process.env.VSAI_API_KEY || process.env.VIRTUAL_STAGING_AI_API_KEY || "";
+const VSAI_PRICE_CENTS = parseInt(process.env.VSAI_PRICE_CENTS || "1500", 10);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
+  apiVersion: "2024-06-20"
+});
 router$5.post("/create", requireAuth, async (req, res) => {
   try {
     if (!VSAI_API_KEY) {
+      console.error("[VSAI] VSAI_API_KEY is not set");
       return res.status(500).json({ error: "VSAI API key not configured." });
     }
     const {
       imageUrl,
       roomType = "living",
-      style = "standard",
-      orderId,
-      generateVariations = false
+      style = "modern"
     } = req.body;
     if (!imageUrl) {
       return res.status(400).json({ error: "imageUrl is required." });
     }
     const userId = req.user.uid;
+    const payload = {
+      image_url: imageUrl,
+      room_type: roomType,
+      style,
+      wait_for_completion: false,
+      add_virtually_staged_watermark: false
+    };
+    console.log("[VSAI] Creating render:", JSON.stringify(payload));
     const vsaiResponse = await fetch(`${VSAI_API_BASE}/render/create`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Api-Key ${VSAI_API_KEY}`
       },
-      body: JSON.stringify({
-        image_url: imageUrl,
-        room_type: roomType,
-        style,
-        wait_for_completion: false,
-        add_virtually_staged_watermark: false
-      })
+      body: JSON.stringify(payload)
     });
+    const responseText = await vsaiResponse.text();
+    console.log(`[VSAI] Create response ${vsaiResponse.status}:`, responseText);
     if (!vsaiResponse.ok) {
-      const error = await vsaiResponse.text();
-      console.error("[VSAI] API error:", error);
-      return res.status(vsaiResponse.status).json({ error: "VSAI render failed." });
+      return res.status(vsaiResponse.status).json({
+        error: `VSAI API error: ${responseText}`
+      });
     }
-    const vsaiData = await vsaiResponse.json();
+    let vsaiData;
+    try {
+      vsaiData = JSON.parse(responseText);
+    } catch {
+      return res.status(500).json({ error: "Invalid VSAI response format." });
+    }
     const jobRef = await db$5().collection("vsaiJobs").add({
       userId,
-      orderId: orderId || null,
       imageUrl,
       roomType,
       style,
       vsaiRenderId: vsaiData.id,
       status: "processing",
       isPaid: false,
-      generateVariations,
+      resultUrl: null,
+      resultUrls: [],
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
+    console.log(`[VSAI] Job created: ${jobRef.id} → vsaiRenderId: ${vsaiData.id}`);
     return res.status(200).json({
       jobId: jobRef.id,
       vsaiRenderId: vsaiData.id,
@@ -1163,7 +1176,7 @@ router$5.post("/create", requireAuth, async (req, res) => {
     });
   } catch (err) {
     console.error("[VSAI] Create error:", err);
-    return res.status(500).json({ error: "Failed to start render job." });
+    return res.status(500).json({ error: String(err) });
   }
 });
 router$5.get("/result/:jobId", requireAuth, async (req, res) => {
@@ -1183,43 +1196,67 @@ router$5.get("/result/:jobId", requireAuth, async (req, res) => {
       });
     }
     if (job.status === "failed") {
-      return res.json({ jobId: req.params.jobId, status: "failed", error: job.error });
+      return res.json({
+        jobId: req.params.jobId,
+        status: "failed",
+        error: job.error || "Render failed."
+      });
     }
-    const vsaiResponse = await fetch(`${VSAI_API_BASE}/render/${job.vsaiRenderId}`, {
-      headers: { Authorization: `Api-Key ${VSAI_API_KEY}` }
-    });
+    if (!VSAI_API_KEY) {
+      return res.status(500).json({ error: "VSAI API key not configured." });
+    }
+    const vsaiResponse = await fetch(
+      `${VSAI_API_BASE}/render/${job.vsaiRenderId}`,
+      { headers: { Authorization: `Api-Key ${VSAI_API_KEY}` } }
+    );
+    const responseText = await vsaiResponse.text();
+    console.log(`[VSAI] Poll ${job.vsaiRenderId} → ${vsaiResponse.status}: ${responseText}`);
     if (!vsaiResponse.ok) {
-      return res.status(vsaiResponse.status).json({ error: "Failed to check render status." });
+      return res.status(vsaiResponse.status).json({
+        error: `VSAI poll error: ${responseText}`
+      });
     }
-    const vsaiData = await vsaiResponse.json();
+    let vsaiData;
+    try {
+      vsaiData = JSON.parse(responseText);
+    } catch {
+      return res.status(500).json({ error: "Invalid VSAI response format." });
+    }
+    const rawStatus = (vsaiData.status || "").toLowerCase();
+    const isComplete = rawStatus === "done" || rawStatus === "completed";
+    const isFailed = rawStatus === "error" || rawStatus === "failed";
+    const normalizedStatus = isComplete ? "completed" : isFailed ? "failed" : "processing";
+    const resultUrl = vsaiData.output_url || vsaiData.rendered_image || vsaiData.result_url || vsaiData.output_urls && vsaiData.output_urls[0] || null;
+    const resultUrls = vsaiData.output_urls || (resultUrl ? [resultUrl] : []);
     const updates = {
-      status: vsaiData.status === "done" ? "completed" : vsaiData.status === "error" ? "failed" : "processing",
+      status: normalizedStatus,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    if (vsaiData.status === "done" && vsaiData.output_url) {
-      updates.resultUrl = vsaiData.output_url;
-      updates.resultUrls = vsaiData.output_urls || [vsaiData.output_url];
+    if (isComplete && resultUrl) {
+      updates.resultUrl = resultUrl;
+      updates.resultUrls = resultUrls;
     }
-    if (vsaiData.status === "error") {
-      updates.error = vsaiData.error || "Render failed";
+    if (isFailed) {
+      updates.error = vsaiData.error || vsaiData.message || "Render failed on VSAI.";
     }
     await jobDoc.ref.update(updates);
     return res.json({
       jobId: req.params.jobId,
-      status: updates.status,
-      resultUrl: vsaiData.output_url || null,
-      resultUrls: vsaiData.output_urls || null
+      status: normalizedStatus,
+      resultUrl: resultUrl || null,
+      resultUrls: resultUrls.length ? resultUrls : null,
+      error: isFailed ? vsaiData.error || vsaiData.message || "Render failed." : void 0
     });
   } catch (err) {
-    console.error("[VSAI] Result poll error:", err);
-    return res.status(500).json({ error: "Failed to check render status." });
+    console.error("[VSAI] Poll error:", err);
+    return res.status(500).json({ error: String(err) });
   }
 });
 router$5.post("/variation", requireAuth, async (req, res) => {
   try {
-    const { jobId, style } = req.body;
-    if (!jobId || !style) {
-      return res.status(400).json({ error: "jobId and style required." });
+    const { jobId, style, roomType } = req.body;
+    if (!jobId) {
+      return res.status(400).json({ error: "jobId required." });
     }
     const jobDoc = await db$5().collection("vsaiJobs").doc(jobId).get();
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
@@ -1227,37 +1264,43 @@ router$5.post("/variation", requireAuth, async (req, res) => {
     if (job.userId !== req.user.uid) {
       return res.status(403).json({ error: "Access denied." });
     }
-    if (!job.resultUrl) {
-      return res.status(400).json({ error: "Job not yet completed." });
-    }
+    const newStyle = style || job.style;
+    const newRoomType = roomType || job.roomType;
+    const payload = {
+      image_url: job.imageUrl,
+      room_type: newRoomType,
+      style: newStyle,
+      wait_for_completion: false,
+      add_virtually_staged_watermark: false
+    };
+    console.log("[VSAI] Creating variation:", JSON.stringify(payload));
     const vsaiResponse = await fetch(`${VSAI_API_BASE}/render/create`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Api-Key ${VSAI_API_KEY}`
       },
-      body: JSON.stringify({
-        image_url: job.imageUrl,
-        room_type: job.roomType,
-        style,
-        wait_for_completion: false,
-        add_virtually_staged_watermark: false
-      })
+      body: JSON.stringify(payload)
     });
+    const responseText = await vsaiResponse.text();
+    console.log(`[VSAI] Variation response ${vsaiResponse.status}:`, responseText);
     if (!vsaiResponse.ok) {
-      return res.status(vsaiResponse.status).json({ error: "VSAI variation failed." });
+      return res.status(vsaiResponse.status).json({
+        error: `VSAI variation error: ${responseText}`
+      });
     }
-    const vsaiData = await vsaiResponse.json();
+    const vsaiData = JSON.parse(responseText);
     const variationRef = await db$5().collection("vsaiJobs").add({
       userId: req.user.uid,
-      orderId: job.orderId,
       imageUrl: job.imageUrl,
-      roomType: job.roomType,
-      style,
+      roomType: newRoomType,
+      style: newStyle,
       vsaiRenderId: vsaiData.id,
       status: "processing",
-      isPaid: job.isPaid,
+      isPaid: false,
       parentJobId: jobId,
+      resultUrl: null,
+      resultUrls: [],
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -1268,9 +1311,116 @@ router$5.post("/variation", requireAuth, async (req, res) => {
     });
   } catch (err) {
     console.error("[VSAI] Variation error:", err);
-    return res.status(500).json({ error: "Failed to create variation." });
+    return res.status(500).json({ error: String(err) });
   }
 });
+router$5.post("/checkout", requireAuth, async (req, res) => {
+  try {
+    const { jobIds, successUrl, cancelUrl } = req.body;
+    if (!jobIds || !Array.isArray(jobIds) || jobIds.length === 0) {
+      return res.status(400).json({ error: "jobIds array required." });
+    }
+    const userId = req.user.uid;
+    const jobDocs = await Promise.all(
+      jobIds.map((id) => db$5().collection("vsaiJobs").doc(id).get())
+    );
+    for (let i = 0; i < jobDocs.length; i++) {
+      const doc = jobDocs[i];
+      if (!doc.exists) {
+        return res.status(404).json({ error: `Job ${jobIds[i]} not found.` });
+      }
+      const data = doc.data();
+      if (data.userId !== userId) {
+        return res.status(403).json({ error: "Access denied." });
+      }
+      if (data.status !== "completed") {
+        return res.status(400).json({ error: `Job ${jobIds[i]} is not completed yet.` });
+      }
+      if (data.isPaid) {
+        return res.status(400).json({ error: `Job ${jobIds[i]} is already paid.` });
+      }
+    }
+    const origin = process.env.FRONTEND_URL || req.headers.origin || "https://iconicimagestx.com";
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items: jobDocs.map((doc) => {
+        const job = doc.data();
+        return {
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: `Virtual Staging — ${capitalize(job.roomType)} (${capitalize(job.style)})`,
+              description: "AI-staged photo delivered in full resolution",
+              images: job.resultUrl ? [job.resultUrl] : void 0
+            },
+            unit_amount: VSAI_PRICE_CENTS
+          },
+          quantity: 1
+        };
+      }),
+      mode: "payment",
+      success_url: successUrl || `${origin}/services/virtual-staging/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: cancelUrl || `${origin}/services/virtual-staging`,
+      metadata: {
+        jobIds: JSON.stringify(jobIds),
+        userId,
+        type: "vsai_renders"
+      },
+      customer_email: req.user.email || void 0
+    });
+    await Promise.all(
+      jobDocs.map(
+        (doc) => doc.ref.update({
+          stripeSessionId: session.id,
+          paymentStatus: "pending",
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        })
+      )
+    );
+    return res.json({ url: session.url, sessionId: session.id });
+  } catch (err) {
+    console.error("[VSAI] Checkout error:", err);
+    return res.status(500).json({ error: String(err) });
+  }
+});
+router$5.post(
+  "/webhook/stripe",
+  // Raw body needed — mount before express.json() parses it
+  async (req, res) => {
+    const sig = req.headers["stripe-signature"];
+    const webhookSecret = process.env.STRIPE_VSAI_WEBHOOK_SECRET || "";
+    let event;
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.rawBody || req.body,
+        sig,
+        webhookSecret
+      );
+    } catch (err) {
+      console.error("[VSAI Webhook] Signature verification failed:", err);
+      return res.status(400).send("Webhook signature failed.");
+    }
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object;
+      if (session.metadata?.type === "vsai_renders") {
+        const jobIds = JSON.parse(session.metadata.jobIds || "[]");
+        await Promise.all(
+          jobIds.map(
+            (id) => db$5().collection("vsaiJobs").doc(id).update({
+              isPaid: true,
+              paymentStatus: "paid",
+              stripeSessionId: session.id,
+              paidAt: admin.firestore.FieldValue.serverTimestamp(),
+              updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            })
+          )
+        );
+        console.log(`[VSAI Webhook] Marked ${jobIds.length} jobs as paid for session ${session.id}`);
+      }
+    }
+    res.json({ received: true });
+  }
+);
 router$5.get("/options", (_req, res) => {
   return res.json({
     roomTypes: [
@@ -1280,30 +1430,24 @@ router$5.get("/options", (_req, res) => {
       { value: "kitchen", label: "Kitchen" },
       { value: "office", label: "Home Office" },
       { value: "bathroom", label: "Bathroom" },
-      { value: "outdoor", label: "Outdoor / Patio" },
-      { value: "empty", label: "Empty Room" }
+      { value: "outdoor", label: "Outdoor / Patio" }
     ],
     styles: [
-      { value: "standard", label: "Standard" },
       { value: "modern", label: "Modern" },
       { value: "contemporary", label: "Contemporary" },
-      { value: "scandinavian", label: "Scandinavian" },
+      { value: "transitional", label: "Traditional" },
+      { value: "scandinavian", label: "Minimalist" },
+      { value: "industrial", label: "Industrial" },
       { value: "farmhouse", label: "Farmhouse" },
       { value: "coastal", label: "Coastal" },
-      { value: "transitional", label: "Transitional" },
-      { value: "industrial", label: "Industrial" },
       { value: "luxury", label: "Luxury" }
-    ]
+    ],
+    pricePerPhoto: VSAI_PRICE_CENTS / 100
   });
 });
-router$5.get("/jobs", requireAuth, async (req, res) => {
-  try {
-    const snapshot = await db$5().collection("vsaiJobs").where("userId", "==", req.user.uid).orderBy("createdAt", "desc").limit(50).get();
-    return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
-  } catch (err) {
-    return res.status(500).json({ error: "Failed to fetch jobs." });
-  }
-});
+function capitalize(s) {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
+}
 const router$4 = Router();
 const db$4 = () => admin.firestore();
 router$4.get("/:orderId", requireAuth, async (req, res) => {

@@ -1,12 +1,10 @@
 /**
  * Iconic Images — Virtual Staging AI Routes
- * Ported from iconic-virtual-vsai-demo/pages/api/vsai-*.ts
- * Converted from Next.js API routes to Express routes.
- * Place at: server/routes/vsai.ts
  */
 
 import { Router } from "express";
 import admin from "firebase-admin";
+import Stripe from "stripe";
 import { requireAuth, type AuthenticatedRequest } from "../middleware/auth";
 
 const router = Router();
@@ -16,20 +14,25 @@ const VSAI_API_BASE = "https://api.virtualstagingai.app/v1";
 const VSAI_API_KEY =
   process.env.VSAI_API_KEY || process.env.VIRTUAL_STAGING_AI_API_KEY || "";
 
-// ─── POST /api/vsai/create — Start a staging render job ──────────────────────
+const VSAI_PRICE_CENTS = parseInt(process.env.VSAI_PRICE_CENTS || "1500", 10); // $15.00 default
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
+  apiVersion: "2024-06-20",
+});
+
+// ─── POST /api/vsai/create ────────────────────────────────────────────────────
 
 router.post("/create", requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
     if (!VSAI_API_KEY) {
+      console.error("[VSAI] VSAI_API_KEY is not set");
       return res.status(500).json({ error: "VSAI API key not configured." });
     }
 
     const {
       imageUrl,
       roomType = "living",
-      style = "standard",
-      orderId,
-      generateVariations = false,
+      style = "modern",
     } = req.body;
 
     if (!imageUrl) {
@@ -38,44 +41,56 @@ router.post("/create", requireAuth, async (req: AuthenticatedRequest, res) => {
 
     const userId = req.user!.uid;
 
-    // Call VSAI API
+    const payload = {
+      image_url: imageUrl,
+      room_type: roomType,
+      style,
+      wait_for_completion: false,
+      add_virtually_staged_watermark: false,
+    };
+
+    console.log("[VSAI] Creating render:", JSON.stringify(payload));
+
     const vsaiResponse = await fetch(`${VSAI_API_BASE}/render/create`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Api-Key ${VSAI_API_KEY}`,
       },
-      body: JSON.stringify({
-        image_url: imageUrl,
-        room_type: roomType,
-        style,
-        wait_for_completion: false,
-        add_virtually_staged_watermark: false,
-      }),
+      body: JSON.stringify(payload),
     });
 
+    const responseText = await vsaiResponse.text();
+    console.log(`[VSAI] Create response ${vsaiResponse.status}:`, responseText);
+
     if (!vsaiResponse.ok) {
-      const error = await vsaiResponse.text();
-      console.error("[VSAI] API error:", error);
-      return res.status(vsaiResponse.status).json({ error: "VSAI render failed." });
+      return res.status(vsaiResponse.status).json({
+        error: `VSAI API error: ${responseText}`,
+      });
     }
 
-    const vsaiData = await vsaiResponse.json() as { id: string; status: string };
+    let vsaiData: { id: string; status: string };
+    try {
+      vsaiData = JSON.parse(responseText);
+    } catch {
+      return res.status(500).json({ error: "Invalid VSAI response format." });
+    }
 
-    // Save job to Firestore
     const jobRef = await db().collection("vsaiJobs").add({
       userId,
-      orderId: orderId || null,
       imageUrl,
       roomType,
       style,
       vsaiRenderId: vsaiData.id,
       status: "processing",
       isPaid: false,
-      generateVariations,
+      resultUrl: null,
+      resultUrls: [],
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+
+    console.log(`[VSAI] Job created: ${jobRef.id} → vsaiRenderId: ${vsaiData.id}`);
 
     return res.status(200).json({
       jobId: jobRef.id,
@@ -84,11 +99,11 @@ router.post("/create", requireAuth, async (req: AuthenticatedRequest, res) => {
     });
   } catch (err) {
     console.error("[VSAI] Create error:", err);
-    return res.status(500).json({ error: "Failed to start render job." });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
-// ─── GET /api/vsai/result/:jobId — Poll render status ────────────────────────
+// ─── GET /api/vsai/result/:jobId ──────────────────────────────────────────────
 
 router.get("/result/:jobId", requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
@@ -97,12 +112,11 @@ router.get("/result/:jobId", requireAuth, async (req: AuthenticatedRequest, res)
 
     const job = jobDoc.data()!;
 
-    // Verify ownership
     if (job.userId !== req.user!.uid) {
       return res.status(403).json({ error: "Access denied." });
     }
 
-    // If already completed, return stored result
+    // Already settled — no need to hit VSAI again
     if (job.status === "completed" && job.resultUrl) {
       return res.json({
         jobId: req.params.jobId,
@@ -113,110 +127,163 @@ router.get("/result/:jobId", requireAuth, async (req: AuthenticatedRequest, res)
     }
 
     if (job.status === "failed") {
-      return res.json({ jobId: req.params.jobId, status: "failed", error: job.error });
+      return res.json({
+        jobId: req.params.jobId,
+        status: "failed",
+        error: job.error || "Render failed.",
+      });
     }
 
-    // Poll VSAI API
-    const vsaiResponse = await fetch(`${VSAI_API_BASE}/render/${job.vsaiRenderId}`, {
-      headers: { Authorization: `Api-Key ${VSAI_API_KEY}` },
-    });
+    if (!VSAI_API_KEY) {
+      return res.status(500).json({ error: "VSAI API key not configured." });
+    }
+
+    // Poll VSAI
+    const vsaiResponse = await fetch(
+      `${VSAI_API_BASE}/render/${job.vsaiRenderId}`,
+      { headers: { Authorization: `Api-Key ${VSAI_API_KEY}` } }
+    );
+
+    const responseText = await vsaiResponse.text();
+    console.log(`[VSAI] Poll ${job.vsaiRenderId} → ${vsaiResponse.status}: ${responseText}`);
 
     if (!vsaiResponse.ok) {
-      return res.status(vsaiResponse.status).json({ error: "Failed to check render status." });
+      return res.status(vsaiResponse.status).json({
+        error: `VSAI poll error: ${responseText}`,
+      });
     }
 
-    const vsaiData = await vsaiResponse.json() as {
-      status: string;
+    let vsaiData: {
+      id?: string;
+      status?: string;
+      // Common VSAI output fields — handle multiple possible shapes
       output_url?: string;
       output_urls?: string[];
+      rendered_image?: string;
+      result_url?: string;
       error?: string;
+      message?: string;
     };
 
-    // Update job in Firestore
+    try {
+      vsaiData = JSON.parse(responseText);
+    } catch {
+      return res.status(500).json({ error: "Invalid VSAI response format." });
+    }
+
+    // Normalize status — VSAI uses "done" / "error" / "pending" / "processing"
+    const rawStatus = (vsaiData.status || "").toLowerCase();
+    const isComplete = rawStatus === "done" || rawStatus === "completed";
+    const isFailed = rawStatus === "error" || rawStatus === "failed";
+    const normalizedStatus = isComplete ? "completed" : isFailed ? "failed" : "processing";
+
+    // Normalize result URL — handle whichever field VSAI uses
+    const resultUrl =
+      vsaiData.output_url ||
+      vsaiData.rendered_image ||
+      vsaiData.result_url ||
+      (vsaiData.output_urls && vsaiData.output_urls[0]) ||
+      null;
+
+    const resultUrls: string[] = vsaiData.output_urls ||
+      (resultUrl ? [resultUrl] : []);
+
     const updates: Record<string, unknown> = {
-      status: vsaiData.status === "done" ? "completed" :
-              vsaiData.status === "error" ? "failed" : "processing",
+      status: normalizedStatus,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
-    if (vsaiData.status === "done" && vsaiData.output_url) {
-      updates.resultUrl = vsaiData.output_url;
-      updates.resultUrls = vsaiData.output_urls || [vsaiData.output_url];
+    if (isComplete && resultUrl) {
+      updates.resultUrl = resultUrl;
+      updates.resultUrls = resultUrls;
     }
 
-    if (vsaiData.status === "error") {
-      updates.error = vsaiData.error || "Render failed";
+    if (isFailed) {
+      updates.error =
+        vsaiData.error || vsaiData.message || "Render failed on VSAI.";
     }
 
     await jobDoc.ref.update(updates);
 
     return res.json({
       jobId: req.params.jobId,
-      status: updates.status,
-      resultUrl: vsaiData.output_url || null,
-      resultUrls: vsaiData.output_urls || null,
+      status: normalizedStatus,
+      resultUrl: resultUrl || null,
+      resultUrls: resultUrls.length ? resultUrls : null,
+      error: isFailed
+        ? (vsaiData.error || vsaiData.message || "Render failed.")
+        : undefined,
     });
   } catch (err) {
-    console.error("[VSAI] Result poll error:", err);
-    return res.status(500).json({ error: "Failed to check render status." });
+    console.error("[VSAI] Poll error:", err);
+    return res.status(500).json({ error: String(err) });
   }
 });
 
-// ─── POST /api/vsai/variation — Generate variation of staged image ────────────
+// ─── POST /api/vsai/variation ─────────────────────────────────────────────────
+// Re-renders the same original image with the same (or new) params.
+// "Variation" = same room/style but different AI seed — new furniture arrangement.
 
 router.post("/variation", requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
-    const { jobId, style } = req.body;
+    const { jobId, style, roomType } = req.body;
 
-    if (!jobId || !style) {
-      return res.status(400).json({ error: "jobId and style required." });
+    if (!jobId) {
+      return res.status(400).json({ error: "jobId required." });
     }
 
     const jobDoc = await db().collection("vsaiJobs").doc(jobId).get();
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
 
     const job = jobDoc.data()!;
-
     if (job.userId !== req.user!.uid) {
       return res.status(403).json({ error: "Access denied." });
     }
 
-    if (!job.resultUrl) {
-      return res.status(400).json({ error: "Job not yet completed." });
-    }
+    const newStyle = style || job.style;
+    const newRoomType = roomType || job.roomType;
 
-    // Create new render with different style
+    const payload = {
+      image_url: job.imageUrl,
+      room_type: newRoomType,
+      style: newStyle,
+      wait_for_completion: false,
+      add_virtually_staged_watermark: false,
+    };
+
+    console.log("[VSAI] Creating variation:", JSON.stringify(payload));
+
     const vsaiResponse = await fetch(`${VSAI_API_BASE}/render/create`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Api-Key ${VSAI_API_KEY}`,
       },
-      body: JSON.stringify({
-        image_url: job.imageUrl,
-        room_type: job.roomType,
-        style,
-        wait_for_completion: false,
-        add_virtually_staged_watermark: false,
-      }),
+      body: JSON.stringify(payload),
     });
 
+    const responseText = await vsaiResponse.text();
+    console.log(`[VSAI] Variation response ${vsaiResponse.status}:`, responseText);
+
     if (!vsaiResponse.ok) {
-      return res.status(vsaiResponse.status).json({ error: "VSAI variation failed." });
+      return res.status(vsaiResponse.status).json({
+        error: `VSAI variation error: ${responseText}`,
+      });
     }
 
-    const vsaiData = await vsaiResponse.json() as { id: string };
+    const vsaiData: { id: string } = JSON.parse(responseText);
 
     const variationRef = await db().collection("vsaiJobs").add({
       userId: req.user!.uid,
-      orderId: job.orderId,
       imageUrl: job.imageUrl,
-      roomType: job.roomType,
-      style,
+      roomType: newRoomType,
+      style: newStyle,
       vsaiRenderId: vsaiData.id,
       status: "processing",
-      isPaid: job.isPaid,
+      isPaid: false,
       parentJobId: jobId,
+      resultUrl: null,
+      resultUrls: [],
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -228,11 +295,153 @@ router.post("/variation", requireAuth, async (req: AuthenticatedRequest, res) =>
     });
   } catch (err) {
     console.error("[VSAI] Variation error:", err);
-    return res.status(500).json({ error: "Failed to create variation." });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
-// ─── GET /api/vsai/options — Available room types and styles ──────────────────
+// ─── POST /api/vsai/checkout ──────────────────────────────────────────────────
+// Creates a Stripe Checkout session for one or more completed VSAI renders.
+
+router.post("/checkout", requireAuth, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { jobIds, successUrl, cancelUrl } = req.body as {
+      jobIds: string[];
+      successUrl?: string;
+      cancelUrl?: string;
+    };
+
+    if (!jobIds || !Array.isArray(jobIds) || jobIds.length === 0) {
+      return res.status(400).json({ error: "jobIds array required." });
+    }
+
+    const userId = req.user!.uid;
+
+    // Verify all jobs exist, belong to this user, and are completed
+    const jobDocs = await Promise.all(
+      jobIds.map((id) => db().collection("vsaiJobs").doc(id).get())
+    );
+
+    for (let i = 0; i < jobDocs.length; i++) {
+      const doc = jobDocs[i];
+      if (!doc.exists) {
+        return res.status(404).json({ error: `Job ${jobIds[i]} not found.` });
+      }
+      const data = doc.data()!;
+      if (data.userId !== userId) {
+        return res.status(403).json({ error: "Access denied." });
+      }
+      if (data.status !== "completed") {
+        return res.status(400).json({ error: `Job ${jobIds[i]} is not completed yet.` });
+      }
+      if (data.isPaid) {
+        return res.status(400).json({ error: `Job ${jobIds[i]} is already paid.` });
+      }
+    }
+
+    const origin =
+      process.env.FRONTEND_URL ||
+      req.headers.origin ||
+      "https://iconicimagestx.com";
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items: jobDocs.map((doc) => {
+        const job = doc.data()!;
+        return {
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: `Virtual Staging — ${capitalize(job.roomType)} (${capitalize(job.style)})`,
+              description: "AI-staged photo delivered in full resolution",
+              images: job.resultUrl ? [job.resultUrl] : undefined,
+            },
+            unit_amount: VSAI_PRICE_CENTS,
+          },
+          quantity: 1,
+        };
+      }),
+      mode: "payment",
+      success_url:
+        successUrl ||
+        `${origin}/services/virtual-staging/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url:
+        cancelUrl ||
+        `${origin}/services/virtual-staging`,
+      metadata: {
+        jobIds: JSON.stringify(jobIds),
+        userId,
+        type: "vsai_renders",
+      },
+      customer_email: req.user!.email || undefined,
+    });
+
+    // Record pending payment on each job
+    await Promise.all(
+      jobDocs.map((doc) =>
+        doc.ref.update({
+          stripeSessionId: session.id,
+          paymentStatus: "pending",
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        })
+      )
+    );
+
+    return res.json({ url: session.url, sessionId: session.id });
+  } catch (err) {
+    console.error("[VSAI] Checkout error:", err);
+    return res.status(500).json({ error: String(err) });
+  }
+});
+
+// ─── POST /api/vsai/webhook/stripe ───────────────────────────────────────────
+// Marks jobs as paid after successful Stripe payment.
+
+router.post(
+  "/webhook/stripe",
+  // Raw body needed — mount before express.json() parses it
+  async (req, res) => {
+    const sig = req.headers["stripe-signature"] as string;
+    const webhookSecret = process.env.STRIPE_VSAI_WEBHOOK_SECRET || "";
+
+    let event: Stripe.Event;
+    try {
+      event = stripe.webhooks.constructEvent(
+        (req as any).rawBody || req.body,
+        sig,
+        webhookSecret
+      );
+    } catch (err) {
+      console.error("[VSAI Webhook] Signature verification failed:", err);
+      return res.status(400).send("Webhook signature failed.");
+    }
+
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object as Stripe.Checkout.Session;
+
+      if (session.metadata?.type === "vsai_renders") {
+        const jobIds: string[] = JSON.parse(session.metadata.jobIds || "[]");
+
+        await Promise.all(
+          jobIds.map((id) =>
+            db().collection("vsaiJobs").doc(id).update({
+              isPaid: true,
+              paymentStatus: "paid",
+              stripeSessionId: session.id,
+              paidAt: admin.firestore.FieldValue.serverTimestamp(),
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            })
+          )
+        );
+
+        console.log(`[VSAI Webhook] Marked ${jobIds.length} jobs as paid for session ${session.id}`);
+      }
+    }
+
+    res.json({ received: true });
+  }
+);
+
+// ─── GET /api/vsai/options ────────────────────────────────────────────────────
 
 router.get("/options", (_req, res) => {
   return res.json({
@@ -244,37 +453,25 @@ router.get("/options", (_req, res) => {
       { value: "office", label: "Home Office" },
       { value: "bathroom", label: "Bathroom" },
       { value: "outdoor", label: "Outdoor / Patio" },
-      { value: "empty", label: "Empty Room" },
     ],
     styles: [
-      { value: "standard", label: "Standard" },
       { value: "modern", label: "Modern" },
       { value: "contemporary", label: "Contemporary" },
-      { value: "scandinavian", label: "Scandinavian" },
+      { value: "transitional", label: "Traditional" },
+      { value: "scandinavian", label: "Minimalist" },
+      { value: "industrial", label: "Industrial" },
       { value: "farmhouse", label: "Farmhouse" },
       { value: "coastal", label: "Coastal" },
-      { value: "transitional", label: "Transitional" },
-      { value: "industrial", label: "Industrial" },
       { value: "luxury", label: "Luxury" },
     ],
+    pricePerPhoto: VSAI_PRICE_CENTS / 100,
   });
 });
 
-// ─── GET /api/vsai/jobs — List user's VSAI jobs ───────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-router.get("/jobs", requireAuth, async (req: AuthenticatedRequest, res) => {
-  try {
-    const snapshot = await db()
-      .collection("vsaiJobs")
-      .where("userId", "==", req.user!.uid)
-      .orderBy("createdAt", "desc")
-      .limit(50)
-      .get();
-
-    return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
-  } catch (err) {
-    return res.status(500).json({ error: "Failed to fetch jobs." });
-  }
-});
+function capitalize(s: string): string {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
+}
 
 export default router;
