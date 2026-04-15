@@ -103,3 +103,19 @@ export async function requireCoordinator(
     next();
   });
 }
+
+// ─── Middleware: Require photographer or above ───────────────────────────────
+
+export async function requirePhotographer(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) {
+  await requireStaff(req, res, () => {
+    const allowed = ["admin", "coordinator", "photographer"];
+    if (!req.staffRole || !allowed.includes(req.staffRole)) {
+      return res.status(403).json({ error: "Photographer access required." });
+    }
+    next();
+  });
+}
