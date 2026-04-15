@@ -21,25 +21,32 @@ import {
   connectStorageEmulator,
 } from "firebase/storage";
 
+// Project: iconic-images-aicon (main platform)
 const firebaseConfig = {
   apiKey:
     import.meta.env.VITE_FIREBASE_API_KEY ||
-    import.meta.env.VITE_PUBLIC_FIREBASE_API_KEY,
+    import.meta.env.VITE_PUBLIC_FIREBASE_API_KEY ||
+    "AIzaSyBp8lJvshIAFrTYTkDSD6OzK4IFvwrq76E",
   authDomain:
     import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ||
-    import.meta.env.VITE_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    import.meta.env.VITE_PUBLIC_FIREBASE_AUTH_DOMAIN ||
+    "iconic-images-aicon.firebaseapp.com",
   projectId:
     import.meta.env.VITE_FIREBASE_PROJECT_ID ||
-    import.meta.env.VITE_PUBLIC_FIREBASE_PROJECT_ID,
+    import.meta.env.VITE_PUBLIC_FIREBASE_PROJECT_ID ||
+    "iconic-images-aicon",
   storageBucket:
     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ||
-    import.meta.env.VITE_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    import.meta.env.VITE_PUBLIC_FIREBASE_STORAGE_BUCKET ||
+    "iconic-images-aicon.firebasestorage.app",
   messagingSenderId:
     import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ||
-    import.meta.env.VITE_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+    import.meta.env.VITE_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ||
+    "1064967965539",
   appId:
     import.meta.env.VITE_FIREBASE_APP_ID ||
-    import.meta.env.VITE_PUBLIC_FIREBASE_APP_ID,
+    import.meta.env.VITE_PUBLIC_FIREBASE_APP_ID ||
+    "1:1064967965539:web:5b32bc58b25e75ad26a156",
 };
 
 // Validate config
