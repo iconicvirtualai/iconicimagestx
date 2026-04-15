@@ -27,25 +27,33 @@ interface CartItem {
 }
 
 // ─── Maps: display label → VSAI API value ────────────────────────────────────
+// Valid room_type values per VSAI v1 API: living, bed, kitchen, dining,
+//   bathroom, home_office, outdoor, kids_room
+// Valid style values: standard, modern, scandinavian, industrial,
+//   mid-century modern, coastal, american, southwestern, farmhouse, luxury
 
 const ROOM_TYPE_MAP: Record<string, string> = {
   "Living Room": "living",
-  "Bedroom":     "bedroom",
+  "Bedroom":     "bed",          // API value is "bed", NOT "bedroom"
   "Dining Room": "dining",
   "Kitchen":     "kitchen",
-  "Home Office": "office",
+  "Home Office": "home_office",  // API value is "home_office", NOT "office"
+  "Bathroom":    "bathroom",
   "Patio":       "outdoor",
+  "Kids Room":   "kids_room",
 };
 
 const STYLE_MAP: Record<string, string> = {
-  "Modern":       "modern",
-  "Contemporary": "contemporary",
-  "Traditional":  "transitional",
-  "Minimalist":   "scandinavian",
-  "Industrial":   "industrial",
-  "Farmhouse":    "farmhouse",
-  "Coastal":      "coastal",
-  "Luxury":       "luxury",
+  "Modern":          "modern",
+  "Scandinavian":    "scandinavian",
+  "Industrial":      "industrial",
+  "Mid-Century":     "mid-century modern",
+  "Coastal":         "coastal",
+  "American":        "american",
+  "Southwestern":    "southwestern",
+  "Farmhouse":       "farmhouse",
+  "Luxury":          "luxury",
+  "Standard":        "standard",
 };
 
 const ROOM_TYPES = Object.keys(ROOM_TYPE_MAP);

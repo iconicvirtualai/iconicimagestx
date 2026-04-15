@@ -444,25 +444,29 @@ router.post(
 // ─── GET /api/vsai/options ────────────────────────────────────────────────────
 
 router.get("/options", (_req, res) => {
+  // Values are exact VSAI v1 API accepted values
   return res.json({
     roomTypes: [
-      { value: "living", label: "Living Room" },
-      { value: "bedroom", label: "Bedroom" },
-      { value: "dining", label: "Dining Room" },
-      { value: "kitchen", label: "Kitchen" },
-      { value: "office", label: "Home Office" },
-      { value: "bathroom", label: "Bathroom" },
-      { value: "outdoor", label: "Outdoor / Patio" },
+      { value: "living",      label: "Living Room" },
+      { value: "bed",         label: "Bedroom" },
+      { value: "dining",      label: "Dining Room" },
+      { value: "kitchen",     label: "Kitchen" },
+      { value: "home_office", label: "Home Office" },
+      { value: "bathroom",    label: "Bathroom" },
+      { value: "outdoor",     label: "Outdoor / Patio" },
+      { value: "kids_room",   label: "Kids Room" },
     ],
     styles: [
-      { value: "modern", label: "Modern" },
-      { value: "contemporary", label: "Contemporary" },
-      { value: "transitional", label: "Traditional" },
-      { value: "scandinavian", label: "Minimalist" },
-      { value: "industrial", label: "Industrial" },
-      { value: "farmhouse", label: "Farmhouse" },
-      { value: "coastal", label: "Coastal" },
-      { value: "luxury", label: "Luxury" },
+      { value: "modern",             label: "Modern" },
+      { value: "scandinavian",       label: "Scandinavian" },
+      { value: "industrial",         label: "Industrial" },
+      { value: "mid-century modern", label: "Mid-Century" },
+      { value: "coastal",            label: "Coastal" },
+      { value: "american",           label: "American" },
+      { value: "southwestern",       label: "Southwestern" },
+      { value: "farmhouse",          label: "Farmhouse" },
+      { value: "luxury",             label: "Luxury" },
+      { value: "standard",           label: "Standard" },
     ],
     pricePerPhoto: VSAI_PRICE_CENTS / 100,
   });
