@@ -189,23 +189,30 @@ router.get("/result/:jobId", requireAuth, async (req: AuthenticatedRequest, res)
 
     // VSAI v1 statuses: "rendering" | "done" | "error"
     const rawStatus = (vsaiData.status || "").toLowerCase();
-    const isComplete = rawStatus === "done" || rawStatus === "completed";
-    const isFailed   = rawStatus === "error" || rawStatus === "failed";
+    const isFailed  = rawStatus === "error" || rawStatus === "failed";
+
+    // For variation jobs: wait for outputs[outputIndex] to appear.
+    // The render cycles back to "rendering" then "done" as variation processes.
+    const outputIndex: number = typeof job.outputIndex === "number" ? job.outputIndex : 0;
+    const outputs: string[] = vsaiData.outputs || vsaiData.output_urls || [];
+
+    const isComplete =
+      (rawStatus === "done" || rawStatus === "completed") &&
+      outputs.length > outputIndex;
+
     const normalizedStatus = isComplete ? "completed" : isFailed ? "failed" : "processing";
 
-    // VSAI v1 puts result URLs in the "outputs" array
+    // Pick the right output: variation jobs use outputIndex, original jobs use 0
     const resultUrl =
-      (vsaiData.outputs && vsaiData.outputs[0]) ||
+      outputs[outputIndex] ||
       vsaiData.output_url ||
       vsaiData.rendered_image ||
       vsaiData.result_url ||
-      (vsaiData.output_urls && vsaiData.output_urls[0]) ||
       null;
 
-    const resultUrls: string[] =
-      vsaiData.outputs ||
-      vsaiData.output_urls ||
-      (resultUrl ? [resultUrl] : []);
+    const resultUrls: string[] = outputs.length
+      ? [outputs[outputIndex]].filter(Boolean) as string[]
+      : (resultUrl ? [resultUrl] : []);
 
     const updates: Record<string, unknown> = {
       status: normalizedStatus,
@@ -240,49 +247,68 @@ router.get("/result/:jobId", requireAuth, async (req: AuthenticatedRequest, res)
 });
 
 // ─── POST /api/vsai/variation ─────────────────────────────────────────────────
-// Re-renders the same original image with the same (or new) params.
-// "Variation" = same room/style but different AI seed — new furniture arrangement.
+// Uses VSAI's /v1/render/create-variation endpoint so the new variation is
+// generated from the SAME render (no new credit consumed — up to 20 per render).
+// The new output is appended to the parent render's "outputs" array.
+// We query the current outputs count first so we know which index to wait for.
 
 router.post("/variation", requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
-    const { jobId, style, roomType } = req.body;
+    const { jobId } = req.body;
 
     if (!jobId) {
       return res.status(400).json({ error: "jobId required." });
     }
 
-    const jobDoc = await db().collection("vsaiJobs").doc(jobId).get();
-    if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
+    // Resolve the ROOT render job (follow parentJobId chain to find the original)
+    let rootJobDoc = await db().collection("vsaiJobs").doc(jobId).get();
+    if (!rootJobDoc.exists) return res.status(404).json({ error: "Job not found." });
 
-    const job = jobDoc.data()!;
-    if (job.userId !== req.user!.uid) {
+    let rootJob = rootJobDoc.data()!;
+    if (rootJob.userId !== req.user!.uid) {
       return res.status(403).json({ error: "Access denied." });
     }
 
-    const newStyle = style || job.style;
-    const newRoomType = roomType || job.roomType;
+    // Walk up to the original render (the one that owns the vsaiRenderId)
+    while (rootJob.parentJobId) {
+      const parentDoc = await db().collection("vsaiJobs").doc(rootJob.parentJobId).get();
+      if (!parentDoc.exists) break;
+      rootJob = parentDoc.data()!;
+    }
 
-    const payload = {
-      image_url: job.imageUrl,
-      room_type: newRoomType,
-      style: newStyle,
-      wait_for_completion: false,
-      add_virtually_staged_watermark: false,
-    };
+    const vsaiRenderId: string = rootJob.vsaiRenderId;
 
-    console.log("[VSAI] Creating variation:", JSON.stringify(payload));
+    // Query current render state to know how many outputs already exist
+    const currentStateRes = await fetch(
+      `${VSAI_API_BASE}/render?render_id=${encodeURIComponent(vsaiRenderId)}`,
+      { headers: { Authorization: `Api-Key ${VSAI_API_KEY}` } }
+    );
+    const currentStateText = await currentStateRes.text();
+    console.log(`[VSAI] Pre-variation render state:`, currentStateText);
 
-    const vsaiResponse = await fetch(`${VSAI_API_BASE}/render/create`, {
+    let currentOutputCount = 1; // at minimum the original render output
+    if (currentStateRes.ok) {
+      try {
+        const current = JSON.parse(currentStateText) as { outputs?: string[] };
+        currentOutputCount = current.outputs?.length ?? 1;
+      } catch { /* ignore */ }
+    }
+
+    // Call VSAI's create-variation — uses existing render credit, not a new one
+    const varPayload = { render_id: vsaiRenderId };
+    console.log("[VSAI] Creating variation via create-variation:", JSON.stringify(varPayload));
+
+    const vsaiResponse = await fetch(`${VSAI_API_BASE}/render/create-variation`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Api-Key ${VSAI_API_KEY}`,
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(varPayload),
     });
 
     const responseText = await vsaiResponse.text();
-    console.log(`[VSAI] Variation response ${vsaiResponse.status}:`, responseText);
+    console.log(`[VSAI] create-variation response ${vsaiResponse.status}:`, responseText);
 
     if (!vsaiResponse.ok) {
       return res.status(vsaiResponse.status).json({
@@ -290,23 +316,15 @@ router.post("/variation", requireAuth, async (req: AuthenticatedRequest, res) =>
       });
     }
 
-    const vsaiData: Record<string, unknown> = JSON.parse(responseText);
-    const vsaiRenderId =
-      (vsaiData.id as string) ||
-      (vsaiData.render_id as string) ||
-      (vsaiData.renderId as string) ||
-      null;
-
-    if (!vsaiRenderId) {
-      return res.status(500).json({ error: `VSAI returned no render ID: ${responseText}` });
-    }
-
+    // Create a Firestore job that polls the SAME vsaiRenderId but waits
+    // for outputs[outputIndex] to appear (the newly appended variation)
     const variationRef = await db().collection("vsaiJobs").add({
       userId: req.user!.uid,
-      imageUrl: job.imageUrl,
-      roomType: newRoomType,
-      style: newStyle,
-      vsaiRenderId,
+      imageUrl: rootJob.imageUrl,
+      roomType: rootJob.roomType,
+      style: rootJob.style,
+      vsaiRenderId,                   // same render — no new credit
+      outputIndex: currentOutputCount, // wait for this index in outputs[]
       status: "processing",
       isPaid: false,
       parentJobId: jobId,

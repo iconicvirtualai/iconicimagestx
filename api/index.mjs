@@ -1230,11 +1230,13 @@ router$5.get("/result/:jobId", requireAuth, async (req, res) => {
       return res.status(500).json({ error: "Invalid VSAI response format." });
     }
     const rawStatus = (vsaiData.status || "").toLowerCase();
-    const isComplete = rawStatus === "done" || rawStatus === "completed";
     const isFailed = rawStatus === "error" || rawStatus === "failed";
+    const outputIndex = typeof job.outputIndex === "number" ? job.outputIndex : 0;
+    const outputs = vsaiData.outputs || vsaiData.output_urls || [];
+    const isComplete = (rawStatus === "done" || rawStatus === "completed") && outputs.length > outputIndex;
     const normalizedStatus = isComplete ? "completed" : isFailed ? "failed" : "processing";
-    const resultUrl = vsaiData.outputs && vsaiData.outputs[0] || vsaiData.output_url || vsaiData.rendered_image || vsaiData.result_url || vsaiData.output_urls && vsaiData.output_urls[0] || null;
-    const resultUrls = vsaiData.outputs || vsaiData.output_urls || (resultUrl ? [resultUrl] : []);
+    const resultUrl = outputs[outputIndex] || vsaiData.output_url || vsaiData.rendered_image || vsaiData.result_url || null;
+    const resultUrls = outputs.length ? [outputs[outputIndex]].filter(Boolean) : resultUrl ? [resultUrl] : [];
     const updates = {
       status: normalizedStatus,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -1261,52 +1263,62 @@ router$5.get("/result/:jobId", requireAuth, async (req, res) => {
 });
 router$5.post("/variation", requireAuth, async (req, res) => {
   try {
-    const { jobId, style, roomType } = req.body;
+    const { jobId } = req.body;
     if (!jobId) {
       return res.status(400).json({ error: "jobId required." });
     }
-    const jobDoc = await db$5().collection("vsaiJobs").doc(jobId).get();
-    if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
-    const job = jobDoc.data();
-    if (job.userId !== req.user.uid) {
+    let rootJobDoc = await db$5().collection("vsaiJobs").doc(jobId).get();
+    if (!rootJobDoc.exists) return res.status(404).json({ error: "Job not found." });
+    let rootJob = rootJobDoc.data();
+    if (rootJob.userId !== req.user.uid) {
       return res.status(403).json({ error: "Access denied." });
     }
-    const newStyle = style || job.style;
-    const newRoomType = roomType || job.roomType;
-    const payload = {
-      image_url: job.imageUrl,
-      room_type: newRoomType,
-      style: newStyle,
-      wait_for_completion: false,
-      add_virtually_staged_watermark: false
-    };
-    console.log("[VSAI] Creating variation:", JSON.stringify(payload));
-    const vsaiResponse = await fetch(`${VSAI_API_BASE}/render/create`, {
+    while (rootJob.parentJobId) {
+      const parentDoc = await db$5().collection("vsaiJobs").doc(rootJob.parentJobId).get();
+      if (!parentDoc.exists) break;
+      rootJob = parentDoc.data();
+    }
+    const vsaiRenderId = rootJob.vsaiRenderId;
+    const currentStateRes = await fetch(
+      `${VSAI_API_BASE}/render?render_id=${encodeURIComponent(vsaiRenderId)}`,
+      { headers: { Authorization: `Api-Key ${VSAI_API_KEY}` } }
+    );
+    const currentStateText = await currentStateRes.text();
+    console.log(`[VSAI] Pre-variation render state:`, currentStateText);
+    let currentOutputCount = 1;
+    if (currentStateRes.ok) {
+      try {
+        const current = JSON.parse(currentStateText);
+        currentOutputCount = current.outputs?.length ?? 1;
+      } catch {
+      }
+    }
+    const varPayload = { render_id: vsaiRenderId };
+    console.log("[VSAI] Creating variation via create-variation:", JSON.stringify(varPayload));
+    const vsaiResponse = await fetch(`${VSAI_API_BASE}/render/create-variation`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Api-Key ${VSAI_API_KEY}`
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(varPayload)
     });
     const responseText = await vsaiResponse.text();
-    console.log(`[VSAI] Variation response ${vsaiResponse.status}:`, responseText);
+    console.log(`[VSAI] create-variation response ${vsaiResponse.status}:`, responseText);
     if (!vsaiResponse.ok) {
       return res.status(vsaiResponse.status).json({
         error: `VSAI variation error: ${responseText}`
       });
     }
-    const vsaiData = JSON.parse(responseText);
-    const vsaiRenderId = vsaiData.id || vsaiData.render_id || vsaiData.renderId || null;
-    if (!vsaiRenderId) {
-      return res.status(500).json({ error: `VSAI returned no render ID: ${responseText}` });
-    }
     const variationRef = await db$5().collection("vsaiJobs").add({
       userId: req.user.uid,
-      imageUrl: job.imageUrl,
-      roomType: newRoomType,
-      style: newStyle,
+      imageUrl: rootJob.imageUrl,
+      roomType: rootJob.roomType,
+      style: rootJob.style,
       vsaiRenderId,
+      // same render — no new credit
+      outputIndex: currentOutputCount,
+      // wait for this index in outputs[]
       status: "processing",
       isPaid: false,
       parentJobId: jobId,
