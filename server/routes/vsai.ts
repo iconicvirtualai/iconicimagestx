@@ -152,25 +152,27 @@ router.get("/result/:jobId", requireAuth, async (req: AuthenticatedRequest, res)
       return res.status(500).json({ error: "VSAI API key not configured." });
     }
 
-    // Poll VSAI
-    const vsaiResponse = await fetch(
-      `${VSAI_API_BASE}/render/${job.vsaiRenderId}`,
-      { headers: { Authorization: `Api-Key ${VSAI_API_KEY}` } }
-    );
+    // Poll VSAI — correct endpoint: GET /v1/render?render_id={id}
+    const pollUrl = `${VSAI_API_BASE}/render?render_id=${encodeURIComponent(job.vsaiRenderId)}`;
+    const vsaiResponse = await fetch(pollUrl, {
+      headers: { Authorization: `Api-Key ${VSAI_API_KEY}` },
+    });
 
     const responseText = await vsaiResponse.text();
     console.log(`[VSAI] Poll ${job.vsaiRenderId} → ${vsaiResponse.status}: ${responseText}`);
 
     if (!vsaiResponse.ok) {
       return res.status(vsaiResponse.status).json({
-        error: `VSAI poll error: ${responseText}`,
+        error: `VSAI poll error (${vsaiResponse.status}): ${responseText}`,
       });
     }
 
     let vsaiData: {
-      id?: string;
+      render_id?: string;
       status?: string;
-      // Common VSAI output fields — handle multiple possible shapes
+      // VSAI v1 response: outputs[] array when done
+      outputs?: string[];
+      // Fallback field names just in case
       output_url?: string;
       output_urls?: string[];
       rendered_image?: string;
@@ -185,21 +187,24 @@ router.get("/result/:jobId", requireAuth, async (req: AuthenticatedRequest, res)
       return res.status(500).json({ error: "Invalid VSAI response format." });
     }
 
-    // Normalize status — VSAI uses "done" / "error" / "pending" / "processing"
+    // VSAI v1 statuses: "rendering" | "done" | "error"
     const rawStatus = (vsaiData.status || "").toLowerCase();
     const isComplete = rawStatus === "done" || rawStatus === "completed";
-    const isFailed = rawStatus === "error" || rawStatus === "failed";
+    const isFailed   = rawStatus === "error" || rawStatus === "failed";
     const normalizedStatus = isComplete ? "completed" : isFailed ? "failed" : "processing";
 
-    // Normalize result URL — handle whichever field VSAI uses
+    // VSAI v1 puts result URLs in the "outputs" array
     const resultUrl =
+      (vsaiData.outputs && vsaiData.outputs[0]) ||
       vsaiData.output_url ||
       vsaiData.rendered_image ||
       vsaiData.result_url ||
       (vsaiData.output_urls && vsaiData.output_urls[0]) ||
       null;
 
-    const resultUrls: string[] = vsaiData.output_urls ||
+    const resultUrls: string[] =
+      vsaiData.outputs ||
+      vsaiData.output_urls ||
       (resultUrl ? [resultUrl] : []);
 
     const updates: Record<string, unknown> = {

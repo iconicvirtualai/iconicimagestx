@@ -1212,15 +1212,15 @@ router$5.get("/result/:jobId", requireAuth, async (req, res) => {
     if (!VSAI_API_KEY) {
       return res.status(500).json({ error: "VSAI API key not configured." });
     }
-    const vsaiResponse = await fetch(
-      `${VSAI_API_BASE}/render/${job.vsaiRenderId}`,
-      { headers: { Authorization: `Api-Key ${VSAI_API_KEY}` } }
-    );
+    const pollUrl = `${VSAI_API_BASE}/render?render_id=${encodeURIComponent(job.vsaiRenderId)}`;
+    const vsaiResponse = await fetch(pollUrl, {
+      headers: { Authorization: `Api-Key ${VSAI_API_KEY}` }
+    });
     const responseText = await vsaiResponse.text();
     console.log(`[VSAI] Poll ${job.vsaiRenderId} → ${vsaiResponse.status}: ${responseText}`);
     if (!vsaiResponse.ok) {
       return res.status(vsaiResponse.status).json({
-        error: `VSAI poll error: ${responseText}`
+        error: `VSAI poll error (${vsaiResponse.status}): ${responseText}`
       });
     }
     let vsaiData;
@@ -1233,8 +1233,8 @@ router$5.get("/result/:jobId", requireAuth, async (req, res) => {
     const isComplete = rawStatus === "done" || rawStatus === "completed";
     const isFailed = rawStatus === "error" || rawStatus === "failed";
     const normalizedStatus = isComplete ? "completed" : isFailed ? "failed" : "processing";
-    const resultUrl = vsaiData.output_url || vsaiData.rendered_image || vsaiData.result_url || vsaiData.output_urls && vsaiData.output_urls[0] || null;
-    const resultUrls = vsaiData.output_urls || (resultUrl ? [resultUrl] : []);
+    const resultUrl = vsaiData.outputs && vsaiData.outputs[0] || vsaiData.output_url || vsaiData.rendered_image || vsaiData.result_url || vsaiData.output_urls && vsaiData.output_urls[0] || null;
+    const resultUrls = vsaiData.outputs || vsaiData.output_urls || (resultUrl ? [resultUrl] : []);
     const updates = {
       status: normalizedStatus,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
