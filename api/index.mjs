@@ -1267,54 +1267,66 @@ router$5.post("/variation", requireAuth, async (req, res) => {
     if (!jobId) {
       return res.status(400).json({ error: "jobId required." });
     }
-    const jobDoc = await db$5().collection("vsaiJobs").doc(jobId).get();
-    if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
-    const job = jobDoc.data();
-    if (job.userId !== req.user.uid) {
+    let rootJobDoc = await db$5().collection("vsaiJobs").doc(jobId).get();
+    if (!rootJobDoc.exists) return res.status(404).json({ error: "Job not found." });
+    let rootJob = rootJobDoc.data();
+    if (rootJob.userId !== req.user.uid) {
       return res.status(403).json({ error: "Access denied." });
     }
-    const resolvedStyle = newStyle || job.style;
-    const resolvedRoomType = newRoomType || job.roomType;
-    const payload = {
-      image_url: job.imageUrl,
-      room_type: resolvedRoomType,
-      style: resolvedStyle,
+    while (rootJob.parentJobId) {
+      const parentDoc = await db$5().collection("vsaiJobs").doc(rootJob.parentJobId).get();
+      if (!parentDoc.exists) break;
+      rootJob = parentDoc.data();
+    }
+    const vsaiRenderId = rootJob.vsaiRenderId;
+    const resolvedStyle = newStyle || rootJob.style;
+    const resolvedRoomType = newRoomType || rootJob.roomType;
+    const currentStateRes = await fetch(
+      `${VSAI_API_BASE}/render?render_id=${encodeURIComponent(vsaiRenderId)}`,
+      { headers: { Authorization: `Api-Key ${VSAI_API_KEY}` } }
+    );
+    const currentStateText = await currentStateRes.text();
+    console.log(`[VSAI] Current render state before variation:`, currentStateText);
+    let currentOutputCount = 1;
+    if (currentStateRes.ok) {
+      try {
+        const current = JSON.parse(currentStateText);
+        currentOutputCount = current.outputs?.length ?? 1;
+      } catch {
+      }
+    }
+    const varUrl = `${VSAI_API_BASE}/render/create-variation?render_id=${encodeURIComponent(vsaiRenderId)}`;
+    const varBody = {
       wait_for_completion: false,
+      roomType: resolvedRoomType,
+      style: resolvedStyle,
       add_virtually_staged_watermark: false
     };
-    console.log("[VSAI] Creating variation (new render):", JSON.stringify(payload));
-    const vsaiResponse = await fetch(`${VSAI_API_BASE}/render/create`, {
+    console.log("[VSAI] create-variation →", varUrl, JSON.stringify(varBody));
+    const vsaiResponse = await fetch(varUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Api-Key ${VSAI_API_KEY}`
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(varBody)
     });
     const responseText = await vsaiResponse.text();
-    console.log(`[VSAI] Variation response ${vsaiResponse.status}:`, responseText);
+    console.log(`[VSAI] create-variation response ${vsaiResponse.status}:`, responseText);
     if (!vsaiResponse.ok) {
       return res.status(vsaiResponse.status).json({
         error: `VSAI variation error: ${responseText}`
       });
     }
-    let vsaiData;
-    try {
-      vsaiData = JSON.parse(responseText);
-    } catch {
-      return res.status(500).json({ error: "Invalid VSAI response format." });
-    }
-    const vsaiRenderId = vsaiData.id || vsaiData.render_id || vsaiData.renderId || null;
-    if (!vsaiRenderId) {
-      console.error("[VSAI] No render ID in variation response:", vsaiData);
-      return res.status(500).json({ error: `VSAI returned no render ID. Response: ${responseText}` });
-    }
     const variationRef = await db$5().collection("vsaiJobs").add({
       userId: req.user.uid,
-      imageUrl: job.imageUrl,
+      imageUrl: rootJob.imageUrl,
       roomType: resolvedRoomType,
       style: resolvedStyle,
       vsaiRenderId,
+      // same render — no new credit consumed
+      outputIndex: currentOutputCount,
+      // poll waits for outputs[this index]
       status: "processing",
       isPaid: false,
       parentJobId: jobId,
