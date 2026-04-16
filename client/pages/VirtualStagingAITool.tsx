@@ -117,6 +117,10 @@ export default function VirtualStagingAITool() {
   const [showReview, setShowReview] = useState(false);
   const [reviewSelected, setReviewSelected] = useState<Set<string>>(new Set());
 
+  // Review screen lightbox (before/after slider preview)
+  const [reviewPreview, setReviewPreview] = useState<{ render: Render; imageUrl: string } | null>(null);
+  const [reviewSliderPos, setReviewSliderPos] = useState(50);
+
   // Checkout
   const [isCheckingOut, setIsCheckingOut] = useState(false);
 
@@ -131,20 +135,25 @@ export default function VirtualStagingAITool() {
 
   // ─── Restore session on mount ───────────────────────────────────────────
   useEffect(() => {
-    // Handle coming back from Stripe cancel: ?cancelled=true&jobs=id1,id2
-    const cancelledJobs = searchParams.get("jobs");
-    if (cancelledJobs) {
-      // Jobs are passed back in URL — nothing extra needed, session already in localStorage
-    }
-
     const session = loadSession();
+    const returningFromStripe = !!searchParams.get("jobs");
+
     if (session) {
       if (session.cart?.length) setCart(session.cart);
       if (session.renders?.length) {
         setRenders(session.renders);
         setSelectedRenderIdx(session.renders.length - 1);
-        // Restore the Firebase Storage imageUrl so we can display it
         if (session.imageUrl) setImageUrl(session.imageUrl);
+      }
+
+      // Coming back from Stripe cancel → drop straight back into review screen
+      if (returningFromStripe) {
+        const allIds = new Set<string>([
+          ...(session.cart?.map((c: CartItem) => c.render.jobId) ?? []),
+          ...(session.renders?.map((r: Render) => r.jobId) ?? []),
+        ]);
+        setReviewSelected(allIds);
+        setShowReview(true);
       }
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -386,7 +395,8 @@ export default function VirtualStagingAITool() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to start checkout.");
 
-      clearSession(); // clear after redirect — Stripe success page will confirm
+      // Do NOT clear session here — if user hits Back from Stripe, we restore it.
+      // Session is cleared on successful payment (success page) or "Start Over".
       window.location.href = data.url;
     } catch (err: unknown) {
       setRenderError(err instanceof Error ? err.message : "Checkout failed.");
@@ -426,7 +436,7 @@ export default function VirtualStagingAITool() {
   // Displayed preview — use blob URL if available, fall back to Firebase Storage URL
   const displayPreview = filePreviewUrl || imageUrl;
 
-  // ─── Review modal ────────────────────────────────────────────────────────
+  // ─── Review screen ────────────────────────────────────────────────────────
   if (showReview) {
     const allRenders = [
       ...cart,
@@ -437,6 +447,67 @@ export default function VirtualStagingAITool() {
     return (
       <div className="flex flex-col min-h-screen bg-white">
         <Header />
+
+        {/* ── Lightbox overlay ─────────────────────────────────────────── */}
+        {reviewPreview && (
+          <div
+            className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4"
+            onClick={() => setReviewPreview(null)}
+          >
+            <button
+              onClick={() => setReviewPreview(null)}
+              className="absolute top-5 right-5 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors z-10"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div
+              className="relative w-full max-w-4xl rounded-2xl overflow-hidden select-none shadow-2xl"
+              style={{ aspectRatio: "16/10" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Before */}
+              <img
+                src={reviewPreview.imageUrl}
+                className="absolute inset-0 w-full h-full object-cover"
+                alt="Original"
+              />
+              {/* After — clipped by slider */}
+              <div
+                className="absolute inset-0 overflow-hidden"
+                style={{ clipPath: `inset(0 ${100 - reviewSliderPos}% 0 0)` }}
+              >
+                <img
+                  src={reviewPreview.render.resultUrl}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  alt="Staged"
+                />
+              </div>
+              {/* Divider */}
+              <div
+                className="absolute top-0 bottom-0 w-0.5 bg-white z-20 pointer-events-none"
+                style={{ left: `${reviewSliderPos}%` }}
+              >
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-full shadow-xl border border-gray-200 flex items-center justify-center">
+                  <div className="flex"><ChevronLeft className="w-3 h-3 text-gray-400" /><ChevronRight className="w-3 h-3 text-gray-400" /></div>
+                </div>
+              </div>
+              {/* Drag range */}
+              <input
+                type="range" min="0" max="100" value={reviewSliderPos}
+                onChange={(e) => setReviewSliderPos(+e.target.value)}
+                className="absolute inset-0 opacity-0 cursor-ew-resize z-30 w-full h-full"
+              />
+              <div className="absolute top-4 left-4 z-40 bg-black/60 backdrop-blur-sm text-white text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-lg">Before</div>
+              <div className="absolute top-4 right-4 z-40 bg-[#0d9488]/80 backdrop-blur-sm text-white text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-lg">
+                After · {reviewPreview.render.style}
+              </div>
+            </div>
+
+            <p className="text-white/50 text-xs mt-4">Drag the slider · Click outside to close</p>
+          </div>
+        )}
+
         <main className="flex-1 pt-32 pb-24">
           <div className="container mx-auto px-4 max-w-3xl">
             <button
@@ -448,7 +519,7 @@ export default function VirtualStagingAITool() {
 
             <h1 className="text-2xl font-bold mb-2">Review Your Order</h1>
             <p className="text-gray-500 text-sm mb-8">
-              Select the renders you want to purchase. Deselect any you don't need.
+              Click a photo to preview it. Toggle the checkbox to include or exclude it from your order.
             </p>
 
             <div className="space-y-3 mb-8">
@@ -457,42 +528,66 @@ export default function VirtualStagingAITool() {
                 return (
                   <div
                     key={render.jobId}
-                    onClick={() => toggleReviewItem(render.jobId)}
-                    className={`flex items-center gap-4 p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                    className={`flex items-center gap-4 p-4 rounded-2xl border-2 transition-all ${
                       checked
                         ? "border-[#0d9488] bg-[#f0fdfa]"
                         : "border-gray-200 bg-white opacity-60"
                     }`}
                   >
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                      checked ? "border-[#0d9488] bg-[#0d9488]" : "border-gray-300"
-                    }`}>
+                    {/* Checkbox — clicking only this area toggles selection */}
+                    <button
+                      onClick={() => toggleReviewItem(render.jobId)}
+                      className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                        checked ? "border-[#0d9488] bg-[#0d9488]" : "border-gray-300 bg-white"
+                      }`}
+                      aria-label={checked ? "Deselect" : "Select"}
+                    >
                       {checked && <CheckCircle className="w-4 h-4 text-white" />}
-                    </div>
+                    </button>
 
+                    {/* Thumbnails — clicking opens the lightbox */}
                     <div className="flex gap-3 flex-1 min-w-0">
-                      {/* Original */}
-                      <div className="relative flex-shrink-0">
+                      <button
+                        className="relative flex-shrink-0 group"
+                        onClick={() => { setReviewPreview({ render, imageUrl: imgUrl }); setReviewSliderPos(50); }}
+                        title="Click to preview"
+                      >
                         <img
                           src={imgUrl}
-                          className="w-20 h-14 rounded-lg object-cover border border-gray-200"
+                          className="w-20 h-14 rounded-lg object-cover border border-gray-200 group-hover:brightness-90 transition-all"
                           alt="Original"
                         />
                         <span className="absolute bottom-0.5 left-0.5 bg-black/60 text-white text-[8px] px-1 rounded">Before</span>
-                      </div>
-                      {/* Staged result */}
-                      <div className="relative flex-shrink-0">
+                      </button>
+
+                      <button
+                        className="relative flex-shrink-0 group"
+                        onClick={() => { setReviewPreview({ render, imageUrl: imgUrl }); setReviewSliderPos(80); }}
+                        title="Click to preview"
+                      >
                         <img
                           src={render.resultUrl}
-                          className="w-20 h-14 rounded-lg object-cover border border-gray-200"
+                          className="w-20 h-14 rounded-lg object-cover border border-gray-200 group-hover:brightness-90 transition-all"
                           alt="Staged"
                         />
                         <span className="absolute bottom-0.5 left-0.5 bg-[#0d9488]/80 text-white text-[8px] px-1 rounded">After</span>
-                      </div>
+                        {/* Preview hint icon */}
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="bg-black/50 rounded-full p-1">
+                            <ChevronLeft className="w-3 h-3 text-white inline" /><ChevronRight className="w-3 h-3 text-white inline" />
+                          </div>
+                        </div>
+                      </button>
 
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex flex-col justify-center">
                         <p className="font-semibold text-sm text-gray-900">{render.roomType} — {render.style}</p>
                         <p className="text-xs text-gray-400 mt-0.5">Full-resolution download</p>
+                        <button
+                          onClick={() => { setReviewPreview({ render, imageUrl: imgUrl }); setReviewSliderPos(50); }}
+                          className="text-[10px] text-[#0d9488] hover:underline mt-1 text-left font-medium"
+                        >
+                          Preview before/after →
+                        </button>
                       </div>
                     </div>
 
