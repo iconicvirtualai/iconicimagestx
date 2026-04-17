@@ -34,6 +34,7 @@ router.post("/", async (req, res) => {
       photographerPreference,
       squareFootage,
       accessMethod,
+      lockboxCode,
       propertyStatus,
       furnishingStatus,
     } = req.body;
@@ -67,6 +68,7 @@ router.post("/", async (req, res) => {
       photographerPreference: photographerPreference || null,
       squareFootage: squareFootage || null,
       accessMethod: accessMethod || null,
+      lockboxCode: lockboxCode || null,
       propertyStatus: propertyStatus || null,
       furnishingStatus: furnishingStatus || null,
       status: "new",
@@ -75,6 +77,11 @@ router.post("/", async (req, res) => {
     };
 
     const docRef = await db().collection("orderRequests").add(orderRequest);
+
+    // Build access info line for emails
+    const accessLine = accessMethod
+      ? `${accessMethod}${lockboxCode ? ` — Code: ${lockboxCode}` : ""}`
+      : "Not specified";
 
     // Send confirmation email to client
     await sendEmail({
@@ -85,6 +92,12 @@ router.post("/", async (req, res) => {
         address,
         total: `$${Number(total).toFixed(2)}`,
         requestId: docRef.id,
+        scheduledDate: scheduledDate || "TBD — we'll confirm shortly",
+        scheduledTime: scheduledTime || "",
+        propertyStatus: propertyStatus || "Not specified",
+        furnishingStatus: furnishingStatus || "Not specified",
+        accessMethod: accessLine,
+        squareFootage: squareFootage ? `${squareFootage} sq ft` : "",
       },
     }).catch((err) => console.error("[Bookings] Confirmation email failed:", err));
 
@@ -100,6 +113,13 @@ router.post("/", async (req, res) => {
         total: `$${Number(total).toFixed(2)}`,
         requestId: docRef.id,
         dashboardUrl: `${process.env.APP_URL}/admin/orders/${docRef.id}`,
+        scheduledDate: scheduledDate || "TBD",
+        scheduledTime: scheduledTime || "",
+        propertyStatus: propertyStatus || "Not specified",
+        furnishingStatus: furnishingStatus || "Not specified",
+        accessMethod: accessLine,
+        squareFootage: squareFootage ? `${squareFootage} sq ft` : "Not provided",
+        photographerPreference: photographerPreference || "Auto-assign",
       },
     }).catch((err) => console.error("[Bookings] Coordinator alert failed:", err));
 
