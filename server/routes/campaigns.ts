@@ -8,6 +8,7 @@ import { Router } from "express";
 import admin from "firebase-admin";
 import { requireCoordinator, type AuthenticatedRequest } from "../middleware/auth";
 import { sendEmail } from "../services/email";
+import { sendSMSCampaign } from "../services/sms";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -76,21 +77,40 @@ router.post("/:id/send", requireCoordinator, async (req, res) => {
     await campaignDoc.ref.update({ status: "sending", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
 
     let sentCount = 0;
-    for (const client of clients) {
-      if (!client.email) continue;
-      try {
-        await sendEmail({
-          to: client.email as string,
-          template: "marketing",
-          subject: campaign.subject,
-          variables: {
-            clientName: `${client.firstName} ${client.lastName}`,
-            body: campaign.body,
-          },
-        });
-        sentCount++;
-      } catch {
-        // continue sending to others
+
+    if (campaign.type === "sms") {
+      // SMS campaign
+      const recipients = clients
+        .filter((c) => c.phone && c.smsOptIn !== false)
+        .map((c) => ({
+          phone: c.phone as string,
+          name: `${c.firstName || ""} ${c.lastName || ""}`.trim() || "there",
+        }));
+
+      const results = await sendSMSCampaign(
+        recipients,
+        campaign.body,
+        campaign.messagingServiceSid || undefined
+      );
+      sentCount = results.filter((r) => r.sid).length;
+    } else {
+      // Email campaign (default)
+      for (const client of clients) {
+        if (!client.email) continue;
+        try {
+          await sendEmail({
+            to: client.email as string,
+            template: "marketing",
+            subject: campaign.subject,
+            variables: {
+              clientName: `${client.firstName} ${client.lastName}`,
+              body: campaign.body,
+            },
+          });
+          sentCount++;
+        } catch {
+          // continue sending to others
+        }
       }
     }
 

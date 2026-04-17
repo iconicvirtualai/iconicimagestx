@@ -24,6 +24,7 @@ import AdminEmailTemplates from "./pages/AdminEmailTemplates";
 import AdminCurrentPricing from "./pages/AdminCurrentPricing";
 import AdminOrderRequest from "./pages/AdminOrderRequest";
 import AdminListings from "./pages/AdminListings";
+import AdminMessages from "./pages/AdminMessages";
 import ClientStudio from "./pages/ClientStudio";
 import AgentLandingPage from "./pages/AgentLandingPage";
 import Insights from "./pages/Insights";
@@ -65,6 +66,7 @@ const App = () => (
           <Route path="/admin/email-templates" element={<AdminEmailTemplates />} />
           <Route path="/admin/current-pricing" element={<AdminCurrentPricing />} />
           <Route path="/admin/order-request/:id" element={<AdminOrderRequest />} />
+          <Route path="/admin/messages" element={<AdminMessages />} />
           <Route path="/studio/:listingId" element={<ClientStudio />} />
           <Route path="/insights" element={<Insights />} />
           <Route path="/services/virtual-staging" element={<VirtualStaging />} />

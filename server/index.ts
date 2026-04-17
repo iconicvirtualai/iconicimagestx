@@ -23,6 +23,7 @@ import staffRouter from "./routes/staff";
 import campaignsRouter from "./routes/campaigns";
 import agentsRouter from "./routes/agents";
 import placesRouter from "./routes/places";
+import smsRouter from "./routes/sms";
 
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
 
@@ -115,6 +116,7 @@ export function createServer() {
   app.use("/api/campaigns", campaignsRouter);
   app.use("/api/agents", agentsRouter);
   app.use("/api/places", placesRouter);
+  app.use("/api/sms", smsRouter);
 
   // ─── Error handler ─────────────────────────────────────────────────
   app.use(

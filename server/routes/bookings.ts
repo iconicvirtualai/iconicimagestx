@@ -8,6 +8,7 @@ import { Router } from "express";
 import admin from "firebase-admin";
 import { requireCoordinator, type AuthenticatedRequest } from "../middleware/auth";
 import { sendEmail } from "../services/email";
+import { sendSMS, SMS_TEMPLATES } from "../services/sms";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -122,6 +123,34 @@ router.post("/", async (req, res) => {
         photographerPreference: photographerPreference || "Auto-assign",
       },
     }).catch((err) => console.error("[Bookings] Coordinator alert failed:", err));
+
+    // Send confirmation SMS to client
+    if (phone) {
+      sendSMS({
+        to: phone,
+        body: SMS_TEMPLATES.bookingConfirmation(
+          firstName,
+          scheduledDate || "TBD — we'll confirm shortly",
+          address,
+          `$${Number(total).toFixed(2)}`
+        ),
+      }).catch((err) => console.error("[Bookings] Confirmation SMS failed:", err));
+    }
+
+    // Send SMS alert to coordinator/admin if ADMIN_PHONE is set
+    if (process.env.ADMIN_PHONE) {
+      const serviceNames = (lineItems as Array<{ name: string }>)
+        .map((i) => i.name)
+        .join(", ");
+      sendSMS({
+        to: process.env.ADMIN_PHONE,
+        body: SMS_TEMPLATES.newBookingAlert(
+          address,
+          scheduledDate || "TBD",
+          serviceNames
+        ),
+      }).catch((err) => console.error("[Bookings] Admin SMS alert failed:", err));
+    }
 
     return res.status(201).json({
       success: true,

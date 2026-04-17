@@ -10,6 +10,7 @@ import {
   Palette,
   DollarSign,
   Mail,
+  MessageSquare,
   LogOut,
   ChevronDown,
 } from "lucide-react";
@@ -87,6 +88,11 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
       label: "Email Templates",
       href: "/admin/email-templates",
       icon: Mail,
+    },
+    {
+      label: "Messages",
+      href: "/admin/messages",
+      icon: MessageSquare,
     },
   ];
 
