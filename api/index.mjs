@@ -192,9 +192,9 @@ function getFallbackTemplate(type, vars) {
   };
   return templates[type] || base(`<p>You have a new notification from Iconic Images.</p>`);
 }
-const router$9 = Router();
+const router$a = Router();
 const db$9 = () => admin.firestore();
-router$9.post("/", async (req, res) => {
+router$a.post("/", async (req, res) => {
   try {
     const {
       firstName,
@@ -297,7 +297,7 @@ router$9.post("/", async (req, res) => {
     return res.status(500).json({ error: "Failed to submit booking request." });
   }
 });
-router$9.get("/", requireCoordinator, async (_req, res) => {
+router$a.get("/", requireCoordinator, async (_req, res) => {
   try {
     const snapshot = await db$9().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
     const requests = snapshot.docs.map((doc) => ({
@@ -310,7 +310,7 @@ router$9.get("/", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking requests." });
   }
 });
-router$9.get("/:id", requireCoordinator, async (req, res) => {
+router$a.get("/:id", requireCoordinator, async (req, res) => {
   try {
     const doc = await db$9().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) {
@@ -322,7 +322,7 @@ router$9.get("/:id", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking request." });
   }
 });
-router$9.patch("/:id/confirm", requireCoordinator, async (req, res) => {
+router$a.patch("/:id/confirm", requireCoordinator, async (req, res) => {
   try {
     const { assignedPhotographerId, assignedPhotographerName, scheduledDate, scheduledTime, internalNotes } = req.body;
     const requestDoc = await db$9().collection("orderRequests").doc(req.params.id).get();
@@ -459,7 +459,7 @@ router$9.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to confirm booking." });
   }
 });
-router$9.patch("/:id/decline", requireCoordinator, async (req, res) => {
+router$a.patch("/:id/decline", requireCoordinator, async (req, res) => {
   try {
     const { reason } = req.body;
     const doc = await db$9().collection("orderRequests").doc(req.params.id).get();
@@ -484,9 +484,9 @@ async function generateInvoiceNumber() {
   const num = parseInt(last.split("-")[2] || "0") + 1;
   return `INV-${year}-${String(num).padStart(4, "0")}`;
 }
-const router$8 = Router();
+const router$9 = Router();
 const db$8 = () => admin.firestore();
-router$8.get("/", requireStaff, async (req, res) => {
+router$9.get("/", requireStaff, async (req, res) => {
   try {
     const { status, photographerId, limit = "50", startAfter } = req.query;
     let query = db$8().collection("orders").orderBy("createdAt", "desc");
@@ -514,7 +514,7 @@ router$8.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch orders." });
   }
 });
-router$8.get("/dashboard", requireStaff, async (_req, res) => {
+router$9.get("/dashboard", requireStaff, async (_req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -547,7 +547,7 @@ router$8.get("/dashboard", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch dashboard stats." });
   }
 });
-router$8.get("/:id", requireStaff, async (req, res) => {
+router$9.get("/:id", requireStaff, async (req, res) => {
   try {
     const orderDoc = await db$8().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
@@ -570,7 +570,7 @@ router$8.get("/:id", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch order." });
   }
 });
-router$8.patch("/:id", requireCoordinator, async (req, res) => {
+router$9.patch("/:id", requireCoordinator, async (req, res) => {
   try {
     const allowed = [
       "status",
@@ -610,7 +610,7 @@ const VALID_TRANSITIONS = {
   completed: [],
   cancelled: []
 };
-router$8.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$9.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status, note } = req.body;
     const orderDoc = await db$8().collection("orders").doc(req.params.id).get();
@@ -656,7 +656,7 @@ router$8.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update order status." });
   }
 });
-router$8.get("/:id/timeline", requireStaff, async (req, res) => {
+router$9.get("/:id/timeline", requireStaff, async (req, res) => {
   try {
     const [messages, editRequests, agentLogs] = await Promise.all([
       db$8().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
@@ -678,10 +678,10 @@ router$8.get("/:id/timeline", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch timeline." });
   }
 });
-const router$7 = Router();
+const router$8 = Router();
 const db$7 = () => admin.firestore();
 const storage = () => admin.storage().bucket();
-router$7.get("/", requireStaff, async (req, res) => {
+router$8.get("/", requireStaff, async (req, res) => {
   try {
     const { status, orderId } = req.query;
     let query = db$7().collection("galleries").orderBy("createdAt", "desc");
@@ -693,7 +693,7 @@ router$7.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch galleries." });
   }
 });
-router$7.get("/:id", requireAuth, async (req, res) => {
+router$8.get("/:id", requireAuth, async (req, res) => {
   try {
     const doc = await db$7().collection("galleries").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Gallery not found." });
@@ -712,7 +712,7 @@ router$7.get("/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch gallery." });
   }
 });
-router$7.post("/:id/upload-url", requirePhotographer, async (req, res) => {
+router$8.post("/:id/upload-url", requirePhotographer, async (req, res) => {
   try {
     const { fileName, fileType, isRaw = false } = req.body;
     if (!fileName || !fileType) {
@@ -737,7 +737,7 @@ router$7.post("/:id/upload-url", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to generate upload URL." });
   }
 });
-router$7.post("/:id/media", requirePhotographer, async (req, res) => {
+router$8.post("/:id/media", requirePhotographer, async (req, res) => {
   try {
     const {
       storagePath,
@@ -784,7 +784,7 @@ router$7.post("/:id/media", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to register media." });
   }
 });
-router$7.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$8.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status } = req.body;
     const validStatuses = ["pending_upload", "raw_uploaded", "editing", "ready_for_review", "approved", "delivered"];
@@ -800,7 +800,7 @@ router$7.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update gallery status." });
   }
 });
-router$7.post("/:id/deliver", requireCoordinator, async (req, res) => {
+router$8.post("/:id/deliver", requireCoordinator, async (req, res) => {
   try {
     const galleryDoc = await db$7().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
@@ -848,7 +848,7 @@ router$7.post("/:id/deliver", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to deliver gallery." });
   }
 });
-router$7.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
+router$8.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
   try {
     const galleryDoc = await db$7().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
@@ -865,12 +865,12 @@ router$7.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to remove media item." });
   }
 });
-const router$6 = Router();
+const router$7 = Router();
 const db$6 = () => admin.firestore();
 const stripe$1 = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
 });
-router$6.post("/create-intent", requireAuth, async (req, res) => {
+router$7.post("/create-intent", requireAuth, async (req, res) => {
   try {
     const { invoiceId, amount, currency = "usd" } = req.body;
     if (!invoiceId || !amount) {
@@ -928,7 +928,7 @@ router$6.post("/create-intent", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to create payment intent." });
   }
 });
-router$6.post("/send-invoice", requireCoordinator, async (req, res) => {
+router$7.post("/send-invoice", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
@@ -959,7 +959,7 @@ router$6.post("/send-invoice", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send invoice." });
   }
 });
-router$6.get("/invoice/:id", async (req, res) => {
+router$7.get("/invoice/:id", async (req, res) => {
   try {
     const invoiceDoc = await db$6().collection("invoices").doc(req.params.id).get();
     if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
@@ -981,7 +981,7 @@ router$6.get("/invoice/:id", async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch invoice." });
   }
 });
-router$6.post(
+router$7.post(
   "/webhook",
   async (req, res) => {
     const sig = req.headers["stripe-signature"];
@@ -1018,7 +1018,7 @@ router$6.post(
     }
   }
 );
-router$6.get("/transactions", requireCoordinator, async (req, res) => {
+router$7.get("/transactions", requireCoordinator, async (req, res) => {
   try {
     const { startDate, endDate, limit = "50" } = req.query;
     let query = db$6().collection("transactions").orderBy("createdAt", "desc");
@@ -1139,7 +1139,7 @@ async function handleRefund(charge) {
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   });
 }
-const router$5 = Router();
+const router$6 = Router();
 const db$5 = () => admin.firestore();
 const VSAI_API_BASE = "https://api.virtualstagingai.app/v1";
 const VSAI_API_KEY = process.env.VSAI_API_KEY || process.env.VIRTUAL_STAGING_AI_API_KEY || "";
@@ -1147,7 +1147,7 @@ const VSAI_PRICE_CENTS = parseInt(process.env.VSAI_PRICE_CENTS || "1500", 10);
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
 });
-router$5.post("/create", requireAuth, async (req, res) => {
+router$6.post("/create", requireAuth, async (req, res) => {
   try {
     if (!VSAI_API_KEY) {
       console.error("[VSAI] VSAI_API_KEY is not set");
@@ -1222,7 +1222,7 @@ router$5.post("/create", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$5.get("/result/:jobId", requireAuth, async (req, res) => {
+router$6.get("/result/:jobId", requireAuth, async (req, res) => {
   try {
     const jobDoc = await db$5().collection("vsaiJobs").doc(req.params.jobId).get();
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
@@ -1297,7 +1297,7 @@ router$5.get("/result/:jobId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$5.post("/variation", requireAuth, async (req, res) => {
+router$6.post("/variation", requireAuth, async (req, res) => {
   try {
     const { jobId, style: newStyle, roomType: newRoomType } = req.body;
     if (!jobId) {
@@ -1381,7 +1381,7 @@ router$5.post("/variation", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$5.post("/checkout", requireAuth, async (req, res) => {
+router$6.post("/checkout", requireAuth, async (req, res) => {
   try {
     const { jobIds, successUrl, cancelUrl } = req.body;
     if (!jobIds || !Array.isArray(jobIds) || jobIds.length === 0) {
@@ -1450,7 +1450,7 @@ router$5.post("/checkout", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$5.post(
+router$6.post(
   "/webhook/stripe",
   // Raw body needed — mount before express.json() parses it
   async (req, res) => {
@@ -1488,7 +1488,7 @@ router$5.post(
     res.json({ received: true });
   }
 );
-router$5.get("/options", (_req, res) => {
+router$6.get("/options", (_req, res) => {
   return res.json({
     roomTypes: [
       { value: "living", label: "Living Room" },
@@ -1518,9 +1518,9 @@ router$5.get("/options", (_req, res) => {
 function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
 }
-const router$4 = Router();
+const router$5 = Router();
 const db$4 = () => admin.firestore();
-router$4.get("/:orderId", requireAuth, async (req, res) => {
+router$5.get("/:orderId", requireAuth, async (req, res) => {
   try {
     const orderDoc = await db$4().collection("orders").doc(req.params.orderId).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
@@ -1549,7 +1549,7 @@ router$4.get("/:orderId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch messages." });
   }
 });
-router$4.post("/:orderId", requireAuth, async (req, res) => {
+router$5.post("/:orderId", requireAuth, async (req, res) => {
   try {
     const { content, attachments } = req.body;
     if (!content?.trim()) {
@@ -1604,7 +1604,7 @@ router$4.post("/:orderId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to send message." });
   }
 });
-router$4.get("/unread/count", requireStaff, async (_req, res) => {
+router$5.get("/unread/count", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$4().collection("messages").where("isRead", "==", false).where("senderType", "==", "client").get();
     return res.json({ unreadCount: snapshot.size });
@@ -1612,9 +1612,9 @@ router$4.get("/unread/count", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to get unread count." });
   }
 });
-const router$3 = Router();
+const router$4 = Router();
 const db$3 = () => admin.firestore();
-router$3.get("/", requireStaff, async (req, res) => {
+router$4.get("/", requireStaff, async (req, res) => {
   try {
     const { status, search, limit = "50" } = req.query;
     let query = db$3().collection("clients").orderBy("createdAt", "desc");
@@ -1634,7 +1634,7 @@ router$3.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch clients." });
   }
 });
-router$3.get("/me", requireAuth, async (req, res) => {
+router$4.get("/me", requireAuth, async (req, res) => {
   try {
     const directDoc = await db$3().collection("clients").doc(req.user.uid).get();
     if (directDoc.exists) {
@@ -1650,7 +1650,7 @@ router$3.get("/me", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch profile." });
   }
 });
-router$3.get("/:id", requireStaff, async (req, res) => {
+router$4.get("/:id", requireStaff, async (req, res) => {
   try {
     const doc = await db$3().collection("clients").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Client not found." });
@@ -1667,7 +1667,7 @@ router$3.get("/:id", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch client." });
   }
 });
-router$3.post("/", requireCoordinator, async (req, res) => {
+router$4.post("/", requireCoordinator, async (req, res) => {
   try {
     const { firstName, lastName, email, phone, address, notes, tags } = req.body;
     if (!firstName || !lastName || !email) {
@@ -1697,7 +1697,7 @@ router$3.post("/", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to create client." });
   }
 });
-router$3.patch("/:id", requireCoordinator, async (req, res) => {
+router$4.patch("/:id", requireCoordinator, async (req, res) => {
   try {
     const allowed = ["firstName", "lastName", "phone", "address", "status", "notes", "tags", "company"];
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
@@ -1710,9 +1710,9 @@ router$3.patch("/:id", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update client." });
   }
 });
-const router$2 = Router();
+const router$3 = Router();
 const db$2 = () => admin.firestore();
-router$2.get("/", requireStaff, async (_req, res) => {
+router$3.get("/", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$2().collection("staff").where("isActive", "==", true).orderBy("firstName").get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -1720,7 +1720,7 @@ router$2.get("/", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch staff." });
   }
 });
-router$2.post("/", requireAdmin, async (req, res) => {
+router$3.post("/", requireAdmin, async (req, res) => {
   try {
     const { firstName, lastName, email, phone, role, tempPassword } = req.body;
     if (!firstName || !lastName || !email || !role || !tempPassword) {
@@ -1756,7 +1756,7 @@ router$2.post("/", requireAdmin, async (req, res) => {
     return res.status(500).json({ error: "Failed to create staff member." });
   }
 });
-router$2.patch("/:id", requireAdmin, async (req, res) => {
+router$3.patch("/:id", requireAdmin, async (req, res) => {
   try {
     const allowed = ["firstName", "lastName", "phone", "role", "isActive"];
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
@@ -1769,7 +1769,7 @@ router$2.patch("/:id", requireAdmin, async (req, res) => {
     return res.status(500).json({ error: "Failed to update staff member." });
   }
 });
-router$2.post("/setup", async (req, res) => {
+router$3.post("/setup", async (req, res) => {
   try {
     const existing = await db$2().collection("staff").limit(1).get();
     if (!existing.empty) {
@@ -1805,9 +1805,9 @@ router$2.post("/setup", async (req, res) => {
     return res.status(500).json({ error: "Setup failed." });
   }
 });
-const router$1 = Router();
+const router$2 = Router();
 const db$1 = () => admin.firestore();
-router$1.get("/", requireCoordinator, async (_req, res) => {
+router$2.get("/", requireCoordinator, async (_req, res) => {
   try {
     const snapshot = await db$1().collection("campaigns").orderBy("createdAt", "desc").limit(50).get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -1815,7 +1815,7 @@ router$1.get("/", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch campaigns." });
   }
 });
-router$1.post("/", requireCoordinator, async (req, res) => {
+router$2.post("/", requireCoordinator, async (req, res) => {
   try {
     const { name, type, subject, body, audience, audienceIds, scheduledAt } = req.body;
     if (!name || !body || !audience) {
@@ -1840,7 +1840,7 @@ router$1.post("/", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to create campaign." });
   }
 });
-router$1.post("/:id/send", requireCoordinator, async (req, res) => {
+router$2.post("/:id/send", requireCoordinator, async (req, res) => {
   try {
     const campaignDoc = await db$1().collection("campaigns").doc(req.params.id).get();
     if (!campaignDoc.exists) return res.status(404).json({ error: "Campaign not found." });
@@ -1889,9 +1889,9 @@ router$1.post("/:id/send", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send campaign." });
   }
 });
-const router = Router();
+const router$1 = Router();
 const db = () => admin.firestore();
-router.get("/briefing", requireStaff, async (_req, res) => {
+router$1.get("/briefing", requireStaff, async (_req, res) => {
   try {
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
@@ -1987,7 +1987,7 @@ router.get("/briefing", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to generate briefing." });
   }
 });
-router.get("/logs", requireStaff, async (req, res) => {
+router$1.get("/logs", requireStaff, async (req, res) => {
   try {
     const { agent, status, requiresReview, limit = "50" } = req.query;
     let query = db().collection("agentLogs").orderBy("createdAt", "desc");
@@ -2002,7 +2002,7 @@ router.get("/logs", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch agent logs." });
   }
 });
-router.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
+router$1.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
   try {
     const { notes } = req.body;
     await db().collection("agentLogs").doc(req.params.id).update({
@@ -2017,7 +2017,7 @@ router.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to resolve flag." });
   }
 });
-router.post("/log", async (req, res) => {
+router$1.post("/log", async (req, res) => {
   try {
     const serviceKey = req.headers["x-agent-key"];
     if (serviceKey !== process.env.AGENT_SERVICE_KEY) {
@@ -2054,6 +2054,96 @@ router.post("/log", async (req, res) => {
     return res.status(201).json({ id: ref.id });
   } catch (err) {
     return res.status(500).json({ error: "Failed to log agent action." });
+  }
+});
+const router = Router();
+const GOOGLE_KEY = process.env.GOOGLE_MAPS_API_KEY || "";
+function fromGoogle(p) {
+  return {
+    place_id: p.place_id,
+    description: p.description,
+    main_text: p.structured_formatting?.main_text || p.description,
+    secondary: p.structured_formatting?.secondary_text || ""
+  };
+}
+function fromNominatim(r, idx) {
+  const parts = [];
+  const a = r.address || {};
+  if (a.house_number && a.road) parts.push(`${a.house_number} ${a.road}`);
+  else if (a.road) parts.push(a.road);
+  if (a.city || a.town || a.village || a.county)
+    parts.push(a.city || a.town || a.village || a.county);
+  if (a.state) parts.push(a.state);
+  if (a.postcode) parts.push(a.postcode);
+  const description = parts.length ? parts.join(", ") : r.display_name;
+  return {
+    place_id: `nominatim_${idx}`,
+    description,
+    main_text: parts[0] || description,
+    secondary: parts.slice(1).join(", ")
+  };
+}
+router.get("/autocomplete", async (req, res) => {
+  const input = (req.query.input || "").trim();
+  if (!input || input.length < 2) {
+    return res.json({ suggestions: [] });
+  }
+  if (GOOGLE_KEY) {
+    try {
+      const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&components=country:us&types=address&key=${GOOGLE_KEY}`;
+      const r = await fetch(url);
+      const data = await r.json();
+      if (data.status === "OK" && data.predictions?.length) {
+        return res.json({ suggestions: data.predictions.map(fromGoogle), source: "google" });
+      }
+    } catch (err) {
+      console.warn("[Places] Google autocomplete failed, falling back to Nominatim:", err);
+    }
+  }
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(input)}&format=json&countrycodes=us&addressdetails=1&limit=6`;
+    const r = await fetch(url, {
+      headers: { "User-Agent": "IconicImages/1.0 (iconicimagestx.com)" }
+    });
+    const data = await r.json();
+    const filtered = data.filter((d) => {
+      const a = d.address || {};
+      return a.house_number || a.road;
+    });
+    return res.json({
+      suggestions: (filtered.length ? filtered : data.slice(0, 5)).map(fromNominatim),
+      source: "nominatim"
+    });
+  } catch (err) {
+    console.error("[Places] Nominatim failed:", err);
+    return res.json({ suggestions: [] });
+  }
+});
+router.get("/distance", async (req, res) => {
+  const destination = (req.query.destination || "").trim();
+  const origin = (req.query.origin || process.env.STUDIO_ADDRESS || "The Woodlands, TX 77380").trim();
+  if (!destination) {
+    return res.status(400).json({ error: "destination is required" });
+  }
+  if (!GOOGLE_KEY) {
+    return res.status(503).json({ error: "Distance calculation requires a Google Maps API key." });
+  }
+  try {
+    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origin)}&destinations=${encodeURIComponent(destination)}&units=imperial&key=${GOOGLE_KEY}`;
+    const r = await fetch(url);
+    const data = await r.json();
+    const element = data.rows?.[0]?.elements?.[0];
+    if (!element || element.status !== "OK") {
+      return res.json({ distanceMiles: null, distanceText: null, durationText: null });
+    }
+    const meters = element.distance.value;
+    const distanceMiles = Math.round(meters / 1609.34 * 10) / 10;
+    const distanceText = element.distance.text;
+    const durationText = element.duration.text;
+    return res.json({ distanceMiles, distanceText, durationText });
+  } catch (err) {
+    console.error("[Places] Distance matrix error:", err);
+    return res.status(500).json({ error: "Failed to calculate distance." });
   }
 });
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
@@ -2110,16 +2200,17 @@ function createServer() {
       res.status(500).json({ error: "Failed to save settings" });
     }
   });
-  app.use("/api/bookings", router$9);
-  app.use("/api/orders", router$8);
-  app.use("/api/galleries", router$7);
-  app.use("/api/payments", router$6);
-  app.use("/api/vsai", router$5);
-  app.use("/api/messages", router$4);
-  app.use("/api/clients", router$3);
-  app.use("/api/staff", router$2);
-  app.use("/api/campaigns", router$1);
-  app.use("/api/agents", router);
+  app.use("/api/bookings", router$a);
+  app.use("/api/orders", router$9);
+  app.use("/api/galleries", router$8);
+  app.use("/api/payments", router$7);
+  app.use("/api/vsai", router$6);
+  app.use("/api/messages", router$5);
+  app.use("/api/clients", router$4);
+  app.use("/api/staff", router$3);
+  app.use("/api/campaigns", router$2);
+  app.use("/api/agents", router$1);
+  app.use("/api/places", router);
   app.use(
     (err, _req, res, _next) => {
       console.error("[Server] Unhandled error:", err);
