@@ -194,5 +194,26 @@ service cloud.firestore {
     match /{document=**} {
       allow read, write: if false;
     }
+    // ─── SMS Logs ────────────────────────────────────────────────────────────
+
+    // Inbound/outbound SMS records written by server via Twilio webhook
+    match /smsLogs/{logId} {
+      allow read: if isStaff();
+      allow create: if false; // server-only via Admin SDK
+      allow update: if isCoordinator();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Conversations (Twilio masked proxy) ─────────────────────────────────
+
+    // Photographer <-> client masked SMS conversations
+    match /conversations/{conversationId} {
+      allow read: if isStaff();
+      allow create: if false; // server-only via Admin SDK
+      allow update: if isCoordinator(); // e.g. mark closed
+      allow delete: if isAdmin();
+    }
+
+
   }
 }
