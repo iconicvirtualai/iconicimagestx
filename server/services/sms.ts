@@ -207,9 +207,9 @@ export const SMS_TEMPLATES = {
     address: string,
     total: string
   ) =>
-    `Hi ${name}! 📸 Your Iconic Images session is confirmed!\n\n` +
-    `📅 ${date}\n📍 ${address}\n💳 Total: ${total}\n\n` +
-    `We'll send a reminder 24 hrs before. Questions? Reply to this text!`,
+    `Hi ${name}! We've received your booking request for ${address}.\n\n` +
+    `⚠️ THIS IS NOT A CONFIRMATION. Our team will review your request and reach out shortly to confirm your appointment.\n\n` +
+    `Requested date: ${date}\nEstimated total: ${total}\n\nQuestions? Reply to this text! — Iconic Images 📸`,
 
   appointmentReminder24h: (name: string, date: string, time: string, address: string) =>
     `Hey ${name}, reminder! Your Iconic Images shoot is tomorrow 📸\n\n` +
