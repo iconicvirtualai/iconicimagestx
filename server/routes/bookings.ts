@@ -126,7 +126,7 @@ router.post("/", async (req, res) => {
 
     // Send confirmation SMS to client
     if (phone) {
-      sendSMS({
+      await sendSMS({
         to: phone,
         body: SMS_TEMPLATES.bookingConfirmation(
           firstName,
@@ -142,7 +142,7 @@ router.post("/", async (req, res) => {
       const serviceNames = (lineItems as Array<{ name: string }>)
         .map((i) => i.name)
         .join(", ");
-      sendSMS({
+      await sendSMS({
         to: process.env.ADMIN_PHONE,
         body: SMS_TEMPLATES.newBookingAlert(
           address,
