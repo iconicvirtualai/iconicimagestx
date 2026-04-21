@@ -40,6 +40,10 @@ import AdminCurrentPricing from "./pages/AdminCurrentPricing";
 import AdminOrderRequest from "./pages/AdminOrderRequest";
 import AdminListings from "./pages/AdminListings";
 import AdminMessages from "./pages/AdminMessages";
+import AdminPhotographer from "./pages/AdminPhotographer";
+import AdminUpload from "./pages/AdminUpload";
+import AdminEditor from "./pages/AdminEditor";
+import AdminTeam from "./pages/AdminTeam";
 
 const queryClient = new QueryClient();
 
@@ -103,6 +107,32 @@ const App = () => (
             <Route path="/admin/messages" element={
               <ProtectedRoute requiredRole="coordinator">
                 <AdminMessages />
+              </ProtectedRoute>
+            } />
+
+            {/* ─── Photographer ───────────────────────────────────────────── */}
+            <Route path="/admin/photographer" element={
+              <ProtectedRoute requiredRole="photographer">
+                <AdminPhotographer />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/upload" element={
+              <ProtectedRoute requiredRole="photographer">
+                <AdminUpload />
+              </ProtectedRoute>
+            } />
+
+            {/* ─── Editor ─────────────────────────────────────────────────── */}
+            <Route path="/admin/editor" element={
+              <ProtectedRoute requiredRole="editor">
+                <AdminEditor />
+              </ProtectedRoute>
+            } />
+
+            {/* ─── Team (admin only) ───────────────────────────────────────── */}
+            <Route path="/admin/team" element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminTeam />
               </ProtectedRoute>
             } />
 
