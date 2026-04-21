@@ -13,7 +13,7 @@ import { sendSMS, SMS_TEMPLATES } from "../services/sms";
 const router = Router();
 const db = () => admin.firestore();
 
-// ─── POST /api/bookings — Public booking form submission ──────────────────────
+// ─── POST /api/bookings — Public booking form submission ────────────────────
 // No auth required — this is the public-facing booking form
 
 router.post("/", async (req, res) => {
@@ -38,6 +38,18 @@ router.post("/", async (req, res) => {
       lockboxCode,
       propertyStatus,
       furnishingStatus,
+      // Additional fields from booking form (previously dropped)
+      specializedPhotography,
+      virtualStagingCredits,
+      selectedService,
+      selectedBasics,
+      selectedAddOns,
+      leadSource,
+      marketingDoing,
+      resultsBothering,
+      perfectBusiness,
+      businessSource,
+      investmentWilling,
     } = req.body;
 
     // Basic validation
@@ -72,8 +84,22 @@ router.post("/", async (req, res) => {
       lockboxCode: lockboxCode || null,
       propertyStatus: propertyStatus || null,
       furnishingStatus: furnishingStatus || null,
+      // Booking form fields — previously dropped
+      specializedPhotography: specializedPhotography || null,
+      virtualStagingCredits: Number(virtualStagingCredits) || 0,
+      selectedService: selectedService || null,
+      selectedBasics: Array.isArray(selectedBasics) ? selectedBasics : [],
+      selectedAddOns: Array.isArray(selectedAddOns) ? selectedAddOns : [],
+      leadSource: leadSource || null,
+      marketingDoing: marketingDoing || null,
+      resultsBothering: resultsBothering || null,
+      perfectBusiness: perfectBusiness || null,
+      businessSource: businessSource || null,
+      investmentWilling: investmentWilling || null,
       status: "new",
+      source: "booking_form",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      submittedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
@@ -185,7 +211,7 @@ router.get("/", requireCoordinator, async (_req, res) => {
   }
 });
 
-// ─── GET /api/bookings/:id — Get single booking request ──────────────────────
+// ─── GET /api/bookings/:id — Get single booking request ──────────────────
 
 router.get("/:id", requireCoordinator, async (req, res) => {
   try {
@@ -369,7 +395,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
   }
 });
 
-// ─── PATCH /api/bookings/:id/decline ─────────────────────────────────────────
+// ─── PATCH /api/bookings/:id/decline ─────────────────────────────────────────────
 
 router.patch("/:id/decline", requireCoordinator, async (req, res) => {
   try {
@@ -389,7 +415,7 @@ router.patch("/:id/decline", requireCoordinator, async (req, res) => {
   }
 });
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────────────────
 
 async function generateInvoiceNumber(): Promise<string> {
   const year = new Date().getFullYear();
