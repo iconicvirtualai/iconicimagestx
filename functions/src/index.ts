@@ -17,6 +17,41 @@ function replaceTags(template: string, data: Record<string, string>): string {
   return result;
 }
 
+// ─── Set custom claims when a staff document is created or updated ────────────
+// This embeds the role directly into the Firebase Auth token so the server
+// middleware can check it without hitting Firestore on every request.
+
+export const syncStaffClaims = functions.firestore
+  .document("staff/{uid}")
+  .onWrite(async (change, context) => {
+    const uid = context.params.uid;
+
+    // Document deleted — remove custom claims
+    if (!change.after.exists) {
+      try {
+        await admin.auth().setCustomUserClaims(uid, { role: null, isStaff: false });
+        console.log(`[syncStaffClaims] Cleared claims for deleted staff ${uid}`);
+      } catch (err) {
+        console.error(`[syncStaffClaims] Failed to clear claims for ${uid}:`, err);
+      }
+      return;
+    }
+
+    const staff = change.after.data()!;
+    const role: string = staff.role || "photographer";
+    const isActive: boolean = staff.isActive !== false;
+
+    try {
+      await admin.auth().setCustomUserClaims(uid, {
+        role,
+        isStaff: isActive,
+      });
+      console.log(`[syncStaffClaims] Set claims for ${uid}: role=${role}, isStaff=${isActive}`);
+    } catch (err) {
+      console.error(`[syncStaffClaims] Failed to set claims for ${uid}:`, err);
+    }
+  });
+
 export const onOrderCreated = functions.firestore
   .document("orders/{orderId}")
   .onCreate(async (snap, context) => {
@@ -24,7 +59,7 @@ export const onOrderCreated = functions.firestore
     const orderId = context.params.orderId;
 
     try {
-      // 🔹 Gmail Auth
+      // Gmail Auth
       const auth = new google.auth.JWT({
         email: process.env.GOOGLE_CLIENT_EMAIL,
         key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
@@ -34,7 +69,7 @@ export const onOrderCreated = functions.firestore
 
       const gmail = google.gmail({ version: "v1", auth });
 
-      // 🔹 Fetch email templates
+      // Fetch email templates
       const clientTemplateDoc = await db.collection("emailTemplates").doc("clientConfirmation").get();
       const ownerTemplateDoc = await db.collection("emailTemplates").doc("ownerNotification").get();
 
@@ -46,29 +81,24 @@ export const onOrderCreated = functions.firestore
         return;
       }
 
-      // 🔥 BUILD LINE ITEMS STRING
+      // BUILD LINE ITEMS STRING
       const lineItemsText = (order.lineItems || [])
-        .map((item: any) => `• ${item.name} — $${item.price}`)
+        .map((item: any) => `- ${item.name} - $${item.price}`)
         .join("\n");
 
       console.log("RAW TEMPLATE:", JSON.stringify(clientTemplate.body));
 
-      // 🔥 BUILD TAG DATA
+      // BUILD TAG DATA
       const tagData: Record<string, string> = {
         clientName: order.clientName || "",
         clientEmail: order.clientEmail || "",
         clientPhone: order.clientPhone || "",
         propertyAddress: order.propertyAddress || "",
-
-        // fallback (optional)
         services: Array.isArray(order.services)
           ? order.services.join(", ")
           : order.services || "",
-
-        // 🔥 NEW VARIABLES
         lineItems: lineItemsText,
-      total: String(order.total || order.pricing?.total || 0),
-
+        total: String(order.total || order.pricing?.total || 0),
         notes: order.notes || "",
         orderId: orderId,
         status: order.status || "",
@@ -76,25 +106,22 @@ export const onOrderCreated = functions.firestore
 
       console.log("TAG DATA:", tagData);
 
-      const replaceTags = (template: string, data: Record<string, string>) => {
-  let result = template;
+      const replaceTagsFn = (template: string, data: Record<string, string>) => {
+        let result = template;
+        Object.entries(data).forEach(([key, value]) => {
+          const regex = new RegExp(`\\{\\s*${key}\\s*\\}`, "g");
+          result = result.replace(regex, value ?? "");
+        });
+        return result;
+      };
 
-  Object.entries(data).forEach(([key, value]) => {
-    const regex = new RegExp(`\\{\\s*${key}\\s*\\}`, "g");
-    result = result.replace(regex, value ?? "");
-  });
+      // Replace template tags
+      const clientSubject = replaceTagsFn(clientTemplate.subject, tagData);
+      const clientBody = replaceTagsFn(clientTemplate.body, tagData);
+      const ownerSubject = replaceTagsFn(ownerTemplate.subject, tagData);
+      const ownerBody = replaceTagsFn(ownerTemplate.body, tagData);
 
-  return result;
-};
-      
-      // 🔹 Replace template tags
-      const clientSubject = replaceTags(clientTemplate.subject, tagData);
-     const clientBody = replaceTags(clientTemplate.body, tagData);
-
-      const ownerSubject = replaceTags(ownerTemplate.subject, tagData);
-     const ownerBody = replaceTags(ownerTemplate.body, tagData);
-
-      // 🔹 Email encoding
+      // Email encoding
       const encodeEmail = (to: string, subject: string, body: string) => {
         const message = [
           `To: ${to}`,
@@ -103,31 +130,25 @@ export const onOrderCreated = functions.firestore
           ``,
           body,
         ].join("\n");
-
         return Buffer.from(message)
           .toString("base64")
           .replace(/\+/g, "-")
           .replace(/\//g, "_");
       };
 
-      // 🔹 Send client email
+      // Send client email
       await gmail.users.messages.send({
         userId: "me",
-        requestBody: {
-          raw: encodeEmail(order.clientEmail, clientSubject, clientBody),
-        },
+        requestBody: { raw: encodeEmail(order.clientEmail, clientSubject, clientBody) },
       });
 
-      // 🔹 Send owner email
+      // Send owner email
       await gmail.users.messages.send({
         userId: "me",
-        requestBody: {
-          raw: encodeEmail("orders@iconicimagestx.com", ownerSubject, ownerBody),
-        },
+        requestBody: { raw: encodeEmail("orders@iconicimagestx.com", ownerSubject, ownerBody) },
       });
 
       console.log("Emails sent successfully");
-
     } catch (error) {
       console.error("EMAIL FUNCTION ERROR:", error);
     }
