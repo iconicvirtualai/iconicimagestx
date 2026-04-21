@@ -6,6 +6,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import ProtectedRoute from "./components/ProtectedRoute";
+
+// Public pages
 import Index from "./pages/Index";
 import About from "./pages/About";
 import Portfolio from "./pages/Portfolio";
@@ -14,6 +17,19 @@ import Book from "./pages/Book";
 import Pricing from "./pages/Pricing";
 import PricingV1 from "./pages/PricingV1";
 import AIPricingAssistant from "./pages/AIPricingAssistant";
+import Insights from "./pages/Insights";
+import Socials from "./pages/Socials";
+import AgentLandingPage from "./pages/AgentLandingPage";
+import Privacy from "./pages/Privacy";
+import ClientStudio from "./pages/ClientStudio";
+import VirtualStaging from "./pages/VirtualStaging";
+import VirtualStagingSelection from "./pages/VirtualStagingSelection";
+import VirtualStagingAITool from "./pages/VirtualStagingAITool";
+import VirtualStagingProOrder from "./pages/VirtualStagingProOrder";
+import VirtualStagingCheckout from "./pages/VirtualStagingCheckout";
+import NotFound from "./pages/NotFound";
+
+// Admin / ops pages
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminListingFile from "./pages/AdminListingFile";
@@ -24,17 +40,6 @@ import AdminCurrentPricing from "./pages/AdminCurrentPricing";
 import AdminOrderRequest from "./pages/AdminOrderRequest";
 import AdminListings from "./pages/AdminListings";
 import AdminMessages from "./pages/AdminMessages";
-import ClientStudio from "./pages/ClientStudio";
-import AgentLandingPage from "./pages/AgentLandingPage";
-import Insights from "./pages/Insights";
-import Socials from "./pages/Socials";
-import VirtualStaging from "./pages/VirtualStaging";
-import VirtualStagingSelection from "./pages/VirtualStagingSelection";
-import VirtualStagingAITool from "./pages/VirtualStagingAITool";
-import VirtualStagingProOrder from "./pages/VirtualStagingProOrder";
-import VirtualStagingCheckout from "./pages/VirtualStagingCheckout";
-import NotFound from "./pages/NotFound";
-import Privacy from "./pages/Privacy";
 
 const queryClient = new QueryClient();
 
@@ -45,38 +50,82 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/portfolio" element={<Portfolio />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/book" element={<Book />} />
-          <Route path="/pricing" element={<Pricing />} />
-          <Route path="/pricing/ai-assistant" element={<AIPricingAssistant />} />
-          <Route path="/pricing-v1" element={<PricingV1 />} />
-          <Route path="/socials" element={<Socials />} />
-          <Route path="/agents" element={<AgentLandingPage />} />
-          <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
-          <Route path="/admin/listings" element={<AdminListings />} />
-          <Route path="/admin/listing/:id" element={<AdminListingFile />} />
-          <Route path="/admin/customers" element={<AdminCustomerCenter />} />
-          <Route path="/admin/edit-site" element={<AdminSiteCustomizer />} />
-          <Route path="/admin/email-templates" element={<AdminEmailTemplates />} />
-          <Route path="/admin/current-pricing" element={<AdminCurrentPricing />} />
-          <Route path="/admin/order-request/:id" element={<AdminOrderRequest />} />
-          <Route path="/admin/messages" element={<AdminMessages />} />
-          <Route path="/studio/:listingId" element={<ClientStudio />} />
-          <Route path="/insights" element={<Insights />} />
-          <Route path="/services/virtual-staging" element={<VirtualStaging />} />
-          <Route path="/services/virtual-staging/select" element={<VirtualStagingSelection />} />
-          <Route path="/services/virtual-staging/ai-tool" element={<VirtualStagingAITool />} />
-          <Route path="/services/virtual-staging/pro-order" element={<VirtualStagingProOrder />} />
-          <Route path="/services/virtual-staging/checkout" element={<VirtualStagingCheckout />} />
-                    <Route path="/privacy" element={<Privacy />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+          <Routes>
+            {/* ─── Public Routes ─────────────────────────────────────────── */}
+            <Route path="/" element={<Index />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/portfolio" element={<Portfolio />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/book" element={<Book />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/pricing/ai-assistant" element={<AIPricingAssistant />} />
+            <Route path="/pricing-v1" element={<PricingV1 />} />
+            <Route path="/socials" element={<Socials />} />
+            <Route path="/agents" element={<AgentLandingPage />} />
+            <Route path="/insights" element={<Insights />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/studio/:listingId" element={<ClientStudio />} />
+            <Route path="/services/virtual-staging" element={<VirtualStaging />} />
+            <Route path="/services/virtual-staging/select" element={<VirtualStagingSelection />} />
+            <Route path="/services/virtual-staging/ai-tool" element={<VirtualStagingAITool />} />
+            <Route path="/services/virtual-staging/pro-order" element={<VirtualStagingProOrder />} />
+            <Route path="/services/virtual-staging/checkout" element={<VirtualStagingCheckout />} />
+
+            {/* ─── Admin Login (public) ───────────────────────────────────── */}
+            <Route path="/admin/login" element={<AdminLogin />} />
+
+            {/* ─── Admin / Coordinator only ──────────────────────────────── */}
+            <Route path="/admin/dashboard" element={
+              <ProtectedRoute requiredRole="coordinator">
+                <AdminDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/listings" element={
+              <ProtectedRoute requiredRole="coordinator">
+                <AdminListings />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/listing/:id" element={
+              <ProtectedRoute requiredRole="photographer">
+                <AdminListingFile />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/customers" element={
+              <ProtectedRoute requiredRole="coordinator">
+                <AdminCustomerCenter />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/order-request/:id" element={
+              <ProtectedRoute requiredRole="coordinator">
+                <AdminOrderRequest />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/messages" element={
+              <ProtectedRoute requiredRole="coordinator">
+                <AdminMessages />
+              </ProtectedRoute>
+            } />
+
+            {/* ─── Admin only ─────────────────────────────────────────────── */}
+            <Route path="/admin/edit-site" element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminSiteCustomizer />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/email-templates" element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminEmailTemplates />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/current-pricing" element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminCurrentPricing />
+              </ProtectedRoute>
+            } />
+
+            {/* ─── Catch-all ──────────────────────────────────────────────── */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
