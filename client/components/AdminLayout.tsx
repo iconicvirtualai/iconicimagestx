@@ -46,7 +46,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
       { label: "Dashboard",       href: "/admin/dashboard",        icon: LayoutDashboard, roles: COORD_UP },
       { label: "Orders",          href: "/admin/dashboard",        icon: ShoppingBag,     roles: COORD_UP },
       { label: "Schedule",        href: "/admin/dashboard",        icon: CalendarDays,    roles: COORD_UP },
-      { label: "Listings",        href: "/admin/listings",         icon: Home,            roles: COORD_UP },
+      { label: "Projects",        href: "/admin/listings",         icon: Home,            roles: COORD_UP },
       { label: "Clients",         href: "/admin/customers",        icon: Users,           roles: COORD_UP },
       { label: "Messages",        href: "/admin/messages",         icon: MessageSquare,   roles: COORD_UP },
     ],
