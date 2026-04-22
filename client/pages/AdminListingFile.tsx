@@ -74,7 +74,8 @@ function Toggle({ label, value, onChange }: { label: string; value: boolean; onC
   );
 }
 
-// ─── Main component ─────────────────────────────────────────────────────────────export default function AdminListingFile() {
+// ─── Main component ─────────────────────────────────────────────────────────────
+export default function AdminListingFile() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [project, setProject] = React.useState<any>(null);
