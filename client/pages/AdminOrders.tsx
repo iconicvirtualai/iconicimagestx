@@ -1,238 +1,152 @@
-import { useState, useEffect } from "react";
+import * as React from "react";
+import { useNavigate } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
+import { Search, ShoppingBag, ArrowRight, DollarSign, CheckCircle } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { collection, getDocs } from "firebase/firestore";
-import { Search, Filter, Package } from "lucide-react";
+import { collection, onSnapshot } from "firebase/firestore";
+import { toast } from "sonner";
 
-interface Order {
-  id: string;
-  clientName: string;
-  address: string;
-  status: "pending" | "in-progress" | "completed" | "cancelled";
-  amount: number;
-  date: string;
-  orderNumber: string;
+function fmtAddress(addr: any): string {
+  if (!addr) return "—";
+  if (typeof addr === "string") return addr;
+  if (typeof addr === "object" && addr !== null) {
+    const parts = [addr.street, addr.city, addr.state, addr.zip].filter(Boolean);
+    return parts.length > 0 ? parts.join(", ") : "—";
+  }
+  return String(addr);
 }
 
+function fmtDate(ts: any): string {
+  if (!ts) return "—";
+  if (ts.toDate) return ts.toDate().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function safeString(val: any): string {
+  if (!val) return "—";
+  if (typeof val === "string") return val;
+  if (typeof val === "object") return JSON.stringify(val);
+  return String(val);
+}
+
+const STATUS_BADGE: Record<string, string> = {
+  pending: "bg-yellow-100 text-yellow-700",
+  needs_scheduled: "bg-red-100 text-red-700",
+  scheduled: "bg-green-100 text-green-700",
+  in_progress: "bg-blue-100 text-blue-700",
+  completed: "bg-teal-100 text-teal-700",
+  delivered: "bg-sky-100 text-sky-700",
+  paid: "bg-teal-100 text-teal-700",
+  cancelled: "bg-gray-100 text-gray-400",
+  archived: "bg-gray-100 text-gray-400",
+};
+
 export default function AdminOrders() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const navigate = useNavigate();
+  const [orders, setOrders] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [search, setSearch] = React.useState("");
+  const [statusFilter, setStatusFilter] = React.useState("all");
 
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        let allOrders: Order[] = [];
-
-        try {
-          const ordersQuery = collection(db, "orders");
-          const snapshot = await getDocs(ordersQuery);
-          allOrders = snapshot.docs.map((doc) => ({
-            id: doc.id,
-            clientName: doc.data().clientName || "Unknown Client",
-            address: doc.data().address || doc.data().city || "No address",
-            status: doc.data().status || "pending",
-            amount: doc.data().amount || 0,
-            date: doc.data().date || new Date().toISOString(),
-            orderNumber: doc.data().orderNumber || ("ORD-" + doc.id.slice(0, 8)),
-          })) as Order[];
-        } catch {
-          const requestsQuery = collection(db, "orderRequests");
-          const snapshot = await getDocs(requestsQuery);
-          allOrders = snapshot.docs.map((doc) => ({
-            id: doc.id,
-            clientName: doc.data().clientName || "Unknown Client",
-            address: doc.data().address || doc.data().city || "No address",
-            status: doc.data().status || "pending",
-            amount: doc.data().amount || 0,
-            date: doc.data().date || new Date().toISOString(),
-            orderNumber: doc.data().orderNumber || ("ORD-" + doc.id.slice(0, 8)),
-          })) as Order[];
-        }
-
-        setOrders(allOrders);
-        setFilteredOrders(allOrders);
-      } catch (error) {
-        console.error("Error fetching orders:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchOrders();
+  React.useEffect(() => {
+    const unsub = onSnapshot(collection(db, "orderRequests"), snap => {
+      setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, err => {
+      console.error(err);
+      toast.error("Failed to load orders");
+      setLoading(false);
+    });
+    return () => unsub();
   }, []);
 
-  useEffect(() => {
-    let filtered = orders;
+  const filtered = React.useMemo(() => {
+    return orders.filter(o => {
+      const addr = fmtAddress(o.address || o.shootLocation);
+      const name = safeString(o.clientName || o.customerName || o.name);
+      const matchSearch = !search.trim() ||
+        addr.toLowerCase().includes(search.toLowerCase()) ||
+        name.toLowerCase().includes(search.toLowerCase());
+      const status = (typeof o.status === "string" ? o.status : "pending").toLowerCase().replace(/\s+/g, "_");
+      const matchStatus = statusFilter === "all" || status.includes(statusFilter);
+      return matchSearch && matchStatus;
+    });
+  }, [orders, search, statusFilter]);
 
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (order) =>
-          order.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          order.address.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    if (filterStatus !== "all") {
-      filtered = filtered.filter((order) => order.status === filterStatus);
-    }
-
-    setFilteredOrders(filtered);
-  }, [searchTerm, filterStatus, orders]);
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "completed":
-        return "bg-green-50 text-green-700 border-green-200";
-      case "in-progress":
-        return "bg-blue-50 text-blue-700 border-blue-200";
-      case "pending":
-        return "bg-yellow-50 text-yellow-700 border-yellow-200";
-      case "cancelled":
-        return "bg-red-50 text-red-700 border-red-200";
-      default:
-        return "bg-gray-50 text-gray-700 border-gray-200";
-    }
-  };
-
-  const totalRevenue = filteredOrders.reduce((sum, order) => sum + order.amount, 0);
-  const completedCount = filteredOrders.filter(
-    (o) => o.status === "completed"
-  ).length;
+  const stats = React.useMemo(() => ({
+    total: orders.length,
+    completed: orders.filter(o => {
+      const s = typeof o.status === "string" ? o.status.toLowerCase() : "";
+      return s.includes("completed") || s.includes("paid") || s.includes("delivered");
+    }).length,
+    revenue: orders.reduce((sum, o) => sum + (Number(o.total) || Number(o.amount) || 0), 0),
+  }), [orders]);
 
   return (
     <AdminLayout title="Orders">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="rounded-2xl border border-gray-100 shadow-sm p-6 bg-white">
-            <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
-              Total Orders
-            </div>
-            <p className="text-3xl font-bold text-gray-900">
-              {filteredOrders.length}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-gray-100 shadow-sm p-6 bg-white">
-            <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
-              Completed
-            </div>
-            <p className="text-3xl font-bold text-green-600">{completedCount}</p>
-          </div>
-          <div className="rounded-2xl border border-gray-100 shadow-sm p-6 bg-white">
-            <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
-              Total Revenue
-            </div>
-            <p className="text-3xl font-bold text-[#0d9488]">
-              ${totalRevenue.toFixed(2)}
-            </p>
-          </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-[#0d9488]/10 flex items-center justify-center"><ShoppingBag className="w-5 h-5 text-[#0d9488]" /></div>
+          <div><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Orders</p><p className="text-xl font-black">{stats.total}</p></div>
         </div>
-
-        <div className="rounded-2xl border border-gray-100 shadow-sm p-6 bg-white mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search by client, order #, or address..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:border-[#0d9488]"
-              />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Filter className="w-5 h-5 text-gray-400" />
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="flex-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-[#0d9488]"
-              >
-                <option value="all">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="in-progress">In Progress</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-            </div>
-          </div>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center"><CheckCircle className="w-5 h-5 text-green-600" /></div>
+          <div><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Completed</p><p className="text-xl font-black">{stats.completed}</p></div>
         </div>
-
-        <div className="rounded-2xl border border-gray-100 shadow-sm bg-white overflow-hidden">
-          {loading ? (
-            <div className="text-center py-12">
-              <p className="text-gray-600">Loading orders...</p>
-            </div>
-          ) : filteredOrders.length === 0 ? (
-            <div className="text-center py-12">
-              <Package className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-600">No orders found</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="text-left py-4 px-6 font-semibold text-gray-900">
-                      Order #
-                    </th>
-                    <th className="text-left py-4 px-6 font-semibold text-gray-900">
-                      Client
-                    </th>
-                    <th className="text-left py-4 px-6 font-semibold text-gray-900">
-                      Address
-                    </th>
-                    <th className="text-left py-4 px-6 font-semibold text-gray-900">
-                      Amount
-                    </th>
-                    <th className="text-left py-4 px-6 font-semibold text-gray-900">
-                      Status
-                    </th>
-                    <th className="text-left py-4 px-6 font-semibold text-gray-900">
-                      Date
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filteredOrders.map((order) => (
-                    <tr
-                      key={order.id}
-                      className="hover:bg-gray-50 transition cursor-pointer"
-                    >
-                      <td className="py-4 px-6 font-semibold text-gray-900">
-                        {order.orderNumber}
-                      </td>
-                      <td className="py-4 px-6 text-gray-900 font-medium">
-                        {order.clientName}
-                      </td>
-                      <td className="py-4 px-6 text-gray-700 text-sm">
-                        {order.address}
-                      </td>
-                      <td className="py-4 px-6 font-semibold text-gray-900">
-                        ${order.amount.toFixed(2)}
-                      </td>
-                      <td className="py-4 px-6">
-                        <span className={'inline-block px-3 py-1 rounded-full text-xs font-semibold border ' + getStatusColor(order.status)}>
-                          {order.status === "in-progress"
-                            ? "In Progress"
-                            : order.status.charAt(0).toUpperCase() +
-                              order.status.slice(1)}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6 text-gray-600 text-sm">
-                        {new Date(order.date).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-teal-100 flex items-center justify-center"><DollarSign className="w-5 h-5 text-teal-600" /></div>
+          <div><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Revenue</p><p className="text-xl font-black">${stats.revenue.toLocaleString()}</p></div>
         </div>
       </div>
+
+      <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mb-6">
+        <div className="flex-1 relative">
+          <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input type="text" placeholder="Search orders..." value={search} onChange={e => setSearch(e.target.value)}
+            className="h-11 w-full pl-10 pr-4 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-medium outline-none focus:ring-2 focus:ring-[#0d9488]/20" />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-6">
+        {["all", "needs_scheduled", "scheduled", "in_progress", "delivered", "paid", "archived"].map(s => (
+          <button key={s} onClick={() => setStatusFilter(s)}
+            className={`px-4 py-2 rounded-lg font-bold text-[10px] uppercase tracking-widest whitespace-nowrap transition-all ${statusFilter === s ? "bg-[#0d9488] text-white" : "bg-white border border-slate-200 text-gray-600 hover:border-[#0d9488]"}`}
+          >{s.replace(/_/g, " ")}</button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 border-[#0d9488] border-t-transparent rounded-full animate-spin" /></div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-24"><ShoppingBag className="w-12 h-12 text-gray-200 mx-auto mb-4" /><p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No orders found</p></div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          {filtered.map((o, i) => {
+            const name = safeString(o.clientName || o.customerName || o.name);
+            const addr = fmtAddress(o.address || o.shootLocation || o.location);
+            const status = (typeof o.status === "string" ? o.status : "pending").toLowerCase().replace(/\s+/g, "_");
+            const badgeCls = STATUS_BADGE[status] || "bg-yellow-100 text-yellow-700";
+            const amount = Number(o.total) || Number(o.amount) || 0;
+            return (
+              <div key={o.id} onClick={() => navigate(`/admin/order-request/${o.id}`)}
+                className={`flex items-center gap-4 px-6 py-4 cursor-pointer hover:bg-gray-50 transition-colors ${i > 0 ? "border-t border-gray-100" : ""}`}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-3 mb-1">
+                    <p className="text-sm font-black text-black">{name}</p>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${badgeCls}`}>{status.replace(/_/g, " ")}</span>
+                  </div>
+                  <p className="text-xs text-gray-500 truncate">{addr}</p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  {amount > 0 && <p className="text-sm font-black text-black">${amount.toLocaleString()}</p>}
+                  <p className="text-[10px] text-gray-400">{fmtDate(o.createdAt || o.date)}</p>
+                </div>
+                <ArrowRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
+              </div>
+            );
+          })}
+        </div>
+      )}
     </AdminLayout>
   );
 }
