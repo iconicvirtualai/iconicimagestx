@@ -3,45 +3,38 @@ import { useParams, useNavigate } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 import { Button } from "@/components/ui/button";
 import {
-  ChevronLeft, Home, Building2, User, Calendar, Clock, Upload, Download,
-  Trash2, Plus, Check, X, Edit3, FileText, History, CreditCard, Lock,
-  Video, Smartphone, Layers, Camera, ExternalLink, Copy, MapPin,
+  ChevronLeft, Home, Building2, User, Calendar, Clock,
+  Upload, Download, Trash2, Plus, Check, X, Edit3, FileText,
+  History, CreditCard, Lock, Video, Smartphone, Layers, Camera,
+  ExternalLink, Copy, MapPin, Image, Unlock,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { doc, onSnapshot, updateDoc, serverTimestamp, addDoc, collection } from "firebase/firestore";
+import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { doc, onSnapshot, updateDoc, serverTimestamp, addDoc, collection, getDocs } from "firebase/firestore";
 import { toast } from "sonner";
 
-// ─── Status systems ─────────────────────────────────────────────────────────────
+// ─── Status systems ───────────────────────────────────────────────────────────
 const RE_STATUSES = ["unscheduled", "scheduled", "in_progress", "delivered", "paid", "archived"];
 const BIZ_STATUSES = ["unscheduled", "consult_scheduled", "appt_scheduled", "in_progress", "delivered", "paid", "archived"];
 
 const STATUS_LABELS: Record<string, string> = {
-  unscheduled:       "Unscheduled",
-  scheduled:         "Scheduled",
-  in_progress:       "In Progress",
-  delivered:         "Delivered",
-  paid:              "Paid",
-  archived:          "Archived",
-  consult_scheduled: "Consult Scheduled",
-  appt_scheduled:    "Appt Scheduled",
+  unscheduled: "Unscheduled", scheduled: "Scheduled", in_progress: "In Progress",
+  delivered: "Delivered", paid: "Paid", archived: "Archived",
+  consult_scheduled: "Consult Scheduled", appt_scheduled: "Appt Scheduled",
 };
 
 const STATUS_BADGE: Record<string, string> = {
-  unscheduled:       "bg-red-100 text-red-700",
-  scheduled:         "bg-green-100 text-green-700",
-  in_progress:       "bg-blue-100 text-blue-700",
-  delivered:         "bg-sky-100 text-sky-700",
-  paid:              "bg-teal-100 text-teal-700",
-  archived:          "bg-gray-100 text-gray-400",
-  consult_scheduled: "bg-orange-100 text-orange-700",
-  appt_scheduled:    "bg-green-100 text-green-700",
+  unscheduled: "bg-red-100 text-red-700", scheduled: "bg-green-100 text-green-700",
+  in_progress: "bg-blue-100 text-blue-700", delivered: "bg-sky-100 text-sky-700",
+  paid: "bg-teal-100 text-teal-700", archived: "bg-gray-100 text-gray-400",
+  consult_scheduled: "bg-orange-100 text-orange-700", appt_scheduled: "bg-green-100 text-green-700",
 };
 
-// ─── Tab configs ─────────────────────────────────────────────────────────────────
-const RE_TABS  = ["Media", "Video", "Social Media", "3D Content", "Files", "Listing Info", "Audit Log"];
+// ─── Tab configs ──────────────────────────────────────────────────────────────
+const RE_TABS = ["Media", "Video", "Social Media", "3D Content", "Files", "Listing Info", "Audit Log"];
 const BIZ_TABS = ["Photos", "Videography", "Branding", "Social Content", "Files", "Project Info", "Audit Log"];
 
-// ─── Helpers ────────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 const inputCls = "w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30";
 const labelCls = "block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1";
 
@@ -60,13 +53,16 @@ function InfoField({ label, value, editing, onChange, type = "text" }: {
   );
 }
 
-function Toggle({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ label, value, onChange, disabled }: {
+  label: string; value: boolean; onChange: (v: boolean) => void; disabled?: boolean;
+}) {
   return (
     <div className="flex items-center justify-between">
       <span className="text-xs font-bold text-gray-700">{label}</span>
       <button
-        onClick={() => onChange(!value)}
-        className={`w-10 h-6 rounded-full transition-colors relative flex-shrink-0 ${value ? "bg-[#0d9488]" : "bg-gray-200"}`}
+        onClick={() => !disabled && onChange(!value)}
+        disabled={disabled}
+        className={`w-10 h-6 rounded-full transition-colors relative flex-shrink-0 ${value ? "bg-[#0d9488]" : "bg-gray-200"} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
       >
         <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${value ? "translate-x-4" : "translate-x-0.5"}`} />
       </button>
@@ -74,7 +70,93 @@ function Toggle({ label, value, onChange }: { label: string; value: boolean; onC
   );
 }
 
-// ─── Main component ─────────────────────────────────────────────────────────────
+// ─── Upload component ─────────────────────────────────────────────────────────
+function PhotoUploader({ projectId, onUpload }: { projectId: string; onUpload: () => void }) {
+  const [uploading, setUploading] = React.useState(false);
+  const [progress, setProgress] = React.useState(0);
+  const fileRef = React.useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = React.useState(false);
+
+  const handleFiles = async (files: FileList | File[]) => {
+    const storage = getStorage();
+    setUploading(true);
+    const fileArray = Array.from(files);
+    let completed = 0;
+
+    for (const file of fileArray) {
+      const path = `listings/${projectId}/photos/${Date.now()}_${file.name}`;
+      const sRef = storageRef(storage, path);
+      const task = uploadBytesResumable(sRef, file);
+
+      await new Promise<void>((resolve, reject) => {
+        task.on("state_changed",
+          (snap) => {
+            const p = Math.round(((completed + snap.bytesTransferred / snap.totalBytes) / fileArray.length) * 100);
+            setProgress(p);
+          },
+          (err) => { toast.error(`Upload failed: ${file.name}`); reject(err); },
+          async () => {
+            const url = await getDownloadURL(task.snapshot.ref);
+            // Update the listing's images array
+            const listingRef = doc(db, "listings", projectId);
+            const snap = await import("firebase/firestore").then(m => m.getDoc(listingRef));
+            const current = snap.data()?.images || [];
+            await updateDoc(listingRef, {
+              images: [...current, { url, name: file.name, path, uploadedAt: new Date().toISOString() }],
+              updatedAt: serverTimestamp(),
+            });
+            completed++;
+            resolve();
+          }
+        );
+      });
+    }
+
+    setUploading(false);
+    setProgress(0);
+    toast.success(`${fileArray.length} photo(s) uploaded!`);
+    onUpload();
+  };
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+  };
+
+  return (
+    <div>
+      <input ref={fileRef} type="file" multiple accept="image/*" className="hidden"
+        onChange={e => e.target.files && handleFiles(e.target.files)} />
+      <div
+        onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={onDrop}
+        onClick={() => fileRef.current?.click()}
+        className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${
+          dragOver ? "border-[#0d9488] bg-[#0d9488]/5" : "border-gray-200 hover:border-[#0d9488]/50"
+        }`}
+      >
+        {uploading ? (
+          <div>
+            <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
+              <div className="bg-[#0d9488] h-2 rounded-full transition-all" style={{ width: `${progress}%` }} />
+            </div>
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Uploading... {progress}%</p>
+          </div>
+        ) : (
+          <>
+            <Upload className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Drop photos here or click to browse</p>
+            <p className="text-[10px] text-gray-300">JPG, PNG, HEIC • Max 50MB each</p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 export default function AdminListingFile() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -82,12 +164,11 @@ export default function AdminListingFile() {
   const [loading, setLoading] = React.useState(true);
   const [activeTab, setActiveTab] = React.useState(0);
   const [updating, setUpdating] = React.useState(false);
+  const [statusLocked, setStatusLocked] = React.useState(true);
 
   // Info editing
   const [editingInfo, setEditingInfo] = React.useState(false);
   const [infoForm, setInfoForm] = React.useState<any>({});
-
-  // Tour URL input
   const [tourInput, setTourInput] = React.useState("");
 
   // Live listener
@@ -111,6 +192,27 @@ export default function AdminListingFile() {
     return () => unsub();
   }, [id, navigate]);
 
+  // Auto-status logic
+  React.useEffect(() => {
+    if (!project || !id) return;
+    const now = new Date();
+    const apptDate = project.apptDate?.toDate ? project.apptDate.toDate() : project.apptDate ? new Date(project.apptDate) : null;
+    const currentStatus = project.status;
+
+    let newStatus: string | null = null;
+
+    if (apptDate && currentStatus === "scheduled" && now > apptDate) {
+      // Past appointment time but no media uploaded yet
+      newStatus = "in_progress";
+    }
+
+    if (newStatus && newStatus !== currentStatus) {
+      updateDoc(doc(db, "listings", id), { status: newStatus, updatedAt: serverTimestamp() })
+        .then(() => toast.info(`Status auto-updated to ${STATUS_LABELS[newStatus!]}`))
+        .catch(console.error);
+    }
+  }, [project, id]);
+
   const patch = async (data: Record<string, any>) => {
     if (!id) return;
     await updateDoc(doc(db, "listings", id), { ...data, updatedAt: serverTimestamp() });
@@ -118,8 +220,13 @@ export default function AdminListingFile() {
 
   const updateStatus = async (val: string) => {
     setUpdating(true);
-    try { await patch({ status: val }); toast.success(`Status → ${STATUS_LABELS[val] ?? val}`); }
-    catch { toast.error("Failed to update status"); }
+    try {
+      const statusData: any = { status: val };
+      if (val === "delivered") statusData.deliveredAt = serverTimestamp();
+      if (val === "paid") statusData.paidAt = serverTimestamp();
+      await patch(statusData);
+      toast.success(`Status → ${STATUS_LABELS[val] ?? val}`);
+    } catch { toast.error("Failed to update status"); }
     finally { setUpdating(false); }
   };
 
@@ -136,11 +243,11 @@ export default function AdminListingFile() {
     catch { toast.error("Failed to save tour URL."); }
   };
 
-  const logAudit = async (action: string) => {
-    if (!id) return;
-    const entry = { action, by: "admin", at: new Date().toLocaleString() };
-    const log = [...(project?.auditLog || []), entry];
-    await patch({ auditLog: log });
+  const deletePhoto = async (index: number) => {
+    const images = [...(project?.images || [])];
+    images.splice(index, 1);
+    await patch({ images });
+    toast.success("Photo removed.");
   };
 
   if (loading) return (
@@ -160,6 +267,7 @@ export default function AdminListingFile() {
   const badge = STATUS_BADGE[project.status] ?? "bg-gray-100 text-gray-500";
   const badgeLabel = STATUS_LABELS[project.status] ?? project.status ?? "—";
   const images: any[] = project.images || [];
+  const coverPhoto = images.length > 0 ? images[0].url : null;
 
   const fmtDate = (v: any) => {
     if (!v) return "—";
@@ -171,8 +279,7 @@ export default function AdminListingFile() {
     <AdminLayout title={isRE ? "Real Estate Project" : "Business Project"}>
       {/* Back + badges */}
       <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
-        <button
-          onClick={() => navigate("/admin/listings")}
+        <button onClick={() => navigate("/admin/listings")}
           className="flex items-center gap-1.5 text-gray-400 hover:text-black text-xs font-bold uppercase tracking-widest transition-colors"
         >
           <ChevronLeft className="w-4 h-4" /> Projects
@@ -185,44 +292,71 @@ export default function AdminListingFile() {
         </div>
       </div>
 
-      {/* Hero card */}
-      <div className="bg-black rounded-[2rem] p-8 text-white mb-6">
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
-          <div>
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 font-mono">{project.id}</p>
-            <h1 className="text-2xl font-black uppercase tracking-tight mb-1 leading-tight">{location}</h1>
-            <p className="text-gray-400 flex items-center gap-1.5 text-sm mb-1">
-              <User className="w-3.5 h-3.5 flex-shrink-0" /> {project.clientName || "—"}
-            </p>
-            {project.clientEmail && <p className="text-gray-500 text-xs">{project.clientEmail}</p>}
-            {project.clientPhone && <p className="text-gray-500 text-xs">{project.clientPhone}</p>}
-            {project.services && (
-              <p className="text-gray-500 text-xs mt-2">{project.services}</p>
-            )}
+      {/* Hero card with cover photo */}
+      <div className="rounded-[2rem] overflow-hidden mb-6 relative">
+        {coverPhoto && (
+          <div className="absolute inset-0">
+            <img src={coverPhoto} alt="" className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-black/50" />
           </div>
-          <div className="bg-white/10 rounded-2xl p-5 border border-white/10 space-y-3 min-w-[220px]">
-            {project.apptDate && (
-              <div>
-                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Appointment</p>
-                <p className="text-sm font-bold">{fmtDate(project.apptDate)}{project.apptTime ? ` · ${project.apptTime}` : ""}</p>
-              </div>
-            )}
-            {isRE && project.accessInfo && (
-              <div>
-                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Access</p>
-                <p className="text-xs font-bold text-gray-300">{project.accessInfo}</p>
-              </div>
-            )}
+        )}
+        <div className={`relative p-8 ${!coverPhoto ? "bg-black" : ""}`}>
+          <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
             <div>
-              <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Status</p>
-              <select
-                value={project.status || "unscheduled"}
-                onChange={e => updateStatus(e.target.value)}
-                disabled={updating}
-                className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs font-black text-white focus:outline-none disabled:opacity-50"
-              >
-                {statuses.map(s => <option key={s} value={s} className="text-black bg-white">{STATUS_LABELS[s]}</option>)}
-              </select>
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 font-mono">{project.id}</p>
+              <h1 className="text-2xl font-black uppercase tracking-tight mb-1 leading-tight text-white">{location}</h1>
+              <p className="text-gray-400 flex items-center gap-1.5 text-sm mb-1">
+                <User className="w-3.5 h-3.5 flex-shrink-0" /> {project.clientName || "—"}
+              </p>
+              {project.clientEmail && <p className="text-gray-500 text-xs">{project.clientEmail}</p>}
+              {project.clientPhone && <p className="text-gray-500 text-xs">{project.clientPhone}</p>}
+              {project.services && Array.isArray(project.services) && project.services.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-3">
+                  {project.services.map((s: string, i: number) => (
+                    <span key={i} className="px-2 py-0.5 bg-white/10 rounded-full text-[9px] font-bold text-gray-300">{s}</span>
+                  ))}
+                </div>
+              )}
+              {project.photographerNames && project.photographerNames.length > 0 && (
+                <p className="text-gray-500 text-xs mt-2 flex items-center gap-1">
+                  <Camera className="w-3 h-3" /> {project.photographerNames.join(", ")}
+                </p>
+              )}
+            </div>
+            <div className="bg-white/10 rounded-2xl p-5 border border-white/10 space-y-3 min-w-[220px]">
+              {project.apptDate && (
+                <div>
+                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Appointment</p>
+                  <p className="text-sm font-bold text-white">{fmtDate(project.apptDate)}{project.apptTime ? ` · ${project.apptTime}` : ""}</p>
+                </div>
+              )}
+              {isRE && project.accessInfo && (
+                <div>
+                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Access</p>
+                  <p className="text-xs font-bold text-gray-300">{project.accessInfo}</p>
+                </div>
+              )}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Status</p>
+                  <button
+                    onClick={() => setStatusLocked(!statusLocked)}
+                    className="text-gray-500 hover:text-white transition-colors"
+                    title={statusLocked ? "Unlock status" : "Lock status"}
+                  >
+                    {statusLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                  </button>
+                </div>
+                <select
+                  value={project.status || "unscheduled"}
+                  onChange={e => updateStatus(e.target.value)}
+                  disabled={updating || statusLocked}
+                  className={`w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs font-black text-white focus:outline-none disabled:opacity-50 ${statusLocked ? "cursor-not-allowed" : ""}`}
+                >
+                  {statuses.map(s => <option key={s} value={s} className="text-black bg-white">{STATUS_LABELS[s]}</option>)}
+                </select>
+                {statusLocked && <p className="text-[9px] text-gray-600 mt-1">Click lock to change</p>}
+              </div>
             </div>
           </div>
         </div>
@@ -230,7 +364,6 @@ export default function AdminListingFile() {
 
       {/* Main + sidebar */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Tabs area */}
         <div className="lg:col-span-3">
           {/* Tab bar */}
           <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl mb-6 overflow-x-auto">
@@ -243,54 +376,39 @@ export default function AdminListingFile() {
 
           {/* Tab body */}
           <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-7 min-h-[400px]">
-
-            {/* ── MEDIA / PHOTOS (tab 0) ── */}
+            {/* MEDIA / PHOTOS (tab 0) */}
             {activeTab === 0 && (
               <div>
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">{isRE ? "Media Gallery" : "Photo Gallery"}</h3>
-                  <button
-                    onClick={() => navigate("/admin/upload")}
-                    className="flex items-center gap-2 px-4 py-2 bg-[#0d9488] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#0f766e] transition-colors"
-                  >
-                    <Upload className="w-3.5 h-3.5" /> Upload Photos
-                  </button>
                 </div>
-                {images.length > 0 ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <PhotoUploader projectId={id!} onUpload={() => {}} />
+                {images.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-6">
                     {images.map((img: any, i: number) => (
                       <div key={i} className="aspect-square rounded-xl overflow-hidden relative group bg-gray-100">
                         <img src={img.url} alt={img.name || `Photo ${i + 1}`} className="w-full h-full object-cover" />
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                          <a href={img.url} download className="p-2 bg-white rounded-lg"><Download className="w-4 h-4 text-black" /></a>
-                          <button
-                            onClick={async () => {
-                              const updated = images.filter((_: any, idx: number) => idx !== i);
-                              await patch({ images: updated });
-                              toast.success("Photo removed.");
-                            }}
-                            className="p-2 bg-white rounded-lg"
-                          ><Trash2 className="w-4 h-4 text-red-500" /></button>
+                          <a href={img.url} target="_blank" rel="noopener noreferrer" className="p-2 bg-white rounded-lg">
+                            <Download className="w-4 h-4 text-black" />
+                          </a>
+                          <button onClick={() => deletePhoto(i)} className="p-2 bg-white rounded-lg">
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </button>
                         </div>
+                        {i === 0 && (
+                          <div className="absolute top-2 left-2">
+                            <span className="px-2 py-0.5 bg-[#0d9488] text-white text-[8px] font-black uppercase tracking-widest rounded-full">Cover</span>
+                          </div>
+                        )}
                       </div>
                     ))}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-20 text-center">
-                    <Camera className="w-12 h-12 text-gray-200 mb-4" />
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-5">No photos yet</p>
-                    <button
-                      onClick={() => navigate("/admin/upload")}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-[#0d9488] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#0f766e] transition-colors"
-                    >
-                      <Upload className="w-3.5 h-3.5" /> Upload Photos
-                    </button>
                   </div>
                 )}
               </div>
             )}
 
-            {/* ── VIDEO / VIDEOGRAPHY (tab 1) ── */}
+            {/* VIDEO (tab 1) */}
             {activeTab === 1 && (
               <div>
                 <div className="flex items-center justify-between mb-6">
@@ -320,7 +438,7 @@ export default function AdminListingFile() {
               </div>
             )}
 
-            {/* ── BRANDING / SOCIAL (tab 2) ── */}
+            {/* SOCIAL / BRANDING (tab 2) */}
             {activeTab === 2 && (
               <div>
                 <div className="flex items-center justify-between mb-6">
@@ -336,7 +454,7 @@ export default function AdminListingFile() {
               </div>
             )}
 
-            {/* ── 3D CONTENT / SOCIAL CONTENT (tab 3) ── */}
+            {/* 3D / SOCIAL CONTENT (tab 3) */}
             {activeTab === 3 && (
               <div>
                 <div className="flex items-center justify-between mb-6">
@@ -378,7 +496,7 @@ export default function AdminListingFile() {
               </div>
             )}
 
-            {/* ── FILES (tab 4) ── */}
+            {/* FILES (tab 4) */}
             {activeTab === 4 && (
               <div>
                 <div className="flex items-center justify-between mb-6">
@@ -406,14 +524,12 @@ export default function AdminListingFile() {
               </div>
             )}
 
-            {/* ── INFO (tab 5) ── */}
+            {/* INFO (tab 5) */}
             {activeTab === 5 && (
               <div>
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">{isRE ? "Listing Information" : "Project Information"}</h3>
-                  <button
-                    onClick={() => editingInfo ? saveInfo() : setEditingInfo(true)}
-                    disabled={updating}
+                  <button onClick={() => editingInfo ? saveInfo() : setEditingInfo(true)} disabled={updating}
                     className="flex items-center gap-2 px-4 py-2 bg-[#0d9488] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#0f766e] transition-colors disabled:opacity-50"
                   >
                     {editingInfo ? <><Check className="w-3.5 h-3.5" /> Save</> : <><Edit3 className="w-3.5 h-3.5" /> Edit</>}
@@ -421,23 +537,23 @@ export default function AdminListingFile() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   {isRE ? (<>
-                    <InfoField label="Property Address"  value={infoForm.address}      editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, address: v }))} />
-                    <InfoField label="List Price"        value={infoForm.listPrice}    editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, listPrice: v }))} />
-                    <InfoField label="List Date"         value={infoForm.listDate}     editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, listDate: v }))} type="date" />
-                    <InfoField label="MLS #"             value={infoForm.mlsNumber}    editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, mlsNumber: v }))} />
-                    <InfoField label="Bedrooms"          value={infoForm.bedrooms}     editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, bedrooms: v }))} />
-                    <InfoField label="Bathrooms"         value={infoForm.bathrooms}    editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, bathrooms: v }))} />
-                    <InfoField label="Square Feet"       value={infoForm.squareFeet}   editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, squareFeet: v }))} />
-                    <InfoField label="Lot Size"          value={infoForm.lotSize}      editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, lotSize: v }))} />
-                    <InfoField label="Neighborhood"      value={infoForm.neighborhood} editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, neighborhood: v }))} />
-                    <InfoField label="Access Info"       value={infoForm.accessInfo}   editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, accessInfo: v }))} />
+                    <InfoField label="Property Address" value={infoForm.address} editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, address: v }))} />
+                    <InfoField label="List Price" value={infoForm.listPrice} editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, listPrice: v }))} />
+                    <InfoField label="List Date" value={infoForm.listDate} editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, listDate: v }))} type="date" />
+                    <InfoField label="MLS #" value={infoForm.mlsNumber} editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, mlsNumber: v }))} />
+                    <InfoField label="Bedrooms" value={infoForm.bedrooms} editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, bedrooms: v }))} />
+                    <InfoField label="Bathrooms" value={infoForm.bathrooms} editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, bathrooms: v }))} />
+                    <InfoField label="Square Feet" value={infoForm.squareFeet} editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, squareFeet: v }))} />
+                    <InfoField label="Lot Size" value={infoForm.lotSize} editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, lotSize: v }))} />
+                    <InfoField label="Neighborhood" value={infoForm.neighborhood} editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, neighborhood: v }))} />
+                    <InfoField label="Access Info" value={infoForm.accessInfo} editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, accessInfo: v }))} />
                   </>) : (<>
-                    <InfoField label="Shoot Location"    value={infoForm.shootLocation} editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, shootLocation: v }))} />
-                    <InfoField label="Business Name"     value={infoForm.businessName}  editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, businessName: v }))} />
-                    <InfoField label="Industry"          value={infoForm.industry}      editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, industry: v }))} />
-                    <InfoField label="Website"           value={infoForm.website}       editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, website: v }))} />
-                    <InfoField label="Brand Colors"      value={infoForm.brandColors}   editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, brandColors: v }))} />
-                    <InfoField label="Deliverables"      value={infoForm.deliverables}  editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, deliverables: v }))} />
+                    <InfoField label="Shoot Location" value={infoForm.shootLocation} editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, shootLocation: v }))} />
+                    <InfoField label="Business Name" value={infoForm.businessName} editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, businessName: v }))} />
+                    <InfoField label="Industry" value={infoForm.industry} editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, industry: v }))} />
+                    <InfoField label="Website" value={infoForm.website} editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, website: v }))} />
+                    <InfoField label="Brand Colors" value={infoForm.brandColors} editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, brandColors: v }))} />
+                    <InfoField label="Deliverables" value={infoForm.deliverables} editing={editingInfo} onChange={v => setInfoForm((f: any) => ({ ...f, deliverables: v }))} />
                   </>)}
                   <div className="sm:col-span-2">
                     <label className={labelCls}>Notes</label>
@@ -451,7 +567,7 @@ export default function AdminListingFile() {
               </div>
             )}
 
-            {/* ── AUDIT LOG (tab 6) ── */}
+            {/* AUDIT LOG (tab 6) */}
             {activeTab === 6 && (
               <div>
                 <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-6">Audit Log</h3>
@@ -478,7 +594,7 @@ export default function AdminListingFile() {
           </div>
         </div>
 
-        {/* ── RIGHT SIDEBAR ── */}
+        {/* RIGHT SIDEBAR */}
         <div className="space-y-6">
           {/* Client */}
           <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-5">
@@ -492,8 +608,8 @@ export default function AdminListingFile() {
           <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-5">
             <h3 className={`${labelCls} mb-4 flex items-center gap-2`}><Lock className="w-3.5 h-3.5" /> Security</h3>
             <div className="space-y-3">
-              <Toggle label="Lock Downloads"  value={!!project.lockDownloads}  onChange={v => patch({ lockDownloads: v })} />
-              <Toggle label="Lock Studio"     value={!!project.lockStudio}     onChange={v => patch({ lockStudio: v })} />
+              <Toggle label="Lock Downloads" value={!!project.lockDownloads} onChange={v => patch({ lockDownloads: v })} />
+              <Toggle label="Lock Studio" value={!!project.lockStudio} onChange={v => patch({ lockStudio: v })} />
               <Toggle label="Require Payment" value={!!project.requirePayment} onChange={v => patch({ requirePayment: v })} />
               <Toggle label="Social Permission" value={!!project.socialPermission} onChange={v => patch({ socialPermission: v })} />
             </div>
@@ -504,11 +620,7 @@ export default function AdminListingFile() {
             <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-5">
               <h3 className={`${labelCls} mb-3`}>Client Studio</h3>
               <p className="text-[10px] text-gray-400 mb-3">Share this link with the client to view their deliverables.</p>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(`${window.location.origin}/studio/${id}`);
-                  toast.success("Studio link copied!");
-                }}
+              <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/studio/${id}`); toast.success("Studio link copied!"); }}
                 className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-800 transition-colors"
               >
                 <Copy className="w-3.5 h-3.5" /> Copy Studio Link
@@ -521,7 +633,7 @@ export default function AdminListingFile() {
             <h3 className={`${labelCls} mb-4 flex items-center gap-2`}><CreditCard className="w-3.5 h-3.5" /> Invoice</h3>
             {project.total > 0 ? (
               <div className="mb-3">
-                <p className="text-xl font-black text-black">${Number(project.total).toLocaleString()}</p>
+                <p className="text-xl font-black text-black">$<span>{Number(project.total).toLocaleString()}</span></p>
                 <p className="text-[10px] text-gray-400 uppercase tracking-widest">{project.invoiceStatus || "Draft"}</p>
               </div>
             ) : (
