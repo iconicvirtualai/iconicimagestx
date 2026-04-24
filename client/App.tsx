@@ -1,3 +1,9 @@
+import AdminBilling from "@/pages/AdminBilling";
+import AdminAicon from "@/pages/AdminAicon";
+import AdminAutomation from "@/pages/AdminAutomation";
+import AdminSchedule from "@/pages/AdminSchedule";
+import AdminOrders from "@/pages/AdminOrders";
+
 import "./global.css";
 
 import { Toaster } from "@/components/ui/toaster";
@@ -155,7 +161,13 @@ const App = () => (
 
             {/* ─── Catch-all ──────────────────────────────────────────────── */}
             <Route path="*" element={<NotFound />} />
-          </Routes>
+          
+      <Route path="/admin/billing" element={<ProtectedRoute><AdminBilling /></ProtectedRoute>} />
+      <Route path="/admin/aicon" element={<ProtectedRoute><AdminAicon /></ProtectedRoute>} />
+      <Route path="/admin/automation" element={<ProtectedRoute><AdminAutomation /></ProtectedRoute>} />
+      <Route path="/admin/schedule" element={<ProtectedRoute><AdminSchedule /></ProtectedRoute>} />
+      <Route path="/admin/orders" element={<ProtectedRoute><AdminOrders /></ProtectedRoute>} />
+    </Routes>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
