@@ -1,29 +1,51 @@
-import { Link } from "react-router-dom";
-import BookingForm from "@/components/BookingForm";
-import { ArrowLeft } from "lucide-react";
+import * as React from "react";
+import { useNavigate } from "react-router-dom";
+import Header from "@/components/Header";
+import Footer from "@/components/Footer";
+import { db } from "@/lib/firebase";
+import { collection, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
+import { toast } from "sonner";
+import {
+  Home, Building2, Check, ChevronRight, ChevronLeft, Camera,
+  Video, Plane, Box, Sparkles, Smartphone, X, Plus, Minus, Info,
+} from "lucide-react";
 
-export default function BookPage() {
-  return (
-    <div className="min-h-screen bg-white flex flex-col">
-      {/* Top nav bar */}
-      <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100 px-6 py-4 flex items-center gap-4">
-        <Link
-          to="/"
-          className="flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-black transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Home
-        </Link>
-        <span className="text-gray-200 select-none">|</span>
-        <span className="text-sm font-bold tracking-widest text-gray-900 uppercase">
-          Book a Session
-        </span>
-      </div>
-
-      {/* Booking form */}
-      <div className="flex-1">
-        <BookingForm />
-      </div>
-    </div>
-  );
+// âââ Types ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+interface ServiceItem {
+  id: string;
+  name: string;
+  category: string;
+  type: string;
+  price: number;
+  duration: number;
+  description: string;
+  isUpsell: boolean;
+  upsellMessage: string;
+  isPremium: boolean;
+  sortOrder: number;
+  isActive: boolean;
 }
+
+interface CartItem {
+  serviceId: string;
+  name: string;
+  price: number;
+  duration: number;
+  qty: number;
+}
+
+type Step = "type" | "services" | "details" | "review";
+
+const SERVICE_ICONS: Record<string, any> = {
+  photography: Camera, videography: Video, aerial: Plane,
+  "3d_tour": Box, staging: Sparkles, social: Smartphone,
+  branding: Sparkles, reel: Video,
+};
+// âââ Helpers âââ Helpers âââ Helpers âââ Helpers âââ Helpers âââ Helpers âââ Helpers âââ Helpers âââ Helpers âââ Helpers âââ Helpers âââ Helpers âââ Helpers âââ Helpers âââ Helpers âââ Helpers âââ Helpers âââ Helpers âââ Helpers âââ Helpers âââ Helpers âââ Helpers 
+ function generateOrderNumber(): string {
+  const d = new Date();
+  const date = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`;
+  const rand = String(Math.floor(Math.random()*999)+1).padStart(3,"0");
+  return `ORD-${date}-${rand}`;
+}
+// âââ Component âââ Component 
