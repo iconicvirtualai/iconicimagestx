@@ -343,7 +343,7 @@ export default function AdminOrderRequest() {
               <div className="space-y-2 mb-4">
                 {lineItems.map((li: any, i: number) => (
                   <div key={i} className="flex justify-between text-sm">
-                    <span className="text-gray-700 font-medium">{li.name || safe(li)}</span>
+                    <span className="text-gray-300 font-medium">{li.name || safe(li)}</span>
                     {li.price != null && <span className="font-bold">{fmtCurrency(li.price)}</span>}
                   </div>
                 ))}
@@ -357,15 +357,15 @@ export default function AdminOrderRequest() {
             )}
             <div className="border-t border-gray-100 pt-3 mt-2">
               <div className="flex justify-between text-lg">
-                <span className="font-black">Total</span>
+                <span className="font-black text-white">Total</span>
                 <span className="font-black text-[#0d9488]">{fmtCurrency(orderTotal)}</span>
               </div>
             </div>
             <div className="mt-4 pt-4 border-t border-gray-100 space-y-2 text-xs">
               <div className="flex justify-between"><span className={`${labelCls}`}>Status</span><span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${statusInfo.color}`}>{statusInfo.label}</span></div>
-              <div className="flex justify-between"><span className={`${labelCls}`}>Requested</span><span className="font-bold text-black">{order.scheduledDate || fmtDate(order.appointmentDate) || "—"}</span></div>
+              <div className="flex justify-between"><span className={`${labelCls}`}>Requested</span><span className="font-bold text-white">{order.scheduledDate || fmtDate(order.appointmentDate) || "—"}</span></div>
               {(order.scheduledTime || order.appointmentTime) && (
-                <div className="flex justify-between"><span className={`${labelCls}`}>Time</span><span className="font-bold text-black">{order.scheduledTime || order.appointmentTime}</span></div>
+                <div className="flex justify-between"><span className={`${labelCls}`}>Time</span><span className="font-bold text-white">{order.scheduledTime || order.appointmentTime}</span></div>
               )}
             </div>
             <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
