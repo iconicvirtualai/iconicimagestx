@@ -1,3 +1,4 @@
+import AdminRevenue from "@/pages/AdminRevenue";
 import AdminBilling from "@/pages/AdminBilling";
 import AdminAicon from "@/pages/AdminAicon";
 import AdminAutomation from "@/pages/AdminAutomation";
@@ -161,6 +162,9 @@ const App = () => (
 
             {/* ─── Catch-all ──────────────────────────────────────────────── */}
             <Route path="*" element={<NotFound />} />
+          
+      <Route path="/admin/revenue" element={<ProtectedRoute><AdminRevenue /></ProtectedRoute>} />
+
           
       <Route path="/admin/billing" element={<ProtectedRoute><AdminBilling /></ProtectedRoute>} />
       <Route path="/admin/aicon" element={<ProtectedRoute><AdminAicon /></ProtectedRoute>} />
