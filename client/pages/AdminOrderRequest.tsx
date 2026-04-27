@@ -52,8 +52,8 @@ const valCls = "text-sm font-bold text-black mt-0.5";
 const editInputCls = "w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-sm font-bold text-black focus:outline-none focus:ring-2 focus:ring-[#0d9488]/50";
 
 // ─── Read-only field ──────────────────────────────────────────────────────────
-function Field({ label, value, editing, editValue, onChange, type = "text", span2 }: {
-  label: string; value: any; editing: boolean; editValue?: any; onChange?: (v: string) => void; type?: string; span2?: boolean;
+function Field({ label, value, editing, editValue, onChange, type = "text", span2, dark }: {
+  label: string; value: any; editing: boolean; editValue?: any; onChange?: (v: string) => void; type?: string; span2?: boolean; dark?: boolean;
 }) {
   return (
     <div className={span2 ? "sm:col-span-2" : ""}>
@@ -62,10 +62,10 @@ function Field({ label, value, editing, editValue, onChange, type = "text", span
         type === "textarea" ? (
           <textarea value={editValue ?? value ?? ""} onChange={e => onChange(e.target.value)} rows={2} className={`${editInputCls} resize-none mt-1`} />
         ) : (
-          <input type={type} value={editValue ?? value ?? ""} onChange={e => onChange(e.target.value)} className={`${editInputCls} mt-1`} />
+          <input type={type} value={editValue ?? value ?? ""} onChange={e => onChange(e.target.value)} className={`${dark ? "w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-sm font-bold text-white focus:outline-none" : editInputCls} mt-1`} />
         )
       ) : (
-        <p className={valCls}>{safe(value)}</p>
+        <p className={dark ? "text-sm font-bold text-white mt-0.5" : valCls}>{safe(value)}</p>
       )}
     </div>
   );
@@ -240,11 +240,11 @@ export default function AdminOrderRequest() {
           <div className="bg-black rounded-2xl p-6">
             <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">Client Information</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-              <Field label="First Name" value={order.firstName} editing={editing} editValue={f("firstName")} onChange={setF("firstName")} />
-              <Field label="Last Name" value={order.lastName} editing={editing} editValue={f("lastName")} onChange={setF("lastName")} />
-              <Field label="Email" value={order.email} editing={editing} editValue={f("email")} onChange={setF("email")} type="email" />
-              <Field label="Phone" value={order.phone} editing={editing} editValue={f("phone")} onChange={setF("phone")} type="tel" />
-              {order.photographerPreference && <Field label="Photographer Preference" value={order.photographerPreference} editing={editing} editValue={f("photographerPreference")} onChange={setF("photographerPreference")} />}
+              <Field label="First Name" value={order.firstName} editing={editing} editValue={f("firstName")} onChange={setF("firstName")} dark />
+              <Field label="Last Name" value={order.lastName} editing={editing} editValue={f("lastName")} onChange={setF("lastName")} dark />
+              <Field label="Email" value={order.email} editing={editing} editValue={f("email")} onChange={setF("email")} type="email" dark />
+              <Field label="Phone" value={order.phone} editing={editing} editValue={f("phone")} onChange={setF("phone")} type="tel" dark />
+              {order.photographerPreference && <Field label="Photographer Preference" value={order.photographerPreference} editing={editing} editValue={f("photographerPreference")} onChange={setF("photographerPreference")} dark />}
             </div>
           </div>
 
