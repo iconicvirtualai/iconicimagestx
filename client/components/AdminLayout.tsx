@@ -69,6 +69,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
       { label: "Revenue", href: "/admin/revenue", icon: DollarSign, roles: ADMIN_ONLY },
 
       { label: "Billing", href: "/admin/billing", icon: CreditCard, roles: ADMIN_ONLY },
+      { label: "Client Billing", href: "/admin/client-billing", icon: CreditCard, roles: ADMIN_ONLY },
     ],
   },
   {
