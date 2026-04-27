@@ -66,7 +66,9 @@ const navGroups: { label: string; items: NavItem[] }[] = [
       { label: "Pricing",         href: "/admin/current-pricing",  icon: DollarSign,      roles: ADMIN_ONLY },
       { label: "Email Templates", href: "/admin/email-templates",  icon: Mail,            roles: ADMIN_ONLY },
       { label: "Site Editor",     href: "/admin/edit-site",        icon: Palette,         roles: ADMIN_ONLY },
-      { label: "Billing",         href: "/admin/billing",          icon: CreditCard,      roles: ADMIN_ONLY },
+      { label: "Revenue", href: "/admin/revenue", icon: DollarSign, roles: ADMIN_ONLY },
+
+      { label: "Billing", href: "/admin/billing", icon: CreditCard, roles: ADMIN_ONLY },
     ],
   },
   {
