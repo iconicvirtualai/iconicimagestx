@@ -48,8 +48,8 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
 };
 
 const labelCls = "text-[10px] font-black text-gray-400 uppercase tracking-widest";
-const valCls = "text-sm font-bold text-white mt-0.5";
-const editInputCls = "w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-sm font-bold text-white focus:outline-none focus:ring-2 focus:ring-[#0d9488]/50";
+const valCls = "text-sm font-bold text-black mt-0.5";
+const editInputCls = "w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-sm font-bold text-black focus:outline-none focus:ring-2 focus:ring-[#0d9488]/50";
 
 // ─── Read-only field ──────────────────────────────────────────────────────────
 function Field({ label, value, editing, editValue, onChange, type = "text", span2 }: {
@@ -238,7 +238,7 @@ export default function AdminOrderRequest() {
 
           {/* ── CLIENT INFORMATION ── */}
           <div className="bg-black rounded-2xl p-6">
-            <h3 className={`${labelCls} mb-4`}>Client Information</h3>
+            <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">Client Information</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
               <Field label="First Name" value={order.firstName} editing={editing} editValue={f("firstName")} onChange={setF("firstName")} />
               <Field label="Last Name" value={order.lastName} editing={editing} editValue={f("lastName")} onChange={setF("lastName")} />
@@ -249,7 +249,7 @@ export default function AdminOrderRequest() {
           </div>
 
           {/* ── PROPERTY / LOCATION ── */}
-          <div className="bg-black rounded-2xl p-6">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <h3 className={`${labelCls} mb-4`}>Property & Location</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
               <Field label="Address" value={fmtAddr(order.address)} editing={editing} editValue={typeof f("address") === "string" ? f("address") : fmtAddr(f("address"))} onChange={setF("address")} span2 />
@@ -261,7 +261,7 @@ export default function AdminOrderRequest() {
           </div>
 
           {/* ── APPOINTMENT ── */}
-          <div className="bg-black rounded-2xl p-6">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <h3 className={`${labelCls} mb-4`}>Appointment</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
               <Field label="Requested Date" value={order.scheduledDate || fmtDate(order.appointmentDate || order.requestedDate)} editing={editing} editValue={f("appointmentDate")} onChange={setF("appointmentDate")} type="date" />
@@ -272,14 +272,23 @@ export default function AdminOrderRequest() {
           </div>
 
           {/* ── SERVICES ── */}
-          <div className="bg-black rounded-2xl p-6">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <h3 className={`${labelCls} mb-4`}>Notes</h3>
+            <div className="grid grid-cols-1 gap-y-4">
+              <Field label="Client Notes / Vibe" value={order.vibeNote || order.notes} editing={editing} editValue={f("vibeNote") || f("notes")} onChange={setF("vibeNote")} type="textarea" span2 />
+              <Field label="Internal Notes (admin only)" value={order.internalNotes} editing={editing} editValue={f("internalNotes")} onChange={setF("internalNotes")} type="textarea" span2 />
+            </div>
+          </div>
+
+          {/* Save/Cancel buttons when editing */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <h3 className={`${labelCls} mb-4`}>Services</h3>
             {editing ? (
               <div>
                 {(form.lineItems || []).map((li, i) => (
                   <div key={i} className="flex gap-2 mb-2 items-center">
-                    <input value={li.name || ""} onChange={e => { var items = [...(form.lineItems || [])]; items[i] = {...items[i], name: e.target.value}; setForm(function(f){ return {...f, lineItems: items}; }); }} placeholder="Service name" className="flex-1 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-sm font-bold text-white focus:outline-none" />
-                    <input type="number" value={li.price || ""} onChange={e => { var items = [...(form.lineItems || [])]; items[i] = {...items[i], price: Number(e.target.value)}; setForm(function(f){ return {...f, lineItems: items, total: items.reduce(function(s,x){return s+(Number(x.price)||0)},0)}; }); }} placeholder="Price" className="w-28 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-sm font-bold text-white focus:outline-none" />
+                    <input value={li.name || ""} onChange={e => { var items = [...(form.lineItems || [])]; items[i] = {...items[i], name: e.target.value}; setForm(function(f){ return {...f, lineItems: items}; }); }} placeholder="Service name" className="flex-1 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-sm font-bold text-black focus:outline-none" />
+                    <input type="number" value={li.price || ""} onChange={e => { var items = [...(form.lineItems || [])]; items[i] = {...items[i], price: Number(e.target.value)}; setForm(function(f){ return {...f, lineItems: items, total: items.reduce(function(s,x){return s+(Number(x.price)||0)},0)}; }); }} placeholder="Price" className="w-28 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-sm font-bold text-black focus:outline-none" />
                     <button onClick={() => { var items = (form.lineItems || []).filter(function(_,idx){return idx!==i}); setForm(function(f){ return {...f, lineItems: items, total: items.reduce(function(s,x){return s+(Number(x.price)||0)},0)}; }); }} className="text-red-400 hover:text-red-300 text-xs font-bold px-2">X</button>
                   </div>
                 ))}
@@ -314,15 +323,6 @@ export default function AdminOrderRequest() {
           </div>
 
           {/* ── NOTES ── */}
-          <div className="bg-black rounded-2xl p-6">
-            <h3 className={`${labelCls} mb-4`}>Notes</h3>
-            <div className="grid grid-cols-1 gap-y-4">
-              <Field label="Client Notes / Vibe" value={order.vibeNote || order.notes} editing={editing} editValue={f("vibeNote") || f("notes")} onChange={setF("vibeNote")} type="textarea" span2 />
-              <Field label="Internal Notes (admin only)" value={order.internalNotes} editing={editing} editValue={f("internalNotes")} onChange={setF("internalNotes")} type="textarea" span2 />
-            </div>
-          </div>
-
-          {/* Save/Cancel buttons when editing */}
           {editing && (
             <div className="flex gap-3">
               <Button onClick={handleSave} disabled={saving} className="bg-[#0d9488] hover:bg-[#0f766e] text-white rounded-xl text-xs font-bold">
@@ -338,12 +338,12 @@ export default function AdminOrderRequest() {
 
           {/* ── Order Summary / Billing ── */}
           <div className="bg-black rounded-[2rem] p-6 text-white">
-            <h3 className={`${labelCls} mb-4`}>Order Summary</h3>
+            <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">Order Summary</h3>
             {lineItems.length > 0 && (
               <div className="space-y-2 mb-4">
                 {lineItems.map((li: any, i: number) => (
                   <div key={i} className="flex justify-between text-sm">
-                    <span className="text-gray-300 font-medium">{li.name || safe(li)}</span>
+                    <span className="text-gray-700 font-medium">{li.name || safe(li)}</span>
                     {li.price != null && <span className="font-bold">{fmtCurrency(li.price)}</span>}
                   </div>
                 ))}
@@ -375,7 +375,7 @@ export default function AdminOrderRequest() {
           </div>
 
           {/* ── Actions ── */}
-          <div className="bg-black rounded-[2rem] p-6 text-white">
+          <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6">
             <h3 className={`${labelCls} mb-4`}>Actions</h3>
             <div className="space-y-2">
               <Button onClick={order.listingId ? () => navigate(`/admin/listing/${order.listingId}`) : handleCreateProject}
