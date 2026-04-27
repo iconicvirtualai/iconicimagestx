@@ -269,14 +269,14 @@ export default function AdminDashboard() {
       {/* ── Stats Grid ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
         {[
-          { label: "Order Requests", value: orderRequests.length.toString(), icon: <ClipboardList className="w-5 h-5" />, color: "bg-red-500",     href: "#requests" },
-          { label: "Scheduled",      value: scheduledCount.toString(),        icon: <Calendar className="w-5 h-5" />,      color: "bg-[#0d9488]", href: "/admin/listings?status=scheduled" },
-          { label: "Active Listings",value: listingsCount.toString(),          icon: <LayoutGrid className="w-5 h-5" />,    color: "bg-blue-500",  href: "/admin/listings" },
-          { label: "Revenue",        value: fmtRev(revenue),                  icon: <DollarSign className="w-5 h-5" />,    color: "bg-orange-500",href: "/admin/billing" },
+          { label: "Order Requests", value: orderRequests.length.toString(), icon: <ClipboardList className="w-5 h-5" />, color: "bg-red-500",     onClick: () => navigate('/admin/orders?status=needs_scheduled') },
+          { label: "Scheduled",      value: scheduledCount.toString(),        icon: <Calendar className="w-5 h-5" />,      color: "bg-[#0d9488]", onClick: () => navigate('/admin/orders?status=scheduled') },
+          { label: "Projects in Progress",value: listingsCount.toString(),          icon: <LayoutGrid className="w-5 h-5" />,    color: "bg-blue-500",  onClick: () => navigate('/admin/orders?status=in_progress,pending_edit,in_review,delivered') },
+          { label: "Revenue",        value: fmtRev(revenue),                  icon: <DollarSign className="w-5 h-5" />,    color: "bg-orange-500",onClick: () => navigate('/admin/revenue') },
         ].map((s) => (
-          <Link
+          <div
             key={s.label}
-            to={s.href}
+            onClick={s.onClick}
             className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm hover:shadow-md transition-shadow group"
           >
             <div className="flex items-center justify-between mb-4">
