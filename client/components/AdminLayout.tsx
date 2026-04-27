@@ -19,7 +19,7 @@ import {
   Settings,
   CreditCard,
   Upload,
-} from "lucide-reacth";
+} from "lucide-react";
 
 interface AdminLayoutProps {
   children: ReactNode;
