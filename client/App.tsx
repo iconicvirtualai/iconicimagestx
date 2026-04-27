@@ -1,5 +1,6 @@
 import AdminRevenue from "@/pages/AdminRevenue";
 import AdminBilling from "@/pages/AdminBilling";
+import AdminClientBilling from "@/pages/AdminClientBilling";
 import AdminAicon from "@/pages/AdminAicon";
 import AdminAutomation from "@/pages/AdminAutomation";
 import AdminSchedule from "@/pages/AdminSchedule";
@@ -167,6 +168,7 @@ const App = () => (
 
           
       <Route path="/admin/billing" element={<ProtectedRoute><AdminBilling /></ProtectedRoute>} />
+          <Route path="/admin/client-billing" element={<ProtectedRoute><AdminClientBilling /></ProtectedRoute>} />
       <Route path="/admin/aicon" element={<ProtectedRoute><AdminAicon /></ProtectedRoute>} />
       <Route path="/admin/automation" element={<ProtectedRoute><AdminAutomation /></ProtectedRoute>} />
       <Route path="/admin/schedule" element={<ProtectedRoute><AdminSchedule /></ProtectedRoute>} />
