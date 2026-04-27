@@ -3,9 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 import { Button } from "@/components/ui/button";
 import {
-  ChevronLeft, Edit3, Save, Calendar, DollarSign, Archive,
-  X, AlertCircle, User, Phone, Mail, MapPin, Clock, FileText,
-  Camera, Check, Home, Building2, Send, Eye, Layers, Plus,
+  ChevronLeft, Edit3, Save, Calendar, Archive,
+  X, AlertCircle, MapPin, Clock, Camera, Layers, Eye, Send,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import {
@@ -15,15 +14,15 @@ import {
 import { toast } from "sonner";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function fmtAddr(addr: any): string {
-  if (!addr) return "—";
-  if (typeof addr === "string") return addr;
-  if (addr.formatted) return addr.formatted;
-  return [addr.street, addr.city, addr.state, addr.zip].filter(Boolean).join(", ") || "—";
+function fmtAddr(a: any): string {
+  if (!a) return "—";
+  if (typeof a === "string") return a;
+  if (a.formatted) return a.formatted;
+  return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "—";
 }
 function fmtDate(ts: any): string {
   if (!ts) return "—";
-  if (typeof ts === "string" && ts.includes(",")) return ts; // already formatted like "Tuesday, April 28, 2026"
+  if (typeof ts === "string" && ts.includes(",")) return ts;
   if (ts.toDate) return ts.toDate().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
   try { return new Date(ts).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }); } catch { return String(ts); }
 }
@@ -36,10 +35,6 @@ function safe(v: any): string {
   return String(v);
 }
 
-const labelCls = "block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-0.5";
-const valCls = "text-sm font-bold text-white";
-const inputCls = "w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-sm font-bold text-white focus:outline-none focus:ring-2 focus:ring-[#0d9488]/50";
-
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   new: { label: "New Request", color: "bg-yellow-100 text-yellow-700" },
   request: { label: "New Request", color: "bg-yellow-100 text-yellow-700" },
@@ -51,6 +46,30 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
   archived: { label: "Archived", color: "bg-gray-100 text-gray-400" },
   cancelled: { label: "Cancelled", color: "bg-red-100 text-red-600" },
 };
+
+const labelCls = "text-[10px] font-black text-gray-400 uppercase tracking-widest";
+const valCls = "text-sm font-bold text-black mt-0.5";
+const editInputCls = "w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30";
+
+// ─── Read-only field ──────────────────────────────────────────────────────────
+function Field({ label, value, editing, editValue, onChange, type = "text", span2 }: {
+  label: string; value: any; editing: boolean; editValue?: any; onChange?: (v: string) => void; type?: string; span2?: boolean;
+}) {
+  return (
+    <div className={span2 ? "sm:col-span-2" : ""}>
+      <p className={labelCls}>{label}</p>
+      {editing && onChange ? (
+        type === "textarea" ? (
+          <textarea value={editValue ?? value ?? ""} onChange={e => onChange(e.target.value)} rows={2} className={`${editInputCls} resize-none mt-1`} />
+        ) : (
+          <input type={type} value={editValue ?? value ?? ""} onChange={e => onChange(e.target.value)} className={`${editInputCls} mt-1`} />
+        )
+      ) : (
+        <p className={valCls}>{safe(value)}</p>
+      )}
+    </div>
+  );
+}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function AdminOrderRequest() {
@@ -75,13 +94,9 @@ export default function AdminOrderRequest() {
         const data = { id: snap.id, ...snap.data() };
         setOrder(data);
         setForm(data);
-        // Pre-fill schedule fields from request
         if (data.appointmentDate) setSchedDate(data.appointmentDate);
         if (data.appointmentTime) setSchedTime(data.appointmentTime);
-      } else {
-        toast.error("Order not found");
-        navigate("/admin/orders");
-      }
+      } else { toast.error("Order not found"); navigate("/admin/orders"); }
       setLoading(false);
     });
     return () => unsub();
@@ -96,7 +111,7 @@ export default function AdminOrderRequest() {
     }).catch(() => {});
   }, []);
 
-  // ─── ACTIONS ────────────────────────────────────────────────────────────────
+  // ─── Actions ──────────────────────────────────────────────────────────────
 
   const handleSave = async () => {
     if (!id) return;
@@ -107,28 +122,19 @@ export default function AdminOrderRequest() {
       await updateDoc(doc(db, "orderRequests", id), updates);
       setEditing(false);
       toast.success("Order updated.");
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to save.");
-    } finally { setSaving(false); }
+    } catch (err) { console.error(err); toast.error("Failed to save."); }
+    finally { setSaving(false); }
   };
 
-  // CREATE/MANAGE PROJECT — creates a listing tile in Projects
   const handleCreateProject = async () => {
     if (!id || !order) return;
-    if (order.listingId) {
-      // Already has a project — navigate to it
-      navigate(`/admin/listing/${order.listingId}`);
-      return;
-    }
+    if (order.listingId) { navigate(`/admin/listing/${order.listingId}`); return; }
     setSaving(true);
     try {
-      const isRE = (order.specializedPhotography === "mls") ||
-        (order.lineItems || []).some((li: any) => {
-          const n = (li.name || "").toLowerCase();
-          return n.includes("listing") || n.includes("aerial") || n.includes("matterport") || n.includes("3d");
-        });
-
+      const isRE = (order.specializedPhotography === "mls") || (order.lineItems || []).some((li: any) => {
+        const n = (li.name || "").toLowerCase();
+        return n.includes("listing") || n.includes("aerial") || n.includes("matterport") || n.includes("3d");
+      });
       const listingData: any = {
         projectType: isRE ? "real_estate" : "business",
         orderRequestId: id,
@@ -141,13 +147,8 @@ export default function AdminOrderRequest() {
         services: (order.lineItems || []).map((li: any) => li.name || String(li)),
         status: order.appointmentDate ? "scheduled" : "unscheduled",
         total: Number(order.total) || Number(order.pricing?.total) || 0,
-        images: [],
-        studioEnabled: true,
-        studioToken: crypto.randomUUID(),
-        lockDownloads: true,
-        requirePayment: true,
-        lockStudio: false,
-        socialPermission: false,
+        images: [], studioEnabled: true, studioToken: crypto.randomUUID(),
+        lockDownloads: true, requirePayment: true, lockStudio: false, socialPermission: false,
         accessInfo: [order.accessMethod, order.lockboxCode].filter(Boolean).join(" - ") || "",
         photographerPreference: order.photographerPreference || null,
         squareFootage: order.squareFootage || null,
@@ -160,50 +161,33 @@ export default function AdminOrderRequest() {
         }),
         photographerIds: selectedProviders,
         photographerNames: selectedProviders.map(pid => staff.find(st => st.id === pid)?.name || pid),
-        invoice: {
-          invoiceNumber: `INV-${id.substring(0, 6).toUpperCase()}`,
-          status: "draft",
-          amountDue: Number(order.total) || 0,
-          amountPaid: 0,
-        },
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        invoice: { invoiceNumber: `INV-${id.substring(0, 6).toUpperCase()}`, status: "draft", amountDue: Number(order.total) || 0, amountPaid: 0 },
+        createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       };
-
       const ref = await addDoc(collection(db, "listings"), listingData);
       await updateDoc(doc(db, "orderRequests", id), { listingId: ref.id, updatedAt: serverTimestamp() });
       toast.success("Project created!");
       navigate(`/admin/listing/${ref.id}`);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to create project.");
-    } finally { setSaving(false); }
+    } catch (err) { console.error(err); toast.error("Failed to create project."); }
+    finally { setSaving(false); }
   };
 
-  // SCHEDULE — just sets a date/time, does NOT create a project
   const handleSchedule = async () => {
-    if (!id) return;
-    if (!schedDate) { toast.error("Select a date."); return; }
+    if (!id || !schedDate) { toast.error("Select a date."); return; }
     setSaving(true);
     try {
       await updateDoc(doc(db, "orderRequests", id), {
-        status: "scheduled",
-        appointmentDate: schedDate,
-        appointmentTime: schedTime || null,
-        scheduledDate: fmtDate(schedDate),
-        scheduledTime: schedTime || null,
+        status: "scheduled", appointmentDate: schedDate, appointmentTime: schedTime || null,
+        scheduledDate: fmtDate(schedDate), scheduledTime: schedTime || null,
         assignedProviders: selectedProviders.map(pid => {
           const s = staff.find(st => st.id === pid);
           return { providerId: pid, name: s?.name || pid, role: s?.role || "photographer" };
         }),
         updatedAt: serverTimestamp(),
       });
-      toast.success("Appointment scheduled.");
-      setShowSchedule(false);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to schedule.");
-    } finally { setSaving(false); }
+      toast.success("Scheduled."); setShowSchedule(false);
+    } catch (err) { console.error(err); toast.error("Failed."); }
+    finally { setSaving(false); }
   };
 
   const handleArchive = async () => {
@@ -215,7 +199,7 @@ export default function AdminOrderRequest() {
   const handleCancel = async () => {
     if (!id) return;
     await updateDoc(doc(db, "orderRequests", id), { status: "cancelled", updatedAt: serverTimestamp() });
-    toast.success("Order cancelled."); setShowCancel(false); navigate("/admin/orders");
+    toast.success("Cancelled."); setShowCancel(false); navigate("/admin/orders");
   };
 
   if (loading) return <AdminLayout title="Order Request"><div className="flex items-center justify-center py-32"><div className="w-8 h-8 border-4 border-[#0d9488] border-t-transparent rounded-full animate-spin" /></div></AdminLayout>;
@@ -228,115 +212,108 @@ export default function AdminOrderRequest() {
   const subtotal = Number(order.pricing?.subtotal) || orderTotal;
   const promoDiscount = Number(order.promoDiscount) || 0;
   const clientName = order.clientName || `${order.firstName || ""} ${order.lastName || ""}`.trim() || "—";
+  const f = (key: string) => form[key] ?? order[key] ?? "";
+  const setF = (key: string) => (val: string) => setForm((prev: any) => ({ ...prev, [key]: val }));
 
   return (
     <AdminLayout title="Order Request">
-      {/* Back */}
       <button onClick={() => navigate("/admin/orders")} className="flex items-center gap-1.5 text-gray-400 hover:text-black text-xs font-bold uppercase tracking-widest mb-6">
         <ChevronLeft className="w-4 h-4" /> Back to Orders
       </button>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* ═══ LEFT: Main content — black header + detail cards ═══ */}
+        {/* ═══ LEFT: Full order view (read-only by default, editable on Manage Order) ═══ */}
         <div className="lg:col-span-2 space-y-6">
 
-          {/* ── BLACK HERO HEADER ── */}
-          <div className="bg-black rounded-[2rem] p-8 text-white">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${statusInfo.color}`}>{statusInfo.label}</span>
-                {order.listingId && (
-                  <button onClick={() => navigate(`/admin/listing/${order.listingId}`)} className="px-3 py-1 rounded-full bg-[#0d9488]/20 text-[#0d9488] text-[9px] font-black uppercase tracking-widest hover:bg-[#0d9488]/30">
-                    View Project →
-                  </button>
+          {/* Status + Order ID bar */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${statusInfo.color}`}>{statusInfo.label}</span>
+              {order.listingId && (
+                <button onClick={() => navigate(`/admin/listing/${order.listingId}`)} className="px-3 py-1 rounded-full bg-[#0d9488]/10 text-[#0d9488] text-[9px] font-black uppercase tracking-widest hover:bg-[#0d9488]/20">View Project →</button>
+              )}
+            </div>
+            <span className="text-[10px] font-mono text-gray-400">#{(order.id || "").substring(0, 8)}</span>
+          </div>
+
+          {/* ── CLIENT INFORMATION ── */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <h3 className={`${labelCls} mb-4`}>Client Information</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+              <Field label="First Name" value={order.firstName} editing={editing} editValue={f("firstName")} onChange={setF("firstName")} />
+              <Field label="Last Name" value={order.lastName} editing={editing} editValue={f("lastName")} onChange={setF("lastName")} />
+              <Field label="Email" value={order.email} editing={editing} editValue={f("email")} onChange={setF("email")} type="email" />
+              <Field label="Phone" value={order.phone} editing={editing} editValue={f("phone")} onChange={setF("phone")} type="tel" />
+              {order.photographerPreference && <Field label="Photographer Preference" value={order.photographerPreference} editing={editing} editValue={f("photographerPreference")} onChange={setF("photographerPreference")} />}
+            </div>
+          </div>
+
+          {/* ── PROPERTY / LOCATION ── */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <h3 className={`${labelCls} mb-4`}>Property & Location</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+              <Field label="Address" value={fmtAddr(order.address)} editing={editing} editValue={typeof f("address") === "string" ? f("address") : fmtAddr(f("address"))} onChange={setF("address")} span2 />
+              {order.squareFootage && <Field label="Square Footage" value={order.squareFootage} editing={editing} editValue={f("squareFootage")} onChange={setF("squareFootage")} />}
+              {order.furnishingStatus && <Field label="Furnishing Status" value={order.furnishingStatus} editing={editing} editValue={f("furnishingStatus")} onChange={setF("furnishingStatus")} />}
+              {order.propertyStatus && <Field label="Property Status" value={order.propertyStatus} editing={editing} editValue={f("propertyStatus")} onChange={setF("propertyStatus")} />}
+              {order.specializedPhotography && <Field label="Photo Type" value={order.specializedPhotography?.toUpperCase()} editing={editing} editValue={f("specializedPhotography")} onChange={setF("specializedPhotography")} />}
+            </div>
+          </div>
+
+          {/* ── APPOINTMENT ── */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <h3 className={`${labelCls} mb-4`}>Appointment</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+              <Field label="Requested Date" value={order.scheduledDate || fmtDate(order.appointmentDate || order.requestedDate)} editing={editing} editValue={f("appointmentDate")} onChange={setF("appointmentDate")} type="date" />
+              <Field label="Requested Time" value={order.scheduledTime || order.appointmentTime || order.requestedTime} editing={editing} editValue={f("appointmentTime")} onChange={setF("appointmentTime")} type="time" />
+              <Field label="Access Method" value={order.accessMethod} editing={editing} editValue={f("accessMethod")} onChange={setF("accessMethod")} />
+              <Field label="Lockbox Code" value={order.lockboxCode} editing={editing} editValue={f("lockboxCode")} onChange={setF("lockboxCode")} />
+            </div>
+          </div>
+
+          {/* ── SERVICES ── */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <h3 className={`${labelCls} mb-4`}>Services</h3>
+            {lineItems.length > 0 ? (
+              <div>
+                {lineItems.map((li: any, i: number) => (
+                  <div key={i} className={`flex justify-between py-3 ${i > 0 ? "border-t border-gray-100" : ""}`}>
+                    <span className="text-sm font-bold">{li.name || safe(li)}</span>
+                    {li.price != null && <span className="text-sm font-black">{fmtCurrency(li.price)}</span>}
+                  </div>
+                ))}
+                {promoDiscount > 0 && (
+                  <div className="flex justify-between py-3 border-t border-gray-100">
+                    <span className="text-sm text-gray-400">Promo ({order.promoCode})</span>
+                    <span className="text-sm font-bold text-green-600">-{fmtCurrency(promoDiscount)}</span>
+                  </div>
                 )}
+                <div className="border-t-2 border-gray-200 pt-3 mt-1 flex justify-between">
+                  <span className="text-lg font-black">Total</span>
+                  <span className="text-lg font-black text-[#0d9488]">{fmtCurrency(orderTotal)}</span>
+                </div>
               </div>
-              <p className="text-[10px] font-mono text-gray-500">#{(order.id || "").substring(0, 8)}</p>
-            </div>
-
-            {/* Client */}
-            <h1 className="text-2xl font-black uppercase tracking-tight mb-1">{clientName}</h1>
-            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-400 mb-6">
-              {order.email && <span className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" />{order.email}</span>}
-              {order.phone && <span className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" />{order.phone}</span>}
-            </div>
-
-            {/* Address + Appointment */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div>
-                <p className={labelCls}>Address</p>
-                <p className={valCls}>{fmtAddr(order.address)}</p>
-              </div>
-              <div>
-                <p className={labelCls}>Requested Date / Time</p>
-                <p className={valCls}>{order.scheduledDate || fmtDate(order.appointmentDate || order.requestedDate) || "—"}</p>
-                <p className="text-xs text-gray-400">{order.scheduledTime || order.appointmentTime || order.requestedTime || ""}</p>
-              </div>
-            </div>
-
-            {/* Property details row */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
-              {order.squareFootage && <div><p className={labelCls}>Sq. Ft.</p><p className={valCls}>{order.squareFootage}</p></div>}
-              {order.furnishingStatus && <div><p className={labelCls}>Furnishing</p><p className={valCls}>{order.furnishingStatus}</p></div>}
-              {order.propertyStatus && <div><p className={labelCls}>Property Status</p><p className={valCls}>{order.propertyStatus}</p></div>}
-              {order.specializedPhotography && <div><p className={labelCls}>Photo Type</p><p className={valCls}>{order.specializedPhotography.toUpperCase()}</p></div>}
-            </div>
-
-            {/* Access info */}
-            {(order.accessMethod || order.lockboxCode) && (
-              <div className="mt-6 p-4 bg-white/5 rounded-xl">
-                <p className={labelCls}>Access</p>
-                <p className="text-sm font-bold text-white">
-                  {[order.accessMethod, order.lockboxCode ? `Code: ${order.lockboxCode}` : null].filter(Boolean).join(" • ")}
-                </p>
-              </div>
-            )}
-
-            {/* Photographer preference */}
-            {order.photographerPreference && (
-              <div className="mt-4">
-                <p className={labelCls}>Photographer Preference</p>
-                <p className={valCls}>{order.photographerPreference}</p>
-              </div>
-            )}
-
-            {/* Notes / Vibe */}
-            {(order.vibeNote || order.notes) && (
-              <div className="mt-4">
-                <p className={labelCls}>Client Notes</p>
-                <p className="text-sm text-gray-300">{order.vibeNote || order.notes}</p>
-              </div>
+            ) : (
+              <p className="text-sm text-gray-400">No services listed.</p>
             )}
           </div>
 
-          {/* ── EDITABLE FIELDS (when Manage Order is active) ── */}
+          {/* ── NOTES ── */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <h3 className={`${labelCls} mb-4`}>Notes</h3>
+            <div className="grid grid-cols-1 gap-y-4">
+              <Field label="Client Notes / Vibe" value={order.vibeNote || order.notes} editing={editing} editValue={f("vibeNote") || f("notes")} onChange={setF("vibeNote")} type="textarea" span2 />
+              <Field label="Internal Notes (admin only)" value={order.internalNotes} editing={editing} editValue={f("internalNotes")} onChange={setF("internalNotes")} type="textarea" span2 />
+            </div>
+          </div>
+
+          {/* Save/Cancel buttons when editing */}
           {editing && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
-              <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Edit Order Details</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-[10px] font-black text-gray-400 uppercase mb-1">First Name</label><input value={form.firstName || ""} onChange={e => setForm((f: any) => ({...f, firstName: e.target.value, clientName: `${e.target.value} ${f.lastName || ""}`.trim()}))} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30" /></div>
-                <div><label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Last Name</label><input value={form.lastName || ""} onChange={e => setForm((f: any) => ({...f, lastName: e.target.value, clientName: `${f.firstName || ""} ${e.target.value}`.trim()}))} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30" /></div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Email</label><input value={form.email || ""} onChange={e => setForm((f: any) => ({...f, email: e.target.value}))} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30" /></div>
-                <div><label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Phone</label><input value={form.phone || ""} onChange={e => setForm((f: any) => ({...f, phone: e.target.value}))} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30" /></div>
-              </div>
-              <div><label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Address</label><input value={typeof form.address === "string" ? form.address : fmtAddr(form.address)} onChange={e => setForm((f: any) => ({...f, address: e.target.value}))} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30" /></div>
-              <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Appt Date</label><input type="date" value={form.appointmentDate || ""} onChange={e => setForm((f: any) => ({...f, appointmentDate: e.target.value}))} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30" /></div>
-                <div><label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Appt Time</label><input type="time" value={form.appointmentTime || ""} onChange={e => setForm((f: any) => ({...f, appointmentTime: e.target.value}))} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30" /></div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Access Method</label><input value={form.accessMethod || ""} onChange={e => setForm((f: any) => ({...f, accessMethod: e.target.value}))} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30" /></div>
-                <div><label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Lockbox Code</label><input value={form.lockboxCode || ""} onChange={e => setForm((f: any) => ({...f, lockboxCode: e.target.value}))} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30" /></div>
-              </div>
-              <div><label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Notes</label><textarea value={form.vibeNote || form.notes || ""} onChange={e => setForm((f: any) => ({...f, vibeNote: e.target.value}))} rows={2} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30 resize-none" /></div>
-              <div className="flex gap-3 pt-2">
-                <Button onClick={handleSave} disabled={saving} className="bg-[#0d9488] hover:bg-[#0f766e] text-white rounded-xl text-xs font-bold">
-                  <Save className="w-3.5 h-3.5 mr-1.5" />{saving ? "Saving..." : "Save Changes"}
-                </Button>
-                <Button onClick={() => { setEditing(false); setForm(order); }} variant="outline" className="rounded-xl text-xs font-bold">Cancel Edit</Button>
-              </div>
+            <div className="flex gap-3">
+              <Button onClick={handleSave} disabled={saving} className="bg-[#0d9488] hover:bg-[#0f766e] text-white rounded-xl text-xs font-bold">
+                <Save className="w-3.5 h-3.5 mr-1.5" />{saving ? "Saving..." : "Save Changes"}
+              </Button>
+              <Button onClick={() => { setEditing(false); setForm(order); }} variant="outline" className="rounded-xl text-xs font-bold">Cancel Edit</Button>
             </div>
           )}
         </div>
@@ -346,102 +323,63 @@ export default function AdminOrderRequest() {
 
           {/* ── Order Summary / Billing ── */}
           <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6">
-            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Order Summary</h3>
-
-            {/* Services list */}
-            {lineItems.length > 0 ? (
+            <h3 className={`${labelCls} mb-4`}>Order Summary</h3>
+            {lineItems.length > 0 && (
               <div className="space-y-2 mb-4">
                 {lineItems.map((li: any, i: number) => (
                   <div key={i} className="flex justify-between text-sm">
-                    <span className="font-medium text-gray-700">{li.name || safe(li)}</span>
+                    <span className="text-gray-700 font-medium">{li.name || safe(li)}</span>
                     {li.price != null && <span className="font-bold">{fmtCurrency(li.price)}</span>}
                   </div>
                 ))}
               </div>
-            ) : (
-              <p className="text-xs text-gray-400 mb-4">No services listed.</p>
             )}
-
-            {/* Promo */}
-            {order.promoCode && (
+            {promoDiscount > 0 && (
               <div className="flex justify-between text-sm mb-2">
-                <span className="text-gray-400">Promo ({order.promoCode})</span>
+                <span className="text-gray-400">Promo</span>
                 <span className="text-green-600 font-bold">-{fmtCurrency(promoDiscount)}</span>
               </div>
             )}
-
-            {/* Totals */}
-            <div className="border-t border-gray-100 pt-3 mt-3 space-y-1">
-              {subtotal !== orderTotal && (
-                <div className="flex justify-between text-sm"><span className="text-gray-400">Subtotal</span><span className="font-bold">{fmtCurrency(subtotal)}</span></div>
-              )}
+            <div className="border-t border-gray-100 pt-3 mt-2">
               <div className="flex justify-between text-lg">
                 <span className="font-black">Total</span>
                 <span className="font-black text-[#0d9488]">{fmtCurrency(orderTotal)}</span>
               </div>
             </div>
-
-            {/* Status + Dates */}
-            <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-400 uppercase tracking-widest font-bold">Status</span>
-                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${statusInfo.color}`}>{statusInfo.label}</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-400 uppercase tracking-widest font-bold">Requested</span>
-                <span className="font-bold">{order.scheduledDate || fmtDate(order.appointmentDate) || "—"}</span>
-              </div>
-              {order.scheduledTime && (
-                <div className="flex justify-between text-xs">
-                  <span className="text-gray-400 uppercase tracking-widest font-bold">Time</span>
-                  <span className="font-bold">{order.scheduledTime || order.appointmentTime}</span>
-                </div>
+            <div className="mt-4 pt-4 border-t border-gray-100 space-y-2 text-xs">
+              <div className="flex justify-between"><span className={`${labelCls}`}>Status</span><span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${statusInfo.color}`}>{statusInfo.label}</span></div>
+              <div className="flex justify-between"><span className={`${labelCls}`}>Requested</span><span className="font-bold text-black">{order.scheduledDate || fmtDate(order.appointmentDate) || "—"}</span></div>
+              {(order.scheduledTime || order.appointmentTime) && (
+                <div className="flex justify-between"><span className={`${labelCls}`}>Time</span><span className="font-bold text-black">{order.scheduledTime || order.appointmentTime}</span></div>
               )}
             </div>
-
-            {/* Invoice buttons */}
             <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
-              <Button variant="outline" className="w-full rounded-xl text-xs font-bold justify-center">
-                <Eye className="w-3.5 h-3.5 mr-1.5" /> View Invoice
-              </Button>
-              <Button variant="outline" className="w-full rounded-xl text-xs font-bold justify-center">
-                <Send className="w-3.5 h-3.5 mr-1.5" /> Send Receipt
-              </Button>
+              <Button variant="outline" className="w-full rounded-xl text-xs font-bold justify-center"><Eye className="w-3.5 h-3.5 mr-1.5" /> View Invoice</Button>
+              <Button variant="outline" className="w-full rounded-xl text-xs font-bold justify-center"><Send className="w-3.5 h-3.5 mr-1.5" /> Send Receipt</Button>
             </div>
           </div>
 
           {/* ── Actions ── */}
           <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6">
-            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Actions</h3>
+            <h3 className={`${labelCls} mb-4`}>Actions</h3>
             <div className="space-y-2">
-              {/* Create/Manage Project */}
               <Button onClick={order.listingId ? () => navigate(`/admin/listing/${order.listingId}`) : handleCreateProject}
-                disabled={saving}
-                className="w-full rounded-xl text-xs font-bold justify-center bg-[#0d9488] hover:bg-[#0f766e] text-white">
-                <Layers className="w-3.5 h-3.5 mr-1.5" />
-                {order.listingId ? "View Project" : "Create Project"}
+                disabled={saving} className="w-full rounded-xl text-xs font-bold justify-center bg-[#0d9488] hover:bg-[#0f766e] text-white">
+                <Layers className="w-3.5 h-3.5 mr-1.5" />{order.listingId ? "View Project" : "Create Project"}
               </Button>
-
-              {/* Manage Order (edit toggle) */}
-              {!editing && (
+              {!editing ? (
                 <Button onClick={() => setEditing(true)} variant="outline" className="w-full rounded-xl text-xs font-bold justify-center">
                   <Edit3 className="w-3.5 h-3.5 mr-1.5" /> Manage Order
                 </Button>
-              )}
-
-              {/* Schedule */}
+              ) : null}
               <Button onClick={() => setShowSchedule(true)} variant="outline" className="w-full rounded-xl text-xs font-bold justify-center">
                 <Calendar className="w-3.5 h-3.5 mr-1.5" /> Schedule
               </Button>
-
-              {/* Archive */}
               {statusKey !== "archived" && statusKey !== "cancelled" && (
                 <Button onClick={handleArchive} variant="outline" className="w-full rounded-xl text-xs font-bold justify-center">
                   <Archive className="w-3.5 h-3.5 mr-1.5" /> Archive
                 </Button>
               )}
-
-              {/* Cancel */}
               {statusKey !== "cancelled" && (
                 <Button onClick={() => setShowCancel(true)} variant="outline" className="w-full rounded-xl text-xs font-bold justify-center text-red-500 border-red-200 hover:bg-red-50">
                   <X className="w-3.5 h-3.5 mr-1.5" /> Cancel Order
@@ -457,15 +395,15 @@ export default function AdminOrderRequest() {
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
             <h3 className="text-lg font-black mb-2">Schedule Appointment</h3>
-            <p className="text-xs text-gray-500 mb-6">Set a date and time for this appointment. This does not create a project.</p>
+            <p className="text-xs text-gray-500 mb-6">Set a date and time. This does not create a project.</p>
             <div className="space-y-4 mb-6">
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Date *</label><input type="date" value={schedDate} onChange={e => setSchedDate(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30" /></div>
-                <div><label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Time</label><input type="time" value={schedTime} onChange={e => setSchedTime(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30" /></div>
+                <div><p className={`${labelCls}`}>Date *</p><input type="date" value={schedDate} onChange={e => setSchedDate(e.target.value)} className={`${editInputCls}`} /></div>
+                <div><p className={`${labelCls}`}>Time</p><input type="time" value={schedTime} onChange={e => setSchedTime(e.target.value)} className={`${editInputCls}`} /></div>
               </div>
               {staff.filter(s => ["photographer", "admin", "coordinator"].includes(s.role)).length > 0 && (
                 <div>
-                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Assign Provider(s)</label>
+                  <p className={`${labelCls} mb-2`}>Assign Provider(s)</p>
                   <div className="flex flex-wrap gap-2">
                     {staff.filter(s => ["photographer", "admin", "coordinator"].includes(s.role)).map(s => {
                       const sel = selectedProviders.includes(s.id);
@@ -496,7 +434,7 @@ export default function AdminOrderRequest() {
           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
             <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
             <h3 className="text-lg font-black mb-2">Cancel This Order?</h3>
-            <p className="text-sm text-gray-500 mb-6">Are you sure you want to cancel this order? This cannot be undone.</p>
+            <p className="text-sm text-gray-500 mb-6">Are you sure you want to cancel this order?</p>
             <div className="flex gap-3">
               <Button onClick={() => setShowCancel(false)} variant="outline" className="flex-1 rounded-xl">Keep Order</Button>
               <Button onClick={handleCancel} className="flex-1 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold">Yes, Cancel</Button>
