@@ -57,9 +57,6 @@ const BLANK: { firstName: string; lastName: string; email: string; phone: string
   firstName: "", lastName: "", email: "", phone: "", address: "", serviceNote: "", scheduledDate: "",
 };
 
-function fmtAddr(a) { if (!a) return "\u2014"; if (typeof a === "string") return a; if (a.formatted) return a.formatted; return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "\u2014"; }
-function fmtCurr(n) { return "$" + (n || 0).toLocaleString("en-US", { minimumFractionDigits: 2 }); }
-
 export default function AdminDashboard() {
   const navigate = useNavigate();
 
@@ -272,14 +269,14 @@ export default function AdminDashboard() {
       {/* ── Stats Grid ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
         {[
-          { label: "Order Requests", value: orderRequests.length.toString(), icon: <ClipboardList className="w-5 h-5" />, color: "bg-red-500",     onClick: () => navigate('/admin/orders?status=needs_scheduled') },
-          { label: "Scheduled",      value: scheduledCount.toString(),        icon: <Calendar className="w-5 h-5" />,      color: "bg-[#0d9488]", onClick: () => navigate('/admin/orders?status=scheduled') },
-          { label: "Projects in Progress",value: listingsCount.toString(),          icon: <LayoutGrid className="w-5 h-5" />,    color: "bg-blue-500",  onClick: () => navigate('/admin/orders?status=in_progress,pending_edit,in_review,delivered') },
-          { label: "Revenue",        value: fmtRev(revenue),                  icon: <DollarSign className="w-5 h-5" />,    color: "bg-orange-500",onClick: () => navigate('/admin/revenue') },
+          { label: "Order Requests", value: orderRequests.length.toString(), icon: <ClipboardList className="w-5 h-5" />, color: "bg-red-500",     href: "#requests" },
+          { label: "Scheduled",      value: scheduledCount.toString(),        icon: <Calendar className="w-5 h-5" />,      color: "bg-[#0d9488]", href: "/admin/listings?status=scheduled" },
+          { label: "Active Listings",value: listingsCount.toString(),          icon: <LayoutGrid className="w-5 h-5" />,    color: "bg-blue-500",  href: "/admin/listings" },
+          { label: "Revenue",        value: fmtRev(revenue),                  icon: <DollarSign className="w-5 h-5" />,    color: "bg-orange-500",href: "/admin/billing" },
         ].map((s) => (
-          <div
+          <Link
             key={s.label}
-            onClick={s.onClick}
+            to={s.href}
             className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm hover:shadow-md transition-shadow group"
           >
             <div className="flex items-center justify-between mb-4">
