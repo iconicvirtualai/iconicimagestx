@@ -57,6 +57,9 @@ const BLANK: { firstName: string; lastName: string; email: string; phone: string
   firstName: "", lastName: "", email: "", phone: "", address: "", serviceNote: "", scheduledDate: "",
 };
 
+function fmtAddr(a) { if (!a) return "\u2014"; if (typeof a === "string") return a; if (a.formatted) return a.formatted; return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "\u2014"; }
+function fmtCurr(n) { return "$" + (n || 0).toLocaleString("en-US", { minimumFractionDigits: 2 }); }
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
 
