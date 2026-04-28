@@ -369,8 +369,8 @@ export default function AdminOrderRequest() {
               )}
             </div>
             <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
-              <Button variant="outline" className="w-full rounded-xl text-xs font-bold justify-center"><Eye className="w-3.5 h-3.5 mr-1.5" /> View Invoice</Button>
-              <Button variant="outline" className="w-full rounded-xl text-xs font-bold justify-center"><Send className="w-3.5 h-3.5 mr-1.5" /> Send Receipt</Button>
+              <Button variant="outline" className="w-full rounded-xl text-xs font-bold justify-center text-black"><Eye className="w-3.5 h-3.5 mr-1.5" /> View Invoice</Button>
+              <Button variant="outline" className="w-full rounded-xl text-xs font-bold justify-center text-black"><Send className="w-3.5 h-3.5 mr-1.5" /> Send Receipt</Button>
             </div>
           </div>
 
