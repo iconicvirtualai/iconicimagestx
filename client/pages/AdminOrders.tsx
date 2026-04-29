@@ -117,8 +117,7 @@ export default function AdminOrders() {
     const items = getLineItems(o);
     const requestedDate = o.scheduledDate || fmtDate(o.appointmentDate || o.requestedDate);
     const requestedTime = o.scheduledTime || o.appointmentTime || o.requestedTime || "";
-    const confirmedDate = o.confirmedDate ? fmtDate(o.confirmedDate) : "";
-    const confirmedTime = o.confirmedTime || "";
+    const isScheduled = ["scheduled","in_progress","pending","pending_edit","in_review","delivered","delivered_unpaid","delivered_paid","paid"].includes(getUnifiedStatus(o)) || (typeof o.status === "string" && o.status.toLowerCase().includes("scheduled"));
     const apptPast = isPast(o.appointmentDate || o.requestedDate);
 
     return (
@@ -143,11 +142,8 @@ export default function AdminOrders() {
             <span className="inline-block px-2 py-0.5 bg-black text-white text-[10px] font-bold rounded">
               {requestedDate} {requestedTime}
             </span>
-          ) : confirmedDate ? (
-            <div>
-              <p className="text-[10px] text-red-500 line-through">{requestedDate} {requestedTime}</p>
-              <p className="text-[10px] font-bold text-blue-600">{confirmedDate} {confirmedTime}</p>
-            </div>
+          ) : isScheduled && requestedDate ? (
+            <span className="text-[10px] font-bold text-blue-600">{requestedDate} {requestedTime}</span>
           ) : requestedDate ? (
             <span className="text-[10px] font-bold text-red-500">{requestedDate} {requestedTime}</span>
           ) : (
