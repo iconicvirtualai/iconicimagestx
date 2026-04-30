@@ -164,6 +164,15 @@ export default function AdminListings() {
 
   // Modal state
   const [showModal, setShowModal] = React.useState(false);
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("new") === "true") {
+      setShowModal(true);
+      // Clean up URL
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
   const [projectType, setProjectType] = React.useState<ProjectType>("real_estate");
   const [reForm, setReForm] = React.useState({ ...BLANK_RE });
   const [bizForm, setBizForm] = React.useState({ ...BLANK_BIZ });
