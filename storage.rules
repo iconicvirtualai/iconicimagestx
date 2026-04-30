@@ -1,0 +1,23 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // VSAI free-trial uploads — any authenticated user (including anonymous)
+    // can upload their own files; only they can read them
+    match /vsai-uploads/{uid}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Gallery media — only staff can write; clients can read their own delivered galleries
+    match /galleries/{orderId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+        firestore.exists(/databases/(default)/documents/staff/$(request.auth.uid));
+    }
+
+    // Default deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -12,9 +12,10 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "npm run build:client && npm run build:server",
+    "build": "npm run build:client && npm run build:server && npm run build:vercel",
     "build:client": "vite build",
     "build:server": "vite build --config vite.config.server.ts",
+    "build:vercel": "vite build --config vite.config.vercel.ts",
     "start": "node dist/server/node-build.mjs",
     "test": "vitest --run",
     "format.fix": "prettier --write .",
@@ -29,7 +30,8 @@
     "googleapis": "^171.4.0",
     "nodemailer": "^8.0.2",
     "twilio": "^5.13.0",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "stripe": "^16.0.0"
   },
   "devDependencies": {
     "@hookform/resolvers": "^5.2.1",

@@ -286,64 +286,38 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     specializedPhotography: "mls" as "mls" | "social" | "both",
   });
 
-  // Dynamic Google Maps loading and Autocomplete Service
-  const [isMapsReady, setIsMapsReady] = useState(false);
+  // Address autocomplete — proxied through our server (key stays server-side)
   const [addressSearchValue, setAddressSearchValue] = useState("");
-  const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
-  const autocompleteService = useRef<any>(null);
+  const [addressSuggestions, setAddressSuggestions] = useState<
+    { place_id: string; description: string; main_text: string; secondary: string }[]
+  >([]);
+  const addressDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Fetch suggestions whenever the input changes
   useEffect(() => {
-    const loadGoogleMaps = () => {
-      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || import.meta.env.VITE_PUBLIC_GOOGLE_MAPS_API_KEY;
-      if (!apiKey || apiKey === "YOUR_GOOGLE_MAPS_API_KEY_HERE") {
-        console.warn("Google Maps API Key is missing. Address autocomplete will not work.");
-        return;
-      }
+    if (addressDebounceRef.current) clearTimeout(addressDebounceRef.current);
 
-      if (typeof window !== "undefined" && !window.google && !document.getElementById("google-maps-script")) {
-        const script = document.createElement("script");
-        script.id = "google-maps-script";
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-        script.async = true;
-        script.onload = () => {
-          setIsMapsReady(true);
-        };
-        document.head.appendChild(script);
-      } else if (window.google) {
-        setIsMapsReady(true);
-      }
-    };
-
-    loadGoogleMaps();
-  }, []);
-
-  useEffect(() => {
-    if (isMapsReady && window.google && !autocompleteService.current) {
-      autocompleteService.current = new window.google.maps.places.AutocompleteService();
-    }
-  }, [isMapsReady]);
-
-  // Handle address input and suggestions
-  useEffect(() => {
-    if (!addressSearchValue || !autocompleteService.current) {
+    if (!addressSearchValue || addressSearchValue.length < 3) {
       setAddressSuggestions([]);
       return;
     }
 
-    const timeoutId = setTimeout(() => {
-      autocompleteService.current.getPlacePredictions(
-        { input: addressSearchValue, componentRestrictions: { country: "us" } },
-        (predictions: any, status: any) => {
-          if (status === "OK" && predictions) {
-            setAddressSuggestions(predictions);
-          } else {
-            setAddressSuggestions([]);
-          }
-        }
-      );
+    addressDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/places/autocomplete?input=${encodeURIComponent(addressSearchValue)}`
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        setAddressSuggestions(data.suggestions || []);
+      } catch {
+        setAddressSuggestions([]);
+      }
     }, 300);
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      if (addressDebounceRef.current) clearTimeout(addressDebounceRef.current);
+    };
   }, [addressSearchValue]);
 
   const handleSelectAddress = (description: string) => {
@@ -352,12 +326,12 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     updateFormData({ address: description });
   };
 
-  // Sync addressSearchValue with formData.address
+  // Keep search input in sync if address is pre-filled (e.g. from URL params)
   useEffect(() => {
-    if (formData.address && addressSearchValue !== formData.address) {
+    if (formData.address && !addressSearchValue) {
       setAddressSearchValue(formData.address);
     }
-  }, [formData.address]);
+  }, [formData.address]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Check for pre-filled service from pricing page or props
   useEffect(() => {
@@ -1085,14 +1059,20 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                       }}
                     />
                     {addressSuggestions.length > 0 && (
-                      <div className="absolute z-[100] left-0 right-0 top-full mt-2 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden max-h-60 overflow-y-auto">
-                        {addressSuggestions.map(({ place_id, description }) => (
+                      <div className="absolute z-[100] left-0 right-0 top-full mt-2 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden max-h-64 overflow-y-auto">
+                        {addressSuggestions.map(({ place_id, description, main_text, secondary }) => (
                           <button
                             key={place_id}
+                            type="button"
                             onClick={() => handleSelectAddress(description)}
-                            className="w-full px-5 py-3 text-left text-[13px] hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-none group"
+                            className="w-full px-5 py-3.5 text-left hover:bg-teal-50 transition-colors border-b border-gray-50 last:border-none group flex flex-col gap-0.5"
                           >
-                            <p className="font-bold text-black group-hover:text-teal-600 transition-colors">{description}</p>
+                            <p className="font-bold text-[13px] text-black group-hover:text-teal-700 transition-colors leading-tight">
+                              {main_text || description}
+                            </p>
+                            {secondary && (
+                              <p className="text-[11px] text-gray-400 font-medium leading-tight">{secondary}</p>
+                            )}
                           </button>
                         ))}
                       </div>
