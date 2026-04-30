@@ -84,7 +84,8 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
 };
 
 const labelCls = "text-[10px] font-black text-gray-400 uppercase tracking-widest";
-const valCls = "text-sm font-bold text-black mt-0.5";
+const valCls = "text-sm font-bold text-black mt-1 px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl min-h-[38px] flex items-center whitespace-pre-wrap";
+const darkValCls = "text-sm font-bold text-white mt-1 px-3 py-2 bg-white/5 border border-white/10 rounded-xl min-h-[38px] flex items-center whitespace-pre-wrap";
 const editInputCls = "w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-sm font-bold text-black focus:outline-none focus:ring-2 focus:ring-[#0d9488]/50";
 
 // ─── Read-only field ──────────────────────────────────────────────────────────
@@ -101,7 +102,7 @@ function Field({ label, value, editing, editValue, onChange, type = "text", span
           <input type={type} value={editValue ?? value ?? ""} onChange={e => onChange(e.target.value)} className={`${dark ? "w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-sm font-bold text-white focus:outline-none" : editInputCls} mt-1`} />
         )
       ) : (
-        <p className={dark ? "text-sm font-bold text-white mt-0.5" : valCls}>{safe(value)}</p>
+        <div className={dark ? darkValCls : valCls}>{safe(value)}</div>
       )}
     </div>
   );
@@ -337,22 +338,22 @@ export default function AdminOrderRequest() {
                 </div>
               </div>
             ) : lineItems.length > 0 ? (
-              <div>
+              <div className="mt-1 bg-gray-50 border border-gray-100 rounded-2xl overflow-hidden">
                 {lineItems.map((li: any, i: number) => (
-                  <div key={i} className={`flex justify-between py-3 ${i > 0 ? "border-t border-gray-100" : ""}`}>
-                    <span className="text-sm font-bold">{li.name || safe(li)}</span>
-                    {li.price != null && <span className="text-sm font-black">{fmtCurrency(li.price)}</span>}
+                  <div key={i} className={`flex justify-between items-center px-4 py-3 ${i > 0 ? "border-t border-gray-200/50" : ""}`}>
+                    <span className="text-sm font-bold text-gray-900">{li.name || safe(li)}</span>
+                    {li.price != null && <span className="text-sm font-black text-[#0d9488]">{fmtCurrency(li.price)}</span>}
                   </div>
                 ))}
                 {promoDiscount > 0 && (
-                  <div className="flex justify-between py-3 border-t border-gray-100">
-                    <span className="text-sm text-gray-400">Promo ({order.promoCode})</span>
+                  <div className="flex justify-between items-center px-4 py-3 border-t border-gray-200/50 bg-green-50/50">
+                    <span className="text-sm font-bold text-gray-500 italic">Promo ({order.promoCode})</span>
                     <span className="text-sm font-bold text-green-600">-{fmtCurrency(promoDiscount)}</span>
                   </div>
                 )}
-                <div className="border-t-2 border-gray-200 pt-3 mt-1 flex justify-between">
-                  <span className="text-lg font-black">Total</span>
-                  <span className="text-lg font-black text-[#0d9488]">{fmtCurrency(orderTotal)}</span>
+                <div className="bg-white border-t border-gray-200 px-4 py-4 flex justify-between items-center">
+                  <span className="text-base font-black uppercase tracking-tight">Total Amount</span>
+                  <span className="text-xl font-black text-black">{fmtCurrency(orderTotal)}</span>
                 </div>
               </div>
             ) : (
