@@ -373,8 +373,21 @@ export default function AdminDashboard() {
                     <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                       <p className="font-black text-sm text-black truncate">{r.clientName || `${r.firstName || ""} ${r.lastName || ""}`.trim() || "—"}</p>
                       <StatusBadge status={r.status || "new"} />
+                      {(r.vibeNote || r.notes || r.internalNotes) && <span className="text-xs" title="Has Notes">🗒️</span>}
                     </div>
                     <p className="text-[10px] text-gray-400 font-bold truncate">{r.address || "Consultation"}</p>
+                    {(() => {
+                      const s = (r.status || "").toLowerCase();
+                      const isSched = ["scheduled","in_progress","pending","pending_edit","in_review","delivered","delivered_unpaid","delivered_paid","paid"].includes(s);
+                      const photog = isSched
+                        ? ((r.assignedProviders || []).map((p: any) => p.name).join(", ") || (Array.isArray(r.photographerNames) ? r.photographerNames.join(", ") : ""))
+                        : r.photographerPreference;
+                      return photog ? (
+                        <p className="text-[9px] text-[#0d9488] font-bold italic leading-none mt-1">
+                          {isSched ? "By: " : "Pref: "}{photog}
+                        </p>
+                      ) : null;
+                    })()}
                   </div>
                   <div className="text-right flex-shrink-0">
                     {r.total > 0 && (
@@ -440,6 +453,7 @@ export default function AdminDashboard() {
                   <div className="flex items-center justify-between gap-2 mb-0.5">
                     <p className="text-xs font-bold text-white truncate group-hover:text-[#0d9488] transition-colors">
                       {r.clientName || `${r.firstName || ""} ${r.lastName || ""}`.trim() || "—"}
+                      {(r.vibeNote || r.notes || r.internalNotes) && <span className="text-[10px] ml-1">🗒️</span>}
                     </p>
                     <StatusBadge status={r.status || "new"} />
                   </div>
@@ -447,6 +461,18 @@ export default function AdminDashboard() {
                     <p className="text-[10px] text-gray-500 truncate">{r.address || "Consultation"}</p>
                     <p className="text-[10px] text-gray-600 flex-shrink-0 ml-2">{fmtDate(r.createdAt || r.submittedAt)}</p>
                   </div>
+                  {(() => {
+                    const s = (r.status || "").toLowerCase();
+                    const isSched = ["scheduled","in_progress","pending","pending_edit","in_review","delivered","delivered_unpaid","delivered_paid","paid"].includes(s);
+                    const photog = isSched
+                      ? ((r.assignedProviders || []).map((p: any) => p.name).join(", ") || (Array.isArray(r.photographerNames) ? r.photographerNames.join(", ") : ""))
+                      : r.photographerPreference;
+                    return photog ? (
+                      <p className="text-[8px] text-gray-500 italic mt-0.5">
+                        {isSched ? "By: " : "Pref: "}{photog}
+                      </p>
+                    ) : null;
+                  })()}
                 </div>
               ))}
             </div>

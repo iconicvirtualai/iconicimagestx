@@ -94,6 +94,7 @@ export default function AdminOrders() {
   const [orders, setOrders] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [itemsPopup, setItemsPopup] = React.useState<any[] | null>(null);
+  const [notesPopup, setNotesPopup] = React.useState<string | null>(null);
   const [now, setNow] = React.useState(Date.now());
   const [selection, setSelection] = React.useState<Set<string>>(new Set());
   const [staff, setStaff] = React.useState<any[]>([]);
@@ -269,46 +270,93 @@ export default function AdminOrders() {
 
     const isScheduled = ["scheduled","in_progress","pending","pending_edit","in_review","delivered","delivered_unpaid","delivered_paid","paid"].includes(status);
 
+    const assignedNames = (o.assignedProviders || []).map((p: any) => p.name).join(", ") || (Array.isArray(o.photographerNames) ? o.photographerNames.join(", ") : "");
+    const preferredName = o.photographerPreference;
+    const photogText = isScheduled ? assignedNames : preferredName;
+    const notes = (o.vibeNote || "") + (o.notes ? "\n" + o.notes : "") + (o.internalNotes ? "\n" + o.internalNotes : "");
+
     return (
       <tr className={`border-t border-gray-100 hover:bg-gray-50 transition-colors ${selection.has(o.id) ? "bg-teal-50/50" : ""}`}>
         <td className="py-3 px-3">
           <input type="checkbox" checked={selection.has(o.id)} onChange={() => toggleSelect(o.id)} className="w-4 h-4 rounded border-gray-300 text-[#0d9488] focus:ring-[#0d9488]" />
         </td>
-        <td onClick={() => navigate("/admin/order-request/" + o.id)} className="py-3 px-3 text-xs font-bold text-[#0d9488] whitespace-nowrap cursor-pointer">#{(o.id || "").substring(0, 6)}</td>
-        <td onClick={() => navigate("/admin/order-request/" + o.id)} className="py-3 px-3 text-xs text-gray-500 whitespace-nowrap cursor-pointer">{fmtDate(o.createdAt || o.submittedAt || o.date)}</td>
-        <td onClick={() => navigate("/admin/order-request/" + o.id)} className="py-3 px-3 text-xs font-bold text-black whitespace-nowrap truncate max-w-[200px] cursor-pointer">{getAddr(o)}</td>
+
+        {/* 1. Date Placed */}
+        <td onClick={() => navigate("/admin/order-request/" + o.id)} className="py-3 px-3 text-xs text-gray-500 whitespace-nowrap cursor-pointer">
+          {fmtDate(o.createdAt || o.submittedAt || o.date)}
+        </td>
+
+        {/* 2. Customer */}
         <td onClick={() => navigate("/admin/order-request/" + o.id)} className="py-3 px-3 whitespace-nowrap cursor-pointer">
           <p className="text-xs font-bold text-black">{getName(o)}</p>
           <p className="text-[10px] text-gray-400">{o.email || ""}</p>
         </td>
+
+        {/* 3. Address */}
+        <td onClick={() => navigate("/admin/order-request/" + o.id)} className="py-3 px-3 text-xs font-bold text-black whitespace-nowrap truncate max-w-[200px] cursor-pointer">
+          {getAddr(o)}
+        </td>
+
+        {/* 4. Items */}
         <td className="py-3 px-3 text-center whitespace-nowrap">
           <button onClick={(e) => { e.stopPropagation(); setItemsPopup(items); }}
             className="text-xs font-bold text-[#0d9488] hover:underline cursor-pointer">
             {items.length}
           </button>
         </td>
-        <td onClick={() => navigate("/admin/order-request/" + o.id)} className="py-3 px-3 text-xs font-bold text-right whitespace-nowrap cursor-pointer">{fmtCurrency(getTotal(o))}</td>
+
+        {/* 5. Total */}
+        <td onClick={() => navigate("/admin/order-request/" + o.id)} className="py-3 px-3 text-xs font-bold text-right whitespace-nowrap cursor-pointer">
+          {fmtCurrency(getTotal(o))}
+        </td>
+
+        {/* 6. Appt Requested Time (with photographer) */}
         <td onClick={() => navigate("/admin/order-request/" + o.id)} className="py-3 px-3 whitespace-nowrap cursor-pointer">
-          {isPast ? (
-            <span className="inline-block px-2.5 py-1 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-lg shadow-sm">
-              {requestedDate} {requestedTime}
-            </span>
-          ) : isScheduled ? (
-            <span className="inline-block px-2.5 py-1 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg shadow-sm">
-              {requestedDate} {requestedTime}
-            </span>
-          ) : requestedDate ? (
-            <span className="inline-block px-2.5 py-1 bg-red-500 text-white text-[10px] font-black uppercase tracking-widest rounded-lg shadow-sm">
-              {requestedDate} {requestedTime}
-            </span>
+          <div className="flex flex-col items-start gap-1">
+            {isPast ? (
+              <span className="inline-block px-2.5 py-1 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-lg shadow-sm">
+                {requestedDate} {requestedTime}
+              </span>
+            ) : isScheduled ? (
+              <span className="inline-block px-2.5 py-1 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg shadow-sm">
+                {requestedDate} {requestedTime}
+              </span>
+            ) : requestedDate ? (
+              <span className="inline-block px-2.5 py-1 bg-red-500 text-white text-[10px] font-black uppercase tracking-widest rounded-lg shadow-sm">
+                {requestedDate} {requestedTime}
+              </span>
+            ) : (
+              <span className="text-[10px] text-gray-300">—</span>
+            )}
+            {photogText && (
+              <p className="text-[9px] text-gray-400 font-bold italic leading-none ml-1">
+                {isScheduled ? "By: " : "Pref: "}{photogText}
+              </p>
+            )}
+          </div>
+        </td>
+
+        {/* 7. Notes */}
+        <td className="py-3 px-3 text-center whitespace-nowrap">
+          {notes.trim() ? (
+            <button onClick={(e) => { e.stopPropagation(); setNotesPopup(notes.trim()); }} className="text-lg hover:scale-110 transition-transform">
+              🗒️
+            </button>
           ) : (
-            <span className="text-[10px] text-gray-300">—</span>
+            <span className="text-gray-300">—</span>
           )}
         </td>
-        <td onClick={() => navigate("/admin/order-request/" + o.id)} className="py-3 px-3 whitespace-nowrap cursor-pointer">
+
+        {/* 8. Status */}
+        <td onClick={() => navigate("/admin/order-request/" + o.id)} className="py-3 px-3 whitespace-nowrap cursor-pointer text-center">
           <span className={"px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest " + statusInfo.color}>
             {statusInfo.label}
           </span>
+        </td>
+
+        {/* 9. Order # */}
+        <td onClick={() => navigate("/admin/order-request/" + o.id)} className="py-3 px-3 text-xs font-bold text-[#0d9488] whitespace-nowrap cursor-pointer text-right">
+          #{(o.id || "").substring(0, 6)}
         </td>
       </tr>
     );
@@ -355,14 +403,15 @@ export default function AdminOrders() {
                         checked={sect1Filtered.slice(0, sect1.perPage).length > 0 && sect1Filtered.slice(0, sect1.perPage).every(o => selection.has(o.id))}
                         className="w-4 h-4 rounded border-gray-300 text-[#0d9488] focus:ring-[#0d9488]" />
                     </th>
-                    <th className={thCls}>#</th>
                     <th className={thCls}>Placed</th>
-                    <th className={thCls}>Address</th>
                     <th className={thCls}>Customer</th>
+                    <th className={thCls}>Address</th>
                     <th className={thCls + " text-center"}>Items</th>
                     <th className={thCls + " text-right"}>Total</th>
                     <th className={thCls}>Appointment</th>
-                    <th className={thCls}>Status</th>
+                    <th className={thCls + " text-center"}>Notes</th>
+                    <th className={thCls + " text-center"}>Status</th>
+                    <th className={thCls + " text-right"}>#</th>
                   </tr></thead>
                   <tbody>{sect1Filtered.slice(0, sect1.perPage).map(o => <OrderRow key={o.id} o={o} />)}</tbody>
                 </table>
@@ -400,14 +449,15 @@ export default function AdminOrders() {
                         checked={sect2Filtered.slice(0, sect2.perPage).length > 0 && sect2Filtered.slice(0, sect2.perPage).every(o => selection.has(o.id))}
                         className="w-4 h-4 rounded border-gray-300 text-[#0d9488] focus:ring-[#0d9488]" />
                     </th>
-                    <SortHeader label="#" field="id" current={sect2.sortField} order={sect2.sortOrder} onSort={(f: any) => setSect2({...sect2, sortField: f, sortOrder: sect2.sortField === f ? (sect2.sortOrder === "asc" ? "desc" : "asc") : "desc"})} />
                     <SortHeader label="Placed" field="createdAt" current={sect2.sortField} order={sect2.sortOrder} onSort={(f: any) => setSect2({...sect2, sortField: f, sortOrder: sect2.sortField === f ? (sect2.sortOrder === "asc" ? "desc" : "asc") : "desc"})} />
-                    <th className={thCls}>Address</th>
                     <SortHeader label="Customer" field="customer" current={sect2.sortField} order={sect2.sortOrder} onSort={(f: any) => setSect2({...sect2, sortField: f, sortOrder: sect2.sortField === f ? (sect2.sortOrder === "asc" ? "desc" : "asc") : "desc"})} />
+                    <th className={thCls}>Address</th>
                     <th className={thCls + " text-center"}>Items</th>
                     <SortHeader label="Total" field="total" current={sect2.sortField} order={sect2.sortOrder} align="right" onSort={(f: any) => setSect2({...sect2, sortField: f, sortOrder: sect2.sortField === f ? (sect2.sortOrder === "asc" ? "desc" : "asc") : "desc"})} />
                     <SortHeader label="Appointment" field="appointment" current={sect2.sortField} order={sect2.sortOrder} onSort={(f: any) => setSect2({...sect2, sortField: f, sortOrder: sect2.sortField === f ? (sect2.sortOrder === "asc" ? "desc" : "asc") : "desc"})} />
-                    <SortHeader label="Status" field="status" current={sect2.sortField} order={sect2.sortOrder} onSort={(f: any) => setSect2({...sect2, sortField: f, sortOrder: sect2.sortField === f ? (sect2.sortOrder === "asc" ? "desc" : "asc") : "desc"})} />
+                    <th className={thCls + " text-center"}>Notes</th>
+                    <SortHeader label="Status" field="status" current={sect2.sortField} order={sect2.sortOrder} align="center" onSort={(f: any) => setSect2({...sect2, sortField: f, sortOrder: sect2.sortField === f ? (sect2.sortOrder === "asc" ? "desc" : "asc") : "desc"})} />
+                    <SortHeader label="#" field="id" current={sect2.sortField} order={sect2.sortOrder} align="right" onSort={(f: any) => setSect2({...sect2, sortField: f, sortOrder: sect2.sortField === f ? (sect2.sortOrder === "asc" ? "desc" : "asc") : "desc"})} />
                   </tr></thead>
                   <tbody>{sect2Filtered.slice(0, sect2.perPage).map(o => <OrderRow key={o.id} o={o} />)}</tbody>
                 </table>
@@ -445,14 +495,15 @@ export default function AdminOrders() {
                         checked={sect3Filtered.slice(0, sect3.perPage).length > 0 && sect3Filtered.slice(0, sect3.perPage).every(o => selection.has(o.id))}
                         className="w-4 h-4 rounded border-gray-300 text-[#0d9488] focus:ring-[#0d9488]" />
                     </th>
-                    <th className={thCls}>#</th>
                     <th className={thCls}>Placed</th>
-                    <th className={thCls}>Address</th>
                     <th className={thCls}>Customer</th>
+                    <th className={thCls}>Address</th>
                     <th className={thCls + " text-center"}>Items</th>
                     <th className={thCls + " text-right"}>Total</th>
                     <th className={thCls}>Appointment</th>
-                    <th className={thCls}>Status</th>
+                    <th className={thCls + " text-center"}>Notes</th>
+                    <th className={thCls + " text-center"}>Status</th>
+                    <th className={thCls + " text-right"}>#</th>
                   </tr></thead>
                   <tbody>{sect3Filtered.slice(0, sect3.perPage).map(o => <OrderRow key={o.id} o={o} />)}</tbody>
                 </table>
@@ -497,7 +548,7 @@ export default function AdminOrders() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setItemsPopup(null)}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-black uppercase tracking-widest">Order Items</h3>
+              <h3 className="text-sm font-black uppercase tracking-widest text-[#0d9488]">Order Items</h3>
               <button onClick={() => setItemsPopup(null)}><X className="w-5 h-5 text-gray-400 hover:text-black" /></button>
             </div>
             {itemsPopup.length === 0 ? (
@@ -516,6 +567,25 @@ export default function AdminOrders() {
                 })}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {notesPopup && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setNotesPopup(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-black uppercase tracking-widest text-[#0d9488]">Order Notes</h3>
+              <button onClick={() => setNotesPopup(null)}><X className="w-5 h-5 text-gray-400 hover:text-black" /></button>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 max-h-[60vh] overflow-y-auto">
+              <p className="text-sm font-medium text-black whitespace-pre-wrap leading-relaxed">
+                {notesPopup}
+              </p>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <Button onClick={() => setNotesPopup(null)} className="bg-black text-white rounded-xl text-xs font-bold px-6">Close</Button>
+            </div>
           </div>
         </div>
       )}
