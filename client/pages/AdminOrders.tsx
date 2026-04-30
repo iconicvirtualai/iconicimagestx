@@ -330,7 +330,7 @@ export default function AdminOrders() {
             )}
             {photogText && (
               <p className="text-[9px] text-gray-400 font-bold italic leading-none ml-1">
-                {isScheduled ? "By: " : "Pref: "}{photogText}
+                {photogText}
               </p>
             )}
           </div>

@@ -384,7 +384,7 @@ export default function AdminDashboard() {
                         : r.photographerPreference;
                       return photog ? (
                         <p className="text-[9px] text-[#0d9488] font-bold italic leading-none mt-1">
-                          {isSched ? "By: " : "Pref: "}{photog}
+                          {photog}
                         </p>
                       ) : null;
                     })()}
@@ -469,7 +469,7 @@ export default function AdminDashboard() {
                       : r.photographerPreference;
                     return photog ? (
                       <p className="text-[8px] text-gray-500 italic mt-0.5">
-                        {isSched ? "By: " : "Pref: "}{photog}
+                        {photog}
                       </p>
                     ) : null;
                   })()}
