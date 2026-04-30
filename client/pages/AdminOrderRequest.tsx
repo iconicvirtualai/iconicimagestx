@@ -33,7 +33,20 @@ function fmtDate(ts: any): string {
   };
 
   if (ts.toDate) return ts.toDate().toLocaleDateString("en-US", options);
-  try { return new Date(ts).toLocaleDateString("en-US", options); } catch { return String(ts); }
+
+  // If it's a YYYY-MM-DD string, add noon to prevent timezone shifts
+  let dateObj: Date;
+  if (typeof ts === "string" && /^\d{4}-\d{2}-\d{2}$/.test(ts)) {
+    dateObj = new Date(ts + "T12:00:00");
+  } else {
+    dateObj = new Date(ts);
+  }
+
+  try {
+    return isNaN(dateObj.getTime()) ? String(ts) : dateObj.toLocaleDateString("en-US", options);
+  } catch {
+    return String(ts);
+  }
 }
 
 function fmtTimeStandard(timeStr: string | any): string {
@@ -238,6 +251,8 @@ export default function AdminOrderRequest() {
   const f = (key: string) => form[key] ?? order[key] ?? "";
   const setF = (key: string) => (val: string) => setForm((prev: any) => ({ ...prev, [key]: val }));
 
+  const isScheduledState = ["scheduled", "in_progress", "delivered", "paid"].includes(statusKey);
+
   return (
     <AdminLayout title="Order Request">
       <button onClick={() => navigate("/admin/orders")} className="flex items-center gap-1.5 text-gray-400 hover:text-black text-xs font-bold uppercase tracking-widest mb-6">
@@ -287,8 +302,8 @@ export default function AdminOrderRequest() {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <h3 className={`${labelCls} mb-4`}>Appointment</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-              <Field label="Requested Date" value={order.scheduledDate || fmtDate(order.appointmentDate || order.requestedDate)} editing={editing} editValue={f("appointmentDate")} onChange={setF("appointmentDate")} type="date" />
-              <Field label="Requested Time" value={fmtTimeStandard(order.scheduledTime || order.appointmentTime || order.requestedTime)} editing={editing} editValue={f("appointmentTime")} onChange={setF("appointmentTime")} type="time" />
+              <Field label={isScheduledState ? "Scheduled Date" : "Requested Date"} value={order.scheduledDate || fmtDate(order.appointmentDate || order.requestedDate)} editing={editing} editValue={f("appointmentDate")} onChange={setF("appointmentDate")} type="date" />
+              <Field label={isScheduledState ? "Scheduled Time" : "Requested Time"} value={fmtTimeStandard(order.scheduledTime || order.appointmentTime || order.requestedTime)} editing={editing} editValue={f("appointmentTime")} onChange={setF("appointmentTime")} type="time" />
               <Field label="Access Method" value={order.accessMethod} editing={editing} editValue={f("accessMethod")} onChange={setF("accessMethod")} />
               <Field label="Lockbox Code" value={order.lockboxCode} editing={editing} editValue={f("lockboxCode")} onChange={setF("lockboxCode")} />
             </div>
@@ -386,7 +401,7 @@ export default function AdminOrderRequest() {
             </div>
             <div className="mt-4 pt-4 border-t border-gray-100 space-y-2 text-xs">
               <div className="flex justify-between"><span className={`${labelCls}`}>Status</span><span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${statusInfo.color}`}>{statusInfo.label}</span></div>
-              <div className="flex justify-between"><span className={`${labelCls}`}>Requested</span><span className="font-bold text-white">{order.scheduledDate || fmtDate(order.appointmentDate) || "—"}</span></div>
+              <div className="flex justify-between"><span className={`${labelCls}`}>{isScheduledState ? "Scheduled" : "Requested"}</span><span className="font-bold text-white">{order.scheduledDate || fmtDate(order.appointmentDate) || "—"}</span></div>
               {(order.scheduledTime || order.appointmentTime) && (
                 <div className="flex justify-between"><span className={`${labelCls}`}>Time</span><span className="font-bold text-white">{fmtTimeStandard(order.scheduledTime || order.appointmentTime)}</span></div>
               )}
