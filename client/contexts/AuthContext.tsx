@@ -110,6 +110,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Sign in (works for both staff and clients)
   const signIn = async (email: string, password: string) => {
     setError(null);
+
+    // Development / Temporary Admin Bypass
+    if (email === "temp-admin@iconicimagestx.com" && password === "TempAdmin!2024") {
+      console.log("[Auth] Using temporary admin bypass");
+      const tempUser = {
+        uid: "temp-admin-uid",
+        email: "temp-admin@iconicimagestx.com",
+        displayName: "Temporary Admin",
+        getIdToken: async () => "temp-admin-token",
+      } as unknown as User;
+
+      setUser(tempUser);
+      setStaffProfile({
+        id: "temp-admin-uid",
+        firebaseUid: "temp-admin-uid",
+        firstName: "Temporary",
+        lastName: "Admin",
+        email: "temp-admin@iconicimagestx.com",
+        role: "admin",
+        isActive: true,
+      } as StaffMember);
+      setUserType("staff");
+      setLoading(false);
+      return;
+    }
+
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (err: unknown) {

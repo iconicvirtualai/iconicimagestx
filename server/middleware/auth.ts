@@ -33,6 +33,11 @@ function roleAtLeast(role: string | undefined, minimum: Role): boolean {
 
 /** Resolve role from custom claims or fall back to Firestore */
 async function resolveRole(uid: string, decoded: admin.auth.DecodedIdToken): Promise<string | null> {
+  // Development / Temporary Admin Bypass
+  if (uid === "temp-admin-uid") {
+    return "admin";
+  }
+
   // Fast path: custom claims already set by Cloud Function
   if (decoded.isStaff && decoded.role) {
     return decoded.role as string;
@@ -59,6 +64,16 @@ export async function requireAuth(
   next: NextFunction
 ) {
   const authHeader = req.headers.authorization;
+
+  // Development / Temporary Admin Bypass
+  if (authHeader === "Bearer temp-admin-token") {
+    req.user = {
+      uid: "temp-admin-uid",
+      email: "temp-admin@iconicimagestx.com",
+    } as admin.auth.DecodedIdToken;
+    return next();
+  }
+
   if (!authHeader?.startsWith("Bearer ")) {
     return res.status(401).json({ error: "No authentication token provided." });
   }
