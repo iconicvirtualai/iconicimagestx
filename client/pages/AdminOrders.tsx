@@ -16,8 +16,37 @@ function fmtAddr(a: any): string {
 function fmtDate(ts: any): string {
   if (!ts) return "";
   if (typeof ts === "string" && ts.includes(",")) return ts;
-  if (ts.toDate) return ts.toDate().toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  try { return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric" }); } catch { return ""; }
+
+  // Use America/Chicago (CST/CDT) for all formatting
+  const options: Intl.DateTimeFormatOptions = {
+    month: "short",
+    day: "numeric",
+    timeZone: "America/Chicago"
+  };
+
+  if (ts.toDate) return ts.toDate().toLocaleDateString("en-US", options);
+  try { return new Date(ts).toLocaleDateString("en-US", options); } catch { return ""; }
+}
+
+function fmtTimeStandard(timeStr: string | any): string {
+  if (!timeStr) return "";
+  if (typeof timeStr !== "string") return "";
+
+  // If it's already in 12h format (e.g. "2:30 PM"), return as is
+  if (timeStr.match(/am|pm/i)) return timeStr.toUpperCase();
+
+  // Parse military time (e.g. "14:30")
+  const parts = timeStr.split(":");
+  if (parts.length < 2) return timeStr;
+
+  let hours = parseInt(parts[0], 10);
+  const minutes = parts[1];
+  const ampm = hours >= 12 ? "PM" : "AM";
+
+  hours = hours % 12;
+  hours = hours ? hours : 12; // the hour '0' should be '12'
+
+  return `${hours}:${minutes} ${ampm}`;
 }
 function fmtCurrency(n: number): string { return "$" + (n || 0).toLocaleString("en-US", { minimumFractionDigits: 2 }); }
 function safe(v: any): string {
@@ -72,9 +101,9 @@ export default function AdminOrders() {
   const [isBulkProjecting, setIsBulkProjecting] = React.useState(false);
 
   // Section States
-  const [sect1, setSect1] = React.useState({ perPage: 20, sort: "newest", search: "" });
-  const [sect2, setSect2] = React.useState({ perPage: 20, sortField: "createdAt", sortOrder: "desc" as "asc"|"desc", search: "" });
-  const [sect3, setSect3] = React.useState({ perPage: 20, sort: "newest", search: "" });
+  const [sect1, setSect1] = React.useState({ perPage: 20, sort: "newest", search: "", collapsed: false });
+  const [sect2, setSect2] = React.useState({ perPage: 20, sortField: "createdAt", sortOrder: "desc" as "asc"|"desc", search: "", collapsed: false });
+  const [sect3, setSect3] = React.useState({ perPage: 20, sort: "newest", search: "", collapsed: true });
 
   React.useEffect(() => {
     const unsub = onSnapshot(collection(db, "orderRequests"), snap => {
@@ -230,7 +259,7 @@ export default function AdminOrders() {
     const statusInfo = UNIFIED_STATUS[status] || UNIFIED_STATUS.unscheduled;
     const items = getLineItems(o);
     const requestedDate = o.scheduledDate || fmtDate(o.appointmentDate || o.requestedDate);
-    const requestedTime = o.scheduledTime || o.appointmentTime || o.requestedTime || "";
+    const requestedTime = fmtTimeStandard(o.scheduledTime || o.appointmentTime || o.requestedTime || "");
 
     // Past detection logic
     let apptDate: Date | null = null;
@@ -295,7 +324,11 @@ export default function AdminOrders() {
           {/* ── SECTION 1: REQUIRING ACTION ── */}
           <section>
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
-              <h2 className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
+              <h2
+                className="text-sm font-black uppercase tracking-widest flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity select-none"
+                onClick={() => setSect1({...sect1, collapsed: !sect1.collapsed})}
+              >
+                {sect1.collapsed ? <ChevronDown className="w-4 h-4 text-[#0d9488]" /> : <ChevronUp className="w-4 h-4 text-[#0d9488]" />}
                 Orders Requiring Action <span className="bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px]">{actionRequired.length}</span>
               </h2>
               <div className="flex items-center gap-2">
@@ -313,32 +346,38 @@ export default function AdminOrders() {
                 </select>
               </div>
             </div>
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto">
-              <table className="w-full">
-                <thead><tr className="border-b-2 border-gray-200">
-                  <th className="py-3 px-3 text-left w-10">
-                    <input type="checkbox" onChange={() => selectAll(sect1Filtered.slice(0, sect1.perPage).map(o => o.id))}
-                      checked={sect1Filtered.slice(0, sect1.perPage).length > 0 && sect1Filtered.slice(0, sect1.perPage).every(o => selection.has(o.id))}
-                      className="w-4 h-4 rounded border-gray-300 text-[#0d9488] focus:ring-[#0d9488]" />
-                  </th>
-                  <th className={thCls}>#</th>
-                  <th className={thCls}>Placed</th>
-                  <th className={thCls}>Address</th>
-                  <th className={thCls}>Customer</th>
-                  <th className={thCls + " text-center"}>Items</th>
-                  <th className={thCls + " text-right"}>Total</th>
-                  <th className={thCls}>Appointment</th>
-                  <th className={thCls}>Status</th>
-                </tr></thead>
-                <tbody>{sect1Filtered.slice(0, sect1.perPage).map(o => <OrderRow key={o.id} o={o} />)}</tbody>
-              </table>
-            </div>
+            {!sect1.collapsed && (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto animate-in fade-in slide-in-from-top-1 duration-300">
+                <table className="w-full">
+                  <thead><tr className="border-b-2 border-gray-200">
+                    <th className="py-3 px-3 text-left w-10">
+                      <input type="checkbox" onChange={() => selectAll(sect1Filtered.slice(0, sect1.perPage).map(o => o.id))}
+                        checked={sect1Filtered.slice(0, sect1.perPage).length > 0 && sect1Filtered.slice(0, sect1.perPage).every(o => selection.has(o.id))}
+                        className="w-4 h-4 rounded border-gray-300 text-[#0d9488] focus:ring-[#0d9488]" />
+                    </th>
+                    <th className={thCls}>#</th>
+                    <th className={thCls}>Placed</th>
+                    <th className={thCls}>Address</th>
+                    <th className={thCls}>Customer</th>
+                    <th className={thCls + " text-center"}>Items</th>
+                    <th className={thCls + " text-right"}>Total</th>
+                    <th className={thCls}>Appointment</th>
+                    <th className={thCls}>Status</th>
+                  </tr></thead>
+                  <tbody>{sect1Filtered.slice(0, sect1.perPage).map(o => <OrderRow key={o.id} o={o} />)}</tbody>
+                </table>
+              </div>
+            )}
           </section>
 
           {/* ── SECTION 2: ALL ORDERS ── */}
           <section>
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
-              <h2 className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
+              <h2
+                className="text-sm font-black uppercase tracking-widest flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity select-none"
+                onClick={() => setSect2({...sect2, collapsed: !sect2.collapsed})}
+              >
+                {sect2.collapsed ? <ChevronDown className="w-4 h-4 text-black" /> : <ChevronUp className="w-4 h-4 text-black" />}
                 All Orders <span className="bg-black text-white px-2 py-0.5 rounded-full text-[10px]">{allActive.length}</span>
               </h2>
               <div className="flex items-center gap-2">
@@ -352,32 +391,38 @@ export default function AdminOrders() {
                 </select>
               </div>
             </div>
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto">
-              <table className="w-full">
-                <thead><tr className="border-b-2 border-gray-200">
-                  <th className="py-3 px-3 text-left w-10">
-                    <input type="checkbox" onChange={() => selectAll(sect2Filtered.slice(0, sect2.perPage).map(o => o.id))}
-                      checked={sect2Filtered.slice(0, sect2.perPage).length > 0 && sect2Filtered.slice(0, sect2.perPage).every(o => selection.has(o.id))}
-                      className="w-4 h-4 rounded border-gray-300 text-[#0d9488] focus:ring-[#0d9488]" />
-                  </th>
-                  <SortHeader label="#" field="id" current={sect2.sortField} order={sect2.sortOrder} onSort={(f: any) => setSect2({...sect2, sortField: f, sortOrder: sect2.sortField === f ? (sect2.sortOrder === "asc" ? "desc" : "asc") : "desc"})} />
-                  <SortHeader label="Placed" field="createdAt" current={sect2.sortField} order={sect2.sortOrder} onSort={(f: any) => setSect2({...sect2, sortField: f, sortOrder: sect2.sortField === f ? (sect2.sortOrder === "asc" ? "desc" : "asc") : "desc"})} />
-                  <th className={thCls}>Address</th>
-                  <SortHeader label="Customer" field="customer" current={sect2.sortField} order={sect2.sortOrder} onSort={(f: any) => setSect2({...sect2, sortField: f, sortOrder: sect2.sortField === f ? (sect2.sortOrder === "asc" ? "desc" : "asc") : "desc"})} />
-                  <th className={thCls + " text-center"}>Items</th>
-                  <SortHeader label="Total" field="total" current={sect2.sortField} order={sect2.sortOrder} align="right" onSort={(f: any) => setSect2({...sect2, sortField: f, sortOrder: sect2.sortField === f ? (sect2.sortOrder === "asc" ? "desc" : "asc") : "desc"})} />
-                  <SortHeader label="Appointment" field="appointment" current={sect2.sortField} order={sect2.sortOrder} onSort={(f: any) => setSect2({...sect2, sortField: f, sortOrder: sect2.sortField === f ? (sect2.sortOrder === "asc" ? "desc" : "asc") : "desc"})} />
-                  <SortHeader label="Status" field="status" current={sect2.sortField} order={sect2.sortOrder} onSort={(f: any) => setSect2({...sect2, sortField: f, sortOrder: sect2.sortField === f ? (sect2.sortOrder === "asc" ? "desc" : "asc") : "desc"})} />
-                </tr></thead>
-                <tbody>{sect2Filtered.slice(0, sect2.perPage).map(o => <OrderRow key={o.id} o={o} />)}</tbody>
-              </table>
-            </div>
+            {!sect2.collapsed && (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto animate-in fade-in slide-in-from-top-1 duration-300">
+                <table className="w-full">
+                  <thead><tr className="border-b-2 border-gray-200">
+                    <th className="py-3 px-3 text-left w-10">
+                      <input type="checkbox" onChange={() => selectAll(sect2Filtered.slice(0, sect2.perPage).map(o => o.id))}
+                        checked={sect2Filtered.slice(0, sect2.perPage).length > 0 && sect2Filtered.slice(0, sect2.perPage).every(o => selection.has(o.id))}
+                        className="w-4 h-4 rounded border-gray-300 text-[#0d9488] focus:ring-[#0d9488]" />
+                    </th>
+                    <SortHeader label="#" field="id" current={sect2.sortField} order={sect2.sortOrder} onSort={(f: any) => setSect2({...sect2, sortField: f, sortOrder: sect2.sortField === f ? (sect2.sortOrder === "asc" ? "desc" : "asc") : "desc"})} />
+                    <SortHeader label="Placed" field="createdAt" current={sect2.sortField} order={sect2.sortOrder} onSort={(f: any) => setSect2({...sect2, sortField: f, sortOrder: sect2.sortField === f ? (sect2.sortOrder === "asc" ? "desc" : "asc") : "desc"})} />
+                    <th className={thCls}>Address</th>
+                    <SortHeader label="Customer" field="customer" current={sect2.sortField} order={sect2.sortOrder} onSort={(f: any) => setSect2({...sect2, sortField: f, sortOrder: sect2.sortField === f ? (sect2.sortOrder === "asc" ? "desc" : "asc") : "desc"})} />
+                    <th className={thCls + " text-center"}>Items</th>
+                    <SortHeader label="Total" field="total" current={sect2.sortField} order={sect2.sortOrder} align="right" onSort={(f: any) => setSect2({...sect2, sortField: f, sortOrder: sect2.sortField === f ? (sect2.sortOrder === "asc" ? "desc" : "asc") : "desc"})} />
+                    <SortHeader label="Appointment" field="appointment" current={sect2.sortField} order={sect2.sortOrder} onSort={(f: any) => setSect2({...sect2, sortField: f, sortOrder: sect2.sortField === f ? (sect2.sortOrder === "asc" ? "desc" : "asc") : "desc"})} />
+                    <SortHeader label="Status" field="status" current={sect2.sortField} order={sect2.sortOrder} onSort={(f: any) => setSect2({...sect2, sortField: f, sortOrder: sect2.sortField === f ? (sect2.sortOrder === "asc" ? "desc" : "asc") : "desc"})} />
+                  </tr></thead>
+                  <tbody>{sect2Filtered.slice(0, sect2.perPage).map(o => <OrderRow key={o.id} o={o} />)}</tbody>
+                </table>
+              </div>
+            )}
           </section>
 
           {/* ── SECTION 3: ARCHIVES & CANCELLATIONS ── */}
           <section>
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
-              <h2 className="text-sm font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
+              <h2
+                className="text-sm font-black uppercase tracking-widest text-gray-400 flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity select-none"
+                onClick={() => setSect3({...sect3, collapsed: !sect3.collapsed})}
+              >
+                {sect3.collapsed ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronUp className="w-4 h-4 text-gray-400" />}
                 Archives & Cancellations <span className="bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full text-[10px]">{archived.length}</span>
               </h2>
               <div className="flex items-center gap-2">
@@ -391,26 +436,28 @@ export default function AdminOrders() {
                 </select>
               </div>
             </div>
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto opacity-70">
-              <table className="w-full">
-                <thead><tr className="border-b-2 border-gray-200">
-                  <th className="py-3 px-3 text-left w-10">
-                    <input type="checkbox" onChange={() => selectAll(sect3Filtered.slice(0, sect3.perPage).map(o => o.id))}
-                      checked={sect3Filtered.slice(0, sect3.perPage).length > 0 && sect3Filtered.slice(0, sect3.perPage).every(o => selection.has(o.id))}
-                      className="w-4 h-4 rounded border-gray-300 text-[#0d9488] focus:ring-[#0d9488]" />
-                  </th>
-                  <th className={thCls}>#</th>
-                  <th className={thCls}>Placed</th>
-                  <th className={thCls}>Address</th>
-                  <th className={thCls}>Customer</th>
-                  <th className={thCls + " text-center"}>Items</th>
-                  <th className={thCls + " text-right"}>Total</th>
-                  <th className={thCls}>Appointment</th>
-                  <th className={thCls}>Status</th>
-                </tr></thead>
-                <tbody>{sect3Filtered.slice(0, sect3.perPage).map(o => <OrderRow key={o.id} o={o} />)}</tbody>
-              </table>
-            </div>
+            {!sect3.collapsed && (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto opacity-70 animate-in fade-in slide-in-from-top-1 duration-300">
+                <table className="w-full">
+                  <thead><tr className="border-b-2 border-gray-200">
+                    <th className="py-3 px-3 text-left w-10">
+                      <input type="checkbox" onChange={() => selectAll(sect3Filtered.slice(0, sect3.perPage).map(o => o.id))}
+                        checked={sect3Filtered.slice(0, sect3.perPage).length > 0 && sect3Filtered.slice(0, sect3.perPage).every(o => selection.has(o.id))}
+                        className="w-4 h-4 rounded border-gray-300 text-[#0d9488] focus:ring-[#0d9488]" />
+                    </th>
+                    <th className={thCls}>#</th>
+                    <th className={thCls}>Placed</th>
+                    <th className={thCls}>Address</th>
+                    <th className={thCls}>Customer</th>
+                    <th className={thCls + " text-center"}>Items</th>
+                    <th className={thCls + " text-right"}>Total</th>
+                    <th className={thCls}>Appointment</th>
+                    <th className={thCls}>Status</th>
+                  </tr></thead>
+                  <tbody>{sect3Filtered.slice(0, sect3.perPage).map(o => <OrderRow key={o.id} o={o} />)}</tbody>
+                </table>
+              </div>
+            )}
           </section>
         </div>
       )}

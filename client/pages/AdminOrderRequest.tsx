@@ -23,8 +23,31 @@ function fmtAddr(a: any): string {
 function fmtDate(ts: any): string {
   if (!ts) return "—";
   if (typeof ts === "string" && ts.includes(",")) return ts;
-  if (ts.toDate) return ts.toDate().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
-  try { return new Date(ts).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }); } catch { return String(ts); }
+
+  const options: Intl.DateTimeFormatOptions = {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "America/Chicago"
+  };
+
+  if (ts.toDate) return ts.toDate().toLocaleDateString("en-US", options);
+  try { return new Date(ts).toLocaleDateString("en-US", options); } catch { return String(ts); }
+}
+
+function fmtTimeStandard(timeStr: string | any): string {
+  if (!timeStr) return "";
+  if (typeof timeStr !== "string") return "";
+  if (timeStr.match(/am|pm/i)) return timeStr.toUpperCase();
+  const parts = timeStr.split(":");
+  if (parts.length < 2) return timeStr;
+  let hours = parseInt(parts[0], 10);
+  const minutes = parts[1];
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  return `${hours}:${minutes} ${ampm}`;
 }
 function fmtCurrency(n: number): string { return "$" + (n || 0).toLocaleString("en-US", { minimumFractionDigits: 2 }); }
 function safe(v: any): string {
@@ -265,7 +288,7 @@ export default function AdminOrderRequest() {
             <h3 className={`${labelCls} mb-4`}>Appointment</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
               <Field label="Requested Date" value={order.scheduledDate || fmtDate(order.appointmentDate || order.requestedDate)} editing={editing} editValue={f("appointmentDate")} onChange={setF("appointmentDate")} type="date" />
-              <Field label="Requested Time" value={order.scheduledTime || order.appointmentTime || order.requestedTime} editing={editing} editValue={f("appointmentTime")} onChange={setF("appointmentTime")} type="time" />
+              <Field label="Requested Time" value={fmtTimeStandard(order.scheduledTime || order.appointmentTime || order.requestedTime)} editing={editing} editValue={f("appointmentTime")} onChange={setF("appointmentTime")} type="time" />
               <Field label="Access Method" value={order.accessMethod} editing={editing} editValue={f("accessMethod")} onChange={setF("accessMethod")} />
               <Field label="Lockbox Code" value={order.lockboxCode} editing={editing} editValue={f("lockboxCode")} onChange={setF("lockboxCode")} />
             </div>
@@ -365,7 +388,7 @@ export default function AdminOrderRequest() {
               <div className="flex justify-between"><span className={`${labelCls}`}>Status</span><span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${statusInfo.color}`}>{statusInfo.label}</span></div>
               <div className="flex justify-between"><span className={`${labelCls}`}>Requested</span><span className="font-bold text-white">{order.scheduledDate || fmtDate(order.appointmentDate) || "—"}</span></div>
               {(order.scheduledTime || order.appointmentTime) && (
-                <div className="flex justify-between"><span className={`${labelCls}`}>Time</span><span className="font-bold text-white">{order.scheduledTime || order.appointmentTime}</span></div>
+                <div className="flex justify-between"><span className={`${labelCls}`}>Time</span><span className="font-bold text-white">{fmtTimeStandard(order.scheduledTime || order.appointmentTime)}</span></div>
               )}
             </div>
             <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
