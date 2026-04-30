@@ -62,14 +62,35 @@ export default function AdminDashboard() {
 
   const [orderRequests, setOrderRequests] = React.useState<any[]>([]);
   const [loadingOrders, setLoadingOrders] = React.useState(true);
-  const [listingsCount, setListingsCount] = React.useState(0);
-  const [scheduledCount, setScheduledCount] = React.useState(0);
-  const [revenue, setRevenue] = React.useState(0);
+  const [listingsInProgressCount, setListingsInProgressCount] = React.useState(0);
+  const [activeAppointmentsCount, setActiveAppointmentsCount] = React.useState(0);
+  const [paidRevenue, setPaidRevenue] = React.useState(0);
 
   const [showNewOrder, setShowNewOrder] = React.useState(false);
   const [form, setForm] = React.useState(BLANK);
   const [saving, setSaving] = React.useState(false);
   const [search, setSearch] = React.useState("");
+
+  // ─── Helpers ─────────────────────────────────────────────────────────────
+  const isRequiresAttention = (o: any) => {
+    const s = (o.status || "new").toLowerCase().replace(/\s+/g, "_");
+    return ["new", "needs_scheduled", "unscheduled", "request"].includes(s);
+  };
+
+  const isActiveAppointment = (o: any) => {
+    const s = (o.status || "").toLowerCase().replace(/\s+/g, "_");
+    if (!["scheduled", "appt_scheduled", "consult_scheduled"].includes(s)) return false;
+
+    const apptDateStr = o.appointmentDate || o.scheduledDate;
+    if (!apptDateStr) return false;
+
+    try {
+      const apptDate = o.appointmentDate?.toDate ? o.appointmentDate.toDate() : new Date(apptDateStr);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return apptDate >= today;
+    } catch { return false; }
+  };
 
   // ─── Order requests live listener ──────────────────────────────────────────
   React.useEffect(() => {
@@ -77,16 +98,25 @@ export default function AdminDashboard() {
       onSnapshot(q, (snap: any) => {
         const docs = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
         setOrderRequests(docs);
-        setScheduledCount(docs.filter((d: any) => d.status === "scheduled").length);
-        setRevenue(docs.reduce((s: number, d: any) => s + (Number(d.total) || 0), 0));
+
+        // Active Appointments: Scheduled + (Today or Future)
+        const activeAppts = docs.filter(isActiveAppointment);
+        setActiveAppointmentsCount(activeAppts.length);
+
+        // Revenue: Paid orders
+        const paidOrders = docs.filter((d: any) => {
+          const s = (d.status || "").toLowerCase();
+          const inv = d.invoice || {};
+          return s === "paid" || s === "delivered_paid" || inv.status === "paid" || inv.amountPaid > 0;
+        });
+        setPaidRevenue(paidOrders.reduce((s: number, d: any) => s + (Number(d.total) || 0), 0));
+
         setLoadingOrders(false);
       });
 
-    // Try createdAt first, fall back to submittedAt if index missing
     const q1 = query(collection(db, "orderRequests"), orderBy("createdAt", "desc"));
     let unsub = attach(q1);
 
-    // If it errors (index not built), fall back silently
     const q1err = onSnapshot(q1, () => {}, () => {
       unsub();
       const q2 = query(collection(db, "orderRequests"), orderBy("submittedAt", "desc"));
@@ -98,9 +128,14 @@ export default function AdminDashboard() {
 
   // ─── Listings live count ────────────────────────────────────────────────────
   React.useEffect(() => {
-    const q = query(collection(db, "listings"), where("status", "!=", "archived"));
-    const unsub = onSnapshot(q, (snap) => setListingsCount(snap.size), () => {
-      onSnapshot(collection(db, "listings"), (snap) => setListingsCount(snap.size));
+    const q = query(collection(db, "listings"), where("status", "in", ["in_progress", "delivered"]));
+    const unsub = onSnapshot(q, (snap) => setListingsInProgressCount(snap.size), () => {
+      // Fallback if "in" query fails (no index)
+      onSnapshot(collection(db, "listings"), (snap) => {
+        const docs = snap.docs.map(d => d.data());
+        const count = docs.filter(d => ["in_progress", "delivered"].includes(d.status)).length;
+        setListingsInProgressCount(count);
+      });
     });
     return () => unsub();
   }, []);
@@ -142,17 +177,22 @@ export default function AdminDashboard() {
     }
   };
 
-  // ─── Filtered list ─────────────────────────────────────────────────────────
+  // ─── Filtered list (Orders Requiring Attention) ───────────────────────────
+  const attentionOrders = React.useMemo(() => {
+    return orderRequests.filter(isRequiresAttention);
+  }, [orderRequests]);
+
   const filtered = React.useMemo(() => {
-    if (!search.trim()) return orderRequests;
+    let result = attentionOrders;
+    if (!search.trim()) return result;
     const s = search.toLowerCase();
-    return orderRequests.filter((r) =>
+    return result.filter((r) =>
       r.clientName?.toLowerCase().includes(s) ||
       r.address?.toLowerCase().includes(s) ||
       r.email?.toLowerCase().includes(s) ||
       r.id?.toLowerCase().includes(s)
     );
-  }, [orderRequests, search]);
+  }, [attentionOrders, search]);
 
   const fmtDate = (ts: any) => {
     if (!ts) return "—";
@@ -269,10 +309,10 @@ export default function AdminDashboard() {
       {/* ── Stats Grid ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
         {[
-          { label: "Order Requests", value: orderRequests.length.toString(), icon: <ClipboardList className="w-5 h-5" />, color: "bg-red-500",     href: "/admin/orders" },
-          { label: "Scheduled",      value: scheduledCount.toString(),        icon: <Calendar className="w-5 h-5" />,      color: "bg-[#0d9488]", href: "/admin/schedule" },
-          { label: "Projects in Progress",value: listingsCount.toString(),     icon: <LayoutGrid className="w-5 h-5" />,    color: "bg-blue-500",  href: "/admin/listings" },
-          { label: "Revenue",        value: fmtRev(revenue),                  icon: <DollarSign className="w-5 h-5" />,    color: "bg-orange-500",href: "/admin/revenue" },
+          { label: "Order Requests", value: attentionOrders.length.toString(), icon: <ClipboardList className="w-5 h-5" />, color: "bg-red-500",     href: "/admin/orders" },
+          { label: "Active Appointments", value: activeAppointmentsCount.toString(), icon: <Calendar className="w-5 h-5" />,      color: "bg-[#0d9488]", href: "/admin/schedule" },
+          { label: "Projects in Progress",value: listingsInProgressCount.toString(), icon: <LayoutGrid className="w-5 h-5" />,    color: "bg-blue-500",  href: "/admin/listings" },
+          { label: "Revenue",        value: fmtRev(paidRevenue),              icon: <DollarSign className="w-5 h-5" />,    color: "bg-orange-500",href: "/admin/revenue" },
         ].map((s) => (
           <Link
             key={s.label}
@@ -292,7 +332,7 @@ export default function AdminDashboard() {
       {/* ── Main content ───────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-        {/* Order Requests Queue */}
+        {/* Orders Requiring Attention Queue */}
         <div id="requests" className="lg:col-span-2">
           <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm">
             <div className="flex items-center justify-between mb-6">
@@ -300,7 +340,7 @@ export default function AdminDashboard() {
                 <div className="p-2 bg-red-50 rounded-lg">
                   <AlertCircle className="w-5 h-5 text-red-500" />
                 </div>
-                <h2 className="text-sm font-black text-black uppercase tracking-widest">Order Requests</h2>
+                <h2 className="text-sm font-black text-black uppercase tracking-widest">Orders Requiring Attention</h2>
               </div>
               <div className="relative">
                 <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
