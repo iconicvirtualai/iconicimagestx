@@ -41,7 +41,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { format, isToday, subDays, isWithinInterval, startOfDay, endOfDay } from "date-fns";
+import { format, subDays, startOfDay } from "date-fns";
 
 // --- Types & Constants ---
 type ServiceType = 'Photos' | 'Twilight' | 'Virtual Staging' | 'Floorplans' | '3D Tour';
@@ -92,9 +92,11 @@ export default function AdminStudio() {
   // Load Settings
   React.useEffect(() => {
     getDoc(doc(db, "settings", "global")).then(snap => {
-      if (snap.exists()) {
-        setApiKey(snap.data().autoEnhanceApiKey || "");
+      let key = import.meta.env.VITE_AUTOENHANCE_API_KEY || "";
+      if (snap.exists() && snap.data().autoEnhanceApiKey) {
+        key = snap.data().autoEnhanceApiKey;
       }
+      setApiKey(key);
     });
   }, []);
 
@@ -383,15 +385,12 @@ function EditingStudio({ listings, apiKey }: { listings: any[], apiKey: string }
     setProcessingId(listing.id);
 
     try {
-      // 1. Mark as Processing
+      // 1. Mark as Processing in Firestore
       await updateDoc(doc(db, "listings", listing.id), {
         workflowStatus: 'Processing',
         updatedAt: serverTimestamp()
       });
 
-      toast.info("Connecting to Autoenhance API...");
-
-      // 2. Integration Layer: Real API calls
       const photos = listing.images || [];
       if (photos.length === 0) {
         toast.error("No photos found to enhance.");
@@ -399,75 +398,119 @@ function EditingStudio({ listings, apiKey }: { listings: any[], apiKey: string }
         return;
       }
 
-      // Prepare payload for Autoenhance
-      // Real API logic based on docs:
-      // a. Upload images to their bucket (assuming we have URLs, we can send them if API supports it,
-      //    or we send raw data. Usually they want a POST to /images or similar).
+      toast.info(`Processing ${photos.length} photos with Autoenhance AI...`);
 
-      // For this implementation, we'll demonstrate the structure of the API call
-      // using the provided reference instructions.
+      // 2. Process each photo
+      const processedImages: any[] = [];
 
-      const response = await fetch("https://api.autoenhance.ai/v2/jobs", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey
-        },
-        body: JSON.stringify({
-          image_urls: photos.map((img: any) => img.url),
-          webhook_url: `${window.location.origin}/api/webhooks/autoenhance`
-        })
-      });
+      for (const photo of photos) {
+        try {
+          // a. Register Image
+          const regRes = await fetch("https://api.autoenhance.ai/v3/images/", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": apiKey
+            },
+            body: JSON.stringify({
+              image_name: photo.name || `image_${Date.now()}.jpg`,
+              order_id: listing.id.substring(0, 8) // Optional: link to a virtual order
+            })
+          });
 
-      if (!response.ok) throw new Error("API call failed");
-      const jobData = await response.json();
-      const jobId = jobData.job_id || jobData.id;
+          if (!regRes.ok) throw new Error("Registration failed");
+          const { upload_url, s3_put_url, id: imageId } = await regRes.json();
+          const targetUrl = upload_url || s3_put_url;
 
-      // Store job ID for polling
+          // b. Fetch photo blob from Firebase
+          const photoBlobRes = await fetch(photo.url);
+          const blob = await photoBlobRes.blob();
+
+          // c. Upload to Autoenhance S3
+          const uploadRes = await fetch(targetUrl, {
+            method: "PUT",
+            headers: {
+              "Content-Type": blob.type
+            },
+            body: blob
+          });
+
+          if (!uploadRes.ok) throw new Error("S3 Upload failed");
+
+          processedImages.push({
+            originalId: photo.id || photo.name,
+            autoenhanceId: imageId,
+            status: 'processing'
+          });
+        } catch (err) {
+          console.error(`Failed to process photo: ${photo.name}`, err);
+        }
+      }
+
+      // Store processed info
       await updateDoc(doc(db, "listings", listing.id), {
-        autoenhanceJobId: jobId,
+        autoenhanceBatch: processedImages,
         updatedAt: serverTimestamp()
       });
 
-      toast.success("Job submitted to Autoenhance!");
+      toast.success("All photos submitted! Monitoring enhancement progress...");
 
-      // 3. Start Polling (in a real app, webhooks are better, but we poll here for UI demo)
+      // 3. Start Polling for the batch
       const poll = setInterval(async () => {
         try {
-          const pollRes = await fetch(`https://api.autoenhance.ai/v2/jobs/${jobId}`, {
-            headers: { "x-api-key": apiKey }
-          });
-          if (!pollRes.ok) return;
-          const pollData = await pollRes.json();
+          const lDoc = await getDoc(doc(db, "listings", listing.id));
+          const batch = lDoc.data()?.autoenhanceBatch || [];
 
-          if (pollData.status === 'completed') {
+          const updatedBatch = await Promise.all(batch.map(async (img: any) => {
+            if (img.status === 'completed' || img.status === 'failed') return img;
+
+            const statusRes = await fetch(`https://api.autoenhance.ai/v3/images/${img.autoenhanceId}/`, {
+              headers: { "x-api-key": apiKey }
+            });
+            if (!statusRes.ok) return img;
+            const statusData = await statusRes.json();
+
+            if (statusData.status === 'processed') {
+              return { ...img, status: 'completed', enhancedUrl: statusData.enhanced_url };
+            } else if (statusData.status === 'failed') {
+              return { ...img, status: 'failed' };
+            }
+            return img;
+          }));
+
+          const allDone = updatedBatch.every(img => img.status === 'completed' || img.status === 'failed');
+
+          // Update Firestore with new statuses
+          await updateDoc(doc(db, "listings", listing.id), {
+            autoenhanceBatch: updatedBatch,
+            updatedAt: serverTimestamp()
+          });
+
+          if (allDone) {
             clearInterval(poll);
+            const enhanced = updatedBatch.filter(img => img.status === 'completed').map(img => img.enhancedUrl);
+
             await updateDoc(doc(db, "listings", listing.id), {
               workflowStatus: 'Completed',
               aiProcessedAt: serverTimestamp(),
-              enhancedImages: pollData.enhanced_images || [],
+              enhancedImages: enhanced,
               updatedAt: serverTimestamp()
             });
-            toast.success(`Photos enhanced for ${listing.propertyAddress}`);
-            setProcessingId(null);
-          } else if (pollData.status === 'failed') {
-            clearInterval(poll);
-            await updateDoc(doc(db, "listings", listing.id), {
-              workflowStatus: 'Failed',
-              updatedAt: serverTimestamp()
-            });
-            toast.error("Autoenhance processing failed.");
+
+            toast.success(`Enhancement complete for ${listing.propertyAddress}`);
             setProcessingId(null);
           }
-        } catch (e) { console.error("Polling error:", e); }
-      }, 5000);
+        } catch (e) {
+          console.error("Batch polling error:", e);
+        }
+      }, 10000); // Poll every 10s
 
-      // Timeout safety for polling
-      setTimeout(() => { clearInterval(poll); setProcessingId(null); }, 300000); // 5 mins
+      // Timeout safety
+      setTimeout(() => { clearInterval(poll); setProcessingId(null); }, 600000); // 10 mins
 
     } catch (err) {
       console.error(err);
-      toast.error("Processing failed.");
+      toast.error("Autoenhance integration failed.");
       await updateDoc(doc(db, "listings", listing.id), {
         workflowStatus: 'Failed',
         updatedAt: serverTimestamp()

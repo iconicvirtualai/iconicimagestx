@@ -55,7 +55,7 @@ export default function AdminSettings() {
     sendPaymentReceiptEmail: true,
 
     // Editing
-    autoEnhanceApiKey: "",
+    autoEnhanceApiKey: import.meta.env.VITE_AUTOENHANCE_API_KEY || "86eaa462-ed5e-422e-93b6-e06348ac37a7",
     autoProcessUploads: true,
     requireHumanReview: true,
     editingBatchTime: "22:00",
