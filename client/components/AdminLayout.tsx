@@ -44,6 +44,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     label: "Operations",
     items: [
       { label: "Dashboard",       href: "/admin/dashboard",        icon: LayoutDashboard, roles: COORD_UP },
+      { label: "Studio",          href: "/admin/studio",           icon: Camera,          roles: ALL_STAFF },
       { label: "Orders",          href: "/admin/orders",        icon: ShoppingBag,     roles: COORD_UP },
       { label: "Schedule",        href: "/admin/schedule",        icon: CalendarDays,    roles: COORD_UP },
       { label: "Projects",        href: "/admin/listings",         icon: Home,            roles: COORD_UP },
@@ -55,8 +56,6 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     label: "Photography",
     items: [
       { label: "My Jobs",         href: "/admin/photographer",     icon: Camera,          roles: PHOTO_UP },
-      { label: "Upload Photos",   href: "/admin/upload",           icon: Upload,          roles: PHOTO_UP },
-      { label: "Photo Queue",     href: "/admin/editor",           icon: ImagePlay,       roles: EDITOR_UP },
     ],
   },
   {

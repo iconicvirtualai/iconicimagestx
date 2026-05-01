@@ -120,10 +120,12 @@ export default function ClientStudio() {
             { id: "videos", label: "Videos", count: videos.length },
             { id: "tours", label: "3D Tours", count: tours.length },
             { id: "revisions", label: "Revisions", count: revisions.filter(r => r.status === "pending").length },
+            { id: "ai_studio", label: "AI Tools", count: 0 },
           ].map(t => (
             <button key={t.id} onClick={() => setActiveTab(t.id as any)}
               className={`py-4 text-xs font-black uppercase tracking-widest border-b-2 transition-colors ${activeTab === t.id ? "border-[#0d9488] text-[#0d9488]" : "border-transparent text-gray-400 hover:text-gray-700"}`}>
               {t.label} {t.count > 0 && <span className="ml-1 text-gray-300">({t.count})</span>}
+              {t.id === 'ai_studio' && <Zap className="w-2.5 h-2.5 ml-1 inline text-teal-500" />}
             </button>
           ))}
         </div>
@@ -225,6 +227,24 @@ export default function ClientStudio() {
                 </div>
               ))
             )}
+          </div>
+        )}
+
+        {/* AI STUDIO (Placeholder) */}
+        {activeTab === "ai_studio" && (
+          <div className="bg-black rounded-3xl p-12 text-center text-white">
+            <Zap className="w-12 h-12 text-[#0d9488] mx-auto mb-4" />
+            <h3 className="text-xl font-black uppercase tracking-tight mb-2">AI Creative Studio</h3>
+            <p className="text-gray-500 text-sm max-w-sm mx-auto mb-8">Unlock AI-powered virtual staging, decluttering, and sky replacement tools directly in your gallery.</p>
+
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 mb-8 max-w-md mx-auto">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 text-left">Your Plan</span>
+                <span className="px-2 py-0.5 bg-yellow-500/10 text-yellow-500 rounded-full text-[9px] font-black uppercase">Standard</span>
+              </div>
+              <p className="text-xs text-gray-400 text-left mb-6">Upgrade to **Pro** or **Elite** to unlock real-time AI staging and high-res downloads.</p>
+              <button className="w-full py-3 bg-[#0d9488] text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#0f766e]">Upgrade Plan</button>
+            </div>
           </div>
         )}
 

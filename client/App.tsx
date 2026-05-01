@@ -52,6 +52,7 @@ import AdminPhotographer from "./pages/AdminPhotographer";
 import AdminUpload from "./pages/AdminUpload";
 import AdminEditor from "./pages/AdminEditor";
 import AdminTeam from "./pages/AdminTeam";
+import AdminStudio from "./pages/AdminStudio";
 import Login from "./pages/Login";
 
 const queryClient = new QueryClient();
@@ -92,6 +93,11 @@ const App = () => (
             <Route path="/admin/dashboard" element={
               <ProtectedRoute requiredRole="coordinator">
                 <AdminDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/studio" element={
+              <ProtectedRoute requiredRole="photographer">
+                <AdminStudio />
               </ProtectedRoute>
             } />
             <Route path="/admin/listings" element={
