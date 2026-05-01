@@ -23,6 +23,8 @@ export default function Footer() {
               <Link to="/contact" className="text-sm font-medium hover:text-white/80 transition-colors">Contact Us</Link>
               <Link to="/privacy" className="text-sm font-medium hover:text-white/80 transition-colors">Privacy Policy</Link>
               <Link to="/terms" className="text-sm font-medium hover:text-white/80 transition-colors">Terms of Service</Link>
+              <Link to="/login" className="text-sm font-medium hover:text-white/80 transition-colors border-l border-white/20 pl-6 ml-2">Client Login</Link>
+              <Link to="/admin/login" className="text-sm font-medium hover:text-white/80 transition-colors">Admin Login</Link>
             </nav>
           </div>
 

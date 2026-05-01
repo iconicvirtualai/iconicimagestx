@@ -52,6 +52,7 @@ import AdminPhotographer from "./pages/AdminPhotographer";
 import AdminUpload from "./pages/AdminUpload";
 import AdminEditor from "./pages/AdminEditor";
 import AdminTeam from "./pages/AdminTeam";
+import Login from "./pages/Login";
 
 const queryClient = new QueryClient();
 
@@ -83,7 +84,8 @@ const App = () => (
             <Route path="/services/virtual-staging/pro-order" element={<VirtualStagingProOrder />} />
             <Route path="/services/virtual-staging/checkout" element={<VirtualStagingCheckout />} />
 
-            {/* ─── Admin Login (public) ───────────────────────────────────── */}
+            {/* ─── Login Routes ─────────────────────────────────────────── */}
+            <Route path="/login" element={<Login />} />
             <Route path="/admin/login" element={<AdminLogin />} />
 
             {/* ─── Admin / Coordinator only ──────────────────────────────── */}

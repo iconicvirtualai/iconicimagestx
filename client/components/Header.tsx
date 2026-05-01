@@ -68,7 +68,7 @@ export default function Header() {
 
         {/* Right side buttons */}
         <div className="hidden lg:flex items-center gap-4">
-          <Link to="/admin/login">
+          <Link to="/login">
             <span className="text-xs font-bold text-white/70 hover:text-white cursor-pointer transition-colors">Log in</span>
           </Link>
           <Link to="/book">
