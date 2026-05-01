@@ -3,6 +3,7 @@ import AdminLayout from "@/components/AdminLayout";
 import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, limit, getDocs } from "firebase/firestore";
 import { AlertCircle, CreditCard, FileText } from "lucide-react";
+import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 
 interface Invoice {
   id: string;
@@ -56,6 +57,9 @@ export default function AdminBilling() {
   return (
     <AdminLayout title="Billing">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="pb-8">
+          <OperationsStatsGrid />
+        </div>
         {/* Current Plan Section */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div className="rounded-2xl border border-gray-100 shadow-sm p-6 bg-white">

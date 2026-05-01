@@ -1,6 +1,7 @@
 import { useState } from "react";
 import AdminLayout from "@/components/AdminLayout";
 import { Zap, Mail, FileText, CheckCircle2 } from "lucide-react";
+import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 
 interface AutomationRule {
   id: string;
@@ -71,6 +72,9 @@ export default function AdminAutomation() {
   return (
     <AdminLayout title="Automation">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="pb-8">
+          <OperationsStatsGrid />
+        </div>
         {/* Overview Card */}
         <div className="rounded-2xl border border-gray-100 shadow-sm p-6 bg-white mb-8">
           <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">

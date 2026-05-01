@@ -1,12 +1,12 @@
 import * as React from "react";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
+import AdminLayout from "@/components/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Link } from "react-router-dom";
 import { ChevronLeft, Tag } from "lucide-react";
+import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 
 interface PricingRow {
   id: string;
@@ -90,119 +90,110 @@ export default function AdminCurrentPricing() {
   );
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#f8fafc]">
-      <Header />
-      
-      <main className="flex-1 pt-24 pb-12">
-        {/* Sub-Header */}
-        <div className="bg-white border-b border-slate-200 sticky top-[72px] z-30 px-6 py-3">
-          <div className="max-w-[1200px] mx-auto flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <Button asChild variant="ghost" size="sm" className="rounded-xl h-9 hover:bg-slate-100">
-                <Link to="/admin/edit-site">
-                  <ChevronLeft className="w-4 h-4 mr-1" /> Back to Customizer
-                </Link>
-              </Button>
-              <div className="w-px h-6 bg-slate-200" />
-              <div className="p-2 bg-slate-100 rounded-lg">
-                <Tag className="w-4 h-4 text-[#0d9488]" />
-              </div>
-              <div>
-                <h1 className="text-sm font-black text-slate-900 uppercase tracking-widest">Current Pricing</h1>
-                <p className="text-[10px] font-bold text-slate-400 uppercase">Live Pricing Manifest</p>
-              </div>
+    <AdminLayout title="Current Pricing">
+      <OperationsStatsGrid />
+      <div className="flex flex-col gap-8">
+        <div className="bg-white border-b border-slate-200 rounded-3xl px-6 py-3 flex items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <Button asChild variant="ghost" size="sm" className="rounded-xl h-9 hover:bg-slate-100">
+              <Link to="/admin/edit-site">
+                <ChevronLeft className="w-4 h-4 mr-1" /> Back to Customizer
+              </Link>
+            </Button>
+            <div className="w-px h-6 bg-slate-200" />
+            <div className="p-2 bg-slate-100 rounded-lg">
+              <Tag className="w-4 h-4 text-[#0d9488]" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Live Pricing Manifest</p>
             </div>
           </div>
         </div>
 
-        <div className="max-w-[1200px] mx-auto px-6 mt-8">
-          <Card className="rounded-[2.5rem] border-slate-200 shadow-sm overflow-hidden bg-white">
-            <CardHeader className="p-8 border-b border-slate-50">
-              <CardTitle className="text-lg font-black text-slate-900 uppercase tracking-tight">Pricing Data Table</CardTitle>
-              <p className="text-xs font-medium text-slate-400">All services, descriptions, and active pricing reflected on the public site.</p>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-slate-50/50">
-                    <TableRow className="border-b border-slate-100">
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
-                        ID
-                        <FilterInput column="id" />
-                      </TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
-                        Name
-                        <FilterInput column="name" />
-                      </TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
-                        Price
-                        <FilterInput column="price" />
-                      </TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
-                        PriceMax
-                        <FilterInput column="priceMax" />
-                      </TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
-                        PriceType
-                        <FilterInput column="priceType" />
-                      </TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
-                        Category
-                        <FilterInput column="category" />
-                      </TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
-                        Active
-                        <FilterInput column="active" />
-                      </TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
-                        Description
-                        <FilterInput column="description" />
-                      </TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
-                        BillingNote
-                        <FilterInput column="billingNote" />
-                      </TableHead>
+        <Card className="rounded-[2.5rem] border-slate-200 shadow-sm overflow-hidden bg-white">
+          <CardHeader className="p-8 border-b border-slate-50">
+            <CardTitle className="text-lg font-black text-slate-900 uppercase tracking-tight">Pricing Data Table</CardTitle>
+            <p className="text-xs font-medium text-slate-400">All services, descriptions, and active pricing reflected on the public site.</p>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-slate-50/50">
+                  <TableRow className="border-b border-slate-100">
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
+                      ID
+                      <FilterInput column="id" />
+                    </TableHead>
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
+                      Name
+                      <FilterInput column="name" />
+                    </TableHead>
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
+                      Price
+                      <FilterInput column="price" />
+                    </TableHead>
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
+                      PriceMax
+                      <FilterInput column="priceMax" />
+                    </TableHead>
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
+                      PriceType
+                      <FilterInput column="priceType" />
+                    </TableHead>
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
+                      Category
+                      <FilterInput column="category" />
+                    </TableHead>
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
+                      Active
+                      <FilterInput column="active" />
+                    </TableHead>
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
+                      Description
+                      <FilterInput column="description" />
+                    </TableHead>
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 px-6">
+                      BillingNote
+                      <FilterInput column="billingNote" />
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredData.map((row) => (
+                    <TableRow key={row.id} className="border-b border-slate-50 hover:bg-slate-50/30 transition-colors">
+                      <TableCell className="py-4 px-6 font-mono text-[11px] text-[#0d9488] font-bold">{row.id}</TableCell>
+                      <TableCell className="py-4 px-6 text-xs font-black text-slate-900 uppercase tracking-tight">{row.name}</TableCell>
+                      <TableCell className="py-4 px-6 text-xs font-bold text-slate-700">${row.price}</TableCell>
+                      <TableCell className="py-4 px-6 text-xs font-bold text-slate-400">{row.priceMax ? `$${row.priceMax}` : "—"}</TableCell>
+                      <TableCell className="py-4 px-6">
+                        <span className="px-2 py-1 rounded-md bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest">
+                          {row.priceType}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-4 px-6">
+                        <span className="px-2 py-1 rounded-md bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-widest">
+                          {row.category}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-4 px-6">
+                        <span className={`px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-widest ${row.active ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+                          {row.active ? 'true' : 'false'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-4 px-6 text-xs text-slate-500 font-medium max-w-[200px] truncate" title={row.description}>
+                        {row.description}
+                      </TableCell>
+                      <TableCell className="py-4 px-6 text-xs text-slate-500 font-bold uppercase tracking-tight">
+                        {row.billingNote}
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredData.map((row) => (
-                      <TableRow key={row.id} className="border-b border-slate-50 hover:bg-slate-50/30 transition-colors">
-                        <TableCell className="py-4 px-6 font-mono text-[11px] text-[#0d9488] font-bold">{row.id}</TableCell>
-                        <TableCell className="py-4 px-6 text-xs font-black text-slate-900 uppercase tracking-tight">{row.name}</TableCell>
-                        <TableCell className="py-4 px-6 text-xs font-bold text-slate-700">${row.price}</TableCell>
-                        <TableCell className="py-4 px-6 text-xs font-bold text-slate-400">{row.priceMax ? `$${row.priceMax}` : "—"}</TableCell>
-                        <TableCell className="py-4 px-6">
-                          <span className="px-2 py-1 rounded-md bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest">
-                            {row.priceType}
-                          </span>
-                        </TableCell>
-                        <TableCell className="py-4 px-6">
-                          <span className="px-2 py-1 rounded-md bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-widest">
-                            {row.category}
-                          </span>
-                        </TableCell>
-                        <TableCell className="py-4 px-6">
-                          <span className={`px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-widest ${row.active ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
-                            {row.active ? 'true' : 'false'}
-                          </span>
-                        </TableCell>
-                        <TableCell className="py-4 px-6 text-xs text-slate-500 font-medium max-w-[200px] truncate" title={row.description}>
-                          {row.description}
-                        </TableCell>
-                        <TableCell className="py-4 px-6 text-xs text-slate-500 font-bold uppercase tracking-tight">
-                          {row.billingNote}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
-
-      <Footer />
-    </div>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </AdminLayout>
   );
 }

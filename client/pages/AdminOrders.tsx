@@ -6,6 +6,7 @@ import { db } from "@/lib/firebase";
 import { collection, onSnapshot, writeBatch, doc, serverTimestamp, addDoc, getDocs, updateDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 
 function fmtAddr(a: any): string {
   if (!a) return "—";
@@ -364,6 +365,9 @@ export default function AdminOrders() {
 
   return (
     <AdminLayout title="Orders">
+      <div className="pb-10">
+        <OperationsStatsGrid />
+      </div>
       {loading ? (
         <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 border-[#0d9488] border-t-transparent rounded-full animate-spin" /></div>
       ) : (

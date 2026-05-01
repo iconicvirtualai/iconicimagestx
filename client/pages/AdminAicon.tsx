@@ -3,6 +3,7 @@ import AdminLayout from "@/components/AdminLayout";
 import { db } from "@/lib/firebase";
 import { collection, query, orderBy, limit, getDocs } from "firebase/firestore";
 import { Activity, CheckCircle2, Clock } from "lucide-react";
+import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 
 interface Agent {
   id: string;
@@ -96,6 +97,9 @@ export default function AdminAicon() {
   return (
     <AdminLayout title="AI Agents">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="pb-8">
+          <OperationsStatsGrid />
+        </div>
         {/* Agents Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {agents.map((agent) => (

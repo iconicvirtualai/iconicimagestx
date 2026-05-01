@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, addDoc, serverTimestamp, updateDoc, doc } from "firebase/firestore";
 import { toast } from "sonner";
+import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 
 function fmtCurrency(n: number): string { return "$" + (n || 0).toLocaleString("en-US", { minimumFractionDigits: 2 }); }
 function fmtDate(ts: any): string {
@@ -117,6 +118,7 @@ export default function AdminClientBilling() {
 
   return (
     <AdminLayout title="Client Billing">
+      <OperationsStatsGrid />
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">

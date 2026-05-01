@@ -3,35 +3,36 @@ import AdminLayout from "@/components/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
-import { 
-  Calendar as CalendarIcon, 
-  List, 
-  ChevronDown, 
-  ChevronUp, 
-  Clock, 
-  MapPin, 
-  User, 
-  FileText, 
+import {
+  Calendar as CalendarIcon,
+  List,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  MapPin,
+  User,
+  FileText,
   DollarSign,
   ChevronLeft,
   ChevronRight,
   X
 } from "lucide-react";
-import { 
-  format, 
-  addMonths, 
-  subMonths, 
-  startOfMonth, 
-  endOfMonth, 
-  startOfWeek, 
-  endOfWeek, 
-  isSameMonth, 
-  isSameDay, 
-  addDays, 
+import {
+  format,
+  addMonths,
+  subMonths,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  isSameMonth,
+  isSameDay,
+  addDays,
   eachDayOfInterval,
   parseISO,
   startOfDay
 } from "date-fns";
+import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -159,7 +160,10 @@ export default function AdminSchedule() {
   return (
     <AdminLayout title="Schedule">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
+        <div className="pb-8">
+          <OperationsStatsGrid />
+        </div>
+
         {/* View Toggle & Controls */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
           <div className="flex bg-gray-100 p-1 rounded-xl">

@@ -4,6 +4,7 @@ import { DollarSign, TrendingUp, Clock, AlertTriangle, CheckCircle, FileText, Do
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 import { toast } from "sonner";
+import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 
 function fmtCurrency(n: number): string { return "$" + (n || 0).toLocaleString("en-US", { minimumFractionDigits: 2 }); }
 function fmtAddr(a: any): string {
@@ -152,6 +153,7 @@ export default function AdminRevenue() {
 
   return (
     <AdminLayout title="Revenue">
+      <OperationsStatsGrid />
       {/* Date filters */}
       <div className="flex flex-wrap items-end gap-3 mb-8">
         <div>

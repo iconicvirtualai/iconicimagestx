@@ -11,6 +11,7 @@ import {
   collection, onSnapshot, addDoc, serverTimestamp, getDocs, query, orderBy,
 } from "firebase/firestore";
 import { toast } from "sonner";
+import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type ProjectType = "real_estate" | "business";
@@ -514,6 +515,7 @@ export default function AdminListings() {
 
   return (
     <AdminLayout title="Projects">
+      <OperationsStatsGrid />
       {/* Top bar */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-6">
         <div className="flex-1 relative">

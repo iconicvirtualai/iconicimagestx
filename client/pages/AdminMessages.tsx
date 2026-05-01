@@ -24,6 +24,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -309,6 +310,9 @@ export default function AdminMessages() {
 
   return (
     <AdminLayout>
+      <div className="pb-8">
+        <OperationsStatsGrid />
+      </div>
       <div className="flex h-full" style={{ height: "calc(100vh - 64px)" }}>
 
         {/* ─── Left sidebar: tabs + thread list ─────────────────────────── */}
