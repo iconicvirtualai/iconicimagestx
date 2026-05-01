@@ -110,6 +110,9 @@ export default function AdminDashboard() {
     const unsub = onSnapshot(collection(db, "orderRequests"), (snap) => {
       setOrderRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
+    }, (err) => {
+      console.error("[AdminDashboard] snapshot error:", err);
+      setLoading(false);
     });
     return () => unsub();
   }, []);

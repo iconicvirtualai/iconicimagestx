@@ -98,7 +98,9 @@ export default function OperationsOverview() {
           });
         }
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.warn("[OperationsOverview] Weather fetch failed (this is non-critical):", err);
+      });
   }, []);
 
   function getWeatherLabel(code: number) {

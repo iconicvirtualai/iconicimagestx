@@ -29,6 +29,9 @@ export default function AdminUpload() {
       const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setJobs(list);
       if (list.length > 0 && !selectedJob) setSelectedJob(list[0].id);
+    }, (err) => {
+      console.error("[AdminUpload] snapshot error:", err);
+      toast.error("Failed to load your assigned jobs.");
     });
     return () => unsub();
   }, [user?.uid]);

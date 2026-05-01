@@ -47,10 +47,15 @@ export function useOperationsMetrics() {
   React.useEffect(() => {
     const unsubOrders = onSnapshot(collection(db, "orderRequests"), (snap) => {
       setOrderRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (err) => {
+      console.error("[useOperationsMetrics] orderRequests snapshot error:", err);
     });
 
     const unsubListings = onSnapshot(collection(db, "listings"), (snap) => {
       setListings(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, (err) => {
+      console.error("[useOperationsMetrics] listings snapshot error:", err);
       setLoading(false);
     });
 
