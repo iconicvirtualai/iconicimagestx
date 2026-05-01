@@ -69,6 +69,50 @@ export const ORDER_STATUS: Record<string, { label: string; badge: string }> = {
   archived:             { label: "Archived",             badge: "bg-gray-100 text-gray-400" },
 };
 
+const fmtRev = (n: number) =>
+  n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n.toFixed(0)}`;
+
+const fmtCurrency = (n: number) =>
+  "$" + (n || 0).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+function generateAlerts(data: any) {
+  const list = [];
+  if (data.overdueDeliveries > 0) list.push({ text: `${data.overdueDeliveries} overdue deliveries`, status: "red" });
+  if (data.urgentRequests > 0) list.push({ text: `${data.urgentRequests} urgent requests (<24h)`, status: "red" });
+  if (data.missingUploads > 0) list.push({ text: `${data.missingUploads} missing uploads`, status: "yellow" });
+  if (data.notScheduled > 5) list.push({ text: `${data.notScheduled} pending order requests`, status: "yellow" });
+  if (data.revToday > 1000) list.push({ text: `Strong revenue day: ${fmtCurrency(data.revToday)}`, status: "green" });
+
+  if (list.length === 0) list.push({ text: "All operations running smoothly", status: "green" });
+  return list.slice(0, 3);
+}
+
+const isActiveAppointment = (o: any) => {
+  const s = (o.status || "").toLowerCase().replace(/\s+/g, "_");
+  if (!["scheduled", "appt_scheduled", "consult_scheduled"].includes(s)) return false;
+
+  const apptDateStr = o.appointmentDate || o.scheduledDate || o.apptDate;
+  if (!apptDateStr) return false;
+
+  try {
+    const apptDate = o.appointmentDate?.toDate ? o.appointmentDate.toDate() :
+                     o.apptDate?.toDate ? o.apptDate.toDate() :
+                     new Date(apptDateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return apptDate >= today;
+  } catch { return false; }
+};
+
+function getWeatherLabel(code: number) {
+  if (code <= 3) return "Sunny/Clear";
+  if (code <= 48) return "Cloudy/Foggy";
+  if (code <= 67) return "Rainy";
+  if (code <= 77) return "Snowy";
+  if (code <= 99) return "Stormy";
+  return "Cloudy";
+}
+
 export function StatusBadge({ status }: { status: string }) {
   const cfg = ORDER_STATUS[status] ?? { label: status || "Unscheduled", badge: "bg-red-100 text-red-700" };
   return (
@@ -228,14 +272,12 @@ export default function AdminDashboard() {
     return () => { unsubOrders(); unsubListings(); };
   }, []);
 
-  function getWeatherLabel(code: number) {
-    if (code <= 3) return "Sunny/Clear";
-    if (code <= 48) return "Cloudy/Foggy";
-    if (code <= 67) return "Rainy";
-    if (code <= 77) return "Snowy";
-    if (code <= 99) return "Stormy";
-    return "Cloudy";
-  }
+  const activeAppointmentsCount = listings.filter(l => isActiveAppointment(l)).length;
+  const listingsInProgressCount = listings.filter(l => ["in_progress", "delivered"].includes((l.status || "").toLowerCase())).length;
+  const paidRevenue = listings.filter(l => {
+    const s = (l.status || "").toLowerCase();
+    return s === "paid" || s === "delivered_paid";
+  }).reduce((s, l) => s + (Number(l.total) || 0), 0);
 
   // ─── Calculations ────────────────────────────────────────────────────────
   const metrics = React.useMemo(() => {
@@ -397,31 +439,6 @@ export default function AdminDashboard() {
       alerts: generateAlerts({ notScheduled, urgentRequests, overdueDeliveries, missingUploads, revToday, revWeek })
     };
   }, [loading, orderRequests, listings, weather]);
-
-  function generateAlerts(data: any) {
-    const list = [];
-    if (data.overdueDeliveries > 0) list.push({ text: `${data.overdueDeliveries} overdue deliveries`, status: "red" });
-    if (data.urgentRequests > 0) list.push({ text: `${data.urgentRequests} urgent requests (<24h)`, status: "red" });
-    if (data.missingUploads > 0) list.push({ text: `${data.missingUploads} missing uploads`, status: "yellow" });
-    if (data.notScheduled > 5) list.push({ text: `${data.notScheduled} pending order requests`, status: "yellow" });
-    if (data.revToday > 1000) list.push({ text: `Strong revenue day: ${fmtCurrency(data.revToday)}`, status: "green" });
-
-    if (list.length === 0) list.push({ text: "All operations running smoothly", status: "green" });
-    return list.slice(0, 3);
-  }
-
-  const fmtRev = (n: number) =>
-    n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n.toFixed(0)}`;
-
-  const fmtCurrency = (n: number) =>
-    "$" + (n || 0).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-
-  const activeAppointmentsCount = listings.filter(l => isActiveAppointment(l)).length;
-  const listingsInProgressCount = listings.filter(l => ["in_progress", "delivered"].includes((l.status || "").toLowerCase())).length;
-  const paidRevenue = listings.filter(l => {
-    const s = (l.status || "").toLowerCase();
-    return s === "paid" || s === "delivered_paid";
-  }).reduce((s, l) => s + (Number(l.total) || 0), 0);
 
   return (
     <AdminLayout title="Dashboard">
