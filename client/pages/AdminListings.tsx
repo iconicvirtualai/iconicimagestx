@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import {
   Search, Plus, ArrowRight, Calendar, User, Home, Building2,
   X, Check, Upload, Filter, ChevronDown, ChevronUp, RotateCcw,
+  Archive, Trash2, ExternalLink, RefreshCw,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import {
   collection, onSnapshot, addDoc, serverTimestamp, getDocs, query, orderBy,
+  writeBatch, doc,
 } from "firebase/firestore";
 import { toast } from "sonner";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
@@ -70,6 +72,7 @@ const RE_STATUSES = [
   { value: "delivered", label: "Delivered", badge: "bg-sky-100 text-sky-700" },
   { value: "paid", label: "Paid", badge: "bg-teal-100 text-teal-700" },
   { value: "archived", label: "Archived", badge: "bg-gray-100 text-gray-400" },
+  { value: "cancelled", label: "Cancelled", badge: "bg-red-100 text-red-700" },
 ];
 
 const BIZ_STATUSES = [
@@ -80,6 +83,7 @@ const BIZ_STATUSES = [
   { value: "delivered", label: "Delivered", badge: "bg-sky-100 text-sky-700" },
   { value: "paid", label: "Paid", badge: "bg-teal-100 text-teal-700" },
   { value: "archived", label: "Archived", badge: "bg-gray-100 text-gray-400" },
+  { value: "cancelled", label: "Cancelled", badge: "bg-red-100 text-red-700" },
 ];
 
 function getBadge(status: string, projectType?: string) {
@@ -149,8 +153,11 @@ export default function AdminListings() {
   const [projects, setProjects] = React.useState<Project[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState("");
-  const [statusFilter, setStatusFilter] = React.useState("all");
+  const [statusFilter, setStatusFilter] = React.useState<string[]>(["in_progress"]);
   const [typeFilter, setTypeFilter] = React.useState<"all" | "real_estate" | "business">("all");
+
+  // Selection
+  const [selection, setSelection] = React.useState<Set<string>>(new Set());
 
   // Advanced filters
   const [showAdvanced, setShowAdvanced] = React.useState(false);
@@ -425,8 +432,47 @@ export default function AdminListings() {
     setSortBy("createdAt");
     setSortDir("desc");
     setSearch("");
-    setStatusFilter("all");
+    setStatusFilter(["in_progress"]);
     setTypeFilter("all");
+  };
+
+  // Bulk Actions
+  const toggleSelect = (id: string) => {
+    const next = new Set(selection);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelection(next);
+  };
+
+  const handleBulkStatus = async (status: string) => {
+    if (selection.size === 0) return;
+    const batch = writeBatch(db);
+    selection.forEach(id => batch.update(doc(db, "listings", id), { status, updatedAt: serverTimestamp() }));
+    await batch.commit();
+    toast.success(`Updated ${selection.size} projects to ${status.replace(/_/g, " ")}.`);
+    setSelection(new Set());
+  };
+
+  const handleBulkOpen = () => {
+    if (selection.size === 0) return;
+    selection.forEach(id => {
+      window.open(`/admin/listing/${id}`, "_blank");
+    });
+    setSelection(new Set());
+  };
+
+  const toggleStatusFilter = (val: string) => {
+    if (val === "all") {
+      setStatusFilter(["all"]);
+      return;
+    }
+    const next = statusFilter.includes("all") ? [] : [...statusFilter];
+    if (next.includes(val)) {
+      const filtered = next.filter(v => v !== val);
+      setStatusFilter(filtered.length === 0 ? ["all"] : filtered);
+    } else {
+      setStatusFilter([...next, val]);
+    }
   };
 
   // ─── Filtered + sorted list ─────────────────────────────────────────────────
@@ -437,7 +483,8 @@ export default function AdminListings() {
         loc.toLowerCase().includes(search.toLowerCase()) ||
         (p.clientName || "").toLowerCase().includes(search.toLowerCase()) ||
         p.id.toLowerCase().includes(search.toLowerCase());
-      const matchStatus = statusFilter === "all" || p.status === statusFilter;
+
+      const matchStatus = statusFilter.includes("all") || statusFilter.includes(p.status || "unscheduled");
       const matchType = typeFilter === "all" || p.projectType === typeFilter;
 
       // Advanced: client name filter
@@ -557,11 +604,16 @@ export default function AdminListings() {
               >{l}</button>
             ))}
         </div>
-        {["all", "unscheduled", "scheduled", "in_progress", "delivered", "paid", "archived"].map(s => (
-          <button key={s} onClick={() => setStatusFilter(s)}
-            className={`px-4 py-2 rounded-lg font-bold text-[10px] uppercase tracking-widest whitespace-nowrap transition-all ${statusFilter === s ? "bg-[#0d9488] text-white" : "bg-white border border-slate-200 text-gray-600 hover:border-[#0d9488]"}`}
-          >{s.replace(/_/g, " ")}</button>
-        ))}
+        <div className="flex flex-wrap gap-2">
+          {["all", "unscheduled", "scheduled", "in_progress", "delivered", "paid", "archived", "cancelled"].map(s => {
+            const active = statusFilter.includes(s);
+            return (
+              <button key={s} onClick={() => toggleStatusFilter(s)}
+                className={`px-4 py-2 rounded-lg font-bold text-[10px] uppercase tracking-widest whitespace-nowrap transition-all ${active ? "bg-[#0d9488] text-white" : "bg-white border border-slate-200 text-gray-600 hover:border-[#0d9488]"}`}
+              >{s.replace(/_/g, " ")}</button>
+            );
+          })}
+        </div>
       </div>
 
       {/* ─── Advanced Filters Panel ─── */}
@@ -678,13 +730,23 @@ export default function AdminListings() {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-24">
           {filtered.map(p => {
             const badge = getBadge(p.status || "unscheduled", p.projectType);
             const loc = p.address || p.shootLocation || "—";
             const isRE = p.projectType !== "business";
+            const isSelected = selection.has(p.id);
+
             return (
-              <div key={p.id} className="rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-all overflow-hidden">
+              <div key={p.id} className={`rounded-2xl border transition-all overflow-hidden relative group ${isSelected ? "border-[#0d9488] ring-2 ring-[#0d9488]/20" : "border-slate-200 bg-white shadow-sm hover:shadow-md"}`}>
+                {/* Checkbox overlay */}
+                <div
+                  onClick={(e) => { e.stopPropagation(); toggleSelect(p.id); }}
+                  className={`absolute top-3 left-3 z-10 w-6 h-6 rounded-lg border-2 flex items-center justify-center cursor-pointer transition-all ${isSelected ? "bg-[#0d9488] border-[#0d9488]" : "bg-black/20 border-white/40 opacity-0 group-hover:opacity-100"}`}
+                >
+                  {isSelected && <Check className="w-4 h-4 text-white" />}
+                </div>
+
                 <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
                   {p.images && p.images.length > 0 ? (
                     <img src={p.images[0].url} alt={loc} className="w-full h-full object-cover" />
@@ -693,7 +755,7 @@ export default function AdminListings() {
                       {isRE ? <Home className="w-8 h-8 text-gray-300" /> : <Building2 className="w-8 h-8 text-gray-300" />}
                     </div>
                   )}
-                  <div className="absolute top-3 left-3">
+                  <div className="absolute top-3 left-12">
                     <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${isRE ? "bg-[#0d9488]/90 text-white" : "bg-black/80 text-white"}`}>
                       {isRE ? "Real Estate" : "Business"}
                     </span>
@@ -702,7 +764,7 @@ export default function AdminListings() {
                     <span className={`px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest ${badge.badge}`}>{badge.label}</span>
                   </div>
                 </div>
-                <div className="p-4">
+                <div className="p-4" onClick={() => toggleSelect(p.id)}>
                   <h3 className="font-bold text-sm text-black mb-1 line-clamp-1">{loc}</h3>
                   <p className="text-xs text-gray-500 mb-2 flex items-center gap-1.5">
                     <User className="w-3 h-3" /> {p.clientName || "—"}
@@ -712,7 +774,7 @@ export default function AdminListings() {
                       <Calendar className="w-3 h-3" /> {fmtDate(p.apptDate)}
                     </p>
                   )}
-                  <button onClick={() => navigate(`/admin/listing/${p.id}`)}
+                  <button onClick={(e) => { e.stopPropagation(); navigate(`/admin/listing/${p.id}`); }}
                     className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[#0d9488]/10 hover:bg-[#0d9488]/20 text-[#0d9488] rounded-lg font-bold text-xs uppercase tracking-widest transition-colors"
                   >
                     Open Project <ArrowRight className="w-3 h-3" />
@@ -721,6 +783,35 @@ export default function AdminListings() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ── BULK ACTION BAR ── */}
+      {selection.size > 0 && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="bg-black text-white px-6 py-4 rounded-3xl shadow-2xl border border-white/10 flex items-center gap-6">
+            <div className="flex items-center gap-3 pr-6 border-r border-white/20">
+              <div className="w-8 h-8 bg-[#0d9488] rounded-full flex items-center justify-center font-bold text-sm">{selection.size}</div>
+              <span className="text-xs font-bold uppercase tracking-wider">Projects Selected</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <button onClick={() => handleBulkStatus("archived")} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest hover:text-[#0d9488] transition-colors"><Archive className="w-4 h-4" /> Archive</button>
+              <button onClick={() => handleBulkStatus("cancelled")} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest hover:text-red-500 transition-colors"><X className="w-4 h-4" /> Cancel</button>
+              <button onClick={handleBulkOpen} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest hover:text-[#0d9488] transition-colors"><ExternalLink className="w-4 h-4" /> Open Tabs</button>
+
+              <div className="group relative">
+                <button className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest hover:text-[#0d9488] transition-colors">
+                  <RefreshCw className="w-4 h-4" /> Status <ChevronUp className="w-3 h-3" />
+                </button>
+                <div className="absolute bottom-full mb-2 left-0 w-48 bg-white text-black rounded-xl shadow-2xl border border-gray-100 overflow-hidden hidden group-hover:block animate-in fade-in slide-in-from-bottom-2 duration-200">
+                  {RE_STATUSES.map(s => (
+                    <button key={s.value} onClick={() => handleBulkStatus(s.value)} className="w-full text-left px-4 py-2.5 text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 border-b border-gray-50 last:border-0">{s.label}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <button onClick={() => setSelection(new Set())} className="ml-4 p-2 hover:bg-white/10 rounded-full"><X className="w-4 h-4 text-gray-500" /></button>
+          </div>
         </div>
       )}
 
