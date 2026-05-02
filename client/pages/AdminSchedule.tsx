@@ -155,7 +155,7 @@ export default function AdminSchedule() {
     return groups;
   }, [appointments]);
 
-  const sortedDateKeys = Object.keys(groupedByDate).sort();
+  const sortedDateKeys = Object.keys(groupedByDate).sort().reverse();
 
   return (
     <AdminLayout title="Schedule">
