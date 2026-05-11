@@ -39,7 +39,7 @@ export default function RaisingTheStandard() {
               transition={{ duration: 0.8 }}
             >
               <h2 className="text-4xl md:text-5xl font-black mb-8 tracking-tight text-white uppercase">
-                We Raise the Bar.
+                We <span className="text-teal-400">ARE</span> the Bar.
               </h2>
 
               <div className="space-y-6 text-xl md:text-2xl text-gray-400 leading-relaxed font-medium">

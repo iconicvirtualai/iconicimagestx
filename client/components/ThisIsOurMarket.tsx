@@ -20,7 +20,7 @@ export default function ThisIsOurMarket() {
               transition={{ duration: 0.8 }}
             >
               <h2 className="text-4xl md:text-5xl font-black mb-8 tracking-tight text-white uppercase">
-                This Is Our Market.
+                This Is <span className="text-teal-400">OUR</span> Market.
               </h2>
 
               <div className="space-y-6 text-xl md:text-2xl text-gray-400 leading-relaxed font-medium">
