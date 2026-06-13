@@ -33,6 +33,16 @@ export default function Insights() {
           <div className="container mx-auto px-4">
             <h1 className="text-4xl md:text-5xl font-bold text-black mb-4">Iconic Insights</h1>
             <p className="text-gray-500 text-lg">Insights, guides, and tips for creating stunning real estate videos.</p>
+
+            {/* Quick Links */}
+            <div className="mt-8 flex flex-col sm:flex-row gap-4">
+              <a href="/insights" className="px-6 py-3 bg-teal-500 text-white rounded-lg font-semibold hover:bg-teal-600 transition-colors inline-block text-center">
+                Insights & Articles
+              </a>
+              <a href="/insights/prep" className="px-6 py-3 bg-white border-2 border-teal-500 text-teal-600 rounded-lg font-semibold hover:bg-teal-50 transition-colors inline-block text-center">
+                📹 Photoshoot Prep Guide
+              </a>
+            </div>
           </div>
         </section>
 

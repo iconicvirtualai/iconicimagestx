@@ -31,6 +31,8 @@ import AgentLandingPage from "./pages/AgentLandingPage";
 import Privacy from "./pages/Privacy";
 import ClientStudio from "./pages/ClientStudio";
 import VirtualStaging from "./pages/VirtualStaging";
+import Prep from "./pages/Prep";
+import StockFootage from "./pages/StockFootage";
 import VirtualStagingSelection from "./pages/VirtualStagingSelection";
 import VirtualStagingAITool from "./pages/VirtualStagingAITool";
 import VirtualStagingProOrder from "./pages/VirtualStagingProOrder";
@@ -77,6 +79,8 @@ const App = () => (
             <Route path="/socials" element={<Socials />} />
             <Route path="/agents" element={<AgentLandingPage />} />
             <Route path="/insights" element={<Insights />} />
+            <Route path="/insights/prep" element={<Prep />} />
+            <Route path="/stock-footage" element={<StockFootage />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/studio/:listingId" element={<ClientStudio />} />
             <Route path="/services/virtual-staging" element={<VirtualStaging />} />

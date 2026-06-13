@@ -27,6 +27,7 @@ export default function Header() {
     { label: "About", href: "/about" },
     { label: "Resources", href: "/insights" },
     { label: "Pricing", href: "/pricing" },
+    { label: "Stock Footage", href: "/stock-footage" },
     { label: "Contact Us", href: "/contact" },
   ];
 
