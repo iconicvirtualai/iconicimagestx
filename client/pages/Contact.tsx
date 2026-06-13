@@ -164,7 +164,7 @@ export default function Contact() {
                       name="name"
                       value={formData.name}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488] outline-none transition-all text-sm"
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488] outline-none transition-all text-sm text-black"
                       placeholder="Your name"
                       required
                     />
@@ -177,7 +177,7 @@ export default function Contact() {
                       name="subject"
                       value={formData.subject}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488] outline-none transition-all text-sm"
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488] outline-none transition-all text-sm text-black"
                       placeholder="Subject"
                       required
                     />
@@ -190,7 +190,7 @@ export default function Contact() {
                       name="email"
                       value={formData.email}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488] outline-none transition-all text-sm"
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488] outline-none transition-all text-sm text-black"
                       placeholder="you@example.com"
                       required
                     />
@@ -203,7 +203,7 @@ export default function Contact() {
                       name="phone"
                       value={formData.phone}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488] outline-none transition-all text-sm"
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488] outline-none transition-all text-sm text-black"
                       placeholder="Your phone number"
                     />
                   </div>
@@ -214,7 +214,7 @@ export default function Contact() {
                       name="message"
                       value={formData.message}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488] outline-none transition-all h-28 resize-none text-sm"
+                      className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488] outline-none transition-all h-28 resize-none text-sm text-black"
                       placeholder="How can we help?"
                       required
                     ></textarea>
