@@ -170,6 +170,34 @@ function getFallbackTemplate(
 
       <p><a href="${vars.dashboardUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Review in Dashboard →</a></p>
     `),
+    contact_form: base(`
+      <h2 style="color:#0d9488;">New Contact Form Submission</h2>
+
+      <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;border:1px solid #eee;border-radius:8px;overflow:hidden;">
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;width:42%;color:#555;border-bottom:1px solid #eee;">From</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.senderName}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Email</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><a href="mailto:${vars.senderEmail}">${vars.senderEmail}</a></td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Phone</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.senderPhone}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Subject</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><strong>${vars.subject}</strong></td></tr>
+      </table>
+
+      <h3 style="color:#555;margin-top:30px;margin-bottom:10px;">Message:</h3>
+      <div style="background:#f8fafc;padding:15px;border-left:4px solid #0d9488;font-style:italic;color:#666;line-height:1.6;">
+        ${vars.message.replace(/\n/g, "<br>")}
+      </div>
+
+      <p style="margin-top:30px;color:#999;font-size:12px;">
+        <strong>To reply:</strong> Send an email directly to ${vars.senderEmail}
+      </p>
+    `),
+    contact_confirmation: base(`
+      <h2 style="color:#0d9488;">We received your message!</h2>
+      <p>Hi ${vars.name},</p>
+      <p>Thank you for reaching out to Iconic Images. We've received your message and our team will review it shortly.</p>
+      <p>We typically respond to inquiries within 24 business hours. If your question is urgent, feel free to call us at <strong>281-356-0965</strong>.</p>
+      <p style="margin-top:30px;color:#888;font-size:12px;">
+        If you have any additional information to add, simply reply to this email or visit <strong>iconicimagestx.com</strong>.
+      </p>
+    `),
   };
 
   return templates[type] || base(`<p>You have a new notification from Iconic Images.</p>`);

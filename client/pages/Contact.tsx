@@ -3,9 +3,75 @@ import Layout from "@/components/Layout";
 import ChatWidget from "@/components/ChatWidget";
 import { Button } from "@/components/ui/button";
 import { Quote, MessageCircle, ArrowRight, Phone } from "lucide-react";
+import { toast } from "@/components/ui/sonner";
+
+interface FormData {
+  name: string;
+  subject: string;
+  email: string;
+  phone: string;
+  message: string;
+}
 
 export default function Contact() {
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState<FormData>({
+    name: "",
+    subject: "",
+    email: "",
+    phone: "",
+    message: ""
+  });
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (!formData.name || !formData.email || !formData.subject || !formData.message) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(formData)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to send message");
+      }
+
+      toast.success("Message sent successfully! We'll get back to you soon.");
+      setFormData({
+        name: "",
+        subject: "",
+        email: "",
+        phone: "",
+        message: ""
+      });
+    } catch (error) {
+      console.error("Contact form error:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to send message. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
   return (
     <Layout>
       <div className="bg-white">
@@ -90,11 +156,14 @@ export default function Contact() {
 
               {/* Right Side: Contact Form */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-2xl p-6 md:p-8">
-                <form className="space-y-5" onSubmit={(e) => e.preventDefault()}>
+                <form className="space-y-5" onSubmit={handleSubmit}>
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-black">Name *</label>
                     <input
                       type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleInputChange}
                       className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488] outline-none transition-all text-sm"
                       placeholder="Your name"
                       required
@@ -105,6 +174,9 @@ export default function Contact() {
                     <label className="text-xs font-bold text-black">Subject *</label>
                     <input
                       type="text"
+                      name="subject"
+                      value={formData.subject}
+                      onChange={handleInputChange}
                       className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488] outline-none transition-all text-sm"
                       placeholder="Subject"
                       required
@@ -115,6 +187,9 @@ export default function Contact() {
                     <label className="text-xs font-bold text-black">Email *</label>
                     <input
                       type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
                       className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488] outline-none transition-all text-sm"
                       placeholder="you@example.com"
                       required
@@ -125,6 +200,9 @@ export default function Contact() {
                     <label className="text-xs font-bold text-black">Phone</label>
                     <input
                       type="tel"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleInputChange}
                       className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488] outline-none transition-all text-sm"
                       placeholder="Your phone number"
                     />
@@ -133,14 +211,21 @@ export default function Contact() {
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-black">Message *</label>
                     <textarea
+                      name="message"
+                      value={formData.message}
+                      onChange={handleInputChange}
                       className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488] outline-none transition-all h-28 resize-none text-sm"
                       placeholder="How can we help?"
                       required
                     ></textarea>
                   </div>
 
-                  <Button className="w-full bg-black hover:bg-gray-900 text-white font-bold py-5 text-base rounded-xl transition-all shadow-[0_10px_30px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.1)] border border-gray-800 hover:border-gray-700">
-                    Send
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full bg-black hover:bg-gray-900 disabled:bg-gray-400 text-white font-bold py-5 text-base rounded-xl transition-all shadow-[0_10px_30px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.1)] border border-gray-800 hover:border-gray-700 disabled:cursor-not-allowed"
+                  >
+                    {isSubmitting ? "Sending..." : "Send"}
                   </Button>
                 </form>
               </div>
