@@ -65,8 +65,19 @@ export function createServer() {
   const app = express();
 
   // CORS
+  const configuredOrigin = process.env.APP_URL;
+  const allowedOrigins = new Set([
+    "https://iconicimagestx.com",
+    "https://www.iconicimagestx.com",
+    "https://iconic-booking-test.cadi0224.chatgpt.site",
+    ...(configuredOrigin ? [configuredOrigin] : []),
+  ]);
+
   app.use(cors({
-    origin: process.env.APP_URL || "*",
+    origin(origin, callback) {
+      // Requests without an Origin header are server-to-server or same-origin.
+      callback(null, !origin || allowedOrigins.has(origin));
+    },
     credentials: true,
   }));
 
