@@ -130,7 +130,7 @@ router.post("/", async (req, res) => {
 
     // Notify coordinator (internal)
     await sendEmail({
-      to: process.env.COORDINATOR_EMAIL || process.env.ADMIN_EMAIL || "",
+      to: "photos@iconicimagestx.com",
       template: "new_booking_alert",
       variables: {
         clientName,
