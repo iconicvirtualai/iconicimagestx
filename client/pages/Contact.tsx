@@ -3,7 +3,7 @@ import Layout from "@/components/Layout";
 import ChatWidget from "@/components/ChatWidget";
 import { Button } from "@/components/ui/button";
 import { Quote, MessageCircle, ArrowRight, Phone } from "lucide-react";
-import { toast } from "@/components/ui/sonner";
+import { toast } from "sonner";
 
 interface FormData {
   name: string;
