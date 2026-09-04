@@ -38,6 +38,7 @@ import VirtualStagingAITool from "./pages/VirtualStagingAITool";
 import VirtualStagingProOrder from "./pages/VirtualStagingProOrder";
 import VirtualStagingCheckout from "./pages/VirtualStagingCheckout";
 import NotFound from "./pages/NotFound";
+import TemporaryBookingPage from "./pages/TemporaryBooking";
 
 // Admin / ops pages
 import AdminLogin from "./pages/AdminLogin";
@@ -73,6 +74,7 @@ const App = () => (
             <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/book" element={<Book />} />
+            <Route path="/temporary-booking" element={<TemporaryBookingPage />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/pricing/ai-assistant" element={<AIPricingAssistant />} />
             <Route path="/pricing-v1" element={<PricingV1 />} />
