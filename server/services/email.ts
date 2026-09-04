@@ -182,7 +182,7 @@ function getFallbackTemplate(
 
       <h3 style="color:#555;margin-top:30px;margin-bottom:10px;">Message:</h3>
       <div style="background:#f8fafc;padding:15px;border-left:4px solid #0d9488;font-style:italic;color:#666;line-height:1.6;">
-        ${vars.message.replace(/\n/g, "<br>")}
+        ${(vars.message || "").replace(/\n/g, "<br>")}
       </div>
 
       <p style="margin-top:30px;color:#999;font-size:12px;">
