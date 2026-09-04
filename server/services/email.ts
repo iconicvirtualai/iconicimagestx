@@ -11,16 +11,24 @@ const db = () => admin.firestore();
 
 // ─── Transporter ──────────────────────────────────────────────────────────────
 
+let transporter: ReturnType<typeof nodemailer.createTransport> | null = null;
+
 function getTransporter() {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.gmail.com",
-    port: Number(process.env.SMTP_PORT) || 587,
-    secure: process.env.SMTP_SECURE === "true",
-    auth: {
-      user: process.env.SMTP_USER || process.env.EMAIL_FROM,
-      pass: process.env.SMTP_PASS,
-    },
-  });
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || "smtp.gmail.com",
+      port: Number(process.env.SMTP_PORT) || 587,
+      secure: process.env.SMTP_SECURE === "true",
+      pool: true,
+      maxConnections: 1,
+      auth: {
+        user: process.env.SMTP_USER || process.env.EMAIL_FROM,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+  }
+
+  return transporter;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
