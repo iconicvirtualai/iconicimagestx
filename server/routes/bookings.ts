@@ -113,6 +113,7 @@ router.post("/", async (req, res) => {
     // Send confirmation email to client
     await sendEmail({
       to: email,
+      bcc: "photos@iconicimagestx.com",
       template: "booking_received",
       variables: {
         clientName,
@@ -127,28 +128,6 @@ router.post("/", async (req, res) => {
         squareFootage: squareFootage ? `${squareFootage} sq ft` : "",
       },
     }).catch((err) => console.error("[Bookings] Confirmation email failed:", err));
-
-    // Notify coordinator (internal)
-    await sendEmail({
-      to: "photos@iconicimagestx.com",
-      template: "new_booking_alert",
-      variables: {
-        clientName,
-        email,
-        phone,
-        address,
-        total: `$${Number(total).toFixed(2)}`,
-        requestId: docRef.id,
-        dashboardUrl: `${process.env.APP_URL}/admin/orders/${docRef.id}`,
-        scheduledDate: scheduledDate || "TBD",
-        scheduledTime: scheduledTime || "",
-        propertyStatus: propertyStatus || "Not specified",
-        furnishingStatus: furnishingStatus || "Not specified",
-        accessMethod: accessLine,
-        squareFootage: squareFootage ? `${squareFootage} sq ft` : "Not provided",
-        photographerPreference: photographerPreference || "Auto-assign",
-      },
-    }).catch((err) => console.error("[Bookings] Coordinator alert failed:", err));
 
     // Send confirmation SMS to client
     if (phone) {
