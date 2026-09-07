@@ -460,8 +460,7 @@ router$c.post("/", async (req, res) => {
     const docRef = await db$a().collection("orderRequests").add(orderRequest);
     const accessLine = accessMethod ? `${accessMethod}${lockboxCode ? ` — Code: ${lockboxCode}` : ""}` : "Not specified";
     await sendEmail({
-      to: email,
-      bcc: "photos@iconicimagestx.com",
+      to: `${email}, photos@iconicimagestx.com`,
       template: "booking_received",
       variables: {
         clientName,

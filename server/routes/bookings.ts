@@ -112,8 +112,7 @@ router.post("/", async (req, res) => {
 
     // Send confirmation email to client
     await sendEmail({
-      to: email,
-      bcc: "photos@iconicimagestx.com",
+      to: `${email}, photos@iconicimagestx.com`,
       template: "booking_received",
       variables: {
         clientName,
