@@ -20,7 +20,7 @@ function getTransporter() {
       port: Number(process.env.SMTP_PORT) || 587,
       secure: process.env.SMTP_SECURE === "true",
       pool: true,
-      maxConnections: 1,
+      maxConnections: 2,
       auth: {
         user: process.env.SMTP_USER || process.env.EMAIL_FROM,
         pass: process.env.SMTP_PASS,

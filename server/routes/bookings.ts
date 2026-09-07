@@ -110,23 +110,33 @@ router.post("/", async (req, res) => {
       ? `${accessMethod}${lockboxCode ? ` — Code: ${lockboxCode}` : ""}`
       : "Not specified";
 
-    // Send confirmation email to client
-    await sendEmail({
-      to: `${email}, photos@iconicimagestx.com`,
-      template: "booking_received",
-      variables: {
-        clientName,
-        address,
-        total: `$${Number(total).toFixed(2)}`,
-        requestId: docRef.id,
-        scheduledDate: scheduledDate || "TBD — we'll confirm shortly",
-        scheduledTime: scheduledTime || "",
-        propertyStatus: propertyStatus || "Not specified",
-        furnishingStatus: furnishingStatus || "Not specified",
-        accessMethod: accessLine,
-        squareFootage: squareFootage ? `${squareFootage} sq ft` : "",
-      },
-    }).catch((err) => console.error("[Bookings] Confirmation email failed:", err));
+    const confirmationVariables = {
+      clientName,
+      address,
+      total: `$${Number(total).toFixed(2)}`,
+      requestId: docRef.id,
+      scheduledDate: scheduledDate || "TBD — we'll confirm shortly",
+      scheduledTime: scheduledTime || "",
+      propertyStatus: propertyStatus || "Not specified",
+      furnishingStatus: furnishingStatus || "Not specified",
+      accessMethod: accessLine,
+      squareFootage: squareFootage ? `${squareFootage} sq ft` : "",
+    };
+
+    // Send both copies in parallel so a slow SMTP connection cannot prevent
+    // the office from receiving the order notification.
+    await Promise.allSettled([
+      sendEmail({
+        to: email,
+        template: "booking_received",
+        variables: confirmationVariables,
+      }),
+      sendEmail({
+        to: "photos@iconicimagestx.com",
+        template: "booking_received",
+        variables: confirmationVariables,
+      }),
+    ]);
 
     // Send confirmation SMS to client
     if (phone) {

@@ -90,7 +90,7 @@ function getTransporter() {
       port: Number(process.env.SMTP_PORT) || 587,
       secure: process.env.SMTP_SECURE === "true",
       pool: true,
-      maxConnections: 1,
+      maxConnections: 2,
       auth: {
         user: process.env.SMTP_USER || process.env.EMAIL_FROM,
         pass: process.env.SMTP_PASS
@@ -459,22 +459,30 @@ router$c.post("/", async (req, res) => {
     };
     const docRef = await db$a().collection("orderRequests").add(orderRequest);
     const accessLine = accessMethod ? `${accessMethod}${lockboxCode ? ` — Code: ${lockboxCode}` : ""}` : "Not specified";
-    await sendEmail({
-      to: `${email}, photos@iconicimagestx.com`,
-      template: "booking_received",
-      variables: {
-        clientName,
-        address,
-        total: `$${Number(total).toFixed(2)}`,
-        requestId: docRef.id,
-        scheduledDate: scheduledDate || "TBD — we'll confirm shortly",
-        scheduledTime: scheduledTime || "",
-        propertyStatus: propertyStatus || "Not specified",
-        furnishingStatus: furnishingStatus || "Not specified",
-        accessMethod: accessLine,
-        squareFootage: squareFootage ? `${squareFootage} sq ft` : ""
-      }
-    }).catch((err) => console.error("[Bookings] Confirmation email failed:", err));
+    const confirmationVariables = {
+      clientName,
+      address,
+      total: `$${Number(total).toFixed(2)}`,
+      requestId: docRef.id,
+      scheduledDate: scheduledDate || "TBD — we'll confirm shortly",
+      scheduledTime: scheduledTime || "",
+      propertyStatus: propertyStatus || "Not specified",
+      furnishingStatus: furnishingStatus || "Not specified",
+      accessMethod: accessLine,
+      squareFootage: squareFootage ? `${squareFootage} sq ft` : ""
+    };
+    await Promise.allSettled([
+      sendEmail({
+        to: email,
+        template: "booking_received",
+        variables: confirmationVariables
+      }),
+      sendEmail({
+        to: "photos@iconicimagestx.com",
+        template: "booking_received",
+        variables: confirmationVariables
+      })
+    ]);
     if (phone) {
       await sendSMS({
         to: phone,
