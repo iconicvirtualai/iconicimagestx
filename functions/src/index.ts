@@ -1,10 +1,59 @@
-import * as functions from "firebase-functions";
+import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 import { google } from "googleapis";
 
 admin.initializeApp();
 
 const db = admin.firestore();
+
+const ICONIC_FROM_EMAIL = "photos@iconicimagestx.com";
+const ICONIC_OFFICE_EMAIL = "photos@iconicimagestx.com";
+
+function encodeEmail(to: string, subject: string, body: string): string {
+  const message = [
+    `To: ${to}`,
+    `From: Iconic Images <${ICONIC_FROM_EMAIL}>`,
+    `Reply-To: ${ICONIC_OFFICE_EMAIL}`,
+    `Subject: ${subject}`,
+    "MIME-Version: 1.0",
+    'Content-Type: text/plain; charset="UTF-8"',
+    "",
+    body,
+  ].join("\n");
+
+  return Buffer.from(message)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+function formatOrderItems(items: any[]): string {
+  if (!Array.isArray(items) || items.length === 0) return "Not specified";
+  return items
+    .map((item) => {
+      const name = item?.name || item?.label || item?.title || "Service";
+      const price = Number(item?.price);
+      return Number.isFinite(price) ? `- ${name}: $${price.toFixed(2)}` : `- ${name}`;
+    })
+    .join("\n");
+}
+
+function formatMoney(value: unknown): string {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? `$${amount.toFixed(2)}` : "$0.00";
+}
+
+function gmailClient() {
+  const auth = new google.auth.JWT({
+    email: process.env.GOOGLE_CLIENT_EMAIL,
+    key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+    scopes: ["https://www.googleapis.com/auth/gmail.send"],
+    subject: ICONIC_FROM_EMAIL,
+  });
+
+  return google.gmail({ version: "v1", auth });
+}
 
 function replaceTags(template: string, data: Record<string, string>): string {
   let result = template;
@@ -49,6 +98,118 @@ export const syncStaffClaims = functions.firestore
       console.log(`[syncStaffClaims] Set claims for ${uid}: role=${role}, isStaff=${isActive}`);
     } catch (err) {
       console.error(`[syncStaffClaims] Failed to set claims for ${uid}:`, err);
+    }
+  });
+
+// A booking is not considered fully received until both the customer and office
+// notifications have been attempted. This Firestore trigger mirrors the proven
+// Sleek Media flow and does not depend on the browser making a second request.
+export const onOrderRequestCreated = functions.firestore
+  .document("orderRequests/{orderId}")
+  .onCreate(async (snap, context) => {
+    const order = snap.data();
+    const orderId = context.params.orderId;
+    const clientEmail = String(order.email || order.clientEmail || "").trim();
+    const clientName = String(order.clientName || order.clientFullName || "Client").trim();
+    const address = String(order.address || order.propertyAddress || "Not specified").trim();
+    const phone = String(order.phone || order.clientPhone || "Not provided").trim();
+    const scheduledDate = String(order.scheduledDate || order.preferredDate || "To be confirmed");
+    const scheduledTime = String(order.scheduledTime || order.preferredTime || "To be confirmed");
+    const access = String(order.accessMethod || order.propertyAccess || "Not specified");
+    const notes = String(order.vibeNote || order.notes || order.specialRequests || "None");
+    const itemText = formatOrderItems(order.lineItems || order.addOns || []);
+    const total = formatMoney(order.total ?? order.totalPrice ?? order.pricing?.total);
+
+    if (!clientEmail) {
+      await snap.ref.set({
+        notificationStatus: "failed",
+        notificationError: "No client email supplied",
+        notificationAttemptedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      return;
+    }
+
+    const summary = [
+      `Order ID: ${orderId}`,
+      `Client: ${clientName}`,
+      `Email: ${clientEmail}`,
+      `Phone: ${phone}`,
+      `Property: ${address}`,
+      `Requested date: ${scheduledDate}`,
+      `Requested time: ${scheduledTime}`,
+      `Access: ${access}`,
+      "",
+      "ORDER DETAILS",
+      itemText,
+      "",
+      `Total: ${total}`,
+      `Notes: ${notes}`,
+    ].join("\n");
+
+    const clientBody = [
+      `Hi ${clientName},`,
+      "",
+      "We received your request with Iconic Images. Your requested appointment is not confirmed until our office follows up.",
+      "",
+      summary,
+      "",
+      "Questions? Reply to this email or contact photos@iconicimagestx.com.",
+      "",
+      "Iconic Images",
+    ].join("\n");
+
+    const officeBody = [
+      "A new order request was submitted through ORDERICONIC.",
+      "",
+      summary,
+      "",
+      `Review the request: https://iconicimagestx.vercel.app/admin/orders/${orderId}`,
+    ].join("\n");
+
+    const gmail = gmailClient();
+    const [clientResult, officeResult] = await Promise.allSettled([
+      gmail.users.messages.send({
+        userId: "me",
+        requestBody: {
+          raw: encodeEmail(clientEmail, `We received your Iconic order request — ${address}`, clientBody),
+        },
+      }),
+      gmail.users.messages.send({
+        userId: "me",
+        requestBody: {
+          raw: encodeEmail(ICONIC_OFFICE_EMAIL, `NEW ICONIC ORDER — ${clientName} — ${address}`, officeBody),
+        },
+      }),
+    ]);
+
+    const clientSent = clientResult.status === "fulfilled";
+    const officeSent = officeResult.status === "fulfilled";
+    const errors = [
+      clientResult.status === "rejected" ? `Client: ${String(clientResult.reason)}` : "",
+      officeResult.status === "rejected" ? `Office: ${String(officeResult.reason)}` : "",
+    ].filter(Boolean);
+
+    await snap.ref.set({
+      clientConfirmationSent: clientSent,
+      officeNotificationSent: officeSent,
+      notificationStatus: clientSent && officeSent ? "sent" : "failed",
+      notificationError: errors.join(" | ") || null,
+      notificationAttemptedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    await db.collection("emailLogs").add({
+      orderId,
+      trigger: "order_request_created",
+      clientEmail,
+      officeEmail: ICONIC_OFFICE_EMAIL,
+      clientSent,
+      officeSent,
+      errors,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    if (!clientSent || !officeSent) {
+      throw new Error(`Booking notifications failed: ${errors.join(" | ")}`);
     }
   });
 
