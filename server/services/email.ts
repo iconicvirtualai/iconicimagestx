@@ -11,22 +11,31 @@ const db = () => admin.firestore();
 
 // ─── Transporter ──────────────────────────────────────────────────────────────
 
+let transporter: ReturnType<typeof nodemailer.createTransport> | null = null;
+
 function getTransporter() {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.gmail.com",
-    port: Number(process.env.SMTP_PORT) || 587,
-    secure: process.env.SMTP_SECURE === "true",
-    auth: {
-      user: process.env.SMTP_USER || process.env.EMAIL_FROM,
-      pass: process.env.SMTP_PASS,
-    },
-  });
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || "smtp.gmail.com",
+      port: Number(process.env.SMTP_PORT) || 587,
+      secure: process.env.SMTP_SECURE === "true",
+      pool: true,
+      maxConnections: 1,
+      auth: {
+        user: process.env.SMTP_USER || process.env.EMAIL_FROM,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+  }
+
+  return transporter;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface SendEmailOptions {
   to: string;
+  bcc?: string;
   template: string;
   variables?: Record<string, string>;
   subject?: string; // override template subject
@@ -36,7 +45,7 @@ interface SendEmailOptions {
 // ─── Main Send Function ───────────────────────────────────────────────────────
 
 export async function sendEmail(options: SendEmailOptions): Promise<void> {
-  const { to, template, variables = {}, subject: subjectOverride, attachments } = options;
+  const { to, bcc, template, variables = {}, subject: subjectOverride, attachments } = options;
 
   if (!to) {
     console.warn("[Email] No recipient specified, skipping.");
@@ -65,6 +74,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
     await transporter.sendMail({
       from: `"Iconic Images" <${process.env.EMAIL_FROM || process.env.SMTP_USER}>`,
       to,
+      bcc,
       subject,
       html: htmlBody,
       attachments,
@@ -182,7 +192,7 @@ function getFallbackTemplate(
 
       <h3 style="color:#555;margin-top:30px;margin-bottom:10px;">Message:</h3>
       <div style="background:#f8fafc;padding:15px;border-left:4px solid #0d9488;font-style:italic;color:#666;line-height:1.6;">
-        ${vars.message.replace(/\n/g, "<br>")}
+        ${(vars.message || "").replace(/\n/g, "<br>")}
       </div>
 
       <p style="margin-top:30px;color:#999;font-size:12px;">
