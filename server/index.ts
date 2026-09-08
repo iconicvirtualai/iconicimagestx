@@ -65,8 +65,25 @@ export function createServer() {
   const app = express();
 
   // CORS
+  const allowedOrigins = new Set([
+    process.env.APP_URL?.replace(/\/$/, ""),
+    "https://iconicimagestx.com",
+    "https://www.iconicimagestx.com",
+    "https://iconicimagestx.vercel.app",
+  ].filter((origin): origin is string => Boolean(origin)));
+
   app.use(cors({
-    origin: process.env.APP_URL || "*",
+    origin(origin, callback) {
+      const normalizedOrigin = origin?.replace(/\/$/, "");
+
+      // Requests without an Origin header are server-to-server or same-origin.
+      if (!normalizedOrigin || allowedOrigins.has(normalizedOrigin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`Origin not allowed by CORS: ${origin}`));
+    },
     credentials: true,
   }));
 
