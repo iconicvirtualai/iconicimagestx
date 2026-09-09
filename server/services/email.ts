@@ -6,6 +6,7 @@
 
 import nodemailer from "nodemailer";
 import admin from "firebase-admin";
+import { google } from "googleapis";
 
 const db = () => admin.firestore();
 
@@ -44,6 +45,49 @@ interface SendEmailOptions {
   attachments?: Array<{ filename: string; path: string }>;
 }
 
+async function sendWithGmailApi(options: {
+  to: string;
+  bcc?: string;
+  subject: string;
+  html: string;
+}): Promise<void> {
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+    throw new Error("Gmail API fallback requires FIREBASE_SERVICE_ACCOUNT");
+  }
+
+  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  const sender = process.env.EMAIL_FROM || process.env.GMAIL_SMTP_USER || process.env.SMTP_USER;
+  if (!sender) throw new Error("No Gmail sender configured");
+
+  const auth = new google.auth.JWT({
+    email: serviceAccount.client_email,
+    key: serviceAccount.private_key,
+    scopes: ["https://www.googleapis.com/auth/gmail.send"],
+    subject: sender,
+  });
+
+  const headers = [
+    `To: ${options.to}`,
+    options.bcc ? `Bcc: ${options.bcc}` : "",
+    `From: Iconic Images <${sender}>`,
+    `Reply-To: photos@iconicimagestx.com`,
+    `Subject: ${options.subject}`,
+    "MIME-Version: 1.0",
+    'Content-Type: text/html; charset="UTF-8"',
+    "",
+    options.html,
+  ].filter(Boolean).join("\r\n");
+
+  const raw = Buffer.from(headers)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+
+  const gmail = google.gmail({ version: "v1", auth });
+  await gmail.users.messages.send({ userId: "me", requestBody: { raw } });
+}
+
 // ─── Main Send Function ───────────────────────────────────────────────────────
 
 export async function sendEmail(options: SendEmailOptions): Promise<void> {
@@ -73,14 +117,19 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
     }
 
     const transporter = getTransporter();
-    await transporter.sendMail({
-      from: `"Iconic Images" <${process.env.GMAIL_SMTP_USER || process.env.EMAIL_FROM || process.env.SMTP_USER}>`,
-      to,
-      bcc,
-      subject,
-      html: htmlBody,
-      attachments,
-    });
+    try {
+      await transporter.sendMail({
+        from: `"Iconic Images" <${process.env.GMAIL_SMTP_USER || process.env.EMAIL_FROM || process.env.SMTP_USER}>`,
+        to,
+        bcc,
+        subject,
+        html: htmlBody,
+        attachments,
+      });
+    } catch (smtpError) {
+      console.warn(`[Email] SMTP failed for ${to}; trying Gmail API fallback.`);
+      await sendWithGmailApi({ to, bcc, subject, html: htmlBody });
+    }
 
     console.log(`[Email] Sent '${template}' to ${to}`);
   } catch (err) {
