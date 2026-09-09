@@ -22,8 +22,10 @@ function getTransporter() {
       pool: true,
       maxConnections: 2,
       auth: {
-        user: process.env.SMTP_USER || process.env.EMAIL_FROM,
-        pass: process.env.SMTP_PASS,
+        // Prefer the dedicated Gmail SMTP credentials. The legacy SMTP_USER /
+        // SMTP_PASS pair is still retained as a fallback for older installs.
+        user: process.env.GMAIL_SMTP_USER || process.env.SMTP_USER || process.env.EMAIL_FROM,
+        pass: process.env.GMAIL_SMTP_APP_PASSWORD || process.env.SMTP_PASS,
       },
     });
   }
@@ -72,7 +74,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
 
     const transporter = getTransporter();
     await transporter.sendMail({
-      from: `"Iconic Images" <${process.env.EMAIL_FROM || process.env.SMTP_USER}>`,
+      from: `"Iconic Images" <${process.env.GMAIL_SMTP_USER || process.env.EMAIL_FROM || process.env.SMTP_USER}>`,
       to,
       bcc,
       subject,
