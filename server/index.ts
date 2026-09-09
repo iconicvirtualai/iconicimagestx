@@ -70,6 +70,7 @@ export function createServer() {
     "https://iconicimagestx.com",
     "https://www.iconicimagestx.com",
     "https://iconicimagestx.vercel.app",
+    "https://iconic-booking-test.cadi0224.chatgpt.site",
   ].filter((origin): origin is string => Boolean(origin)));
 
   app.use(cors({
