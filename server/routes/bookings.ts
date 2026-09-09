@@ -13,6 +13,33 @@ import { sendSMS, SMS_TEMPLATES } from "../services/sms";
 const router = Router();
 const db = () => admin.firestore();
 
+function escapeEmailHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function emailValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => typeof item === "object" && item !== null
+        ? `${escapeEmailHtml((item as { name?: string }).name || "Item")}${(item as { price?: number }).price != null ? ` — $${Number((item as { price?: number }).price).toFixed(2)}` : ""}`
+        : escapeEmailHtml(item))
+      .filter(Boolean)
+      .join("<br>");
+  }
+  return escapeEmailHtml(value);
+}
+
+function detailRow(label: string, value: unknown, shaded = false): string {
+  const empty = value == null || value === "" || (Array.isArray(value) && value.length === 0);
+  if (empty) return "";
+  return `<tr${shaded ? ' style="background:#f8fafc;"' : ""}><td style="padding:10px 14px;font-weight:bold;width:42%;color:#555;border-bottom:1px solid #eee;vertical-align:top;">${escapeEmailHtml(label)}</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${emailValue(value)}</td></tr>`;
+}
+
 // ─── POST /api/bookings — Public booking form submission ────────────────────
 // No auth required — this is the public-facing booking form
 
@@ -121,6 +148,37 @@ router.post("/", async (req, res) => {
       furnishingStatus: furnishingStatus || "Not specified",
       accessMethod: accessLine,
       squareFootage: squareFootage ? `${squareFootage} sq ft` : "",
+      completeOrderSummary: `
+        <h3 style="color:#333;margin:28px 0 10px;">Complete order details</h3>
+        <table style="width:100%;border-collapse:collapse;margin:0 0 20px;font-size:14px;border:1px solid #eee;border-radius:8px;overflow:hidden;">
+          ${detailRow("Client", clientName, true)}
+          ${detailRow("Email", email)}
+          ${detailRow("Phone", phone, true)}
+          ${detailRow("Property / Request", address)}
+          ${detailRow("Requested Date", scheduledDate, true)}
+          ${detailRow("Requested Time", scheduledTime)}
+          ${detailRow("Preferred Photographer", photographerPreference, true)}
+          ${detailRow("Square Footage", squareFootage)}
+          ${detailRow("Access Method", accessLine, true)}
+          ${detailRow("Property Status", propertyStatus)}
+          ${detailRow("Furnishing", furnishingStatus, true)}
+          ${detailRow("Package and Services", lineItems)}
+          ${detailRow("Selected Basics", selectedBasics, true)}
+          ${detailRow("Selected Add-ons", selectedAddOns)}
+          ${detailRow("Special Requests / Notes", vibeNote, true)}
+          ${detailRow("Specialized Photography", specializedPhotography)}
+          ${detailRow("Virtual Staging Credits", virtualStagingCredits, true)}
+          ${detailRow("Promo Code", promoCode)}
+          ${detailRow("Promo Discount", promoDiscount, true)}
+          ${detailRow("Lead Source", leadSource)}
+          ${detailRow("Current Marketing", marketingDoing, true)}
+          ${detailRow("Current Challenges", resultsBothering)}
+          ${detailRow("Ideal Business", perfectBusiness, true)}
+          ${detailRow("Business Source", businessSource)}
+          ${detailRow("Investment Preference", investmentWilling, true)}
+          ${detailRow("Order Total", `$${Number(total).toFixed(2)}`)}
+          ${detailRow("Confirmation ID", docRef.id, true)}
+        </table>`,
     };
 
     // Send both copies in parallel so a slow SMTP connection cannot prevent

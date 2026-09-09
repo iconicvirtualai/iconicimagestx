@@ -116,6 +116,12 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
       htmlBody = interpolate(tmpl.htmlBody, variables);
     }
 
+    // Booking emails must always carry the complete submitted-field summary,
+    // including when a custom Firestore template overrides the fallback copy.
+    if (template === "booking_received" && variables.completeOrderSummary) {
+      htmlBody += variables.completeOrderSummary;
+    }
+
     const transporter = getTransporter();
     try {
       await transporter.sendMail({
