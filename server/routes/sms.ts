@@ -26,6 +26,25 @@ import { requireStaff, requireCoordinator, type AuthenticatedRequest } from "../
 const router = Router();
 const db = () => admin.firestore();
 
+function addressLabel(address: unknown): string {
+  if (!address) return "the property";
+  if (typeof address === "string") return address;
+  if (typeof address === "object") {
+    const a = address as Record<string, unknown>;
+    if (typeof a.formatted === "string" && a.formatted) return a.formatted;
+    return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "the property";
+  }
+  return String(address);
+}
+
+async function findOrderLikeDocument(id: string) {
+  const orderRequestDoc = await db().collection("orderRequests").doc(id).get();
+  if (orderRequestDoc.exists) return orderRequestDoc;
+  const orderDoc = await db().collection("orders").doc(id).get();
+  if (orderDoc.exists) return orderDoc;
+  return null;
+}
+
 // ─── POST /api/sms/send — One-off SMS to any client ──────────────────────────
 
 router.post("/send", requireStaff, async (req: AuthenticatedRequest, res: Response) => {
@@ -75,21 +94,19 @@ router.post("/remind/:orderId", requireStaff, async (req: AuthenticatedRequest, 
   try {
     const { type = "24h" } = req.body; // "24h" | "1h"
 
-    const orderDoc = await db().collection("orderRequests").doc(req.params.orderId).get()
-      || await db().collection("orders").doc(req.params.orderId).get();
-
-    if (!orderDoc?.exists) {
+    const orderDoc = await findOrderLikeDocument(req.params.orderId);
+    if (!orderDoc) {
       return res.status(404).json({ error: "Order not found." });
     }
 
     const order = orderDoc.data()!;
-    const phone = order.phone;
+    const phone = order.phone || order.clientPhone;
     if (!phone) return res.status(400).json({ error: "No phone number on order." });
 
     const name = order.firstName || order.clientName?.split(" ")[0] || "there";
     const date = order.scheduledDate || "your scheduled date";
     const time = order.scheduledTime || "your appointment time";
-    const address = order.address || "the property";
+    const address = order.addressLabel || addressLabel(order.address || order.propertyAddress);
 
     let body: string;
     if (type === "1h") {
