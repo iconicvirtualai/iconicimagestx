@@ -70,12 +70,14 @@ function getUnifiedStatus(o: any): string {
   if (s.includes("delivered")) return "delivered_unpaid";
   if (s === "in_review") return "in_review";
   if (s === "pending" || s === "pending_edit" || s === "in_progress") return "pending";
+  if (s === "confirmed") return "confirmed";
   if (s === "scheduled" || s === "appt_scheduled" || s === "consult_scheduled") return "scheduled";
   return "unscheduled";
 }
 
 const UNIFIED_STATUS: Record<string, { label: string; color: string }> = {
   unscheduled: { label: "Unscheduled", color: "bg-red-500 text-white" },
+  confirmed: { label: "Confirmed", color: "bg-emerald-600 text-white" },
   scheduled: { label: "Scheduled", color: "bg-blue-600 text-white" },
   pending: { label: "Pending", color: "bg-yellow-100 text-yellow-700" },
   in_review: { label: "In Review", color: "bg-purple-100 text-purple-700" },
@@ -199,7 +201,7 @@ export default function AdminOrders() {
 
   const actionRequired = orders.filter(o => {
     const s = getUnifiedStatus(o);
-    return s === "unscheduled" && s !== "archived" && s !== "cancelled";
+    return s === "unscheduled";
   });
 
   const allActive = orders.filter(o => {
@@ -269,7 +271,7 @@ export default function AdminOrders() {
     else if (o.appointmentDate) apptDate = new Date(o.appointmentDate);
     const isPast = apptDate ? apptDate.getTime() < now : false;
 
-    const isScheduled = ["scheduled","in_progress","pending","pending_edit","in_review","delivered","delivered_unpaid","delivered_paid","paid"].includes(status);
+    const isScheduled = ["confirmed","scheduled","in_progress","pending","pending_edit","in_review","delivered","delivered_unpaid","delivered_paid","paid"].includes(status);
 
     const assignedNames = (o.assignedProviders || []).map((p: any) => p.name).join(", ") || (Array.isArray(o.photographerNames) ? o.photographerNames.join(", ") : "");
     const preferredName = o.photographerPreference;

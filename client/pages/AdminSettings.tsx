@@ -67,6 +67,8 @@ export default function AdminSettings() {
     payPeriod: "biweekly",
     editingCostPerPhoto: 0.50,
     avgPhotosPerOrder: 25,
+    squareFeePercent: 2.9,
+    squareFeeFlat: 0.30,
     stripeFeePercent: 2.9,
     stripeFeeFlat: 0.30,
 
@@ -234,8 +236,10 @@ export default function AdminSettings() {
                 </div>
                 <div><p className={labelCls}>Editing Cost per Photo ($)</p><input type="number" step="0.01" value={settings.editingCostPerPhoto} onChange={e => set("editingCostPerPhoto", Number(e.target.value))} className={inputCls} /></div>
                 <div><p className={labelCls}>Avg Photos per Order</p><input type="number" value={settings.avgPhotosPerOrder} onChange={e => set("avgPhotosPerOrder", Number(e.target.value))} className={inputCls} /></div>
-                <div><p className={labelCls}>Stripe Fee (%)</p><input type="number" step="0.1" value={settings.stripeFeePercent} onChange={e => set("stripeFeePercent", Number(e.target.value))} className={inputCls} /></div>
-                <div><p className={labelCls}>Stripe Flat Fee ($)</p><input type="number" step="0.01" value={settings.stripeFeeFlat} onChange={e => set("stripeFeeFlat", Number(e.target.value))} className={inputCls} /></div>
+                <div><p className={labelCls}>Square Fee (%)</p><input type="number" step="0.1" value={settings.squareFeePercent} onChange={e => set("squareFeePercent", Number(e.target.value))} className={inputCls} /></div>
+                <div><p className={labelCls}>Square Flat Fee ($)</p><input type="number" step="0.01" value={settings.squareFeeFlat} onChange={e => set("squareFeeFlat", Number(e.target.value))} className={inputCls} /></div>
+                <div><p className={labelCls}>Studio Noir Stripe Fee (%)</p><input type="number" step="0.1" value={settings.stripeFeePercent} onChange={e => set("stripeFeePercent", Number(e.target.value))} className={inputCls} /></div>
+                <div><p className={labelCls}>Studio Noir Stripe Flat Fee ($)</p><input type="number" step="0.01" value={settings.stripeFeeFlat} onChange={e => set("stripeFeeFlat", Number(e.target.value))} className={inputCls} /></div>
               </div>
             </div>
           )}

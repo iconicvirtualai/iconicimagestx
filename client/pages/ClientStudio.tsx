@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import {
   Download, Lock, Image, Video, MessageSquare, Send,
   ChevronLeft, ChevronRight, X, Edit3, Share2, ExternalLink,
-  Star, Check, Layers,
+  Star, Check, Layers, Zap,
 } from "lucide-react";
 
 function fmtAddr(a: any): string {
@@ -24,7 +24,7 @@ export default function ClientStudio() {
   const [revisionNote, setRevisionNote] = React.useState("");
   const [revisionType, setRevisionType] = React.useState<"single" | "gallery">("single");
   const [submittingRevision, setSubmittingRevision] = React.useState(false);
-  const [activeTab, setActiveTab] = React.useState<"photos" | "videos" | "tours" | "revisions">("photos");
+  const [activeTab, setActiveTab] = React.useState<"photos" | "videos" | "tours" | "revisions" | "ai_studio">("photos");
 
   React.useEffect(() => {
     if (!listingId) return;

@@ -53,7 +53,6 @@ let db: ReturnType<typeof getFirestore>;
 try {
   db = initializeFirestore(app, {
     experimentalForceLongPolling: true,
-    useFetchStreams: false,
   });
 } catch {
   db = getFirestore(app);

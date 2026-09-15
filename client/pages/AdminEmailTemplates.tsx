@@ -153,7 +153,7 @@ function AdminEmailTemplates() {
   const renderPreview = (text: string) => {
     let preview = text;
     Object.entries(SAMPLE_DATA).forEach(([tag, value]) => {
-      preview = preview.replaceAll(tag, value);
+      preview = preview.split(tag).join(value);
     });
     return preview;
   };

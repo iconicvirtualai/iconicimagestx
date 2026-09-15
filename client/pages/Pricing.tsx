@@ -833,10 +833,10 @@ export default function Pricing() {
                     </div>
 
                     <div className="mt-auto space-y-4">
-                      {tier.disclaimer && (
+                      {(tier as any).disclaimer && (
                         <div className="text-center mb-2 px-2">
-                          <p className="text-[11px] font-bold text-black uppercase tracking-tight leading-none mb-1">{tier.disclaimer.title}</p>
-                          <p className="text-[9px] text-gray-500 leading-tight italic">{tier.disclaimer.text}</p>
+                          <p className="text-[11px] font-bold text-black uppercase tracking-tight leading-none mb-1">{(tier as any).disclaimer.title}</p>
+                          <p className="text-[9px] text-gray-500 leading-tight italic">{(tier as any).disclaimer.text}</p>
                         </div>
                       )}
                       <Button asChild className={`w-full py-6 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] ${

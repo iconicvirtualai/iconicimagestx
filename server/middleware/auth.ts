@@ -21,6 +21,9 @@ export interface AuthenticatedRequest extends Request {
 
 type Role = "admin" | "coordinator" | "photographer" | "editor";
 
+const TEMP_ADMIN_ENABLED =
+  process.env.ENABLE_TEMP_ADMIN === "true" || process.env.NODE_ENV !== "production";
+
 // ─── Helpers ────────────────────────────────────────────────────────────────────────────
 
 function roleAtLeast(role: string | undefined, minimum: Role): boolean {
@@ -34,7 +37,7 @@ function roleAtLeast(role: string | undefined, minimum: Role): boolean {
 /** Resolve role from custom claims or fall back to Firestore */
 async function resolveRole(uid: string, decoded: admin.auth.DecodedIdToken): Promise<string | null> {
   // Development / Temporary Admin Bypass
-  if (uid === "temp-admin-uid") {
+  if (TEMP_ADMIN_ENABLED && uid === "temp-admin-uid") {
     return "admin";
   }
 
@@ -66,7 +69,7 @@ export async function requireAuth(
   const authHeader = req.headers.authorization;
 
   // Development / Temporary Admin Bypass
-  if (authHeader === "Bearer temp-admin-token") {
+  if (TEMP_ADMIN_ENABLED && authHeader === "Bearer temp-admin-token") {
     req.user = {
       uid: "temp-admin-uid",
       email: "temp-admin@iconicimagestx.com",

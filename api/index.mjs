@@ -9,6 +9,7 @@ import twilio from "twilio";
 import { google } from "googleapis";
 import Stripe from "stripe";
 import crypto from "crypto";
+const TEMP_ADMIN_ENABLED = process.env.ENABLE_TEMP_ADMIN === "true" || process.env.NODE_ENV !== "production";
 function roleAtLeast(role, minimum) {
   if (!role) return false;
   const hierarchy = ["editor", "photographer", "coordinator", "admin"];
@@ -17,7 +18,7 @@ function roleAtLeast(role, minimum) {
   return roleIdx >= minIdx;
 }
 async function resolveRole(uid, decoded) {
-  if (uid === "temp-admin-uid") {
+  if (TEMP_ADMIN_ENABLED && uid === "temp-admin-uid") {
     return "admin";
   }
   if (decoded.isStaff && decoded.role) {
@@ -36,7 +37,7 @@ async function resolveRole(uid, decoded) {
 }
 async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
-  if (authHeader === "Bearer temp-admin-token") {
+  if (TEMP_ADMIN_ENABLED && authHeader === "Bearer temp-admin-token") {
     req.user = {
       uid: "temp-admin-uid",
       email: "temp-admin@iconicimagestx.com"
@@ -454,7 +455,7 @@ const db$b = () => admin.firestore();
 function appUrl$2() {
   return process.env.APP_URL || "https://iconicimagestx.com";
 }
-function addressLabel$2(address) {
+function addressLabel(address) {
   if (!address) return "Address not provided";
   if (typeof address === "string") return address;
   if (typeof address === "object") {
@@ -464,7 +465,7 @@ function addressLabel$2(address) {
   }
   return String(address);
 }
-function toDate$1(value) {
+function toDate(value) {
   if (!value) return null;
   if (typeof value === "object" && value !== null && "toDate" in value && typeof value.toDate === "function") {
     return value.toDate();
@@ -676,10 +677,10 @@ router$d.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     const requestLastName = request.lastName || request.clientName?.split(" ")?.slice(1).join(" ") || "";
     const requestClientName = request.clientName || `${requestFirstName} ${requestLastName}`.trim() || "Client";
     const requestAddress = request.address || request.propertyAddress || "";
-    const requestAddressLabel = addressLabel$2(requestAddress);
+    const requestAddressLabel = addressLabel(requestAddress);
     const requestLineItems = Array.isArray(request.lineItems) && request.lineItems.length > 0 ? request.lineItems : Array.isArray(request.services) ? request.services.map((service) => typeof service === "string" ? { name: service, price: 0 } : service) : [];
     const requestTotal = Number(request.total ?? request.pricing?.total ?? 0) || 0;
-    const confirmDate = toDate$1(scheduledDate || request.scheduledDate || request.appointmentDate || request.requestedDate);
+    const confirmDate = toDate(scheduledDate || request.scheduledDate || request.appointmentDate || request.requestedDate);
     const confirmTime = scheduledTime || request.scheduledTime || request.appointmentTime || request.requestedTime || null;
     if (!requestEmail) {
       return res.status(400).json({ error: "Client email is missing on this booking request." });
@@ -2639,53 +2640,6 @@ router$5.post("/:id/send", requireCoordinator, async (req, res) => {
 });
 const router$4 = Router();
 const db$2 = () => admin.firestore();
-function isAgentAuthorized(req) {
-  const serviceKey = req.headers["x-agent-key"];
-  const auth = req.headers.authorization;
-  const cronSecret = process.env.CRON_SECRET;
-  return serviceKey === process.env.AGENT_SERVICE_KEY || Boolean(cronSecret && auth === `Bearer ${cronSecret}`);
-}
-function toDate(value) {
-  if (!value) return null;
-  if (typeof value === "object" && value !== null && "toDate" in value && typeof value.toDate === "function") {
-    return value.toDate();
-  }
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-function addressLabel$1(address) {
-  if (!address) return "the property";
-  if (typeof address === "string") return address;
-  if (typeof address === "object") {
-    const a = address;
-    if (typeof a.formatted === "string" && a.formatted) return a.formatted;
-    return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "the property";
-  }
-  return String(address);
-}
-function combineDateAndTime(date, time) {
-  if (!date) return null;
-  const combined = new Date(date);
-  if (typeof time !== "string" || !time.trim()) return combined;
-  const trimmed = time.trim();
-  const match = trimmed.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$/i);
-  if (!match) return combined;
-  let hours = Number(match[1]);
-  const minutes = Number(match[2] || 0);
-  const suffix = match[3]?.toUpperCase();
-  if (suffix === "PM" && hours < 12) hours += 12;
-  if (suffix === "AM" && hours === 12) hours = 0;
-  combined.setHours(hours, minutes, 0, 0);
-  return combined;
-}
-function sameCalendarDay(a, b) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-async function loadOrderForAppointment(appointment) {
-  if (!appointment.orderId) return null;
-  const orderDoc = await db$2().collection("orders").doc(String(appointment.orderId)).get();
-  return orderDoc.exists ? { id: orderDoc.id, ref: orderDoc.ref, data: orderDoc.data() || {} } : null;
-}
 router$4.get("/briefing", requireStaff, async (_req, res) => {
   try {
     const today = /* @__PURE__ */ new Date();
@@ -2782,107 +2736,6 @@ router$4.get("/briefing", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to generate briefing." });
   }
 });
-async function runReminderSweep(req, res) {
-  try {
-    if (!isAgentAuthorized(req)) {
-      return res.status(401).json({ error: "Invalid agent key." });
-    }
-    const now = /* @__PURE__ */ new Date();
-    const today = new Date(now);
-    today.setHours(0, 0, 0, 0);
-    const twoDaysOut = new Date(today);
-    twoDaysOut.setDate(twoDaysOut.getDate() + 2);
-    const appointments = await db$2().collection("appointments").where("scheduledDate", ">=", admin.firestore.Timestamp.fromDate(today)).where("scheduledDate", "<", admin.firestore.Timestamp.fromDate(twoDaysOut)).get();
-    const results = [];
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    for (const appointmentDoc of appointments.docs) {
-      const appointment = appointmentDoc.data();
-      const status = String(appointment.status || "").toLowerCase();
-      if (!["confirmed", "scheduled"].includes(status)) continue;
-      const scheduledDate = toDate(appointment.scheduledDate);
-      if (!scheduledDate) continue;
-      const orderRecord = await loadOrderForAppointment(appointment);
-      const order = orderRecord?.data || {};
-      const merged = { ...appointment, ...order };
-      const sent = appointment.remindersSent || {};
-      const orderId = String(appointment.orderId || orderRecord?.id || appointmentDoc.id);
-      const phone = merged.clientPhone || merged.phone;
-      const name = merged.firstName || merged.clientName?.split(" ")?.[0] || "there";
-      const time = merged.scheduledTime || merged.appointmentTime || "your appointment time";
-      const address = merged.addressLabel || addressLabel$1(merged.address || merged.propertyAddress);
-      const dueTypes = [];
-      if (!sent["24h"] && sameCalendarDay(scheduledDate, tomorrow)) {
-        dueTypes.push("24h");
-      }
-      const scheduledAt = combineDateAndTime(scheduledDate, time);
-      const minutesUntil = scheduledAt ? (scheduledAt.getTime() - now.getTime()) / 6e4 : Number.POSITIVE_INFINITY;
-      if (!sent["1h"] && minutesUntil >= 45 && minutesUntil <= 75) {
-        dueTypes.push("1h");
-      }
-      let sentMap = { ...sent };
-      for (const type of dueTypes) {
-        if (!phone) {
-          results.push({ appointmentId: appointmentDoc.id, orderId, type, skipped: "missing_phone" });
-          continue;
-        }
-        const body = type === "1h" ? SMS_TEMPLATES.appointmentReminder1h(name, String(time)) : SMS_TEMPLATES.appointmentReminder24h(name, scheduledDate.toLocaleDateString("en-US"), String(time), String(address));
-        try {
-          const result = await sendSMS({ to: String(phone), body });
-          sentMap = { ...sentMap, [type]: true };
-          const update = {
-            remindersSent: sentMap,
-            [`reminder${type === "24h" ? "24h" : "1h"}SentAt`]: admin.firestore.FieldValue.serverTimestamp(),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
-          };
-          await Promise.all([
-            appointmentDoc.ref.update(update),
-            orderRecord?.ref.update(update) || Promise.resolve(),
-            db$2().collection("smsLogs").add({
-              direction: "outbound",
-              to: normalisePhone(String(phone)),
-              body,
-              sid: result.sid,
-              status: result.status,
-              type: `reminder_${type}`,
-              orderId,
-              appointmentId: appointmentDoc.id,
-              sentBy: "aicon-reminder-runner",
-              createdAt: admin.firestore.FieldValue.serverTimestamp()
-            })
-          ]);
-          results.push({ appointmentId: appointmentDoc.id, orderId, type, sent: true, sid: result.sid });
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          await db$2().collection("agentLogs").add({
-            agent: "nora",
-            action: "Reminder send failed",
-            summary: `Reminder ${type} failed for order ${orderId}`,
-            status: "flagged",
-            relatedId: orderId,
-            relatedType: "order",
-            priority: "high",
-            requiresHumanReview: true,
-            details: message,
-            createdAt: admin.firestore.FieldValue.serverTimestamp()
-          });
-          results.push({ appointmentId: appointmentDoc.id, orderId, type, error: message });
-        }
-      }
-    }
-    return res.json({
-      success: true,
-      checked: appointments.size,
-      sent: results.filter((r) => r.sent).length,
-      results
-    });
-  } catch (err) {
-    console.error("[Agents] Reminder sweep error:", err);
-    return res.status(500).json({ error: "Failed to run reminder sweep." });
-  }
-}
-router$4.get("/run-reminders", runReminderSweep);
-router$4.post("/run-reminders", runReminderSweep);
 router$4.get("/logs", requireStaff, async (req, res) => {
   try {
     const { agent, status, requiresReview, limit = "50" } = req.query;
@@ -3138,23 +2991,6 @@ router$2.get("/distance", async (req, res) => {
 });
 const router$1 = Router();
 const db = () => admin.firestore();
-function addressLabel(address) {
-  if (!address) return "the property";
-  if (typeof address === "string") return address;
-  if (typeof address === "object") {
-    const a = address;
-    if (typeof a.formatted === "string" && a.formatted) return a.formatted;
-    return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "the property";
-  }
-  return String(address);
-}
-async function findOrderLikeDocument(id) {
-  const orderRequestDoc = await db().collection("orderRequests").doc(id).get();
-  if (orderRequestDoc.exists) return orderRequestDoc;
-  const orderDoc = await db().collection("orders").doc(id).get();
-  if (orderDoc.exists) return orderDoc;
-  return null;
-}
 router$1.post("/send", requireStaff, async (req, res) => {
   try {
     const { to, body, orderId } = req.body;
@@ -3192,17 +3028,17 @@ router$1.post("/send", requireStaff, async (req, res) => {
 router$1.post("/remind/:orderId", requireStaff, async (req, res) => {
   try {
     const { type = "24h" } = req.body;
-    const orderDoc = await findOrderLikeDocument(req.params.orderId);
-    if (!orderDoc) {
+    const orderDoc = await db().collection("orderRequests").doc(req.params.orderId).get() || await db().collection("orders").doc(req.params.orderId).get();
+    if (!orderDoc?.exists) {
       return res.status(404).json({ error: "Order not found." });
     }
     const order = orderDoc.data();
-    const phone = order.phone || order.clientPhone;
+    const phone = order.phone;
     if (!phone) return res.status(400).json({ error: "No phone number on order." });
     const name = order.firstName || order.clientName?.split(" ")[0] || "there";
     const date = order.scheduledDate || "your scheduled date";
     const time = order.scheduledTime || "your appointment time";
-    const address = order.addressLabel || addressLabel(order.address || order.propertyAddress);
+    const address = order.address || "the property";
     let body;
     if (type === "1h") {
       body = SMS_TEMPLATES.appointmentReminder1h(name, time);
@@ -3454,7 +3290,6 @@ router.post("/", async (req, res) => {
   }
 });
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
-const API_BUILD_MARKER = "codex-2026-09-15-v3";
 if (!admin.apps.length) {
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
@@ -3499,7 +3334,6 @@ function createServer() {
     res.json({
       status: "ok",
       message: process.env.PING_MESSAGE ?? "Iconic Images API",
-      build: API_BUILD_MARKER,
       timestamp: (/* @__PURE__ */ new Date()).toISOString()
     });
   });

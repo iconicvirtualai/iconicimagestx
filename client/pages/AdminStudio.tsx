@@ -165,7 +165,7 @@ export default function AdminStudio() {
       {activeTab === "upload" ? (
         <UploadPortal listings={listings} user={user} isAdmin={isAdmin} isEditor={isEditor} />
       ) : (
-        <EditingStudio listings={listings} apiKey={apiKey} />
+        <EditingStudio listings={listings} apiKey={apiKey} user={user} />
       )}
     </AdminLayout>
   );
@@ -345,7 +345,7 @@ function UploadPortal({ listings, user, isAdmin, isEditor }: any) {
 
 // --- Editing Studio Section ---
 
-function EditingStudio({ listings, apiKey }: { listings: any[], apiKey: string }) {
+function EditingStudio({ listings, apiKey, user }: { listings: any[], apiKey: string, user: any }) {
   const [filter, setFilter] = React.useState<WorkflowStatus | 'All'>('All');
   const [processingId, setProcessingId] = React.useState<string | null>(null);
 
@@ -519,6 +519,49 @@ function EditingStudio({ listings, apiKey }: { listings: any[], apiKey: string }
     }
   };
 
+  const queueAiconEditor = async (listing: any) => {
+    if (!user) return;
+    setProcessingId(listing.id);
+    try {
+      const token = await user.getIdToken();
+      const photos = listing.images || [];
+      const res = await fetch("/api/media-jobs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          listingId: listing.id,
+          orderId: listing.orderId || listing.orderRequestId || null,
+          provider: "aicon",
+          preset: "real_estate_standard",
+          notes: listing.notes || listing.vibeNote || listing.internalNotes || "",
+          requirements: {
+            priority: listing.sameDayDelivery ? "rush" : "normal",
+            services: listing.services || [],
+            lockDownloads: listing.lockDownloads !== false,
+            requirePayment: listing.requirePayment !== false,
+          },
+          mediaItems: photos,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const result = await res.json();
+      await updateDoc(doc(db, "listings", listing.id), {
+        workflowStatus: "Processing",
+        aiconEditorJobId: result.jobId,
+        updatedAt: serverTimestamp(),
+      });
+      toast.success("Queued in aICON Editor.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not queue this job in aICON Editor.");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   const markDelivered = async (id: string) => {
     await updateDoc(doc(db, "listings", id), {
       status: 'delivered_unpaid',
@@ -611,11 +654,11 @@ function EditingStudio({ listings, apiKey }: { listings: any[], apiKey: string }
                   <div className="flex items-center gap-2">
                     {!l.aiProcessedAt && status === 'Pending' && !isIncomplete && (
                       <Button 
-                        onClick={() => runAutoenhance(l)} 
+                        onClick={() => queueAiconEditor(l)} 
                         disabled={processingId === l.id}
                         className="bg-[#0d9488] hover:bg-[#0f766e] text-white rounded-xl text-[10px] font-black uppercase tracking-widest h-9 px-4"
                       >
-                        <Zap className="w-3.5 h-3.5 mr-2" /> Send to Autoenhance
+                        <Zap className="w-3.5 h-3.5 mr-2" /> Send to aICON Editor
                       </Button>
                     )}
                     {l.aiProcessedAt && status === 'Completed' && (

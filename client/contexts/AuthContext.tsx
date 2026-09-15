@@ -26,6 +26,9 @@ import type { StaffMember, Client } from "../lib/schema";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+const TEMP_ADMIN_ENABLED =
+  import.meta.env.DEV || import.meta.env.VITE_ENABLE_TEMP_ADMIN === "true";
+
 type AuthUserType = "staff" | "client" | null;
 
 interface AuthContextValue {
@@ -112,7 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
 
     // Development / Temporary Admin Bypass
-    if (email === "temp-admin@iconicimagestx.com" && password === "TempAdmin!2024") {
+    if (TEMP_ADMIN_ENABLED && email === "temp-admin@iconicimagestx.com" && password === "TempAdmin!2024") {
       console.log("[Auth] Using temporary admin bypass");
       const tempUser = {
         uid: "temp-admin-uid",

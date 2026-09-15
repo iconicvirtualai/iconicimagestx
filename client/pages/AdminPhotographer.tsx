@@ -119,7 +119,7 @@ export default function AdminPhotographer() {
   };
 
   // Revenue calculation (placeholder rates)
-  const payRate = staffProfile?.payRate || 75; // per project default
+  const payRate = (staffProfile as any)?.payRate || 75; // per project default
   const completedCount = pastJobs.filter(j => (j.status || "").includes("completed") || (j.images || []).length > 0).length;
   const pendingPayout = completedCount * payRate;
   const totalEarnings = assignments.length * payRate;
