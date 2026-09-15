@@ -4,7 +4,7 @@ import AdminLayout from "@/components/AdminLayout";
 import { Button } from "@/components/ui/button";
 import {
   ChevronLeft, Edit3, Save, Calendar, Archive,
-  X, AlertCircle, MapPin, Clock, Camera, Layers, Eye, Send,
+  X, AlertCircle, MapPin, Clock, Camera, Layers, Eye, Send, Check,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import {
@@ -12,6 +12,7 @@ import {
   collection, addDoc, getDocs,
 } from "firebase/firestore";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtAddr(a: any): string {
@@ -71,6 +72,17 @@ function safe(v: any): string {
   return String(v);
 }
 
+function parseBookingDate(value: any): string | null {
+  if (!value) return null;
+  if (value.toDate) return value.toDate().toISOString();
+  if (typeof value === "string") {
+    if (/^\d{4}-\d{2}-\d{2}/.test(value)) return value;
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+  }
+  return null;
+}
+
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   new: { label: "New Request", color: "bg-yellow-100 text-yellow-700" },
   request: { label: "New Request", color: "bg-yellow-100 text-yellow-700" },
@@ -112,6 +124,7 @@ function Field({ label, value, editing, editValue, onChange, type = "text", span
 export default function AdminOrderRequest() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [order, setOrder] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [editing, setEditing] = React.useState(false);
@@ -128,7 +141,7 @@ export default function AdminOrderRequest() {
     if (!id) return;
     const unsub = onSnapshot(doc(db, "orderRequests", id), snap => {
       if (snap.exists()) {
-        const data = { id: snap.id, ...snap.data() };
+        const data: any = { id: snap.id, ...snap.data() };
         setOrder(data);
         setForm(data);
         if (data.appointmentDate) setSchedDate(data.appointmentDate);
@@ -225,6 +238,48 @@ export default function AdminOrderRequest() {
       toast.success("Scheduled."); setShowSchedule(false);
     } catch (err) { console.error(err); toast.error("Failed."); }
     finally { setSaving(false); }
+  };
+
+  const handleConfirmBooking = async () => {
+    if (!id || !order) return;
+    if (!user) {
+      toast.error("Please sign in again before confirming this booking.");
+      return;
+    }
+    if (order.convertedToOrderId) {
+      navigate(`/admin/order/${order.convertedToOrderId}`);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/bookings/${id}/confirm`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          assignedPhotographerId: selectedProviders[0] || null,
+          assignedPhotographerName: selectedProviders[0]
+            ? staff.find(s => s.id === selectedProviders[0])?.name || null
+            : order.photographerPreference || null,
+          scheduledDate: parseBookingDate(schedDate || order.appointmentDate || order.scheduledDate),
+          scheduledTime: schedTime || order.appointmentTime || order.scheduledTime || null,
+          internalNotes: order.internalNotes || "",
+        }),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(result.error || "Confirmation failed.");
+      toast.success("Booking confirmed. Order, appointment, gallery, and invoice created.");
+      navigate(`/admin/order/${result.orderId}`);
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Confirmation failed.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleArchive = async () => {
@@ -420,6 +475,10 @@ export default function AdminOrderRequest() {
               <Button onClick={order.listingId ? () => navigate(`/admin/listing/${order.listingId}`) : handleCreateProject}
                 disabled={saving} className="w-full rounded-xl text-xs font-bold justify-center bg-[#0d9488] hover:bg-[#0f766e] text-white">
                 <Layers className="w-3.5 h-3.5 mr-1.5" />{order.listingId ? "View Project" : "Create Project"}
+              </Button>
+              <Button onClick={handleConfirmBooking}
+                disabled={saving} className="w-full rounded-xl text-xs font-bold justify-center bg-emerald-600 hover:bg-emerald-700 text-white">
+                <Check className="w-3.5 h-3.5 mr-1.5" />{order.convertedToOrderId ? "Open Confirmed Order" : "Confirm Booking"}
               </Button>
               {!editing ? (
                 <Button onClick={() => setEditing(true)} variant="outline" className="w-full rounded-xl text-xs font-bold justify-center">

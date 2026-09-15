@@ -8,8 +8,9 @@ import {
   Camera, AlertCircle, Plus, Minus, Save, Printer, ExternalLink,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { doc, onSnapshot, updateDoc, serverTimestamp, collection, getDocs } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc, serverTimestamp, collection, getDocs, query, where } from "firebase/firestore";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ─── Status system ────────────────────────────────────────────────────────────
 const ORDER_STATUSES = [
@@ -53,11 +54,15 @@ const labelCls = "block text-[10px] font-black text-gray-400 uppercase tracking-
 export default function AdminOrderDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [order, setOrder] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [editing, setEditing] = React.useState(false);
   const [editForm, setEditForm] = React.useState<any>({});
   const [saving, setSaving] = React.useState(false);
+  const [sendingInvoice, setSendingInvoice] = React.useState(false);
+  const [deliveringGallery, setDeliveringGallery] = React.useState(false);
+  const [mediaLinkForm, setMediaLinkForm] = React.useState({ url: "", title: "", type: "video" });
   const [showCancel, setShowCancel] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<"details"|"invoice"|"gallery"|"history">("details");
 
@@ -74,6 +79,18 @@ export default function AdminOrderDetail() {
         setOrder(data);
         setEditForm(data);
         setLoading(false);
+        Promise.all([
+          getDocs(query(collection(db, "galleries"), where("orderId", "==", snap.id))),
+          getDocs(query(collection(db, "invoices"), where("orderId", "==", snap.id))),
+          getDocs(query(collection(db, "appointments"), where("orderId", "==", snap.id))),
+        ]).then(([gallerySnap, invoiceSnap, appointmentSnap]) => {
+          setOrder((prev: any) => prev?.id === snap.id ? {
+            ...prev,
+            gallery: gallerySnap.empty ? null : { id: gallerySnap.docs[0].id, ...gallerySnap.docs[0].data() },
+            invoice: invoiceSnap.empty ? prev.invoice || null : { id: invoiceSnap.docs[0].id, ...invoiceSnap.docs[0].data() },
+            appointment: appointmentSnap.empty ? null : { id: appointmentSnap.docs[0].id, ...appointmentSnap.docs[0].data() },
+          } : prev);
+        }).catch((err) => console.error("[AdminOrderDetail] Related records lookup failed:", err));
       } else {
         // Fallback to orderRequests
         const unsub2 = onSnapshot(doc(db, "orderRequests", id), snap2 => {
@@ -175,6 +192,107 @@ export default function AdminOrderDetail() {
       return;
     }
     await patch({ status: "archived", archivedAt: serverTimestamp() }, "Order archived");
+  };
+
+  const getToken = async () => {
+    if (!user) throw new Error("Please sign in again.");
+    return user.getIdToken();
+  };
+
+  const handleSendInvoice = async () => {
+    const invoiceId = order.invoice?.id || invoice.id;
+    if (!invoiceId) {
+      toast.error("No invoice is attached to this order yet.");
+      return;
+    }
+
+    setSendingInvoice(true);
+    try {
+      const token = await getToken();
+      const res = await fetch("/api/payments/send-invoice", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ invoiceId }),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(result.error || "Could not send invoice.");
+      toast.success("Invoice sent to the client.");
+      if (result.paymentUrl) window.open(result.paymentUrl, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not send invoice.");
+    } finally {
+      setSendingInvoice(false);
+    }
+  };
+
+  const handleDeliverGallery = async () => {
+    const galleryId = order.gallery?.id;
+    if (!galleryId) {
+      toast.error("No gallery is attached to this order yet.");
+      return;
+    }
+
+    setDeliveringGallery(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/galleries/${galleryId}/deliver`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ downloadEnabled: true, expiresInDays: 30 }),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(result.error || "Could not deliver gallery.");
+      toast.success("Gallery delivery sent.");
+      if (result.deliveryUrl) window.open(result.deliveryUrl, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not deliver gallery.");
+    } finally {
+      setDeliveringGallery(false);
+    }
+  };
+
+  const handleAddMediaLink = async () => {
+    const galleryId = order.gallery?.id;
+    if (!galleryId) {
+      toast.error("No gallery is attached to this order yet.");
+      return;
+    }
+    if (!mediaLinkForm.url.trim()) {
+      toast.error("Paste a video, reel, or tour link first.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/galleries/${galleryId}/media-link`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          url: mediaLinkForm.url.trim(),
+          title: mediaLinkForm.title.trim(),
+          type: mediaLinkForm.type,
+          downloadable: false,
+        }),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(result.error || "Could not add media link.");
+      setMediaLinkForm({ url: "", title: "", type: "video" });
+      toast.success("Media link added to this gallery.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not add media link.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) return (
@@ -484,7 +602,7 @@ export default function AdminOrderDetail() {
           </div>
 
           <div className="flex gap-3 mt-8">
-            <Button className="rounded-xl bg-[#0d9488] hover:bg-[#0f766e] text-white text-xs font-bold">
+            <Button onClick={handleSendInvoice} disabled={sendingInvoice} className="rounded-xl bg-[#0d9488] hover:bg-[#0f766e] text-white text-xs font-bold">
               <Send className="w-3.5 h-3.5 mr-1.5" /> Send Invoice
             </Button>
             <Button variant="outline" className="rounded-xl text-xs font-bold">
@@ -498,15 +616,36 @@ export default function AdminOrderDetail() {
       {activeTab === "gallery" && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <h3 className={`${labelCls} mb-4`}>Gallery & Deliverables</h3>
-          {order.gallery?.galleryUrl ? (
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-[160px_1fr_1fr_auto] gap-2">
+            <select value={mediaLinkForm.type} onChange={e => setMediaLinkForm(f => ({ ...f, type: e.target.value }))} className={inputCls}>
+              <option value="video">Video</option>
+              <option value="reel">Reel</option>
+              <option value="matterport">Matterport</option>
+              <option value="tour">Tour Link</option>
+            </select>
+            <input value={mediaLinkForm.title} onChange={e => setMediaLinkForm(f => ({ ...f, title: e.target.value }))} placeholder="Client-facing title" className={inputCls} />
+            <input value={mediaLinkForm.url} onChange={e => setMediaLinkForm(f => ({ ...f, url: e.target.value }))} placeholder="Hosted video, reel, or Matterport URL" className={inputCls} />
+            <Button onClick={handleAddMediaLink} disabled={saving || !order.gallery?.id} className="rounded-xl bg-black hover:bg-gray-900 text-white text-xs font-bold">
+              <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Link
+            </Button>
+          </div>
+          {order.gallery?.deliveryUrl || order.gallery?.galleryUrl ? (
             <div className="p-4 bg-gray-50 rounded-xl">
-              <a href={order.gallery.galleryUrl} target="_blank" rel="noopener noreferrer"
+              <a href={order.gallery.deliveryUrl || order.gallery.galleryUrl} target="_blank" rel="noopener noreferrer"
                 className="flex items-center gap-2 text-[#0d9488] font-bold text-sm">
                 View Gallery <ExternalLink className="w-4 h-4" />
               </a>
+              <Button onClick={handleDeliverGallery} disabled={deliveringGallery} className="mt-4 rounded-xl bg-[#0d9488] hover:bg-[#0f766e] text-white text-xs font-bold">
+                <Send className="w-3.5 h-3.5 mr-1.5" /> Deliver Gallery
+              </Button>
             </div>
           ) : (
-            <p className="text-sm text-gray-400">Gallery not created yet. Photos will appear here once uploaded and processed.</p>
+            <div className="space-y-4">
+              <p className="text-sm text-gray-400">Gallery not created yet. Photos will appear here once uploaded and processed.</p>
+              <Button onClick={handleDeliverGallery} disabled={deliveringGallery || !order.gallery?.id} className="rounded-xl bg-[#0d9488] hover:bg-[#0f766e] text-white text-xs font-bold">
+                <Send className="w-3.5 h-3.5 mr-1.5" /> Deliver Gallery
+              </Button>
+            </div>
           )}
         </div>
       )}
