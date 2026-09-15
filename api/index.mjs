@@ -314,7 +314,7 @@ async function createMaskedConversation(friendlyName, photographer, client, webh
   if (webhookUrl) {
     await client_sdk.conversations.v1.conversations(conversationSid).webhooks.create({
       target: "webhook",
-      "configuration.method": "POST",
+      "configuration.method": "post",
       "configuration.url": webhookUrl,
       "configuration.filters": ["onMessageAdded"]
     });
