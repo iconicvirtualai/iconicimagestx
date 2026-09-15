@@ -30,6 +30,8 @@ import Socials from "./pages/Socials";
 import AgentLandingPage from "./pages/AgentLandingPage";
 import Privacy from "./pages/Privacy";
 import ClientStudio from "./pages/ClientStudio";
+import ClientInvoice from "./pages/ClientInvoice";
+import PublicGallery from "./pages/PublicGallery";
 import VirtualStaging from "./pages/VirtualStaging";
 import Prep from "./pages/Prep";
 import StockFootage from "./pages/StockFootage";
@@ -47,6 +49,7 @@ import AdminCustomerCenter from "./pages/AdminCustomerCenter";
 import AdminSiteCustomizer from "./pages/AdminSiteCustomizer";
 import AdminEmailTemplates from "./pages/AdminEmailTemplates";
 import AdminCurrentPricing from "./pages/AdminCurrentPricing";
+import AdminOrderDetail from "./pages/AdminOrderDetail";
 import AdminOrderRequest from "./pages/AdminOrderRequest";
 import AdminListings from "./pages/AdminListings";
 import AdminMessages from "./pages/AdminMessages";
@@ -83,6 +86,8 @@ const App = () => (
             <Route path="/stock-footage" element={<StockFootage />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/studio/:listingId" element={<ClientStudio />} />
+            <Route path="/gallery/:galleryId" element={<PublicGallery />} />
+            <Route path="/invoice/:invoiceId" element={<ClientInvoice />} />
             <Route path="/services/virtual-staging" element={<VirtualStaging />} />
             <Route path="/services/virtual-staging/select" element={<VirtualStagingSelection />} />
             <Route path="/services/virtual-staging/ai-tool" element={<VirtualStagingAITool />} />
@@ -91,6 +96,7 @@ const App = () => (
 
             {/* ─── Login Routes ─────────────────────────────────────────── */}
             <Route path="/login" element={<Login />} />
+            <Route path="/portal" element={<Login />} />
             <Route path="/admin/login" element={<AdminLogin />} />
 
             {/* ─── Admin / Staff ────────────────────────────────────────── */}
@@ -99,6 +105,8 @@ const App = () => (
             <Route path="/admin/listings" element={<ProtectedRoute requiredRole="coordinator"><AdminListings /></ProtectedRoute>} />
             <Route path="/admin/listing/:id" element={<ProtectedRoute requiredRole="photographer"><AdminListingFile /></ProtectedRoute>} />
             <Route path="/admin/customers" element={<ProtectedRoute requiredRole="coordinator"><AdminCustomerCenter /></ProtectedRoute>} />
+            <Route path="/admin/order/:id" element={<ProtectedRoute requiredRole="coordinator"><AdminOrderDetail /></ProtectedRoute>} />
+            <Route path="/admin/orders/:id" element={<ProtectedRoute requiredRole="coordinator"><AdminOrderDetail /></ProtectedRoute>} />
             <Route path="/admin/order-request/:id" element={<ProtectedRoute requiredRole="coordinator"><AdminOrderRequest /></ProtectedRoute>} />
             <Route path="/admin/messages" element={<ProtectedRoute requiredRole="coordinator"><AdminMessages /></ProtectedRoute>} />
             <Route path="/admin/photographer" element={<ProtectedRoute requiredRole="photographer"><AdminPhotographer /></ProtectedRoute>} />
