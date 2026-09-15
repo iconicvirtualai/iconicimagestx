@@ -6,7 +6,9 @@ import path from "path";
 import admin from "firebase-admin";
 import nodemailer from "nodemailer";
 import twilio from "twilio";
+import { google } from "googleapis";
 import Stripe from "stripe";
+import crypto from "crypto";
 function roleAtLeast(role, minimum) {
   if (!role) return false;
   const hierarchy = ["editor", "photographer", "coordinator", "admin"];
@@ -81,26 +83,32 @@ async function requirePhotographer(req, res, next) {
     next();
   });
 }
-const db$b = () => admin.firestore();
+const db$c = () => admin.firestore();
+let transporter = null;
 function getTransporter() {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.gmail.com",
-    port: Number(process.env.SMTP_PORT) || 587,
-    secure: process.env.SMTP_SECURE === "true",
-    auth: {
-      user: process.env.SMTP_USER || process.env.EMAIL_FROM,
-      pass: process.env.SMTP_PASS
-    }
-  });
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || "smtp.gmail.com",
+      port: Number(process.env.SMTP_PORT) || 587,
+      secure: process.env.SMTP_SECURE === "true",
+      pool: true,
+      maxConnections: 1,
+      auth: {
+        user: process.env.SMTP_USER || process.env.EMAIL_FROM,
+        pass: process.env.SMTP_PASS
+      }
+    });
+  }
+  return transporter;
 }
 async function sendEmail(options) {
-  const { to, template, variables = {}, subject: subjectOverride, attachments } = options;
+  const { to, bcc, cc, template, variables = {}, subject: subjectOverride, attachments } = options;
   if (!to) {
     console.warn("[Email] No recipient specified, skipping.");
     return;
   }
   try {
-    const templateDoc = await db$b().collection("emailTemplates").where("category", "==", template).where("isActive", "==", true).limit(1).get();
+    const templateDoc = await db$c().collection("emailTemplates").where("category", "==", template).where("isActive", "==", true).limit(1).get();
     let subject = subjectOverride || `Message from Iconic Images`;
     let htmlBody = getFallbackTemplate(template, variables);
     if (!templateDoc.empty) {
@@ -108,10 +116,12 @@ async function sendEmail(options) {
       subject = subjectOverride || interpolate(tmpl.subject, variables);
       htmlBody = interpolate(tmpl.htmlBody, variables);
     }
-    const transporter = getTransporter();
-    await transporter.sendMail({
+    const transporter2 = getTransporter();
+    await transporter2.sendMail({
       from: `"Iconic Images" <${process.env.EMAIL_FROM || process.env.SMTP_USER}>`,
       to,
+      bcc,
+      cc,
       subject,
       html: htmlBody,
       attachments
@@ -218,7 +228,7 @@ function getFallbackTemplate(type, vars) {
 
       <h3 style="color:#555;margin-top:30px;margin-bottom:10px;">Message:</h3>
       <div style="background:#f8fafc;padding:15px;border-left:4px solid #0d9488;font-style:italic;color:#666;line-height:1.6;">
-        ${vars.message.replace(/\n/g, "<br>")}
+        ${(vars.message || "").replace(/\n/g, "<br>")}
       </div>
 
       <p style="margin-top:30px;color:#999;font-size:12px;">
@@ -367,9 +377,110 @@ Questions or edits? Just reply here. — Iconic Images`,
 
 Check dashboard for details.`
 };
-const router$c = Router();
-const db$a = () => admin.firestore();
-router$c.post("/", async (req, res) => {
+function getPrivateKey() {
+  return (process.env.GOOGLE_CALENDAR_PRIVATE_KEY || "").replace(/\\n/g, "\n");
+}
+function getAuth() {
+  const clientEmail = process.env.GOOGLE_CALENDAR_CLIENT_EMAIL;
+  const privateKey = getPrivateKey();
+  if (!clientEmail || !privateKey) return null;
+  return new google.auth.JWT({
+    email: clientEmail,
+    key: privateKey,
+    scopes: ["https://www.googleapis.com/auth/calendar"]
+  });
+}
+function parseTime(time) {
+  if (!time) return { hours: 9, minutes: 0 };
+  const match = time.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+  if (!match) return { hours: 9, minutes: 0 };
+  let hours = Number(match[1]);
+  const minutes = Number(match[2] || 0);
+  const meridian = match[3]?.toUpperCase();
+  if (meridian === "PM" && hours < 12) hours += 12;
+  if (meridian === "AM" && hours === 12) hours = 0;
+  return { hours, minutes };
+}
+function eventTimes(date, time) {
+  if (!date) return null;
+  const { hours, minutes } = parseTime(time);
+  const start = new Date(date);
+  start.setHours(hours, minutes, 0, 0);
+  const end = new Date(start);
+  end.setMinutes(end.getMinutes() + Number(process.env.DEFAULT_APPOINTMENT_DURATION_MINUTES || 90));
+  return { start, end };
+}
+async function createCalendarBookingEvent(booking) {
+  const auth = getAuth();
+  const times = eventTimes(booking.scheduledDate, booking.scheduledTime);
+  if (!auth || !times) return null;
+  const calendarId = booking.photographerCalendarId || booking.photographerEmail || process.env.GOOGLE_CALENDAR_ID || "primary";
+  const calendar = google.calendar({ version: "v3", auth });
+  const summary = `Iconic Images: ${booking.clientName}`;
+  const description = [
+    `Order: ${booking.orderId}`,
+    `Client: ${booking.clientName}`,
+    booking.clientEmail ? `Email: ${booking.clientEmail}` : "",
+    booking.clientPhone ? `Phone: ${booking.clientPhone}` : "",
+    booking.photographerName ? `Photographer: ${booking.photographerName}` : "",
+    booking.services.length ? `Services: ${booking.services.join(", ")}` : "",
+    booking.notes ? `Notes: ${booking.notes}` : ""
+  ].filter(Boolean).join("\n");
+  const response = await calendar.events.insert({
+    calendarId,
+    sendUpdates: "none",
+    requestBody: {
+      summary,
+      location: booking.address,
+      description,
+      start: { dateTime: times.start.toISOString(), timeZone: "America/Chicago" },
+      end: { dateTime: times.end.toISOString(), timeZone: "America/Chicago" },
+      extendedProperties: {
+        private: {
+          orderId: booking.orderId,
+          source: "iconicimagestx"
+        }
+      }
+    }
+  });
+  return {
+    calendarId,
+    eventId: response.data.id || null,
+    htmlLink: response.data.htmlLink || null
+  };
+}
+const router$d = Router();
+const db$b = () => admin.firestore();
+function appUrl$2() {
+  return process.env.APP_URL || "https://iconicimagestx.com";
+}
+function addressLabel$2(address) {
+  if (!address) return "Address not provided";
+  if (typeof address === "string") return address;
+  if (typeof address === "object") {
+    const a = address;
+    if (typeof a.formatted === "string" && a.formatted) return a.formatted;
+    return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "Address not provided";
+  }
+  return String(address);
+}
+function toDate$1(value) {
+  if (!value) return null;
+  if (typeof value === "object" && value !== null && "toDate" in value && typeof value.toDate === "function") {
+    return value.toDate();
+  }
+  if (typeof value === "string") {
+    const normalized = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00` : value;
+    const parsed2 = new Date(normalized);
+    return Number.isNaN(parsed2.getTime()) ? null : parsed2;
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+function money$1(value) {
+  return `$${(Number(value) || 0).toFixed(2)}`;
+}
+router$d.post("/", async (req, res) => {
   try {
     const {
       firstName,
@@ -450,7 +561,7 @@ router$c.post("/", async (req, res) => {
       submittedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    const docRef = await db$a().collection("orderRequests").add(orderRequest);
+    const docRef = await db$b().collection("orderRequests").add(orderRequest);
     const accessLine = accessMethod ? `${accessMethod}${lockboxCode ? ` — Code: ${lockboxCode}` : ""}` : "Not specified";
     await sendEmail({
       to: email,
@@ -458,36 +569,34 @@ router$c.post("/", async (req, res) => {
       variables: {
         clientName,
         address,
-        total: `$${Number(total).toFixed(2)}`,
+        total: money$1(total),
         requestId: docRef.id,
         scheduledDate: scheduledDate || "TBD — we'll confirm shortly",
         scheduledTime: scheduledTime || "",
         propertyStatus: propertyStatus || "Not specified",
         furnishingStatus: furnishingStatus || "Not specified",
         accessMethod: accessLine,
-        squareFootage: squareFootage ? `${squareFootage} sq ft` : ""
+        squareFootage: squareFootage ? `${squareFootage} sq ft` : "",
+        dashboardUrl: `${appUrl$2()}/admin/order-request/${docRef.id}`
       }
     }).catch((err) => console.error("[Bookings] Confirmation email failed:", err));
     await sendEmail({
-      to: process.env.COORDINATOR_EMAIL || process.env.ADMIN_EMAIL || "",
-      template: "new_booking_alert",
+      to: "photos@iconicimagestx.com",
+      template: "booking_received",
       variables: {
         clientName,
-        email,
-        phone,
         address,
-        total: `$${Number(total).toFixed(2)}`,
+        total: money$1(total),
         requestId: docRef.id,
-        dashboardUrl: `${process.env.APP_URL}/admin/orders/${docRef.id}`,
-        scheduledDate: scheduledDate || "TBD",
+        scheduledDate: scheduledDate || "TBD — we'll confirm shortly",
         scheduledTime: scheduledTime || "",
         propertyStatus: propertyStatus || "Not specified",
         furnishingStatus: furnishingStatus || "Not specified",
         accessMethod: accessLine,
-        squareFootage: squareFootage ? `${squareFootage} sq ft` : "Not provided",
-        photographerPreference: photographerPreference || "Auto-assign"
+        squareFootage: squareFootage ? `${squareFootage} sq ft` : "",
+        dashboardUrl: `${appUrl$2()}/admin/order-request/${docRef.id}`
       }
-    }).catch((err) => console.error("[Bookings] Coordinator alert failed:", err));
+    }).catch((err) => console.error("[Bookings] Office notification email failed:", err));
     if (phone) {
       await sendSMS({
         to: phone,
@@ -495,7 +604,7 @@ router$c.post("/", async (req, res) => {
           firstName,
           scheduledDate || "TBD — we'll confirm shortly",
           address,
-          `$${Number(total).toFixed(2)}`
+          money$1(total)
         )
       }).catch((err) => console.error("[Bookings] Confirmation SMS failed:", err));
     }
@@ -520,9 +629,9 @@ router$c.post("/", async (req, res) => {
     return res.status(500).json({ error: "Failed to submit booking request." });
   }
 });
-router$c.get("/", requireCoordinator, async (_req, res) => {
+router$d.get("/", requireCoordinator, async (_req, res) => {
   try {
-    const snapshot = await db$a().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
+    const snapshot = await db$b().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
     const requests = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data()
@@ -533,9 +642,9 @@ router$c.get("/", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking requests." });
   }
 });
-router$c.get("/:id", requireCoordinator, async (req, res) => {
+router$d.get("/:id", requireCoordinator, async (req, res) => {
   try {
-    const doc = await db$a().collection("orderRequests").doc(req.params.id).get();
+    const doc = await db$b().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) {
       return res.status(404).json({ error: "Booking request not found." });
     }
@@ -545,16 +654,43 @@ router$c.get("/:id", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking request." });
   }
 });
-router$c.patch("/:id/confirm", requireCoordinator, async (req, res) => {
+router$d.patch("/:id/confirm", requireCoordinator, async (req, res) => {
   try {
     const { assignedPhotographerId, assignedPhotographerName, scheduledDate, scheduledTime, internalNotes } = req.body;
-    const requestDoc = await db$a().collection("orderRequests").doc(req.params.id).get();
+    const requestDoc = await db$b().collection("orderRequests").doc(req.params.id).get();
     if (!requestDoc.exists) {
       return res.status(404).json({ error: "Booking request not found." });
     }
     const request = requestDoc.data();
+    if (request.convertedToOrderId) {
+      return res.json({
+        success: true,
+        orderId: request.convertedToOrderId,
+        clientId: request.clientId || null,
+        message: "Booking was already confirmed."
+      });
+    }
+    const requestEmail = String(request.email || request.clientEmail || "").toLowerCase().trim();
+    const requestPhone = request.phone || request.clientPhone || "";
+    const requestFirstName = request.firstName || request.clientName?.split(" ")?.[0] || "Client";
+    const requestLastName = request.lastName || request.clientName?.split(" ")?.slice(1).join(" ") || "";
+    const requestClientName = request.clientName || `${requestFirstName} ${requestLastName}`.trim() || "Client";
+    const requestAddress = request.address || request.propertyAddress || "";
+    const requestAddressLabel = addressLabel$2(requestAddress);
+    const requestLineItems = Array.isArray(request.lineItems) && request.lineItems.length > 0 ? request.lineItems : Array.isArray(request.services) ? request.services.map((service) => typeof service === "string" ? { name: service, price: 0 } : service) : [];
+    const requestTotal = Number(request.total ?? request.pricing?.total ?? 0) || 0;
+    const confirmDate = toDate$1(scheduledDate || request.scheduledDate || request.appointmentDate || request.requestedDate);
+    const confirmTime = scheduledTime || request.scheduledTime || request.appointmentTime || request.requestedTime || null;
+    if (!requestEmail) {
+      return res.status(400).json({ error: "Client email is missing on this booking request." });
+    }
+    let photographer = null;
+    if (assignedPhotographerId) {
+      const staffDoc = await db$b().collection("staff").doc(assignedPhotographerId).get();
+      photographer = staffDoc.exists ? staffDoc.data() : null;
+    }
     let clientId;
-    const existingClients = await db$a().collection("clients").where("email", "==", request.email).limit(1).get();
+    const existingClients = await db$b().collection("clients").where("email", "==", requestEmail).limit(1).get();
     if (!existingClients.empty) {
       clientId = existingClients.docs[0].id;
       await existingClients.docs[0].ref.update({
@@ -563,11 +699,11 @@ router$c.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
     } else {
-      const clientRef = await db$a().collection("clients").add({
-        firstName: request.firstName,
-        lastName: request.lastName,
-        email: request.email,
-        phone: request.phone,
+      const clientRef = await db$b().collection("clients").add({
+        firstName: requestFirstName,
+        lastName: requestLastName,
+        email: requestEmail,
+        phone: requestPhone,
         address: request.address,
         totalOrders: 1,
         totalSpend: 0,
@@ -583,21 +719,22 @@ router$c.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     const orderData = {
       orderRequestId: req.params.id,
       clientId,
-      clientName: request.clientName,
-      clientEmail: request.email,
-      clientPhone: request.phone,
-      address: request.address,
-      services: request.lineItems || [],
+      clientName: requestClientName,
+      clientEmail: requestEmail,
+      clientPhone: requestPhone,
+      address: requestAddress,
+      addressLabel: requestAddressLabel,
+      services: requestLineItems,
       addOns: [],
       pricing: request.pricing || {},
-      total: request.total || 0,
+      total: requestTotal,
       depositPaid: 0,
-      balanceDue: request.total || 0,
+      balanceDue: requestTotal,
       status: "confirmed",
       assignedPhotographerId: assignedPhotographerId || null,
       assignedPhotographerName: assignedPhotographerName || null,
-      scheduledDate: scheduledDate ? admin.firestore.Timestamp.fromDate(new Date(scheduledDate)) : null,
-      scheduledTime: scheduledTime || request.scheduledTime || null,
+      scheduledDate: confirmDate ? admin.firestore.Timestamp.fromDate(confirmDate) : null,
+      scheduledTime: confirmTime,
       squareFootage: request.squareFootage || null,
       accessMethod: request.accessMethod || null,
       propertyStatus: request.propertyStatus || null,
@@ -608,67 +745,127 @@ router$c.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    const orderRef = await db$a().collection("orders").add(orderData);
-    await db$a().collection("appointments").add({
+    const orderRef = await db$b().collection("orders").add(orderData);
+    const appointmentRef = await db$b().collection("appointments").add({
       orderId: orderRef.id,
       clientId,
-      clientName: request.clientName,
-      address: request.address,
-      scheduledDate: scheduledDate ? admin.firestore.Timestamp.fromDate(new Date(scheduledDate)) : null,
-      scheduledTime: scheduledTime || request.scheduledTime || null,
+      clientName: requestClientName,
+      address: requestAddress,
+      addressLabel: requestAddressLabel,
+      scheduledDate: confirmDate ? admin.firestore.Timestamp.fromDate(confirmDate) : null,
+      scheduledTime: confirmTime,
       photographerId: assignedPhotographerId || null,
       photographerName: assignedPhotographerName || null,
-      services: request.lineItems || [],
+      services: requestLineItems,
       status: "confirmed",
       notes: request.vibeNote || "",
       internalNotes: internalNotes || "",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    await db$a().collection("galleries").add({
+    const galleryRef = await db$b().collection("galleries").add({
       orderId: orderRef.id,
       clientId,
-      clientName: request.clientName,
-      address: request.address,
-      title: `${request.address} — Gallery`,
+      clientName: requestClientName,
+      address: requestAddress,
+      addressLabel: requestAddressLabel,
+      title: `${requestAddressLabel} — Gallery`,
       status: "pending_upload",
       mediaItems: [],
       downloadEnabled: false,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    await db$a().collection("invoices").add({
+    const calendarResult = await createCalendarBookingEvent({
+      orderId: orderRef.id,
+      clientName: requestClientName,
+      clientEmail: requestEmail,
+      clientPhone: requestPhone,
+      address: requestAddressLabel,
+      services: requestLineItems.map((item) => item.name || String(item)).filter(Boolean),
+      scheduledDate: confirmDate,
+      scheduledTime: confirmTime,
+      photographerEmail: photographer?.email || null,
+      photographerCalendarId: photographer?.googleCalendarId || photographer?.calendarId || null,
+      photographerName: assignedPhotographerName || photographer?.name || null,
+      notes: internalNotes || request.vibeNote || ""
+    }).catch(async (err) => {
+      console.error("[Bookings] Calendar event creation failed:", err);
+      await db$b().collection("agentLogs").add({
+        agent: "nora",
+        action: "Calendar event failed",
+        summary: `Google Calendar event was not created for order ${orderRef.id}`,
+        status: "flagged",
+        relatedId: orderRef.id,
+        relatedType: "order",
+        priority: "high",
+        requiresHumanReview: true,
+        details: err instanceof Error ? err.message : String(err),
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      return null;
+    });
+    if (calendarResult?.eventId) {
+      await Promise.all([
+        orderRef.update({
+          googleCalendarEventId: calendarResult.eventId,
+          googleCalendarId: calendarResult.calendarId,
+          googleCalendarUrl: calendarResult.htmlLink,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        }),
+        appointmentRef.update({
+          googleCalendarEventId: calendarResult.eventId,
+          googleCalendarId: calendarResult.calendarId,
+          googleCalendarUrl: calendarResult.htmlLink,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        })
+      ]);
+    }
+    const invoiceRef = await db$b().collection("invoices").add({
       orderId: orderRef.id,
       clientId,
-      clientName: request.clientName,
-      clientEmail: request.email,
+      galleryId: galleryRef.id,
+      clientName: requestClientName,
+      clientEmail: requestEmail,
       invoiceNumber: await generateInvoiceNumber(),
-      lineItems: request.lineItems || [],
-      subtotal: request.pricing?.subtotal || request.total || 0,
+      lineItems: requestLineItems,
+      subtotal: request.pricing?.subtotal || requestTotal,
       tax: request.pricing?.tax || 0,
-      total: request.total || 0,
+      total: requestTotal,
       amountPaid: 0,
-      amountDue: request.total || 0,
+      amountDue: requestTotal,
       status: "draft",
+      paymentProvider: "square",
+      paymentUrl: `${appUrl$2()}/invoice/${orderRef.id}`,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    await invoiceRef.update({
+      paymentUrl: `${appUrl$2()}/invoice/${invoiceRef.id}`
+    });
+    await galleryRef.update({
+      invoiceId: invoiceRef.id,
+      deliveryUrl: `${appUrl$2()}/gallery/${galleryRef.id}`
     });
     await requestDoc.ref.update({
       status: "confirmed",
       convertedToOrderId: orderRef.id,
+      clientId,
+      galleryId: galleryRef.id,
+      invoiceId: invoiceRef.id,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
     await sendEmail({
-      to: request.email,
+      to: requestEmail,
       template: "order_confirmed",
       variables: {
-        clientName: request.clientName,
-        address: request.address,
-        scheduledDate: scheduledDate || "To be confirmed",
-        scheduledTime: scheduledTime || "To be confirmed",
+        clientName: requestClientName,
+        address: requestAddressLabel,
+        scheduledDate: confirmDate ? confirmDate.toLocaleDateString("en-US") : "To be confirmed",
+        scheduledTime: confirmTime || "To be confirmed",
         photographerName: assignedPhotographerName || "Our team",
         orderId: orderRef.id,
-        portalUrl: `${process.env.APP_URL}/portal`
+        portalUrl: `${appUrl$2()}/portal`
       }
     }).catch((err) => console.error("[Bookings] Confirmation email failed:", err));
     return res.json({
@@ -682,10 +879,10 @@ router$c.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to confirm booking." });
   }
 });
-router$c.patch("/:id/decline", requireCoordinator, async (req, res) => {
+router$d.patch("/:id/decline", requireCoordinator, async (req, res) => {
   try {
     const { reason } = req.body;
-    const doc = await db$a().collection("orderRequests").doc(req.params.id).get();
+    const doc = await db$b().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Not found." });
     await doc.ref.update({
       status: "declined",
@@ -699,20 +896,23 @@ router$c.patch("/:id/decline", requireCoordinator, async (req, res) => {
 });
 async function generateInvoiceNumber() {
   const year = (/* @__PURE__ */ new Date()).getFullYear();
-  const snapshot = await db$a().collection("invoices").where("invoiceNumber", ">=", `INV-${year}-`).orderBy("invoiceNumber", "desc").limit(1).get();
-  if (snapshot.empty) {
+  const snapshot = await db$b().collection("invoices").where("invoiceNumber", ">=", `INV-${year}-`).orderBy("invoiceNumber", "desc").limit(1).get().catch((err) => {
+    console.error("[Bookings] Invoice number lookup failed:", err);
+    return null;
+  });
+  if (!snapshot || snapshot.empty) {
     return `INV-${year}-0001`;
   }
   const last = snapshot.docs[0].data().invoiceNumber;
   const num = parseInt(last.split("-")[2] || "0") + 1;
   return `INV-${year}-${String(num).padStart(4, "0")}`;
 }
-const router$b = Router();
-const db$9 = () => admin.firestore();
-router$b.get("/", requireStaff, async (req, res) => {
+const router$c = Router();
+const db$a = () => admin.firestore();
+router$c.get("/", requireStaff, async (req, res) => {
   try {
     const { status, photographerId, limit = "50", startAfter } = req.query;
-    let query = db$9().collection("orders").orderBy("createdAt", "desc");
+    let query = db$a().collection("orders").orderBy("createdAt", "desc");
     if (status) query = query.where("status", "==", status);
     if (photographerId) {
       query = query.where("assignedPhotographerId", "==", photographerId);
@@ -720,7 +920,7 @@ router$b.get("/", requireStaff, async (req, res) => {
     const limitNum = Math.min(Number(limit), 200);
     query = query.limit(limitNum);
     if (startAfter) {
-      const cursorDoc = await db$9().collection("orders").doc(startAfter).get();
+      const cursorDoc = await db$a().collection("orders").doc(startAfter).get();
       if (cursorDoc.exists) {
         query = query.startAfter(cursorDoc);
       }
@@ -737,16 +937,16 @@ router$b.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch orders." });
   }
 });
-router$b.get("/dashboard", requireStaff, async (_req, res) => {
+router$c.get("/dashboard", requireStaff, async (_req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const [allOrders, todayOrders, monthTransactions, pendingRequests] = await Promise.all([
-      db$9().collection("orders").get(),
-      db$9().collection("orders").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(todayStart)).get(),
-      db$9().collection("transactions").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(monthStart)).where("status", "==", "completed").get(),
-      db$9().collection("orderRequests").where("status", "==", "new").get()
+      db$a().collection("orders").get(),
+      db$a().collection("orders").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(todayStart)).get(),
+      db$a().collection("transactions").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(monthStart)).where("status", "==", "completed").get(),
+      db$a().collection("orderRequests").where("status", "==", "new").get()
     ]);
     const statusCounts = {};
     allOrders.docs.forEach((d) => {
@@ -770,30 +970,42 @@ router$b.get("/dashboard", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch dashboard stats." });
   }
 });
-router$b.get("/:id", requireStaff, async (req, res) => {
+router$c.get("/:id", requireStaff, async (req, res) => {
   try {
-    const orderDoc = await db$9().collection("orders").doc(req.params.id).get();
+    const orderDoc = await db$a().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
     const order = { id: orderDoc.id, ...orderDoc.data() };
     const [gallery, invoice, appointment, messages] = await Promise.all([
-      db$9().collection("galleries").where("orderId", "==", req.params.id).limit(1).get(),
-      db$9().collection("invoices").where("orderId", "==", req.params.id).limit(1).get(),
-      db$9().collection("appointments").where("orderId", "==", req.params.id).limit(1).get(),
-      db$9().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "desc").limit(20).get()
+      db$a().collection("galleries").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
+        console.error("[Orders] Gallery lookup failed:", err);
+        return null;
+      }),
+      db$a().collection("invoices").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
+        console.error("[Orders] Invoice lookup failed:", err);
+        return null;
+      }),
+      db$a().collection("appointments").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
+        console.error("[Orders] Appointment lookup failed:", err);
+        return null;
+      }),
+      db$a().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "desc").limit(20).get().catch((err) => {
+        console.error("[Orders] Messages lookup failed:", err);
+        return null;
+      })
     ]);
     return res.json({
       order,
-      gallery: gallery.empty ? null : { id: gallery.docs[0].id, ...gallery.docs[0].data() },
-      invoice: invoice.empty ? null : { id: invoice.docs[0].id, ...invoice.docs[0].data() },
-      appointment: appointment.empty ? null : { id: appointment.docs[0].id, ...appointment.docs[0].data() },
-      messages: messages.docs.map((d) => ({ id: d.id, ...d.data() }))
+      gallery: !gallery || gallery.empty ? null : { id: gallery.docs[0].id, ...gallery.docs[0].data() },
+      invoice: !invoice || invoice.empty ? null : { id: invoice.docs[0].id, ...invoice.docs[0].data() },
+      appointment: !appointment || appointment.empty ? null : { id: appointment.docs[0].id, ...appointment.docs[0].data() },
+      messages: messages ? messages.docs.map((d) => ({ id: d.id, ...d.data() })) : []
     });
   } catch (err) {
     console.error("[Orders] Fetch error:", err);
     return res.status(500).json({ error: "Failed to fetch order." });
   }
 });
-router$b.patch("/:id", requireCoordinator, async (req, res) => {
+router$c.patch("/:id", requireCoordinator, async (req, res) => {
   try {
     const allowed = [
       "status",
@@ -815,7 +1027,7 @@ router$b.patch("/:id", requireCoordinator, async (req, res) => {
         new Date(updates.scheduledDate)
       );
     }
-    await db$9().collection("orders").doc(req.params.id).update(updates);
+    await db$a().collection("orders").doc(req.params.id).update(updates);
     return res.json({ success: true });
   } catch (err) {
     console.error("[Orders] Update error:", err);
@@ -833,10 +1045,10 @@ const VALID_TRANSITIONS = {
   completed: [],
   cancelled: []
 };
-router$b.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$c.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status, note } = req.body;
-    const orderDoc = await db$9().collection("orders").doc(req.params.id).get();
+    const orderDoc = await db$a().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
     const currentStatus = orderDoc.data().status;
     const validNext = VALID_TRANSITIONS[currentStatus] || [];
@@ -854,14 +1066,14 @@ router$b.patch("/:id/status", requireCoordinator, async (req, res) => {
       updates.completedAt = admin.firestore.FieldValue.serverTimestamp();
     }
     await orderDoc.ref.update(updates);
-    const apptSnapshot = await db$9().collection("appointments").where("orderId", "==", req.params.id).limit(1).get();
+    const apptSnapshot = await db$a().collection("appointments").where("orderId", "==", req.params.id).limit(1).get();
     if (!apptSnapshot.empty) {
       const apptStatus = status === "in_progress" ? "in_progress" : status === "shot_complete" || status === "editing" ? "completed" : status === "cancelled" ? "cancelled" : void 0;
       if (apptStatus) {
         await apptSnapshot.docs[0].ref.update({ status: apptStatus });
       }
     }
-    await db$9().collection("agentLogs").add({
+    await db$a().collection("agentLogs").add({
       agent: "nora",
       action: `Order status changed: ${currentStatus} → ${status}`,
       summary: `Order ${req.params.id} transitioned to ${status}`,
@@ -879,12 +1091,12 @@ router$b.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update order status." });
   }
 });
-router$b.get("/:id/timeline", requireStaff, async (req, res) => {
+router$c.get("/:id/timeline", requireStaff, async (req, res) => {
   try {
     const [messages, editRequests, agentLogs] = await Promise.all([
-      db$9().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
-      db$9().collection("editRequests").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
-      db$9().collection("agentLogs").where("relatedId", "==", req.params.id).orderBy("createdAt", "asc").get()
+      db$a().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
+      db$a().collection("editRequests").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
+      db$a().collection("agentLogs").where("relatedId", "==", req.params.id).orderBy("createdAt", "asc").get()
     ]);
     const timeline = [
       ...messages.docs.map((d) => ({ type: "message", ...d.data(), id: d.id })),
@@ -901,13 +1113,31 @@ router$b.get("/:id/timeline", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch timeline." });
   }
 });
-const router$a = Router();
-const db$8 = () => admin.firestore();
+const router$b = Router();
+const db$9 = () => admin.firestore();
 const storage = () => admin.storage().bucket();
-router$a.get("/", requireStaff, async (req, res) => {
+function appUrl$1() {
+  return process.env.APP_URL || "https://iconicimagestx.com";
+}
+function publicMediaItem(item, canDownload) {
+  const url = item.shareUrl || item.embedUrl || item.url;
+  return {
+    id: item.id,
+    url,
+    shareUrl: item.shareUrl || item.url || item.embedUrl || null,
+    embedUrl: item.embedUrl || item.url || null,
+    fileName: item.fileName || item.title || "Media",
+    title: item.title || item.fileName || "Media",
+    type: item.type || "photo",
+    width: item.width || null,
+    height: item.height || null,
+    canDownload: Boolean(canDownload && item.downloadable !== false)
+  };
+}
+router$b.get("/", requireStaff, async (req, res) => {
   try {
     const { status, orderId } = req.query;
-    let query = db$8().collection("galleries").orderBy("createdAt", "desc");
+    let query = db$9().collection("galleries").orderBy("createdAt", "desc");
     if (status) query = query.where("status", "==", status);
     if (orderId) query = query.where("orderId", "==", orderId);
     const snapshot = await query.limit(100).get();
@@ -916,12 +1146,45 @@ router$a.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch galleries." });
   }
 });
-router$a.get("/:id", requireAuth, async (req, res) => {
+router$b.get("/public/:id", async (req, res) => {
   try {
-    const doc = await db$8().collection("galleries").doc(req.params.id).get();
+    const doc = await db$9().collection("galleries").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Gallery not found." });
     const gallery = doc.data();
-    const staffDoc = await db$8().collection("staff").doc(req.user.uid).get();
+    const invoiceSnap = gallery.orderId ? await db$9().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get() : null;
+    const invoice = invoiceSnap && !invoiceSnap.empty ? { id: invoiceSnap.docs[0].id, ...invoiceSnap.docs[0].data() } : null;
+    const invoiceStatus = invoice?.status || null;
+    const paid = invoiceStatus === "paid" || Number(invoice?.amountDue || 0) <= 0;
+    const canDownload = Boolean(gallery.downloadEnabled) && paid;
+    return res.json({
+      id: doc.id,
+      title: gallery.title,
+      address: gallery.address,
+      clientName: gallery.clientName,
+      status: gallery.status,
+      deliveredAt: gallery.deliveredAt || null,
+      expiresAt: gallery.expiresAt || null,
+      downloadEnabled: canDownload,
+      paymentRequired: !paid,
+      invoiceId: invoice?.id || null,
+      invoiceStatus,
+      mediaItems: ["delivered", "approved"].includes(gallery.status) ? [
+        ...gallery.mediaItems || [],
+        ...gallery.videoLinks || [],
+        ...gallery.tourLinks || []
+      ].map((item) => publicMediaItem(item, canDownload)) : []
+    });
+  } catch (err) {
+    console.error("[Galleries] Public fetch error:", err);
+    return res.status(500).json({ error: "Failed to fetch gallery." });
+  }
+});
+router$b.get("/:id", requireAuth, async (req, res) => {
+  try {
+    const doc = await db$9().collection("galleries").doc(req.params.id).get();
+    if (!doc.exists) return res.status(404).json({ error: "Gallery not found." });
+    const gallery = doc.data();
+    const staffDoc = await db$9().collection("staff").doc(req.user.uid).get();
     if (!staffDoc.exists) {
       if (gallery.clientId !== req.user.uid) {
         return res.status(403).json({ error: "Access denied." });
@@ -935,13 +1198,13 @@ router$a.get("/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch gallery." });
   }
 });
-router$a.post("/:id/upload-url", requirePhotographer, async (req, res) => {
+router$b.post("/:id/upload-url", requirePhotographer, async (req, res) => {
   try {
     const { fileName, fileType, isRaw = false } = req.body;
     if (!fileName || !fileType) {
       return res.status(400).json({ error: "fileName and fileType required." });
     }
-    const galleryDoc = await db$8().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$9().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const folder = isRaw ? "raw" : "edited";
     const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -960,7 +1223,7 @@ router$a.post("/:id/upload-url", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to generate upload URL." });
   }
 });
-router$a.post("/:id/media", requirePhotographer, async (req, res) => {
+router$b.post("/:id/media", requirePhotographer, async (req, res) => {
   try {
     const {
       storagePath,
@@ -974,7 +1237,7 @@ router$a.post("/:id/media", requirePhotographer, async (req, res) => {
     if (!storagePath || !fileName) {
       return res.status(400).json({ error: "storagePath and fileName required." });
     }
-    const galleryDoc = await db$8().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$9().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const file = storage().file(storagePath);
     const [url] = await file.getSignedUrl({
@@ -1007,14 +1270,44 @@ router$a.post("/:id/media", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to register media." });
   }
 });
-router$a.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$b.post("/:id/media-link", requireCoordinator, async (req, res) => {
+  try {
+    const { url, title, type = "video", embedUrl, thumbnailUrl, downloadable = false } = req.body;
+    if (!url) return res.status(400).json({ error: "url required." });
+    const galleryDoc = await db$9().collection("galleries").doc(req.params.id).get();
+    if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
+    const item = {
+      id: `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+      url,
+      shareUrl: url,
+      embedUrl: embedUrl || url,
+      thumbnailUrl: thumbnailUrl || null,
+      title: title || (type === "tour" ? "3D Tour" : "Video"),
+      fileName: title || url,
+      type,
+      downloadable,
+      uploadedBy: req.user.uid,
+      uploadedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+    await galleryDoc.ref.update({
+      mediaItems: admin.firestore.FieldValue.arrayUnion(item),
+      status: "ready_for_review",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    return res.status(201).json({ success: true, mediaItem: item });
+  } catch (err) {
+    console.error("[Galleries] Media link register error:", err);
+    return res.status(500).json({ error: "Failed to register media link." });
+  }
+});
+router$b.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status } = req.body;
     const validStatuses = ["pending_upload", "raw_uploaded", "editing", "ready_for_review", "approved", "delivered"];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: "Invalid status." });
     }
-    await db$8().collection("galleries").doc(req.params.id).update({
+    await db$9().collection("galleries").doc(req.params.id).update({
       status,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -1023,16 +1316,16 @@ router$a.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update gallery status." });
   }
 });
-router$a.post("/:id/deliver", requireCoordinator, async (req, res) => {
+router$b.post("/:id/deliver", requireCoordinator, async (req, res) => {
   try {
-    const galleryDoc = await db$8().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$9().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const gallery = galleryDoc.data();
     const { downloadEnabled = true, expiresInDays = 30 } = req.body;
     const expiresAt = admin.firestore.Timestamp.fromDate(
       new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1e3)
     );
-    const deliveryUrl = `${process.env.APP_URL}/gallery/${req.params.id}`;
+    const deliveryUrl = `${appUrl$1()}/gallery/${req.params.id}`;
     await galleryDoc.ref.update({
       status: "delivered",
       deliveryUrl,
@@ -1042,15 +1335,15 @@ router$a.post("/:id/deliver", requireCoordinator, async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
     if (gallery.orderId) {
-      await db$8().collection("orders").doc(gallery.orderId).update({
+      await db$9().collection("orders").doc(gallery.orderId).update({
         status: "delivered",
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
     }
-    const clientDoc = await db$8().collection("clients").doc(gallery.clientId).get();
+    const clientDoc = await db$9().collection("clients").doc(gallery.clientId).get();
     const client = clientDoc.data();
     if (client?.email) {
-      const invoiceSnap = await db$8().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
+      const invoiceSnap = await db$9().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
       const invoice = invoiceSnap.empty ? null : invoiceSnap.docs[0].data();
       await sendEmail({
         to: client.email,
@@ -1060,10 +1353,16 @@ router$a.post("/:id/deliver", requireCoordinator, async (req, res) => {
           address: gallery.address,
           galleryUrl: deliveryUrl,
           invoiceAmount: invoice ? `$${invoice.total.toFixed(2)}` : "",
-          paymentUrl: invoice ? `${process.env.APP_URL}/invoice/${invoiceSnap.docs[0].id}` : "",
+          paymentUrl: invoice ? `${appUrl$1()}/invoice/${invoiceSnap.docs[0].id}` : "",
           expiresAt: `${expiresInDays} days`
         }
       });
+    }
+    if (client?.phone) {
+      await sendSMS({
+        to: client.phone,
+        body: SMS_TEMPLATES.photosDelivered(gallery.clientName || client.name || "there", deliveryUrl)
+      }).catch((err) => console.error("[Galleries] Delivery SMS failed:", err));
     }
     return res.json({ success: true, deliveryUrl });
   } catch (err) {
@@ -1071,9 +1370,9 @@ router$a.post("/:id/deliver", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to deliver gallery." });
   }
 });
-router$a.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
+router$b.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
   try {
-    const galleryDoc = await db$8().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$9().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const gallery = galleryDoc.data();
     const mediaItems = (gallery.mediaItems || []).filter(
@@ -1088,105 +1387,189 @@ router$a.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to remove media item." });
   }
 });
-const router$9 = Router();
-const db$7 = () => admin.firestore();
+const router$a = Router();
+const db$8 = () => admin.firestore();
 const stripe$1 = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
 });
-router$9.post("/create-intent", requireAuth, async (req, res) => {
-  try {
-    const { invoiceId, amount, currency = "usd" } = req.body;
-    if (!invoiceId || !amount) {
-      return res.status(400).json({ error: "invoiceId and amount required." });
+function appUrl() {
+  return process.env.APP_URL || "https://iconicimagestx.com";
+}
+function stripeReady() {
+  return Boolean(process.env.STRIPE_SECRET_KEY);
+}
+function squareReady() {
+  return Boolean(process.env.SQUARE_ACCESS_TOKEN && process.env.SQUARE_LOCATION_ID);
+}
+function squareBaseUrl() {
+  return process.env.SQUARE_ENVIRONMENT === "sandbox" ? "https://connect.squareupsandbox.com" : "https://connect.squareup.com";
+}
+function invoiceProvider(invoice) {
+  const explicit = String(invoice.paymentProvider || invoice.processor || "").toLowerCase();
+  if (explicit === "stripe" || explicit === "square") return explicit;
+  const channel = String(invoice.channel || invoice.brand || invoice.bookingType || "").toLowerCase();
+  return channel.includes("studio noir") || channel.includes("studionoir") ? "stripe" : "square";
+}
+function money(value) {
+  return `$${(Number(value) || 0).toFixed(2)}`;
+}
+async function applySuccessfulPayment({
+  invoiceId,
+  orderId,
+  clientId,
+  clientName,
+  amount,
+  method,
+  squarePaymentId,
+  stripePaymentIntentId
+}) {
+  const invoiceRef = db$8().collection("invoices").doc(invoiceId);
+  const invoiceDoc = await invoiceRef.get();
+  if (!invoiceDoc.exists) return;
+  const invoice = invoiceDoc.data();
+  const currentPaid = Number(invoice.amountPaid) || 0;
+  const total = Number(invoice.total) || 0;
+  const newAmountPaid = currentPaid + amount;
+  const newAmountDue = Math.max(0, total - newAmountPaid);
+  const resolvedOrderId = orderId || invoice.orderId || "";
+  const resolvedClientId = clientId || invoice.clientId || "";
+  await invoiceRef.update({
+    amountPaid: newAmountPaid,
+    amountDue: newAmountDue,
+    status: newAmountDue <= 0 ? "paid" : "partial",
+    paidAt: newAmountDue <= 0 ? admin.firestore.FieldValue.serverTimestamp() : null,
+    paymentMethod: method,
+    ...squarePaymentId ? { squarePaymentId } : {},
+    ...stripePaymentIntentId ? { stripePaymentIntentId } : {},
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  if (resolvedOrderId) {
+    await db$8().collection("orders").doc(resolvedOrderId).update({
+      depositPaid: admin.firestore.FieldValue.increment(amount),
+      balanceDue: admin.firestore.FieldValue.increment(-amount),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }).catch((err) => console.error("[Payments] Order balance update failed:", err));
+  }
+  if (resolvedClientId) {
+    await db$8().collection("clients").doc(resolvedClientId).update({
+      totalSpend: admin.firestore.FieldValue.increment(amount),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }).catch((err) => console.error("[Payments] Client spend update failed:", err));
+  }
+  if (resolvedOrderId && newAmountDue <= 0) {
+    const gallerySnap = await db$8().collection("galleries").where("orderId", "==", resolvedOrderId).limit(1).get();
+    if (!gallerySnap.empty) {
+      await gallerySnap.docs[0].ref.update({
+        downloadEnabled: true,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
     }
-    const invoiceDoc = await db$7().collection("invoices").doc(invoiceId).get();
+  }
+  await db$8().collection("transactions").add({
+    type: "payment",
+    orderId: resolvedOrderId,
+    invoiceId,
+    clientId: resolvedClientId,
+    clientName: clientName || invoice.clientName,
+    amount,
+    paymentMethod: method,
+    status: "completed",
+    ...squarePaymentId ? { squarePaymentId } : {},
+    ...stripePaymentIntentId ? { stripePaymentIntentId } : {},
+    processedAt: admin.firestore.FieldValue.serverTimestamp(),
+    processedBy: "system",
+    createdAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  if (invoice.clientEmail) {
+    await sendEmail({
+      to: invoice.clientEmail,
+      template: "payment_receipt",
+      variables: {
+        clientName: invoice.clientName,
+        amount: money(amount),
+        invoiceNumber: invoice.invoiceNumber,
+        balance: money(newAmountDue)
+      }
+    }).catch(console.error);
+  }
+}
+router$a.post("/create-intent", requireAuth, async (req, res) => {
+  try {
+    if (!stripeReady()) {
+      return res.status(503).json({ error: "Studio Noir Stripe payments are not configured yet." });
+    }
+    const { invoiceId, amount, currency = "usd" } = req.body;
+    if (!invoiceId || !amount) return res.status(400).json({ error: "invoiceId and amount required." });
+    const invoiceDoc = await db$8().collection("invoices").doc(invoiceId).get();
     if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
     const invoice = invoiceDoc.data();
-    let stripeCustomerId = invoice.stripeCustomerId;
-    if (!stripeCustomerId) {
-      const clientDoc = await db$7().collection("clients").doc(invoice.clientId).get();
-      const client = clientDoc.data();
-      if (client) {
-        const customer = await stripe$1.customers.create({
-          email: invoice.clientEmail,
-          name: invoice.clientName,
-          metadata: {
-            clientId: invoice.clientId,
-            firebaseUid: client.firebaseUid || ""
-          }
-        });
-        stripeCustomerId = customer.id;
-        await db$7().collection("clients").doc(invoice.clientId).update({
-          stripeCustomerId,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-      }
+    if (invoiceProvider(invoice) !== "stripe") {
+      return res.status(400).json({ error: "This invoice is configured for Square, not Stripe." });
     }
     const paymentIntent = await stripe$1.paymentIntents.create({
-      amount: Math.round(amount * 100),
-      // cents
+      amount: Math.round(Number(amount) * 100),
       currency,
-      customer: stripeCustomerId || void 0,
       metadata: {
         invoiceId,
         orderId: invoice.orderId || "",
         clientId: invoice.clientId || "",
         clientName: invoice.clientName || ""
       },
-      description: `Iconic Images — Invoice ${invoice.invoiceNumber}`,
+      description: `Studio Noir - Invoice ${invoice.invoiceNumber}`,
       receipt_email: invoice.clientEmail
     });
     await invoiceDoc.ref.update({
+      paymentProvider: "stripe",
       stripePaymentIntentId: paymentIntent.id,
       status: "sent",
       sentAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    return res.json({
-      clientSecret: paymentIntent.client_secret,
-      paymentIntentId: paymentIntent.id
-    });
+    return res.json({ clientSecret: paymentIntent.client_secret, paymentIntentId: paymentIntent.id });
   } catch (err) {
     console.error("[Payments] Create intent error:", err);
     return res.status(500).json({ error: "Failed to create payment intent." });
   }
 });
-router$9.post("/send-invoice", requireCoordinator, async (req, res) => {
+router$a.post("/send-invoice", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
-    const invoiceDoc = await db$7().collection("invoices").doc(invoiceId).get();
+    const invoiceDoc = await db$8().collection("invoices").doc(invoiceId).get();
     if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
     const invoice = invoiceDoc.data();
-    const paymentUrl = `${process.env.APP_URL}/invoice/${invoiceId}`;
+    const provider = invoiceProvider(invoice);
+    const paymentUrl = `${appUrl()}/invoice/${invoiceId}`;
     await sendEmail({
       to: invoice.clientEmail,
       template: "invoice",
       variables: {
         clientName: invoice.clientName,
         invoiceNumber: invoice.invoiceNumber,
-        amount: `$${invoice.total.toFixed(2)}`,
+        amount: money(invoice.total),
         paymentUrl,
         dueDate: invoice.dueDate ? invoice.dueDate.toDate().toLocaleDateString() : "Upon receipt"
       }
     });
     await invoiceDoc.ref.update({
       status: "sent",
+      paymentProvider: provider,
       paymentUrl,
       sentAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    return res.json({ success: true, paymentUrl });
+    return res.json({ success: true, paymentUrl, provider });
   } catch (err) {
     console.error("[Payments] Send invoice error:", err);
     return res.status(500).json({ error: "Failed to send invoice." });
   }
 });
-router$9.get("/invoice/:id", async (req, res) => {
+router$a.get("/invoice/:id", async (req, res) => {
   try {
-    const invoiceDoc = await db$7().collection("invoices").doc(req.params.id).get();
+    const invoiceDoc = await db$8().collection("invoices").doc(req.params.id).get();
     if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
     const invoice = invoiceDoc.data();
+    const provider = invoiceProvider(invoice);
     return res.json({
       id: invoiceDoc.id,
       invoiceNumber: invoice.invoiceNumber,
@@ -1198,53 +1581,226 @@ router$9.get("/invoice/:id", async (req, res) => {
       amountPaid: invoice.amountPaid,
       amountDue: invoice.amountDue,
       status: invoice.status,
-      stripePaymentIntentId: invoice.stripePaymentIntentId
+      paymentProvider: provider,
+      stripePaymentIntentId: invoice.stripePaymentIntentId || null,
+      squarePaymentId: invoice.squarePaymentId || null,
+      squarePaymentLinkId: invoice.squarePaymentLinkId || null,
+      galleryId: invoice.galleryId || null,
+      paymentUrl: invoice.paymentUrl || `${appUrl()}/invoice/${invoiceDoc.id}`,
+      canPayOnline: provider === "stripe" ? stripeReady() : squareReady()
     });
   } catch (err) {
+    console.error("[Payments] Invoice fetch error:", err);
     return res.status(500).json({ error: "Failed to fetch invoice." });
   }
 });
-router$9.post(
-  "/webhook",
-  async (req, res) => {
-    const sig = req.headers["stripe-signature"];
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
-    let event;
-    try {
-      event = stripe$1.webhooks.constructEvent(req.body, sig, webhookSecret);
-    } catch (err) {
-      console.error("[Payments] Webhook signature verification failed:", err);
-      return res.status(400).json({ error: "Invalid webhook signature." });
+router$a.post("/invoice/:id/checkout", async (req, res) => {
+  try {
+    const invoiceDoc = await db$8().collection("invoices").doc(req.params.id).get();
+    if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
+    const invoice = invoiceDoc.data();
+    const amountDue = Number(invoice.amountDue ?? invoice.total ?? 0);
+    const provider = invoiceProvider(invoice);
+    if (invoice.status === "paid" || amountDue <= 0) {
+      return res.json({
+        paid: true,
+        provider,
+        redirectUrl: invoice.galleryId ? `${appUrl()}/gallery/${invoice.galleryId}` : `${appUrl()}/invoice/${invoiceDoc.id}`
+      });
     }
-    try {
-      switch (event.type) {
-        case "payment_intent.succeeded": {
-          const intent = event.data.object;
-          await handlePaymentSucceeded(intent);
-          break;
-        }
-        case "payment_intent.payment_failed": {
-          const intent = event.data.object;
-          await handlePaymentFailed(intent);
-          break;
-        }
-        case "charge.refunded": {
-          const charge = event.data.object;
-          await handleRefund(charge);
-          break;
-        }
+    if (provider === "square") {
+      if (!squareReady()) return res.status(503).json({ error: "Square payments are not configured yet." });
+      const response = await fetch(`${squareBaseUrl()}/v2/online-checkout/payment-links`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Square-Version": process.env.SQUARE_VERSION || "2026-08-20",
+          Authorization: `Bearer ${process.env.SQUARE_ACCESS_TOKEN}`
+        },
+        body: JSON.stringify({
+          idempotency_key: `${invoiceDoc.id}-${Date.now()}`,
+          quick_pay: {
+            name: `Iconic Images Invoice ${invoice.invoiceNumber || invoiceDoc.id}`,
+            price_money: {
+              amount: Math.round(amountDue * 100),
+              currency: "USD"
+            },
+            location_id: process.env.SQUARE_LOCATION_ID
+          },
+          checkout_options: {
+            redirect_url: invoice.galleryId ? `${appUrl()}/gallery/${invoice.galleryId}` : `${appUrl()}/invoice/${invoiceDoc.id}?paid=1`
+          },
+          pre_populated_data: {
+            buyer_email: invoice.clientEmail || void 0
+          },
+          payment_note: `Iconic Images invoice ${invoice.invoiceNumber || invoiceDoc.id}`
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        console.error("[Payments] Square checkout error:", result);
+        return res.status(500).json({ error: "Failed to start Square checkout." });
       }
-      return res.json({ received: true });
-    } catch (err) {
-      console.error("[Payments] Webhook handler error:", err);
-      return res.status(500).json({ error: "Webhook handler failed." });
+      const link = result.payment_link;
+      await invoiceDoc.ref.update({
+        status: "sent",
+        paymentProvider: "square",
+        paymentUrl: link?.url || `${appUrl()}/invoice/${invoiceDoc.id}`,
+        squarePaymentLinkId: link?.id || null,
+        squareOrderId: link?.order_id || null,
+        sentAt: invoice.sentAt || admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      return res.json({ checkoutUrl: link?.url, provider: "square" });
     }
+    if (!stripeReady()) {
+      return res.status(503).json({ error: "Studio Noir Stripe payments are not configured yet." });
+    }
+    const session = await stripe$1.checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["card"],
+      customer_email: invoice.clientEmail || void 0,
+      client_reference_id: invoiceDoc.id,
+      line_items: [{
+        price_data: {
+          currency: "usd",
+          unit_amount: Math.round(amountDue * 100),
+          product_data: {
+            name: `Studio Noir Invoice ${invoice.invoiceNumber || invoiceDoc.id}`,
+            description: invoice.address || invoice.clientName || void 0
+          }
+        },
+        quantity: 1
+      }],
+      payment_intent_data: {
+        receipt_email: invoice.clientEmail || void 0,
+        metadata: {
+          invoiceId: invoiceDoc.id,
+          orderId: invoice.orderId || "",
+          clientId: invoice.clientId || "",
+          clientName: invoice.clientName || ""
+        }
+      },
+      metadata: {
+        invoiceId: invoiceDoc.id,
+        orderId: invoice.orderId || "",
+        clientId: invoice.clientId || ""
+      },
+      success_url: `${appUrl()}/invoice/${invoiceDoc.id}?paid=1`,
+      cancel_url: `${appUrl()}/invoice/${invoiceDoc.id}?cancelled=1`
+    });
+    await invoiceDoc.ref.update({
+      status: "sent",
+      paymentProvider: "stripe",
+      paymentUrl: `${appUrl()}/invoice/${invoiceDoc.id}`,
+      stripeCheckoutSessionId: session.id,
+      sentAt: invoice.sentAt || admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    return res.json({ checkoutUrl: session.url, provider: "stripe" });
+  } catch (err) {
+    console.error("[Payments] Checkout error:", err);
+    return res.status(500).json({ error: "Failed to start checkout." });
   }
-);
-router$9.get("/transactions", requireCoordinator, async (req, res) => {
+});
+router$a.post("/webhook", async (req, res) => {
+  const sig = req.headers["stripe-signature"];
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
+  let event;
+  try {
+    event = stripe$1.webhooks.constructEvent(req.body, sig, webhookSecret);
+  } catch (err) {
+    console.error("[Payments] Stripe webhook signature verification failed:", err);
+    return res.status(400).json({ error: "Invalid webhook signature." });
+  }
+  try {
+    switch (event.type) {
+      case "checkout.session.completed": {
+        const session = event.data.object;
+        if (session.payment_intent) {
+          const intent = await stripe$1.paymentIntents.retrieve(
+            typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent.id
+          );
+          await handleStripePaymentSucceeded(intent);
+        }
+        break;
+      }
+      case "payment_intent.succeeded":
+        await handleStripePaymentSucceeded(event.data.object);
+        break;
+      case "payment_intent.payment_failed":
+        await handleStripePaymentFailed(event.data.object);
+        break;
+      case "charge.refunded":
+        await handleStripeRefund(event.data.object);
+        break;
+    }
+    return res.json({ received: true });
+  } catch (err) {
+    console.error("[Payments] Stripe webhook handler error:", err);
+    return res.status(500).json({ error: "Webhook handler failed." });
+  }
+});
+router$a.post("/square-webhook", async (req, res) => {
+  try {
+    const rawBody = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : JSON.stringify(req.body || {});
+    const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
+    if (signatureKey) {
+      const notificationUrl = `${appUrl()}/api/payments/square-webhook`;
+      const expected = crypto.createHmac("sha256", signatureKey).update(notificationUrl + rawBody).digest("base64");
+      const received = Array.isArray(req.headers["x-square-hmacsha256-signature"]) ? req.headers["x-square-hmacsha256-signature"][0] : req.headers["x-square-hmacsha256-signature"];
+      const valid = Boolean(received) && Buffer.byteLength(expected) === Buffer.byteLength(received || "") && crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(received || ""));
+      if (!valid) return res.status(400).json({ error: "Invalid Square webhook signature." });
+    }
+    const event = JSON.parse(rawBody);
+    const payment = event?.data?.object?.payment;
+    if (!payment?.id || payment.status !== "COMPLETED") return res.json({ received: true });
+    let invoiceDoc = null;
+    if (payment.order_id) {
+      const bySquareOrder = await db$8().collection("invoices").where("squareOrderId", "==", payment.order_id).limit(1).get();
+      if (!bySquareOrder.empty) invoiceDoc = bySquareOrder.docs[0];
+    }
+    if (!invoiceDoc) {
+      const byPayment = await db$8().collection("invoices").where("squarePaymentId", "==", payment.id).limit(1).get();
+      if (!byPayment.empty) invoiceDoc = byPayment.docs[0];
+    }
+    if (!invoiceDoc) {
+      await db$8().collection("agentLogs").add({
+        agent: "travis",
+        action: "Unmatched Square payment",
+        summary: `Square payment ${payment.id} could not be matched to an invoice`,
+        status: "flagged",
+        relatedType: "invoice",
+        priority: "high",
+        requiresHumanReview: true,
+        details: payment.order_id || "",
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      return res.json({ received: true, unmatched: true });
+    }
+    const invoice = invoiceDoc.data();
+    if (invoice.squarePaymentId === payment.id || invoice.status === "paid") {
+      return res.json({ received: true, duplicate: true });
+    }
+    await applySuccessfulPayment({
+      invoiceId: invoiceDoc.id,
+      orderId: invoice.orderId,
+      clientId: invoice.clientId,
+      clientName: invoice.clientName,
+      amount: Number(payment.total_money?.amount || 0) / 100,
+      method: "square",
+      squarePaymentId: payment.id
+    });
+    return res.json({ received: true });
+  } catch (err) {
+    console.error("[Payments] Square webhook error:", err);
+    return res.status(500).json({ error: "Square webhook handler failed." });
+  }
+});
+router$a.get("/transactions", requireCoordinator, async (req, res) => {
   try {
     const { startDate, endDate, limit = "50" } = req.query;
-    let query = db$7().collection("transactions").orderBy("createdAt", "desc");
+    let query = db$8().collection("transactions").orderBy("createdAt", "desc");
     if (startDate) {
       query = query.where(
         "createdAt",
@@ -1264,74 +1820,30 @@ router$9.get("/transactions", requireCoordinator, async (req, res) => {
     const totalRevenue = transactions.filter((t) => t.status === "completed" && t.type === "payment").reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
     return res.json({ transactions, totalRevenue });
   } catch (err) {
+    console.error("[Payments] Transactions error:", err);
     return res.status(500).json({ error: "Failed to fetch transactions." });
   }
 });
-async function handlePaymentSucceeded(intent) {
+async function handleStripePaymentSucceeded(intent) {
   const { invoiceId, orderId, clientId, clientName } = intent.metadata;
   if (!invoiceId) return;
-  const amount = intent.amount_received / 100;
-  const invoiceRef = db$7().collection("invoices").doc(invoiceId);
-  const invoiceDoc = await invoiceRef.get();
-  if (!invoiceDoc.exists) return;
-  const invoice = invoiceDoc.data();
-  const newAmountPaid = (invoice.amountPaid || 0) + amount;
-  const newAmountDue = Math.max(0, invoice.total - newAmountPaid);
-  await invoiceRef.update({
-    amountPaid: newAmountPaid,
-    amountDue: newAmountDue,
-    status: newAmountDue <= 0 ? "paid" : "partial",
-    paidAt: newAmountDue <= 0 ? admin.firestore.FieldValue.serverTimestamp() : null,
-    paymentMethod: "stripe",
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
-  });
-  await db$7().collection("transactions").add({
-    type: "payment",
-    orderId: orderId || invoice.orderId,
+  await applySuccessfulPayment({
     invoiceId,
-    clientId: clientId || invoice.clientId,
-    clientName: clientName || invoice.clientName,
-    amount,
-    paymentMethod: "stripe",
-    status: "completed",
-    stripePaymentIntentId: intent.id,
-    processedAt: admin.firestore.FieldValue.serverTimestamp(),
-    processedBy: "system",
-    createdAt: admin.firestore.FieldValue.serverTimestamp()
+    orderId,
+    clientId,
+    clientName,
+    amount: intent.amount_received / 100,
+    method: "stripe",
+    stripePaymentIntentId: intent.id
   });
-  if (orderId) {
-    await db$7().collection("orders").doc(orderId).update({
-      depositPaid: admin.firestore.FieldValue.increment(amount),
-      balanceDue: admin.firestore.FieldValue.increment(-amount),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-  }
-  if (clientId) {
-    await db$7().collection("clients").doc(clientId).update({
-      totalSpend: admin.firestore.FieldValue.increment(amount),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-  }
-  if (invoice.clientEmail) {
-    await sendEmail({
-      to: invoice.clientEmail,
-      template: "payment_receipt",
-      variables: {
-        clientName: invoice.clientName,
-        amount: `$${amount.toFixed(2)}`,
-        invoiceNumber: invoice.invoiceNumber,
-        balance: `$${newAmountDue.toFixed(2)}`
-      }
-    }).catch(console.error);
-  }
 }
-async function handlePaymentFailed(intent) {
+async function handleStripePaymentFailed(intent) {
   const { invoiceId } = intent.metadata;
   if (!invoiceId) return;
-  await db$7().collection("agentLogs").add({
+  await db$8().collection("agentLogs").add({
     agent: "travis",
-    action: "Payment failed",
-    summary: `Payment failed for invoice ${invoiceId}`,
+    action: "Studio Noir payment failed",
+    summary: `Stripe payment failed for invoice ${invoiceId}`,
     status: "flagged",
     relatedId: invoiceId,
     relatedType: "invoice",
@@ -1341,14 +1853,14 @@ async function handlePaymentFailed(intent) {
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   });
 }
-async function handleRefund(charge) {
+async function handleStripeRefund(charge) {
   if (!charge.payment_intent) return;
   const intentId = typeof charge.payment_intent === "string" ? charge.payment_intent : charge.payment_intent.id;
-  const invoiceSnap = await db$7().collection("invoices").where("stripePaymentIntentId", "==", intentId).limit(1).get();
+  const invoiceSnap = await db$8().collection("invoices").where("stripePaymentIntentId", "==", intentId).limit(1).get();
   if (invoiceSnap.empty) return;
   const invoiceDoc = invoiceSnap.docs[0];
   const refundAmount = charge.amount_refunded / 100;
-  await db$7().collection("transactions").add({
+  await db$8().collection("transactions").add({
     type: "refund",
     invoiceId: invoiceDoc.id,
     clientId: invoiceDoc.data().clientId,
@@ -1362,15 +1874,15 @@ async function handleRefund(charge) {
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   });
 }
-const router$8 = Router();
-const db$6 = () => admin.firestore();
+const router$9 = Router();
+const db$7 = () => admin.firestore();
 const VSAI_API_BASE = "https://api.virtualstagingai.app/v1";
 const VSAI_API_KEY = process.env.VSAI_API_KEY || process.env.VIRTUAL_STAGING_AI_API_KEY || "";
 const VSAI_PRICE_CENTS = parseInt(process.env.VSAI_PRICE_CENTS || "1500", 10);
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
 });
-router$8.post("/create", requireAuth, async (req, res) => {
+router$9.post("/create", requireAuth, async (req, res) => {
   try {
     if (!VSAI_API_KEY) {
       console.error("[VSAI] VSAI_API_KEY is not set");
@@ -1421,7 +1933,7 @@ router$8.post("/create", requireAuth, async (req, res) => {
         error: `VSAI returned no render ID. Response: ${responseText}`
       });
     }
-    const jobRef = await db$6().collection("vsaiJobs").add({
+    const jobRef = await db$7().collection("vsaiJobs").add({
       userId,
       imageUrl,
       roomType,
@@ -1445,9 +1957,9 @@ router$8.post("/create", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$8.get("/result/:jobId", requireAuth, async (req, res) => {
+router$9.get("/result/:jobId", requireAuth, async (req, res) => {
   try {
-    const jobDoc = await db$6().collection("vsaiJobs").doc(req.params.jobId).get();
+    const jobDoc = await db$7().collection("vsaiJobs").doc(req.params.jobId).get();
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
     const job = jobDoc.data();
     if (job.userId !== req.user.uid) {
@@ -1520,20 +2032,20 @@ router$8.get("/result/:jobId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$8.post("/variation", requireAuth, async (req, res) => {
+router$9.post("/variation", requireAuth, async (req, res) => {
   try {
     const { jobId, style: newStyle, roomType: newRoomType } = req.body;
     if (!jobId) {
       return res.status(400).json({ error: "jobId required." });
     }
-    let rootJobDoc = await db$6().collection("vsaiJobs").doc(jobId).get();
+    let rootJobDoc = await db$7().collection("vsaiJobs").doc(jobId).get();
     if (!rootJobDoc.exists) return res.status(404).json({ error: "Job not found." });
     let rootJob = rootJobDoc.data();
     if (rootJob.userId !== req.user.uid) {
       return res.status(403).json({ error: "Access denied." });
     }
     while (rootJob.parentJobId) {
-      const parentDoc = await db$6().collection("vsaiJobs").doc(rootJob.parentJobId).get();
+      const parentDoc = await db$7().collection("vsaiJobs").doc(rootJob.parentJobId).get();
       if (!parentDoc.exists) break;
       rootJob = parentDoc.data();
     }
@@ -1577,7 +2089,7 @@ router$8.post("/variation", requireAuth, async (req, res) => {
         error: `VSAI variation error: ${responseText}`
       });
     }
-    const variationRef = await db$6().collection("vsaiJobs").add({
+    const variationRef = await db$7().collection("vsaiJobs").add({
       userId: req.user.uid,
       imageUrl: rootJob.imageUrl,
       roomType: resolvedRoomType,
@@ -1604,7 +2116,7 @@ router$8.post("/variation", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$8.post("/checkout", requireAuth, async (req, res) => {
+router$9.post("/checkout", requireAuth, async (req, res) => {
   try {
     const { jobIds, successUrl, cancelUrl } = req.body;
     if (!jobIds || !Array.isArray(jobIds) || jobIds.length === 0) {
@@ -1612,7 +2124,7 @@ router$8.post("/checkout", requireAuth, async (req, res) => {
     }
     const userId = req.user.uid;
     const jobDocs = await Promise.all(
-      jobIds.map((id) => db$6().collection("vsaiJobs").doc(id).get())
+      jobIds.map((id) => db$7().collection("vsaiJobs").doc(id).get())
     );
     for (let i = 0; i < jobDocs.length; i++) {
       const doc = jobDocs[i];
@@ -1673,7 +2185,7 @@ router$8.post("/checkout", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$8.post(
+router$9.post(
   "/webhook/stripe",
   // Raw body needed — mount before express.json() parses it
   async (req, res) => {
@@ -1696,7 +2208,7 @@ router$8.post(
         const jobIds = JSON.parse(session.metadata.jobIds || "[]");
         await Promise.all(
           jobIds.map(
-            (id) => db$6().collection("vsaiJobs").doc(id).update({
+            (id) => db$7().collection("vsaiJobs").doc(id).update({
               isPaid: true,
               paymentStatus: "paid",
               stripeSessionId: session.id,
@@ -1711,7 +2223,7 @@ router$8.post(
     res.json({ received: true });
   }
 );
-router$8.get("/options", (_req, res) => {
+router$9.get("/options", (_req, res) => {
   return res.json({
     roomTypes: [
       { value: "living", label: "Living Room" },
@@ -1741,24 +2253,24 @@ router$8.get("/options", (_req, res) => {
 function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
 }
-const router$7 = Router();
-const db$5 = () => admin.firestore();
-router$7.get("/:orderId", requireAuth, async (req, res) => {
+const router$8 = Router();
+const db$6 = () => admin.firestore();
+router$8.get("/:orderId", requireAuth, async (req, res) => {
   try {
-    const orderDoc = await db$5().collection("orders").doc(req.params.orderId).get();
+    const orderDoc = await db$6().collection("orders").doc(req.params.orderId).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
     const order = orderDoc.data();
-    const staffDoc = await db$5().collection("staff").doc(req.user.uid).get();
+    const staffDoc = await db$6().collection("staff").doc(req.user.uid).get();
     const isStaff = staffDoc.exists;
     if (!isStaff && order.clientId !== req.user.uid) {
       return res.status(403).json({ error: "Access denied." });
     }
-    const snapshot = await db$5().collection("messages").where("orderId", "==", req.params.orderId).orderBy("createdAt", "asc").limit(100).get();
+    const snapshot = await db$6().collection("messages").where("orderId", "==", req.params.orderId).orderBy("createdAt", "asc").limit(100).get();
     const messages = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     const unread = snapshot.docs.filter(
       (d) => !d.data().isRead && d.data().senderId !== req.user.uid
     );
-    const batch = db$5().batch();
+    const batch = db$6().batch();
     unread.forEach((d) => {
       batch.update(d.ref, {
         isRead: true,
@@ -1772,16 +2284,16 @@ router$7.get("/:orderId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch messages." });
   }
 });
-router$7.post("/:orderId", requireAuth, async (req, res) => {
+router$8.post("/:orderId", requireAuth, async (req, res) => {
   try {
     const { content, attachments } = req.body;
     if (!content?.trim()) {
       return res.status(400).json({ error: "Message content required." });
     }
-    const orderDoc = await db$5().collection("orders").doc(req.params.orderId).get();
+    const orderDoc = await db$6().collection("orders").doc(req.params.orderId).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
     const order = orderDoc.data();
-    const staffDoc = await db$5().collection("staff").doc(req.user.uid).get();
+    const staffDoc = await db$6().collection("staff").doc(req.user.uid).get();
     const isStaff = staffDoc.exists;
     if (!isStaff && order.clientId !== req.user.uid) {
       return res.status(403).json({ error: "Access denied." });
@@ -1793,7 +2305,7 @@ router$7.post("/:orderId", requireAuth, async (req, res) => {
       senderName = `${staff.firstName} ${staff.lastName}`.trim();
       senderType = "staff";
     } else {
-      const clientDoc = await db$5().collection("clients").doc(order.clientId).get();
+      const clientDoc = await db$6().collection("clients").doc(order.clientId).get();
       if (clientDoc.exists) {
         const client = clientDoc.data();
         senderName = `${client.firstName} ${client.lastName}`.trim();
@@ -1809,8 +2321,8 @@ router$7.post("/:orderId", requireAuth, async (req, res) => {
       isRead: false,
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    const docRef = await db$5().collection("messages").add(message);
-    await db$5().collection("agentLogs").add({
+    const docRef = await db$6().collection("messages").add(message);
+    await db$6().collection("agentLogs").add({
       agent: "nora",
       action: "New message",
       summary: `New message on order ${req.params.orderId} from ${senderName}`,
@@ -1827,20 +2339,20 @@ router$7.post("/:orderId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to send message." });
   }
 });
-router$7.get("/unread/count", requireStaff, async (_req, res) => {
+router$8.get("/unread/count", requireStaff, async (_req, res) => {
   try {
-    const snapshot = await db$5().collection("messages").where("isRead", "==", false).where("senderType", "==", "client").get();
+    const snapshot = await db$6().collection("messages").where("isRead", "==", false).where("senderType", "==", "client").get();
     return res.json({ unreadCount: snapshot.size });
   } catch (err) {
     return res.status(500).json({ error: "Failed to get unread count." });
   }
 });
-const router$6 = Router();
-const db$4 = () => admin.firestore();
-router$6.get("/", requireStaff, async (req, res) => {
+const router$7 = Router();
+const db$5 = () => admin.firestore();
+router$7.get("/", requireStaff, async (req, res) => {
   try {
     const { status, search, limit = "50" } = req.query;
-    let query = db$4().collection("clients").orderBy("createdAt", "desc");
+    let query = db$5().collection("clients").orderBy("createdAt", "desc");
     if (status) query = query.where("status", "==", status);
     const snapshot = await query.limit(Number(limit)).get();
     let clients = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -1857,13 +2369,13 @@ router$6.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch clients." });
   }
 });
-router$6.get("/me", requireAuth, async (req, res) => {
+router$7.get("/me", requireAuth, async (req, res) => {
   try {
-    const directDoc = await db$4().collection("clients").doc(req.user.uid).get();
+    const directDoc = await db$5().collection("clients").doc(req.user.uid).get();
     if (directDoc.exists) {
       const data = directDoc.data();
       if (data._redirect) {
-        const realDoc = await db$4().collection("clients").doc(data._redirect).get();
+        const realDoc = await db$5().collection("clients").doc(data._redirect).get();
         if (realDoc.exists) return res.json({ id: realDoc.id, ...realDoc.data() });
       }
       return res.json({ id: directDoc.id, ...data });
@@ -1873,13 +2385,13 @@ router$6.get("/me", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch profile." });
   }
 });
-router$6.get("/:id", requireStaff, async (req, res) => {
+router$7.get("/:id", requireStaff, async (req, res) => {
   try {
-    const doc = await db$4().collection("clients").doc(req.params.id).get();
+    const doc = await db$5().collection("clients").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Client not found." });
     const [orders, invoices] = await Promise.all([
-      db$4().collection("orders").where("clientId", "==", req.params.id).orderBy("createdAt", "desc").limit(10).get(),
-      db$4().collection("invoices").where("clientId", "==", req.params.id).orderBy("createdAt", "desc").limit(10).get()
+      db$5().collection("orders").where("clientId", "==", req.params.id).orderBy("createdAt", "desc").limit(10).get(),
+      db$5().collection("invoices").where("clientId", "==", req.params.id).orderBy("createdAt", "desc").limit(10).get()
     ]);
     return res.json({
       client: { id: doc.id, ...doc.data() },
@@ -1890,17 +2402,17 @@ router$6.get("/:id", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch client." });
   }
 });
-router$6.post("/", requireCoordinator, async (req, res) => {
+router$7.post("/", requireCoordinator, async (req, res) => {
   try {
     const { firstName, lastName, email, phone, address, notes, tags } = req.body;
     if (!firstName || !lastName || !email) {
       return res.status(400).json({ error: "firstName, lastName, and email required." });
     }
-    const existing = await db$4().collection("clients").where("email", "==", email.toLowerCase()).limit(1).get();
+    const existing = await db$5().collection("clients").where("email", "==", email.toLowerCase()).limit(1).get();
     if (!existing.empty) {
       return res.status(409).json({ error: "Client with this email already exists.", id: existing.docs[0].id });
     }
-    const ref = await db$4().collection("clients").add({
+    const ref = await db$5().collection("clients").add({
       firstName,
       lastName,
       email: email.toLowerCase().trim(),
@@ -1920,30 +2432,30 @@ router$6.post("/", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to create client." });
   }
 });
-router$6.patch("/:id", requireCoordinator, async (req, res) => {
+router$7.patch("/:id", requireCoordinator, async (req, res) => {
   try {
     const allowed = ["firstName", "lastName", "phone", "address", "status", "notes", "tags", "company"];
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
     allowed.forEach((k) => {
       if (k in req.body) updates[k] = req.body[k];
     });
-    await db$4().collection("clients").doc(req.params.id).update(updates);
+    await db$5().collection("clients").doc(req.params.id).update(updates);
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ error: "Failed to update client." });
   }
 });
-const router$5 = Router();
-const db$3 = () => admin.firestore();
-router$5.get("/", requireStaff, async (_req, res) => {
+const router$6 = Router();
+const db$4 = () => admin.firestore();
+router$6.get("/", requireStaff, async (_req, res) => {
   try {
-    const snapshot = await db$3().collection("staff").where("isActive", "==", true).orderBy("firstName").get();
+    const snapshot = await db$4().collection("staff").where("isActive", "==", true).orderBy("firstName").get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
   } catch (err) {
     return res.status(500).json({ error: "Failed to fetch staff." });
   }
 });
-router$5.post("/", requireAdmin, async (req, res) => {
+router$6.post("/", requireAdmin, async (req, res) => {
   try {
     const { firstName, lastName, email, phone, role, tempPassword } = req.body;
     if (!firstName || !lastName || !email || !role || !tempPassword) {
@@ -1954,7 +2466,7 @@ router$5.post("/", requireAdmin, async (req, res) => {
       password: tempPassword,
       displayName: `${firstName} ${lastName}`
     });
-    await db$3().collection("staff").doc(userRecord.uid).set({
+    await db$4().collection("staff").doc(userRecord.uid).set({
       firebaseUid: userRecord.uid,
       firstName,
       lastName,
@@ -1979,22 +2491,22 @@ router$5.post("/", requireAdmin, async (req, res) => {
     return res.status(500).json({ error: "Failed to create staff member." });
   }
 });
-router$5.patch("/:id", requireAdmin, async (req, res) => {
+router$6.patch("/:id", requireAdmin, async (req, res) => {
   try {
     const allowed = ["firstName", "lastName", "phone", "role", "isActive"];
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
     allowed.forEach((k) => {
       if (k in req.body) updates[k] = req.body[k];
     });
-    await db$3().collection("staff").doc(req.params.id).update(updates);
+    await db$4().collection("staff").doc(req.params.id).update(updates);
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ error: "Failed to update staff member." });
   }
 });
-router$5.post("/setup", async (req, res) => {
+router$6.post("/setup", async (req, res) => {
   try {
-    const existing = await db$3().collection("staff").limit(1).get();
+    const existing = await db$4().collection("staff").limit(1).get();
     if (!existing.empty) {
       return res.status(403).json({ error: "Staff already configured." });
     }
@@ -2007,7 +2519,7 @@ router$5.post("/setup", async (req, res) => {
       password,
       displayName: `${firstName} ${lastName}`
     });
-    await db$3().collection("staff").doc(userRecord.uid).set({
+    await db$4().collection("staff").doc(userRecord.uid).set({
       firebaseUid: userRecord.uid,
       firstName,
       lastName,
@@ -2028,23 +2540,23 @@ router$5.post("/setup", async (req, res) => {
     return res.status(500).json({ error: "Setup failed." });
   }
 });
-const router$4 = Router();
-const db$2 = () => admin.firestore();
-router$4.get("/", requireCoordinator, async (_req, res) => {
+const router$5 = Router();
+const db$3 = () => admin.firestore();
+router$5.get("/", requireCoordinator, async (_req, res) => {
   try {
-    const snapshot = await db$2().collection("campaigns").orderBy("createdAt", "desc").limit(50).get();
+    const snapshot = await db$3().collection("campaigns").orderBy("createdAt", "desc").limit(50).get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
   } catch (err) {
     return res.status(500).json({ error: "Failed to fetch campaigns." });
   }
 });
-router$4.post("/", requireCoordinator, async (req, res) => {
+router$5.post("/", requireCoordinator, async (req, res) => {
   try {
     const { name, type, subject, body, audience, audienceIds, scheduledAt } = req.body;
     if (!name || !body || !audience) {
       return res.status(400).json({ error: "name, body, and audience required." });
     }
-    const ref = await db$2().collection("campaigns").add({
+    const ref = await db$3().collection("campaigns").add({
       name,
       type: type || "email",
       status: "draft",
@@ -2063,17 +2575,17 @@ router$4.post("/", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to create campaign." });
   }
 });
-router$4.post("/:id/send", requireCoordinator, async (req, res) => {
+router$5.post("/:id/send", requireCoordinator, async (req, res) => {
   try {
-    const campaignDoc = await db$2().collection("campaigns").doc(req.params.id).get();
+    const campaignDoc = await db$3().collection("campaigns").doc(req.params.id).get();
     if (!campaignDoc.exists) return res.status(404).json({ error: "Campaign not found." });
     const campaign = campaignDoc.data();
     if (campaign.status === "sent") {
       return res.status(400).json({ error: "Campaign already sent." });
     }
-    let recipientQuery = db$2().collection("clients").where("status", "==", "active");
+    let recipientQuery = db$3().collection("clients").where("status", "==", "active");
     if (campaign.audience === "vip") {
-      recipientQuery = db$2().collection("clients").where("status", "==", "vip");
+      recipientQuery = db$3().collection("clients").where("status", "==", "vip");
     }
     const clientsSnap = await recipientQuery.get();
     let clients = clientsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -2120,14 +2632,61 @@ router$4.post("/:id/send", requireCoordinator, async (req, res) => {
     return res.json({ success: true, sent: sentCount });
   } catch (err) {
     console.error("[Campaigns] Send error:", err);
-    await db$2().collection("campaigns").doc(req.params.id).update({ status: "draft" }).catch(() => {
+    await db$3().collection("campaigns").doc(req.params.id).update({ status: "draft" }).catch(() => {
     });
     return res.status(500).json({ error: "Failed to send campaign." });
   }
 });
-const router$3 = Router();
-const db$1 = () => admin.firestore();
-router$3.get("/briefing", requireStaff, async (_req, res) => {
+const router$4 = Router();
+const db$2 = () => admin.firestore();
+function isAgentAuthorized(req) {
+  const serviceKey = req.headers["x-agent-key"];
+  const auth = req.headers.authorization;
+  const cronSecret = process.env.CRON_SECRET;
+  return serviceKey === process.env.AGENT_SERVICE_KEY || Boolean(cronSecret && auth === `Bearer ${cronSecret}`);
+}
+function toDate(value) {
+  if (!value) return null;
+  if (typeof value === "object" && value !== null && "toDate" in value && typeof value.toDate === "function") {
+    return value.toDate();
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+function addressLabel$1(address) {
+  if (!address) return "the property";
+  if (typeof address === "string") return address;
+  if (typeof address === "object") {
+    const a = address;
+    if (typeof a.formatted === "string" && a.formatted) return a.formatted;
+    return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "the property";
+  }
+  return String(address);
+}
+function combineDateAndTime(date, time) {
+  if (!date) return null;
+  const combined = new Date(date);
+  if (typeof time !== "string" || !time.trim()) return combined;
+  const trimmed = time.trim();
+  const match = trimmed.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+  if (!match) return combined;
+  let hours = Number(match[1]);
+  const minutes = Number(match[2] || 0);
+  const suffix = match[3]?.toUpperCase();
+  if (suffix === "PM" && hours < 12) hours += 12;
+  if (suffix === "AM" && hours === 12) hours = 0;
+  combined.setHours(hours, minutes, 0, 0);
+  return combined;
+}
+function sameCalendarDay(a, b) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+async function loadOrderForAppointment(appointment) {
+  if (!appointment.orderId) return null;
+  const orderDoc = await db$2().collection("orders").doc(String(appointment.orderId)).get();
+  return orderDoc.exists ? { id: orderDoc.id, ref: orderDoc.ref, data: orderDoc.data() || {} } : null;
+}
+router$4.get("/briefing", requireStaff, async (_req, res) => {
   try {
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
@@ -2148,16 +2707,16 @@ router$3.get("/briefing", requireStaff, async (_req, res) => {
       overdueInvoices,
       recentLogs
     ] = await Promise.all([
-      db$1().collection("orderRequests").where("status", "==", "new").get(),
-      db$1().collection("appointments").where("scheduledDate", ">=", todayTs).where("scheduledDate", "<", tomorrowTs).where("status", "in", ["confirmed", "scheduled"]).get(),
-      db$1().collection("appointments").where("scheduledDate", ">=", tomorrowTs).where("scheduledDate", "<", admin.firestore.Timestamp.fromDate(
+      db$2().collection("orderRequests").where("status", "==", "new").get(),
+      db$2().collection("appointments").where("scheduledDate", ">=", todayTs).where("scheduledDate", "<", tomorrowTs).where("status", "in", ["confirmed", "scheduled"]).get(),
+      db$2().collection("appointments").where("scheduledDate", ">=", tomorrowTs).where("scheduledDate", "<", admin.firestore.Timestamp.fromDate(
         new Date(tomorrow.getTime() + 24 * 60 * 60 * 1e3)
       )).where("status", "in", ["confirmed", "scheduled"]).get(),
-      db$1().collection("agentLogs").where("requiresHumanReview", "==", true).where("reviewedAt", "==", null).orderBy("createdAt", "desc").limit(20).get(),
-      db$1().collection("agentLogs").where("priority", "==", "urgent").where("requiresHumanReview", "==", true).orderBy("createdAt", "desc").limit(5).get(),
-      db$1().collection("galleries").where("status", "in", ["raw_uploaded", "editing"]).get(),
-      db$1().collection("invoices").where("status", "==", "overdue").get(),
-      db$1().collection("agentLogs").where("createdAt", ">=", yesterdayTs).orderBy("createdAt", "desc").limit(50).get()
+      db$2().collection("agentLogs").where("requiresHumanReview", "==", true).where("reviewedAt", "==", null).orderBy("createdAt", "desc").limit(20).get(),
+      db$2().collection("agentLogs").where("priority", "==", "urgent").where("requiresHumanReview", "==", true).orderBy("createdAt", "desc").limit(5).get(),
+      db$2().collection("galleries").where("status", "in", ["raw_uploaded", "editing"]).get(),
+      db$2().collection("invoices").where("status", "==", "overdue").get(),
+      db$2().collection("agentLogs").where("createdAt", ">=", yesterdayTs).orderBy("createdAt", "desc").limit(50).get()
     ]);
     const agentSummaries = {
       nora: {
@@ -2223,10 +2782,111 @@ router$3.get("/briefing", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to generate briefing." });
   }
 });
-router$3.get("/logs", requireStaff, async (req, res) => {
+async function runReminderSweep(req, res) {
+  try {
+    if (!isAgentAuthorized(req)) {
+      return res.status(401).json({ error: "Invalid agent key." });
+    }
+    const now = /* @__PURE__ */ new Date();
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+    const twoDaysOut = new Date(today);
+    twoDaysOut.setDate(twoDaysOut.getDate() + 2);
+    const appointments = await db$2().collection("appointments").where("scheduledDate", ">=", admin.firestore.Timestamp.fromDate(today)).where("scheduledDate", "<", admin.firestore.Timestamp.fromDate(twoDaysOut)).get();
+    const results = [];
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    for (const appointmentDoc of appointments.docs) {
+      const appointment = appointmentDoc.data();
+      const status = String(appointment.status || "").toLowerCase();
+      if (!["confirmed", "scheduled"].includes(status)) continue;
+      const scheduledDate = toDate(appointment.scheduledDate);
+      if (!scheduledDate) continue;
+      const orderRecord = await loadOrderForAppointment(appointment);
+      const order = orderRecord?.data || {};
+      const merged = { ...appointment, ...order };
+      const sent = appointment.remindersSent || {};
+      const orderId = String(appointment.orderId || orderRecord?.id || appointmentDoc.id);
+      const phone = merged.clientPhone || merged.phone;
+      const name = merged.firstName || merged.clientName?.split(" ")?.[0] || "there";
+      const time = merged.scheduledTime || merged.appointmentTime || "your appointment time";
+      const address = merged.addressLabel || addressLabel$1(merged.address || merged.propertyAddress);
+      const dueTypes = [];
+      if (!sent["24h"] && sameCalendarDay(scheduledDate, tomorrow)) {
+        dueTypes.push("24h");
+      }
+      const scheduledAt = combineDateAndTime(scheduledDate, time);
+      const minutesUntil = scheduledAt ? (scheduledAt.getTime() - now.getTime()) / 6e4 : Number.POSITIVE_INFINITY;
+      if (!sent["1h"] && minutesUntil >= 45 && minutesUntil <= 75) {
+        dueTypes.push("1h");
+      }
+      let sentMap = { ...sent };
+      for (const type of dueTypes) {
+        if (!phone) {
+          results.push({ appointmentId: appointmentDoc.id, orderId, type, skipped: "missing_phone" });
+          continue;
+        }
+        const body = type === "1h" ? SMS_TEMPLATES.appointmentReminder1h(name, String(time)) : SMS_TEMPLATES.appointmentReminder24h(name, scheduledDate.toLocaleDateString("en-US"), String(time), String(address));
+        try {
+          const result = await sendSMS({ to: String(phone), body });
+          sentMap = { ...sentMap, [type]: true };
+          const update = {
+            remindersSent: sentMap,
+            [`reminder${type === "24h" ? "24h" : "1h"}SentAt`]: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          };
+          await Promise.all([
+            appointmentDoc.ref.update(update),
+            orderRecord?.ref.update(update) || Promise.resolve(),
+            db$2().collection("smsLogs").add({
+              direction: "outbound",
+              to: normalisePhone(String(phone)),
+              body,
+              sid: result.sid,
+              status: result.status,
+              type: `reminder_${type}`,
+              orderId,
+              appointmentId: appointmentDoc.id,
+              sentBy: "aicon-reminder-runner",
+              createdAt: admin.firestore.FieldValue.serverTimestamp()
+            })
+          ]);
+          results.push({ appointmentId: appointmentDoc.id, orderId, type, sent: true, sid: result.sid });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          await db$2().collection("agentLogs").add({
+            agent: "nora",
+            action: "Reminder send failed",
+            summary: `Reminder ${type} failed for order ${orderId}`,
+            status: "flagged",
+            relatedId: orderId,
+            relatedType: "order",
+            priority: "high",
+            requiresHumanReview: true,
+            details: message,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+          results.push({ appointmentId: appointmentDoc.id, orderId, type, error: message });
+        }
+      }
+    }
+    return res.json({
+      success: true,
+      checked: appointments.size,
+      sent: results.filter((r) => r.sent).length,
+      results
+    });
+  } catch (err) {
+    console.error("[Agents] Reminder sweep error:", err);
+    return res.status(500).json({ error: "Failed to run reminder sweep." });
+  }
+}
+router$4.get("/run-reminders", runReminderSweep);
+router$4.post("/run-reminders", runReminderSweep);
+router$4.get("/logs", requireStaff, async (req, res) => {
   try {
     const { agent, status, requiresReview, limit = "50" } = req.query;
-    let query = db$1().collection("agentLogs").orderBy("createdAt", "desc");
+    let query = db$2().collection("agentLogs").orderBy("createdAt", "desc");
     if (agent) query = query.where("agent", "==", agent);
     if (status) query = query.where("status", "==", status);
     if (requiresReview === "true") {
@@ -2238,10 +2898,10 @@ router$3.get("/logs", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch agent logs." });
   }
 });
-router$3.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
+router$4.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
   try {
     const { notes } = req.body;
-    await db$1().collection("agentLogs").doc(req.params.id).update({
+    await db$2().collection("agentLogs").doc(req.params.id).update({
       requiresHumanReview: false,
       status: "completed",
       reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -2253,7 +2913,7 @@ router$3.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to resolve flag." });
   }
 });
-router$3.post("/log", async (req, res) => {
+router$4.post("/log", async (req, res) => {
   try {
     const serviceKey = req.headers["x-agent-key"];
     if (serviceKey !== process.env.AGENT_SERVICE_KEY) {
@@ -2273,7 +2933,7 @@ router$3.post("/log", async (req, res) => {
     if (!agent || !action || !summary) {
       return res.status(400).json({ error: "agent, action, and summary required." });
     }
-    const ref = await db$1().collection("agentLogs").add({
+    const ref = await db$2().collection("agentLogs").add({
       agent,
       action,
       summary,
@@ -2290,6 +2950,100 @@ router$3.post("/log", async (req, res) => {
     return res.status(201).json({ id: ref.id });
   } catch (err) {
     return res.status(500).json({ error: "Failed to log agent action." });
+  }
+});
+const router$3 = Router();
+const db$1 = () => admin.firestore();
+router$3.get("/", requireStaff, async (req, res) => {
+  try {
+    const { status, listingId, orderId, limit = "100" } = req.query;
+    let q = db$1().collection("mediaJobs").orderBy("createdAt", "desc");
+    if (status) q = q.where("status", "==", status);
+    if (listingId) q = q.where("listingId", "==", listingId);
+    if (orderId) q = q.where("orderId", "==", orderId);
+    const snapshot = await q.limit(Math.min(Number(limit), 200)).get();
+    return res.json(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+  } catch (err) {
+    console.error("[MediaJobs] List error:", err);
+    return res.status(500).json({ error: "Failed to fetch media jobs." });
+  }
+});
+router$3.post("/", requireStaff, async (req, res) => {
+  try {
+    const {
+      listingId,
+      orderId,
+      galleryId,
+      provider = process.env.AI_PHOTO_PROVIDER || "aicon",
+      preset = "real_estate_standard",
+      notes = "",
+      mediaItems = [],
+      requirements = {}
+    } = req.body;
+    if (!listingId && !orderId && !galleryId) {
+      return res.status(400).json({ error: "listingId, orderId, or galleryId required." });
+    }
+    if (!Array.isArray(mediaItems) || mediaItems.length === 0) {
+      return res.status(400).json({ error: "At least one media item is required." });
+    }
+    const ref = await db$1().collection("mediaJobs").add({
+      listingId: listingId || null,
+      orderId: orderId || null,
+      galleryId: galleryId || null,
+      provider,
+      preset,
+      notes,
+      requirements,
+      mediaItems: mediaItems.map((item, index) => ({
+        id: item.id || item.path || item.name || `media_${index + 1}`,
+        name: item.name || item.fileName || `Media ${index + 1}`,
+        url: item.url || null,
+        storagePath: item.path || item.storagePath || null,
+        type: item.type || "photo",
+        status: "queued"
+      })),
+      status: "queued",
+      priority: requirements.priority || "normal",
+      attempts: 0,
+      createdBy: req.user?.uid || null,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    await db$1().collection("agentLogs").add({
+      agent: "aicon-editor",
+      action: "Media job queued",
+      summary: `${mediaItems.length} item(s) queued for ${provider}`,
+      status: "queued",
+      relatedId: ref.id,
+      relatedType: "mediaJob",
+      priority: requirements.priority || "normal",
+      requiresHumanReview: true,
+      details: notes,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    return res.status(201).json({ success: true, jobId: ref.id });
+  } catch (err) {
+    console.error("[MediaJobs] Create error:", err);
+    return res.status(500).json({ error: "Failed to create media job." });
+  }
+});
+router$3.patch("/:id/status", requireCoordinator, async (req, res) => {
+  try {
+    const { status, resultItems = [], error = "", requiresHumanReview } = req.body;
+    const valid = ["queued", "processing", "ready_for_review", "completed", "failed", "cancelled"];
+    if (!valid.includes(status)) return res.status(400).json({ error: "Invalid status." });
+    await db$1().collection("mediaJobs").doc(req.params.id).update({
+      status,
+      resultItems,
+      error,
+      requiresHumanReview: requiresHumanReview ?? status !== "completed",
+      completedAt: status === "completed" ? admin.firestore.FieldValue.serverTimestamp() : null,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("[MediaJobs] Status update error:", err);
+    return res.status(500).json({ error: "Failed to update media job." });
   }
 });
 const router$2 = Router();
@@ -2384,6 +3138,23 @@ router$2.get("/distance", async (req, res) => {
 });
 const router$1 = Router();
 const db = () => admin.firestore();
+function addressLabel(address) {
+  if (!address) return "the property";
+  if (typeof address === "string") return address;
+  if (typeof address === "object") {
+    const a = address;
+    if (typeof a.formatted === "string" && a.formatted) return a.formatted;
+    return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "the property";
+  }
+  return String(address);
+}
+async function findOrderLikeDocument(id) {
+  const orderRequestDoc = await db().collection("orderRequests").doc(id).get();
+  if (orderRequestDoc.exists) return orderRequestDoc;
+  const orderDoc = await db().collection("orders").doc(id).get();
+  if (orderDoc.exists) return orderDoc;
+  return null;
+}
 router$1.post("/send", requireStaff, async (req, res) => {
   try {
     const { to, body, orderId } = req.body;
@@ -2421,17 +3192,17 @@ router$1.post("/send", requireStaff, async (req, res) => {
 router$1.post("/remind/:orderId", requireStaff, async (req, res) => {
   try {
     const { type = "24h" } = req.body;
-    const orderDoc = await db().collection("orderRequests").doc(req.params.orderId).get() || await db().collection("orders").doc(req.params.orderId).get();
-    if (!orderDoc?.exists) {
+    const orderDoc = await findOrderLikeDocument(req.params.orderId);
+    if (!orderDoc) {
       return res.status(404).json({ error: "Order not found." });
     }
     const order = orderDoc.data();
-    const phone = order.phone;
+    const phone = order.phone || order.clientPhone;
     if (!phone) return res.status(400).json({ error: "No phone number on order." });
     const name = order.firstName || order.clientName?.split(" ")[0] || "there";
     const date = order.scheduledDate || "your scheduled date";
     const time = order.scheduledTime || "your appointment time";
-    const address = order.address || "the property";
+    const address = order.addressLabel || addressLabel(order.address || order.propertyAddress);
     let body;
     if (type === "1h") {
       body = SMS_TEMPLATES.appointmentReminder1h(name, time);
@@ -2466,8 +3237,8 @@ router$1.post("/conversation", requireStaff, async (req, res) => {
     if (!existing.empty) {
       return res.json({ conversationSid: existing.docs[0].data().conversationSid, existing: true });
     }
-    const appUrl = process.env.APP_URL || process.env.VERCEL_URL || "";
-    const webhookUrl = appUrl ? `${appUrl}/api/sms/webhook` : void 0;
+    const appUrl2 = process.env.APP_URL || process.env.VERCEL_URL || "";
+    const webhookUrl = appUrl2 ? `${appUrl2}/api/sms/webhook` : void 0;
     const result = await createMaskedConversation(
       `Order ${orderId} — ${photographerName || "Photographer"} + ${clientName || "Client"}`,
       { phone: photographerPhone, name: photographerName },
@@ -2720,6 +3491,7 @@ function createServer() {
     credentials: true
   }));
   app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
+  app.use("/api/payments/square-webhook", express.raw({ type: "application/json" }));
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: true }));
   app.get("/api/ping", (_req, res) => {
@@ -2745,16 +3517,17 @@ function createServer() {
       res.status(500).json({ error: "Failed to save settings" });
     }
   });
-  app.use("/api/bookings", router$c);
-  app.use("/api/orders", router$b);
-  app.use("/api/galleries", router$a);
-  app.use("/api/payments", router$9);
-  app.use("/api/vsai", router$8);
-  app.use("/api/messages", router$7);
-  app.use("/api/clients", router$6);
-  app.use("/api/staff", router$5);
-  app.use("/api/campaigns", router$4);
-  app.use("/api/agents", router$3);
+  app.use("/api/bookings", router$d);
+  app.use("/api/orders", router$c);
+  app.use("/api/galleries", router$b);
+  app.use("/api/payments", router$a);
+  app.use("/api/vsai", router$9);
+  app.use("/api/messages", router$8);
+  app.use("/api/clients", router$7);
+  app.use("/api/staff", router$6);
+  app.use("/api/campaigns", router$5);
+  app.use("/api/agents", router$4);
+  app.use("/api/media-jobs", router$3);
   app.use("/api/places", router$2);
   app.use("/api/sms", router$1);
   app.use("/api/contact", router);
