@@ -22,6 +22,7 @@ import clientsRouter from "./routes/clients";
 import staffRouter from "./routes/staff";
 import campaignsRouter from "./routes/campaigns";
 import agentsRouter from "./routes/agents";
+import mediaJobsRouter from "./routes/mediaJobs";
 import placesRouter from "./routes/places";
 import smsRouter from "./routes/sms";
 import contactRouter from "./routes/contact";
@@ -81,8 +82,9 @@ export function createServer() {
     credentials: true,
   }));
 
-  // Stripe webhook needs raw body — mount BEFORE express.json()
+  // Payment webhooks need raw body — mount BEFORE express.json()
   app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
+  app.use("/api/payments/square-webhook", express.raw({ type: "application/json" }));
 
   // Standard middleware
   app.use(express.json({ limit: "10mb" }));
@@ -127,6 +129,7 @@ export function createServer() {
   app.use("/api/staff", staffRouter);
   app.use("/api/campaigns", campaignsRouter);
   app.use("/api/agents", agentsRouter);
+  app.use("/api/media-jobs", mediaJobsRouter);
   app.use("/api/places", placesRouter);
   app.use("/api/sms", smsRouter);
   app.use("/api/contact", contactRouter);
