@@ -3,6 +3,12 @@
   "installCommand": "pnpm install --frozen-lockfile",
   "buildCommand": "pnpm run build",
   "outputDirectory": "dist/spa",
+  "crons": [
+    {
+      "path": "/api/agents/run-reminders",
+      "schedule": "0 14 * * *"
+    }
+  ],
   "functions": {
     "api/index.mjs": {
       "runtime": "nodejs22.x",
