@@ -132,7 +132,7 @@ export async function createMaskedConversation(
       inactive: "P30D",   // auto-close after 30 days inactive
       closed: "P60D",
     },
-  });
+  } as any);
 
   const conversationSid = conversation.sid;
 
@@ -142,10 +142,10 @@ export async function createMaskedConversation(
       .conversations(conversationSid)
       .webhooks.create({
         target: "webhook",
-        "configuration.method": "POST",
+        "configuration.method": "post",
         "configuration.url": webhookUrl,
         "configuration.filters": ["onMessageAdded"],
-      });
+      } as any);
   }
 
   // 3. Add photographer as SMS participant
@@ -155,7 +155,7 @@ export async function createMaskedConversation(
       "messagingBinding.type": "sms",
       "messagingBinding.address": normalisePhone(photographer.phone),
       identity: `photographer_${normalisePhone(photographer.phone).replace("+", "")}`,
-    });
+    } as any);
 
   // 4. Add client as SMS participant
   const clientParticipant = await client_sdk.conversations.v1
@@ -164,7 +164,7 @@ export async function createMaskedConversation(
       "messagingBinding.type": "sms",
       "messagingBinding.address": normalisePhone(client.phone),
       identity: `client_${normalisePhone(client.phone).replace("+", "")}`,
-    });
+    } as any);
 
   console.log(`[Conversations] Created: ${conversationSid} (${friendlyName})`);
 
