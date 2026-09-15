@@ -1,34 +1,43 @@
-name: Apply Codex Repair Patch
+name: Rebuild Vercel API Bundle
 
 on:
   push:
     branches: [main]
     paths:
-      - '.codex-repair/*.patch'
       - '.github/workflows/apply-codex-repair.yml'
+      - 'server/**'
+      - 'api/index.mjs'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'vite.config.vercel.ts'
 
 permissions:
   contents: write
 
 jobs:
-  apply:
-    if: ${{ !contains(github.event.head_commit.message, 'Apply Codex repair patch') }}
+  rebuild-api:
+    if: ${{ !contains(github.event.head_commit.message, 'Commit rebuilt Vercel API bundle') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Apply repair patches
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.14.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build Vercel API bundle
+        run: pnpm run build:vercel
+      - name: Commit rebuilt bundle
         run: |
           git config user.name "codex-repair-bot"
           git config user.email "codex-repair-bot@users.noreply.github.com"
-          for patch in .codex-repair/*.patch; do
-            [ -f "$patch" ] || continue
-            git apply --check "$patch"
-            git apply "$patch"
-          done
-          rm -rf .codex-repair
-          git add -A
+          git add api/index.mjs
           git diff --cached --quiet && exit 0
-          git commit -m "Apply Codex repair patch"
+          git commit -m "Commit rebuilt Vercel API bundle"
           git push
