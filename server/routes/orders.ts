@@ -106,21 +106,34 @@ router.get("/:id", requireStaff, async (req: AuthenticatedRequest, res) => {
 
     const order = { id: orderDoc.id, ...orderDoc.data() };
 
-    // Fetch related records in parallel
+    // Fetch related records independently so an optional missing index or
+    // collection issue does not prevent staff from opening the order.
     const [gallery, invoice, appointment, messages] = await Promise.all([
-      db().collection("galleries").where("orderId", "==", req.params.id).limit(1).get(),
-      db().collection("invoices").where("orderId", "==", req.params.id).limit(1).get(),
-      db().collection("appointments").where("orderId", "==", req.params.id).limit(1).get(),
+      db().collection("galleries").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
+        console.error("[Orders] Gallery lookup failed:", err);
+        return null;
+      }),
+      db().collection("invoices").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
+        console.error("[Orders] Invoice lookup failed:", err);
+        return null;
+      }),
+      db().collection("appointments").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
+        console.error("[Orders] Appointment lookup failed:", err);
+        return null;
+      }),
       db().collection("messages").where("orderId", "==", req.params.id)
-        .orderBy("createdAt", "desc").limit(20).get(),
+        .orderBy("createdAt", "desc").limit(20).get().catch((err) => {
+          console.error("[Orders] Messages lookup failed:", err);
+          return null;
+        }),
     ]);
 
     return res.json({
       order,
-      gallery: gallery.empty ? null : { id: gallery.docs[0].id, ...gallery.docs[0].data() },
-      invoice: invoice.empty ? null : { id: invoice.docs[0].id, ...invoice.docs[0].data() },
-      appointment: appointment.empty ? null : { id: appointment.docs[0].id, ...appointment.docs[0].data() },
-      messages: messages.docs.map((d) => ({ id: d.id, ...d.data() })),
+      gallery: !gallery || gallery.empty ? null : { id: gallery.docs[0].id, ...gallery.docs[0].data() },
+      invoice: !invoice || invoice.empty ? null : { id: invoice.docs[0].id, ...invoice.docs[0].data() },
+      appointment: !appointment || appointment.empty ? null : { id: appointment.docs[0].id, ...appointment.docs[0].data() },
+      messages: messages ? messages.docs.map((d) => ({ id: d.id, ...d.data() })) : [],
     });
   } catch (err) {
     console.error("[Orders] Fetch error:", err);
