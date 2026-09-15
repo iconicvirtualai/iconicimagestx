@@ -3454,6 +3454,7 @@ router.post("/", async (req, res) => {
   }
 });
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
+const API_BUILD_MARKER = "codex-2026-09-15-v2";
 if (!admin.apps.length) {
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
@@ -3498,6 +3499,7 @@ function createServer() {
     res.json({
       status: "ok",
       message: process.env.PING_MESSAGE ?? "Iconic Images API",
+      build: API_BUILD_MARKER,
       timestamp: (/* @__PURE__ */ new Date()).toISOString()
     });
   });
