@@ -1,0 +1,34 @@
+name: Apply Codex Repair Patch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.codex-repair/*.patch'
+      - '.github/workflows/apply-codex-repair.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: ${{ !contains(github.event.head_commit.message, 'Apply Codex repair patch') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply repair patches
+        run: |
+          git config user.name "codex-repair-bot"
+          git config user.email "codex-repair-bot@users.noreply.github.com"
+          for patch in .codex-repair/*.patch; do
+            [ -f "$patch" ] || continue
+            git apply --check "$patch"
+            git apply "$patch"
+          done
+          rm -rf .codex-repair
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "Apply Codex repair patch"
+          git push
