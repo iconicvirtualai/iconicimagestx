@@ -28,7 +28,7 @@ import smsRouter from "./routes/sms";
 import contactRouter from "./routes/contact";
 
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
-const API_BUILD_MARKER = "codex-2026-09-15-v2";
+const API_BUILD_MARKER = "codex-2026-09-15-v3";
 
 // ─── Firebase Admin Init ──────────────────────────────────────────────────────
 
