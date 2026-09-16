@@ -190,7 +190,7 @@ router.post("/:id/media", requirePhotographer, async (req: AuthenticatedRequest,
       isRaw,
       isEdited: !isRaw,
       uploadedBy: req.user!.uid,
-      uploadedAt: admin.firestore.FieldValue.serverTimestamp(),
+      uploadedAt: admin.firestore.Timestamp.now(),
     };
 
     await galleryDoc.ref.update({
@@ -227,7 +227,7 @@ router.post("/:id/media-link", requireCoordinator, async (req: AuthenticatedRequ
       type,
       downloadable,
       uploadedBy: req.user!.uid,
-      uploadedAt: admin.firestore.FieldValue.serverTimestamp(),
+      uploadedAt: admin.firestore.Timestamp.now(),
     };
 
     await galleryDoc.ref.update({

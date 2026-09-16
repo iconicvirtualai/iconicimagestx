@@ -1303,7 +1303,7 @@ router$b.post("/:id/media", requirePhotographer, async (req, res) => {
       isRaw,
       isEdited: !isRaw,
       uploadedBy: req.user.uid,
-      uploadedAt: admin.firestore.FieldValue.serverTimestamp()
+      uploadedAt: admin.firestore.Timestamp.now()
     };
     await galleryDoc.ref.update({
       mediaItems: admin.firestore.FieldValue.arrayUnion(mediaItem),
@@ -1333,7 +1333,7 @@ router$b.post("/:id/media-link", requireCoordinator, async (req, res) => {
       type,
       downloadable,
       uploadedBy: req.user.uid,
-      uploadedAt: admin.firestore.FieldValue.serverTimestamp()
+      uploadedAt: admin.firestore.Timestamp.now()
     };
     await galleryDoc.ref.update({
       mediaItems: admin.firestore.FieldValue.arrayUnion(item),
