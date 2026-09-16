@@ -12,6 +12,7 @@ on:
       - "pnpm-lock.yaml"
       - "vercel.json"
       - "vite.config*.ts"
+      - ".vercel/project.json"
 
 concurrency:
   group: vercel-production-deploy
