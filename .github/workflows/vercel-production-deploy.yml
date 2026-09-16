@@ -57,10 +57,10 @@ jobs:
         run: pnpm run build
 
       - name: Pull Vercel environment
-        run: pnpm dlx vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+        run: pnpm dlx vercel@latest pull --yes --environment=production --scope=cadis-projects-a65eca8a --token="$VERCEL_TOKEN"
 
       - name: Build Vercel output
-        run: pnpm dlx vercel@latest build --prod --token="$VERCEL_TOKEN"
+        run: pnpm dlx vercel@latest build --prod --scope=cadis-projects-a65eca8a --token="$VERCEL_TOKEN"
 
       - name: Deploy to production
-        run: pnpm dlx vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+        run: pnpm dlx vercel@latest deploy --prebuilt --prod --scope=cadis-projects-a65eca8a --token="$VERCEL_TOKEN"
