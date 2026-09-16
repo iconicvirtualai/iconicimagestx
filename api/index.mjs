@@ -456,6 +456,45 @@ async function createCalendarBookingEvent(booking) {
     htmlLink: response.data.htmlLink || null
   };
 }
+async function verifyCalendarWriteAccess() {
+  const auth = getAuth();
+  if (!auth) {
+    throw new Error("Google Calendar service account is not configured.");
+  }
+  const calendarId = process.env.GOOGLE_CALENDAR_ID || "primary";
+  const calendar = google.calendar({ version: "v3", auth });
+  const start = new Date(Date.now() + 24 * 60 * 60 * 1e3);
+  start.setSeconds(0, 0);
+  const end = new Date(start);
+  end.setMinutes(end.getMinutes() + 5);
+  const response = await calendar.events.insert({
+    calendarId,
+    sendUpdates: "none",
+    requestBody: {
+      summary: "Iconic Calendar Health Check",
+      description: "Temporary event created by Iconic Images to verify booking calendar write access.",
+      start: { dateTime: start.toISOString(), timeZone: "America/Chicago" },
+      end: { dateTime: end.toISOString(), timeZone: "America/Chicago" },
+      extendedProperties: {
+        private: {
+          source: "iconicimagestx-health-check"
+        }
+      }
+    }
+  });
+  const eventId = response.data.id;
+  if (eventId) {
+    await calendar.events.delete({
+      calendarId,
+      eventId,
+      sendUpdates: "none"
+    });
+  }
+  return {
+    calendarId,
+    eventId: eventId || null
+  };
+}
 const router$d = Router();
 const db$b = () => admin.firestore();
 function appUrl$2() {
@@ -3541,6 +3580,23 @@ function createServer() {
       build: API_BUILD_MARKER,
       timestamp: (/* @__PURE__ */ new Date()).toISOString()
     });
+  });
+  app.post("/api/health/calendar", async (req, res) => {
+    const expectedSecret = process.env.CALENDAR_HEALTH_SECRET;
+    const providedSecret = req.header("x-calendar-health-secret");
+    if (!expectedSecret || providedSecret !== expectedSecret) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    try {
+      const result = await verifyCalendarWriteAccess();
+      return res.json({ success: true, ...result });
+    } catch (error) {
+      console.error("[Health] Calendar write check failed:", error);
+      return res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Calendar write check failed"
+      });
+    }
   });
   app.get("/api/settings", async (_req, res) => {
     try {

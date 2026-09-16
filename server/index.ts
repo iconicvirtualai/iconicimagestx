@@ -26,6 +26,7 @@ import mediaJobsRouter from "./routes/mediaJobs";
 import placesRouter from "./routes/places";
 import smsRouter from "./routes/sms";
 import contactRouter from "./routes/contact";
+import { verifyCalendarWriteAccess } from "./services/calendar";
 
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
 const API_BUILD_MARKER = "codex-2026-09-15-v3";
@@ -99,6 +100,26 @@ export function createServer() {
       build: API_BUILD_MARKER,
       timestamp: new Date().toISOString(),
     });
+  });
+
+  app.post("/api/health/calendar", async (req, res) => {
+    const expectedSecret = process.env.CALENDAR_HEALTH_SECRET;
+    const providedSecret = req.header("x-calendar-health-secret");
+
+    if (!expectedSecret || providedSecret !== expectedSecret) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    try {
+      const result = await verifyCalendarWriteAccess();
+      return res.json({ success: true, ...result });
+    } catch (error) {
+      console.error("[Health] Calendar write check failed:", error);
+      return res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Calendar write check failed",
+      });
+    }
   });
 
   // ─── Site Settings ─────────────────────────────────────────────────

@@ -103,3 +103,47 @@ export async function createCalendarBookingEvent(booking: CalendarBooking) {
     htmlLink: response.data.htmlLink || null,
   };
 }
+
+export async function verifyCalendarWriteAccess() {
+  const auth = getAuth();
+  if (!auth) {
+    throw new Error("Google Calendar service account is not configured.");
+  }
+
+  const calendarId = process.env.GOOGLE_CALENDAR_ID || "primary";
+  const calendar = google.calendar({ version: "v3", auth });
+  const start = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  start.setSeconds(0, 0);
+  const end = new Date(start);
+  end.setMinutes(end.getMinutes() + 5);
+
+  const response = await calendar.events.insert({
+    calendarId,
+    sendUpdates: "none",
+    requestBody: {
+      summary: "Iconic Calendar Health Check",
+      description: "Temporary event created by Iconic Images to verify booking calendar write access.",
+      start: { dateTime: start.toISOString(), timeZone: "America/Chicago" },
+      end: { dateTime: end.toISOString(), timeZone: "America/Chicago" },
+      extendedProperties: {
+        private: {
+          source: "iconicimagestx-health-check",
+        },
+      },
+    },
+  });
+
+  const eventId = response.data.id;
+  if (eventId) {
+    await calendar.events.delete({
+      calendarId,
+      eventId,
+      sendUpdates: "none",
+    });
+  }
+
+  return {
+    calendarId,
+    eventId: eventId || null,
+  };
+}
