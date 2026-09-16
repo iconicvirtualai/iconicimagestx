@@ -199,6 +199,12 @@ function getFallbackTemplate(type, vars) {
       <p>We've received your payment of <strong>${vars.amount}</strong> for invoice ${vars.invoiceNumber}.</p>
       ${vars.balance && vars.balance !== "$0.00" ? `<p>Remaining balance: <strong>${vars.balance}</strong></p>` : "<p>Your account is paid in full. Thank you!</p>"}
     `),
+    manual_message: base(`
+      <h2>Message from Iconic Images</h2>
+      <div style="line-height:1.6;color:#333;">
+        ${(vars.message || "").replace(/\n/g, "<br>")}
+      </div>
+    `),
     new_booking_alert: base(`
       <h2>🔔 New Booking Request</h2>
 
@@ -2256,6 +2262,38 @@ function capitalize(s) {
 }
 const router$8 = Router();
 const db$6 = () => admin.firestore();
+router$8.post("/email", requireStaff, async (req, res) => {
+  try {
+    const { to, subject, body, orderId, clientId } = req.body;
+    if (!to || !body?.trim()) {
+      return res.status(400).json({ error: "Email recipient and body required." });
+    }
+    await sendEmail({
+      to,
+      template: "manual_message",
+      subject: subject || "Message from Iconic Images",
+      variables: {
+        message: body.trim()
+      }
+    });
+    await db$6().collection("messages").add({
+      orderId: orderId || null,
+      clientId: clientId || null,
+      senderId: req.user.uid,
+      senderType: "staff",
+      senderName: req.user.email || "Iconic Images",
+      recipient: to,
+      content: body.trim(),
+      channel: "email",
+      isRead: true,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    return res.status(201).json({ success: true });
+  } catch (err) {
+    console.error("[Messages] Email send error:", err);
+    return res.status(500).json({ error: "Failed to send email." });
+  }
+});
 router$8.get("/:orderId", requireAuth, async (req, res) => {
   try {
     const orderDoc = await db$6().collection("orders").doc(req.params.orderId).get();
@@ -3455,6 +3493,7 @@ router.post("/", async (req, res) => {
   }
 });
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
+const API_BUILD_MARKER = "codex-2026-09-15-v3";
 if (!admin.apps.length) {
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
@@ -3499,6 +3538,7 @@ function createServer() {
     res.json({
       status: "ok",
       message: process.env.PING_MESSAGE ?? "Iconic Images API",
+      build: API_BUILD_MARKER,
       timestamp: (/* @__PURE__ */ new Date()).toISOString()
     });
   });
