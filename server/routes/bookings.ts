@@ -96,6 +96,7 @@ router.post("/", async (req, res) => {
     }
 
     const clientName = `${firstName} ${lastName}`.trim();
+    const displayAddress = addressLabel(address);
 
     const orderRequest = {
       firstName,
@@ -150,7 +151,7 @@ router.post("/", async (req, res) => {
       template: "booking_received",
       variables: {
         clientName,
-        address,
+        address: displayAddress,
         total: money(total),
         requestId: docRef.id,
         scheduledDate: scheduledDate || "TBD — we'll confirm shortly",
@@ -170,7 +171,7 @@ router.post("/", async (req, res) => {
       template: "booking_received",
       variables: {
         clientName,
-        address,
+        address: displayAddress,
         total: money(total),
         requestId: docRef.id,
         scheduledDate: scheduledDate || "TBD — we'll confirm shortly",
@@ -190,7 +191,7 @@ router.post("/", async (req, res) => {
         body: SMS_TEMPLATES.bookingConfirmation(
           firstName,
           scheduledDate || "TBD — we'll confirm shortly",
-          address,
+          displayAddress,
           money(total)
         ),
       }).catch((err) => console.error("[Bookings] Confirmation SMS failed:", err));
@@ -204,7 +205,7 @@ router.post("/", async (req, res) => {
       await sendSMS({
         to: process.env.ADMIN_PHONE,
         body: SMS_TEMPLATES.newBookingAlert(
-          address,
+          displayAddress,
           scheduledDate || "TBD",
           serviceNames
         ),

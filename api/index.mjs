@@ -411,11 +411,19 @@ function parseTime(time) {
 function eventTimes(date, time) {
   if (!date) return null;
   const { hours, minutes } = parseTime(time);
-  const start = new Date(date);
-  start.setHours(hours, minutes, 0, 0);
-  const end = new Date(start);
-  end.setMinutes(end.getMinutes() + Number(process.env.DEFAULT_APPOINTMENT_DURATION_MINUTES || 90));
-  return { start, end };
+  const datePart = date.toISOString().slice(0, 10);
+  const startMinutes = hours * 60 + minutes;
+  const endMinutes = startMinutes + Number(process.env.DEFAULT_APPOINTMENT_DURATION_MINUTES || 90);
+  const hhmm = (totalMinutes) => {
+    const dayMinutes = (totalMinutes % 1440 + 1440) % 1440;
+    const hh = Math.floor(dayMinutes / 60).toString().padStart(2, "0");
+    const mm = (dayMinutes % 60).toString().padStart(2, "0");
+    return `${hh}:${mm}:00`;
+  };
+  return {
+    start: `${datePart}T${hhmm(startMinutes)}`,
+    end: `${datePart}T${hhmm(endMinutes)}`
+  };
 }
 async function createCalendarBookingEvent(booking) {
   const auth = getAuth();
@@ -440,8 +448,8 @@ async function createCalendarBookingEvent(booking) {
       summary,
       location: booking.address,
       description,
-      start: { dateTime: times.start.toISOString(), timeZone: "America/Chicago" },
-      end: { dateTime: times.end.toISOString(), timeZone: "America/Chicago" },
+      start: { dateTime: times.start, timeZone: "America/Chicago" },
+      end: { dateTime: times.end, timeZone: "America/Chicago" },
       extendedProperties: {
         private: {
           orderId: booking.orderId,
@@ -500,7 +508,7 @@ const db$b = () => admin.firestore();
 function appUrl$2() {
   return process.env.APP_URL || "https://iconicimagestx.com";
 }
-function addressLabel$2(address) {
+function addressLabel$3(address) {
   if (!address) return "Address not provided";
   if (typeof address === "string") return address;
   if (typeof address === "object") {
@@ -568,6 +576,7 @@ router$d.post("/", async (req, res) => {
       return res.status(400).json({ error: "No services selected." });
     }
     const clientName = `${firstName} ${lastName}`.trim();
+    const displayAddress = addressLabel$3(address);
     const orderRequest = {
       firstName,
       lastName,
@@ -614,7 +623,7 @@ router$d.post("/", async (req, res) => {
       template: "booking_received",
       variables: {
         clientName,
-        address,
+        address: displayAddress,
         total: money$1(total),
         requestId: docRef.id,
         scheduledDate: scheduledDate || "TBD — we'll confirm shortly",
@@ -631,7 +640,7 @@ router$d.post("/", async (req, res) => {
       template: "booking_received",
       variables: {
         clientName,
-        address,
+        address: displayAddress,
         total: money$1(total),
         requestId: docRef.id,
         scheduledDate: scheduledDate || "TBD — we'll confirm shortly",
@@ -649,7 +658,7 @@ router$d.post("/", async (req, res) => {
         body: SMS_TEMPLATES.bookingConfirmation(
           firstName,
           scheduledDate || "TBD — we'll confirm shortly",
-          address,
+          displayAddress,
           money$1(total)
         )
       }).catch((err) => console.error("[Bookings] Confirmation SMS failed:", err));
@@ -659,7 +668,7 @@ router$d.post("/", async (req, res) => {
       await sendSMS({
         to: process.env.ADMIN_PHONE,
         body: SMS_TEMPLATES.newBookingAlert(
-          address,
+          displayAddress,
           scheduledDate || "TBD",
           serviceNames
         )
@@ -722,7 +731,7 @@ router$d.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     const requestLastName = request.lastName || request.clientName?.split(" ")?.slice(1).join(" ") || "";
     const requestClientName = request.clientName || `${requestFirstName} ${requestLastName}`.trim() || "Client";
     const requestAddress = request.address || request.propertyAddress || "";
-    const requestAddressLabel = addressLabel$2(requestAddress);
+    const requestAddressLabel = addressLabel$3(requestAddress);
     const requestLineItems = Array.isArray(request.lineItems) && request.lineItems.length > 0 ? request.lineItems : Array.isArray(request.services) ? request.services.map((service) => typeof service === "string" ? { name: service, price: 0 } : service) : [];
     const requestTotal = Number(request.total ?? request.pricing?.total ?? 0) || 0;
     const confirmDate = toDate$1(scheduledDate || request.scheduledDate || request.appointmentDate || request.requestedDate);
@@ -1165,6 +1174,16 @@ const storage = () => admin.storage().bucket();
 function appUrl$1() {
   return process.env.APP_URL || "https://iconicimagestx.com";
 }
+function addressLabel$2(address) {
+  if (!address) return "the property";
+  if (typeof address === "string") return address;
+  if (typeof address === "object") {
+    const a = address;
+    if (typeof a.formatted === "string" && a.formatted) return a.formatted;
+    return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "the property";
+  }
+  return String(address);
+}
 function publicMediaItem(item, canDownload) {
   const url = item.shareUrl || item.embedUrl || item.url;
   return {
@@ -1396,7 +1415,7 @@ router$b.post("/:id/deliver", requireCoordinator, async (req, res) => {
         template: "gallery_delivery",
         variables: {
           clientName: gallery.clientName,
-          address: gallery.address,
+          address: gallery.addressLabel || addressLabel$2(gallery.address),
           galleryUrl: deliveryUrl,
           invoiceAmount: invoice ? `$${invoice.total.toFixed(2)}` : "",
           paymentUrl: invoice ? `${appUrl$1()}/invoice/${invoiceSnap.docs[0].id}` : "",

@@ -49,11 +49,20 @@ function parseTime(time?: string | null) {
 function eventTimes(date?: Date | null, time?: string | null) {
   if (!date) return null;
   const { hours, minutes } = parseTime(time);
-  const start = new Date(date);
-  start.setHours(hours, minutes, 0, 0);
-  const end = new Date(start);
-  end.setMinutes(end.getMinutes() + Number(process.env.DEFAULT_APPOINTMENT_DURATION_MINUTES || 90));
-  return { start, end };
+  const datePart = date.toISOString().slice(0, 10);
+  const startMinutes = hours * 60 + minutes;
+  const endMinutes = startMinutes + Number(process.env.DEFAULT_APPOINTMENT_DURATION_MINUTES || 90);
+  const hhmm = (totalMinutes: number) => {
+    const dayMinutes = ((totalMinutes % 1440) + 1440) % 1440;
+    const hh = Math.floor(dayMinutes / 60).toString().padStart(2, "0");
+    const mm = (dayMinutes % 60).toString().padStart(2, "0");
+    return `${hh}:${mm}:00`;
+  };
+
+  return {
+    start: `${datePart}T${hhmm(startMinutes)}`,
+    end: `${datePart}T${hhmm(endMinutes)}`,
+  };
 }
 
 export async function createCalendarBookingEvent(booking: CalendarBooking) {
@@ -86,8 +95,8 @@ export async function createCalendarBookingEvent(booking: CalendarBooking) {
       summary,
       location: booking.address,
       description,
-      start: { dateTime: times.start.toISOString(), timeZone: "America/Chicago" },
-      end: { dateTime: times.end.toISOString(), timeZone: "America/Chicago" },
+      start: { dateTime: times.start, timeZone: "America/Chicago" },
+      end: { dateTime: times.end, timeZone: "America/Chicago" },
       extendedProperties: {
         private: {
           orderId: booking.orderId,

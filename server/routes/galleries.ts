@@ -18,6 +18,17 @@ function appUrl() {
   return process.env.APP_URL || "https://iconicimagestx.com";
 }
 
+function addressLabel(address: unknown): string {
+  if (!address) return "the property";
+  if (typeof address === "string") return address;
+  if (typeof address === "object") {
+    const a = address as Record<string, unknown>;
+    if (typeof a.formatted === "string" && a.formatted) return a.formatted;
+    return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "the property";
+  }
+  return String(address);
+}
+
 function publicMediaItem(item: any, canDownload: boolean) {
   const url = item.shareUrl || item.embedUrl || item.url;
   return {
@@ -316,7 +327,7 @@ router.post("/:id/deliver", requireCoordinator, async (req, res) => {
         template: "gallery_delivery",
         variables: {
           clientName: gallery.clientName,
-          address: gallery.address,
+          address: gallery.addressLabel || addressLabel(gallery.address),
           galleryUrl: deliveryUrl,
           invoiceAmount: invoice ? `$${invoice.total.toFixed(2)}` : "",
           paymentUrl: invoice ? `${appUrl()}/invoice/${invoiceSnap.docs[0].id}` : "",
