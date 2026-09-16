@@ -164,6 +164,12 @@ function getFallbackTemplate(
       <p>We've received your payment of <strong>${vars.amount}</strong> for invoice ${vars.invoiceNumber}.</p>
       ${vars.balance && vars.balance !== "$0.00" ? `<p>Remaining balance: <strong>${vars.balance}</strong></p>` : "<p>Your account is paid in full. Thank you!</p>"}
     `),
+    manual_message: base(`
+      <h2>Message from Iconic Images</h2>
+      <div style="line-height:1.6;color:#333;">
+        ${(vars.message || "").replace(/\n/g, "<br>")}
+      </div>
+    `),
     new_booking_alert: base(`
       <h2>🔔 New Booking Request</h2>
 

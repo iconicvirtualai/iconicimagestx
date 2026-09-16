@@ -7,9 +7,49 @@
 import { Router } from "express";
 import admin from "firebase-admin";
 import { requireAuth, requireStaff, type AuthenticatedRequest } from "../middleware/auth";
+import { sendEmail } from "../services/email";
 
 const router = Router();
 const db = () => admin.firestore();
+
+// ─── POST /api/messages/email — Send a one-off staff email ───────────────────
+
+router.post("/email", requireStaff, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { to, subject, body, orderId, clientId } = req.body;
+
+    if (!to || !body?.trim()) {
+      return res.status(400).json({ error: "Email recipient and body required." });
+    }
+
+    await sendEmail({
+      to,
+      template: "manual_message",
+      subject: subject || "Message from Iconic Images",
+      variables: {
+        message: body.trim(),
+      },
+    });
+
+    await db().collection("messages").add({
+      orderId: orderId || null,
+      clientId: clientId || null,
+      senderId: req.user!.uid,
+      senderType: "staff",
+      senderName: req.user!.email || "Iconic Images",
+      recipient: to,
+      content: body.trim(),
+      channel: "email",
+      isRead: true,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return res.status(201).json({ success: true });
+  } catch (err) {
+    console.error("[Messages] Email send error:", err);
+    return res.status(500).json({ error: "Failed to send email." });
+  }
+});
 
 // ─── GET /api/messages/:orderId — Get messages for an order ──────────────────
 

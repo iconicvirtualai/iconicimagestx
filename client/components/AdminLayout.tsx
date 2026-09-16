@@ -49,7 +49,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
       { label: "Schedule",        href: "/admin/schedule",        icon: CalendarDays,    roles: COORD_UP },
       { label: "Projects",        href: "/admin/listings",         icon: Home,            roles: COORD_UP },
       { label: "Clients",         href: "/admin/customers",        icon: Users,           roles: COORD_UP },
-      { label: "Messages",        href: "/admin/messages",         icon: MessageSquare,   roles: COORD_UP },
+      { label: "Communications",  href: "/admin/communications",  icon: MessageSquare,   roles: COORD_UP },
     ],
   },
   {

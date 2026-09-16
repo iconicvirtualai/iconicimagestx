@@ -72,7 +72,8 @@ function useRecentlyVisited() {
       "/admin/revenue": "Revenue",
       "/admin/team": "Team",
       "/admin/clients": "Clients",
-      "/admin/messages": "Messages",
+      "/admin/communications": "Communications",
+      "/admin/messages": "Communications",
       "/admin/email-templates": "Email Templates",
     };
 
@@ -316,7 +317,7 @@ export default function AdminDashboard() {
 
               {/* Standard Links (if recents empty or just to fill) */}
               {recentPages.length < 3 && [
-                { label: "Messages",       icon: <Mail className="w-3 h-3" />,       href: "/admin/messages" },
+                { label: "Communications", icon: <Mail className="w-3 h-3" />,       href: "/admin/communications" },
                 { label: "Team",           icon: <Users className="w-3 h-3" />,      href: "/admin/team" },
               ].filter(link => !recentPages.some(r => r.path === link.href)).map((a) => (
                 <Link

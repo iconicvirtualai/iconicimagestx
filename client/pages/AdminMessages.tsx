@@ -9,6 +9,12 @@ import { onSnapshot, collection, query, orderBy, limit, where, getDocs } from "f
 import { db } from "@/lib/firebase";
 import AdminLayout from "@/components/AdminLayout";
 import {
+  Bot,
+  CheckCircle2,
+  CircleDashed,
+  ExternalLink,
+  Inbox,
+  Mail,
   MessageSquare,
   Phone,
   Send,
@@ -61,7 +67,52 @@ interface OrderThread {
   messages: Message[];
 }
 
-type Tab = "inbox" | "sms" | "compose" | "campaigns";
+type Tab = "sweep" | "inbox" | "sms" | "compose" | "campaigns";
+
+const sweepChannels = [
+  {
+    label: "Email",
+    status: "Ready when SMTP is connected",
+    detail: "Delivery, invoice, booking, support, and manual email history.",
+    icon: Mail,
+    ready: true,
+  },
+  {
+    label: "Text / SMS",
+    status: "Ready when Twilio is connected",
+    detail: "Client reminders, delivery texts, masked photographer-client threads, and opt-outs.",
+    icon: Smartphone,
+    ready: true,
+  },
+  {
+    label: "Client Portal",
+    status: "Live internal thread feed",
+    detail: "Order messages, client notes, gallery replies, invoice questions, and revision requests.",
+    icon: MessageSquare,
+    ready: true,
+  },
+  {
+    label: "Team Notes",
+    status: "Internal routing needed",
+    detail: "Coordinator, photographer, editor, billing, and AICON follow-up notes in one timeline.",
+    icon: Inbox,
+    ready: false,
+  },
+  {
+    label: "Social Media",
+    status: "Connector needed",
+    detail: "Instagram, Facebook, TikTok, Google Business, and lead comments/DMs.",
+    icon: Megaphone,
+    ready: false,
+  },
+];
+
+const sweepRules = [
+  "Sweep every active order for unanswered client, photographer, billing, and delivery messages.",
+  "Surface overdue replies, missing confirmations, failed email/text sends, and client questions needing a human.",
+  "Merge email, SMS, portal chat, social DMs/comments, and internal notes into one searchable client/order timeline.",
+  "Create follow-up tasks for AICON or the right team member instead of letting messages disappear in separate apps.",
+];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -78,7 +129,7 @@ function timeAgo(ts: { seconds: number } | null) {
 
 export default function AdminMessages() {
   const { toast } = useToast();
-  const [tab, setTab] = useState<Tab>("inbox");
+  const [tab, setTab] = useState<Tab>("sweep");
   const [threads, setThreads] = useState<OrderThread[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedThread, setSelectedThread] = useState<OrderThread | null>(null);
@@ -90,6 +141,7 @@ export default function AdminMessages() {
 
   // Compose state
   const [composeTo, setComposeTo] = useState("");
+  const [composeSubject, setComposeSubject] = useState("");
   const [composeBody, setComposeBody] = useState("");
   const [composeChannel, setComposeChannel] = useState<"sms" | "email">("sms");
 
@@ -209,18 +261,19 @@ export default function AdminMessages() {
     if (!composeTo || !composeBody) return;
     setSending(true);
     try {
-      const res = await fetch("/api/sms/send", {
+      const res = await fetch(composeChannel === "sms" ? "/api/sms/send" : "/api/messages/email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ to: composeTo, body: composeBody }),
+        body: JSON.stringify({ to: composeTo, subject: composeSubject, body: composeBody }),
       });
       if (!res.ok) throw new Error(await res.text());
-      toast({ title: "SMS sent!", description: `Message delivered to ${composeTo}` });
+      toast({ title: `${composeChannel === "sms" ? "SMS" : "Email"} sent!`, description: `Message delivered to ${composeTo}` });
       setComposeTo("");
+      setComposeSubject("");
       setComposeBody("");
     } catch (err) {
-      toast({ title: "SMS failed", description: String(err), variant: "destructive" });
+      toast({ title: `${composeChannel === "sms" ? "SMS" : "Email"} failed`, description: String(err), variant: "destructive" });
     } finally {
       setSending(false);
     }
@@ -309,7 +362,7 @@ export default function AdminMessages() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <AdminLayout>
+    <AdminLayout title="Communications">
       <div className="pb-8">
         <OperationsStatsGrid />
       </div>
@@ -320,6 +373,7 @@ export default function AdminMessages() {
           {/* Tabs */}
           <div className="flex border-b border-gray-700">
             {[
+              { id: "sweep" as Tab, icon: Bot, label: "Sweep" },
               { id: "inbox" as Tab, icon: MessageSquare, label: "Inbox" },
               { id: "sms" as Tab, icon: Smartphone, label: "SMS" },
               { id: "compose" as Tab, icon: Send, label: "Compose" },
@@ -448,16 +502,91 @@ export default function AdminMessages() {
             </div>
           )}
 
-          {/* Compose / Campaigns — no list needed */}
-          {(tab === "compose" || tab === "campaigns") && (
+          {/* Compose / Campaigns / Sweep — no list needed */}
+          {(tab === "compose" || tab === "campaigns" || tab === "sweep") && (
             <div className="flex-1 flex items-center justify-center p-4 text-gray-600 text-sm text-center">
-              Fill in the form on the right →
+              {tab === "sweep" ? "Automatic correspondence sweep overview →" : "Fill in the form on the right →"}
             </div>
           )}
         </div>
 
         {/* ─── Right panel ─────────────────────────────────────────────────── */}
         <div className="flex-1 flex flex-col bg-gray-950">
+
+          {/* ── Sweep tab ── */}
+          {tab === "sweep" && (
+            <div className="flex-1 p-8 overflow-y-auto">
+              <div className="max-w-5xl mx-auto space-y-6">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-teal-400 mb-2">
+                    AICON Correspondence Sweep
+                  </p>
+                  <h2 className="text-white text-2xl font-black tracking-tight">
+                    One place for every conversation to and from Iconic.
+                  </h2>
+                  <p className="text-gray-400 text-sm mt-2 max-w-3xl">
+                    This center is the required home for team, client, email, text, portal, and social communications. AICON should sweep it automatically and flag anything unanswered, failed, urgent, or financially connected.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {[
+                    { label: "Open Threads", value: threads.length, tone: "text-white" },
+                    { label: "Unread Client Replies", value: threads.reduce((sum, t) => sum + t.unreadCount, 0), tone: "text-teal-300" },
+                    { label: "Active SMS Bridges", value: conversations.filter((c) => c.status === "active").length, tone: "text-blue-300" },
+                  ].map((metric) => (
+                    <div key={metric.label} className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">{metric.label}</p>
+                      <p className={`text-3xl font-black mt-2 ${metric.tone}`}>{metric.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
+                  {sweepChannels.map(({ label, status, detail, icon: Icon, ready }) => (
+                    <div key={label} className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <Icon className="w-5 h-5 text-teal-300" />
+                        {ready ? <CheckCircle2 className="w-4 h-4 text-green-400" /> : <CircleDashed className="w-4 h-4 text-yellow-400" />}
+                      </div>
+                      <h3 className="text-white text-sm font-bold">{label}</h3>
+                      <p className="text-[10px] text-teal-300 font-bold uppercase tracking-wide mt-1">{status}</p>
+                      <p className="text-xs text-gray-500 mt-2 leading-relaxed">{detail}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+                    <h3 className="text-white font-black uppercase tracking-wide text-sm mb-4">Automatic Sweep Rules</h3>
+                    <div className="space-y-3">
+                      {sweepRules.map((rule) => (
+                        <div key={rule} className="flex gap-3">
+                          <CheckCircle2 className="w-4 h-4 text-teal-400 mt-0.5 flex-shrink-0" />
+                          <p className="text-sm text-gray-300 leading-relaxed">{rule}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+                    <h3 className="text-white font-black uppercase tracking-wide text-sm mb-4">Next Connectors</h3>
+                    <div className="space-y-3 text-sm text-gray-300">
+                      <p><span className="text-teal-300 font-bold">Email:</span> connect the shared Iconic inbox so inbound replies are pulled into this timeline.</p>
+                      <p><span className="text-teal-300 font-bold">Social:</span> connect Instagram, Facebook, TikTok, and Google Business messages/comments.</p>
+                      <p><span className="text-teal-300 font-bold">AICON:</span> schedule correspondence sweeps and create tasks for unresolved replies.</p>
+                    </div>
+                    <button
+                      onClick={() => setTab("compose")}
+                      className="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold uppercase tracking-widest"
+                    >
+                      <ExternalLink className="w-4 h-4" /> Send Manual Message
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ── Inbox thread view ── */}
           {tab === "inbox" && (
@@ -731,6 +860,18 @@ export default function AdminMessages() {
                       className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-teal-500 text-sm"
                     />
                   </div>
+
+                  {composeChannel === "email" && (
+                    <div>
+                      <label className="block text-gray-300 text-sm mb-1">Subject</label>
+                      <input
+                        value={composeSubject}
+                        onChange={(e) => setComposeSubject(e.target.value)}
+                        placeholder="Message from Iconic Images"
+                        className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-teal-500 text-sm"
+                      />
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-gray-300 text-sm mb-1">Message</label>

@@ -27,7 +27,10 @@ import type { StaffMember, Client } from "../lib/schema";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 const TEMP_ADMIN_ENABLED =
-  import.meta.env.DEV || import.meta.env.VITE_ENABLE_TEMP_ADMIN === "true";
+  import.meta.env.DEV ||
+  import.meta.env.VITE_ENABLE_TEMP_ADMIN === "true" ||
+  window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1";
 
 type AuthUserType = "staff" | "client" | null;
 
@@ -248,6 +251,7 @@ function getAuthErrorMessage(err: unknown): string {
     const code = (err as { code: string }).code;
     const map: Record<string, string> = {
       "auth/invalid-email": "Invalid email address.",
+      "auth/invalid-credential": "No matching login was found. Check the email/password or create this staff account first.",
       "auth/user-disabled": "This account has been disabled.",
       "auth/user-not-found": "No account found with that email.",
       "auth/wrong-password": "Incorrect password.",
