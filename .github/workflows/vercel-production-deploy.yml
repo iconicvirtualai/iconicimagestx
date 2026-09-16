@@ -13,6 +13,7 @@ on:
       - "vercel.json"
       - "vite.config*.ts"
       - ".vercel/project.json"
+      - ".github/workflows/vercel-production-deploy.yml"
 
 concurrency:
   group: vercel-production-deploy
