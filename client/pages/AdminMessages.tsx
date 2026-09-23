@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -65,6 +66,13 @@ interface OrderThread {
   lastMessage?: Message;
   unreadCount: number;
   messages: Message[];
+}
+
+interface MailchimpList {
+  id: string;
+  name: string;
+  memberCount: number;
+  unsubscribeCount: number;
 }
 
 type Tab = "sweep" | "inbox" | "sms" | "compose" | "campaigns";
@@ -129,6 +137,7 @@ function timeAgo(ts: { seconds: number } | null) {
 
 export default function AdminMessages() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [tab, setTab] = useState<Tab>("sweep");
   const [threads, setThreads] = useState<OrderThread[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -158,6 +167,22 @@ export default function AdminMessages() {
   const [campaignBody, setCampaignBody] = useState("");
   const [campaignAudience, setCampaignAudience] = useState("all");
   const [launchingCampaign, setLaunchingCampaign] = useState(false);
+  const [mailchimpConnected, setMailchimpConnected] = useState(false);
+  const [mailchimpMessage, setMailchimpMessage] = useState("Mailchimp has not been checked yet.");
+  const [mailchimpAccount, setMailchimpAccount] = useState("");
+  const [mailchimpLists, setMailchimpLists] = useState<MailchimpList[]>([]);
+  const [mailchimpListId, setMailchimpListId] = useState("");
+  const [mailchimpAudience, setMailchimpAudience] = useState("all");
+  const [checkingMailchimp, setCheckingMailchimp] = useState(false);
+  const [syncingMailchimp, setSyncingMailchimp] = useState(false);
+
+  async function authHeaders(extra: Record<string, string> = {}) {
+    const token = await user?.getIdToken?.();
+    return {
+      ...extra,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+  }
 
   // ─── Real-time messages ───────────────────────────────────────────────────
 
@@ -229,6 +254,12 @@ export default function AdminMessages() {
     return () => unsub();
   }, [tab]);
 
+  useEffect(() => {
+    if (tab === "campaigns") {
+      checkMailchimp();
+    }
+  }, [tab]);
+
   // Auto-scroll messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -242,7 +273,7 @@ export default function AdminMessages() {
     try {
       const res = await fetch(`/api/messages/${selectedThread.orderId}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await authHeaders({ "Content-Type": "application/json" }),
         credentials: "include",
         body: JSON.stringify({ content: replyText.trim() }),
       });
@@ -263,7 +294,7 @@ export default function AdminMessages() {
     try {
       const res = await fetch(composeChannel === "sms" ? "/api/sms/send" : "/api/messages/email", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await authHeaders({ "Content-Type": "application/json" }),
         credentials: "include",
         body: JSON.stringify({ to: composeTo, subject: composeSubject, body: composeBody }),
       });
@@ -287,7 +318,7 @@ export default function AdminMessages() {
     try {
       const res = await fetch("/api/sms/conversation", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await authHeaders({ "Content-Type": "application/json" }),
         credentials: "include",
         body: JSON.stringify({
           orderId: newConvoOrderId,
@@ -319,7 +350,7 @@ export default function AdminMessages() {
       // Create campaign
       const createRes = await fetch("/api/campaigns", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await authHeaders({ "Content-Type": "application/json" }),
         credentials: "include",
         body: JSON.stringify({
           name: campaignName,
@@ -333,6 +364,7 @@ export default function AdminMessages() {
       // Send
       const sendRes = await fetch(`/api/campaigns/${id}/send`, {
         method: "POST",
+        headers: await authHeaders(),
         credentials: "include",
       });
       const result = await sendRes.json();
@@ -347,6 +379,58 @@ export default function AdminMessages() {
       toast({ title: "Campaign failed", description: String(err), variant: "destructive" });
     } finally {
       setLaunchingCampaign(false);
+    }
+  }
+
+  async function checkMailchimp() {
+    setCheckingMailchimp(true);
+    try {
+      const res = await fetch("/api/campaigns/mailchimp/status", {
+        headers: await authHeaders(),
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Mailchimp check failed.");
+
+      setMailchimpConnected(Boolean(data.connected));
+      setMailchimpAccount(data.accountName || "");
+      setMailchimpLists(data.lists || []);
+      setMailchimpMessage(
+        data.connected
+          ? `Connected${data.accountName ? ` to ${data.accountName}` : ""}.`
+          : data.message || "Mailchimp is not configured."
+      );
+      if (!mailchimpListId && data.lists?.[0]?.id) setMailchimpListId(data.lists[0].id);
+    } catch (err) {
+      setMailchimpConnected(false);
+      setMailchimpMessage(err instanceof Error ? err.message : "Mailchimp check failed.");
+      toast({ title: "Mailchimp check failed", description: String(err), variant: "destructive" });
+    } finally {
+      setCheckingMailchimp(false);
+    }
+  }
+
+  async function syncMailchimp() {
+    if (!mailchimpListId) return;
+    setSyncingMailchimp(true);
+    try {
+      const res = await fetch("/api/campaigns/mailchimp/sync", {
+        method: "POST",
+        headers: await authHeaders({ "Content-Type": "application/json" }),
+        credentials: "include",
+        body: JSON.stringify({ listId: mailchimpListId, audience: mailchimpAudience }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Mailchimp sync failed.");
+
+      toast({
+        title: "Mailchimp sync complete",
+        description: `${data.synced} clients synced${data.failed ? `, ${data.failed} failed` : ""}.`,
+      });
+    } catch (err) {
+      toast({ title: "Mailchimp sync failed", description: String(err), variant: "destructive" });
+    } finally {
+      setSyncingMailchimp(false);
     }
   }
 
@@ -925,8 +1009,94 @@ export default function AdminMessages() {
           {/* ── Campaigns tab ── */}
           {tab === "campaigns" && (
             <div className="flex-1 p-8 overflow-y-auto">
-              <div className="max-w-lg mx-auto">
-                <h2 className="text-white text-2xl font-semibold mb-2">SMS Campaign</h2>
+              <div className="max-w-3xl mx-auto space-y-6">
+                <div>
+                  <h2 className="text-white text-2xl font-semibold mb-2">Marketing Campaigns</h2>
+                  <p className="text-gray-400 text-sm">
+                    Sync client audiences to Mailchimp and send compliant SMS campaigns from one control panel.
+                  </p>
+                </div>
+
+                <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6">
+                  <div className="flex items-start justify-between gap-4 mb-5">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Mail className="w-5 h-5 text-teal-400" />
+                        <h3 className="text-white text-lg font-semibold">Mailchimp</h3>
+                        <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-full ${
+                          mailchimpConnected
+                            ? "bg-green-500/15 text-green-300"
+                            : "bg-yellow-500/15 text-yellow-300"
+                        }`}>
+                          {mailchimpConnected ? "Connected" : "Needs API Key"}
+                        </span>
+                      </div>
+                      <p className="text-gray-400 text-sm">{mailchimpMessage}</p>
+                      {mailchimpAccount && (
+                        <p className="text-gray-500 text-xs mt-1">Account: {mailchimpAccount}</p>
+                      )}
+                    </div>
+                    <button
+                      onClick={checkMailchimp}
+                      disabled={checkingMailchimp}
+                      className="px-3 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-40 text-gray-200 rounded-lg text-xs font-bold uppercase tracking-widest flex items-center gap-2"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${checkingMailchimp ? "animate-spin" : ""}`} />
+                      Check
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="md:col-span-2">
+                      <label className="block text-gray-300 text-sm mb-1">Mailchimp Audience/List</label>
+                      <select
+                        value={mailchimpListId}
+                        onChange={(e) => setMailchimpListId(e.target.value)}
+                        disabled={!mailchimpConnected || mailchimpLists.length === 0}
+                        className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white focus:outline-none focus:border-teal-500 text-sm disabled:opacity-50"
+                      >
+                        {mailchimpLists.length === 0 ? (
+                          <option value="">No lists found</option>
+                        ) : (
+                          mailchimpLists.map((list) => (
+                            <option key={list.id} value={list.id}>
+                              {list.name} ({list.memberCount} contacts)
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-300 text-sm mb-1">Sync Segment</label>
+                      <select
+                        value={mailchimpAudience}
+                        onChange={(e) => setMailchimpAudience(e.target.value)}
+                        className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white focus:outline-none focus:border-teal-500 text-sm"
+                      >
+                        <option value="all">Active Clients</option>
+                        <option value="vip">VIP Clients</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <p className="text-xs text-gray-500">
+                      API key stays server-side in `MAILCHIMP_API_KEY`. The dashboard only shows status and audiences.
+                    </p>
+                    <button
+                      onClick={syncMailchimp}
+                      disabled={!mailchimpConnected || !mailchimpListId || syncingMailchimp}
+                      className="px-4 py-3 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 text-white rounded-xl font-medium flex items-center justify-center gap-2 text-sm"
+                    >
+                      {syncingMailchimp ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                      {syncingMailchimp ? "Syncing…" : "Sync Clients to Mailchimp"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6">
+                  <h3 className="text-white text-lg font-semibold mb-2">SMS Campaign</h3>
                 <p className="text-gray-400 text-sm mb-6">
                   Send a bulk text to your client list. Opt-out is handled automatically.
                 </p>
@@ -996,6 +1166,7 @@ export default function AdminMessages() {
                     )}
                     {launchingCampaign ? "Sending campaign…" : "Launch Campaign"}
                   </button>
+                </div>
                 </div>
               </div>
             </div>

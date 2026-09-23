@@ -2639,12 +2639,132 @@ router$6.post("/setup", async (req, res) => {
 });
 const router$5 = Router();
 const db$3 = () => admin.firestore();
+function mailchimpConfig() {
+  const apiKey = process.env.MAILCHIMP_API_KEY || "";
+  const serverPrefix = process.env.MAILCHIMP_SERVER_PREFIX || apiKey.split("-").pop() || "";
+  return { apiKey, serverPrefix };
+}
+async function mailchimpRequest(path2, init = {}) {
+  const { apiKey, serverPrefix } = mailchimpConfig();
+  if (!apiKey || !serverPrefix) {
+    throw new Error("Mailchimp is not configured. Set MAILCHIMP_API_KEY.");
+  }
+  const auth = Buffer.from(`iconic:${apiKey}`).toString("base64");
+  const response = await fetch(`https://${serverPrefix}.api.mailchimp.com/3.0${path2}`, {
+    ...init,
+    headers: {
+      Authorization: `Basic ${auth}`,
+      "Content-Type": "application/json",
+      ...init.headers || {}
+    }
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const detail = typeof data.detail === "string" ? data.detail : "Mailchimp request failed.";
+    throw new Error(detail);
+  }
+  return data;
+}
 router$5.get("/", requireCoordinator, async (_req, res) => {
   try {
     const snapshot = await db$3().collection("campaigns").orderBy("createdAt", "desc").limit(50).get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
   } catch (err) {
     return res.status(500).json({ error: "Failed to fetch campaigns." });
+  }
+});
+router$5.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
+  try {
+    const { apiKey, serverPrefix } = mailchimpConfig();
+    if (!apiKey || !serverPrefix) {
+      return res.json({
+        connected: false,
+        message: "Add MAILCHIMP_API_KEY to enable Mailchimp.",
+        lists: []
+      });
+    }
+    const account = await mailchimpRequest("/");
+    const listsData = await mailchimpRequest("/lists?count=20&fields=lists.id,lists.name,lists.stats.member_count,lists.stats.unsubscribe_count");
+    return res.json({
+      connected: true,
+      accountName: account.account_name || account.username || "Mailchimp",
+      serverPrefix,
+      lists: (listsData.lists || []).map((list) => ({
+        id: list.id,
+        name: list.name,
+        memberCount: list.stats?.member_count || 0,
+        unsubscribeCount: list.stats?.unsubscribe_count || 0
+      }))
+    });
+  } catch (err) {
+    console.error("[Campaigns] Mailchimp status error:", err);
+    return res.status(500).json({
+      connected: false,
+      error: err instanceof Error ? err.message : "Mailchimp connection failed."
+    });
+  }
+});
+router$5.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
+  try {
+    const { listId, audience = "all" } = req.body;
+    if (!listId) return res.status(400).json({ error: "listId required." });
+    let recipientQuery = db$3().collection("clients").where("status", "==", "active");
+    if (audience === "vip") {
+      recipientQuery = db$3().collection("clients").where("status", "==", "vip");
+    }
+    const clientsSnap = await recipientQuery.get();
+    const clients = clientsSnap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((client) => client.email && client.emailMarketingOptOut !== true);
+    let synced = 0;
+    const errors = [];
+    for (const client of clients) {
+      const email = String(client.email).toLowerCase().trim();
+      const hash = crypto.createHash("md5").update(email).digest("hex");
+      const mergeFields = {
+        FNAME: client.firstName || "",
+        LNAME: client.lastName || ""
+      };
+      const tags = ["Iconic Images", audience === "vip" ? "VIP" : "Client"].filter(Boolean);
+      try {
+        await mailchimpRequest(`/lists/${listId}/members/${hash}`, {
+          method: "PUT",
+          body: JSON.stringify({
+            email_address: email,
+            status_if_new: "subscribed",
+            status: client.mailchimpStatus || "subscribed",
+            merge_fields: mergeFields
+          })
+        });
+        await mailchimpRequest(`/lists/${listId}/members/${hash}/tags`, {
+          method: "POST",
+          body: JSON.stringify({
+            tags: tags.map((name) => ({ name, status: "active" }))
+          })
+        });
+        synced++;
+      } catch (err) {
+        errors.push({
+          email,
+          error: err instanceof Error ? err.message : "Sync failed"
+        });
+      }
+    }
+    await db$3().collection("agentLogs").add({
+      agent: "remmi",
+      action: "Mailchimp sync",
+      summary: `Synced ${synced} clients to Mailchimp list ${listId}`,
+      status: errors.length ? "flagged" : "completed",
+      relatedType: "campaign",
+      priority: errors.length ? "medium" : "low",
+      requiresHumanReview: errors.length > 0,
+      details: { listId, audience, synced, failed: errors.length, errors: errors.slice(0, 20) },
+      createdBy: req.user.uid,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    }).catch(() => {
+    });
+    return res.json({ success: true, synced, failed: errors.length, errors: errors.slice(0, 20) });
+  } catch (err) {
+    console.error("[Campaigns] Mailchimp sync error:", err);
+    return res.status(500).json({ error: err instanceof Error ? err.message : "Failed to sync Mailchimp." });
   }
 });
 router$5.post("/", requireCoordinator, async (req, res) => {
