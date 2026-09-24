@@ -37,7 +37,11 @@ import {
   Eye,
   Download,
   Search,
-  ArrowRight
+  ArrowRight,
+  FileText,
+  Link as LinkIcon,
+  Palette,
+  Wand2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -46,6 +50,7 @@ import { format, subDays, startOfDay } from "date-fns";
 // --- Types & Constants ---
 type ServiceType = 'Photos' | 'Twilight' | 'Virtual Staging' | 'Floorplans' | '3D Tour';
 type WorkflowStatus = 'Pending' | 'Processing' | 'Completed' | 'Failed';
+type StudioTab = "upload" | "studio" | "templates";
 
 const labelCls = "text-[10px] font-black text-gray-400 uppercase tracking-widest";
 
@@ -68,7 +73,7 @@ function StatusBadge({ status }: { status: WorkflowStatus }) {
 
 export default function AdminStudio() {
   const { user, staffProfile } = useAuth();
-  const [activeTab, setActiveTab] = React.useState<"upload" | "studio">("upload");
+  const [activeTab, setActiveTab] = React.useState<StudioTab>("upload");
   const [listings, setListings] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState("");
@@ -160,12 +165,22 @@ export default function AdminStudio() {
             Editing Studio
           </button>
         )}
+        {(isAdmin || isEditor) && (
+          <button
+            onClick={() => setActiveTab("templates")}
+            className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === "templates" ? "bg-white text-black shadow-sm" : "text-gray-400 hover:text-gray-600"}`}
+          >
+            Templates & Floorplans
+          </button>
+        )}
       </div>
 
       {activeTab === "upload" ? (
         <UploadPortal listings={listings} user={user} isAdmin={isAdmin} isEditor={isEditor} />
-      ) : (
+      ) : activeTab === "studio" ? (
         <EditingStudio listings={listings} apiKey={apiKey} user={user} />
+      ) : (
+        <TemplatesFloorplans listings={listings} user={user} />
       )}
     </AdminLayout>
   );
@@ -698,6 +713,303 @@ function EditingStudio({ listings, apiKey, user }: { listings: any[], apiKey: st
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function TemplatesFloorplans({ listings, user }: { listings: any[]; user: any }) {
+  const [selectedListing, setSelectedListing] = React.useState<string | null>(null);
+  const [floorplanFiles, setFloorplanFiles] = React.useState<File[]>([]);
+  const [uploading, setUploading] = React.useState(false);
+  const [progress, setProgress] = React.useState<Record<string, number>>({});
+  const [cubiCasaUrl, setCubiCasaUrl] = React.useState("");
+  const [cubiCasaOrderId, setCubiCasaOrderId] = React.useState("");
+  const [templateType, setTemplateType] = React.useState("branded-floorplan");
+  const [designNotes, setDesignNotes] = React.useState("");
+  const fileRef = React.useRef<HTMLInputElement>(null);
+
+  const selected = listings.find((l: any) => l.id === selectedListing);
+  const visibleListings = listings.filter((listing: any) => {
+    const services = (listing.services || []).map((item: any) => String(typeof item === "string" ? item : item.name || "").toLowerCase());
+    const hasFloorplan = services.some((service: string) => service.includes("floor") || service.includes("3d") || service.includes("matterport"));
+    return hasFloorplan || (listing.floorplans || []).length > 0 || (listing.cubiCasaImports || []).length > 0;
+  });
+  const jobList = visibleListings.length > 0 ? visibleListings : listings;
+
+  const addFiles = (incoming: FileList | File[]) => {
+    const next = Array.from(incoming).filter((file) => {
+      const name = file.name.toLowerCase();
+      return file.type.startsWith("image/") || file.type === "application/pdf" || name.endsWith(".svg") || name.endsWith(".dwg") || name.endsWith(".dxf");
+    });
+    if (next.length === 0) {
+      toast.error("Use PDF, image, SVG, DWG, or DXF floorplan files.");
+      return;
+    }
+    setFloorplanFiles((prev) => [...prev, ...next]);
+  };
+
+  const uploadFloorplans = async () => {
+    if (!selectedListing || !selected || floorplanFiles.length === 0) return;
+    setUploading(true);
+
+    const clientName = selected.clientName || selected.customerName || "Agent";
+    const address = selected.propertyAddress || selected.address || selected.shootLocation || "Address";
+    const basePath = `Floorplans/${selectedListing}/${clientName} - ${address}`;
+
+    try {
+      const uploaded = await Promise.all(floorplanFiles.map((file) => {
+        const path = `${basePath}/${Date.now()}_${file.name}`;
+        const sRef = ref(storage, path);
+        const task = uploadBytesResumable(sRef, file);
+
+        return new Promise<any>((resolve, reject) => {
+          task.on("state_changed",
+            (snap) => {
+              const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
+              setProgress((prev) => ({ ...prev, [file.name]: pct }));
+            },
+            reject,
+            async () => {
+              const url = await getDownloadURL(task.snapshot.ref);
+              resolve({
+                url,
+                name: file.name,
+                path,
+                source: "studio-upload",
+                type: file.type || "floorplan",
+                uploadedAt: new Date().toISOString(),
+                uploadedBy: user?.uid || "studio",
+              });
+            }
+          );
+        });
+      }));
+
+      await updateDoc(doc(db, "listings", selectedListing), {
+        floorplans: [...(selected.floorplans || []), ...uploaded],
+        designAssets: [...(selected.designAssets || []), ...uploaded.map((item) => ({ ...item, assetType: "floorplan" }))],
+        floorplanWorkflowStatus: "ready_for_template",
+        updatedAt: serverTimestamp(),
+      });
+
+      toast.success("Floorplan files added to the template workspace.");
+      setFloorplanFiles([]);
+      setProgress({});
+    } catch (error) {
+      console.error(error);
+      toast.error("Floorplan upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const importCubiCasa = async () => {
+    if (!selectedListing || !selected || (!cubiCasaUrl.trim() && !cubiCasaOrderId.trim())) {
+      toast.error("Add a CubiCasa link or order ID first.");
+      return;
+    }
+
+    const item = {
+      source: "cubi-casa",
+      orderId: cubiCasaOrderId.trim(),
+      url: cubiCasaUrl.trim(),
+      status: "import_requested",
+      requestedAt: new Date().toISOString(),
+      requestedBy: user?.uid || "studio",
+    };
+
+    await updateDoc(doc(db, "listings", selectedListing), {
+      cubiCasaImports: [...(selected.cubiCasaImports || []), item],
+      floorplans: cubiCasaUrl.trim()
+        ? [...(selected.floorplans || []), { ...item, name: cubiCasaOrderId.trim() || "CubiCasa floorplan", type: "external-link" }]
+        : selected.floorplans || [],
+      floorplanWorkflowStatus: "cubi_casa_import_requested",
+      updatedAt: serverTimestamp(),
+    });
+
+    toast.success("CubiCasa import queued for this listing.");
+    setCubiCasaUrl("");
+    setCubiCasaOrderId("");
+  };
+
+  const queueCanvaTemplate = async () => {
+    if (!selectedListing || !selected) return;
+    const request = {
+      templateType,
+      notes: designNotes.trim(),
+      status: "queued",
+      provider: "canva",
+      requestedAt: new Date().toISOString(),
+      requestedBy: user?.uid || "studio",
+      floorplanCount: (selected.floorplans || []).length,
+    };
+
+    await updateDoc(doc(db, "listings", selectedListing), {
+      canvaDesignRequests: [...(selected.canvaDesignRequests || []), request],
+      floorplanWorkflowStatus: "canva_template_queued",
+      updatedAt: serverTimestamp(),
+    });
+
+    toast.success("Canva template request queued.");
+    setDesignNotes("");
+  };
+
+  return (
+    <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+      <div className="xl:col-span-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className={labelCls}>Floorplan Jobs</h3>
+          <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">{jobList.length} Jobs</span>
+        </div>
+        <div className="space-y-3 max-h-[720px] overflow-y-auto pr-2">
+          {jobList.map((listing: any) => {
+            const floorplans = listing.floorplans || [];
+            const requests = listing.canvaDesignRequests || [];
+            return (
+              <button
+                key={listing.id}
+                onClick={() => setSelectedListing(listing.id)}
+                className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedListing === listing.id ? "border-[#0d9488] bg-[#0d9488]/5" : "border-gray-100 bg-white hover:border-gray-200"}`}
+              >
+                <p className="text-xs font-black truncate">{listing.propertyAddress || listing.address || "Unnamed listing"}</p>
+                <p className="text-[10px] text-gray-400 font-bold mt-0.5">{listing.clientName || listing.customerName || "Agent"}</p>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 bg-gray-100 rounded-full">
+                    {floorplans.length} Floorplans
+                  </span>
+                  <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 bg-gray-100 rounded-full">
+                    {requests.length} Canva
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="xl:col-span-8 space-y-6">
+        {!selected ? (
+          <div className="h-80 bg-white rounded-[2rem] border border-gray-100 flex flex-col items-center justify-center text-center">
+            <FileText className="w-12 h-12 text-gray-200 mb-4" />
+            <p className="text-sm font-black text-gray-300 uppercase tracking-widest">Select a listing to manage templates</p>
+          </div>
+        ) : (
+          <>
+            <div className="bg-white rounded-[2rem] border border-gray-100 p-6">
+              <div className="flex items-start justify-between gap-4 mb-6">
+                <div>
+                  <p className={labelCls}>Selected Listing</p>
+                  <h3 className="text-lg font-black text-black mt-1">{selected.propertyAddress || selected.address || "Unnamed listing"}</h3>
+                  <p className="text-xs text-gray-400 font-bold mt-1">{selected.clientName || selected.customerName || "Agent"}</p>
+                </div>
+                <StatusBadge status={(selected.floorplanWorkflowStatus === "canva_template_queued" ? "Processing" : "Pending") as WorkflowStatus} />
+              </div>
+
+              <div
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  addFiles(event.dataTransfer.files);
+                }}
+                onClick={() => fileRef.current?.click()}
+                className="min-h-52 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50/60 flex flex-col items-center justify-center text-center cursor-pointer hover:border-[#0d9488] hover:bg-[#0d9488]/5 transition-all"
+              >
+                <input
+                  ref={fileRef}
+                  type="file"
+                  multiple
+                  accept=".pdf,.png,.jpg,.jpeg,.webp,.svg,.dwg,.dxf"
+                  className="hidden"
+                  onChange={(event) => event.target.files && addFiles(event.target.files)}
+                />
+                <FileText className="w-10 h-10 text-gray-300 mb-4" />
+                <p className="text-sm font-black text-gray-500 uppercase tracking-widest">Drop Floorplan Files</p>
+                <p className="text-[10px] text-gray-400 font-bold mt-1">PDF, PNG, JPG, SVG, DWG, DXF</p>
+              </div>
+
+              {floorplanFiles.length > 0 && (
+                <div className="mt-5 space-y-2">
+                  {floorplanFiles.map((file, index) => (
+                    <div key={`${file.name}-${index}`} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                      <FileText className="w-4 h-4 text-[#0d9488]" />
+                      <p className="text-xs font-bold text-black flex-1 truncate">{file.name}</p>
+                      {progress[file.name] !== undefined ? (
+                        <span className="text-[10px] font-black text-[#0d9488]">{progress[file.name]}%</span>
+                      ) : (
+                        <button onClick={() => setFloorplanFiles((prev) => prev.filter((_, i) => i !== index))}>
+                          <Trash2 className="w-3.5 h-3.5 text-gray-300 hover:text-red-400" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <Button onClick={uploadFloorplans} disabled={uploading} className="w-full bg-black hover:bg-gray-900 text-white rounded-xl h-12 font-black uppercase tracking-widest text-xs">
+                    {uploading ? "Uploading Floorplans..." : "Add Floorplans to Listing"}
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-white rounded-[2rem] border border-gray-100 p-6">
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="p-2 bg-orange-50 rounded-xl text-orange-500"><LinkIcon className="w-4 h-4" /></div>
+                  <div>
+                    <h3 className="text-sm font-black text-black uppercase tracking-widest">CubiCasa Import</h3>
+                    <p className="text-[10px] text-gray-400 font-bold">Queue direct floorplan import</p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <input value={cubiCasaOrderId} onChange={(event) => setCubiCasaOrderId(event.target.value)} placeholder="CubiCasa order ID" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30" />
+                  <input value={cubiCasaUrl} onChange={(event) => setCubiCasaUrl(event.target.value)} placeholder="CubiCasa share/download URL" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30" />
+                  <Button onClick={importCubiCasa} variant="outline" className="w-full rounded-xl h-11 text-[10px] font-black uppercase tracking-widest">
+                    Import From CubiCasa
+                  </Button>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-[2rem] border border-gray-100 p-6">
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="p-2 bg-purple-50 rounded-xl text-purple-500"><Palette className="w-4 h-4" /></div>
+                  <div>
+                    <h3 className="text-sm font-black text-black uppercase tracking-widest">Canva Templates</h3>
+                    <p className="text-[10px] text-gray-400 font-bold">Queue graphics editing handoff</p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <select value={templateType} onChange={(event) => setTemplateType(event.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30">
+                    <option value="branded-floorplan">Branded Floorplan</option>
+                    <option value="listing-flyer">Listing Flyer</option>
+                    <option value="social-carousel">Social Carousel</option>
+                    <option value="open-house">Open House Graphic</option>
+                  </select>
+                  <textarea value={designNotes} onChange={(event) => setDesignNotes(event.target.value)} placeholder="Template notes, branding, callouts, room labels..." rows={4} className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30 resize-none" />
+                  <Button onClick={queueCanvaTemplate} className="w-full bg-[#0d9488] hover:bg-[#0f766e] text-white rounded-xl h-11 text-[10px] font-black uppercase tracking-widest">
+                    <Wand2 className="w-3.5 h-3.5 mr-2" /> Queue Canva Design
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-[2rem] border border-gray-100 p-6">
+              <h3 className="text-sm font-black text-black uppercase tracking-widest mb-4">Template Assets</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {(selected.floorplans || []).length === 0 ? (
+                  <p className="text-xs text-gray-300 font-bold uppercase tracking-widest">No floorplan assets yet</p>
+                ) : (selected.floorplans || []).map((asset: any, index: number) => (
+                  <a key={`${asset.name || asset.url}-${index}`} href={asset.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-[#0d9488]/40 transition-colors">
+                    <FileText className="w-4 h-4 text-[#0d9488]" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-black text-black truncate">{asset.name || asset.orderId || "Floorplan asset"}</p>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{asset.source || "Uploaded"}</p>
+                    </div>
+                    <Download className="w-3.5 h-3.5 text-gray-300" />
+                  </a>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
