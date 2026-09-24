@@ -2,12 +2,14 @@ import * as React from "react";
 import AdminLayout from "@/components/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
 import {
   appointmentRevenue,
   chicagoDateKey,
   getAssignedNames,
+  isScheduledRecord,
   orderServices,
+  scheduleRecordDate,
   staffDisplayName,
   toDate,
 } from "@/lib/scheduleRecords";
@@ -86,6 +88,7 @@ export default function AdminSchedule() {
   const [viewMode, setViewMode] = React.useState<"calendar" | "list">("list");
   const [rawAppointments, setRawAppointments] = React.useState<any[]>([]);
   const [rawListings, setRawListings] = React.useState<any[]>([]);
+  const [rawOrderRequests, setRawOrderRequests] = React.useState<any[]>([]);
   const [calendarEvents, setCalendarEvents] = React.useState<any[]>([]);
   const [staff, setStaff] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -94,28 +97,23 @@ export default function AdminSchedule() {
   const [selectedAppt, setSelectedAppt] = React.useState<Appointment | null>(null);
 
   React.useEffect(() => {
-    const appointmentsQuery = query(
-      collection(db, "appointments"),
-      where("status", "in", ["scheduled", "confirmed", "appt_scheduled", "consult_scheduled"])
-    );
-    const listingsQuery = query(
-      collection(db, "listings"),
-      where("status", "in", ["scheduled", "confirmed", "appt_scheduled", "consult_scheduled"])
-    );
-
-    const unsubAppointments = onSnapshot(appointmentsQuery, (snap) => {
+    const unsubAppointments = onSnapshot(collection(db, "appointments"), (snap) => {
       setRawAppointments(snap.docs.map(doc => ({ id: doc.id, source: "appointment", ...doc.data() })));
       setLoading(false);
     });
-    const unsubListings = onSnapshot(listingsQuery, (snap) => {
+    const unsubListings = onSnapshot(collection(db, "listings"), (snap) => {
       setRawListings(snap.docs.map(doc => ({ id: doc.id, source: "listing", ...doc.data() })));
+    });
+    const unsubOrderRequests = onSnapshot(collection(db, "orderRequests"), (snap) => {
+      setRawOrderRequests(snap.docs.map(doc => ({ id: doc.id, source: "order-request", ...doc.data() })));
+      setLoading(false);
     });
     const unsubStaff = onSnapshot(collection(db, "staff"), (snap) => {
       setStaff(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
     });
 
-    return () => { unsubAppointments(); unsubListings(); unsubStaff(); };
+    return () => { unsubAppointments(); unsubListings(); unsubOrderRequests(); unsubStaff(); };
   }, []);
 
   React.useEffect(() => {
@@ -167,11 +165,16 @@ export default function AdminSchedule() {
   }, [currentMonth, staff, user]);
 
   const appointments = React.useMemo(() => {
-    const appointmentKeys = new Set(
-      rawAppointments.flatMap((item) => [item.orderRequestId, item.orderId, item.listingId].filter(Boolean))
-    );
-    const fallbackListings = rawListings.filter((item) => !appointmentKeys.has(item.orderRequestId) && !appointmentKeys.has(item.id));
-    const localAppointments = rawAppointments.concat(fallbackListings).map((record) => normalizeAppointment(record, staff));
+    const visibleAppointments = rawAppointments.filter(isScheduledRecord);
+    const appointmentKeys = new Set(visibleAppointments.flatMap(scheduleRecordKeys));
+    const fallbackListings = rawListings.filter((item) => isScheduledRecord(item) && !scheduleRecordKeys(item).some((key) => appointmentKeys.has(key)));
+    const listingKeys = new Set(fallbackListings.flatMap(scheduleRecordKeys));
+    const fallbackOrderRequests = rawOrderRequests.filter((item) => {
+      if (!isScheduledRecord(item)) return false;
+      const keys = scheduleRecordKeys(item);
+      return !keys.some((key) => appointmentKeys.has(key) || listingKeys.has(key));
+    });
+    const localAppointments = visibleAppointments.concat(fallbackListings, fallbackOrderRequests).map((record) => normalizeAppointment(record, staff));
     const googleAppointments = calendarEvents.map(normalizeCalendarAppointment).filter((item): item is Appointment => Boolean(item));
     const usedGoogleIds = new Set<string>();
 
@@ -194,7 +197,7 @@ export default function AdminSchedule() {
     });
 
     return data;
-  }, [rawAppointments, rawListings, calendarEvents, staff]);
+  }, [rawAppointments, rawListings, rawOrderRequests, calendarEvents, staff]);
 
   React.useEffect(() => {
     const dates = new Set<string>();
@@ -474,8 +477,8 @@ export default function AdminSchedule() {
 }
 
 function normalizeAppointment(record: any, staff: any[]): Appointment {
-  const apptDate = parseDate(record.scheduledDate || record.appointmentDate || record.apptDate);
-  const address = record.addressLabel || record.address || record.shootLocation || "No address";
+  const apptDate = scheduleRecordDate(record);
+  const address = record.addressLabel || record.address || record.propertyAddress || record.shootLocation || "No address";
   const city = extractCity(address);
   const services = Array.isArray(record.services) && record.services.length > 0
     ? record.services.map((item: any) => typeof item === "string" ? item : item.name || String(item))
@@ -483,7 +486,7 @@ function normalizeAppointment(record: any, staff: any[]): Appointment {
 
   return {
     id: record.id,
-    clientName: record.clientName || record.customerName || "Unknown Client",
+    clientName: record.clientName || record.customerName || `${record.firstName || ""} ${record.lastName || ""}`.trim() || "Unknown Client",
     address,
     apptDate,
     apptTime: record.scheduledTime || record.appointmentTime || record.apptTime || "TBD",
@@ -492,12 +495,22 @@ function normalizeAppointment(record: any, staff: any[]): Appointment {
     projectType: record.projectType || "real_estate",
     photographerNames: getAssignedNames(record, staff),
     status: record.status,
-    orderNumber: record.orderRequestId?.substring(0, 6) || record.orderId?.substring(0, 6) || record.id.substring(0, 6),
+    orderNumber: record.orderRequestId?.substring(0, 6) || record.orderId?.substring(0, 6) || record.convertedToOrderId?.substring(0, 6) || record.id.substring(0, 6),
     duration: record.duration || "1.5hr",
     city,
     googleCalendarUrl: record.googleCalendarUrl || null,
     source: record.source || "appointment",
   };
+}
+
+function scheduleRecordKeys(record: any) {
+  return [
+    record.id,
+    record.orderRequestId,
+    record.orderId,
+    record.convertedToOrderId,
+    record.listingId,
+  ].filter(Boolean).map(String);
 }
 
 function normalizeCalendarAppointment(event: any): Appointment | null {

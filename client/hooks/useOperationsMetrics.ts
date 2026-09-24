@@ -16,6 +16,8 @@ import {
   centralNoonDate,
   chicagoDateKey,
   getAssignedNames,
+  isScheduledRecord,
+  scheduleRecordDate,
   staffDisplayName,
   toDate,
 } from "@/lib/scheduleRecords";
@@ -159,9 +161,7 @@ export function useOperationsMetrics() {
     const monthKey = todayKey.slice(0, 7);
 
     const getApptDate = (item: any) => {
-      const d = item.appointmentDate || item.apptDate || item.scheduledDate;
-      if (typeof d === "string" && /^[A-Za-z]{3,9}\s+\d{1,2}/.test(d)) return null;
-      return toDate(d);
+      return scheduleRecordDate(item);
     };
 
     const getCreatedAt = (item: any) => {
@@ -175,25 +175,23 @@ export function useOperationsMetrics() {
     const isThisWeek = (d: Date | null) => d && weekKeys.has(chicagoDateKey(d));
     const isThisMonth = (d: Date | null) => d && chicagoDateKey(d).slice(0, 7) === monthKey;
 
-    const isActiveScheduledStatus = (status: any) =>
-      ["scheduled", "confirmed", "appt_scheduled", "consult_scheduled"].includes(String(status || "").toLowerCase().replace(/\s+/g, "_"));
+    const isActiveScheduledStatus = (item: any) => isScheduledRecord(item);
 
     const uniqueItems = listings.concat(
       orderRequests.filter(or => !listings.some(l => l.orderRequestId === or.id))
     );
 
-    const appointmentKeys = new Set(
-      appointments.flatMap((item) => [item.orderRequestId, item.orderId, item.listingId, item.id].filter(Boolean))
-    );
+    const visibleAppointments = appointments.filter(isScheduledRecord);
+    const appointmentKeys = new Set(visibleAppointments.flatMap(scheduleRecordKeys));
     const scheduledFallbackItems = uniqueItems.filter((item) => {
-      if (!isActiveScheduledStatus(item.status)) return false;
-      return !appointmentKeys.has(item.orderRequestId) && !appointmentKeys.has(item.convertedToOrderId) && !appointmentKeys.has(item.listingId) && !appointmentKeys.has(item.id);
+      if (!isScheduledRecord(item)) return false;
+      return !scheduleRecordKeys(item).some((key) => appointmentKeys.has(key));
     });
-    const appointmentItems = appointments.concat(scheduledFallbackItems);
+    const appointmentItems = visibleAppointments.concat(scheduledFallbackItems);
 
-    const scheduledToday = appointmentItems.filter(i => isActiveScheduledStatus(i.status) && isToday(getApptDate(i)));
-    const scheduledWeek = appointmentItems.filter(i => isActiveScheduledStatus(i.status) && isThisWeek(getApptDate(i)));
-    const scheduledMonth = appointmentItems.filter(i => isActiveScheduledStatus(i.status) && isThisMonth(getApptDate(i)));
+    const scheduledToday = appointmentItems.filter(i => isToday(getApptDate(i)));
+    const scheduledWeek = appointmentItems.filter(i => isThisWeek(getApptDate(i)));
+    const scheduledMonth = appointmentItems.filter(i => isThisMonth(getApptDate(i)));
     const calendarWeekEvents = calendarEvents
       .map(normalizeCalendarMetricEvent)
       .filter((event): event is any => Boolean(event) && isThisWeek(getApptDate(event)));
@@ -296,8 +294,6 @@ export function useOperationsMetrics() {
     const orderRequestsFiltered = orderRequests.filter(r => ["new", "needs_scheduled", "unscheduled", "request"].includes((r.status||"").toLowerCase()));
     
     const activeAppointmentsCount = appointmentItems.filter(l => {
-        const s = (l.status || "").toLowerCase().replace(/\s+/g, "_");
-        if (!["scheduled", "confirmed", "appt_scheduled", "consult_scheduled"].includes(s)) return false;
         const d = getApptDate(l);
         if (!d) return false;
         return chicagoDateKey(d) >= todayKey;
@@ -385,4 +381,14 @@ function tokenMetricOverlap(a: string, b: string) {
   const tokensA = new Set(String(a || "").toLowerCase().match(/[a-z0-9]+/g) || []);
   const tokensB = new Set(String(b || "").toLowerCase().match(/[a-z0-9]+/g) || []);
   return Array.from(tokensA).some((token) => token.length > 2 && tokensB.has(token));
+}
+
+function scheduleRecordKeys(record: any) {
+  return [
+    record.id,
+    record.orderRequestId,
+    record.orderId,
+    record.convertedToOrderId,
+    record.listingId,
+  ].filter(Boolean).map(String);
 }

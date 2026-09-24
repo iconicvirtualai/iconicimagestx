@@ -50,6 +50,35 @@ export function toDate(value: any): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+export function scheduleRecordDate(record: any): Date | null {
+  const candidates = [
+    record?.appointmentDate,
+    record?.scheduledDate,
+    record?.apptDate,
+    record?.requestedDate,
+  ];
+  for (const candidate of candidates) {
+    const parsed = toDate(candidate);
+    if (parsed) return parsed;
+  }
+  return null;
+}
+
+export function hasScheduleDate(record: any) {
+  return Boolean(scheduleRecordDate(record));
+}
+
+export function scheduleStatusKey(status: any) {
+  return String(status || "").toLowerCase().replace(/\s+/g, "_").replace(/-/g, "_");
+}
+
+export function isScheduledRecord(record: any) {
+  if (!hasScheduleDate(record)) return false;
+  const status = scheduleStatusKey(record?.status);
+  if (["archived", "cancelled", "canceled", "declined", "new", "request", "needs_scheduled", "unscheduled"].includes(status)) return false;
+  return true;
+}
+
 export function chicagoDateKey(date: Date) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Chicago",
