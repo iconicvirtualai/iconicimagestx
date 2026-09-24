@@ -3,10 +3,11 @@ import { useNavigate } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 import { Search, ChevronDown, X, Trash2, Archive, Calendar, Layers, Check, ChevronUp, AlertCircle, RefreshCw } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, writeBatch, doc, serverTimestamp, addDoc, getDocs, updateDoc, Timestamp } from "firebase/firestore";
+import { collection, onSnapshot, writeBatch, doc, serverTimestamp, addDoc, getDocs, updateDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
+import { getAssignedNames, upsertScheduledAppointment } from "@/lib/scheduleRecords";
 
 function fmtAddr(a: any): string {
   if (!a) return "—";
@@ -27,10 +28,6 @@ function fmtDate(ts: any): string {
 
   if (ts.toDate) return ts.toDate().toLocaleDateString("en-US", options);
   try { return new Date(ts).toLocaleDateString("en-US", options); } catch { return ""; }
-}
-
-function scheduleDateTimestamp(value: string) {
-  return Timestamp.fromDate(new Date(`${value}T12:00:00`));
 }
 
 function fmtTimeStandard(timeStr: string | any): string {
@@ -277,7 +274,7 @@ export default function AdminOrders() {
 
     const isScheduled = ["confirmed","scheduled","in_progress","pending","pending_edit","in_review","delivered","delivered_unpaid","delivered_paid","paid"].includes(status);
 
-    const assignedNames = (o.assignedProviders || []).map((p: any) => p.name).join(", ") || (Array.isArray(o.photographerNames) ? o.photographerNames.join(", ") : "");
+    const assignedNames = getAssignedNames(o, staff).join(", ");
     const preferredName = o.photographerPreference;
     const photogText = isScheduled ? assignedNames : preferredName;
     const notes = (o.vibeNote || "") + (o.notes ? "\n" + o.notes : "") + (o.internalNotes ? "\n" + o.internalNotes : "");
@@ -626,19 +623,14 @@ function BulkScheduleFlow({ ids, orders, staff, onClose }: any) {
   const handleNext = async () => {
     setSaving(true);
     try {
-      const updates: any = {
-        status: "scheduled",
-        appointmentDate: date,
-        appointmentTime: time || null,
-        scheduledDate: scheduleDateTimestamp(date),
-        scheduledTime: time || null,
-        assignedProviders: providers.map(pid => {
-          const s = staff.find((st: any) => st.id === pid);
-          return { providerId: pid, name: s?.name || pid, role: s?.role || "photographer" };
-        }),
-        updatedAt: serverTimestamp(),
-      };
-      await updateDoc(doc(db, "orderRequests", orderId), updates);
+      await upsertScheduledAppointment({
+        orderRequestId: orderId,
+        order,
+        date,
+        time: time || null,
+        providerIds: providers,
+        staff,
+      });
 
       if (idx < ids.length - 1) {
         setIdx(idx + 1);

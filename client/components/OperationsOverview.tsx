@@ -146,9 +146,9 @@ export default function OperationsOverview() {
         { label: "At-Risk", value: metrics.atRiskCount, status: metrics.atRiskCount > 5 ? "red" as const : "yellow" as const, sub: "Inactive > 30d" },
       ],
       performance: [
-        { label: "On-Time Rate", value: "96%", status: "green" as const },
-        { label: "Late Appts", value: 0, status: "green" as const },
-        { label: "SLA (24hr)", value: "92%", status: "green" as const },
+        { label: "Top Rev Team", value: metrics.topTeamRev ? metrics.topTeamRev[0] : "—", sub: metrics.topTeamRev ? fmtCurrency(metrics.topTeamRev[1].rev) : "" },
+        { label: "Top Volume", value: metrics.topTeamVol ? metrics.topTeamVol[0] : "—", sub: metrics.topTeamVol ? `${metrics.topTeamVol[1].vol} Appts` : "" },
+        { label: "Unassigned", value: metrics.unassignedAppointmentsThisWeek, status: metrics.unassignedAppointmentsThisWeek > 0 ? "red" as const : "green" as const, sub: "This Week" },
       ],
       feedback: [
         { label: "Complaints", value: 0, status: "green" as const },

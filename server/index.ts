@@ -26,7 +26,8 @@ import mediaJobsRouter from "./routes/mediaJobs";
 import placesRouter from "./routes/places";
 import smsRouter from "./routes/sms";
 import contactRouter from "./routes/contact";
-import { verifyCalendarWriteAccess } from "./services/calendar";
+import { listCalendarScheduleEvents, verifyCalendarWriteAccess } from "./services/calendar";
+import { requireStaff } from "./middleware/auth";
 
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
 const API_BUILD_MARKER = "codex-2026-09-15-v3";
@@ -118,6 +119,26 @@ export function createServer() {
       return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : "Calendar write check failed",
+      });
+    }
+  });
+
+  app.post("/api/calendar/schedule", requireStaff, async (req, res) => {
+    try {
+      const calendars = Array.isArray(req.body?.calendars) ? req.body.calendars : [];
+      const timeMin = typeof req.body?.timeMin === "string" ? req.body.timeMin : "";
+      const timeMax = typeof req.body?.timeMax === "string" ? req.body.timeMax : "";
+
+      if (!timeMin || !timeMax) {
+        return res.status(400).json({ error: "timeMin and timeMax are required." });
+      }
+
+      const events = await listCalendarScheduleEvents({ calendars, timeMin, timeMax });
+      return res.json({ events });
+    } catch (error) {
+      console.error("[Calendar] Schedule sync failed:", error);
+      return res.status(500).json({
+        error: error instanceof Error ? error.message : "Calendar schedule sync failed.",
       });
     }
   });

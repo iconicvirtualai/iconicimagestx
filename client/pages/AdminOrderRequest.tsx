@@ -10,10 +10,12 @@ import { db } from "@/lib/firebase";
 import {
   doc, onSnapshot, updateDoc, serverTimestamp,
   collection, addDoc, getDocs,
-  Timestamp, query, where, writeBatch,
 } from "firebase/firestore";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/AuthContext";
+import {
+  markScheduledAppointmentConfirmed,
+  upsertScheduledAppointment,
+} from "@/lib/scheduleRecords";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtAddr(a: any): string {
@@ -71,21 +73,6 @@ function safe(v: any): string {
   if (typeof v === "number") return String(v);
   if (typeof v === "object") return JSON.stringify(v);
   return String(v);
-}
-
-function parseBookingDate(value: any): string | null {
-  if (!value) return null;
-  if (value.toDate) return value.toDate().toISOString();
-  if (typeof value === "string") {
-    if (/^\d{4}-\d{2}-\d{2}/.test(value)) return value;
-    const parsed = new Date(value);
-    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
-  }
-  return null;
-}
-
-function scheduleDateTimestamp(value: string) {
-  return Timestamp.fromDate(new Date(`${value}T12:00:00`));
 }
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
@@ -230,14 +217,13 @@ export default function AdminOrderRequest() {
     if (!id || !schedDate) { toast.error("Select a date."); return; }
     setSaving(true);
     try {
-      await updateDoc(doc(db, "orderRequests", id), {
-        status: "scheduled", appointmentDate: schedDate, appointmentTime: schedTime || null,
-        scheduledDate: scheduleDateTimestamp(schedDate), scheduledTime: schedTime || null,
-        assignedProviders: selectedProviders.map(pid => {
-          const s = staff.find(st => st.id === pid);
-          return { providerId: pid, name: s?.name || pid, role: s?.role || "photographer" };
-        }),
-        updatedAt: serverTimestamp(),
+      await upsertScheduledAppointment({
+        orderRequestId: id,
+        order,
+        date: schedDate,
+        time: schedTime || null,
+        providerIds: selectedProviders,
+        staff,
       });
       toast.success("Scheduled."); setShowSchedule(false);
     } catch (err) { console.error(err); toast.error("Failed."); }
@@ -258,39 +244,7 @@ export default function AdminOrderRequest() {
 
     setSaving(true);
     try {
-      const batch = writeBatch(db);
-      batch.update(doc(db, "orderRequests", id), {
-        status: "confirmed",
-        clientConfirmedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-
-      if (order.convertedToOrderId) {
-        batch.update(doc(db, "orders", order.convertedToOrderId), {
-          status: "confirmed",
-          clientConfirmedAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-
-        const appointmentSnap = await getDocs(query(collection(db, "appointments"), where("orderId", "==", order.convertedToOrderId)));
-        appointmentSnap.docs.forEach((appointmentDoc) => {
-          batch.update(appointmentDoc.ref, {
-            status: "confirmed",
-            clientConfirmedAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-          });
-        });
-      }
-
-      if (order.listingId) {
-        batch.update(doc(db, "listings", order.listingId), {
-          status: "confirmed",
-          clientConfirmedAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-      }
-
-      await batch.commit();
+      await markScheduledAppointmentConfirmed(id, order);
       toast.success("Appointment marked confirmed.");
     } catch (err) {
       console.error(err);

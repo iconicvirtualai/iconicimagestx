@@ -3,16 +3,23 @@ import { db } from "@/lib/firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 import {
   startOfWeek,
-  endOfWeek,
-  startOfMonth,
   isWithinInterval,
-  parseISO,
   differenceInHours,
   subDays,
   isAfter,
   addHours,
   setHours,
+  addDays,
 } from "date-fns";
+import {
+  appointmentRevenue,
+  centralNoonDate,
+  chicagoDateKey,
+  getAssignedNames,
+  staffDisplayName,
+  toDate,
+} from "@/lib/scheduleRecords";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface OperationMetrics {
   orderRequestsCount: number;
@@ -37,14 +44,20 @@ export interface OperationMetrics {
   activeShooterNames: string[];
   topClientRev: [string, { rev: number; vol: number; last: Date }] | null;
   topClientVol: [string, { rev: number; vol: number; last: Date }] | null;
+  topTeamRev: [string, { rev: number; vol: number; last: Date }] | null;
+  topTeamVol: [string, { rev: number; vol: number; last: Date }] | null;
+  unassignedAppointmentsThisWeek: number;
   atRiskCount: number;
 }
 
 export function useOperationsMetrics() {
+  const { user } = useAuth();
   const [orderRequests, setOrderRequests] = React.useState<any[]>([]);
   const [listings, setListings] = React.useState<any[]>([]);
   const [appointments, setAppointments] = React.useState<any[]>([]);
   const [invoices, setInvoices] = React.useState<any[]>([]);
+  const [staff, setStaff] = React.useState<any[]>([]);
+  const [calendarEvents, setCalendarEvents] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
@@ -74,35 +87,81 @@ export function useOperationsMetrics() {
       console.error("[useOperationsMetrics] invoices snapshot error:", err);
     });
 
-    return () => { unsubOrders(); unsubListings(); unsubAppointments(); unsubInvoices(); };
+    const unsubStaff = onSnapshot(collection(db, "staff"), (snap) => {
+      setStaff(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (err) => {
+      console.error("[useOperationsMetrics] staff snapshot error:", err);
+    });
+
+    return () => { unsubOrders(); unsubListings(); unsubAppointments(); unsubInvoices(); unsubStaff(); };
   }, []);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function loadCalendarEvents() {
+      if (!user?.getIdToken) return;
+      const todayKey = chicagoDateKey(new Date());
+      const weekStart = startOfWeek(centralNoonDate(todayKey), { weekStartsOn: 1 });
+      const weekEnd = addDays(weekStart, 7);
+      const defaultCalendars = [
+        { id: "mike@iconicimagestx.com", name: "Mike Luna" },
+        { id: "armando@iconicimagestx.com", name: "Armando" },
+        { id: "pedro@iconicimagestx.com", name: "Pedro" },
+        { id: "steven@iconicimagestx.com", name: "Steven" },
+        { id: "cadi@iconicimagestx.com", name: "Cadi" },
+        { id: "daniel@iconicimagestx.com", name: "Daniel" },
+      ];
+      const staffCalendars = staff
+        .map((person) => ({
+          id: person.googleCalendarId || person.calendarId || person.calendarEmail || person.email,
+          name: staffDisplayName(person) || person.email,
+        }))
+        .filter((item) => item.id);
+      const calendars = Array.from(
+        new Map(defaultCalendars.concat(staffCalendars).map((item) => [item.id.toLowerCase(), item])).values()
+      );
+
+      try {
+        const token = await user.getIdToken();
+        const response = await fetch("/api/calendar/schedule", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            calendars,
+            timeMin: weekStart.toISOString(),
+            timeMax: weekEnd.toISOString(),
+          }),
+        });
+        if (!response.ok) throw new Error(await response.text());
+        const data = await response.json();
+        if (!cancelled) setCalendarEvents(Array.isArray(data.events) ? data.events : []);
+      } catch (error) {
+        console.warn("[useOperationsMetrics] Google Calendar sync unavailable:", error);
+        if (!cancelled) setCalendarEvents([]);
+      }
+    }
+
+    loadCalendarEvents();
+    return () => { cancelled = true; };
+  }, [staff, user]);
 
   const metrics = React.useMemo(() => {
     if (loading) return null;
 
     const now = new Date();
-    const weekStart = startOfWeek(now, { weekStartsOn: 1 }); // Monday
-    const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-    const monthStart = startOfMonth(now);
-
-    const chicagoDateKey = (date: Date) =>
-      new Intl.DateTimeFormat("en-CA", {
-        timeZone: "America/Chicago",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(date);
+    const todayKey = chicagoDateKey(now);
+    const weekStart = startOfWeek(centralNoonDate(todayKey), { weekStartsOn: 1 }); // Monday in Iconic's Central work week
+    const weekKeys = new Set(Array.from({ length: 7 }, (_, i) => chicagoDateKey(addDays(weekStart, i))));
+    const monthKey = todayKey.slice(0, 7);
 
     const getApptDate = (item: any) => {
       const d = item.appointmentDate || item.apptDate || item.scheduledDate;
-      if (!d) return null;
-      if (d.toDate) return d.toDate();
-      if (typeof d === "string") {
-        if (/^[A-Za-z]{3,9}\s+\d{1,2}/.test(d)) return null;
-        if (d.includes("T")) return parseISO(d);
-        return parseISO(`${d}T12:00:00`);
-      }
-      return new Date(d);
+      if (typeof d === "string" && /^[A-Za-z]{3,9}\s+\d{1,2}/.test(d)) return null;
+      return toDate(d);
     };
 
     const getCreatedAt = (item: any) => {
@@ -113,8 +172,8 @@ export function useOperationsMetrics() {
     };
 
     const isToday = (d: Date | null) => d && chicagoDateKey(d) === chicagoDateKey(now);
-    const isThisWeek = (d: Date | null) => d && isWithinInterval(d, { start: weekStart, end: weekEnd });
-    const isThisMonth = (d: Date | null) => d && isAfter(d, monthStart);
+    const isThisWeek = (d: Date | null) => d && weekKeys.has(chicagoDateKey(d));
+    const isThisMonth = (d: Date | null) => d && chicagoDateKey(d).slice(0, 7) === monthKey;
 
     const isActiveScheduledStatus = (status: any) =>
       ["scheduled", "confirmed", "appt_scheduled", "consult_scheduled"].includes(String(status || "").toLowerCase().replace(/\s+/g, "_"));
@@ -123,39 +182,46 @@ export function useOperationsMetrics() {
       orderRequests.filter(or => !listings.some(l => l.orderRequestId === or.id))
     );
 
-    const appointmentItems = appointments.length > 0
-      ? appointments
-      : uniqueItems.filter(i => isActiveScheduledStatus(i.status));
+    const appointmentKeys = new Set(
+      appointments.flatMap((item) => [item.orderRequestId, item.orderId, item.listingId, item.id].filter(Boolean))
+    );
+    const scheduledFallbackItems = uniqueItems.filter((item) => {
+      if (!isActiveScheduledStatus(item.status)) return false;
+      return !appointmentKeys.has(item.orderRequestId) && !appointmentKeys.has(item.convertedToOrderId) && !appointmentKeys.has(item.listingId) && !appointmentKeys.has(item.id);
+    });
+    const appointmentItems = appointments.concat(scheduledFallbackItems);
 
     const scheduledToday = appointmentItems.filter(i => isActiveScheduledStatus(i.status) && isToday(getApptDate(i)));
     const scheduledWeek = appointmentItems.filter(i => isActiveScheduledStatus(i.status) && isThisWeek(getApptDate(i)));
-    const scheduledMonth = uniqueItems.filter(i => isThisMonth(getApptDate(i)));
+    const scheduledMonth = appointmentItems.filter(i => isActiveScheduledStatus(i.status) && isThisMonth(getApptDate(i)));
+    const calendarWeekEvents = calendarEvents
+      .map(normalizeCalendarMetricEvent)
+      .filter((event): event is any => Boolean(event) && isThisWeek(getApptDate(event)));
 
-    const revToday = scheduledToday.reduce((s, i) => s + (Number(i.total) || 0), 0);
-    const revWeek = scheduledWeek.reduce((s, i) => s + (Number(i.total) || 0), 0);
-    const revMonth = scheduledMonth.reduce((s, i) => s + (Number(i.total) || 0), 0);
-    const revProjected = uniqueItems.filter(i => {
+    const revToday = scheduledToday.reduce((s, i) => s + appointmentRevenue(i), 0);
+    const revWeek = scheduledWeek.reduce((s, i) => s + appointmentRevenue(i), 0);
+    const revMonth = scheduledMonth.reduce((s, i) => s + appointmentRevenue(i), 0);
+    const revProjected = appointmentItems.filter(i => {
       const d = getApptDate(i);
-      return d && isAfter(d, now) && !["paid", "delivered_paid"].includes((i.status || "").toLowerCase());
-    }).reduce((s, i) => s + (Number(i.total) || 0), 0);
+      return d && chicagoDateKey(d) >= todayKey && !["paid", "delivered_paid"].includes((i.status || "").toLowerCase());
+    }).reduce((s, i) => s + appointmentRevenue(i), 0);
 
     const shooters: Record<string, number> = {};
+    let unassignedAppointmentsThisWeek = 0;
+    const matchedCalendarIds = new Set<string>();
     scheduledWeek.forEach(i => {
-      const names = new Set<string>();
-      const addName = (name: unknown) => {
-        if (typeof name !== "string") return;
-        const trimmed = name.trim();
-        if (trimmed) names.add(trimmed);
-      };
-
-      if (Array.isArray(i.photographerNames)) i.photographerNames.forEach(addName);
-      addName(i.photographerName);
-      addName(i.assignedPhotographerName);
-      (i.assignedProviders || []).forEach((p: any) => addName(p?.name));
-
-      names.forEach((name) => {
+      const calendarMatch = calendarWeekEvents.find((event) => !matchedCalendarIds.has(event.id) && matchesCalendarMetricEvent(i, event));
+      if (calendarMatch) matchedCalendarIds.add(calendarMatch.id);
+      const names = getAssignedNames(i, staff);
+      const resolvedNames = names.length > 0 ? names : (calendarMatch?.photographerName ? [calendarMatch.photographerName] : []);
+      if (resolvedNames.length === 0) unassignedAppointmentsThisWeek += 1;
+      resolvedNames.forEach((name) => {
         shooters[name] = (shooters[name] || 0) + 1;
       });
+    });
+    calendarWeekEvents.forEach((event) => {
+      if (matchedCalendarIds.has(event.id) || !event.photographerName) return;
+      shooters[event.photographerName] = (shooters[event.photographerName] || 0) + 1;
     });
 
     const notScheduledCount = orderRequests.filter(or => {
@@ -193,18 +259,38 @@ export function useOperationsMetrics() {
     const cancellationsCount = stabilityItems.filter(i => (i.status || "").toLowerCase() === "cancelled").length;
     const noShowsCount = stabilityItems.filter(i => (i.status || "").toLowerCase() === "no_show").length;
 
+    const revenueAppointments = appointmentItems.filter((item) => appointmentRevenue(item) > 0);
+
     const clientData: Record<string, { rev: number; vol: number; last: Date }> = {};
-    uniqueItems.forEach(i => {
+    revenueAppointments.forEach(i => {
       const name = i.clientName || i.customerName || "Unknown";
+      if (name === "Unknown") return;
       const date = getApptDate(i) || getCreatedAt(i) || new Date(0);
       if (!clientData[name]) clientData[name] = { rev: 0, vol: 0, last: date };
-      clientData[name].rev += (Number(i.total) || 0);
+      clientData[name].rev += appointmentRevenue(i);
       clientData[name].vol += 1;
       if (isAfter(date, clientData[name].last)) clientData[name].last = date;
     });
 
+    const teamData: Record<string, { rev: number; vol: number; last: Date }> = {};
+    revenueAppointments.forEach(i => {
+      const calendarMatch = calendarWeekEvents.find((event) => matchesCalendarMetricEvent(i, event));
+      const names = getAssignedNames(i, staff);
+      const resolvedNames = names.length > 0 ? names : (calendarMatch?.photographerName ? [calendarMatch.photographerName] : []);
+      const date = getApptDate(i) || getCreatedAt(i) || new Date(0);
+      const revenue = appointmentRevenue(i);
+      resolvedNames.forEach((name) => {
+        if (!teamData[name]) teamData[name] = { rev: 0, vol: 0, last: date };
+        teamData[name].rev += revenue;
+        teamData[name].vol += 1;
+        if (isAfter(date, teamData[name].last)) teamData[name].last = date;
+      });
+    });
+
     const topClientRev = Object.entries(clientData).sort((a, b) => b[1].rev - a[1].rev)[0] as [string, { rev: number; vol: number; last: Date }] | undefined;
     const topClientVol = Object.entries(clientData).sort((a, b) => b[1].vol - a[1].vol)[0] as [string, { rev: number; vol: number; last: Date }] | undefined;
+    const topTeamRev = Object.entries(teamData).sort((a, b) => b[1].rev - a[1].rev)[0] as [string, { rev: number; vol: number; last: Date }] | undefined;
+    const topTeamVol = Object.entries(teamData).sort((a, b) => b[1].vol - a[1].vol)[0] as [string, { rev: number; vol: number; last: Date }] | undefined;
     const atRiskCount = Object.values(clientData).filter(c => differenceInHours(now, c.last) > 24 * 30).length;
 
     const orderRequestsFiltered = orderRequests.filter(r => ["new", "needs_scheduled", "unscheduled", "request"].includes((r.status||"").toLowerCase()));
@@ -214,9 +300,7 @@ export function useOperationsMetrics() {
         if (!["scheduled", "confirmed", "appt_scheduled", "consult_scheduled"].includes(s)) return false;
         const d = getApptDate(l);
         if (!d) return false;
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        return d >= today;
+        return chicagoDateKey(d) >= todayKey;
     }).length;
 
     const listingsInProgressCount = listings.filter(l => ["in_progress", "delivered"].includes((l.status || "").toLowerCase())).length;
@@ -248,9 +332,57 @@ export function useOperationsMetrics() {
       activeShooterNames: Object.keys(shooters),
       topClientRev: topClientRev || null,
       topClientVol: topClientVol || null,
+      topTeamRev: topTeamRev || null,
+      topTeamVol: topTeamVol || null,
+      unassignedAppointmentsThisWeek,
       atRiskCount,
     };
-  }, [loading, orderRequests, listings, appointments, invoices]);
+  }, [loading, orderRequests, listings, appointments, invoices, staff, calendarEvents]);
 
   return { metrics, loading };
+}
+
+function normalizeCalendarMetricEvent(event: any) {
+  const start = toDate(event.start);
+  if (!start) return null;
+  const summaryParts = String(event.summary || "").split(/\s+[—-]\s+/).map((part) => part.trim()).filter(Boolean);
+  return {
+    id: `google-${event.calendarId}-${event.id}`,
+    clientName: summaryParts[0] || "",
+    address: event.location || summaryParts[1] || "",
+    appointmentDate: start,
+    appointmentTime: start.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: "America/Chicago",
+    }),
+    photographerName: event.photographerName,
+  };
+}
+
+function matchesCalendarMetricEvent(local: any, event: any) {
+  const localDate = toDate(local.scheduledDate || local.appointmentDate || local.apptDate);
+  const eventDate = toDate(event.appointmentDate);
+  if (!localDate || !eventDate) return false;
+  if (chicagoDateKey(localDate) !== chicagoDateKey(eventDate)) return false;
+  if (normalizeMetricTime(local.scheduledTime || local.appointmentTime || local.apptTime) !== normalizeMetricTime(event.appointmentTime)) return false;
+
+  const localClient = String(local.clientName || local.customerName || "").toLowerCase();
+  const localAddress = String(local.addressLabel || local.address || local.shootLocation || "").toLowerCase();
+  const eventClient = String(event.clientName || "").toLowerCase();
+  const eventAddress = String(event.address || "").toLowerCase();
+  return tokenMetricOverlap(localClient, eventClient) || tokenMetricOverlap(localAddress, eventAddress);
+}
+
+function normalizeMetricTime(value: any) {
+  if (!value) return "";
+  const date = new Date(`2026-01-01 ${value}`);
+  if (Number.isNaN(date.getTime())) return String(value).trim().toLowerCase();
+  return `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
+}
+
+function tokenMetricOverlap(a: string, b: string) {
+  const tokensA = new Set(String(a || "").toLowerCase().match(/[a-z0-9]+/g) || []);
+  const tokensB = new Set(String(b || "").toLowerCase().match(/[a-z0-9]+/g) || []);
+  return Array.from(tokensA).some((token) => token.length > 2 && tokensB.has(token));
 }

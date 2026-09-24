@@ -503,6 +503,48 @@ async function verifyCalendarWriteAccess() {
     eventId: eventId || null
   };
 }
+async function listCalendarScheduleEvents({
+  calendars,
+  timeMin,
+  timeMax
+}) {
+  const auth = getAuth();
+  if (!auth) return [];
+  const calendar = google.calendar({ version: "v3", auth });
+  const uniqueCalendars = Array.from(
+    new Map(
+      calendars.filter((item) => item.id).map((item) => [item.id.toLowerCase(), item])
+    ).values()
+  );
+  const results = await Promise.allSettled(
+    uniqueCalendars.map(async (source) => {
+      const response = await calendar.events.list({
+        calendarId: source.id,
+        timeMin,
+        timeMax,
+        singleEvents: true,
+        orderBy: "startTime",
+        maxResults: 250
+      });
+      return (response.data.items || []).map((event) => ({
+        id: event.id || `${source.id}-${event.iCalUID || event.htmlLink || event.summary}`,
+        calendarId: source.id,
+        photographerName: source.name || source.id,
+        summary: event.summary || "Untitled appointment",
+        location: event.location || "",
+        description: event.description || "",
+        start: event.start?.dateTime || event.start?.date || null,
+        end: event.end?.dateTime || event.end?.date || null,
+        htmlLink: event.htmlLink || null
+      }));
+    })
+  );
+  return results.flatMap((result, index) => {
+    if (result.status === "fulfilled") return result.value;
+    console.error(`[Calendar] Failed to read ${uniqueCalendars[index]?.id}:`, result.reason);
+    return [];
+  });
+}
 const router$d = Router();
 const db$b = () => admin.firestore();
 function appUrl$2() {
@@ -3734,6 +3776,23 @@ function createServer() {
       return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : "Calendar write check failed"
+      });
+    }
+  });
+  app.post("/api/calendar/schedule", requireStaff, async (req, res) => {
+    try {
+      const calendars = Array.isArray(req.body?.calendars) ? req.body.calendars : [];
+      const timeMin = typeof req.body?.timeMin === "string" ? req.body.timeMin : "";
+      const timeMax = typeof req.body?.timeMax === "string" ? req.body.timeMax : "";
+      if (!timeMin || !timeMax) {
+        return res.status(400).json({ error: "timeMin and timeMax are required." });
+      }
+      const events = await listCalendarScheduleEvents({ calendars, timeMin, timeMax });
+      return res.json({ events });
+    } catch (error) {
+      console.error("[Calendar] Schedule sync failed:", error);
+      return res.status(500).json({
+        error: error instanceof Error ? error.message : "Calendar schedule sync failed."
       });
     }
   });

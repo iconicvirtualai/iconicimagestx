@@ -4,6 +4,15 @@ import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import {
+  appointmentRevenue,
+  chicagoDateKey,
+  getAssignedNames,
+  orderServices,
+  staffDisplayName,
+  toDate,
+} from "@/lib/scheduleRecords";
+import { useAuth } from "@/contexts/AuthContext";
+import {
   Calendar as CalendarIcon,
   List,
   ChevronDown,
@@ -12,7 +21,6 @@ import {
   MapPin,
   User,
   FileText,
-  DollarSign,
   ChevronLeft,
   ChevronRight,
   X
@@ -27,10 +35,8 @@ import {
   endOfWeek,
   isSameMonth,
   isSameDay,
-  addDays,
   eachDayOfInterval,
   parseISO,
-  startOfDay
 } from "date-fns";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 
@@ -50,18 +56,23 @@ interface Appointment {
   orderNumber?: string;
   duration?: string;
   city?: string;
+  googleCalendarUrl?: string | null;
+  source?: string;
 }
+
+const DEFAULT_CALENDAR_SOURCES = [
+  { id: "mike@iconicimagestx.com", name: "Mike Luna" },
+  { id: "armando@iconicimagestx.com", name: "Armando" },
+  { id: "pedro@iconicimagestx.com", name: "Pedro" },
+  { id: "steven@iconicimagestx.com", name: "Steven" },
+  { id: "cadi@iconicimagestx.com", name: "Cadi" },
+  { id: "daniel@iconicimagestx.com", name: "Daniel" },
+];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function parseDate(d: any): Date | null {
-  if (!d) return null;
-  if (d.toDate) return d.toDate();
-  if (typeof d === "string") {
-    if (d.includes("T")) return parseISO(d);
-    return parseISO(`${d}T12:00:00`); // Noon to avoid TZ shifts
-  }
-  return new Date(d);
+  return toDate(d);
 }
 
 function fmtCurrency(n: number): string {
@@ -71,71 +82,127 @@ function fmtCurrency(n: number): string {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function AdminSchedule() {
+  const { user } = useAuth();
   const [viewMode, setViewMode] = React.useState<"calendar" | "list">("list");
-  const [appointments, setAppointments] = React.useState<Appointment[]>([]);
+  const [rawAppointments, setRawAppointments] = React.useState<any[]>([]);
+  const [rawListings, setRawListings] = React.useState<any[]>([]);
+  const [calendarEvents, setCalendarEvents] = React.useState<any[]>([]);
+  const [staff, setStaff] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [currentMonth, setCurrentMonth] = React.useState(new Date());
   const [collapsedDates, setCollapsedDates] = React.useState<Set<string>>(new Set());
   const [selectedAppt, setSelectedAppt] = React.useState<Appointment | null>(null);
 
   React.useEffect(() => {
-    // Listen to listings with scheduled statuses
-    const q = query(
+    const appointmentsQuery = query(
+      collection(db, "appointments"),
+      where("status", "in", ["scheduled", "confirmed", "appt_scheduled", "consult_scheduled"])
+    );
+    const listingsQuery = query(
       collection(db, "listings"),
-      where("status", "in", ["scheduled", "appt_scheduled", "consult_scheduled"])
+      where("status", "in", ["scheduled", "confirmed", "appt_scheduled", "consult_scheduled"])
     );
 
-    const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map(doc => {
-        const d = doc.data();
-        const apptDate = parseDate(d.apptDate);
-        
-        // Extract city from address if possible
-        let city = "TBD";
-        if (d.address && typeof d.address === "string") {
-          const parts = d.address.split(",");
-          if (parts.length > 1) city = parts[parts.length - 3]?.trim() || parts[1]?.trim() || "TBD";
-        }
-
-        return {
-          id: doc.id,
-          clientName: d.clientName || "Unknown Client",
-          address: d.address || d.shootLocation || "No address",
-          apptDate: apptDate,
-          apptTime: d.apptTime || "TBD",
-          services: d.services || [],
-          total: Number(d.total) || 0,
-          projectType: d.projectType || "real_estate",
-          photographerNames: d.photographerNames || (d.assignedProviders || []).map((p: any) => p.name) || [],
-          status: d.status,
-          orderNumber: d.orderRequestId?.substring(0, 6) || doc.id.substring(0, 6),
-          duration: d.duration || "1hr", // Mock duration if not present
-          city: city
-        } as Appointment;
-      });
-
-      // Sort by date and time
-      data.sort((a, b) => {
-        const da = a.apptDate?.getTime() || 0;
-        const db = b.apptDate?.getTime() || 0;
-        if (da !== db) return da - db;
-        return (a.apptTime || "").localeCompare(b.apptTime || "");
-      });
-
-      setAppointments(data);
-      
-      // Initialize all dates as collapsed
-      const dates = new Set<string>();
-      data.forEach(a => {
-        if (a.apptDate) dates.add(format(a.apptDate, "yyyy-MM-dd"));
-      });
-      setCollapsedDates(dates);
-      
+    const unsubAppointments = onSnapshot(appointmentsQuery, (snap) => {
+      setRawAppointments(snap.docs.map(doc => ({ id: doc.id, source: "appointment", ...doc.data() })));
+      setLoading(false);
+    });
+    const unsubListings = onSnapshot(listingsQuery, (snap) => {
+      setRawListings(snap.docs.map(doc => ({ id: doc.id, source: "listing", ...doc.data() })));
+    });
+    const unsubStaff = onSnapshot(collection(db, "staff"), (snap) => {
+      setStaff(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
     });
 
-    return () => unsub();
+    return () => { unsubAppointments(); unsubListings(); unsubStaff(); };
   }, []);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function loadCalendarEvents() {
+      if (!user?.getIdToken) return;
+      const startDate = startOfWeek(startOfMonth(currentMonth));
+      const endDate = endOfWeek(endOfMonth(currentMonth));
+      const staffCalendars = staff
+        .map((person) => ({
+          id: person.googleCalendarId || person.calendarId || person.calendarEmail || person.email,
+          name: staffDisplayName(person) || person.email,
+        }))
+        .filter((item) => item.id);
+      const calendars = Array.from(
+        new Map(
+          DEFAULT_CALENDAR_SOURCES.concat(staffCalendars)
+            .filter((item) => item.id)
+            .map((item) => [item.id.toLowerCase(), item])
+        ).values()
+      );
+
+      try {
+        const token = await user.getIdToken();
+        const response = await fetch("/api/calendar/schedule", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            calendars,
+            timeMin: startDate.toISOString(),
+            timeMax: endDate.toISOString(),
+          }),
+        });
+        if (!response.ok) throw new Error(await response.text());
+        const data = await response.json();
+        if (!cancelled) setCalendarEvents(Array.isArray(data.events) ? data.events : []);
+      } catch (error) {
+        console.warn("[AdminSchedule] Google Calendar sync unavailable:", error);
+        if (!cancelled) setCalendarEvents([]);
+      }
+    }
+
+    loadCalendarEvents();
+    return () => { cancelled = true; };
+  }, [currentMonth, staff, user]);
+
+  const appointments = React.useMemo(() => {
+    const appointmentKeys = new Set(
+      rawAppointments.flatMap((item) => [item.orderRequestId, item.orderId, item.listingId].filter(Boolean))
+    );
+    const fallbackListings = rawListings.filter((item) => !appointmentKeys.has(item.orderRequestId) && !appointmentKeys.has(item.id));
+    const localAppointments = rawAppointments.concat(fallbackListings).map((record) => normalizeAppointment(record, staff));
+    const googleAppointments = calendarEvents.map(normalizeCalendarAppointment).filter((item): item is Appointment => Boolean(item));
+    const usedGoogleIds = new Set<string>();
+
+    const data = localAppointments.map((appointment) => {
+      const match = googleAppointments.find((event) => !usedGoogleIds.has(event.id) && matchesCalendarEvent(appointment, event));
+      if (!match) return appointment;
+      usedGoogleIds.add(match.id);
+      return {
+        ...appointment,
+        photographerNames: appointment.photographerNames.length > 0 ? appointment.photographerNames : match.photographerNames,
+        googleCalendarUrl: match.googleCalendarUrl,
+      };
+    }).concat(googleAppointments.filter((event) => !usedGoogleIds.has(event.id)));
+
+    data.sort((a, b) => {
+      const da = a.apptDate?.getTime() || 0;
+      const db = b.apptDate?.getTime() || 0;
+      if (da !== db) return da - db;
+      return (a.apptTime || "").localeCompare(b.apptTime || "");
+    });
+
+    return data;
+  }, [rawAppointments, rawListings, calendarEvents, staff]);
+
+  React.useEffect(() => {
+    const dates = new Set<string>();
+    appointments.forEach(a => {
+      if (a.apptDate) dates.add(format(a.apptDate, "yyyy-MM-dd"));
+    });
+    setCollapsedDates(dates);
+  }, [appointments]);
 
   const toggleDateCollapse = (dateStr: string) => {
     const next = new Set(collapsedDates);
@@ -406,6 +473,110 @@ export default function AdminSchedule() {
   );
 }
 
+function normalizeAppointment(record: any, staff: any[]): Appointment {
+  const apptDate = parseDate(record.scheduledDate || record.appointmentDate || record.apptDate);
+  const address = record.addressLabel || record.address || record.shootLocation || "No address";
+  const city = extractCity(address);
+  const services = Array.isArray(record.services) && record.services.length > 0
+    ? record.services.map((item: any) => typeof item === "string" ? item : item.name || String(item))
+    : orderServices(record);
+
+  return {
+    id: record.id,
+    clientName: record.clientName || record.customerName || "Unknown Client",
+    address,
+    apptDate,
+    apptTime: record.scheduledTime || record.appointmentTime || record.apptTime || "TBD",
+    services,
+    total: appointmentRevenue(record),
+    projectType: record.projectType || "real_estate",
+    photographerNames: getAssignedNames(record, staff),
+    status: record.status,
+    orderNumber: record.orderRequestId?.substring(0, 6) || record.orderId?.substring(0, 6) || record.id.substring(0, 6),
+    duration: record.duration || "1.5hr",
+    city,
+    googleCalendarUrl: record.googleCalendarUrl || null,
+    source: record.source || "appointment",
+  };
+}
+
+function normalizeCalendarAppointment(event: any): Appointment | null {
+  const apptDate = parseDate(event.start);
+  if (!apptDate) return null;
+  const parts = String(event.summary || "").split(/\s+[—-]\s+/).map((part) => part.trim()).filter(Boolean);
+  const clientName = parts[0] || "Google Calendar Appointment";
+  const address = event.location || parts[1] || "No address";
+  const services = parts.slice(2);
+
+  return {
+    id: `google-${event.calendarId}-${event.id}`,
+    clientName,
+    address,
+    apptDate,
+    apptTime: apptDate.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: "America/Chicago",
+    }),
+    services: services.length ? services : ["Google Calendar"],
+    total: 0,
+    projectType: "real_estate",
+    photographerNames: event.photographerName ? [event.photographerName] : [],
+    status: "scheduled",
+    orderNumber: "GCal",
+    duration: calendarDuration(event.start, event.end),
+    city: extractCity(address),
+    googleCalendarUrl: event.htmlLink || null,
+    source: "google-calendar",
+  };
+}
+
+function matchesCalendarEvent(local: Appointment, googleEvent: Appointment) {
+  if (!local.apptDate || !googleEvent.apptDate) return false;
+  if (chicagoDateKey(local.apptDate) !== chicagoDateKey(googleEvent.apptDate)) return false;
+
+  const localTime = normalizeTime(local.apptTime);
+  const googleTime = normalizeTime(googleEvent.apptTime);
+  const sameTime = localTime && googleTime && localTime === googleTime;
+  const localText = `${local.clientName} ${local.address}`.toLowerCase();
+  const googleText = `${googleEvent.clientName} ${googleEvent.address}`.toLowerCase();
+  const sameClient = tokenOverlap(local.clientName, googleEvent.clientName);
+  const sameAddress = tokenOverlap(local.address, googleEvent.address);
+
+  return Boolean(sameTime && (sameClient || sameAddress || googleText.includes(local.clientName.toLowerCase()) || localText.includes(googleEvent.clientName.toLowerCase())));
+}
+
+function normalizeTime(value: string) {
+  if (!value) return "";
+  const date = new Date(`2026-01-01 ${value}`);
+  if (Number.isNaN(date.getTime())) return value.trim().toLowerCase();
+  return `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
+}
+
+function tokenOverlap(a: string, b: string) {
+  const tokensA = new Set(String(a || "").toLowerCase().match(/[a-z0-9]+/g) || []);
+  const tokensB = new Set(String(b || "").toLowerCase().match(/[a-z0-9]+/g) || []);
+  return Array.from(tokensA).some((token) => token.length > 2 && tokensB.has(token));
+}
+
+function calendarDuration(start: any, end: any) {
+  const startDate = toDate(start);
+  const endDate = toDate(end);
+  if (!startDate || !endDate) return "1.5hr";
+  const minutes = Math.max(0, Math.round((endDate.getTime() - startDate.getTime()) / 60000));
+  if (!minutes) return "1.5hr";
+  if (minutes % 60 === 0) return `${minutes / 60}hr`;
+  return `${minutes}min`;
+}
+
+function extractCity(address: any) {
+  if (!address || typeof address !== "string") return "TBD";
+  const parts = address.split(",").map((part) => part.trim()).filter(Boolean);
+  if (parts.length >= 3) return parts[parts.length - 2];
+  if (parts.length >= 2) return parts[1];
+  return "TBD";
+}
+
 // ─── Calendar View ───────────────────────────────────────────────────────────
 
 function CalendarView({ appointments, currentMonth, onSelectAppt }: any) {
@@ -465,7 +636,7 @@ function CalendarView({ appointments, currentMonth, onSelectAppt }: any) {
                       {a.apptTime} • {a.duration}
                     </div>
                     <div className="text-[7px] font-medium opacity-70 truncate leading-none">
-                      {a.city}
+                      {a.photographerNames.join(", ") || "Unassigned"} • {a.city}
                     </div>
                   </div>
                 ))}

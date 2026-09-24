@@ -15,6 +15,23 @@ export interface CalendarBooking {
   notes?: string;
 }
 
+export interface CalendarSource {
+  id: string;
+  name?: string;
+}
+
+export interface CalendarScheduleEvent {
+  id: string;
+  calendarId: string;
+  photographerName: string;
+  summary: string;
+  location: string;
+  description: string;
+  start: string | null;
+  end: string | null;
+  htmlLink: string | null;
+}
+
 function getPrivateKey() {
   return (process.env.GOOGLE_CALENDAR_PRIVATE_KEY || "").replace(/\\n/g, "\n");
 }
@@ -155,4 +172,57 @@ export async function verifyCalendarWriteAccess() {
     calendarId,
     eventId: eventId || null,
   };
+}
+
+export async function listCalendarScheduleEvents({
+  calendars,
+  timeMin,
+  timeMax,
+}: {
+  calendars: CalendarSource[];
+  timeMin: string;
+  timeMax: string;
+}) {
+  const auth = getAuth();
+  if (!auth) return [];
+
+  const calendar = google.calendar({ version: "v3", auth });
+  const uniqueCalendars = Array.from(
+    new Map(
+      calendars
+        .filter((item) => item.id)
+        .map((item) => [item.id.toLowerCase(), item])
+    ).values()
+  );
+
+  const results = await Promise.allSettled(
+    uniqueCalendars.map(async (source) => {
+      const response = await calendar.events.list({
+        calendarId: source.id,
+        timeMin,
+        timeMax,
+        singleEvents: true,
+        orderBy: "startTime",
+        maxResults: 250,
+      });
+
+      return (response.data.items || []).map((event): CalendarScheduleEvent => ({
+        id: event.id || `${source.id}-${event.iCalUID || event.htmlLink || event.summary}`,
+        calendarId: source.id,
+        photographerName: source.name || source.id,
+        summary: event.summary || "Untitled appointment",
+        location: event.location || "",
+        description: event.description || "",
+        start: event.start?.dateTime || event.start?.date || null,
+        end: event.end?.dateTime || event.end?.date || null,
+        htmlLink: event.htmlLink || null,
+      }));
+    })
+  );
+
+  return results.flatMap((result, index) => {
+    if (result.status === "fulfilled") return result.value;
+    console.error(`[Calendar] Failed to read ${uniqueCalendars[index]?.id}:`, result.reason);
+    return [];
+  });
 }
