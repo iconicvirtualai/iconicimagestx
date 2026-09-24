@@ -45,7 +45,6 @@ export function useOperationsMetrics() {
   const [listings, setListings] = React.useState<any[]>([]);
   const [appointments, setAppointments] = React.useState<any[]>([]);
   const [invoices, setInvoices] = React.useState<any[]>([]);
-  const [staff, setStaff] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
@@ -75,13 +74,7 @@ export function useOperationsMetrics() {
       console.error("[useOperationsMetrics] invoices snapshot error:", err);
     });
 
-    const unsubStaff = onSnapshot(collection(db, "staff"), (snap) => {
-      setStaff(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, (err) => {
-      console.error("[useOperationsMetrics] staff snapshot error:", err);
-    });
-
-    return () => { unsubOrders(); unsubListings(); unsubAppointments(); unsubInvoices(); unsubStaff(); };
+    return () => { unsubOrders(); unsubListings(); unsubAppointments(); unsubInvoices(); };
   }, []);
 
   const metrics = React.useMemo(() => {
@@ -148,36 +141,22 @@ export function useOperationsMetrics() {
 
     const shooters: Record<string, number> = {};
     scheduledWeek.forEach(i => {
-      const names = i.photographerNames || i.photographerName || (i.assignedProviders || []).map((p: any) => p.name) || [];
-      if (Array.isArray(names)) {
-        names.forEach((n: string) => shooters[n] = (shooters[n] || 0) + 1);
-      } else if (typeof names === "string") {
-        shooters[names] = (shooters[names] || 0) + 1;
-      }
-    });
+      const names = new Set<string>();
+      const addName = (name: unknown) => {
+        if (typeof name !== "string") return;
+        const trimmed = name.trim();
+        if (trimmed) names.add(trimmed);
+      };
 
-    const activeShooterNames = staff
-      .filter((person: any) => {
-        if (person.isActive === false) return false;
-        const role = String(person.role || person.type || "").toLowerCase();
-        const permissions = Object.keys(person.permissions || {}).filter((key) => person.permissions?.[key]).join(" ").toLowerCase();
-        const skills = [
-          ...(Array.isArray(person.skills) ? person.skills : []),
-          ...(Array.isArray(person.capabilities) ? person.capabilities : []),
-        ].join(" ").toLowerCase();
-        return person.isShooter === true ||
-          person.canShoot === true ||
-          role.includes("photographer") ||
-          role.includes("shooter") ||
-          role.includes("admin") ||
-          role.includes("owner") ||
-          role.includes("coordinator") ||
-          skills.includes("photograph") ||
-          skills.includes("shoot") ||
-          permissions.includes("photographer");
-      })
-      .map((person: any) => person.name || `${person.firstName || ""} ${person.lastName || ""}`.trim() || person.email || person.id)
-      .filter(Boolean);
+      if (Array.isArray(i.photographerNames)) i.photographerNames.forEach(addName);
+      addName(i.photographerName);
+      addName(i.assignedPhotographerName);
+      (i.assignedProviders || []).forEach((p: any) => addName(p?.name));
+
+      names.forEach((name) => {
+        shooters[name] = (shooters[name] || 0) + 1;
+      });
+    });
 
     const notScheduledCount = orderRequests.filter(or => {
       const s = (or.status || "").toLowerCase();
@@ -265,13 +244,13 @@ export function useOperationsMetrics() {
       cancellationsCount,
       noShowsCount,
       shooters,
-      activeShooterCount: activeShooterNames.length || Object.keys(shooters).length,
-      activeShooterNames: activeShooterNames.length ? activeShooterNames : Object.keys(shooters),
+      activeShooterCount: Object.keys(shooters).length,
+      activeShooterNames: Object.keys(shooters),
       topClientRev: topClientRev || null,
       topClientVol: topClientVol || null,
       atRiskCount,
     };
-  }, [loading, orderRequests, listings, appointments, invoices, staff]);
+  }, [loading, orderRequests, listings, appointments, invoices]);
 
   return { metrics, loading };
 }
