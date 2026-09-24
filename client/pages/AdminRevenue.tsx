@@ -49,7 +49,7 @@ const DATE_PRESETS = [
 const labelCls = "text-[10px] font-black text-gray-400 uppercase tracking-widest";
 
 export default function AdminRevenue() {
-  const [orders, setOrders] = React.useState<any[]>([]);
+  const [invoices, setInvoices] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [datePreset, setDatePreset] = React.useState("Last 30 Days");
   const [customFrom, setCustomFrom] = React.useState("");
@@ -65,8 +65,8 @@ export default function AdminRevenue() {
   });
 
   React.useEffect(() => {
-    const unsub = onSnapshot(collection(db, "orderRequests"), snap => {
-      setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    const unsub = onSnapshot(collection(db, "invoices"), snap => {
+      setInvoices(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
     }, err => { console.error(err); setLoading(false); });
     return () => unsub();
@@ -97,12 +97,12 @@ export default function AdminRevenue() {
 
   const filtered = React.useMemo(() => {
     const { start, end } = getDateRange();
-    return orders.filter(o => {
-      const d = getTs(o.createdAt || o.submittedAt || o.date);
+    return invoices.filter(o => {
+      const d = getTs(o.createdAt || o.updatedAt || o.sentAt || o.paidAt);
       if (!d) return false;
       return d >= start && d <= end;
     });
-  }, [orders, datePreset, customFrom, customTo]);
+  }, [invoices, datePreset, customFrom, customTo]);
 
   // Revenue stages
   const stats = React.useMemo(() => {
@@ -110,25 +110,24 @@ export default function AdminRevenue() {
     let photographerPayout = 0, editingCost = 0, platformFees = 0;
 
     filtered.forEach(o => {
-      const total = Number(o.total) || Number(o.amount) || Number(o.pricing?.total) || 0;
+      const total = Number(o.total) || (Number(o.amountDue) || 0) + (Number(o.amountPaid) || 0);
       const status = (typeof o.status === "string" ? o.status : "").toLowerCase();
-      const inv = o.invoice || {};
-      const paid = inv.amountPaid || 0;
+      const paid = Number(o.amountPaid) || 0;
 
       // Categorize
-      if (["cancelled", "archived"].includes(status) && paid === 0) return;
+      if (["cancelled", "void", "voided", "archived"].includes(status) && paid === 0) return;
 
       projected += total;
 
-      if (["delivered", "paid", "completed", "archived"].includes(status)) {
+      if (["sent", "draft", "overdue", "paid", "completed"].includes(status)) {
         earned += total;
       }
 
-      if (inv.status === "sent" || inv.status === "draft" || total > 0) {
+      if (status === "sent" || status === "draft" || total > 0) {
         invoiced += total;
       }
 
-      if (inv.status === "overdue" || (inv.dueDate && getTs(inv.dueDate) && getTs(inv.dueDate)! < new Date() && paid < total)) {
+      if (status === "overdue" || (o.dueDate && getTs(o.dueDate) && getTs(o.dueDate)! < new Date() && paid < total)) {
         overdue += (total - paid);
       }
 
@@ -167,7 +166,7 @@ export default function AdminRevenue() {
           <div><p className={`${labelCls} mb-1`}>From</p><input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} className={inputCls} /></div>
           <div><p className={`${labelCls} mb-1`}>To</p><input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} className={inputCls} /></div>
         </>)}
-        <p className="text-xs text-gray-400 ml-2">{stats.count} orders in period</p>
+        <p className="text-xs text-gray-400 ml-2">{stats.count} invoices in period</p>
       </div>
 
       {loading ? (
@@ -286,13 +285,13 @@ export default function AdminRevenue() {
               </tr></thead>
               <tbody>
                 {filtered.slice(0, 50).map((o, i) => {
-                  const total = Number(o.total) || Number(o.pricing?.total) || 0;
-                  const paid = o.invoice?.amountPaid || 0;
-                  const due = total - paid;
+                  const total = Number(o.total) || (Number(o.amountDue) || 0) + (Number(o.amountPaid) || 0);
+                  const paid = Number(o.amountPaid) || 0;
+                  const due = Number(o.amountDue) || Math.max(total - paid, 0);
                   return (
                     <tr key={o.id} className="border-t border-gray-100 hover:bg-gray-50">
-                      <td className="py-2.5 px-4 text-xs font-bold text-[#0d9488]">#{(o.id || "").substring(0, 6)}</td>
-                      <td className="py-2.5 px-4 text-xs text-gray-500">{fmtDate(o.createdAt || o.submittedAt)}</td>
+                      <td className="py-2.5 px-4 text-xs font-bold text-[#0d9488]">{o.invoiceNumber || `#${(o.id || "").substring(0, 6)}`}</td>
+                      <td className="py-2.5 px-4 text-xs text-gray-500">{fmtDate(o.createdAt || o.updatedAt || o.sentAt || o.paidAt)}</td>
                       <td className="py-2.5 px-4 text-xs font-bold">{safe(o.clientName || o.customerName || o.name)}</td>
                       <td className="py-2.5 px-4 text-xs text-gray-500">{fmtAddr(o.address)}</td>
                       <td className="py-2.5 px-4 text-xs font-bold text-right">{fmtCurrency(total)}</td>

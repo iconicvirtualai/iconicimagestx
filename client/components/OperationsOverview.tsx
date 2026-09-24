@@ -115,7 +115,7 @@ export default function OperationsOverview() {
   const overviewData = React.useMemo(() => {
     if (!metrics) return null;
 
-    const shooterList = Object.entries(metrics.shooters).map(([name, count]) => `${name}(${count})`).join(", ");
+    const shooterList = metrics.activeShooterNames.join(", ");
 
     return {
       revenue: [
@@ -127,7 +127,7 @@ export default function OperationsOverview() {
       operations: [
         { label: "Appts Today", value: metrics.scheduledToday.length },
         { label: "Appts This Week", value: metrics.scheduledWeek.length },
-        { label: "Active Shooters", value: Object.keys(metrics.shooters).length, sub: shooterList || "None" },
+        { label: "Active Shooters", value: metrics.activeShooterCount, sub: shooterList || "None" },
       ],
       actionRequired: [
         { label: "Pending Requests", value: metrics.notScheduledCount, status: metrics.notScheduledCount > 0 ? "red" as const : "gray" as const, sub: "Not Scheduled" },
@@ -185,7 +185,7 @@ export default function OperationsOverview() {
           <h2 className="text-sm font-black text-black uppercase tracking-widest">Daily Overview</h2>
         </div>
         <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-          {new Date().toLocaleDateString("en-US", { weekday: 'long', month: 'long', day: 'numeric' })}
+          {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "America/Chicago" })}
         </div>
       </div>
 

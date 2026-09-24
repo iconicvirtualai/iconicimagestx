@@ -5,7 +5,6 @@ import {
   startOfWeek,
   endOfWeek,
   startOfMonth,
-  isSameDay,
   isWithinInterval,
   parseISO,
   differenceInHours,
@@ -34,6 +33,8 @@ export interface OperationMetrics {
   cancellationsCount: number;
   noShowsCount: number;
   shooters: Record<string, number>;
+  activeShooterCount: number;
+  activeShooterNames: string[];
   topClientRev: [string, { rev: number; vol: number; last: Date }] | null;
   topClientVol: [string, { rev: number; vol: number; last: Date }] | null;
   atRiskCount: number;
@@ -42,6 +43,9 @@ export interface OperationMetrics {
 export function useOperationsMetrics() {
   const [orderRequests, setOrderRequests] = React.useState<any[]>([]);
   const [listings, setListings] = React.useState<any[]>([]);
+  const [appointments, setAppointments] = React.useState<any[]>([]);
+  const [invoices, setInvoices] = React.useState<any[]>([]);
+  const [staff, setStaff] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
@@ -59,7 +63,25 @@ export function useOperationsMetrics() {
       setLoading(false);
     });
 
-    return () => { unsubOrders(); unsubListings(); };
+    const unsubAppointments = onSnapshot(collection(db, "appointments"), (snap) => {
+      setAppointments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (err) => {
+      console.error("[useOperationsMetrics] appointments snapshot error:", err);
+    });
+
+    const unsubInvoices = onSnapshot(collection(db, "invoices"), (snap) => {
+      setInvoices(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (err) => {
+      console.error("[useOperationsMetrics] invoices snapshot error:", err);
+    });
+
+    const unsubStaff = onSnapshot(collection(db, "staff"), (snap) => {
+      setStaff(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (err) => {
+      console.error("[useOperationsMetrics] staff snapshot error:", err);
+    });
+
+    return () => { unsubOrders(); unsubListings(); unsubAppointments(); unsubInvoices(); unsubStaff(); };
   }, []);
 
   const metrics = React.useMemo(() => {
@@ -70,11 +92,20 @@ export function useOperationsMetrics() {
     const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
     const monthStart = startOfMonth(now);
 
+    const chicagoDateKey = (date: Date) =>
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/Chicago",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(date);
+
     const getApptDate = (item: any) => {
       const d = item.appointmentDate || item.apptDate || item.scheduledDate;
       if (!d) return null;
       if (d.toDate) return d.toDate();
       if (typeof d === "string") {
+        if (/^[A-Za-z]{3,9}\s+\d{1,2}/.test(d)) return null;
         if (d.includes("T")) return parseISO(d);
         return parseISO(`${d}T12:00:00`);
       }
@@ -88,16 +119,23 @@ export function useOperationsMetrics() {
       return new Date(d);
     };
 
-    const isToday = (d: Date | null) => d && isSameDay(d, now);
+    const isToday = (d: Date | null) => d && chicagoDateKey(d) === chicagoDateKey(now);
     const isThisWeek = (d: Date | null) => d && isWithinInterval(d, { start: weekStart, end: weekEnd });
     const isThisMonth = (d: Date | null) => d && isAfter(d, monthStart);
+
+    const isActiveScheduledStatus = (status: any) =>
+      ["scheduled", "confirmed", "appt_scheduled", "consult_scheduled"].includes(String(status || "").toLowerCase().replace(/\s+/g, "_"));
 
     const uniqueItems = listings.concat(
       orderRequests.filter(or => !listings.some(l => l.orderRequestId === or.id))
     );
 
-    const scheduledToday = uniqueItems.filter(i => isToday(getApptDate(i)));
-    const scheduledWeek = uniqueItems.filter(i => isThisWeek(getApptDate(i)));
+    const appointmentItems = appointments.length > 0
+      ? appointments
+      : uniqueItems.filter(i => isActiveScheduledStatus(i.status));
+
+    const scheduledToday = appointmentItems.filter(i => isActiveScheduledStatus(i.status) && isToday(getApptDate(i)));
+    const scheduledWeek = appointmentItems.filter(i => isActiveScheduledStatus(i.status) && isThisWeek(getApptDate(i)));
     const scheduledMonth = uniqueItems.filter(i => isThisMonth(getApptDate(i)));
 
     const revToday = scheduledToday.reduce((s, i) => s + (Number(i.total) || 0), 0);
@@ -109,8 +147,8 @@ export function useOperationsMetrics() {
     }).reduce((s, i) => s + (Number(i.total) || 0), 0);
 
     const shooters: Record<string, number> = {};
-    scheduledToday.forEach(i => {
-      const names = i.photographerNames || (i.assignedProviders || []).map((p: any) => p.name) || [];
+    scheduledWeek.forEach(i => {
+      const names = i.photographerNames || i.photographerName || (i.assignedProviders || []).map((p: any) => p.name) || [];
       if (Array.isArray(names)) {
         names.forEach((n: string) => shooters[n] = (shooters[n] || 0) + 1);
       } else if (typeof names === "string") {
@@ -118,14 +156,39 @@ export function useOperationsMetrics() {
       }
     });
 
+    const activeShooterNames = staff
+      .filter((person: any) => {
+        if (person.isActive === false) return false;
+        const role = String(person.role || person.type || "").toLowerCase();
+        const permissions = Object.keys(person.permissions || {}).filter((key) => person.permissions?.[key]).join(" ").toLowerCase();
+        const skills = [
+          ...(Array.isArray(person.skills) ? person.skills : []),
+          ...(Array.isArray(person.capabilities) ? person.capabilities : []),
+        ].join(" ").toLowerCase();
+        return person.isShooter === true ||
+          person.canShoot === true ||
+          role.includes("photographer") ||
+          role.includes("shooter") ||
+          role.includes("admin") ||
+          role.includes("owner") ||
+          role.includes("coordinator") ||
+          skills.includes("photograph") ||
+          skills.includes("shoot") ||
+          permissions.includes("photographer");
+      })
+      .map((person: any) => person.name || `${person.firstName || ""} ${person.lastName || ""}`.trim() || person.email || person.id)
+      .filter(Boolean);
+
     const notScheduledCount = orderRequests.filter(or => {
       const s = (or.status || "").toLowerCase();
       return ["new", "needs_scheduled", "unscheduled", "request"].includes(s) && !or.appointmentDate;
     }).length;
 
     const urgentRequestsCount = orderRequests.filter(or => {
-      const d = getApptDate(or) || getCreatedAt(or);
-      return d && Math.abs(differenceInHours(d, now)) <= 24;
+      const status = String(or.status || "").toLowerCase();
+      if (["confirmed", "cancelled", "archived", "declined"].includes(status)) return false;
+      const d = getApptDate(or);
+      return d && d >= now && differenceInHours(d, now) <= 24;
     }).length;
 
     const overdueDeliveriesCount = listings.filter(l => {
@@ -167,9 +230,9 @@ export function useOperationsMetrics() {
 
     const orderRequestsFiltered = orderRequests.filter(r => ["new", "needs_scheduled", "unscheduled", "request"].includes((r.status||"").toLowerCase()));
     
-    const activeAppointmentsCount = listings.filter(l => {
+    const activeAppointmentsCount = appointmentItems.filter(l => {
         const s = (l.status || "").toLowerCase().replace(/\s+/g, "_");
-        if (!["scheduled", "appt_scheduled", "consult_scheduled"].includes(s)) return false;
+        if (!["scheduled", "confirmed", "appt_scheduled", "consult_scheduled"].includes(s)) return false;
         const d = getApptDate(l);
         if (!d) return false;
         const today = new Date();
@@ -179,10 +242,9 @@ export function useOperationsMetrics() {
 
     const listingsInProgressCount = listings.filter(l => ["in_progress", "delivered"].includes((l.status || "").toLowerCase())).length;
     
-    const paidRevenue = listings.filter(l => {
-      const s = (l.status || "").toLowerCase();
-      return s === "paid" || s === "delivered_paid";
-    }).reduce((s, l) => s + (Number(l.total) || 0), 0);
+    const paidRevenue = invoices.reduce((sum, invoice: any) => (
+      sum + (Number(invoice.total) || Number(invoice.amountDue) + Number(invoice.amountPaid) || 0)
+    ), 0);
 
     return {
       orderRequestsCount: orderRequestsFiltered.length,
@@ -203,11 +265,13 @@ export function useOperationsMetrics() {
       cancellationsCount,
       noShowsCount,
       shooters,
+      activeShooterCount: activeShooterNames.length || Object.keys(shooters).length,
+      activeShooterNames: activeShooterNames.length ? activeShooterNames : Object.keys(shooters),
       topClientRev: topClientRev || null,
       topClientVol: topClientVol || null,
       atRiskCount,
     };
-  }, [loading, orderRequests, listings]);
+  }, [loading, orderRequests, listings, appointments, invoices, staff]);
 
   return { metrics, loading };
 }

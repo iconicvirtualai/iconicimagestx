@@ -10,6 +10,7 @@ import { db } from "@/lib/firebase";
 import {
   doc, onSnapshot, updateDoc, serverTimestamp,
   collection, addDoc, getDocs,
+  Timestamp, query, where, writeBatch,
 } from "firebase/firestore";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -83,6 +84,10 @@ function parseBookingDate(value: any): string | null {
   return null;
 }
 
+function scheduleDateTimestamp(value: string) {
+  return Timestamp.fromDate(new Date(`${value}T12:00:00`));
+}
+
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   new: { label: "New Request", color: "bg-yellow-100 text-yellow-700" },
   request: { label: "New Request", color: "bg-yellow-100 text-yellow-700" },
@@ -124,7 +129,6 @@ function Field({ label, value, editing, editValue, onChange, type = "text", span
 export default function AdminOrderRequest() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [order, setOrder] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [editing, setEditing] = React.useState(false);
@@ -228,7 +232,7 @@ export default function AdminOrderRequest() {
     try {
       await updateDoc(doc(db, "orderRequests", id), {
         status: "scheduled", appointmentDate: schedDate, appointmentTime: schedTime || null,
-        scheduledDate: fmtDate(schedDate), scheduledTime: schedTime || null,
+        scheduledDate: scheduleDateTimestamp(schedDate), scheduledTime: schedTime || null,
         assignedProviders: selectedProviders.map(pid => {
           const s = staff.find(st => st.id === pid);
           return { providerId: pid, name: s?.name || pid, role: s?.role || "photographer" };
@@ -242,38 +246,52 @@ export default function AdminOrderRequest() {
 
   const handleConfirmBooking = async () => {
     if (!id || !order) return;
-    if (!user) {
-      toast.error("Please sign in again before confirming this booking.");
+    const status = String(order.status || "").toLowerCase();
+    if (status === "confirmed") {
+      toast.success("This appointment is already confirmed.");
       return;
     }
-    if (order.convertedToOrderId) {
-      navigate(`/admin/order/${order.convertedToOrderId}`);
+    if (!["scheduled", "appt_scheduled", "consult_scheduled"].includes(status)) {
+      toast.error("Schedule this appointment before marking it confirmed.");
       return;
     }
 
     setSaving(true);
     try {
-      const token = await user.getIdToken();
-      const res = await fetch(`/api/bookings/${id}/confirm`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          assignedPhotographerId: selectedProviders[0] || null,
-          assignedPhotographerName: selectedProviders[0]
-            ? staff.find(s => s.id === selectedProviders[0])?.name || null
-            : order.photographerPreference || null,
-          scheduledDate: parseBookingDate(schedDate || order.appointmentDate || order.scheduledDate),
-          scheduledTime: schedTime || order.appointmentTime || order.scheduledTime || null,
-          internalNotes: order.internalNotes || "",
-        }),
+      const batch = writeBatch(db);
+      batch.update(doc(db, "orderRequests", id), {
+        status: "confirmed",
+        clientConfirmedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
-      const result = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(result.error || "Confirmation failed.");
-      toast.success("Booking confirmed. Order, appointment, gallery, and invoice created.");
-      navigate(`/admin/order/${result.orderId}`);
+
+      if (order.convertedToOrderId) {
+        batch.update(doc(db, "orders", order.convertedToOrderId), {
+          status: "confirmed",
+          clientConfirmedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+
+        const appointmentSnap = await getDocs(query(collection(db, "appointments"), where("orderId", "==", order.convertedToOrderId)));
+        appointmentSnap.docs.forEach((appointmentDoc) => {
+          batch.update(appointmentDoc.ref, {
+            status: "confirmed",
+            clientConfirmedAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+        });
+      }
+
+      if (order.listingId) {
+        batch.update(doc(db, "listings", order.listingId), {
+          status: "confirmed",
+          clientConfirmedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      await batch.commit();
+      toast.success("Appointment marked confirmed.");
     } catch (err) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Confirmation failed.");
@@ -358,7 +376,7 @@ export default function AdminOrderRequest() {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <h3 className={`${labelCls} mb-4`}>Appointment</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-              <Field label={isScheduledState ? "Scheduled Date" : "Requested Date"} value={order.scheduledDate || fmtDate(order.appointmentDate || order.requestedDate)} editing={editing} editValue={f("appointmentDate")} onChange={setF("appointmentDate")} type="date" />
+              <Field label={isScheduledState ? "Scheduled Date" : "Requested Date"} value={fmtDate(order.scheduledDate || order.appointmentDate || order.requestedDate)} editing={editing} editValue={f("appointmentDate")} onChange={setF("appointmentDate")} type="date" />
               <Field label={isScheduledState ? "Scheduled Time" : "Requested Time"} value={fmtTimeStandard(order.scheduledTime || order.appointmentTime || order.requestedTime)} editing={editing} editValue={f("appointmentTime")} onChange={setF("appointmentTime")} type="time" />
               <Field label="Access Method" value={order.accessMethod} editing={editing} editValue={f("accessMethod")} onChange={setF("accessMethod")} />
               <Field label="Lockbox Code" value={order.lockboxCode} editing={editing} editValue={f("lockboxCode")} onChange={setF("lockboxCode")} />
@@ -457,7 +475,7 @@ export default function AdminOrderRequest() {
             </div>
             <div className="mt-4 pt-4 border-t border-gray-100 space-y-2 text-xs">
               <div className="flex justify-between"><span className={`${labelCls}`}>Status</span><span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${statusInfo.color}`}>{statusInfo.label}</span></div>
-              <div className="flex justify-between"><span className={`${labelCls}`}>{isScheduledState ? "Scheduled" : "Requested"}</span><span className="font-bold text-white">{order.scheduledDate || fmtDate(order.appointmentDate) || "—"}</span></div>
+              <div className="flex justify-between"><span className={`${labelCls}`}>{isScheduledState ? "Scheduled" : "Requested"}</span><span className="font-bold text-white">{fmtDate(order.scheduledDate || order.appointmentDate) || "—"}</span></div>
               {(order.scheduledTime || order.appointmentTime) && (
                 <div className="flex justify-between"><span className={`${labelCls}`}>Time</span><span className="font-bold text-white">{fmtTimeStandard(order.scheduledTime || order.appointmentTime)}</span></div>
               )}
@@ -477,8 +495,8 @@ export default function AdminOrderRequest() {
                 <Layers className="w-3.5 h-3.5 mr-1.5" />{order.listingId ? "View Project" : "Create Project"}
               </Button>
               <Button onClick={handleConfirmBooking}
-                disabled={saving} className="w-full rounded-xl text-xs font-bold justify-center bg-emerald-600 hover:bg-emerald-700 text-white">
-                <Check className="w-3.5 h-3.5 mr-1.5" />{order.convertedToOrderId ? "Open Confirmed Order" : "Confirm Booking"}
+                disabled={saving || statusKey === "confirmed"} className="w-full rounded-xl text-xs font-bold justify-center bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50">
+                <Check className="w-3.5 h-3.5 mr-1.5" />{statusKey === "confirmed" ? "Confirmed" : "Mark Client Confirmed"}
               </Button>
               {!editing ? (
                 <Button onClick={() => setEditing(true)} variant="outline" className="w-full rounded-xl text-xs font-bold justify-center">

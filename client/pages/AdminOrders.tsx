@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 import { Search, ChevronDown, X, Trash2, Archive, Calendar, Layers, Check, ChevronUp, AlertCircle, RefreshCw } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, writeBatch, doc, serverTimestamp, addDoc, getDocs, updateDoc } from "firebase/firestore";
+import { collection, onSnapshot, writeBatch, doc, serverTimestamp, addDoc, getDocs, updateDoc, Timestamp } from "firebase/firestore";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
@@ -27,6 +27,10 @@ function fmtDate(ts: any): string {
 
   if (ts.toDate) return ts.toDate().toLocaleDateString("en-US", options);
   try { return new Date(ts).toLocaleDateString("en-US", options); } catch { return ""; }
+}
+
+function scheduleDateTimestamp(value: string) {
+  return Timestamp.fromDate(new Date(`${value}T12:00:00`));
 }
 
 function fmtTimeStandard(timeStr: string | any): string {
@@ -262,7 +266,7 @@ export default function AdminOrders() {
     const status = getUnifiedStatus(o);
     const statusInfo = UNIFIED_STATUS[status] || UNIFIED_STATUS.unscheduled;
     const items = getLineItems(o);
-    const requestedDate = o.scheduledDate || fmtDate(o.appointmentDate || o.requestedDate);
+    const requestedDate = fmtDate(o.scheduledDate || o.appointmentDate || o.requestedDate);
     const requestedTime = fmtTimeStandard(o.scheduledTime || o.appointmentTime || o.requestedTime || "");
 
     // Past detection logic
@@ -626,7 +630,7 @@ function BulkScheduleFlow({ ids, orders, staff, onClose }: any) {
         status: "scheduled",
         appointmentDate: date,
         appointmentTime: time || null,
-        scheduledDate: fmtDate(date),
+        scheduledDate: scheduleDateTimestamp(date),
         scheduledTime: time || null,
         assignedProviders: providers.map(pid => {
           const s = staff.find((st: any) => st.id === pid);
