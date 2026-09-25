@@ -6,6 +6,7 @@
 
 import { Router } from "express";
 import admin from "firebase-admin";
+import sharp from "sharp";
 import { requireCoordinator, requirePhotographer, requireStaff, requireAuth, type AuthenticatedRequest } from "../middleware/auth";
 import { sendEmail } from "../services/email";
 import { sendSMS, SMS_TEMPLATES } from "../services/sms";
@@ -29,19 +30,78 @@ function addressLabel(address: unknown): string {
   return String(address);
 }
 
-function publicMediaItem(item: any, canDownload: boolean) {
-  const url = item.shareUrl || item.embedUrl || item.url;
+function timestampDate(value: any): Date | null {
+  if (!value) return null;
+  if (typeof value.toDate === "function") return value.toDate();
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+async function signedReadUrl(path: string, minutes = 30) {
+  const [url] = await storage().file(path).getSignedUrl({
+    version: "v4",
+    action: "read",
+    expires: Date.now() + minutes * 60 * 1000,
+  });
+  return url;
+}
+
+async function createWatermarkedPreview(storagePath: string, galleryId: string, mediaId: string) {
+  const [source] = await storage().file(storagePath).download();
+  const resized = await sharp(source)
+    .rotate()
+    .resize({ width: 1600, withoutEnlargement: true })
+    .jpeg({ quality: 78, mozjpeg: true })
+    .toBuffer({ resolveWithObject: true });
+  const width = resized.info.width;
+  const height = resized.info.height;
+  const fontSize = Math.max(28, Math.round(width / 18));
+  const watermark = Buffer.from(`
+    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+      <g transform="translate(${width / 2} ${height / 2}) rotate(-28)">
+        <text x="0" y="0" text-anchor="middle" fill="white" fill-opacity="0.52"
+          stroke="black" stroke-opacity="0.28" stroke-width="2"
+          font-family="Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="700"
+          letter-spacing="8">ICONIC IMAGES • PREVIEW</text>
+      </g>
+    </svg>`);
+  const preview = await sharp(resized.data)
+    .composite([{ input: watermark, gravity: "center" }])
+    .jpeg({ quality: 80, mozjpeg: true })
+    .toBuffer();
+  const previewStoragePath = `galleries/${galleryId}/previews/${mediaId}.jpg`;
+  await storage().file(previewStoragePath).save(preview, {
+    contentType: "image/jpeg",
+    resumable: false,
+    metadata: { cacheControl: "private, max-age=1800" },
+  });
+  return previewStoragePath;
+}
+
+async function publicMediaItem(item: any, canDownload: boolean, galleryId: string) {
+  const isHostedLink = ["video", "reel", "tour", "matterport"].includes(item.type);
+  const previewPath = item.previewStoragePath || (canDownload ? item.storagePath : null);
+  const displayUrl = previewPath
+    ? await signedReadUrl(previewPath)
+    : isHostedLink
+      ? item.shareUrl || item.embedUrl || item.url
+      : canDownload
+        ? item.url
+        : null;
   return {
     id: item.id,
-    url,
-    shareUrl: item.shareUrl || item.url || item.embedUrl || null,
-    embedUrl: item.embedUrl || item.url || null,
+    url: displayUrl,
+    shareUrl: isHostedLink ? item.shareUrl || item.url || item.embedUrl || null : null,
+    embedUrl: isHostedLink ? item.embedUrl || item.url || null : null,
     fileName: item.fileName || item.title || "Media",
     title: item.title || item.fileName || "Media",
     type: item.type || "photo",
     width: item.width || null,
     height: item.height || null,
     canDownload: Boolean(canDownload && item.downloadable !== false),
+    downloadUrl: canDownload && item.storagePath && item.downloadable !== false
+      ? `/api/galleries/public/${galleryId}/media/${item.id}/download`
+      : null,
   };
 }
 
@@ -78,7 +138,16 @@ router.get("/public/:id", async (req, res) => {
       : null;
     const invoiceStatus = (invoice as any)?.status || null;
     const paid = invoiceStatus === "paid" || Number((invoice as any)?.amountDue || 0) <= 0;
-    const canDownload = Boolean(gallery.downloadEnabled) && paid;
+    const expiry = timestampDate(gallery.expiresAt);
+    const expired = Boolean(expiry && expiry.getTime() < Date.now());
+    const canDownload = Boolean(gallery.downloadEnabled) && paid && !expired;
+    const items = ["delivered", "approved"].includes(gallery.status) && !expired
+      ? [
+          ...(gallery.mediaItems || []),
+          ...(gallery.videoLinks || []),
+          ...(gallery.tourLinks || []),
+        ]
+      : [];
 
     return res.json({
       id: doc.id,
@@ -88,21 +157,55 @@ router.get("/public/:id", async (req, res) => {
       status: gallery.status,
       deliveredAt: gallery.deliveredAt || null,
       expiresAt: gallery.expiresAt || null,
+      expired,
       downloadEnabled: canDownload,
       paymentRequired: !paid,
       invoiceId: (invoice as any)?.id || null,
       invoiceStatus,
-      mediaItems: ["delivered", "approved"].includes(gallery.status)
-        ? [
-            ...(gallery.mediaItems || []),
-            ...(gallery.videoLinks || []),
-            ...(gallery.tourLinks || []),
-          ].map((item: any) => publicMediaItem(item, canDownload))
-        : [],
+      mediaItems: await Promise.all(items.map((item: any) => publicMediaItem(item, canDownload, doc.id))),
     });
   } catch (err) {
     console.error("[Galleries] Public fetch error:", err);
     return res.status(500).json({ error: "Failed to fetch gallery." });
+  }
+});
+
+// Originals are only issued after gallery, expiry, and payment checks pass.
+router.get("/public/:id/media/:mediaId/download", async (req, res) => {
+  try {
+    const galleryDoc = await db().collection("galleries").doc(req.params.id).get();
+    if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
+    const gallery = galleryDoc.data()!;
+    if (!["delivered", "approved"].includes(gallery.status)) {
+      return res.status(403).json({ error: "Gallery has not been released." });
+    }
+    const expiry = timestampDate(gallery.expiresAt);
+    if (expiry && expiry.getTime() < Date.now()) {
+      return res.status(410).json({ error: "This gallery delivery link has expired." });
+    }
+    const invoiceSnap = gallery.orderId
+      ? await db().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get()
+      : null;
+    const invoice = invoiceSnap && !invoiceSnap.empty ? invoiceSnap.docs[0].data() : null;
+    const paid = !invoice || invoice.status === "paid" || Number(invoice.amountDue || 0) <= 0;
+    if (!gallery.downloadEnabled || !paid) {
+      return res.status(402).json({ error: "Payment is required before downloading." });
+    }
+    const item = (gallery.mediaItems || []).find((media: any) => media.id === req.params.mediaId);
+    if (!item?.storagePath || item.downloadable === false) {
+      return res.status(404).json({ error: "Download not available." });
+    }
+    const safeFileName = String(item.fileName || "iconic-media").replace(/["\\]/g, "_");
+    const [downloadUrl] = await storage().file(item.storagePath).getSignedUrl({
+      version: "v4",
+      action: "read",
+      expires: Date.now() + 5 * 60 * 1000,
+      responseDisposition: `attachment; filename="${safeFileName}"`,
+    });
+    return res.redirect(302, downloadUrl);
+  } catch (err) {
+    console.error("[Galleries] Download error:", err);
+    return res.status(500).json({ error: "Failed to prepare download." });
   }
 });
 
@@ -170,7 +273,7 @@ router.post("/:id/upload-url", requirePhotographer, async (req, res) => {
 router.post("/:id/media", requirePhotographer, async (req: AuthenticatedRequest, res) => {
   try {
     const {
-      storagePath, fileName, type = "photo",
+      storagePath, fileName, fileType, type = "photo",
       width, height, fileSize, isRaw = false
     } = req.body;
 
@@ -181,18 +284,16 @@ router.post("/:id/media", requirePhotographer, async (req: AuthenticatedRequest,
     const galleryDoc = await db().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
 
-    // Generate signed read URL (7 days)
-    const file = storage().file(storagePath);
-    const [url] = await file.getSignedUrl({
-      version: "v4",
-      action: "read",
-      expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
-    });
-
+    const mediaId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const isPhoto = type === "photo" && !isRaw && String(fileType || "").startsWith("image/");
+    let previewStoragePath: string | null = null;
+    if (isPhoto) {
+      previewStoragePath = await createWatermarkedPreview(storagePath, req.params.id, mediaId);
+    }
     const mediaItem = {
-      id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      url,
+      id: mediaId,
       storagePath,
+      previewStoragePath,
       fileName,
       type,
       width: width || null,

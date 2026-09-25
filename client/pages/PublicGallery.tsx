@@ -67,7 +67,13 @@ export default function PublicGallery() {
           </div>
         )}
 
-        {gallery.status !== "delivered" && gallery.status !== "approved" ? (
+        {gallery.expired ? (
+          <div className="text-center py-20">
+            <AlertCircle className="w-16 h-16 text-amber-400 mx-auto mb-4" />
+            <h2 className="text-xl font-black mb-2">Gallery Link Expired</h2>
+            <p className="text-sm text-gray-500">Contact Iconic Images to restore access to this delivery.</p>
+          </div>
+        ) : gallery.status !== "delivered" && gallery.status !== "approved" ? (
           <div className="text-center py-20">
             <Image className="w-16 h-16 text-gray-200 mx-auto mb-4" />
             <h2 className="text-xl font-black mb-2">Media Is Being Prepared</h2>
@@ -91,7 +97,8 @@ export default function PublicGallery() {
                     <p className="text-[10px] text-gray-400 mt-1 break-all">{item.shareUrl || item.url}</p>
                   </div>
                 ) : (
-                  <img src={item.url} alt={item.fileName || `Media ${index + 1}`} className="w-full h-full object-cover" loading="lazy" />
+                  item.url ? <img src={item.url} alt={item.fileName || `Media ${index + 1}`} className="w-full h-full object-cover" loading="lazy" /> :
+                    <div className="w-full h-full flex items-center justify-center bg-gray-100"><Lock className="w-7 h-7 text-gray-300" /></div>
                 )}
                 {(item.type === "video" || item.type === "reel" || item.type === "tour" || item.type === "matterport") && (item.shareUrl || item.url) && (
                   <div className="absolute left-2 right-2 bottom-2 flex gap-2">
@@ -104,7 +111,7 @@ export default function PublicGallery() {
                   </div>
                 )}
                 {item.canDownload && !["video", "reel", "tour", "matterport"].includes(item.type) && (
-                  <a href={item.url} download className="absolute bottom-2 right-2 p-2 bg-white rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                  <a href={item.downloadUrl} className="absolute bottom-2 right-2 p-2 bg-white rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
                     <Download className="w-4 h-4 text-black" />
                   </a>
                 )}
