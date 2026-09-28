@@ -39,6 +39,7 @@ import VirtualStagingSelection from "./pages/VirtualStagingSelection";
 import VirtualStagingAITool from "./pages/VirtualStagingAITool";
 import VirtualStagingProOrder from "./pages/VirtualStagingProOrder";
 import VirtualStagingCheckout from "./pages/VirtualStagingCheckout";
+import Go from "./pages/Go";
 import NotFound from "./pages/NotFound";
 
 // Admin / ops pages
@@ -85,6 +86,8 @@ const App = () => (
             <Route path="/insights/prep" element={<Prep />} />
             <Route path="/stock-footage" element={<StockFootage />} />
             <Route path="/privacy" element={<Privacy />} />
+            {/* Shirt QR destination. /go/ matches here too (trailing slash is ignored). */}
+            <Route path="/go" element={<Go />} />
             <Route path="/studio/:listingId" element={<ClientStudio />} />
             <Route path="/gallery/:galleryId" element={<PublicGallery />} />
             <Route path="/invoice/:invoiceId" element={<ClientInvoice />} />
