@@ -101,9 +101,9 @@ const App = () => (
 
             {/* ─── Admin / Staff ────────────────────────────────────────── */}
             <Route path="/admin/dashboard" element={<ProtectedRoute requiredRole="coordinator"><AdminDashboard /></ProtectedRoute>} />
-            <Route path="/admin/studio" element={<ProtectedRoute requiredRole="photographer"><AdminStudio /></ProtectedRoute>} />
+            <Route path="/admin/studio" element={<ProtectedRoute requiredRole="staff"><AdminStudio /></ProtectedRoute>} />
             <Route path="/admin/listings" element={<ProtectedRoute requiredRole="coordinator"><AdminListings /></ProtectedRoute>} />
-            <Route path="/admin/listing/:id" element={<ProtectedRoute requiredRole="photographer"><AdminListingFile /></ProtectedRoute>} />
+            <Route path="/admin/listing/:id" element={<ProtectedRoute requiredRole="staff"><AdminListingFile /></ProtectedRoute>} />
             <Route path="/admin/customers" element={<ProtectedRoute requiredRole="coordinator"><AdminCustomerCenter /></ProtectedRoute>} />
             <Route path="/admin/order/:id" element={<ProtectedRoute requiredRole="coordinator"><AdminOrderDetail /></ProtectedRoute>} />
             <Route path="/admin/orders/:id" element={<ProtectedRoute requiredRole="coordinator"><AdminOrderDetail /></ProtectedRoute>} />
@@ -118,13 +118,13 @@ const App = () => (
             <Route path="/admin/email-templates" element={<ProtectedRoute requiredRole="admin"><AdminEmailTemplates /></ProtectedRoute>} />
             <Route path="/admin/current-pricing" element={<ProtectedRoute requiredRole="admin"><AdminCurrentPricing /></ProtectedRoute>} />
             
-            <Route path="/admin/revenue" element={<ProtectedRoute><AdminRevenue /></ProtectedRoute>} />
-            <Route path="/admin/billing" element={<ProtectedRoute><AdminBilling /></ProtectedRoute>} />
-            <Route path="/admin/client-billing" element={<ProtectedRoute><AdminClientBilling /></ProtectedRoute>} />
-            <Route path="/admin/aicon" element={<ProtectedRoute><AdminAicon /></ProtectedRoute>} />
-            <Route path="/admin/automation" element={<ProtectedRoute><AdminAutomation /></ProtectedRoute>} />
-            <Route path="/admin/schedule" element={<ProtectedRoute><AdminSchedule /></ProtectedRoute>} />
-            <Route path="/admin/orders" element={<ProtectedRoute><AdminOrders /></ProtectedRoute>} />
+            <Route path="/admin/revenue" element={<ProtectedRoute requiredRole="admin"><AdminRevenue /></ProtectedRoute>} />
+            <Route path="/admin/billing" element={<ProtectedRoute requiredRole="admin"><AdminBilling /></ProtectedRoute>} />
+            <Route path="/admin/client-billing" element={<ProtectedRoute requiredRole="admin"><AdminClientBilling /></ProtectedRoute>} />
+            <Route path="/admin/aicon" element={<ProtectedRoute requiredRole="coordinator"><AdminAicon /></ProtectedRoute>} />
+            <Route path="/admin/automation" element={<ProtectedRoute requiredRole="admin"><AdminAutomation /></ProtectedRoute>} />
+            <Route path="/admin/schedule" element={<ProtectedRoute requiredRole="coordinator"><AdminSchedule /></ProtectedRoute>} />
+            <Route path="/admin/orders" element={<ProtectedRoute requiredRole="coordinator"><AdminOrders /></ProtectedRoute>} />
 
             {/* ─── Catch-all ──────────────────────────────────────────────── */}
             <Route path="*" element={<NotFound />} />

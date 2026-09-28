@@ -8,24 +8,27 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function staffData() {
+      return get(/databases/$(database)/documents/staff/$(request.auth.uid)).data;
+    }
+
     function isStaff() {
       return isAuthenticated() &&
-        exists(/databases/$(database)/documents/staff/$(request.auth.uid));
+        exists(/databases/$(database)/documents/staff/$(request.auth.uid)) &&
+        staffData().isActive != false &&
+        staffData().role in ['admin', 'coordinator', 'photographer', 'editor'];
     }
 
     function isAdmin() {
-      return isAuthenticated() &&
-        get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role == 'admin';
+      return isStaff() && staffData().role == 'admin';
     }
 
     function isCoordinator() {
-      return isAuthenticated() &&
-        get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role in ['admin', 'coordinator'];
+      return isStaff() && staffData().role in ['admin', 'coordinator'];
     }
 
     function isPhotographer() {
-      return isAuthenticated() &&
-        get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role in ['admin', 'coordinator', 'photographer'];
+      return isStaff() && staffData().role in ['admin', 'coordinator', 'photographer'];
     }
 
     function isClientOwner(clientId) {
@@ -106,7 +109,7 @@ service cloud.firestore {
 
     match /transactions/{transactionId} {
       allow read: if isCoordinator();
-      allow create: if isAuthenticated(); // payment webhooks write here
+      allow create: if false; // server writes payments with the Admin SDK
       allow update: if isCoordinator();
       allow delete: if isAdmin();
     }
@@ -160,7 +163,7 @@ service cloud.firestore {
 
     match /agentLogs/{logId} {
       allow read: if isStaff();
-      allow create: if isAuthenticated(); // agents write via service account
+      allow create: if false; // server writes agent logs with the Admin SDK
       allow update: if isCoordinator(); // mark reviewed
       allow delete: if isAdmin();
     }

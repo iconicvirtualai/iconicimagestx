@@ -1,6 +1,14 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    function isActiveStaff() {
+      return request.auth != null
+        && firestore.exists(/databases/(default)/documents/staff/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/staff/$(request.auth.uid)).data.isActive != false
+        && firestore.get(/databases/(default)/documents/staff/$(request.auth.uid)).data.role in [
+          'admin', 'coordinator', 'photographer', 'editor'
+        ];
+    }
 
     // VSAI free-trial uploads — any authenticated user (including anonymous)
     // can upload their own files; only they can read them
@@ -8,16 +16,14 @@ service firebase.storage {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
-    // Gallery media — only staff can write; clients can read their own delivered galleries
-    match /galleries/{orderId}/{allPaths=**} {
-      allow read: if true;
-      allow write: if true;
+    // Gallery files are served to clients through signed URLs after the invoice is paid.
+    match /galleries/{allPaths=**} {
+      allow read, write: if isActiveStaff();
     }
 
-    // Studio Uploads — RAW files and assets uploaded by photographers
-    // TEMPORARY: allow public access for development until real auth is fully mapped
+    // Studio uploads stay on staff accounts. Public delivery uses signed URLs.
     match /Uploads/{allPaths=**} {
-      allow read, write: if true;
+      allow read, write: if isActiveStaff();
     }
 
     // Default deny

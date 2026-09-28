@@ -7,12 +7,13 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { staffHomePath } from "@shared/staffAccess";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
 export default function AdminLogin() {
-  const { signIn, user, isStaff, loading, resetPassword } = useAuth();
+  const { signIn, signOutUser, user, isStaff, staffProfile, loading, resetPassword } = useAuth();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
@@ -23,10 +24,18 @@ export default function AdminLogin() {
 
   // Redirect if already logged in as staff
   useEffect(() => {
-    if (!loading && user && isStaff) {
-      navigate("/admin/dashboard");
+    if (loading) return;
+    if (user && isStaff) {
+      navigate(staffHomePath(staffProfile?.role));
+      return;
     }
-  }, [user, isStaff, loading, navigate]);
+    if (user && !isStaff) {
+      toast.error("This login is not an active staff account.");
+      void signOutUser();
+    }
+    // signOutUser identity changes each render; only the auth state should retrigger this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, isStaff, staffProfile, loading, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

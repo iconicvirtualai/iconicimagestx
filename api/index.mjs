@@ -9,35 +9,63 @@ import twilio from "twilio";
 import { google } from "googleapis";
 import Stripe from "stripe";
 import crypto from "crypto";
-const TEMP_ADMIN_ENABLED = process.env.ENABLE_TEMP_ADMIN === "true" || process.env.NODE_ENV !== "production";
+const STAFF_ROLES = ["admin", "coordinator", "photographer", "editor"];
+function isStaffRole(role) {
+  return typeof role === "string" && STAFF_ROLES.includes(role);
+}
+function isActiveStaffRecord(data) {
+  if (!data) return false;
+  if (data.isActive === false) return false;
+  return isStaffRole(data.role);
+}
+function isHostedDeployment(env) {
+  if (env.VERCEL === "1" || env.VERCEL_ENV) return true;
+  return env.NODE_ENV === "production";
+}
+function isTempAdminEnabled(env = liveServerEnv()) {
+  if (env.ENABLE_TEMP_ADMIN !== "true") return false;
+  return !isHostedDeployment(env);
+}
+function liveServerEnv(env = process.env) {
+  return {
+    ENABLE_TEMP_ADMIN: env.ENABLE_TEMP_ADMIN,
+    VERCEL: env.VERCEL,
+    VERCEL_ENV: env.VERCEL_ENV,
+    // Bracket access so production server bundles keep the runtime value.
+    NODE_ENV: env["NODE_ENV"]
+  };
+}
+function tempAdminAllowed() {
+  return isTempAdminEnabled(liveServerEnv());
+}
 function roleAtLeast(role, minimum) {
   if (!role) return false;
-  const hierarchy = ["editor", "photographer", "coordinator", "admin"];
-  const minIdx = hierarchy.indexOf(minimum);
-  const roleIdx = hierarchy.indexOf(role);
-  return roleIdx >= minIdx;
+  if (role === "admin") return true;
+  if (role === "coordinator") return minimum !== "admin";
+  return role === "photographer";
 }
 async function resolveRole(uid, decoded) {
-  if (TEMP_ADMIN_ENABLED && uid === "temp-admin-uid") {
+  if (tempAdminAllowed() && uid === "temp-admin-uid") {
     return "admin";
-  }
-  if (decoded.isStaff && decoded.role) {
-    return decoded.role;
   }
   try {
     const staffDoc = await admin.firestore().collection("staff").doc(uid).get();
     if (!staffDoc.exists) return null;
     const data = staffDoc.data();
-    if (data.isActive === false) return null;
+    if (!isActiveStaffRecord(data)) return null;
     return data.role;
   } catch (err) {
     console.error("[Auth] Firestore staff lookup failed:", err);
+    const claimRole = decoded.role;
+    if (decoded.isStaff === true && isActiveStaffRecord({ role: claimRole, isActive: true })) {
+      return claimRole;
+    }
     return null;
   }
 }
 async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
-  if (TEMP_ADMIN_ENABLED && authHeader === "Bearer temp-admin-token") {
+  if (tempAdminAllowed() && authHeader === "Bearer temp-admin-token") {
     req.user = {
       uid: "temp-admin-uid",
       email: "temp-admin@iconicimagestx.com"
@@ -1210,6 +1238,79 @@ router$c.get("/:id/timeline", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch timeline." });
   }
 });
+const CLOSED_STATUSES = /* @__PURE__ */ new Set(["void", "voided", "cancelled", "canceled"]);
+const SETTLED_STATUSES = /* @__PURE__ */ new Set(["paid", "comped"]);
+function statusOf(invoice) {
+  return String(invoice?.status || "").toLowerCase();
+}
+function numeric(value) {
+  if (value == null || value === "") return null;
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : null;
+}
+function invoiceBalance(invoice) {
+  const total = numeric(invoice?.total) ?? 0;
+  const amountPaid = numeric(invoice?.amountPaid) ?? 0;
+  const statedDue = numeric(invoice?.amountDue);
+  const computedDue = Math.max(0, total - amountPaid);
+  const amountDue = statedDue == null ? computedDue : Math.max(0, statedDue);
+  return { total, amountPaid, amountDue };
+}
+function invoiceAllowsDownload(invoice) {
+  if (!invoice) return false;
+  const status = statusOf(invoice);
+  if (CLOSED_STATUSES.has(status)) return false;
+  if (SETTLED_STATUSES.has(status)) return true;
+  const { total, amountPaid, amountDue } = invoiceBalance(invoice);
+  const statedDue = numeric(invoice.amountDue);
+  if (total <= 0 && (statedDue == null || statedDue <= 0)) return true;
+  if (statedDue != null && statedDue <= 0 && amountPaid <= 0 && total > 0) return false;
+  return amountDue <= 0 && amountPaid > 0;
+}
+function amountStillDue(invoice) {
+  if (!invoice) return 0;
+  const status = statusOf(invoice);
+  if (SETTLED_STATUSES.has(status) || CLOSED_STATUSES.has(status)) return 0;
+  const { total, amountPaid, amountDue } = invoiceBalance(invoice);
+  const computedDue = Math.max(0, total - amountPaid);
+  const statedDue = numeric(invoice.amountDue);
+  if (statedDue != null && statedDue <= 0 && computedDue > 0 && amountPaid <= 0) return computedDue;
+  return amountDue;
+}
+function squarePaymentNote(invoiceId, invoiceNumber) {
+  const label = invoiceNumber ? `Iconic Images invoice ${invoiceNumber}` : "Iconic Images invoice";
+  return `${label} invoiceId:${invoiceId}`;
+}
+function invoiceIdFromSquareNote(note) {
+  if (typeof note !== "string") return null;
+  const match = note.match(/invoiceId:([A-Za-z0-9_-]+)/);
+  return match?.[1] || null;
+}
+const LINK_MEDIA_TYPES = /* @__PURE__ */ new Set(["video", "reel", "tour", "matterport"]);
+function publicMediaItem(item, canDownload) {
+  const type = String(item.type || "photo");
+  const title = item.title || item.fileName || "Media";
+  const base = {
+    id: item.id,
+    fileName: item.fileName || title,
+    title,
+    type,
+    width: item.width || null,
+    height: item.height || null,
+    canDownload: Boolean(canDownload && item.downloadable !== false && !LINK_MEDIA_TYPES.has(type)),
+    locked: !canDownload
+  };
+  if (!canDownload) {
+    return { ...base, url: null, shareUrl: null, embedUrl: null };
+  }
+  const url = item.shareUrl || item.embedUrl || item.url || null;
+  return {
+    ...base,
+    url,
+    shareUrl: item.shareUrl || item.url || item.embedUrl || null,
+    embedUrl: item.embedUrl || item.url || null
+  };
+}
 const router$b = Router();
 const db$9 = () => admin.firestore();
 const storage = () => admin.storage().bucket();
@@ -1226,20 +1327,16 @@ function addressLabel$2(address) {
   }
   return String(address);
 }
-function publicMediaItem(item, canDownload) {
-  const url = item.shareUrl || item.embedUrl || item.url;
-  return {
-    id: item.id,
-    url,
-    shareUrl: item.shareUrl || item.url || item.embedUrl || null,
-    embedUrl: item.embedUrl || item.url || null,
-    fileName: item.fileName || item.title || "Media",
-    title: item.title || item.fileName || "Media",
-    type: item.type || "photo",
-    width: item.width || null,
-    height: item.height || null,
-    canDownload: Boolean(canDownload && item.downloadable !== false)
-  };
+async function invoiceForGallery(gallery) {
+  if (typeof gallery.invoiceId === "string" && gallery.invoiceId) {
+    const doc = await db$9().collection("invoices").doc(gallery.invoiceId).get();
+    if (doc.exists) return { id: doc.id, ...doc.data() };
+  }
+  if (typeof gallery.orderId === "string" && gallery.orderId) {
+    const snap = await db$9().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
+    if (!snap.empty) return { id: snap.docs[0].id, ...snap.docs[0].data() };
+  }
+  return null;
 }
 router$b.get("/", requireStaff, async (req, res) => {
   try {
@@ -1258,11 +1355,10 @@ router$b.get("/public/:id", async (req, res) => {
     const doc = await db$9().collection("galleries").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Gallery not found." });
     const gallery = doc.data();
-    const invoiceSnap = gallery.orderId ? await db$9().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get() : null;
-    const invoice = invoiceSnap && !invoiceSnap.empty ? { id: invoiceSnap.docs[0].id, ...invoiceSnap.docs[0].data() } : null;
+    const invoice = await invoiceForGallery(gallery);
     const invoiceStatus = invoice?.status || null;
-    const paid = invoiceStatus === "paid" || Number(invoice?.amountDue || 0) <= 0;
-    const canDownload = Boolean(gallery.downloadEnabled) && paid;
+    const paid = invoiceAllowsDownload(invoice);
+    const canDownload = paid;
     return res.json({
       id: doc.id,
       title: gallery.title,
@@ -1428,7 +1524,10 @@ router$b.post("/:id/deliver", requireCoordinator, async (req, res) => {
     const galleryDoc = await db$9().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const gallery = galleryDoc.data();
-    const { downloadEnabled = true, expiresInDays = 30 } = req.body;
+    const invoice = await invoiceForGallery(gallery);
+    const paid = invoiceAllowsDownload(invoice);
+    const downloadEnabled = paid;
+    const expiresInDays = Number(req.body?.expiresInDays) > 0 ? Number(req.body.expiresInDays) : 30;
     const expiresAt = admin.firestore.Timestamp.fromDate(
       new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1e3)
     );
@@ -1450,8 +1549,7 @@ router$b.post("/:id/deliver", requireCoordinator, async (req, res) => {
     const clientDoc = await db$9().collection("clients").doc(gallery.clientId).get();
     const client = clientDoc.data();
     if (client?.email) {
-      const invoiceSnap = await db$9().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
-      const invoice = invoiceSnap.empty ? null : invoiceSnap.docs[0].data();
+      const invoiceTotal = Number(invoice?.total);
       await sendEmail({
         to: client.email,
         template: "gallery_delivery",
@@ -1459,8 +1557,8 @@ router$b.post("/:id/deliver", requireCoordinator, async (req, res) => {
           clientName: gallery.clientName,
           address: gallery.addressLabel || addressLabel$2(gallery.address),
           galleryUrl: deliveryUrl,
-          invoiceAmount: invoice ? `$${invoice.total.toFixed(2)}` : "",
-          paymentUrl: invoice ? `${appUrl$1()}/invoice/${invoiceSnap.docs[0].id}` : "",
+          invoiceAmount: invoice && Number.isFinite(invoiceTotal) ? `$${invoiceTotal.toFixed(2)}` : "",
+          paymentUrl: invoice ? `${appUrl$1()}/invoice/${invoice.id}` : "",
           expiresAt: `${expiresInDays} days`
         }
       });
@@ -1520,6 +1618,40 @@ function invoiceProvider(invoice) {
 function money(value) {
   return `$${(Number(value) || 0).toFixed(2)}`;
 }
+async function paymentAlreadyRecorded({
+  squarePaymentId,
+  stripePaymentIntentId
+}) {
+  if (squarePaymentId) {
+    const existing = await db$8().collection("transactions").where("squarePaymentId", "==", squarePaymentId).limit(1).get();
+    if (!existing.empty) return true;
+  }
+  if (stripePaymentIntentId) {
+    const existing = await db$8().collection("transactions").where("stripePaymentIntentId", "==", stripePaymentIntentId).limit(1).get();
+    if (!existing.empty) return true;
+  }
+  return false;
+}
+async function unlockGalleriesForInvoice({
+  invoiceId,
+  orderId,
+  galleryId
+}) {
+  const refs = /* @__PURE__ */ new Map();
+  if (galleryId) refs.set(galleryId, db$8().collection("galleries").doc(galleryId));
+  const lookups = [
+    db$8().collection("galleries").where("invoiceId", "==", invoiceId).get()
+  ];
+  if (orderId) lookups.push(db$8().collection("galleries").where("orderId", "==", orderId).get());
+  const snaps = await Promise.all(lookups);
+  snaps.forEach((snap) => snap.docs.forEach((doc) => refs.set(doc.id, doc.ref)));
+  await Promise.all([...refs.values()].map((ref) => ref.update({
+    downloadEnabled: true,
+    paymentStatus: "paid",
+    unlockedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  }).catch((err) => console.error("[Payments] Gallery unlock failed:", err))));
+}
 async function applySuccessfulPayment({
   invoiceId,
   orderId,
@@ -1534,12 +1666,25 @@ async function applySuccessfulPayment({
   const invoiceDoc = await invoiceRef.get();
   if (!invoiceDoc.exists) return;
   const invoice = invoiceDoc.data();
+  const resolvedOrderId = orderId || invoice.orderId || "";
+  const resolvedClientId = clientId || invoice.clientId || "";
+  const sameSquare = Boolean(squarePaymentId) && invoice.squarePaymentId === squarePaymentId;
+  const sameStripe = Boolean(stripePaymentIntentId) && invoice.stripePaymentIntentId === stripePaymentIntentId;
+  const duplicate = sameSquare || sameStripe || await paymentAlreadyRecorded({ squarePaymentId, stripePaymentIntentId });
+  if (duplicate) {
+    if (invoiceAllowsDownload(invoice)) {
+      await unlockGalleriesForInvoice({
+        invoiceId,
+        orderId: resolvedOrderId,
+        galleryId: typeof invoice.galleryId === "string" ? invoice.galleryId : void 0
+      });
+    }
+    return;
+  }
   const currentPaid = Number(invoice.amountPaid) || 0;
   const total = Number(invoice.total) || 0;
   const newAmountPaid = currentPaid + amount;
   const newAmountDue = Math.max(0, total - newAmountPaid);
-  const resolvedOrderId = orderId || invoice.orderId || "";
-  const resolvedClientId = clientId || invoice.clientId || "";
   await invoiceRef.update({
     amountPaid: newAmountPaid,
     amountDue: newAmountDue,
@@ -1553,7 +1698,8 @@ async function applySuccessfulPayment({
   if (resolvedOrderId) {
     await db$8().collection("orders").doc(resolvedOrderId).update({
       depositPaid: admin.firestore.FieldValue.increment(amount),
-      balanceDue: admin.firestore.FieldValue.increment(-amount),
+      balanceDue: newAmountDue,
+      paymentStatus: newAmountDue <= 0 ? "paid" : "partial",
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     }).catch((err) => console.error("[Payments] Order balance update failed:", err));
   }
@@ -1563,14 +1709,12 @@ async function applySuccessfulPayment({
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     }).catch((err) => console.error("[Payments] Client spend update failed:", err));
   }
-  if (resolvedOrderId && newAmountDue <= 0) {
-    const gallerySnap = await db$8().collection("galleries").where("orderId", "==", resolvedOrderId).limit(1).get();
-    if (!gallerySnap.empty) {
-      await gallerySnap.docs[0].ref.update({
-        downloadEnabled: true,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-    }
+  if (newAmountDue <= 0) {
+    await unlockGalleriesForInvoice({
+      invoiceId,
+      orderId: resolvedOrderId,
+      galleryId: typeof invoice.galleryId === "string" ? invoice.galleryId : void 0
+    });
   }
   await db$8().collection("transactions").add({
     type: "payment",
@@ -1679,6 +1823,7 @@ router$a.get("/invoice/:id", async (req, res) => {
     const provider = invoiceProvider(invoice);
     return res.json({
       id: invoiceDoc.id,
+      paid: invoiceAllowsDownload(invoice),
       invoiceNumber: invoice.invoiceNumber,
       clientName: invoice.clientName,
       lineItems: invoice.lineItems,
@@ -1706,14 +1851,17 @@ router$a.post("/invoice/:id/checkout", async (req, res) => {
     const invoiceDoc = await db$8().collection("invoices").doc(req.params.id).get();
     if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
     const invoice = invoiceDoc.data();
-    const amountDue = Number(invoice.amountDue ?? invoice.total ?? 0);
+    const amountDue = amountStillDue(invoice);
     const provider = invoiceProvider(invoice);
-    if (invoice.status === "paid" || amountDue <= 0) {
+    if (invoiceAllowsDownload(invoice)) {
       return res.json({
         paid: true,
         provider,
         redirectUrl: invoice.galleryId ? `${appUrl()}/gallery/${invoice.galleryId}` : `${appUrl()}/invoice/${invoiceDoc.id}`
       });
+    }
+    if (amountDue <= 0) {
+      return res.status(400).json({ error: "This invoice cannot be paid online." });
     }
     if (provider === "square") {
       if (!squareReady()) return res.status(503).json({ error: "Square payments are not configured yet." });
@@ -1735,12 +1883,12 @@ router$a.post("/invoice/:id/checkout", async (req, res) => {
             location_id: process.env.SQUARE_LOCATION_ID
           },
           checkout_options: {
-            redirect_url: invoice.galleryId ? `${appUrl()}/gallery/${invoice.galleryId}` : `${appUrl()}/invoice/${invoiceDoc.id}?paid=1`
+            redirect_url: `${appUrl()}/invoice/${invoiceDoc.id}?paid=1`
           },
           pre_populated_data: {
             buyer_email: invoice.clientEmail || void 0
           },
-          payment_note: `Iconic Images invoice ${invoice.invoiceNumber || invoiceDoc.id}`
+          payment_note: squarePaymentNote(invoiceDoc.id, invoice.invoiceNumber)
         })
       });
       const result = await response.json().catch(() => ({}));
@@ -1848,29 +1996,67 @@ router$a.post("/webhook", async (req, res) => {
     return res.status(500).json({ error: "Webhook handler failed." });
   }
 });
+function squareNotificationUrls() {
+  const explicit = process.env.SQUARE_WEBHOOK_NOTIFICATION_URL;
+  const urls = [
+    explicit,
+    `${appUrl()}/api/payments/square-webhook`,
+    process.env.FRONTEND_URL ? `${process.env.FRONTEND_URL.replace(/\/$/, "")}/api/payments/square-webhook` : ""
+  ].filter((url) => Boolean(url));
+  return [...new Set(urls)];
+}
+function squareSignatureValid(rawBody, received, key) {
+  if (!received) return false;
+  const receivedBuf = Buffer.from(received);
+  return squareNotificationUrls().some((url) => {
+    const expected = crypto.createHmac("sha256", key).update(url + rawBody).digest("base64");
+    const expectedBuf = Buffer.from(expected);
+    if (expectedBuf.length !== receivedBuf.length) return false;
+    return crypto.timingSafeEqual(expectedBuf, receivedBuf);
+  });
+}
+async function findInvoiceForSquarePayment(payment) {
+  const noteId = invoiceIdFromSquareNote(payment.note || payment.payment_note);
+  if (noteId) {
+    const byNote = await db$8().collection("invoices").doc(noteId).get();
+    if (byNote.exists) return byNote;
+  }
+  const referenceId = typeof payment.reference_id === "string" ? payment.reference_id : "";
+  if (referenceId) {
+    const byReference = await db$8().collection("invoices").doc(referenceId).get();
+    if (byReference.exists) return byReference;
+  }
+  if (typeof payment.order_id === "string" && payment.order_id) {
+    const bySquareOrder = await db$8().collection("invoices").where("squareOrderId", "==", payment.order_id).limit(1).get();
+    if (!bySquareOrder.empty) return bySquareOrder.docs[0];
+  }
+  const linkId = payment.payment_link_id || payment.paymentLinkId;
+  if (typeof linkId === "string" && linkId) {
+    const byLink = await db$8().collection("invoices").where("squarePaymentLinkId", "==", linkId).limit(1).get();
+    if (!byLink.empty) return byLink.docs[0];
+  }
+  if (typeof payment.id === "string" && payment.id) {
+    const byPayment = await db$8().collection("invoices").where("squarePaymentId", "==", payment.id).limit(1).get();
+    if (!byPayment.empty) return byPayment.docs[0];
+  }
+  return null;
+}
 router$a.post("/square-webhook", async (req, res) => {
   try {
     const rawBody = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : JSON.stringify(req.body || {});
     const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
-    if (signatureKey) {
-      const notificationUrl = `${appUrl()}/api/payments/square-webhook`;
-      const expected = crypto.createHmac("sha256", signatureKey).update(notificationUrl + rawBody).digest("base64");
-      const received = Array.isArray(req.headers["x-square-hmacsha256-signature"]) ? req.headers["x-square-hmacsha256-signature"][0] : req.headers["x-square-hmacsha256-signature"];
-      const valid = Boolean(received) && Buffer.byteLength(expected) === Buffer.byteLength(received || "") && crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(received || ""));
-      if (!valid) return res.status(400).json({ error: "Invalid Square webhook signature." });
+    if (!signatureKey) {
+      console.error("[Payments] Square webhook rejected: SQUARE_WEBHOOK_SIGNATURE_KEY is not set.");
+      return res.status(401).json({ error: "Square webhook signature key is not configured." });
+    }
+    const received = Array.isArray(req.headers["x-square-hmacsha256-signature"]) ? req.headers["x-square-hmacsha256-signature"][0] : req.headers["x-square-hmacsha256-signature"];
+    if (!squareSignatureValid(rawBody, received, signatureKey)) {
+      return res.status(400).json({ error: "Invalid Square webhook signature." });
     }
     const event = JSON.parse(rawBody);
-    const payment = event?.data?.object?.payment;
+    const payment = event?.data?.object?.payment || event?.data?.object;
     if (!payment?.id || payment.status !== "COMPLETED") return res.json({ received: true });
-    let invoiceDoc = null;
-    if (payment.order_id) {
-      const bySquareOrder = await db$8().collection("invoices").where("squareOrderId", "==", payment.order_id).limit(1).get();
-      if (!bySquareOrder.empty) invoiceDoc = bySquareOrder.docs[0];
-    }
-    if (!invoiceDoc) {
-      const byPayment = await db$8().collection("invoices").where("squarePaymentId", "==", payment.id).limit(1).get();
-      if (!byPayment.empty) invoiceDoc = byPayment.docs[0];
-    }
+    const invoiceDoc = await findInvoiceForSquarePayment(payment);
     if (!invoiceDoc) {
       await db$8().collection("agentLogs").add({
         agent: "travis",
@@ -1880,21 +2066,24 @@ router$a.post("/square-webhook", async (req, res) => {
         relatedType: "invoice",
         priority: "high",
         requiresHumanReview: true,
-        details: payment.order_id || "",
+        details: payment.order_id || payment.note || "",
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
       return res.json({ received: true, unmatched: true });
     }
-    const invoice = invoiceDoc.data();
-    if (invoice.squarePaymentId === payment.id || invoice.status === "paid") {
-      return res.json({ received: true, duplicate: true });
+    const invoice = invoiceDoc.data() || {};
+    if (invoiceProvider(invoice) === "stripe") {
+      return res.json({ received: true, ignored: "stripe-invoice" });
     }
+    const amountCents = Number(payment.amount_money?.amount ?? payment.total_money?.amount ?? 0);
+    const amount = amountCents / 100;
+    if (amount <= 0) return res.json({ received: true, ignored: "zero-amount" });
     await applySuccessfulPayment({
       invoiceId: invoiceDoc.id,
       orderId: invoice.orderId,
       clientId: invoice.clientId,
       clientName: invoice.clientName,
-      amount: Number(payment.total_money?.amount || 0) / 100,
+      amount,
       method: "square",
       squarePaymentId: payment.id
     });
@@ -1934,6 +2123,12 @@ router$a.get("/transactions", requireCoordinator, async (req, res) => {
 async function handleStripePaymentSucceeded(intent) {
   const { invoiceId, orderId, clientId, clientName } = intent.metadata;
   if (!invoiceId) return;
+  const invoiceDoc = await db$8().collection("invoices").doc(invoiceId).get();
+  if (!invoiceDoc.exists) return;
+  if (invoiceProvider(invoiceDoc.data() || {}) !== "stripe") {
+    console.warn(`[Payments] Ignored Stripe payment ${intent.id} for non-Stripe invoice ${invoiceId}`);
+    return;
+  }
   await applySuccessfulPayment({
     invoiceId,
     orderId,
@@ -2645,6 +2840,13 @@ router$6.patch("/:id", requireAdmin, async (req, res) => {
 });
 router$6.post("/setup", async (req, res) => {
   try {
+    if (isHostedDeployment(liveServerEnv())) {
+      const secret = process.env.STAFF_SETUP_SECRET;
+      const provided = req.header("x-setup-secret");
+      if (!secret || provided !== secret) {
+        return res.status(403).json({ error: "Staff setup is disabled." });
+      }
+    }
     const existing = await db$4().collection("staff").limit(1).get();
     if (!existing.empty) {
       return res.status(403).json({ error: "Staff already configured." });
@@ -2902,7 +3104,10 @@ function isAgentAuthorized(req) {
   const serviceKey = req.headers["x-agent-key"];
   const auth = req.headers.authorization;
   const cronSecret = process.env.CRON_SECRET;
-  return serviceKey === process.env.AGENT_SERVICE_KEY || Boolean(cronSecret && auth === `Bearer ${cronSecret}`);
+  const agentKey = process.env.AGENT_SERVICE_KEY;
+  const keyOk = Boolean(agentKey) && serviceKey === agentKey;
+  const cronOk = Boolean(cronSecret) && auth === `Bearer ${cronSecret}`;
+  return keyOk || cronOk;
 }
 function toDate(value) {
   if (!value) return null;
@@ -3174,8 +3379,7 @@ router$4.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
 });
 router$4.post("/log", async (req, res) => {
   try {
-    const serviceKey = req.headers["x-agent-key"];
-    if (serviceKey !== process.env.AGENT_SERVICE_KEY) {
+    if (!isAgentAuthorized(req)) {
       return res.status(401).json({ error: "Invalid agent key." });
     }
     const {
@@ -3713,7 +3917,7 @@ router.post("/", async (req, res) => {
   }
 });
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
-const API_BUILD_MARKER = "codex-2026-09-15-v3";
+const API_BUILD_MARKER = "auth-square-2026-09-28";
 if (!admin.apps.length) {
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
@@ -3804,7 +4008,7 @@ function createServer() {
       res.status(404).json({ error: "Settings not found" });
     }
   });
-  app.post("/api/settings", async (req, res) => {
+  app.post("/api/settings", requireAdmin, async (req, res) => {
     try {
       await fs.writeFile(SETTINGS_FILE, JSON.stringify(req.body, null, 2));
       res.json({ success: true });

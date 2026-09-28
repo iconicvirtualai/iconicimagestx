@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { AlertCircle, CheckCircle2, CreditCard, FileText, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -9,6 +9,7 @@ function money(value: number) {
 
 export default function ClientInvoice() {
   const { invoiceId } = useParams<{ invoiceId: string }>();
+  const [searchParams] = useSearchParams();
   const [invoice, setInvoice] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [checkingOut, setCheckingOut] = React.useState(false);
@@ -38,7 +39,8 @@ export default function ClientInvoice() {
     </div>
   );
 
-  const paid = invoice.status === "paid" || Number(invoice.amountDue || 0) <= 0;
+  const paid = Boolean(invoice.paid) || invoice.status === "paid";
+  const awaitingSquare = searchParams.get("paid") === "1" && !paid;
   const lineItems: any[] = invoice.lineItems || [];
   const providerLabel = invoice.paymentProvider === "stripe" ? "Stripe" : "Square";
 
@@ -116,6 +118,12 @@ export default function ClientInvoice() {
               </div>
             ) : (
               <div className="space-y-3">
+                {awaitingSquare && (
+                  <div className="flex items-start gap-3 text-teal-800 bg-teal-50 border border-teal-100 rounded-xl p-4">
+                    <CheckCircle2 className="w-5 h-5 mt-0.5" />
+                    <p className="text-sm font-bold">Square checkout finished. This page unlocks downloads after the payment is confirmed. Refresh in a moment if it still shows due.</p>
+                  </div>
+                )}
                 <Button onClick={startCheckout} className="w-full h-12 bg-[#0d9488] hover:bg-[#0f766e] text-white rounded-xl font-bold" disabled={checkingOut || !invoice.canPayOnline}>
                   <CreditCard className="w-4 h-4 mr-2" /> {checkingOut ? "Opening Secure Checkout..." : "Pay Securely"}
                 </Button>
