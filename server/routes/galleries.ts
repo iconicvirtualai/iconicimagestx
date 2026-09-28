@@ -275,8 +275,8 @@ router.post("/:id/deliver", requireCoordinator, async (req, res) => {
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
 
     const gallery = galleryDoc.data()!;
-    const invoice = await invoiceForGallery(gallery);
-    const paid = invoiceAllowsDownload(invoice);
+    const linkedInvoice = await invoiceForGallery(gallery);
+    const paid = invoiceAllowsDownload(linkedInvoice);
     const downloadEnabled = paid;
     const expiresInDays = Number(req.body?.expiresInDays) > 0 ? Number(req.body.expiresInDays) : 30;
 
@@ -309,7 +309,14 @@ router.post("/:id/deliver", requireCoordinator, async (req, res) => {
     const client = clientDoc.data();
 
     if (client?.email) {
-      const invoiceTotal = Number((invoice as { total?: number } | null)?.total);
+      // Get invoice for payment link
+      const invoiceSnap = await db()
+        .collection("invoices")
+        .where("orderId", "==", gallery.orderId)
+        .limit(1)
+        .get();
+      const invoice = invoiceSnap.empty ? null : invoiceSnap.docs[0].data();
+
       await sendEmail({
         to: client.email,
         template: "gallery_delivery",
@@ -317,8 +324,8 @@ router.post("/:id/deliver", requireCoordinator, async (req, res) => {
           clientName: gallery.clientName,
           address: gallery.addressLabel || addressLabel(gallery.address),
           galleryUrl: deliveryUrl,
-          invoiceAmount: invoice && Number.isFinite(invoiceTotal) ? `$${invoiceTotal.toFixed(2)}` : "",
-          paymentUrl: invoice ? `${appUrl()}/invoice/${(invoice as { id: string }).id}` : "",
+          invoiceAmount: invoice ? `$${invoice.total.toFixed(2)}` : "",
+          paymentUrl: invoice ? `${appUrl()}/invoice/${invoiceSnap.docs[0].id}` : "",
           expiresAt: `${expiresInDays} days`,
         },
       });

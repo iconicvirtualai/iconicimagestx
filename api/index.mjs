@@ -1524,8 +1524,8 @@ router$b.post("/:id/deliver", requireCoordinator, async (req, res) => {
     const galleryDoc = await db$9().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const gallery = galleryDoc.data();
-    const invoice = await invoiceForGallery(gallery);
-    const paid = invoiceAllowsDownload(invoice);
+    const linkedInvoice = await invoiceForGallery(gallery);
+    const paid = invoiceAllowsDownload(linkedInvoice);
     const downloadEnabled = paid;
     const expiresInDays = Number(req.body?.expiresInDays) > 0 ? Number(req.body.expiresInDays) : 30;
     const expiresAt = admin.firestore.Timestamp.fromDate(
@@ -1549,7 +1549,8 @@ router$b.post("/:id/deliver", requireCoordinator, async (req, res) => {
     const clientDoc = await db$9().collection("clients").doc(gallery.clientId).get();
     const client = clientDoc.data();
     if (client?.email) {
-      const invoiceTotal = Number(invoice?.total);
+      const invoiceSnap = await db$9().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
+      const invoice = invoiceSnap.empty ? null : invoiceSnap.docs[0].data();
       await sendEmail({
         to: client.email,
         template: "gallery_delivery",
@@ -1557,8 +1558,8 @@ router$b.post("/:id/deliver", requireCoordinator, async (req, res) => {
           clientName: gallery.clientName,
           address: gallery.addressLabel || addressLabel$2(gallery.address),
           galleryUrl: deliveryUrl,
-          invoiceAmount: invoice && Number.isFinite(invoiceTotal) ? `$${invoiceTotal.toFixed(2)}` : "",
-          paymentUrl: invoice ? `${appUrl$1()}/invoice/${invoice.id}` : "",
+          invoiceAmount: invoice ? `$${invoice.total.toFixed(2)}` : "",
+          paymentUrl: invoice ? `${appUrl$1()}/invoice/${invoiceSnap.docs[0].id}` : "",
           expiresAt: `${expiresInDays} days`
         }
       });
