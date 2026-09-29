@@ -22,7 +22,9 @@ export interface AuthenticatedRequest extends Request {
 type Role = "admin" | "coordinator" | "photographer" | "editor";
 
 const TEMP_ADMIN_ENABLED =
-  process.env.ENABLE_TEMP_ADMIN === "true" || process.env.NODE_ENV !== "production";
+  process.env.ENABLE_TEMP_ADMIN === "true" ||
+  process.env.NODE_ENV !== "production" ||
+  process.env.VERCEL_ENV === "preview";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────────────
 

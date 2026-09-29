@@ -26,11 +26,16 @@ import type { StaffMember, Client } from "../lib/schema";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+const hostname = window.location.hostname;
+const isVercelPreviewHost =
+  hostname.endsWith(".vercel.app") && hostname.includes("-git-");
+
 const TEMP_ADMIN_ENABLED =
   import.meta.env.DEV ||
   import.meta.env.VITE_ENABLE_TEMP_ADMIN === "true" ||
-  window.location.hostname === "localhost" ||
-  window.location.hostname === "127.0.0.1";
+  hostname === "localhost" ||
+  hostname === "127.0.0.1" ||
+  isVercelPreviewHost;
 
 type AuthUserType = "staff" | "client" | null;
 
