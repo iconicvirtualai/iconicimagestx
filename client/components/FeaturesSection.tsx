@@ -295,9 +295,15 @@ export default function FeaturesSection() {
             colSpan="md:col-span-2"
           >
             <div className="flex h-full items-center justify-center p-4 gap-6">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="w-16 h-16 md:w-20 md:h-20 rounded-xl border-2 shadow-lg overflow-hidden bg-gray-100 flex-shrink-0 first:ring-2" style={{ borderTopColor: 'white', borderRightColor: 'white', borderBottomColor: 'white', borderLeftColor: i === 1 ? settings.global.primaryColor : 'white', borderStyle: 'solid', boxShadow: i === 1 ? `0 0 0 2px ${settings.global.primaryColor}33, 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)` : undefined }}>
-                  <img src={`https://i.pravatar.cc/150?u=${i+10}`} className="w-full h-full object-cover" alt="Avatar" />
+              {[
+                "/media/photos/website-hero-dan.jpg",
+                "/media/photos/drone-hero.jpg",
+                "/media/photos/luxury-interior.jpg",
+                "/media/photos/haeckerville-17.jpg",
+                "/media/photos/claymore-vs-final.jpg",
+              ].map((src, i) => (
+                <div key={src} className="w-16 h-16 md:w-20 md:h-20 rounded-xl border-2 shadow-lg overflow-hidden bg-gray-100 flex-shrink-0 first:ring-2" style={{ borderTopColor: 'white', borderRightColor: 'white', borderBottomColor: 'white', borderLeftColor: i === 0 ? settings.global.primaryColor : 'white', borderStyle: 'solid', boxShadow: i === 0 ? `0 0 0 2px ${settings.global.primaryColor}33, 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)` : undefined }}>
+                  <img src={src} className="w-full h-full object-cover" alt="Listing photograph" />
                 </div>
               ))}
             </div>

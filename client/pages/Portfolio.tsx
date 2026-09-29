@@ -8,14 +8,13 @@ const PHOTOS = [
   { src: "/media/photos/luxury-exterior.jpg", alt: "Luxury home exterior", title: "Luxury Exterior" },
   { src: "/media/photos/luxury-interior.jpg", alt: "Luxury interior living space", title: "Luxury Interior" },
   { src: "/media/photos/luxury-a7305553.jpg", alt: "Luxury listing interior detail", title: "Listing Detail" },
-  { src: "/media/photos/luxury-mtz02998.jpg", alt: "Vertical luxury interior portrait", title: "Vertical Interior" },
+  { src: "/media/photos/luxury-mtz02998.jpg", alt: "Vertical luxury interior", title: "Vertical Interior" },
   { src: "/media/photos/haeckerville-8.jpg", alt: "Haeckerville listing photograph", title: "Haeckerville" },
   { src: "/media/photos/haeckerville-9.jpg", alt: "Haeckerville listing photograph", title: "Haeckerville" },
   { src: "/media/photos/haeckerville-10.jpg", alt: "Haeckerville listing photograph", title: "Haeckerville" },
   { src: "/media/photos/haeckerville-17.jpg", alt: "Haeckerville listing photograph", title: "Haeckerville" },
   { src: "/media/photos/claymore-vs-final.jpg", alt: "Claymore virtual staging final", title: "Claymore Staging" },
   { src: "/media/photos/vs-ico7432.jpg", alt: "Virtual staging interior", title: "Virtual Staging" },
-  { src: "/media/photos/lifestyle-gq.jpg", alt: "Lifestyle portrait", title: "Lifestyle" },
 ];
 
 export default function Portfolio() {

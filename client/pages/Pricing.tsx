@@ -729,17 +729,17 @@ export default function Pricing() {
           <section id="branding-personal" className="py-24 bg-[#fafafa]">
             <div className="max-w-4xl mx-auto px-4 text-center">
               <h2 className="text-4xl md:text-6xl font-black text-black mb-8 tracking-tight">Elevate Your <span className="accent-text-bordered">Personal Brand</span></h2>
-              <p className="text-lg text-gray-500 mb-12 max-w-xl mx-auto font-medium">See the difference between a standard corporate headshot and an Iconic Lifestyle Portrait.</p>
+              <p className="text-lg text-gray-500 mb-12 max-w-xl mx-auto font-medium">Listing photography and virtual staging, finished to the Iconic standard.</p>
 
               <div className="relative max-w-2xl mx-auto aspect-[16/9] rounded-[2rem] overflow-hidden shadow-xl border-4 border-white">
                 {/* After (Iconic) */}
                 <img
-                  src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1200&q=80"
+                  src="/media/photos/luxury-interior.jpg"
                   className="absolute inset-0 w-full h-full object-cover"
-                  alt="Iconic Lifestyle"
+                  alt="Finished luxury interior"
                 />
                 <div className="absolute inset-0 flex flex-col justify-end p-6 text-white z-10 text-right pointer-events-none">
-                  <div className="px-3 py-1.5 rounded-full inline-block self-end text-[10px] font-black uppercase tracking-widest shadow-lg" style={{ backgroundColor: settings.global.primaryColor }}>Iconic Lifestyle</div>
+                  <div className="px-3 py-1.5 rounded-full inline-block self-end text-[10px] font-black uppercase tracking-widest shadow-lg" style={{ backgroundColor: settings.global.primaryColor }}>Iconic Finish</div>
                 </div>
 
                 {/* Before (Standard) */}
@@ -748,12 +748,12 @@ export default function Pricing() {
                   style={{ clipPath: `inset(0 ${100 - brandingSliderPos}% 0 0)` }}
                 >
                   <img
-                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1200&q=80"
+                    src="/media/photos/haeckerville-17.jpg"
                     className="absolute inset-0 w-full h-full object-cover grayscale brightness-[0.8]"
-                    alt="Standard Corporate"
+                    alt="Listing interior"
                   />
                   <div className="absolute inset-0 flex flex-col justify-end p-6 text-white z-10 text-left pointer-events-none">
-                    <div className="bg-gray-800/80 px-3 py-1.5 rounded-full inline-block self-start text-[10px] font-black uppercase tracking-widest">Standard Corporate</div>
+                    <div className="bg-gray-800/80 px-3 py-1.5 rounded-full inline-block self-start text-[10px] font-black uppercase tracking-widest">Listing</div>
                   </div>
                 </div>
 

@@ -7,19 +7,19 @@ export default function TestimonialsSection() {
       name: "Chris Lawrence",
       role: "Owner, Rip City Photography, LLC",
       content: "Iconic has completely transformed our production workflow. We've seen a 400% increase in media engagement since switching to their partnership model.",
-      avatar: "https://i.pravatar.cc/150?u=chris",
+      avatar: "/media/photos/haeckerville-9.jpg",
     },
     {
       name: "Bryce Perez",
       role: "Founder, RE Media Company",
       content: "The quality and turnaround time are unmatched. Being able to offer cinematic reels within 24 hours has given us a massive competitive edge.",
-      avatar: "https://i.pravatar.cc/150?u=bryce",
+      avatar: "/media/photos/vs-ico7432.jpg",
     },
     {
       name: "Mark Shepherd",
       role: "MD & Founder, Apollo3D Ltd, UK",
       content: "Everything from booking to delivery is seamless. It feels like having an elite creative team in-house without the overhead costs.",
-      avatar: "https://i.pravatar.cc/150?u=mark",
+      avatar: "/media/photos/claymore-vs-final.jpg",
     },
   ];
 
@@ -55,7 +55,7 @@ export default function TestimonialsSection() {
             <div key={i} className="bg-white p-10 rounded-[2.5rem] border border-gray-100 shadow-sm text-left flex flex-col h-full hover:shadow-md transition-shadow">
               <div className="flex items-center gap-4 mb-8">
                 <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-100 border-2 border-white shadow-sm">
-                  <img src={t.avatar} alt={t.name} className="w-full h-full object-cover" />
+                  <img src={t.avatar} alt="" className="w-full h-full object-cover" />
                 </div>
                 <div>
                   <h4 className="font-bold text-black">{t.name}</h4>

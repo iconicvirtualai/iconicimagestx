@@ -10,14 +10,14 @@ export default function StepsSection() {
       step: "STEP 1",
       title: "Book your session",
       description: "Select your creative service and schedule a time through our seamless partnership portal in just a few clicks.",
-      image: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F72c9fbb7ba5e4993ae8e72ee6060f07a", // Calendar/Planning
+      image: "/media/photos/haeckerville-8.jpg",
       icon: <Calendar className="w-5 h-5" style={{ color: settings.global.primaryColor }} />,
     },
     {
       step: "STEP 2",
       title: "We capture the vision",
       description: "Our professional creative team arrives on-site with state-of-the-art equipment to capture high-impact raw media.",
-      image: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Ff9bbfe449cbd41bda1969183f92dae43", // Camera/Shooting
+      image: "/media/photos/luxury-exterior.jpg",
       icon: <Camera className="w-5 h-5" style={{ color: settings.global.primaryColor }} />,
     },
     {

@@ -3,7 +3,7 @@ export default function AudienceDetails() {
     {
       title: "Realtors & Brokers",
       description: "Attract leads, close faster, and win more listings with engaging property videos.",
-      image: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F4250f70a1a8a4ece8cf324f7cbcd7fbc",
+      image: "/media/photos/luxury-exterior.jpg",
     },
     {
       title: "Photographers",
@@ -13,22 +13,22 @@ export default function AudienceDetails() {
     {
       title: "Real Estate Media Companies",
       description: "Scale your business and stay competitive with AI property videos — no extra overhead.",
-      image: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F3c473a3b6e4d461bac1599f7231d3d2d",
+      image: "/media/photos/haeckerville-10.jpg",
     },
     {
       title: "Developers & Builders",
       description: "Showcase new construction and development projects with cinematic fly-throughs.",
-      image: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F3c860cce026648ed89033acda9e01478",
+      image: "/media/photos/drone-hero.jpg",
     },
     {
       title: "Small Business Owners",
       description: "Professional media content to tell your brand story and engage your local community.",
-      image: "https://images.unsplash.com/photo-1556740734-7a9a2b77af53?w=400&h=400&fit=crop",
+      image: "/media/photos/luxury-interior.jpg",
     },
     {
       title: "Online Appearance",
       description: "High-impact visual identity for anyone looking to dominate their digital space.",
-      image: "https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?w=400&h=400&fit=crop",
+      image: "/media/photos/luxury-a7305553.jpg",
     },
   ];
 
