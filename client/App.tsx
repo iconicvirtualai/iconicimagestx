@@ -48,6 +48,7 @@ import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminListingFile from "./pages/AdminListingFile";
 import AdminCustomerCenter from "./pages/AdminCustomerCenter";
+import AdminClientAccount from "./pages/AdminClientAccount";
 import AdminSiteCustomizer from "./pages/AdminSiteCustomizer";
 import AdminEmailTemplates from "./pages/AdminEmailTemplates";
 import AdminCurrentPricing from "./pages/AdminCurrentPricing";
@@ -110,6 +111,7 @@ const App = () => (
             <Route path="/admin/listings" element={<ProtectedRoute requiredRole="coordinator"><AdminListings /></ProtectedRoute>} />
             <Route path="/admin/listing/:id" element={<ProtectedRoute requiredRole="photographer"><AdminListingFile /></ProtectedRoute>} />
             <Route path="/admin/customers" element={<ProtectedRoute requiredRole="coordinator"><AdminCustomerCenter /></ProtectedRoute>} />
+            <Route path="/admin/customers/:id" element={<ProtectedRoute requiredRole="coordinator"><AdminClientAccount /></ProtectedRoute>} />
             <Route path="/admin/order/:id" element={<ProtectedRoute requiredRole="coordinator"><AdminOrderDetail /></ProtectedRoute>} />
             <Route path="/admin/orders/:id" element={<ProtectedRoute requiredRole="coordinator"><AdminOrderDetail /></ProtectedRoute>} />
             <Route path="/admin/order-request/:id" element={<ProtectedRoute requiredRole="coordinator"><AdminOrderRequest /></ProtectedRoute>} />

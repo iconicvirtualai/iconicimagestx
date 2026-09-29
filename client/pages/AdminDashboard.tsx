@@ -71,6 +71,7 @@ function useRecentlyVisited() {
       "/admin/schedule": "Schedule",
       "/admin/revenue": "Revenue",
       "/admin/team": "Team",
+      "/admin/customers": "Clients",
       "/admin/clients": "Clients",
       "/admin/communications": "Communications",
       "/admin/messages": "Communications",
@@ -81,6 +82,7 @@ function useRecentlyVisited() {
     if (!label) {
       if (location.pathname.startsWith("/admin/order-request/")) label = "Order Detail";
       if (location.pathname.startsWith("/admin/listing/")) label = "Project Detail";
+      if (location.pathname.startsWith("/admin/customers/")) label = "Client Account";
     }
 
     if (!label) return;

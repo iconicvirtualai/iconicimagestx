@@ -45,6 +45,23 @@ export interface Client {
   portalAccess: boolean;
   notes?: string;
   tags: string[];
+  /** CRM grouping, such as a brokerage team or campaign list. */
+  group?: string;
+  social?: {
+    instagram?: string;
+    facebook?: string;
+    tiktok?: string;
+    website?: string;
+  };
+  marketingNotes?: string;
+  conciergeStatus?: "" | "not_started" | "interested" | "active";
+  conciergeNotes?: string;
+  presentation?: {
+    goal?: string;
+    audience?: string;
+    talkingPoints?: string;
+  };
+  taxNotes?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
