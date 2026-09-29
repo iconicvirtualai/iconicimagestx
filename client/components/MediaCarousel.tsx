@@ -12,26 +12,26 @@ export default function MediaCarousel() {
     : [
         {
           id: 1,
-          before: { type: 'image' as const, url: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Faecac2467163410db0180e8fdd8a98f7?format=webp&width=800&height=1200" },
-          after: { type: 'video' as const, url: "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F4ea5feebdab84ee585ffaa811d803379?alt=media&token=dda6499e-44a2-47a4-a456-1cacb39b6ae4&apiKey=0ed22311ac6a4dbebeda1b4230c2746c" },
+          before: { type: 'image' as const, url: "/media/photos/luxury-exterior.jpg" },
+          after: { type: 'video' as const, url: "/media/video/product-photography.mp4" },
           aspect: "16/9" as const,
         },
         {
           id: 2,
-          before: { type: 'image' as const, url: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fe7a04734046e4171bfccc96600f0870f?format=webp&width=800&height=1200" },
-          after: { type: 'video' as const, url: "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fba0e88982aa140c2bd2a033055391c4a?alt=media&token=2faaf53d-9e02-4887-aa85-08c6f971cee4&apiKey=0ed22311ac6a4dbebeda1b4230c2746c" },
+          before: { type: 'image' as const, url: "/media/photos/luxury-mtz02998.jpg" },
+          after: { type: 'video' as const, url: "/media/reels/superpower-jaz-12s.mp4" },
           aspect: "9/16" as const,
         },
         {
           id: 3,
-          before: { type: 'image' as const, url: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F1bc44dc912bd4cd4848b7cbe64db7001?format=webp&width=800&height=1200" },
-          after: { type: 'video' as const, url: "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F4203b3fa6d2046f6b3aebe85986706ad?alt=media&token=60e7a23a-12d3-45d9-8063-8fa212dc4c4c&apiKey=0ed22311ac6a4dbebeda1b4230c2746c" },
+          before: { type: 'image' as const, url: "/media/photos/claymore-vs-final.jpg" },
+          after: { type: 'video' as const, url: "/media/video/product-photography.mp4" },
           aspect: "16/9" as const,
         },
         {
           id: 4,
-          before: { type: 'image' as const, url: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F54911d726f0a43b684406564dac1e5e8?format=webp&width=800&height=1200" },
-          after: { type: 'video' as const, url: "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F4be86e27da6548d59c567aa0bdfc66e9?alt=media&token=927f0df1-6342-47f7-809f-131e4df074d6&apiKey=0ed22311ac6a4dbebeda1b4230c2746c" },
+          before: { type: 'image' as const, url: "/media/photos/haeckerville-10.jpg" },
+          after: { type: 'video' as const, url: "/media/video/content-web-clip.mp4" },
           aspect: "9/16" as const,
         },
       ];
