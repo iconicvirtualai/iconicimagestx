@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import { X } from "lucide-react";
+import { SNAP_REELS } from "@/lib/snapReels";
 
 type Category = "All" | "People" | "Families" | "Studio" | "Holiday" | "Headshots" | "Listings" | "Aerial" | "Virtual Staging";
 
@@ -125,6 +126,38 @@ export default function Portfolio() {
                 ))}
               </div>
             )}
+
+            <div className="mt-20 border-t border-white/10 pt-16">
+              <p className="text-[11px] font-black uppercase tracking-[0.45em] text-teal-400 mb-4">
+                Photo to video
+              </p>
+              <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tight mb-4">
+                Snap Reels
+              </h2>
+              <p className="mb-8 max-w-2xl text-gray-400">
+                Essential Snap Reels: listing photos cut into a 9:16 vertical.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                {SNAP_REELS.map((reel) => (
+                  <figure key={reel.src}>
+                    <div className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-black">
+                      <video
+                        src={reel.src}
+                        controls
+                        playsInline
+                        preload="metadata"
+                        className="aspect-[9/16] w-full object-cover bg-black"
+                      />
+                    </div>
+                    <figcaption className="mt-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-teal-400">Snap Reel</p>
+                      <p className="mt-1 text-sm font-bold">{reel.agent}</p>
+                      <p className="text-xs text-gray-400">{reel.address}</p>
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+            </div>
 
             <div className="mt-20 border-t border-white/10 pt-16">
               <p className="text-[11px] font-black uppercase tracking-[0.45em] text-teal-400 mb-4">

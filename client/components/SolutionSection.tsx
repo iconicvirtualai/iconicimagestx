@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Play, Volume2, VolumeX, ChevronLeft, ChevronRight } from "lucide-react";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { SNAP_REELS } from "@/lib/snapReels";
 
 export default function SolutionSection() {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -26,7 +27,13 @@ export default function SolutionSection() {
       url: "/media/video/content-web-clip.mp4",
       aspect: "9/16",
       title: "Content Package"
-    }
+    },
+    ...SNAP_REELS.map((reel, index) => ({
+      id: 4 + index,
+      url: reel.src,
+      aspect: "9/16" as const,
+      title: `Snap Reel · ${reel.agent}`,
+    })),
   ];
 
   const nextSlide = () => {
@@ -142,6 +149,9 @@ export default function SolutionSection() {
               <ChevronRight className="w-6 h-6" />
             </button>
           </div>
+          <p className="mt-4 text-[11px] font-black uppercase tracking-[0.28em] text-teal-400">
+            {currentVideo.title}
+          </p>
         </div>
       </div>
     </section>

@@ -144,22 +144,29 @@ export default function FeaturesSection() {
         {/* Features Bento Grid (3-Column Layout) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
 
-          {/* Image to Video */}
+          {/* Snap Reels */}
           <FeatureCard
-            title="Image to Video"
-            description="Effortlessly convert your property still images into captivating video tours that highlight key features and create immersive experiences for potential buyers."
+            title="Snap Reels"
+            description="Turn the listing stills into a 9:16 Snap Reel. A vertical cut buyers can watch before they ever book a showing."
             colSpan="md:col-span-2"
           >
             <div className="flex h-full items-center justify-center p-4 gap-4">
               <img src="/media/photos/luxury-interior.jpg" className="w-1/2 h-full object-cover rounded-lg border border-gray-100" alt="Listing still" />
               <ArrowRight className="w-6 h-6 shrink-0" style={{ color: settings.global.primaryColor }} />
-              <div className="w-1/2 h-full relative rounded-lg overflow-hidden border border-gray-100">
-                <img src="/media/photos/haeckerville-10.jpg" className="w-full h-full object-cover" alt="Video frame" />
-                <div className="absolute inset-0 flex items-center justify-center bg-black/10">
-                  <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-lg">
-                    <Play className="w-3 h-3 translate-x-0.5" style={{ color: settings.global.primaryColor, fill: settings.global.primaryColor }} />
-                  </div>
-                </div>
+              <div className="w-1/2 h-full relative rounded-lg overflow-hidden border border-gray-100 bg-black">
+                <video
+                  src="/media/videos/snap-reels/kari-stoney-brook.mp4"
+                  className="h-full w-full object-cover"
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  preload="metadata"
+                  aria-label="Snap Reel for Kari Riddle, 8719 Stoney Brook Ln"
+                />
+                <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-1 text-[8px] font-black uppercase tracking-widest text-white">
+                  Snap Reel
+                </span>
               </div>
             </div>
           </FeatureCard>
