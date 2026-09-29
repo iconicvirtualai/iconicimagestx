@@ -20,6 +20,7 @@ export default function Footer() {
               <Link to="/pricing" className="text-sm font-medium hover:text-white/80 transition-colors">Pricing</Link>
               <Link to="/socials" className="text-sm font-medium hover:text-white/80 transition-colors">Socials</Link>
               <Link to="/portfolio" className="text-sm font-medium hover:text-white/80 transition-colors">Portfolio</Link>
+              <Link to="/studio-105" className="text-sm font-medium hover:text-white/80 transition-colors">Studio 105</Link>
               <Link to="/contact" className="text-sm font-medium hover:text-white/80 transition-colors">Contact Us</Link>
               <Link to="/privacy" className="text-sm font-medium hover:text-white/80 transition-colors">Privacy Policy</Link>
               <Link to="/terms" className="text-sm font-medium hover:text-white/80 transition-colors">Terms of Service</Link>

@@ -471,7 +471,11 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     }
 
     // Check if we should show the Iconic Finish popup
-    if (step === 1) {
+      if (step === 1) {
+      if (isStudioPath) {
+        setStep(4);
+        return;
+      }
       if (isConsultationPath) {
         setStep(4); // Jump to scheduling
         return;
@@ -491,6 +495,10 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     }
 
     if (step === 4) {
+      if (isStudioPath) {
+        setStep(6);
+        return;
+      }
       if (isConsultationPath) {
         setStep(5); // Questionnaire
       } else {
@@ -516,11 +524,15 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   };
 
   const prevStep = () => {
-    if (step === 4 && isConsultationPath) {
+    if (step === 4 && (isConsultationPath || isStudioPath)) {
       setStep(1);
       return;
     }
     if (step === 6) {
+      if (isStudioPath) {
+        setStep(4);
+        return;
+      }
       if (isConsultationPath) {
         setStep(5);
       } else {
@@ -606,6 +618,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
 };
   const selectedServiceData = services.find(s => s.id === formData.selectedService);
   const isConsultationPath = selectedServiceData && ["branding", "business", "growth"].includes(selectedServiceData.category);
+  const isStudioPath = selectedServiceData?.category === "studio";
 
   const calculateTotal = () => {
     let total = 0;
@@ -798,7 +811,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
             <div className="space-y-4">
               {!showBasics ? (
                 // Campaign Tiers View
-                (["listings", "branding", "business", "growth"] as const).map((cat) => (
+                (["listings", "branding", "business", "growth", "studio"] as const).map((cat) => (
                   <div key={cat} className="space-y-3">
                     <button 
                       onClick={() => toggleCategory(cat)}
@@ -810,12 +823,14 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                            {cat === "branding" && <Users className="w-4 h-4" />}
                            {cat === "business" && <Zap className="w-4 h-4" />}
                            {cat === "growth" && <Star className="w-4 h-4" />}
+                           {cat === "studio" && <Boxes className="w-4 h-4" />}
                         </div>
                         <h3 className="text-sm font-black uppercase tracking-widest text-black">
                           {cat === "listings" && "Listings & Spaces"}
                           {cat === "branding" && "The Human Brand"}
                           {cat === "business" && "Social Monopoly"}
                           {cat === "growth" && "Brand & Growth"}
+                          {cat === "studio" && "Studio 105"}
                         </h3>
                       </div>
                       {expandedCategories.includes(cat) ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
@@ -1540,9 +1555,10 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
               {[1, 2, 3, 4, 5, 6].map((i) => {
                 const isCurrentOrPast = (step as number) >= i;
                 const isStepConsultationIgnored = isConsultationPath && [2, 3].includes(i);
-                const isStepStandardIgnored = !isConsultationPath && i === 5;
+                const isStepStudioIgnored = isStudioPath && [2, 3, 5].includes(i);
+                const isStepStandardIgnored = !isConsultationPath && !isStudioPath && i === 5;
 
-                if (isStepConsultationIgnored || isStepStandardIgnored) return null;
+                if (isStepConsultationIgnored || isStepStudioIgnored || isStepStandardIgnored) return null;
 
                 return (
                   <div key={i} className="flex-1 h-1.5 rounded-full transition-all duration-700 bg-gray-100 relative overflow-hidden">

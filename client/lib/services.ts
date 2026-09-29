@@ -1,7 +1,7 @@
 export interface Service {
   id: string;
   name: string;
-  category: "listings" | "branding" | "business" | "growth";
+  category: "listings" | "branding" | "business" | "growth" | "studio";
   price: number;
   description: string;
   tagline?: string;
@@ -158,5 +158,20 @@ export const services: Service[] = [
       "Scroll-Stopping Visual Flow.",
       "Conversion-Focused Copywriting"
     ]
+  },
+
+  {
+    id: "studio-noir",
+    name: "Studio Noir",
+    category: "studio",
+    price: 0,
+    description: "Dark, dramatic room at Studio 105. Rate confirmed when the hold is set.",
+  },
+  {
+    id: "studio-blanc",
+    name: "Studio Blanc",
+    category: "studio",
+    price: 0,
+    description: "Bright white room at Studio 105. Rate confirmed when the hold is set.",
   }
 ];
