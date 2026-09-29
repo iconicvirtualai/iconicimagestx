@@ -2,18 +2,30 @@ import { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import { X } from "lucide-react";
 
-type Category = "All" | "People" | "Families" | "Studio" | "Holiday" | "Listings" | "Aerial" | "Virtual Staging";
+type Category = "All" | "People" | "Families" | "Studio" | "Holiday" | "Headshots" | "Listings" | "Aerial" | "Virtual Staging";
 
 type Photo = {
   src: string;
   alt: string;
   title: string;
-  category: Exclude<Category, "All" | "Families" | "Studio" | "Holiday">;
+  category: Exclude<Category, "All">;
 };
 
 const PHOTOS: Photo[] = [
   { src: "/media/photos/lifestyle-mtz04327.jpg", alt: "Polished corporate portrait in a royal blue suit", title: "Corporate Portrait", category: "People" },
   { src: "/media/photos/lifestyle-kennedy-mtz01127.jpg", alt: "Warm smiling lifestyle portrait", title: "Lifestyle Portrait", category: "People" },
+  { src: "/media/photos/lifestyle-daughtery-mtz00636.jpg", alt: "Lifestyle portrait against a white brick wall", title: "Lifestyle Portrait", category: "People" },
+  { src: "/media/photos/lifestyle-logan-dan02309.jpg", alt: "Outdoor portrait in a navy suit", title: "Lifestyle Portrait", category: "People" },
+  { src: "/media/photos/lifestyle-mtz04655.jpg", alt: "Portrait seated on stone steps", title: "Lifestyle Portrait", category: "People" },
+  { src: "/media/photos/lifestyle-mtz04802.jpg", alt: "Portrait leaning against a stone column", title: "Lifestyle Portrait", category: "People" },
+  { src: "/media/photos/family-bryant-mtz09081.jpg", alt: "Family of four seated on a front porch", title: "Family Portrait", category: "Families" },
+  { src: "/media/photos/family-bryant-mtz09154.jpg", alt: "Mother and daughter portrait outdoors", title: "Mother and Daughter", category: "Families" },
+  { src: "/media/photos/family-bryant-mtz09392.jpg", alt: "Family of four standing outdoors", title: "Family Portrait", category: "Families" },
+  { src: "/media/photos/studio-mtz01691.jpg", alt: "Studio portrait on a beige backdrop", title: "Studio Portrait", category: "Studio" },
+  { src: "/media/photos/holiday-gregg-mtz05507.jpg", alt: "Holiday portrait in a silver sequin gown", title: "Holiday Portrait", category: "Holiday" },
+  { src: "/media/photos/holiday-mtz08102.jpg", alt: "Holiday portrait in a red dress", title: "Holiday Portrait", category: "Holiday" },
+  { src: "/media/photos/headshot-gracepoint-1.jpg", alt: "Headshot against a brick wall", title: "Headshot", category: "Headshots" },
+  { src: "/media/photos/headshot-gracepoint-4.jpg", alt: "Headshot in front of office windows", title: "Headshot", category: "Headshots" },
   { src: "/media/photos/website-hero-dan.jpg", alt: "Aerial of a luxury estate at dusk", title: "Aerial Estate", category: "Aerial" },
   { src: "/media/photos/drone-hero.jpg", alt: "Drone view of a waterfront luxury home", title: "Drone Hero", category: "Aerial" },
   { src: "/media/photos/luxury-exterior.jpg", alt: "Luxury home exterior", title: "Luxury Exterior", category: "Listings" },
@@ -28,22 +40,25 @@ const PHOTOS: Photo[] = [
   { src: "/media/photos/vs-ico7432.jpg", alt: "Virtual staging interior", title: "Virtual Staging", category: "Virtual Staging" },
 ];
 
-const FILTERS: Category[] = ["All", "People", "Families", "Studio", "Holiday", "Listings", "Aerial", "Virtual Staging"];
+const FILTERS: Category[] = ["All", "People", "Families", "Studio", "Holiday", "Headshots", "Listings", "Aerial", "Virtual Staging"];
 
-const COMING_SOON: { category: Category; title: string; note: string }[] = [
-  { category: "Families", title: "Families", note: "Family sessions are next in the gallery." },
-  { category: "Studio", title: "Studio", note: "Studio 105 portraits and product sets are on the way." },
-  { category: "Holiday", title: "Holiday / Seasonal", note: "Holiday minis and seasonal sets will live here." },
-];
+const FILTER_LABEL: Record<Category, string> = {
+  All: "All",
+  People: "People / Lifestyle",
+  Families: "Families",
+  Studio: "Studio",
+  Holiday: "Holiday / Seasonal",
+  Headshots: "Headshots",
+  Listings: "Listings",
+  Aerial: "Aerial",
+  "Virtual Staging": "Virtual Staging",
+};
 
 export default function Portfolio() {
   const [filter, setFilter] = useState<Category>("All");
   const [active, setActive] = useState<Photo | null>(null);
 
   const visible = filter === "All" ? PHOTOS : PHOTOS.filter((photo) => photo.category === filter);
-  const placeholders = filter === "All"
-    ? COMING_SOON
-    : COMING_SOON.filter((item) => item.category === filter);
 
   useEffect(() => {
     if (!active) return;
@@ -66,7 +81,7 @@ export default function Portfolio() {
               Portfolio
             </h1>
             <p className="mt-6 max-w-2xl text-lg text-gray-300 leading-relaxed">
-              People, listings, aerials, and virtual staging from Iconic Images.
+              People, families, studio, holiday, headshots, listings, aerials, and virtual staging from Iconic Images.
             </p>
 
             <div className="mt-10 flex flex-wrap gap-2">
@@ -81,7 +96,7 @@ export default function Portfolio() {
                       : "border-white/15 text-white/70 hover:text-white"
                   }`}
                 >
-                  {item === "People" ? "People / Lifestyle" : item === "Holiday" ? "Holiday / Seasonal" : item}
+                  {FILTER_LABEL[item]}
                 </button>
               ))}
             </div>
@@ -107,21 +122,6 @@ export default function Portfolio() {
                       {photo.title}
                     </span>
                   </button>
-                ))}
-              </div>
-            )}
-
-            {placeholders.length > 0 && (
-              <div className={`grid gap-4 ${visible.length > 0 ? "mt-6" : "mt-10"} sm:grid-cols-2 lg:grid-cols-3`}>
-                {placeholders.map((item) => (
-                  <div
-                    key={item.category}
-                    className="rounded-[1.5rem] border border-dashed border-white/20 bg-white/[0.03] p-8 min-h-[220px] flex flex-col justify-end"
-                  >
-                    <p className="text-[10px] font-black uppercase tracking-[0.35em] text-teal-400 mb-3">Coming soon</p>
-                    <h2 className="text-2xl font-black uppercase tracking-tight">{item.title}</h2>
-                    <p className="mt-2 text-sm text-gray-400">{item.note}</p>
-                  </div>
                 ))}
               </div>
             )}
