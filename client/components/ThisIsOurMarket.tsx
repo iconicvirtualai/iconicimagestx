@@ -60,8 +60,8 @@ export default function ThisIsOurMarket() {
                 className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[400px] md:w-[350px] md:h-[450px] rounded-3xl overflow-hidden shadow-2xl z-20 border-8 border-[#111]"
               >
                 <img
-                  src="https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&q=80&fm=webp"
-                  alt="Creative team at work"
+                  src="/media/photos/lifestyle-kennedy-mtz01127.jpg"
+                  alt="Iconic lifestyle portrait"
                   className="w-full h-full object-cover grayscale brightness-90 group-hover:grayscale-0 transition-all duration-700"
                 />
               </motion.div>
@@ -75,8 +75,8 @@ export default function ThisIsOurMarket() {
                 className="absolute top-[10%] -right-10 w-[200px] h-[260px] rounded-2xl overflow-hidden shadow-2xl z-30 border-4 border-[#222]"
               >
                 <img
-                  src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&q=80&fm=webp"
-                  alt="High end property visuals"
+                  src="/media/photos/drone-hero.jpg"
+                  alt="Iconic drone photograph of a luxury home"
                   className="w-full h-full object-cover"
                 />
               </motion.div>

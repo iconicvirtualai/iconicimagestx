@@ -12,7 +12,7 @@ export const DEFAULT_SITE_SETTINGS = {
   homepage: {
     heroTitle: "ELEVATE YOUR LISTINGS WITH MEDIA THAT SELLS",
     heroSubtitle: "Your Creative Media Partners for Real Estate & Business Professionals.",
-    heroImage: "/media/photos/website-hero-dan.jpg",
+    heroImage: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F26788b47d9a5440b8ea57e344d7943c2",
     showAudienceSection: true,
     showAIToolsSection: true,
     showBeforeAfter: true,

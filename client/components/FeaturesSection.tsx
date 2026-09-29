@@ -68,14 +68,14 @@ const VirtualStagingSnippet = () => {
     <div className="relative h-full w-full bg-gray-50 flex items-center justify-center overflow-hidden">
       {/* Background Room - Empty */}
       <img
-        src="https://images.unsplash.com/photo-1600607687940-47a0f9259017?w=400&q=225&fit=crop"
+        src="/media/photos/haeckerville-9.jpg"
         className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${step === 3 ? 'opacity-0' : 'opacity-100'}`}
         alt="Empty Room"
       />
 
       {/* Background Room - Staged */}
       <img
-        src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&q=225&fit=crop"
+        src="/media/photos/claymore-vs-final.jpg"
         className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${step === 3 ? 'opacity-100' : 'opacity-0'}`}
         alt="Staged Room"
       />
@@ -151,10 +151,10 @@ export default function FeaturesSection() {
             colSpan="md:col-span-2"
           >
             <div className="flex h-full items-center justify-center p-4 gap-4">
-              <img src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&q=225&fit=crop" className="w-1/2 h-full object-cover rounded-lg border border-gray-100" alt="Before" />
+              <img src="/media/photos/luxury-interior.jpg" className="w-1/2 h-full object-cover rounded-lg border border-gray-100" alt="Listing still" />
               <ArrowRight className="w-6 h-6 shrink-0" style={{ color: settings.global.primaryColor }} />
               <div className="w-1/2 h-full relative rounded-lg overflow-hidden border border-gray-100">
-                <img src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&q=225&fit=crop" className="w-full h-full object-cover" alt="After" />
+                <img src="/media/photos/haeckerville-10.jpg" className="w-full h-full object-cover" alt="Video frame" />
                 <div className="absolute inset-0 flex items-center justify-center bg-black/10">
                   <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-lg">
                     <Play className="w-3 h-3 translate-x-0.5" style={{ color: settings.global.primaryColor, fill: settings.global.primaryColor }} />
@@ -199,11 +199,11 @@ export default function FeaturesSection() {
           >
             <div className="relative h-full flex">
               <div className="w-1/2 h-full relative border-r border-white/50">
-                <img src="https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?w=400&q=225&fit=crop" className="w-full h-full object-cover grayscale brightness-75" alt="Before" />
+                <img src="/media/photos/luxury-exterior.jpg" className="w-full h-full object-cover grayscale brightness-75" alt="Before" />
                 <span className="absolute top-3 left-3 bg-white/20 backdrop-blur-md text-white text-[8px] font-bold px-2 py-0.5 rounded uppercase border border-white/30">Before</span>
               </div>
               <div className="w-1/2 h-full relative">
-                <img src="https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?w=400&q=225&fit=crop" className="w-full h-full object-cover" alt="After" />
+                <img src="/media/photos/website-hero-dan.jpg" className="w-full h-full object-cover" alt="After" />
                 <span className="absolute top-3 right-3 backdrop-blur-md text-white text-[8px] font-bold px-2 py-0.5 rounded uppercase" style={{ backgroundColor: `${settings.global.primaryColor}CC` }}>After</span>
               </div>
               <div className="absolute left-1/2 top-0 bottom-0 w-[2px] bg-white z-10 flex items-center justify-center -translate-x-1/2">
@@ -227,7 +227,7 @@ export default function FeaturesSection() {
               <div className="flex gap-4 mb-4">
                 <div className="flex-1 bg-white border border-gray-100 rounded-lg shadow-sm p-3">
                   <div className="w-full aspect-video bg-gray-100 rounded-md overflow-hidden relative">
-                    <img src="https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=400&q=225&fit=crop" className="w-full h-full object-cover" alt="Studio Preview" />
+                    <img src="/media/photos/luxury-a7305553.jpg" className="w-full h-full object-cover" alt="Studio preview" />
                     <div className="absolute inset-0 flex items-center justify-center">
                       <Play className="w-4 h-4 text-white" />
                     </div>
@@ -295,9 +295,15 @@ export default function FeaturesSection() {
             colSpan="md:col-span-2"
           >
             <div className="flex h-full items-center justify-center p-4 gap-6">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="w-16 h-16 md:w-20 md:h-20 rounded-xl border-2 shadow-lg overflow-hidden bg-gray-100 flex-shrink-0 first:ring-2" style={{ borderTopColor: 'white', borderRightColor: 'white', borderBottomColor: 'white', borderLeftColor: i === 1 ? settings.global.primaryColor : 'white', borderStyle: 'solid', boxShadow: i === 1 ? `0 0 0 2px ${settings.global.primaryColor}33, 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)` : undefined }}>
-                  <img src={`https://i.pravatar.cc/150?u=${i+10}`} className="w-full h-full object-cover" alt="Avatar" />
+              {[
+                "/media/photos/lifestyle-mtz04327.jpg",
+                "/media/photos/lifestyle-kennedy-mtz01127.jpg",
+                "/media/photos/headshot-gracepoint-4.jpg",
+                "/media/photos/lifestyle-daughtery-mtz00636.jpg",
+                "/media/photos/headshot-gracepoint-1.jpg",
+              ].map((src, i) => (
+                <div key={src} className="w-16 h-16 md:w-20 md:h-20 rounded-xl border-2 shadow-lg overflow-hidden bg-gray-100 flex-shrink-0 first:ring-2" style={{ borderTopColor: 'white', borderRightColor: 'white', borderBottomColor: 'white', borderLeftColor: i === 0 ? settings.global.primaryColor : 'white', borderStyle: 'solid', boxShadow: i === 0 ? `0 0 0 2px ${settings.global.primaryColor}33, 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)` : undefined }}>
+                  <img src={src} className="w-full h-full object-cover" alt="Iconic portrait" />
                 </div>
               ))}
             </div>
