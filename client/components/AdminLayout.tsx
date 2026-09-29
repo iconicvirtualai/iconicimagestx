@@ -131,7 +131,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
   return (
     <div className="flex h-screen bg-[#f4f7f8]">
       {/* Sidebar */}
-      <aside className="relative w-60 bg-[#0a0a0a] border-r border-gray-800 flex flex-col fixed left-0 top-0 h-screen overflow-hidden">
+      <aside className="fixed left-0 top-0 z-20 flex h-screen w-60 flex-col overflow-hidden border-r border-gray-800 bg-[#0a0a0a]">
         <div aria-hidden="true" className="pointer-events-none absolute inset-0">
           <img src="/media/decor/glow-teal.svg" alt="" className="absolute -top-24 -left-16 w-72 opacity-80" />
           <img src="/media/decor/arc.svg" alt="" className="absolute -bottom-16 -right-16 w-56 opacity-60" />
@@ -207,29 +207,29 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
       </aside>
 
       {/* Main Content */}
-      <main className="relative ml-60 flex-1 overflow-y-auto">
+      <main className="relative ml-60 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
         <AdminDecor />
-        <div className="relative z-[1] min-h-full">
+        <div className="relative z-[1] min-h-full w-full">
           {title && (
             <div className="relative border-b border-slate-200 bg-white sticky top-0 z-10 overflow-hidden">
               <img
                 src="/media/decor/arc.svg"
                 alt=""
                 aria-hidden="true"
-                className="pointer-events-none absolute left-1/2 top-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2 opacity-90"
+                className="pointer-events-none absolute right-6 top-1/2 h-24 w-24 -translate-y-1/2 opacity-70"
               />
               <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-teal-500/70 to-transparent" />
-              <div className="container mx-auto px-8 py-5 max-w-7xl flex items-center justify-between">
+              <div className="flex w-full items-center justify-between gap-4 px-6 py-5">
                 <h1 className="text-xl font-black text-black uppercase tracking-tight">
                   {title}
                 </h1>
-                <span className={`relative text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${badge.color}`}>
+                <span className={`relative shrink-0 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${badge.color}`}>
                   {badge.label}
                 </span>
               </div>
             </div>
           )}
-          <div className="container mx-auto px-8 py-8 max-w-7xl">
+          <div className="w-full min-w-0 px-6 py-6">
             {children}
           </div>
         </div>
@@ -243,9 +243,8 @@ function AdminDecor({ full = false }: { full?: boolean }) {
     <div aria-hidden="true" className={`pointer-events-none fixed inset-y-0 right-0 z-0 overflow-hidden ${full ? "left-0" : "left-60"}`}>
       <div className="absolute inset-0 admin-decor-wash" />
       <div className="absolute inset-0 shadow-[inset_0_0_140px_rgba(15,23,42,0.05)]" />
-      <img src="/media/decor/arc.svg" alt="" className="absolute top-16 -right-24 w-[520px]" />
-      <img src="/media/decor/glow-teal.svg" alt="" className="absolute bottom-0 -left-10 w-[460px]" />
-      <img src="/media/decor/dots.svg" alt="" className="absolute top-24 left-8 w-72" />
+      <img src="/media/decor/arc.svg" alt="" className="absolute -top-8 -right-28 w-[380px] opacity-60" />
+      <img src="/media/decor/dots.svg" alt="" className="absolute bottom-8 right-10 w-40 opacity-40" />
     </div>
   );
 }

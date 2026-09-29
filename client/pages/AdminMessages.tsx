@@ -600,7 +600,7 @@ export default function AdminMessages() {
           {/* ── Sweep tab ── */}
           {tab === "sweep" && (
             <div className="flex-1 p-8 overflow-y-auto">
-              <div className="max-w-5xl mx-auto space-y-6">
+              <div className="w-full min-w-0 space-y-6">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.24em] text-teal-400 mb-2">
                     AICON Correspondence Sweep

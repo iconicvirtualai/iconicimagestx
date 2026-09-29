@@ -127,6 +127,8 @@ export default function AdminOrderRequest() {
   const [showCancel, setShowCancel] = React.useState(false);
   const [staff, setStaff] = React.useState<any[]>([]);
   const [selectedProviders, setSelectedProviders] = React.useState<string[]>([]);
+  const [projectTypeChoice, setProjectTypeChoice] = React.useState<"real_estate" | "business">("real_estate");
+  const projectTypeTouched = React.useRef(false);
 
   React.useEffect(() => {
     if (!id) return;
@@ -135,6 +137,15 @@ export default function AdminOrderRequest() {
         const data: any = { id: snap.id, ...snap.data() };
         setOrder(data);
         setForm(data);
+        if (!projectTypeTouched.current) {
+          const lineItems = data.lineItems || [];
+          const inferredRealEstate = data.specializedPhotography === "mls" || lineItems.some((li: any) => {
+            const n = (li.name || "").toLowerCase();
+            return n.includes("listing") || n.includes("aerial") || n.includes("matterport") || n.includes("3d");
+          });
+          const hasBusinessSignal = Boolean(data.specializedPhotography && data.specializedPhotography !== "mls") || (lineItems.length > 0 && !inferredRealEstate);
+          setProjectTypeChoice(hasBusinessSignal ? "business" : "real_estate");
+        }
         if (data.appointmentDate) setSchedDate(data.appointmentDate);
         if (data.appointmentTime) setSchedTime(data.appointmentTime);
       } else { toast.error("Order not found"); navigate("/admin/orders"); }
@@ -172,17 +183,14 @@ export default function AdminOrderRequest() {
     if (order.listingId) { navigate(`/admin/listing/${order.listingId}`); return; }
     setSaving(true);
     try {
-      const isRE = (order.specializedPhotography === "mls") || (order.lineItems || []).some((li: any) => {
-        const n = (li.name || "").toLowerCase();
-        return n.includes("listing") || n.includes("aerial") || n.includes("matterport") || n.includes("3d");
-      });
       const listingData: any = {
-        projectType: isRE ? "real_estate" : "business",
+        projectType: projectTypeChoice,
         orderRequestId: id,
         clientName: order.clientName || `${order.firstName || ""} ${order.lastName || ""}`.trim(),
         clientEmail: order.email || "",
         clientPhone: order.phone || "",
         address: fmtAddr(order.address),
+        shootLocation: projectTypeChoice === "business" ? fmtAddr(order.address) : null,
         apptDate: order.appointmentDate ? new Date(order.appointmentDate + "T12:00:00") : null,
         apptTime: order.scheduledTime || order.appointmentTime || null,
         services: (order.lineItems || []).map((li: any) => li.name || String(li)),
@@ -444,6 +452,19 @@ export default function AdminOrderRequest() {
           <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6">
             <h3 className={`${labelCls} mb-4`}>Actions</h3>
             <div className="space-y-2">
+              {!order.listingId && (
+                <div>
+                  <p className={`${labelCls} mb-2`}>Project type</p>
+                  <div className="flex bg-gray-100 rounded-xl p-1" role="group" aria-label="Project type">
+                    <button type="button" onClick={() => { projectTypeTouched.current = true; setProjectTypeChoice("real_estate"); }}
+                      className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest ${projectTypeChoice === "real_estate" ? "bg-[#0d9488] text-white" : "text-gray-500"}`}
+                    >Real Estate</button>
+                    <button type="button" onClick={() => { projectTypeTouched.current = true; setProjectTypeChoice("business"); }}
+                      className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest ${projectTypeChoice === "business" ? "bg-black text-white" : "text-gray-500"}`}
+                    >Business</button>
+                  </div>
+                </div>
+              )}
               <Button onClick={order.listingId ? () => navigate(`/admin/listing/${order.listingId}`) : handleCreateProject}
                 disabled={saving} className="w-full rounded-xl text-xs font-bold justify-center bg-[#0d9488] hover:bg-[#0f766e] text-white">
                 <Layers className="w-3.5 h-3.5 mr-1.5" />{order.listingId ? "View Project" : "Create Project"}

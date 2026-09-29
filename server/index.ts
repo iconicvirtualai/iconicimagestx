@@ -28,6 +28,7 @@ import smsRouter from "./routes/sms";
 import contactRouter from "./routes/contact";
 import { listCalendarScheduleEvents, verifyCalendarWriteAccess } from "./services/calendar";
 import { requireStaff } from "./middleware/auth";
+import { handleListingPhotoUpload } from "./routes/listingPhotos";
 
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
 const API_BUILD_MARKER = "codex-2026-09-15-v3";
@@ -92,6 +93,18 @@ export function createServer() {
   // Standard middleware
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: true }));
+
+  // Gallery photos: raw image body, staff auth (preview temp-admin included).
+  // Registered before other parsers consume the body. JSON middleware ignores non-JSON.
+  app.post(
+    "/api/listings/:id/photos",
+    express.raw({
+      type: ["image/jpeg", "image/png", "image/webp", "application/octet-stream"],
+      limit: "8mb",
+    }),
+    requireStaff,
+    handleListingPhotoUpload,
+  );
 
   // ─── Health check ──────────────────────────────────────────────────
   app.get("/api/ping", (_req, res) => {
