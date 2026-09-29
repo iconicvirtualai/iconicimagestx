@@ -85,8 +85,8 @@ export default function TheNetwork() {
             className="absolute bottom-0 left-[35%] w-[140px] h-[140px] md:w-[220px] md:h-[220px] rounded-[2rem] overflow-hidden shadow-2xl z-30 border-4 border-white rotate-[-2deg]"
           >
             <img
-              src="/media/photos/haeckerville-17.jpg"
-              alt="Haeckerville listing"
+              src="https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=500&q=80&fm=webp"
+              alt="Architectural detail"
               className="w-full h-full object-cover grayscale opacity-80"
             />
           </motion.div>
