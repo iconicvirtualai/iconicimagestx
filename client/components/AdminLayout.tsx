@@ -94,8 +94,9 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-[#f8fafc]">
-        <div className="text-center">
+      <div className="relative flex items-center justify-center h-screen bg-[#f4f7f8] overflow-hidden">
+        <AdminDecor full />
+        <div className="relative text-center">
           <div className="w-12 h-12 rounded-lg bg-[#0d9488] mx-auto mb-4 animate-pulse" />
           <p className="text-sm font-bold text-gray-500 uppercase tracking-widest">Loading...</p>
         </div>
@@ -128,12 +129,16 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
     .filter((group) => group.items.length > 0);
 
   return (
-    <div className="flex h-screen bg-[#f8fafc]">
+    <div className="flex h-screen bg-[#f4f7f8]">
       {/* Sidebar */}
-      <aside className="w-60 bg-[#0a0a0a] border-r border-gray-800 flex flex-col fixed left-0 top-0 h-screen overflow-y-auto">
+      <aside className="relative w-60 bg-[#0a0a0a] border-r border-gray-800 flex flex-col fixed left-0 top-0 h-screen overflow-hidden">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+          <img src="/media/decor/glow-teal.svg" alt="" className="absolute -top-24 -left-16 w-72 opacity-80" />
+          <img src="/media/decor/arc.svg" alt="" className="absolute -bottom-16 -right-16 w-56 opacity-60" />
+        </div>
 
         {/* Logo */}
-        <div className="p-5 border-b border-gray-800">
+        <div className="relative p-5 border-b border-gray-800">
           <Link to="/admin/dashboard" className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-[#0d9488] flex items-center justify-center flex-shrink-0">
               <span className="font-black text-white text-base">I</span>
@@ -146,7 +151,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-5 space-y-5 overflow-y-auto">
+        <nav className="relative flex-1 px-3 py-5 space-y-5 overflow-y-auto">
           {visibleGroups.map((group) => (
             <div key={group.label}>
               <p className="text-[9px] font-black text-gray-600 uppercase tracking-[0.15em] px-3 mb-2">
@@ -177,7 +182,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
         </nav>
 
         {/* User section */}
-        <div className="border-t border-gray-800 p-4 space-y-3">
+        <div className="relative border-t border-gray-800 p-4 space-y-3">
           <div className="px-3 py-3 bg-[#111] rounded-lg">
             <div className="flex items-center justify-between mb-1">
               <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest">
@@ -202,15 +207,23 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
       </aside>
 
       {/* Main Content */}
-      <main className="ml-60 flex-1 overflow-y-auto">
-        <div className="min-h-full">
+      <main className="relative ml-60 flex-1 overflow-y-auto">
+        <AdminDecor />
+        <div className="relative z-[1] min-h-full">
           {title && (
-            <div className="border-b border-slate-200 bg-white sticky top-0 z-10">
+            <div className="relative border-b border-slate-200 bg-white sticky top-0 z-10 overflow-hidden">
+              <img
+                src="/media/decor/arc.svg"
+                alt=""
+                aria-hidden="true"
+                className="pointer-events-none absolute left-1/2 top-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2 opacity-90"
+              />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-teal-500/70 to-transparent" />
               <div className="container mx-auto px-8 py-5 max-w-7xl flex items-center justify-between">
                 <h1 className="text-xl font-black text-black uppercase tracking-tight">
                   {title}
                 </h1>
-                <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${badge.color}`}>
+                <span className={`relative text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${badge.color}`}>
                   {badge.label}
                 </span>
               </div>
@@ -221,6 +234,18 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
           </div>
         </div>
       </main>
+    </div>
+  );
+}
+
+function AdminDecor({ full = false }: { full?: boolean }) {
+  return (
+    <div aria-hidden="true" className={`pointer-events-none fixed inset-y-0 right-0 z-0 overflow-hidden ${full ? "left-0" : "left-60"}`}>
+      <div className="absolute inset-0 admin-decor-wash" />
+      <div className="absolute inset-0 shadow-[inset_0_0_140px_rgba(15,23,42,0.05)]" />
+      <img src="/media/decor/arc.svg" alt="" className="absolute top-16 -right-24 w-[520px]" />
+      <img src="/media/decor/glow-teal.svg" alt="" className="absolute bottom-0 -left-10 w-[460px]" />
+      <img src="/media/decor/dots.svg" alt="" className="absolute top-24 left-8 w-72" />
     </div>
   );
 }
