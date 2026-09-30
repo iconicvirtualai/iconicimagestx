@@ -11,6 +11,10 @@ import { db } from "@/lib/firebase";
 import { doc, onSnapshot, updateDoc, serverTimestamp, collection, getDocs, query, where } from "firebase/firestore";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  LIFE_OF_THE_LISTING_CARE_PRICE_LABEL,
+  LIFE_OF_THE_LISTING_CARE_SUMMARY_LABEL,
+} from "@shared/lifeOfTheListingCare";
 
 // ─── Status system ────────────────────────────────────────────────────────────
 const ORDER_STATUSES = [
@@ -455,6 +459,12 @@ export default function AdminOrderDetail() {
                 </div>
               ) : (
                 <p className="text-sm text-gray-400">No services listed. Use Manage Order to add services.</p>
+              )}
+              {order.lifeOfTheListingCare === true && (
+                <div className="mt-4 flex justify-between items-start gap-3 border-t border-gray-100 pt-3">
+                  <p className="text-sm font-bold text-neutral-950">{LIFE_OF_THE_LISTING_CARE_SUMMARY_LABEL}</p>
+                  <p className="text-sm font-black text-gray-500 shrink-0">{LIFE_OF_THE_LISTING_CARE_PRICE_LABEL}</p>
+                </div>
               )}
             </div>
 

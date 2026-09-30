@@ -4,7 +4,7 @@ import BookingForm from "@/components/BookingForm";
 export default function BookPage() {
   return (
     <Layout>
-      <div className="bg-white">
+      <div className="bg-white text-neutral-950">
         <div style={{ padding: "40px" }}>
           <BookingForm />
         </div>

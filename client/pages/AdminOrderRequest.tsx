@@ -16,6 +16,10 @@ import {
   markScheduledAppointmentConfirmed,
   upsertScheduledAppointment,
 } from "@/lib/scheduleRecords";
+import {
+  LIFE_OF_THE_LISTING_CARE_PRICE_LABEL,
+  LIFE_OF_THE_LISTING_CARE_SUMMARY_LABEL,
+} from "@shared/lifeOfTheListingCare";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtAddr(a: any): string {
@@ -380,6 +384,12 @@ export default function AdminOrderRequest() {
                     {li.price != null && <span className="text-sm font-black text-[#0d9488]">{fmtCurrency(li.price)}</span>}
                   </div>
                 ))}
+                {order.lifeOfTheListingCare === true && (
+                  <div className="flex justify-between items-center gap-3 px-4 py-3 border-t border-gray-200/50">
+                    <span className="text-sm font-bold text-gray-900">{LIFE_OF_THE_LISTING_CARE_SUMMARY_LABEL}</span>
+                    <span className="text-sm font-black text-gray-500 shrink-0">{LIFE_OF_THE_LISTING_CARE_PRICE_LABEL}</span>
+                  </div>
+                )}
                 {promoDiscount > 0 && (
                   <div className="flex justify-between items-center px-4 py-3 border-t border-gray-200/50 bg-green-50/50">
                     <span className="text-sm font-bold text-gray-500 italic">Promo ({order.promoCode})</span>
@@ -393,6 +403,12 @@ export default function AdminOrderRequest() {
               </div>
             ) : (
               <p className="text-sm text-gray-500">No services listed.</p>
+            )}
+            {editing && order.lifeOfTheListingCare === true && (
+              <p className="mt-3 text-sm font-bold text-gray-700">
+                {LIFE_OF_THE_LISTING_CARE_SUMMARY_LABEL}
+                <span className="ml-2 font-black text-gray-500">{LIFE_OF_THE_LISTING_CARE_PRICE_LABEL}</span>
+              </p>
             )}
           </div>
 
@@ -421,6 +437,12 @@ export default function AdminOrderRequest() {
                     {li.price != null && <span className="font-bold">{fmtCurrency(li.price)}</span>}
                   </div>
                 ))}
+                {order.lifeOfTheListingCare === true && (
+                  <div className="flex justify-between gap-3 text-sm">
+                    <span className="text-gray-300 font-medium">{LIFE_OF_THE_LISTING_CARE_SUMMARY_LABEL}</span>
+                    <span className="font-bold shrink-0">{LIFE_OF_THE_LISTING_CARE_PRICE_LABEL}</span>
+                  </div>
+                )}
               </div>
             )}
             {promoDiscount > 0 && (

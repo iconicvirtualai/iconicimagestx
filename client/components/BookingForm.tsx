@@ -6,6 +6,12 @@ import { createOrder } from "@/lib/createOrder";
 import { useSearchParams } from "react-router-dom";
 import ChatWidget from "@/components/ChatWidget";
 import { services } from "@/lib/services";
+import {
+  LIFE_OF_THE_LISTING_CARE_BLURB,
+  LIFE_OF_THE_LISTING_CARE_CHECKBOX_LABEL,
+  LIFE_OF_THE_LISTING_CARE_PRICE_LABEL,
+  LIFE_OF_THE_LISTING_CARE_SUMMARY_LABEL,
+} from "@shared/lifeOfTheListingCare";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
@@ -39,6 +45,12 @@ import { format, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameM
 import { toast } from "sonner";
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6 | "success";
+
+/**
+ * Public pages sit inside Layout's `text-white`. Form controls inherit that
+ * color, so light fields need an explicit dark text color and placeholder.
+ */
+const lightControlText = "text-neutral-950 placeholder:text-neutral-500 caret-neutral-950";
 
 const basicsList = [
   {
@@ -265,6 +277,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     selectedService: initialServiceId || "" as string,
     selectedBasics: [] as string[],
     selectedAddOns: [] as string[],
+    lifeOfTheListingCare: false,
     premiumUpgrade: false,
     accessInfo: "Lockbox",
     lockboxCode: "",
@@ -662,7 +675,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
   };
 
   const renderSummarySidebar = () => (
-    <div className="bg-white rounded-[2rem] border border-gray-100 p-6 shadow-xl sticky top-8">
+    <div className="bg-white text-neutral-950 rounded-[2rem] border border-gray-100 p-6 shadow-xl sticky top-8">
       <h3 className="text-lg font-black text-black uppercase tracking-tight mb-4 pb-3 border-b">Order Summary</h3>
       <div className="space-y-3 mb-6">
         {selectedServiceData && (
@@ -719,6 +732,12 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
              })}
           </div>
         )}
+        {formData.lifeOfTheListingCare && (
+          <div className="flex justify-between items-start gap-3 text-[11px]">
+            <span className="text-gray-500">{LIFE_OF_THE_LISTING_CARE_SUMMARY_LABEL}</span>
+            <span className="font-bold text-neutral-950 shrink-0">{LIFE_OF_THE_LISTING_CARE_PRICE_LABEL}</span>
+          </div>
+        )}
         {formData.serviceDate && (
           <div className="pt-2 mt-2 border-t border-gray-100 flex justify-between items-center text-[11px]">
              <span className="text-gray-500 italic flex items-center gap-1.5"><CalendarIcon className="w-3 h-3" /> {format(formData.serviceDate, "PPP")}</span>
@@ -740,7 +759,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
         <div className="flex gap-2">
           <Input
             placeholder="PROMO CODE"
-            className="h-10 text-[10px] font-black uppercase tracking-widest border-gray-100 rounded-xl px-4"
+            className={`h-10 text-[10px] font-black uppercase tracking-widest border-gray-100 rounded-xl px-4 bg-white ${lightControlText}`}
             value={promoInput}
             onChange={(e) => setPromoInput(e.target.value)}
           />
@@ -1066,7 +1085,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                     <Input
                       type="text"
                       placeholder="123 Luxury Lane, Houston, TX"
-                      className="h-14 rounded-xl border-gray-100 focus:border-black text-[15px] px-5 w-full"
+                      className={`h-14 rounded-xl border-gray-100 focus:border-black text-[15px] px-5 w-full bg-white ${lightControlText}`}
                       value={addressSearchValue || formData.address}
                       onChange={(e) => {
                         setAddressSearchValue(e.target.value);
@@ -1104,7 +1123,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                       type="text"
                       inputMode="numeric"
                       placeholder="2500"
-                      className="h-14 rounded-xl border-gray-100 focus:border-black text-[15px] px-5"
+                      className={`h-14 rounded-xl border-gray-100 focus:border-black text-[15px] px-5 bg-white ${lightControlText}`}
                       value={formData.sqft}
                       onChange={(e) => {
                         const val = e.target.value.replace(/\D/g, "");
@@ -1122,7 +1141,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                           key={access}
                           onClick={() => updateFormData({ accessInfo: access })}
                           className={`flex-1 py-3.5 rounded-lg text-[9px] font-black uppercase tracking-widest border-2 transition-all ${
-                            formData.accessInfo === access ? 'border-black bg-black text-white' : 'border-gray-100 bg-white text-gray-400'
+                            formData.accessInfo === access ? 'border-black bg-black text-white' : 'border-gray-100 bg-white text-neutral-700'
                           }`}
                         >
                           {access}
@@ -1139,7 +1158,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                       <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Lockbox Code</label>
                       <Input 
                         placeholder="Enter Code"
-                        className="h-12 rounded-xl border-gray-100 focus:border-black text-sm px-5 bg-gray-50/50"
+                        className={`h-12 rounded-xl border-gray-100 focus:border-black text-sm px-5 bg-gray-50 ${lightControlText}`}
                         value={formData.lockboxCode}
                         onChange={(e) => updateFormData({ lockboxCode: e.target.value })}
                       />
@@ -1150,7 +1169,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                       <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">CBS or Shackle Code?</label>
                       <Input 
                         placeholder="Enter Code or Notes"
-                        className="h-12 rounded-xl border-gray-100 focus:border-black text-sm px-5 bg-gray-50/50"
+                        className={`h-12 rounded-xl border-gray-100 focus:border-black text-sm px-5 bg-gray-50 ${lightControlText}`}
                         value={formData.supraCode}
                         onChange={(e) => updateFormData({ supraCode: e.target.value })}
                       />
@@ -1168,7 +1187,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                           key={status}
                           onClick={() => updateFormData({ propertyStatus: status })}
                           className={`flex-1 py-3 rounded-lg text-[9px] font-black uppercase tracking-widest border-2 transition-all ${
-                            formData.propertyStatus === status ? 'border-black bg-gray-50' : 'border-gray-50 bg-white text-gray-400'
+                            formData.propertyStatus === status ? 'border-black bg-gray-50 text-neutral-950' : 'border-gray-50 bg-white text-neutral-700'
                           }`}
                         >
                           {status}
@@ -1189,7 +1208,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                             }
                           }}
                           className={`flex-1 py-3 rounded-lg text-[9px] font-black uppercase tracking-widest border-2 transition-all ${
-                            formData.furnishingStatus === status ? 'border-black bg-gray-50' : 'border-gray-50 bg-white text-gray-400'
+                            formData.furnishingStatus === status ? 'border-black bg-gray-50 text-neutral-950' : 'border-gray-50 bg-white text-neutral-700'
                           }`}
                         >
                           {status}
@@ -1205,7 +1224,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                   </label>
                   <textarea 
                     placeholder="Anything special we should highlight? (The view, the kitchen, the hidden wine cellar?)"
-                    className="w-full h-24 rounded-xl border-2 border-gray-100 focus:border-black text-xs p-4 resize-none transition-all outline-none"
+                    className={`w-full h-24 rounded-xl border-2 border-gray-100 bg-white focus:border-black text-xs p-4 resize-none transition-all outline-none ${lightControlText}`}
                     value={formData.vibeNote}
                     onChange={(e) => updateFormData({ vibeNote: e.target.value })}
                   />
@@ -1249,12 +1268,12 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                         }
                       }}
                     >
-                      <SelectTrigger className="h-16 rounded-[1.25rem] border-2 px-6 font-black text-black border-black bg-white focus:ring-0">
+                      <SelectTrigger className={`h-16 rounded-[1.25rem] border-2 px-6 font-black border-black bg-white focus:ring-0 ${lightControlText}`}>
                         <SelectValue placeholder="Select Month" />
                       </SelectTrigger>
-                      <SelectContent className="rounded-2xl border-none shadow-2xl p-2 max-h-[300px]">
+                      <SelectContent className="rounded-2xl border-none shadow-2xl p-2 max-h-[300px] bg-white text-neutral-950">
                         {months.map((m) => (
-                          <SelectItem key={format(m, "yyyy-MM")} value={format(m, "yyyy-MM")} className="rounded-xl py-3 font-bold cursor-pointer focus:bg-gray-50">
+                          <SelectItem key={format(m, "yyyy-MM")} value={format(m, "yyyy-MM")} className="rounded-xl py-3 font-bold cursor-pointer text-neutral-950 focus:bg-gray-50 focus:text-neutral-950">
                             {format(m, "MMMM yyyy")}
                           </SelectItem>
                         ))}
@@ -1274,12 +1293,12 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                         updateFormData({ serviceDate: new Date(year, month - 1, day) });
                       }}
                     >
-                      <SelectTrigger className="h-16 rounded-[1.25rem] border-2 px-6 font-black text-black border-black bg-white focus:ring-0">
+                      <SelectTrigger className={`h-16 rounded-[1.25rem] border-2 px-6 font-black border-black bg-white focus:ring-0 ${lightControlText}`}>
                         <SelectValue placeholder="Select Date" />
                       </SelectTrigger>
-                      <SelectContent className="rounded-2xl border-none shadow-2xl p-2 max-h-[300px]">
+                      <SelectContent className="rounded-2xl border-none shadow-2xl p-2 max-h-[300px] bg-white text-neutral-950">
                         {daysInMonth.map((d) => (
-                          <SelectItem key={format(d, "yyyy-MM-dd")} value={format(d, "yyyy-MM-dd")} className="rounded-xl py-3 font-bold cursor-pointer focus:bg-gray-50">
+                          <SelectItem key={format(d, "yyyy-MM-dd")} value={format(d, "yyyy-MM-dd")} className="rounded-xl py-3 font-bold cursor-pointer text-neutral-950 focus:bg-gray-50 focus:text-neutral-950">
                             {format(d, "EEEE, do")}
                           </SelectItem>
                         ))}
@@ -1298,12 +1317,12 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                       value={formData.serviceTime}
                       onValueChange={(val) => updateFormData({ serviceTime: val })}
                     >
-                      <SelectTrigger className="h-16 rounded-[1.25rem] border-2 px-6 font-black text-black border-black bg-white focus:ring-0">
+                      <SelectTrigger className={`h-16 rounded-[1.25rem] border-2 px-6 font-black border-black bg-white focus:ring-0 ${lightControlText}`}>
                         <SelectValue placeholder="Select Time" />
                       </SelectTrigger>
-                      <SelectContent className="rounded-2xl border-none shadow-2xl p-2">
+                      <SelectContent className="rounded-2xl border-none shadow-2xl p-2 bg-white text-neutral-950">
                         {["9:00 AM", "11:00 AM", "1:00 PM", "3:00 PM", "5:00 PM"].map((t) => (
-                          <SelectItem key={t} value={t} className="rounded-xl py-3 font-bold cursor-pointer focus:bg-gray-50">
+                          <SelectItem key={t} value={t} className="rounded-xl py-3 font-bold cursor-pointer text-neutral-950 focus:bg-gray-50 focus:text-neutral-950">
                             {t}
                           </SelectItem>
                         ))}
@@ -1320,12 +1339,12 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                         value={formData.preferredPhotographer}
                         onValueChange={(val) => updateFormData({ preferredPhotographer: val })}
                       >
-                        <SelectTrigger className="h-16 rounded-[1.25rem] border-2 px-6 font-black text-black border-black bg-white focus:ring-0">
+                        <SelectTrigger className={`h-16 rounded-[1.25rem] border-2 px-6 font-black border-black bg-white focus:ring-0 ${lightControlText}`}>
                           <SelectValue placeholder="Select Photographer" />
                         </SelectTrigger>
-                        <SelectContent className="rounded-2xl border-none shadow-2xl p-2">
+                        <SelectContent className="rounded-2xl border-none shadow-2xl p-2 bg-white text-neutral-950">
                           {photographers.map((p) => (
-                            <SelectItem key={p} value={p} className="rounded-xl py-3 font-bold cursor-pointer focus:bg-gray-50">
+                            <SelectItem key={p} value={p} className="rounded-xl py-3 font-bold cursor-pointer text-neutral-950 focus:bg-gray-50 focus:text-neutral-950">
                               {p}
                             </SelectItem>
                           ))}
@@ -1362,7 +1381,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                           key={opt}
                           onClick={() => updateFormData({ [q.id]: opt })}
                           className={`p-4 rounded-xl text-[11px] font-bold text-left border-2 transition-all flex items-center justify-between ${
-                            formData[q.id as keyof typeof formData] === opt ? 'border-black bg-gray-50' : 'border-gray-50 bg-white hover:border-gray-200'
+                            formData[q.id as keyof typeof formData] === opt ? 'border-black bg-gray-50 text-neutral-950' : 'border-gray-50 bg-white text-neutral-800 hover:border-gray-200'
                           }`}
                          >
                            {opt}
@@ -1396,7 +1415,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">First Name</label>
                     <Input
                       placeholder="John"
-                      className="h-14 rounded-xl border-2 focus:border-black px-5"
+                      className={`h-14 rounded-xl border-2 focus:border-black px-5 bg-white ${lightControlText}`}
                       value={formData.firstName}
                       onChange={(e) => updateFormData({ firstName: e.target.value })}
                     />
@@ -1405,7 +1424,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Last Name</label>
                     <Input
                       placeholder="Doe"
-                      className="h-14 rounded-xl border-2 focus:border-black px-5"
+                      className={`h-14 rounded-xl border-2 focus:border-black px-5 bg-white ${lightControlText}`}
                       value={formData.lastName}
                       onChange={(e) => updateFormData({ lastName: e.target.value })}
                     />
@@ -1417,7 +1436,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                     <Input
                       type="email"
                       placeholder="john@example.com"
-                      className="h-14 rounded-xl border-2 focus:border-black px-5"
+                      className={`h-14 rounded-xl border-2 focus:border-black px-5 bg-white ${lightControlText}`}
                       value={formData.email}
                       onChange={(e) => updateFormData({ email: e.target.value })}
                     />
@@ -1427,7 +1446,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                     <Input
                       type="tel"
                       placeholder="(555) 000-0000"
-                      className="h-14 rounded-xl border-2 focus:border-black px-5"
+                      className={`h-14 rounded-xl border-2 focus:border-black px-5 bg-white ${lightControlText}`}
                       value={formData.phone}
                       onChange={(e) => updateFormData({ phone: e.target.value })}
                     />
@@ -1472,6 +1491,48 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                          ))}
                       </div>
                    </div>
+
+                   {!isStudioPath && (
+                     <div className={`rounded-2xl border-2 p-4 transition-all ${
+                       formData.lifeOfTheListingCare ? "border-black bg-white shadow-md" : "border-gray-100 bg-white"
+                     }`}>
+                       <div className="flex items-start gap-3">
+                         <button
+                           type="button"
+                           role="checkbox"
+                           aria-checked={formData.lifeOfTheListingCare}
+                           onClick={() => updateFormData({ lifeOfTheListingCare: !formData.lifeOfTheListingCare })}
+                           className="flex flex-1 items-start gap-3 text-left"
+                         >
+                           <span
+                             className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-all shrink-0 ${
+                               formData.lifeOfTheListingCare ? "border-black bg-black" : "border-gray-200 bg-white"
+                             }`}
+                           >
+                             {formData.lifeOfTheListingCare && <Check className="w-3 h-3 text-white stroke-[4]" />}
+                           </span>
+                           <span className="text-[11px] font-bold text-neutral-800">
+                             {LIFE_OF_THE_LISTING_CARE_CHECKBOX_LABEL}
+                           </span>
+                         </button>
+                         <span className="text-[10px] font-black uppercase tracking-wide text-neutral-600 shrink-0 pt-0.5">
+                           {LIFE_OF_THE_LISTING_CARE_PRICE_LABEL}
+                         </span>
+                       </div>
+                       <button
+                         type="button"
+                         onClick={() => setSelectedDetailItem({
+                           name: "Life of the Listing Care",
+                           description: LIFE_OF_THE_LISTING_CARE_BLURB,
+                           priceNote: LIFE_OF_THE_LISTING_CARE_PRICE_LABEL,
+                         })}
+                         className="mt-2 ml-8 inline-flex items-center gap-1 text-[10px] font-bold text-neutral-600 hover:text-neutral-950"
+                       >
+                         <Info className="w-3 h-3" />
+                         Service note
+                       </button>
+                     </div>
+                   )}
                  </>
                )}
             </div>
@@ -1522,6 +1583,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                     selectedService: "",
                     selectedBasics: [],
                     selectedAddOns: [],
+                    lifeOfTheListingCare: false,
                     premiumUpgrade: false,
                     virtualStagingCredits: 0
                   }));
@@ -1539,14 +1601,14 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
 
   if (step === "success") {
     return (
-      <div className="max-w-2xl mx-auto px-4">
+      <div className="max-w-2xl mx-auto px-4 text-neutral-950">
         {renderStep()}
       </div>
     );
   }
 
   return (
-    <div className="max-w-[1300px] mx-auto px-4 py-8">
+    <div className="max-w-[1300px] mx-auto px-4 py-8 text-neutral-950">
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Main Form Area */}
         <div className="flex-1 space-y-8">
@@ -1572,7 +1634,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
               })}
            </div>
 
-           <div className="min-h-[550px] bg-white rounded-[3rem] border border-gray-50 p-10 shadow-sm relative overflow-hidden">
+           <div className="min-h-[550px] bg-white text-neutral-950 rounded-[3rem] border border-gray-50 p-10 shadow-sm relative overflow-hidden">
               <div className="absolute top-0 right-0 p-10 opacity-[0.01] pointer-events-none">
                  <Sparkles className="w-80 h-80" />
               </div>
@@ -1838,6 +1900,11 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                   <div className="space-y-0.5">
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Investment</p>
                     <p className="text-2xl font-black text-black">${selectedDetailItem.price}</p>
+                  </div>
+                ) : selectedDetailItem?.priceNote ? (
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Price</p>
+                    <p className="text-2xl font-black text-black">{selectedDetailItem.priceNote}</p>
                   </div>
                 ) : <div />}
                 <Button
