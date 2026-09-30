@@ -1,9 +1,7 @@
 import * as React from "react";
 import AdminLayout from "@/components/AdminLayout";
 import { useAuth } from "@/contexts/AuthContext";
-import { db, storage } from "@/lib/firebase";
-import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { fetchAssignedListings, uploadListingFile } from "@/lib/listingUpload";
 import { Upload, CheckCircle2, XCircle, Image as ImageIcon, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -15,26 +13,28 @@ export default function AdminUpload() {
   const [files, setFiles] = React.useState<File[]>([]);
   const [uploads, setUploads] = React.useState<Record<string, number>>({});
   const [uploading, setUploading] = React.useState(false);
+  const [jobsError, setJobsError] = React.useState("");
   const fileRef = React.useRef<HTMLInputElement>(null);
 
+  const loadJobs = React.useCallback(async () => {
+    if (!user) return;
+    try {
+      const list = await fetchAssignedListings();
+      const active = list.filter((job) => !["archived", "cancelled"].includes(String(job.status || "")));
+      const next = active.length > 0 ? active : list;
+      setJobs(next);
+      setJobsError("");
+      setSelectedJob((current) => current || String(next[0]?.id || ""));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to load your assigned jobs.";
+      setJobsError(message);
+      toast.error(message);
+    }
+  }, [user]);
+
   React.useEffect(() => {
-    if (!user?.uid) return;
-    const q = query(
-      collection(db, "listings"),
-      where("photographerUid", "==", user.uid),
-      where("status", "in", ["scheduled", "pending"]),
-      orderBy("shootDate", "desc")
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setJobs(list);
-      if (list.length > 0 && !selectedJob) setSelectedJob(list[0].id);
-    }, (err) => {
-      console.error("[AdminUpload] snapshot error:", err);
-      toast.error("Failed to load your assigned jobs.");
-    });
-    return () => unsub();
-  }, [user?.uid]);
+    loadJobs();
+  }, [loadJobs]);
 
   const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -56,34 +56,21 @@ export default function AdminUpload() {
     if (!selectedJob || files.length === 0) return;
     setUploading(true);
 
-    const promises = files.map((file) => {
-      return new Promise<void>((resolve, reject) => {
-        const path = `listings/${selectedJob}/photos/${Date.now()}_${file.name}`;
-        const storageRef = ref(storage, path);
-        const task = uploadBytesResumable(storageRef, file);
-
-        task.on(
-          "state_changed",
-          (snap) => {
-            const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
-            setUploads((prev) => ({ ...prev, [file.name]: pct }));
-          },
-          (err) => { console.error(err); reject(err); },
-          async () => {
-            await getDownloadURL(task.snapshot.ref);
-            resolve();
-          }
-        );
-      });
-    });
-
     try {
-      await Promise.all(promises);
+      for (const file of files) {
+        await uploadListingFile({
+          listingId: selectedJob,
+          file,
+          folder: "photos",
+          onProgress: (pct) => setUploads((prev) => ({ ...prev, [file.name]: pct })),
+        });
+      }
       toast.success(`${files.length} photo${files.length > 1 ? "s" : ""} uploaded successfully!`);
       setFiles([]);
       setUploads({});
-    } catch {
-      toast.error("Some uploads failed. Please try again.");
+      if (fileRef.current) fileRef.current.value = "";
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Some uploads failed. Please try again.");
     } finally {
       setUploading(false);
     }
@@ -102,7 +89,11 @@ export default function AdminUpload() {
           {jobs.length === 0 ? (
             <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
               <FolderOpen className="w-5 h-5 text-gray-300" />
-              <p className="text-sm text-gray-400 font-bold">No active jobs assigned to you.</p>
+              <div>
+                <p className="text-sm text-gray-400 font-bold">No active jobs assigned to you.</p>
+                <p className="text-xs text-gray-400 mt-1">A playtest job appears here after the secret staff bootstrap assigns one to this login.</p>
+                {jobsError && <p className="text-xs text-red-500 mt-1">{jobsError}</p>}
+              </div>
             </div>
           ) : (
             <select

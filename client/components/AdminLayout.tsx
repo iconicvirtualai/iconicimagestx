@@ -57,6 +57,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     label: "Photography",
     items: [
       { label: "My Jobs",         href: "/admin/photographer",     icon: Camera,          roles: PHOTO_UP },
+      { label: "Upload",          href: "/admin/upload",           icon: Upload,          roles: PHOTO_UP },
     ],
   },
   {

@@ -8,6 +8,8 @@ import { Router } from "express";
 import admin from "firebase-admin";
 import { requireAdmin, requireStaff } from "../middleware/auth";
 import { isHostedDeployment, liveServerEnv } from "../../shared/tempAdmin";
+import { readSetupSecret, secretsMatch } from "../lib/playtestPolicy";
+import { bootstrapPlaytest } from "../services/playtestBootstrap";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -79,8 +81,46 @@ router.patch("/:id", requireAdmin, async (req, res) => {
   }
 });
 
+function requireSetupSecret(req: { header: (name: string) => string | undefined }, res: { status: (code: number) => { json: (body: unknown) => unknown } }) {
+  const expected = process.env.STAFF_SETUP_SECRET;
+  if (!expected) {
+    res.status(503).json({
+      error: "STAFF_SETUP_SECRET is not set. Add it to Vercel Production, then redeploy.",
+    });
+    return false;
+  }
+  const provided = readSetupSecret(req.header("x-staff-setup-secret") || req.header("x-setup-secret"));
+  if (!secretsMatch(provided, expected)) {
+    res.status(401).json({ error: "Invalid staff setup secret." });
+    return false;
+  }
+  return true;
+}
+
+// POST /api/staff/playtest — secret-gated photographer + demo job for playtest
+router.post("/playtest", async (req, res) => {
+  if (!requireSetupSecret(req, res)) return;
+  if (!admin.apps.length) {
+    return res.status(503).json({
+      error: "Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT and FIREBASE_STORAGE_BUCKET.",
+    });
+  }
+  try {
+    const result = await bootstrapPlaytest(req.body || {});
+    return res.status(201).json(result);
+  } catch (err: unknown) {
+    const status = (err as { status?: number }).status;
+    if (status && status >= 400 && status < 500) {
+      return res.status(status).json({ error: err instanceof Error ? err.message : "Playtest setup failed." });
+    }
+    console.error("[Staff] Playtest bootstrap error:", err);
+    return res.status(500).json({ error: "Playtest setup failed." });
+  }
+});
+
 // POST /api/staff/setup — First-run: create initial admin account
-// Only works if NO staff documents exist yet
+// Only works if NO staff documents exist yet.
+// Hosted deploys also require x-setup-secret (main's gate).
 router.post("/setup", async (req, res) => {
   try {
     if (isHostedDeployment(liveServerEnv())) {

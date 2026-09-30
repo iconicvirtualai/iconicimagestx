@@ -62,6 +62,7 @@ import AdminEditor from "./pages/AdminEditor";
 import AdminTeam from "./pages/AdminTeam";
 import AdminStudio from "./pages/AdminStudio";
 import Login from "./pages/Login";
+import ClientPortal from "./pages/ClientPortal";
 
 const queryClient = new QueryClient();
 
@@ -103,6 +104,7 @@ const App = () => (
             {/* ─── Login Routes ─────────────────────────────────────────── */}
             <Route path="/login" element={<Login />} />
             <Route path="/portal" element={<Login />} />
+            <Route path="/portal/home" element={<ClientPortal />} />
             <Route path="/admin/login" element={<AdminLogin />} />
 
             {/* ─── Admin / Staff ────────────────────────────────────────── */}

@@ -70,7 +70,7 @@ Go to your Vercel project → Settings → Environment Variables and add each va
 
 ## Step 4 — Create Your First Admin Account
 
-Once deployed, run this one-time setup to create the first admin staff member:
+Set `STAFF_SETUP_SECRET` on the server first. The setup route rejects calls that do not send that secret, including the first admin.
 
 ```bash
 curl -X POST https://iconicimagestx.vercel.app/api/staff/setup \
@@ -84,7 +84,7 @@ curl -X POST https://iconicimagestx.vercel.app/api/staff/setup \
   }'
 ```
 
-Hosted deployments reject this route unless `STAFF_SETUP_SECRET` is set in the environment and sent as `x-setup-secret`. It still only works when the `staff` collection is empty. After this, create additional staff through the admin dashboard. Do not use the temporary local admin login in production.
+Hosted deployments reject this route unless `STAFF_SETUP_SECRET` is set and sent as `x-setup-secret`. It still only works when the `staff` collection is empty. After staff exists, create a playtest photographer and demo job with `POST /api/staff/playtest` and header `x-staff-setup-secret` (same secret value). Do not turn temp-admin on for hosted deploys.
 
 ---
 

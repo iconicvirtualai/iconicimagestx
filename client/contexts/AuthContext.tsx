@@ -16,12 +16,11 @@ import {
 import {
   signInWithEmailAndPassword,
   signOut,
-  createUserWithEmailAndPassword,
   sendPasswordResetEmail,
   onAuthStateChanged,
   type User,
 } from "firebase/auth";
-import { doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
 import type { StaffMember, Client } from "../lib/schema";
 import { isActiveStaffRecord } from "@shared/staffAccess";
@@ -50,12 +49,13 @@ interface AuthContextValue {
   signOutUser: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
 
-  // Client portal registration
+  // Client portal registration. Creates Firebase Auth + clients/{uid}.
   registerClient: (
     email: string,
     password: string,
-    clientId: string
+    profile: { firstName: string; lastName: string; phone?: string }
   ) => Promise<void>;
+  refreshProfile: () => Promise<void>;
 
   // Helpers
   isAdmin: boolean;
@@ -80,6 +80,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const tempSession = useRef(false);
 
+  const loadProfiles = async (firebaseUser: User) => {
+    setStaffProfile(null);
+    setClientProfile(null);
+    setUserType(null);
+
+    const staffDoc = await getDoc(doc(db, "staff", firebaseUser.uid));
+    const staffData = staffDoc.exists() ? staffDoc.data() : null;
+    if (staffData && isActiveStaffRecord(staffData)) {
+      setStaffProfile({ id: staffDoc.id, ...staffData } as StaffMember);
+      setUserType("staff");
+      return;
+    }
+
+    // Portal clients are stored at clients/{uid}, with firebaseUid linking any booking record.
+    const clientDoc = await getDoc(doc(db, "clients", firebaseUser.uid));
+    if (clientDoc.exists()) {
+      setClientProfile({ id: clientDoc.id, ...clientDoc.data() } as Client);
+      setUserType("client");
+    }
+  };
+
   // Listen for auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -90,31 +111,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       tempSession.current = false;
       setUser(firebaseUser);
-      setStaffProfile(null);
-      setClientProfile(null);
-      setUserType(null);
 
       if (firebaseUser) {
         try {
-          // Check if this UID belongs to a staff member
-          const staffDoc = await getDoc(doc(db, "staff", firebaseUser.uid));
-          const staffData = staffDoc.exists() ? staffDoc.data() : null;
-          if (staffData && isActiveStaffRecord(staffData)) {
-            setStaffProfile({ id: staffDoc.id, ...staffData } as StaffMember);
-            setUserType("staff");
-          } else {
-            // Check if client record links to this UID
-            // We query clients where firebaseUid == user.uid
-            // For efficiency, clients collection uses UID as document ID when portal is active
-            const clientDoc = await getDoc(doc(db, "clients", firebaseUser.uid));
-            if (clientDoc.exists()) {
-              setClientProfile({ id: clientDoc.id, ...clientDoc.data() } as Client);
-              setUserType("client");
-            }
-          }
+          await loadProfiles(firebaseUser);
         } catch (err) {
           console.error("[AuthContext] Profile fetch error:", err);
+          setStaffProfile(null);
+          setClientProfile(null);
+          setUserType(null);
         }
+      } else {
+        setStaffProfile(null);
+        setClientProfile(null);
+        setUserType(null);
       }
 
       setLoading(false);
@@ -183,38 +193,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await sendPasswordResetEmail(auth, email);
   };
 
+  const refreshProfile = async () => {
+    if (!auth.currentUser) return;
+    await loadProfiles(auth.currentUser);
+  };
+
   /**
-   * Register a client for portal access.
-   * Pass the existing Firestore clientId so we can link the auth account
-   * to their existing client record.
+   * Create a client portal account.
+   * The server writes clients/{uid} with the Admin SDK because Firestore rules
+   * do not allow a new client to create their own document.
    */
   const registerClient = async (
     email: string,
     password: string,
-    clientId: string
+    profile: { firstName: string; lastName: string; phone?: string }
   ) => {
     setError(null);
+    const normalizedEmail = email.trim().toLowerCase();
     try {
-      const credential = await createUserWithEmailAndPassword(auth, email, password);
-      const uid = credential.user.uid;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (auth.currentUser) {
+        headers.Authorization = `Bearer ${await auth.currentUser.getIdToken()}`;
+      }
+      const res = await fetch("/api/clients/register", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          email: normalizedEmail,
+          password,
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          phone: profile.phone || "",
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Could not create the account.");
+      }
 
-      // Link auth UID into the client document
-      await setDoc(
-        doc(db, "clients", clientId),
-        { firebaseUid: uid, portalAccess: true, updatedAt: Timestamp.now() },
-        { merge: true }
-      );
-
-      // Also create a lookup doc at /clients/{uid} so AuthContext can find them
-      // by UID if clientId !== uid
-      if (clientId !== uid) {
-        await setDoc(doc(db, "clients", uid), {
-          _redirect: clientId, // Lookup pointer
-          updatedAt: Timestamp.now(),
-        });
+      if (auth.currentUser) {
+        await loadProfiles(auth.currentUser);
+      } else {
+        await signInWithEmailAndPassword(auth, normalizedEmail, password);
       }
     } catch (err: unknown) {
-      const message = getAuthErrorMessage(err);
+      const message = err instanceof Error ? err.message : getAuthErrorMessage(err);
       setError(message);
       throw new Error(message);
     }
@@ -242,6 +265,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signOutUser,
         resetPassword,
         registerClient,
+        refreshProfile,
         isAdmin,
         isCoordinator,
         isPhotographer,

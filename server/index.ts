@@ -20,6 +20,7 @@ import vsaiRouter from "./routes/vsai";
 import messagingRouter from "./routes/messaging";
 import clientsRouter from "./routes/clients";
 import staffRouter from "./routes/staff";
+import listingsRouter from "./routes/listings";
 import campaignsRouter from "./routes/campaigns";
 import agentsRouter from "./routes/agents";
 import mediaJobsRouter from "./routes/mediaJobs";
@@ -184,6 +185,7 @@ export function createServer() {
   app.use("/api/messages", messagingRouter);
   app.use("/api/clients", clientsRouter);
   app.use("/api/staff", staffRouter);
+  app.use("/api/listings", listingsRouter);
   app.use("/api/campaigns", campaignsRouter);
   app.use("/api/agents", agentsRouter);
   app.use("/api/media-jobs", mediaJobsRouter);
