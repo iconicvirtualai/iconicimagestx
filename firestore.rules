@@ -193,6 +193,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Content library metadata. The API writes this with the Admin SDK.
+    match /contentAssets/{assetId} {
+      allow read, write: if false;
+    }
+
     // ─── Catch-all: deny everything else ─────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;
