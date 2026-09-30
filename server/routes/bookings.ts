@@ -145,7 +145,8 @@ router.post("/", async (req, res) => {
       ? `${accessMethod}${lockboxCode ? ` — Code: ${lockboxCode}` : ""}`
       : "Not specified";
 
-    // Send confirmation email to client
+    // Order-received confirmation to the client. booking_received is excluded from the
+    // RED blast kill and sends even when CLIENT_NOTIFY_LIVE is unset.
     await sendEmail({
       to: email,
       template: "booking_received",

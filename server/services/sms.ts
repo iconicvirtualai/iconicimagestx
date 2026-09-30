@@ -15,6 +15,7 @@
  */
 
 import twilio from "twilio";
+import { clientNotifyBlockReason, clientNotifyLive } from "../../shared/clientNotify";
 
 // ─── Client ──────────────────────────────────────────────────────────────────
 
@@ -50,6 +51,11 @@ export interface SendSMSOptions {
 }
 
 export async function sendSMS({ to, body, from }: SendSMSOptions) {
+  if (!clientNotifyLive()) {
+    console.warn(`[SMS] Suppressed to ${to} — ${clientNotifyBlockReason()}. No message sent.`);
+    return { sid: "", status: "suppressed", suppressed: true as const };
+  }
+
   const fromNumber = from || process.env.TWILIO_PHONE_NUMBER;
   if (!fromNumber) throw new Error("TWILIO_PHONE_NUMBER not set.");
 
@@ -76,6 +82,11 @@ export async function sendSMSCampaign(
   bodyTemplate: string,       // use {{name}} for personalisation
   messagingServiceSid?: string
 ) {
+  if (!clientNotifyLive()) {
+    console.warn(`[SMS] Suppressed campaign to ${recipients.length} recipients — ${clientNotifyBlockReason()}.`);
+    return recipients.map((recipient) => ({ phone: recipient.phone, error: "suppressed" }));
+  }
+
   const client = getClient();
   const sid = messagingServiceSid || process.env.TWILIO_MESSAGING_SERVICE_SID;
   const fromNumber = process.env.TWILIO_PHONE_NUMBER;
@@ -123,6 +134,11 @@ export async function createMaskedConversation(
   client: ConversationParticipant,
   webhookUrl?: string
 ) {
+  if (!clientNotifyLive()) {
+    console.warn(`[SMS] Suppressed masked conversation — ${clientNotifyBlockReason()}. No SMS sent.`);
+    throw new Error("Client notifications are off.");
+  }
+
   const client_sdk = getClient();
 
   // 1. Create the conversation
@@ -181,6 +197,11 @@ export async function sendConversationMessage(
   body: string,
   author = "Iconic Images"
 ) {
+  if (!clientNotifyLive()) {
+    console.warn(`[SMS] Suppressed conversation message — ${clientNotifyBlockReason()}. No SMS sent.`);
+    throw new Error("Client notifications are off.");
+  }
+
   const client_sdk = getClient();
   const message = await client_sdk.conversations.v1
     .conversations(conversationSid)

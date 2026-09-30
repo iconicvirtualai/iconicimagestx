@@ -10,6 +10,7 @@ import admin from "firebase-admin";
 import crypto from "crypto";
 import { requireCoordinator, requireAuth, type AuthenticatedRequest } from "../middleware/auth";
 import { sendEmail } from "../services/email";
+import { clientNotifyLive } from "../../shared/clientNotify";
 import { amountStillDue, invoiceAllowsDownload, invoiceIdFromSquareNote, squarePaymentNote } from "../../shared/paymentAccess";
 
 const router = Router();
@@ -234,7 +235,7 @@ router.post("/create-intent", requireAuth, async (req: AuthenticatedRequest, res
         clientName: invoice.clientName || "",
       },
       description: `Studio Noir - Invoice ${invoice.invoiceNumber}`,
-      receipt_email: invoice.clientEmail,
+      ...(clientNotifyLive() && invoice.clientEmail ? { receipt_email: invoice.clientEmail } : {}),
     });
 
     await invoiceDoc.ref.update({
@@ -421,7 +422,7 @@ router.post("/invoice/:id/checkout", async (req: Request, res: Response) => {
         quantity: 1,
       }],
       payment_intent_data: {
-        receipt_email: invoice.clientEmail || undefined,
+        ...(clientNotifyLive() && invoice.clientEmail ? { receipt_email: invoice.clientEmail } : {}),
         metadata: {
           invoiceId: invoiceDoc.id,
           orderId: invoice.orderId || "",

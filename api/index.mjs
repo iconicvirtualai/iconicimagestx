@@ -112,6 +112,19 @@ async function requirePhotographer(req, res, next) {
     next();
   });
 }
+const ORDER_RECEIVED_EMAIL_TEMPLATE = "booking_received";
+function clientNotifyLive(env = process.env) {
+  if (env.CLIENT_COMMS_ZONE === "RED") return false;
+  return env.CLIENT_NOTIFY_LIVE === "true";
+}
+function emailAllowed(template, env = process.env) {
+  if (template === ORDER_RECEIVED_EMAIL_TEMPLATE) return true;
+  return clientNotifyLive(env);
+}
+function clientNotifyBlockReason(env = process.env) {
+  if (env.CLIENT_COMMS_ZONE === "RED") return "CLIENT_COMMS_ZONE=RED";
+  return "CLIENT_NOTIFY_LIVE is not exactly true";
+}
 const db$g = () => admin.firestore();
 let transporter = null;
 function getTransporter() {
@@ -134,6 +147,12 @@ async function sendEmail(options) {
   const { to, bcc, cc, template, variables = {}, subject: subjectOverride, attachments } = options;
   if (!to) {
     console.warn("[Email] No recipient specified, skipping.");
+    return;
+  }
+  if (!emailAllowed(template)) {
+    console.warn(
+      `[Email] Suppressed '${template}' to ${to} — ${clientNotifyBlockReason()}. No message sent.`
+    );
     return;
   }
   try {
@@ -300,6 +319,10 @@ function normalisePhone(raw) {
   return `+${digits}`;
 }
 async function sendSMS({ to, body, from }) {
+  if (!clientNotifyLive()) {
+    console.warn(`[SMS] Suppressed to ${to} — ${clientNotifyBlockReason()}. No message sent.`);
+    return { sid: "", status: "suppressed", suppressed: true };
+  }
   const fromNumber = from || process.env.TWILIO_PHONE_NUMBER;
   if (!fromNumber) throw new Error("TWILIO_PHONE_NUMBER not set.");
   const client = getClient();
@@ -312,6 +335,10 @@ async function sendSMS({ to, body, from }) {
   return { sid: message.sid, status: message.status };
 }
 async function sendSMSCampaign(recipients, bodyTemplate, messagingServiceSid) {
+  if (!clientNotifyLive()) {
+    console.warn(`[SMS] Suppressed campaign to ${recipients.length} recipients — ${clientNotifyBlockReason()}.`);
+    return recipients.map((recipient) => ({ phone: recipient.phone, error: "suppressed" }));
+  }
   const client = getClient();
   const sid = messagingServiceSid || process.env.TWILIO_MESSAGING_SERVICE_SID;
   const fromNumber = process.env.TWILIO_PHONE_NUMBER;
@@ -336,6 +363,10 @@ async function sendSMSCampaign(recipients, bodyTemplate, messagingServiceSid) {
   return results;
 }
 async function createMaskedConversation(friendlyName, photographer, client, webhookUrl) {
+  if (!clientNotifyLive()) {
+    console.warn(`[SMS] Suppressed masked conversation — ${clientNotifyBlockReason()}. No SMS sent.`);
+    throw new Error("Client notifications are off.");
+  }
   const client_sdk = getClient();
   const conversation = await client_sdk.conversations.v1.conversations.create({
     friendlyName,
@@ -372,6 +403,10 @@ async function createMaskedConversation(friendlyName, photographer, client, webh
   };
 }
 async function sendConversationMessage(conversationSid, body, author = "Iconic Images") {
+  if (!clientNotifyLive()) {
+    console.warn(`[SMS] Suppressed conversation message — ${clientNotifyBlockReason()}. No SMS sent.`);
+    throw new Error("Client notifications are off.");
+  }
   const client_sdk = getClient();
   const message = await client_sdk.conversations.v1.conversations(conversationSid).messages.create({ body, author });
   return { sid: message.sid };
@@ -1768,7 +1803,7 @@ router$b.post("/create-intent", requireAuth, async (req, res) => {
         clientName: invoice.clientName || ""
       },
       description: `Studio Noir - Invoice ${invoice.invoiceNumber}`,
-      receipt_email: invoice.clientEmail
+      ...clientNotifyLive() && invoice.clientEmail ? { receipt_email: invoice.clientEmail } : {}
     });
     await invoiceDoc.ref.update({
       paymentProvider: "stripe",
@@ -1929,7 +1964,7 @@ router$b.post("/invoice/:id/checkout", async (req, res) => {
         quantity: 1
       }],
       payment_intent_data: {
-        receipt_email: invoice.clientEmail || void 0,
+        ...clientNotifyLive() && invoice.clientEmail ? { receipt_email: invoice.clientEmail } : {},
         metadata: {
           invoiceId: invoiceDoc.id,
           orderId: invoice.orderId || "",
@@ -3909,6 +3944,10 @@ router$5.post("/:id/send", requireCoordinator, async (req, res) => {
     if (campaign.status === "sent") {
       return res.status(400).json({ error: "Campaign already sent." });
     }
+    if (!clientNotifyLive()) {
+      console.warn(`[Campaigns] Suppressed send for ${req.params.id} — ${clientNotifyBlockReason()}.`);
+      return res.status(503).json({ error: "Client notifications are off.", suppressed: true });
+    }
     let recipientQuery = db$3().collection("clients").where("status", "==", "active");
     if (campaign.audience === "vip") {
       recipientQuery = db$3().collection("clients").where("status", "==", "vip");
@@ -4158,6 +4197,10 @@ async function runReminderSweep(req, res) {
         const body = type === "1h" ? SMS_TEMPLATES.appointmentReminder1h(name, String(time)) : SMS_TEMPLATES.appointmentReminder24h(name, scheduledDate.toLocaleDateString("en-US"), String(time), String(address));
         try {
           const result = await sendSMS({ to: String(phone), body });
+          if (result.suppressed) {
+            results.push({ appointmentId: appointmentDoc.id, orderId, type, skipped: "client_notify_off" });
+            continue;
+          }
           sentMap = { ...sentMap, [type]: true };
           const update = {
             remindersSent: sentMap,
@@ -4488,6 +4531,10 @@ router$1.post("/send", requireStaff, async (req, res) => {
     const { to, body, orderId } = req.body;
     if (!to || !body) return res.status(400).json({ error: "to and body required." });
     const result = await sendSMS({ to, body });
+    if (result.suppressed) {
+      console.warn(`[SMS] Suppressed staff send to ${to} — ${clientNotifyBlockReason()}.`);
+      return res.status(503).json({ error: "Client notifications are off.", suppressed: true });
+    }
     await db().collection("smsLogs").add({
       direction: "outbound",
       to: normalisePhone(to),
@@ -4538,6 +4585,10 @@ router$1.post("/remind/:orderId", requireStaff, async (req, res) => {
       body = SMS_TEMPLATES.appointmentReminder24h(name, date, time, address);
     }
     const result = await sendSMS({ to: phone, body });
+    if (result.suppressed) {
+      console.warn(`[SMS] Suppressed reminder to ${phone} — ${clientNotifyBlockReason()}.`);
+      return res.status(503).json({ error: "Client notifications are off.", suppressed: true });
+    }
     await db().collection("smsLogs").add({
       direction: "outbound",
       to: normalisePhone(phone),
@@ -4685,6 +4736,10 @@ router$1.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
     const campaign = campaignDoc.data();
     if (campaign.status === "sent") return res.status(400).json({ error: "Campaign already sent." });
     if (campaign.type !== "sms") return res.status(400).json({ error: "Not an SMS campaign." });
+    if (!clientNotifyLive()) {
+      console.warn(`[SMS] Suppressed campaign ${req.params.id} — ${clientNotifyBlockReason()}.`);
+      return res.status(503).json({ error: "Client notifications are off.", suppressed: true });
+    }
     const clientsSnap = await db().collection("clients").where("smsOptIn", "==", true).get();
     let clients = clientsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
     if (campaign.audience === "custom" && campaign.audienceIds?.length) {
@@ -4953,6 +5008,9 @@ function createServer() {
     } catch {
       res.status(500).json({ error: "Failed to save settings" });
     }
+  });
+  app.get("/api/client-notify", (_req, res) => {
+    res.json({ live: clientNotifyLive() });
   });
   app.use("/api/bookings", router$e);
   app.use("/api/orders", router$d);

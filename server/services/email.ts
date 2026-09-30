@@ -6,6 +6,7 @@
 
 import nodemailer from "nodemailer";
 import admin from "firebase-admin";
+import { clientNotifyBlockReason, emailAllowed } from "../../shared/clientNotify";
 
 const db = () => admin.firestore();
 
@@ -50,6 +51,15 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
 
   if (!to) {
     console.warn("[Email] No recipient specified, skipping.");
+    return;
+  }
+
+  // booking_received (order-received confirmation) always sends.
+  // Marketing, portal, contact auto-acks, and other non-order mail stay off under RED.
+  if (!emailAllowed(template)) {
+    console.warn(
+      `[Email] Suppressed '${template}' to ${to} — ${clientNotifyBlockReason()}. No message sent.`,
+    );
     return;
   }
 

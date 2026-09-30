@@ -90,6 +90,12 @@ export default function Login() {
     e.preventDefault();
     if (!resetEmail) return;
     try {
+      const gate = await fetch("/api/client-notify");
+      const gateData = await gate.json().catch(() => ({ live: false }));
+      if (!gate.ok || gateData?.live !== true) {
+        toast.error("Failed to send reset email.");
+        return;
+      }
       await resetPassword(resetEmail);
       toast.success("Reset email sent. Check your inbox.");
       setMode("signin");
