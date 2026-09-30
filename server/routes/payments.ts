@@ -10,6 +10,7 @@ import admin from "firebase-admin";
 import crypto from "crypto";
 import { requireCoordinator, requireAuth, type AuthenticatedRequest } from "../middleware/auth";
 import { sendEmail } from "../services/email";
+import { amountStillDue, invoiceAllowsDownload, invoiceIdFromSquareNote, squarePaymentNote } from "../../shared/paymentAccess";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -48,6 +49,52 @@ function money(value: unknown) {
   return `$${(Number(value) || 0).toFixed(2)}`;
 }
 
+async function paymentAlreadyRecorded({
+  squarePaymentId,
+  stripePaymentIntentId,
+}: {
+  squarePaymentId?: string;
+  stripePaymentIntentId?: string;
+}) {
+  if (squarePaymentId) {
+    const existing = await db().collection("transactions").where("squarePaymentId", "==", squarePaymentId).limit(1).get();
+    if (!existing.empty) return true;
+  }
+  if (stripePaymentIntentId) {
+    const existing = await db().collection("transactions").where("stripePaymentIntentId", "==", stripePaymentIntentId).limit(1).get();
+    if (!existing.empty) return true;
+  }
+  return false;
+}
+
+async function unlockGalleriesForInvoice({
+  invoiceId,
+  orderId,
+  galleryId,
+}: {
+  invoiceId: string;
+  orderId?: string;
+  galleryId?: string;
+}) {
+  const refs = new Map<string, FirebaseFirestore.DocumentReference>();
+  if (galleryId) refs.set(galleryId, db().collection("galleries").doc(galleryId));
+
+  const lookups: Promise<FirebaseFirestore.QuerySnapshot>[] = [
+    db().collection("galleries").where("invoiceId", "==", invoiceId).get(),
+  ];
+  if (orderId) lookups.push(db().collection("galleries").where("orderId", "==", orderId).get());
+
+  const snaps = await Promise.all(lookups);
+  snaps.forEach((snap) => snap.docs.forEach((doc) => refs.set(doc.id, doc.ref)));
+
+  await Promise.all([...refs.values()].map((ref) => ref.update({
+    downloadEnabled: true,
+    paymentStatus: "paid",
+    unlockedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }).catch((err) => console.error("[Payments] Gallery unlock failed:", err))));
+}
+
 async function applySuccessfulPayment({
   invoiceId,
   orderId,
@@ -72,12 +119,27 @@ async function applySuccessfulPayment({
   if (!invoiceDoc.exists) return;
 
   const invoice = invoiceDoc.data()!;
+  const resolvedOrderId = orderId || invoice.orderId || "";
+  const resolvedClientId = clientId || invoice.clientId || "";
+  const sameSquare = Boolean(squarePaymentId) && invoice.squarePaymentId === squarePaymentId;
+  const sameStripe = Boolean(stripePaymentIntentId) && invoice.stripePaymentIntentId === stripePaymentIntentId;
+  const duplicate = sameSquare || sameStripe || await paymentAlreadyRecorded({ squarePaymentId, stripePaymentIntentId });
+
+  if (duplicate) {
+    if (invoiceAllowsDownload(invoice)) {
+      await unlockGalleriesForInvoice({
+        invoiceId,
+        orderId: resolvedOrderId,
+        galleryId: typeof invoice.galleryId === "string" ? invoice.galleryId : undefined,
+      });
+    }
+    return;
+  }
+
   const currentPaid = Number(invoice.amountPaid) || 0;
   const total = Number(invoice.total) || 0;
   const newAmountPaid = currentPaid + amount;
   const newAmountDue = Math.max(0, total - newAmountPaid);
-  const resolvedOrderId = orderId || invoice.orderId || "";
-  const resolvedClientId = clientId || invoice.clientId || "";
 
   await invoiceRef.update({
     amountPaid: newAmountPaid,
@@ -93,7 +155,8 @@ async function applySuccessfulPayment({
   if (resolvedOrderId) {
     await db().collection("orders").doc(resolvedOrderId).update({
       depositPaid: admin.firestore.FieldValue.increment(amount),
-      balanceDue: admin.firestore.FieldValue.increment(-amount),
+      balanceDue: newAmountDue,
+      paymentStatus: newAmountDue <= 0 ? "paid" : "partial",
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }).catch((err) => console.error("[Payments] Order balance update failed:", err));
   }
@@ -105,19 +168,12 @@ async function applySuccessfulPayment({
     }).catch((err) => console.error("[Payments] Client spend update failed:", err));
   }
 
-  if (resolvedOrderId && newAmountDue <= 0) {
-    const gallerySnap = await db()
-      .collection("galleries")
-      .where("orderId", "==", resolvedOrderId)
-      .limit(1)
-      .get();
-
-    if (!gallerySnap.empty) {
-      await gallerySnap.docs[0].ref.update({
-        downloadEnabled: true,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    }
+  if (newAmountDue <= 0) {
+    await unlockGalleriesForInvoice({
+      invoiceId,
+      orderId: resolvedOrderId,
+      galleryId: typeof invoice.galleryId === "string" ? invoice.galleryId : undefined,
+    });
   }
 
   await db().collection("transactions").add({
@@ -247,6 +303,7 @@ router.get("/invoice/:id", async (req: Request, res: Response) => {
 
     return res.json({
       id: invoiceDoc.id,
+      paid: invoiceAllowsDownload(invoice),
       invoiceNumber: invoice.invoiceNumber,
       clientName: invoice.clientName,
       lineItems: invoice.lineItems,
@@ -276,10 +333,10 @@ router.post("/invoice/:id/checkout", async (req: Request, res: Response) => {
     if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
 
     const invoice = invoiceDoc.data()!;
-    const amountDue = Number(invoice.amountDue ?? invoice.total ?? 0);
+    const amountDue = amountStillDue(invoice);
     const provider = invoiceProvider(invoice);
 
-    if (invoice.status === "paid" || amountDue <= 0) {
+    if (invoiceAllowsDownload(invoice)) {
       return res.json({
         paid: true,
         provider,
@@ -287,6 +344,10 @@ router.post("/invoice/:id/checkout", async (req: Request, res: Response) => {
           ? `${appUrl()}/gallery/${invoice.galleryId}`
           : `${appUrl()}/invoice/${invoiceDoc.id}`,
       });
+    }
+
+    if (amountDue <= 0) {
+      return res.status(400).json({ error: "This invoice cannot be paid online." });
     }
 
     if (provider === "square") {
@@ -310,14 +371,12 @@ router.post("/invoice/:id/checkout", async (req: Request, res: Response) => {
             location_id: process.env.SQUARE_LOCATION_ID,
           },
           checkout_options: {
-            redirect_url: invoice.galleryId
-              ? `${appUrl()}/gallery/${invoice.galleryId}`
-              : `${appUrl()}/invoice/${invoiceDoc.id}?paid=1`,
+            redirect_url: `${appUrl()}/invoice/${invoiceDoc.id}?paid=1`,
           },
           pre_populated_data: {
             buyer_email: invoice.clientEmail || undefined,
           },
-          payment_note: `Iconic Images invoice ${invoice.invoiceNumber || invoiceDoc.id}`,
+          payment_note: squarePaymentNote(invoiceDoc.id, invoice.invoiceNumber),
         }),
       });
 
@@ -439,50 +498,96 @@ router.post("/webhook", async (req: Request, res: Response) => {
   }
 });
 
+function squareNotificationUrls(): string[] {
+  const explicit = process.env.SQUARE_WEBHOOK_NOTIFICATION_URL;
+  const urls = [
+    explicit,
+    `${appUrl()}/api/payments/square-webhook`,
+    process.env.FRONTEND_URL
+      ? `${process.env.FRONTEND_URL.replace(/\/$/, "")}/api/payments/square-webhook`
+      : "",
+  ].filter((url): url is string => Boolean(url));
+  return [...new Set(urls)];
+}
+
+function squareSignatureValid(rawBody: string, received: string | undefined, key: string): boolean {
+  if (!received) return false;
+  const receivedBuf = Buffer.from(received);
+  return squareNotificationUrls().some((url) => {
+    const expected = crypto.createHmac("sha256", key).update(url + rawBody).digest("base64");
+    const expectedBuf = Buffer.from(expected);
+    if (expectedBuf.length !== receivedBuf.length) return false;
+    return crypto.timingSafeEqual(expectedBuf, receivedBuf);
+  });
+}
+
+async function findInvoiceForSquarePayment(payment: Record<string, unknown>) {
+  const noteId = invoiceIdFromSquareNote(payment.note || payment.payment_note);
+  if (noteId) {
+    const byNote = await db().collection("invoices").doc(noteId).get();
+    if (byNote.exists) return byNote;
+  }
+
+  const referenceId = typeof payment.reference_id === "string" ? payment.reference_id : "";
+  if (referenceId) {
+    const byReference = await db().collection("invoices").doc(referenceId).get();
+    if (byReference.exists) return byReference;
+  }
+
+  if (typeof payment.order_id === "string" && payment.order_id) {
+    const bySquareOrder = await db()
+      .collection("invoices")
+      .where("squareOrderId", "==", payment.order_id)
+      .limit(1)
+      .get();
+    if (!bySquareOrder.empty) return bySquareOrder.docs[0];
+  }
+
+  const linkId = payment.payment_link_id || payment.paymentLinkId;
+  if (typeof linkId === "string" && linkId) {
+    const byLink = await db()
+      .collection("invoices")
+      .where("squarePaymentLinkId", "==", linkId)
+      .limit(1)
+      .get();
+    if (!byLink.empty) return byLink.docs[0];
+  }
+
+  if (typeof payment.id === "string" && payment.id) {
+    const byPayment = await db()
+      .collection("invoices")
+      .where("squarePaymentId", "==", payment.id)
+      .limit(1)
+      .get();
+    if (!byPayment.empty) return byPayment.docs[0];
+  }
+
+  return null;
+}
+
 router.post("/square-webhook", async (req: Request, res: Response) => {
   try {
     const rawBody = Buffer.isBuffer(req.body)
       ? req.body.toString("utf8")
       : JSON.stringify(req.body || {});
     const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
+    if (!signatureKey) {
+      console.error("[Payments] Square webhook rejected: SQUARE_WEBHOOK_SIGNATURE_KEY is not set.");
+      return res.status(401).json({ error: "Square webhook signature key is not configured." });
+    }
 
-    if (signatureKey) {
-      const notificationUrl = `${appUrl()}/api/payments/square-webhook`;
-      const expected = crypto.createHmac("sha256", signatureKey)
-        .update(notificationUrl + rawBody)
-        .digest("base64");
-      const received = Array.isArray(req.headers["x-square-hmacsha256-signature"])
-        ? req.headers["x-square-hmacsha256-signature"][0]
-        : req.headers["x-square-hmacsha256-signature"];
-      const valid = Boolean(received) &&
-        Buffer.byteLength(expected) === Buffer.byteLength(received || "") &&
-        crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(received || ""));
-      if (!valid) return res.status(400).json({ error: "Invalid Square webhook signature." });
+    const received = Array.isArray(req.headers["x-square-hmacsha256-signature"])
+      ? req.headers["x-square-hmacsha256-signature"][0]
+      : req.headers["x-square-hmacsha256-signature"];
+    if (!squareSignatureValid(rawBody, received, signatureKey)) {
+      return res.status(400).json({ error: "Invalid Square webhook signature." });
     }
 
     const event = JSON.parse(rawBody);
-    const payment = event?.data?.object?.payment;
+    const payment = event?.data?.object?.payment || event?.data?.object;
     if (!payment?.id || payment.status !== "COMPLETED") return res.json({ received: true });
 
-    let invoiceDoc: FirebaseFirestore.QueryDocumentSnapshot | null = null;
-    if (payment.order_id) {
-      const bySquareOrder = await db()
-        .collection("invoices")
-        .where("squareOrderId", "==", payment.order_id)
-        .limit(1)
-        .get();
-      if (!bySquareOrder.empty) invoiceDoc = bySquareOrder.docs[0];
-    }
-
-    if (!invoiceDoc) {
-      const byPayment = await db()
-        .collection("invoices")
-        .where("squarePaymentId", "==", payment.id)
-        .limit(1)
-        .get();
-      if (!byPayment.empty) invoiceDoc = byPayment.docs[0];
-    }
-
+    const invoiceDoc = await findInvoiceForSquarePayment(payment);
     if (!invoiceDoc) {
       await db().collection("agentLogs").add({
         agent: "travis",
@@ -492,23 +597,27 @@ router.post("/square-webhook", async (req: Request, res: Response) => {
         relatedType: "invoice",
         priority: "high",
         requiresHumanReview: true,
-        details: payment.order_id || "",
+        details: payment.order_id || payment.note || "",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
       return res.json({ received: true, unmatched: true });
     }
 
-    const invoice = invoiceDoc.data();
-    if (invoice.squarePaymentId === payment.id || invoice.status === "paid") {
-      return res.json({ received: true, duplicate: true });
+    const invoice = invoiceDoc.data() || {};
+    if (invoiceProvider(invoice) === "stripe") {
+      return res.json({ received: true, ignored: "stripe-invoice" });
     }
+
+    const amountCents = Number(payment.amount_money?.amount ?? payment.total_money?.amount ?? 0);
+    const amount = amountCents / 100;
+    if (amount <= 0) return res.json({ received: true, ignored: "zero-amount" });
 
     await applySuccessfulPayment({
       invoiceId: invoiceDoc.id,
       orderId: invoice.orderId,
       clientId: invoice.clientId,
       clientName: invoice.clientName,
-      amount: Number(payment.total_money?.amount || 0) / 100,
+      amount,
       method: "square",
       squarePaymentId: payment.id,
     });
@@ -554,6 +663,13 @@ router.get("/transactions", requireCoordinator, async (req, res) => {
 async function handleStripePaymentSucceeded(intent: Stripe.PaymentIntent) {
   const { invoiceId, orderId, clientId, clientName } = intent.metadata;
   if (!invoiceId) return;
+
+  const invoiceDoc = await db().collection("invoices").doc(invoiceId).get();
+  if (!invoiceDoc.exists) return;
+  if (invoiceProvider(invoiceDoc.data() || {}) !== "stripe") {
+    console.warn(`[Payments] Ignored Stripe payment ${intent.id} for non-Stripe invoice ${invoiceId}`);
+    return;
+  }
 
   await applySuccessfulPayment({
     invoiceId,

@@ -7,6 +7,7 @@
 import { Router } from "express";
 import admin from "firebase-admin";
 import { requireAdmin, requireStaff } from "../middleware/auth";
+import { isHostedDeployment, liveServerEnv } from "../../shared/tempAdmin";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -82,6 +83,14 @@ router.patch("/:id", requireAdmin, async (req, res) => {
 // Only works if NO staff documents exist yet
 router.post("/setup", async (req, res) => {
   try {
+    if (isHostedDeployment(liveServerEnv())) {
+      const secret = process.env.STAFF_SETUP_SECRET;
+      const provided = req.header("x-setup-secret");
+      if (!secret || provided !== secret) {
+        return res.status(403).json({ error: "Staff setup is disabled." });
+      }
+    }
+
     const existing = await db().collection("staff").limit(1).get();
     if (!existing.empty) {
       return res.status(403).json({ error: "Staff already configured." });

@@ -1,13 +1,15 @@
 /**
  * Iconic Images — Firebase Admin Auth Middleware
  *
- * Uses Firebase custom claims (set by syncStaffClaims Cloud Function) for fast
- * role checking without a Firestore lookup on every request.
- * Falls back to a Firestore lookup if claims haven't been set yet.
+ * Staff role comes from the Firestore staff record (admin, coordinator,
+ * photographer, editor) and must be active. Custom claims are only used if
+ * that lookup fails. Temporary admin tokens are local/dev only.
  */
 
 import { type Request, type Response, type NextFunction } from "express";
 import admin from "firebase-admin";
+import { isActiveStaffRecord } from "../../shared/staffAccess";
+import { isTempAdminEnabled, liveServerEnv } from "../../shared/tempAdmin";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────────────────
 
@@ -21,42 +23,39 @@ export interface AuthenticatedRequest extends Request {
 
 type Role = "admin" | "coordinator" | "photographer" | "editor";
 
-const TEMP_ADMIN_ENABLED =
-  process.env.ENABLE_TEMP_ADMIN === "true" ||
-  process.env.NODE_ENV !== "production" ||
-  process.env.VERCEL_ENV === "preview";
+function tempAdminAllowed(): boolean {
+  return isTempAdminEnabled(liveServerEnv());
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────────────
 
 function roleAtLeast(role: string | undefined, minimum: Role): boolean {
   if (!role) return false;
-  const hierarchy: Role[] = ["editor", "photographer", "coordinator", "admin"];
-  const minIdx = hierarchy.indexOf(minimum);
-  const roleIdx = hierarchy.indexOf(role as Role);
-  return roleIdx >= minIdx;
+  if (role === "admin") return true;
+  if (role === "coordinator") return minimum !== "admin";
+  if (minimum === "photographer") return role === "photographer";
+  if (minimum === "editor") return role === "editor";
+  return false;
 }
 
-/** Resolve role from custom claims or fall back to Firestore */
+/** Resolve role from the staff record. Claims are only a fallback if Firestore is unreachable. */
 async function resolveRole(uid: string, decoded: admin.auth.DecodedIdToken): Promise<string | null> {
-  // Development / Temporary Admin Bypass
-  if (TEMP_ADMIN_ENABLED && uid === "temp-admin-uid") {
+  if (tempAdminAllowed() && uid === "temp-admin-uid") {
     return "admin";
   }
 
-  // Fast path: custom claims already set by Cloud Function
-  if (decoded.isStaff && decoded.role) {
-    return decoded.role as string;
-  }
-
-  // Slow path: claims not yet set — read from Firestore
   try {
     const staffDoc = await admin.firestore().collection("staff").doc(uid).get();
     if (!staffDoc.exists) return null;
     const data = staffDoc.data()!;
-    if (data.isActive === false) return null;
+    if (!isActiveStaffRecord(data)) return null;
     return data.role as string;
   } catch (err) {
     console.error("[Auth] Firestore staff lookup failed:", err);
+    const claimRole = decoded.role;
+    if (decoded.isStaff === true && isActiveStaffRecord({ role: claimRole, isActive: true })) {
+      return claimRole as string;
+    }
     return null;
   }
 }
@@ -71,7 +70,7 @@ export async function requireAuth(
   const authHeader = req.headers.authorization;
 
   // Development / Temporary Admin Bypass
-  if (TEMP_ADMIN_ENABLED && authHeader === "Bearer temp-admin-token") {
+  if (tempAdminAllowed() && authHeader === "Bearer temp-admin-token") {
     req.user = {
       uid: "temp-admin-uid",
       email: "temp-admin@iconicimagestx.com",

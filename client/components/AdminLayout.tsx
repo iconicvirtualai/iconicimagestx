@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { staffHomePath } from "@shared/staffAccess";
 import {
   LayoutDashboard,
   Home,
@@ -139,7 +140,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
 
         {/* Logo */}
         <div className="relative p-5 border-b border-gray-800">
-          <Link to="/admin/dashboard" className="flex items-center gap-3">
+          <Link to={staffHomePath(role)} className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-[#0d9488] flex items-center justify-center flex-shrink-0">
               <span className="font-black text-white text-base">I</span>
             </div>

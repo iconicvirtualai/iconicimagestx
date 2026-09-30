@@ -35,7 +35,7 @@ export default function PublicGallery() {
   );
 
   const media: any[] = gallery.mediaItems || [];
-  const needsPayment = gallery.paymentRequired && gallery.invoiceId;
+  const needsPayment = Boolean(gallery.paymentRequired);
   const copyLink = async (url: string) => {
     await navigator.clipboard.writeText(url);
     toast.success("Share link copied.");
@@ -57,13 +57,15 @@ export default function PublicGallery() {
             <div className="flex items-start gap-3">
               <Lock className="w-5 h-5 text-yellow-700 mt-0.5" />
               <div>
-                <p className="text-sm font-black text-yellow-900">Downloads are locked until payment is recorded.</p>
-                <p className="text-xs text-yellow-700 mt-1">You can review the gallery here; download access unlocks after the invoice is paid.</p>
+                <p className="text-sm font-black text-yellow-900">This delivery stays locked until the invoice is paid.</p>
+                <p className="text-xs text-yellow-700 mt-1">Photos, videos, and tour links unlock after Square records the payment.</p>
               </div>
             </div>
-            <Button asChild className="bg-black hover:bg-gray-800 text-white rounded-xl">
-              <Link to={`/invoice/${gallery.invoiceId}`}><CreditCard className="w-4 h-4 mr-2" /> View Invoice</Link>
-            </Button>
+            {gallery.invoiceId && (
+              <Button asChild className="bg-black hover:bg-gray-800 text-white rounded-xl">
+                <Link to={`/invoice/${gallery.invoiceId}`}><CreditCard className="w-4 h-4 mr-2" /> View Invoice</Link>
+              </Button>
+            )}
           </div>
         )}
 
@@ -82,7 +84,12 @@ export default function PublicGallery() {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {media.map((item, index) => (
               <div key={item.id || index} className="aspect-[4/3] rounded-xl overflow-hidden bg-gray-100 relative group">
-                {item.type === "video" || item.type === "reel" ? (
+                {item.locked || !item.url ? (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-center p-4">
+                    <Lock className="w-6 h-6 text-gray-400 mb-2" />
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">{item.title || item.fileName || "Locked"}</p>
+                  </div>
+                ) : item.type === "video" || item.type === "reel" ? (
                   <video src={item.embedUrl || item.url} controls className="w-full h-full object-cover" />
                 ) : item.type === "tour" || item.type === "matterport" ? (
                   <div className="w-full h-full bg-black text-white flex flex-col items-center justify-center text-center p-4">

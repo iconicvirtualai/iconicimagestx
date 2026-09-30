@@ -9,6 +9,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -23,19 +24,15 @@ import {
 import { doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
 import type { StaffMember, Client } from "../lib/schema";
+import { isActiveStaffRecord } from "@shared/staffAccess";
+import { isTempAdminClientEnabled } from "@shared/tempAdmin";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-const hostname = window.location.hostname;
-const isVercelPreviewHost =
-  hostname.endsWith(".vercel.app") && hostname.includes("-git-");
-
-const TEMP_ADMIN_ENABLED =
-  import.meta.env.DEV ||
-  import.meta.env.VITE_ENABLE_TEMP_ADMIN === "true" ||
-  hostname === "localhost" ||
-  hostname === "127.0.0.1" ||
-  isVercelPreviewHost;
+const TEMP_ADMIN_ENABLED = isTempAdminClientEnabled({
+  flag: import.meta.env.VITE_ENABLE_TEMP_ADMIN,
+  hostname: typeof window === "undefined" ? undefined : window.location.hostname,
+});
 
 type AuthUserType = "staff" | "client" | null;
 
@@ -81,10 +78,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userType, setUserType] = useState<AuthUserType>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const tempSession = useRef(false);
 
   // Listen for auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!firebaseUser && tempSession.current) {
+        setLoading(false);
+        return;
+      }
+
+      tempSession.current = false;
       setUser(firebaseUser);
       setStaffProfile(null);
       setClientProfile(null);
@@ -94,8 +98,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           // Check if this UID belongs to a staff member
           const staffDoc = await getDoc(doc(db, "staff", firebaseUser.uid));
-          if (staffDoc.exists()) {
-            setStaffProfile({ id: staffDoc.id, ...staffDoc.data() } as StaffMember);
+          const staffData = staffDoc.exists() ? staffDoc.data() : null;
+          if (staffData && isActiveStaffRecord(staffData)) {
+            setStaffProfile({ id: staffDoc.id, ...staffData } as StaffMember);
             setUserType("staff");
           } else {
             // Check if client record links to this UID
@@ -122,9 +127,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (email: string, password: string) => {
     setError(null);
 
-    // Development / Temporary Admin Bypass
+    // Local/dev only. The flag is build-time; the host check is runtime.
     if (TEMP_ADMIN_ENABLED && email === "temp-admin@iconicimagestx.com" && password === "TempAdmin!2024") {
-      console.log("[Auth] Using temporary admin bypass");
+      console.log("[Auth] Using temporary local admin bypass");
+      tempSession.current = true;
       const tempUser = {
         uid: "temp-admin-uid",
         email: "temp-admin@iconicimagestx.com",
@@ -159,7 +165,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Sign out
   const signOutUser = async () => {
     setError(null);
-    await signOut(auth);
+    tempSession.current = false;
+    setUser(null);
+    setStaffProfile(null);
+    setClientProfile(null);
+    setUserType(null);
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error("[Auth] Sign out error:", err);
+    }
   };
 
   // Password reset

@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { staffHomePath } from "@shared/staffAccess";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
 export default function Login() {
-  const { signIn, user, userType, loading, resetPassword } = useAuth();
+  const { signIn, user, userType, staffProfile, loading, resetPassword } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -20,7 +21,7 @@ export default function Login() {
   useEffect(() => {
     if (!loading && user) {
       if (userType === "staff") {
-        navigate("/admin/dashboard");
+        navigate(staffHomePath(staffProfile?.role));
       } else if (userType === "client") {
         // Redirect to their most recent studio or a generic portal
         // For now, just generic success message or redirect to a known page
@@ -30,7 +31,7 @@ export default function Login() {
         navigate(from);
       }
     }
-  }, [user, userType, loading, navigate, location]);
+  }, [user, userType, staffProfile, loading, navigate, location]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
