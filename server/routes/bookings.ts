@@ -145,7 +145,8 @@ router.post("/", async (req, res) => {
       ? `${accessMethod}${lockboxCode ? ` — Code: ${lockboxCode}` : ""}`
       : "Not specified";
 
-    // Send confirmation email to client
+    // Order-received confirmation to the client. booking_received is excluded from the
+    // RED blast kill and sends even when CLIENT_NOTIFY_LIVE is unset.
     await sendEmail({
       to: email,
       template: "booking_received",
@@ -184,10 +185,12 @@ router.post("/", async (req, res) => {
       },
     }).catch((err) => console.error("[Bookings] Office notification email failed:", err));
 
-    // Send confirmation SMS to client
+    // Order-received SMS to the client. Same carve-out as booking_received:
+    // not blocked by RED or a missing CLIENT_NOTIFY_LIVE.
     if (phone) {
       await sendSMS({
         to: phone,
+        kind: "booking_confirmation",
         body: SMS_TEMPLATES.bookingConfirmation(
           firstName,
           scheduledDate || "TBD — we'll confirm shortly",

@@ -281,6 +281,10 @@ async function runReminderSweep(req: any, res: any) {
 
         try {
           const result = await sendSMS({ to: String(phone), body });
+          if (result.suppressed) {
+            results.push({ appointmentId: appointmentDoc.id, orderId, type, skipped: "client_notify_off" });
+            continue;
+          }
           sentMap = { ...sentMap, [type]: true };
           const update = {
             remindersSent: sentMap,

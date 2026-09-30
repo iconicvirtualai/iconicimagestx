@@ -28,6 +28,7 @@ import placesRouter from "./routes/places";
 import smsRouter from "./routes/sms";
 import contactRouter from "./routes/contact";
 import { listCalendarScheduleEvents, verifyCalendarWriteAccess } from "./services/calendar";
+import { clientNotifyLive } from "../shared/clientNotify";
 import { requireAdmin, requireStaff } from "./middleware/auth";
 import { handleListingPhotoUpload } from "./routes/listingPhotos";
 
@@ -174,6 +175,13 @@ export function createServer() {
     } catch {
       res.status(500).json({ error: "Failed to save settings" });
     }
+  });
+
+  // Portal password-reset and other non-order client mail check this.
+  // booking_received does not. live is false unless CLIENT_NOTIFY_LIVE is exactly "true"
+  // and CLIENT_COMMS_ZONE is not RED.
+  app.get("/api/client-notify", (_req, res) => {
+    res.json({ live: clientNotifyLive() });
   });
 
   // ─── API Routes ────────────────────────────────────────────────────

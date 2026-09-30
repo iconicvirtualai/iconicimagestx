@@ -10,6 +10,7 @@ import crypto from "crypto";
 import { requireCoordinator, type AuthenticatedRequest } from "../middleware/auth";
 import { sendEmail } from "../services/email";
 import { sendSMSCampaign } from "../services/sms";
+import { clientNotifyBlockReason, clientNotifyLive } from "../../shared/clientNotify";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -199,6 +200,10 @@ router.post("/:id/send", requireCoordinator, async (req, res) => {
     const campaign = campaignDoc.data()!;
     if (campaign.status === "sent") {
       return res.status(400).json({ error: "Campaign already sent." });
+    }
+    if (!clientNotifyLive()) {
+      console.warn(`[Campaigns] Suppressed send for ${req.params.id} — ${clientNotifyBlockReason()}.`);
+      return res.status(503).json({ error: "Client notifications are off.", suppressed: true });
     }
 
     // Get recipients

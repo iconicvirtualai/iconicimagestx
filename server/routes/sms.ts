@@ -22,6 +22,7 @@ import {
   normalisePhone,
 } from "../services/sms";
 import { requireStaff, requireCoordinator, type AuthenticatedRequest } from "../middleware/auth";
+import { clientNotifyBlockReason, clientNotifyLive } from "../../shared/clientNotify";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -53,6 +54,10 @@ router.post("/send", requireStaff, async (req: AuthenticatedRequest, res: Respon
     if (!to || !body) return res.status(400).json({ error: "to and body required." });
 
     const result = await sendSMS({ to, body });
+    if (result.suppressed) {
+      console.warn(`[SMS] Suppressed staff send to ${to} — ${clientNotifyBlockReason()}.`);
+      return res.status(503).json({ error: "Client notifications are off.", suppressed: true });
+    }
 
     // Log to Firestore
     await db().collection("smsLogs").add({
@@ -116,6 +121,10 @@ router.post("/remind/:orderId", requireStaff, async (req: AuthenticatedRequest, 
     }
 
     const result = await sendSMS({ to: phone, body });
+    if (result.suppressed) {
+      console.warn(`[SMS] Suppressed reminder to ${phone} — ${clientNotifyBlockReason()}.`);
+      return res.status(503).json({ error: "Client notifications are off.", suppressed: true });
+    }
 
     await db().collection("smsLogs").add({
       direction: "outbound",
@@ -325,6 +334,10 @@ router.post("/campaign/:id/send", requireCoordinator, async (req: AuthenticatedR
     const campaign = campaignDoc.data()!;
     if (campaign.status === "sent") return res.status(400).json({ error: "Campaign already sent." });
     if (campaign.type !== "sms") return res.status(400).json({ error: "Not an SMS campaign." });
+    if (!clientNotifyLive()) {
+      console.warn(`[SMS] Suppressed campaign ${req.params.id} — ${clientNotifyBlockReason()}.`);
+      return res.status(503).json({ error: "Client notifications are off.", suppressed: true });
+    }
 
     // Get recipients
     const clientsSnap = await db().collection("clients")
