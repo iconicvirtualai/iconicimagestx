@@ -33,11 +33,11 @@ const PHOTOS: Photo[] = [
   { src: "/media/photos/luxury-interior.jpg", alt: "Luxury interior living space", title: "Luxury Interior", category: "Listings" },
   { src: "/media/photos/luxury-a7305553.jpg", alt: "Luxury listing interior detail", title: "Listing Detail", category: "Listings" },
   { src: "/media/photos/luxury-mtz02998.jpg", alt: "Vertical luxury interior", title: "Vertical Interior", category: "Listings" },
-  { src: "/media/photos/haeckerville-8.jpg", alt: "Haeckerville listing photograph", title: "Haeckerville", category: "Listings" },
-  { src: "/media/photos/haeckerville-9.jpg", alt: "Haeckerville listing photograph", title: "Haeckerville", category: "Listings" },
-  { src: "/media/photos/haeckerville-10.jpg", alt: "Haeckerville listing photograph", title: "Haeckerville", category: "Listings" },
-  { src: "/media/photos/haeckerville-17.jpg", alt: "Haeckerville listing photograph", title: "Haeckerville", category: "Listings" },
-  { src: "/media/photos/claymore-vs-final.jpg", alt: "Claymore virtual staging final", title: "Claymore Staging", category: "Virtual Staging" },
+  { src: "/media/photos/listing-living-01.jpg", alt: "Bright listing living room", title: "Living Room", category: "Listings" },
+  { src: "/media/photos/listing-living-02.jpg", alt: "Open listing living space", title: "Open Living", category: "Listings" },
+  { src: "/media/photos/listing-living-03.jpg", alt: "Listing interior with natural light", title: "Listing Interior", category: "Listings" },
+  { src: "/media/photos/listing-living-04.jpg", alt: "Listing interior in evening light", title: "Evening Interior", category: "Listings" },
+  { src: "/media/photos/staged-living-room.jpg", alt: "Virtually staged living room", title: "Staged Living Room", category: "Virtual Staging" },
   { src: "/media/photos/vs-ico7432.jpg", alt: "Virtual staging interior", title: "Virtual Staging", category: "Virtual Staging" },
 ];
 
@@ -137,7 +137,7 @@ export default function Portfolio() {
               <p className="mb-8 max-w-2xl text-gray-400">
                 Essential Snap Reels: listing photos cut into a 9:16 vertical.
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {SNAP_REELS.map((reel) => (
                   <figure key={reel.src}>
                     <div className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-black">
@@ -146,13 +146,14 @@ export default function Portfolio() {
                         controls
                         playsInline
                         preload="metadata"
+                        aria-label={`Snap Reel — ${reel.title}`}
                         className="aspect-[9/16] w-full object-cover bg-black"
                       />
                     </div>
                     <figcaption className="mt-3">
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-teal-400">Snap Reel</p>
-                      <p className="mt-1 text-sm font-bold">{reel.agent}</p>
-                      <p className="text-xs text-gray-400">{reel.address}</p>
+                      <p className="mt-1 text-sm font-bold">{reel.title}</p>
+                      <p className="text-xs text-gray-400">{reel.vibe}</p>
                     </figcaption>
                   </figure>
                 ))}

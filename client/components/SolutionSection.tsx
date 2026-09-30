@@ -18,7 +18,7 @@ export default function SolutionSection() {
     },
     {
       id: 2,
-      url: "/media/reels/superpower-jaz-12s.mp4",
+      url: "/media/reels/superpower-reel-12s.mp4",
       aspect: "9/16",
       title: "Vertical Reel"
     },
@@ -32,7 +32,7 @@ export default function SolutionSection() {
       id: 4 + index,
       url: reel.src,
       aspect: "9/16" as const,
-      title: `Snap Reel · ${reel.agent}`,
+      title: `Snap Reel · ${reel.title}`,
     })),
   ];
 

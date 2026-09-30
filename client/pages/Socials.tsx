@@ -88,7 +88,7 @@ const INITIAL_PLATFORMS = [
 const FEATURED_PROPERTIES = [
   {
     id: 1,
-    address: "1245 Willow Creek Dr",
+    title: "Bright Living",
     location: "Spring, TX",
     platform: "Zillow",
     image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80",
@@ -98,7 +98,7 @@ const FEATURED_PROPERTIES = [
   },
   {
     id: 2,
-    address: "882 High Meadow Ln",
+    title: "Estate Light",
     location: "The Woodlands, TX",
     platform: "HAR.com",
     image: "https://images.unsplash.com/photo-1600607687940-4e524cb35a3a?w=800&q=80",
@@ -108,7 +108,7 @@ const FEATURED_PROPERTIES = [
   },
   {
     id: 3,
-    address: "552 Oak Forest Ct",
+    title: "Open Concept",
     location: "Conroe, TX",
     platform: "Zillow",
     image: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&q=80",
@@ -118,7 +118,7 @@ const FEATURED_PROPERTIES = [
   },
   {
     id: 4,
-    address: "210 River Walk Way",
+    title: "Weekend Retreat",
     location: "Humble, TX",
     platform: "HAR.com",
     image: "https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?w=800&q=80",
@@ -358,7 +358,7 @@ export default function Socials() {
                   className="min-w-[300px] md:min-w-[380px] bg-white rounded-[2rem] overflow-hidden border border-gray-100 shadow-xl snap-center group hover:shadow-2xl hover:-translate-y-1 transition-all duration-500"
                 >
                   <div className="relative aspect-[16/10] overflow-hidden">
-                    <img src={property.image} alt={property.address} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                    <img src={property.image} alt={property.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity"></div>
 
                     <div className="absolute top-5 left-5 flex gap-2">
@@ -372,7 +372,7 @@ export default function Socials() {
 
                     <div className="absolute bottom-5 left-6 right-6">
                       <p className="text-[10px] font-bold text-teal-400 uppercase tracking-[0.2em] mb-1">Recent Masterpiece</p>
-                      <h3 className="text-xl font-bold text-white tracking-tight leading-tight">{property.address}</h3>
+                      <h3 className="text-xl font-bold text-white tracking-tight leading-tight">{property.title}</h3>
                       <p className="text-xs text-white/80 font-medium">{property.location}</p>
                     </div>
                   </div>

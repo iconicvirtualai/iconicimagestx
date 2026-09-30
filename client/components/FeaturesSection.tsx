@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { FEATURED_SNAP_REEL } from "@/lib/snapReels";
 
 const FeatureCard = ({
   title,
@@ -68,14 +69,14 @@ const VirtualStagingSnippet = () => {
     <div className="relative h-full w-full bg-gray-50 flex items-center justify-center overflow-hidden">
       {/* Background Room - Empty */}
       <img
-        src="/media/photos/haeckerville-9.jpg"
+        src="/media/photos/listing-living-02.jpg"
         className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${step === 3 ? 'opacity-0' : 'opacity-100'}`}
         alt="Empty Room"
       />
 
       {/* Background Room - Staged */}
       <img
-        src="/media/photos/claymore-vs-final.jpg"
+        src="/media/photos/staged-living-room.jpg"
         className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${step === 3 ? 'opacity-100' : 'opacity-0'}`}
         alt="Staged Room"
       />
@@ -155,14 +156,14 @@ export default function FeaturesSection() {
               <ArrowRight className="w-6 h-6 shrink-0" style={{ color: settings.global.primaryColor }} />
               <div className="w-1/2 h-full relative rounded-lg overflow-hidden border border-gray-100 bg-black">
                 <video
-                  src="/media/videos/snap-reels/kari-stoney-brook.mp4"
+                  src={FEATURED_SNAP_REEL.src}
                   className="h-full w-full object-cover"
                   autoPlay
                   muted
                   loop
                   playsInline
                   preload="metadata"
-                  aria-label="Snap Reel for Kari Riddle, 8719 Stoney Brook Ln"
+                  aria-label={`Snap Reel — ${FEATURED_SNAP_REEL.title}`}
                 />
                 <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-1 text-[8px] font-black uppercase tracking-widest text-white">
                   Snap Reel
