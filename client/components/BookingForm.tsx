@@ -35,11 +35,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
   Check, Mail, Phone, MapPin, Maximize, Calendar as CalendarIcon,
   ArrowRight, ArrowLeft, Sparkles, Wand2, Clock, ChevronDown,
   ChevronUp, Zap, Video, Camera, Star, Info, MessageSquare,
@@ -1086,21 +1081,18 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                     {LIFE_OF_THE_LISTING_CARE_PRICE_LABEL}
                   </span>
                 </div>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label="Life of the Listing Care details"
-                      className="mt-2 ml-8 inline-flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-black"
-                    >
-                      <Info className="w-3 h-3" />
-                      Service note
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-sm text-left text-xs leading-relaxed">
-                    {LIFE_OF_THE_LISTING_CARE_BLURB}
-                  </TooltipContent>
-                </Tooltip>
+                <button
+                  type="button"
+                  onClick={() => setSelectedDetailItem({
+                    name: "Life of the Listing Care",
+                    description: LIFE_OF_THE_LISTING_CARE_BLURB,
+                    priceNote: LIFE_OF_THE_LISTING_CARE_PRICE_LABEL,
+                  })}
+                  className="mt-2 ml-8 inline-flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-black"
+                >
+                  <Info className="w-3 h-3" />
+                  Service note
+                </button>
               </div>
             </div>
           </motion.div>
@@ -1900,6 +1892,11 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                   <div className="space-y-0.5">
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Investment</p>
                     <p className="text-2xl font-black text-black">${selectedDetailItem.price}</p>
+                  </div>
+                ) : selectedDetailItem?.priceNote ? (
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Price</p>
+                    <p className="text-2xl font-black text-black">{selectedDetailItem.priceNote}</p>
                   </div>
                 ) : <div />}
                 <Button

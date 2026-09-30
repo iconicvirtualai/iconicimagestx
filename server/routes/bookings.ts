@@ -10,7 +10,7 @@ import { requireCoordinator, type AuthenticatedRequest } from "../middleware/aut
 import { sendEmail } from "../services/email";
 import { sendSMS, SMS_TEMPLATES } from "../services/sms";
 import { createCalendarBookingEvent } from "../services/calendar";
-import { lifeOfTheListingCareSelected } from "@shared/lifeOfTheListingCare";
+import { lifeOfTheListingCareSelected } from "../../shared/lifeOfTheListingCare";
 
 const router = Router();
 const db = () => admin.firestore();
