@@ -6,6 +6,12 @@ import { createOrder } from "@/lib/createOrder";
 import { useSearchParams } from "react-router-dom";
 import ChatWidget from "@/components/ChatWidget";
 import { services } from "@/lib/services";
+import {
+  LIFE_OF_THE_LISTING_CARE_BLURB,
+  LIFE_OF_THE_LISTING_CARE_CHECKBOX_LABEL,
+  LIFE_OF_THE_LISTING_CARE_PRICE_LABEL,
+  LIFE_OF_THE_LISTING_CARE_SUMMARY_LABEL,
+} from "@shared/lifeOfTheListingCare";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
@@ -28,6 +34,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Check, Mail, Phone, MapPin, Maximize, Calendar as CalendarIcon,
   ArrowRight, ArrowLeft, Sparkles, Wand2, Clock, ChevronDown,
@@ -265,6 +276,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     selectedService: initialServiceId || "" as string,
     selectedBasics: [] as string[],
     selectedAddOns: [] as string[],
+    lifeOfTheListingCare: false,
     premiumUpgrade: false,
     accessInfo: "Lockbox",
     lockboxCode: "",
@@ -719,6 +731,12 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
              })}
           </div>
         )}
+        {formData.lifeOfTheListingCare && (
+          <div className="flex justify-between items-start gap-3 text-[11px]">
+            <span className="text-gray-500">{LIFE_OF_THE_LISTING_CARE_SUMMARY_LABEL}</span>
+            <span className="font-bold text-black shrink-0">{LIFE_OF_THE_LISTING_CARE_PRICE_LABEL}</span>
+          </div>
+        )}
         {formData.serviceDate && (
           <div className="pt-2 mt-2 border-t border-gray-100 flex justify-between items-center text-[11px]">
              <span className="text-gray-500 italic flex items-center gap-1.5"><CalendarIcon className="w-3 h-3" /> {format(formData.serviceDate, "PPP")}</span>
@@ -1040,6 +1058,49 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                     </div>
                   </div>
                 ))}
+              </div>
+
+              <div className={`rounded-2xl border-2 p-4 transition-all ${
+                formData.lifeOfTheListingCare ? "border-black bg-white shadow-md" : "border-gray-100 bg-white"
+              }`}>
+                <div className="flex items-start gap-3">
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={formData.lifeOfTheListingCare}
+                    onClick={() => updateFormData({ lifeOfTheListingCare: !formData.lifeOfTheListingCare })}
+                    className="flex flex-1 items-start gap-3 text-left"
+                  >
+                    <span
+                      className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-all shrink-0 ${
+                        formData.lifeOfTheListingCare ? "border-black bg-black" : "border-gray-200 bg-white"
+                      }`}
+                    >
+                      {formData.lifeOfTheListingCare && <Check className="w-3 h-3 text-white stroke-[4]" />}
+                    </span>
+                    <span className="text-[11px] font-bold text-gray-700">
+                      {LIFE_OF_THE_LISTING_CARE_CHECKBOX_LABEL}
+                    </span>
+                  </button>
+                  <span className="text-[10px] font-black uppercase tracking-wide text-gray-500 shrink-0 pt-0.5">
+                    {LIFE_OF_THE_LISTING_CARE_PRICE_LABEL}
+                  </span>
+                </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Life of the Listing Care details"
+                      className="mt-2 ml-8 inline-flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-black"
+                    >
+                      <Info className="w-3 h-3" />
+                      Service note
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-sm text-left text-xs leading-relaxed">
+                    {LIFE_OF_THE_LISTING_CARE_BLURB}
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </div>
           </motion.div>
@@ -1522,6 +1583,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                     selectedService: "",
                     selectedBasics: [],
                     selectedAddOns: [],
+                    lifeOfTheListingCare: false,
                     premiumUpgrade: false,
                     virtualStagingCredits: 0
                   }));
