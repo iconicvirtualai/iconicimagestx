@@ -113,6 +113,12 @@
 }
 
 @layer utilities {
+  .admin-decor-wash {
+    background:
+      radial-gradient(380px 240px at 100% 0%, rgba(13, 148, 136, 0.1), transparent 70%),
+      linear-gradient(180deg, #f7fafa 0%, #f4f7f8 100%);
+  }
+
   .accent-text-bordered {
     color: white;
     text-shadow:

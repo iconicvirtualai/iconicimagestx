@@ -17,7 +17,7 @@ export default function RaisingTheStandard() {
 
               {/* Video Content */}
               <video
-                src="https://videos.pexels.com/video-files/34236991/14509265_360_640_24fps.mp4"
+                src="/media/video/content-web-clip.mp4"
                 autoPlay
                 loop
                 muted

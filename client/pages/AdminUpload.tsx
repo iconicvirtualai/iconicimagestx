@@ -93,7 +93,7 @@ export default function AdminUpload() {
 
   return (
     <AdminLayout title="Upload Photos">
-      <div className="max-w-3xl mx-auto">
+      <div className="w-full min-w-0">
         {/* Job selector */}
         <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 mb-6">
           <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3">

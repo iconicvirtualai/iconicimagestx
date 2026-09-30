@@ -27,6 +27,7 @@ export default function Header() {
     { label: "About", href: "/about" },
     { label: "Resources", href: "/insights" },
     { label: "Pricing", href: "/pricing" },
+    { label: "Studio 105", href: "/studio-105" },
     { label: "Stock Footage", href: "/stock-footage" },
     { label: "Contact Us", href: "/contact" },
   ];
@@ -38,15 +39,11 @@ export default function Header() {
       >
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2 flex-shrink-0 group">
-          <div
-            className="w-8 h-8 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105"
-            style={{ backgroundColor: settings.global.primaryColor }}
-          >
+          <div className="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center transition-transform group-hover:scale-105 bg-black ring-1 ring-white/15">
             <img
-              src="https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fc64073babcd04fcf966feeaacd4c903c?format=webp&width=800&height=1200"
-              alt="Logo"
-              className="w-5 h-5 object-contain"
-              style={{ filter: 'invert(1)' }}
+              src="/media/logos/camera-logo-white-on-black.png"
+              alt="Iconic Images"
+              className="w-full h-full object-cover"
             />
           </div>
           <span className="text-[15px] font-bold tracking-tight text-white uppercase">

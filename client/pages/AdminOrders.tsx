@@ -104,6 +104,7 @@ export default function AdminOrders() {
   const [staff, setStaff] = React.useState<any[]>([]);
   const [isBulkScheduling, setIsBulkScheduling] = React.useState(false);
   const [isBulkProjecting, setIsBulkProjecting] = React.useState(false);
+  const [bulkProjectType, setBulkProjectType] = React.useState<"real_estate" | "business">("real_estate");
 
   // Section States
   const [sect1, setSect1] = React.useState({ perPage: 20, sort: "newest", search: "", collapsed: false });
@@ -157,18 +158,14 @@ export default function AdminOrders() {
         const order = orders.find(o => o.id === id);
         if (!order || order.listingId) continue;
 
-        const isRE = (order.specializedPhotography === "mls") || (order.lineItems || []).some((li: any) => {
-          const n = (li.name || "").toLowerCase();
-          return n.includes("listing") || n.includes("aerial") || n.includes("matterport") || n.includes("3d");
-        });
-
         const listingData: any = {
-          projectType: isRE ? "real_estate" : "business",
+          projectType: bulkProjectType,
           orderRequestId: id,
           clientName: getName(order),
           clientEmail: order.email || "",
           clientPhone: order.phone || "",
           address: getAddr(order),
+          shootLocation: bulkProjectType === "business" ? getAddr(order) : null,
           apptDate: order.appointmentDate ? (order.appointmentDate.toDate ? order.appointmentDate.toDate() : new Date(order.appointmentDate + "T12:00:00")) : null,
           apptTime: order.scheduledTime || order.appointmentTime || null,
           services: (order.lineItems || []).map((li: any) => li.name || String(li)),
@@ -523,7 +520,7 @@ export default function AdminOrders() {
       {/* ── BULK ACTION BAR ── */}
       {selection.size > 0 && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <div className="bg-black text-white px-6 py-4 rounded-3xl shadow-2xl border border-white/10 flex items-center gap-6">
+          <div className="bg-black text-white px-6 py-4 rounded-3xl shadow-2xl border border-white/10 flex flex-wrap items-center gap-4 max-w-[calc(100vw-2rem)]">
             <div className="flex items-center gap-3 pr-6 border-r border-white/20">
               <div className="w-8 h-8 bg-[#0d9488] rounded-full flex items-center justify-center font-bold text-sm">{selection.size}</div>
               <span className="text-xs font-bold uppercase tracking-wider">Orders Selected</span>
@@ -531,6 +528,10 @@ export default function AdminOrders() {
             <div className="flex items-center gap-4">
               <button onClick={() => handleBulkStatus("archived")} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest hover:text-[#0d9488] transition-colors"><Archive className="w-4 h-4" /> Archive</button>
               <button onClick={() => handleBulkStatus("cancelled")} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest hover:text-red-500 transition-colors"><X className="w-4 h-4" /> Cancel</button>
+              <div className="flex rounded-xl bg-white/10 p-0.5" role="group" aria-label="Project type">
+                <button type="button" onClick={() => setBulkProjectType("real_estate")} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest ${bulkProjectType === "real_estate" ? "bg-[#0d9488] text-white" : "text-gray-300"}`}>Real Estate</button>
+                <button type="button" onClick={() => setBulkProjectType("business")} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest ${bulkProjectType === "business" ? "bg-white text-black" : "text-gray-300"}`}>Business</button>
+              </div>
               <button onClick={handleBulkProject} disabled={isBulkProjecting} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest hover:text-[#0d9488] transition-colors">
                 {isBulkProjecting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Layers className="w-4 h-4" />} Create Projects
               </button>

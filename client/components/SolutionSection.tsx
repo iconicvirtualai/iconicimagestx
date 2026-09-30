@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Play, Volume2, VolumeX, ChevronLeft, ChevronRight } from "lucide-react";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { SNAP_REELS } from "@/lib/snapReels";
 
 export default function SolutionSection() {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -11,28 +12,28 @@ export default function SolutionSection() {
   const videos = [
     {
       id: 1,
-      url: "https://videos.pexels.com/video-files/30067640/12896699_640_360_30fps.mp4",
+      url: "/media/video/product-photography.mp4",
       aspect: "16/9",
-      title: "Luxury Exterior"
+      title: "Product Photography"
     },
     {
       id: 2,
-      url: "https://videos.pexels.com/video-files/31548166/13445880_360_640_30fps.mp4",
+      url: "/media/reels/superpower-jaz-12s.mp4",
       aspect: "9/16",
-      title: "Vertical Showcase"
+      title: "Vertical Reel"
     },
     {
       id: 3,
-      url: "https://videos.pexels.com/video-files/19403229/19403229-hd_1280_720_25fps.mp4",
-      aspect: "16/9",
-      title: "Designer Interior"
-    },
-    {
-      id: 4,
-      url: "https://videos.pexels.com/video-files/34236991/14509265_360_640_24fps.mp4",
+      url: "/media/video/content-web-clip.mp4",
       aspect: "9/16",
-      title: "Portrait View"
-    }
+      title: "Content Package"
+    },
+    ...SNAP_REELS.map((reel, index) => ({
+      id: 4 + index,
+      url: reel.src,
+      aspect: "9/16" as const,
+      title: `Snap Reel · ${reel.agent}`,
+    })),
   ];
 
   const nextSlide = () => {
@@ -148,6 +149,9 @@ export default function SolutionSection() {
               <ChevronRight className="w-6 h-6" />
             </button>
           </div>
+          <p className="mt-4 text-[11px] font-black uppercase tracking-[0.28em] text-teal-400">
+            {currentVideo.title}
+          </p>
         </div>
       </div>
     </section>

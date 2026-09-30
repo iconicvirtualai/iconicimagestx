@@ -9,8 +9,8 @@ import {
   ExternalLink, Copy, MapPin, Image, Unlock,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { doc, onSnapshot, updateDoc, serverTimestamp, addDoc, collection, getDocs } from "firebase/firestore";
+import { useAuth } from "@/contexts/AuthContext";
+import { doc, onSnapshot, updateDoc, serverTimestamp } from "firebase/firestore";
 import { toast } from "sonner";
 
 // ─── Status systems ───────────────────────────────────────────────────────────
@@ -70,52 +70,131 @@ function Toggle({ label, value, onChange, disabled }: {
   );
 }
 
+const INFO_FIELDS = [
+  "address", "listPrice", "listDate", "mlsNumber", "bedrooms", "bathrooms",
+  "squareFeet", "lotSize", "neighborhood", "accessInfo", "shootLocation",
+  "businessName", "industry", "website", "brandColors", "deliverables", "notes",
+] as const;
+
+function projectKind(value: unknown): "real_estate" | "business" {
+  return value === "business" ? "business" : "real_estate";
+}
+
+async function compressPhoto(file: File): Promise<Blob> {
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    throw new Error(`${file.name} could not be read. Use a JPG or PNG.`);
+  }
+  const maxEdge = 2560;
+  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    bitmap.close();
+    throw new Error("Could not prepare this image for upload.");
+  }
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, width, height);
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close();
+
+  const toBlob = (quality: number) =>
+    new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => (blob ? resolve(blob) : reject(new Error("Could not encode this image."))),
+        "image/jpeg",
+        quality,
+      );
+    });
+
+  let quality = 0.86;
+  let blob = await toBlob(quality);
+  while (blob.size > 3_200_000 && quality > 0.5) {
+    quality -= 0.08;
+    blob = await toBlob(quality);
+  }
+  if (blob.size > 4_000_000) {
+    throw new Error(`${file.name} is still too large after resizing. Try a smaller JPG.`);
+  }
+  return blob;
+}
+
+function uploadPhoto(projectId: string, token: string, fileName: string, blob: Blob, onProgress: (ratio: number) => void) {
+  return new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `/api/listings/${projectId}/photos?name=${encodeURIComponent(fileName)}`);
+    xhr.setRequestHeader("Content-Type", "image/jpeg");
+    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) onProgress(event.loaded / event.total);
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress(1);
+        resolve();
+        return;
+      }
+      let message = `Upload failed (${xhr.status}).`;
+      try {
+        const body = JSON.parse(xhr.responseText);
+        if (body?.error) message = String(body.error);
+      } catch { /* response was not JSON */ }
+      reject(new Error(message));
+    };
+    xhr.onerror = () => reject(new Error("Upload could not reach the server."));
+    xhr.send(blob);
+  });
+}
+
 // ─── Upload component ─────────────────────────────────────────────────────────
 function PhotoUploader({ projectId, onUpload }: { projectId: string; onUpload: () => void }) {
+  const { user } = useAuth();
   const [uploading, setUploading] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
+  const [statusLabel, setStatusLabel] = React.useState("Preparing…");
   const fileRef = React.useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = React.useState(false);
 
   const handleFiles = async (files: FileList | File[]) => {
-    const storage = getStorage();
-    setUploading(true);
-    const fileArray = Array.from(files);
-    let completed = 0;
-
-    for (const file of fileArray) {
-      const path = `listings/${projectId}/photos/${Date.now()}_${file.name}`;
-      const sRef = storageRef(storage, path);
-      const task = uploadBytesResumable(sRef, file);
-
-      await new Promise<void>((resolve, reject) => {
-        task.on("state_changed",
-          (snap) => {
-            const p = Math.round(((completed + snap.bytesTransferred / snap.totalBytes) / fileArray.length) * 100);
-            setProgress(p);
-          },
-          (err) => { toast.error(`Upload failed: ${file.name}`); reject(err); },
-          async () => {
-            const url = await getDownloadURL(task.snapshot.ref);
-            // Update the listing's images array
-            const listingRef = doc(db, "listings", projectId);
-            const snap = await import("firebase/firestore").then(m => m.getDoc(listingRef));
-            const current = snap.data()?.images || [];
-            await updateDoc(listingRef, {
-              images: [...current, { url, name: file.name, path, uploadedAt: new Date().toISOString() }],
-              updatedAt: serverTimestamp(),
-            });
-            completed++;
-            resolve();
-          }
-        );
-      });
+    const fileArray = Array.from(files).filter((file) => file.type.startsWith("image/") || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name));
+    if (!fileArray.length) {
+      toast.error("Choose a JPG, PNG, or WebP image.");
+      return;
     }
-
-    setUploading(false);
+    setUploading(true);
     setProgress(0);
-    toast.success(`${fileArray.length} photo(s) uploaded!`);
-    onUpload();
+    setStatusLabel("Preparing…");
+    try {
+      const token = await user?.getIdToken();
+      if (!token) throw new Error("Sign in again before uploading photos.");
+      for (let index = 0; index < fileArray.length; index++) {
+        const file = fileArray[index];
+        setStatusLabel(`Preparing ${file.name}…`);
+        const blob = await compressPhoto(file);
+        setStatusLabel(`Uploading ${file.name}…`);
+        await uploadPhoto(projectId, token, file.name, blob, (ratio) => {
+          const overall = Math.round(((index + ratio) / fileArray.length) * 100);
+          setProgress(overall);
+          setStatusLabel(`Uploading… ${overall}%`);
+        });
+      }
+      toast.success(`${fileArray.length} photo${fileArray.length === 1 ? "" : "s"} uploaded.`);
+      onUpload();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Upload failed.";
+      toast.error(message);
+    } finally {
+      setUploading(false);
+      setProgress(0);
+      setStatusLabel("Preparing…");
+      if (fileRef.current) fileRef.current.value = "";
+    }
   };
 
   const onDrop = (e: React.DragEvent) => {
@@ -142,7 +221,7 @@ function PhotoUploader({ projectId, onUpload }: { projectId: string; onUpload: (
             <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
               <div className="bg-[#0d9488] h-2 rounded-full transition-all" style={{ width: `${progress}%` }} />
             </div>
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Uploading... {progress}%</p>
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">{statusLabel}</p>
           </div>
         ) : (
           <>
@@ -170,15 +249,18 @@ export default function AdminListingFile() {
   const [editingInfo, setEditingInfo] = React.useState(false);
   const [infoForm, setInfoForm] = React.useState<any>({});
   const [tourInput, setTourInput] = React.useState("");
+  const editingInfoRef = React.useRef(false);
+  editingInfoRef.current = editingInfo;
 
   // Live listener
   React.useEffect(() => {
     if (!id) return;
     const unsub = onSnapshot(doc(db, "listings", id), snap => {
       if (snap.exists()) {
-        const data = { id: snap.id, ...snap.data() };
+        const data = { id: snap.id, ...snap.data() } as any;
+        data.projectType = projectKind(data.projectType);
         setProject(data);
-        setInfoForm(data);
+        if (!editingInfoRef.current) setInfoForm(data);
       } else {
         toast.error("Project not found");
         navigate("/admin/listings");
@@ -232,8 +314,16 @@ export default function AdminListingFile() {
 
   const saveInfo = async () => {
     setUpdating(true);
-    try { await patch(infoForm); toast.success("Saved."); setEditingInfo(false); }
-    catch { toast.error("Failed to save."); }
+    try {
+      const projectType = projectKind(infoForm.projectType);
+      const payload: Record<string, unknown> = { projectType };
+      for (const key of INFO_FIELDS) {
+        if (infoForm[key] !== undefined) payload[key] = infoForm[key] ?? "";
+      }
+      await patch(payload);
+      toast.success("Saved.");
+      setEditingInfo(false);
+    } catch { toast.error("Failed to save."); }
     finally { setUpdating(false); }
   };
 
@@ -260,7 +350,9 @@ export default function AdminListingFile() {
 
   if (!project) return null;
 
-  const isRE = project.projectType !== "business";
+  const savedType = projectKind(project.projectType);
+  const formType = projectKind(infoForm.projectType);
+  const isRE = (editingInfo ? formType : savedType) !== "business";
   const tabs = isRE ? RE_TABS : BIZ_TABS;
   const statuses = isRE ? RE_STATUSES : BIZ_STATUSES;
   const location = project.address || project.shootLocation || "—";
@@ -363,8 +455,8 @@ export default function AdminListingFile() {
       </div>
 
       {/* Main + sidebar */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-3">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-6">
+        <div className="min-w-0">
           {/* Tab bar */}
           <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl mb-6 overflow-x-auto">
             {tabs.map((t, i) => (
@@ -529,11 +621,34 @@ export default function AdminListingFile() {
               <div>
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">{isRE ? "Listing Information" : "Project Information"}</h3>
-                  <button onClick={() => editingInfo ? saveInfo() : setEditingInfo(true)} disabled={updating}
+                  <button onClick={() => {
+                    if (editingInfo) { saveInfo(); return; }
+                    setInfoForm((current: any) => ({ ...current, projectType: projectKind(current.projectType) }));
+                    setEditingInfo(true);
+                  }} disabled={updating}
                     className="flex items-center gap-2 px-4 py-2 bg-[#0d9488] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#0f766e] transition-colors disabled:opacity-50"
                   >
                     {editingInfo ? <><Check className="w-3.5 h-3.5" /> Save</> : <><Edit3 className="w-3.5 h-3.5" /> Edit</>}
                   </button>
+                </div>
+                <div className="mb-5">
+                  <p className={labelCls}>Project type</p>
+                  {editingInfo ? (
+                    <div className="flex bg-gray-100 rounded-2xl p-1 max-w-md">
+                      <button type="button" onClick={() => setInfoForm((current: any) => ({ ...current, projectType: "real_estate" }))}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${formType === "real_estate" ? "bg-white text-black shadow-sm" : "text-gray-400"}`}
+                      >
+                        <Home className="w-3.5 h-3.5" /> Real Estate
+                      </button>
+                      <button type="button" onClick={() => setInfoForm((current: any) => ({ ...current, projectType: "business" }))}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${formType === "business" ? "bg-white text-black shadow-sm" : "text-gray-400"}`}
+                      >
+                        <Building2 className="w-3.5 h-3.5" /> Business
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-sm font-bold text-gray-800">{savedType === "business" ? "Business" : "Real Estate"}</p>
+                  )}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   {isRE ? (<>

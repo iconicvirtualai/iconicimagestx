@@ -825,14 +825,15 @@ export default function AdminListings() {
                 <h3 className="text-sm font-black text-black uppercase tracking-widest">New Project</h3>
                 <button onClick={closeModal}><X className="w-5 h-5 text-gray-400 hover:text-black" /></button>
               </div>
-              <div className="flex bg-gray-100 rounded-2xl p-1 mb-6">
-                <button onClick={() => setProjectType("real_estate")}
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${projectType === "real_estate" ? "bg-white text-black shadow-sm" : "text-gray-400 hover:text-gray-700"}`}
+              <p className={labelCls}>Project type *</p>
+              <div className="flex bg-gray-100 rounded-2xl p-1 mb-6" role="group" aria-label="Project type">
+                <button type="button" onClick={() => setProjectType("real_estate")}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${projectType === "real_estate" ? "bg-[#0d9488] text-white shadow-sm" : "text-gray-500 hover:text-gray-800"}`}
                 >
                   <Home className="w-4 h-4" /> Real Estate
                 </button>
-                <button onClick={() => setProjectType("business")}
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${projectType === "business" ? "bg-white text-black shadow-sm" : "text-gray-400 hover:text-gray-700"}`}
+                <button type="button" onClick={() => setProjectType("business")}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${projectType === "business" ? "bg-black text-white shadow-sm" : "text-gray-500 hover:text-gray-800"}`}
                 >
                   <Building2 className="w-4 h-4" /> Business
                 </button>
@@ -1047,7 +1048,7 @@ export default function AdminListings() {
               <Button onClick={handleCreate} disabled={saving}
                 className="flex-1 bg-[#0d9488] hover:bg-[#0f766e] text-white font-bold rounded-xl">
                 <Check className="w-4 h-4 mr-2" />
-                {saving ? "Creating…" : "Create Project"}
+                {saving ? "Creating…" : projectType === "business" ? "Create Business Project" : "Create Real Estate Project"}
               </Button>
               <Button variant="outline" onClick={closeModal} className="rounded-xl font-bold">Cancel</Button>
             </div>

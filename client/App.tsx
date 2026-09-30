@@ -20,6 +20,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Index from "./pages/Index";
 import About from "./pages/About";
 import Portfolio from "./pages/Portfolio";
+import Studio105 from "./pages/Studio105";
 import Contact from "./pages/Contact";
 import Book from "./pages/Book";
 import Pricing from "./pages/Pricing";
@@ -47,6 +48,7 @@ import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminListingFile from "./pages/AdminListingFile";
 import AdminCustomerCenter from "./pages/AdminCustomerCenter";
+import AdminClientAccount from "./pages/AdminClientAccount";
 import AdminSiteCustomizer from "./pages/AdminSiteCustomizer";
 import AdminEmailTemplates from "./pages/AdminEmailTemplates";
 import AdminCurrentPricing from "./pages/AdminCurrentPricing";
@@ -75,6 +77,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/about" element={<About />} />
             <Route path="/portfolio" element={<Portfolio />} />
+            <Route path="/studio-105" element={<Studio105 />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/book" element={<Book />} />
             <Route path="/pricing" element={<Pricing />} />
@@ -108,6 +111,7 @@ const App = () => (
             <Route path="/admin/listings" element={<ProtectedRoute requiredRole="coordinator"><AdminListings /></ProtectedRoute>} />
             <Route path="/admin/listing/:id" element={<ProtectedRoute requiredRole="staff"><AdminListingFile /></ProtectedRoute>} />
             <Route path="/admin/customers" element={<ProtectedRoute requiredRole="coordinator"><AdminCustomerCenter /></ProtectedRoute>} />
+            <Route path="/admin/customers/:id" element={<ProtectedRoute requiredRole="coordinator"><AdminClientAccount /></ProtectedRoute>} />
             <Route path="/admin/order/:id" element={<ProtectedRoute requiredRole="coordinator"><AdminOrderDetail /></ProtectedRoute>} />
             <Route path="/admin/orders/:id" element={<ProtectedRoute requiredRole="coordinator"><AdminOrderDetail /></ProtectedRoute>} />
             <Route path="/admin/order-request/:id" element={<ProtectedRoute requiredRole="coordinator"><AdminOrderRequest /></ProtectedRoute>} />

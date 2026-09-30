@@ -1,7 +1,102 @@
-import { Calendar, Camera, Scissors, Rocket, ArrowRight } from "lucide-react";
+import { Calendar, Camera, Scissors, Rocket, ArrowRight, Download, Share2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+
+function BookStepVisual() {
+  const days = ["M", "T", "W", "T", "F", "S", "S"];
+  const dates = [8, 9, 10, 11, 12, 13, 14];
+  return (
+    <div className="absolute inset-0 bg-[#0c1211] p-3 flex flex-col text-white" aria-hidden="true">
+      <div className="flex items-center justify-between text-[9px] font-black tracking-[0.2em] mb-2">
+        <span>PORTAL</span>
+        <span className="text-teal-400">PICK A TIME</span>
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-center">
+        {days.map((day, i) => (
+          <span key={`${day}-${i}`} className="text-[8px] text-white/35 font-bold">{day}</span>
+        ))}
+        {dates.map((date) => (
+          <span
+            key={date}
+            className={`text-[9px] font-black rounded-md py-1 ${date === 12 ? "bg-teal-500 text-black" : "bg-white/5 text-white/70"}`}
+          >
+            {date}
+          </span>
+        ))}
+      </div>
+      <div className="mt-auto grid grid-cols-3 gap-1">
+        {["9:00", "11:30", "2:00"].map((time, i) => (
+          <span key={time} className={`text-[8px] font-black text-center rounded-md py-1.5 ${i === 1 ? "bg-white text-black" : "bg-white/10 text-white/80"}`}>
+            {time}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CaptureStepVisual() {
+  return (
+    <div className="absolute inset-0 bg-black" aria-hidden="true">
+      <img
+        src="/media/logos/camera-logo-white-on-black.png"
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover opacity-50"
+      />
+      <div className="absolute inset-3 border border-white/50 rounded-lg">
+        <div className="absolute top-2 left-2 flex items-center gap-1 text-[9px] font-black tracking-widest text-white">
+          <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+          REC
+        </div>
+        <div className="absolute bottom-2 inset-x-2 flex items-center justify-between text-[8px] font-black tracking-[0.18em] text-white">
+          <span>ON SET</span>
+          <span className="text-teal-300">4K</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EditStepVisual() {
+  return (
+    <div className="absolute inset-0 bg-[#101413] p-3 flex flex-col justify-end text-white" aria-hidden="true">
+      <div className="mb-2 text-[9px] font-black tracking-[0.22em] text-teal-400">TIMELINE</div>
+      <div className="space-y-1.5">
+        <div className="h-3 w-[88%] rounded-sm bg-teal-500" />
+        <div className="ml-6 h-3 w-[62%] rounded-sm bg-white/25" />
+        <div className="h-3 w-[74%] rounded-sm bg-white/50" />
+      </div>
+      <div className="relative mt-3 h-1 rounded-full bg-white/15">
+        <div className="absolute left-[38%] top-1/2 h-3 w-1 -translate-y-1/2 rounded-sm bg-white" />
+      </div>
+    </div>
+  );
+}
+
+function DeliveryStepVisual() {
+  return (
+    <div className="absolute inset-0 bg-white p-3 flex flex-col" aria-hidden="true">
+      <div className="mb-2 flex items-center justify-between text-[9px] font-black tracking-[0.18em]">
+        <span className="text-black">GALLERY</span>
+        <span className="text-teal-600">READY</span>
+      </div>
+      <div className="grid grid-cols-3 gap-1 flex-1">
+        {["bg-zinc-900", "bg-teal-700", "bg-zinc-700", "bg-zinc-800", "bg-teal-900", "bg-zinc-600"].map((tone) => (
+          <div key={tone} className={`rounded-sm ${tone}`} />
+        ))}
+      </div>
+      <div className="mt-2 flex gap-1">
+        <span className="inline-flex items-center gap-1 rounded-md bg-black px-2 py-1 text-[8px] font-black uppercase tracking-wider text-white">
+          <Download className="h-2.5 w-2.5" /> Download
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-md border border-black/10 px-2 py-1 text-[8px] font-black uppercase tracking-wider text-black">
+          <Share2 className="h-2.5 w-2.5" /> Share
+        </span>
+      </div>
+    </div>
+  );
+}
 
 export default function StepsSection() {
   const settings = useSiteSettings();
@@ -10,29 +105,29 @@ export default function StepsSection() {
       step: "STEP 1",
       title: "Book your session",
       description: "Select your creative service and schedule a time through our seamless partnership portal in just a few clicks.",
-      image: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F72c9fbb7ba5e4993ae8e72ee6060f07a", // Calendar/Planning
       icon: <Calendar className="w-5 h-5" style={{ color: settings.global.primaryColor }} />,
+      visual: <BookStepVisual />,
     },
     {
       step: "STEP 2",
       title: "We capture the vision",
       description: "Our professional creative team arrives on-site with state-of-the-art equipment to capture high-impact raw media.",
-      image: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Ff9bbfe449cbd41bda1969183f92dae43", // Camera/Shooting
       icon: <Camera className="w-5 h-5" style={{ color: settings.global.primaryColor }} />,
+      visual: <CaptureStepVisual />,
     },
     {
       step: "STEP 3",
       title: "Rapid post-production",
       description: "Our expert editors transform raw clips into polished, cinematic masterpieces that perfectly align with your brand.",
-      image: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F7cc17ef433b7405db1939d36b6ef6266", // Editing
       icon: <Scissors className="w-5 h-5" style={{ color: settings.global.primaryColor }} />,
+      visual: <EditStepVisual />,
     },
     {
       step: "STEP 4",
       title: "Delivery & launch",
       description: "Receive your ready-to-post assets within 24 hours. Download, publish, and dominate your social feed instantly.",
-      image: "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fd71c845602824dcf8f5c696217f1c217", // Social/Launch
       icon: <Rocket className="w-5 h-5" style={{ color: settings.global.primaryColor }} />,
+      visual: <DeliveryStepVisual />,
     },
   ];
 
@@ -77,12 +172,8 @@ export default function StepsSection() {
                 </p>
               </div>
 
-              <div className="mt-auto relative rounded-xl overflow-hidden aspect-[4/3] bg-gray-50 border border-gray-50">
-                <img
-                  src={item.image}
-                  alt={item.title}
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                />
+              <div className="mt-auto relative rounded-xl overflow-hidden aspect-[4/3] bg-gray-50 border border-gray-100">
+                {item.visual}
                 <div className="absolute top-3 right-3 w-8 h-8 bg-white/80 backdrop-blur-md rounded-lg flex items-center justify-center shadow-sm border border-white/40">
                   <div className="scale-75">
                     {item.icon}

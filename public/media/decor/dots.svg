@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="280" height="280" viewBox="0 0 280 280" fill="none">
+  <defs>
+    <radialGradient id="fade" cx="30%" cy="20%" r="75%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <mask id="fade-mask">
+      <rect width="280" height="280" fill="url(#fade)"/>
+    </mask>
+  </defs>
+  <g mask="url(#fade-mask)" fill="#0d9488" fill-opacity="0.45">
+    <circle cx="20" cy="20" r="1.6"/>
+    <circle cx="52" cy="20" r="1.6"/>
+    <circle cx="84" cy="20" r="1.6"/>
+    <circle cx="116" cy="20" r="1.6"/>
+    <circle cx="148" cy="20" r="1.6"/>
+    <circle cx="180" cy="20" r="1.6"/>
+    <circle cx="212" cy="20" r="1.6"/>
+    <circle cx="244" cy="20" r="1.6"/>
+    <circle cx="20" cy="52" r="1.6"/>
+    <circle cx="52" cy="52" r="1.6"/>
+    <circle cx="84" cy="52" r="1.6"/>
+    <circle cx="116" cy="52" r="1.6"/>
+    <circle cx="148" cy="52" r="1.6"/>
+    <circle cx="180" cy="52" r="1.6"/>
+    <circle cx="212" cy="52" r="1.6"/>
+    <circle cx="244" cy="52" r="1.6"/>
+    <circle cx="20" cy="84" r="1.6"/>
+    <circle cx="52" cy="84" r="1.6"/>
+    <circle cx="84" cy="84" r="1.6"/>
+    <circle cx="116" cy="84" r="1.6"/>
+    <circle cx="148" cy="84" r="1.6"/>
+    <circle cx="180" cy="84" r="1.6"/>
+    <circle cx="212" cy="84" r="1.6"/>
+    <circle cx="244" cy="84" r="1.6"/>
+    <circle cx="20" cy="116" r="1.6"/>
+    <circle cx="52" cy="116" r="1.6"/>
+    <circle cx="84" cy="116" r="1.6"/>
+    <circle cx="116" cy="116" r="1.6"/>
+    <circle cx="148" cy="116" r="1.6"/>
+    <circle cx="180" cy="116" r="1.6"/>
+    <circle cx="212" cy="116" r="1.6"/>
+    <circle cx="244" cy="116" r="1.6"/>
+    <circle cx="20" cy="148" r="1.6"/>
+    <circle cx="52" cy="148" r="1.6"/>
+    <circle cx="84" cy="148" r="1.6"/>
+    <circle cx="116" cy="148" r="1.6"/>
+    <circle cx="148" cy="148" r="1.6"/>
+    <circle cx="180" cy="148" r="1.6"/>
+    <circle cx="212" cy="148" r="1.6"/>
+    <circle cx="244" cy="148" r="1.6"/>
+    <circle cx="20" cy="180" r="1.6"/>
+    <circle cx="52" cy="180" r="1.6"/>
+    <circle cx="84" cy="180" r="1.6"/>
+    <circle cx="116" cy="180" r="1.6"/>
+    <circle cx="148" cy="180" r="1.6"/>
+    <circle cx="180" cy="180" r="1.6"/>
+    <circle cx="212" cy="180" r="1.6"/>
+    <circle cx="244" cy="180" r="1.6"/>
+  </g>
+</svg>

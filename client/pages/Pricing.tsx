@@ -1,14 +1,109 @@
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Check, X, ArrowRight, Star, ChevronLeft, ChevronRight, Info, Sparkles, Zap, Trophy, Crown, Camera, Video, Layout as LayoutIcon, Box, Users, Clock, DollarSign, Palette, Rocket, Mic } from "lucide-react";
-import { useState, useRef } from "react";
+import { Check, X, ArrowRight, Star, ChevronRight, Info, Sparkles, Zap, Trophy, Crown, Camera, Video, Layout as LayoutIcon, Box, Users, Clock, DollarSign, Palette, Rocket, Mic } from "lucide-react";
+import { useState } from "react";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+
+const BRAND_STAGES = [
+  {
+    label: "Standard",
+    src: "/media/photos/standard-headshot.jpg",
+    alt: "Stiff standard headshot",
+    treatment: "grayscale contrast-75 brightness-90",
+    note: "Flat light. A stiff crop. Easy to scroll past.",
+  },
+  {
+    label: "Iconic Corporate",
+    src: "/media/photos/lifestyle-mtz04327.jpg",
+    alt: "Polished corporate lifestyle portrait in a royal blue suit",
+    treatment: "",
+    note: "Polished, confident, and ready for the brand.",
+  },
+  {
+    label: "Iconic Lifestyle",
+    src: "/media/photos/lifestyle-kennedy-mtz01127.jpg",
+    alt: "Warm smiling lifestyle portrait",
+    treatment: "",
+    note: "Alive. Warm. The frame people actually stop for.",
+  },
+];
+
+function BrandTransformation({
+  stage,
+  onStage,
+  accent,
+}: {
+  stage: number;
+  onStage: (stage: number) => void;
+  accent: string;
+}) {
+  const current = BRAND_STAGES[stage] ?? BRAND_STAGES[0];
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 text-center">
+      <h2 className="text-4xl md:text-6xl font-black text-black mb-6 tracking-tight">
+        Elevate Your <span className="accent-text-bordered">Personal Brand</span>
+      </h2>
+      <p className="text-lg text-gray-500 mb-10 max-w-2xl mx-auto font-medium">
+        Three beats. A stiff standard headshot, a polished Iconic corporate portrait, then a lifestyle frame with some life in it.
+      </p>
+
+      <div className="flex flex-wrap justify-center gap-2 mb-6">
+        {BRAND_STAGES.map((item, index) => (
+          <button
+            key={item.label}
+            type="button"
+            onClick={() => onStage(index)}
+            className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.18em] border transition-colors ${
+              stage === index ? "text-white border-transparent" : "bg-white text-gray-500 border-gray-200"
+            }`}
+            style={stage === index ? { backgroundColor: accent } : undefined}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="relative max-w-md mx-auto aspect-[3/4] rounded-[2rem] overflow-hidden shadow-xl border-4 border-white bg-zinc-200">
+        <img
+          src={current.src}
+          alt={current.alt}
+          className={`absolute inset-0 h-full w-full object-cover object-[center_18%] ${current.treatment}`}
+        />
+        <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black/70 to-transparent text-left">
+          <div className="inline-block rounded-full bg-black/70 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white">
+            {current.label}
+          </div>
+          <p className="mt-2 text-sm font-medium text-white">{current.note}</p>
+        </div>
+      </div>
+
+      <label className="mt-6 block max-w-md mx-auto text-left">
+        <span className="sr-only">Scrub the brand transformation</span>
+        <input
+          type="range"
+          min={0}
+          max={2}
+          step={1}
+          value={stage}
+          onChange={(event) => onStage(Number(event.target.value))}
+          className="w-full accent-teal-600"
+        />
+        <div className="mt-2 flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-400">
+          <span>Standard</span>
+          <span>Corporate</span>
+          <span>Lifestyle</span>
+        </div>
+      </label>
+    </div>
+  );
+}
 
 export default function Pricing() {
   const settings = useSiteSettings();
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
-  const [brandingSliderPos, setBrandingSliderPos] = useState(50);
+  const [brandStage, setBrandStage] = useState(1);
   const [selectedPhotoPkg, setSelectedPhotoPkg] = useState<string | null>(null);
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
   const [isPremiumUpgrade, setIsPremiumUpgrade] = useState(false);
@@ -728,60 +823,9 @@ export default function Pricing() {
             </div>
           </section>
 
-          {/* Branding Before & After Slider - Smaller */}
+          {/* Personal brand transformation */}
           <section id="branding-personal" className="py-24 bg-[#fafafa]">
-            <div className="max-w-4xl mx-auto px-4 text-center">
-              <h2 className="text-4xl md:text-6xl font-black text-black mb-8 tracking-tight">Elevate Your <span className="accent-text-bordered">Personal Brand</span></h2>
-              <p className="text-lg text-gray-500 mb-12 max-w-xl mx-auto font-medium">See the difference between a standard corporate headshot and an Iconic Lifestyle Portrait.</p>
-
-              <div className="relative max-w-2xl mx-auto aspect-[16/9] rounded-[2rem] overflow-hidden shadow-xl border-4 border-white">
-                {/* After (Iconic) */}
-                <img
-                  src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1200&q=80"
-                  className="absolute inset-0 w-full h-full object-cover"
-                  alt="Iconic Lifestyle"
-                />
-                <div className="absolute inset-0 flex flex-col justify-end p-6 text-white z-10 text-right pointer-events-none">
-                  <div className="px-3 py-1.5 rounded-full inline-block self-end text-[10px] font-black uppercase tracking-widest shadow-lg" style={{ backgroundColor: settings.global.primaryColor }}>Iconic Lifestyle</div>
-                </div>
-
-                {/* Before (Standard) */}
-                <div
-                  className="absolute inset-0 overflow-hidden"
-                  style={{ clipPath: `inset(0 ${100 - brandingSliderPos}% 0 0)` }}
-                >
-                  <img
-                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1200&q=80"
-                    className="absolute inset-0 w-full h-full object-cover grayscale brightness-[0.8]"
-                    alt="Standard Corporate"
-                  />
-                  <div className="absolute inset-0 flex flex-col justify-end p-6 text-white z-10 text-left pointer-events-none">
-                    <div className="bg-gray-800/80 px-3 py-1.5 rounded-full inline-block self-start text-[10px] font-black uppercase tracking-widest">Standard Corporate</div>
-                  </div>
-                </div>
-
-                {/* Slider Control */}
-                <div
-                  className="absolute inset-y-0 z-20 pointer-events-none"
-                  style={{ left: `${brandingSliderPos}%` }}
-                >
-                  <div className="absolute inset-y-0 -left-[1px] w-[2px] bg-white shadow-xl"></div>
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center text-white border-4 border-white shadow-2xl" style={{ backgroundColor: settings.global.primaryColor }}>
-                    <ChevronLeft className="w-3 h-3" />
-                    <ChevronRight className="w-3 h-3" />
-                  </div>
-                </div>
-
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={brandingSliderPos}
-                  onChange={(e) => setBrandingSliderPos(parseInt(e.target.value))}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-30"
-                />
-              </div>
-            </div>
+            <BrandTransformation stage={brandStage} onStage={setBrandStage} accent={settings.global.primaryColor} />
           </section>
 
           {/* Section 2: Iconic Branding */}

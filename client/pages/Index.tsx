@@ -7,6 +7,7 @@ import StepsSection from "@/components/StepsSection";
 import AudienceSection from "@/components/AudienceSection";
 import AudienceDetails from "@/components/AudienceDetails";
 import FeaturesSection from "@/components/FeaturesSection";
+import SnapReelsStrip from "@/components/SnapReelsStrip";
 import RaisingTheStandard from "@/components/RaisingTheStandard";
 import ThisIsOurMarket from "@/components/ThisIsOurMarket";
 import TheNetwork from "@/components/TheNetwork";
@@ -38,6 +39,7 @@ export default function Index() {
           <AudienceDetails />
         </>
       )}
+      <SnapReelsStrip />
       <FeaturesSection />
       <TestimonialsSection />
       <FAQSection />
