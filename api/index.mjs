@@ -113,12 +113,17 @@ async function requirePhotographer(req, res, next) {
   });
 }
 const ORDER_RECEIVED_EMAIL_TEMPLATE = "booking_received";
+const ORDER_RECEIVED_SMS_KIND = "booking_confirmation";
 function clientNotifyLive(env = process.env) {
   if (env.CLIENT_COMMS_ZONE === "RED") return false;
   return env.CLIENT_NOTIFY_LIVE === "true";
 }
 function emailAllowed(template, env = process.env) {
   if (template === ORDER_RECEIVED_EMAIL_TEMPLATE) return true;
+  return clientNotifyLive(env);
+}
+function smsAllowed(kind, env = process.env) {
+  if (kind === ORDER_RECEIVED_SMS_KIND) return true;
   return clientNotifyLive(env);
 }
 function clientNotifyBlockReason(env = process.env) {
@@ -318,8 +323,8 @@ function normalisePhone(raw) {
   if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
   return `+${digits}`;
 }
-async function sendSMS({ to, body, from }) {
-  if (!clientNotifyLive()) {
+async function sendSMS({ to, body, from, kind }) {
+  if (!smsAllowed(kind)) {
     console.warn(`[SMS] Suppressed to ${to} — ${clientNotifyBlockReason()}. No message sent.`);
     return { sid: "", status: "suppressed", suppressed: true };
   }
@@ -760,6 +765,7 @@ router$e.post("/", async (req, res) => {
     if (phone) {
       await sendSMS({
         to: phone,
+        kind: "booking_confirmation",
         body: SMS_TEMPLATES.bookingConfirmation(
           firstName,
           scheduledDate || "TBD — we'll confirm shortly",

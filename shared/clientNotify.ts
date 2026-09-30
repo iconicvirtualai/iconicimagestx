@@ -6,11 +6,13 @@
  * AND CLIENT_COMMS_ZONE is not "RED". Unset, empty, "TRUE", "1", or
  * "false" stays OFF.
  *
- * Order-received confirmation email (template booking_received) is excluded.
- * It stays default-on and is not blocked by RED or by this flag.
+ * Order-received client confirmation is excluded: email template booking_received
+ * and SMS kind booking_confirmation. Both stay default-on and are not blocked
+ * by RED or by this flag.
  * Do not set BOOKING_NOTIFY_LIVE.
  */
 export const ORDER_RECEIVED_EMAIL_TEMPLATE = "booking_received";
+export const ORDER_RECEIVED_SMS_KIND = "booking_confirmation";
 
 export function clientNotifyLive(env: Record<string, string | undefined> = process.env): boolean {
   if (env.CLIENT_COMMS_ZONE === "RED") return false;
@@ -20,6 +22,12 @@ export function clientNotifyLive(env: Record<string, string | undefined> = proce
 /** booking_received always sends. Every other template follows the blast kill. */
 export function emailAllowed(template: string, env: Record<string, string | undefined> = process.env): boolean {
   if (template === ORDER_RECEIVED_EMAIL_TEMPLATE) return true;
+  return clientNotifyLive(env);
+}
+
+/** Client bookingConfirmation SMS always sends. Every other SMS follows the blast kill. */
+export function smsAllowed(kind?: string, env: Record<string, string | undefined> = process.env): boolean {
+  if (kind === ORDER_RECEIVED_SMS_KIND) return true;
   return clientNotifyLive(env);
 }
 

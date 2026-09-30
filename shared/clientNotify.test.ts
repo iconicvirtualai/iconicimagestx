@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { clientNotifyBlockReason, clientNotifyLive, emailAllowed } from "./clientNotify";
+import { clientNotifyBlockReason, clientNotifyLive, emailAllowed, smsAllowed } from "./clientNotify";
 
 describe("clientNotifyLive", () => {
   it("stays off unless CLIENT_NOTIFY_LIVE is exactly true", () => {
@@ -34,6 +34,14 @@ describe("booking_received stays on under RED", () => {
     }
     expect(emailAllowed("marketing", { CLIENT_NOTIFY_LIVE: "true" })).toBe(true);
   });
+
+  it("sends the client bookingConfirmation SMS with no flags set and while the zone is RED", () => {
+    expect(smsAllowed("booking_confirmation", {})).toBe(true);
+    expect(smsAllowed("booking_confirmation", { CLIENT_COMMS_ZONE: "RED" })).toBe(true);
+    expect(smsAllowed("booking_confirmation", { CLIENT_NOTIFY_LIVE: "false", CLIENT_COMMS_ZONE: "RED" })).toBe(true);
+    expect(smsAllowed(undefined, {})).toBe(false);
+    expect(smsAllowed("reminder", { CLIENT_NOTIFY_LIVE: "true", CLIENT_COMMS_ZONE: "RED" })).toBe(false);
+  });
 });
 
 describe("outbound transports check the gate before sending", () => {
@@ -47,18 +55,25 @@ describe("outbound transports check the gate before sending", () => {
     expect(send).toBeGreaterThan(gate);
   });
 
-  it("blocks twilio SMS, campaigns, and conversations until the gate allows it", () => {
+  it("lets only the booking confirmation SMS through the twilio gate", () => {
+    const policy = readFileSync(new URL("./clientNotify.ts", import.meta.url), "utf8");
     const sms = readFileSync(new URL("../server/services/sms.ts", import.meta.url), "utf8");
-    const sends = [
-      "client.messages.create",
-      "client_sdk.conversations.v1.conversations.create",
-      ".messages.create({ body, author })",
-    ];
-    for (const marker of sends) {
-      const send = sms.indexOf(marker);
-      const gate = sms.lastIndexOf("if (!clientNotifyLive())", send);
-      expect(send).toBeGreaterThan(-1);
-      expect(gate).toBeGreaterThan(-1);
+    const bookings = readFileSync(new URL("../server/routes/bookings.ts", import.meta.url), "utf8");
+    expect(policy).toContain("kind === ORDER_RECEIVED_SMS_KIND");
+    const gate = sms.indexOf("if (!smsAllowed(kind))");
+    const send = sms.indexOf("client.messages.create");
+    expect(gate).toBeGreaterThan(-1);
+    expect(send).toBeGreaterThan(gate);
+    const clientSms = bookings.indexOf('kind: "booking_confirmation"');
+    const adminSms = bookings.indexOf("SMS_TEMPLATES.newBookingAlert");
+    expect(clientSms).toBeGreaterThan(-1);
+    expect(adminSms).toBeGreaterThan(clientSms);
+    expect(bookings.slice(clientSms, adminSms)).not.toContain("newBookingAlert");
+    for (const marker of ["client_sdk.conversations.v1.conversations.create", ".messages.create({ body, author })"]) {
+      const at = sms.indexOf(marker);
+      expect(sms.lastIndexOf("if (!clientNotifyLive())", at)).toBeGreaterThan(-1);
     }
+    const campaignSend = sms.lastIndexOf("client.messages.create");
+    expect(sms.lastIndexOf("if (!clientNotifyLive())", campaignSend)).toBeGreaterThan(gate);
   });
 });

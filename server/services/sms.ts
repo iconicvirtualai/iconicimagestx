@@ -15,7 +15,7 @@
  */
 
 import twilio from "twilio";
-import { clientNotifyBlockReason, clientNotifyLive } from "../../shared/clientNotify";
+import { clientNotifyBlockReason, clientNotifyLive, smsAllowed } from "../../shared/clientNotify";
 
 // ─── Client ──────────────────────────────────────────────────────────────────
 
@@ -48,10 +48,12 @@ export interface SendSMSOptions {
   to: string;          // raw phone number
   body: string;        // message text (≤ 1600 chars)
   from?: string;       // override sender (defaults to TWILIO_PHONE_NUMBER)
+  /** Client order-received booking confirmation. Excluded from the RED kill. */
+  kind?: "booking_confirmation";
 }
 
-export async function sendSMS({ to, body, from }: SendSMSOptions) {
-  if (!clientNotifyLive()) {
+export async function sendSMS({ to, body, from, kind }: SendSMSOptions) {
+  if (!smsAllowed(kind)) {
     console.warn(`[SMS] Suppressed to ${to} — ${clientNotifyBlockReason()}. No message sent.`);
     return { sid: "", status: "suppressed", suppressed: true as const };
   }

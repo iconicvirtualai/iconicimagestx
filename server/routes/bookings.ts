@@ -185,10 +185,12 @@ router.post("/", async (req, res) => {
       },
     }).catch((err) => console.error("[Bookings] Office notification email failed:", err));
 
-    // Send confirmation SMS to client
+    // Order-received SMS to the client. Same carve-out as booking_received:
+    // not blocked by RED or a missing CLIENT_NOTIFY_LIVE.
     if (phone) {
       await sendSMS({
         to: phone,
+        kind: "booking_confirmation",
         body: SMS_TEMPLATES.bookingConfirmation(
           firstName,
           scheduledDate || "TBD — we'll confirm shortly",
