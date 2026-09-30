@@ -472,6 +472,29 @@ export interface VSAIJob {
 
 // ─── Promo Codes ─────────────────────────────────────────────────────────────
 
+/**
+ * Staff content library. Bytes are in Firebase Storage at content-bucket/.
+ * Clients do not read this collection; use GET /api/content-assets.
+ */
+export interface ContentAsset {
+  id: string;
+  fileName: string;
+  contentType: string;
+  kind: "image" | "video";
+  sizeBytes: number;
+  storagePath: string;
+  purpose: "portfolio" | "marketing" | "go" | "general";
+  tags: string[];
+  folder: string;
+  visibility: "public" | "staff";
+  alt: string;
+  publicUrl?: string | null;
+  uploadedBy: string;
+  uploadedByEmail?: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
 export interface PromoCode {
   id: string;
   code: string;

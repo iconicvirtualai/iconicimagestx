@@ -27,6 +27,7 @@ import mediaJobsRouter from "./routes/mediaJobs";
 import placesRouter from "./routes/places";
 import smsRouter from "./routes/sms";
 import contactRouter from "./routes/contact";
+import contentAssetsRouter from "./routes/contentAssets";
 import { listCalendarScheduleEvents, verifyCalendarWriteAccess } from "./services/calendar";
 import { requireAdmin, requireStaff } from "./middleware/auth";
 import { handleListingPhotoUpload } from "./routes/listingPhotos";
@@ -192,6 +193,7 @@ export function createServer() {
   app.use("/api/places", placesRouter);
   app.use("/api/sms", smsRouter);
   app.use("/api/contact", contactRouter);
+  app.use("/api/content-assets", contentAssetsRouter);
 
   // ─── Error handler ─────────────────────────────────────────────────
   app.use(

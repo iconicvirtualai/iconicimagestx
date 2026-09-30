@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import admin from "firebase-admin";
+import { isIconicUploadOrigin } from "../../shared/contentBucket";
 import {
   contentTypeForUpload,
   isListingStoragePath,
@@ -18,13 +19,22 @@ const BROWSER_ORIGINS = [
   "http://127.0.0.1:8080",
 ];
 
+const extraOrigins = new Set<string>();
 let corsAttempt: Promise<void> | null = null;
+
+/** Remember an Iconic Vercel preview so signed browser uploads can succeed there. */
+export function allowUploadOrigin(origin: string | undefined) {
+  if (!origin || BROWSER_ORIGINS.includes(origin) || extraOrigins.has(origin)) return;
+  if (!isIconicUploadOrigin(origin)) return;
+  extraOrigins.add(origin);
+  corsAttempt = null;
+}
 
 /** Let the browser PUT signed URLs from the live site. Failure is non-fatal. */
 export function ensureBucketCors(): Promise<void> {
   if (!corsAttempt) {
     corsAttempt = bucket().setCorsConfiguration([{
-      origin: BROWSER_ORIGINS,
+      origin: [...BROWSER_ORIGINS, ...extraOrigins],
       method: ["GET", "HEAD", "PUT", "POST", "DELETE", "OPTIONS"],
       responseHeader: ["Content-Type", "Authorization", "Content-Length", "x-goog-resumable"],
       maxAgeSeconds: 3600,
