@@ -24,8 +24,10 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { DEFAULT_SITE_SETTINGS } from "@/hooks/useSiteSettings";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function AdminSiteCustomizer() {
+  const { user } = useAuth();
   const [settings, setSettings] = React.useState(DEFAULT_SITE_SETTINGS);
 
   React.useEffect(() => {
@@ -72,9 +74,13 @@ export default function AdminSiteCustomizer() {
 
     // Save to server for persistence and "publish preview"
     try {
+      const token = user ? await user.getIdToken() : "";
       const res = await fetch("/api/settings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify(settings),
       });
 

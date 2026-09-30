@@ -27,10 +27,10 @@ import placesRouter from "./routes/places";
 import smsRouter from "./routes/sms";
 import contactRouter from "./routes/contact";
 import { listCalendarScheduleEvents, verifyCalendarWriteAccess } from "./services/calendar";
-import { requireStaff } from "./middleware/auth";
+import { requireAdmin, requireStaff } from "./middleware/auth";
 
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
-const API_BUILD_MARKER = "codex-2026-09-15-v3";
+const API_BUILD_MARKER = "auth-square-2026-09-28";
 
 // ─── Firebase Admin Init ──────────────────────────────────────────────────────
 
@@ -153,7 +153,7 @@ export function createServer() {
     }
   });
 
-  app.post("/api/settings", async (req, res) => {
+  app.post("/api/settings", requireAdmin, async (req, res) => {
     try {
       await fs.writeFile(SETTINGS_FILE, JSON.stringify(req.body, null, 2));
       res.json({ success: true });

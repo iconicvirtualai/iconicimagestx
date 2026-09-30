@@ -9,6 +9,7 @@ import admin from "firebase-admin";
 import { requireCoordinator, requirePhotographer, requireStaff, requireAuth, type AuthenticatedRequest } from "../middleware/auth";
 import { sendEmail } from "../services/email";
 import { sendSMS, SMS_TEMPLATES } from "../services/sms";
+import { invoiceAllowsDownload, publicMediaItem } from "../../shared/paymentAccess";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -29,20 +30,16 @@ function addressLabel(address: unknown): string {
   return String(address);
 }
 
-function publicMediaItem(item: any, canDownload: boolean) {
-  const url = item.shareUrl || item.embedUrl || item.url;
-  return {
-    id: item.id,
-    url,
-    shareUrl: item.shareUrl || item.url || item.embedUrl || null,
-    embedUrl: item.embedUrl || item.url || null,
-    fileName: item.fileName || item.title || "Media",
-    title: item.title || item.fileName || "Media",
-    type: item.type || "photo",
-    width: item.width || null,
-    height: item.height || null,
-    canDownload: Boolean(canDownload && item.downloadable !== false),
-  };
+async function invoiceForGallery(gallery: Record<string, unknown>) {
+  if (typeof gallery.invoiceId === "string" && gallery.invoiceId) {
+    const doc = await db().collection("invoices").doc(gallery.invoiceId).get();
+    if (doc.exists) return { id: doc.id, ...doc.data() };
+  }
+  if (typeof gallery.orderId === "string" && gallery.orderId) {
+    const snap = await db().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
+    if (!snap.empty) return { id: snap.docs[0].id, ...snap.docs[0].data() };
+  }
+  return null;
 }
 
 // ─── GET /api/galleries — List galleries ─────────────────────────────────────
@@ -70,15 +67,10 @@ router.get("/public/:id", async (req, res) => {
     if (!doc.exists) return res.status(404).json({ error: "Gallery not found." });
 
     const gallery = doc.data()!;
-    const invoiceSnap = gallery.orderId
-      ? await db().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get()
-      : null;
-    const invoice = invoiceSnap && !invoiceSnap.empty
-      ? { id: invoiceSnap.docs[0].id, ...invoiceSnap.docs[0].data() }
-      : null;
+    const invoice = await invoiceForGallery(gallery);
     const invoiceStatus = (invoice as any)?.status || null;
-    const paid = invoiceStatus === "paid" || Number((invoice as any)?.amountDue || 0) <= 0;
-    const canDownload = Boolean(gallery.downloadEnabled) && paid;
+    const paid = invoiceAllowsDownload(invoice);
+    const canDownload = paid;
 
     return res.json({
       id: doc.id,
@@ -283,7 +275,10 @@ router.post("/:id/deliver", requireCoordinator, async (req, res) => {
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
 
     const gallery = galleryDoc.data()!;
-    const { downloadEnabled = true, expiresInDays = 30 } = req.body;
+    const linkedInvoice = await invoiceForGallery(gallery);
+    const paid = invoiceAllowsDownload(linkedInvoice);
+    const downloadEnabled = paid;
+    const expiresInDays = Number(req.body?.expiresInDays) > 0 ? Number(req.body.expiresInDays) : 30;
 
     const expiresAt = admin.firestore.Timestamp.fromDate(
       new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000)

@@ -17,8 +17,10 @@ function isAgentAuthorized(req: { headers: Record<string, string | string[] | un
   const serviceKey = req.headers["x-agent-key"];
   const auth = req.headers.authorization;
   const cronSecret = process.env.CRON_SECRET;
-  return serviceKey === process.env.AGENT_SERVICE_KEY ||
-    Boolean(cronSecret && auth === `Bearer ${cronSecret}`);
+  const agentKey = process.env.AGENT_SERVICE_KEY;
+  const keyOk = Boolean(agentKey) && serviceKey === agentKey;
+  const cronOk = Boolean(cronSecret) && auth === `Bearer ${cronSecret}`;
+  return keyOk || cronOk;
 }
 
 function toDate(value: unknown): Date | null {
@@ -381,8 +383,7 @@ router.patch("/logs/:id/resolve", requireCoordinator, async (req: AuthenticatedR
 router.post("/log", async (req, res) => {
   try {
     // Verify agent service key
-    const serviceKey = req.headers["x-agent-key"];
-    if (serviceKey !== process.env.AGENT_SERVICE_KEY) {
+    if (!isAgentAuthorized(req)) {
       return res.status(401).json({ error: "Invalid agent key." });
     }
 

@@ -75,6 +75,7 @@ Once deployed, run this one-time setup to create the first admin staff member:
 ```bash
 curl -X POST https://iconicimagestx.vercel.app/api/staff/setup \
   -H "Content-Type: application/json" \
+  -H "x-setup-secret: $STAFF_SETUP_SECRET" \
   -d '{
     "firstName": "Your",
     "lastName": "Name",
@@ -83,11 +84,25 @@ curl -X POST https://iconicimagestx.vercel.app/api/staff/setup \
   }'
 ```
 
-This only works when the `staff` collection is empty. After this, create additional staff through the admin dashboard.
+Hosted deployments reject this route unless `STAFF_SETUP_SECRET` is set in the environment and sent as `x-setup-secret`. It still only works when the `staff` collection is empty. After this, create additional staff through the admin dashboard. Do not use the temporary local admin login in production.
 
 ---
 
-## Step 5 — Wire Up Stripe Webhook
+## Step 5 — Wire Up Payments
+
+Square is the processor for Iconic client orders and invoices. Stripe stays on Studio Noir and legacy Virtual Staging only.
+
+### Square
+
+1. Square Developer Dashboard → Webhooks
+2. URL: `https://iconicimagestx.vercel.app/api/payments/square-webhook`
+3. Subscribe to `payment.updated`
+4. Set `SQUARE_ACCESS_TOKEN`, `SQUARE_LOCATION_ID`, and `SQUARE_WEBHOOK_SIGNATURE_KEY` in Vercel
+5. If the webhook URL is not exactly `{APP_URL}/api/payments/square-webhook`, also set `SQUARE_WEBHOOK_NOTIFICATION_URL` to the full URL Square has on file. Signature checks use that URL plus the raw body.
+
+Unsigned Square webhooks are rejected. A paid invoice unlocks gallery delivery and writes the transaction.
+
+### Stripe (Studio Noir / legacy VSAI only)
 
 1. Go to [Stripe Dashboard](https://dashboard.stripe.com) → Developers → Webhooks
 2. Click **Add endpoint**
@@ -103,8 +118,8 @@ This only works when the `staff` collection is empty. After this, create additio
 ## Step 6 — Update Firestore Security Rules
 
 1. Go to [Firebase Console](https://console.firebase.google.com) → Firestore → Rules
-2. Replace everything with the contents of `firestore/firestore.rules`
-3. Click **Publish**
+2. Replace everything with the contents of `firestore.rules` and click **Publish**
+3. Open Firebase Storage → Rules, replace everything with `storage.rules`, and publish that too
 
 ---
 
