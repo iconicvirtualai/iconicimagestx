@@ -687,11 +687,14 @@ export default function Pricing() {
                           </div>
                           <div className="relative z-10">
                             <div className="flex flex-col mb-6">
-                              <div className="flex items-center justify-between mb-2">
-                                <h4 className="font-black text-xs uppercase tracking-widest accent-text-bordered">THE ICONIC POLISH (Premium Upgrade)</h4>
-                                <span className="text-3xl font-black text-white">$75</span>
+                              <div className="mb-2 flex items-baseline justify-between gap-3">
+                                <h4 className="min-w-0 break-normal font-black text-xs uppercase leading-snug tracking-wide accent-text-bordered">
+                                  THE ICONIC POLISH{" "}
+                                  <span className="inline-block max-w-full">(Premium Upgrade)</span>
+                                </h4>
+                                <span className="shrink-0 whitespace-nowrap text-3xl font-black leading-none text-white">$75</span>
                               </div>
-                              <p className="text-[11px] font-bold text-gray-100">Standard on Market Leader | $75 Add-on for all other packages (Next Day Delivery)</p>
+                              <p className="text-[11px] font-bold text-gray-100">Standard on Market Leader | <span className="whitespace-nowrap">$75</span> Add-on for all other packages (Next Day Delivery)</p>
                             </div>
                             <div className="grid grid-cols-1 gap-3">
                               {[
