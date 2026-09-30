@@ -10,6 +10,7 @@ import { requireCoordinator, type AuthenticatedRequest } from "../middleware/aut
 import { sendEmail } from "../services/email";
 import { sendSMS, SMS_TEMPLATES } from "../services/sms";
 import { createCalendarBookingEvent } from "../services/calendar";
+import { lifeOfTheListingCareSelected } from "../../shared/lifeOfTheListingCare";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -84,6 +85,7 @@ router.post("/", async (req, res) => {
       perfectBusiness,
       businessSource,
       investmentWilling,
+      lifeOfTheListingCare,
     } = req.body;
 
     // Basic validation
@@ -131,6 +133,8 @@ router.post("/", async (req, res) => {
       perfectBusiness: perfectBusiness || null,
       businessSource: businessSource || null,
       investmentWilling: investmentWilling || null,
+      // Draft add-on. Quote only — do not price it or mention it in client email/SMS.
+      lifeOfTheListingCare: lifeOfTheListingCareSelected(lifeOfTheListingCare),
       status: "new",
       source: "booking_form",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -369,6 +373,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       furnishingStatus: request.furnishingStatus || null,
       notes: request.vibeNote || "",
       internalNotes: internalNotes || "",
+      lifeOfTheListingCare: lifeOfTheListingCareSelected(request.lifeOfTheListingCare),
       confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),

@@ -5,6 +5,8 @@
  *  2. Confirmation emails are sent to the client and coordinator
  */
 
+import { lifeOfTheListingCareSelected } from "@shared/lifeOfTheListingCare";
+
 export async function createOrder(formData: any) {
   const lineItems = formData.lineItems || [];
   const total     = formData.total     || 0;
@@ -39,6 +41,8 @@ export async function createOrder(formData: any) {
     specializedPhotography: formData.specializedPhotography || "",
     virtualStagingCredits:  formData.virtualStagingCredits  || 0,
     leadSource:             formData.leadSource             || "",
+    // Unpriced draft add-on. Kept off lineItems so it cannot change the total.
+    lifeOfTheListingCare:   lifeOfTheListingCareSelected(formData.lifeOfTheListingCare),
   };
 
   console.log("POSTING ORDER TO /api/bookings:", payload);
