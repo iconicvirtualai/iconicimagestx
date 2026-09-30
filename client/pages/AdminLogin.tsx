@@ -22,7 +22,7 @@ export default function AdminLogin() {
   const [showReset, setShowReset] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
 
-  // Redirect if already logged in as staff
+  // Photographers and editors cannot open the coordinator dashboard.
   useEffect(() => {
     if (loading) return;
     if (user && isStaff) {

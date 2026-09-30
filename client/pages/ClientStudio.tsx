@@ -1,7 +1,9 @@
 import * as React from "react";
 import { useParams } from "react-router-dom";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, getDoc, addDoc, serverTimestamp } from "firebase/firestore";
+import { useAuth } from "@/contexts/AuthContext";
+import { doc, getDoc, serverTimestamp } from "firebase/firestore";
+import { fetchListing } from "@/lib/listingUpload";
 import { toast } from "sonner";
 import {
   Download, Lock, Image, Video, MessageSquare, Send,
@@ -17,6 +19,7 @@ function fmtAddr(a: any): string {
 
 export default function ClientStudio() {
   const { listingId } = useParams<{ listingId: string }>();
+  const { user, loading: authLoading } = useAuth();
   const [project, setProject] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [selectedPhoto, setSelectedPhoto] = React.useState<number | null>(null);
@@ -27,12 +30,36 @@ export default function ClientStudio() {
   const [activeTab, setActiveTab] = React.useState<"photos" | "videos" | "tours" | "revisions" | "ai_studio">("photos");
 
   React.useEffect(() => {
-    if (!listingId) return;
-    getDoc(doc(db, "listings", listingId)).then(snap => {
-      if (snap.exists()) setProject({ id: snap.id, ...snap.data() });
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, [listingId]);
+    if (!listingId || authLoading) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        try {
+          const snap = await getDoc(doc(db, "listings", listingId));
+          if (snap.exists()) {
+            if (!cancelled) setProject({ id: snap.id, ...snap.data() });
+            return;
+          }
+        } catch (err) {
+          console.warn("[ClientStudio] Direct listing read failed.", err);
+        }
+        if (user) {
+          const project = await fetchListing(listingId);
+          if (!cancelled) setProject(project);
+        } else if (!cancelled) {
+          setProject(null);
+        }
+      } catch (err) {
+        console.warn("[ClientStudio] API listing read failed.", err);
+        if (!cancelled) setProject(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [listingId, authLoading, user]);
 
   const handleRevisionSubmit = async () => {
     if (!revisionNote.trim() || !listingId) return;

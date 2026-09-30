@@ -7,9 +7,7 @@ import {
   AlertCircle, DollarSign, MessageSquare, ChevronRight, Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, getDocs, updateDoc, doc, serverTimestamp } from "firebase/firestore";
-import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { fetchAssignedListings, uploadListingFile } from "@/lib/listingUpload";
 import { toast } from "sonner";
 
 function fmtAddr(a: any): string {
@@ -47,20 +45,25 @@ export default function AdminPhotographer() {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [selectedProject, setSelectedProject] = React.useState<string | null>(null);
 
-  // Load assignments from listings where this photographer is assigned
-  React.useEffect(() => {
-    const unsub = onSnapshot(collection(db, "listings"), snap => {
-      const myId = user?.uid || "";
-      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      // Filter to assignments for this photographer (or show all if admin)
-      const mine = staffProfile?.role === "admin"
-        ? all
-        : all.filter((p: any) => (p.photographerIds || []).includes(myId) || (p.assignedProviders || []).some((ap: any) => ap.providerId === myId));
-      setAssignments(mine);
+  const loadAssignments = React.useCallback(async () => {
+    if (!user) {
       setLoading(false);
-    }, () => setLoading(false));
-    return () => unsub();
-  }, [user, staffProfile]);
+      return;
+    }
+    try {
+      const mine = await fetchAssignedListings();
+      setAssignments(mine);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to load jobs.");
+      setAssignments([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  React.useEffect(() => {
+    loadAssignments();
+  }, [loadAssignments]);
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
@@ -84,38 +87,31 @@ export default function AdminPhotographer() {
     return d && d < today;
   }).sort((a, b) => (getApptDate(b)?.getTime() || 0) - (getApptDate(a)?.getTime() || 0));
 
-  // Upload handler
   const handleUpload = async (projectId: string, files: FileList) => {
-    const storage = getStorage();
     setUploading(true);
     const fileArray = Array.from(files);
     let completed = 0;
-    for (const file of fileArray) {
-      const path = `listings/${projectId}/raw/${Date.now()}_${file.name}`;
-      const sRef = storageRef(storage, path);
-      const task = uploadBytesResumable(sRef, file);
-      await new Promise<void>((resolve, reject) => {
-        task.on("state_changed",
-          (snap) => { setUploadProgress(Math.round(((completed + snap.bytesTransferred / snap.totalBytes) / fileArray.length) * 100)); },
-          (err) => { toast.error("Upload failed: " + file.name); reject(err); },
-          async () => {
-            const url = await getDownloadURL(task.snapshot.ref);
-            const listingRef = doc(db, "listings", projectId);
-            const snap = await getDocs(collection(db, "listings"));
-            const current = snap.docs.find(d => d.id === projectId)?.data()?.images || [];
-            await updateDoc(listingRef, {
-              images: [...current, { url, name: file.name, path, uploadedAt: new Date().toISOString(), uploadedBy: user?.uid }],
-              updatedAt: serverTimestamp(),
-            });
-            completed++;
-            resolve();
-          }
-        );
-      });
+    try {
+      for (const file of fileArray) {
+        await uploadListingFile({
+          listingId: projectId,
+          file,
+          folder: "raw",
+          onProgress: (pct) => {
+            setUploadProgress(Math.round(((completed + pct / 100) / fileArray.length) * 100));
+          },
+        });
+        completed++;
+      }
+      toast.success(fileArray.length + " file(s) uploaded!");
+      await loadAssignments();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Upload failed.");
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
-    setUploading(false);
-    setUploadProgress(0);
-    toast.success(fileArray.length + " file(s) uploaded!");
   };
 
   // Revenue calculation (placeholder rates)

@@ -7,9 +7,23 @@
 import { Router } from "express";
 import admin from "firebase-admin";
 import { requireCoordinator, requireStaff, requireAuth, type AuthenticatedRequest } from "../middleware/auth";
+import { cleanPersonName, normalizeEmail } from "../../shared/listingAccess";
+import { resolveClientIdentity, upsertPortalClient } from "../services/clientAccounts";
+import { jsonSafe } from "../lib/firestoreJson";
 
 const router = Router();
 const db = () => admin.firestore();
+
+function addressText(value: unknown): string {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "object") {
+    const address = value as Record<string, unknown>;
+    if (typeof address.formatted === "string" && address.formatted) return address.formatted;
+    return [address.street, address.city, address.state, address.zip].filter(Boolean).join(", ");
+  }
+  return String(value);
+}
 
 // GET /api/clients — list (staff only)
 router.get("/", requireStaff, async (req, res) => {
@@ -34,6 +48,172 @@ router.get("/", requireStaff, async (req, res) => {
     return res.json(clients);
   } catch (err) {
     return res.status(500).json({ error: "Failed to fetch clients." });
+  }
+});
+
+function adminReady(res: { status: (code: number) => { json: (body: unknown) => unknown } }) {
+  if (admin.apps.length) return true;
+  res.status(503).json({
+    error: "Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT.",
+  });
+  return false;
+}
+
+// POST /api/clients/register — public client portal signup (never creates staff)
+router.post("/register", async (req, res) => {
+  if (!adminReady(res)) return;
+  const firstName = cleanPersonName(req.body?.firstName);
+  const lastName = cleanPersonName(req.body?.lastName);
+  const phone = String(req.body?.phone || "").trim().slice(0, 40);
+  if (!firstName || !lastName) {
+    return res.status(400).json({ error: "First and last name are required." });
+  }
+
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith("Bearer ")) {
+      const decoded = await admin.auth().verifyIdToken(authHeader.slice("Bearer ".length));
+      const staffDoc = await db().collection("staff").doc(decoded.uid).get();
+      if (staffDoc.exists && staffDoc.data()?.isActive !== false) {
+        return res.status(403).json({ error: "Staff accounts cannot register as clients." });
+      }
+      const email = normalizeEmail(decoded.email || req.body?.email);
+      if (!email) return res.status(400).json({ error: "A valid email is required." });
+      const result = await upsertPortalClient({ uid: decoded.uid, email, firstName, lastName, phone });
+      return res.status(201).json(result);
+    }
+
+    const email = normalizeEmail(req.body?.email);
+    const password = String(req.body?.password || "");
+    if (!email || !email.includes("@")) {
+      return res.status(400).json({ error: "A valid email is required." });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ error: "Password must be at least 6 characters." });
+    }
+
+    const staffHit = await db().collection("staff").where("email", "==", email).limit(1).get();
+    if (!staffHit.empty) {
+      return res.status(403).json({ error: "This email is a staff login. Use the staff sign-in page." });
+    }
+
+    let userRecord: admin.auth.UserRecord;
+    try {
+      userRecord = await admin.auth().createUser({
+        email,
+        password,
+        displayName: `${firstName} ${lastName}`,
+      });
+    } catch (err: unknown) {
+      const code = (err as { code?: string }).code;
+      if (code === "auth/email-already-exists") {
+        return res.status(409).json({ error: "An account with this email already exists. Sign in instead." });
+      }
+      if (code === "auth/invalid-password" || code === "auth/weak-password") {
+        return res.status(400).json({ error: "Password must be at least 6 characters." });
+      }
+      throw err;
+    }
+
+    try {
+      const result = await upsertPortalClient({ uid: userRecord.uid, email, firstName, lastName, phone });
+      return res.status(201).json(result);
+    } catch (err) {
+      await admin.auth().deleteUser(userRecord.uid).catch(() => undefined);
+      throw err;
+    }
+  } catch (err) {
+    console.error("[Clients] Register error:", err);
+    return res.status(500).json({ error: "Could not create the client account." });
+  }
+});
+
+// GET /api/clients/me/home — galleries, invoices, and projects for the signed-in client
+router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
+  if (!adminReady(res)) return;
+  try {
+    const identity = await resolveClientIdentity(req.user!.uid, req.user!.email);
+    if (!identity.profile) {
+      return res.status(404).json({ error: "Client profile not found." });
+    }
+
+    const galleries: Record<string, unknown>[] = [];
+    const invoices: Record<string, unknown>[] = [];
+    const projects: Record<string, unknown>[] = [];
+    const seenGallery = new Set<string>();
+    const seenInvoice = new Set<string>();
+    const seenProject = new Set<string>();
+
+    for (const clientId of identity.ids) {
+      const [gallerySnap, invoiceSnap, projectSnap] = await Promise.all([
+        db().collection("galleries").where("clientId", "==", clientId).limit(20).get(),
+        db().collection("invoices").where("clientId", "==", clientId).limit(20).get(),
+        db().collection("listings").where("clientId", "==", clientId).limit(20).get(),
+      ]);
+      for (const doc of gallerySnap.docs) {
+        if (seenGallery.has(doc.id)) continue;
+        seenGallery.add(doc.id);
+        const data = doc.data();
+        galleries.push({
+          id: doc.id,
+          title: data.title || addressText(data.address) || "Gallery",
+          address: addressText(data.address),
+          status: data.status || "pending_upload",
+          href: `/gallery/${doc.id}`,
+        });
+      }
+      for (const doc of invoiceSnap.docs) {
+        if (seenInvoice.has(doc.id)) continue;
+        seenInvoice.add(doc.id);
+        const data = doc.data();
+        invoices.push({
+          id: doc.id,
+          invoiceNumber: data.invoiceNumber || doc.id,
+          status: data.status || "draft",
+          total: data.total || 0,
+          amountDue: data.amountDue ?? data.total ?? 0,
+          href: `/invoice/${doc.id}`,
+        });
+      }
+      for (const doc of projectSnap.docs) {
+        if (seenProject.has(doc.id)) continue;
+        seenProject.add(doc.id);
+        const data = doc.data();
+        projects.push({
+          id: doc.id,
+          address: addressText(data.propertyAddress || data.address || data.shootLocation) || "Project",
+          status: data.status || "scheduled",
+          imageCount: Array.isArray(data.images) ? data.images.length : 0,
+          href: `/studio/${doc.id}`,
+        });
+      }
+    }
+
+    if (identity.email) {
+      const byEmail = await db().collection("listings").where("clientEmail", "==", identity.email).limit(20).get();
+      for (const doc of byEmail.docs) {
+        if (seenProject.has(doc.id)) continue;
+        seenProject.add(doc.id);
+        const data = doc.data();
+        projects.push({
+          id: doc.id,
+          address: addressText(data.propertyAddress || data.address || data.shootLocation) || "Project",
+          status: data.status || "scheduled",
+          imageCount: Array.isArray(data.images) ? data.images.length : 0,
+          href: `/studio/${doc.id}`,
+        });
+      }
+    }
+
+    return res.json({
+      profile: jsonSafe(identity.profile),
+      galleries,
+      invoices,
+      projects,
+    });
+  } catch (err) {
+    console.error("[Clients] Home error:", err);
+    return res.status(500).json({ error: "Failed to load your portal." });
   }
 });
 
