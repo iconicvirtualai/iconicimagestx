@@ -2,6 +2,7 @@ import * as React from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { AlertCircle, CheckCircle2, CreditCard, FileText, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Footer from "@/components/Footer";
 
 function money(value: number) {
   return "$" + (Number(value) || 0).toLocaleString("en-US", { minimumFractionDigits: 2 });
@@ -30,12 +31,15 @@ export default function ClientInvoice() {
   if (loading) return <div className="min-h-screen bg-white flex items-center justify-center"><div className="w-8 h-8 border-4 border-[#0d9488] border-t-transparent rounded-full animate-spin" /></div>;
 
   if (error || !invoice) return (
-    <div className="min-h-screen bg-white flex items-center justify-center px-4">
-      <div className="max-w-md text-center">
-        <AlertCircle className="w-12 h-12 mx-auto mb-4 text-red-500" />
-        <h1 className="text-2xl font-black mb-2">Invoice Unavailable</h1>
-        <p className="text-sm text-gray-500">{error}</p>
+    <div className="min-h-screen bg-white flex flex-col">
+      <div className="flex flex-1 items-center justify-center px-4">
+        <div className="max-w-md text-center">
+          <AlertCircle className="w-12 h-12 mx-auto mb-4 text-red-500" />
+          <h1 className="text-2xl font-black mb-2">Invoice Unavailable</h1>
+          <p className="text-sm text-gray-500">{error}</p>
+        </div>
       </div>
+      <Footer />
     </div>
   );
 
@@ -140,6 +144,7 @@ export default function ClientInvoice() {
           <FileText className="w-4 h-4" /> Iconic Images
         </Link>
       </main>
+      <Footer />
     </div>
   );
 }

@@ -211,7 +211,10 @@ export default function VirtualStagingProOrder() {
                   </Button>
                   
                   <p className="mt-6 text-center text-[11px] text-gray-500">
-                    By submitting, you agree to Iconic's <span className="underline cursor-pointer">Terms of Service</span>.
+                    By submitting, you agree to Iconic&apos;s{" "}
+                    <Link to="/terms" className="underline">Terms and Conditions</Link>
+                    {" "}and{" "}
+                    <Link to="/privacy" className="underline">Privacy Policy</Link>.
                   </p>
                 </div>
               </div>

@@ -1,5 +1,6 @@
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
+import { SmsConsentField } from "@/components/SmsConsentField";
 import { ChevronLeft, ChevronRight, X, Download, Lock } from "lucide-react";
 import { useState } from "react";
 
@@ -27,6 +28,7 @@ export default function StockFootage() {
     address: "",
     phone: ""
   });
+  const [smsConsent, setSmsConsent] = useState(false);
 
   const neighborhoods: PhotoGallery[] = [
     {
@@ -110,6 +112,10 @@ export default function StockFootage() {
 
   const handleLicenseeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!smsConsent) {
+      alert("Check the box to agree to Iconic Images booking and appointment text messages.");
+      return;
+    }
     
     // Simulate Stripe checkout
     alert(`Thank you for your purchase, ${licenseeData.fullName}!\n\nYour photos are being prepared for download. A download link will be sent to ${licenseeData.email}`);
@@ -122,6 +128,7 @@ export default function StockFootage() {
       address: "",
       phone: ""
     });
+    setSmsConsent(false);
     setShowLicenseeForm(false);
     setShowCheckout(false);
     setSelectedNeighborhood(null);
@@ -398,6 +405,12 @@ export default function StockFootage() {
                         placeholder="(555) 123-4567"
                       />
                     </div>
+
+                    <SmsConsentField
+                      id="stock-sms-consent"
+                      checked={smsConsent}
+                      onChange={setSmsConsent}
+                    />
 
                     <div className="pt-4 border-t">
                       <div className="flex items-center justify-between mb-6">

@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import Footer from "@/components/Footer";
 import { FolderOpen, Image, LogOut, Receipt } from "lucide-react";
 
 interface PortalHome {
@@ -145,6 +146,7 @@ export default function ClientPortal() {
           </>
         )}
       </main>
+      <Footer />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { doc, getDoc, serverTimestamp } from "firebase/firestore";
@@ -105,6 +105,11 @@ export default function ClientStudio() {
         <Lock className="w-12 h-12 text-gray-300 mx-auto mb-4" />
         <h2 className="text-xl font-black mb-2">Gallery Not Found</h2>
         <p className="text-sm text-gray-500">This gallery may have expired or the link is incorrect.</p>
+        <p className="mt-4 text-sm">
+          <Link to="/privacy" className="underline">Privacy Policy</Link>
+          {" · "}
+          <Link to="/terms" className="underline">Terms and Conditions</Link>
+        </p>
       </div>
     </div>
   );
@@ -335,6 +340,10 @@ export default function ClientStudio() {
         <div className="max-w-6xl mx-auto px-4 text-center">
           <p className="text-[10px] text-gray-400 uppercase tracking-widest">Powered by Iconic Images Photography</p>
           <p className="text-[10px] text-gray-300 mt-1">iconicimagestx.com</p>
+          <div className="mt-3 flex justify-center gap-4 text-xs">
+            <Link to="/privacy" className="underline text-gray-500">Privacy Policy</Link>
+            <Link to="/terms" className="underline text-gray-500">Terms and Conditions</Link>
+          </div>
         </div>
       </footer>
     </div>
