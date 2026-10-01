@@ -11,6 +11,7 @@ import {
 import {
   buildSubmittedLineItems,
   calculateSidebarTotal,
+  normalizeBookingLineItems,
   orderTotalLabel,
   separatePromoDiscount,
   sumLineItemPrices,
@@ -76,6 +77,27 @@ describe("booking total contract", () => {
 
     expect(withCare).toBe(withoutCare);
     expect(items.some((item) => /life of the listing/i.test(item.name))).toBe(false);
+  });
+
+  it("keeps catalog notes off the charged total", () => {
+    const items = buildSubmittedLineItems(fixedSelection);
+    const normalized = normalizeBookingLineItems(items.map((item) => ({
+      ...item,
+      description: "Staff note",
+      category: "photography",
+      bookingKind: "service",
+      tier: "campaign",
+    })));
+    expect(sumLineItemPrices(normalized)).toBe(sumLineItemPrices(items));
+    expect(orderTotalLabel(sumLineItemPrices(normalized))).toBe("$1118.00");
+    expect(normalized[0]).toMatchObject({
+      description: "Staff note",
+      category: "photography",
+      bookingKind: "service",
+      tier: "campaign",
+      price: items[0].price,
+    });
+    expect(normalizeBookingLineItems([{ name: "Photos", price: 150 }])[0]).not.toHaveProperty("description");
   });
 
   it("keeps ICONICAI at $35 and NEWYEAR at $50", () => {

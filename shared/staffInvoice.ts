@@ -5,13 +5,27 @@
 
 import { normalizeBookingLineItems, type BookingLineItem } from "./bookingPricing.ts";
 import { cleanPersonName, normalizeEmail } from "./listingAccess.ts";
+import { draftInvoiceNumber } from "./orderProjectInvoice.ts";
+import type { StaffCatalogPackage } from "./bookingCatalog.ts";
+
+export interface StaffServiceLine {
+  id?: string;
+  name: string;
+  price: number;
+  description?: string;
+  category?: string;
+  bookingKind?: string;
+  tier?: string;
+  unitPrice?: number;
+  qty?: number;
+}
 
 export interface StaffInvoiceForm {
   clientName: string;
   clientEmail: string;
   billToAddress: string;
   notes: string;
-  services: Array<{ id?: string; name: string; price: number }>;
+  services: StaffServiceLine[];
   promoCode: string;
   promoDiscount: number;
   tax: number;
@@ -30,6 +44,7 @@ export interface InvoiceBillingPatch {
   promoDiscount: number;
   total: number;
   amountDue: number;
+  invoiceNumber?: string;
 }
 
 export function staffInvoicePath(invoiceId: string): string {
@@ -39,6 +54,106 @@ export function staffInvoicePath(invoiceId: string): string {
 /** Client checkout page. Staff create/view/manage must not navigate here. */
 export function clientPaymentPath(invoiceId: string): string {
   return `/invoice/${requiredId(invoiceId)}`;
+}
+
+const PROFESSIONAL_INVOICE_NUMBER = /^(?:INV-\d{4}-[A-Z0-9]{3,12}|[A-Z]{2,12}-[A-Z0-9]{3,12})$/i;
+
+/**
+ * Iconic-facing invoice number. A stored INV-YYYY-#### (or similar) is kept.
+ * A missing value or the document id becomes INV-YYYY-###### from that same id,
+ * so links can stay on the document id.
+ */
+export function professionalInvoiceNumber(stored: unknown, docId: string, now = new Date()): string {
+  const raw = typeof stored === "string" ? stored.trim() : "";
+  const id = docId.trim();
+  if (
+    raw &&
+    raw !== id &&
+    !/^[A-Za-z0-9]{20}$/.test(raw) &&
+    PROFESSIONAL_INVOICE_NUMBER.test(raw)
+  ) {
+    return raw.toUpperCase();
+  }
+  return draftInvoiceNumber(id || "invoice", now);
+}
+
+/** Number to write when the stored one is missing or is the document id. */
+export function invoiceNumberForSave(stored: unknown, docId: string, now = new Date()): string | undefined {
+  const id = docId.trim();
+  if (!id) return undefined;
+  const current = typeof stored === "string" ? stored.trim() : "";
+  const next = professionalInvoiceNumber(stored, id, now);
+  return current === next ? undefined : next;
+}
+
+export function findStaffCatalogPackage(
+  line: { id?: string; name?: string },
+  catalog: StaffCatalogPackage[],
+): StaffCatalogPackage | undefined {
+  const id = String(line.id || "").trim();
+  if (id) {
+    const byId = catalog.find((item) => item.id === id || item.bookingId === id);
+    if (byId) return byId;
+  }
+  const name = String(line.name || "").trim().toLowerCase();
+  if (!name) return undefined;
+  return catalog.find((item) => item.name.trim().toLowerCase() === name);
+}
+
+function wholeQty(value: unknown): number {
+  const qty = Math.round(Number(value));
+  return Number.isFinite(qty) && qty > 0 ? qty : 1;
+}
+
+function catalogServiceName(id: string, name: string, qty: number): string {
+  if (id === "virtual-staging") {
+    return qty === 1 ? "Virtual Staging" : `Virtual Staging (${qty} credits)`;
+  }
+  return name;
+}
+
+/** One catalog package as an invoice line. Price is the catalog unit price times quantity. */
+export function staffServiceFromPackage(pkg: StaffCatalogPackage, qty = 1): StaffServiceLine {
+  const count = wholeQty(qty);
+  const unitPrice = cents(pkg.price);
+  const id = pkg.bookingId || pkg.id;
+  return {
+    id,
+    name: catalogServiceName(id, pkg.name, count),
+    description: pkg.description,
+    category: pkg.category,
+    bookingKind: pkg.bookingKind,
+    tier: pkg.tier,
+    unitPrice,
+    qty: count,
+    price: cents(unitPrice * count),
+  };
+}
+
+export function staffServiceQty(line: StaffServiceLine, qty: number): StaffServiceLine {
+  const count = wholeQty(qty);
+  const unit = Number.isFinite(Number(line.unitPrice))
+    ? Number(line.unitPrice)
+    : (Number(line.price) || 0) / wholeQty(line.qty);
+  const id = String(line.id || "");
+  return {
+    ...line,
+    name: catalogServiceName(id, line.name, count),
+    qty: count,
+    unitPrice: cents(unit),
+    price: cents(unit * count),
+  };
+}
+
+export function staffServiceUnitPrice(line: StaffServiceLine, unitPrice: number): StaffServiceLine {
+  const unit = cents(Math.max(0, Number(unitPrice) || 0));
+  const count = wholeQty(line.qty);
+  return {
+    ...line,
+    qty: count,
+    unitPrice: unit,
+    price: cents(unit * count),
+  };
 }
 
 export function billToAddressText(address: unknown): string {
@@ -133,7 +248,7 @@ function personName(order: { clientName?: unknown; firstName?: unknown; lastName
  */
 export function staffInvoiceSavePatch(
   form: StaffInvoiceForm,
-  existing: { amountPaid?: unknown } = {},
+  existing: { amountPaid?: unknown; invoiceNumber?: unknown; id?: unknown } = {},
 ): InvoiceBillingPatch {
   const services = serviceRows(form.services);
   const promoCode = form.promoCode.trim();
@@ -142,7 +257,7 @@ export function staffInvoiceSavePatch(
   const subtotal = cents(services.reduce((sum, item) => sum + item.price, 0));
   const total = cents(Math.max(0, subtotal - promoDiscount) + tax);
   const amountPaid = cents(Math.max(0, Number(existing.amountPaid) || 0));
-  return {
+  const patch: InvoiceBillingPatch = {
     clientName: cleanPersonName(form.clientName) || "Client",
     clientEmail: normalizeEmail(form.clientEmail),
     billToAddress: form.billToAddress.trim(),
@@ -155,6 +270,9 @@ export function staffInvoiceSavePatch(
     total,
     amountDue: cents(Math.max(0, total - amountPaid)),
   };
+  const invoiceNumber = invoiceNumberForSave(existing.invoiceNumber, typeof existing.id === "string" ? existing.id : "");
+  if (invoiceNumber) patch.invoiceNumber = invoiceNumber;
+  return patch;
 }
 
 /**
