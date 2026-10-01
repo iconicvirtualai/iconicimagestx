@@ -835,7 +835,7 @@ export default function AdminListingFile() {
           {project.studioEnabled && (
             <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-5">
               <h3 className={`${labelCls} mb-3`}>Client Studio</h3>
-              <p className="text-[10px] text-gray-400 mb-3">Share this link with the client to view their deliverables.</p>
+              <p className="text-[10px] text-gray-400 mb-3">Share this link with the client. It uses this project id and opens without a client login when Client Studio is on and Lock Studio is off.</p>
               <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/studio/${id}`); toast.success("Studio link copied!"); }}
                 className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-800 transition-colors"
               >

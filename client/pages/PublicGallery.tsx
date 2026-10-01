@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { Copy, Download, ExternalLink, Image, Link2, Lock, AlertCircle, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Footer from "@/components/Footer";
@@ -7,21 +7,51 @@ import { toast } from "sonner";
 
 export default function PublicGallery() {
   const { galleryId } = useParams<{ galleryId: string }>();
+  const navigate = useNavigate();
   const [gallery, setGallery] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
 
   React.useEffect(() => {
     if (!galleryId) return;
-    fetch(`/api/galleries/public/${galleryId}`)
-      .then(async res => {
-        if (!res.ok) throw new Error(await res.text());
-        return res.json();
-      })
-      .then(setGallery)
-      .catch(() => setError("We could not open this gallery. Please contact Iconic Images."))
-      .finally(() => setLoading(false));
-  }, [galleryId]);
+    let cancelled = false;
+    let redirecting = false;
+    setLoading(true);
+    setError("");
+    setGallery(null);
+    (async () => {
+      try {
+        const res = await fetch(`/api/galleries/public/${galleryId}`);
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (res.status === 404) {
+          const linkRes = await fetch(`/api/galleries/link/${encodeURIComponent(galleryId)}`);
+          const link = await linkRes.json().catch(() => ({}));
+          if (cancelled) return;
+          if (linkRes.ok && link.kind === "listing" && link.openGalleryId && link.openGalleryId !== galleryId) {
+            redirecting = true;
+            navigate(`/gallery/${link.openGalleryId}`, { replace: true });
+            return;
+          }
+          if (linkRes.ok && link.kind === "listing") {
+            redirecting = true;
+            navigate(`/studio/${galleryId}`, { replace: true });
+            return;
+          }
+          throw new Error(link.message || data.message || data.error || "Gallery link not found.");
+        }
+        if (!res.ok) throw new Error(data.message || data.error || "We could not open this gallery.");
+        setGallery(data);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : "We could not open this gallery.");
+      } finally {
+        if (!cancelled && !redirecting) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [galleryId, navigate]);
 
   if (loading) return <div className="min-h-screen bg-white flex items-center justify-center"><div className="w-8 h-8 border-4 border-[#0d9488] border-t-transparent rounded-full animate-spin" /></div>;
 

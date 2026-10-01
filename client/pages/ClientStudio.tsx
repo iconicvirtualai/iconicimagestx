@@ -1,8 +1,8 @@
 import * as React from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { doc, getDoc, serverTimestamp } from "firebase/firestore";
+import { doc, serverTimestamp } from "firebase/firestore";
 import { fetchListing } from "@/lib/listingUpload";
 import { toast } from "sonner";
 import {
@@ -17,10 +17,25 @@ function fmtAddr(a: any): string {
   return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "";
 }
 
+function failureCopy(status: number, data: { code?: string; message?: string; error?: string }, id: string) {
+  const message = data.message || data.error || "";
+  if (data.code === "studio_disabled") return { title: "Studio link is off", message };
+  if (data.code === "studio_locked") return { title: "Studio link is locked", message };
+  if (data.code === "invalid_id") return { title: "Gallery link not found", message };
+  if (status === 503) return { title: "Gallery link could not be checked", message };
+  return {
+    title: "Gallery link not found",
+    message: message || `No gallery or project uses ${id}.`,
+  };
+}
+
 export default function ClientStudio() {
   const { listingId } = useParams<{ listingId: string }>();
-  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [project, setProject] = React.useState<any>(null);
+  const [failure, setFailure] = React.useState<{ title: string; message: string; galleryId?: string } | null>(null);
+  const [leaving, setLeaving] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [selectedPhoto, setSelectedPhoto] = React.useState<number | null>(null);
   const [showRevision, setShowRevision] = React.useState(false);
@@ -30,28 +45,63 @@ export default function ClientStudio() {
   const [activeTab, setActiveTab] = React.useState<"photos" | "videos" | "tours" | "revisions" | "ai_studio">("photos");
 
   React.useEffect(() => {
-    if (!listingId || authLoading) return;
+    if (!listingId) return;
     let cancelled = false;
     (async () => {
       try {
-        try {
-          const snap = await getDoc(doc(db, "listings", listingId));
-          if (snap.exists()) {
-            if (!cancelled) setProject({ id: snap.id, ...snap.data() });
-            return;
-          }
-        } catch (err) {
-          console.warn("[ClientStudio] Direct listing read failed.", err);
+        const res = await fetch(`/api/galleries/link/${encodeURIComponent(listingId)}`);
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+
+        if (res.ok && data.kind === "gallery" && data.released && data.galleryId) {
+          setLeaving(true);
+          navigate(`/gallery/${data.galleryId}`, { replace: true });
+          return;
         }
-        if (user) {
-          const project = await fetchListing(listingId);
-          if (!cancelled) setProject(project);
-        } else if (!cancelled) {
+        if (res.ok && data.kind === "gallery") {
           setProject(null);
+          setFailure({
+            title: "Gallery is not released",
+            message: data.staffNote || "This gallery exists, but photos have not been released.",
+            galleryId: data.galleryId,
+          });
+          return;
         }
+        if (res.ok && data.kind === "listing" && data.openGalleryId) {
+          setLeaving(true);
+          navigate(`/gallery/${data.openGalleryId}`, { replace: true });
+          return;
+        }
+        if (res.ok && data.kind === "listing" && data.project) {
+          setFailure(null);
+          setProject(data.project);
+          return;
+        }
+
+        if (res.status === 503 && user) {
+          try {
+            const signedInProject = await fetchListing(listingId);
+            if (!cancelled) {
+              setFailure(null);
+              setProject(signedInProject);
+            }
+            return;
+          } catch (err) {
+            console.warn("[ClientStudio] Signed-in listing read failed.", err);
+          }
+        }
+
+        setProject(null);
+        setFailure(failureCopy(res.status, data, listingId));
       } catch (err) {
-        console.warn("[ClientStudio] API listing read failed.", err);
-        if (!cancelled) setProject(null);
+        console.warn("[ClientStudio] Gallery link lookup failed.", err);
+        if (!cancelled) {
+          setProject(null);
+          setFailure({
+            title: "Gallery link not found",
+            message: `The lookup for ${listingId} did not finish. Check galleries/${listingId} and listings/${listingId}.`,
+          });
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -59,7 +109,7 @@ export default function ClientStudio() {
     return () => {
       cancelled = true;
     };
-  }, [listingId, authLoading, user]);
+  }, [listingId, navigate, user]);
 
   const handleRevisionSubmit = async () => {
     if (!revisionNote.trim() || !listingId) return;
@@ -93,18 +143,24 @@ export default function ClientStudio() {
     }
   };
 
-  if (loading) return (
+  if (loading || leaving) return (
     <div className="min-h-screen bg-[#fafafa] flex items-center justify-center">
       <div className="w-8 h-8 border-4 border-[#0d9488] border-t-transparent rounded-full animate-spin" />
     </div>
   );
 
   if (!project) return (
-    <div className="min-h-screen bg-[#fafafa] flex items-center justify-center">
-      <div className="text-center">
+    <div className="min-h-screen bg-[#fafafa] flex items-center justify-center px-4">
+      <div className="max-w-lg text-center">
         <Lock className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-        <h2 className="text-xl font-black mb-2">Gallery Not Found</h2>
-        <p className="text-sm text-gray-500">This gallery may have expired or the link is incorrect.</p>
+        <h2 className="text-xl font-black mb-2">{failure?.title || "Gallery link not found"}</h2>
+        <p className="text-sm text-gray-600">{failure?.message || "This gallery link could not be opened."}</p>
+        {listingId && <p className="mt-3 text-xs font-mono text-gray-400 break-all">{listingId}</p>}
+        {failure?.galleryId && (
+          <p className="mt-4 text-sm">
+            <Link to={`/gallery/${failure.galleryId}`} className="underline">Open the delivery page</Link>
+          </p>
+        )}
         <p className="mt-4 text-sm">
           <Link to="/privacy" className="underline">Privacy Policy</Link>
           {" · "}
@@ -165,6 +221,12 @@ export default function ClientStudio() {
 
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Locked notice */}
+        {project.notice && (
+          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-6">
+            <p className="text-sm font-bold text-gray-800">{project.notice}</p>
+          </div>
+        )}
+
         {locked && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 mb-6 flex items-center gap-3">
             <Lock className="w-5 h-5 text-yellow-600 flex-shrink-0" />
@@ -187,8 +249,10 @@ export default function ClientStudio() {
                   <img src={img.url} alt={img.name || `Photo ${i+1}`} className="w-full h-full object-cover" loading="lazy" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
                     {!locked && <button className="p-2 bg-white rounded-lg"><Download className="w-4 h-4 text-black" /></button>}
-                    <button onClick={e => { e.stopPropagation(); setSelectedPhoto(i); setRevisionType("single"); setShowRevision(true); }}
-                      className="p-2 bg-white rounded-lg"><Edit3 className="w-4 h-4 text-black" /></button>
+                    {user && (
+                      <button onClick={e => { e.stopPropagation(); setSelectedPhoto(i); setRevisionType("single"); setShowRevision(true); }}
+                        className="p-2 bg-white rounded-lg"><Edit3 className="w-4 h-4 text-black" /></button>
+                    )}
                   </div>
                   <div className="absolute bottom-2 left-2 text-[10px] font-bold text-white bg-black/50 px-2 py-0.5 rounded">{i+1}</div>
                 </div>
@@ -236,10 +300,17 @@ export default function ClientStudio() {
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-black uppercase tracking-widest">Revision Requests</h3>
-              <button onClick={() => { setRevisionType("gallery"); setShowRevision(true); }}
-                className="px-4 py-2 bg-[#0d9488] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#0f766e]">
-                + Request Revision
-              </button>
+              {user ? (
+                <button onClick={() => { setRevisionType("gallery"); setShowRevision(true); }}
+                  className="px-4 py-2 bg-[#0d9488] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#0f766e]">
+                  + Request Revision
+                </button>
+              ) : (
+                <Link to="/login" state={{ from: { pathname: `/studio/${listingId}` } }}
+                  className="px-4 py-2 border border-gray-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-600">
+                  Sign in to request a revision
+                </Link>
+              )}
             </div>
             {revisions.length === 0 ? (
               <div className="text-center py-16"><MessageSquare className="w-12 h-12 text-gray-200 mx-auto mb-4" /><p className="text-gray-400 font-bold">No revision requests</p><p className="text-xs text-gray-300 mt-1">Click on a photo or use the button above to request changes</p></div>
@@ -286,10 +357,12 @@ export default function ClientStudio() {
             <button className="flex items-center gap-2 px-6 py-3 bg-black text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-800">
               <Download className="w-4 h-4" /> Download All Photos
             </button>
-            <button onClick={() => { setRevisionType("gallery"); setShowRevision(true); }}
-              className="flex items-center gap-2 px-6 py-3 border-2 border-gray-200 text-gray-700 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-50">
-              <Edit3 className="w-4 h-4" /> Request Revision
-            </button>
+            {user && (
+              <button onClick={() => { setRevisionType("gallery"); setShowRevision(true); }}
+                className="flex items-center gap-2 px-6 py-3 border-2 border-gray-200 text-gray-700 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-50">
+                <Edit3 className="w-4 h-4" /> Request Revision
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -304,7 +377,9 @@ export default function ClientStudio() {
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3">
             <span className="text-white text-xs font-bold">{selectedPhoto + 1} / {images.length}</span>
             {!locked && <a href={images[selectedPhoto]?.url} download className="px-3 py-1.5 bg-white text-black rounded-lg text-[10px] font-bold">Download</a>}
-            <button onClick={() => { setRevisionType("single"); setShowRevision(true); }} className="px-3 py-1.5 bg-white/20 text-white rounded-lg text-[10px] font-bold">Request Edit</button>
+            {user && (
+              <button onClick={() => { setRevisionType("single"); setShowRevision(true); }} className="px-3 py-1.5 bg-white/20 text-white rounded-lg text-[10px] font-bold">Request Edit</button>
+            )}
           </div>
         </div>
       )}

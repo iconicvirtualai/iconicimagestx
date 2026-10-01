@@ -10,6 +10,7 @@ import { requireCoordinator, requirePhotographer, requireStaff, requireAuth, typ
 import { sendEmail } from "../services/email";
 import { sendSMS, SMS_TEMPLATES } from "../services/sms";
 import { invoiceAllowsDownload, publicMediaItem } from "../../shared/paymentAccess";
+import { handlePublicGalleryLink } from "./galleryLink";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -97,6 +98,11 @@ router.get("/public/:id", async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch gallery." });
   }
 });
+
+// ─── GET /api/galleries/link/:id — Staff-shared /studio/:id resolver ────────
+// Registered before /:id so "link" is not treated as a gallery id.
+
+router.get("/link/:id", handlePublicGalleryLink);
 
 // ─── GET /api/galleries/:id — Get single gallery ──────────────────────────────
 
