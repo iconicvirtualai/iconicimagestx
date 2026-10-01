@@ -1,7 +1,9 @@
 import * as React from "react";
 import AdminLayout from "@/components/AdminLayout";
 import { useAuth } from "@/contexts/AuthContext";
+import { Link } from "react-router-dom";
 import { fetchAssignedListings, uploadListingFile } from "@/lib/listingUpload";
+import { iconicStudioHref } from "@shared/iconicStudio";
 import { Upload, CheckCircle2, XCircle, Image as ImageIcon, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -111,6 +113,8 @@ export default function AdminUpload() {
           {selectedJobData && (
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-2">
               Listing ID: {selectedJob}
+              {" · "}
+              <Link to={iconicStudioHref(selectedJob)} className="text-[#0d9488]">Open Iconic Studio</Link>
             </p>
           )}
         </div>

@@ -51,7 +51,9 @@ export function isListingStoragePath(listingId: string, storagePath: unknown): b
   const prefix = `listings/${listingId}/`;
   if (!storagePath.startsWith(prefix)) return false;
   const rest = storagePath.slice(prefix.length);
-  return rest.startsWith("photos/") || rest.startsWith("raw/");
+  // finals/ is the Iconic Studio approve destination. Uploads still only
+  // request photos/ or raw/ signed URLs.
+  return rest.startsWith("photos/") || rest.startsWith("raw/") || rest.startsWith("finals/");
 }
 
 export function staffCanAccessListing(
