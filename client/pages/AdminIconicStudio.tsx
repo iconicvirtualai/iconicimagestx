@@ -19,6 +19,7 @@ import {
   type StudioFrame,
 } from "@shared/iconicStudio";
 import { toast } from "sonner";
+import { PresentationSharePanel } from "@/components/PresentationSharePanel";
 
 function asFrame(raw: Record<string, unknown>, index: number): StudioFrame | null {
   const name = String(raw.name || "");
@@ -128,8 +129,15 @@ export default function AdminIconicStudio() {
     navigate(iconicStudioHref(id));
   };
 
+  const shareListingId = listingId || (demo ? "sampledemo" : "");
+
   return (
     <AdminLayout title="Iconic Studio">
+      {shareListingId && (
+        <div className="mb-4 max-w-md">
+          <PresentationSharePanel listingId={shareListingId} getToken={getToken} demo={demo || shareListingId === "sampledemo"} />
+        </div>
+      )}
       {loading ? (
         <p className="text-sm font-bold text-gray-500">Loading Iconic Studio...</p>
       ) : (

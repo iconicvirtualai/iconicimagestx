@@ -32,6 +32,7 @@ import { listCalendarScheduleEvents, verifyCalendarWriteAccess } from "./service
 import { clientNotifyLive } from "../shared/clientNotify";
 import { requireAdmin, requireStaff } from "./middleware/auth";
 import { handleListingPhotoUpload } from "./routes/listingPhotos";
+import presentationsRouter from "./routes/presentations";
 
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
 const API_BUILD_MARKER = "auth-square-2026-09-28";
@@ -204,6 +205,7 @@ export function createServer() {
   app.use("/api/messages", messagingRouter);
   app.use("/api/clients", clientsRouter);
   app.use("/api/staff", staffRouter);
+  app.use("/api", presentationsRouter);
   app.use("/api/listings", listingsRouter);
   app.use("/api/campaigns", campaignsRouter);
   app.use("/api/agents", agentsRouter);

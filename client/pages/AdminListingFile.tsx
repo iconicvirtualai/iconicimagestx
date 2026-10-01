@@ -19,6 +19,7 @@ import {
 } from "@shared/orderProjectInvoice";
 import { ensureLinkedInvoice, resolveLinkedInvoice } from "@/lib/orderProjectInvoice";
 import { staffInvoicePath } from "@shared/staffInvoice";
+import { PresentationShareButton, PresentationSharePanel } from "@/components/PresentationSharePanel";
 
 // ─── Status systems ───────────────────────────────────────────────────────────
 const RE_STATUSES = ["unscheduled", "scheduled", "in_progress", "delivered", "paid", "archived"];
@@ -246,6 +247,8 @@ function PhotoUploader({ projectId, onUpload }: { projectId: string; onUpload: (
 export default function AdminListingFile() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const getPresentationToken = () => user?.getIdToken();
   const [project, setProject] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [activeTab, setActiveTab] = React.useState(0);
@@ -560,8 +563,15 @@ export default function AdminListingFile() {
             {/* MEDIA / PHOTOS (tab 0) */}
             {activeTab === 0 && (
               <div>
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between mb-6 gap-3">
                   <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">{isRE ? "Media Gallery" : "Photo Gallery"}</h3>
+                  {id && (
+                    <PresentationShareButton
+                      listingId={id}
+                      getToken={getPresentationToken}
+                      className="inline-flex items-center gap-2 rounded-xl bg-black px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white"
+                    />
+                  )}
                 </div>
                 <PhotoUploader projectId={id!} onUpload={() => {}} />
                 {images.length > 0 && (
@@ -818,6 +828,8 @@ export default function AdminListingFile() {
               <Toggle label="Social Permission" value={!!project.socialPermission} onChange={v => patch({ socialPermission: v })} />
             </div>
           </div>
+
+          {id && <PresentationSharePanel listingId={id} getToken={getPresentationToken} />}
 
           {/* Client Studio link */}
           {project.studioEnabled && (

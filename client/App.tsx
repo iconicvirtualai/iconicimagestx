@@ -34,6 +34,7 @@ import Terms from "./pages/Terms";
 import ClientStudio from "./pages/ClientStudio";
 import ClientInvoice from "./pages/ClientInvoice";
 import PublicGallery from "./pages/PublicGallery";
+import ListingPresentation from "./pages/ListingPresentation";
 import VirtualStaging from "./pages/VirtualStaging";
 import Prep from "./pages/Prep";
 import StockFootage from "./pages/StockFootage";
@@ -98,6 +99,7 @@ const App = () => (
             <Route path="/go" element={<Go />} />
             <Route path="/studio/:listingId" element={<ClientStudio />} />
             <Route path="/gallery/:galleryId" element={<PublicGallery />} />
+            <Route path="/present/:token" element={<ListingPresentation />} />
             <Route path="/invoice/:invoiceId" element={<ClientInvoice />} />
             <Route path="/services/virtual-staging" element={<VirtualStaging />} />
             <Route path="/services/virtual-staging/select" element={<VirtualStagingSelection />} />

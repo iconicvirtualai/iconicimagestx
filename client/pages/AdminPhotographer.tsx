@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { fetchAssignedListings, uploadListingFile } from "@/lib/listingUpload";
 import { iconicStudioHref } from "@shared/iconicStudio";
+import { PresentationShareButton } from "@/components/PresentationSharePanel";
 import { toast } from "sonner";
 
 function fmtAddr(a: any): string {
@@ -157,6 +158,11 @@ export default function AdminPhotographer() {
             className="flex items-center gap-1.5 px-3 py-2 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800">
             <Camera className="w-3.5 h-3.5" /> Iconic Studio
           </Link>
+          <PresentationShareButton
+            listingId={job.id}
+            getToken={() => user?.getIdToken()}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white text-black border border-gray-200 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-50"
+          />
         </div>
       </div>
     );
