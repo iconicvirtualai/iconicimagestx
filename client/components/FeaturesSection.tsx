@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { FEATURED_SNAP_REEL } from "@/lib/snapReels";
+import { beforeAfterById } from "@/lib/beforeAfter";
 
 const FeatureCard = ({
   title,
@@ -54,9 +55,39 @@ const FeatureCard = ({
   );
 };
 
+const AiPhotoEditSnippet = () => {
+  const settings = useSiteSettings();
+  const twilight = beforeAfterById("twilight-pool");
+
+  return (
+    <div className="relative h-full flex">
+      <div className="w-1/2 h-full relative border-r border-white/50">
+        <img src={twilight.before.src} className="w-full h-full object-cover" alt={twilight.before.alt} />
+        <span className="absolute top-3 left-3 bg-white/20 backdrop-blur-md text-white text-[8px] font-bold px-2 py-0.5 rounded uppercase border border-white/30">Before</span>
+      </div>
+      <div className="w-1/2 h-full relative">
+        <img src={twilight.after.src} className="w-full h-full object-cover" alt={twilight.after.alt} />
+        <span className="absolute top-3 right-3 backdrop-blur-md text-white text-[8px] font-bold px-2 py-0.5 rounded uppercase" style={{ backgroundColor: `${settings.global.primaryColor}CC` }}>After</span>
+      </div>
+      <div className="absolute left-1/2 top-0 bottom-0 w-[2px] bg-white z-10 flex items-center justify-center -translate-x-1/2">
+        <div className="w-4 h-4 bg-white rounded-full shadow-lg border border-gray-100 flex items-center justify-center">
+          <div className="flex gap-[1px]">
+            <div className="w-[1px] h-2 bg-gray-300"></div>
+            <div className="w-[1px] h-2 bg-gray-300"></div>
+          </div>
+        </div>
+      </div>
+      <span className="absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-md bg-black/70 px-2 py-1 text-[8px] font-black uppercase tracking-widest text-white">
+        {twilight.label}
+      </span>
+    </div>
+  );
+};
+
 const VirtualStagingSnippet = () => {
   const [step, setStep] = useState(0); // 0: initial, 1: dragging, 2: processing, 3: result
   const settings = useSiteSettings();
+  const lifestyle = beforeAfterById("pavilion-lifestyle");
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -69,16 +100,16 @@ const VirtualStagingSnippet = () => {
     <div className="relative h-full w-full bg-gray-50 flex items-center justify-center overflow-hidden">
       {/* Background Room - Empty */}
       <img
-        src="/media/photos/listing-living-02.jpg"
+        src={lifestyle.before.src}
         className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${step === 3 ? 'opacity-0' : 'opacity-100'}`}
-        alt="Empty Room"
+        alt={lifestyle.before.alt}
       />
 
       {/* Background Room - Staged */}
       <img
-        src="/media/photos/staged-living-room.jpg"
+        src={lifestyle.after.src}
         className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${step === 3 ? 'opacity-100' : 'opacity-0'}`}
-        alt="Staged Room"
+        alt={lifestyle.after.alt}
       />
 
       {/* Animation Overlay */}
@@ -205,24 +236,7 @@ export default function FeaturesSection() {
             description="Make your listing photos stand out with AI-powered enhancements — like twilights, lawn repairs, and other edits that instantly elevate any property."
             colSpan="md:col-span-2"
           >
-            <div className="relative h-full flex">
-              <div className="w-1/2 h-full relative border-r border-white/50">
-                <img src="/media/photos/luxury-exterior.jpg" className="w-full h-full object-cover grayscale brightness-75" alt="Before" />
-                <span className="absolute top-3 left-3 bg-white/20 backdrop-blur-md text-white text-[8px] font-bold px-2 py-0.5 rounded uppercase border border-white/30">Before</span>
-              </div>
-              <div className="w-1/2 h-full relative">
-                <img src="/media/photos/website-hero-dan.jpg" className="w-full h-full object-cover" alt="After" />
-                <span className="absolute top-3 right-3 backdrop-blur-md text-white text-[8px] font-bold px-2 py-0.5 rounded uppercase" style={{ backgroundColor: `${settings.global.primaryColor}CC` }}>After</span>
-              </div>
-              <div className="absolute left-1/2 top-0 bottom-0 w-[2px] bg-white z-10 flex items-center justify-center -translate-x-1/2">
-                <div className="w-4 h-4 bg-white rounded-full shadow-lg border border-gray-100 flex items-center justify-center">
-                  <div className="flex gap-[1px]">
-                    <div className="w-[1px] h-2 bg-gray-300"></div>
-                    <div className="w-[1px] h-2 bg-gray-300"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <AiPhotoEditSnippet />
           </FeatureCard>
 
           {/* Studio */}

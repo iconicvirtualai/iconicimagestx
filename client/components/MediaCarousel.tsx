@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { AI_BEFORE_AFTER } from "@/lib/beforeAfter";
 import BeforeAfterTile from "./BeforeAfterTile";
 
 export default function MediaCarousel() {
@@ -36,8 +37,17 @@ export default function MediaCarousel() {
         },
       ];
 
+  const stillPairs = AI_BEFORE_AFTER.map((pair) => ({
+    id: pair.id,
+    before: { type: "image" as const, url: pair.before.src, alt: pair.before.alt },
+    after: { type: "image" as const, url: pair.after.src, alt: pair.after.alt },
+    aspect: "16/9" as const,
+  }));
+
+  const carouselPairs = [...stillPairs, ...mediaPairs];
+
   // Double the items for seamless loop
-  const displayPairs = [...mediaPairs, ...mediaPairs, ...mediaPairs];
+  const displayPairs = [...carouselPairs, ...carouselPairs, ...carouselPairs];
 
   const renderTrack = (type: 'before' | 'after') => (
     <div className="flex animate-scroll whitespace-nowrap py-4">
