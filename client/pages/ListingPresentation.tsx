@@ -89,7 +89,7 @@ export function PresentationView({
             type="button"
             onClick={onCopy}
             data-testid="presentation-copy"
-            className="rounded-full border border-white/30 bg-black/35 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-white backdrop-blur-md"
+            className={`rounded-full px-4 py-2.5 text-[10px] font-semibold uppercase tracking-[0.22em] ${copied ? "bg-white text-black" : "border border-white/30 bg-black/45 text-white backdrop-blur-md"}`}
           >
             {copied ? "Copied" : "Copy link"}
           </button>
@@ -200,6 +200,12 @@ export function PresentationView({
         </p>
       </section>
 
+      {copied && (
+        <div role="status" className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-white px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-black shadow-lg">
+          Link copied
+        </div>
+      )}
+
       {open != null && presentation.photos[open] && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black" role="dialog" aria-modal="true" aria-label="Photograph">
           <button type="button" onClick={() => setOpen(null)} className="absolute right-4 top-4 rounded-full border border-white/20 p-2" aria-label="Close">
@@ -268,20 +274,26 @@ export default function ListingPresentation() {
     return () => observer.disconnect();
   }, [presentation]);
 
-  const copy = async () => {
+  const copy = () => {
     const url = window.location.href;
-    try {
-      await navigator.clipboard.writeText(url);
-    } catch {
-      const input = document.createElement("input");
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 12000);
+    const fallback = () => {
+      const input = document.createElement("textarea");
       input.value = url;
+      input.setAttribute("readonly", "true");
+      input.style.position = "fixed";
+      input.style.left = "-9999px";
       document.body.appendChild(input);
       input.select();
       document.execCommand("copy");
       input.remove();
+    };
+    if (!navigator.clipboard?.writeText) {
+      fallback();
+      return;
     }
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1800);
+    navigator.clipboard.writeText(url).catch(fallback);
   };
 
   if (error) {
