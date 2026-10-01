@@ -10,7 +10,9 @@ import {
   where,
 } from "firebase/firestore";
 import { choosePortalClient, type ClientCandidate } from "@shared/listingWrite";
+import { nonEmptyId } from "@shared/orderProjectInvoice";
 import { db } from "@/lib/firebase";
+import { syncListingPair } from "@/lib/orderProjectInvoice";
 
 function asCandidate(id: string, data: Record<string, unknown>): ClientCandidate {
   return {
@@ -51,6 +53,8 @@ export async function linkOrderToListing(input: {
   listingId: string;
   clientId?: string | null;
   clientEmail?: string | null;
+  orderId?: string | null;
+  invoiceId?: string | null;
 }): Promise<void> {
   const patch: Record<string, unknown> = {
     listingId: input.listingId,
@@ -59,6 +63,10 @@ export async function linkOrderToListing(input: {
   if (input.clientId) patch.clientId = input.clientId;
   const email = (input.clientEmail || "").trim().toLowerCase();
   if (email) patch.clientEmail = email;
+  const orderId = nonEmptyId(input.orderId);
+  const invoiceId = nonEmptyId(input.invoiceId);
+  if (orderId) patch.orderId = orderId;
+  if (invoiceId) patch.invoiceId = invoiceId;
 
   try {
     await updateDoc(doc(db, "orderRequests", input.orderRequestId), patch);
@@ -77,5 +85,17 @@ export async function linkOrderToListing(input: {
     throw new Error(
       `Project ${input.listingId} was created but could not be linked to this order. Open it from Projects and attach it, or delete that extra project. ${detail}`,
     );
+  }
+
+  try {
+    await syncListingPair({
+      orderRequestId: input.orderRequestId,
+      listingId: input.listingId,
+      orderId,
+      invoiceId,
+    });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : "Could not finish the invoice link.";
+    throw new Error(`Project is linked to this order. Open it and use Manage Invoice to finish the shared invoice. ${detail}`);
   }
 }

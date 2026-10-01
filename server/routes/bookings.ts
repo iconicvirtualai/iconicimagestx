@@ -12,6 +12,7 @@ import { sendSMS, SMS_TEMPLATES } from "../services/sms";
 import { createCalendarBookingEvent } from "../services/calendar";
 import { lifeOfTheListingCareSelected } from "../../shared/lifeOfTheListingCare";
 import { buildBookingInvoiceDraft, existingInvoiceId } from "../../shared/bookingInvoice";
+import { planInvoiceLink } from "../../shared/orderProjectInvoice";
 import { orderTotalLabel } from "../../shared/bookingPricing";
 import { normalizeEmail } from "../../shared/listingAccess";
 import { attachSquareInvoiceAfterBooking } from "../services/squareInvoices";
@@ -321,6 +322,16 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
 
     const request = requestDoc.data()!;
     if (request.convertedToOrderId) {
+      try {
+        await stampDurableLinks({
+          invoiceId: existingInvoiceId(request.invoiceId),
+          orderRequestId: req.params.id,
+          orderId: String(request.convertedToOrderId),
+          listingId: existingInvoiceId(request.listingId),
+        });
+      } catch (err) {
+        console.error("[Bookings] Order/project/invoice link failed:", err);
+      }
       return res.json({
         success: true,
         orderId: request.convertedToOrderId,
@@ -508,6 +519,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
     }
 
     const linkedInvoiceId = existingInvoiceId(request.invoiceId);
+    const listingId = existingInvoiceId(request.listingId);
     let invoiceId = linkedInvoiceId;
     if (linkedInvoiceId) {
       const existingInvoice = await db().collection("invoices").doc(linkedInvoiceId).get();
@@ -518,6 +530,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
           galleryId: galleryRef.id,
           clientName: requestClientName,
           clientEmail: requestEmail,
+          ...(listingId ? { listingId } : {}),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       } else {
@@ -540,6 +553,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
         ...draft,
         orderId: orderRef.id,
         galleryId: galleryRef.id,
+        ...(listingId ? { listingId } : {}),
         invoiceNumber: await generateInvoiceNumber(),
         paymentUrl: `${appUrl()}/invoice/${invoiceRef.id}`,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -562,6 +576,17 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       invoiceId,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+
+    try {
+      await stampDurableLinks({
+        invoiceId,
+        orderRequestId: req.params.id,
+        orderId: orderRef.id,
+        listingId,
+      });
+    } catch (err) {
+      console.error("[Bookings] Order/project/invoice link failed:", err);
+    }
 
     // Send confirmation email to client
     await sendEmail({
@@ -620,6 +645,34 @@ router.patch("/:id/decline", requireCoordinator, async (req, res) => {
 });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────────────────
+
+/** Point the order, project, and invoice at each other. Does not change totals or send mail. */
+async function stampDurableLinks(input: {
+  invoiceId: string | null;
+  orderRequestId: string;
+  orderId: string;
+  listingId: string | null;
+}): Promise<void> {
+  if (!input.invoiceId || !input.orderId) return;
+  const plan = planInvoiceLink({
+    orderRequestId: input.orderRequestId,
+    orderId: input.orderId,
+    listingId: input.listingId,
+    orderInvoiceId: input.invoiceId,
+  });
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const invoiceRef = db().collection("invoices").doc(plan.createId);
+  const invoiceSnap = await invoiceRef.get();
+  if (invoiceSnap.exists && Object.keys(plan.invoiceFields).length > 0) {
+    await invoiceRef.update({ ...plan.invoiceFields, updatedAt: now });
+  }
+  if (plan.orderFields) {
+    await db().collection("orders").doc(input.orderId).update({ ...plan.orderFields, updatedAt: now });
+  }
+  if (input.listingId && plan.listingFields) {
+    await db().collection("listings").doc(input.listingId).update({ ...plan.listingFields, updatedAt: now });
+  }
+}
 
 async function linkClientIdByEmail(email: string): Promise<string | null> {
   try {
