@@ -39,6 +39,11 @@ interface SendEmailOptions {
   bcc?: string;
   cc?: string;
   template: string;
+  /**
+   * "staff" is required for the live_chat office alert. Omit for client mail.
+   * Visitor addresses must not be paired with audience "staff".
+   */
+  audience?: "client" | "staff";
   variables?: Record<string, string>;
   subject?: string; // override template subject
   attachments?: Array<{ filename: string; path: string }>;
@@ -46,21 +51,22 @@ interface SendEmailOptions {
 
 // ─── Main Send Function ───────────────────────────────────────────────────────
 
-export async function sendEmail(options: SendEmailOptions): Promise<void> {
-  const { to, bcc, cc, template, variables = {}, subject: subjectOverride, attachments } = options;
+export async function sendEmail(options: SendEmailOptions): Promise<{ sent: boolean }> {
+  const { to, bcc, cc, template, audience, variables = {}, subject: subjectOverride, attachments } = options;
 
   if (!to) {
     console.warn("[Email] No recipient specified, skipping.");
-    return;
+    return { sent: false };
   }
 
   // booking_received (order-received confirmation) always sends.
-  // Marketing, portal, contact auto-acks, and other non-order mail stay off under RED.
-  if (!emailAllowed(template)) {
+  // live_chat sends only with audience "staff" (visitor → office).
+  // Marketing, portal, contact auto-acks, and other non-order client mail stay off under RED.
+  if (!emailAllowed(template, process.env, audience)) {
     console.warn(
       `[Email] Suppressed '${template}' to ${to} — ${clientNotifyBlockReason()}. No message sent.`,
     );
-    return;
+    return { sent: false };
   }
 
   try {
@@ -93,6 +99,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
     });
 
     console.log(`[Email] Sent '${template}' to ${to}`);
+    return { sent: true };
   } catch (err) {
     console.error(`[Email] Failed to send '${template}' to ${to}:`, err);
     throw err;
@@ -216,6 +223,21 @@ function getFallbackTemplate(
       <p style="margin-top:30px;color:#999;font-size:12px;">
         <strong>To reply:</strong> Send an email directly to ${vars.senderEmail}
       </p>
+    `),
+    live_chat: base(`
+      <h2 style="color:#0d9488;">Live chat message</h2>
+      <p>A visitor sent a message from the website chat. Reply to them directly — this alert did not email or text the visitor.</p>
+
+      <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;border:1px solid #eee;border-radius:8px;overflow:hidden;">
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;width:42%;color:#555;border-bottom:1px solid #eee;">From</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.senderName}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Email</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.senderEmail}</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Phone</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.senderPhone}</td></tr>
+      </table>
+
+      <h3 style="color:#555;margin-top:30px;margin-bottom:10px;">Message:</h3>
+      <div style="background:#f8fafc;padding:15px;border-left:4px solid #0d9488;color:#333;line-height:1.6;">
+        ${(vars.message || "").replace(/\n/g, "<br>")}
+      </div>
     `),
     contact_confirmation: base(`
       <h2 style="color:#0d9488;">We received your message!</h2>
