@@ -722,6 +722,51 @@ function existingInvoiceId(value) {
   const id = value.trim();
   return id ? id : null;
 }
+function nonEmptyId(value) {
+  if (typeof value !== "string") return null;
+  const id = value.trim();
+  return id ? id : null;
+}
+function orderInvoiceDocId(orderRequestId) {
+  return `ordreq_${orderRequestId}`;
+}
+function listingInvoiceDocId(listingId) {
+  return `listing_${listingId}`;
+}
+function compact(fields) {
+  const out = {};
+  for (const [key, value] of Object.entries(fields)) {
+    if (value) out[key] = value;
+  }
+  return out;
+}
+function planInvoiceLink(anchor) {
+  const orderRequestId = nonEmptyId(anchor.orderRequestId);
+  const orderId = nonEmptyId(anchor.orderId);
+  const listingId = nonEmptyId(anchor.listingId);
+  const orderInvoiceId = nonEmptyId(anchor.orderInvoiceId);
+  const listingInvoiceId = nonEmptyId(anchor.listingInvoiceId);
+  const found = (anchor.foundInvoiceIds || []).map(nonEmptyId).filter((id) => Boolean(id));
+  const invoiceId = orderInvoiceId || listingInvoiceId || found[0] || null;
+  const createId = invoiceId || (orderRequestId ? orderInvoiceDocId(orderRequestId) : null) || (listingId ? listingInvoiceDocId(listingId) : null);
+  if (!createId) {
+    throw new Error("An order or project is required to link an invoice.");
+  }
+  const invoiceFields = compact({
+    orderRequestId,
+    orderId,
+    listingId
+  });
+  return {
+    invoiceId,
+    attached: Boolean(invoiceId),
+    createId,
+    invoiceFields,
+    orderRequestFields: orderRequestId ? compact({ invoiceId: createId, listingId, orderId }) : null,
+    listingFields: listingId ? compact({ invoiceId: createId, orderRequestId, orderId }) : null,
+    orderFields: orderId ? compact({ invoiceId: createId, orderRequestId, listingId }) : null
+  };
+}
 const CLOSED_STATUSES = /* @__PURE__ */ new Set(["void", "voided", "cancelled", "canceled"]);
 const SETTLED_STATUSES = /* @__PURE__ */ new Set(["paid", "comped"]);
 function statusOf(invoice) {
@@ -1388,6 +1433,16 @@ router$f.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     }
     const request = requestDoc.data();
     if (request.convertedToOrderId) {
+      try {
+        await stampDurableLinks({
+          invoiceId: existingInvoiceId(request.invoiceId),
+          orderRequestId: req.params.id,
+          orderId: String(request.convertedToOrderId),
+          listingId: existingInvoiceId(request.listingId)
+        });
+      } catch (err) {
+        console.error("[Bookings] Order/project/invoice link failed:", err);
+      }
       return res.json({
         success: true,
         orderId: request.convertedToOrderId,
@@ -1549,6 +1604,7 @@ router$f.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       ]);
     }
     const linkedInvoiceId = existingInvoiceId(request.invoiceId);
+    const listingId = existingInvoiceId(request.listingId);
     let invoiceId = linkedInvoiceId;
     if (linkedInvoiceId) {
       const existingInvoice = await db$g().collection("invoices").doc(linkedInvoiceId).get();
@@ -1559,6 +1615,7 @@ router$f.patch("/:id/confirm", requireCoordinator, async (req, res) => {
           galleryId: galleryRef.id,
           clientName: requestClientName,
           clientEmail: requestEmail,
+          ...listingId ? { listingId } : {},
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
       } else {
@@ -1581,6 +1638,7 @@ router$f.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         ...draft,
         orderId: orderRef.id,
         galleryId: galleryRef.id,
+        ...listingId ? { listingId } : {},
         invoiceNumber: await generateInvoiceNumber(),
         paymentUrl: `${appUrl$2()}/invoice/${invoiceRef.id}`,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -1600,6 +1658,16 @@ router$f.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       invoiceId,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
+    try {
+      await stampDurableLinks({
+        invoiceId,
+        orderRequestId: req.params.id,
+        orderId: orderRef.id,
+        listingId
+      });
+    } catch (err) {
+      console.error("[Bookings] Order/project/invoice link failed:", err);
+    }
     await sendEmail({
       to: requestEmail,
       template: "order_confirmed",
@@ -1647,6 +1715,27 @@ router$f.patch("/:id/decline", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to decline booking." });
   }
 });
+async function stampDurableLinks(input) {
+  if (!input.invoiceId || !input.orderId) return;
+  const plan = planInvoiceLink({
+    orderRequestId: input.orderRequestId,
+    orderId: input.orderId,
+    listingId: input.listingId,
+    orderInvoiceId: input.invoiceId
+  });
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const invoiceRef = db$g().collection("invoices").doc(plan.createId);
+  const invoiceSnap = await invoiceRef.get();
+  if (invoiceSnap.exists && Object.keys(plan.invoiceFields).length > 0) {
+    await invoiceRef.update({ ...plan.invoiceFields, updatedAt: now });
+  }
+  if (plan.orderFields) {
+    await db$g().collection("orders").doc(input.orderId).update({ ...plan.orderFields, updatedAt: now });
+  }
+  if (input.listingId && plan.listingFields) {
+    await db$g().collection("listings").doc(input.listingId).update({ ...plan.listingFields, updatedAt: now });
+  }
+}
 async function linkClientIdByEmail(email) {
   try {
     const normalized = normalizeEmail(email);
