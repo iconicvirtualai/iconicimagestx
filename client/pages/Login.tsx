@@ -30,6 +30,7 @@ export default function Login() {
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
+  const [resetSentTo, setResetSentTo] = useState("");
 
   useEffect(() => {
     if (loading || !user || !userType) return;
@@ -89,19 +90,26 @@ export default function Login() {
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resetEmail) return;
+    const emailToReset = resetEmail.trim();
+    if (!emailToReset) {
+      toast.error("Enter the email on the account.");
+      return;
+    }
+    setSubmitting(true);
     try {
       const gate = await fetch("/api/client-notify");
       const gateData = await gate.json().catch(() => ({ live: false }));
       if (!gate.ok || gateData?.live !== true) {
-        toast.error("Failed to send reset email.");
+        toast.error("Password reset email is paused while client notifications are off.");
         return;
       }
-      await resetPassword(resetEmail);
-      toast.success("Reset email sent. Check your inbox.");
-      setMode("signin");
-    } catch {
-      toast.error("Failed to send reset email.");
+      await resetPassword(emailToReset, "portal");
+      setResetSentTo(emailToReset);
+      toast.success("If an account exists for that email, a reset link is on its way.");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Could not send the reset email.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -137,10 +145,27 @@ export default function Login() {
               {submitting ? "Saving..." : "Finish client profile"}
             </Button>
           </form>
+        ) : resetSentTo ? (
+          <div className="space-y-4 text-center">
+            <p className="text-zinc-200 text-sm">Check {resetSentTo}</p>
+            <p className="text-zinc-400 text-sm">
+              If an account exists for that email, a reset link is on its way. Open the link, choose a new password, and you will come back here to sign in.
+            </p>
+            <Button
+              type="button"
+              onClick={() => {
+                setResetSentTo("");
+                setMode("signin");
+              }}
+              className="w-full bg-white text-black hover:bg-gray-100 font-semibold"
+            >
+              Back to sign in
+            </Button>
+          </div>
         ) : mode === "reset" ? (
           <form onSubmit={handleResetPassword} className="space-y-4">
             <p className="text-zinc-400 text-sm text-center">
-              Enter your email to receive a password reset link.
+              Enter your email and we will send a link to set a new password. The link opens on this site and brings you back here to sign in.
             </p>
             <Input
               type="email"
@@ -148,10 +173,11 @@ export default function Login() {
               value={resetEmail}
               onChange={(e) => setResetEmail(e.target.value)}
               className={inputClass}
+              autoComplete="email"
               required
             />
-            <Button type="submit" className="w-full bg-white text-black hover:bg-gray-100">
-              Send Reset Link
+            <Button type="submit" disabled={submitting} className="w-full bg-white text-black hover:bg-gray-100 font-semibold">
+              {submitting ? "Sending reset link..." : "Send reset link"}
             </Button>
             <div className="text-center">
               <button type="button" onClick={() => setMode("signin")} className="text-zinc-500 hover:text-zinc-300 text-sm">
@@ -202,7 +228,14 @@ export default function Login() {
               {submitting ? "Signing in..." : "Sign In"}
             </Button>
             <div className="text-center">
-              <button type="button" onClick={() => setMode("reset")} className="text-zinc-500 hover:text-zinc-300 text-sm transition-colors">
+              <button
+                type="button"
+                onClick={() => {
+                  setResetEmail((current) => current || email);
+                  setMode("reset");
+                }}
+                className="text-zinc-300 hover:text-white text-sm underline underline-offset-4 transition-colors"
+              >
                 Forgot password?
               </button>
             </div>

@@ -216,3 +216,21 @@ The virtual staging API routes are now in `server/routes/vsai.ts`. You no longer
 | `packages` | Admin | Public |
 | `promoCodes` | Admin | Public |
 | `siteSettings` | Admin | Public |
+
+---
+
+## Staff and portal password reset
+
+Forgot password on `/admin/login` and `/portal` asks Firebase Auth to email a reset link. The app does not send that mail through Nodemailer, so the client-notification kill switch and `CLIENT_COMMS_ZONE=RED` do not block staff reset. Portal reset still waits until `/api/client-notify` reports live, which is the existing pause for non-order client mail.
+
+The link only opens this site after two Firebase Console settings. Code cannot set them.
+
+1. Open the Firebase project `iconic-images-aicon` → **Authentication** → **Settings** → **Authorized domains**.
+2. Add `iconicimagestx.vercel.app`. The project currently allows only `localhost`, `iconic-images-aicon.firebaseapp.com`, and `iconic-images-aicon.web.app`. Also add `iconicimagestx.com` and `www.iconicimagestx.com` if those hosts serve the app.
+3. Open **Authentication** → **Templates** → **Password reset** → pencil icon → **Customize action URL**.
+4. Set the action URL to `https://iconicimagestx.vercel.app/reset-password` and save.
+5. Firebase uses that action URL for every auth email template (password reset, email verification, and email recovery). The same page handles those modes. Leave the sender on Firebase's default address unless you are ready to verify a custom domain; a custom sender is not required for the reset link to work.
+
+Until the domain is authorized, **Send reset link** fails with a toast naming Authorized domains, and no email is sent. After the domain is authorized but before the action URL is customized, Firebase's own page accepts the new password and then returns the person to `/admin/login` (or `/portal` for a client). After the action URL is saved, the email opens `/reset-password` on `iconicimagestx.vercel.app`, the person sets a password there, and the app returns them to sign in.
+
+To reset the staff account `cadi@caditorres.com` after this is deployed: open `https://iconicimagestx.vercel.app/admin/login`, choose **Forgot password?**, enter that email, and use the link in the inbox.
