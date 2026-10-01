@@ -10,8 +10,14 @@ import {
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { doc, onSnapshot, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, updateDoc, serverTimestamp } from "firebase/firestore";
 import { toast } from "sonner";
+import {
+  invoiceDraftFromOrder,
+  invoiceDraftFromProject,
+  projectInvoiceButtonLabel,
+} from "@shared/orderProjectInvoice";
+import { ensureLinkedInvoice, resolveLinkedInvoice } from "@/lib/orderProjectInvoice";
 
 // ─── Status systems ───────────────────────────────────────────────────────────
 const RE_STATUSES = ["unscheduled", "scheduled", "in_progress", "delivered", "paid", "archived"];
@@ -251,6 +257,10 @@ export default function AdminListingFile() {
   const [tourInput, setTourInput] = React.useState("");
   const editingInfoRef = React.useRef(false);
   editingInfoRef.current = editingInfo;
+  const [linkedOrder, setLinkedOrder] = React.useState<any>(null);
+  const [linkedInvoice, setLinkedInvoice] = React.useState<any>(null);
+  const [invoicePhase, setInvoicePhase] = React.useState<"loading" | "missing" | "linked">("loading");
+  const [invoiceBusy, setInvoiceBusy] = React.useState(false);
 
   // Live listener
   React.useEffect(() => {
@@ -273,6 +283,58 @@ export default function AdminListingFile() {
     });
     return () => unsub();
   }, [id, navigate]);
+
+  React.useEffect(() => {
+    setInvoicePhase("loading");
+    setLinkedInvoice(null);
+    setLinkedOrder(null);
+  }, [id]);
+
+  React.useEffect(() => {
+    if (!project?.id || project.id !== id) return;
+    let cancel = false;
+    (async () => {
+      let order: any = null;
+      const orderRequestId = typeof project.orderRequestId === "string" ? project.orderRequestId : "";
+      if (orderRequestId) {
+        try {
+          const snap = await getDoc(doc(db, "orderRequests", orderRequestId));
+          if (snap.exists()) order = { id: snap.id, ...snap.data() };
+        } catch (err) {
+          console.error("[AdminListingFile] Order lookup failed.", err);
+        }
+      }
+      if (cancel) return;
+      setLinkedOrder(order);
+      const anchor = {
+        orderRequestId: orderRequestId || null,
+        orderId: project.orderId || order?.convertedToOrderId || order?.orderId || null,
+        listingId: project.id,
+        orderInvoiceId: order?.invoiceId,
+        listingInvoiceId: project.invoiceId,
+      };
+      try {
+        const invoiceId = await resolveLinkedInvoice(anchor);
+        if (cancel) return;
+        if (!invoiceId) {
+          setLinkedInvoice(null);
+          setInvoicePhase("missing");
+          return;
+        }
+        const invoiceSnap = await getDoc(doc(db, "invoices", invoiceId));
+        if (cancel) return;
+        setLinkedInvoice(invoiceSnap.exists() ? { id: invoiceSnap.id, ...invoiceSnap.data() } : { id: invoiceId });
+        setInvoicePhase("linked");
+      } catch (err) {
+        console.error("[AdminListingFile] Invoice lookup failed.", err);
+        if (cancel) return;
+        const stored = typeof project.invoiceId === "string" ? project.invoiceId.trim() : "";
+        setLinkedInvoice(stored ? { id: stored } : null);
+        setInvoicePhase(stored ? "linked" : "missing");
+      }
+    })();
+    return () => { cancel = true; };
+  }, [id, project?.id, project?.orderRequestId, project?.invoiceId, project?.orderId]);
 
   // Auto-status logic
   React.useEffect(() => {
@@ -331,6 +393,32 @@ export default function AdminListingFile() {
     if (!tourInput.trim()) return;
     try { await patch({ tourUrl: tourInput.trim() }); toast.success("3D tour URL saved."); setTourInput(""); }
     catch { toast.error("Failed to save tour URL."); }
+  };
+
+  const handleManageInvoice = async () => {
+    if (!project?.id || invoicePhase === "loading") return;
+    setInvoiceBusy(true);
+    try {
+      let order = linkedOrder;
+      const orderRequestId = typeof project.orderRequestId === "string" ? project.orderRequestId : "";
+      if (!order && orderRequestId) {
+        const snap = await getDoc(doc(db, "orderRequests", orderRequestId));
+        if (snap.exists()) order = { id: snap.id, ...snap.data() };
+      }
+      const invoiceId = await ensureLinkedInvoice({
+        orderRequestId: orderRequestId || null,
+        orderId: project.orderId || order?.convertedToOrderId || order?.orderId || null,
+        listingId: project.id,
+        orderInvoiceId: order?.invoiceId || linkedInvoice?.id,
+        listingInvoiceId: project.invoiceId || linkedInvoice?.id,
+      }, order ? invoiceDraftFromOrder(order) : invoiceDraftFromProject(project));
+      navigate(`/invoice/${invoiceId}`);
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Could not open the invoice.");
+    } finally {
+      setInvoiceBusy(false);
+    }
   };
 
   const deletePhoto = async (index: number) => {
@@ -743,19 +831,47 @@ export default function AdminListingFile() {
             </div>
           )}
 
-          {/* Invoice */}
+          {/* Order linked to this project */}
+          <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-5">
+            <h3 className={`${labelCls} mb-4`}>Order</h3>
+            {linkedOrder ? (
+              <div className="space-y-2 mb-3">
+                <p className="text-sm font-black text-black">{linkedOrder.clientName || project.clientName || "Client"}</p>
+                <p className="text-[10px] font-mono text-gray-400">#{String(linkedOrder.id).slice(0, 8)}</p>
+                <p className="text-xs font-bold text-gray-600">{String(linkedOrder.status || "new").replace(/_/g, " ")}</p>
+                <p className="text-sm font-black text-[#0d9488]">${Number(linkedOrder.total || linkedOrder.pricing?.total || 0).toLocaleString()}</p>
+              </div>
+            ) : project.orderRequestId ? (
+              <p className="text-xs text-gray-400 mb-3">Order link saved.</p>
+            ) : (
+              <p className="text-xs text-gray-400 mb-3">No order linked. Invoice for this project is created here.</p>
+            )}
+            {linkedOrder && (
+              <button type="button" onClick={() => navigate(`/admin/order-request/${linkedOrder.id}`)}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-600 hover:bg-gray-50 transition-colors"
+              >View Order</button>
+            )}
+          </div>
+
+          {/* Invoice — same document as the order when this project came from one */}
           <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-5">
             <h3 className={`${labelCls} mb-4 flex items-center gap-2`}><CreditCard className="w-3.5 h-3.5" /> Invoice</h3>
-            {project.total > 0 ? (
+            {linkedInvoice ? (
               <div className="mb-3">
-                <p className="text-xl font-black text-black">$<span>{Number(project.total).toLocaleString()}</span></p>
-                <p className="text-[10px] text-gray-400 uppercase tracking-widest">{project.invoiceStatus || "Draft"}</p>
+                <p className="text-xl font-black text-black">${Number(linkedInvoice.total ?? linkedInvoice.amountDue ?? project.total ?? 0).toLocaleString()}</p>
+                <p className="text-[10px] text-gray-400 uppercase tracking-widest">{linkedInvoice.status || "Draft"}</p>
+                {linkedInvoice.invoiceNumber && <p className="text-[10px] font-mono text-gray-400 mt-1">{linkedInvoice.invoiceNumber}</p>}
               </div>
             ) : (
-              <p className="text-xs text-gray-400 mb-3">No invoice generated yet.</p>
+              <p className="text-xs text-gray-400 mb-3">{invoicePhase === "loading" ? "Checking invoice…" : "No invoice yet."}</p>
             )}
-            <button className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-600 hover:bg-gray-50 transition-colors">
-              Manage Invoice
+            <button
+              type="button"
+              onClick={handleManageInvoice}
+              disabled={invoiceBusy || invoicePhase === "loading"}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              {invoiceBusy ? "Opening..." : invoicePhase === "loading" ? "Invoice…" : projectInvoiceButtonLabel(invoicePhase === "linked")}
             </button>
           </div>
         </div>

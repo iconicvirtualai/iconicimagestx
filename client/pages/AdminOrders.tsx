@@ -7,6 +7,7 @@ import { collection, onSnapshot, writeBatch, doc, serverTimestamp, addDoc, getDo
 import { toast } from "sonner";
 import { listingAppointmentDate } from "@shared/listingWrite";
 import { linkOrderToListing, resolvePortalClientId } from "@/lib/listingClient";
+import { listingLinkFields } from "@shared/orderProjectInvoice";
 import { Button } from "@/components/ui/button";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 import { getAssignedNames, upsertScheduledAppointment } from "@/lib/scheduleRecords";
@@ -170,9 +171,14 @@ export default function AdminOrders() {
             console.warn("[AdminOrders] Client lookup failed.", lookupErr);
           }
           const apptDate = listingAppointmentDate(order.appointmentDate);
+          const links = listingLinkFields({
+            orderRequestId: id,
+            orderId: order.convertedToOrderId || order.orderId,
+            invoiceId: order.invoiceId,
+          });
           const listingData: any = {
             projectType: bulkProjectType,
-            orderRequestId: id,
+            ...links,
             clientId,
             clientName: getName(order),
             clientEmail,
@@ -190,7 +196,14 @@ export default function AdminOrders() {
             createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
           };
           const ref = await addDoc(collection(db, "listings"), listingData);
-          await linkOrderToListing({ orderRequestId: id, listingId: ref.id, clientId, clientEmail });
+          await linkOrderToListing({
+            orderRequestId: id,
+            listingId: ref.id,
+            clientId,
+            clientEmail,
+            orderId: links.orderId || null,
+            invoiceId: links.invoiceId || null,
+          });
           count++;
         } catch (err) {
           console.error(err);

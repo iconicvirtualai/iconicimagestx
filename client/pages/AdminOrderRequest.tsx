@@ -4,7 +4,7 @@ import AdminLayout from "@/components/AdminLayout";
 import { Button } from "@/components/ui/button";
 import {
   ChevronLeft, Edit3, Save, Calendar, Archive,
-  X, AlertCircle, MapPin, Clock, Camera, Layers, Eye, Send, Check,
+  X, AlertCircle, MapPin, Clock, Camera, Layers, Eye, Send, Check, FilePlus,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import {
@@ -13,6 +13,12 @@ import {
 } from "firebase/firestore";
 import { toast } from "sonner";
 import { listingAppointmentDate } from "@shared/listingWrite";
+import {
+  invoiceDraftFromOrder,
+  listingLinkFields,
+  orderInvoiceButtonLabel,
+} from "@shared/orderProjectInvoice";
+import { ensureLinkedInvoice, resolveLinkedInvoice } from "@/lib/orderProjectInvoice";
 import { separatePromoDiscount } from "@shared/bookingPricing";
 import { linkOrderToListing, resolvePortalClientId } from "@/lib/listingClient";
 import { deliverInvoiceEmail } from "@/lib/deliverInvoice";
@@ -136,10 +142,15 @@ export default function AdminOrderRequest() {
   const [schedTime, setSchedTime] = React.useState("");
   const [showCancel, setShowCancel] = React.useState(false);
   const [sendingReceipt, setSendingReceipt] = React.useState(false);
+  const [invoicePhase, setInvoicePhase] = React.useState<"loading" | "missing" | "linked">("loading");
+  const [linkedInvoiceId, setLinkedInvoiceId] = React.useState<string | null>(null);
+  const [invoiceBusy, setInvoiceBusy] = React.useState(false);
   const [staff, setStaff] = React.useState<any[]>([]);
   const [selectedProviders, setSelectedProviders] = React.useState<string[]>([]);
   const [projectTypeChoice, setProjectTypeChoice] = React.useState<"real_estate" | "business">("real_estate");
   const projectTypeTouched = React.useRef(false);
+  const editingRef = React.useRef(false);
+  editingRef.current = editing;
 
   React.useEffect(() => {
     if (!id) return;
@@ -147,7 +158,7 @@ export default function AdminOrderRequest() {
       if (snap.exists()) {
         const data: any = { id: snap.id, ...snap.data() };
         setOrder(data);
-        setForm(data);
+        if (!editingRef.current) setForm(data);
         if (!projectTypeTouched.current) {
           const lineItems = data.lineItems || [];
           const inferredRealEstate = data.specializedPhotography === "mls" || lineItems.some((li: any) => {
@@ -164,6 +175,28 @@ export default function AdminOrderRequest() {
     });
     return () => unsub();
   }, [id, navigate]);
+
+  React.useEffect(() => {
+    if (!order?.id) return;
+    let cancel = false;
+    resolveLinkedInvoice({
+      orderRequestId: order.id,
+      orderId: order.convertedToOrderId || order.orderId,
+      listingId: order.listingId,
+      orderInvoiceId: order.invoiceId,
+    }).then((invoiceId) => {
+      if (cancel) return;
+      setLinkedInvoiceId(invoiceId);
+      setInvoicePhase(invoiceId ? "linked" : "missing");
+    }).catch((err) => {
+      console.error("[AdminOrderRequest] Invoice lookup failed.", err);
+      if (cancel) return;
+      const stored = typeof order.invoiceId === "string" ? order.invoiceId.trim() : "";
+      setLinkedInvoiceId(stored || null);
+      setInvoicePhase(stored ? "linked" : "missing");
+    });
+    return () => { cancel = true; };
+  }, [order?.id, order?.invoiceId, order?.listingId, order?.convertedToOrderId, order?.orderId]);
 
   React.useEffect(() => {
     getDocs(collection(db, "staff")).then(snap => {
@@ -202,9 +235,14 @@ export default function AdminOrderRequest() {
         console.warn("[AdminOrderRequest] Client lookup failed.", lookupErr);
       }
       const apptDate = listingAppointmentDate(order.appointmentDate);
+      const links = listingLinkFields({
+        orderRequestId: id,
+        orderId: order.convertedToOrderId || order.orderId,
+        invoiceId: linkedInvoiceId || order.invoiceId,
+      });
       const listingData: any = {
         projectType: projectTypeChoice,
-        orderRequestId: id,
+        ...links,
         clientId,
         clientName: order.clientName || `${order.firstName || ""} ${order.lastName || ""}`.trim(),
         clientEmail,
@@ -230,7 +268,6 @@ export default function AdminOrderRequest() {
         }),
         photographerIds: selectedProviders,
         photographerNames: selectedProviders.map(pid => staff.find(st => st.id === pid)?.name || pid),
-        invoice: { invoiceNumber: `INV-${id.substring(0, 6).toUpperCase()}`, status: "draft", amountDue: Number(order.total) || 0, amountPaid: 0 },
         createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       };
       const ref = await addDoc(collection(db, "listings"), listingData);
@@ -239,6 +276,8 @@ export default function AdminOrderRequest() {
         listingId: ref.id,
         clientId,
         clientEmail,
+        orderId: links.orderId || null,
+        invoiceId: links.invoiceId || null,
       });
       toast.success("Project created!");
       navigate(`/admin/listing/${ref.id}`);
@@ -302,21 +341,30 @@ export default function AdminOrderRequest() {
     toast.success("Cancelled."); setShowCancel(false); navigate("/admin/orders");
   };
 
-  const handleViewInvoice = () => {
-    const invoiceId = typeof order?.invoiceId === "string" ? order.invoiceId : "";
-    if (!invoiceId) {
-      toast.error("No invoice is attached to this request yet.");
-      return;
+  const handleInvoice = async () => {
+    if (!order?.id || invoicePhase === "loading") return;
+    setInvoiceBusy(true);
+    try {
+      const invoiceId = await ensureLinkedInvoice({
+        orderRequestId: order.id,
+        orderId: order.convertedToOrderId || order.orderId,
+        listingId: order.listingId,
+        orderInvoiceId: linkedInvoiceId || order.invoiceId,
+      }, invoiceDraftFromOrder(order));
+      setLinkedInvoiceId(invoiceId);
+      setInvoicePhase("linked");
+      navigate(`/invoice/${invoiceId}`);
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Could not open the invoice.");
+    } finally {
+      setInvoiceBusy(false);
     }
-    navigate(`/invoice/${invoiceId}`);
   };
 
   const handleSendReceipt = async () => {
-    const invoiceId = typeof order?.invoiceId === "string" ? order.invoiceId : "";
-    if (!invoiceId) {
-      toast.error("No invoice is attached to this request yet.");
-      return;
-    }
+    const invoiceId = linkedInvoiceId || "";
+    if (!invoiceId) return;
     if (!user) {
       toast.error("Please sign in again.");
       return;
@@ -348,6 +396,8 @@ export default function AdminOrderRequest() {
   const setF = (key: string) => (val: string) => setForm((prev: any) => ({ ...prev, [key]: val }));
 
   const isScheduledState = ["scheduled", "in_progress", "delivered", "paid"].includes(statusKey);
+  const invoiceAttached = invoicePhase === "linked" && Boolean(linkedInvoiceId);
+  const invoiceLabel = invoicePhase === "loading" ? "Invoice…" : orderInvoiceButtonLabel(invoiceAttached);
 
   return (
     <AdminLayout title="Order Request">
@@ -521,8 +571,11 @@ export default function AdminOrderRequest() {
               )}
             </div>
             <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
-              <Button type="button" onClick={handleViewInvoice} variant="outline" className="w-full rounded-xl text-xs font-bold justify-center text-black"><Eye className="w-3.5 h-3.5 mr-1.5" /> View Invoice</Button>
-              <Button type="button" onClick={handleSendReceipt} disabled={sendingReceipt} variant="outline" className="w-full rounded-xl text-xs font-bold justify-center text-black"><Send className="w-3.5 h-3.5 mr-1.5" /> {sendingReceipt ? "Sending..." : "Send Receipt"}</Button>
+              <Button type="button" onClick={handleInvoice} disabled={invoiceBusy || invoicePhase === "loading"} variant="outline" className="w-full rounded-xl text-xs font-bold justify-center text-black">
+                {invoiceAttached ? <Eye className="w-3.5 h-3.5 mr-1.5" /> : <FilePlus className="w-3.5 h-3.5 mr-1.5" />}
+                {invoiceBusy ? "Opening..." : invoiceLabel}
+              </Button>
+              <Button type="button" onClick={handleSendReceipt} disabled={!invoiceAttached || sendingReceipt} variant="outline" className="w-full rounded-xl text-xs font-bold justify-center text-black"><Send className="w-3.5 h-3.5 mr-1.5" /> {sendingReceipt ? "Sending..." : "Send Receipt"}</Button>
             </div>
           </div>
 
