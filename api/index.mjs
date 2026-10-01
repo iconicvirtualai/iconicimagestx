@@ -613,6 +613,9 @@ async function listCalendarScheduleEvents({
     return [];
   });
 }
+function lifeOfTheListingCareSelected(value) {
+  return value === true;
+}
 const router$e = Router();
 const db$f = () => admin.firestore();
 function appUrl$2() {
@@ -677,7 +680,8 @@ router$e.post("/", async (req, res) => {
       resultsBothering,
       perfectBusiness,
       businessSource,
-      investmentWilling
+      investmentWilling,
+      lifeOfTheListingCare
     } = req.body;
     if (!firstName || !lastName || !email || !phone || !address) {
       return res.status(400).json({ error: "Missing required fields." });
@@ -720,6 +724,8 @@ router$e.post("/", async (req, res) => {
       perfectBusiness: perfectBusiness || null,
       businessSource: businessSource || null,
       investmentWilling: investmentWilling || null,
+      // Draft add-on. Quote only — do not price it or mention it in client email/SMS.
+      lifeOfTheListingCare: lifeOfTheListingCareSelected(lifeOfTheListingCare),
       status: "new",
       source: "booking_form",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -907,6 +913,7 @@ router$e.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       furnishingStatus: request.furnishingStatus || null,
       notes: request.vibeNote || "",
       internalNotes: internalNotes || "",
+      lifeOfTheListingCare: lifeOfTheListingCareSelected(request.lifeOfTheListingCare),
       confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
