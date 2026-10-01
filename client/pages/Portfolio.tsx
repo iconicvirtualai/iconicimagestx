@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import { X } from "lucide-react";
 import { SNAP_REELS } from "@/lib/snapReels";
+import { AI_BEFORE_AFTER, AERIAL_STILLS, PRIMARY_SUITE_STILL } from "@/lib/beforeAfter";
 
 type Category = "All" | "People" | "Families" | "Studio" | "Holiday" | "Headshots" | "Listings" | "Aerial" | "Virtual Staging";
 
@@ -39,6 +40,14 @@ const PHOTOS: Photo[] = [
   { src: "/media/photos/listing-living-04.jpg", alt: "Listing interior in evening light", title: "Evening Interior", category: "Listings" },
   { src: "/media/photos/staged-living-room.jpg", alt: "Virtually staged living room", title: "Staged Living Room", category: "Virtual Staging" },
   { src: "/media/photos/vs-ico7432.jpg", alt: "Virtual staging interior", title: "Virtual Staging", category: "Virtual Staging" },
+  ...AERIAL_STILLS,
+  PRIMARY_SUITE_STILL,
+  ...AI_BEFORE_AFTER.map((pair) => ({
+    src: pair.after.src,
+    alt: pair.after.alt,
+    title: pair.label,
+    category: pair.id === "twilight-pool" ? "Listings" as const : "Virtual Staging" as const,
+  })),
 ];
 
 const FILTERS: Category[] = ["All", "People", "Families", "Studio", "Holiday", "Headshots", "Listings", "Aerial", "Virtual Staging"];
@@ -126,6 +135,50 @@ export default function Portfolio() {
                 ))}
               </div>
             )}
+
+            <div className="mt-20 border-t border-white/10 pt-16">
+              <p className="text-[11px] font-black uppercase tracking-[0.45em] text-teal-400 mb-4">
+                AI edits
+              </p>
+              <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tight mb-4">
+                Before / After
+              </h2>
+              <p className="mb-10 max-w-2xl text-gray-400">
+                Twilight conversion, lifestyle staging, and virtual declutter from Iconic.
+              </p>
+              <div className="space-y-12">
+                {AI_BEFORE_AFTER.map((pair) => (
+                  <figure key={pair.id}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="relative overflow-hidden rounded-[1.5rem] border border-white/10 bg-zinc-900">
+                        <img
+                          src={pair.before.src}
+                          alt={pair.before.alt}
+                          className="aspect-[3/2] w-full object-cover"
+                        />
+                        <span className="absolute left-3 top-3 rounded-full bg-black/70 px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-white">
+                          Before
+                        </span>
+                      </div>
+                      <div className="relative overflow-hidden rounded-[1.5rem] border border-white/10 bg-zinc-900">
+                        <img
+                          src={pair.after.src}
+                          alt={pair.after.alt}
+                          className="aspect-[3/2] w-full object-cover"
+                        />
+                        <span className="absolute right-3 top-3 rounded-full bg-teal-500 px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-black">
+                          After
+                        </span>
+                      </div>
+                    </div>
+                    <figcaption className="mt-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-teal-400">{pair.label}</p>
+                      <p className="mt-1 text-sm text-gray-400">{pair.scene}</p>
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+            </div>
 
             <div className="mt-20 border-t border-white/10 pt-16">
               <p className="text-[11px] font-black uppercase tracking-[0.45em] text-teal-400 mb-4">

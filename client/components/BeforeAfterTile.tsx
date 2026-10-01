@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 interface MediaSource {
   type: 'image' | 'video';
   url: string;
+  alt?: string;
 }
 
 interface BeforeAfterTileProps {
@@ -20,6 +21,7 @@ function MediaContent({ media, className }: { media: MediaSource; className?: st
         loop
         muted
         playsInline
+        aria-label={media.alt || "Media content"}
         className={`w-full h-full object-cover ${className || ""}`}
       />
     );
@@ -27,7 +29,7 @@ function MediaContent({ media, className }: { media: MediaSource; className?: st
   return (
     <img
       src={media.url}
-      alt="Media content"
+      alt={media.alt || "Media content"}
       className={`w-full h-full object-cover ${className || ""}`}
     />
   );

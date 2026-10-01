@@ -1,7 +1,13 @@
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { CheckCircle2, ArrowRight, Sparkles, UserCheck } from "lucide-react";
+import { CheckCircle2, Sparkles, UserCheck } from "lucide-react";
+import { beforeAfterById, type BeforeAfterPair } from "@/lib/beforeAfter";
+
+const SHOWCASE: BeforeAfterPair[] = [
+  beforeAfterById("pavilion-lifestyle"),
+  beforeAfterById("living-declutter"),
+];
 
 export default function VirtualStaging() {
   return (
@@ -37,27 +43,37 @@ export default function VirtualStaging() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-24">
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl aspect-video bg-gray-100 border-8 border-gray-50">
-              <img 
-                src="https://images.unsplash.com/photo-1600607687940-47a0f9259017?w=800&q=80" 
-                alt="Empty Room" 
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm">
-                Before: Empty
+          <div className="space-y-16 mb-24">
+            {SHOWCASE.map((pair) => (
+              <div key={pair.id}>
+                <p className="text-center text-xs font-bold uppercase tracking-[0.25em] text-[#0d9488] mb-6">
+                  {pair.label}
+                  <span className="text-gray-400"> · {pair.scene}</span>
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                  <div className="relative rounded-3xl overflow-hidden shadow-2xl aspect-video bg-gray-100 border-8 border-gray-50">
+                    <img
+                      src={pair.before.src}
+                      alt={pair.before.alt}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm">
+                      Before
+                    </div>
+                  </div>
+                  <div className="relative rounded-3xl overflow-hidden shadow-2xl aspect-video bg-gray-100 border-8 border-gray-50">
+                    <img
+                      src={pair.after.src}
+                      alt={pair.after.alt}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute top-4 right-4 bg-[#0d9488]/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-white shadow-sm">
+                      After
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl aspect-video bg-gray-100 border-8 border-gray-50">
-              <img 
-                src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80" 
-                alt="Staged Room" 
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute top-4 right-4 bg-[#0d9488]/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-white shadow-sm">
-                After: Staged
-              </div>
-            </div>
+            ))}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-24">
