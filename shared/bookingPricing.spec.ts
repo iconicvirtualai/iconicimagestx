@@ -192,6 +192,8 @@ describe("booking catalog parity", () => {
     expect(adminPricing).toContain("apprenticeshipPackages");
     expect(adminPricing).toContain("APPRENTICESHIP_RULES");
     expect(adminPricing).toContain("APPRENTICESHIP_OVERAGE_LABEL");
+    expect(adminPricing).toContain("whitespace-normal");
+    expect(adminPricing).not.toContain("truncate");
     expect(packageSchema).toContain("appointmentLimit?: string;");
     expect(packageSchema).toContain("overage?: string;");
     expect(packageSchema).toContain("rules?: string[];");

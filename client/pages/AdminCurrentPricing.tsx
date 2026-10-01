@@ -200,7 +200,7 @@ export default function AdminCurrentPricing() {
                           {row.active ? 'true' : 'false'}
                         </span>
                       </TableCell>
-                      <TableCell className="py-4 px-6 text-xs text-slate-500 font-medium max-w-[200px] truncate" title={row.description}>
+                      <TableCell className="py-4 px-6 text-xs text-slate-500 font-medium max-w-md whitespace-normal align-top" title={row.description}>
                         {row.description}
                       </TableCell>
                       <TableCell className="py-4 px-6 text-xs text-slate-500 font-bold uppercase tracking-tight">
