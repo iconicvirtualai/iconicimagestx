@@ -3,8 +3,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { createOrder } from "@/lib/createOrder";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import ChatWidget from "@/components/ChatWidget";
+import { SmsConsentField } from "@/components/SmsConsentField";
 import { services } from "@/lib/services";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -277,6 +278,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     teaserPersonalBrand: false,
     teaserSocialConsult: false,
     socialMarketingPermission: true,
+    smsConsent: false,
     marketingDoing: "",
     resultsBothering: "",
     perfectBusiness: "",
@@ -547,6 +549,10 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
 
   const handleBookNow = async (e?: React.FormEvent) => {
   if (e) e.preventDefault();
+  if (!formData.smsConsent) {
+    toast.error("Check the box to agree to Iconic Images booking and appointment text messages.");
+    return;
+  }
   console.log("STEP 1: submit clicked");
   setIsSubmitting(true);
 const selectedServiceData = services.find(s => s.id === formData.selectedService);
@@ -1434,6 +1440,11 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                   </div>
                </div>
 
+               <SmsConsentField
+                 checked={formData.smsConsent}
+                 onChange={(smsConsent) => updateFormData({ smsConsent })}
+               />
+
                {!isConsultationPath && (
                  <>
                    {/* Marketing Permission Toggle */}
@@ -1442,6 +1453,12 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                          <div className="space-y-0.5">
                             <h4 className="text-[11px] font-black uppercase tracking-widest text-black">Marketing Permission</h4>
                             <p className="text-[9px] text-gray-500 leading-relaxed max-w-[280px]">I give permission for Iconic Images to market my listing via social media and other online channels.</p>
+                            <p className="text-[11px] text-gray-600 leading-relaxed max-w-[320px]">
+                              Listing marketing is separate from text messages. SMS terms are in our{" "}
+                              <Link to="/privacy" className="underline font-semibold text-black">Privacy Policy</Link>
+                              {" "}and{" "}
+                              <Link to="/terms" className="underline font-semibold text-black">Terms and Conditions</Link>.
+                            </p>
                          </div>
                          <div
                           onClick={() => updateFormData({ socialMarketingPermission: !formData.socialMarketingPermission })}
@@ -1523,7 +1540,8 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                     selectedBasics: [],
                     selectedAddOns: [],
                     premiumUpgrade: false,
-                    virtualStagingCredits: 0
+                    virtualStagingCredits: 0,
+                    smsConsent: false
                   }));
                 }}
                 variant="outline"
@@ -1599,10 +1617,17 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                   Next Stage <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform ml-2" />
                 </Button>
               ) : (
+                <div className="flex-1 space-y-3">
+                <p className="text-sm leading-relaxed text-gray-700">
+                  Iconic Images will send transactional booking and appointment texts only if the consent box above is checked. Message frequency varies. Message and data rates may apply. Reply STOP to opt out. Reply HELP for help.{" "}
+                  <Link to="/privacy" className="font-semibold text-black underline">Privacy Policy</Link>
+                  {" · "}
+                  <Link to="/terms" className="font-semibold text-black underline">Terms and Conditions</Link>.
+                </p>
                 <Button
                   onClick={handleBookNow}
                   disabled={isSubmitting}
-                  className="flex-1 h-16 bg-black hover:bg-gray-900 text-white font-black uppercase tracking-[0.15em] text-[11px] rounded-2xl shadow-xl transition-all hover:scale-[1.005] group"
+                  className="w-full h-16 bg-black hover:bg-gray-900 text-white font-black uppercase tracking-[0.15em] text-[11px] rounded-2xl shadow-xl transition-all hover:scale-[1.005] group"
                   style={{ backgroundColor: settings.global.primaryColor }}
                 >
                   {isSubmitting ? (
@@ -1616,6 +1641,7 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
                     </div>
                   )}
                 </Button>
+                </div>
               )}
            </div>
         </div>

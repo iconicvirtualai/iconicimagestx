@@ -30,6 +30,7 @@ import Insights from "./pages/Insights";
 import Socials from "./pages/Socials";
 import AgentLandingPage from "./pages/AgentLandingPage";
 import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
 import ClientStudio from "./pages/ClientStudio";
 import ClientInvoice from "./pages/ClientInvoice";
 import PublicGallery from "./pages/PublicGallery";
@@ -90,6 +91,7 @@ const App = () => (
             <Route path="/insights/prep" element={<Prep />} />
             <Route path="/stock-footage" element={<StockFootage />} />
             <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
             {/* Shirt QR destination. /go/ matches here too (trailing slash is ignored). */}
             <Route path="/go" element={<Go />} />
             <Route path="/studio/:listingId" element={<ClientStudio />} />

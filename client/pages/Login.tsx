@@ -5,6 +5,7 @@ import { staffHomePath } from "@shared/staffAccess";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import Footer from "@/components/Footer";
 
 function clientDestination(pathname?: string) {
   if (!pathname) return "/portal/home";
@@ -115,7 +116,8 @@ export default function Login() {
   const inputClass = "bg-zinc-900 border-zinc-700 text-white placeholder:text-zinc-500 focus:border-zinc-400";
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center px-4 py-10">
+    <div className="min-h-screen bg-black flex flex-col">
+    <div className="flex flex-1 items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="text-center mb-10">
           <h1 className="text-white text-3xl font-bold tracking-wider">ICONIC</h1>
@@ -219,6 +221,8 @@ export default function Login() {
           </div>
         )}
       </div>
+    </div>
+    <Footer />
     </div>
   );
 }

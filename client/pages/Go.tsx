@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
+import { LegalLinks } from "@/components/LegalLinks";
 import { goPromo, hasGoPromoCta } from "@/lib/goPromo";
 
 const ctaClassName =
@@ -71,6 +72,10 @@ export default function Go() {
       </main>
 
       <footer className="px-6 pb-8 text-center">
+        <LegalLinks
+          className="mb-4 justify-center"
+          linkClassName="text-sm font-semibold text-white underline decoration-white/40 underline-offset-4 hover:decoration-white"
+        />
         <a
           href="https://iconicimagestx.com"
           className="text-sm font-semibold text-white underline decoration-white/40 underline-offset-4 hover:decoration-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"

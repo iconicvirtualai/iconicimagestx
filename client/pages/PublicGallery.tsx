@@ -2,6 +2,7 @@ import * as React from "react";
 import { useParams, Link } from "react-router-dom";
 import { Copy, Download, ExternalLink, Image, Link2, Lock, AlertCircle, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Footer from "@/components/Footer";
 import { toast } from "sonner";
 
 export default function PublicGallery() {
@@ -25,12 +26,15 @@ export default function PublicGallery() {
   if (loading) return <div className="min-h-screen bg-white flex items-center justify-center"><div className="w-8 h-8 border-4 border-[#0d9488] border-t-transparent rounded-full animate-spin" /></div>;
 
   if (error || !gallery) return (
-    <div className="min-h-screen bg-white flex items-center justify-center px-4">
-      <div className="max-w-md text-center">
-        <AlertCircle className="w-12 h-12 mx-auto mb-4 text-red-500" />
-        <h1 className="text-2xl font-black mb-2">Gallery Unavailable</h1>
-        <p className="text-sm text-gray-500">{error}</p>
+    <div className="min-h-screen bg-white flex flex-col">
+      <div className="flex flex-1 items-center justify-center px-4">
+        <div className="max-w-md text-center">
+          <AlertCircle className="w-12 h-12 mx-auto mb-4 text-red-500" />
+          <h1 className="text-2xl font-black mb-2">Gallery Unavailable</h1>
+          <p className="text-sm text-gray-500">{error}</p>
+        </div>
       </div>
+      <Footer />
     </div>
   );
 
@@ -120,6 +124,7 @@ export default function PublicGallery() {
           </div>
         )}
       </main>
+      <Footer />
     </div>
   );
 }

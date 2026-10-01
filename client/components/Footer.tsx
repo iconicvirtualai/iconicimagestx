@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Facebook, Instagram, Youtube } from "lucide-react";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { LegalLinks } from "@/components/LegalLinks";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -22,8 +23,6 @@ export default function Footer() {
               <Link to="/portfolio" className="text-sm font-medium hover:text-white/80 transition-colors">Portfolio</Link>
               <Link to="/studio-105" className="text-sm font-medium hover:text-white/80 transition-colors">Studio 105</Link>
               <Link to="/contact" className="text-sm font-medium hover:text-white/80 transition-colors">Contact Us</Link>
-              <Link to="/privacy" className="text-sm font-medium hover:text-white/80 transition-colors">Privacy Policy</Link>
-              <Link to="/terms" className="text-sm font-medium hover:text-white/80 transition-colors">Terms of Service</Link>
               <Link to="/login" className="text-sm font-medium hover:text-white/80 transition-colors border-l border-white/20 pl-6 ml-2">Client Login</Link>
               <Link to="/admin/login" className="text-sm font-medium hover:text-white/80 transition-colors">Admin Login</Link>
             </nav>
@@ -41,6 +40,11 @@ export default function Footer() {
             <a href="https://youtube.com/@iconicimagestx" target="_blank" rel="noopener noreferrer" className="hover:scale-110 transition-transform"><Youtube className="w-5 h-5" /></a>
           </div>
         </div>
+
+        <LegalLinks
+          className="mt-8 justify-center border-t border-white/20 pt-6"
+          linkClassName="text-sm font-semibold underline underline-offset-4 hover:text-white/80 transition-colors"
+        />
       </div>
     </footer>
   );
