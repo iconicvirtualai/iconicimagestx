@@ -4,10 +4,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { clientPortalAction, staffHomePath } from "@shared/staffAccess";
 import { Button } from "@/components/ui/button";
 import Footer from "@/components/Footer";
-import { FolderOpen, Image, LogOut, Receipt } from "lucide-react";
+import { ClipboardList, FolderOpen, Image, LogOut, Receipt } from "lucide-react";
 
 interface PortalHome {
   profile?: { firstName?: string; lastName?: string; email?: string };
+  orders?: Array<{ id: string; address: string; status: string; href?: string }>;
   galleries: Array<{ id: string; title: string; address?: string; status: string; href: string }>;
   invoices: Array<{ id: string; invoiceNumber: string; status: string; total: number; amountDue: number; href: string }>;
   projects: Array<{ id: string; address: string; status: string; imageCount: number; href: string }>;
@@ -104,6 +105,28 @@ export default function ClientPortal() {
           </div>
         ) : (
           <>
+            <Section
+              icon={<ClipboardList className="w-4 h-4" />}
+              title="Orders"
+              empty="No orders yet. An order created for this email shows up here."
+            >
+              {(home?.orders || []).map((order) => {
+                const body = (
+                  <>
+                    <p className="font-black">{order.address || "Order"}</p>
+                    <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">{String(order.status || "new").replace(/_/g, " ")}</p>
+                  </>
+                );
+                return order.href ? (
+                  <Link key={order.id} to={order.href} className="block bg-white rounded-2xl border border-gray-100 p-5 hover:border-[#0d9488]">
+                    {body}
+                  </Link>
+                ) : (
+                  <div key={order.id} className="bg-white rounded-2xl border border-gray-100 p-5">{body}</div>
+                );
+              })}
+            </Section>
+
             <Section
               icon={<Image className="w-4 h-4" />}
               title="Galleries"

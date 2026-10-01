@@ -14,6 +14,7 @@ import {
 } from "firebase/firestore";
 import { toast } from "sonner";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
+import { choosePortalClient, listingAppointmentDate } from "@shared/listingWrite";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type ProjectType = "real_estate" | "business";
@@ -46,6 +47,8 @@ interface Client {
   lastName: string;
   email: string;
   phone: string;
+  firebaseUid?: string | null;
+  portalAccess?: boolean | null;
 }
 
 interface StaffMember {
@@ -340,20 +343,25 @@ export default function AdminListings() {
       const serviceNames = selectedServices.map(s => s.name);
       const photographerNames = photographers.filter(p => form.photographerIds.includes(p.id)).map(p => p.name);
 
+      const clientEmail = form.email.toLowerCase().trim();
+      const chosen = choosePortalClient(clients, { clientId: form.clientId, email: clientEmail });
+      const clientId = chosen?.id || form.clientId || null;
+      const apptDate = listingAppointmentDate(form.apptDate);
+
       const docData: any = {
         projectType,
-        clientId: form.clientId || null,
+        clientId,
         clientName,
-        clientEmail: form.email.toLowerCase().trim(),
+        clientEmail,
         clientPhone: form.phone || null,
-        apptDate: form.apptDate ? new Date(form.apptDate) : null,
+        apptDate,
         apptTime: form.apptTime || null,
         serviceIds: form.serviceIds,
         services: serviceNames,
         photographerIds: form.photographerIds,
         photographerNames,
         notes: form.notes || null,
-        status: form.apptDate ? "scheduled" : "unscheduled",
+        status: apptDate ? "scheduled" : "unscheduled",
         images: [],
         studioEnabled: true,
         studioToken: crypto.randomUUID(),
@@ -393,8 +401,8 @@ export default function AdminListings() {
 
       const ref = await addDoc(collection(db, "listings"), docData);
 
-      // Create client record if new customer
-      if (form.isNewCustomer && !form.clientId) {
+      // Create client record if new customer and this email is not already on file.
+      if (form.isNewCustomer && !clientId) {
         await addDoc(collection(db, "clients"), {
           firstName: form.firstName,
           lastName: form.lastName,
@@ -415,7 +423,7 @@ export default function AdminListings() {
       navigate(`/admin/listing/${ref.id}`);
     } catch (err) {
       console.error(err);
-      toast.error("Failed to create project.");
+      toast.error(err instanceof Error ? err.message : "Failed to create project.");
     } finally {
       setSaving(false);
     }
