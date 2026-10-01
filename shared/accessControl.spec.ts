@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  CLIENT_HOME_PATH,
   INITIAL_AUTH_SESSION,
+  clientLoginAction,
+  clientPortalAction,
+  isActiveClientRecord,
   isActiveStaffRecord,
   isStaffRole,
   reduceAuthSession,
@@ -140,6 +144,152 @@ describe("staff login session", () => {
       }),
     ).toBe(switched);
     expect(switched.loading).toBe(true);
+  });
+});
+
+describe("client login session", () => {
+  it("does not send a signed-in user home while the client profile is still loading", () => {
+    const signedIn = reduceAuthSession(INITIAL_AUTH_SESSION, { type: "signed-in", userId: "client-1" });
+    expect(signedIn.loading).toBe(true);
+    expect(signedIn.userType).toBeNull();
+    expect(
+      clientLoginAction({
+        loading: signedIn.loading,
+        hasUser: signedIn.userId != null,
+        isClient: signedIn.userType === "client",
+      }),
+    ).toEqual({ type: "pending" });
+    expect(
+      clientPortalAction({
+        loading: signedIn.loading,
+        hasUser: true,
+        isClient: false,
+      }),
+    ).toEqual({ type: "pending" });
+  });
+
+  it("redirects only after an active client profile resolves", () => {
+    const signedIn = reduceAuthSession({ userId: null, userType: null, loading: false }, {
+      type: "signed-in",
+      userId: "client-1",
+    });
+    const active = sessionFromProfiles({
+      staff: null,
+      client: { status: "active", portalAccess: true },
+    });
+    const resolved = reduceAuthSession(signedIn, {
+      type: "profiles-resolved",
+      userId: "client-1",
+      userType: active.userType,
+    });
+    expect(resolved.loading).toBe(false);
+    expect(resolved.userType).toBe("client");
+    expect(
+      clientLoginAction({
+        loading: resolved.loading,
+        hasUser: true,
+        isClient: resolved.userType === "client",
+        destination: CLIENT_HOME_PATH,
+      }),
+    ).toEqual({ type: "redirect", path: "/portal/home" });
+    expect(
+      clientPortalAction({
+        loading: resolved.loading,
+        hasUser: true,
+        isClient: resolved.userType === "client",
+      }),
+    ).toEqual({ type: "show-home" });
+    expect(isActiveClientRecord({ status: "vip" })).toBe(true);
+    expect(isActiveClientRecord({ status: "active" })).toBe(true);
+  });
+
+  it("rejects a missing or inactive client only after the profile read resolves", () => {
+    const signedIn = reduceAuthSession({ userId: null, userType: null, loading: false }, {
+      type: "signed-in",
+      userId: "client-1",
+    });
+    expect(
+      clientPortalAction({
+        loading: signedIn.loading,
+        hasUser: true,
+        isClient: false,
+      }),
+    ).toEqual({ type: "pending" });
+
+    const missing = sessionFromProfiles({ staff: null, client: null });
+    const resolved = reduceAuthSession(signedIn, {
+      type: "profiles-resolved",
+      userId: "client-1",
+      userType: missing.userType,
+    });
+    expect(resolved.loading).toBe(false);
+    expect(resolved.userType).toBeNull();
+    expect(
+      clientLoginAction({
+        loading: resolved.loading,
+        hasUser: true,
+        isClient: resolved.userType === "client",
+      }),
+    ).toEqual({ type: "not-client" });
+    expect(
+      clientPortalAction({
+        loading: resolved.loading,
+        hasUser: true,
+        isClient: resolved.userType === "client",
+      }),
+    ).toEqual({ type: "not-client" });
+
+    expect(sessionFromProfiles({ client: { status: "inactive", portalAccess: true } }).userType).toBeNull();
+    expect(sessionFromProfiles({ client: { status: "active", portalAccess: false } }).userType).toBeNull();
+    expect(isActiveClientRecord(null)).toBe(false);
+  });
+
+  it("drops a client profile result that finishes after sign-out or a newer user", () => {
+    const signedIn = reduceAuthSession(INITIAL_AUTH_SESSION, { type: "signed-in", userId: "client-1" });
+    const signedOut = reduceAuthSession(signedIn, { type: "signed-out" });
+    const lateClient = reduceAuthSession(signedOut, {
+      type: "profiles-resolved",
+      userId: "client-1",
+      userType: "client",
+    });
+    expect(lateClient).toBe(signedOut);
+    expect(
+      clientLoginAction({
+        loading: lateClient.loading,
+        hasUser: lateClient.userId != null,
+        isClient: lateClient.userType === "client",
+      }),
+    ).toEqual({ type: "pending" });
+    expect(
+      clientPortalAction({
+        loading: lateClient.loading,
+        hasUser: lateClient.userId != null,
+        isClient: lateClient.userType === "client",
+      }),
+    ).toEqual({ type: "signed-out" });
+
+    const switched = reduceAuthSession(signedIn, { type: "signed-in", userId: "client-2" });
+    const stale = reduceAuthSession(switched, {
+      type: "profiles-resolved",
+      userId: "client-1",
+      userType: "client",
+    });
+    expect(stale).toBe(switched);
+    expect(stale.loading).toBe(true);
+    expect(
+      clientLoginAction({
+        loading: stale.loading,
+        hasUser: true,
+        isClient: stale.userType === "client",
+      }),
+    ).toEqual({ type: "pending" });
+    expect(
+      clientPortalAction({
+        loading: stale.loading,
+        hasUser: true,
+        isClient: false,
+      }),
+    ).toEqual({ type: "pending" });
   });
 });
 

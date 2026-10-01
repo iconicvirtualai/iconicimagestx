@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { clientPortalAction, staffHomePath } from "@shared/staffAccess";
 import { Button } from "@/components/ui/button";
 import Footer from "@/components/Footer";
 import { FolderOpen, Image, LogOut, Receipt } from "lucide-react";
@@ -24,21 +25,7 @@ export default function ClientPortal() {
   const [fetching, setFetching] = useState(true);
 
   useEffect(() => {
-    if (loading) return;
-    if (!user) {
-      navigate("/portal", { replace: true });
-      return;
-    }
-    if (userType === "staff") {
-      const role = staffProfile?.role;
-      navigate(role === "photographer" ? "/admin/photographer" : role === "editor" ? "/admin/editor" : "/admin/dashboard", { replace: true });
-      return;
-    }
-    if (userType !== "client") {
-      setFetching(false);
-      setError("This login is not linked to a client profile yet.");
-      return;
-    }
+    if (loading || !user || userType !== "client") return;
 
     let cancelled = false;
     (async () => {
@@ -60,7 +47,24 @@ export default function ClientPortal() {
     return () => {
       cancelled = true;
     };
-  }, [user, userType, staffProfile, loading, navigate]);
+  }, [user, userType, loading]);
+
+  if (loading) {
+    return <PortalPending />;
+  }
+
+  if (user && userType === "staff") {
+    return <Navigate to={staffHomePath(staffProfile?.role)} replace />;
+  }
+
+  const gate = clientPortalAction({
+    loading,
+    hasUser: Boolean(user),
+    isClient: userType === "client",
+  });
+  if (gate.type !== "show-home" || !user) {
+    return <Navigate to="/portal" replace />;
+  }
 
   const firstName = home?.profile?.firstName || clientProfile?.firstName || "there";
 
@@ -147,6 +151,14 @@ export default function ClientPortal() {
         )}
       </main>
       <Footer />
+    </div>
+  );
+}
+
+function PortalPending() {
+  return (
+    <div className="min-h-screen bg-[#f6f7f8] flex items-center justify-center">
+      <div className="w-8 h-8 border-4 border-[#0d9488] border-t-transparent rounded-full animate-spin" />
     </div>
   );
 }

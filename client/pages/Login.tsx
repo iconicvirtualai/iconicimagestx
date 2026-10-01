@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { staffHomePath } from "@shared/staffAccess";
+import { clientLoginAction, staffHomePath } from "@shared/staffAccess";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -32,13 +32,22 @@ export default function Login() {
   const [resetEmail, setResetEmail] = useState("");
 
   useEffect(() => {
-    if (loading || !user || !userType) return;
-    if (userType === "staff") {
+    // Staff home is a different gate. Client home waits until clients/{uid}
+    // resolves to an active portal profile; a missing profile stays here.
+    if (!loading && user && userType === "staff") {
       navigate(staffHomePath(staffProfile?.role));
       return;
     }
     const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
-    navigate(clientDestination(from));
+    const action = clientLoginAction({
+      loading,
+      hasUser: Boolean(user),
+      isClient: userType === "client",
+      destination: clientDestination(from),
+    });
+    if (action.type === "redirect") {
+      navigate(action.path);
+    }
   }, [user, userType, staffProfile, loading, navigate, location]);
 
   const handleLogin = async (e: React.FormEvent) => {

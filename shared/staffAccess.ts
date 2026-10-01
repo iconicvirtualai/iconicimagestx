@@ -21,13 +21,34 @@ export function staffHomePath(role: string | undefined): string {
 
 export type AuthUserType = "staff" | "client" | null;
 
+export const CLIENT_HOME_PATH = "/portal/home";
+
+/**
+ * Portal client record. Missing portalAccess is allowed (older docs).
+ * An explicit false or an inactive status is not a portal login.
+ */
+export function isActiveClientRecord(
+  data: { status?: unknown; portalAccess?: unknown } | null | undefined,
+): boolean {
+  if (!data) return false;
+  if (data.status === "inactive") return false;
+  if (data.portalAccess === false) return false;
+  return true;
+}
+
 /** Classify a resolved staff/client pair. Inactive staff do not count as staff. */
 export function sessionFromProfiles(input: {
   staff?: { role?: unknown; isActive?: unknown } | null;
-  hasClient: boolean;
+  /** Legacy flag used when the caller already decided the client doc counts. */
+  hasClient?: boolean;
+  /** Raw clients/{uid} document. Null means the read finished with no doc. */
+  client?: { status?: unknown; portalAccess?: unknown } | null;
 }): { userType: AuthUserType; role?: string } {
   if (input.staff && isActiveStaffRecord(input.staff)) {
     return { userType: "staff", role: String(input.staff.role) };
+  }
+  if ("client" in input) {
+    return isActiveClientRecord(input.client) ? { userType: "client" } : { userType: null };
   }
   if (input.hasClient) return { userType: "client" };
   return { userType: null };
@@ -94,4 +115,47 @@ export function staffLoginAction(input: {
   if (input.loading || !input.hasUser) return { type: "pending" };
   if (input.isStaff) return { type: "redirect", path: staffHomePath(input.role) };
   return { type: "not-staff" };
+}
+
+export type ClientLoginAction =
+  | { type: "pending" }
+  | { type: "redirect"; path: string }
+  | { type: "not-client" };
+
+/**
+ * Client login decision. Pending while signed out or while clients/{uid} is
+ * still loading. Redirect only after an active portal profile resolves.
+ * not-client is only returned once that read has finished.
+ */
+export function clientLoginAction(input: {
+  loading: boolean;
+  hasUser: boolean;
+  isClient: boolean;
+  destination?: string;
+}): ClientLoginAction {
+  if (input.loading || !input.hasUser) return { type: "pending" };
+  if (input.isClient) return { type: "redirect", path: input.destination || CLIENT_HOME_PATH };
+  return { type: "not-client" };
+}
+
+export type ClientPortalAction =
+  | { type: "pending" }
+  | { type: "show-home" }
+  | { type: "signed-out" }
+  | { type: "not-client" };
+
+/**
+ * Client home decision. A signed-in user with no client profile yet stays
+ * pending. Bounce to login only after the profile read settles, or when the
+ * session is actually signed out.
+ */
+export function clientPortalAction(input: {
+  loading: boolean;
+  hasUser: boolean;
+  isClient: boolean;
+}): ClientPortalAction {
+  if (input.loading) return { type: "pending" };
+  if (!input.hasUser) return { type: "signed-out" };
+  if (input.isClient) return { type: "show-home" };
+  return { type: "not-client" };
 }
