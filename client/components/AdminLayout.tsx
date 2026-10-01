@@ -20,6 +20,7 @@ import {
   Settings,
   CreditCard,
   Upload,
+  FolderOpen,
 } from "lucide-react";
 
 interface AdminLayoutProps {
@@ -58,6 +59,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     items: [
       { label: "My Jobs",         href: "/admin/photographer",     icon: Camera,          roles: PHOTO_UP },
       { label: "Upload",          href: "/admin/upload",           icon: Upload,          roles: PHOTO_UP },
+      { label: "Media Library",   href: "/admin/media",            icon: FolderOpen,      roles: PHOTO_UP },
     ],
   },
   {

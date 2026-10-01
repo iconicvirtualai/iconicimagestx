@@ -8,7 +8,9 @@ import { Router } from "express";
 import admin from "firebase-admin";
 import {
   requireAuth,
+  requireCoordinator,
   requirePhotographer,
+  requireStaff,
   type AuthenticatedRequest,
 } from "../middleware/auth";
 import {
@@ -19,7 +21,15 @@ import {
   staffCanAccessListing,
 } from "../../shared/listingAccess";
 import { resolveClientIdentity } from "../services/clientAccounts";
+import { byteSize } from "../../shared/mediaLibrary";
 import {
+  assignListingFiles,
+  createListingMediaFolder,
+  deleteListingFiles,
+  deleteListingMediaFolder,
+  moveListingFiles,
+  queueListingAiEdit,
+  queueListingCubiCasa,
   createListingUploadUrl,
   registerListingPhoto,
   saveListingBytes,
@@ -169,6 +179,7 @@ router.post("/:id/photos", requirePhotographer, async (req: AuthenticatedRequest
         contentType: saved.contentType,
         uploadedBy: req.user!.uid,
         existingUrl: saved.url,
+        size: bytes.length,
       });
       return res.status(201).json({ success: true, ...registered });
     }
@@ -183,10 +194,107 @@ router.post("/:id/photos", requirePhotographer, async (req: AuthenticatedRequest
       fileName,
       contentType: req.body?.contentType,
       uploadedBy: req.user!.uid,
+      size: byteSize(req.body?.size),
     });
     return res.status(201).json({ success: true, ...registered });
   } catch (err) {
     return sendKnownError(res, err, "Failed to save the uploaded photo.");
+  }
+});
+
+function pathsFrom(body: unknown): string[] {
+  const raw = (body as { paths?: unknown; path?: unknown }) || {};
+  const list = Array.isArray(raw.paths) ? raw.paths : raw.path ? [raw.path] : [];
+  return [...new Set(list.filter((item): item is string => typeof item === "string" && item.trim().length > 0))];
+}
+
+router.post("/:id/media/folders", requirePhotographer, async (req: AuthenticatedRequest, res) => {
+  if (!adminReady(res)) return;
+  try {
+    await assertListingAccess(req, req.params.id);
+    const folder = await createListingMediaFolder(req.params.id, req.body?.name, req.user!.uid);
+    return res.status(201).json({ folder });
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to create the folder.");
+  }
+});
+
+router.post("/:id/media/folders/delete", requirePhotographer, async (req: AuthenticatedRequest, res) => {
+  if (!adminReady(res)) return;
+  try {
+    await assertListingAccess(req, req.params.id);
+    const folderId = typeof req.body?.folderId === "string" ? req.body.folderId : "";
+    const result = await deleteListingMediaFolder(req.params.id, folderId);
+    return res.json(result);
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to delete the folder.");
+  }
+});
+
+router.post("/:id/media/files/delete", requirePhotographer, async (req: AuthenticatedRequest, res) => {
+  if (!adminReady(res)) return;
+  try {
+    await assertListingAccess(req, req.params.id);
+    const result = await deleteListingFiles(req.params.id, pathsFrom(req.body));
+    return res.json(result);
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to delete the file.");
+  }
+});
+
+router.post("/:id/media/files/folder", requirePhotographer, async (req: AuthenticatedRequest, res) => {
+  if (!adminReady(res)) return;
+  try {
+    await assertListingAccess(req, req.params.id);
+    const folderId = typeof req.body?.folderId === "string" ? req.body.folderId : null;
+    const result = await assignListingFiles(req.params.id, pathsFrom(req.body), folderId);
+    return res.json(result);
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to move the file into that folder.");
+  }
+});
+
+router.post("/:id/media/files/move", requireCoordinator, async (req: AuthenticatedRequest, res) => {
+  if (!adminReady(res)) return;
+  try {
+    const destinationListingId = typeof req.body?.destinationListingId === "string" ? req.body.destinationListingId : "";
+    if (!destinationListingId) return res.status(400).json({ error: "Choose a destination listing." });
+    await assertListingAccess(req, req.params.id);
+    await assertListingAccess(req, destinationListingId);
+    const storageFolder = req.body?.destinationStorageFolder === "raw" ? "raw" : "photos";
+    const result = await moveListingFiles({
+      sourceListingId: req.params.id,
+      destinationListingId,
+      paths: pathsFrom(req.body),
+      destinationStorageFolder: storageFolder,
+      destinationFolderId: typeof req.body?.destinationFolderId === "string" ? req.body.destinationFolderId : null,
+      movedBy: req.user!.uid,
+    });
+    return res.json(result);
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to move the file.");
+  }
+});
+
+router.post("/:id/media/cubicasa", requireStaff, async (req: AuthenticatedRequest, res) => {
+  if (!adminReady(res)) return;
+  try {
+    await assertListingAccess(req, req.params.id);
+    const result = await queueListingCubiCasa(req.params.id, pathsFrom(req.body), req.user!.uid);
+    return res.status(201).json(result);
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to queue the CubiCasa request.");
+  }
+});
+
+router.post("/:id/media/ai-edit", requireStaff, async (req: AuthenticatedRequest, res) => {
+  if (!adminReady(res)) return;
+  try {
+    await assertListingAccess(req, req.params.id);
+    const result = await queueListingAiEdit(req.params.id, pathsFrom(req.body), req.user!.uid);
+    return res.status(201).json(result);
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to queue the edit.");
   }
 });
 

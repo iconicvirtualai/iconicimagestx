@@ -4,11 +4,13 @@ import AdminLayout from "@/components/AdminLayout";
 import { Button } from "@/components/ui/button";
 import {
   ChevronLeft, Home, Building2, User, Calendar, Clock,
-  Upload, Download, Trash2, Plus, Check, X, Edit3, FileText,
+  Upload, Download, Plus, Check, X, Edit3, FileText,
   History, CreditCard, Lock, Video, Smartphone, Layers, Camera,
   ExternalLink, Copy, MapPin, Image, Unlock,
 } from "lucide-react";
+import MediaLibrary from "@/components/MediaLibrary";
 import { db } from "@/lib/firebase";
+import { fetchAssignedListings } from "@/lib/listingUpload";
 import { useAuth } from "@/contexts/AuthContext";
 import { doc, onSnapshot, updateDoc, serverTimestamp } from "firebase/firestore";
 import { toast } from "sonner";
@@ -239,7 +241,9 @@ function PhotoUploader({ projectId, onUpload }: { projectId: string; onUpload: (
 export default function AdminListingFile() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user, staffProfile } = useAuth();
   const [project, setProject] = React.useState<any>(null);
+  const [destinations, setDestinations] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [activeTab, setActiveTab] = React.useState(0);
   const [updating, setUpdating] = React.useState(false);
@@ -273,6 +277,14 @@ export default function AdminListingFile() {
     });
     return () => unsub();
   }, [id, navigate]);
+
+  const canMove = staffProfile?.role === "admin" || staffProfile?.role === "coordinator";
+  const canOrganize = canMove || staffProfile?.role === "photographer";
+
+  React.useEffect(() => {
+    if (!user || !canMove) return;
+    fetchAssignedListings().then(setDestinations).catch(() => setDestinations([]));
+  }, [user, canMove]);
 
   // Auto-status logic
   React.useEffect(() => {
@@ -331,13 +343,6 @@ export default function AdminListingFile() {
     if (!tourInput.trim()) return;
     try { await patch({ tourUrl: tourInput.trim() }); toast.success("3D tour URL saved."); setTourInput(""); }
     catch { toast.error("Failed to save tour URL."); }
-  };
-
-  const deletePhoto = async (index: number) => {
-    const images = [...(project?.images || [])];
-    images.splice(index, 1);
-    await patch({ images });
-    toast.success("Photo removed.");
   };
 
   if (loading) return (
@@ -475,28 +480,14 @@ export default function AdminListingFile() {
                   <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">{isRE ? "Media Gallery" : "Photo Gallery"}</h3>
                 </div>
                 <PhotoUploader projectId={id!} onUpload={() => {}} />
-                {images.length > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-6">
-                    {images.map((img: any, i: number) => (
-                      <div key={i} className="aspect-square rounded-xl overflow-hidden relative group bg-gray-100">
-                        <img src={img.url} alt={img.name || `Photo ${i + 1}`} className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                          <a href={img.url} target="_blank" rel="noopener noreferrer" className="p-2 bg-white rounded-lg">
-                            <Download className="w-4 h-4 text-black" />
-                          </a>
-                          <button onClick={() => deletePhoto(i)} className="p-2 bg-white rounded-lg">
-                            <Trash2 className="w-4 h-4 text-red-500" />
-                          </button>
-                        </div>
-                        {i === 0 && (
-                          <div className="absolute top-2 left-2">
-                            <span className="px-2 py-0.5 bg-[#0d9488] text-white text-[8px] font-black uppercase tracking-widest rounded-full">Cover</span>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <div className="mt-6">
+                  <MediaLibrary
+                    listing={project}
+                    destinations={destinations.length ? destinations : [project]}
+                    canMove={canMove}
+                    canOrganize={canOrganize}
+                  />
+                </div>
               </div>
             )}
 

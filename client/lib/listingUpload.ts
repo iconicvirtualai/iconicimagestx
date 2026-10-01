@@ -73,7 +73,7 @@ export async function uploadListingFile(options: {
     const res = await fetch(`/api/listings/${listingId}/photos`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ fileName: file.name, contentType, folder, dataBase64 }),
+      body: JSON.stringify({ fileName: file.name, contentType, folder, dataBase64, size: file.size }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || "Upload failed.");
@@ -98,6 +98,7 @@ export async function uploadListingFile(options: {
         contentType: ticket.contentType || contentType,
         folder,
         storagePath: ticket.storagePath,
+        size: file.size,
       }),
     });
     const saved = await saveRes.json().catch(() => ({}));
@@ -113,4 +114,49 @@ export async function uploadListingFile(options: {
     console.warn("[Upload] Signed upload failed, retrying through the API.", err);
     return saveDirect();
   }
+}
+
+async function listingPost(listingId: string, path: string, body: Record<string, unknown>) {
+  const headers = await authorizedJsonHeaders();
+  const res = await fetch(`/api/listings/${listingId}/media/${path}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Request failed.");
+  return data as Record<string, unknown>;
+}
+
+export async function createListingFolder(listingId: string, name: string) {
+  return listingPost(listingId, "folders", { name });
+}
+
+export async function deleteListingFolder(listingId: string, folderId: string) {
+  return listingPost(listingId, "folders/delete", { folderId });
+}
+
+export async function deleteListingFiles(listingId: string, paths: string[]) {
+  return listingPost(listingId, "files/delete", { paths });
+}
+
+export async function assignListingFiles(listingId: string, paths: string[], folderId: string | null) {
+  return listingPost(listingId, "files/folder", { paths, folderId });
+}
+
+export async function moveListingFiles(listingId: string, body: {
+  paths: string[];
+  destinationListingId: string;
+  destinationStorageFolder: "photos" | "raw";
+  destinationFolderId?: string | null;
+}) {
+  return listingPost(listingId, "files/move", body);
+}
+
+export async function queueListingCubiCasa(listingId: string, paths: string[]) {
+  return listingPost(listingId, "cubicasa", { paths });
+}
+
+export async function queueListingAiEdit(listingId: string, paths: string[]) {
+  return listingPost(listingId, "ai-edit", { paths });
 }

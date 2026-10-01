@@ -59,6 +59,7 @@ import AdminListings from "./pages/AdminListings";
 import AdminMessages from "./pages/AdminMessages";
 import AdminPhotographer from "./pages/AdminPhotographer";
 import AdminUpload from "./pages/AdminUpload";
+import AdminMediaLibrary from "./pages/AdminMediaLibrary";
 import AdminEditor from "./pages/AdminEditor";
 import AdminTeam from "./pages/AdminTeam";
 import AdminStudio from "./pages/AdminStudio";
@@ -123,6 +124,7 @@ const App = () => (
             <Route path="/admin/communications" element={<ProtectedRoute requiredRole="coordinator"><AdminMessages /></ProtectedRoute>} />
             <Route path="/admin/photographer" element={<ProtectedRoute requiredRole="photographer"><AdminPhotographer /></ProtectedRoute>} />
             <Route path="/admin/upload" element={<ProtectedRoute requiredRole="photographer"><AdminUpload /></ProtectedRoute>} />
+            <Route path="/admin/media" element={<ProtectedRoute requiredRole="photographer"><AdminMediaLibrary /></ProtectedRoute>} />
             <Route path="/admin/editor" element={<ProtectedRoute requiredRole="editor"><AdminEditor /></ProtectedRoute>} />
             <Route path="/admin/team" element={<ProtectedRoute requiredRole="admin"><AdminTeam /></ProtectedRoute>} />
             <Route path="/admin/edit-site" element={<ProtectedRoute requiredRole="admin"><AdminSiteCustomizer /></ProtectedRoute>} />

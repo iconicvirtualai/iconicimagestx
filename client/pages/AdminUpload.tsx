@@ -1,5 +1,6 @@
 import * as React from "react";
 import AdminLayout from "@/components/AdminLayout";
+import MediaLibrary from "@/components/MediaLibrary";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchAssignedListings, uploadListingFile } from "@/lib/listingUpload";
 import { Upload, CheckCircle2, XCircle, Image as ImageIcon, FolderOpen } from "lucide-react";
@@ -7,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 export default function AdminUpload() {
-  const { user } = useAuth();
+  const { user, staffProfile } = useAuth();
+  const canMove = staffProfile?.role === "admin" || staffProfile?.role === "coordinator";
   const [jobs, setJobs] = React.useState<any[]>([]);
   const [selectedJob, setSelectedJob] = React.useState<string>("");
   const [files, setFiles] = React.useState<File[]>([]);
@@ -65,10 +67,11 @@ export default function AdminUpload() {
           onProgress: (pct) => setUploads((prev) => ({ ...prev, [file.name]: pct })),
         });
       }
-      toast.success(`${files.length} photo${files.length > 1 ? "s" : ""} uploaded successfully!`);
+      toast.success(`${files.length} photo${files.length > 1 ? "s" : ""} uploaded. Open the tiles below.`);
       setFiles([]);
       setUploads({});
       if (fileRef.current) fileRef.current.value = "";
+      await loadJobs();
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Some uploads failed. Please try again.");
     } finally {
@@ -172,6 +175,19 @@ export default function AdminUpload() {
         >
           {uploading ? "Uploading..." : `Upload ${files.length > 0 ? files.length + " " : ""}Photo${files.length !== 1 ? "s" : ""}`}
         </Button>
+
+        {selectedJobData && (
+          <div className="mt-6">
+            <MediaLibrary
+              listing={selectedJobData}
+              destinations={jobs}
+              canMove={canMove}
+              canOrganize
+              onChanged={loadJobs}
+              onUploadClick={() => fileRef.current?.click()}
+            />
+          </div>
+        )}
       </div>
     </AdminLayout>
   );
