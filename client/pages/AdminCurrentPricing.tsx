@@ -7,6 +7,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Link } from "react-router-dom";
 import { ChevronLeft, Tag } from "lucide-react";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
+import {
+  APPRENTICESHIP_OVERAGE_LABEL,
+  APPRENTICESHIP_RULES,
+  apprenticeshipPackages,
+} from "@shared/bookingCatalog";
 
 interface PricingRow {
   id: string;
@@ -45,8 +50,21 @@ const pricingData: PricingRow[] = [
   { id: "photos-20", name: "20 Photos", price: "99", priceMax: "", priceType: "per-listing", category: "real-estate", active: true, description: "Basic Photo Package", billingNote: "Per Listing" },
   { id: "photos-35", name: "35 Photos", price: "150", priceMax: "", priceType: "per-listing", category: "real-estate", active: true, description: "Standard Photo Package", billingNote: "Per Listing" },
   { id: "photos-50", name: "50 Photos", price: "200", priceMax: "", priceType: "per-listing", category: "real-estate", active: true, description: "High Volume Photo Package", billingNote: "Per Listing" },
-  { id: "apprentice-25", name: "Apprenticeship — 25 Photos", price: "75", priceMax: "", priceType: "per-listing", category: "real-estate", active: true, description: "20 Minute Appointment ONLY. Overages $25 per 15 minutes.", billingNote: "Per Listing" },
-  { id: "apprentice-50", name: "Apprenticeship — 50 Photos", price: "125", priceMax: "", priceType: "per-listing", category: "real-estate", active: true, description: "1 Hour Appointment ONLY. Overages $25 per 15 minutes.", billingNote: "Per Listing" },
+  ...apprenticeshipPackages.map((pkg): PricingRow => ({
+    id: pkg.id,
+    name: pkg.name,
+    price: String(pkg.price),
+    priceMax: "",
+    priceType: "per-listing",
+    category: "real-estate",
+    active: true,
+    description: [
+      pkg.appointmentLimit,
+      `Overages ${APPRENTICESHIP_OVERAGE_LABEL}.`,
+      ...APPRENTICESHIP_RULES,
+    ].filter(Boolean).join(" "),
+    billingNote: "Per Listing",
+  })),
   { id: "aerial-addon", name: "Aerial Add-On", price: "99", priceMax: "", priceType: "addon", category: "real-estate", active: true, description: "Drone imagery", billingNote: "Per Listing" },
   { id: "reel-addon", name: "Reel Add-On", price: "125", priceMax: "", priceType: "addon", category: "real-estate", active: true, description: "Social media reel", billingNote: "Per Listing" },
   { id: "video-addon", name: "Video Add-On", price: "350", priceMax: "500", priceType: "addon", category: "real-estate", active: true, description: "Full video production", billingNote: "Per Listing" },

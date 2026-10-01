@@ -20,6 +20,8 @@ import {
 const bookingForm = readFileSync(new URL("../client/components/BookingForm.tsx", import.meta.url), "utf8");
 const catalogSource = readFileSync(new URL("./bookingCatalog.ts", import.meta.url), "utf8");
 const rules = readFileSync(new URL("../firestore.rules", import.meta.url), "utf8");
+const adminPricing = readFileSync(new URL("../client/pages/AdminCurrentPricing.tsx", import.meta.url), "utf8");
+const packageSchema = readFileSync(new URL("../client/lib/schema.ts", import.meta.url), "utf8");
 
 const fixedSelection: BookingPriceInput = {
   selectedService: "listing-showcase",
@@ -187,6 +189,12 @@ describe("booking catalog parity", () => {
     expect(pricingPage).toContain("APPRENTICESHIP_BRIDGE_COPY");
     expect(pricingPage).toContain("APPRENTICESHIP_RULES");
     expect(pricingPage).toContain("services-apprenticeship");
+    expect(adminPricing).toContain("apprenticeshipPackages");
+    expect(adminPricing).toContain("APPRENTICESHIP_RULES");
+    expect(adminPricing).toContain("APPRENTICESHIP_OVERAGE_LABEL");
+    expect(packageSchema).toContain("appointmentLimit?: string;");
+    expect(packageSchema).toContain("overage?: string;");
+    expect(packageSchema).toContain("rules?: string[];");
   });
 
   it("lets active staff write the public packages catalog", () => {
