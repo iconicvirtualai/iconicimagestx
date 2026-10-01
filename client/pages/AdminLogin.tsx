@@ -7,7 +7,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { staffHomePath } from "@shared/staffAccess";
+import { staffLoginAction } from "@shared/staffAccess";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -22,14 +22,20 @@ export default function AdminLogin() {
   const [showReset, setShowReset] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
 
-  // Photographers and editors cannot open the coordinator dashboard.
+  // Wait until profile loading finishes. A signed-in user with isStaff still
+  // false is only "not staff" after staff/{uid} has been read.
   useEffect(() => {
-    if (loading) return;
-    if (user && isStaff) {
-      navigate(staffHomePath(staffProfile?.role));
+    const action = staffLoginAction({
+      loading,
+      hasUser: Boolean(user),
+      isStaff,
+      role: staffProfile?.role,
+    });
+    if (action.type === "redirect") {
+      navigate(action.path);
       return;
     }
-    if (user && !isStaff) {
+    if (action.type === "not-staff") {
       toast.error("This login is not an active staff account.");
       void signOutUser();
     }
