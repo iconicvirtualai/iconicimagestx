@@ -14,6 +14,7 @@ import { lifeOfTheListingCareSelected } from "../../shared/lifeOfTheListingCare"
 import { buildBookingInvoiceDraft, existingInvoiceId } from "../../shared/bookingInvoice";
 import { orderTotalLabel } from "../../shared/bookingPricing";
 import { normalizeEmail } from "../../shared/listingAccess";
+import { attachSquareInvoiceAfterBooking } from "../services/squareInvoices";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -246,6 +247,16 @@ router.post("/", async (req, res) => {
           serviceNames
         ),
       }).catch((err) => console.error("[Bookings] Admin SMS alert failed:", err));
+    }
+
+    // Square is best-effort after the emailed total is already fixed.
+    // A timeout or API error must not fail the booking or change that total.
+    if (invoiceId) {
+      try {
+        await attachSquareInvoiceAfterBooking(invoiceId);
+      } catch (err) {
+        console.error("[Bookings] Square invoice sync failed:", err);
+      }
     }
 
     return res.status(201).json({
@@ -566,6 +577,14 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
         portalUrl: `${appUrl()}/portal`,
       },
     }).catch((err) => console.error("[Bookings] Confirmation email failed:", err));
+
+    if (invoiceId) {
+      try {
+        await attachSquareInvoiceAfterBooking(invoiceId);
+      } catch (err) {
+        console.error("[Bookings] Square invoice sync failed:", err);
+      }
+    }
 
     return res.json({
       success: true,

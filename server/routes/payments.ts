@@ -12,6 +12,7 @@ import { requireCoordinator, requireAuth, type AuthenticatedRequest } from "../m
 import { sendEmail } from "../services/email";
 import { clientNotifyLive } from "../../shared/clientNotify";
 import { amountStillDue, invoiceAllowsDownload, invoiceIdFromSquareNote, squarePaymentNote } from "../../shared/paymentAccess";
+import { fetchPublishedSquareInvoiceUrl, resolveSquareCheckoutUrl, squareApiBaseUrl } from "../../shared/squareInvoice";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -33,9 +34,7 @@ function squareReady() {
 }
 
 function squareBaseUrl() {
-  return process.env.SQUARE_ENVIRONMENT === "sandbox"
-    ? "https://connect.squareupsandbox.com"
-    : "https://connect.squareup.com";
+  return squareApiBaseUrl(process.env.SQUARE_ENVIRONMENT);
 }
 
 function invoiceProvider(invoice: Record<string, unknown>): "square" | "stripe" {
@@ -383,6 +382,28 @@ router.post("/invoice/:id/checkout", async (req: Request, res: Response) => {
     }
 
     if (provider === "square") {
+      const freshUrl =
+        squareReady() && invoice.squareInvoiceId
+          ? await fetchPublishedSquareInvoiceUrl(String(invoice.squareInvoiceId), {
+              fetchImpl: fetch,
+              env: process.env,
+              timeoutMs: 5000,
+            })
+          : null;
+      const publishedUrl = resolveSquareCheckoutUrl({
+        freshUrl,
+        storedUrl: invoice.squareInvoiceUrl,
+      });
+      if (publishedUrl) {
+        if (freshUrl && freshUrl !== invoice.squareInvoiceUrl) {
+          await invoiceDoc.ref.update({
+            squareInvoiceUrl: freshUrl,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }).catch((err) => console.error("[Payments] Square invoice URL save failed:", err));
+        }
+        return res.json({ checkoutUrl: publishedUrl, provider: "square" });
+      }
+
       if (!squareReady()) return res.status(503).json({ error: "Square payments are not configured yet." });
 
       const response = await fetch(`${squareBaseUrl()}/v2/online-checkout/payment-links`, {
