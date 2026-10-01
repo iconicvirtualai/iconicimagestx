@@ -676,6 +676,100 @@ function clientCanViewListing(listing, identity) {
   const listingEmail = normalizeEmail(listing.clientEmail);
   return Boolean(email && listingEmail && email === listingEmail);
 }
+const APPRENTICESHIP_RULES = [
+  "Apprentices are learning.",
+  "We do not make additional trips.",
+  "We do not edit out anything additional — you get what you pay for.",
+  "You're helping us help you.",
+  "Once apprentices graduate we will have new apprentices. Graduates become vetted Iconic shooters, just like the OGs. It's a lifetime cycle — clients help all along the way.",
+  "But we don't play: be prepped and ready to go when we arrive."
+];
+function isApprenticeshipPackage(id) {
+  return id.startsWith("apprentice-");
+}
+const basicsList = [
+  {
+    id: "photos-20",
+    name: "20 Photos",
+    price: 99,
+    description: "Essential photo package for smaller listings.",
+    features: [
+      "20 High-End Photos",
+      "Basic Edits",
+      "Color Balance",
+      "Clear Windows",
+      "Sky Replacement",
+      "Next Day Turn Around",
+      "Reflection/Mirror Removal"
+    ]
+  },
+  {
+    id: "photos-35",
+    name: "35 Photos",
+    price: 150,
+    description: "Standard photo package for most residential listings.",
+    features: [
+      "35 High-End Photos",
+      "Basic Edits",
+      "Color Balance",
+      "Clear Windows",
+      "Sky Replacement",
+      "Next Day Turn Around",
+      "Reflection/Mirror Removal"
+    ]
+  },
+  {
+    id: "photos-50",
+    name: "50 Photos",
+    price: 200,
+    description: "Complete photo package for large homes and detailed spaces.",
+    features: [
+      "50 High-End Photos",
+      "Basic Edits",
+      "Color Balance",
+      "Clear Windows",
+      "Sky Replacement",
+      "Next Day Turn Around",
+      "Reflection/Mirror Removal"
+    ]
+  },
+  {
+    id: "apprentice-25",
+    name: "The Apprenticeship Program — 25 Photos",
+    cardTitle: "25 photos",
+    price: 75,
+    kicker: "The cheap one",
+    appointmentLimit: "20 Minute Appointment ONLY",
+    aside: "Twenty-five photos. Twenty minutes. You'll feel the savings — and the stopwatch.",
+    description: "25 photos, shot by an apprentice. 20 Minute Appointment ONLY. Overages billed at $25 per 15-minute increment.",
+    features: [
+      "25 Photos",
+      "20 Minute Appointment ONLY",
+      "Photos only",
+      "Overages: $25 per 15-minute increment"
+    ],
+    rules: APPRENTICESHIP_RULES
+  },
+  {
+    id: "apprentice-50",
+    name: "The Apprenticeship Program — 50 Photos",
+    cardTitle: "50 photos",
+    price: 125,
+    kicker: "Slightly less cheap",
+    appointmentLimit: "1 Hour Appointment ONLY",
+    aside: "Fifty photos and a full hour. You still walked past the real packages.",
+    description: "50 photos, shot by an apprentice. 1 Hour Appointment ONLY. Overages billed at $25 per 15-minute increment.",
+    features: [
+      "50 Photos",
+      "1 Hour Appointment ONLY",
+      "Photos only",
+      "Overages: $25 per 15-minute increment"
+    ],
+    rules: APPRENTICESHIP_RULES
+  }
+];
+basicsList.filter((item) => isApprenticeshipPackage(item.id));
+basicsList.filter((item) => !isApprenticeshipPackage(item.id));
 function orderTotalLabel(value) {
   return `$${(Number(value) || 0).toFixed(2)}`;
 }
