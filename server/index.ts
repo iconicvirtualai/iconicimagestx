@@ -96,10 +96,20 @@ export function createServer() {
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: true }));
 
-  // Gallery photos: raw image body, staff auth. Temp-admin is accepted only
-  // when the local/dev gate in shared/tempAdmin allows it.
+  // Two clients share this path:
+  // - Admin gallery (AdminListingFile) POSTs raw image bytes. Staff token required.
+  // - Photographer My Jobs and the Upload tab POST JSON (base64, or a storagePath
+  //   after a signed upload). That must reach listingsRouter below.
+  // This route is registered first, so a JSON post has to skip it with next("route").
+  // Otherwise express.json() has already parsed the body into an object, and the
+  // raw handler answers "No image data was received."
   app.post(
     "/api/listings/:id/photos",
+    (req, _res, next) => {
+      const type = String(req.headers["content-type"] || "").split(";")[0].trim().toLowerCase();
+      if (type === "application/json") return next("route");
+      next();
+    },
     express.raw({
       type: ["image/jpeg", "image/png", "image/webp", "application/octet-stream"],
       limit: "8mb",
