@@ -16,9 +16,12 @@ import { listingAppointmentDate } from "@shared/listingWrite";
 import {
   invoiceDraftFromOrder,
   listingLinkFields,
+  nonEmptyId,
   orderInvoiceButtonLabel,
 } from "@shared/orderProjectInvoice";
+import { staffInvoicePath } from "@shared/staffInvoice";
 import { ensureLinkedInvoice, resolveLinkedInvoice } from "@/lib/orderProjectInvoice";
+import { syncOrderBillingToInvoice } from "@/lib/staffInvoice";
 import { separatePromoDiscount } from "@shared/bookingPricing";
 import { linkOrderToListing, resolvePortalClientId } from "@/lib/listingClient";
 import { deliverInvoiceEmail } from "@/lib/deliverInvoice";
@@ -217,9 +220,34 @@ export default function AdminOrderRequest() {
       delete updates.id;
       await updateDoc(doc(db, "orderRequests", id), updates);
       setEditing(false);
-      toast.success("Order updated.");
-    } catch (err) { console.error(err); toast.error("Failed to save."); }
-    finally { setSaving(false); }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save.");
+      setSaving(false);
+      return;
+    }
+    try {
+      let invoiceId = nonEmptyId(linkedInvoiceId) || nonEmptyId(form.invoiceId);
+      if (!invoiceId) {
+        invoiceId = await resolveLinkedInvoice({
+          orderRequestId: id,
+          orderId: form.convertedToOrderId || form.orderId,
+          listingId: form.listingId,
+          orderInvoiceId: form.invoiceId,
+        });
+      }
+      if (invoiceId) {
+        const synced = await syncOrderBillingToInvoice(invoiceId, form);
+        toast.success(synced ? "Order updated. Invoice updated." : "Order updated.");
+      } else {
+        toast.success("Order updated.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Order saved. The linked invoice could not be updated.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCreateProject = async () => {
@@ -353,7 +381,7 @@ export default function AdminOrderRequest() {
       }, invoiceDraftFromOrder(order));
       setLinkedInvoiceId(invoiceId);
       setInvoicePhase("linked");
-      navigate(`/invoice/${invoiceId}`);
+      navigate(staffInvoicePath(invoiceId));
     } catch (err) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Could not open the invoice.");

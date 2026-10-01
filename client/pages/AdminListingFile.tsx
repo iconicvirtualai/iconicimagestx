@@ -18,6 +18,7 @@ import {
   projectInvoiceButtonLabel,
 } from "@shared/orderProjectInvoice";
 import { ensureLinkedInvoice, resolveLinkedInvoice } from "@/lib/orderProjectInvoice";
+import { staffInvoicePath } from "@shared/staffInvoice";
 
 // ─── Status systems ───────────────────────────────────────────────────────────
 const RE_STATUSES = ["unscheduled", "scheduled", "in_progress", "delivered", "paid", "archived"];
@@ -412,7 +413,7 @@ export default function AdminListingFile() {
         orderInvoiceId: order?.invoiceId || linkedInvoice?.id,
         listingInvoiceId: project.invoiceId || linkedInvoice?.id,
       }, order ? invoiceDraftFromOrder(order) : invoiceDraftFromProject(project));
-      navigate(`/invoice/${invoiceId}`);
+      navigate(staffInvoicePath(invoiceId));
     } catch (err) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Could not open the invoice.");
