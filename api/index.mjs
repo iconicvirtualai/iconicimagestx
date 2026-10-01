@@ -2790,6 +2790,13 @@ function clientCanViewListing(listing, identity) {
   const listingEmail = normalizeEmail(listing.clientEmail);
   return Boolean(email && listingEmail && email === listingEmail);
 }
+function visibleToPortalClient(record, identity) {
+  if (!record) return false;
+  if (record.clientId && identity.ids.includes(String(record.clientId))) return true;
+  const email = normalizeEmail(identity.email);
+  if (!email) return false;
+  return [record.email, record.clientEmail].some((value) => normalizeEmail(value) === email);
+}
 const db$9 = () => admin.firestore();
 async function upsertPortalClient(input) {
   const email = normalizeEmail(input.email);
@@ -3029,6 +3036,40 @@ router$8.get("/me/home", requireAuth, async (req, res) => {
         });
       }
     }
+    const orders = [];
+    const seenOrder = /* @__PURE__ */ new Set();
+    const pushOrder = (entry) => {
+      if (seenOrder.has(entry.id)) return;
+      const data = entry.data();
+      if (!visibleToPortalClient(
+        { clientId: data.clientId, email: data.email, clientEmail: data.clientEmail },
+        { ids: identity.ids, email: identity.email }
+      )) return;
+      seenOrder.add(entry.id);
+      const listingId = typeof data.listingId === "string" ? data.listingId : "";
+      orders.push({
+        id: entry.id,
+        address: addressText(data.address || data.shootLocation) || "Order",
+        status: data.status || "new",
+        href: listingId ? `/studio/${listingId}` : ""
+      });
+    };
+    try {
+      for (const clientId of identity.ids) {
+        const snap = await db$8().collection("orderRequests").where("clientId", "==", clientId).limit(20).get();
+        snap.docs.forEach(pushOrder);
+      }
+      if (identity.email) {
+        const [byEmail, byClientEmail] = await Promise.all([
+          db$8().collection("orderRequests").where("email", "==", identity.email).limit(20).get(),
+          db$8().collection("orderRequests").where("clientEmail", "==", identity.email).limit(20).get()
+        ]);
+        byEmail.docs.forEach(pushOrder);
+        byClientEmail.docs.forEach(pushOrder);
+      }
+    } catch (orderErr) {
+      console.error("[Clients] Order lookup failed:", orderErr);
+    }
     if (identity.email) {
       const byEmail = await db$8().collection("listings").where("clientEmail", "==", identity.email).limit(20).get();
       for (const doc of byEmail.docs) {
@@ -3046,6 +3087,7 @@ router$8.get("/me/home", requireAuth, async (req, res) => {
     }
     return res.json({
       profile: jsonSafe(identity.profile),
+      orders,
       galleries,
       invoices,
       projects
