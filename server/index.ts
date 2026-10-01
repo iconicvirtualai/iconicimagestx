@@ -24,6 +24,7 @@ import listingsRouter from "./routes/listings";
 import campaignsRouter from "./routes/campaigns";
 import agentsRouter from "./routes/agents";
 import mediaJobsRouter from "./routes/mediaJobs";
+import studioRouter from "./routes/studio";
 import placesRouter from "./routes/places";
 import smsRouter from "./routes/sms";
 import contactRouter from "./routes/contact";
@@ -207,6 +208,7 @@ export function createServer() {
   app.use("/api/campaigns", campaignsRouter);
   app.use("/api/agents", agentsRouter);
   app.use("/api/media-jobs", mediaJobsRouter);
+  app.use("/api/studio", studioRouter);
   app.use("/api/places", placesRouter);
   app.use("/api/sms", smsRouter);
   app.use("/api/contact", contactRouter);

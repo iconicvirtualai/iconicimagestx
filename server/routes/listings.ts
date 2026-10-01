@@ -19,12 +19,14 @@ import {
   staffCanAccessListing,
 } from "../../shared/listingAccess";
 import { resolveClientIdentity } from "../services/clientAccounts";
+import { shouldBumpStudioQueue } from "../../shared/iconicStudio";
 import {
   createListingUploadUrl,
   registerListingPhoto,
   saveListingBytes,
   serializeDoc,
 } from "../services/listingMedia";
+import { bumpRawIngestJob } from "../services/studioJobs";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -68,6 +70,15 @@ async function assertListingAccess(req: AuthenticatedRequest, listingId: string)
     throw Object.assign(new Error("You do not have access to this project."), { status: 403 });
   }
   return listing;
+}
+
+async function noteRawUpload(listingId: string, image: { path?: string; url?: string; name?: string; contentType?: string }, uploadedBy: string) {
+  if (!image?.path || !shouldBumpStudioQueue(image.path)) return;
+  try {
+    await bumpRawIngestJob({ listingId, image: { ...image, path: image.path }, uploadedBy });
+  } catch (err) {
+    console.error("[Studio] Raw upload saved, but the edit queue was not bumped.", err);
+  }
 }
 
 function sendKnownError(res: { status: (code: number) => { json: (body: unknown) => unknown } }, err: unknown, fallback: string) {
@@ -170,6 +181,7 @@ router.post("/:id/photos", requirePhotographer, async (req: AuthenticatedRequest
         uploadedBy: req.user!.uid,
         existingUrl: saved.url,
       });
+      await noteRawUpload(listingId, registered.image, req.user!.uid);
       return res.status(201).json({ success: true, ...registered });
     }
 
@@ -184,6 +196,7 @@ router.post("/:id/photos", requirePhotographer, async (req: AuthenticatedRequest
       contentType: req.body?.contentType,
       uploadedBy: req.user!.uid,
     });
+    await noteRawUpload(listingId, registered.image, req.user!.uid);
     return res.status(201).json({ success: true, ...registered });
   } catch (err) {
     return sendKnownError(res, err, "Failed to save the uploaded photo.");

@@ -205,6 +205,16 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ─── Iconic Studio edit queue ────────────────────────────────────────────
+    // Staff read/write for raw ingest, AI edits, and adjust saves.
+    // A human must publish these rules in the Firebase console.
+    // Vercel does not deploy firestore.rules.
+
+    match /editJobs/{jobId} {
+      allow read, create, update: if isStaff();
+      allow delete: if isAdmin();
+    }
+
     // ─── Listings / projects ─────────────────────────────────────────────────
     // Admin Create Project and New Project write this collection from the
     // browser. Without this match the catch-all denies every staff write.

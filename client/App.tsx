@@ -62,6 +62,7 @@ import AdminUpload from "./pages/AdminUpload";
 import AdminEditor from "./pages/AdminEditor";
 import AdminTeam from "./pages/AdminTeam";
 import AdminStudio from "./pages/AdminStudio";
+import AdminIconicStudio from "./pages/AdminIconicStudio";
 import Login from "./pages/Login";
 import ClientPortal from "./pages/ClientPortal";
 
@@ -112,6 +113,8 @@ const App = () => (
             {/* ─── Admin / Staff ────────────────────────────────────────── */}
             <Route path="/admin/dashboard" element={<ProtectedRoute requiredRole="coordinator"><AdminDashboard /></ProtectedRoute>} />
             <Route path="/admin/studio" element={<ProtectedRoute requiredRole="staff"><AdminStudio /></ProtectedRoute>} />
+            <Route path="/admin/iconic-studio" element={<ProtectedRoute requiredRole="staff"><AdminIconicStudio /></ProtectedRoute>} />
+            <Route path="/admin/iconic-studio/:listingId" element={<ProtectedRoute requiredRole="staff"><AdminIconicStudio /></ProtectedRoute>} />
             <Route path="/admin/listings" element={<ProtectedRoute requiredRole="coordinator"><AdminListings /></ProtectedRoute>} />
             <Route path="/admin/listing/:id" element={<ProtectedRoute requiredRole="staff"><AdminListingFile /></ProtectedRoute>} />
             <Route path="/admin/customers" element={<ProtectedRoute requiredRole="coordinator"><AdminCustomerCenter /></ProtectedRoute>} />

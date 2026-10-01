@@ -20,6 +20,7 @@ import {
   Settings,
   CreditCard,
   Upload,
+  Aperture,
 } from "lucide-react";
 
 interface AdminLayoutProps {
@@ -56,6 +57,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: "Photography",
     items: [
+      { label: "Iconic Studio",   href: "/admin/iconic-studio",    icon: Aperture,        roles: ALL_STAFF },
       { label: "My Jobs",         href: "/admin/photographer",     icon: Camera,          roles: PHOTO_UP },
       { label: "Upload",          href: "/admin/upload",           icon: Upload,          roles: PHOTO_UP },
     ],

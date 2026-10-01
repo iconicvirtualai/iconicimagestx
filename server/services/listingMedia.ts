@@ -81,6 +81,8 @@ export async function registerListingPhoto(options: {
   contentType?: string;
   uploadedBy: string;
   existingUrl?: string;
+  /** Optional Iconic Studio markers. Cannot override url, path, or name. */
+  extra?: Record<string, unknown>;
 }) {
   const { listingId, storagePath, fileName, uploadedBy } = options;
   if (!isListingStoragePath(listingId, storagePath)) {
@@ -120,6 +122,7 @@ export async function registerListingPhoto(options: {
     contentType: contentTypeForUpload(fileName, options.contentType),
     uploadedAt: new Date().toISOString(),
     uploadedBy,
+    ...studioImageExtra(options.extra),
   };
 
   const listing = listingSnap.data() || {};
@@ -134,6 +137,17 @@ export async function registerListingPhoto(options: {
   }
 
   return { image: already || image, listingId };
+}
+
+/** Keep studio markers off the identity fields the media library and portal read. */
+export function studioImageExtra(extra: unknown): Record<string, unknown> {
+  if (!extra || typeof extra !== "object") return {};
+  const src = extra as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  if (src.studioApproved === true) out.studioApproved = true;
+  if (src.studioRole === "adjusted" || src.studioRole === "final") out.studioRole = src.studioRole;
+  if (typeof src.sourcePath === "string" && src.sourcePath.length <= 500) out.sourcePath = src.sourcePath;
+  return out;
 }
 
 async function syncPlaytestGallery(

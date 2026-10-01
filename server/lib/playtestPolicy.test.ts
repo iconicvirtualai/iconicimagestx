@@ -54,9 +54,11 @@ describe("listing upload access", () => {
     expect(clientCanViewListing(listing, { uid: "stranger", email: "nope@example.com" })).toBe(false);
   });
 
-  it("only accepts photo and raw paths for that listing", () => {
+  it("accepts photo, raw, and finals paths for that listing", () => {
     expect(isListingStoragePath("job1", "listings/job1/photos/1_a.jpg")).toBe(true);
     expect(isListingStoragePath("job1", "listings/job1/raw/1_a.CR2")).toBe(true);
+    expect(isListingStoragePath("job1", "listings/job1/finals/1_a.jpg")).toBe(true);
+    expect(isListingStoragePath("job1", "listings/job1/secret/1_a.jpg")).toBe(false);
     expect(isListingStoragePath("job1", "listings/other/photos/1_a.jpg")).toBe(false);
     expect(isListingStoragePath("job1", "listings/job1/../staff/secret")).toBe(false);
     expect(contentTypeForUpload("frame.JPG", "")).toBe("image/jpeg");
