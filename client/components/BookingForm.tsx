@@ -556,7 +556,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                   <span className="text-gray-500">
                     {b.name}
                     {b.appointmentLimit && (
-                      <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                      <span className="mt-0.5 block text-[10px] font-medium leading-snug text-gray-400">
                         {b.appointmentLimit}
                       </span>
                     )}
@@ -848,14 +848,14 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                               selected ? 'border-black shadow-lg' : 'border-gray-100 hover:border-gray-300'
                             }`}
                           >
-                            <div className="space-y-2 pr-6">
+                            <div className="space-y-1.5 pr-6">
                               <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">{b.kicker}</p>
-                              <h4 className="font-black text-black uppercase text-sm leading-tight">{b.cardTitle || b.name}</h4>
-                              <span className="text-lg font-black text-black block">${b.price}</span>
-                              <span className="inline-flex rounded-full bg-black px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white">
-                                {b.appointmentLimit}
-                              </span>
-                              <p className="text-[11px] font-medium leading-relaxed text-gray-500">{b.aside}</p>
+                              <h4 className="text-2xl font-black leading-none text-black">{b.cardTitle || b.name}</h4>
+                              <span className="text-xl font-black text-black block">${b.price}</span>
+                              {b.appointmentLimit && (
+                                <p className="text-[10px] font-medium leading-snug text-gray-400">{b.appointmentLimit}</p>
+                              )}
+                              <p className="pt-1 text-[11px] font-medium leading-relaxed text-gray-500">{b.aside}</p>
                             </div>
                             {selected && (
                               <div className="absolute top-4 right-4 w-5 h-5 rounded-full bg-black flex items-center justify-center">
@@ -1855,11 +1855,9 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
           </div>
           <div className="p-8 space-y-6">
              {selectedDetailItem?.appointmentLimit && (
-                <div className="rounded-2xl bg-black px-4 py-3 text-white">
-                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">Appointment cap</p>
-                   <p className="mt-1 text-sm font-black uppercase tracking-wide">{selectedDetailItem.appointmentLimit}</p>
-                   <p className="mt-1 text-[11px] font-medium text-white/70">Overages: {APPRENTICESHIP_OVERAGE_LABEL}.</p>
-                </div>
+                <p className="text-[11px] font-medium leading-snug text-gray-400">
+                   {selectedDetailItem.appointmentLimit}. Overages: {APPRENTICESHIP_OVERAGE_LABEL}.
+                </p>
              )}
              {selectedDetailItem?.features && (
                 <div className="space-y-4">

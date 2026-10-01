@@ -774,11 +774,11 @@ export default function Pricing() {
                               <div className="flex items-start justify-between gap-3">
                                 <div>
                                   <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">{pkg.kicker}</p>
-                                  <span className="font-bold text-gray-700">{pkg.cardTitle}</span>
+                                  <span className="block text-2xl font-black leading-none text-black">{pkg.cardTitle}</span>
                                 </div>
-                                <span className="text-xl font-black text-black">${pkg.price}</span>
+                                <span className="text-2xl font-black leading-none text-black">${pkg.price}</span>
                               </div>
-                              <p className="mt-2 text-[11px] font-black uppercase tracking-widest text-black">{pkg.appointmentLimit}</p>
+                              <p className="mt-2 text-[10px] font-medium leading-snug text-gray-400">{pkg.appointmentLimit}</p>
                               <p className="mt-1 text-[12px] font-medium leading-relaxed text-gray-500">{pkg.aside}</p>
                             </div>
                           ))}

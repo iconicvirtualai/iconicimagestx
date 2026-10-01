@@ -102,13 +102,13 @@ export const basicsList: CatalogItem[] = [
   {
     id: "apprentice-25",
     name: "The Apprenticeship Program — 25 Photos",
-    cardTitle: "25 Photos",
+    cardTitle: "25 photos",
     price: 75,
     kicker: "The cheap one",
     appointmentLimit: "20 Minute Appointment ONLY",
     aside: "Twenty-five photos. Twenty minutes. You'll feel the savings — and the stopwatch.",
     description:
-      "20 Minute Appointment ONLY. Photos only, shot by an apprentice. Overages billed at $25 per 15-minute increment.",
+      "25 photos, shot by an apprentice. 20 Minute Appointment ONLY. Overages billed at $25 per 15-minute increment.",
     features: [
       "25 Photos",
       "20 Minute Appointment ONLY",
@@ -120,13 +120,13 @@ export const basicsList: CatalogItem[] = [
   {
     id: "apprentice-50",
     name: "The Apprenticeship Program — 50 Photos",
-    cardTitle: "50 Photos",
+    cardTitle: "50 photos",
     price: 125,
     kicker: "Slightly less cheap",
     appointmentLimit: "1 Hour Appointment ONLY",
     aside: "Fifty photos and a full hour. You still walked past the real packages.",
     description:
-      "1 Hour Appointment ONLY. Photos only, shot by an apprentice. Overages billed at $25 per 15-minute increment.",
+      "50 photos, shot by an apprentice. 1 Hour Appointment ONLY. Overages billed at $25 per 15-minute increment.",
     features: [
       "50 Photos",
       "1 Hour Appointment ONLY",
