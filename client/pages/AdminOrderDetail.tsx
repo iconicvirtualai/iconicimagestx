@@ -15,6 +15,7 @@ import {
   LIFE_OF_THE_LISTING_CARE_PRICE_LABEL,
   LIFE_OF_THE_LISTING_CARE_SUMMARY_LABEL,
 } from "@shared/lifeOfTheListingCare";
+import { staffInvoicePath } from "@shared/staffInvoice";
 
 // ─── Status system ────────────────────────────────────────────────────────────
 const ORDER_STATUSES = [
@@ -224,7 +225,6 @@ export default function AdminOrderDetail() {
       const result = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(result.error || "Could not send invoice.");
       toast.success("Invoice sent to the client.");
-      if (result.paymentUrl) window.open(result.paymentUrl, "_blank", "noopener,noreferrer");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not send invoice.");
     } finally {
@@ -612,6 +612,11 @@ export default function AdminOrderDetail() {
           </div>
 
           <div className="flex gap-3 mt-8">
+            {(order.invoice?.id || invoice.id) && (
+              <Button type="button" onClick={() => navigate(staffInvoicePath(String(order.invoice?.id || invoice.id)))} variant="outline" className="rounded-xl text-xs font-bold">
+                Edit Invoice
+              </Button>
+            )}
             <Button onClick={handleSendInvoice} disabled={sendingInvoice} className="rounded-xl bg-[#0d9488] hover:bg-[#0f766e] text-white text-xs font-bold">
               <Send className="w-3.5 h-3.5 mr-1.5" /> Send Invoice
             </Button>

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { deliverInvoiceEmail } from "@/lib/deliverInvoice";
+import { staffInvoicePath } from "@shared/staffInvoice";
 import { Search, DollarSign, Send, Eye, Plus, FileText, ChevronDown, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
@@ -97,7 +98,7 @@ export default function AdminClientBilling() {
       toast.error("No invoice is attached to this request yet.");
       return;
     }
-    navigate(`/invoice/${invoiceId}`);
+    navigate(staffInvoicePath(invoiceId));
   };
 
   const sendInvoice = async (invoiceId: string) => {
