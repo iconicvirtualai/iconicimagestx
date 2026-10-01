@@ -60,7 +60,10 @@ service cloud.firestore {
     // ─── Staff Collections ───────────────────────────────────────────────────
 
     match /staff/{staffId} {
-      allow read: if isStaff();
+      // Own record is readable by that Auth user so login can tell a missing
+      // or inactive staff doc from an active one. Everyone else's records
+      // stay limited to active staff.
+      allow read: if (isAuthenticated() && staffId == request.auth.uid) || isStaff();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }

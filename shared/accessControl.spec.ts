@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { isActiveStaffRecord, isStaffRole, staffHomePath } from "./staffAccess";
+import {
+  INITIAL_AUTH_SESSION,
+  isActiveStaffRecord,
+  isStaffRole,
+  reduceAuthSession,
+  sessionFromProfiles,
+  staffHomePath,
+  staffLoginAction,
+} from "./staffAccess";
 import { isHostedDeployment, isLocalAdminHost, isTempAdminClientEnabled, isTempAdminEnabled } from "./tempAdmin";
 import { amountStillDue, invoiceAllowsDownload, invoiceIdFromSquareNote, publicMediaItem, squarePaymentNote } from "./paymentAccess";
 
@@ -39,6 +47,99 @@ describe("staff roles", () => {
     expect(staffHomePath("photographer")).toBe("/admin/photographer");
     expect(staffHomePath("editor")).toBe("/admin/editor");
     expect(staffHomePath("coordinator")).toBe("/admin/dashboard");
+  });
+});
+
+describe("staff login session", () => {
+  it("does not reject a signed-in user while profiles are still loading", () => {
+    const signedIn = reduceAuthSession(INITIAL_AUTH_SESSION, { type: "signed-in", userId: "staff-1" });
+    expect(signedIn.loading).toBe(true);
+    expect(signedIn.userType).toBeNull();
+    expect(
+      staffLoginAction({
+        loading: signedIn.loading,
+        hasUser: signedIn.userId != null,
+        isStaff: signedIn.userType === "staff",
+      }),
+    ).toEqual({ type: "pending" });
+  });
+
+  it("redirects an active staff profile after it resolves", () => {
+    const signedIn = reduceAuthSession({ userId: null, userType: null, loading: false }, {
+      type: "signed-in",
+      userId: "staff-1",
+    });
+    const admin = sessionFromProfiles({ staff: { role: "admin", isActive: true }, hasClient: false });
+    const resolved = reduceAuthSession(signedIn, {
+      type: "profiles-resolved",
+      userId: "staff-1",
+      userType: admin.userType,
+      role: admin.role,
+    });
+    expect(resolved.loading).toBe(false);
+    expect(
+      staffLoginAction({
+        loading: resolved.loading,
+        hasUser: true,
+        isStaff: resolved.userType === "staff",
+        role: resolved.role,
+      }),
+    ).toEqual({ type: "redirect", path: "/admin/dashboard" });
+
+    const photographer = sessionFromProfiles({ staff: { role: "photographer", isActive: true }, hasClient: false });
+    expect(staffHomePath(photographer.role)).toBe("/admin/photographer");
+    const editor = sessionFromProfiles({ staff: { role: "editor" }, hasClient: false });
+    expect(staffHomePath(editor.role)).toBe("/admin/editor");
+  });
+
+  it("rejects non-staff only after profile resolution", () => {
+    const signedIn = reduceAuthSession({ userId: null, userType: null, loading: false }, {
+      type: "signed-in",
+      userId: "client-1",
+    });
+    const missing = sessionFromProfiles({ staff: null, hasClient: false });
+    const resolved = reduceAuthSession(signedIn, {
+      type: "profiles-resolved",
+      userId: "client-1",
+      userType: missing.userType,
+    });
+    expect(
+      staffLoginAction({
+        loading: resolved.loading,
+        hasUser: true,
+        isStaff: resolved.userType === "staff",
+      }),
+    ).toEqual({ type: "not-staff" });
+
+    const inactive = sessionFromProfiles({
+      staff: { role: "admin", isActive: false },
+      hasClient: true,
+    });
+    expect(inactive.userType).toBe("client");
+  });
+
+  it("drops a profile result that finishes after sign-out or a newer user", () => {
+    const signedIn = reduceAuthSession(INITIAL_AUTH_SESSION, { type: "signed-in", userId: "staff-1" });
+    const signedOut = reduceAuthSession(signedIn, { type: "signed-out" });
+    expect(
+      reduceAuthSession(signedOut, {
+        type: "profiles-resolved",
+        userId: "staff-1",
+        userType: "staff",
+        role: "admin",
+      }),
+    ).toBe(signedOut);
+
+    const switched = reduceAuthSession(signedIn, { type: "signed-in", userId: "staff-2" });
+    expect(
+      reduceAuthSession(switched, {
+        type: "profiles-resolved",
+        userId: "staff-1",
+        userType: "staff",
+        role: "admin",
+      }),
+    ).toBe(switched);
+    expect(switched.loading).toBe(true);
   });
 });
 

@@ -23,7 +23,13 @@ import {
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
 import type { StaffMember, Client } from "../lib/schema";
-import { isActiveStaffRecord } from "@shared/staffAccess";
+import {
+  INITIAL_AUTH_SESSION,
+  reduceAuthSession,
+  sessionFromProfiles,
+  type AuthSessionEvent,
+  type AuthSessionState,
+} from "@shared/staffAccess";
 import { isTempAdminClientEnabled } from "@shared/tempAdmin";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -34,6 +40,12 @@ const TEMP_ADMIN_ENABLED = isTempAdminClientEnabled({
 });
 
 type AuthUserType = "staff" | "client" | null;
+
+function isPermissionDenied(err: unknown): boolean {
+  if (typeof err !== "object" || err === null || !("code" in err)) return false;
+  const code = String((err as { code: unknown }).code);
+  return code === "permission-denied" || code.endsWith("/permission-denied");
+}
 
 interface AuthContextValue {
   // State
@@ -79,55 +91,108 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const tempSession = useRef(false);
+  const sessionRef = useRef<AuthSessionState>(INITIAL_AUTH_SESSION);
+
+  const commitSession = (event: AuthSessionEvent) => {
+    const next = reduceAuthSession(sessionRef.current, event);
+    if (event.type === "profiles-resolved" && next === sessionRef.current) return null;
+    sessionRef.current = next;
+    setLoading(next.loading);
+    setUserType(next.userType);
+    if (event.type !== "profiles-resolved") {
+      setStaffProfile(null);
+      setClientProfile(null);
+    }
+    if (event.type === "signed-out") setUser(null);
+    return next;
+  };
 
   const loadProfiles = async (firebaseUser: User) => {
-    setStaffProfile(null);
-    setClientProfile(null);
-    setUserType(null);
-
-    const staffDoc = await getDoc(doc(db, "staff", firebaseUser.uid));
-    const staffData = staffDoc.exists() ? staffDoc.data() : null;
-    if (staffData && isActiveStaffRecord(staffData)) {
-      setStaffProfile({ id: staffDoc.id, ...staffData } as StaffMember);
-      setUserType("staff");
-      return;
+    let staffData: Record<string, unknown> | null = null;
+    let staffId = firebaseUser.uid;
+    try {
+      const staffDoc = await getDoc(doc(db, "staff", firebaseUser.uid));
+      if (staffDoc.exists()) {
+        staffData = staffDoc.data() as Record<string, unknown>;
+        staffId = staffDoc.id;
+      }
+    } catch (err) {
+      // Current rules hide a missing or inactive staff doc behind permission-denied.
+      // That is "no active staff record", not a failed login. Other errors still throw.
+      if (!isPermissionDenied(err)) throw err;
     }
 
-    // Portal clients are stored at clients/{uid}, with firebaseUid linking any booking record.
-    const clientDoc = await getDoc(doc(db, "clients", firebaseUser.uid));
-    if (clientDoc.exists()) {
-      setClientProfile({ id: clientDoc.id, ...clientDoc.data() } as Client);
-      setUserType("client");
+    const staffRecord = staffData as { role?: unknown; isActive?: unknown } | null;
+    const staffSession = sessionFromProfiles({ staff: staffRecord, hasClient: false });
+    let clientData: Record<string, unknown> | null = null;
+    let clientId = firebaseUser.uid;
+    if (staffSession.userType !== "staff") {
+      try {
+        const clientDoc = await getDoc(doc(db, "clients", firebaseUser.uid));
+        if (clientDoc.exists()) {
+          clientData = clientDoc.data() as Record<string, unknown>;
+          clientId = clientDoc.id;
+        }
+      } catch (err) {
+        if (!isPermissionDenied(err)) throw err;
+      }
     }
+
+    const classified = sessionFromProfiles({
+      staff: staffRecord,
+      hasClient: clientData != null,
+    });
+    const applied = commitSession({
+      type: "profiles-resolved",
+      userId: firebaseUser.uid,
+      userType: classified.userType,
+      role: classified.role,
+    });
+    if (!applied) return;
+
+    setStaffProfile(
+      classified.userType === "staff" && staffData
+        ? ({ id: staffId, ...staffData } as StaffMember)
+        : null,
+    );
+    setClientProfile(
+      classified.userType === "client" && clientData
+        ? ({ id: clientId, ...clientData } as Client)
+        : null,
+    );
   };
 
   // Listen for auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (!firebaseUser && tempSession.current) {
-        setLoading(false);
+      if (!firebaseUser && tempSession.current) return;
+
+      tempSession.current = false;
+
+      if (!firebaseUser) {
+        commitSession({ type: "signed-out" });
         return;
       }
 
-      tempSession.current = false;
+      // Same turn as setUser: loading stays true until profiles resolve, so
+      // AdminLogin cannot treat this user as non-staff before the staff doc read.
       setUser(firebaseUser);
+      commitSession({ type: "signed-in", userId: firebaseUser.uid });
 
-      if (firebaseUser) {
-        try {
-          await loadProfiles(firebaseUser);
-        } catch (err) {
-          console.error("[AuthContext] Profile fetch error:", err);
+      try {
+        await loadProfiles(firebaseUser);
+      } catch (err) {
+        console.error("[AuthContext] Profile fetch error:", err);
+        const applied = commitSession({
+          type: "profiles-resolved",
+          userId: firebaseUser.uid,
+          userType: null,
+        });
+        if (applied) {
           setStaffProfile(null);
           setClientProfile(null);
-          setUserType(null);
         }
-      } else {
-        setStaffProfile(null);
-        setClientProfile(null);
-        setUserType(null);
       }
-
-      setLoading(false);
     });
 
     return unsubscribe;
@@ -158,6 +223,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: "admin",
         isActive: true,
       } as StaffMember);
+      sessionRef.current = {
+        userId: "temp-admin-uid",
+        userType: "staff",
+        role: "admin",
+        loading: false,
+      };
       setUserType("staff");
       setLoading(false);
       return;
@@ -176,10 +247,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOutUser = async () => {
     setError(null);
     tempSession.current = false;
-    setUser(null);
-    setStaffProfile(null);
-    setClientProfile(null);
-    setUserType(null);
+    commitSession({ type: "signed-out" });
     try {
       await signOut(auth);
     } catch (err) {
