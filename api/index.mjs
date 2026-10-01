@@ -130,7 +130,7 @@ function clientNotifyBlockReason(env = process.env) {
   if (env.CLIENT_COMMS_ZONE === "RED") return "CLIENT_COMMS_ZONE=RED";
   return "CLIENT_NOTIFY_LIVE is not exactly true";
 }
-const db$g = () => admin.firestore();
+const db$h = () => admin.firestore();
 let transporter = null;
 function getTransporter() {
   if (!transporter) {
@@ -161,7 +161,7 @@ async function sendEmail(options) {
     return;
   }
   try {
-    const templateDoc = await db$g().collection("emailTemplates").where("category", "==", template).where("isActive", "==", true).limit(1).get();
+    const templateDoc = await db$h().collection("emailTemplates").where("category", "==", template).where("isActive", "==", true).limit(1).get();
     let subject = subjectOverride || `Message from Iconic Images`;
     let htmlBody = getFallbackTemplate(template, variables);
     if (!templateDoc.empty) {
@@ -616,6 +616,526 @@ async function listCalendarScheduleEvents({
 function lifeOfTheListingCareSelected(value) {
   return value === true;
 }
+const PLAYTEST_ADDRESS = "100 Playtest Lane, Austin, TX 78701";
+const STAFF_ROLES = ["admin", "coordinator", "photographer", "editor"];
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+function cleanPersonName(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").slice(0, 80);
+}
+function isStaffRole(value) {
+  return STAFF_ROLES.includes(value);
+}
+function safeStorageFileName(fileName) {
+  const base = String(fileName || "upload").split(/[/\\]/).pop() || "upload";
+  const cleaned = base.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/_+/g, "_");
+  return cleaned.slice(0, 180) || "upload";
+}
+function contentTypeForUpload(fileName, provided) {
+  const raw = String(provided || "").trim().toLowerCase();
+  if (/^[\w.+-]+\/[\w.+-]+$/.test(raw) && raw.length <= 120 && raw !== "application/octet-stream") {
+    return raw;
+  }
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".gif")) return "image/gif";
+  if (lower.endsWith(".heic")) return "image/heic";
+  if (lower.endsWith(".heif")) return "image/heif";
+  if (lower.endsWith(".mp4")) return "video/mp4";
+  if (lower.endsWith(".mov")) return "video/quicktime";
+  return raw && /^[\w.+-]+\/[\w.+-]+$/.test(raw) ? raw : "application/octet-stream";
+}
+function isListingStoragePath(listingId, storagePath) {
+  if (!listingId || typeof storagePath !== "string") return false;
+  if (storagePath.includes("..") || storagePath.includes("\\") || storagePath.startsWith("/")) return false;
+  const prefix = `listings/${listingId}/`;
+  if (!storagePath.startsWith(prefix)) return false;
+  const rest = storagePath.slice(prefix.length);
+  return rest.startsWith("photos/") || rest.startsWith("raw/");
+}
+function staffCanAccessListing(role, uid, listing) {
+  if (!listing || !uid) return false;
+  if (role === "admin" || role === "coordinator") return true;
+  if (listing.photographerUid === uid) return true;
+  if (Array.isArray(listing.photographerIds) && listing.photographerIds.includes(uid)) return true;
+  if (Array.isArray(listing.assignedProviders)) {
+    return listing.assignedProviders.some(
+      (provider) => provider?.providerId === uid || provider?.uid === uid || provider?.id === uid
+    );
+  }
+  return false;
+}
+function clientCanViewListing(listing, identity) {
+  if (!listing || !identity?.uid) return false;
+  const ids = /* @__PURE__ */ new Set([identity.uid, ...identity.ids || []]);
+  if (listing.clientId && ids.has(String(listing.clientId))) return true;
+  const email = normalizeEmail(identity.email);
+  const listingEmail = normalizeEmail(listing.clientEmail);
+  return Boolean(email && listingEmail && email === listingEmail);
+}
+function orderTotalLabel(value) {
+  return `$${(Number(value) || 0).toFixed(2)}`;
+}
+function normalizeBookingLineItems(items) {
+  if (!Array.isArray(items)) return [];
+  return items.map((raw) => {
+    const item = raw && typeof raw === "object" ? raw : {};
+    const price = Number(item.price) || 0;
+    const qty = Number(item.qty) > 0 ? Number(item.qty) : 1;
+    const unitPrice = item.unitPrice == null || item.unitPrice === "" ? price / qty : Number(item.unitPrice) || 0;
+    const line = {
+      name: String(item.name || ""),
+      unitPrice,
+      qty,
+      price
+    };
+    if (item.id != null && item.id !== "") line.id = String(item.id);
+    return line;
+  });
+}
+function buildBookingInvoiceDraft(input) {
+  const total = Number(input.total) || 0;
+  const lineItems = normalizeBookingLineItems(input.lineItems);
+  return {
+    orderRequestId: input.orderRequestId || null,
+    orderId: null,
+    clientId: input.clientId || null,
+    clientEmail: normalizeEmail(input.clientEmail),
+    clientName: input.clientName,
+    lineItems,
+    subtotal: Number(input.pricing?.subtotal ?? total) || 0,
+    tax: Number(input.pricing?.tax) || 0,
+    total,
+    amountPaid: 0,
+    amountDue: total,
+    status: "draft",
+    paymentProvider: "square",
+    promoCode: input.promoCode || null,
+    promoDiscount: Number(input.promoDiscount) || 0
+  };
+}
+function existingInvoiceId(value) {
+  if (typeof value !== "string") return null;
+  const id = value.trim();
+  return id ? id : null;
+}
+const CLOSED_STATUSES = /* @__PURE__ */ new Set(["void", "voided", "cancelled", "canceled"]);
+const SETTLED_STATUSES = /* @__PURE__ */ new Set(["paid", "comped"]);
+function statusOf(invoice) {
+  return String(invoice?.status || "").toLowerCase();
+}
+function numeric(value) {
+  if (value == null || value === "") return null;
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : null;
+}
+function invoiceBalance(invoice) {
+  const total = numeric(invoice?.total) ?? 0;
+  const amountPaid = numeric(invoice?.amountPaid) ?? 0;
+  const statedDue = numeric(invoice?.amountDue);
+  const computedDue = Math.max(0, total - amountPaid);
+  const amountDue = statedDue == null ? computedDue : Math.max(0, statedDue);
+  return { total, amountPaid, amountDue };
+}
+function invoiceAllowsDownload(invoice) {
+  if (!invoice) return false;
+  const status = statusOf(invoice);
+  if (CLOSED_STATUSES.has(status)) return false;
+  if (SETTLED_STATUSES.has(status)) return true;
+  const { total, amountPaid, amountDue } = invoiceBalance(invoice);
+  const statedDue = numeric(invoice.amountDue);
+  if (total <= 0 && (statedDue == null || statedDue <= 0)) return true;
+  if (statedDue != null && statedDue <= 0 && amountPaid <= 0 && total > 0) return false;
+  return amountDue <= 0 && amountPaid > 0;
+}
+function amountStillDue(invoice) {
+  if (!invoice) return 0;
+  const status = statusOf(invoice);
+  if (SETTLED_STATUSES.has(status) || CLOSED_STATUSES.has(status)) return 0;
+  const { total, amountPaid, amountDue } = invoiceBalance(invoice);
+  const computedDue = Math.max(0, total - amountPaid);
+  const statedDue = numeric(invoice.amountDue);
+  if (statedDue != null && statedDue <= 0 && computedDue > 0 && amountPaid <= 0) return computedDue;
+  return amountDue;
+}
+function squarePaymentNote(invoiceId, invoiceNumber) {
+  const label = invoiceNumber ? `Iconic Images invoice ${invoiceNumber}` : "Iconic Images invoice";
+  return `${label} invoiceId:${invoiceId}`;
+}
+function invoiceIdFromSquareNote(note) {
+  if (typeof note !== "string") return null;
+  const match = note.match(/invoiceId:([A-Za-z0-9_-]+)/);
+  return match?.[1] || null;
+}
+const LINK_MEDIA_TYPES = /* @__PURE__ */ new Set(["video", "reel", "tour", "matterport"]);
+function publicMediaItem(item, canDownload) {
+  const type = String(item.type || "photo");
+  const title = item.title || item.fileName || "Media";
+  const base = {
+    id: item.id,
+    fileName: item.fileName || title,
+    title,
+    type,
+    width: item.width || null,
+    height: item.height || null,
+    canDownload: Boolean(canDownload && item.downloadable !== false && !LINK_MEDIA_TYPES.has(type)),
+    locked: !canDownload
+  };
+  if (!canDownload) {
+    return { ...base, url: null, shareUrl: null, embedUrl: null };
+  }
+  const url = item.shareUrl || item.embedUrl || item.url || null;
+  return {
+    ...base,
+    url,
+    shareUrl: item.shareUrl || item.url || item.embedUrl || null,
+    embedUrl: item.embedUrl || item.url || null
+  };
+}
+const SQUARE_VERSION_FALLBACK = "2026-08-20";
+const SYNC_BUDGET_MS = 8e3;
+function squareApiBaseUrl(environment) {
+  return environment === "sandbox" ? "https://connect.squareupsandbox.com" : "https://connect.squareup.com";
+}
+function squareConfigured(env) {
+  return Boolean(env.SQUARE_ACCESS_TOKEN && env.SQUARE_LOCATION_ID);
+}
+function squareInvoiceAlreadySynced(invoice) {
+  return typeof invoice.squareInvoiceId === "string" && invoice.squareInvoiceId.trim().length > 0;
+}
+function preferredSquareCheckoutUrl(invoice) {
+  if (typeof invoice.squareInvoiceUrl !== "string") return null;
+  const url = invoice.squareInvoiceUrl.trim();
+  if (!url.startsWith("https://")) return null;
+  return url;
+}
+function resolveSquareCheckoutUrl(input) {
+  const fresh = preferredSquareCheckoutUrl({ squareInvoiceUrl: input.freshUrl });
+  if (fresh) return fresh;
+  return preferredSquareCheckoutUrl({ squareInvoiceUrl: input.storedUrl });
+}
+function squareInvoiceDueDate(now) {
+  const due = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1e3);
+  return due.toISOString().slice(0, 10);
+}
+function toCents(amount) {
+  return Math.round((Number(amount) || 0) * 100);
+}
+function buildSquareOrderPricing(lineItems, total, paymentNote) {
+  const normalized = normalizeBookingLineItems(lineItems);
+  const lines = [];
+  const discounts = [];
+  normalized.forEach((item, index) => {
+    const extendedCents = toCents(item.price);
+    if (extendedCents < 0) {
+      const name = item.name.trim() || "Discount";
+      discounts.push({
+        uid: `discount-${index}`,
+        name: name.slice(0, 255),
+        type: "FIXED_AMOUNT",
+        scope: "ORDER",
+        amount_money: { amount: Math.abs(extendedCents), currency: "USD" }
+      });
+      return;
+    }
+    if (extendedCents === 0) return;
+    const qty = Number.isInteger(item.qty) && item.qty > 0 ? item.qty : 1;
+    const unitCents = toCents(item.unitPrice);
+    const pricedAsQty = unitCents > 0 && unitCents * qty === extendedCents;
+    const line = {
+      uid: `line-${index}`,
+      name: (item.name.trim() || "Service").slice(0, 512),
+      quantity: pricedAsQty ? String(qty) : "1",
+      base_price_money: {
+        amount: pricedAsQty ? unitCents : extendedCents,
+        currency: "USD"
+      }
+    };
+    if (index === 0 && paymentNote) line.note = paymentNote.slice(0, 500);
+    lines.push(line);
+  });
+  if (lines.length === 0) return null;
+  const lineSum = lines.reduce((sum, line) => sum + line.base_price_money.amount * Number(line.quantity), 0);
+  const discountSum = discounts.reduce((sum, discount) => sum + discount.amount_money.amount, 0);
+  const amountCents = lineSum - discountSum;
+  if (amountCents <= 0) return null;
+  if (amountCents !== toCents(Number(total) || 0)) return null;
+  return { lineItems: lines, discounts, amountCents };
+}
+function stableKey(prefix, value) {
+  let h1 = 2166136261;
+  let h2 = 2166136261;
+  for (let i = 0; i < value.length; i++) {
+    h1 = Math.imul(h1 ^ value.charCodeAt(i), 16777619);
+    h2 = Math.imul(h2 ^ value.charCodeAt(value.length - 1 - i), 16777619);
+  }
+  const hex = (h1 >>> 0).toString(16).padStart(8, "0") + (h2 >>> 0).toString(16).padStart(8, "0");
+  return `${prefix}${hex}`.slice(0, 45);
+}
+function idempotencyKey(prefix, invoiceId) {
+  const key = `${prefix}${invoiceId}`;
+  return key.length <= 45 ? key : stableKey(prefix, invoiceId);
+}
+function splitName(name) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return {};
+  if (parts.length === 1) return { given_name: parts[0].slice(0, 300) };
+  return {
+    given_name: parts[0].slice(0, 300),
+    family_name: parts.slice(1).join(" ").slice(0, 300)
+  };
+}
+function squareError(body, fallback) {
+  const errors = body && typeof body === "object" && "errors" in body ? body.errors : null;
+  if (Array.isArray(errors) && errors[0] && typeof errors[0] === "object" && "detail" in errors[0]) {
+    const detail = errors[0].detail;
+    if (typeof detail === "string" && detail) return detail;
+  }
+  if (body && typeof body === "object" && "error" in body) {
+    const error = body.error;
+    if (typeof error === "string" && error) return error;
+  }
+  return fallback;
+}
+async function squareRequest(deps, path2, init, deadline) {
+  const token = deps.env.SQUARE_ACCESS_TOKEN;
+  if (!token) return { ok: false, status: 0, body: { error: "Square is not configured" } };
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) return { ok: false, status: 0, body: { error: "Square invoice sync timed out" } };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), remaining);
+  try {
+    const response = await deps.fetchImpl(`${squareApiBaseUrl(deps.env.SQUARE_ENVIRONMENT)}${path2}`, {
+      method: init.method,
+      headers: {
+        "Content-Type": "application/json",
+        "Square-Version": deps.env.SQUARE_VERSION || SQUARE_VERSION_FALLBACK,
+        Authorization: `Bearer ${token}`
+      },
+      body: init.body === void 0 ? void 0 : JSON.stringify(init.body),
+      signal: controller.signal
+    });
+    const body = await response.json().catch(() => ({}));
+    return { ok: response.ok, status: response.status, body };
+  } catch (err) {
+    const aborted = err instanceof Error && (err.name === "AbortError" || /abort/i.test(err.message));
+    return {
+      ok: false,
+      status: 0,
+      body: { error: aborted ? "Square invoice sync timed out" : err instanceof Error ? err.message : "Square request failed" }
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+function publicUrlOf(body) {
+  return preferredSquareCheckoutUrl({ squareInvoiceUrl: body?.invoice?.public_url });
+}
+async function fetchPublishedSquareInvoiceUrl(squareInvoiceId, deps) {
+  const id = squareInvoiceId.trim();
+  if (!id || !squareConfigured(deps.env)) return null;
+  const result = await squareRequest(
+    deps,
+    `/v2/invoices/${encodeURIComponent(id)}`,
+    { method: "GET" },
+    Date.now() + (deps.timeoutMs ?? 5e3)
+  );
+  if (!result.ok) return null;
+  return publicUrlOf(result.body);
+}
+async function syncSquareInvoice(invoice, deps) {
+  try {
+    if (squareInvoiceAlreadySynced(invoice)) return { ok: true, skipped: true, reason: "already-synced" };
+    if (String(invoice.paymentProvider || "").toLowerCase() === "stripe") {
+      return { ok: true, skipped: true, reason: "stripe" };
+    }
+    const total = Number(invoice.total) || 0;
+    if (total <= 0) return { ok: true, skipped: true, reason: "nothing-due" };
+    if (!squareConfigured(deps.env)) return { ok: true, skipped: true, reason: "not-configured" };
+    const email = typeof invoice.clientEmail === "string" ? invoice.clientEmail.trim().toLowerCase() : "";
+    if (!email) return { ok: true, skipped: true, reason: "missing-email" };
+    const invoiceNumber = typeof invoice.invoiceNumber === "string" ? invoice.invoiceNumber.trim() : "";
+    const paymentNote = squarePaymentNote(invoice.id, invoiceNumber || void 0);
+    const pricing = buildSquareOrderPricing(invoice.lineItems, total, paymentNote);
+    if (!pricing) return { ok: true, skipped: true, reason: "total-mismatch" };
+    const deadline = Date.now() + (deps.timeoutMs ?? SYNC_BUDGET_MS);
+    const locationId = deps.env.SQUARE_LOCATION_ID || "";
+    const clientName = typeof invoice.clientName === "string" ? invoice.clientName : "";
+    const search = await squareRequest(
+      deps,
+      "/v2/customers/search",
+      {
+        method: "POST",
+        body: {
+          query: { filter: { email_address: { exact: email } } },
+          limit: 1
+        }
+      },
+      deadline
+    );
+    if (!search.ok && search.body?.error === "Square invoice sync timed out") {
+      return { ok: false, error: "Square invoice sync timed out" };
+    }
+    let customerId = search.ok && Array.isArray(search.body?.customers) ? search.body.customers[0]?.id : "";
+    if (!customerId) {
+      const createdCustomer = await squareRequest(
+        deps,
+        "/v2/customers",
+        {
+          method: "POST",
+          body: {
+            idempotency_key: stableKey("ii-cus-", email),
+            email_address: email,
+            ...splitName(clientName)
+          }
+        },
+        deadline
+      );
+      if (!createdCustomer.ok) {
+        return { ok: false, error: squareError(createdCustomer.body, "Square customer create failed") };
+      }
+      customerId = createdCustomer.body?.customer?.id || "";
+    }
+    if (!customerId) return { ok: false, error: "Square customer create failed" };
+    const order = await squareRequest(
+      deps,
+      "/v2/orders",
+      {
+        method: "POST",
+        body: {
+          idempotency_key: idempotencyKey("ii-ord-", invoice.id),
+          order: {
+            location_id: locationId,
+            customer_id: customerId,
+            reference_id: invoice.id.slice(0, 40),
+            line_items: pricing.lineItems,
+            ...pricing.discounts.length ? { discounts: pricing.discounts } : {}
+          }
+        }
+      },
+      deadline
+    );
+    const orderId = order.ok ? order.body?.order?.id : "";
+    if (!orderId) return { ok: false, error: squareError(order.body, "Square order create failed") };
+    const invoiceBody = {
+      location_id: locationId,
+      order_id: orderId,
+      primary_recipient: { customer_id: customerId },
+      payment_requests: [
+        {
+          request_type: "BALANCE",
+          due_date: squareInvoiceDueDate(deps.now ? deps.now() : /* @__PURE__ */ new Date())
+        }
+      ],
+      delivery_method: "SHARE_MANUALLY",
+      accepted_payment_methods: { card: true },
+      title: `Iconic Images Invoice ${invoiceNumber || invoice.id}`.slice(0, 255),
+      description: paymentNote
+    };
+    if (/^[A-Za-z0-9-]{1,40}$/.test(invoiceNumber)) invoiceBody.invoice_number = invoiceNumber;
+    const createdInvoice = await squareRequest(
+      deps,
+      "/v2/invoices",
+      {
+        method: "POST",
+        body: {
+          idempotency_key: idempotencyKey("ii-inv-", invoice.id),
+          invoice: invoiceBody
+        }
+      },
+      deadline
+    );
+    const squareInvoice = createdInvoice.ok ? createdInvoice.body?.invoice : null;
+    const squareInvoiceId = typeof squareInvoice?.id === "string" ? squareInvoice.id : "";
+    if (!squareInvoiceId) {
+      return { ok: false, error: squareError(createdInvoice.body, "Square invoice create failed") };
+    }
+    let url = publicUrlOf(createdInvoice.body);
+    const status = typeof squareInvoice?.status === "string" ? squareInvoice.status : "DRAFT";
+    if (!url || status === "DRAFT") {
+      const published = await squareRequest(
+        deps,
+        `/v2/invoices/${encodeURIComponent(squareInvoiceId)}/publish`,
+        {
+          method: "POST",
+          body: {
+            version: Number(squareInvoice?.version) || 0,
+            idempotency_key: idempotencyKey("ii-pub-", invoice.id)
+          }
+        },
+        deadline
+      );
+      url = publicUrlOf(published.body) || url;
+      if (!url) {
+        const retrieved = await squareRequest(
+          deps,
+          `/v2/invoices/${encodeURIComponent(squareInvoiceId)}`,
+          { method: "GET" },
+          deadline
+        );
+        url = publicUrlOf(retrieved.body);
+      }
+    }
+    if (!url) {
+      return { ok: false, error: "Square invoice published without a public URL" };
+    }
+    return {
+      ok: true,
+      skipped: false,
+      squareInvoiceId,
+      squareInvoiceUrl: url,
+      squareOrderId: typeof squareInvoice?.order_id === "string" && squareInvoice.order_id ? squareInvoice.order_id : orderId,
+      squareCustomerId: customerId
+    };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Square invoice sync failed" };
+  }
+}
+const db$g = () => admin.firestore();
+function squareInvoiceSynced(result) {
+  return result.ok === true && result.skipped === false;
+}
+async function attachSquareInvoiceAfterBooking(invoiceId) {
+  const ref = db$g().collection("invoices").doc(invoiceId);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    console.error("[Square] Invoice sync skipped: invoice missing", invoiceId);
+    return { ok: false, error: "Invoice missing" };
+  }
+  const data = snap.data() || {};
+  const result = await syncSquareInvoice(
+    {
+      id: invoiceId,
+      clientEmail: data.clientEmail,
+      clientName: data.clientName,
+      invoiceNumber: data.invoiceNumber,
+      lineItems: data.lineItems,
+      total: data.total,
+      paymentProvider: data.paymentProvider,
+      squareInvoiceId: data.squareInvoiceId
+    },
+    { fetchImpl: fetch, env: process.env }
+  );
+  if (squareInvoiceSynced(result)) {
+    await ref.update({
+      squareInvoiceId: result.squareInvoiceId,
+      squareInvoiceUrl: result.squareInvoiceUrl,
+      squareOrderId: result.squareOrderId,
+      squareCustomerId: result.squareCustomerId,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    return result;
+  }
+  if ("error" in result) {
+    console.error("[Square] Invoice sync failed:", result.error);
+  } else if (result.reason === "total-mismatch" || result.reason === "missing-email") {
+    console.error("[Square] Invoice sync skipped:", result.reason, invoiceId);
+  }
+  return result;
+}
 const router$e = Router();
 const db$f = () => admin.firestore();
 function appUrl$2() {
@@ -645,7 +1165,7 @@ function toDate$1(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 function money$1(value) {
-  return `$${(Number(value) || 0).toFixed(2)}`;
+  return orderTotalLabel(value);
 }
 router$e.post("/", async (req, res) => {
   try {
@@ -733,6 +1253,31 @@ router$e.post("/", async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
     const docRef = await db$f().collection("orderRequests").add(orderRequest);
+    let invoiceId = null;
+    try {
+      const created = await createBookingInvoiceDraft({
+        orderRequestId: docRef.id,
+        email,
+        clientName,
+        lineItems,
+        pricing,
+        total,
+        promoCode,
+        promoDiscount
+      });
+      invoiceId = created.invoiceId;
+      try {
+        await docRef.update({
+          invoiceId: created.invoiceId,
+          ...created.clientId ? { clientId: created.clientId } : {}
+        });
+      } catch (linkErr) {
+        console.error("[Bookings] Invoice link update failed:", linkErr);
+      }
+    } catch (err) {
+      console.error("[Bookings] Invoice draft create failed:", err);
+      invoiceId = null;
+    }
     const accessLine = accessMethod ? `${accessMethod}${lockboxCode ? ` — Code: ${lockboxCode}` : ""}` : "Not specified";
     await sendEmail({
       to: email,
@@ -791,9 +1336,17 @@ router$e.post("/", async (req, res) => {
         )
       }).catch((err) => console.error("[Bookings] Admin SMS alert failed:", err));
     }
+    if (invoiceId) {
+      try {
+        await attachSquareInvoiceAfterBooking(invoiceId);
+      } catch (err) {
+        console.error("[Bookings] Square invoice sync failed:", err);
+      }
+    }
     return res.status(201).json({
       success: true,
       requestId: docRef.id,
+      invoiceId,
       message: "Booking request received. We'll confirm shortly!"
     });
   } catch (err) {
@@ -839,6 +1392,7 @@ router$e.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         success: true,
         orderId: request.convertedToOrderId,
         clientId: request.clientId || null,
+        invoiceId: existingInvoiceId(request.invoiceId),
         message: "Booking was already confirmed."
       });
     }
@@ -994,30 +1548,48 @@ router$e.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         })
       ]);
     }
-    const invoiceRef = await db$f().collection("invoices").add({
-      orderId: orderRef.id,
-      clientId,
-      galleryId: galleryRef.id,
-      clientName: requestClientName,
-      clientEmail: requestEmail,
-      invoiceNumber: await generateInvoiceNumber(),
-      lineItems: requestLineItems,
-      subtotal: request.pricing?.subtotal || requestTotal,
-      tax: request.pricing?.tax || 0,
-      total: requestTotal,
-      amountPaid: 0,
-      amountDue: requestTotal,
-      status: "draft",
-      paymentProvider: "square",
-      paymentUrl: `${appUrl$2()}/invoice/${orderRef.id}`,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-    await invoiceRef.update({
-      paymentUrl: `${appUrl$2()}/invoice/${invoiceRef.id}`
-    });
+    const linkedInvoiceId = existingInvoiceId(request.invoiceId);
+    let invoiceId = linkedInvoiceId;
+    if (linkedInvoiceId) {
+      const existingInvoice = await db$f().collection("invoices").doc(linkedInvoiceId).get();
+      if (existingInvoice.exists) {
+        await existingInvoice.ref.update({
+          orderId: orderRef.id,
+          clientId,
+          galleryId: galleryRef.id,
+          clientName: requestClientName,
+          clientEmail: requestEmail,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      } else {
+        console.error(`[Bookings] Confirm kept invoiceId ${linkedInvoiceId} but the invoice doc is missing. Not creating a second invoice.`);
+      }
+    } else {
+      const invoiceRef = db$f().collection("invoices").doc();
+      const draft = buildBookingInvoiceDraft({
+        lineItems: requestLineItems,
+        total: requestTotal,
+        pricing: request.pricing,
+        clientEmail: requestEmail,
+        clientId,
+        clientName: requestClientName,
+        orderRequestId: req.params.id,
+        promoCode: request.promoCode,
+        promoDiscount: request.promoDiscount
+      });
+      await invoiceRef.set({
+        ...draft,
+        orderId: orderRef.id,
+        galleryId: galleryRef.id,
+        invoiceNumber: await generateInvoiceNumber(),
+        paymentUrl: `${appUrl$2()}/invoice/${invoiceRef.id}`,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      invoiceId = invoiceRef.id;
+    }
     await galleryRef.update({
-      invoiceId: invoiceRef.id,
+      invoiceId,
       deliveryUrl: `${appUrl$2()}/gallery/${galleryRef.id}`
     });
     await requestDoc.ref.update({
@@ -1025,7 +1597,7 @@ router$e.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       convertedToOrderId: orderRef.id,
       clientId,
       galleryId: galleryRef.id,
-      invoiceId: invoiceRef.id,
+      invoiceId,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
     await sendEmail({
@@ -1041,10 +1613,18 @@ router$e.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         portalUrl: `${appUrl$2()}/portal`
       }
     }).catch((err) => console.error("[Bookings] Confirmation email failed:", err));
+    if (invoiceId) {
+      try {
+        await attachSquareInvoiceAfterBooking(invoiceId);
+      } catch (err) {
+        console.error("[Bookings] Square invoice sync failed:", err);
+      }
+    }
     return res.json({
       success: true,
       orderId: orderRef.id,
       clientId,
+      invoiceId,
       message: "Booking confirmed and order created."
     });
   } catch (err) {
@@ -1067,6 +1647,40 @@ router$e.patch("/:id/decline", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to decline booking." });
   }
 });
+async function linkClientIdByEmail(email) {
+  try {
+    const normalized = normalizeEmail(email);
+    if (!normalized) return null;
+    const snap = await db$f().collection("clients").where("email", "==", normalized).limit(1).get();
+    return snap.empty ? null : snap.docs[0].id;
+  } catch (err) {
+    console.error("[Bookings] Client lookup for invoice failed:", err);
+    return null;
+  }
+}
+async function createBookingInvoiceDraft(input) {
+  const clientId = await linkClientIdByEmail(input.email);
+  const draft = buildBookingInvoiceDraft({
+    lineItems: input.lineItems,
+    total: input.total,
+    pricing: input.pricing,
+    clientEmail: input.email,
+    clientId,
+    clientName: input.clientName,
+    orderRequestId: input.orderRequestId,
+    promoCode: input.promoCode,
+    promoDiscount: input.promoDiscount
+  });
+  const invoiceRef = db$f().collection("invoices").doc();
+  await invoiceRef.set({
+    ...draft,
+    invoiceNumber: await generateInvoiceNumber(),
+    paymentUrl: `${appUrl$2()}/invoice/${invoiceRef.id}`,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  return { invoiceId: invoiceRef.id, clientId };
+}
 async function generateInvoiceNumber() {
   const year = (/* @__PURE__ */ new Date()).getFullYear();
   const snapshot = await db$f().collection("invoices").where("invoiceNumber", ">=", `INV-${year}-`).orderBy("invoiceNumber", "desc").limit(1).get().catch((err) => {
@@ -1286,79 +1900,6 @@ router$d.get("/:id/timeline", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch timeline." });
   }
 });
-const CLOSED_STATUSES = /* @__PURE__ */ new Set(["void", "voided", "cancelled", "canceled"]);
-const SETTLED_STATUSES = /* @__PURE__ */ new Set(["paid", "comped"]);
-function statusOf(invoice) {
-  return String(invoice?.status || "").toLowerCase();
-}
-function numeric(value) {
-  if (value == null || value === "") return null;
-  const amount = Number(value);
-  return Number.isFinite(amount) ? amount : null;
-}
-function invoiceBalance(invoice) {
-  const total = numeric(invoice?.total) ?? 0;
-  const amountPaid = numeric(invoice?.amountPaid) ?? 0;
-  const statedDue = numeric(invoice?.amountDue);
-  const computedDue = Math.max(0, total - amountPaid);
-  const amountDue = statedDue == null ? computedDue : Math.max(0, statedDue);
-  return { total, amountPaid, amountDue };
-}
-function invoiceAllowsDownload(invoice) {
-  if (!invoice) return false;
-  const status = statusOf(invoice);
-  if (CLOSED_STATUSES.has(status)) return false;
-  if (SETTLED_STATUSES.has(status)) return true;
-  const { total, amountPaid, amountDue } = invoiceBalance(invoice);
-  const statedDue = numeric(invoice.amountDue);
-  if (total <= 0 && (statedDue == null || statedDue <= 0)) return true;
-  if (statedDue != null && statedDue <= 0 && amountPaid <= 0 && total > 0) return false;
-  return amountDue <= 0 && amountPaid > 0;
-}
-function amountStillDue(invoice) {
-  if (!invoice) return 0;
-  const status = statusOf(invoice);
-  if (SETTLED_STATUSES.has(status) || CLOSED_STATUSES.has(status)) return 0;
-  const { total, amountPaid, amountDue } = invoiceBalance(invoice);
-  const computedDue = Math.max(0, total - amountPaid);
-  const statedDue = numeric(invoice.amountDue);
-  if (statedDue != null && statedDue <= 0 && computedDue > 0 && amountPaid <= 0) return computedDue;
-  return amountDue;
-}
-function squarePaymentNote(invoiceId, invoiceNumber) {
-  const label = invoiceNumber ? `Iconic Images invoice ${invoiceNumber}` : "Iconic Images invoice";
-  return `${label} invoiceId:${invoiceId}`;
-}
-function invoiceIdFromSquareNote(note) {
-  if (typeof note !== "string") return null;
-  const match = note.match(/invoiceId:([A-Za-z0-9_-]+)/);
-  return match?.[1] || null;
-}
-const LINK_MEDIA_TYPES = /* @__PURE__ */ new Set(["video", "reel", "tour", "matterport"]);
-function publicMediaItem(item, canDownload) {
-  const type = String(item.type || "photo");
-  const title = item.title || item.fileName || "Media";
-  const base = {
-    id: item.id,
-    fileName: item.fileName || title,
-    title,
-    type,
-    width: item.width || null,
-    height: item.height || null,
-    canDownload: Boolean(canDownload && item.downloadable !== false && !LINK_MEDIA_TYPES.has(type)),
-    locked: !canDownload
-  };
-  if (!canDownload) {
-    return { ...base, url: null, shareUrl: null, embedUrl: null };
-  }
-  const url = item.shareUrl || item.embedUrl || item.url || null;
-  return {
-    ...base,
-    url,
-    shareUrl: item.shareUrl || item.url || item.embedUrl || null,
-    embedUrl: item.embedUrl || item.url || null
-  };
-}
 const router$c = Router();
 const db$d = () => admin.firestore();
 const storage = () => admin.storage().bucket();
@@ -1656,7 +2197,7 @@ function squareReady() {
   return Boolean(process.env.SQUARE_ACCESS_TOKEN && process.env.SQUARE_LOCATION_ID);
 }
 function squareBaseUrl() {
-  return process.env.SQUARE_ENVIRONMENT === "sandbox" ? "https://connect.squareupsandbox.com" : "https://connect.squareup.com";
+  return squareApiBaseUrl(process.env.SQUARE_ENVIRONMENT);
 }
 function invoiceProvider(invoice) {
   const explicit = String(invoice.paymentProvider || invoice.processor || "").toLowerCase();
@@ -1864,6 +2405,32 @@ router$b.post("/send-invoice", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send invoice." });
   }
 });
+router$b.post("/send-receipt", requireCoordinator, async (req, res) => {
+  try {
+    const { invoiceId } = req.body;
+    if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
+    const invoiceDoc = await db$c().collection("invoices").doc(invoiceId).get();
+    if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
+    const invoice = invoiceDoc.data();
+    if (!invoiceAllowsDownload(invoice)) {
+      return res.status(409).json({ error: "Invoice is not paid. Send the pay link instead." });
+    }
+    await sendEmail({
+      to: invoice.clientEmail,
+      template: "payment_receipt",
+      variables: {
+        clientName: invoice.clientName,
+        amount: money(invoice.amountPaid || invoice.total),
+        invoiceNumber: invoice.invoiceNumber,
+        balance: money(amountStillDue(invoice))
+      }
+    });
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("[Payments] Send receipt error:", err);
+    return res.status(500).json({ error: "Failed to send receipt." });
+  }
+});
 router$b.get("/invoice/:id", async (req, res) => {
   try {
     const invoiceDoc = await db$c().collection("invoices").doc(req.params.id).get();
@@ -1913,6 +2480,24 @@ router$b.post("/invoice/:id/checkout", async (req, res) => {
       return res.status(400).json({ error: "This invoice cannot be paid online." });
     }
     if (provider === "square") {
+      const freshUrl = squareReady() && invoice.squareInvoiceId ? await fetchPublishedSquareInvoiceUrl(String(invoice.squareInvoiceId), {
+        fetchImpl: fetch,
+        env: process.env,
+        timeoutMs: 5e3
+      }) : null;
+      const publishedUrl = resolveSquareCheckoutUrl({
+        freshUrl,
+        storedUrl: invoice.squareInvoiceUrl
+      });
+      if (publishedUrl) {
+        if (freshUrl && freshUrl !== invoice.squareInvoiceUrl) {
+          await invoiceDoc.ref.update({
+            squareInvoiceUrl: freshUrl,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          }).catch((err) => console.error("[Payments] Square invoice URL save failed:", err));
+        }
+        return res.json({ checkoutUrl: publishedUrl, provider: "square" });
+      }
       if (!squareReady()) return res.status(503).json({ error: "Square payments are not configured yet." });
       const response = await fetch(`${squareBaseUrl()}/v2/online-checkout/payment-links`, {
         method: "POST",
@@ -2730,66 +3315,6 @@ router$9.get("/unread/count", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to get unread count." });
   }
 });
-const PLAYTEST_ADDRESS = "100 Playtest Lane, Austin, TX 78701";
-const STAFF_ROLES = ["admin", "coordinator", "photographer", "editor"];
-function normalizeEmail(value) {
-  return String(value || "").trim().toLowerCase();
-}
-function cleanPersonName(value) {
-  return String(value || "").trim().replace(/\s+/g, " ").slice(0, 80);
-}
-function isStaffRole(value) {
-  return STAFF_ROLES.includes(value);
-}
-function safeStorageFileName(fileName) {
-  const base = String(fileName || "upload").split(/[/\\]/).pop() || "upload";
-  const cleaned = base.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/_+/g, "_");
-  return cleaned.slice(0, 180) || "upload";
-}
-function contentTypeForUpload(fileName, provided) {
-  const raw = String(provided || "").trim().toLowerCase();
-  if (/^[\w.+-]+\/[\w.+-]+$/.test(raw) && raw.length <= 120 && raw !== "application/octet-stream") {
-    return raw;
-  }
-  const lower = fileName.toLowerCase();
-  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
-  if (lower.endsWith(".png")) return "image/png";
-  if (lower.endsWith(".webp")) return "image/webp";
-  if (lower.endsWith(".gif")) return "image/gif";
-  if (lower.endsWith(".heic")) return "image/heic";
-  if (lower.endsWith(".heif")) return "image/heif";
-  if (lower.endsWith(".mp4")) return "video/mp4";
-  if (lower.endsWith(".mov")) return "video/quicktime";
-  return raw && /^[\w.+-]+\/[\w.+-]+$/.test(raw) ? raw : "application/octet-stream";
-}
-function isListingStoragePath(listingId, storagePath) {
-  if (!listingId || typeof storagePath !== "string") return false;
-  if (storagePath.includes("..") || storagePath.includes("\\") || storagePath.startsWith("/")) return false;
-  const prefix = `listings/${listingId}/`;
-  if (!storagePath.startsWith(prefix)) return false;
-  const rest = storagePath.slice(prefix.length);
-  return rest.startsWith("photos/") || rest.startsWith("raw/");
-}
-function staffCanAccessListing(role, uid, listing) {
-  if (!listing || !uid) return false;
-  if (role === "admin" || role === "coordinator") return true;
-  if (listing.photographerUid === uid) return true;
-  if (Array.isArray(listing.photographerIds) && listing.photographerIds.includes(uid)) return true;
-  if (Array.isArray(listing.assignedProviders)) {
-    return listing.assignedProviders.some(
-      (provider) => provider?.providerId === uid || provider?.uid === uid || provider?.id === uid
-    );
-  }
-  return false;
-}
-function clientCanViewListing(listing, identity) {
-  if (!listing || !identity?.uid) return false;
-  const ids = /* @__PURE__ */ new Set([identity.uid, ...identity.ids || []]);
-  if (listing.clientId && ids.has(String(listing.clientId))) return true;
-  const email = normalizeEmail(identity.email);
-  const listingEmail = normalizeEmail(listing.clientEmail);
-  return Boolean(email && listingEmail && email === listingEmail);
-}
 function visibleToPortalClient(record, identity) {
   if (!record) return false;
   if (record.clientId && identity.ids.includes(String(record.clientId))) return true;
@@ -2992,6 +3517,19 @@ router$8.get("/me/home", requireAuth, async (req, res) => {
     const seenGallery = /* @__PURE__ */ new Set();
     const seenInvoice = /* @__PURE__ */ new Set();
     const seenProject = /* @__PURE__ */ new Set();
+    const pushInvoice = (entry) => {
+      if (seenInvoice.has(entry.id)) return;
+      seenInvoice.add(entry.id);
+      const data = entry.data();
+      invoices.push({
+        id: entry.id,
+        invoiceNumber: data.invoiceNumber || entry.id,
+        status: data.status || "draft",
+        total: data.total || 0,
+        amountDue: data.amountDue ?? data.total ?? 0,
+        href: `/invoice/${entry.id}`
+      });
+    };
     for (const clientId of identity.ids) {
       const [gallerySnap, invoiceSnap, projectSnap] = await Promise.all([
         db$8().collection("galleries").where("clientId", "==", clientId).limit(20).get(),
@@ -3010,19 +3548,7 @@ router$8.get("/me/home", requireAuth, async (req, res) => {
           href: `/gallery/${doc.id}`
         });
       }
-      for (const doc of invoiceSnap.docs) {
-        if (seenInvoice.has(doc.id)) continue;
-        seenInvoice.add(doc.id);
-        const data = doc.data();
-        invoices.push({
-          id: doc.id,
-          invoiceNumber: data.invoiceNumber || doc.id,
-          status: data.status || "draft",
-          total: data.total || 0,
-          amountDue: data.amountDue ?? data.total ?? 0,
-          href: `/invoice/${doc.id}`
-        });
-      }
+      invoiceSnap.docs.forEach(pushInvoice);
       for (const doc of projectSnap.docs) {
         if (seenProject.has(doc.id)) continue;
         seenProject.add(doc.id);
@@ -3069,6 +3595,14 @@ router$8.get("/me/home", requireAuth, async (req, res) => {
       }
     } catch (orderErr) {
       console.error("[Clients] Order lookup failed:", orderErr);
+    }
+    if (identity.email) {
+      try {
+        const byInvoiceEmail = await db$8().collection("invoices").where("clientEmail", "==", identity.email).limit(20).get();
+        byInvoiceEmail.docs.forEach(pushInvoice);
+      } catch (invoiceErr) {
+        console.error("[Clients] Invoice email lookup failed:", invoiceErr);
+      }
     }
     if (identity.email) {
       const byEmail = await db$8().collection("listings").where("clientEmail", "==", identity.email).limit(20).get();
