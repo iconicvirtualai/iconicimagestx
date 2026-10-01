@@ -4957,6 +4957,11 @@ function createServer() {
   app.use(express.urlencoded({ extended: true }));
   app.post(
     "/api/listings/:id/photos",
+    (req, _res, next) => {
+      const type = String(req.headers["content-type"] || "").split(";")[0].trim().toLowerCase();
+      if (type === "application/json") return next("route");
+      next();
+    },
     express.raw({
       type: ["image/jpeg", "image/png", "image/webp", "application/octet-stream"],
       limit: "8mb"
