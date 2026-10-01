@@ -4,6 +4,14 @@ import { Link } from "react-router-dom";
 import { Check, X, ArrowRight, Star, ChevronRight, Info, Sparkles, Zap, Trophy, Crown, Camera, Video, Layout as LayoutIcon, Box, Users, Clock, DollarSign, Palette, Rocket, Mic } from "lucide-react";
 import { useState } from "react";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import {
+  APPRENTICESHIP_BRIDGE_COPY,
+  APPRENTICESHIP_OVERAGE_LABEL,
+  APPRENTICESHIP_PROGRAM_NAME,
+  APPRENTICESHIP_RULES,
+  apprenticeshipPackages,
+  isApprenticeshipPackage,
+} from "@shared/bookingCatalog";
 
 const BRAND_STAGES = [
   {
@@ -114,17 +122,18 @@ export default function Pricing() {
     );
   };
 
+  const apprenticeSelected = !!selectedPhotoPkg && isApprenticeshipPackage(selectedPhotoPkg);
+
   const getBasicsBookingUrl = (premium = false) => {
-    const items = [
-      selectedPhotoPkg,
-      ...selectedAddOns
-    ].filter(Boolean);
+    const items = apprenticeSelected
+      ? [selectedPhotoPkg]
+      : [selectedPhotoPkg, ...selectedAddOns].filter(Boolean);
 
     if (items.length === 0) return "/book";
 
     const params = new URLSearchParams();
     params.set("items", items.join(","));
-    if (premium) params.set("premium", "true");
+    if (premium && !apprenticeSelected) params.set("premium", "true");
     return `/book?${params.toString()}`;
   };
 
@@ -688,9 +697,9 @@ export default function Pricing() {
                   </div>
 
                   <div className="bg-[#fafafa] rounded-[2.5rem] p-8 md:p-12 border border-gray-100">
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
                       {/* Photo Packages */}
-                      <div className="lg:col-span-1 space-y-6">
+                      <div className="space-y-6">
                         <h4 className="font-black text-xs uppercase tracking-widest mb-6" style={{ color: settings.global.primaryColor }}>Photo Packages</h4>
                         <div className="space-y-4">
                           {[
@@ -738,8 +747,57 @@ export default function Pricing() {
                         </div>
                       </div>
 
+                      <div id="apprenticeship" data-testid="services-apprenticeship" className="space-y-6">
+                        <h4 className="font-black text-xs uppercase tracking-widest" style={{ color: settings.global.primaryColor }}>
+                          {APPRENTICESHIP_PROGRAM_NAME}
+                        </h4>
+                        <p className="text-sm font-bold leading-relaxed text-gray-700">{APPRENTICESHIP_BRIDGE_COPY}</p>
+                        <p className="text-[13px] font-medium leading-relaxed text-gray-500">
+                          The photo packages beside this are the real Iconic shoot. This rate is lower on purpose, and the rules are how it stays that way.
+                        </p>
+                        <div className="space-y-4">
+                          {apprenticeshipPackages.map((pkg) => (
+                            <div
+                              key={pkg.id}
+                              data-testid={`services-${pkg.id}`}
+                              onClick={() => {
+                                const next = selectedPhotoPkg === pkg.id ? null : pkg.id;
+                                setSelectedPhotoPkg(next);
+                                if (next) setSelectedAddOns([]);
+                              }}
+                              className="p-4 bg-white rounded-xl border transition-all cursor-pointer hover:shadow-md"
+                              style={{
+                                borderColor: selectedPhotoPkg === pkg.id ? settings.global.primaryColor : '#f3f4f6',
+                                backgroundColor: selectedPhotoPkg === pkg.id ? `${settings.global.primaryColor}05` : 'white'
+                              }}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">{pkg.kicker}</p>
+                                  <span className="font-bold text-gray-700">{pkg.cardTitle}</span>
+                                </div>
+                                <span className="text-xl font-black text-black">${pkg.price}</span>
+                              </div>
+                              <p className="mt-2 text-[11px] font-black uppercase tracking-widest text-black">{pkg.appointmentLimit}</p>
+                              <p className="mt-1 text-[12px] font-medium leading-relaxed text-gray-500">{pkg.aside}</p>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-[13px] font-bold text-gray-700">Overages: {APPRENTICESHIP_OVERAGE_LABEL}.</p>
+                        <div data-testid="services-apprenticeship-rules" className="rounded-2xl border border-black bg-white p-4 space-y-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em]">The rules</p>
+                          <ul className="list-disc space-y-2 pl-4">
+                            {APPRENTICESHIP_RULES.map((rule) => (
+                              <li key={rule} className="text-[13px] font-medium leading-relaxed text-gray-700">{rule}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-12 grid grid-cols-1 lg:grid-cols-2 gap-12 border-t border-gray-100 pt-12">
                       {/* Add-Ons */}
-                      <div className="lg:col-span-1 space-y-6">
+                      <div className="space-y-6">
                         <div>
                           <h4 className="font-black text-xs uppercase tracking-widest mb-1" style={{ color: settings.global.primaryColor }}>Add-On Services</h4>
                           <p className="text-[10px] text-gray-400 font-bold italic mb-6">(Must already be on site doing a full service shoot)</p>
@@ -757,8 +815,11 @@ export default function Pricing() {
                           ].map((addon) => (
                             <div
                               key={addon.id}
-                              onClick={() => toggleAddOn(addon.id)}
-                              className="flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer hover:shadow-md"
+                              onClick={() => {
+                                if (apprenticeSelected) return;
+                                toggleAddOn(addon.id);
+                              }}
+                              className={`flex items-center justify-between p-4 rounded-xl border transition-all hover:shadow-md ${apprenticeSelected ? "cursor-not-allowed opacity-40" : "cursor-pointer"}`}
                               style={{
                                 borderColor: selectedAddOns.includes(addon.id) ? settings.global.primaryColor : '#f3f4f6',
                                 backgroundColor: selectedAddOns.includes(addon.id) ? `${settings.global.primaryColor}05` : 'rgba(255,255,255,0.5)'
@@ -775,7 +836,7 @@ export default function Pricing() {
                       </div>
 
                       {/* ICONIC Edits */}
-                      <div className="lg:col-span-1">
+                      <div>
                         <div className="h-full bg-black rounded-3xl p-8 text-white relative overflow-hidden group hover:scale-[1.02] transition-transform duration-500">
                           <div className="absolute top-0 right-0 p-6 opacity-10">
                             <Palette className="w-24 h-24" />
@@ -810,9 +871,15 @@ export default function Pricing() {
                                 </div>
                               ))}
                             </div>
-                            <Button asChild className="w-full mt-8 text-white font-black py-6 rounded-xl transition-all shadow-lg shadow-teal-900/20 bg-[#0d9488] hover:bg-[#0f766e]">
-                              <Link to={getBasicsBookingUrl(true)}>UPGRADE MY EDITS</Link>
-                            </Button>
+                            {apprenticeSelected ? (
+                              <p className="mt-8 text-[11px] font-bold leading-relaxed text-gray-300">
+                                Apprentice photos are not eligible for Iconic Polish. You get what you pay for.
+                              </p>
+                            ) : (
+                              <Button asChild className="w-full mt-8 text-white font-black py-6 rounded-xl transition-all shadow-lg shadow-teal-900/20 bg-[#0d9488] hover:bg-[#0f766e]">
+                                <Link to={getBasicsBookingUrl(true)}>UPGRADE MY EDITS</Link>
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </div>
