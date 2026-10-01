@@ -31,6 +31,10 @@ service cloud.firestore {
       return isStaff() && staffData().role in ['admin', 'coordinator', 'photographer'];
     }
 
+    function isEditor() {
+      return isStaff() && staffData().role == 'editor';
+    }
+
     function isClientOwner(clientId) {
       return isAuthenticated() && request.auth.uid == clientId;
     }
@@ -196,6 +200,24 @@ service cloud.firestore {
     match /promoCodes/{codeId} {
       allow read: if true; // booking form validates these
       allow write: if isAdmin();
+    }
+
+    // ─── Listings / projects ─────────────────────────────────────────────────
+    // Admin Create Project and New Project write this collection from the
+    // browser. Without this match the catch-all denies every staff write.
+
+    match /listings/{listingId} {
+      // Each or-branch is separate so a photographer query
+      // (photographerIds array-contains uid) is provable. Coordinators and
+      // editors can still read the whole collection.
+      allow read: if isCoordinator() || isEditor()
+        || (isAuthenticated() && resource.data.clientId == request.auth.uid)
+        || (isPhotographer() && resource.data.photographerUid == request.auth.uid)
+        || (isPhotographer() && resource.data.photographerIds is list
+            && request.auth.uid in resource.data.photographerIds);
+      allow create: if isCoordinator();
+      allow update: if isCoordinator() || isEditor();
+      allow delete: if isAdmin();
     }
 
     // ─── Catch-all: deny everything else ─────────────────────────────────────

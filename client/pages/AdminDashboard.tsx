@@ -19,9 +19,11 @@ import {
   collection,
   onSnapshot,
   addDoc,
+  getDocs,
   serverTimestamp,
 } from "firebase/firestore";
 import { toast } from "sonner";
+import { resolvePortalClientId } from "@/lib/listingClient";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 import OperationsOverview from "@/components/OperationsOverview";
 
@@ -50,6 +52,7 @@ export function StatusBadge({ status }: { status: string }) {
 // ─── Blank new order form ──────────────────────────────────────────────────────
 const BLANK = {
   firstName: "", lastName: "", email: "", phone: "", address: "", serviceNote: "", scheduledDate: "",
+  clientId: "", clientSearch: "",
 };
 
 // ─── Hook for Recently Visited ─────────────────────────────────────────────────
@@ -108,6 +111,8 @@ export default function AdminDashboard() {
   const [showNewOrder, setShowNewOrder] = React.useState(false);
   const [form, setForm] = React.useState(BLANK);
   const [saving, setSaving] = React.useState(false);
+  const [clients, setClients] = React.useState<Array<{ id: string; firstName?: string; lastName?: string; email?: string; phone?: string }>>([]);
+  const [showClientMatches, setShowClientMatches] = React.useState(false);
 
   React.useEffect(() => {
     const unsub = onSnapshot(collection(db, "orderRequests"), (snap) => {
@@ -120,6 +125,35 @@ export default function AdminDashboard() {
     return () => unsub();
   }, []);
 
+  React.useEffect(() => {
+    if (!showNewOrder) return;
+    getDocs(collection(db, "clients"))
+      .then((snap) => {
+        setClients(snap.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
+      })
+      .catch((err) => console.warn("[AdminDashboard] Client list failed.", err));
+  }, [showNewOrder]);
+
+  const clientMatches = form.clientSearch.trim().length > 1
+    ? clients.filter((client) => {
+        const haystack = `${client.firstName || ""} ${client.lastName || ""} ${client.email || ""}`.toLowerCase();
+        return haystack.includes(form.clientSearch.trim().toLowerCase());
+      }).slice(0, 6)
+    : [];
+
+  const selectClient = (client: { id: string; firstName?: string; lastName?: string; email?: string; phone?: string }) => {
+    setForm((prev) => ({
+      ...prev,
+      clientId: client.id,
+      clientSearch: `${client.firstName || ""} ${client.lastName || ""}`.trim(),
+      firstName: client.firstName || "",
+      lastName: client.lastName || "",
+      email: client.email || "",
+      phone: client.phone || "",
+    }));
+    setShowClientMatches(false);
+  };
+
   const handleCreate = async () => {
     if (!form.firstName || !form.email) {
       toast.error("First name and email are required.");
@@ -127,11 +161,20 @@ export default function AdminDashboard() {
     }
     setSaving(true);
     try {
+      const email = form.email.toLowerCase().trim();
+      let clientId: string | null = form.clientId || null;
+      try {
+        clientId = await resolvePortalClientId({ email, clientId });
+      } catch (lookupErr) {
+        console.warn("[AdminDashboard] Client lookup failed.", lookupErr);
+      }
       const ref = await addDoc(collection(db, "orderRequests"), {
         firstName: form.firstName,
         lastName: form.lastName,
         clientName: `${form.firstName} ${form.lastName}`.trim(),
-        email: form.email.toLowerCase().trim(),
+        email,
+        clientEmail: email,
+        clientId,
         phone: form.phone,
         address: form.address,
         lineItems: form.serviceNote ? [{ name: form.serviceNote, price: 0 }] : [],
@@ -144,13 +187,13 @@ export default function AdminDashboard() {
         submittedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-      toast.success("Order created.");
+      toast.success(clientId ? "Order created and linked to that client." : "Order created. No client account uses that email yet.");
       setShowNewOrder(false);
       setForm(BLANK);
       navigate(`/admin/order-request/${ref.id}`);
     } catch (err) {
       console.error(err);
-      toast.error("Failed to create order.");
+      toast.error(err instanceof Error ? err.message : "Failed to create order.");
     } finally {
       setSaving(false);
     }
@@ -180,6 +223,35 @@ export default function AdminDashboard() {
               </button>
             </div>
 
+            <div className="relative mb-3">
+              <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Existing client</label>
+              <input
+                value={form.clientSearch}
+                onChange={(e) => {
+                  setForm((prev) => ({ ...prev, clientSearch: e.target.value, clientId: "" }));
+                  setShowClientMatches(true);
+                }}
+                onFocus={() => setShowClientMatches(true)}
+                placeholder="Search Marty or an email to attach this order"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30"
+              />
+              {showClientMatches && clientMatches.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                  {clientMatches.map((client) => (
+                    <button
+                      key={client.id}
+                      type="button"
+                      onClick={() => selectClient(client)}
+                      className="w-full text-left px-4 py-3 hover:bg-gray-50 text-sm font-bold border-b border-gray-100 last:border-0"
+                    >
+                      {`${client.firstName || ""} ${client.lastName || ""}`.trim() || "Client"}
+                      <span className="text-gray-400 font-normal ml-2 text-xs">{client.email}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-3 mb-3">
               {(["firstName", "lastName"] as const).map((k) => (
                 <div key={k}>
@@ -198,7 +270,7 @@ export default function AdminDashboard() {
                 <input
                   type="email"
                   value={form.email}
-                  onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+                  onChange={(e) => setForm((p) => ({ ...p, email: e.target.value, clientId: "" }))}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30"
                 />
               </div>

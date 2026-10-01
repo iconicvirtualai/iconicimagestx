@@ -8,6 +8,7 @@ import { Router } from "express";
 import admin from "firebase-admin";
 import { requireCoordinator, requireStaff, requireAuth, type AuthenticatedRequest } from "../middleware/auth";
 import { cleanPersonName, normalizeEmail } from "../../shared/listingAccess";
+import { visibleToPortalClient } from "../../shared/listingWrite";
 import { resolveClientIdentity, upsertPortalClient } from "../services/clientAccounts";
 import { jsonSafe } from "../lib/firestoreJson";
 
@@ -189,6 +190,41 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
       }
     }
 
+    const orders: Record<string, unknown>[] = [];
+    const seenOrder = new Set<string>();
+    const pushOrder = (entry: FirebaseFirestore.QueryDocumentSnapshot) => {
+      if (seenOrder.has(entry.id)) return;
+      const data = entry.data();
+      if (!visibleToPortalClient(
+        { clientId: data.clientId, email: data.email, clientEmail: data.clientEmail },
+        { ids: identity.ids, email: identity.email },
+      )) return;
+      seenOrder.add(entry.id);
+      const listingId = typeof data.listingId === "string" ? data.listingId : "";
+      orders.push({
+        id: entry.id,
+        address: addressText(data.address || data.shootLocation) || "Order",
+        status: data.status || "new",
+        href: listingId ? `/studio/${listingId}` : "",
+      });
+    };
+    try {
+      for (const clientId of identity.ids) {
+        const snap = await db().collection("orderRequests").where("clientId", "==", clientId).limit(20).get();
+        snap.docs.forEach(pushOrder);
+      }
+      if (identity.email) {
+        const [byEmail, byClientEmail] = await Promise.all([
+          db().collection("orderRequests").where("email", "==", identity.email).limit(20).get(),
+          db().collection("orderRequests").where("clientEmail", "==", identity.email).limit(20).get(),
+        ]);
+        byEmail.docs.forEach(pushOrder);
+        byClientEmail.docs.forEach(pushOrder);
+      }
+    } catch (orderErr) {
+      console.error("[Clients] Order lookup failed:", orderErr);
+    }
+
     if (identity.email) {
       const byEmail = await db().collection("listings").where("clientEmail", "==", identity.email).limit(20).get();
       for (const doc of byEmail.docs) {
@@ -207,6 +243,7 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
 
     return res.json({
       profile: jsonSafe(identity.profile),
+      orders,
       galleries,
       invoices,
       projects,

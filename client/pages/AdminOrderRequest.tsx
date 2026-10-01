@@ -12,6 +12,8 @@ import {
   collection, addDoc, getDocs,
 } from "firebase/firestore";
 import { toast } from "sonner";
+import { listingAppointmentDate } from "@shared/listingWrite";
+import { linkOrderToListing, resolvePortalClientId } from "@/lib/listingClient";
 import {
   markScheduledAppointmentConfirmed,
   upsertScheduledAppointment,
@@ -187,18 +189,27 @@ export default function AdminOrderRequest() {
     if (order.listingId) { navigate(`/admin/listing/${order.listingId}`); return; }
     setSaving(true);
     try {
+      const clientEmail = String(order.email || order.clientEmail || "").trim().toLowerCase();
+      let clientId = order.clientId || null;
+      try {
+        clientId = await resolvePortalClientId({ email: clientEmail, clientId: order.clientId });
+      } catch (lookupErr) {
+        console.warn("[AdminOrderRequest] Client lookup failed.", lookupErr);
+      }
+      const apptDate = listingAppointmentDate(order.appointmentDate);
       const listingData: any = {
         projectType: projectTypeChoice,
         orderRequestId: id,
+        clientId,
         clientName: order.clientName || `${order.firstName || ""} ${order.lastName || ""}`.trim(),
-        clientEmail: order.email || "",
+        clientEmail,
         clientPhone: order.phone || "",
         address: fmtAddr(order.address),
         shootLocation: projectTypeChoice === "business" ? fmtAddr(order.address) : null,
-        apptDate: order.appointmentDate ? new Date(order.appointmentDate + "T12:00:00") : null,
+        apptDate,
         apptTime: order.scheduledTime || order.appointmentTime || null,
         services: (order.lineItems || []).map((li: any) => li.name || String(li)),
-        status: order.appointmentDate ? "scheduled" : "unscheduled",
+        status: apptDate ? "scheduled" : "unscheduled",
         total: Number(order.total) || Number(order.pricing?.total) || 0,
         images: [], studioEnabled: true, studioToken: crypto.randomUUID(),
         lockDownloads: true, requirePayment: true, lockStudio: false, socialPermission: false,
@@ -218,10 +229,18 @@ export default function AdminOrderRequest() {
         createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       };
       const ref = await addDoc(collection(db, "listings"), listingData);
-      await updateDoc(doc(db, "orderRequests", id), { listingId: ref.id, updatedAt: serverTimestamp() });
+      await linkOrderToListing({
+        orderRequestId: id,
+        listingId: ref.id,
+        clientId,
+        clientEmail,
+      });
       toast.success("Project created!");
       navigate(`/admin/listing/${ref.id}`);
-    } catch (err) { console.error(err); toast.error("Failed to create project."); }
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Failed to create project.");
+    }
     finally { setSaving(false); }
   };
 

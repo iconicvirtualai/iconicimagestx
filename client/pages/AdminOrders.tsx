@@ -3,8 +3,10 @@ import { useNavigate } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 import { Search, ChevronDown, X, Trash2, Archive, Calendar, Layers, Check, ChevronUp, AlertCircle, RefreshCw } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, writeBatch, doc, serverTimestamp, addDoc, getDocs, updateDoc } from "firebase/firestore";
+import { collection, onSnapshot, writeBatch, doc, serverTimestamp, addDoc, getDocs } from "firebase/firestore";
 import { toast } from "sonner";
+import { listingAppointmentDate } from "@shared/listingWrite";
+import { linkOrderToListing, resolvePortalClientId } from "@/lib/listingClient";
 import { Button } from "@/components/ui/button";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 import { getAssignedNames, upsertScheduledAppointment } from "@/lib/scheduleRecords";
@@ -153,35 +155,55 @@ export default function AdminOrders() {
     if (selection.size === 0) return;
     setIsBulkProjecting(true);
     let count = 0;
+    const failures: string[] = [];
     try {
       for (const id of Array.from(selection)) {
         const order = orders.find(o => o.id === id);
         if (!order || order.listingId) continue;
 
-        const listingData: any = {
-          projectType: bulkProjectType,
-          orderRequestId: id,
-          clientName: getName(order),
-          clientEmail: order.email || "",
-          clientPhone: order.phone || "",
-          address: getAddr(order),
-          shootLocation: bulkProjectType === "business" ? getAddr(order) : null,
-          apptDate: order.appointmentDate ? (order.appointmentDate.toDate ? order.appointmentDate.toDate() : new Date(order.appointmentDate + "T12:00:00")) : null,
-          apptTime: order.scheduledTime || order.appointmentTime || null,
-          services: (order.lineItems || []).map((li: any) => li.name || String(li)),
-          status: order.appointmentDate ? "scheduled" : "unscheduled",
-          total: getTotal(order),
-          images: [], studioEnabled: true, studioToken: crypto.randomUUID(),
-          lockDownloads: true, requirePayment: true, lockStudio: false, socialPermission: false,
-          accessInfo: [order.accessMethod, order.lockboxCode].filter(Boolean).join(" - ") || "",
-          createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
-        };
-        const ref = await addDoc(collection(db, "listings"), listingData);
-        await updateDoc(doc(db, "orderRequests", id), { listingId: ref.id, updatedAt: serverTimestamp() });
-        count++;
+        try {
+          const clientEmail = String(order.email || order.clientEmail || "").trim().toLowerCase();
+          let clientId = order.clientId || null;
+          try {
+            clientId = await resolvePortalClientId({ email: clientEmail, clientId: order.clientId });
+          } catch (lookupErr) {
+            console.warn("[AdminOrders] Client lookup failed.", lookupErr);
+          }
+          const apptDate = listingAppointmentDate(order.appointmentDate);
+          const listingData: any = {
+            projectType: bulkProjectType,
+            orderRequestId: id,
+            clientId,
+            clientName: getName(order),
+            clientEmail,
+            clientPhone: order.phone || "",
+            address: getAddr(order),
+            shootLocation: bulkProjectType === "business" ? getAddr(order) : null,
+            apptDate,
+            apptTime: order.scheduledTime || order.appointmentTime || null,
+            services: (order.lineItems || []).map((li: any) => li.name || String(li)),
+            status: apptDate ? "scheduled" : "unscheduled",
+            total: getTotal(order),
+            images: [], studioEnabled: true, studioToken: crypto.randomUUID(),
+            lockDownloads: true, requirePayment: true, lockStudio: false, socialPermission: false,
+            accessInfo: [order.accessMethod, order.lockboxCode].filter(Boolean).join(" - ") || "",
+            createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+          };
+          const ref = await addDoc(collection(db, "listings"), listingData);
+          await linkOrderToListing({ orderRequestId: id, listingId: ref.id, clientId, clientEmail });
+          count++;
+        } catch (err) {
+          console.error(err);
+          failures.push(err instanceof Error ? err.message : "Failed to create project.");
+        }
       }
-      toast.success(`Created projects for ${count} orders.`);
-    } catch (err) { console.error(err); toast.error("Some projects failed."); }
+      if (failures.length === 0) toast.success(`Created projects for ${count} orders.`);
+      else if (count === 0) toast.error(failures[0]);
+      else toast.error(`Created ${count}. ${failures.length} failed: ${failures[0]}`);
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Some projects failed.");
+    }
     finally { setIsBulkProjecting(false); setSelection(new Set()); }
   };
 
