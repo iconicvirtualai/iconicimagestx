@@ -7,6 +7,7 @@ import { iconicStudioHref } from "@shared/iconicStudio";
 import { Upload, CheckCircle2, XCircle, Image as ImageIcon, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { PresentationSharePanel } from "@/components/PresentationSharePanel";
 
 export default function AdminUpload() {
   const { user } = useAuth();
@@ -118,6 +119,12 @@ export default function AdminUpload() {
             </p>
           )}
         </div>
+
+        {selectedJob && (
+          <div className="mb-6 max-w-md">
+            <PresentationSharePanel listingId={selectedJob} getToken={() => user?.getIdToken()} />
+          </div>
+        )}
 
         {/* Drop zone */}
         <div

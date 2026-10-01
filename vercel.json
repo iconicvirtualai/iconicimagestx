@@ -11,11 +11,13 @@
   ],
   "functions": {
     "api/index.mjs": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "dist/spa/index.html"
     }
   },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/present/:token", "destination": "/api/presentations/shell/:token" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
