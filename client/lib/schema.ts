@@ -367,6 +367,12 @@ export interface Package {
   bookingId?: string;
   bookingKind?: "service" | "basic" | "addon" | "upgrade";
   source?: "booking-form-hardcoded";
+  /** Hard appointment cap. Present on The Apprenticeship Program packages. */
+  appointmentLimit?: string;
+  /** Overage label, for example "$25 per 15-minute increment". */
+  overage?: string;
+  /** Program rules shown to clients and stored with the apprenticeship SKUs. */
+  rules?: string[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
