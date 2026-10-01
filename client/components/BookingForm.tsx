@@ -9,7 +9,20 @@ import { SmsConsentField } from "@/components/SmsConsentField";
 import { services } from "@/lib/services";
 import { db } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
-import { addOns, basicsList, findCatalogPriceMismatches, promoDiscountFor } from "@shared/bookingCatalog";
+import {
+  APPRENTICESHIP_BRIDGE_COPY,
+  APPRENTICESHIP_OVERAGE_LABEL,
+  APPRENTICESHIP_PROGRAM_NAME,
+  APPRENTICESHIP_RULES,
+  addOns,
+  apprenticeshipPackages,
+  basicsList,
+  findCatalogPriceMismatches,
+  isApprenticeshipPackage,
+  isExclusivePhotoPackage,
+  photoOnlyPackages,
+  promoDiscountFor,
+} from "@shared/bookingCatalog";
 import {
   buildSubmittedLineItems,
   calculateSidebarTotal,
@@ -251,12 +264,19 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
       const items = itemsParam.split(",");
       const specializedSocial = items.includes("specialized-social");
       const specializedBoth = items.includes("specialized-both");
+      const apprenticePick = items.find((id) => isApprenticeshipPackage(id));
 
       setFormData(prev => ({
         ...prev,
-        selectedBasics: items.filter(i => i !== "specialized-social" && i !== "specialized-both"),
-        premiumUpgrade: premiumParam,
-        specializedPhotography: specializedBoth ? "both" : specializedSocial ? "social" : prev.specializedPhotography
+        selectedBasics: apprenticePick
+          ? [apprenticePick]
+          : items.filter(i => i !== "specialized-social" && i !== "specialized-both"),
+        selectedAddOns: apprenticePick ? [] : prev.selectedAddOns,
+        premiumUpgrade: apprenticePick ? false : premiumParam,
+        virtualStagingCredits: apprenticePick ? 0 : prev.virtualStagingCredits,
+        specializedPhotography: apprenticePick
+          ? "mls"
+          : specializedBoth ? "both" : specializedSocial ? "social" : prev.specializedPhotography
       }));
       setShowBasics(true);
     }
@@ -305,14 +325,23 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
 
   const toggleBasic = (id: string) => {
     const isSelecting = !formData.selectedBasics.includes(id);
-    // If it's a photo package, only one at a time
-    if (id.startsWith("photos-")) {
+    const apprenticePick = isSelecting && isApprenticeshipPackage(id);
+    // Photo-count packages are one choice: standard photos-only or apprenticeship.
+    if (isExclusivePhotoPackage(id)) {
       setFormData(prev => ({
         ...prev,
         selectedService: "", // Deselect campaign tiers if a basic is chosen
         selectedBasics: prev.selectedBasics.includes(id)
           ? prev.selectedBasics.filter(b => b !== id)
-          : [id, ...prev.selectedBasics.filter(b => !b.startsWith("photos-"))]
+          : [id, ...prev.selectedBasics.filter(b => !isExclusivePhotoPackage(b))],
+        ...(apprenticePick
+          ? {
+              selectedAddOns: [],
+              premiumUpgrade: false,
+              virtualStagingCredits: 0,
+              specializedPhotography: "mls" as const,
+            }
+          : {}),
       }));
     } else {
       setFormData(prev => ({
@@ -354,6 +383,9 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     }
   };
 
+  const apprenticeshipSelected = formData.selectedBasics.some((id) => isApprenticeshipPackage(id));
+  const apprenticeshipOnly = apprenticeshipSelected && !formData.selectedService;
+
   const nextStep = () => {
     if (step === 1 && !formData.selectedService && formData.selectedBasics.length === 0) {
       toast.error("Please select a Campaign Tier or Basics package");
@@ -368,6 +400,12 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
       }
       if (isConsultationPath) {
         setStep(4); // Jump to scheduling
+        return;
+      }
+
+      // Apprentice photos stay photos-only: no polish upsell, no add-on step.
+      if (apprenticeshipOnly) {
+        setStep(3);
         return;
       }
 
@@ -414,6 +452,10 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   };
 
   const prevStep = () => {
+    if (step === 3 && apprenticeshipOnly) {
+      setStep(1);
+      return;
+    }
     if (step === 4 && (isConsultationPath || isStudioPath)) {
       setStep(1);
       return;
@@ -510,12 +552,24 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
             {formData.selectedBasics.map(id => {
               const b = basicsList.find(x => x.id === id);
               return b ? (
-                <div key={id} className="flex justify-between items-center text-[11px]">
-                  <span className="text-gray-500">{b.name}</span>
-                  <span className="font-bold text-black">${b.price}</span>
+                <div key={id} className="flex justify-between items-start gap-3 text-[11px]">
+                  <span className="text-gray-500">
+                    {b.name}
+                    {b.appointmentLimit && (
+                      <span className="mt-0.5 block text-[10px] font-medium leading-snug text-gray-400">
+                        {b.appointmentLimit}
+                      </span>
+                    )}
+                  </span>
+                  <span className="font-bold text-black shrink-0">${b.price}</span>
                 </div>
               ) : null;
             })}
+            {apprenticeshipSelected && (
+              <p className="text-[10px] font-bold leading-relaxed text-gray-400">
+                Run long and it adds up: {APPRENTICESHIP_OVERAGE_LABEL}. That overage is not in this estimate.
+              </p>
+            )}
           </div>
         )}
         {formData.premiumUpgrade && (
@@ -596,7 +650,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
       <div className="pt-4 border-t border-dashed border-gray-200">
         <div className="flex justify-between items-center mb-4">
           <span className="text-[10px] font-black uppercase text-gray-400">Total Estimate</span>
-          <span className="text-2xl font-black text-black" style={{ color: settings.global.primaryColor }}>
+          <span data-testid="booking-total" className="text-2xl font-black text-black" style={{ color: settings.global.primaryColor }}>
             ${calculateTotal()}
           </span>
         </div>
@@ -741,27 +795,93 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                   </div>
                 ))
               ) : (
-                // Basics View
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                   {basicsList.map((b) => (
-                     <button
-                      key={b.id}
-                      onClick={() => toggleBasic(b.id)}
-                      className={`p-6 rounded-2xl border-2 transition-all text-left bg-white relative ${
-                        formData.selectedBasics.includes(b.id) ? 'border-black bg-white scale-[1.01] shadow-lg' : 'border-gray-100 bg-white hover:border-gray-200'
-                      }`}
-                     >
-                       <div className="space-y-1">
-                          <h4 className="font-black text-black uppercase text-sm">{b.name}</h4>
-                          <span className="text-sm font-black text-black block">${b.price}</span>
-                       </div>
-                       {formData.selectedBasics.includes(b.id) && (
-                         <div className="absolute top-4 right-4 w-5 h-5 rounded-full bg-black flex items-center justify-center">
-                           <Check className="w-2.5 h-2.5 text-white stroke-[4]" />
-                         </div>
-                       )}
-                     </button>
-                   ))}
+                // Basics View — photos-only beside the apprenticeship program
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                  <div data-testid="basics-photos" className="space-y-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Photos-Only</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-3">
+                      {photoOnlyPackages.map((b) => (
+                        <button
+                          key={b.id}
+                          type="button"
+                          onClick={() => toggleBasic(b.id)}
+                          aria-pressed={formData.selectedBasics.includes(b.id)}
+                          className={`p-6 rounded-2xl border-2 transition-all text-left bg-white relative ${
+                            formData.selectedBasics.includes(b.id) ? 'border-black bg-white scale-[1.01] shadow-lg' : 'border-gray-100 bg-white hover:border-gray-200'
+                          }`}
+                        >
+                          <div className="space-y-1 pr-6">
+                            <h4 className="font-black text-black uppercase text-sm">{b.name}</h4>
+                            <span className="text-sm font-black text-black block">${b.price}</span>
+                          </div>
+                          {formData.selectedBasics.includes(b.id) && (
+                            <div className="absolute top-4 right-4 w-5 h-5 rounded-full bg-black flex items-center justify-center">
+                              <Check className="w-2.5 h-2.5 text-white stroke-[4]" />
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div data-testid="apprenticeship-program" className="space-y-4 rounded-[1.75rem] border border-dashed border-gray-200 bg-[#fafafa] p-5">
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: settings.global.primaryColor }}>
+                        {APPRENTICESHIP_PROGRAM_NAME}
+                      </p>
+                      <p className="text-sm font-bold leading-relaxed text-gray-700">{APPRENTICESHIP_BRIDGE_COPY}</p>
+                      <p className="text-[11px] font-medium leading-relaxed text-gray-500">
+                        The packages beside this are the real Iconic shoot. This rate is lower on purpose — photos only, with a hard clock.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3">
+                      {apprenticeshipPackages.map((b) => {
+                        const selected = formData.selectedBasics.includes(b.id);
+                        return (
+                          <button
+                            key={b.id}
+                            type="button"
+                            data-testid={b.id}
+                            onClick={() => toggleBasic(b.id)}
+                            aria-pressed={selected}
+                            className={`p-5 rounded-2xl border-2 transition-all text-left bg-white relative ${
+                              selected ? 'border-black shadow-lg' : 'border-gray-100 hover:border-gray-300'
+                            }`}
+                          >
+                            <div className="space-y-1.5 pr-6">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">{b.kicker}</p>
+                              <h4 className="text-2xl font-black leading-none text-black">{b.cardTitle || b.name}</h4>
+                              <span className="text-xl font-black text-black block">${b.price}</span>
+                              {b.appointmentLimit && (
+                                <p className="text-[10px] font-medium leading-snug text-gray-400">{b.appointmentLimit}</p>
+                              )}
+                              <p className="pt-1 text-[11px] font-medium leading-relaxed text-gray-500">{b.aside}</p>
+                            </div>
+                            {selected && (
+                              <div className="absolute top-4 right-4 w-5 h-5 rounded-full bg-black flex items-center justify-center">
+                                <Check className="w-2.5 h-2.5 text-white stroke-[4]" />
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[11px] font-bold leading-relaxed text-gray-600">
+                      Overages: {APPRENTICESHIP_OVERAGE_LABEL}.
+                    </p>
+                    {apprenticeshipSelected && (
+                      <div data-testid="apprenticeship-rules" className="rounded-2xl border border-black bg-white p-4 space-y-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-black">The rules. Read them.</p>
+                        <ul className="list-disc space-y-2 pl-4">
+                          {APPRENTICESHIP_RULES.map((rule) => (
+                            <li key={rule} className="text-[12px] font-medium leading-relaxed text-gray-700">
+                              {rule}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -776,7 +896,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
             className="space-y-10"
           >
             {/* Iconic Upgrade Section */}
-            {((selectedServiceData && selectedServiceData.id !== "listing-market-leader") || formData.selectedBasics.length > 0) && (
+            {!apprenticeshipOnly && ((selectedServiceData && selectedServiceData.id !== "listing-market-leader") || formData.selectedBasics.length > 0) && (
               <div className="bg-black rounded-[2rem] p-8 text-white relative overflow-hidden">
                  <div className="absolute top-0 right-0 p-8 opacity-10">
                     <Sparkles className="w-24 h-24" />
@@ -846,8 +966,8 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
               </div>
             )}
 
-            {/* Strategic Add-ons Section */}
-            <div className="space-y-8">
+            {/* Strategic Add-ons Section — not offered on apprenticeship (photos only). */}
+            {!apprenticeshipOnly && <div className="space-y-8">
               <div className="text-center space-y-1.5">
                  <h3 className="text-xl font-black uppercase text-black">The Strategic Add-ons</h3>
                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Don't forget the details that convert</p>
@@ -881,7 +1001,20 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                   </div>
                 ))}
               </div>
-            </div>
+            </div>}
+            {apprenticeshipOnly && (
+              <div className="rounded-[1.75rem] border border-black bg-white p-6 space-y-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em]">Photos only. The rules still apply.</p>
+                <p className="text-sm font-medium leading-relaxed text-gray-600">
+                  No aerials, video, floor plans, or extra edits. Overages stay {APPRENTICESHIP_OVERAGE_LABEL}.
+                </p>
+                <ul className="list-disc space-y-2 pl-4">
+                  {APPRENTICESHIP_RULES.map((rule) => (
+                    <li key={rule} className="text-[12px] font-medium leading-relaxed text-gray-700">{rule}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </motion.div>
         );
 
@@ -1024,7 +1157,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                           key={status}
                           onClick={() => {
                             updateFormData({ furnishingStatus: status });
-                            if (status === "Unfurnished") {
+                            if (status === "Unfurnished" && !apprenticeshipSelected) {
                               setShowVirtualStagingPopup(true);
                             }
                           }}
@@ -1721,6 +1854,11 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
              </div>
           </div>
           <div className="p-8 space-y-6">
+             {selectedDetailItem?.appointmentLimit && (
+                <p className="text-[11px] font-medium leading-snug text-gray-400">
+                   {selectedDetailItem.appointmentLimit}. Overages: {APPRENTICESHIP_OVERAGE_LABEL}.
+                </p>
+             )}
              {selectedDetailItem?.features && (
                 <div className="space-y-4">
                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 flex items-center gap-2">
@@ -1734,6 +1872,16 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                          </div>
                       ))}
                    </div>
+                </div>
+             )}
+             {Array.isArray(selectedDetailItem?.rules) && selectedDetailItem.rules.length > 0 && (
+                <div className="space-y-3 rounded-2xl border border-black p-4">
+                   <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-black">The rules. Read them.</h4>
+                   <ul className="list-disc space-y-2 pl-4">
+                      {selectedDetailItem.rules.map((rule: string) => (
+                         <li key={rule} className="text-[12px] font-medium leading-relaxed text-gray-700">{rule}</li>
+                      ))}
+                   </ul>
                 </div>
              )}
              <div className="pt-4 border-t border-gray-100 flex items-center justify-between">

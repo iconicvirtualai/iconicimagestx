@@ -13,6 +13,44 @@ export interface CatalogItem {
   price: number;
   description: string;
   features?: string[];
+  /** Hard appointment cap. Present only on apprenticeship packages. */
+  appointmentLimit?: string;
+  /** Short card line. Witty pressure, not a second price. */
+  aside?: string;
+  /** Shown on the card above the name. */
+  kicker?: string;
+  /** Short label for the booking card. Falls back to name. */
+  cardTitle?: string;
+  rules?: string[];
+}
+
+export const APPRENTICESHIP_PROGRAM_NAME = "The Apprenticeship Program";
+
+export const APPRENTICESHIP_BRIDGE_COPY =
+  "Need to go even lower? That's okay — we don't judge… but you have to follow the rules.";
+
+export const APPRENTICESHIP_OVERAGE_LABEL = "$25 per 15-minute increment";
+
+export const APPRENTICESHIP_RULES = [
+  "Apprentices are learning.",
+  "We do not make additional trips.",
+  "We do not edit out anything additional — you get what you pay for.",
+  "You're helping us help you.",
+  "Once apprentices graduate we will have new apprentices. Graduates become vetted Iconic shooters, just like the OGs. It's a lifetime cycle — clients help all along the way.",
+  "But we don't play: be prepped and ready to go when we arrive.",
+];
+
+export function isApprenticeshipPackage(id: string): boolean {
+  return id.startsWith("apprentice-");
+}
+
+/** Photo-count packages are one choice: standard photos-only or apprenticeship. */
+export function isExclusivePhotoPackage(id: string): boolean {
+  return id.startsWith("photos-") || isApprenticeshipPackage(id);
+}
+
+export function basicLineName(item: CatalogItem): string {
+  return item.appointmentLimit ? `${item.name} (${item.appointmentLimit})` : item.name;
 }
 
 export const basicsList: CatalogItem[] = [
@@ -61,7 +99,46 @@ export const basicsList: CatalogItem[] = [
       "Reflection/Mirror Removal",
     ],
   },
+  {
+    id: "apprentice-25",
+    name: "The Apprenticeship Program — 25 Photos",
+    cardTitle: "25 photos",
+    price: 75,
+    kicker: "The cheap one",
+    appointmentLimit: "20 Minute Appointment ONLY",
+    aside: "Twenty-five photos. Twenty minutes. You'll feel the savings — and the stopwatch.",
+    description:
+      "25 photos, shot by an apprentice. 20 Minute Appointment ONLY. Overages billed at $25 per 15-minute increment.",
+    features: [
+      "25 Photos",
+      "20 Minute Appointment ONLY",
+      "Photos only",
+      "Overages: $25 per 15-minute increment",
+    ],
+    rules: APPRENTICESHIP_RULES,
+  },
+  {
+    id: "apprentice-50",
+    name: "The Apprenticeship Program — 50 Photos",
+    cardTitle: "50 photos",
+    price: 125,
+    kicker: "Slightly less cheap",
+    appointmentLimit: "1 Hour Appointment ONLY",
+    aside: "Fifty photos and a full hour. You still walked past the real packages.",
+    description:
+      "50 photos, shot by an apprentice. 1 Hour Appointment ONLY. Overages billed at $25 per 15-minute increment.",
+    features: [
+      "50 Photos",
+      "1 Hour Appointment ONLY",
+      "Photos only",
+      "Overages: $25 per 15-minute increment",
+    ],
+    rules: APPRENTICESHIP_RULES,
+  },
 ];
+
+export const apprenticeshipPackages = basicsList.filter((item) => isApprenticeshipPackage(item.id));
+export const photoOnlyPackages = basicsList.filter((item) => !isApprenticeshipPackage(item.id));
 
 export const addOns: Array<{ category: string; items: CatalogItem[] }> = [
   {
@@ -266,6 +343,9 @@ export interface BookingPackageSeed {
   bookingId: string;
   bookingKind: BookingCatalogKind;
   source: "booking-form-hardcoded";
+  appointmentLimit?: string;
+  overage?: string;
+  rules?: string[];
 }
 
 function serviceCategory(service: Service): BookingPackageCategory {
@@ -320,6 +400,13 @@ export function bookingPackageSeedDocs(): BookingPackageSeed[] {
       bookingId: basic.id,
       bookingKind: "basic",
       source: "booking-form-hardcoded",
+      ...(basic.appointmentLimit
+        ? {
+            appointmentLimit: basic.appointmentLimit,
+            overage: APPRENTICESHIP_OVERAGE_LABEL,
+            rules: basic.rules || [],
+          }
+        : {}),
     });
   }
 

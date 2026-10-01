@@ -141,6 +141,54 @@ describe("booking catalog parity", () => {
     expect(bookingForm).toContain("charging hardcoded prices");
   });
 
+  it("prices apprenticeship packages at the hard time caps and seeds them with the basics", () => {
+    expect(calculateSidebarTotal({ selectedBasics: ["apprentice-25"] })).toBe(75);
+    expect(calculateSidebarTotal({ selectedBasics: ["apprentice-50"] })).toBe(125);
+    expect(sumLineItemPrices(buildSubmittedLineItems({ selectedBasics: ["apprentice-25", "apprentice-50"] }))).toBe(200);
+
+    const twentyFive = buildSubmittedLineItems({ selectedBasics: ["apprentice-25"] })[0];
+    const fifty = buildSubmittedLineItems({ selectedBasics: ["apprentice-50"] })[0];
+    expect(twentyFive).toMatchObject({
+      id: "apprentice-25",
+      unitPrice: 75,
+      qty: 1,
+      price: 75,
+    });
+    expect(fifty).toMatchObject({ id: "apprentice-50", unitPrice: 125, qty: 1, price: 125 });
+    expect(twentyFive.name).toContain("20 Minute Appointment ONLY");
+    expect(fifty.name).toContain("1 Hour Appointment ONLY");
+    expect(twentyFive.name).not.toMatch(/aerial|video|floor plan/i);
+
+    const docs = bookingPackageSeedDocs();
+    const apprentice25 = docs.find((doc) => doc.id === "apprentice-25");
+    const apprentice50 = docs.find((doc) => doc.id === "apprentice-50");
+    expect(apprentice25).toMatchObject({
+      price: 75,
+      tier: "basic",
+      bookingKind: "basic",
+      category: "photography",
+      appointmentLimit: "20 Minute Appointment ONLY",
+      overage: "$25 per 15-minute increment",
+    });
+    expect(apprentice50).toMatchObject({
+      price: 125,
+      appointmentLimit: "1 Hour Appointment ONLY",
+      overage: "$25 per 15-minute increment",
+    });
+    expect(apprentice25?.rules?.join(" ")).toMatch(/do not make additional trips/i);
+    expect(apprentice25?.rules?.join(" ")).toMatch(/do not edit out anything additional/i);
+    expect(apprentice25?.price).toBe(hardcodedChargePrice("apprentice-25"));
+    expect(apprentice50?.price).toBe(hardcodedChargePrice("apprentice-50"));
+
+    const pricingPage = readFileSync(new URL("../client/pages/Pricing.tsx", import.meta.url), "utf8");
+    expect(catalogSource).toContain("Need to go even lower? That's okay — we don't judge… but you have to follow the rules.");
+    expect(bookingForm).toContain("APPRENTICESHIP_BRIDGE_COPY");
+    expect(bookingForm).toContain("APPRENTICESHIP_RULES");
+    expect(pricingPage).toContain("APPRENTICESHIP_BRIDGE_COPY");
+    expect(pricingPage).toContain("APPRENTICESHIP_RULES");
+    expect(pricingPage).toContain("services-apprenticeship");
+  });
+
   it("lets active staff write the public packages catalog", () => {
     const block = rules.slice(rules.indexOf("match /packages/{packageId}"));
     expect(block).toContain("allow read: if true;");

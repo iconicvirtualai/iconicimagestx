@@ -18,6 +18,7 @@ import {
   SPECIALIZED_SOCIAL_NAME,
   SPECIALIZED_SOCIAL_PRICE,
   VIRTUAL_STAGING_UNIT_PRICE,
+  basicLineName,
   basicsList,
   findAddOn,
 } from "./bookingCatalog.ts";
@@ -94,7 +95,7 @@ export function buildSubmittedLineItems(input: BookingPriceInput): BookingLineIt
     if (basic) {
       items.push({
         id: basic.id,
-        name: basic.name,
+        name: basicLineName(basic),
         unitPrice: basic.price,
         qty: 1,
         price: basic.price,
