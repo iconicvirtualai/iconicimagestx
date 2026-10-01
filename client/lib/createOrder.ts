@@ -41,6 +41,13 @@ export async function createOrder(formData: any) {
     specializedPhotography: formData.specializedPhotography || "",
     virtualStagingCredits:  formData.virtualStagingCredits  || 0,
     leadSource:             formData.leadSource             || "",
+    selectedService:        formData.selectedService        || null,
+    selectedBasics:         Array.isArray(formData.selectedBasics) ? formData.selectedBasics : [],
+    selectedAddOns:         Array.isArray(formData.selectedAddOns) ? formData.selectedAddOns : [],
+    // Promo is also a single negative line item. This field is a record of that
+    // discount and must not be subtracted again from `total`.
+    promoCode:              formData.promoCode              || null,
+    promoDiscount:          Number(formData.promoDiscount)  || 0,
     // Unpriced draft add-on. Kept off lineItems so it cannot change the total.
     lifeOfTheListingCare:   lifeOfTheListingCareSelected(formData.lifeOfTheListingCare),
   };

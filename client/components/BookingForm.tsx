@@ -7,6 +7,15 @@ import { Link, useSearchParams } from "react-router-dom";
 import ChatWidget from "@/components/ChatWidget";
 import { SmsConsentField } from "@/components/SmsConsentField";
 import { services } from "@/lib/services";
+import { db } from "@/lib/firebase";
+import { collection, getDocs } from "firebase/firestore";
+import { addOns, basicsList, findCatalogPriceMismatches, promoDiscountFor } from "@shared/bookingCatalog";
+import {
+  buildSubmittedLineItems,
+  calculateSidebarTotal,
+  sumLineItemPrices,
+  type BookingPriceInput,
+} from "@shared/bookingPricing";
 import {
   LIFE_OF_THE_LISTING_CARE_BLURB,
   LIFE_OF_THE_LISTING_CARE_CHECKBOX_LABEL,
@@ -52,162 +61,6 @@ type Step = 1 | 2 | 3 | 4 | 5 | 6 | "success";
  * color, so light fields need an explicit dark text color and placeholder.
  */
 const lightControlText = "text-neutral-950 placeholder:text-neutral-500 caret-neutral-950";
-
-const basicsList = [
-  {
-    id: "photos-20",
-    name: "20 Photos",
-    price: 99,
-    description: "Essential photo package for smaller listings.",
-    features: [
-      "20 High-End Photos",
-      "Basic Edits",
-      "Color Balance",
-      "Clear Windows",
-      "Sky Replacement",
-      "Next Day Turn Around",
-      "Reflection/Mirror Removal"
-    ]
-  },
-  {
-    id: "photos-35",
-    name: "35 Photos",
-    price: 150,
-    description: "Standard photo package for most residential listings.",
-    features: [
-      "35 High-End Photos",
-      "Basic Edits",
-      "Color Balance",
-      "Clear Windows",
-      "Sky Replacement",
-      "Next Day Turn Around",
-      "Reflection/Mirror Removal"
-    ]
-  },
-  {
-    id: "photos-50",
-    name: "50 Photos",
-    price: 200,
-    description: "Complete photo package for large homes and detailed spaces.",
-    features: [
-      "50 High-End Photos",
-      "Basic Edits",
-      "Color Balance",
-      "Clear Windows",
-      "Sky Replacement",
-      "Next Day Turn Around",
-      "Reflection/Mirror Removal"
-    ]
-  },
-];
-
-const addOns = [
-  { category: "Speed & Social", items: [
-    {
-      id: "same-day",
-      name: "Same-Day Delivery",
-      price: 50,
-      description: "Photos, Twilight Render and Snap Reel by 7PM (Basic Edits).",
-      features: [
-        "Photos by 7PM",
-        "Snap Reel by 7PM",
-        "Twilight Renders by 7PM"
-      ]
-    },
-    {
-      id: "basic-reel",
-      name: "Basic Reel",
-      price: 125,
-      description: "A high-impact 15s vertical video optimized for social media.",
-      features: [
-        "15-Second Vertical Video",
-        "Trending Audio Integration",
-        "Fast-Paced Editing Style"
-      ]
-    },
-  ]},
-  { category: "The Space", items: [
-    {
-      id: "aerial-drone",
-      name: "Aerial Drone Stills",
-      price: 99,
-      description: "Capture the property and its surroundings from a unique perspective.",
-      features: [
-        "5 High-Res Aerial Photos",
-        "Neighborhood Context Shots",
-        "Professional Color Grading"
-      ]
-    },
-    {
-      id: "matterport-3d",
-      name: "Matterport 3D Tour",
-      price: 200,
-      description: "A fully immersive 3D walkthrough experience for remote buyers.",
-      features: [
-        "Full 3D Interior Model",
-        "Dollhouse View",
-        "Interactive Floor Navigation"
-      ]
-    },
-    {
-      id: "basic-video",
-      name: "Basic Video",
-      price: 300,
-      description: "A professional cinematic walkthrough of the property interior.",
-      features: [
-        "60-Second 4K Video",
-        "Interior & Exterior Highlights",
-        "Licensed Background Music"
-      ]
-    },
-    {
-      id: "aerial-premium",
-      name: "Aerial Premium Video",
-      price: 550,
-      description: "The ultimate drone experience with cinematic sweeps and tracking shots.",
-      features: [
-        "90-Second 4K Aerial Film",
-        "Dynamic Tracking Shots",
-        "Advanced Neighborhood Highlights"
-      ]
-    },
-    {
-      id: "floorplan-2d",
-      name: "2D Floor Plan",
-      price: 75,
-      description: "Accurate dimensions and layout visualization for buyers.",
-      features: [
-        "Precise Room Measurements",
-        "Clean Schematic Layout",
-        "PDF & JPG Deliverables"
-      ]
-    },
-    {
-      id: "amenity-addon",
-      name: "Amenity",
-      price: 50,
-      description: "Capture the shared spaces and community features that add value.",
-      features: [
-        "Pool & Clubhouse Shots",
-        "Parks & Shared Spaces",
-        "Community Context"
-      ]
-    },
-  ]},
-  { category: "The Brand", items: [
-    {
-      id: "agent-intro",
-      name: "Agent Intro/Outro",
-      price: 75,
-      description: "Put a face to the brand with a professional on-camera introduction.",
-      features: [
-        "On-Camera Greeting",
-        "Professional Audio Setup",
-        "Call-to-Action Closing"
-      ]
-    },
-  ]}
-];
 
 const photographers = [
   "Marcus Johnson",
@@ -300,6 +153,28 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     leadSource: "", // UTM tracking
     specializedPhotography: "mls" as "mls" | "social" | "both",
   });
+
+  // Catalog is display/admin parity only. A failed read or a price that
+  // disagrees with the hardcoded lists never changes the charged total.
+  useEffect(() => {
+    let cancelled = false;
+    getDocs(collection(db, "packages"))
+      .then((snap) => {
+        if (cancelled) return;
+        const mismatches = findCatalogPriceMismatches(
+          snap.docs.map((entry) => ({ id: entry.id, ...entry.data() })),
+        );
+        if (mismatches.length > 0) {
+          console.warn("[Booking] Catalog price mismatch — charging hardcoded prices", mismatches);
+        }
+      })
+      .catch((err) => {
+        console.warn("[Booking] Catalog read failed — charging hardcoded prices", err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Address autocomplete — proxied through our server (key stays server-side)
   const [addressSearchValue, setAddressSearchValue] = useState("");
@@ -560,6 +435,17 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     }
   };
 
+  const bookingPriceInput = (): BookingPriceInput => ({
+    selectedService: formData.selectedService,
+    selectedBasics: formData.selectedBasics,
+    selectedAddOns: formData.selectedAddOns,
+    premiumUpgrade: formData.premiumUpgrade,
+    virtualStagingCredits: formData.virtualStagingCredits,
+    specializedPhotography: formData.specializedPhotography,
+    promo: appliedPromo,
+    lifeOfTheListingCare: formData.lifeOfTheListingCare,
+  });
+
   const handleBookNow = async (e?: React.FormEvent) => {
   if (e) e.preventDefault();
   if (!formData.smsConsent) {
@@ -568,61 +454,16 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   }
   console.log("STEP 1: submit clicked");
   setIsSubmitting(true);
-const selectedServiceData = services.find(s => s.id === formData.selectedService);
-
-  const lineItems = [
-    ...(selectedServiceData ? [{
-      name: selectedServiceData.name,
-      price: selectedServiceData.price
-    }] : []),
-
-    ...formData.selectedBasics.map(id => {
-      const b = basicsList.find(x => x.id === id);
-      return b ? { name: b.name, price: b.price } : null;
-    }).filter(Boolean),
-
-    ...formData.selectedAddOns.map(id => {
-      let found;
-      addOns.forEach(cat => {
-        const a = cat.items.find(x => x.id === id);
-        if (a) found = a;
-      });
-      return found ? { name: found.name, price: found.price } : null;
-    }).filter(Boolean),
-
-    ...(formData.premiumUpgrade ? [{
-      name: "Iconic Finish (Premium Upgrade)",
-      price: 75
-    }] : []),
-
-    ...(formData.virtualStagingCredits > 0 ? [{
-      name: `Virtual Staging (${formData.virtualStagingCredits} credits)`,
-      price: formData.virtualStagingCredits * 35
-    }] : []),
-
-    ...(formData.specializedPhotography === "social" ? [{
-      name: "Social Media Optimized Photography",
-      price: 85
-    }] : []),
-
-    ...(formData.specializedPhotography === "both" ? [{
-      name: "MLS + Social Media Optimized Photography",
-      price: 125
-    }] : []),
-
-    ...(appliedPromo ? [{
-      name: `Promo Code: ${appliedPromo.code}`,
-      price: -appliedPromo.discount
-    }] : [])
-  ] as { name: string; price: number }[];
-
-  const total = lineItems.reduce((sum, item) => sum + item.price, 0);
+  const lineItems = buildSubmittedLineItems(bookingPriceInput());
+  const total = sumLineItemPrices(lineItems);
 
   try {
     await createOrder({
       ...formData,
       lineItems,
-      total
+      total,
+      promoCode: appliedPromo?.code || null,
+      promoDiscount: appliedPromo?.discount || 0,
     });
 
     setStep("success");
@@ -639,41 +480,15 @@ const selectedServiceData = services.find(s => s.id === formData.selectedService
   const isConsultationPath = selectedServiceData && ["branding", "business", "growth"].includes(selectedServiceData.category);
   const isStudioPath = selectedServiceData?.category === "studio";
 
-  const calculateTotal = () => {
-    let total = 0;
-    if (selectedServiceData) total += selectedServiceData.price;
-    
-    formData.selectedBasics.forEach(id => {
-      const b = basicsList.find(x => x.id === id);
-      if (b) total += b.price;
-    });
-
-    formData.selectedAddOns.forEach(id => {
-      addOns.forEach(cat => {
-        const a = cat.items.find(x => x.id === id);
-        if (a) total += a.price;
-      });
-    });
-
-    if (formData.premiumUpgrade) total += 75;
-    if (formData.virtualStagingCredits > 0) total += formData.virtualStagingCredits * 35;
-
-    if (formData.specializedPhotography === "social") total += 85;
-    if (formData.specializedPhotography === "both") total += 125;
-
-    if (appliedPromo) {
-      total = Math.max(0, total - appliedPromo.discount);
-    }
-
-    return total;
-  };
+  const calculateTotal = () => calculateSidebarTotal(bookingPriceInput());
 
   const handleApplyPromo = () => {
-    if (promoInput.toUpperCase() === "ICONICAI") {
-      setAppliedPromo({ code: "ICONICAI", discount: 35 }); // $35 off (1 free virtual staging)
+    const promo = promoDiscountFor(promoInput);
+    if (promo?.code === "ICONICAI") {
+      setAppliedPromo(promo); // $35 off (1 free virtual staging)
       toast.success("Promo code 'ICONICAI' applied! ($35 discount)");
-    } else if (promoInput.toUpperCase() === "NEWYEAR") {
-      setAppliedPromo({ code: "NEWYEAR", discount: 50 });
+    } else if (promo?.code === "NEWYEAR") {
+      setAppliedPromo(promo);
       toast.success("Promo code applied!");
     } else {
       toast.error("Invalid promo code");

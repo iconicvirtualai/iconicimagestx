@@ -363,6 +363,10 @@ export interface Package {
   isFeatured?: boolean;
   sortOrder: number;
   category: "photography" | "video" | "virtual_staging" | "marketing" | "addon";
+  /** Booking-form id when this package was seeded from the hardcoded catalog. */
+  bookingId?: string;
+  bookingKind?: "service" | "basic" | "addon" | "upgrade";
+  source?: "booking-form-hardcoded";
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
