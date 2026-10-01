@@ -67,9 +67,13 @@ export const handleListingPhotoUpload: RequestHandler = async (req, res) => {
 
     const url = `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/${encodeURIComponent(objectPath)}?alt=media&token=${token}`;
     const image = {
+      id: randomUUID(),
       url,
       name: fileName,
       path: objectPath,
+      contentType: "image/jpeg",
+      size: body.length,
+      folderId: null,
       uploadedAt: new Date().toISOString(),
       uploadedBy: (req as AuthenticatedRequest).user?.uid || "staff",
     };

@@ -3148,7 +3148,7 @@ function readSetupSecret(headerValue) {
   return "";
 }
 const db$7 = () => admin.firestore();
-function httpError(status, error) {
+function httpError$1(status, error) {
   return Object.assign(new Error(error), { status });
 }
 async function bootstrapPlaytest(input) {
@@ -3161,9 +3161,9 @@ async function bootstrapPlaytest(input) {
   const seedListing = input.seedListing !== false;
   const seedGallery = input.seedGallery !== false;
   const clientEmail = normalizeEmail(input.clientEmail);
-  if (!email || !email.includes("@")) throw httpError(400, "Photographer email is required.");
-  if (password.length < 6) throw httpError(400, "Photographer password must be at least 6 characters.");
-  if (!isStaffRole(role)) throw httpError(400, "Role must be admin, coordinator, photographer, or editor.");
+  if (!email || !email.includes("@")) throw httpError$1(400, "Photographer email is required.");
+  if (password.length < 6) throw httpError$1(400, "Photographer password must be at least 6 characters.");
+  if (!isStaffRole(role)) throw httpError$1(400, "Role must be admin, coordinator, photographer, or editor.");
   const photographer = await ensurePlaytestStaff({
     email,
     password,
@@ -3228,7 +3228,7 @@ async function ensurePlaytestStaff(input) {
     user = await admin.auth().getUserByEmail(input.email);
     const existing = await db$7().collection("staff").doc(user.uid).get();
     if (existing.exists && existing.data()?.playtest !== true) {
-      throw httpError(409, "That email already belongs to a staff account that is not a playtest login. Use a different email.");
+      throw httpError$1(409, "That email already belongs to a staff account that is not a playtest login. Use a different email.");
     }
     await admin.auth().updateUser(user.uid, {
       password: input.password,
@@ -3499,6 +3499,110 @@ router$7.post("/setup", async (req, res) => {
     return res.status(500).json({ error: "Setup failed." });
   }
 });
+const CUBICASA_MANUAL_NEXT_STEP = "CubiCasa has no API client in this app. Place the order in CubiCasa, then paste the order ID and share URL in Studio → Templates.";
+const AI_EDIT_QUEUE_NOTE = "Queued on the existing mediaJobs list (same queue as Studio → aICON Editor). This does not call CubiCasa, Autoenhance, or Virtual Staging.";
+const RESERVED_VIEWS = /* @__PURE__ */ new Set(["all", "photos", "raw"]);
+function storageFolderFromPath(path2) {
+  const normalized = path2.replace(/\\/g, "/");
+  if (normalized.includes("/raw/")) return "raw";
+  if (normalized.includes("/photos/")) return "photos";
+  return "other";
+}
+function byteSize(value) {
+  const numeric2 = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+  if (!Number.isFinite(numeric2) || numeric2 < 0) return null;
+  return Math.round(numeric2);
+}
+function normalizeMediaFile(raw, index = 0) {
+  if (!raw || typeof raw !== "object") return null;
+  const item = raw;
+  const path2 = typeof item.path === "string" ? item.path : "";
+  const url = typeof item.url === "string" ? item.url : "";
+  if (!path2 && !url) return null;
+  const name = typeof item.name === "string" && item.name.trim() ? item.name.trim() : path2.split("/").pop() || `file-${index + 1}`;
+  const folderId = typeof item.folderId === "string" && item.folderId.trim() ? item.folderId.trim() : null;
+  return {
+    id: typeof item.id === "string" && item.id.trim() ? item.id.trim() : path2 || `idx-${index}`,
+    name,
+    path: path2,
+    url,
+    contentType: contentTypeForUpload(name, typeof item.contentType === "string" ? item.contentType : void 0),
+    uploadedAt: typeof item.uploadedAt === "string" ? item.uploadedAt : "",
+    uploadedBy: typeof item.uploadedBy === "string" ? item.uploadedBy : "",
+    size: byteSize(item.size),
+    folderId,
+    storageFolder: storageFolderFromPath(path2)
+  };
+}
+function sanitizeFolderName(raw) {
+  return String(raw || "").replace(/[\\/]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
+}
+function normalizeMediaFolder(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const item = raw;
+  const id = typeof item.id === "string" ? item.id.trim() : "";
+  const name = sanitizeFolderName(item.name);
+  if (!id || !name || RESERVED_VIEWS.has(id)) return null;
+  return {
+    id,
+    name,
+    createdAt: typeof item.createdAt === "string" ? item.createdAt : "",
+    createdBy: typeof item.createdBy === "string" ? item.createdBy : ""
+  };
+}
+function normalizeMediaFolders(raw) {
+  if (!Array.isArray(raw)) return [];
+  const seen = /* @__PURE__ */ new Set();
+  const folders = [];
+  for (const item of raw) {
+    const folder = normalizeMediaFolder(item);
+    if (!folder) continue;
+    const key = folder.name.toLowerCase();
+    if (seen.has(folder.id) || seen.has(key)) continue;
+    seen.add(folder.id);
+    seen.add(key);
+    folders.push(folder);
+  }
+  return folders;
+}
+function createFolderId(now = Date.now(), entropy = "") {
+  const suffix = entropy || Math.random().toString(36).slice(2, 8);
+  return `fld_${now.toString(36)}_${suffix}`;
+}
+function buildListingObjectPath(listingId, folder, fileName, now = Date.now()) {
+  return `listings/${listingId}/${folder}/${now}_${safeStorageFileName(fileName)}`;
+}
+function planFileMove(input) {
+  const sameObject = input.sourceListingId === input.destinationListingId && input.file.storageFolder === input.destinationStorageFolder;
+  if (sameObject) return { mode: "metadata", nextPath: input.file.path };
+  return {
+    mode: "copy",
+    nextPath: buildListingObjectPath(
+      input.destinationListingId,
+      input.destinationStorageFolder,
+      input.file.name
+    )
+  };
+}
+function buildCubiCasaLibraryRequest(input) {
+  return {
+    source: "media-library",
+    provider: "cubicasa",
+    status: "needs_manual_order",
+    apiConnected: false,
+    orderId: "",
+    url: "",
+    listingId: input.listingId,
+    files: input.files.map((file) => ({
+      name: file.name,
+      path: file.path,
+      url: file.url
+    })),
+    requestedAt: input.requestedAt || (/* @__PURE__ */ new Date()).toISOString(),
+    requestedBy: input.requestedBy,
+    nextStep: CUBICASA_MANUAL_NEXT_STEP
+  };
+}
 const db$5 = () => admin.firestore();
 const bucket = () => admin.storage().bucket();
 const BROWSER_ORIGINS = [
@@ -3563,8 +3667,8 @@ async function registerListingPhoto(options) {
   if (!isListingStoragePath(listingId, storagePath)) {
     throw Object.assign(new Error("Storage path is not inside this listing."), { status: 400 });
   }
-  const listingRef = db$5().collection("listings").doc(listingId);
-  const listingSnap = await listingRef.get();
+  const listingRef2 = db$5().collection("listings").doc(listingId);
+  const listingSnap = await listingRef2.get();
   if (!listingSnap.exists) {
     throw Object.assign(new Error("Listing not found."), { status: 404 });
   }
@@ -3587,18 +3691,21 @@ async function registerListingPhoto(options) {
     url = firebaseDownloadUrl(bucket().name, storagePath, token);
   }
   const image = {
+    id: randomUUID(),
     url,
     name: safeStorageFileName(fileName),
     path: storagePath,
     contentType: contentTypeForUpload(fileName, options.contentType),
     uploadedAt: (/* @__PURE__ */ new Date()).toISOString(),
-    uploadedBy
+    uploadedBy,
+    size: byteSize(options.size),
+    folderId: null
   };
   const listing = listingSnap.data() || {};
   const images = Array.isArray(listing.images) ? listing.images : [];
   const already = images.find((item) => item?.path === storagePath);
   if (!already) {
-    await listingRef.update({
+    await listingRef2.update({
       images: admin.firestore.FieldValue.arrayUnion(image),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -3645,6 +3752,388 @@ async function syncPlaytestGallery(listingId, listing, image) {
 }
 function serializeDoc(id, data) {
   return jsonSafe({ id, ...data });
+}
+function httpError(status, message) {
+  return Object.assign(new Error(message), { status });
+}
+function listingRef(listingId) {
+  return db$5().collection("listings").doc(listingId);
+}
+async function readListing(listingId) {
+  const snap = await listingRef(listingId).get();
+  if (!snap.exists) throw httpError(404, "Listing not found.");
+  return { id: snap.id, ref: listingRef(listingId), data: snap.data() || {} };
+}
+function imageList(data) {
+  return Array.isArray(data.images) ? data.images : [];
+}
+function findRawImage(images, storagePath) {
+  return images.find((item) => {
+    const file = normalizeMediaFile(item);
+    return file?.path === storagePath;
+  });
+}
+async function patchListing(listingId, mutate) {
+  const ref = listingRef(listingId);
+  return db$5().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw httpError(404, "Listing not found.");
+    const data = snap.data() || {};
+    const patch = mutate(data);
+    tx.update(ref, {
+      ...patch,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    return data;
+  });
+}
+async function createListingMediaFolder(listingId, nameInput, createdBy) {
+  const name = sanitizeFolderName(nameInput);
+  if (!name) throw httpError(400, "Folder name is required.");
+  const reserved = /* @__PURE__ */ new Set(["all", "photos", "raw", "all files"]);
+  if (reserved.has(name.toLowerCase())) throw httpError(400, "That folder name is reserved.");
+  const folder = {
+    id: createFolderId(),
+    name,
+    createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+    createdBy
+  };
+  await patchListing(listingId, (data) => {
+    const folders = normalizeMediaFolders(data.mediaFolders);
+    if (folders.some((item) => item.name.toLowerCase() === name.toLowerCase())) {
+      throw httpError(409, "A folder with that name already exists.");
+    }
+    return { mediaFolders: [...folders, folder] };
+  });
+  return folder;
+}
+async function deleteListingMediaFolder(listingId, folderId) {
+  if (!folderId) throw httpError(400, "folderId is required.");
+  let removed = 0;
+  await patchListing(listingId, (data) => {
+    const folders = normalizeMediaFolders(data.mediaFolders);
+    if (!folders.some((folder) => folder.id === folderId)) throw httpError(404, "Folder not found.");
+    const images = imageList(data).map((item) => {
+      if (!item || typeof item !== "object") return item;
+      const record = item;
+      if (record.folderId !== folderId) return item;
+      removed += 1;
+      const next = { ...record };
+      delete next.folderId;
+      return next;
+    });
+    return {
+      mediaFolders: folders.filter((folder) => folder.id !== folderId),
+      images
+    };
+  });
+  return { deleted: true, filesReturned: removed };
+}
+async function assignListingFiles(listingId, paths, folderId) {
+  if (!paths.length) throw httpError(400, "Choose at least one file.");
+  for (const path2 of paths) {
+    if (!isListingStoragePath(listingId, path2)) throw httpError(400, "That file is not stored on this listing.");
+  }
+  await patchListing(listingId, (data) => {
+    if (folderId && !normalizeMediaFolders(data.mediaFolders).some((folder) => folder.id === folderId)) {
+      throw httpError(404, "Folder not found.");
+    }
+    const wanted = new Set(paths);
+    let touched = 0;
+    const images = imageList(data).map((item) => {
+      const file = normalizeMediaFile(item);
+      if (!file || !wanted.has(file.path) || !item || typeof item !== "object") return item;
+      touched += 1;
+      const next = { ...item };
+      if (folderId) next.folderId = folderId;
+      else delete next.folderId;
+      return next;
+    });
+    if (touched !== paths.length) throw httpError(404, "One or more files were not found on this listing.");
+    return { images };
+  });
+  return { updated: paths.length, folderId };
+}
+async function deleteStorageObject(storagePath) {
+  const file = bucket().file(storagePath);
+  const [exists] = await file.exists();
+  if (exists) await file.delete();
+}
+async function removePlaytestGalleryItem(listingId, listing, storagePath) {
+  const galleryIds = /* @__PURE__ */ new Set();
+  if (typeof listing.playtestGalleryId === "string" && listing.playtestGalleryId) galleryIds.add(listing.playtestGalleryId);
+  if (listing.playtest === true) {
+    const snap = await db$5().collection("galleries").where("listingId", "==", listingId).limit(5).get();
+    snap.docs.forEach((doc) => {
+      if (doc.data().playtest === true) galleryIds.add(doc.id);
+    });
+  }
+  for (const galleryId of galleryIds) {
+    const ref = db$5().collection("galleries").doc(galleryId);
+    const snap = await ref.get();
+    if (!snap.exists || snap.data()?.playtest !== true) continue;
+    const items = Array.isArray(snap.data()?.mediaItems) ? snap.data().mediaItems : [];
+    const next = items.filter((item) => item?.storagePath !== storagePath);
+    if (next.length === items.length) continue;
+    await ref.update({
+      mediaItems: next,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+  }
+}
+async function deleteListingFiles(listingId, paths) {
+  if (!paths.length) throw httpError(400, "Choose at least one file.");
+  for (const path2 of paths) {
+    if (!isListingStoragePath(listingId, path2)) throw httpError(400, "That file is not stored on this listing.");
+  }
+  const listing = await readListing(listingId);
+  const wanted = new Set(paths);
+  await patchListing(listingId, (data) => {
+    const images = imageList(data);
+    const found = images.filter((item) => {
+      const file = normalizeMediaFile(item);
+      return file && wanted.has(file.path);
+    }).length;
+    if (found !== paths.length) throw httpError(404, "One or more files were not found on this listing.");
+    return {
+      images: images.filter((item) => {
+        const file = normalizeMediaFile(item);
+        return !file || !wanted.has(file.path);
+      })
+    };
+  });
+  for (const path2 of paths) {
+    await deleteStorageObject(path2);
+    await removePlaytestGalleryItem(listingId, listing.data, path2);
+  }
+  return { deleted: paths };
+}
+async function copyListingObject(sourcePath, destPath, fileName, contentType) {
+  const source = bucket().file(sourcePath);
+  const [exists] = await source.exists();
+  if (!exists) throw httpError(400, "Uploaded file was not found in storage.");
+  const dest = bucket().file(destPath);
+  await source.copy(dest);
+  const [metadata] = await source.getMetadata();
+  const token = randomUUID();
+  const resolvedType = contentTypeForUpload(fileName, contentType || metadata.contentType);
+  await dest.setMetadata({
+    contentType: resolvedType,
+    metadata: { firebaseStorageDownloadTokens: token }
+  });
+  return {
+    url: firebaseDownloadUrl(bucket().name, destPath, token),
+    size: byteSize(metadata.size),
+    contentType: resolvedType
+  };
+}
+function withoutPaths(images, paths) {
+  return images.filter((item) => {
+    const file = normalizeMediaFile(item);
+    return !file || !paths.has(file.path);
+  });
+}
+async function moveListingFiles(options) {
+  const { sourceListingId, destinationListingId, paths, destinationStorageFolder, destinationFolderId, movedBy } = options;
+  if (!paths.length) throw httpError(400, "Choose at least one file.");
+  if (paths.some((path2) => !isListingStoragePath(sourceListingId, path2))) {
+    throw httpError(400, "That file is not stored on this listing.");
+  }
+  const source = await readListing(sourceListingId);
+  const destination = sourceListingId === destinationListingId ? source : await readListing(destinationListingId);
+  if (destinationFolderId && !normalizeMediaFolders(destination.data.mediaFolders).some((folder) => folder.id === destinationFolderId)) {
+    throw httpError(404, "Destination folder not found.");
+  }
+  const moved = [];
+  for (const path2 of paths) {
+    const currentSource = await readListing(sourceListingId);
+    const currentRaw = findRawImage(imageList(currentSource.data), path2);
+    if (!currentRaw) throw httpError(404, "One or more files were not found on this listing.");
+    const file = normalizeMediaFile(currentRaw);
+    const storageFolder = destinationFolderId ? file.storageFolder === "raw" ? "raw" : "photos" : destinationStorageFolder;
+    const plan = planFileMove({
+      file,
+      sourceListingId,
+      destinationListingId,
+      destinationStorageFolder: storageFolder
+    });
+    const base = currentRaw;
+    const nextRecord = {
+      ...base,
+      folderId: destinationFolderId || void 0
+    };
+    if (!destinationFolderId) delete nextRecord.folderId;
+    if (plan.mode === "metadata") {
+      await patchListing(sourceListingId, (data) => ({
+        images: imageList(data).map((item) => normalizeMediaFile(item)?.path === path2 ? nextRecord : item)
+      }));
+      moved.push({ from: path2, to: path2, listingId: destinationListingId });
+      continue;
+    }
+    const copied = await copyListingObject(path2, plan.nextPath, file.name, file.contentType);
+    const relocated = {
+      ...nextRecord,
+      id: randomUUID(),
+      url: copied.url,
+      path: plan.nextPath,
+      contentType: copied.contentType,
+      size: copied.size ?? file.size,
+      movedFrom: {
+        listingId: sourceListingId,
+        path: path2,
+        movedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        movedBy
+      }
+    };
+    try {
+      if (sourceListingId === destinationListingId) {
+        await patchListing(sourceListingId, (data) => ({
+          images: imageList(data).map((item) => normalizeMediaFile(item)?.path === path2 ? relocated : item)
+        }));
+      } else {
+        await db$5().runTransaction(async (tx) => {
+          const sourceSnap = await tx.get(listingRef(sourceListingId));
+          const destSnap = await tx.get(listingRef(destinationListingId));
+          if (!sourceSnap.exists || !destSnap.exists) throw httpError(404, "Listing not found.");
+          const sourceImages = imageList(sourceSnap.data() || {});
+          if (!findRawImage(sourceImages, path2)) throw httpError(404, "One or more files were not found on this listing.");
+          tx.update(listingRef(sourceListingId), {
+            images: withoutPaths(sourceImages, /* @__PURE__ */ new Set([path2])),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+          tx.update(listingRef(destinationListingId), {
+            images: [...imageList(destSnap.data() || {}), relocated],
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+        });
+      }
+    } catch (err) {
+      await deleteStorageObject(plan.nextPath);
+      throw err;
+    }
+    await deleteStorageObject(path2);
+    await removePlaytestGalleryItem(sourceListingId, currentSource.data, path2);
+    if (destination.data.playtest === true || destinationListingId !== sourceListingId) {
+      const destListing = destinationListingId === sourceListingId ? currentSource.data : destination.data;
+      await syncPlaytestGallery(destinationListingId, destListing, {
+        url: copied.url,
+        name: file.name,
+        path: plan.nextPath,
+        contentType: copied.contentType,
+        uploadedAt: file.uploadedAt || (/* @__PURE__ */ new Date()).toISOString(),
+        uploadedBy: file.uploadedBy || movedBy
+      });
+    }
+    moved.push({ from: path2, to: plan.nextPath, listingId: destinationListingId });
+  }
+  return {
+    moved,
+    limitation: "The file follows the destination listing. Client and photographer stay whatever is already set on that listing."
+  };
+}
+async function queueListingCubiCasa(listingId, paths, requestedBy) {
+  const listing = await readListing(listingId);
+  const files = imageList(listing.data).map((item) => normalizeMediaFile(item)).filter((file) => Boolean(file && paths.includes(file.path)));
+  if (!paths.length) throw httpError(400, "Choose at least one file.");
+  if (files.length !== paths.length) throw httpError(404, "One or more files were not found on this listing.");
+  for (const file of files) {
+    if (!isListingStoragePath(listingId, file.path)) throw httpError(400, "That file is not stored on this listing.");
+  }
+  const request = buildCubiCasaLibraryRequest({
+    listingId,
+    requestedBy,
+    files: files.map((file) => ({ name: file.name, path: file.path, url: file.url }))
+  });
+  const job = await db$5().collection("mediaJobs").add({
+    listingId,
+    orderId: listing.data.orderId || listing.data.orderRequestId || null,
+    provider: "cubicasa-manual",
+    preset: "floorplan_from_library",
+    notes: request.nextStep,
+    externalApiCalled: false,
+    apiConnected: false,
+    requirements: { source: "media-library", priority: "normal" },
+    mediaItems: files.map((file) => ({
+      id: file.id,
+      name: file.name,
+      url: file.url,
+      storagePath: file.path,
+      type: "photo",
+      status: "queued"
+    })),
+    status: "queued",
+    priority: "normal",
+    attempts: 0,
+    requiresHumanReview: true,
+    createdBy: requestedBy,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  await listing.ref.update({
+    cubiCasaImports: admin.firestore.FieldValue.arrayUnion({ ...request, mediaJobId: job.id }),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  return {
+    success: true,
+    mode: "manual_queue",
+    apiConnected: false,
+    jobId: job.id,
+    nextStep: request.nextStep
+  };
+}
+async function queueListingAiEdit(listingId, paths, requestedBy) {
+  const listing = await readListing(listingId);
+  const files = imageList(listing.data).map((item) => normalizeMediaFile(item)).filter((file) => Boolean(file && paths.includes(file.path)));
+  if (!paths.length) throw httpError(400, "Choose at least one file.");
+  if (files.length !== paths.length) throw httpError(404, "One or more files were not found on this listing.");
+  for (const file of files) {
+    if (!isListingStoragePath(listingId, file.path)) throw httpError(400, "That file is not stored on this listing.");
+  }
+  const provider = process.env.AI_PHOTO_PROVIDER || "aicon";
+  const job = await db$5().collection("mediaJobs").add({
+    listingId,
+    orderId: listing.data.orderId || listing.data.orderRequestId || null,
+    provider,
+    preset: "real_estate_standard",
+    notes: AI_EDIT_QUEUE_NOTE,
+    externalApiCalled: false,
+    requirements: { source: "media-library", priority: "normal" },
+    mediaItems: files.map((file) => ({
+      id: file.id,
+      name: file.name,
+      url: file.url,
+      storagePath: file.path,
+      type: file.contentType.startsWith("video/") ? "video" : "photo",
+      status: "queued"
+    })),
+    status: "queued",
+    priority: "normal",
+    attempts: 0,
+    requiresHumanReview: true,
+    createdBy: requestedBy,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  await db$5().collection("agentLogs").add({
+    agent: "aicon-editor",
+    action: "Media job queued",
+    summary: `${files.length} library file(s) queued for ${provider}`,
+    status: "queued",
+    relatedId: job.id,
+    relatedType: "mediaJob",
+    priority: "normal",
+    requiresHumanReview: true,
+    details: AI_EDIT_QUEUE_NOTE,
+    createdAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  return {
+    success: true,
+    mode: "internal_queue",
+    apiConnected: false,
+    provider,
+    jobId: job.id,
+    nextStep: AI_EDIT_QUEUE_NOTE
+  };
 }
 const router$6 = Router();
 const db$4 = () => admin.firestore();
@@ -3774,7 +4263,8 @@ router$6.post("/:id/photos", requirePhotographer, async (req, res) => {
         fileName,
         contentType: saved.contentType,
         uploadedBy: req.user.uid,
-        existingUrl: saved.url
+        existingUrl: saved.url,
+        size: bytes.length
       });
       return res.status(201).json({ success: true, ...registered2 });
     }
@@ -3787,11 +4277,100 @@ router$6.post("/:id/photos", requirePhotographer, async (req, res) => {
       storagePath,
       fileName,
       contentType: req.body?.contentType,
-      uploadedBy: req.user.uid
+      uploadedBy: req.user.uid,
+      size: byteSize(req.body?.size)
     });
     return res.status(201).json({ success: true, ...registered });
   } catch (err) {
     return sendKnownError(res, err, "Failed to save the uploaded photo.");
+  }
+});
+function pathsFrom(body) {
+  const raw = body || {};
+  const list = Array.isArray(raw.paths) ? raw.paths : raw.path ? [raw.path] : [];
+  return [...new Set(list.filter((item) => typeof item === "string" && item.trim().length > 0))];
+}
+router$6.post("/:id/media/folders", requirePhotographer, async (req, res) => {
+  if (!adminReady(res)) return;
+  try {
+    await assertListingAccess(req, req.params.id);
+    const folder = await createListingMediaFolder(req.params.id, req.body?.name, req.user.uid);
+    return res.status(201).json({ folder });
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to create the folder.");
+  }
+});
+router$6.post("/:id/media/folders/delete", requirePhotographer, async (req, res) => {
+  if (!adminReady(res)) return;
+  try {
+    await assertListingAccess(req, req.params.id);
+    const folderId = typeof req.body?.folderId === "string" ? req.body.folderId : "";
+    const result = await deleteListingMediaFolder(req.params.id, folderId);
+    return res.json(result);
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to delete the folder.");
+  }
+});
+router$6.post("/:id/media/files/delete", requirePhotographer, async (req, res) => {
+  if (!adminReady(res)) return;
+  try {
+    await assertListingAccess(req, req.params.id);
+    const result = await deleteListingFiles(req.params.id, pathsFrom(req.body));
+    return res.json(result);
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to delete the file.");
+  }
+});
+router$6.post("/:id/media/files/folder", requirePhotographer, async (req, res) => {
+  if (!adminReady(res)) return;
+  try {
+    await assertListingAccess(req, req.params.id);
+    const folderId = typeof req.body?.folderId === "string" ? req.body.folderId : null;
+    const result = await assignListingFiles(req.params.id, pathsFrom(req.body), folderId);
+    return res.json(result);
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to move the file into that folder.");
+  }
+});
+router$6.post("/:id/media/files/move", requireCoordinator, async (req, res) => {
+  if (!adminReady(res)) return;
+  try {
+    const destinationListingId = typeof req.body?.destinationListingId === "string" ? req.body.destinationListingId : "";
+    if (!destinationListingId) return res.status(400).json({ error: "Choose a destination listing." });
+    await assertListingAccess(req, req.params.id);
+    await assertListingAccess(req, destinationListingId);
+    const storageFolder = req.body?.destinationStorageFolder === "raw" ? "raw" : "photos";
+    const result = await moveListingFiles({
+      sourceListingId: req.params.id,
+      destinationListingId,
+      paths: pathsFrom(req.body),
+      destinationStorageFolder: storageFolder,
+      destinationFolderId: typeof req.body?.destinationFolderId === "string" ? req.body.destinationFolderId : null,
+      movedBy: req.user.uid
+    });
+    return res.json(result);
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to move the file.");
+  }
+});
+router$6.post("/:id/media/cubicasa", requireStaff, async (req, res) => {
+  if (!adminReady(res)) return;
+  try {
+    await assertListingAccess(req, req.params.id);
+    const result = await queueListingCubiCasa(req.params.id, pathsFrom(req.body), req.user.uid);
+    return res.status(201).json(result);
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to queue the CubiCasa request.");
+  }
+});
+router$6.post("/:id/media/ai-edit", requireStaff, async (req, res) => {
+  if (!adminReady(res)) return;
+  try {
+    await assertListingAccess(req, req.params.id);
+    const result = await queueListingAiEdit(req.params.id, pathsFrom(req.body), req.user.uid);
+    return res.status(201).json(result);
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to queue the edit.");
   }
 });
 const router$5 = Router();
@@ -4892,9 +5471,13 @@ const handleListingPhotoUpload = async (req, res) => {
     });
     const url = `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/${encodeURIComponent(objectPath)}?alt=media&token=${token}`;
     const image = {
+      id: randomUUID(),
       url,
       name: fileName,
       path: objectPath,
+      contentType: "image/jpeg",
+      size: body.length,
+      folderId: null,
       uploadedAt: (/* @__PURE__ */ new Date()).toISOString(),
       uploadedBy: req.user?.uid || "staff"
     };

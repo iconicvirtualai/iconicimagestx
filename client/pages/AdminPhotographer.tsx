@@ -1,13 +1,13 @@
 import * as React from "react";
-import { useNavigate } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
+import MediaLibrary from "@/components/MediaLibrary";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  Calendar, Clock, MapPin, Camera, Upload, CheckCircle,
-  AlertCircle, DollarSign, MessageSquare, ChevronRight, Star,
+  Calendar, Clock, MapPin, Upload,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { fetchAssignedListings, uploadListingFile } from "@/lib/listingUpload";
+import { canPreviewImage, normalizeMediaFiles } from "@shared/mediaLibrary";
 import { toast } from "sonner";
 
 function fmtAddr(a: any): string {
@@ -36,7 +36,7 @@ const labelCls = "text-[10px] font-black text-gray-400 uppercase tracking-widest
 
 export default function AdminPhotographer() {
   const { user, staffProfile } = useAuth();
-  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [assignments, setAssignments] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [activeTab, setActiveTab] = React.useState<"today" | "upcoming" | "past" | "uploads" | "revenue">("today");
@@ -44,6 +44,8 @@ export default function AdminPhotographer() {
   const [uploadProgress, setUploadProgress] = React.useState(0);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [selectedProject, setSelectedProject] = React.useState<string | null>(null);
+  const [libraryJobId, setLibraryJobId] = React.useState<string>("");
+  const canMove = staffProfile?.role === "admin" || staffProfile?.role === "coordinator";
 
   const loadAssignments = React.useCallback(async () => {
     if (!user) {
@@ -64,6 +66,15 @@ export default function AdminPhotographer() {
   React.useEffect(() => {
     loadAssignments();
   }, [loadAssignments]);
+
+  React.useEffect(() => {
+    if (searchParams.get("tab") === "uploads") setActiveTab("uploads");
+  }, [searchParams]);
+
+  const openLibrary = (jobId: string) => {
+    setLibraryJobId(jobId);
+    setActiveTab("uploads");
+  };
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
@@ -103,7 +114,8 @@ export default function AdminPhotographer() {
         });
         completed++;
       }
-      toast.success(fileArray.length + " file(s) uploaded!");
+      toast.success(fileArray.length + " file(s) uploaded. They are in this job's library.");
+      openLibrary(projectId);
       await loadAssignments();
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Upload failed.");
@@ -141,6 +153,20 @@ export default function AdminPhotographer() {
         {services && <div className="mb-3"><p className={labelCls}>Services</p><p className="text-xs font-bold">{services}</p></div>}
         {job.accessInfo && <div className="mb-3 p-2 bg-yellow-50 rounded-lg"><p className={labelCls}>Access</p><p className="text-xs font-bold">{job.accessInfo}</p></div>}
         {job.notes && <div className="mb-3"><p className={labelCls}>Notes</p><p className="text-xs text-gray-600">{job.notes}</p></div>}
+        {(job.images || []).length > 0 && (
+          <div className="mb-3">
+            <p className={labelCls}>{(job.images || []).length} files on this job</p>
+            <div className="flex gap-2 mt-2 overflow-x-auto">
+              {normalizeMediaFiles(job.images).slice(0, 6).map((file) => (
+                canPreviewImage(file) && file.url ? (
+                  <img key={file.path || file.id} src={file.url} alt={file.name} className="w-14 h-14 rounded-lg object-cover bg-gray-100 flex-shrink-0" />
+                ) : (
+                  <div key={file.path || file.id} className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center text-[8px] font-black text-gray-400 flex-shrink-0 px-1 text-center">FILE</div>
+                )
+              ))}
+            </div>
+          </div>
+        )}
         <div className="flex gap-2 mt-3">
           <a href={`https://maps.google.com/?q=${encodeURIComponent(fmtAddr(job.address || job.shootLocation))}`} target="_blank" rel="noopener noreferrer"
             className="flex items-center gap-1.5 px-3 py-2 bg-[#0d9488]/10 text-[#0d9488] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#0d9488]/20">
@@ -152,6 +178,10 @@ export default function AdminPhotographer() {
               <Upload className="w-3.5 h-3.5" /> Upload Photos
             </button>
           )}
+          <button onClick={() => openLibrary(job.id)}
+            className="flex items-center gap-1.5 px-3 py-2 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest">
+            View files
+          </button>
         </div>
       </div>
     );
@@ -233,19 +263,49 @@ export default function AdminPhotographer() {
           {/* UPLOADS */}
           {activeTab === "uploads" && (
             <div className="space-y-4">
-              <p className="text-xs text-gray-500 mb-4">Select a project to upload RAW photos. Files will be automatically sorted and sent to the editing pipeline.</p>
-              {assignments.filter(a => a.status !== "archived").map(a => (
-                <div key={a.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-bold">{fmtAddr(a.address || a.shootLocation)}</p>
-                    <p className="text-xs text-gray-400">{fmtDate(a.apptDate)} &middot; {(a.images || []).length} photos uploaded</p>
-                  </div>
-                  <button onClick={() => { setSelectedProject(a.id); fileInputRef.current?.click(); }}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-[#0d9488] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#0f766e]">
-                    <Upload className="w-3.5 h-3.5" /> Upload
-                  </button>
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col sm:flex-row sm:items-end gap-3">
+                <div className="flex-1">
+                  <label htmlFor="library-job" className={labelCls}>Job library</label>
+                  <select
+                    id="library-job"
+                    value={libraryJobId || assignments[0]?.id || ""}
+                    onChange={(event) => setLibraryJobId(event.target.value)}
+                    className="mt-2 w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold"
+                  >
+                    {assignments.filter(a => a.status !== "archived").map((job) => (
+                      <option key={job.id} value={job.id}>{fmtAddr(job.address || job.shootLocation)} · {(job.images || []).length} files</option>
+                    ))}
+                  </select>
                 </div>
-              ))}
+                <button
+                  onClick={() => {
+                    const jobId = libraryJobId || assignments[0]?.id;
+                    if (!jobId) return;
+                    setSelectedProject(jobId);
+                    fileInputRef.current?.click();
+                  }}
+                  className="flex items-center justify-center gap-1.5 px-4 py-2 bg-[#0d9488] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#0f766e]"
+                >
+                  <Upload className="w-3.5 h-3.5" /> Upload
+                </button>
+              </div>
+              {(() => {
+                const jobId = libraryJobId || assignments[0]?.id;
+                const job = assignments.find((item) => item.id === jobId);
+                if (!job) {
+                  return <p className="text-sm font-bold text-gray-400 uppercase tracking-widest text-center py-16">No jobs yet</p>;
+                }
+                return (
+                  <MediaLibrary
+                    listing={job}
+                    destinations={assignments}
+                    canMove={canMove}
+                    canOrganize
+                    onChanged={loadAssignments}
+                    onUploadClick={() => { setSelectedProject(job.id); fileInputRef.current?.click(); }}
+                  />
+                );
+              })()}
             </div>
           )}
 
