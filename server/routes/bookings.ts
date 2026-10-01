@@ -11,6 +11,10 @@ import { sendEmail } from "../services/email";
 import { sendSMS, SMS_TEMPLATES } from "../services/sms";
 import { createCalendarBookingEvent } from "../services/calendar";
 import { lifeOfTheListingCareSelected } from "../../shared/lifeOfTheListingCare";
+import { buildBookingInvoiceDraft, existingInvoiceId } from "../../shared/bookingInvoice";
+import { orderTotalLabel } from "../../shared/bookingPricing";
+import { normalizeEmail } from "../../shared/listingAccess";
+import { attachSquareInvoiceAfterBooking } from "../services/squareInvoices";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -45,7 +49,7 @@ function toDate(value: unknown): Date | null {
 }
 
 function money(value: unknown): string {
-  return `$${(Number(value) || 0).toFixed(2)}`;
+  return orderTotalLabel(value);
 }
 
 // ─── POST /api/bookings — Public booking form submission ────────────────────
@@ -144,6 +148,32 @@ router.post("/", async (req, res) => {
 
     const docRef = await db().collection("orderRequests").add(orderRequest);
 
+    let invoiceId: string | null = null;
+    try {
+      const created = await createBookingInvoiceDraft({
+        orderRequestId: docRef.id,
+        email,
+        clientName,
+        lineItems,
+        pricing,
+        total,
+        promoCode,
+        promoDiscount,
+      });
+      invoiceId = created.invoiceId;
+      try {
+        await docRef.update({
+          invoiceId: created.invoiceId,
+          ...(created.clientId ? { clientId: created.clientId } : {}),
+        });
+      } catch (linkErr) {
+        console.error("[Bookings] Invoice link update failed:", linkErr);
+      }
+    } catch (err) {
+      console.error("[Bookings] Invoice draft create failed:", err);
+      invoiceId = null;
+    }
+
     // Build access info line for emails
     const accessLine = accessMethod
       ? `${accessMethod}${lockboxCode ? ` — Code: ${lockboxCode}` : ""}`
@@ -219,9 +249,20 @@ router.post("/", async (req, res) => {
       }).catch((err) => console.error("[Bookings] Admin SMS alert failed:", err));
     }
 
+    // Square is best-effort after the emailed total is already fixed.
+    // A timeout or API error must not fail the booking or change that total.
+    if (invoiceId) {
+      try {
+        await attachSquareInvoiceAfterBooking(invoiceId);
+      } catch (err) {
+        console.error("[Bookings] Square invoice sync failed:", err);
+      }
+    }
+
     return res.status(201).json({
       success: true,
       requestId: docRef.id,
+      invoiceId,
       message: "Booking request received. We'll confirm shortly!",
     });
   } catch (err) {
@@ -284,6 +325,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
         success: true,
         orderId: request.convertedToOrderId,
         clientId: request.clientId || null,
+        invoiceId: existingInvoiceId(request.invoiceId),
         message: "Booking was already confirmed.",
       });
     }
@@ -465,33 +507,49 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       ]);
     }
 
-    // Create Invoice draft
-    const invoiceRef = await db().collection("invoices").add({
-      orderId: orderRef.id,
-      clientId,
-      galleryId: galleryRef.id,
-      clientName: requestClientName,
-      clientEmail: requestEmail,
-      invoiceNumber: await generateInvoiceNumber(),
-      lineItems: requestLineItems,
-      subtotal: request.pricing?.subtotal || requestTotal,
-      tax: request.pricing?.tax || 0,
-      total: requestTotal,
-      amountPaid: 0,
-      amountDue: requestTotal,
-      status: "draft",
-      paymentProvider: "square",
-      paymentUrl: `${appUrl()}/invoice/${orderRef.id}`,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    await invoiceRef.update({
-      paymentUrl: `${appUrl()}/invoice/${invoiceRef.id}`,
-    });
+    const linkedInvoiceId = existingInvoiceId(request.invoiceId);
+    let invoiceId = linkedInvoiceId;
+    if (linkedInvoiceId) {
+      const existingInvoice = await db().collection("invoices").doc(linkedInvoiceId).get();
+      if (existingInvoice.exists) {
+        await existingInvoice.ref.update({
+          orderId: orderRef.id,
+          clientId,
+          galleryId: galleryRef.id,
+          clientName: requestClientName,
+          clientEmail: requestEmail,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } else {
+        console.error(`[Bookings] Confirm kept invoiceId ${linkedInvoiceId} but the invoice doc is missing. Not creating a second invoice.`);
+      }
+    } else {
+      const invoiceRef = db().collection("invoices").doc();
+      const draft = buildBookingInvoiceDraft({
+        lineItems: requestLineItems,
+        total: requestTotal,
+        pricing: request.pricing,
+        clientEmail: requestEmail,
+        clientId,
+        clientName: requestClientName,
+        orderRequestId: req.params.id,
+        promoCode: request.promoCode,
+        promoDiscount: request.promoDiscount,
+      });
+      await invoiceRef.set({
+        ...draft,
+        orderId: orderRef.id,
+        galleryId: galleryRef.id,
+        invoiceNumber: await generateInvoiceNumber(),
+        paymentUrl: `${appUrl()}/invoice/${invoiceRef.id}`,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      invoiceId = invoiceRef.id;
+    }
 
     await galleryRef.update({
-      invoiceId: invoiceRef.id,
+      invoiceId,
       deliveryUrl: `${appUrl()}/gallery/${galleryRef.id}`,
     });
 
@@ -501,7 +559,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       convertedToOrderId: orderRef.id,
       clientId,
       galleryId: galleryRef.id,
-      invoiceId: invoiceRef.id,
+      invoiceId,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
@@ -520,10 +578,19 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       },
     }).catch((err) => console.error("[Bookings] Confirmation email failed:", err));
 
+    if (invoiceId) {
+      try {
+        await attachSquareInvoiceAfterBooking(invoiceId);
+      } catch (err) {
+        console.error("[Bookings] Square invoice sync failed:", err);
+      }
+    }
+
     return res.json({
       success: true,
       orderId: orderRef.id,
       clientId,
+      invoiceId,
       message: "Booking confirmed and order created.",
     });
   } catch (err) {
@@ -553,6 +620,51 @@ router.patch("/:id/decline", requireCoordinator, async (req, res) => {
 });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────────────────
+
+async function linkClientIdByEmail(email: string): Promise<string | null> {
+  try {
+    const normalized = normalizeEmail(email);
+    if (!normalized) return null;
+    const snap = await db().collection("clients").where("email", "==", normalized).limit(1).get();
+    return snap.empty ? null : snap.docs[0].id;
+  } catch (err) {
+    console.error("[Bookings] Client lookup for invoice failed:", err);
+    return null;
+  }
+}
+
+async function createBookingInvoiceDraft(input: {
+  orderRequestId: string;
+  email: string;
+  clientName: string;
+  lineItems: unknown;
+  pricing: { subtotal?: unknown; tax?: unknown } | null | undefined;
+  total: unknown;
+  promoCode?: string | null;
+  promoDiscount?: unknown;
+}): Promise<{ invoiceId: string; clientId: string | null }> {
+  const clientId = await linkClientIdByEmail(input.email);
+  const draft = buildBookingInvoiceDraft({
+    lineItems: input.lineItems,
+    total: input.total,
+    pricing: input.pricing,
+    clientEmail: input.email,
+    clientId,
+    clientName: input.clientName,
+    orderRequestId: input.orderRequestId,
+    promoCode: input.promoCode,
+    promoDiscount: input.promoDiscount,
+  });
+  const invoiceRef = db().collection("invoices").doc();
+  await invoiceRef.set({
+    ...draft,
+    invoiceNumber: await generateInvoiceNumber(),
+    paymentUrl: `${appUrl()}/invoice/${invoiceRef.id}`,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return { invoiceId: invoiceRef.id, clientId };
+}
 
 async function generateInvoiceNumber(): Promise<string> {
   const year = new Date().getFullYear();

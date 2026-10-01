@@ -13,7 +13,10 @@ import {
 } from "firebase/firestore";
 import { toast } from "sonner";
 import { listingAppointmentDate } from "@shared/listingWrite";
+import { separatePromoDiscount } from "@shared/bookingPricing";
 import { linkOrderToListing, resolvePortalClientId } from "@/lib/listingClient";
+import { deliverInvoiceEmail } from "@/lib/deliverInvoice";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   markScheduledAppointmentConfirmed,
   upsertScheduledAppointment,
@@ -122,6 +125,7 @@ function Field({ label, value, editing, editValue, onChange, type = "text", span
 export default function AdminOrderRequest() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [order, setOrder] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [editing, setEditing] = React.useState(false);
@@ -131,6 +135,7 @@ export default function AdminOrderRequest() {
   const [schedDate, setSchedDate] = React.useState("");
   const [schedTime, setSchedTime] = React.useState("");
   const [showCancel, setShowCancel] = React.useState(false);
+  const [sendingReceipt, setSendingReceipt] = React.useState(false);
   const [staff, setStaff] = React.useState<any[]>([]);
   const [selectedProviders, setSelectedProviders] = React.useState<string[]>([]);
   const [projectTypeChoice, setProjectTypeChoice] = React.useState<"real_estate" | "business">("real_estate");
@@ -297,6 +302,37 @@ export default function AdminOrderRequest() {
     toast.success("Cancelled."); setShowCancel(false); navigate("/admin/orders");
   };
 
+  const handleViewInvoice = () => {
+    const invoiceId = typeof order?.invoiceId === "string" ? order.invoiceId : "";
+    if (!invoiceId) {
+      toast.error("No invoice is attached to this request yet.");
+      return;
+    }
+    navigate(`/invoice/${invoiceId}`);
+  };
+
+  const handleSendReceipt = async () => {
+    const invoiceId = typeof order?.invoiceId === "string" ? order.invoiceId : "";
+    if (!invoiceId) {
+      toast.error("No invoice is attached to this request yet.");
+      return;
+    }
+    if (!user) {
+      toast.error("Please sign in again.");
+      return;
+    }
+    setSendingReceipt(true);
+    try {
+      const token = await user.getIdToken();
+      const action = await deliverInvoiceEmail(invoiceId, token);
+      toast.success(action === "payment_receipt" ? "Receipt sent to the client." : "Pay link sent to the client.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not send.");
+    } finally {
+      setSendingReceipt(false);
+    }
+  };
+
   if (loading) return <AdminLayout title="Order Request"><div className="flex items-center justify-center py-32"><div className="w-8 h-8 border-4 border-[#0d9488] border-t-transparent rounded-full animate-spin" /></div></AdminLayout>;
   if (!order) return null;
 
@@ -306,6 +342,7 @@ export default function AdminOrderRequest() {
   const orderTotal = Number(order.total) || Number(order.pricing?.total) || 0;
   const subtotal = Number(order.pricing?.subtotal) || orderTotal;
   const promoDiscount = Number(order.promoDiscount) || 0;
+  const extraPromo = separatePromoDiscount(lineItems, promoDiscount);
   const clientName = order.clientName || `${order.firstName || ""} ${order.lastName || ""}`.trim() || "—";
   const f = (key: string) => form[key] ?? order[key] ?? "";
   const setF = (key: string) => (val: string) => setForm((prev: any) => ({ ...prev, [key]: val }));
@@ -409,10 +446,10 @@ export default function AdminOrderRequest() {
                     <span className="text-sm font-black text-gray-500 shrink-0">{LIFE_OF_THE_LISTING_CARE_PRICE_LABEL}</span>
                   </div>
                 )}
-                {promoDiscount > 0 && (
+                {extraPromo > 0 && (
                   <div className="flex justify-between items-center px-4 py-3 border-t border-gray-200/50 bg-green-50/50">
                     <span className="text-sm font-bold text-gray-500 italic">Promo ({order.promoCode})</span>
-                    <span className="text-sm font-bold text-green-600">-{fmtCurrency(promoDiscount)}</span>
+                    <span className="text-sm font-bold text-green-600">-{fmtCurrency(extraPromo)}</span>
                   </div>
                 )}
                 <div className="bg-white border-t border-gray-200 px-4 py-4 flex justify-between items-center">
@@ -464,10 +501,10 @@ export default function AdminOrderRequest() {
                 )}
               </div>
             )}
-            {promoDiscount > 0 && (
+            {extraPromo > 0 && (
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-gray-400">Promo</span>
-                <span className="text-green-600 font-bold">-{fmtCurrency(promoDiscount)}</span>
+                <span className="text-green-600 font-bold">-{fmtCurrency(extraPromo)}</span>
               </div>
             )}
             <div className="border-t border-gray-100 pt-3 mt-2">
@@ -484,8 +521,8 @@ export default function AdminOrderRequest() {
               )}
             </div>
             <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
-              <Button variant="outline" className="w-full rounded-xl text-xs font-bold justify-center text-black"><Eye className="w-3.5 h-3.5 mr-1.5" /> View Invoice</Button>
-              <Button variant="outline" className="w-full rounded-xl text-xs font-bold justify-center text-black"><Send className="w-3.5 h-3.5 mr-1.5" /> Send Receipt</Button>
+              <Button type="button" onClick={handleViewInvoice} variant="outline" className="w-full rounded-xl text-xs font-bold justify-center text-black"><Eye className="w-3.5 h-3.5 mr-1.5" /> View Invoice</Button>
+              <Button type="button" onClick={handleSendReceipt} disabled={sendingReceipt} variant="outline" className="w-full rounded-xl text-xs font-bold justify-center text-black"><Send className="w-3.5 h-3.5 mr-1.5" /> {sendingReceipt ? "Sending..." : "Send Receipt"}</Button>
             </div>
           </div>
 

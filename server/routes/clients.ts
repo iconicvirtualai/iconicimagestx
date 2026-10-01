@@ -144,6 +144,19 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
     const seenGallery = new Set<string>();
     const seenInvoice = new Set<string>();
     const seenProject = new Set<string>();
+    const pushInvoice = (entry: FirebaseFirestore.QueryDocumentSnapshot) => {
+      if (seenInvoice.has(entry.id)) return;
+      seenInvoice.add(entry.id);
+      const data = entry.data();
+      invoices.push({
+        id: entry.id,
+        invoiceNumber: data.invoiceNumber || entry.id,
+        status: data.status || "draft",
+        total: data.total || 0,
+        amountDue: data.amountDue ?? data.total ?? 0,
+        href: `/invoice/${entry.id}`,
+      });
+    };
 
     for (const clientId of identity.ids) {
       const [gallerySnap, invoiceSnap, projectSnap] = await Promise.all([
@@ -163,19 +176,7 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
           href: `/gallery/${doc.id}`,
         });
       }
-      for (const doc of invoiceSnap.docs) {
-        if (seenInvoice.has(doc.id)) continue;
-        seenInvoice.add(doc.id);
-        const data = doc.data();
-        invoices.push({
-          id: doc.id,
-          invoiceNumber: data.invoiceNumber || doc.id,
-          status: data.status || "draft",
-          total: data.total || 0,
-          amountDue: data.amountDue ?? data.total ?? 0,
-          href: `/invoice/${doc.id}`,
-        });
-      }
+      invoiceSnap.docs.forEach(pushInvoice);
       for (const doc of projectSnap.docs) {
         if (seenProject.has(doc.id)) continue;
         seenProject.add(doc.id);
@@ -223,6 +224,15 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
       }
     } catch (orderErr) {
       console.error("[Clients] Order lookup failed:", orderErr);
+    }
+
+    if (identity.email) {
+      try {
+        const byInvoiceEmail = await db().collection("invoices").where("clientEmail", "==", identity.email).limit(20).get();
+        byInvoiceEmail.docs.forEach(pushInvoice);
+      } catch (invoiceErr) {
+        console.error("[Clients] Invoice email lookup failed:", invoiceErr);
+      }
     }
 
     if (identity.email) {

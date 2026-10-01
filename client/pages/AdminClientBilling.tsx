@@ -1,6 +1,8 @@
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
+import { useAuth } from "@/contexts/AuthContext";
+import { deliverInvoiceEmail } from "@/lib/deliverInvoice";
 import { Search, DollarSign, Send, Eye, Plus, FileText, ChevronDown, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
@@ -30,6 +32,8 @@ const labelCls = "text-[10px] font-black text-gray-400 uppercase tracking-widest
 
 export default function AdminClientBilling() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [sendingId, setSendingId] = React.useState<string | null>(null);
   const [orders, setOrders] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState("");
@@ -56,6 +60,7 @@ export default function AdminClientBilling() {
       const status = inv.status || (paid >= total && total > 0 ? "paid" : total > 0 ? "draft" : "draft");
       return {
         orderId: o.id,
+        invoiceId: typeof o.invoiceId === "string" ? o.invoiceId : "",
         invoiceNumber: inv.invoiceNumber || `INV-${(o.id || "").substring(0, 6).toUpperCase()}`,
         clientName: safe(o.clientName || o.customerName || `${o.firstName || ""} ${o.lastName || ""}`.trim()),
         clientEmail: o.email || o.clientEmail || "",
@@ -86,6 +91,35 @@ export default function AdminClientBilling() {
     overdue: invoices.filter(i => i.status === "overdue").reduce((s, i) => s + i.due, 0),
     count: invoices.length,
   }), [invoices]);
+
+  const openInvoice = (invoiceId: string) => {
+    if (!invoiceId) {
+      toast.error("No invoice is attached to this request yet.");
+      return;
+    }
+    navigate(`/invoice/${invoiceId}`);
+  };
+
+  const sendInvoice = async (invoiceId: string) => {
+    if (!invoiceId) {
+      toast.error("No invoice is attached to this request yet.");
+      return;
+    }
+    if (!user) {
+      toast.error("Please sign in again.");
+      return;
+    }
+    setSendingId(invoiceId);
+    try {
+      const token = await user.getIdToken();
+      const action = await deliverInvoiceEmail(invoiceId, token);
+      toast.success(action === "payment_receipt" ? "Receipt sent to the client." : "Pay link sent to the client.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not send.");
+    } finally {
+      setSendingId(null);
+    }
+  };
 
   const handleAddItem = () => setNewInv(f => ({ ...f, items: [...f.items, { name: "", price: 0 }] }));
   const handleRemoveItem = (idx: number) => setNewInv(f => ({ ...f, items: f.items.filter((_, i) => i !== idx) }));
@@ -197,8 +231,8 @@ export default function AdminClientBilling() {
                     <td className="py-3 px-4"><span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${st.color}`}>{st.label}</span></td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
-                        <button className="p-1.5 hover:bg-gray-100 rounded-lg" title="View"><Eye className="w-3.5 h-3.5 text-gray-400" /></button>
-                        <button className="p-1.5 hover:bg-gray-100 rounded-lg" title="Send"><Send className="w-3.5 h-3.5 text-gray-400" /></button>
+                        <button type="button" className="p-1.5 hover:bg-gray-100 rounded-lg" title="View invoice" aria-label="View invoice" onClick={() => openInvoice(inv.invoiceId)}><Eye className="w-3.5 h-3.5 text-gray-400" /></button>
+                        <button type="button" className="p-1.5 hover:bg-gray-100 rounded-lg disabled:opacity-50" title="Send receipt" aria-label="Send receipt" disabled={sendingId === inv.invoiceId} onClick={() => sendInvoice(inv.invoiceId)}><Send className="w-3.5 h-3.5 text-gray-400" /></button>
                       </div>
                     </td>
                   </tr>
