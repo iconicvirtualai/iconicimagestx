@@ -134,13 +134,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           clientId = clientDoc.id;
         }
       } catch (err) {
+        // permission-denied is "could not read clients/{uid}", not a resolved
+        // empty profile. Rules must allow that own-doc read or a real client
+        // is classified as not-a-client. Other errors still fail the load.
         if (!isPermissionDenied(err)) throw err;
       }
     }
 
     const classified = sessionFromProfiles({
       staff: staffRecord,
-      hasClient: clientData != null,
+      client: clientData as { status?: unknown; portalAccess?: unknown } | null,
     });
     const applied = commitSession({
       type: "profiles-resolved",
@@ -174,8 +177,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Same turn as setUser: loading stays true until profiles resolve, so
-      // AdminLogin cannot treat this user as non-staff before the staff doc read.
+      // Same turn as setUser: loading stays true until staff and client
+      // profile reads settle, so login cannot treat this user as signed-out
+      // or not-a-client while clients/{uid} is still in flight.
       setUser(firebaseUser);
       commitSession({ type: "signed-in", userId: firebaseUser.uid });
 
@@ -263,6 +267,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = async () => {
     if (!auth.currentUser) return;
+    commitSession({ type: "signed-in", userId: auth.currentUser.uid });
     await loadProfiles(auth.currentUser);
   };
 
@@ -300,6 +305,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (auth.currentUser) {
+        commitSession({ type: "signed-in", userId: auth.currentUser.uid });
         await loadProfiles(auth.currentUser);
       } else {
         await signInWithEmailAndPassword(auth, normalizedEmail, password);

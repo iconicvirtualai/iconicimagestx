@@ -50,9 +50,11 @@ service cloud.firestore {
 
     // ─── Client Collections ──────────────────────────────────────────────────
 
-    // Clients: staff can read/write, client can read their own record
+    // Clients: staff can read/write, client can read their own record.
+    // Owner check is first so a staff-rule error cannot deny clients/{uid}
+    // during portal login. Other clients' documents stay staff-only.
     match /clients/{clientId} {
-      allow read: if isStaff() || isClientOwner(clientId);
+      allow read: if isClientOwner(clientId) || isStaff();
       allow create, update: if isCoordinator();
       allow delete: if isAdmin();
     }
