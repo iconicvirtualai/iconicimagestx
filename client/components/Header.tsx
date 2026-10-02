@@ -25,10 +25,9 @@ export default function Header() {
 
   const menuItems = [
     { label: "About", href: "/about" },
-    { label: "Resources", href: "/insights" },
     { label: "Pricing", href: "/pricing" },
     { label: "Studio 105", href: "/studio-105" },
-    { label: "Stock Footage", href: "/stock-footage" },
+    { label: "Portfolio", href: "/portfolio" },
     { label: "Contact Us", href: "/contact" },
   ];
 

@@ -12,7 +12,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -26,7 +26,6 @@ import Book from "./pages/Book";
 import Pricing from "./pages/Pricing";
 import PricingV1 from "./pages/PricingV1";
 import AIPricingAssistant from "./pages/AIPricingAssistant";
-import Insights from "./pages/Insights";
 import Socials from "./pages/Socials";
 import AgentLandingPage from "./pages/AgentLandingPage";
 import Privacy from "./pages/Privacy";
@@ -36,8 +35,6 @@ import ClientInvoice from "./pages/ClientInvoice";
 import PublicGallery from "./pages/PublicGallery";
 import ListingPresentation from "./pages/ListingPresentation";
 import VirtualStaging from "./pages/VirtualStaging";
-import Prep from "./pages/Prep";
-import StockFootage from "./pages/StockFootage";
 import VirtualStagingSelection from "./pages/VirtualStagingSelection";
 import VirtualStagingAITool from "./pages/VirtualStagingAITool";
 import VirtualStagingProOrder from "./pages/VirtualStagingProOrder";
@@ -90,9 +87,10 @@ const App = () => (
             <Route path="/pricing-v1" element={<PricingV1 />} />
             <Route path="/socials" element={<Socials />} />
             <Route path="/agents" element={<AgentLandingPage />} />
-            <Route path="/insights" element={<Insights />} />
-            <Route path="/insights/prep" element={<Prep />} />
-            <Route path="/stock-footage" element={<StockFootage />} />
+            {/* Resources and stock library stay off the public site until real packs exist. */}
+            <Route path="/insights" element={<Navigate to="/" replace />} />
+            <Route path="/insights/prep" element={<Navigate to="/" replace />} />
+            <Route path="/stock-footage" element={<Navigate to="/" replace />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             {/* Shirt QR destination. /go/ matches here too (trailing slash is ignored). */}
