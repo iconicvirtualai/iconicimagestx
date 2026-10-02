@@ -82,6 +82,11 @@ export default function HomepageBlazeLoop({ slots = HOMEPAGE_BLAZE_LOOP }: Props
     }
 
     const video = videoRef.current;
+    let watchdog = 0;
+    const arm = (delay: number) => {
+      window.clearTimeout(watchdog);
+      watchdog = window.setTimeout(() => advance(), delay);
+    };
     const kick = () => {
       if (!video) return;
       try {
@@ -90,18 +95,22 @@ export default function HomepageBlazeLoop({ slots = HOMEPAGE_BLAZE_LOOP }: Props
         /* The element can reject a seek before metadata arrives. */
       }
       void video.play().catch(() => {
-        /* Autoplay can be blocked. The duration timer still hard-cuts forward. */
+        /* Autoplay can be blocked. The stall watchdog still hard-cuts forward. */
       });
     };
+    const onPlaying = () => arm(slot.durationMs);
     if (video) {
+      video.addEventListener("playing", onPlaying);
       if (video.readyState >= 1) kick();
       else video.addEventListener("loadedmetadata", kick, { once: true });
     }
-
-    const timer = window.setTimeout(() => advance(), slot.durationMs);
+    arm(slot.durationMs + 4_000);
     return () => {
-      window.clearTimeout(timer);
-      if (video) video.removeEventListener("loadedmetadata", kick);
+      window.clearTimeout(watchdog);
+      if (video) {
+        video.removeEventListener("playing", onPlaying);
+        video.removeEventListener("loadedmetadata", kick);
+      }
     };
   }, [advance, cut, sequenceKey]);
 
