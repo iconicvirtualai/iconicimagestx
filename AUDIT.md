@@ -32,9 +32,9 @@ Captions on marketing stills stay Iconic-only: no agent names, no listing street
 | `/agents` | Not in the nav. Fake stars, “4.98”, invented quotes, and Unsplash frames removed. Booking form remains. |
 | `/privacy`, `/terms` | Text pages. No stock images. Linked from the footer legal row. |
 | `/present/preview` | Staff preview shell. Uses the logo and presentation media helpers. Auth is not required for the preview token. Not changed. |
-| `/login`, `/portal` | Client portal sign-in. Not changed. |
+| `/login`, `/portal` | Live crawl: HTTP 200 and a blank UI. This PR does not change the login page. Auth is left as-is. |
 | `/portal/home` | Client home after a real portal profile loads. Not changed. |
-| `/admin/login` | Staff sign-in, including photographers. A photographer role still goes to `/admin/photographer`. Not changed. |
+| `/admin/login` | Live crawl: HTTP 200 and a blank UI. This PR does not change the admin login page. A photographer role still goes to `/admin/photographer` once a staff session exists. Auth is left as-is. |
 | `/go` | Shirt QR page. No stock images. Not changed. |
 | `/insights`, `/insights/prep`, `/stock-footage` | Redirect to `/`. |
 
@@ -67,7 +67,7 @@ Captions on marketing stills stay Iconic-only: no agent names, no listing street
 
 - Client: `/login` and `/portal` share the client sign-in. A client profile lands on `/portal/home`.
 - Photographer and other staff: `/admin/login`. Photographers continue to `/admin/photographer`. Editors to `/admin/editor`. Other staff to `/admin/dashboard`.
-- This PR does not change auth guards.
+- Live crawl (2026-10-02): `/login` and `/admin/login` both return HTTP 200 with a blank UI. `Login.tsx` and `AdminLogin.tsx` are unchanged in this PR. `App.tsx` only swaps the Resources and Stock Footage routes for redirects home. Auth is not being fixed here.
 
 ## What each launch still replaced
 
