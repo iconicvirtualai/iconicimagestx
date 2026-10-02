@@ -17,6 +17,13 @@ import { services } from "../client/lib/services.ts";
 
 export const ORDER_GALLERY_RELEASE = "hold_until_order_complete" as const;
 
+/**
+ * Cadi locked Showcase delivery at 30 approved photos.
+ * The live catalog feature still says "50 Images". The order plan and the
+ * gallery gate both use this count instead of that catalog figure.
+ */
+export const SHOWCASE_PHOTO_COUNT = 30;
+
 export const ICONIC_POLISH_INSTRUCTION =
   "Iconic Polish: if a fireplace is visible, add a realistic fire; if a driveway, street, or curb is visible, remove vehicles and debris and repair the pavement; remove clutter and personal items. Keep the architecture.";
 
@@ -141,10 +148,16 @@ function twilightRole(index: number): string {
   return `exterior-${index + 1}`;
 }
 
-function collectTexts(input: OrderEditInput): { texts: string[]; packageName: string; polishFromOrder: boolean } {
+function isShowcaseItem(id: string, name: string, catalogId?: string): boolean {
+  const blob = `${id} ${name} ${catalogId || ""}`.toLowerCase();
+  return blob.includes("listing-showcase") || blob.includes("the showcase");
+}
+
+function collectTexts(input: OrderEditInput): { texts: string[]; packageName: string; polishFromOrder: boolean; showcase: boolean } {
   const texts: string[] = [];
   const packageNames: string[] = [];
   let polishFromOrder = false;
+  let showcase = false;
   const items = [...asItems(input.lineItems), ...asItems(input.services)];
   for (const id of asIds(input.serviceIds)) items.push({ id, name: "" });
 
@@ -155,6 +168,7 @@ function collectTexts(input: OrderEditInput): { texts: string[]; packageName: st
       packageNames.push(catalog.name);
       for (const feature of catalog.features || []) texts.push(feature);
     }
+    if (isShowcaseItem(item.id, item.name, catalog?.id)) showcase = true;
     const blob = `${item.id} ${item.name}`.toLowerCase();
     if (blob.includes("iconic finish") || blob.includes("iconic polish") || blob.includes("iconic-finish")) {
       polishFromOrder = true;
@@ -164,6 +178,7 @@ function collectTexts(input: OrderEditInput): { texts: string[]; packageName: st
     texts,
     packageName: packageNames[0] || items.find((item) => item.name)?.name || "Custom order",
     polishFromOrder,
+    showcase,
   };
 }
 
@@ -218,6 +233,10 @@ export function planOrderEdits(input: OrderEditInput = {}): OrderEditPlan {
   }
 
   const iconicPolish = input.iconicPolish === true || polishFromOrder;
+  if (collected.showcase) {
+    photoCount = SHOWCASE_PHOTO_COUNT;
+    photoFull = false;
+  }
   const count = Math.min(8, Math.max(0, twilightCount));
   const twilight = Array.from({ length: count }, (_, index) => {
     const role = twilightRole(index);

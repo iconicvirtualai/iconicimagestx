@@ -96,7 +96,7 @@ describe("Iconic Studio staff shell", () => {
       />,
     );
     expect(html).toContain("studio-gallery-gate");
-    expect(html).toContain("Photos (0/50)");
+    expect(html).toContain("Photos (0/30)");
     expect(html).toContain("Twilight renders (0/2)");
     expect(html).toContain("5 aerial stills (0/5)");
     expect(html).toContain("held until the order is 100%");

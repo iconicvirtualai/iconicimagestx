@@ -17,7 +17,7 @@ describe("order edit plan", () => {
   it("reads Showcase from the catalog, including two twilight slots", () => {
     const plan = planOrderEdits({ serviceIds: ["listing-showcase"] });
     expect(plan.packageName).toBe("The Showcase");
-    expect(plan.photoCount).toBe(50);
+    expect(plan.photoCount).toBe(30);
     expect(plan.photoScope).toBe("count");
     expect(plan.deliverables.find((item) => item.id === "aerials")?.count).toBe(5);
     expect(plan.twilight.map((slot) => slot.role)).toEqual(["front", "back"]);
@@ -35,6 +35,16 @@ describe("order edit plan", () => {
     expect(plan.iconicPolish).toBe(false);
     expect(plan.photoPrompt).not.toMatch(/Iconic Polish/);
     expect(plan.notes.join(" ")).toMatch(/does not send/i);
+  });
+
+  it("locks Showcase at 30 photos when the catalog feature still says 50 images", () => {
+    const fromCatalog = planOrderEdits({ serviceIds: ["listing-showcase"] });
+    const fromName = planOrderEdits({ services: ["The Showcase"] });
+    expect(fromCatalog.photoCount).toBe(30);
+    expect(fromName.photoCount).toBe(30);
+    const customFifty = planOrderEdits({ services: ["50 Images"] });
+    expect(customFifty.photoCount).toBe(50);
+    expect(customFifty.packageName).not.toBe("The Showcase");
   });
 
   it("accepts an order line written as twilight images and does not double-count the package", () => {

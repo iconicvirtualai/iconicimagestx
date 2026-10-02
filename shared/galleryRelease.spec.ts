@@ -21,7 +21,7 @@ function photoJobs(count: number) {
 function showcaseCompleteEvidence() {
   return {
     jobs: [
-      ...photoJobs(50),
+      ...photoJobs(30),
       {
         slot: "twilight-front",
         type: "twilight",
@@ -71,11 +71,11 @@ describe("gallery release gate", () => {
       "animated-reel",
       "floorplan",
     ]);
-    expect(report.gaps.find((gap) => gap.id === "photos")).toMatchObject({ required: 50, satisfied: 0 });
+    expect(report.gaps.find((gap) => gap.id === "photos")).toMatchObject({ required: 30, satisfied: 0 });
     expect(report.gaps.find((gap) => gap.id === "twilight")).toMatchObject({ required: 2, satisfied: 0 });
     expect(report.gaps.find((gap) => gap.id === "aerials")).toMatchObject({ required: 5, satisfied: 0 });
     expect(report.message).toMatch(/held until the order is 100%/i);
-    expect(report.message).toMatch(/Photos \(0\/50\)/);
+    expect(report.message).toMatch(/Photos \(0\/30\)/);
     expect(report.message).toMatch(/Twilight renders \(0\/2\)/);
     expect(report.message).toMatch(/5 aerial stills \(0\/5\)/);
     expect(report.message).toMatch(/Snap reel/);
@@ -92,7 +92,7 @@ describe("gallery release gate", () => {
       ],
     });
     expect(partial.complete).toBe(false);
-    expect(partial.message).toMatch(/Photos \(25\/50\)/);
+    expect(partial.message).toMatch(/Photos \(25\/30\)/);
     expect(partial.message).toMatch(/Twilight renders \(1\/2\)/);
 
     const done = assessGalleryRelease(showcase, showcaseCompleteEvidence());

@@ -2781,6 +2781,7 @@ function decideClientGalleryLink(input) {
   };
 }
 const ORDER_GALLERY_RELEASE = "hold_until_order_complete";
+const SHOWCASE_PHOTO_COUNT = 30;
 const ICONIC_POLISH_INSTRUCTION = "Iconic Polish: if a fireplace is visible, add a realistic fire; if a driveway, street, or curb is visible, remove vehicles and debris and repair the pavement; remove clutter and personal items. Keep the architecture.";
 const PHOTO_BASE = "Prepare this listing photo. Balance color, clear window glare, and replace a blown-out sky when the sky is visible. Keep the architecture, furnishings, and camera angle.";
 function asItems(value) {
@@ -2825,10 +2826,15 @@ function twilightRole(index) {
   if (index === 1) return "back";
   return `exterior-${index + 1}`;
 }
+function isShowcaseItem(id, name, catalogId) {
+  const blob = `${id} ${name} ${catalogId || ""}`.toLowerCase();
+  return blob.includes("listing-showcase") || blob.includes("the showcase");
+}
 function collectTexts(input) {
   const texts = [];
   const packageNames = [];
   let polishFromOrder = false;
+  let showcase = false;
   const items = [...asItems(input.lineItems), ...asItems(input.services)];
   for (const id of asIds(input.serviceIds)) items.push({ id, name: "" });
   for (const item of items) {
@@ -2838,6 +2844,7 @@ function collectTexts(input) {
       packageNames.push(catalog.name);
       for (const feature of catalog.features || []) texts.push(feature);
     }
+    if (isShowcaseItem(item.id, item.name, catalog?.id)) showcase = true;
     const blob = `${item.id} ${item.name}`.toLowerCase();
     if (blob.includes("iconic finish") || blob.includes("iconic polish") || blob.includes("iconic-finish")) {
       polishFromOrder = true;
@@ -2846,7 +2853,8 @@ function collectTexts(input) {
   return {
     texts,
     packageName: packageNames[0] || items.find((item) => item.name)?.name || "Custom order",
-    polishFromOrder
+    polishFromOrder,
+    showcase
   };
 }
 function planOrderEdits(input = {}) {
@@ -2896,6 +2904,10 @@ function planOrderEdits(input = {}) {
     if (/iconic finish|iconic polish/i.test(text2)) polishFromOrder = true;
   }
   const iconicPolish = input.iconicPolish === true || polishFromOrder;
+  if (collected.showcase) {
+    photoCount = SHOWCASE_PHOTO_COUNT;
+    photoFull = false;
+  }
   const count = Math.min(8, Math.max(0, twilightCount));
   const twilight = Array.from({ length: count }, (_, index) => {
     const role = twilightRole(index);
