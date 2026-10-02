@@ -140,22 +140,25 @@ function clientNotifyBlockReason(env = process.env) {
   return "CLIENT_NOTIFY_LIVE is not exactly true";
 }
 const db$j = () => admin.firestore();
-let transporter = null;
-function getTransporter() {
-  if (!transporter) {
-    transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || "smtp.gmail.com",
-      port: Number(process.env.SMTP_PORT) || 587,
-      secure: process.env.SMTP_SECURE === "true",
-      pool: true,
-      maxConnections: 1,
-      auth: {
-        user: process.env.SMTP_USER || process.env.EMAIL_FROM,
-        pass: process.env.SMTP_PASS
-      }
-    });
+class EmailNotConfiguredError extends Error {
+  code = "email_not_configured";
+  constructor() {
+    super("SMTP is not configured. Set SMTP_USER and SMTP_PASS.");
+    this.name = "EmailNotConfiguredError";
   }
-  return transporter;
+}
+function createTransport() {
+  const user = process.env.SMTP_USER || process.env.EMAIL_FROM;
+  const pass = process.env.SMTP_PASS;
+  if (!user || !pass) {
+    throw new EmailNotConfiguredError();
+  }
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST || "smtp.gmail.com",
+    port: Number(process.env.SMTP_PORT) || 587,
+    secure: process.env.SMTP_SECURE === "true",
+    auth: { user, pass }
+  });
 }
 async function sendEmail(options) {
   const { to, bcc, cc, template, audience, variables = {}, subject: subjectOverride, attachments } = options;
@@ -169,17 +172,27 @@ async function sendEmail(options) {
     );
     return { sent: false };
   }
+  let subject = subjectOverride || `Message from Iconic Images`;
+  let htmlBody = getFallbackTemplate(template, variables);
   try {
-    const templateDoc = await db$j().collection("emailTemplates").where("category", "==", template).where("isActive", "==", true).limit(1).get();
-    let subject = subjectOverride || `Message from Iconic Images`;
-    let htmlBody = getFallbackTemplate(template, variables);
-    if (!templateDoc.empty) {
-      const tmpl = templateDoc.docs[0].data();
-      subject = subjectOverride || interpolate(tmpl.subject, variables);
-      htmlBody = interpolate(tmpl.htmlBody, variables);
+    if (admin.apps.length) {
+      const templateDoc = await db$j().collection("emailTemplates").where("category", "==", template).where("isActive", "==", true).limit(1).get();
+      if (!templateDoc.empty) {
+        const tmpl = templateDoc.docs[0].data();
+        if (!subjectOverride && typeof tmpl.subject === "string" && tmpl.subject.trim()) {
+          subject = interpolate(tmpl.subject, variables);
+        }
+        if (typeof tmpl.htmlBody === "string" && tmpl.htmlBody.trim()) {
+          htmlBody = interpolate(tmpl.htmlBody, variables);
+        }
+      }
     }
-    const transporter2 = getTransporter();
-    await transporter2.sendMail({
+  } catch (err) {
+    console.warn(`[Email] Template lookup failed for '${template}'. Using the built-in copy.`, err);
+  }
+  const transporter = createTransport();
+  try {
+    await transporter.sendMail({
       from: `"Iconic Images" <${process.env.EMAIL_FROM || process.env.SMTP_USER}>`,
       to,
       bcc,
@@ -193,6 +206,8 @@ async function sendEmail(options) {
   } catch (err) {
     console.error(`[Email] Failed to send '${template}' to ${to}:`, err);
     throw err;
+  } finally {
+    transporter.close();
   }
 }
 function interpolate(template, variables) {
@@ -7168,24 +7183,47 @@ ${oneLine(input.name).slice(0, 80)}
 ${reply}
 ${text2}`.slice(0, 640);
 }
+class LiveChatDeliveryError extends Error {
+  code;
+  constructor(message, code) {
+    super(message);
+    this.name = "LiveChatDeliveryError";
+    this.code = code;
+  }
+}
+function isMissingTransport(err) {
+  const code = typeof err === "object" && err && "code" in err ? String(err.code) : "";
+  if (code === "email_not_configured") return true;
+  const message = err instanceof Error ? err.message : "";
+  return /Twilio credentials not configured|TWILIO_PHONE_NUMBER not set|SMTP is not configured/i.test(message);
+}
 async function deliverLiveChat(input) {
   const to = liveChatStaffEmail();
-  const emailResult = await sendEmail({
-    to,
-    template: STAFF_INBOUND_EMAIL_TEMPLATE,
-    audience: "staff",
-    subject: `Live chat from ${oneLine(input.name).slice(0, 80)}`,
-    variables: {
-      senderName: escapeHtml$2(input.name),
-      senderEmail: escapeHtml$2(input.email || "Not provided"),
-      senderPhone: escapeHtml$2(input.phone || "Not provided"),
-      message: escapeHtml$2(input.message)
+  let emailDelivered = false;
+  let emailError;
+  try {
+    const emailResult = await sendEmail({
+      to,
+      template: STAFF_INBOUND_EMAIL_TEMPLATE,
+      audience: "staff",
+      subject: `Live chat from ${oneLine(input.name).slice(0, 80)}`,
+      variables: {
+        senderName: escapeHtml$2(input.name),
+        senderEmail: escapeHtml$2(input.email || "Not provided"),
+        senderPhone: escapeHtml$2(input.phone || "Not provided"),
+        message: escapeHtml$2(input.message)
+      }
+    });
+    emailDelivered = emailResult.sent;
+    if (!emailDelivered) {
+      emailError = new Error("Staff live-chat email was not sent.");
     }
-  });
-  if (!emailResult.sent) {
-    throw new Error("Staff live-chat email was not sent.");
+  } catch (err) {
+    emailError = err;
+    console.error(`[LiveChat] Staff email to ${to} failed.`, err);
   }
   let smsDelivered = false;
+  let smsError;
   try {
     const sms = await sendSMS({
       to: STAFF_INBOUND_SMS_TO,
@@ -7194,12 +7232,21 @@ async function deliverLiveChat(input) {
     });
     smsDelivered = !sms.suppressed && Boolean(sms.sid);
     if (!smsDelivered) {
-      console.warn(`[LiveChat] Staff SMS not sent (${sms.status}). Email to ${to} was delivered.`);
+      smsError = new Error(`Staff SMS not sent (${sms.status}).`);
+      console.warn(`[LiveChat] Staff SMS not sent (${sms.status}).`);
     }
   } catch (err) {
-    console.error("[LiveChat] Staff SMS failed (best effort). Email was delivered.", err);
+    smsError = err;
+    console.error("[LiveChat] Staff SMS failed.", err);
   }
-  return { emailDelivered: true, smsDelivered };
+  if (emailDelivered || smsDelivered) {
+    return { emailDelivered, smsDelivered };
+  }
+  const notConfigured = isMissingTransport(emailError) && isMissingTransport(smsError);
+  throw new LiveChatDeliveryError(
+    notConfigured ? "Live chat delivery is not configured. Set SMTP_USER, SMTP_PASS, and the Twilio credentials." : "Staff live-chat email and SMS were not sent.",
+    notConfigured ? "not_configured" : "failed"
+  );
 }
 const router$1 = Router();
 const liveChatLimiter = createRateLimiter({
@@ -7228,6 +7275,11 @@ router$1.post("/live-chat", async (req, res) => {
     });
   } catch (error) {
     console.error("[LiveChat] Delivery failed:", error);
+    if (error instanceof LiveChatDeliveryError && error.code === "not_configured") {
+      return res.status(503).json({
+        error: "Chat delivery isn't set up on this server yet. Please call 281-356-0965."
+      });
+    }
     return res.status(500).json({
       error: "We couldn't deliver your message. Please try again, or call 281-356-0965."
     });
