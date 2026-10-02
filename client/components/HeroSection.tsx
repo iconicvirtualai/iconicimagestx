@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { HERO_STILL } from "@/lib/launchStills";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 const CAPABILITIES = [
   "Cinematic Filmmakers",
@@ -13,6 +13,7 @@ const CAPABILITIES = [
 ];
 
 export default function HeroSection() {
+  const settings = useSiteSettings();
   const [capabilityIndex, setCapabilityIndex] = useState(0);
 
   useEffect(() => {
@@ -27,12 +28,12 @@ export default function HeroSection() {
       {/* Background Image with Overlay */}
       <div className="absolute inset-0 z-0">
         <img
-          src={HERO_STILL.src}
-          alt={HERO_STILL.alt}
-          className="w-full h-full object-cover object-center"
+          src="https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F6529795874414a1e9fe845f3eb948e94?format=webp&width=1600&height=900"
+          alt="Luxury Real Estate Background"
+          className="w-full h-full object-cover opacity-60"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/55 to-black/10"></div>
-        <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/40 to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black"></div>
       </div>
 
       <div className="max-w-[1200px] mx-auto px-8 w-full relative z-10">

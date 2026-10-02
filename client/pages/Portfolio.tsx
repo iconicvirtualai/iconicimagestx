@@ -135,9 +135,6 @@ export default function Portfolio() {
                     <span className="absolute left-3 top-3 rounded-full bg-black/70 px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-white">
                       {photo.category}
                     </span>
-                    <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-4 pb-4 pt-10 text-[11px] font-black uppercase tracking-[0.25em] text-white">
-                      {photo.title}
-                    </span>
                   </button>
                 ))}
               </div>

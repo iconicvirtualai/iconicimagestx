@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
-import { launchStill } from "@/lib/launchStills";
 
 export default function ThisIsOurMarket() {
   const settings = useSiteSettings();
@@ -76,8 +75,8 @@ export default function ThisIsOurMarket() {
                 className="absolute top-[10%] -right-10 w-[200px] h-[260px] rounded-2xl overflow-hidden shadow-2xl z-30 border-4 border-[#222]"
               >
                 <img
-                  src={launchStill("aerial-property").src}
-                  alt={launchStill("aerial-property").alt}
+                  src="/media/photos/drone-hero.jpg"
+                  alt="Iconic drone photograph of a luxury home"
                   className="w-full h-full object-cover"
                 />
               </motion.div>
