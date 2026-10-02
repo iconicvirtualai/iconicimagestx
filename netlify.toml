@@ -24,3 +24,24 @@
   from = "/podcast-guest-prep/"
   status = 200
   to = "/podcast-guest-prep.html"
+
+# Bare studio and gallery paths have no project id.
+[[redirects]]
+  from = "/studio"
+  status = 302
+  to = "/studio-105"
+
+[[redirects]]
+  from = "/studio/"
+  status = 302
+  to = "/studio-105"
+
+[[redirects]]
+  from = "/gallery"
+  status = 302
+  to = "/studio-105"
+
+[[redirects]]
+  from = "/gallery/"
+  status = 302
+  to = "/studio-105"
