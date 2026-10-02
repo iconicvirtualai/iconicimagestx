@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { renderToString } from "react-dom/server";
 import IconicStudioWorkspace from "./IconicStudioWorkspace";
 import { sampleStudioFrames } from "@shared/iconicStudio";
+import { planOrderEdits } from "@shared/orderEditPlan";
 
 describe("Iconic Studio staff shell", () => {
   it("renders the filmstrip, preview, and four tool tabs", () => {
@@ -29,5 +30,47 @@ describe("Iconic Studio staff shell", () => {
     expect(html).toContain("living-room.jpg");
     expect(html).toContain("RAW");
     expect(html).toContain("Agents: later");
+  });
+
+  it("shows the order plan and a real after image without the placeholder todo", () => {
+    const html = renderToString(
+      <IconicStudioWorkspace
+        listings={[{ id: "sampledemo", address: "100 Sample Lane", imageCount: 1 }]}
+        jobs={[{
+          id: "job-1",
+          listingId: "sampledemo",
+          origin: "order",
+          type: "twilight",
+          label: "Twilight · front",
+          status: "review",
+          beforeUrl: "https://cdn.example/before.jpg",
+          afterUrl: "https://cdn.example/after.jpg",
+          placeholder: false,
+          note: "OpenAI edit is ready for review.",
+          sourcePath: "listings/sampledemo/photos/front.jpg",
+          resultPath: "listings/sampledemo/photos/front-ai.jpg",
+        }]}
+        listingId="sampledemo"
+        address="100 Sample Lane"
+        frames={sampleStudioFrames()}
+        editPlan={planOrderEdits({ serviceIds: ["listing-showcase"] })}
+        initialTab="ai"
+        onSelectListing={() => undefined}
+        onAiEdit={async () => undefined}
+        onRunOrder={async () => undefined}
+        onSaveAdjust={async () => undefined}
+        onApprove={async () => undefined}
+        onReject={async () => undefined}
+      />,
+    );
+    expect(html).toContain("Order edits");
+    expect(html).toContain("The Showcase");
+    expect(html).toContain("Staff override");
+    expect(html).toContain("Run next order edit");
+    expect(html).toContain("https://cdn.example/after.jpg");
+    expect(html).toContain("Approve final");
+    expect(html).toContain("Reject");
+    expect(html).not.toContain("TODO");
+    expect(html).not.toContain("After · placeholder");
   });
 });

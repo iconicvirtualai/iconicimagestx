@@ -1,4 +1,5 @@
 import type { StudioAdjustments } from "@shared/iconicStudio";
+import type { OrderEditPlan } from "@shared/orderEditPlan";
 
 type TokenGetter = () => Promise<string>;
 
@@ -16,6 +17,8 @@ export interface StudioWorkspaceResponse {
     address: string;
     status: string;
     galleryId?: string;
+    iconicPolish?: boolean;
+    editPlan?: OrderEditPlan | null;
     images: Array<Record<string, unknown>>;
   } | null;
 }
@@ -44,6 +47,49 @@ export async function fetchStudioWorkspace(listingId: string | undefined, getTok
   const query = listingId ? `?listingId=${encodeURIComponent(listingId)}` : "";
   const res = await fetch(`/api/studio/workspace${query}`, { headers });
   return readJson(res) as Promise<StudioWorkspaceResponse>;
+}
+
+export async function postStudioOrderEdits(getToken: TokenGetter, listingId: string) {
+  const headers = await authorizedHeaders(getToken);
+  const res = await fetch("/api/studio/order-edits", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ listingId }),
+  });
+  return readJson(res) as Promise<{
+    plan: Record<string, unknown>;
+    prepared: number;
+    remaining: number;
+    waiting: number;
+    ran: {
+      jobId: string;
+      status: string;
+      beforeUrl: string;
+      afterUrl: string;
+      placeholder: boolean;
+      note: string;
+    } | null;
+  }>;
+}
+
+export async function postIconicPolish(getToken: TokenGetter, body: { listingId: string; iconicPolish: boolean }) {
+  const headers = await authorizedHeaders(getToken);
+  const res = await fetch("/api/studio/iconic-polish", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+  return readJson(res) as Promise<{ iconicPolish: boolean }>;
+}
+
+export async function postStudioReject(getToken: TokenGetter, body: { listingId: string; jobId: string }) {
+  const headers = await authorizedHeaders(getToken);
+  const res = await fetch("/api/studio/reject", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+  return readJson(res) as Promise<{ success: boolean; note?: string }>;
 }
 
 export async function postStudioAiEdit(getToken: TokenGetter, body: {
