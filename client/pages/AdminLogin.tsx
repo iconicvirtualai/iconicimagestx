@@ -21,6 +21,8 @@ export default function AdminLogin() {
   const [submitting, setSubmitting] = useState(false);
   const [showReset, setShowReset] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
+  const [sendingReset, setSendingReset] = useState(false);
+  const [resetSentTo, setResetSentTo] = useState("");
 
   // Wait until profile loading finishes. A signed-in user with isStaff still
   // false is only "not staff" after staff/{uid} has been read.
@@ -63,13 +65,20 @@ export default function AdminLogin() {
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resetEmail) return;
+    const emailToReset = resetEmail.trim();
+    if (!emailToReset) {
+      toast.error("Enter the email on the account.");
+      return;
+    }
+    setSendingReset(true);
     try {
-      await resetPassword(resetEmail);
-      toast.success("Reset email sent. Check your inbox.");
-      setShowReset(false);
-    } catch {
-      toast.error("Failed to send reset email.");
+      await resetPassword(emailToReset, "admin");
+      setResetSentTo(emailToReset);
+      toast.success("If an account exists for that email, a reset link is on its way.");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Could not send the reset email.");
+    } finally {
+      setSendingReset(false);
     }
   };
 
@@ -92,7 +101,24 @@ export default function AdminLogin() {
           </p>
         </div>
 
-        {!showReset ? (
+        {resetSentTo ? (
+          <div className="space-y-4 text-center">
+            <p className="text-zinc-200 text-sm">Check {resetSentTo}</p>
+            <p className="text-zinc-400 text-sm">
+              If an account exists for that email, a reset link is on its way. Open the link, choose a new password, and you will come back to this page to sign in.
+            </p>
+            <Button
+              type="button"
+              onClick={() => {
+                setResetSentTo("");
+                setShowReset(false);
+              }}
+              className="w-full bg-white text-black hover:bg-gray-100 font-semibold"
+            >
+              Back to sign in
+            </Button>
+          </div>
+        ) : !showReset ? (
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <Input
@@ -135,8 +161,11 @@ export default function AdminLogin() {
             <div className="text-center">
               <button
                 type="button"
-                onClick={() => setShowReset(true)}
-                className="text-zinc-500 hover:text-zinc-300 text-sm transition-colors"
+                onClick={() => {
+                  setResetEmail((current) => current || email);
+                  setShowReset(true);
+                }}
+                className="text-zinc-300 hover:text-white text-sm underline underline-offset-4 transition-colors"
               >
                 Forgot password?
               </button>
@@ -145,21 +174,25 @@ export default function AdminLogin() {
         ) : (
           <form onSubmit={handleResetPassword} className="space-y-4">
             <p className="text-zinc-400 text-sm text-center">
-              Enter your email to receive a password reset link.
+              Enter your email and we will send a link to set a new password. The link opens on this site and brings you back here to sign in.
             </p>
+            <label className="sr-only" htmlFor="admin-reset-email">Email address</label>
             <Input
+              id="admin-reset-email"
               type="email"
               placeholder="Email address"
               value={resetEmail}
               onChange={(e) => setResetEmail(e.target.value)}
               className="bg-zinc-900 border-zinc-700 text-white placeholder:text-zinc-500"
+              autoComplete="email"
               required
             />
             <Button
               type="submit"
-              className="w-full bg-white text-black hover:bg-gray-100"
+              disabled={sendingReset}
+              className="w-full bg-white text-black hover:bg-gray-100 font-semibold"
             >
-              Send Reset Link
+              {sendingReset ? "Sending reset link..." : "Send reset link"}
             </Button>
             <div className="text-center">
               <button
