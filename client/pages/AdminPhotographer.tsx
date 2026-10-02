@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { fetchAssignedListings, uploadListingFile } from "@/lib/listingUpload";
+import { postIconicPolish } from "@/lib/studioApi";
 import { iconicStudioHref } from "@shared/iconicStudio";
 import { PresentationShareButton } from "@/components/PresentationSharePanel";
 import { toast } from "sonner";
@@ -43,6 +44,7 @@ export default function AdminPhotographer() {
   const [loading, setLoading] = React.useState(true);
   const [activeTab, setActiveTab] = React.useState<"today" | "upcoming" | "past" | "uploads" | "revenue">("today");
   const [uploading, setUploading] = React.useState(false);
+  const [iconicPolish, setIconicPolish] = React.useState(false);
   const [uploadProgress, setUploadProgress] = React.useState(0);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [selectedProject, setSelectedProject] = React.useState<string | null>(null);
@@ -94,6 +96,9 @@ export default function AdminPhotographer() {
     const fileArray = Array.from(files);
     let completed = 0;
     try {
+      if (user) {
+        await postIconicPolish(() => user.getIdToken(), { listingId: projectId, iconicPolish });
+      }
       for (const file of fileArray) {
         await uploadListingFile({
           listingId: projectId,
@@ -149,10 +154,16 @@ export default function AdminPhotographer() {
             <MapPin className="w-3.5 h-3.5" /> Directions
           </a>
           {showUpload && (
-            <button onClick={() => { setSelectedProject(job.id); fileInputRef.current?.click(); }}
-              className="flex items-center gap-1.5 px-3 py-2 bg-[#0d9488] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#0f766e]">
-              <Upload className="w-3.5 h-3.5" /> Upload Photos
-            </button>
+            <>
+              <label className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-600">
+                <input type="checkbox" checked={iconicPolish} onChange={(event) => setIconicPolish(event.target.checked)} />
+                Iconic Polish
+              </label>
+              <button onClick={() => { setSelectedProject(job.id); fileInputRef.current?.click(); }}
+                className="flex items-center gap-1.5 px-3 py-2 bg-[#0d9488] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#0f766e]">
+                <Upload className="w-3.5 h-3.5" /> Upload Photos
+              </button>
+            </>
           )}
           <Link to={iconicStudioHref(job.id)}
             className="flex items-center gap-1.5 px-3 py-2 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800">
@@ -244,7 +255,14 @@ export default function AdminPhotographer() {
           {/* UPLOADS */}
           {activeTab === "uploads" && (
             <div className="space-y-4">
-              <p className="text-xs text-gray-500 mb-4">Select a project to upload RAW photos. Files will be automatically sorted and sent to the editing pipeline.</p>
+              <p className="text-xs text-gray-500 mb-4">Upload the shoot. Edits come from the order, not from picking a look per photo. Turn on Iconic Polish before you submit if this listing needs fireplace fire, clean driveways, and clutter removal.</p>
+              <label className="mb-4 flex items-start gap-3 rounded-2xl border border-gray-100 bg-white p-4">
+                <input type="checkbox" className="mt-1" checked={iconicPolish} onChange={(event) => setIconicPolish(event.target.checked)} />
+                <span>
+                  <span className="block text-xs font-black uppercase tracking-widest">Iconic Polish</span>
+                  <span className="mt-1 block text-xs text-gray-500">Saved with the upload. It does not send the gallery.</span>
+                </span>
+              </label>
               {assignments.filter(a => a.status !== "archived").map(a => (
                 <div key={a.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center justify-between">
                   <div>

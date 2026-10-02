@@ -7,7 +7,8 @@
 import { randomUUID } from "crypto";
 import admin from "firebase-admin";
 import {
-  aiEditStub,
+  AI_EDIT_MISSING_KEY_NOTE,
+  AI_EDIT_READY_NOTE,
   clampAdjustments,
   finalsObjectPath,
   frameFromListingImage,
@@ -16,13 +17,27 @@ import {
   isRawStudioFile,
   isStudioPreviewable,
   listingAddressLabel,
+  realEstateEditPrompt,
+  resolveStudioApprovePath,
   type AiEditRequest,
   type StudioAdjustments,
   type StudioFrame,
 } from "../../shared/iconicStudio";
-import { isListingStoragePath, safeStorageFileName } from "../../shared/listingAccess";
+import { isListingStoragePath, safeStorageFileName, contentTypeForUpload } from "../../shared/listingAccess";
+import {
+  orderEditDocId,
+  orderEditDrafts,
+  planOrderEdits,
+  type OrderEditPlan,
+} from "../../shared/orderEditPlan";
 import { jsonSafe } from "../lib/firestoreJson";
 import { firebaseDownloadUrl, registerListingPhoto, saveListingBytes } from "./listingMedia";
+import {
+  OPENAI_IMAGE_EDIT_MODEL,
+  OpenAiEditError,
+  editListingPhotoWithOpenAI,
+  readOpenAiApiKey,
+} from "./openaiImageEdit";
 
 const db = () => admin.firestore();
 const bucket = () => admin.storage().bucket();
@@ -106,34 +121,317 @@ export async function assertStudioAccess(uid: string, role: string, listingId: s
   }
 }
 
-export async function enqueueAiEdit(input: AiEditRequest & { createdBy: string }) {
-  const listing = await loadListing(input.listingId);
-  const frames = (Array.isArray(listing.data.images) ? listing.data.images : [])
+function listingFrames(data: FirebaseFirestore.DocumentData): StudioFrame[] {
+  return (Array.isArray(data.images) ? data.images : [])
     .map((item, index) => frameFromListingImage(item, index))
     .filter((frame): frame is StudioFrame => Boolean(frame));
-  const frame = frames.find((item) => item.path === input.sourcePath);
-  if (!frame) throw httpError(404, "That file is not on this listing.");
+}
 
-  const stub = aiEditStub(process.env, input.imageUrl);
+async function downloadListingImage(listingId: string, sourcePath: string, fileName: string, contentType: string) {
+  if (!isListingStoragePath(listingId, sourcePath)) {
+    throw new OpenAiEditError("That photo is not stored on this listing.");
+  }
+  if (!isStudioPreviewable(fileName, contentType)) {
+    throw new OpenAiEditError("OpenAI can edit a JPEG, PNG, or WebP. RAW files stay in the queue until a preview exists.");
+  }
+  const file = bucket().file(sourcePath);
+  const [exists] = await file.exists();
+  if (!exists) throw new OpenAiEditError("Source photo was not found in storage.");
+  const [metadata] = await file.getMetadata();
+  const size = Number(metadata.size || 0);
+  if (size > 20_000_000) {
+    throw new OpenAiEditError("That photo is over 20 MB. Export a smaller JPEG and queue the edit again.");
+  }
+  const resolved = contentTypeForUpload(fileName, String(metadata.contentType || contentType || ""));
+  if (resolved !== "image/jpeg" && resolved !== "image/png" && resolved !== "image/webp") {
+    throw new OpenAiEditError("OpenAI can edit a JPEG, PNG, or WebP. RAW files stay in the queue until a preview exists.");
+  }
+  const [bytes] = await file.download();
+  return { bytes, contentType: resolved };
+}
+
+/** One real Images API edit. The prompt is already the order or staff instruction. */
+async function runOpenAiEdit(input: {
+  listingId: string;
+  sourcePath: string;
+  fileName: string;
+  contentType: string;
+  prompt: string;
+}) {
+  const apiKey = readOpenAiApiKey(process.env);
+  if (!apiKey) throw new OpenAiEditError(AI_EDIT_MISSING_KEY_NOTE);
+  const source = await downloadListingImage(input.listingId, input.sourcePath, input.fileName, input.contentType);
+  const edited = await editListingPhotoWithOpenAI({
+    apiKey,
+    prompt: realEstateEditPrompt(input.prompt),
+    bytes: source.bytes,
+    contentType: source.contentType,
+  });
+  const base = input.fileName.replace(/\.\w+$/, "") || "edit";
+  const saved = await saveListingBytes(input.listingId, `${base}-ai.jpg`, "image/jpeg", "photos", edited.bytes);
+  return { afterUrl: saved.url, resultPath: saved.storagePath };
+}
+
+function failureNote(err: unknown): string {
+  if (err instanceof OpenAiEditError) return err.message;
+  return "The AI edit failed before a finished image was saved.";
+}
+
+export async function loadOrderEditContext(listingId: string): Promise<{ listing: Awaited<ReturnType<typeof loadListing>>; plan: OrderEditPlan }> {
+  const listing = await loadListing(listingId);
+  let order: FirebaseFirestore.DocumentData | null = null;
+  const orderId = typeof listing.data.orderId === "string" ? listing.data.orderId : "";
+  if (orderId) {
+    const snap = await db().collection("orders").doc(orderId).get();
+    if (snap.exists) order = snap.data() || {};
+  }
+  const plan = planOrderEdits({
+    lineItems: listing.data.lineItems || order?.lineItems || order?.services,
+    services: listing.data.services,
+    serviceIds: listing.data.serviceIds,
+    iconicPolish: listing.data.iconicPolish === true,
+  });
+  return { listing, plan };
+}
+
+export async function setIconicPolish(input: { listingId: string; iconicPolish: boolean }) {
+  const listing = await loadListing(input.listingId);
+  await listing.ref.update({
+    iconicPolish: input.iconicPolish,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  const { plan } = await loadOrderEditContext(input.listingId);
+  return { iconicPolish: plan.iconicPolish, plan };
+}
+
+/**
+ * Write order-driven edit jobs, then run the next one that has a source photo.
+ * One OpenAI call per request so the serverless limit can finish the upload.
+ * Reels and gallery delivery are not queued here.
+ */
+export async function queueOrderEdits(input: { listingId: string; createdBy: string }) {
+  const { listing, plan } = await loadOrderEditContext(input.listingId);
+  const frames = listingFrames(listing.data);
+  const drafts = orderEditDrafts(plan, frames);
+  const settled = new Set(["review", "approved", "rejected", "processing"]);
+  let prepared = 0;
+
+  for (const draft of drafts) {
+    const ref = db().collection("editJobs").doc(orderEditDocId(input.listingId, draft.slot));
+    const snap = await ref.get();
+    const current = snap.data() || {};
+    if (snap.exists && settled.has(String(current.status || ""))) continue;
+    const payload: Record<string, unknown> = {
+      kind: "ai_edit",
+      origin: "order",
+      slot: draft.slot,
+      type: draft.type,
+      label: draft.label,
+      listingId: input.listingId,
+      status: "pending",
+      provider: "openai",
+      model: OPENAI_IMAGE_EDIT_MODEL,
+      prompt: draft.prompt,
+      sourcePath: draft.sourcePath,
+      sourceUrl: draft.imageUrl,
+      beforeUrl: draft.imageUrl,
+      afterUrl: "",
+      resultPath: "",
+      placeholder: false,
+      iconicPolish: plan.iconicPolish,
+      note: draft.sourcePath
+        ? "Queued from the order. OpenAI has not run this photo yet."
+        : draft.waitingNote,
+      createdBy: input.createdBy,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    if (!snap.exists) payload.createdAt = admin.firestore.FieldValue.serverTimestamp();
+    await ref.set(payload, { merge: true });
+    prepared += 1;
+  }
+
+  const jobSnap = await db().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
+  const pending = jobSnap.docs.filter((doc) => {
+    const data = doc.data() || {};
+    return data.origin === "order" && data.status === "pending" && typeof data.sourcePath === "string" && data.sourcePath;
+  });
+  const waiting = jobSnap.docs.filter((doc) => {
+    const data = doc.data() || {};
+    return data.origin === "order" && data.status === "pending" && !data.sourcePath;
+  }).length;
+
+  pending.sort((a, b) => {
+    const rank = (doc: FirebaseFirestore.QueryDocumentSnapshot) => (doc.data().type === "twilight" ? 0 : 1);
+    return rank(a) - rank(b);
+  });
+  const next = pending[0];
+  if (!next) {
+    return { plan, prepared, ran: null, remaining: 0, waiting };
+  }
+
+  const data = next.data() || {};
+  await next.ref.update({
+    status: "processing",
+    note: "Editing this photo with OpenAI.",
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  const fileName = String(data.sourcePath || "").split("/").pop() || "photo.jpg";
+  try {
+    const saved = await runOpenAiEdit({
+      listingId: input.listingId,
+      sourcePath: String(data.sourcePath),
+      fileName,
+      contentType: "",
+      prompt: String(data.prompt || plan.photoPrompt),
+    });
+    await next.ref.update({
+      status: "review",
+      beforeUrl: data.beforeUrl || data.sourceUrl || "",
+      afterUrl: saved.afterUrl,
+      resultPath: saved.resultPath,
+      placeholder: false,
+      note: AI_EDIT_READY_NOTE,
+      pipeline: ["pending", "processing", "review"],
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return {
+      plan,
+      prepared,
+      remaining: Math.max(0, pending.length - 1),
+      waiting,
+      ran: {
+        jobId: next.id,
+        status: "review" as const,
+        beforeUrl: String(data.beforeUrl || data.sourceUrl || ""),
+        afterUrl: saved.afterUrl,
+        resultPath: saved.resultPath,
+        placeholder: false,
+        note: AI_EDIT_READY_NOTE,
+      },
+    };
+  } catch (err) {
+    const note = failureNote(err);
+    console.error("[Studio AI]", err instanceof Error ? err.message : err);
+    await next.ref.update({
+      status: "failed",
+      placeholder: false,
+      afterUrl: "",
+      note,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return {
+      plan,
+      prepared,
+      remaining: Math.max(0, pending.length - 1),
+      waiting,
+      ran: {
+        jobId: next.id,
+        status: "failed" as const,
+        beforeUrl: String(data.beforeUrl || data.sourceUrl || ""),
+        afterUrl: "",
+        placeholder: false,
+        note,
+      },
+    };
+  }
+}
+
+/** Staff override for one frame. The default path is queueOrderEdits. */
+export async function enqueueAiEdit(input: AiEditRequest & { createdBy: string }) {
+  const listing = await loadListing(input.listingId);
+  const frame = listingFrames(listing.data).find((item) => item.path === input.sourcePath);
+  if (!frame) throw httpError(404, "That file is not on this listing.");
+  if (!isStudioPreviewable(frame.name, frame.contentType)) {
+    throw httpError(400, "Choose a JPEG, PNG, or WebP. RAW stays in the queue until a preview exists.");
+  }
+
+  const beforeUrl = frame.url || input.imageUrl;
   const ref = await db().collection("editJobs").add({
     kind: "ai_edit",
+    origin: "staff_override",
     type: input.type,
     listingId: input.listingId,
-    status: stub.status,
-    pipeline: stub.pipeline,
-    provider: stub.provider,
+    status: "processing",
+    provider: "openai",
+    model: OPENAI_IMAGE_EDIT_MODEL,
     prompt: input.prompt,
     sourcePath: input.sourcePath,
-    sourceUrl: input.imageUrl,
-    beforeUrl: stub.beforeUrl,
-    afterUrl: stub.afterUrl,
-    placeholder: stub.placeholder,
-    note: stub.note,
+    sourceUrl: beforeUrl,
+    beforeUrl,
+    afterUrl: "",
+    placeholder: false,
+    note: "Editing this photo with OpenAI.",
     createdBy: input.createdBy,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
-  return { id: ref.id, ...stub };
+
+  try {
+    const saved = await runOpenAiEdit({
+      listingId: input.listingId,
+      sourcePath: input.sourcePath,
+      fileName: frame.name,
+      contentType: frame.contentType,
+      prompt: input.prompt,
+    });
+    await ref.update({
+      status: "review",
+      afterUrl: saved.afterUrl,
+      resultPath: saved.resultPath,
+      placeholder: false,
+      note: AI_EDIT_READY_NOTE,
+      pipeline: ["pending", "processing", "review"],
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return {
+      id: ref.id,
+      status: "review" as const,
+      provider: "openai" as const,
+      beforeUrl,
+      afterUrl: saved.afterUrl,
+      resultPath: saved.resultPath,
+      placeholder: false,
+      note: AI_EDIT_READY_NOTE,
+    };
+  } catch (err) {
+    const note = failureNote(err);
+    console.error("[Studio AI]", err instanceof Error ? err.message : err);
+    await ref.update({
+      status: "failed",
+      placeholder: false,
+      afterUrl: "",
+      note,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return {
+      id: ref.id,
+      status: "failed" as const,
+      provider: "openai" as const,
+      beforeUrl,
+      afterUrl: "",
+      placeholder: false,
+      note,
+    };
+  }
+}
+
+export async function rejectStudioJob(input: { listingId: string; jobId: string; rejectedBy: string }) {
+  const ref = db().collection("editJobs").doc(input.jobId);
+  const snap = await ref.get();
+  if (!snap.exists) throw httpError(404, "Edit job not found.");
+  const job = snap.data() || {};
+  if (job.listingId !== input.listingId) throw httpError(400, "That job is for a different listing.");
+  if (job.status === "approved") throw httpError(400, "Approved finals stay on the listing.");
+  const note = job.status === "failed"
+    ? String(job.note || "Rejected.")
+    : "Rejected before approval. The edited image was not added to the gallery.";
+  await ref.set({
+    status: "rejected",
+    rejectedBy: input.rejectedBy,
+    note,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+  return { id: input.jobId, status: "rejected" as const, note };
 }
 
 export async function saveAdjustedJpeg(input: {
@@ -347,15 +645,21 @@ export async function loadStudioWorkspace(input: {
       throw httpError(403, "This job is not assigned to you.");
     }
     const loaded = await loadListing(input.listingId);
-    const images = (Array.isArray(loaded.data.images) ? loaded.data.images : [])
-      .map((item, index) => frameFromListingImage(item, index))
-      .filter(Boolean);
+    const images = listingFrames(loaded.data);
+    let editPlan: OrderEditPlan | null = null;
+    try {
+      editPlan = (await loadOrderEditContext(input.listingId)).plan;
+    } catch (err) {
+      console.error("[Studio AI] Order plan failed:", err instanceof Error ? err.message : err);
+    }
     listing = {
       id: loaded.id,
       address: listingAddressLabel(loaded.data),
       status: loaded.data.status || "",
       galleryId: loaded.data.galleryId || loaded.data.playtestGalleryId || "",
+      iconicPolish: loaded.data.iconicPolish === true,
       images,
+      editPlan,
     };
   }
 

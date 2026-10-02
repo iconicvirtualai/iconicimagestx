@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  AI_EDIT_STUB_NOTE,
+  AI_EDIT_READY_NOTE,
   DEFAULT_ADJUSTMENTS,
   STUDIO_FLAGS,
   adjustmentCssFilter,
   adjustmentsAreNeutral,
-  aiEditStub,
   applyPixel,
   canOpenIconicStudio,
   clampAdjustments,
@@ -17,8 +16,11 @@ import {
   isRawStudioFile,
   isStudioPreviewable,
   listingAddressLabel,
+  listingPhotoEditSize,
   parseAiEditRequest,
   presetPrompt,
+  realEstateEditPrompt,
+  resolveStudioApprovePath,
   sharpenLuma,
   shouldBumpStudioQueue,
 } from "./iconicStudio";
@@ -146,13 +148,30 @@ describe("Iconic Studio AI jobs", () => {
     }).ok).toBe(false);
   });
 
-  it("stubs the provider and parks the job in review with a placeholder after image", () => {
-    const stub = aiEditStub({}, "https://cdn.example/room.jpg");
-    expect(stub.provider).toBe("stub");
-    expect(stub.status).toBe("review");
-    expect(stub.afterUrl).toBe(stub.beforeUrl);
-    expect(stub.note).toBe(AI_EDIT_STUB_NOTE);
-    expect(aiEditStub({ OPENAI_API_KEY: "sk-test" }, "https://cdn.example/room.jpg").provider).toBe("openai");
+  it("wraps a preset for the image edit and approves only a finished AI file", () => {
+    const prompt = realEstateEditPrompt(presetPrompt("virtual_stage"));
+    expect(prompt).toMatch(/photoreal real-estate/i);
+    expect(prompt).toMatch(/Virtually stage/i);
+    expect(prompt).not.toMatch(/TODO/);
+    expect(prompt).not.toMatch(/placeholder/);
+    expect(AI_EDIT_READY_NOTE).not.toMatch(/TODO/);
+    expect(listingPhotoEditSize(1800, 1200)).toBe("1536x1024");
+
+    expect(resolveStudioApprovePath({
+      kind: "ai_edit",
+      status: "review",
+      placeholder: true,
+      sourcePath,
+    }).ok).toBe(false);
+    const approved = resolveStudioApprovePath({
+      kind: "ai_edit",
+      status: "review",
+      resultPath: `listings/${listingId}/photos/room-ai.jpg`,
+      sourcePath,
+    });
+    expect(approved).toEqual({ ok: true, sourcePath: `listings/${listingId}/photos/room-ai.jpg` });
+    const adjust = resolveStudioApprovePath({ kind: "adjust", resultPath: "", sourcePath }, "");
+    expect(adjust.ok && adjust.sourcePath).toBe(sourcePath);
   });
 
   it("marks a gallery ready for deliver without touching delivered or approved", () => {

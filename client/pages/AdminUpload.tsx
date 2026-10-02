@@ -3,6 +3,7 @@ import AdminLayout from "@/components/AdminLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "react-router-dom";
 import { fetchAssignedListings, uploadListingFile } from "@/lib/listingUpload";
+import { postIconicPolish } from "@/lib/studioApi";
 import { iconicStudioHref } from "@shared/iconicStudio";
 import { Upload, CheckCircle2, XCircle, Image as ImageIcon, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ export default function AdminUpload() {
   const [files, setFiles] = React.useState<File[]>([]);
   const [uploads, setUploads] = React.useState<Record<string, number>>({});
   const [uploading, setUploading] = React.useState(false);
+  const [iconicPolish, setIconicPolish] = React.useState(false);
   const [jobsError, setJobsError] = React.useState("");
   const fileRef = React.useRef<HTMLInputElement>(null);
 
@@ -60,6 +62,9 @@ export default function AdminUpload() {
     setUploading(true);
 
     try {
+      if (user) {
+        await postIconicPolish(() => user.getIdToken(), { listingId: selectedJob, iconicPolish });
+      }
       for (const file of files) {
         await uploadListingFile({
           listingId: selectedJob,
@@ -174,6 +179,21 @@ export default function AdminUpload() {
             </div>
           </div>
         )}
+
+        <label className="mb-4 flex items-start gap-3 rounded-2xl border border-gray-100 bg-white p-4">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={iconicPolish}
+            onChange={(event) => setIconicPolish(event.target.checked)}
+          />
+          <span>
+            <span className="block text-xs font-black uppercase tracking-widest">Iconic Polish</span>
+            <span className="mt-1 block text-xs text-gray-500">
+              Turn this on before you submit. It adds fireplace fire, clean driveways, and clutter removal on top of the order. You do not pick an edit for each photo.
+            </span>
+          </span>
+        </label>
 
         {/* Upload button */}
         <Button
