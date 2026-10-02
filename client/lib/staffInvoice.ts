@@ -47,7 +47,7 @@ export async function saveStaffInvoiceEdits(invoiceId: string, form: StaffInvoic
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists()) throw new Error("Invoice not found.");
-    const patch = staffInvoiceSavePatch(form, snap.data() || {});
+    const patch = staffInvoiceSavePatch(form, { ...(snap.data() || {}), id });
     tx.update(ref, { ...patch, updatedAt: serverTimestamp() });
   });
 }

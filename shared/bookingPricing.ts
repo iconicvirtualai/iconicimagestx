@@ -40,6 +40,11 @@ export interface BookingLineItem {
   unitPrice: number;
   qty: number;
   price: number;
+  /** Catalog fields copied onto a staff invoice line. Booking totals ignore them. */
+  description?: string;
+  category?: string;
+  bookingKind?: string;
+  tier?: string;
 }
 
 export function calculateSidebarTotal(input: BookingPriceInput): number {
@@ -214,6 +219,18 @@ export function normalizeBookingLineItems(items: unknown): BookingLineItem[] {
       price,
     };
     if (item.id != null && item.id !== "") line.id = String(item.id);
+    const description = optionalLineText(item.description);
+    if (description) line.description = description;
+    const category = optionalLineText(item.category);
+    if (category) line.category = category;
+    const bookingKind = optionalLineText(item.bookingKind);
+    if (bookingKind) line.bookingKind = bookingKind;
+    const tier = optionalLineText(item.tier);
+    if (tier) line.tier = tier;
     return line;
   });
+}
+
+function optionalLineText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
 }

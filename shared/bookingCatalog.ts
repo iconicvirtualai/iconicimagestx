@@ -448,3 +448,105 @@ export function bookingPackageSeedDocs(): BookingPackageSeed[] {
 
   return docs;
 }
+
+export const BOOKING_PACKAGE_CATEGORY_ORDER: BookingPackageCategory[] = [
+  "photography",
+  "video",
+  "virtual_staging",
+  "marketing",
+  "addon",
+];
+
+export const BOOKING_PACKAGE_CATEGORY_LABELS: Record<BookingPackageCategory, string> = {
+  photography: "Photography",
+  video: "Video",
+  virtual_staging: "Virtual staging",
+  marketing: "Marketing",
+  addon: "Add-ons",
+};
+
+export const BOOKING_CATALOG_KIND_LABELS: Record<BookingCatalogKind, string> = {
+  service: "Package",
+  basic: "Photo set",
+  addon: "Add-on",
+  upgrade: "Upgrade",
+};
+
+/** Package row the staff invoice picker can select. Same fields as the seed. */
+export interface StaffCatalogPackage {
+  id: string;
+  name: string;
+  price: number;
+  description: string;
+  category: BookingPackageCategory;
+  bookingKind: BookingCatalogKind;
+  tier: BookingPackageTier;
+  includedServices: string[];
+  sortOrder: number;
+  isActive: boolean;
+  bookingId: string;
+}
+
+const PACKAGE_CATEGORIES = new Set<string>(BOOKING_PACKAGE_CATEGORY_ORDER);
+const PACKAGE_KINDS = new Set<string>(["service", "basic", "addon", "upgrade"]);
+const PACKAGE_TIERS = new Set<string>(["basic", "standard", "premium", "campaign", "addon"]);
+
+function finiteCatalogNumber(value: unknown): number | undefined {
+  if (value == null || value === "") return undefined;
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : undefined;
+}
+
+function catalogText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/**
+ * Options for the staff invoice picker.
+ * The seed is the same list `pnpm seed:booking-catalog` writes into `packages`.
+ * Live package docs overlay name, price, description, and the other catalog fields.
+ * Public booking totals stay on the hardcoded lists and are not read from here.
+ */
+export function packagesForStaffEditor(liveDocs: Array<Record<string, unknown>> = []): StaffCatalogPackage[] {
+  const byId = new Map<string, StaffCatalogPackage>();
+  for (const seed of bookingPackageSeedDocs()) {
+    byId.set(seed.id, { ...seed, includedServices: [...seed.includedServices] });
+  }
+
+  for (const doc of liveDocs) {
+    const id = catalogText(doc.id || doc.bookingId);
+    if (!id) continue;
+    const current = byId.get(id);
+    const name = catalogText(doc.name) || current?.name || "";
+    if (!name) continue;
+    const categoryRaw = catalogText(doc.category);
+    const kindRaw = catalogText(doc.bookingKind);
+    const tierRaw = catalogText(doc.tier);
+    const included = Array.isArray(doc.includedServices)
+      ? doc.includedServices.map((entry) => catalogText(entry)).filter(Boolean)
+      : current?.includedServices ?? [];
+    byId.set(id, {
+      id,
+      name,
+      price: finiteCatalogNumber(doc.price) ?? current?.price ?? 0,
+      description: catalogText(doc.description) || current?.description || "",
+      category: PACKAGE_CATEGORIES.has(categoryRaw)
+        ? categoryRaw as BookingPackageCategory
+        : current?.category ?? "addon",
+      bookingKind: PACKAGE_KINDS.has(kindRaw)
+        ? kindRaw as BookingCatalogKind
+        : current?.bookingKind ?? "addon",
+      tier: PACKAGE_TIERS.has(tierRaw)
+        ? tierRaw as BookingPackageTier
+        : current?.tier ?? "addon",
+      includedServices: included,
+      sortOrder: finiteCatalogNumber(doc.sortOrder) ?? current?.sortOrder ?? 1000,
+      isActive: doc.isActive === false ? false : doc.isActive === true ? true : current?.isActive ?? true,
+      bookingId: catalogText(doc.bookingId) || current?.bookingId || id,
+    });
+  }
+
+  return [...byId.values()]
+    .filter((item) => item.isActive)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+}
