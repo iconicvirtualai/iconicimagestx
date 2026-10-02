@@ -11,6 +11,7 @@ export default function PublicGallery() {
   const [gallery, setGallery] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
+  const [errorTitle, setErrorTitle] = React.useState("Gallery Unavailable");
 
   React.useEffect(() => {
     if (!galleryId) return;
@@ -18,6 +19,7 @@ export default function PublicGallery() {
     let redirecting = false;
     setLoading(true);
     setError("");
+    setErrorTitle("Gallery Unavailable");
     setGallery(null);
     (async () => {
       try {
@@ -38,6 +40,16 @@ export default function PublicGallery() {
             navigate(`/studio/${galleryId}`, { replace: true });
             return;
           }
+          const linkTitle = link.code === "studio_locked"
+            ? "Studio link is locked"
+            : link.code === "studio_disabled"
+              ? "Studio link is off"
+              : link.code === "lookup_unavailable" || link.code === "lookup_failed"
+                ? "Gallery link could not be checked"
+                : link.code === "unknown" || link.code === "dangling_pointer"
+                  ? "No gallery or project found"
+                  : "Gallery Unavailable";
+          setErrorTitle(linkTitle);
           throw new Error(link.message || data.message || data.error || "Gallery link not found.");
         }
         if (!res.ok) throw new Error(data.message || data.error || "We could not open this gallery.");
@@ -60,7 +72,7 @@ export default function PublicGallery() {
       <div className="flex flex-1 items-center justify-center px-4">
         <div className="max-w-md text-center">
           <AlertCircle className="w-12 h-12 mx-auto mb-4 text-red-500" />
-          <h1 className="text-2xl font-black mb-2">Gallery Unavailable</h1>
+          <h1 className="text-2xl font-black mb-2">{errorTitle}</h1>
           <p className="text-sm text-gray-500">{error}</p>
         </div>
       </div>

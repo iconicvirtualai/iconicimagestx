@@ -50,6 +50,8 @@ export interface PublicStudioProject {
   requirePayment: boolean;
   invoice: { status: string } | null;
   notice: string | null;
+  /** Marks the share payload so the page does not write it back over the listing. */
+  view: "public";
 }
 
 export type ClientGalleryLinkResult =
@@ -91,6 +93,11 @@ function isReleased(doc: GalleryLinkDoc | null): boolean {
 
 function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function httpUrl(value: unknown): string {
+  const url = text(value);
+  return url.startsWith("https://") || url.startsWith("http://") ? url : "";
 }
 
 function galleryResult(doc: GalleryLinkDoc, via?: string): ClientGalleryLinkResult {
@@ -139,9 +146,10 @@ function publicImages(listing: GalleryLinkDoc): Array<{ url: string; name: strin
   const images: Array<{ url: string; name: string }> = [];
   listing.images.forEach((item, index) => {
     const frame = frameFromListingImage(item, index);
-    if (!frame || frame.raw || !frame.url) return;
+    const url = httpUrl(frame?.url);
+    if (!frame || frame.raw || !url) return;
     if (frame.path.includes("/raw/")) return;
-    images.push({ url: frame.url, name: frame.name });
+    images.push({ url, name: frame.name });
   });
   return images.slice(0, 200);
 }
@@ -152,7 +160,7 @@ function publicVideos(listing: GalleryLinkDoc): Array<{ url: string; name: strin
   for (const item of listing.videos) {
     if (!item || typeof item !== "object") continue;
     const row = item as Record<string, unknown>;
-    const url = text(row.url);
+    const url = httpUrl(row.url);
     if (!url || url.includes("/raw/")) continue;
     videos.push({ url, name: text(row.name) || "Video" });
   }
@@ -249,7 +257,6 @@ function listingResult(listing: GalleryLinkDoc, related: GalleryLinkDoc[]): Clie
 }
 
 function publicProject(listing: GalleryLinkDoc, _related: GalleryLinkDoc[], notice: string | null): PublicStudioProject {
-  const tour = text(listing.tourUrl);
   return {
     id: listing.id,
     address: addressOf(listing),
@@ -257,12 +264,13 @@ function publicProject(listing: GalleryLinkDoc, _related: GalleryLinkDoc[], noti
     services: servicesOf(listing),
     images: publicImages(listing),
     videos: publicVideos(listing),
-    tourUrl: tour.startsWith("http://") || tour.startsWith("https://") ? tour : "",
+    tourUrl: httpUrl(listing.tourUrl),
     revisions: publicRevisions(listing),
     lockDownloads: listing.lockDownloads === true,
     requirePayment: listing.requirePayment === true,
     invoice: invoiceOf(listing),
     notice,
+    view: "public",
   };
 }
 

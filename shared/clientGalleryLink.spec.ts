@@ -16,7 +16,13 @@ function listing(overrides: Record<string, unknown> = {}): GalleryLinkDoc {
     images: [
       { url: "https://cdn.example/final.jpg", name: "front.jpg", path: `listings/${LISTING_ID}/finals/1_front.jpg` },
       { url: "https://cdn.example/raw.dng", name: "front.dng", path: `listings/${LISTING_ID}/raw/1_front.dng`, contentType: "image/x-adobe-dng" },
+      { url: "javascript:alert(1)", name: "bad.jpg", path: `listings/${LISTING_ID}/photos/bad.jpg` },
     ],
+    videos: [
+      { url: "javascript:alert(1)", name: "bad" },
+      { url: "https://cdn.example/walkthrough.mp4", name: "Walkthrough" },
+    ],
+    tourUrl: "javascript:alert(1)",
     ...overrides,
   };
 }
@@ -40,8 +46,12 @@ describe("decideClientGalleryLink", () => {
     expect(result.openGalleryId).toBeNull();
     expect(result.project.id).toBe(LISTING_ID);
     expect(result.project.images).toEqual([{ url: "https://cdn.example/final.jpg", name: "front.jpg" }]);
+    expect(result.project.videos).toEqual([{ url: "https://cdn.example/walkthrough.mp4", name: "Walkthrough" }]);
+    expect(result.project.tourUrl).toBe("");
+    expect(result.project.view).toBe("public");
     expect(result.project.clientName).toBe("Ada Agent");
     expect(JSON.stringify(result.project)).not.toContain("ada@example.com");
+    expect(JSON.stringify(result.project)).not.toContain("javascript:");
     expect(JSON.stringify(result.project)).not.toContain("512-555-0100");
     expect(JSON.stringify(result.project)).not.toContain("lockbox");
     expect(JSON.stringify(result.project)).not.toContain("secret-token");

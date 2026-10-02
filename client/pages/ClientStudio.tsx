@@ -2,7 +2,7 @@ import * as React from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { doc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp } from "firebase/firestore";
 import { fetchListing } from "@/lib/listingUpload";
 import { toast } from "sonner";
 import {
@@ -21,8 +21,15 @@ function failureCopy(status: number, data: { code?: string; message?: string; er
   const message = data.message || data.error || "";
   if (data.code === "studio_disabled") return { title: "Studio link is off", message };
   if (data.code === "studio_locked") return { title: "Studio link is locked", message };
-  if (data.code === "invalid_id") return { title: "Gallery link not found", message };
-  if (status === 503) return { title: "Gallery link could not be checked", message };
+  if (data.code === "dangling_pointer") return { title: "Linked record is missing", message };
+  if (data.code === "unknown") return { title: "No gallery or project found", message };
+  if (data.code === "invalid_id") return { title: "This is not a gallery link", message };
+  if (status === 503 || status === 500 || data.code === "lookup_unavailable" || data.code === "lookup_failed") {
+    return {
+      title: "Gallery link could not be checked",
+      message: message || "The gallery lookup did not finish. This is not a missing gallery id.",
+    };
+  }
   return {
     title: "Gallery link not found",
     message: message || `No gallery or project uses ${id}.`,
@@ -32,7 +39,7 @@ function failureCopy(status: number, data: { code?: string; message?: string; er
 export default function ClientStudio() {
   const { listingId } = useParams<{ listingId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [project, setProject] = React.useState<any>(null);
   const [failure, setFailure] = React.useState<{ title: string; message: string; galleryId?: string } | null>(null);
   const [leaving, setLeaving] = React.useState(false);
@@ -45,8 +52,10 @@ export default function ClientStudio() {
   const [activeTab, setActiveTab] = React.useState<"photos" | "videos" | "tours" | "revisions" | "ai_studio">("photos");
 
   React.useEffect(() => {
-    if (!listingId) return;
+    if (!listingId || authLoading) return;
     let cancelled = false;
+    setLoading(true);
+    setLeaving(false);
     (async () => {
       try {
         const res = await fetch(`/api/galleries/link/${encodeURIComponent(listingId)}`);
@@ -73,8 +82,22 @@ export default function ClientStudio() {
           return;
         }
         if (res.ok && data.kind === "listing" && data.project) {
-          setFailure(null);
-          setProject(data.project);
+          let next = data.project;
+          if (user) {
+            try {
+              const snap = await getDoc(doc(db, "listings", listingId));
+              if (snap.exists()) {
+                next = { id: snap.id, ...snap.data() };
+                if (data.project.notice && !next.notice) next.notice = data.project.notice;
+              }
+            } catch (err) {
+              console.warn("[ClientStudio] Signed-in listing read failed.", err);
+            }
+          }
+          if (!cancelled) {
+            setFailure(null);
+            setProject(next);
+          }
           return;
         }
 
@@ -98,8 +121,8 @@ export default function ClientStudio() {
         if (!cancelled) {
           setProject(null);
           setFailure({
-            title: "Gallery link not found",
-            message: `The lookup for ${listingId} did not finish. Check galleries/${listingId} and listings/${listingId}.`,
+            title: "Gallery link could not be checked",
+            message: `The lookup for ${listingId} did not finish. This is not a missing gallery id. Check galleries/${listingId} and listings/${listingId}.`,
           });
         }
       } finally {
@@ -109,10 +132,16 @@ export default function ClientStudio() {
     return () => {
       cancelled = true;
     };
-  }, [listingId, navigate, user]);
+  }, [listingId, navigate, user, authLoading]);
+
+  const canRevise = Boolean(user) && project?.view !== "public";
 
   const handleRevisionSubmit = async () => {
     if (!revisionNote.trim() || !listingId) return;
+    if (!canRevise) {
+      toast.error("This shared view can't save a revision. Open the project while signed in with edit access.");
+      return;
+    }
     setSubmittingRevision(true);
     try {
       // Add revision to the project
@@ -249,7 +278,7 @@ export default function ClientStudio() {
                   <img src={img.url} alt={img.name || `Photo ${i+1}`} className="w-full h-full object-cover" loading="lazy" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
                     {!locked && <button className="p-2 bg-white rounded-lg"><Download className="w-4 h-4 text-black" /></button>}
-                    {user && (
+                    {canRevise && (
                       <button onClick={e => { e.stopPropagation(); setSelectedPhoto(i); setRevisionType("single"); setShowRevision(true); }}
                         className="p-2 bg-white rounded-lg"><Edit3 className="w-4 h-4 text-black" /></button>
                     )}
@@ -300,11 +329,13 @@ export default function ClientStudio() {
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-black uppercase tracking-widest">Revision Requests</h3>
-              {user ? (
+              {canRevise ? (
                 <button onClick={() => { setRevisionType("gallery"); setShowRevision(true); }}
                   className="px-4 py-2 bg-[#0d9488] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#0f766e]">
                   + Request Revision
                 </button>
+              ) : user ? (
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Revision saves need project edit access</p>
               ) : (
                 <Link to="/login" state={{ from: { pathname: `/studio/${listingId}` } }}
                   className="px-4 py-2 border border-gray-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-600">
@@ -357,7 +388,7 @@ export default function ClientStudio() {
             <button className="flex items-center gap-2 px-6 py-3 bg-black text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-800">
               <Download className="w-4 h-4" /> Download All Photos
             </button>
-            {user && (
+            {canRevise && (
               <button onClick={() => { setRevisionType("gallery"); setShowRevision(true); }}
                 className="flex items-center gap-2 px-6 py-3 border-2 border-gray-200 text-gray-700 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-50">
                 <Edit3 className="w-4 h-4" /> Request Revision
@@ -377,7 +408,7 @@ export default function ClientStudio() {
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3">
             <span className="text-white text-xs font-bold">{selectedPhoto + 1} / {images.length}</span>
             {!locked && <a href={images[selectedPhoto]?.url} download className="px-3 py-1.5 bg-white text-black rounded-lg text-[10px] font-bold">Download</a>}
-            {user && (
+            {canRevise && (
               <button onClick={() => { setRevisionType("single"); setShowRevision(true); }} className="px-3 py-1.5 bg-white/20 text-white rounded-lg text-[10px] font-bold">Request Edit</button>
             )}
           </div>
