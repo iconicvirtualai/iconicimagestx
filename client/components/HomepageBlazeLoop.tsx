@@ -36,8 +36,8 @@ function BurnIn({ slot, onBlack }: { slot: HomepageBlazeSlot; onBlack: boolean }
 }
 
 /**
- * Muted 9:16 hard-cut loop. Renders nothing until at least one slot `src` is set,
- * so empty draft placeholders do not leave a broken frame on the homepage.
+ * Muted 9:16 hard-cut loop. Renders nothing while slots are on hold or src is
+ * empty, so Drive drafts cannot land on the homepage as a broken or live frame.
  */
 export default function HomepageBlazeLoop({ slots = HOMEPAGE_BLAZE_LOOP }: Props) {
   const playable = useMemo(() => playableBlazeSlots(slots), [slots]);

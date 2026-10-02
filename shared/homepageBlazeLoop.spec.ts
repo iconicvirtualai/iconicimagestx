@@ -8,11 +8,13 @@ import {
   blazeCopyIsBrandSafe,
   blazeLoopShouldRender,
   blazePublicCopy,
+  blazeSlotIsPlayable,
   playableBlazeSlots,
 } from "./homepageBlazeLoop";
 
-const withSrc = HOMEPAGE_BLAZE_LOOP.map((slot) => ({
+const withFinalSrc = HOMEPAGE_BLAZE_LOOP.map((slot) => ({
   ...slot,
+  approval: "final" as const,
   src: `https://cdn.example/blaze/${slot.id}.mp4`,
 }));
 
@@ -42,30 +44,47 @@ describe("homepage blaze loop slots", () => {
     ]);
   });
 
-  it("leaves src empty so draft Drive files are not wired as finals", () => {
+  it("leaves every slot on hold with an empty src", () => {
     expect(blazeLoopShouldRender()).toBe(false);
     expect(playableBlazeSlots()).toEqual([]);
+    const shipped = JSON.stringify(HOMEPAGE_BLAZE_LOOP);
+    expect(shipped).not.toMatch(/drive\.google|googleusercontent|santa|elf|bathroom/i);
     for (const slot of HOMEPAGE_BLAZE_LOOP) {
+      expect(slot.approval).toBe("hold-not-final");
       expect(slot.src).toBe("");
-      expect(slot.src).not.toMatch(/drive\.google|googleusercontent/i);
+      expect(blazeSlotIsPlayable(slot)).toBe(false);
     }
   });
 
-  it("plays filled slots in locked order and skips blanks", () => {
-    const shuffled = [withSrc[2], withSrc[0], { ...withSrc[1], src: "  " }];
+  it("refuses Drive drafts and held slots even when a src is filled in", () => {
+    const heldWithSrc = {
+      ...HOMEPAGE_BLAZE_LOOP[1],
+      src: "https://drive.google.com/file/d/1UTpe1GIaAXmWp5VEaGnf612gyDwiDQll/view",
+    };
+    const finalButDrive = { ...heldWithSrc, approval: "final" as const };
+    expect(blazeSlotIsPlayable(heldWithSrc)).toBe(false);
+    expect(blazeSlotIsPlayable(finalButDrive)).toBe(false);
+    expect(playableBlazeSlots([heldWithSrc, finalButDrive])).toEqual([]);
+    expect(blazeLoopShouldRender([heldWithSrc, finalButDrive])).toBe(false);
+  });
+
+  it("plays approved slots in locked order and skips blanks", () => {
+    const shuffled = [withFinalSrc[2], withFinalSrc[0], { ...withFinalSrc[1], src: "  " }];
     expect(playableBlazeSlots(shuffled).map((slot) => slot.id)).toEqual(["BUILT", "TEN_YEARS"]);
   });
 
   it("hard-cuts through the series, holds the closer, then loops", () => {
-    const slots = playableBlazeSlots(withSrc);
+    const slots = playableBlazeSlots(withFinalSrc);
     expect(blazeAdvance(slots, 0, "clip")).toEqual({ index: 1, phase: "clip" });
     expect(blazeAdvance(slots, 1, "clip")).toEqual({ index: 2, phase: "clip" });
     expect(blazeAdvance(slots, 2, "clip")).toEqual({ index: 2, phase: "endcard" });
     expect(blazeAdvance(slots, 2, "endcard")).toEqual({ index: 0, phase: "clip" });
   });
 
-  it("loops a single filled slot without an end card", () => {
-    const slots = playableBlazeSlots([{ ...HOMEPAGE_BLAZE_LOOP[0], src: "https://cdn.example/built.mp4" }]);
+  it("loops a single approved slot without an end card", () => {
+    const slots = playableBlazeSlots([
+      { ...HOMEPAGE_BLAZE_LOOP[0], approval: "final" as const, src: "https://cdn.example/built.mp4" },
+    ]);
     expect(blazeAdvance(slots, 0, "clip")).toEqual({ index: 0, phase: "clip" });
   });
 

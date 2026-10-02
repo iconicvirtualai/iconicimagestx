@@ -4,15 +4,35 @@ import HomepageBlazeLoop from "./HomepageBlazeLoop";
 import { HOMEPAGE_BLAZE_LOOP } from "@shared/homepageBlazeLoop";
 
 describe("HomepageBlazeLoop", () => {
-  it("renders nothing while every src is empty", () => {
+  it("renders nothing while slots are on hold", () => {
     const html = renderToString(<HomepageBlazeLoop />);
     expect(html).toBe("");
   });
 
-  it("hard-cuts a muted 9:16 clip when a final src is set", () => {
+  it("does not render a held slot even if a Drive src was pasted", () => {
     const html = renderToString(
       <HomepageBlazeLoop
-        slots={[{ ...HOMEPAGE_BLAZE_LOOP[0], src: "https://cdn.example/blaze/built.mp4" }]}
+        slots={[
+          {
+            ...HOMEPAGE_BLAZE_LOOP[1],
+            src: "https://drive.google.com/file/d/1UTpe1GIaAXmWp5VEaGnf612gyDwiDQll/view",
+          },
+        ]}
+      />,
+    );
+    expect(html).toBe("");
+  });
+
+  it("hard-cuts a muted 9:16 clip when a slot is marked final", () => {
+    const html = renderToString(
+      <HomepageBlazeLoop
+        slots={[
+          {
+            ...HOMEPAGE_BLAZE_LOOP[0],
+            approval: "final",
+            src: "https://cdn.example/blaze/built.mp4",
+          },
+        ]}
       />,
     );
     expect(html).toContain('data-testid="homepage-blaze-loop"');
@@ -34,7 +54,13 @@ describe("HomepageBlazeLoop", () => {
   it("puts the closer under the Iconic mark and hashtag once", () => {
     const html = renderToString(
       <HomepageBlazeLoop
-        slots={[{ ...HOMEPAGE_BLAZE_LOOP[2], src: "https://cdn.example/blaze/ten-years.mp4" }]}
+        slots={[
+          {
+            ...HOMEPAGE_BLAZE_LOOP[2],
+            approval: "final",
+            src: "https://cdn.example/blaze/ten-years.mp4",
+          },
+        ]}
       />,
     );
     expect(html).toContain('data-slot="TEN_YEARS"');

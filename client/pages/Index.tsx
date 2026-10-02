@@ -23,7 +23,7 @@ export default function Index() {
   return (
     <Layout>
       <HeroSection />
-      {/* Hidden until a final MP4 src is set in shared/homepageBlazeLoop.ts */}
+      {/* Hidden while blaze slots are hold-not-final. See shared/homepageBlazeLoop.ts */}
       <HomepageBlazeLoop />
       {settings.homepage.showBeforeAfter && (
         <>
