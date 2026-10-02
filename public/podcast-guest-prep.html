@@ -1,0 +1,371 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Podcast Guest Prep | Iconic Images</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">
+<style>
+/* Layout: one calm column of numbered "segments" (the episode run-of-show), sticky REC bar with progress, live prep sheet at the end */
+:root {
+  --bg: #F3F3F1;
+  --surface: #FFFFFF;
+  --ink: #16171A;
+  --muted: #5E6068;
+  --line: #DEDDD8;
+  /* accent options: light value / dark value */
+  --a-l: #146C74; --a-d: #6CCBD2;
+  --tally: var(--a-l);
+  --tally-soft: color-mix(in srgb, var(--tally) 10%, var(--surface));
+  --on-accent: #FFFFFF;
+  --chip: #ECEBE7;
+  --focus: var(--tally);
+  --display: "Poppins", "Avenir Next", "Segoe UI", sans-serif;
+  --body: "Poppins", "Helvetica Neue", Arial, sans-serif;
+  --mono: "Poppins", "Helvetica Neue", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111214; --surface: #1A1B1F; --ink: #EDEDEA; --muted: #A2A3AA; --line: #2E2F35;
+    --tally: var(--a-d); --on-accent: #111214; --chip: #25262B; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111214; --surface: #1A1B1F; --ink: #EDEDEA; --muted: #A2A3AA; --line: #2E2F35;
+  --tally: var(--a-d); --on-accent: #111214; --chip: #25262B; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.55; }
+.wrap { max-width: 760px; margin: 0 auto; padding-inline: 20px; padding-block: 0 80px; }
+
+
+/* REC bar */
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+.bar-in { max-width: 760px; margin: 0 auto; padding: 10px 20px; display: flex; align-items: center; gap: 14px; font-family: var(--mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.rec { display: inline-flex; align-items: center; gap: 8px; color: var(--tally); font-weight: 500; }
+.rec i { width: 9px; height: 9px; border-radius: 50%; background: var(--tally); animation: blink 1.6s steps(1) infinite; }
+@keyframes blink { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .rec i { animation: none; } }
+.meter { flex: 1; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; min-width: 60px; }
+.meter b { display: block; height: 100%; width: 0; background: var(--tally); transition: width .3s; }
+.saved { white-space: nowrap; }
+
+
+/* Hero */
+header.hero { padding-block: 48px 28px; display: grid; gap: 14px; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--tally); }
+h1 { font-family: var(--display); font-weight: 800; font-size: clamp(34px, 7vw, 54px); line-height: 1.02; letter-spacing: -.02em; margin: 0; text-wrap: balance; }
+.lede { font-size: 18px; color: var(--muted); margin: 0; max-width: 60ch; }
+.howto { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 14px; color: var(--muted); padding: 0; margin: 6px 0 0; list-style: none; }
+.howto li { display: flex; gap: 8px; align-items: baseline; }
+.howto strong { color: var(--ink); font-weight: 600; }
+
+
+/* Segments */
+section.seg { border-top: 1px solid var(--line); padding-block: 32px 8px; display: grid; gap: 22px; }
+.seg-head { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; align-items: baseline; }
+.seg-no { font-family: var(--mono); font-size: 13px; color: var(--tally); grid-row: span 2; padding-top: 6px; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 26px; line-height: 1.15; margin: 0; letter-spacing: -.01em; text-wrap: balance; }
+.seg-sub { color: var(--muted); margin: 0; font-size: 15px; }
+
+
+.q { display: grid; gap: 8px; }
+.q label.ql, .q .ql { font-weight: 600; font-size: 16px; line-height: 1.35; }
+.q .help { font-size: 14px; color: var(--muted); margin: -4px 0 0; }
+.tag { display: inline-block; font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; padding: 2px 7px; border-radius: 3px; margin-left: 8px; vertical-align: 2px; font-weight: 500; }
+.tag.req { background: transparent; color: var(--muted); border: 1px solid var(--line); text-transform: none; letter-spacing: .01em; font-size: 11.5px; padding: 1px 8px; border-radius: 999px; }
+.tag.clip { background: var(--chip); color: var(--muted); }
+input[type=text], input[type=email], input[type=tel], input[type=url], textarea, select {
+  width: 100%; font: inherit; font-size: 16px; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px;
+}
+textarea { min-height: 96px; resize: vertical; line-height: 1.5; }
+input::placeholder, textarea::placeholder { color: color-mix(in srgb, var(--muted) 70%, transparent); }
+input:focus-visible, textarea:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.row2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; }
+
+
+/* Topic chips */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { font: inherit; font-size: 14px; cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 8px 14px; transition: background .15s, border-color .15s; }
+.chip:hover { border-color: var(--muted); }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.choice { display: flex; flex-wrap: wrap; gap: 8px; }
+
+
+/* Prep sheet output */
+.out { border: 1px solid var(--line); background: var(--surface); border-radius: 12px; overflow: hidden; }
+.out-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+.out-head span { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+pre#sheet { margin: 0; padding: 18px; max-height: 420px; overflow: auto; font-family: var(--mono); font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+.btn { font: inherit; font-weight: 600; font-size: 15px; cursor: pointer; border-radius: 8px; padding: 11px 18px; border: 1px solid var(--tally); background: var(--tally); color: var(--on-accent); }
+.btn.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+.btns { display: flex; flex-wrap: wrap; gap: 10px; }
+.send { display: grid; gap: 10px; background: var(--tally-soft); border-radius: 12px; padding: 18px; }
+.send p { margin: 0; }
+.addr { font-family: var(--mono); font-size: 15px; user-select: all; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
+.missing { color: var(--muted); font-size: 14px; margin: 0; }
+.toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s; }
+.toast.on { opacity: 1; }
+footer { color: var(--muted); font-size: 13px; padding-top: 28px; }
+@media (max-width: 480px) { .bar-in .saved { display: none; } h2 { font-size: 23px; } }
+</style>
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+
+
+
+
+<div class="bar"><div class="bar-in">
+  <span class="rec"><i></i>Pre-show</span>
+  <span class="meter" aria-hidden="true"><b id="meterFill"></b></span>
+  <span id="pct">0%</span>
+  <span class="saved" id="savedNote">Draft saves on this device</span>
+</div></div>
+
+
+<div class="wrap">
+  <header class="hero">
+    <div class="eyebrow">Iconic Images Podcast · Guest prep sheet</div>
+    <h1>Give us the good stuff before the mics go hot.</h1>
+    <p class="lede">This sheet helps us build the conversation around what you actually want to talk about, so nothing feels scripted and nothing good gets left on the table.</p>
+    <ul class="howto">
+      <li><strong>~10 minutes</strong> start to finish</li>
+      <li><strong>Only 4 answers required.</strong> Skip anything else.</li>
+      <li><strong>Bullet points are fine.</strong> Messy beats blank.</li>
+    </ul>
+  </header>
+
+
+  <form id="f" novalidate>
+    <div id="segments"></div>
+
+
+    <section class="seg" id="finish">
+      <div class="seg-head">
+        <span class="seg-no">09</span>
+        <h2>Send it over</h2>
+        <p class="seg-sub">Your answers are packaged below as a prep sheet. Copy it and email or text it to us.</p>
+      </div>
+      <p class="missing" id="missing" hidden></p>
+      <div class="out">
+        <div class="out-head">
+          <span>Your prep sheet</span>
+          <div class="btns">
+            <button type="button" class="btn" id="copyBtn">Copy my answers</button>
+          </div>
+        </div>
+        <pre id="sheet" aria-live="polite"></pre>
+      </div>
+      <div class="send">
+        <p><strong>Paste it into an email to</strong> <span class="addr">mike@iconicimagestx.com</span></p>
+        <p style="font-size:14px;color:var(--muted)">Subject line idea: "Podcast prep – your name". A text to Mike works too. Send it at least 48 hours before your recording so we can plan the episode.</p>
+        <div class="btns"><a class="btn ghost" id="mailLink" href="mailto:mike@iconicimagestx.com">Open in my email app</a></div>
+      </div>
+      <div class="btns"><button type="button" class="btn ghost" id="clearBtn">Clear my answers</button><span id="clearConfirm" hidden><button type="button" class="btn" id="clearYes">Yes, clear everything</button></span></div>
+    </section>
+  </form>
+
+
+  <footer>Iconic Images Media &amp; Marketing · The Woodlands, TX · Nothing you write here goes public. We use it to plan the episode, and we'll check with you before anything off-limits comes up.</footer>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+
+<script>
+const SEGMENTS = [
+  { title: "The basics", sub: "So we introduce you right and tag the right accounts.", qs: [
+    { id: "name", label: "Your name", type: "text", req: true, ph: "Jordan Reyes", half: true },
+    { id: "pronounce", label: "How do you pronounce it?", type: "text", ph: "RAY-ez", half: true },
+    { id: "biz", label: "Company, brokerage, or team", type: "text", req: true, ph: "Reyes Home Group, eXp Realty", half: true },
+    { id: "role", label: "What you do, in plain words", type: "text", ph: "Listing agent, mostly Conroe and Magnolia", half: true },
+    { id: "intro", label: "How should we introduce you?", type: "textarea", help: "One or two sentences. What would you want a stranger to hear first about you?", ph: "Top-producing listing agent in Montgomery County who sold 40 homes last year without a single open house." },
+    { id: "ig", label: "Instagram handle", type: "text", ph: "@yourhandle", half: true },
+    { id: "site", label: "Website or other socials", type: "text", ph: "yoursite.com, TikTok, YouTube", half: true }
+  ]},
+  { title: "Your story", sub: "The origin story is the backbone of the episode. Give us the real version.", qs: [
+    { id: "origin", label: "How did you end up doing what you do?", type: "textarea", ph: "What were you doing before? What made you jump?" },
+    { id: "almostquit", label: "When did you almost quit, and what kept you in it?", type: "textarea", clip: true, ph: "The low point, and the thing that turned it around." },
+    { id: "different", label: "What do you do that most people in your field don't?", type: "textarea", ph: "Your edge. Your weird system. The thing clients mention." }
+  ]},
+  { title: "Hot takes", sub: "We're blunt on this show. These are the moments people share.", qs: [
+    { id: "unpopular", label: "What's an opinion most people in your industry would disagree with?", type: "textarea", req: true, clip: true, ph: "Open houses are a waste of a Saturday. Zillow photos are killing listings. Say it." },
+    { id: "overrated", label: "Something everyone is doing right now that you think is overrated", type: "textarea", clip: true, ph: "A tactic, a trend, a tool, a piece of advice." },
+    { id: "mistake", label: "The biggest mistake you see agents, clients, or homeowners make", type: "textarea", clip: true, ph: "And what they should do instead." }
+  ]},
+  { title: "Receipts and stories", sub: "Specific numbers and real moments make the best episodes and the best clips.", qs: [
+    { id: "win", label: "Your proudest win. Give us the numbers.", type: "textarea", clip: true, ph: "Sold a $1.2M home in 4 days. Went from 3 to 30 deals a year. Whatever it is." },
+    { id: "sideways", label: "A deal or project that went sideways. What happened?", type: "textarea", ph: "The disaster, and what it taught you." },
+    { id: "funny", label: "A story that still makes you laugh (or cringe)", type: "textarea", clip: true, ph: "The showing, the client, the seller who turned on every ceiling fan..." }
+  ]},
+  { title: "What listeners get", sub: "Every episode should leave people with something they can use.", qs: [
+    { id: "takeaway", label: "If listeners remember one thing from you, what should it be?", type: "textarea", req: true, ph: "Your main point for the whole episode." },
+    { id: "tactic", label: "A tactic, tool, or habit someone could use tomorrow", type: "textarea", clip: true, ph: "The more specific, the better. Scripts, apps, routines, all fair game." },
+    { id: "working", label: "What's working for you in marketing or lead gen right now?", type: "textarea", ph: "Content, referrals, ads, partnerships, events..." }
+  ]},
+  { title: "Pick your topics", sub: "Tap anything you'd enjoy talking about. Pick as many as you want.", qs: [
+    { id: "topics", label: "Topics you'd like to cover", type: "chips", options: [
+      "Local market (Conroe, Magnolia, The Woodlands)", "Builder incentives vs. resale", "Pricing and seller expectations",
+      "Relocation buyers", "Social media and content", "Personal branding", "Getting comfortable on camera",
+      "Lead generation", "Referrals and repeat business", "Building a team", "Mindset and burnout",
+      "AI and new tech", "Money and business growth", "Wild client stories", "Faith, family, and balance"
+    ]},
+    { id: "othertopics", label: "Anything else you want to talk about?", type: "textarea", ph: "A passion project, a cause, a side business, a story you've never told on a mic." }
+  ]},
+  { title: "Rapid fire", sub: "Quick, fun answers. We may throw these at you at the end.", qs: [
+    { id: "food", label: "Favorite local spot to eat", type: "text", ph: "Where you take clients after a closing", half: true },
+    { id: "app", label: "One app or tool you can't work without", type: "text", ph: "", half: true },
+    { id: "worsthouse", label: "Worst house you've ever walked into", type: "text", clip: true, ph: "Keep it short. We'll get the full story on air." },
+    { id: "plan-b", label: "If you weren't doing this, you'd be...", type: "text", ph: "", half: true },
+    { id: "song", label: "Your walk-up song", type: "text", ph: "", half: true }
+  ]},
+  { title: "Ground rules and logistics", sub: "So we promote the right things and steer clear of the wrong ones.", qs: [
+    { id: "offlimits", label: "Anything off-limits?", type: "textarea", ph: "Topics, names, deals, or details you don't want to discuss on camera." },
+    { id: "promote", label: "Anything you want to promote?", type: "textarea", ph: "A listing, an event, a free guide, a new service." },
+    { id: "cta", label: "Where should people go to find you?", type: "text", ph: "DM me on Instagram, go to my website, call my office...", },
+    { id: "email", label: "Best email", type: "email", req: true, ph: "you@email.com", half: true },
+    { id: "phone", label: "Best phone for day-of", type: "tel", ph: "(936) 555-0100", half: true },
+    { id: "date", label: "Your recording date (we record on Tuesdays)", type: "text", ph: "Tue, Oct 13 at 10am, or 'not scheduled yet'", half: true },
+    { id: "clips", label: "OK for us to post short clips from your episode?", type: "choice", options: ["Yes, tag me", "Yes, but check with me first", "Let's talk about it"], half: true },
+    { id: "notes", label: "Anything else we should know?", type: "textarea", ph: "Bringing a co-guest, need parking info, nervous on camera (totally normal), etc." }
+  ]}
+];
+
+
+const KEY = "iconic-guest-prep-v1";
+let state = {};
+try { state = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { state = {}; }
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+
+function qHTML(q) {
+  const tags = (q.req ? '<span class="tag req">required</span>' : "") + (q.clip ? '<span class="tag clip">Clip gold</span>' : "");
+  const help = q.help ? `<p class="help">${esc(q.help)}</p>` : "";
+  if (q.type === "chips" || q.type === "choice") {
+    const btns = q.options.map(o => `<button type="button" class="chip" data-q="${q.id}" data-v="${esc(o)}" aria-pressed="false">${esc(o)}</button>`).join("");
+    return `<div class="q" role="group" aria-labelledby="l-${q.id}"><span class="ql" id="l-${q.id}">${esc(q.label)}${tags}</span>${help}<div class="${q.type === "chips" ? "chips" : "choice"}">${btns}</div></div>`;
+  }
+  const field = q.type === "textarea"
+    ? `<textarea id="${q.id}" name="${q.id}" placeholder="${esc(q.ph || "")}"></textarea>`
+    : `<input type="${q.type}" id="${q.id}" name="${q.id}" placeholder="${esc(q.ph || "")}" autocomplete="off">`;
+  return `<div class="q"><label class="ql" for="${q.id}">${esc(q.label)}${tags}</label>${help}${field}</div>`;
+}
+
+
+function render() {
+  const host = document.getElementById("segments");
+  host.innerHTML = SEGMENTS.map((s, i) => {
+    let body = "", buf = [];
+    const flush = () => { if (buf.length) { body += `<div class="row2">${buf.join("")}</div>`; buf = []; } };
+    s.qs.forEach(q => { if (q.half) buf.push(qHTML(q)); else { flush(); body += qHTML(q); } });
+    flush();
+    return `<section class="seg"><div class="seg-head"><span class="seg-no">${String(i + 1).padStart(2, "0")}</span><h2>${esc(s.title)}</h2><p class="seg-sub">${esc(s.sub)}</p></div>${body}</section>`;
+  }).join("");
+  // restore
+  SEGMENTS.flatMap(s => s.qs).forEach(q => {
+    if (q.type === "chips" || q.type === "choice") {
+      const v = state[q.id] || (q.type === "chips" ? [] : "");
+      document.querySelectorAll(`.chip[data-q="${q.id}"]`).forEach(b => {
+        b.setAttribute("aria-pressed", String(q.type === "chips" ? v.includes(b.dataset.v) : v === b.dataset.v));
+      });
+    } else {
+      const el = document.getElementById(q.id);
+      if (el && state[q.id]) el.value = state[q.id];
+    }
+  });
+}
+
+
+let saveT;
+function save() {
+  clearTimeout(saveT);
+  saveT = setTimeout(() => {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); document.getElementById("savedNote").textContent = "Draft saved on this device"; } catch (e) {}
+  }, 300);
+  update();
+}
+
+
+function allQs() { return SEGMENTS.flatMap(s => s.qs); }
+function filled(q) { const v = state[q.id]; return Array.isArray(v) ? v.length > 0 : !!(v && String(v).trim()); }
+
+
+function buildSheet() {
+  const lines = [];
+  const name = (state.name || "").trim() || "[Guest name]";
+  lines.push(`PODCAST GUEST PREP · ${name.toUpperCase()}`);
+  lines.push("=".repeat(Math.min(48, 26 + name.length)));
+  SEGMENTS.forEach(s => {
+    const answered = s.qs.filter(filled);
+    if (!answered.length) return;
+    lines.push("", `## ${s.title.toUpperCase()}`);
+    answered.forEach(q => {
+      const v = state[q.id];
+      const val = Array.isArray(v) ? v.map(x => "  • " + x).join("\n") : String(v).trim();
+      const multi = Array.isArray(v) || q.type === "textarea";
+      lines.push(multi ? `${q.label}${q.clip ? " [clip]" : ""}:\n${Array.isArray(v) ? val : val.split("\n").map(l => "  " + l).join("\n")}` : `${q.label}: ${val}`);
+    });
+  });
+  return lines.join("\n");
+}
+
+
+function update() {
+  const qs = allQs();
+  const n = qs.filter(filled).length;
+  const pct = Math.round(n / qs.length * 100);
+  document.getElementById("meterFill").style.width = pct + "%";
+  document.getElementById("pct").textContent = pct + "%";
+  const sheet = buildSheet();
+  document.getElementById("sheet").textContent = n ? sheet : "Start answering above. Your prep sheet builds itself here.";
+  const miss = qs.filter(q => q.req && !filled(q)).map(q => q.label);
+  const m = document.getElementById("missing");
+  m.hidden = !miss.length;
+  m.textContent = miss.length ? "Still needed: " + miss.join(" · ") : "";
+  const subj = "Podcast prep – " + ((state.name || "").trim() || "Guest");
+  document.getElementById("mailLink").href = "mailto:mike@iconicimagestx.com?subject=" + encodeURIComponent(subj) + "&body=" + encodeURIComponent(sheet.slice(0, 1800));
+}
+
+
+function toast(msg) { const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("on"); setTimeout(() => t.classList.remove("on"), 2200); }
+
+
+document.addEventListener("input", e => { if (e.target.id && e.target.closest("#segments")) { state[e.target.id] = e.target.value; save(); } });
+document.addEventListener("click", e => {
+  const b = e.target.closest(".chip"); if (!b) return;
+  const q = allQs().find(x => x.id === b.dataset.q);
+  if (q.type === "chips") {
+    const arr = state[q.id] || [];
+    const i = arr.indexOf(b.dataset.v);
+    if (i >= 0) arr.splice(i, 1); else arr.push(b.dataset.v);
+    state[q.id] = arr; b.setAttribute("aria-pressed", String(i < 0));
+  } else {
+    const on = state[q.id] !== b.dataset.v;
+    state[q.id] = on ? b.dataset.v : "";
+    document.querySelectorAll(`.chip[data-q="${q.id}"]`).forEach(x => x.setAttribute("aria-pressed", String(on && x === b)));
+  }
+  save();
+});
+document.getElementById("f").addEventListener("submit", e => e.preventDefault());
+document.getElementById("copyBtn").addEventListener("click", () => {
+  const text = buildSheet();
+  const fallback = () => { const r = document.createRange(); r.selectNodeContents(document.getElementById("sheet")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); toast("Selected. Press Ctrl/Cmd + C to copy."); };
+  try { navigator.clipboard.writeText(text).then(() => toast("Copied. Paste it into an email to Mike."), fallback); } catch (err) { fallback(); }
+});
+document.getElementById("clearBtn").addEventListener("click", () => { document.getElementById("clearConfirm").hidden = false; });
+document.getElementById("clearYes").addEventListener("click", () => {
+  state = {}; try { localStorage.removeItem(KEY); } catch (e) {}
+  render(); update(); document.getElementById("clearConfirm").hidden = true; toast("Cleared");
+});
+
+
+render(); update();
+</script>
+
+
+</body>
+</html>

@@ -37,6 +37,18 @@ function expressPlugin(): Plugin {
     name: "express-plugin",
     apply: "serve", // Only apply during development (serve mode)
     configureServer(server) {
+      // Serve the standalone guest-prep sheet at a clean path before the SPA fallback.
+      server.middlewares.use((req, _res, next) => {
+        const raw = req.url || "";
+        const queryAt = raw.indexOf("?");
+        const pathOnly = queryAt === -1 ? raw : raw.slice(0, queryAt);
+        if (pathOnly === "/podcast-guest-prep" || pathOnly === "/podcast-guest-prep/") {
+          const search = queryAt === -1 ? "" : raw.slice(queryAt);
+          req.url = `/podcast-guest-prep.html${search}`;
+        }
+        next();
+      });
+
       const app = createServer();
 
       // Add Express app as middleware to Vite dev server

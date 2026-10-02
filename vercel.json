@@ -18,6 +18,8 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/present/:token", "destination": "/api/presentations/shell/:token" },
+    { "source": "/podcast-guest-prep", "destination": "/podcast-guest-prep.html" },
+    { "source": "/podcast-guest-prep/", "destination": "/podcast-guest-prep.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
