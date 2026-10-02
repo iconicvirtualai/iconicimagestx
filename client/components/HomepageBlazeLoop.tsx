@@ -13,6 +13,8 @@ import {
 
 type Props = {
   slots?: readonly HomepageBlazeSlot[];
+  /** About places the same loop inside its banner, without the homepage section padding. */
+  embedded?: boolean;
 };
 
 function BurnIn({ slot, onBlack }: { slot: HomepageBlazeSlot; onBlack: boolean }) {
@@ -39,7 +41,7 @@ function BurnIn({ slot, onBlack }: { slot: HomepageBlazeSlot; onBlack: boolean }
  * Muted 9:16 hard-cut loop of the wired finals. Plays each file through, then
  * cuts. Burn-ins stay in the picture. A held or empty slot is skipped.
  */
-export default function HomepageBlazeLoop({ slots = HOMEPAGE_BLAZE_LOOP }: Props) {
+export default function HomepageBlazeLoop({ slots = HOMEPAGE_BLAZE_LOOP, embedded = false }: Props) {
   const playable = useMemo(() => playableBlazeSlots(slots), [slots]);
   const sequenceKey = playable.map((slot) => `${slot.id}:${slot.src}`).join("|");
   const [index, setIndex] = useState(0);
@@ -119,9 +121,7 @@ export default function HomepageBlazeLoop({ slots = HOMEPAGE_BLAZE_LOOP }: Props
   const slot = playable[safeIndex];
   const showClipBurnIn = phase === "clip" && slot.overlayBurnIn;
 
-  return (
-    <section className="bg-black px-4 pb-16" aria-label="Iconic reel" data-testid="homepage-blaze-loop">
-      <div className="mx-auto w-full max-w-[320px]">
+  const frame = (
         <div
           className="relative aspect-[9/16] overflow-hidden rounded-[1.75rem] border border-white/10 bg-black shadow-2xl"
           data-phase={phase}
@@ -145,7 +145,19 @@ export default function HomepageBlazeLoop({ slots = HOMEPAGE_BLAZE_LOOP }: Props
           {showClipBurnIn && <BurnIn slot={slot} onBlack={false} />}
           {phase === "endcard" && <BurnIn slot={slot} onBlack />}
         </div>
+  );
+
+  if (embedded) {
+    return (
+      <div className="mx-auto w-full max-w-[280px]" aria-label="Iconic reel" data-testid="homepage-blaze-loop">
+        {frame}
       </div>
+    );
+  }
+
+  return (
+    <section className="bg-black px-4 pb-16" aria-label="Iconic reel" data-testid="homepage-blaze-loop">
+      <div className="mx-auto w-full max-w-[320px]">{frame}</div>
     </section>
   );
 }
