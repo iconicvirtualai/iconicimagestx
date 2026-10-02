@@ -13,6 +13,13 @@ const distPath = path.join(__dirname, "../spa");
 // Serve static files
 app.use(express.static(distPath));
 
+// Standalone guest-prep sheet. The SPA catch-all below would otherwise
+// return the marketing app for this clean URL.
+const podcastGuestPrep = path.join(distPath, "podcast-guest-prep.html");
+app.get(["/podcast-guest-prep", "/podcast-guest-prep/"], (_req, res) => {
+  res.sendFile(podcastGuestPrep);
+});
+
 // Handle React Router - serve index.html for all non-API routes
 app.get("/{*splat}", async (req, res) => {
   // Don't serve index.html for API routes

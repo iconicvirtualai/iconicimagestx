@@ -13,3 +13,14 @@
   from = "/api/*"
   status = 200
   to = "/.netlify/functions/api/:splat"
+
+# Standalone guest-prep sheet. Must stay ahead of any SPA fallback.
+[[redirects]]
+  from = "/podcast-guest-prep"
+  status = 200
+  to = "/podcast-guest-prep.html"
+
+[[redirects]]
+  from = "/podcast-guest-prep/"
+  status = 200
+  to = "/podcast-guest-prep.html"
