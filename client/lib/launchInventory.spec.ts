@@ -22,7 +22,6 @@ const RESTORED_PRE_32 = new Set([
   "client/pages/StockFootage.tsx",
   "client/components/HeroSection.tsx",
   "client/components/MediaCarousel.tsx",
-  "client/components/TestimonialsSection.tsx",
   "client/hooks/useSiteSettings.ts",
 ]);
 
