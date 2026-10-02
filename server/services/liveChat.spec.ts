@@ -72,7 +72,10 @@ describe("live chat staff routing", () => {
     expect(source).not.toContain("to: input.email");
     expect(source).not.toContain("to: input.phone");
     expect(widget).toContain('fetch("/api/contact/live-chat"');
+    expect(widget).toContain("text-gray-900 placeholder:text-gray-500");
     expect(widget).not.toContain("setTimeout");
+    const email = readFileSync(new URL("./email.ts", import.meta.url), "utf8");
+    expect(email).not.toContain("pool: true");
   });
 });
 

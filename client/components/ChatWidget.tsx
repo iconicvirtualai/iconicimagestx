@@ -148,7 +148,7 @@ export default function ChatWidget({ isOpen, onClose }: { isOpen: boolean; onClo
     : "";
 
   return (
-    <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 w-[min(380px,calc(100vw-2rem))] h-[min(550px,calc(100dvh-2rem))] bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col z-[100] animate-in slide-in-from-bottom-6 duration-300">
+    <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 w-[min(380px,calc(100vw-2rem))] h-[min(550px,calc(100dvh-2rem))] bg-white text-gray-900 rounded-2xl shadow-2xl border border-gray-100 flex flex-col z-[100] animate-in slide-in-from-bottom-6 duration-300">
       <div className="p-6 bg-[#0d9488] rounded-t-2xl flex items-center justify-between text-white">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center border border-white/30 backdrop-blur-sm">
@@ -205,7 +205,7 @@ export default function ChatWidget({ isOpen, onClose }: { isOpen: boolean; onClo
               placeholder="Your name"
               autoComplete="name"
               aria-label="Your name"
-              className="w-full px-4 py-2 bg-gray-100 rounded-xl outline-none text-sm focus:ring-2 ring-teal-500/20 border border-transparent focus:bg-white transition-all"
+              className="w-full px-4 py-2 bg-gray-100 rounded-xl outline-none text-sm text-gray-900 placeholder:text-gray-500 caret-gray-900 focus:ring-2 ring-teal-500/20 border border-transparent focus:bg-white transition-all"
             />
             <input
               type="email"
@@ -214,7 +214,7 @@ export default function ChatWidget({ isOpen, onClose }: { isOpen: boolean; onClo
               placeholder="Email"
               autoComplete="email"
               aria-label="Email"
-              className="w-full px-4 py-2 bg-gray-100 rounded-xl outline-none text-sm focus:ring-2 ring-teal-500/20 border border-transparent focus:bg-white transition-all"
+              className="w-full px-4 py-2 bg-gray-100 rounded-xl outline-none text-sm text-gray-900 placeholder:text-gray-500 caret-gray-900 focus:ring-2 ring-teal-500/20 border border-transparent focus:bg-white transition-all"
             />
             <input
               type="tel"
@@ -223,7 +223,7 @@ export default function ChatWidget({ isOpen, onClose }: { isOpen: boolean; onClo
               placeholder="Phone"
               autoComplete="tel"
               aria-label="Phone"
-              className="w-full px-4 py-2 bg-gray-100 rounded-xl outline-none text-sm focus:ring-2 ring-teal-500/20 border border-transparent focus:bg-white transition-all"
+              className="w-full px-4 py-2 bg-gray-100 rounded-xl outline-none text-sm text-gray-900 placeholder:text-gray-500 caret-gray-900 focus:ring-2 ring-teal-500/20 border border-transparent focus:bg-white transition-all"
             />
             {contactError ? (
               <p role="alert" className="text-xs text-red-600">{contactError}</p>
@@ -264,7 +264,7 @@ export default function ChatWidget({ isOpen, onClose }: { isOpen: boolean; onClo
                 placeholder="Type your message..."
                 aria-label="Message"
                 disabled={sending}
-                className="flex-1 px-4 py-2 bg-gray-100 rounded-xl outline-none text-sm focus:ring-2 ring-teal-500/20 border border-transparent focus:bg-white transition-all disabled:opacity-60"
+                className="flex-1 px-4 py-2 bg-gray-100 rounded-xl outline-none text-sm text-gray-900 placeholder:text-gray-500 caret-gray-900 focus:ring-2 ring-teal-500/20 border border-transparent focus:bg-white transition-all disabled:opacity-60"
               />
               <button
                 type="submit"

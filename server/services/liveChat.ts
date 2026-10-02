@@ -94,35 +94,61 @@ export function liveChatSmsBody(input: LiveChatMessage): string {
 }
 
 export interface LiveChatDelivery {
-  emailDelivered: true;
+  emailDelivered: boolean;
   smsDelivered: boolean;
 }
 
+export class LiveChatDeliveryError extends Error {
+  readonly code: "not_configured" | "failed";
+
+  constructor(message: string, code: "not_configured" | "failed") {
+    super(message);
+    this.name = "LiveChatDeliveryError";
+    this.code = code;
+  }
+}
+
+function isMissingTransport(err: unknown): boolean {
+  const code = typeof err === "object" && err && "code" in err ? String((err as { code?: unknown }).code) : "";
+  if (code === "email_not_configured") return true;
+  const message = err instanceof Error ? err.message : "";
+  return /Twilio credentials not configured|TWILIO_PHONE_NUMBER not set|SMTP is not configured/i.test(message);
+}
+
 /**
- * Emails the office, then best-effort SMS to Google Voice.
- * Throws if the email does not send. SMS failure does not throw.
- * Does not email or text the visitor.
+ * Emails the office and texts Google Voice.
+ * Either channel reaching the office counts as delivered.
+ * Throws only when both fail. Does not email or text the visitor.
  */
 export async function deliverLiveChat(input: LiveChatMessage): Promise<LiveChatDelivery> {
   const to = liveChatStaffEmail();
-  const emailResult = await sendEmail({
-    to,
-    template: STAFF_INBOUND_EMAIL_TEMPLATE,
-    audience: "staff",
-    subject: `Live chat from ${oneLine(input.name).slice(0, 80)}`,
-    variables: {
-      senderName: escapeHtml(input.name),
-      senderEmail: escapeHtml(input.email || "Not provided"),
-      senderPhone: escapeHtml(input.phone || "Not provided"),
-      message: escapeHtml(input.message),
-    },
-  });
+  let emailDelivered = false;
+  let emailError: unknown;
 
-  if (!emailResult.sent) {
-    throw new Error("Staff live-chat email was not sent.");
+  try {
+    const emailResult = await sendEmail({
+      to,
+      template: STAFF_INBOUND_EMAIL_TEMPLATE,
+      audience: "staff",
+      subject: `Live chat from ${oneLine(input.name).slice(0, 80)}`,
+      variables: {
+        senderName: escapeHtml(input.name),
+        senderEmail: escapeHtml(input.email || "Not provided"),
+        senderPhone: escapeHtml(input.phone || "Not provided"),
+        message: escapeHtml(input.message),
+      },
+    });
+    emailDelivered = emailResult.sent;
+    if (!emailDelivered) {
+      emailError = new Error("Staff live-chat email was not sent.");
+    }
+  } catch (err) {
+    emailError = err;
+    console.error(`[LiveChat] Staff email to ${to} failed.`, err);
   }
 
   let smsDelivered = false;
+  let smsError: unknown;
   try {
     const sms = await sendSMS({
       to: STAFF_INBOUND_SMS_TO,
@@ -131,11 +157,23 @@ export async function deliverLiveChat(input: LiveChatMessage): Promise<LiveChatD
     });
     smsDelivered = !sms.suppressed && Boolean(sms.sid);
     if (!smsDelivered) {
-      console.warn(`[LiveChat] Staff SMS not sent (${sms.status}). Email to ${to} was delivered.`);
+      smsError = new Error(`Staff SMS not sent (${sms.status}).`);
+      console.warn(`[LiveChat] Staff SMS not sent (${sms.status}).`);
     }
   } catch (err) {
-    console.error("[LiveChat] Staff SMS failed (best effort). Email was delivered.", err);
+    smsError = err;
+    console.error("[LiveChat] Staff SMS failed.", err);
   }
 
-  return { emailDelivered: true, smsDelivered };
+  if (emailDelivered || smsDelivered) {
+    return { emailDelivered, smsDelivered };
+  }
+
+  const notConfigured = isMissingTransport(emailError) && isMissingTransport(smsError);
+  throw new LiveChatDeliveryError(
+    notConfigured
+      ? "Live chat delivery is not configured. Set SMTP_USER, SMTP_PASS, and the Twilio credentials."
+      : "Staff live-chat email and SMS were not sent.",
+    notConfigured ? "not_configured" : "failed",
+  );
 }

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { clientIp } from "../lib/clientIp";
 import { createRateLimiter } from "../lib/rateLimit";
-import { LIVE_CHAT_MAX_PER_WINDOW, LIVE_CHAT_WINDOW_MS, deliverLiveChat, parseLiveChatBody } from "../services/liveChat";
+import { LIVE_CHAT_MAX_PER_WINDOW, LIVE_CHAT_WINDOW_MS, LiveChatDeliveryError, deliverLiveChat, parseLiveChatBody } from "../services/liveChat";
 
 const router = Router();
 
@@ -39,6 +39,11 @@ router.post("/live-chat", async (req, res) => {
     });
   } catch (error) {
     console.error("[LiveChat] Delivery failed:", error);
+    if (error instanceof LiveChatDeliveryError && error.code === "not_configured") {
+      return res.status(503).json({
+        error: "Chat delivery isn't set up on this server yet. Please call 281-356-0965.",
+      });
+    }
     return res.status(500).json({
       error: "We couldn't deliver your message. Please try again, or call 281-356-0965.",
     });

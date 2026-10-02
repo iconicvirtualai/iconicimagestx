@@ -12,24 +12,32 @@ const db = () => admin.firestore();
 
 // ─── Transporter ──────────────────────────────────────────────────────────────
 
-let transporter: ReturnType<typeof nodemailer.createTransport> | null = null;
+export class EmailNotConfiguredError extends Error {
+  readonly code = "email_not_configured";
 
-function getTransporter() {
-  if (!transporter) {
-    transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || "smtp.gmail.com",
-      port: Number(process.env.SMTP_PORT) || 587,
-      secure: process.env.SMTP_SECURE === "true",
-      pool: true,
-      maxConnections: 1,
-      auth: {
-        user: process.env.SMTP_USER || process.env.EMAIL_FROM,
-        pass: process.env.SMTP_PASS,
-      },
-    });
+  constructor() {
+    super("SMTP is not configured. Set SMTP_USER and SMTP_PASS.");
+    this.name = "EmailNotConfiguredError";
+  }
+}
+
+/**
+ * One connection per send. A pooled socket dies when a serverless instance
+ * freezes, and the next live-chat send then fails before the office gets it.
+ */
+function createTransport() {
+  const user = process.env.SMTP_USER || process.env.EMAIL_FROM;
+  const pass = process.env.SMTP_PASS;
+  if (!user || !pass) {
+    throw new EmailNotConfiguredError();
   }
 
-  return transporter;
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST || "smtp.gmail.com",
+    port: Number(process.env.SMTP_PORT) || 587,
+    secure: process.env.SMTP_SECURE === "true",
+    auth: { user, pass },
+  });
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -69,25 +77,35 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ sent: bool
     return { sent: false };
   }
 
+  let subject = subjectOverride || `Message from Iconic Images`;
+  let htmlBody = getFallbackTemplate(template, variables);
+
+  // A missing or broken Firestore template must not block the built-in copy.
   try {
-    // Look up template from Firestore
-    const templateDoc = await db()
-      .collection("emailTemplates")
-      .where("category", "==", template)
-      .where("isActive", "==", true)
-      .limit(1)
-      .get();
+    if (admin.apps.length) {
+      const templateDoc = await db()
+        .collection("emailTemplates")
+        .where("category", "==", template)
+        .where("isActive", "==", true)
+        .limit(1)
+        .get();
 
-    let subject = subjectOverride || `Message from Iconic Images`;
-    let htmlBody = getFallbackTemplate(template, variables);
-
-    if (!templateDoc.empty) {
-      const tmpl = templateDoc.docs[0].data();
-      subject = subjectOverride || interpolate(tmpl.subject, variables);
-      htmlBody = interpolate(tmpl.htmlBody, variables);
+      if (!templateDoc.empty) {
+        const tmpl = templateDoc.docs[0].data();
+        if (!subjectOverride && typeof tmpl.subject === "string" && tmpl.subject.trim()) {
+          subject = interpolate(tmpl.subject, variables);
+        }
+        if (typeof tmpl.htmlBody === "string" && tmpl.htmlBody.trim()) {
+          htmlBody = interpolate(tmpl.htmlBody, variables);
+        }
+      }
     }
+  } catch (err) {
+    console.warn(`[Email] Template lookup failed for '${template}'. Using the built-in copy.`, err);
+  }
 
-    const transporter = getTransporter();
+  const transporter = createTransport();
+  try {
     await transporter.sendMail({
       from: `"Iconic Images" <${process.env.EMAIL_FROM || process.env.SMTP_USER}>`,
       to,
@@ -103,6 +121,8 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ sent: bool
   } catch (err) {
     console.error(`[Email] Failed to send '${template}' to ${to}:`, err);
     throw err;
+  } finally {
+    transporter.close();
   }
 }
 

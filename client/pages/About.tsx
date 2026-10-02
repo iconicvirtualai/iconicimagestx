@@ -3,6 +3,16 @@ import { Button } from "@/components/ui/button";
 import { Star, Zap, Rocket, MapPin, Quote, Award } from "lucide-react";
 import { Link } from "react-router-dom";
 
+const ABOUT_TILES = [
+  { img: "/media/about/tiles/01_est_2016.jpg", label: "Est. 2016" },
+  { img: "/media/about/tiles/02_the_engine.jpg", label: "The Engine" },
+  { img: "/media/about/tiles/03_scale.jpg", label: "Scale" },
+  { img: "/media/about/tiles/04_growth.jpg", label: "Growth" },
+  { img: "/media/about/tiles/05_legacy.jpg", label: "Legacy" },
+  { img: "/media/about/tiles/06_cinematic.jpg", label: "Cinematic" },
+  { img: "/media/about/tiles/08_market_lead.jpg", label: "Market Lead" },
+];
+
 export default function About() {
   return (
     <Layout>
@@ -28,25 +38,7 @@ export default function About() {
             {/* Moving Photo Carousel */}
             <div className="relative w-full overflow-hidden py-12">
               <div className="flex animate-scroll whitespace-nowrap">
-                {[
-                  { img: "/media/about/tiles/01_est_2016.jpg", label: "Est. 2016" },
-                  { img: "/media/about/tiles/02_the_engine.jpg", label: "The Engine" },
-                  { img: "/media/about/tiles/03_scale.jpg", label: "Scale" },
-                  { img: "/media/about/tiles/04_growth.jpg", label: "Growth" },
-                  { img: "/media/about/tiles/05_legacy.jpg", label: "Legacy" },
-                  { img: "/media/about/tiles/06_cinematic.jpg", label: "Cinematic" },
-                  { img: "/media/about/tiles/07_elite.jpg", label: "Elite" },
-                  { img: "/media/about/tiles/08_market_lead.jpg", label: "Market Lead" },
-                  // Repeat for seamless loop
-                  { img: "/media/about/tiles/01_est_2016.jpg", label: "Est. 2016" },
-                  { img: "/media/about/tiles/02_the_engine.jpg", label: "The Engine" },
-                  { img: "/media/about/tiles/03_scale.jpg", label: "Scale" },
-                  { img: "/media/about/tiles/04_growth.jpg", label: "Growth" },
-                  { img: "/media/about/tiles/05_legacy.jpg", label: "Legacy" },
-                  { img: "/media/about/tiles/06_cinematic.jpg", label: "Cinematic" },
-                  { img: "/media/about/tiles/07_elite.jpg", label: "Elite" },
-                  { img: "/media/about/tiles/08_market_lead.jpg", label: "Market Lead" },
-                ].map((item, i) => (
+                {[...ABOUT_TILES, ...ABOUT_TILES].map((item, i) => (
                   <div key={i} className="flex-shrink-0 mx-2 w-[184px] h-[184px] md:w-[268px] md:h-[268px] bg-gray-900 rounded-2xl border border-white/10 flex items-center justify-center relative overflow-hidden group">
                     <img src={item.img} className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-110 group-hover:opacity-60 transition-all duration-700" alt={item.label} />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
@@ -194,12 +186,13 @@ export default function About() {
       </div>
 
       <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes scroll {
+        @keyframes about-marquee {
           0% { transform: translateX(0); }
           100% { transform: translateX(-50%); }
         }
         .animate-scroll {
-          animation: scroll 40s linear infinite;
+          animation: about-marquee 48s linear infinite;
+          animation-timeline: auto;
         }
         .animate-scroll:hover {
           animation-play-state: paused;

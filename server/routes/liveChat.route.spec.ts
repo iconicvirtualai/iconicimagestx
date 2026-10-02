@@ -110,13 +110,25 @@ describe("POST /api/contact/live-chat", () => {
     expect(data.smsDelivered).toBe(false);
   });
 
-  it("keeps the send as a failure when email does not go out", async () => {
+  it("still delivers when email fails and the office text goes out", async () => {
     sendEmailMock.mockResolvedValue({ sent: false });
     const res = await postChat(validBody, "203.0.113.23");
     const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(data.emailDelivered).toBe(false);
+    expect(data.smsDelivered).toBe(true);
+    expect(sendSMSMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the send as a failure when neither email nor SMS goes out", async () => {
+    sendEmailMock.mockResolvedValue({ sent: false });
+    sendSMSMock.mockResolvedValue({ sid: "", status: "suppressed", suppressed: true });
+    const res = await postChat(validBody, "203.0.113.25");
+    const data = await res.json();
     expect(res.status).toBe(500);
     expect(data.success).toBeUndefined();
-    expect(sendSMSMock).not.toHaveBeenCalled();
+    expect(data.error).toMatch(/couldn't deliver/i);
   });
 
   it("rate-limits a single IP before it can spam SMS", async () => {
