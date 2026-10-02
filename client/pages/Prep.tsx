@@ -13,48 +13,48 @@ export default function Prep() {
       title: "Proper Lighting Setup",
       description: "Learn how to use natural and artificial lighting to showcase rooms in their best light.",
       duration: "8:45",
-      thumbnail: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=600&q=80",
-      videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ"
+      thumbnail: "/media/photos/luxury-interior.jpg",
+      videoUrl: "/media/video/content-web-clip.mp4"
     },
     {
       id: "staging",
       title: "Staging Your Spaces",
       description: "Expert tips on decluttering, decorating, and presenting each room to its full potential.",
       duration: "12:30",
-      thumbnail: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&q=80",
-      videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ"
+      thumbnail: "/media/photos/staged-living-room.jpg",
+      videoUrl: "/media/video/content-web-clip.mp4"
     },
     {
       id: "cleanup",
       title: "Pre-Shoot Cleaning Checklist",
       description: "A comprehensive walkthrough of cleaning steps to ensure your listing looks showroom-ready.",
       duration: "10:15",
-      thumbnail: "https://images.unsplash.com/photo-1582321905220-8149df7ee89d?w=600&q=80",
-      videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ"
+      thumbnail: "/media/photos/listing-living-03.jpg",
+      videoUrl: "/media/video/content-web-clip.mp4"
     },
     {
       id: "camera",
       title: "Camera & Equipment Angles",
       description: "Discover the best angles and camera movements to capture each room dynamically.",
       duration: "9:20",
-      thumbnail: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=600&q=80",
-      videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ"
+      thumbnail: "/media/photos/luxury-exterior.jpg",
+      videoUrl: "/media/video/content-web-clip.mp4"
     },
     {
       id: "outdoor",
       title: "Outdoor & Exterior Shots",
       description: "Learn how to capture curb appeal, landscaping, and exterior features that sell properties.",
       duration: "7:50",
-      thumbnail: "https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=600&q=80",
-      videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ"
+      thumbnail: "/media/photos/drone-hero.jpg",
+      videoUrl: "/media/video/content-web-clip.mp4"
     },
     {
       id: "audio",
       title: "Audio & Sound Considerations",
       description: "Eliminate background noise and ensure clean audio recording during your shoot.",
       duration: "6:40",
-      thumbnail: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600&q=80",
-      videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ"
+      thumbnail: "/media/before-after/pavilion-lifestyle.jpg",
+      videoUrl: "/media/video/content-web-clip.mp4"
     }
   ];
 
@@ -66,9 +66,9 @@ export default function Prep() {
           <section className="pt-24 pb-12 bg-gradient-to-b from-gray-50 to-white">
             <div className="container mx-auto px-4">
               <div className="max-w-4xl">
-                <Link to="/insights" className="inline-flex items-center gap-2 text-teal-600 hover:text-teal-700 text-sm font-semibold mb-6">
+                <Link to="/" className="inline-flex items-center gap-2 text-teal-600 hover:text-teal-700 text-sm font-semibold mb-6">
                   <ChevronRight className="w-4 h-4 rotate-180" />
-                  Back to Resources
+                  Back home
                 </Link>
                 <h1 className="text-4xl md:text-5xl font-bold text-black mb-4">Photoshoot Preparation Guide</h1>
                 <p className="text-gray-600 text-lg">Master the art of preparing real estate listings for professional photography and videography. These expert guides will help you maximize the visual impact of every property.</p>
@@ -201,11 +201,12 @@ export default function Prep() {
               ✕
             </button>
             <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-              <iframe
+              <video
                 src={prepGuides.find(g => g.id === selectedVideo)?.videoUrl}
                 title="Preparation Video"
-                className="w-full h-full"
-                allowFullScreen
+                className="w-full h-full object-cover"
+                controls
+                playsInline
               />
             </div>
           </div>

@@ -225,9 +225,9 @@ export default function ImageEditorModal({ isOpen, onClose, imageUrl }: ImageEdi
                             <span className="text-[8px] font-black uppercase tracking-widest">Create</span>
                           </button>
                           {[
-                            { name: 'Airy', img: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=100&q=80' },
-                            { name: 'Crisp', img: 'https://images.unsplash.com/photo-1600585154341-be6161a56a0c?w=100&q=80' },
-                            { name: 'Gold', img: 'https://images.unsplash.com/photo-1600585154342-be6161a56a0c?w=100&q=80' }
+                            { name: 'Airy', img: '/media/photos/luxury-interior.jpg' },
+                            { name: 'Crisp', img: '/media/photos/listing-living-01.jpg' },
+                            { name: 'Gold', img: '/media/photos/listing-living-02.jpg' }
                           ].map((profile, i) => (
                             <div key={i} className="min-w-[80px] flex flex-col gap-2 group">
                               <div className="aspect-square rounded-xl overflow-hidden border-2 border-transparent group-hover:border-[#0d9488] transition-all cursor-pointer">
@@ -364,9 +364,9 @@ export default function ImageEditorModal({ isOpen, onClose, imageUrl }: ImageEdi
                             <span className="text-[8px] font-black uppercase tracking-widest">Upload</span>
                           </button>
                           {[
-                            { name: 'Exterior View', img: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=100&q=80' },
-                            { name: 'Midnight Fade', img: 'https://images.unsplash.com/photo-1600585154341-be6161a56a0c?w=100&q=80' },
-                            { name: 'Palm Breeze', img: 'https://images.unsplash.com/photo-1600585154342-be6161a56a0c?w=100&q=80' }
+                            { name: 'Exterior View', img: '/media/photos/luxury-interior.jpg' },
+                            { name: 'Midnight Fade', img: '/media/photos/listing-living-01.jpg' },
+                            { name: 'Palm Breeze', img: '/media/photos/listing-living-02.jpg' }
                           ].map((tv, i) => (
                             <div key={i} className="min-w-[80px] flex flex-col gap-2 group">
                               <div className="aspect-square rounded-xl overflow-hidden border-2 border-transparent group-hover:border-[#0d9488] transition-all cursor-pointer relative">
@@ -393,8 +393,8 @@ export default function ImageEditorModal({ isOpen, onClose, imageUrl }: ImageEdi
                             <span className="text-[8px] font-black uppercase tracking-widest">Upload</span>
                           </button>
                           {[
-                            { name: 'Cottage Flame', img: 'https://images.unsplash.com/photo-1542332213-31f87348057f?w=100&q=80' },
-                            { name: 'Panorama Glow', img: 'https://images.unsplash.com/photo-1516594798947-e65505dbb29d?w=100&q=80' }
+                            { name: 'Cottage Flame', img: '/media/photos/luxury-a7305553.jpg' },
+                            { name: 'Panorama Glow', img: '/media/before-after/twilight-pool-lifestyle.jpg' }
                           ].map((fire, i) => (
                             <div key={i} className="min-w-[80px] flex flex-col gap-2 group">
                               <div className="aspect-square rounded-xl overflow-hidden border-2 border-transparent group-hover:border-[#0d9488] transition-all cursor-pointer">
@@ -429,9 +429,9 @@ export default function ImageEditorModal({ isOpen, onClose, imageUrl }: ImageEdi
                             <span className="text-[8px] font-black uppercase tracking-widest">Upload</span>
                           </button>
                           {[
-                            { name: 'Twilight', img: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=200&q=80' },
-                            { name: 'Sunset', img: 'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?w=200&q=80' },
-                            { name: 'Daylight', img: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=200&q=80' }
+                            { name: 'Twilight', img: '/media/before-after/aerial-estate.jpg' },
+                            { name: 'Sunset', img: '/media/photos/drone-hero.jpg' },
+                            { name: 'Daylight', img: '/media/photos/luxury-exterior.jpg' }
                           ].map((sky, i) => (
                             <div key={i} className="min-w-[110px] flex flex-col gap-2 group">
                               <div 
@@ -504,9 +504,9 @@ export default function ImageEditorModal({ isOpen, onClose, imageUrl }: ImageEdi
                         <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-widest mb-4">FURNITURE STYLE</h3>
                         <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
                           {[
-                            { name: 'Modern', img: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=200&q=80' },
-                            { name: 'Scandinavian', img: 'https://images.unsplash.com/photo-1600585154341-be6161a56a0c?w=200&q=80' },
-                            { name: 'Industrial', img: 'https://images.unsplash.com/photo-1600585154342-be6161a56a0c?w=200&q=80' }
+                            { name: 'Modern', img: '/media/photos/luxury-interior.jpg' },
+                            { name: 'Scandinavian', img: '/media/photos/listing-living-01.jpg' },
+                            { name: 'Industrial', img: '/media/photos/listing-living-02.jpg' }
                           ].map((style, i) => (
                             <div key={i} className="min-w-[110px] flex flex-col gap-2 group">
                               <div 

@@ -137,9 +137,9 @@ export default function VirtualStagingCheckout() {
                     <div className="flex items-center gap-4">
                       <div className="w-20 h-20 rounded-xl overflow-hidden bg-white border border-gray-200 flex-shrink-0">
                         <img 
-                          src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&q=80" 
-                          className="w-full h-full object-cover" 
-                          alt="Order Item" 
+                          src="/media/photos/staged-living-room.jpg"
+                          className="w-full h-full object-cover"
+                          alt="Virtually staged living room" 
                         />
                       </div>
                       <div className="flex-1">
