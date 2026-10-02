@@ -24,3 +24,25 @@
   from = "/podcast-guest-prep/"
   status = 200
   to = "/podcast-guest-prep.html"
+
+# Bare client links have no id. Serve the SPA shell with a real 404.
+# /studio/:id and /gallery/:id are not these rules.
+[[redirects]]
+  from = "/studio"
+  status = 404
+  to = "/index.html"
+
+[[redirects]]
+  from = "/studio/"
+  status = 404
+  to = "/index.html"
+
+[[redirects]]
+  from = "/gallery"
+  status = 404
+  to = "/index.html"
+
+[[redirects]]
+  from = "/gallery/"
+  status = 404
+  to = "/index.html"

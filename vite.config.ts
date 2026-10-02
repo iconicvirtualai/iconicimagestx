@@ -1,7 +1,10 @@
 import { defineConfig, loadEnv, Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
+import fs from "node:fs/promises";
 import path from "path";
 import { createServer } from "./server";
+import { isBareClientRoute } from "./shared/bareClientRoute";
+import { applyBareNotFound } from "./server/lib/bareClientNotFound";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -49,6 +52,29 @@ function expressPlugin(): Plugin {
         next();
       });
 
+      // Exact /studio and /gallery are 404s. ID paths fall through to the SPA.
+      server.middlewares.use(async (req, res, next) => {
+        if (req.method !== "GET" && req.method !== "HEAD") return next();
+        const raw = req.url || "/";
+        const queryAt = raw.indexOf("?");
+        const pathOnly = queryAt === -1 ? raw : raw.slice(0, queryAt);
+        if (!isBareClientRoute(pathOnly)) return next();
+        try {
+          const indexPath = path.resolve(server.config.root, "index.html");
+          const source = await fs.readFile(indexPath, "utf8");
+          const transformed = await server.transformIndexHtml(pathOnly, source);
+          const html = applyBareNotFound(transformed, pathOnly);
+          res.statusCode = 404;
+          res.setHeader("Content-Type", "text/html; charset=utf-8");
+          res.setHeader("Cache-Control", "no-store");
+          res.setHeader("X-Robots-Tag", "noindex");
+          res.end(req.method === "HEAD" ? undefined : html);
+        } catch (err) {
+          next(err);
+        }
+      });
+
+      process.env.ICONIC_VITE_DEV = "1";
       const app = createServer();
 
       // Add Express app as middleware to Vite dev server

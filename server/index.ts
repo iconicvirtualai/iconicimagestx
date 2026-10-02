@@ -34,6 +34,8 @@ import { clientNotifyLive } from "../shared/clientNotify";
 import { requireAdmin, requireStaff } from "./middleware/auth";
 import { handleListingPhotoUpload } from "./routes/listingPhotos";
 import presentationsRouter from "./routes/presentations";
+import { bareNotFoundDocument, renderBareClientNotFound } from "./lib/bareClientNotFound";
+import { bareClientRouteKind } from "../shared/bareClientRoute";
 
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
 const API_BUILD_MARKER = "auth-square-2026-09-28";
@@ -195,6 +197,22 @@ export function createServer() {
   // and CLIENT_COMMS_ZONE is not RED.
   app.get("/api/client-notify", (_req, res) => {
     res.json({ live: clientNotifyLive() });
+  });
+
+  // Bare /studio and /gallery have no client id. Vercel rewrites them here
+  // so the response status is 404. /studio/:id and /gallery/:id are not this route.
+  app.get(["/studio", "/studio/", "/gallery", "/gallery/"], async (req, res, next) => {
+    if (process.env.ICONIC_VITE_DEV === "1") return next();
+    try {
+      const html = await renderBareClientNotFound(req.path);
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader("X-Robots-Tag", "noindex");
+      return res.status(404).type("html").send(html);
+    } catch (err) {
+      console.error("[BareRoute] Not-found page failed:", err);
+      const kind = bareClientRouteKind(req.path) ?? "studio";
+      return res.status(404).type("html").send(bareNotFoundDocument(kind));
+    }
   });
 
   // ─── API Routes ────────────────────────────────────────────────────

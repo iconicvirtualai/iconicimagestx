@@ -2,6 +2,8 @@ import path from "path";
 import { createServer } from "./index";
 import * as express from "express";
 import { renderPresentationShell } from "./routes/presentations";
+import { isBareClientRoute } from "../shared/bareClientRoute";
+import { renderBareClientNotFound } from "./lib/bareClientNotFound";
 
 const app = createServer();
 const port = process.env.PORT || 3000;
@@ -25,6 +27,13 @@ app.get("/{*splat}", async (req, res) => {
   // Don't serve index.html for API routes
   if (req.path.startsWith("/api/") || req.path.startsWith("/health")) {
     return res.status(404).json({ error: "API endpoint not found" });
+  }
+
+  if (isBareClientRoute(req.path)) {
+    const html = await renderBareClientNotFound(req.path);
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-Robots-Tag", "noindex");
+    return res.status(404).type("html").send(html);
   }
 
   const presentation = req.path.match(/^\/present\/([^/]+)\/?$/);

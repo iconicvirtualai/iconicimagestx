@@ -42,6 +42,7 @@ import VirtualStagingProOrder from "./pages/VirtualStagingProOrder";
 import VirtualStagingCheckout from "./pages/VirtualStagingCheckout";
 import Go from "./pages/Go";
 import NotFound from "./pages/NotFound";
+import BareClientRouteNotFound from "./pages/BareClientRouteNotFound";
 
 // Admin / ops pages
 import AdminLogin from "./pages/AdminLogin";
@@ -96,6 +97,9 @@ const App = () => (
             <Route path="/terms" element={<Terms />} />
             {/* Shirt QR destination. /go/ matches here too (trailing slash is ignored). */}
             <Route path="/go" element={<Go />} />
+            {/* Bare paths are not client links. ID routes below stay on ClientStudio and PublicGallery. */}
+            <Route path="/studio" element={<BareClientRouteNotFound />} />
+            <Route path="/gallery" element={<BareClientRouteNotFound />} />
             <Route path="/studio/:listingId" element={<ClientStudio />} />
             <Route path="/gallery/:galleryId" element={<PublicGallery />} />
             <Route path="/present/:token" element={<ListingPresentation />} />

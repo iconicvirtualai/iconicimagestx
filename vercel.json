@@ -20,6 +20,10 @@
     { "source": "/present/:token", "destination": "/api/presentations/shell/:token" },
     { "source": "/podcast-guest-prep", "destination": "/podcast-guest-prep.html" },
     { "source": "/podcast-guest-prep/", "destination": "/podcast-guest-prep.html" },
+    { "source": "/studio", "destination": "/api/index" },
+    { "source": "/studio/", "destination": "/api/index" },
+    { "source": "/gallery", "destination": "/api/index" },
+    { "source": "/gallery/", "destination": "/api/index" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
