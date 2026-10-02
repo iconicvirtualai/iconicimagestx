@@ -1,64 +1,14 @@
 import Layout from "@/components/Layout";
+import AboutBanner from "@/components/AboutBanner";
 import { Button } from "@/components/ui/button";
-import { Star, Zap, Rocket, MapPin, Quote, Award } from "lucide-react";
+import { Star, Zap, Rocket, MapPin } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export default function About() {
   return (
     <Layout>
       <div className="bg-white text-black">
-        {/* 10 Years Banner */}
-        <section className="bg-black text-white overflow-hidden relative">
-          <div className="absolute inset-0 opacity-20 pointer-events-none">
-            <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-teal-500/20 via-transparent to-transparent"></div>
-          </div>
-          <div className="container mx-auto px-4 py-12 md:py-16 relative z-10 text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-400 font-bold text-xs tracking-widest uppercase mb-6 animate-pulse">
-              <Award className="w-4 h-4" />
-              Decade of Excellence
-            </div>
-            <h1 className="text-4xl md:text-6xl font-bold mb-4 tracking-tight">
-              A Decade of <span className="text-[#0d9488]">Setting the Standard.</span>
-            </h1>
-            <p className="text-lg md:text-xl text-gray-300 font-medium max-w-2xl mx-auto leading-relaxed">
-              Est. 2016<br />
-              10 Years. Thousands of Listings. Millions in Commission Generated for our Partners.
-            </p>
-
-            {/* Moving Photo Carousel */}
-            <div className="relative w-full overflow-hidden py-12">
-              <div className="flex animate-scroll whitespace-nowrap">
-                {[
-                  { img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80", label: "Est. 2016" },
-                  { img: "https://images.unsplash.com/photo-1492691523567-61723c275df1?w=800&q=80", label: "The Engine" },
-                  { img: "https://images.unsplash.com/photo-1626544823126-bb212353394c?w=800&q=80", label: "Scale" },
-                  { img: "https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&q=80", label: "Growth" },
-                  { img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80", label: "Legacy" },
-                  { img: "https://images.unsplash.com/photo-1492691523567-61723c275df1?w=800&q=80", label: "Cinematic" },
-                  { img: "https://images.unsplash.com/photo-1626544823126-bb212353394c?w=800&q=80", label: "Elite" },
-                  { img: "https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&q=80", label: "Market Lead" },
-                  // Repeat for seamless loop
-                  { img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80", label: "Est. 2016" },
-                  { img: "https://images.unsplash.com/photo-1492691523567-61723c275df1?w=800&q=80", label: "The Engine" },
-                  { img: "https://images.unsplash.com/photo-1626544823126-bb212353394c?w=800&q=80", label: "Scale" },
-                  { img: "https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&q=80", label: "Growth" },
-                  { img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80", label: "Legacy" },
-                  { img: "https://images.unsplash.com/photo-1492691523567-61723c275df1?w=800&q=80", label: "Cinematic" },
-                  { img: "https://images.unsplash.com/photo-1626544823126-bb212353394c?w=800&q=80", label: "Elite" },
-                  { img: "https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&q=80", label: "Market Lead" },
-                ].map((item, i) => (
-                  <div key={i} className="flex-shrink-0 mx-2 w-[184px] h-[184px] md:w-[268px] md:h-[268px] bg-gray-900 rounded-2xl border border-white/10 flex items-center justify-center relative overflow-hidden group">
-                    <img src={item.img} className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-110 group-hover:opacity-60 transition-all duration-700" alt={item.label} />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                    <span className="absolute bottom-6 left-6 z-10 text-[10px] font-bold text-white uppercase tracking-widest opacity-80 group-hover:opacity-100 transition-opacity">
-                      {item.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
+        <AboutBanner />
 
         {/* The Intelligence Hub */}
         <section className="py-24 bg-white">
@@ -193,18 +143,6 @@ export default function About() {
         </section>
       </div>
 
-      <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes scroll {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        .animate-scroll {
-          animation: scroll 40s linear infinite;
-        }
-        .animate-scroll:hover {
-          animation-play-state: paused;
-        }
-      `}} />
     </Layout>
   );
 }

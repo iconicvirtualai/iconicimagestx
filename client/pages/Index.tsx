@@ -1,5 +1,6 @@
 import Layout from "@/components/Layout";
 import HeroSection from "@/components/HeroSection";
+import HomepageBlazeLoop from "@/components/HomepageBlazeLoop";
 import MediaCarousel from "@/components/MediaCarousel";
 import SolutionSection from "@/components/SolutionSection";
 import StatsBar from "@/components/StatsBar";
@@ -22,6 +23,8 @@ export default function Index() {
   return (
     <Layout>
       <HeroSection />
+      {/* Muted hard-cut loop: BUILT → US → Ten years. */}
+      <HomepageBlazeLoop />
       {settings.homepage.showBeforeAfter && (
         <>
           <MediaCarousel />
