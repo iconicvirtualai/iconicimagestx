@@ -29,10 +29,10 @@ export default function HeroSection() {
         <img
           src={HERO_STILL.src}
           alt={HERO_STILL.alt}
-          className="w-full h-full object-cover opacity-60"
+          className="w-full h-full object-cover object-center"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/40 to-transparent"></div>
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/55 to-black/10"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black"></div>
       </div>
 
       <div className="max-w-[1200px] mx-auto px-8 w-full relative z-10">
