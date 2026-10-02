@@ -29,23 +29,23 @@ export default function About() {
             <div className="relative w-full overflow-hidden py-12">
               <div className="flex animate-scroll whitespace-nowrap">
                 {[
-                  { img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80", label: "Est. 2016" },
-                  { img: "https://images.unsplash.com/photo-1492691523567-61723c275df1?w=800&q=80", label: "The Engine" },
-                  { img: "https://images.unsplash.com/photo-1626544823126-bb212353394c?w=800&q=80", label: "Scale" },
-                  { img: "https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&q=80", label: "Growth" },
-                  { img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80", label: "Legacy" },
-                  { img: "https://images.unsplash.com/photo-1492691523567-61723c275df1?w=800&q=80", label: "Cinematic" },
-                  { img: "https://images.unsplash.com/photo-1626544823126-bb212353394c?w=800&q=80", label: "Elite" },
-                  { img: "https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&q=80", label: "Market Lead" },
+                  { img: "/media/about/tiles/01_est_2016.jpg", label: "Est. 2016" },
+                  { img: "/media/about/tiles/02_the_engine.jpg", label: "The Engine" },
+                  { img: "/media/about/tiles/03_scale.jpg", label: "Scale" },
+                  { img: "/media/about/tiles/04_growth.jpg", label: "Growth" },
+                  { img: "/media/about/tiles/05_legacy.jpg", label: "Legacy" },
+                  { img: "/media/about/tiles/06_cinematic.jpg", label: "Cinematic" },
+                  { img: "/media/about/tiles/07_elite.jpg", label: "Elite" },
+                  { img: "/media/about/tiles/08_market_lead.jpg", label: "Market Lead" },
                   // Repeat for seamless loop
-                  { img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80", label: "Est. 2016" },
-                  { img: "https://images.unsplash.com/photo-1492691523567-61723c275df1?w=800&q=80", label: "The Engine" },
-                  { img: "https://images.unsplash.com/photo-1626544823126-bb212353394c?w=800&q=80", label: "Scale" },
-                  { img: "https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&q=80", label: "Growth" },
-                  { img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80", label: "Legacy" },
-                  { img: "https://images.unsplash.com/photo-1492691523567-61723c275df1?w=800&q=80", label: "Cinematic" },
-                  { img: "https://images.unsplash.com/photo-1626544823126-bb212353394c?w=800&q=80", label: "Elite" },
-                  { img: "https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&q=80", label: "Market Lead" },
+                  { img: "/media/about/tiles/01_est_2016.jpg", label: "Est. 2016" },
+                  { img: "/media/about/tiles/02_the_engine.jpg", label: "The Engine" },
+                  { img: "/media/about/tiles/03_scale.jpg", label: "Scale" },
+                  { img: "/media/about/tiles/04_growth.jpg", label: "Growth" },
+                  { img: "/media/about/tiles/05_legacy.jpg", label: "Legacy" },
+                  { img: "/media/about/tiles/06_cinematic.jpg", label: "Cinematic" },
+                  { img: "/media/about/tiles/07_elite.jpg", label: "Elite" },
+                  { img: "/media/about/tiles/08_market_lead.jpg", label: "Market Lead" },
                 ].map((item, i) => (
                   <div key={i} className="flex-shrink-0 mx-2 w-[184px] h-[184px] md:w-[268px] md:h-[268px] bg-gray-900 rounded-2xl border border-white/10 flex items-center justify-center relative overflow-hidden group">
                     <img src={item.img} className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-110 group-hover:opacity-60 transition-all duration-700" alt={item.label} />
