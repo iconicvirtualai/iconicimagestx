@@ -130,6 +130,48 @@ export function draftInvoiceNumber(invoiceId: string, now = new Date()): string 
   return `INV-${year}-${suffix}`;
 }
 
+const HUMAN_INVOICE_NUMBER = /^INV-\d{4}-[A-Z0-9]+$/;
+
+/** A customer-facing number. Rejects the INV-2026-0NaN sequence bug. */
+export function isHumanInvoiceNumber(value: unknown): value is string {
+  return typeof value === "string" && HUMAN_INVOICE_NUMBER.test(value.trim()) && !/nan/i.test(value);
+}
+
+/**
+ * Next INV-year-#### from stored numbers.
+ * Only pure numeric suffixes count. Letter suffixes and NaN leftovers are ignored,
+ * so the sequence can never become "0NaN".
+ */
+export function nextSequentialInvoiceNumber(existing: Iterable<unknown>, year: number): string {
+  const prefix = `INV-${year}-`;
+  let max = 0;
+  for (const value of existing) {
+    if (typeof value !== "string" || !value.startsWith(prefix)) continue;
+    const suffix = value.slice(prefix.length);
+    if (!/^\d+$/.test(suffix)) continue;
+    const parsed = Number(suffix);
+    if (!Number.isSafeInteger(parsed) || parsed < 0) continue;
+    if (parsed > max) max = parsed;
+  }
+  const next = max + 1;
+  const safe = Number.isSafeInteger(next) && next > 0 ? next : 1;
+  return `${prefix}${String(safe).padStart(4, "0")}`;
+}
+
+/**
+ * Number to show a person. Keeps a valid stored number.
+ * Replaces NaN and other garbage with a stable number from the invoice id.
+ */
+export function presentInvoiceNumber(stored: unknown, invoiceId?: unknown, now = new Date()): string {
+  if (typeof stored === "string") {
+    const trimmed = stored.trim();
+    if (isHumanInvoiceNumber(trimmed)) return trimmed;
+  }
+  const id = typeof invoiceId === "string" ? invoiceId.trim() : "";
+  if (id) return draftInvoiceNumber(id, now);
+  return `INV-${now.getFullYear()}-0001`;
+}
+
 /** Copy the order's stored total and lines. Does not reprice from the catalog. */
 export function invoiceDraftFromOrder(order: {
   id: string;

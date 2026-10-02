@@ -1,8 +1,9 @@
 import * as React from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
-import { AlertCircle, CheckCircle2, CreditCard, FileText, Lock } from "lucide-react";
+import { AlertCircle, CheckCircle2, CreditCard, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Footer from "@/components/Footer";
+import { presentInvoiceNumber } from "@shared/orderProjectInvoice";
 
 function money(value: number) {
   return "$" + (Number(value) || 0).toLocaleString("en-US", { minimumFractionDigits: 2 });
@@ -75,7 +76,7 @@ export default function ClientInvoice() {
       <header className="bg-black text-white">
         <div className="max-w-3xl mx-auto px-4 py-10">
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Iconic Images</p>
-          <h1 className="text-3xl font-black mt-2">Invoice {invoice.invoiceNumber}</h1>
+          <h1 className="text-3xl font-black mt-2">Invoice {presentInvoiceNumber(invoice.invoiceNumber, invoiceId)}</h1>
           <p className="text-gray-400 mt-1">{invoice.clientName}</p>
         </div>
       </header>
@@ -140,9 +141,9 @@ export default function ClientInvoice() {
           </div>
         </div>
 
-        <Link to="/" className="mt-6 inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-gray-400 hover:text-black">
-          <FileText className="w-4 h-4" /> Iconic Images
-        </Link>
+        <a href="/" data-testid="invoice-back-home" className="mt-6 inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-gray-400 hover:text-black">
+          Back to Home
+        </a>
       </main>
       <Footer />
     </div>

@@ -1,5 +1,5 @@
 import Layout from "@/components/Layout";
-import { Facebook, Instagram, Youtube, Share2, ArrowUpRight, Heart } from "lucide-react";
+import { Facebook, Instagram, Share2, ArrowUpRight, Heart } from "lucide-react";
 
 const STILLS = [
   {
@@ -16,7 +16,7 @@ const STILLS = [
   },
   {
     id: 3,
-    platform: "YouTube",
+    platform: "Listing",
     image: "/media/photos/luxury-interior.jpg",
     description: "Listing interior from the Iconic library.",
   },
@@ -53,13 +53,6 @@ const PLATFORMS = [
     ),
     color: "from-black to-gray-800",
     url: "https://tiktok.com/@iconicimagestx",
-  },
-  {
-    name: "YouTube",
-    handle: "Iconic Images",
-    icon: <Youtube className="w-5 h-5" />,
-    color: "from-[#FF0000] to-[#CC0000]",
-    url: "https://youtube.com/@iconicimagestx",
   },
 ];
 
@@ -102,7 +95,7 @@ export default function Socials() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-20">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-20">
               {PLATFORMS.map((platform) => (
                 <a
                   key={platform.name}

@@ -11,6 +11,7 @@ import {
 import {
   buildSubmittedLineItems,
   calculateSidebarTotal,
+  hasBookingSelection,
   normalizeBookingLineItems,
   orderTotalLabel,
   separatePromoDiscount,
@@ -125,10 +126,21 @@ describe("booking total contract", () => {
 
   it("wires the booking form through the shared helpers", () => {
     expect(bookingForm).toContain("calculateSidebarTotal(bookingPriceInput())");
+    expect(bookingForm).toContain("hasBookingSelection(bookingPriceInput())");
+    expect(bookingForm).toContain("Select a package");
     expect(bookingForm).toContain("buildSubmittedLineItems(bookingPriceInput())");
     expect(bookingForm).toContain("sumLineItemPrices(lineItems)");
     expect(bookingForm).toContain("promoDiscountFor(promoInput)");
     expect(bookingForm).not.toContain("lifeOfTheListingCarePrice");
+  });
+
+  it("hides an estimate until a priced package or tier is selected", () => {
+    expect(hasBookingSelection({})).toBe(false);
+    expect(hasBookingSelection({ promo: { code: "NEWYEAR", discount: 50 } })).toBe(false);
+    expect(hasBookingSelection({ specializedPhotography: "mls" })).toBe(false);
+    expect(hasBookingSelection({ selectedService: "listing-essentials" })).toBe(true);
+    expect(hasBookingSelection({ selectedBasics: ["photos-35"] })).toBe(true);
+    expect(calculateSidebarTotal({})).toBe(0);
   });
 });
 

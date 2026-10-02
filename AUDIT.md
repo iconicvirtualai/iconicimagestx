@@ -43,7 +43,7 @@ Captions on marketing stills stay Iconic-only: no agent names, no listing street
 - Resources and Stock Footage are no longer nav items. Old URLs redirect home instead of 404ing into Unsplash.
 - `/agents` “Ask about referrals” now goes to `/contact`. It previously had no destination.
 - `FeaturedServices` is not mounted. It used to link to `/services`, which is not a route. Its images are local now, but the component is still unused.
-- Footer social URLs match the handles already on the site (`facebook.com/iconicimagestx`, `instagram.com/iconicimagestx`, `tiktok.com/@iconicimagestx`, `youtube.com/@iconicimagestx`). This audit did not verify that each profile is live.
+- Footer social URLs match the handles already on the site (`facebook.com/iconicimagestx`, `instagram.com/iconicimagestx`, `tiktok.com/@iconicimagestx`). The guessed YouTube handle `youtube.com/@iconicimagestx` returned 404 and no other Iconic channel URL is in the repo, so that link is not shown. This audit did not verify that each remaining profile is live.
 
 ## Stock and social proof still open
 
