@@ -975,6 +975,14 @@ const basicsList = [
 ];
 basicsList.filter((item) => isApprenticeshipPackage(item.id));
 basicsList.filter((item) => !isApprenticeshipPackage(item.id));
+const BOOKING_PACKAGE_CATEGORY_ORDER = [
+  "photography",
+  "video",
+  "virtual_staging",
+  "marketing",
+  "addon"
+];
+new Set(BOOKING_PACKAGE_CATEGORY_ORDER);
 function orderTotalLabel(value) {
   return `$${(Number(value) || 0).toFixed(2)}`;
 }
@@ -992,8 +1000,19 @@ function normalizeBookingLineItems(items) {
       price
     };
     if (item.id != null && item.id !== "") line.id = String(item.id);
+    const description = optionalLineText(item.description);
+    if (description) line.description = description;
+    const category = optionalLineText(item.category);
+    if (category) line.category = category;
+    const bookingKind = optionalLineText(item.bookingKind);
+    if (bookingKind) line.bookingKind = bookingKind;
+    const tier = optionalLineText(item.tier);
+    if (tier) line.tier = tier;
     return line;
   });
+}
+function optionalLineText(value) {
+  return typeof value === "string" ? value.trim() : "";
 }
 function buildBookingInvoiceDraft(input) {
   const total = Number(input.total) || 0;
@@ -1065,6 +1084,39 @@ function planInvoiceLink(anchor) {
     listingFields: listingId ? compact({ invoiceId: createId, orderRequestId, orderId }) : null,
     orderFields: orderId ? compact({ invoiceId: createId, orderRequestId, listingId }) : null
   };
+}
+function draftInvoiceNumber(invoiceId, now = /* @__PURE__ */ new Date()) {
+  const year = now.getFullYear();
+  const suffix = invoiceId.replace(/[^A-Za-z0-9]/g, "").slice(-6).toUpperCase() || "000001";
+  return `INV-${year}-${suffix}`;
+}
+const HUMAN_INVOICE_NUMBER = /^INV-\d{4}-[A-Z0-9]+$/;
+function isHumanInvoiceNumber(value) {
+  return typeof value === "string" && HUMAN_INVOICE_NUMBER.test(value.trim()) && !/nan/i.test(value);
+}
+function nextSequentialInvoiceNumber(existing, year) {
+  const prefix = `INV-${year}-`;
+  let max = 0;
+  for (const value of existing) {
+    if (typeof value !== "string" || !value.startsWith(prefix)) continue;
+    const suffix = value.slice(prefix.length);
+    if (!/^\d+$/.test(suffix)) continue;
+    const parsed = Number(suffix);
+    if (!Number.isSafeInteger(parsed) || parsed < 0) continue;
+    if (parsed > max) max = parsed;
+  }
+  const next = max + 1;
+  const safe = Number.isSafeInteger(next) && next > 0 ? next : 1;
+  return `${prefix}${String(safe).padStart(4, "0")}`;
+}
+function presentInvoiceNumber(stored, invoiceId, now = /* @__PURE__ */ new Date()) {
+  if (typeof stored === "string") {
+    const trimmed = stored.trim();
+    if (isHumanInvoiceNumber(trimmed)) return trimmed;
+  }
+  const id = typeof invoiceId === "string" ? invoiceId.trim() : "";
+  if (id) return draftInvoiceNumber(id, now);
+  return `INV-${now.getFullYear()}-0001`;
 }
 const CLOSED_STATUSES = /* @__PURE__ */ new Set(["void", "voided", "cancelled", "canceled"]);
 const SETTLED_STATUSES = /* @__PURE__ */ new Set(["paid", "comped"]);
@@ -2071,16 +2123,17 @@ async function createBookingInvoiceDraft(input) {
 }
 async function generateInvoiceNumber() {
   const year = (/* @__PURE__ */ new Date()).getFullYear();
-  const snapshot = await db$i().collection("invoices").where("invoiceNumber", ">=", `INV-${year}-`).orderBy("invoiceNumber", "desc").limit(1).get().catch((err) => {
+  const snapshot = await db$i().collection("invoices").where("invoiceNumber", ">=", `INV-${year}-`).where("invoiceNumber", "<", `INV-${year + 1}`).get().catch((err) => {
     console.error("[Bookings] Invoice number lookup failed:", err);
     return null;
   });
-  if (!snapshot || snapshot.empty) {
-    return `INV-${year}-0001`;
+  if (!snapshot) {
+    return `INV-${year}-${String(Date.now()).slice(-6)}`;
   }
-  const last = snapshot.docs[0].data().invoiceNumber;
-  const num = parseInt(last.split("-")[2] || "0") + 1;
-  return `INV-${year}-${String(num).padStart(4, "0")}`;
+  return nextSequentialInvoiceNumber(
+    snapshot.docs.map((entry) => entry.data().invoiceNumber),
+    year
+  );
 }
 const router$g = Router();
 const db$h = () => admin.firestore();
@@ -3387,7 +3440,7 @@ router$e.get("/invoice/:id", async (req, res) => {
     return res.json({
       id: invoiceDoc.id,
       paid: invoiceAllowsDownload(invoice),
-      invoiceNumber: invoice.invoiceNumber,
+      invoiceNumber: presentInvoiceNumber(invoice.invoiceNumber, invoiceDoc.id),
       clientName: invoice.clientName,
       lineItems: invoice.lineItems,
       subtotal: invoice.subtotal,
