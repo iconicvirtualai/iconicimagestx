@@ -2,6 +2,9 @@
  * Iconic Studio (team v1).
  * Full studio is for Iconic staff. Agent upsell and outside-photographer
  * SaaS stay off. Helpers here are safe to import from client and server.
+ *
+ * Default AI edits are planned from the order in shared/orderEditPlan.ts.
+ * Presets here are staff overrides for one frame, not a photographer picker.
  */
 
 import { isListingStoragePath, safeStorageFileName } from "./listingAccess";
@@ -16,39 +19,44 @@ export const STUDIO_FLAGS = {
   canvaBrand: false,
 } as const;
 
-export const EDIT_JOB_STATUSES = ["pending", "processing", "review", "approved"] as const;
+export const EDIT_JOB_STATUSES = ["pending", "processing", "review", "approved", "failed", "rejected"] as const;
 export type EditJobStatus = (typeof EDIT_JOB_STATUSES)[number];
 
 export const AI_EDIT_PRESETS = [
   {
     id: "virtual_stage",
     label: "Virtual stage",
-    prompt: "Virtually stage this room with realistic furniture for a listing photo. Keep the architecture.",
+    prompt: "Virtually stage this room with photoreal furniture, a rug, and simple decor scaled to the space. Leave the walls, windows, floors, ceiling, and camera angle unchanged.",
   },
   {
     id: "remove_clutter",
     label: "Remove clutter",
-    prompt: "Remove clutter and personal items. Keep the architecture, windows, and lighting.",
+    prompt: "Remove clutter, personal items, cords, and small mess. Rebuild only the cleared floor and surfaces so they look clean. Keep the furniture that belongs, plus the architecture and lighting.",
   },
   {
     id: "remove_cars",
     label: "Remove cars",
-    prompt: "Remove cars from the driveway and the street. Repair the ground so it looks natural.",
+    prompt: "Remove vehicles from the driveway, garage apron, and street. Rebuild the pavement, curb, and landscaping so the empty space looks natural.",
   },
   {
     id: "add_fire",
     label: "Add fire",
-    prompt: "Add a natural fire in the fireplace without changing the rest of the room.",
+    prompt: "Add a realistic burning fire inside the existing fireplace only. Do not move the fireplace or change the rest of the room.",
   },
   {
     id: "add_tv",
     label: "Add TV",
-    prompt: "Add a television on the main wall, scaled to the room.",
+    prompt: "Add one realistic flat-screen television on the main wall, sized to the room, with a dark screen. Do not change the wall, furniture, or camera.",
   },
   {
     id: "add_people",
     label: "Add people",
-    prompt: "Add a few natural-looking people that fit a real-estate listing photo.",
+    prompt: "Add two or three casually dressed adults, small in the frame, who look natural in a listing photo and do not block the room. Keep faces generic and the architecture unchanged.",
+  },
+  {
+    id: "twilight",
+    label: "Twilight",
+    prompt: "Convert this exterior listing photo into a photoreal twilight. Turn on warm interior and landscape lights. Keep the architecture and camera angle. Use a natural evening sky.",
   },
   {
     id: "free_text",
@@ -59,11 +67,19 @@ export const AI_EDIT_PRESETS = [
 
 export type AiEditType = (typeof AI_EDIT_PRESETS)[number]["id"];
 
-export const AI_EDIT_STUB_NOTE =
-  "TODO: OpenAI image edits are not connected. OPENAI_API_KEY is not in this app's env patterns. The after image is the source placeholder so Needs review still works. Uploads are not failed.";
+export const AI_EDIT_MISSING_KEY_NOTE =
+  "OPENAI_API_KEY is not configured on the server, so this photo was not edited.";
 
-export const AI_EDIT_KEY_PRESENT_NOTE =
-  "TODO: OPENAI_API_KEY is set, but Iconic Studio does not call the images API in this version. The job stays in review with the source as the after placeholder.";
+export const AI_EDIT_TIMEOUT_NOTE =
+  "OpenAI took too long to edit this photo. The job was marked failed. Queue it again.";
+
+export const AI_EDIT_READY_NOTE = "OpenAI edit is ready for review.";
+
+export const AI_EDIT_SAMPLE_NOTE =
+  "Sample layout only. Queue AI Edit calls OpenAI when this listing is loaded from the studio.";
+
+/** Output sizes the Images edit API documents for gpt-image-1. */
+export type ListingEditSize = "1024x1024" | "1536x1024" | "1024x1536";
 
 export const RAW_IMPORT_LABEL = "RAW — import for AI queue";
 
@@ -267,6 +283,64 @@ export function presetPrompt(type: string): string {
   return AI_EDIT_PRESETS.find((preset) => preset.id === type)?.prompt || "";
 }
 
+/** Guardrails around a preset or free-text request. Sent only to the image edit API. */
+export function realEstateEditPrompt(userPrompt: string): string {
+  const request = userPrompt.trim().replace(/\s+/g, " ");
+  return [
+    "Photoreal real-estate listing photo.",
+    "Edit only the supplied photograph.",
+    "Keep the same camera angle, architecture, windows, doors, flooring, and lighting.",
+    "Do not add text, logos, watermarks, borders, or an illustrated style.",
+    `Requested change: ${request}`,
+  ].join(" ");
+}
+
+/** Landscape, portrait, or square output. Unknown dimensions stay landscape, the usual listing frame. */
+export function listingPhotoEditSize(width: number, height: number): ListingEditSize {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return "1536x1024";
+  }
+  const ratio = width / height;
+  if (ratio >= 1.15) return "1536x1024";
+  if (ratio <= 0.87) return "1024x1536";
+  return "1024x1024";
+}
+
+/**
+ * Approve must publish the finished file.
+ * AI jobs require the stored edit. Adjust jobs still fall back to their source.
+ */
+export function resolveStudioApprovePath(
+  job: {
+    kind?: unknown;
+    status?: unknown;
+    placeholder?: unknown;
+    resultPath?: unknown;
+    sourcePath?: unknown;
+  },
+  fallbackPath = "",
+): { ok: true; sourcePath: string } | { ok: false; error: string } {
+  const fallback = String(fallbackPath || "").trim();
+  if (job.kind === "ai_edit") {
+    if (job.status === "failed") {
+      return { ok: false, error: "This AI edit failed. Queue it again before approving." };
+    }
+    if (job.status === "rejected") {
+      return { ok: false, error: "This AI edit was rejected." };
+    }
+    const resultPath = typeof job.resultPath === "string" ? job.resultPath.trim() : "";
+    if (job.placeholder === true || !resultPath) {
+      return { ok: false, error: "This AI edit has no finished image to approve." };
+    }
+    return { ok: true, sourcePath: resultPath };
+  }
+  const resultPath = typeof job.resultPath === "string" ? job.resultPath.trim() : "";
+  const sourcePath = typeof job.sourcePath === "string" ? job.sourcePath.trim() : "";
+  const path = resultPath || sourcePath || fallback;
+  if (!path) return { ok: false, error: "sourcePath is required." };
+  return { ok: true, sourcePath: path };
+}
+
 export function parseAiEditRequest(body: unknown): { ok: true; value: AiEditRequest } | { ok: false; error: string } {
   if (!body || typeof body !== "object") return { ok: false, error: "Request body is required." };
   const row = body as Record<string, unknown>;
@@ -300,19 +374,6 @@ export function parseAiEditRequest(body: unknown): { ok: true; value: AiEditRequ
       imageUrl,
       sourcePath,
     },
-  };
-}
-
-export function aiEditStub(env: { OPENAI_API_KEY?: string } | NodeJS.ProcessEnv, sourceUrl: string) {
-  const key = typeof env.OPENAI_API_KEY === "string" && env.OPENAI_API_KEY.trim().length > 0;
-  return {
-    provider: key ? "openai" as const : "stub" as const,
-    status: "review" as const,
-    beforeUrl: sourceUrl,
-    afterUrl: sourceUrl,
-    placeholder: true,
-    note: key ? AI_EDIT_KEY_PRESENT_NOTE : AI_EDIT_STUB_NOTE,
-    pipeline: ["pending", "review"] as EditJobStatus[],
   };
 }
 

@@ -473,11 +473,11 @@ View your gallery: ${galleryUrl}
 
 Questions or edits? Just reply here. — Iconic Images`,
   photographerIntro: (photographerName, clientName, date) => `Hi ${clientName}! I'm ${photographerName}, your Iconic Images photographer for ${date}. Feel free to text me here with any questions before the shoot! 📸`,
-  newBookingAlert: (address, date, services) => `🔔 NEW BOOKING — Iconic Images
+  newBookingAlert: (address, date, services2) => `🔔 NEW BOOKING — Iconic Images
 
 📍 ${address}
 📅 ${date}
-🏠 ${services}
+🏠 ${services2}
 
 Check dashboard for details.`
 };
@@ -705,6 +705,167 @@ function clientCanViewListing(listing, identity) {
   const listingEmail = normalizeEmail(listing.clientEmail);
   return Boolean(email && listingEmail && email === listingEmail);
 }
+const services = [
+  // Listings
+  {
+    id: "listing-essentials",
+    name: "The Essentials",
+    category: "listings",
+    price: 249,
+    description: "Clean, bright, and ready to post. Perfect for quick turnarounds.",
+    features: [
+      "30 Images",
+      "The 'Snap' Reel (15s)",
+      "Trending Audio",
+      "Pre-Launch Delivery Packet",
+      "1 Iconic Twilight Render",
+      "Same Day Delivery*"
+    ]
+  },
+  {
+    id: "listing-showcase",
+    name: "The Showcase",
+    category: "listings",
+    price: 549,
+    description: "A complete visual deep-dive. We capture the details, the angles, and the atmosphere.",
+    isPopular: true,
+    features: [
+      "50 Images",
+      "5 Aerials",
+      "The 'Snap' Reel (15s)",
+      "1 'Iconic' 3D Animated Reel (60s Vert)",
+      "2D Floorplan",
+      "Pre-Launch Delivery Packet",
+      "2 Iconic Twilight Renders",
+      "Same Day Delivery*"
+    ]
+  },
+  {
+    id: "listing-legacy",
+    name: "The Legacy",
+    category: "listings",
+    price: 899,
+    description: "Our highest level of care. We create a cinematic experience.",
+    features: [
+      "Full Images",
+      "Full Aerials",
+      "The 'Snap' Reel (15s)",
+      "1 'Iconic' 3D Animated Reel (60s Vert)",
+      "90s 4K Cinematic Property Video (with Aerial)",
+      "Pre-Launch Delivery Packet",
+      "5 Iconic Twilight Renders",
+      "Agent On Camera Intro/Outro",
+      "3D Motion Graphics and Animations",
+      "Same Day Delivery*"
+    ]
+  },
+  {
+    id: "listing-market-leader",
+    name: "The Market Leader",
+    category: "listings",
+    price: 1599,
+    description: "Total market saturation strategy. Full-cycle media partner.",
+    features: [
+      "Full Images (Next-Day)",
+      "Full Aerials (Same-Day by 7PM)",
+      "The 'Snap' Reel (15s) (Same-Day by 7PM)",
+      "1 'Iconic' Animated Reel (60s Vert) (Next-Day)",
+      "2D Floorplan (Next-Day)",
+      "Pre-Launch Delivery Packet (Same-Day by 7PM)",
+      "5 Iconic Twilight Renders (Same-Day by 7PM)",
+      "90s 4K Cinematic Video (Next-Day)",
+      "VR / Matterport (Vision Pro Ready) & 2D Floorplan (Next-Day)",
+      "The Iconic Finish - Complimentary Premium Editing",
+      "Post-Sale Marketing Package (Scheduled)"
+    ]
+  },
+  // Branding
+  {
+    id: "branding-refresh",
+    name: "The Refresh",
+    category: "branding",
+    price: 349,
+    description: "The Modern Portrait. Approachable, professional, and uniquely you.",
+    features: [
+      "60-Minute Session",
+      "10 High-End 'Lifestyle' Portraits",
+      "The Woodlands/Spring Locations",
+      "AI Digital Twin Lite Setup",
+      "Voice and Likeness Cloning"
+    ]
+  },
+  {
+    id: "branding-content-partner",
+    name: "The Content Partner",
+    category: "branding",
+    price: 999,
+    description: "30 days of content in 2 hours. Never wonder what to post again.",
+    isPopular: true,
+    features: [
+      "2-Hour Monthly Filming Session",
+      "Full Strategy, Scripting & Direction",
+      "20 Custom Reels for Socials",
+      "Trending Audio & Personal Branding"
+    ]
+  },
+  {
+    id: "branding-local-legend",
+    name: "The Local Legend",
+    category: "branding",
+    price: 2499,
+    description: "The Market Takeover Campaign. Your Story, Told Cinematically.",
+    features: [
+      "6-8 Hour Signature Production Day",
+      "90-Second 4K Bio Film",
+      '5 "Local Authority" Neighborhood Spotlights',
+      'Pre-Production "Vibe Check" and Professional Scripting',
+      "Post-Production Guidance and Marketing Review"
+    ]
+  },
+  // Business (Social Monopoly)
+  {
+    id: "business-baseline",
+    name: "The Baseline",
+    category: "business",
+    price: 500,
+    description: "The Professional Foundation. Establish consistency with 8 edited reels per month.",
+    phase: 1,
+    features: [
+      "8 Professionally Edited Reels (2/week)",
+      'Signature "Iconic" 2026 Editing Style',
+      "Trending Audio & Brand Integration"
+    ]
+  },
+  {
+    id: "business-growth-engine",
+    name: "The Growth Engine",
+    category: "business",
+    price: 850,
+    description: "Turning Views into Conversations. 12 edited reels with high-conversion hooks.",
+    phase: 1,
+    isPopular: true,
+    features: [
+      "12 Professionally Edited Reels (3/week)",
+      "The Hook Suite: High-conversion captions & strategic hashtags.",
+      "Scroll-Stopping Visual Flow.",
+      "Conversion-Focused Copywriting"
+    ]
+  },
+  {
+    id: "studio-noir",
+    name: "Studio Noir",
+    category: "studio",
+    price: 0,
+    description: "Dark, dramatic room at Studio 105. Rate confirmed when the hold is set."
+  },
+  {
+    id: "studio-blanc",
+    name: "Studio Blanc",
+    category: "studio",
+    price: 0,
+    description: "Bright white room at Studio 105. Rate confirmed when the hold is set."
+  }
+];
 const APPRENTICESHIP_RULES = [
   "Apprentices are learning.",
   "We do not make additional trips.",
@@ -4291,32 +4452,37 @@ const AI_EDIT_PRESETS = [
   {
     id: "virtual_stage",
     label: "Virtual stage",
-    prompt: "Virtually stage this room with realistic furniture for a listing photo. Keep the architecture."
+    prompt: "Virtually stage this room with photoreal furniture, a rug, and simple decor scaled to the space. Leave the walls, windows, floors, ceiling, and camera angle unchanged."
   },
   {
     id: "remove_clutter",
     label: "Remove clutter",
-    prompt: "Remove clutter and personal items. Keep the architecture, windows, and lighting."
+    prompt: "Remove clutter, personal items, cords, and small mess. Rebuild only the cleared floor and surfaces so they look clean. Keep the furniture that belongs, plus the architecture and lighting."
   },
   {
     id: "remove_cars",
     label: "Remove cars",
-    prompt: "Remove cars from the driveway and the street. Repair the ground so it looks natural."
+    prompt: "Remove vehicles from the driveway, garage apron, and street. Rebuild the pavement, curb, and landscaping so the empty space looks natural."
   },
   {
     id: "add_fire",
     label: "Add fire",
-    prompt: "Add a natural fire in the fireplace without changing the rest of the room."
+    prompt: "Add a realistic burning fire inside the existing fireplace only. Do not move the fireplace or change the rest of the room."
   },
   {
     id: "add_tv",
     label: "Add TV",
-    prompt: "Add a television on the main wall, scaled to the room."
+    prompt: "Add one realistic flat-screen television on the main wall, sized to the room, with a dark screen. Do not change the wall, furniture, or camera."
   },
   {
     id: "add_people",
     label: "Add people",
-    prompt: "Add a few natural-looking people that fit a real-estate listing photo."
+    prompt: "Add two or three casually dressed adults, small in the frame, who look natural in a listing photo and do not block the room. Keep faces generic and the architecture unchanged."
+  },
+  {
+    id: "twilight",
+    label: "Twilight",
+    prompt: "Convert this exterior listing photo into a photoreal twilight. Turn on warm interior and landscape lights. Keep the architecture and camera angle. Use a natural evening sky."
   },
   {
     id: "free_text",
@@ -4324,8 +4490,9 @@ const AI_EDIT_PRESETS = [
     prompt: ""
   }
 ];
-const AI_EDIT_STUB_NOTE = "TODO: OpenAI image edits are not connected. OPENAI_API_KEY is not in this app's env patterns. The after image is the source placeholder so Needs review still works. Uploads are not failed.";
-const AI_EDIT_KEY_PRESENT_NOTE = "TODO: OPENAI_API_KEY is set, but Iconic Studio does not call the images API in this version. The job stays in review with the source as the after placeholder.";
+const AI_EDIT_MISSING_KEY_NOTE = "OPENAI_API_KEY is not configured on the server, so this photo was not edited.";
+const AI_EDIT_TIMEOUT_NOTE = "OpenAI took too long to edit this photo. The job was marked failed. Queue it again.";
+const AI_EDIT_READY_NOTE = "OpenAI edit is ready for review.";
 const RAW_EXT$1 = /\.(cr2|cr3|nef|nrw|arw|srf|sr2|dng|raw|rw2|orf|raf|pef|3fr|fff|iiq)$/i;
 const PREVIEW_EXT = /\.(jpe?g|png|webp|gif)$/i;
 function ingestJobId(listingId) {
@@ -4380,6 +4547,46 @@ function clampAdjustments(input) {
 function presetPrompt(type) {
   return AI_EDIT_PRESETS.find((preset) => preset.id === type)?.prompt || "";
 }
+function realEstateEditPrompt(userPrompt) {
+  const request = userPrompt.trim().replace(/\s+/g, " ");
+  return [
+    "Photoreal real-estate listing photo.",
+    "Edit only the supplied photograph.",
+    "Keep the same camera angle, architecture, windows, doors, flooring, and lighting.",
+    "Do not add text, logos, watermarks, borders, or an illustrated style.",
+    `Requested change: ${request}`
+  ].join(" ");
+}
+function listingPhotoEditSize(width, height) {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return "1536x1024";
+  }
+  const ratio = width / height;
+  if (ratio >= 1.15) return "1536x1024";
+  if (ratio <= 0.87) return "1024x1536";
+  return "1024x1024";
+}
+function resolveStudioApprovePath(job, fallbackPath = "") {
+  const fallback = String(fallbackPath || "").trim();
+  if (job.kind === "ai_edit") {
+    if (job.status === "failed") {
+      return { ok: false, error: "This AI edit failed. Queue it again before approving." };
+    }
+    if (job.status === "rejected") {
+      return { ok: false, error: "This AI edit was rejected." };
+    }
+    const resultPath2 = typeof job.resultPath === "string" ? job.resultPath.trim() : "";
+    if (job.placeholder === true || !resultPath2) {
+      return { ok: false, error: "This AI edit has no finished image to approve." };
+    }
+    return { ok: true, sourcePath: resultPath2 };
+  }
+  const resultPath = typeof job.resultPath === "string" ? job.resultPath.trim() : "";
+  const sourcePath = typeof job.sourcePath === "string" ? job.sourcePath.trim() : "";
+  const path2 = resultPath || sourcePath || fallback;
+  if (!path2) return { ok: false, error: "sourcePath is required." };
+  return { ok: true, sourcePath: path2 };
+}
 function parseAiEditRequest(body) {
   if (!body || typeof body !== "object") return { ok: false, error: "Request body is required." };
   const row = body;
@@ -4413,18 +4620,6 @@ function parseAiEditRequest(body) {
       imageUrl,
       sourcePath
     }
-  };
-}
-function aiEditStub(env, sourceUrl) {
-  const key = typeof env.OPENAI_API_KEY === "string" && env.OPENAI_API_KEY.trim().length > 0;
-  return {
-    provider: key ? "openai" : "stub",
-    status: "review",
-    beforeUrl: sourceUrl,
-    afterUrl: sourceUrl,
-    placeholder: true,
-    note: key ? AI_EDIT_KEY_PRESENT_NOTE : AI_EDIT_STUB_NOTE,
-    pipeline: ["pending", "review"]
   };
 }
 function galleryStatusAfterStudioAdd(current) {
@@ -4610,6 +4805,346 @@ async function syncPlaytestGallery(listingId, listing, image) {
 function serializeDoc(id, data) {
   return jsonSafe({ id, ...data });
 }
+const ORDER_GALLERY_RELEASE = "hold_until_order_complete";
+const ICONIC_POLISH_INSTRUCTION = "Iconic Polish: if a fireplace is visible, add a realistic fire; if a driveway, street, or curb is visible, remove vehicles and debris and repair the pavement; remove clutter and personal items. Keep the architecture.";
+const PHOTO_BASE = "Prepare this listing photo. Balance color, clear window glare, and replace a blown-out sky when the sky is visible. Keep the architecture, furnishings, and camera angle.";
+function asItems(value) {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (typeof entry === "string") {
+      const name2 = entry.trim();
+      return name2 ? [{ id: "", name: name2 }] : [];
+    }
+    if (!entry || typeof entry !== "object") return [];
+    const row = entry;
+    const id = String(row.id || "").trim();
+    const name = String(row.name || row.label || "").trim();
+    return id || name ? [{ id, name }] : [];
+  });
+}
+function asIds(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry) => String(entry || "").trim()).filter(Boolean);
+}
+function packageByIdOrName(id, name) {
+  const idKey = id.toLowerCase();
+  const nameKey = name.toLowerCase();
+  return services.find((service) => service.id === id || nameKey && service.name.toLowerCase() === nameKey || service.id === idKey);
+}
+function twilightPrompt(role, polish) {
+  const place = role === "front" ? "front exterior" : role === "back" ? "rear exterior" : "exterior";
+  const request = [
+    `Convert this ${place} listing photo into a photoreal twilight.`,
+    "Turn on warm interior lights and landscape lighting.",
+    "Keep the architecture, landscaping, and camera angle.",
+    "Use a natural evening sky. Do not add people or text."
+  ];
+  if (polish) request.push(ICONIC_POLISH_INSTRUCTION);
+  return request.join(" ");
+}
+function photoPrompt(polish) {
+  return polish ? `${PHOTO_BASE} ${ICONIC_POLISH_INSTRUCTION}` : PHOTO_BASE;
+}
+function twilightRole(index) {
+  if (index === 0) return "front";
+  if (index === 1) return "back";
+  return `exterior-${index + 1}`;
+}
+function collectTexts(input) {
+  const texts = [];
+  const packageNames = [];
+  let polishFromOrder = false;
+  const items = [...asItems(input.lineItems), ...asItems(input.services)];
+  for (const id of asIds(input.serviceIds)) items.push({ id, name: "" });
+  for (const item of items) {
+    if (item.name) texts.push(item.name);
+    const catalog = packageByIdOrName(item.id, item.name);
+    if (catalog) {
+      packageNames.push(catalog.name);
+      for (const feature of catalog.features || []) texts.push(feature);
+    }
+    const blob = `${item.id} ${item.name}`.toLowerCase();
+    if (blob.includes("iconic finish") || blob.includes("iconic polish") || blob.includes("iconic-finish")) {
+      polishFromOrder = true;
+    }
+  }
+  return {
+    texts,
+    packageName: packageNames[0] || items.find((item) => item.name)?.name || "Custom order",
+    polishFromOrder
+  };
+}
+function planOrderEdits(input = {}) {
+  const collected = collectTexts(input);
+  let twilightCount = 0;
+  let photoCount = null;
+  let photoFull = false;
+  let polishFromOrder = collected.polishFromOrder;
+  const deliverables = /* @__PURE__ */ new Map();
+  for (const text2 of collected.texts) {
+    const twilight2 = text2.match(/(\d+)\s+(?:iconic\s+)?twilight/i);
+    if (twilight2) twilightCount = Math.max(twilightCount, Number(twilight2[1]));
+    else if (/twilight/i.test(text2)) twilightCount = Math.max(twilightCount, 1);
+    const photos = text2.match(/(\d+)\s+(?:high-end\s+|iconic\s+)?(?:images|photos)\b/i);
+    if (photos) photoCount = Math.max(photoCount || 0, Number(photos[1]));
+    if (/full images/i.test(text2)) photoFull = true;
+    const aerials = text2.match(/(\d+)\s+aerial/i);
+    if (aerials || /full aerials|aerial drone/i.test(text2)) {
+      deliverables.set("aerials", {
+        id: "aerials",
+        label: aerials ? `${aerials[1]} aerial stills` : "Aerial stills",
+        kind: "capture"
+      });
+    }
+    if (/snap/i.test(text2) && /reel/i.test(text2)) {
+      deliverables.set("snap-reel", { id: "snap-reel", label: "Snap reel", kind: "video" });
+    }
+    if (/animated reel|walk-?through reel|3d animated/i.test(text2)) {
+      deliverables.set("animated-reel", { id: "animated-reel", label: "Animated walk-through reel", kind: "video" });
+    }
+    if (/cinematic/i.test(text2) && /video/i.test(text2)) {
+      deliverables.set("cinematic-video", { id: "cinematic-video", label: "Cinematic property video", kind: "video" });
+    }
+    if (/floor\s*plan|floorplan/i.test(text2)) {
+      deliverables.set("floorplan", { id: "floorplan", label: "Floor plan", kind: "floorplan" });
+    }
+    if (/matterport|\b3d tour\b/i.test(text2)) {
+      deliverables.set("tour-3d", { id: "tour-3d", label: "3D tour", kind: "capture" });
+    }
+    if (/same[- ]day/i.test(text2)) {
+      deliverables.set("same-day", { id: "same-day", label: "Same-day delivery", kind: "delivery" });
+    }
+    if (/iconic finish|iconic polish/i.test(text2)) polishFromOrder = true;
+  }
+  const iconicPolish = input.iconicPolish === true || polishFromOrder;
+  const count = Math.min(8, Math.max(0, twilightCount));
+  const twilight = Array.from({ length: count }, (_, index) => {
+    const role = twilightRole(index);
+    return { slot: `twilight-${role}`, role, prompt: twilightPrompt(role, iconicPolish) };
+  });
+  return {
+    packageName: collected.packageName,
+    iconicPolish,
+    polishFromOrder,
+    photoPrompt: photoPrompt(iconicPolish),
+    photoCount: photoFull ? null : photoCount,
+    twilight,
+    deliverables: [...deliverables.values()],
+    galleryRelease: ORDER_GALLERY_RELEASE,
+    notes: [
+      "Image edits use the order. Photographers do not pick a preset per photo.",
+      "Reels, aerial capture, floor plans, and delivery are not OpenAI image edits.",
+      "The gallery stays held until the order is complete. This plan does not send it."
+    ]
+  };
+}
+function sourceScore(name, role) {
+  const normalized = name.toLowerCase();
+  if (role === "front" && /front|facade|elevation/.test(normalized)) return 5;
+  if (role === "back" && /back|rear|pool/.test(normalized)) return 5;
+  if (/exterior|outside/.test(normalized)) {
+    if (role === "front" || role === "back") return 2;
+    return 4;
+  }
+  if (/aerial|drone/.test(normalized)) return 0;
+  return 0;
+}
+function previewable(frame) {
+  if (frame.raw) return false;
+  if (frame.previewable === false) return false;
+  return Boolean(frame.path);
+}
+function orderEditDrafts(plan, frames) {
+  const usable = frames.filter(previewable);
+  const used = /* @__PURE__ */ new Set();
+  const drafts = [];
+  for (const slot of plan.twilight) {
+    let best = null;
+    let bestScore = 0;
+    for (const frame of usable) {
+      if (used.has(frame.path)) continue;
+      const score = sourceScore(frame.name || frame.path, slot.role);
+      if (score > bestScore) {
+        best = frame;
+        bestScore = score;
+      }
+    }
+    if (best && bestScore > 0) used.add(best.path);
+    const waiting = !best;
+    drafts.push({
+      slot: slot.slot,
+      origin: "order",
+      type: "twilight",
+      label: `Twilight · ${slot.role}`,
+      prompt: slot.prompt,
+      sourcePath: best?.path || "",
+      imageUrl: best?.url || "",
+      fileName: best?.name || `${slot.slot}.jpg`,
+      waitingNote: waiting ? `Waiting for a ${slot.role} exterior. The photographer is not asked to pick the edit.` : ""
+    });
+  }
+  for (const frame of usable) {
+    drafts.push({
+      slot: photoSlot(frame.path),
+      origin: "order",
+      type: "photo",
+      label: plan.iconicPolish ? "Photo · Iconic Polish" : "Photo",
+      prompt: plan.photoPrompt,
+      sourcePath: frame.path,
+      imageUrl: frame.url,
+      fileName: frame.name || "photo.jpg",
+      waitingNote: ""
+    });
+  }
+  return drafts;
+}
+function photoSlot(storagePath) {
+  let hash = 2166136261;
+  for (const char of storagePath) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `photo_${(hash >>> 0).toString(16)}`;
+}
+function orderEditDocId(listingId, slot) {
+  const clean = `${listingId}_${slot}`.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 700);
+  return `order_${clean}`;
+}
+const OPENAI_IMAGE_EDITS_URL = "https://api.openai.com/v1/images/edits";
+const OPENAI_IMAGE_EDIT_MODEL = "gpt-image-1";
+const OPENAI_IMAGE_EDIT_TIMEOUT_MS = 45e3;
+const MAX_SOURCE_BYTES = 2e7;
+class OpenAiEditError extends Error {
+  status;
+  constructor(message, status) {
+    super(message);
+    this.name = "OpenAiEditError";
+    this.status = status;
+  }
+}
+function readOpenAiApiKey(env) {
+  return typeof env.OPENAI_API_KEY === "string" ? env.OPENAI_API_KEY.trim() : "";
+}
+function imageSize(bytes) {
+  if (bytes.length >= 24 && bytes[0] === 137 && bytes.toString("ascii", 1, 4) === "PNG") {
+    return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+  }
+  if (bytes.length > 30 && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP") {
+    const format = bytes.toString("ascii", 12, 16);
+    if (format === "VP8X" && bytes.length >= 30) {
+      return { width: 1 + bytes.readUIntLE(24, 3), height: 1 + bytes.readUIntLE(27, 3) };
+    }
+    if (format === "VP8 " && bytes.length >= 30) {
+      return { width: bytes.readUInt16LE(26) & 16383, height: bytes.readUInt16LE(28) & 16383 };
+    }
+    if (format === "VP8L" && bytes.length >= 25) {
+      const bits = bytes.readUInt32LE(21);
+      return { width: (bits & 16383) + 1, height: (bits >> 14 & 16383) + 1 };
+    }
+  }
+  if (bytes.length > 4 && bytes[0] === 255 && bytes[1] === 216) {
+    let offset = 2;
+    while (offset + 9 < bytes.length) {
+      if (bytes[offset] !== 255) break;
+      const marker = bytes[offset + 1];
+      if (marker === 216 || marker === 217) {
+        offset += 2;
+        continue;
+      }
+      const size = bytes.readUInt16BE(offset + 2);
+      if (marker >= 192 && marker <= 195) {
+        return { height: bytes.readUInt16BE(offset + 5), width: bytes.readUInt16BE(offset + 7) };
+      }
+      if (size < 2) break;
+      offset += 2 + size;
+    }
+  }
+  return null;
+}
+function editSizeForImage(bytes) {
+  const size = imageSize(bytes);
+  return listingPhotoEditSize(size?.width ?? 0, size?.height ?? 0);
+}
+function imagePart(bytes, contentType) {
+  const type = contentType.includes("png") ? "image/png" : contentType.includes("webp") ? "image/webp" : "image/jpeg";
+  const extension = type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg";
+  return {
+    blob: new Blob([new Uint8Array(bytes)], { type }),
+    filename: `source.${extension}`
+  };
+}
+function isTimeoutError(err) {
+  if (!err || typeof err !== "object") return false;
+  const name = err.name;
+  return name === "TimeoutError" || name === "AbortError";
+}
+function openAiErrorNote(status, body) {
+  let message = "";
+  let code = "";
+  try {
+    const parsed = JSON.parse(body);
+    message = String(parsed.error?.message || "").trim();
+    code = String(parsed.error?.code || "").trim();
+  } catch {
+    message = "";
+  }
+  if (code === "moderation_blocked" || /moderation/i.test(message)) {
+    return "OpenAI blocked this edit. Revise the prompt and queue it again.";
+  }
+  if (status === 401) return "OpenAI rejected the API key. Check OPENAI_API_KEY on the server.";
+  if (status === 429) return "OpenAI rate limit reached. Wait a moment and queue the edit again.";
+  const detail = message.replace(/\s+/g, " ").slice(0, 180);
+  if (detail) return `OpenAI could not edit this photo (${status}). ${detail}`;
+  return `OpenAI could not edit this photo (${status}). Queue the edit again.`;
+}
+async function editListingPhotoWithOpenAI(input) {
+  const apiKey = input.apiKey.trim();
+  if (!apiKey) throw new OpenAiEditError("OPENAI_API_KEY is not configured on the server, so this photo was not edited.");
+  if (!input.bytes.length) throw new OpenAiEditError("The source photo was empty.");
+  if (input.bytes.length > MAX_SOURCE_BYTES) {
+    throw new OpenAiEditError("That photo is over 20 MB. Export a smaller JPEG and queue the edit again.");
+  }
+  const prompt = input.prompt.trim();
+  if (prompt.length < 3) throw new OpenAiEditError("Describe the AI edit.");
+  const file = imagePart(input.bytes, input.contentType);
+  const form = new FormData();
+  form.append("model", OPENAI_IMAGE_EDIT_MODEL);
+  form.append("prompt", prompt);
+  form.append("image", file.blob, file.filename);
+  form.append("n", "1");
+  form.append("size", editSizeForImage(input.bytes));
+  form.append("quality", "medium");
+  form.append("output_format", "jpeg");
+  form.append("output_compression", "85");
+  form.append("input_fidelity", "high");
+  const fetchImpl = input.fetchImpl || fetch;
+  const timeoutMs = input.timeoutMs ?? OPENAI_IMAGE_EDIT_TIMEOUT_MS;
+  let response;
+  try {
+    response = await fetchImpl(OPENAI_IMAGE_EDITS_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+      signal: AbortSignal.timeout(timeoutMs)
+    });
+  } catch (err) {
+    if (isTimeoutError(err)) throw new OpenAiEditError(AI_EDIT_TIMEOUT_NOTE);
+    throw new OpenAiEditError("Iconic Studio could not reach OpenAI. Queue the edit again.");
+  }
+  const body = await response.text();
+  if (!response.ok) throw new OpenAiEditError(openAiErrorNote(response.status, body), response.status);
+  let parsed;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    throw new OpenAiEditError("OpenAI returned an unreadable image edit.");
+  }
+  const encoded = parsed.data?.[0]?.b64_json || "";
+  if (!encoded) throw new OpenAiEditError("OpenAI returned no edited image.");
+  const bytes = Buffer.from(encoded, "base64");
+  if (bytes.length < 32) throw new OpenAiEditError("OpenAI returned an empty edited image.");
+  return { bytes, contentType: "image/jpeg" };
+}
 const db$6 = () => admin.firestore();
 const bucket = () => admin.storage().bucket();
 function httpError(status, message) {
@@ -4681,31 +5216,284 @@ async function assertStudioAccess(uid, role, listingId) {
     throw httpError(403, "This job is not assigned to you.");
   }
 }
+function listingFrames(data) {
+  return (Array.isArray(data.images) ? data.images : []).map((item, index) => frameFromListingImage(item, index)).filter((frame) => Boolean(frame));
+}
+async function downloadListingImage(listingId, sourcePath, fileName, contentType) {
+  if (!isListingStoragePath(listingId, sourcePath)) {
+    throw new OpenAiEditError("That photo is not stored on this listing.");
+  }
+  if (!isStudioPreviewable(fileName, contentType)) {
+    throw new OpenAiEditError("OpenAI can edit a JPEG, PNG, or WebP. RAW files stay in the queue until a preview exists.");
+  }
+  const file = bucket().file(sourcePath);
+  const [exists] = await file.exists();
+  if (!exists) throw new OpenAiEditError("Source photo was not found in storage.");
+  const [metadata] = await file.getMetadata();
+  const size = Number(metadata.size || 0);
+  if (size > 2e7) {
+    throw new OpenAiEditError("That photo is over 20 MB. Export a smaller JPEG and queue the edit again.");
+  }
+  const resolved = contentTypeForUpload(fileName, String(metadata.contentType || contentType || ""));
+  if (resolved !== "image/jpeg" && resolved !== "image/png" && resolved !== "image/webp") {
+    throw new OpenAiEditError("OpenAI can edit a JPEG, PNG, or WebP. RAW files stay in the queue until a preview exists.");
+  }
+  const [bytes] = await file.download();
+  return { bytes, contentType: resolved };
+}
+async function runOpenAiEdit(input) {
+  const apiKey = readOpenAiApiKey(process.env);
+  if (!apiKey) throw new OpenAiEditError(AI_EDIT_MISSING_KEY_NOTE);
+  const source = await downloadListingImage(input.listingId, input.sourcePath, input.fileName, input.contentType);
+  const edited = await editListingPhotoWithOpenAI({
+    apiKey,
+    prompt: realEstateEditPrompt(input.prompt),
+    bytes: source.bytes,
+    contentType: source.contentType
+  });
+  const base = input.fileName.replace(/\.\w+$/, "") || "edit";
+  const saved = await saveListingBytes(input.listingId, `${base}-ai.jpg`, "image/jpeg", "photos", edited.bytes);
+  return { afterUrl: saved.url, resultPath: saved.storagePath };
+}
+function failureNote(err) {
+  if (err instanceof OpenAiEditError) return err.message;
+  return "The AI edit failed before a finished image was saved.";
+}
+async function loadOrderEditContext(listingId) {
+  const listing = await loadListing$1(listingId);
+  let order = null;
+  const orderId = typeof listing.data.orderId === "string" ? listing.data.orderId : "";
+  if (orderId) {
+    const snap = await db$6().collection("orders").doc(orderId).get();
+    if (snap.exists) order = snap.data() || {};
+  }
+  const plan = planOrderEdits({
+    lineItems: listing.data.lineItems || order?.lineItems || order?.services,
+    services: listing.data.services,
+    serviceIds: listing.data.serviceIds,
+    iconicPolish: listing.data.iconicPolish === true
+  });
+  return { listing, plan };
+}
+async function setIconicPolish(input) {
+  const listing = await loadListing$1(input.listingId);
+  await listing.ref.update({
+    iconicPolish: input.iconicPolish,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  const { plan } = await loadOrderEditContext(input.listingId);
+  return { iconicPolish: plan.iconicPolish, plan };
+}
+async function queueOrderEdits(input) {
+  const { listing, plan } = await loadOrderEditContext(input.listingId);
+  const frames = listingFrames(listing.data);
+  const drafts = orderEditDrafts(plan, frames);
+  const settled = /* @__PURE__ */ new Set(["review", "approved", "rejected", "processing"]);
+  let prepared = 0;
+  for (const draft of drafts) {
+    const ref = db$6().collection("editJobs").doc(orderEditDocId(input.listingId, draft.slot));
+    const snap = await ref.get();
+    const current = snap.data() || {};
+    if (snap.exists && settled.has(String(current.status || ""))) continue;
+    const payload = {
+      kind: "ai_edit",
+      origin: "order",
+      slot: draft.slot,
+      type: draft.type,
+      label: draft.label,
+      listingId: input.listingId,
+      status: "pending",
+      provider: "openai",
+      model: OPENAI_IMAGE_EDIT_MODEL,
+      prompt: draft.prompt,
+      sourcePath: draft.sourcePath,
+      sourceUrl: draft.imageUrl,
+      beforeUrl: draft.imageUrl,
+      afterUrl: "",
+      resultPath: "",
+      placeholder: false,
+      iconicPolish: plan.iconicPolish,
+      note: draft.sourcePath ? "Queued from the order. OpenAI has not run this photo yet." : draft.waitingNote,
+      createdBy: input.createdBy,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+    if (!snap.exists) payload.createdAt = admin.firestore.FieldValue.serverTimestamp();
+    await ref.set(payload, { merge: true });
+    prepared += 1;
+  }
+  const jobSnap = await db$6().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
+  const pending = jobSnap.docs.filter((doc) => {
+    const data2 = doc.data() || {};
+    return data2.origin === "order" && data2.status === "pending" && typeof data2.sourcePath === "string" && data2.sourcePath;
+  });
+  const waiting = jobSnap.docs.filter((doc) => {
+    const data2 = doc.data() || {};
+    return data2.origin === "order" && data2.status === "pending" && !data2.sourcePath;
+  }).length;
+  pending.sort((a, b) => {
+    const rank = (doc) => doc.data().type === "twilight" ? 0 : 1;
+    return rank(a) - rank(b);
+  });
+  const next = pending[0];
+  if (!next) {
+    return { plan, prepared, ran: null, remaining: 0, waiting };
+  }
+  const data = next.data() || {};
+  await next.ref.update({
+    status: "processing",
+    note: "Editing this photo with OpenAI.",
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  const fileName = String(data.sourcePath || "").split("/").pop() || "photo.jpg";
+  try {
+    const saved = await runOpenAiEdit({
+      listingId: input.listingId,
+      sourcePath: String(data.sourcePath),
+      fileName,
+      contentType: "",
+      prompt: String(data.prompt || plan.photoPrompt)
+    });
+    await next.ref.update({
+      status: "review",
+      beforeUrl: data.beforeUrl || data.sourceUrl || "",
+      afterUrl: saved.afterUrl,
+      resultPath: saved.resultPath,
+      placeholder: false,
+      note: AI_EDIT_READY_NOTE,
+      pipeline: ["pending", "processing", "review"],
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    return {
+      plan,
+      prepared,
+      remaining: Math.max(0, pending.length - 1),
+      waiting,
+      ran: {
+        jobId: next.id,
+        status: "review",
+        beforeUrl: String(data.beforeUrl || data.sourceUrl || ""),
+        afterUrl: saved.afterUrl,
+        resultPath: saved.resultPath,
+        placeholder: false,
+        note: AI_EDIT_READY_NOTE
+      }
+    };
+  } catch (err) {
+    const note = failureNote(err);
+    console.error("[Studio AI]", err instanceof Error ? err.message : err);
+    await next.ref.update({
+      status: "failed",
+      placeholder: false,
+      afterUrl: "",
+      note,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    return {
+      plan,
+      prepared,
+      remaining: Math.max(0, pending.length - 1),
+      waiting,
+      ran: {
+        jobId: next.id,
+        status: "failed",
+        beforeUrl: String(data.beforeUrl || data.sourceUrl || ""),
+        afterUrl: "",
+        placeholder: false,
+        note
+      }
+    };
+  }
+}
 async function enqueueAiEdit(input) {
   const listing = await loadListing$1(input.listingId);
-  const frames = (Array.isArray(listing.data.images) ? listing.data.images : []).map((item, index) => frameFromListingImage(item, index)).filter((frame2) => Boolean(frame2));
-  const frame = frames.find((item) => item.path === input.sourcePath);
+  const frame = listingFrames(listing.data).find((item) => item.path === input.sourcePath);
   if (!frame) throw httpError(404, "That file is not on this listing.");
-  const stub = aiEditStub(process.env, input.imageUrl);
+  if (!isStudioPreviewable(frame.name, frame.contentType)) {
+    throw httpError(400, "Choose a JPEG, PNG, or WebP. RAW stays in the queue until a preview exists.");
+  }
+  const beforeUrl = frame.url || input.imageUrl;
   const ref = await db$6().collection("editJobs").add({
     kind: "ai_edit",
+    origin: "staff_override",
     type: input.type,
     listingId: input.listingId,
-    status: stub.status,
-    pipeline: stub.pipeline,
-    provider: stub.provider,
+    status: "processing",
+    provider: "openai",
+    model: OPENAI_IMAGE_EDIT_MODEL,
     prompt: input.prompt,
     sourcePath: input.sourcePath,
-    sourceUrl: input.imageUrl,
-    beforeUrl: stub.beforeUrl,
-    afterUrl: stub.afterUrl,
-    placeholder: stub.placeholder,
-    note: stub.note,
+    sourceUrl: beforeUrl,
+    beforeUrl,
+    afterUrl: "",
+    placeholder: false,
+    note: "Editing this photo with OpenAI.",
     createdBy: input.createdBy,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   });
-  return { id: ref.id, ...stub };
+  try {
+    const saved = await runOpenAiEdit({
+      listingId: input.listingId,
+      sourcePath: input.sourcePath,
+      fileName: frame.name,
+      contentType: frame.contentType,
+      prompt: input.prompt
+    });
+    await ref.update({
+      status: "review",
+      afterUrl: saved.afterUrl,
+      resultPath: saved.resultPath,
+      placeholder: false,
+      note: AI_EDIT_READY_NOTE,
+      pipeline: ["pending", "processing", "review"],
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    return {
+      id: ref.id,
+      status: "review",
+      provider: "openai",
+      beforeUrl,
+      afterUrl: saved.afterUrl,
+      resultPath: saved.resultPath,
+      placeholder: false,
+      note: AI_EDIT_READY_NOTE
+    };
+  } catch (err) {
+    const note = failureNote(err);
+    console.error("[Studio AI]", err instanceof Error ? err.message : err);
+    await ref.update({
+      status: "failed",
+      placeholder: false,
+      afterUrl: "",
+      note,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    return {
+      id: ref.id,
+      status: "failed",
+      provider: "openai",
+      beforeUrl,
+      afterUrl: "",
+      placeholder: false,
+      note
+    };
+  }
+}
+async function rejectStudioJob(input) {
+  const ref = db$6().collection("editJobs").doc(input.jobId);
+  const snap = await ref.get();
+  if (!snap.exists) throw httpError(404, "Edit job not found.");
+  const job = snap.data() || {};
+  if (job.listingId !== input.listingId) throw httpError(400, "That job is for a different listing.");
+  if (job.status === "approved") throw httpError(400, "Approved finals stay on the listing.");
+  const note = job.status === "failed" ? String(job.note || "Rejected.") : "Rejected before approval. The edited image was not added to the gallery.";
+  await ref.set({
+    status: "rejected",
+    rejectedBy: input.rejectedBy,
+    note,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  }, { merge: true });
+  return { id: input.jobId, status: "rejected", note };
 }
 async function saveAdjustedJpeg(input) {
   if (!input.bytes.length) throw httpError(400, "Adjusted JPEG was empty.");
@@ -4884,13 +5672,21 @@ async function loadStudioWorkspace(input) {
       throw httpError(403, "This job is not assigned to you.");
     }
     const loaded = await loadListing$1(input.listingId);
-    const images = (Array.isArray(loaded.data.images) ? loaded.data.images : []).map((item, index) => frameFromListingImage(item, index)).filter(Boolean);
+    const images = listingFrames(loaded.data);
+    let editPlan = null;
+    try {
+      editPlan = (await loadOrderEditContext(input.listingId)).plan;
+    } catch (err) {
+      console.error("[Studio AI] Order plan failed:", err instanceof Error ? err.message : err);
+    }
     listing = {
       id: loaded.id,
       address: listingAddressLabel(loaded.data),
       status: loaded.data.status || "",
       galleryId: loaded.data.galleryId || loaded.data.playtestGalleryId || "",
-      images
+      iconicPolish: loaded.data.iconicPolish === true,
+      images,
+      editPlan
     };
   }
   return {
@@ -5734,6 +6530,37 @@ router$5.get("/workspace", requireStaff, async (req, res) => {
     return sendKnownError(res, err, "Failed to load Iconic Studio.");
   }
 });
+router$5.post("/order-edits", requireStaff, async (req, res) => {
+  const listingId = String(req.body?.listingId || "").trim();
+  if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
+    return res.status(400).json({ error: "A valid listing id is required." });
+  }
+  if (!adminReady(res)) return;
+  try {
+    await assertStudioAccess(req.user.uid, req.staffRole || "", listingId);
+    const result = await queueOrderEdits({ listingId, createdBy: req.user.uid });
+    return res.status(201).json(result);
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to queue the order edits.");
+  }
+});
+router$5.post("/iconic-polish", requireStaff, async (req, res) => {
+  const listingId = String(req.body?.listingId || "").trim();
+  if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
+    return res.status(400).json({ error: "A valid listing id is required." });
+  }
+  if (typeof req.body?.iconicPolish !== "boolean") {
+    return res.status(400).json({ error: "iconicPolish must be true or false." });
+  }
+  if (!adminReady(res)) return;
+  try {
+    await assertStudioAccess(req.user.uid, req.staffRole || "", listingId);
+    const result = await setIconicPolish({ listingId, iconicPolish: req.body.iconicPolish });
+    return res.json(result);
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to save Iconic Polish.");
+  }
+});
 router$5.post("/ai-edit", requireStaff, async (req, res) => {
   const parsed = parseAiEditRequest(req.body);
   if (parsed.ok === false) return res.status(400).json({ error: parsed.error });
@@ -5777,6 +6604,23 @@ router$5.post("/adjust", requireStaff, async (req, res) => {
     return sendKnownError(res, err, "Failed to save the adjustment.");
   }
 });
+router$5.post("/reject", requireStaff, async (req, res) => {
+  if (!adminReady(res)) return;
+  try {
+    const listingId = String(req.body?.listingId || "");
+    const jobId = String(req.body?.jobId || "");
+    if (!jobId) return res.status(400).json({ error: "jobId is required." });
+    await assertStudioAccess(req.user.uid, req.staffRole || "", listingId);
+    const result = await rejectStudioJob({
+      listingId,
+      jobId,
+      rejectedBy: req.user.uid
+    });
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to reject the edit.");
+  }
+});
 router$5.post("/approve", requireStaff, async (req, res) => {
   if (!adminReady(res)) return;
   try {
@@ -5790,7 +6634,9 @@ router$5.post("/approve", requireStaff, async (req, res) => {
       if (!jobSnap.exists) return res.status(404).json({ error: "Edit job not found." });
       const job = jobSnap.data() || {};
       if (job.listingId !== listingId) return res.status(400).json({ error: "That job is for a different listing." });
-      sourcePath = String(job.resultPath || job.sourcePath || sourcePath);
+      const resolved = resolveStudioApprovePath(job, sourcePath);
+      if (resolved.ok === false) return res.status(400).json({ error: resolved.error });
+      sourcePath = resolved.sourcePath;
       if (!fileName) fileName = sourcePath.split("/").pop() || "final.jpg";
     }
     if (!sourcePath) return res.status(400).json({ error: "sourcePath is required." });

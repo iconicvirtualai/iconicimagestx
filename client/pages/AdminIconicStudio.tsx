@@ -8,16 +8,17 @@ import {
   postStudioAdjust,
   postStudioAiEdit,
   postStudioApprove,
+  postStudioOrderEdits,
+  postStudioReject,
 } from "@/lib/studioApi";
 import {
-  AI_EDIT_STUB_NOTE,
   iconicStudioHref,
-  presetPrompt,
   sampleStudioFrames,
   STUDIO_FLAGS,
   type StudioAdjustments,
   type StudioFrame,
 } from "@shared/iconicStudio";
+import { planOrderEdits, type OrderEditPlan } from "@shared/orderEditPlan";
 import { toast } from "sonner";
 import { PresentationSharePanel } from "@/components/PresentationSharePanel";
 
@@ -43,21 +44,10 @@ function sampleWorkspace() {
   const frames = sampleStudioFrames();
   return {
     listings: [{ id: "sampledemo", address: "100 Sample Lane, Austin, TX", status: "uploaded", imageCount: frames.length }],
-    jobs: [{
-      id: "sample-review",
-      listingId: "sampledemo",
-      kind: "ai_edit",
-      type: "virtual_stage",
-      status: "review",
-      prompt: presetPrompt("virtual_stage"),
-      beforeUrl: "",
-      afterUrl: "",
-      placeholder: true,
-      sourcePath: frames[0].path,
-      note: AI_EDIT_STUB_NOTE,
-    }] as StudioJobView[],
+    jobs: [] as StudioJobView[],
     frames,
     address: "100 Sample Lane, Austin, TX",
+    editPlan: planOrderEdits({ serviceIds: ["listing-showcase"] }),
   };
 }
 
@@ -75,6 +65,7 @@ export default function AdminIconicStudio() {
   const [jobs, setJobs] = useState<StudioJobView[]>([]);
   const [frames, setFrames] = useState<StudioFrame[]>([]);
   const [address, setAddress] = useState("Iconic Studio");
+  const [editPlan, setEditPlan] = useState<OrderEditPlan | null>(null);
 
   const applySample = useCallback(() => {
     const sample = sampleWorkspace();
@@ -83,6 +74,7 @@ export default function AdminIconicStudio() {
     setJobs(sample.jobs);
     setFrames(sample.frames);
     setAddress(sample.address);
+    setEditPlan(sample.editPlan);
   }, []);
 
   const load = useCallback(async () => {
@@ -97,6 +89,7 @@ export default function AdminIconicStudio() {
       setJobs((data.jobs || []) as unknown as StudioJobView[]);
       setFrames(nextFrames);
       setAddress(data.listing?.address || "Choose a listing");
+      setEditPlan(data.listing?.editPlan || null);
       if (!listingId && data.listings?.[0]?.id) {
         navigate(iconicStudioHref(data.listings[0].id), { replace: true });
       }
@@ -111,6 +104,7 @@ export default function AdminIconicStudio() {
         setListings([]);
         setJobs([]);
         setFrames([]);
+        setEditPlan(null);
       }
     } finally {
       setLoading(false);
@@ -148,24 +142,26 @@ export default function AdminIconicStudio() {
           address={address}
           frames={frames}
           demo={demo}
+          editPlan={editPlan}
           onSelectListing={onSelectListing}
+          onRunOrder={async () => {
+            if (demo) {
+              toast.message("Sample order", { description: "A live listing runs the next order edit through OpenAI. The gallery is not sent." });
+              return;
+            }
+            const result = await postStudioOrderEdits(getToken, listingId);
+            if (!result.ran) {
+              toast.message("Order queue", { description: result.waiting ? "Waiting for an exterior filename before twilight can run." : "No photo is waiting to edit." });
+            } else if (result.ran.status === "failed") {
+              toast.error(result.ran.note);
+            } else {
+              toast.success("Order edit is ready for review.");
+            }
+            await load();
+          }}
           onAiEdit={async ({ type, prompt, frame }) => {
             if (demo || !frame.url) {
-              const job: StudioJobView = {
-                id: `local-${Date.now()}`,
-                listingId: listingId || "sampledemo",
-                kind: "ai_edit",
-                type,
-                status: "review",
-                prompt,
-                beforeUrl: frame.url,
-                afterUrl: frame.url,
-                placeholder: true,
-                sourcePath: frame.path,
-                note: AI_EDIT_STUB_NOTE,
-              };
-              setJobs((current) => [job, ...current]);
-              toast.message("Needs review", { description: "Stub queue. The after image is a placeholder of the source." });
+              toast.message("Sample override", { description: "Staff overrides call OpenAI when this listing is loaded from the studio." });
               return;
             }
             const job = await postStudioAiEdit(getToken, {
@@ -175,7 +171,8 @@ export default function AdminIconicStudio() {
               imageUrl: frame.url,
               sourcePath: frame.path,
             });
-            toast.success(job.provider === "stub" ? "Edit queued for review" : "Edit sent to the provider");
+            if (job.status === "failed") toast.error(job.note);
+            else toast.success("Edit ready for review.");
             await load();
           }}
           onSaveAdjust={async ({ frame, adjustments, dataBase64 }) => {
@@ -191,6 +188,16 @@ export default function AdminIconicStudio() {
               dataBase64,
             });
             toast.success("Adjusted JPEG saved to the listing.");
+            await load();
+          }}
+          onReject={async (job) => {
+            if (demo) {
+              setJobs((current) => current.filter((item) => item.id !== job.id));
+              toast.message("Sample reject", { description: "The edited image is not added to the gallery." });
+              return;
+            }
+            const result = await postStudioReject(getToken, { listingId, jobId: job.id });
+            toast.success(result.note || "Edit rejected.");
             await load();
           }}
           onApprove={async ({ frame, job }) => {

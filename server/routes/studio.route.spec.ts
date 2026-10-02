@@ -60,6 +60,12 @@ describe("Iconic Studio AI route", () => {
   it("requires a staff token", async () => {
     const result = await postAi();
     expect(result.status).toBe(401);
+    const order = await fetch(`${baseUrl}/api/studio/order-edits`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ listingId: "project1234" }),
+    });
+    expect(order.status).toBe(401);
   });
 
   it("rejects an unknown edit type before touching storage", async () => {

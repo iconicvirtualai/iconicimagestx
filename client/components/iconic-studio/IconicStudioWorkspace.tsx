@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AI_EDIT_PRESETS,
-  AI_EDIT_STUB_NOTE,
   DEFAULT_ADJUSTMENTS,
   RAW_IMPORT_LABEL,
   STUDIO_FLAGS,
@@ -10,6 +9,7 @@ import {
   type StudioAdjustments,
   type StudioFrame,
 } from "@shared/iconicStudio";
+import type { OrderEditPlan } from "@shared/orderEditPlan";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { loadHtmlImage, paintProceduralRoom, renderAdjustedJpeg } from "@/lib/studioCanvas";
@@ -28,6 +28,9 @@ export interface StudioJobView {
   sourcePath?: string;
   resultPath?: string;
   fileCount?: number;
+  origin?: string;
+  label?: string;
+  slot?: string;
 }
 
 export interface StudioListingOption {
@@ -69,10 +72,14 @@ export default function IconicStudioWorkspace({
   address,
   frames,
   demo = false,
+  editPlan = null,
+  initialTab,
   onSelectListing,
   onAiEdit,
+  onRunOrder,
   onSaveAdjust,
   onApprove,
+  onReject,
 }: {
   listings: StudioListingOption[];
   jobs: StudioJobView[];
@@ -80,12 +87,16 @@ export default function IconicStudioWorkspace({
   address: string;
   frames: StudioFrame[];
   demo?: boolean;
+  editPlan?: OrderEditPlan | null;
+  initialTab?: StudioTab;
   onSelectListing: (id: string) => void;
   onAiEdit: (input: { type: string; prompt: string; frame: StudioFrame }) => Promise<void>;
+  onRunOrder?: () => Promise<void>;
   onSaveAdjust: (input: { frame: StudioFrame; adjustments: StudioAdjustments; dataBase64: string }) => Promise<void>;
   onApprove: (input: { frame?: StudioFrame; job?: StudioJobView }) => Promise<void>;
+  onReject?: (job: StudioJobView) => Promise<void>;
 }) {
-  const [tab, setTab] = useState<StudioTab>("adjust");
+  const [tab, setTab] = useState<StudioTab>(initialTab || "adjust");
   const [selectedId, setSelectedId] = useState(frames[0]?.id || "");
   const [adjustments, setAdjustments] = useState<StudioAdjustments>(DEFAULT_ADJUSTMENTS);
   const [prompt, setPrompt] = useState("");
@@ -107,7 +118,11 @@ export default function IconicStudioWorkspace({
 
   const frame = frames.find((item) => item.id === selectedId) || frames[0] || null;
   const previewUrl = frame?.url || (frame && !frame.raw ? sampleUrl : "");
-  const reviewJobs = jobs.filter((job) => job.status === "review" && (!listingId || job.listingId === listingId));
+  const reviewJobs = jobs.filter((job) => {
+    if (listingId && job.listingId && job.listingId !== listingId) return false;
+    if (job.status === "review" || job.status === "failed") return true;
+    return job.status === "pending" && job.origin === "order" && !job.sourcePath;
+  });
   const queueListings = useMemo(() => {
     const active = new Set(
       jobs.filter((job) => job.status === "pending" || job.status === "review").map((job) => job.listingId),
@@ -291,9 +306,12 @@ export default function IconicStudioWorkspace({
                 busy={busy || !frame}
                 reviewJobs={reviewJobs}
                 sampleUrl={sampleUrl}
+                editPlan={editPlan}
                 onPrompt={setPrompt}
                 onEnqueue={enqueue}
+                onRunOrder={onRunOrder ? () => run(onRunOrder) : undefined}
                 onApprove={(job) => run(() => onApprove({ job, frame: frames.find((item) => item.path === (job.resultPath || job.sourcePath)) }))}
+                onReject={onReject ? (job) => run(() => onReject(job)) : undefined}
               />
             )}
             {tab === "brand" && <BrandPanel />}
@@ -399,20 +417,52 @@ function AiPanel({
   busy,
   reviewJobs,
   sampleUrl,
+  editPlan,
   onPrompt,
   onEnqueue,
+  onRunOrder,
   onApprove,
+  onReject,
 }: {
   prompt: string;
   busy?: boolean;
   reviewJobs: StudioJobView[];
   sampleUrl: string;
+  editPlan?: OrderEditPlan | null;
   onPrompt: (value: string) => void;
   onEnqueue: (type: string) => void;
+  onRunOrder?: () => void;
   onApprove: (job: StudioJobView) => void;
+  onReject?: (job: StudioJobView) => void;
 }) {
+  const polish = editPlan?.iconicPolish ? "Iconic Polish on" : "Iconic Polish off";
+  const twilight = editPlan?.twilight.length
+    ? `${editPlan.twilight.length} twilight (${editPlan.twilight.map((slot) => slot.role).join(", ")})`
+    : "No twilight on this order";
   return (
     <div className="space-y-3">
+      <section className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+        <p className={labelCls}>Order edits</p>
+        <p className="mt-1 text-xs font-bold text-gray-700">{editPlan?.packageName || "No package on this listing yet"}</p>
+        <p className="mt-1 text-[11px] leading-snug text-gray-500">
+          {twilight}. {polish}. Uploaded photos use the order prompt. Shooters do not pick an edit per photo.
+        </p>
+        {editPlan && editPlan.deliverables.length > 0 && (
+          <p className="mt-1 text-[11px] text-gray-500">
+            Not image edits: {editPlan.deliverables.map((item) => item.label).join(", ")}.
+          </p>
+        )}
+        <p className="mt-1 text-[11px] text-gray-500">Gallery stays held until the order is complete.</p>
+        <button
+          type="button"
+          disabled={busy || !onRunOrder}
+          onClick={onRunOrder}
+          className="mt-2 rounded-xl bg-black px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-40"
+        >
+          {busy ? "Editing…" : "Run next order edit"}
+        </button>
+      </section>
+      <p className={labelCls}>Staff override</p>
       <div className="grid grid-cols-2 gap-2">
         {AI_EDIT_PRESETS.filter((preset) => preset.id !== "free_text").map((preset) => (
           <button
@@ -437,19 +487,20 @@ function AiPanel({
           className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
         />
       </label>
-      <button type="button" disabled={busy} onClick={() => onEnqueue("free_text")} className="rounded-xl bg-black px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-40">
-        Queue AI edit
+      <button type="button" disabled={busy} onClick={() => onEnqueue("free_text")} className="rounded-xl border border-black px-3 py-2 text-[10px] font-black uppercase tracking-widest disabled:opacity-40">
+        {busy ? "Editing…" : "Queue AI edit"}
       </button>
       <div data-testid="studio-review-tray">
         <p className={labelCls}>Needs review</p>
         {reviewJobs.length === 0 && <p className="mt-2 text-xs text-gray-500">No edits waiting.</p>}
         <div className="mt-2 space-y-3">
           {reviewJobs.map((job) => {
-            const before = job.beforeUrl || sampleUrl;
-            const after = job.afterUrl || sampleUrl;
+            const before = job.beforeUrl || "";
+            const after = job.afterUrl || "";
+            const canApprove = job.status === "review" && !job.placeholder && Boolean(after);
             return (
               <article key={job.id} className="rounded-xl border border-gray-100 p-2">
-                <p className="text-[10px] font-black uppercase tracking-widest">{job.type || "edit"} · {job.status}</p>
+                <p className="text-[10px] font-black uppercase tracking-widest">{job.label || job.type || "edit"} · {job.status}</p>
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   <figure>
                     {before ? <img src={before} alt="" className="h-16 w-full rounded object-cover" /> : <div className="h-16 rounded bg-gray-100" />}
@@ -462,16 +513,26 @@ function AiPanel({
                     </figcaption>
                   </figure>
                 </div>
-                {job.note && <p className="mt-2 text-[11px] leading-snug text-gray-500">{job.note}</p>}
-                <button type="button" onClick={() => onApprove(job)} className="mt-2 rounded-lg bg-[#0d9488] px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white">
-                  Approve final
-                </button>
+                {job.note && (
+                  <p className={`mt-2 text-[11px] leading-snug ${job.status === "failed" ? "text-red-700" : "text-gray-500"}`}>{job.note}</p>
+                )}
+                <div className="mt-2 flex gap-2">
+                  {canApprove && (
+                    <button type="button" onClick={() => onApprove(job)} className="rounded-lg bg-[#0d9488] px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white">
+                      Approve final
+                    </button>
+                  )}
+                  {onReject && job.status !== "pending" && (
+                    <button type="button" onClick={() => onReject(job)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest">
+                      Reject
+                    </button>
+                  )}
+                </div>
               </article>
             );
           })}
         </div>
       </div>
-      <p className="sr-only">{AI_EDIT_STUB_NOTE}</p>
     </div>
   );
 }
