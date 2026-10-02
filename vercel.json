@@ -15,6 +15,12 @@
       "includeFiles": "dist/spa/index.html"
     }
   },
+  "redirects": [
+    { "source": "/studio", "destination": "/studio-105", "permanent": false },
+    { "source": "/studio/", "destination": "/studio-105", "permanent": false },
+    { "source": "/gallery", "destination": "/studio-105", "permanent": false },
+    { "source": "/gallery/", "destination": "/studio-105", "permanent": false }
+  ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/present/:token", "destination": "/api/presentations/shell/:token" },

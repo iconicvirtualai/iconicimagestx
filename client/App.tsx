@@ -106,6 +106,9 @@ const App = () => (
             <Route path="/terms" element={<Terms />} />
             {/* Shirt QR destination. /go/ matches here too (trailing slash is ignored). */}
             <Route path="/go" element={<Go />} />
+            {/* Bare paths have no project id. Studio 105 is the public studio page. */}
+            <Route path="/studio" element={<Navigate to="/studio-105" replace />} />
+            <Route path="/gallery" element={<Navigate to="/studio-105" replace />} />
             <Route path="/studio/:listingId" element={<ClientStudio />} />
             <Route path="/gallery/:galleryId" element={<PublicGallery />} />
             <Route path="/present/:token" element={<ListingPresentation />} />

@@ -20,6 +20,11 @@ app.get(["/podcast-guest-prep", "/podcast-guest-prep/"], (_req, res) => {
   res.sendFile(podcastGuestPrep);
 });
 
+// Bare /studio and /gallery have no project id. ID routes stay on the SPA.
+app.get(["/studio", "/studio/", "/gallery", "/gallery/"], (_req, res) => {
+  res.redirect(302, "/studio-105");
+});
+
 // Handle React Router - serve index.html for all non-API routes
 app.get("/{*splat}", async (req, res) => {
   // Don't serve index.html for API routes
