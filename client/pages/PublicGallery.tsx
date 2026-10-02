@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { Copy, Download, ExternalLink, Image, Link2, Lock, AlertCircle, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Footer from "@/components/Footer";
@@ -7,21 +7,63 @@ import { toast } from "sonner";
 
 export default function PublicGallery() {
   const { galleryId } = useParams<{ galleryId: string }>();
+  const navigate = useNavigate();
   const [gallery, setGallery] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
+  const [errorTitle, setErrorTitle] = React.useState("Gallery Unavailable");
 
   React.useEffect(() => {
     if (!galleryId) return;
-    fetch(`/api/galleries/public/${galleryId}`)
-      .then(async res => {
-        if (!res.ok) throw new Error(await res.text());
-        return res.json();
-      })
-      .then(setGallery)
-      .catch(() => setError("We could not open this gallery. Please contact Iconic Images."))
-      .finally(() => setLoading(false));
-  }, [galleryId]);
+    let cancelled = false;
+    let redirecting = false;
+    setLoading(true);
+    setError("");
+    setErrorTitle("Gallery Unavailable");
+    setGallery(null);
+    (async () => {
+      try {
+        const res = await fetch(`/api/galleries/public/${galleryId}`);
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (res.status === 404) {
+          const linkRes = await fetch(`/api/galleries/link/${encodeURIComponent(galleryId)}`);
+          const link = await linkRes.json().catch(() => ({}));
+          if (cancelled) return;
+          if (linkRes.ok && link.kind === "listing" && link.openGalleryId && link.openGalleryId !== galleryId) {
+            redirecting = true;
+            navigate(`/gallery/${link.openGalleryId}`, { replace: true });
+            return;
+          }
+          if (linkRes.ok && link.kind === "listing") {
+            redirecting = true;
+            navigate(`/studio/${galleryId}`, { replace: true });
+            return;
+          }
+          const linkTitle = link.code === "studio_locked"
+            ? "Studio link is locked"
+            : link.code === "studio_disabled"
+              ? "Studio link is off"
+              : link.code === "lookup_unavailable" || link.code === "lookup_failed"
+                ? "Gallery link could not be checked"
+                : link.code === "unknown" || link.code === "dangling_pointer"
+                  ? "No gallery or project found"
+                  : "Gallery Unavailable";
+          setErrorTitle(linkTitle);
+          throw new Error(link.message || data.message || data.error || "Gallery link not found.");
+        }
+        if (!res.ok) throw new Error(data.message || data.error || "We could not open this gallery.");
+        setGallery(data);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : "We could not open this gallery.");
+      } finally {
+        if (!cancelled && !redirecting) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [galleryId, navigate]);
 
   if (loading) return <div className="min-h-screen bg-white flex items-center justify-center"><div className="w-8 h-8 border-4 border-[#0d9488] border-t-transparent rounded-full animate-spin" /></div>;
 
@@ -30,7 +72,7 @@ export default function PublicGallery() {
       <div className="flex flex-1 items-center justify-center px-4">
         <div className="max-w-md text-center">
           <AlertCircle className="w-12 h-12 mx-auto mb-4 text-red-500" />
-          <h1 className="text-2xl font-black mb-2">Gallery Unavailable</h1>
+          <h1 className="text-2xl font-black mb-2">{errorTitle}</h1>
           <p className="text-sm text-gray-500">{error}</p>
         </div>
       </div>
