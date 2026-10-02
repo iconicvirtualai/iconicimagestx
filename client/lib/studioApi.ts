@@ -1,3 +1,4 @@
+import type { GalleryReleaseReport } from "@shared/galleryRelease";
 import type { StudioAdjustments } from "@shared/iconicStudio";
 import type { OrderEditPlan } from "@shared/orderEditPlan";
 
@@ -19,7 +20,25 @@ export interface StudioWorkspaceResponse {
     galleryId?: string;
     iconicPolish?: boolean;
     editPlan?: OrderEditPlan | null;
+    release?: GalleryReleaseReport | null;
     images: Array<Record<string, unknown>>;
+  } | null;
+}
+
+export interface OrderQueueTickResult {
+  prepared: number;
+  remaining: number;
+  waiting: number;
+  shouldFollowUp: boolean;
+  ran: {
+    jobId: string;
+    status: string;
+    note: string;
+    slot?: string;
+    type?: string;
+    beforeUrl?: string;
+    afterUrl?: string;
+    placeholder?: boolean;
   } | null;
 }
 
@@ -70,6 +89,38 @@ export async function postStudioOrderEdits(getToken: TokenGetter, listingId: str
       note: string;
     } | null;
   }>;
+}
+
+export async function postStudioOrderQueueTick(getToken: TokenGetter, listingId: string) {
+  const headers = await authorizedHeaders(getToken);
+  const res = await fetch("/api/studio/order-queue/tick", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ listingId }),
+  });
+  return readJson(res) as Promise<OrderQueueTickResult>;
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** One OpenAI edit per request, then the next, until the listing queue is idle. */
+export async function drainOrderEditQueue(
+  getToken: TokenGetter,
+  listingId: string,
+  onStep?: (result: OrderQueueTickResult) => void,
+  shouldStop?: () => boolean,
+) {
+  let latest: OrderQueueTickResult | null = null;
+  for (let step = 0; step < 120; step += 1) {
+    if (shouldStop?.()) return latest;
+    latest = await postStudioOrderQueueTick(getToken, listingId);
+    onStep?.(latest);
+    if (!latest.shouldFollowUp) return latest;
+    if (!latest.ran) await wait(1500);
+  }
+  return latest;
 }
 
 export async function postIconicPolish(getToken: TokenGetter, body: { listingId: string; iconicPolish: boolean }) {

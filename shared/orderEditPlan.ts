@@ -8,14 +8,21 @@
  * of the order.
  *
  * This module only plans image edits and records the other deliverables.
- * It does not call OpenAI, does not send a gallery, and does not mark an
- * order complete. Upload-time auto-queue and the "send the gallery only at
- * 100%" gate are follow-ons that should call this plan.
+ * It does not call OpenAI and it does not send a gallery. The upload
+ * auto-queue and the gallery release gate both call this plan. Release
+ * stays on hold_until_order_complete until approved finals match it.
  */
 
 import { services } from "../client/lib/services.ts";
 
 export const ORDER_GALLERY_RELEASE = "hold_until_order_complete" as const;
+
+/**
+ * Cadi locked Showcase delivery at 30 approved photos.
+ * The live catalog feature still says "50 Images". The order plan and the
+ * gallery gate both use this count instead of that catalog figure.
+ */
+export const SHOWCASE_PHOTO_COUNT = 30;
 
 export const ICONIC_POLISH_INSTRUCTION =
   "Iconic Polish: if a fireplace is visible, add a realistic fire; if a driveway, street, or curb is visible, remove vehicles and debris and repair the pavement; remove clutter and personal items. Keep the architecture.";
@@ -34,6 +41,11 @@ export interface OrderDeliverable {
   label: string;
   /** Not an Images API edit. Capture, video, floor plan, or delivery. */
   kind: "capture" | "video" | "floorplan" | "delivery";
+  /**
+   * Expected file count when the package states one.
+   * Null means the full uploaded set (Full Aerials). Omitted for items that are one file.
+   */
+  count?: number | null;
 }
 
 export interface OrderEditPlan {
@@ -42,8 +54,10 @@ export interface OrderEditPlan {
   /** True when the order itself includes Iconic Finish or Iconic Polish. */
   polishFromOrder: boolean;
   photoPrompt: string;
-  /** Package still count. Null means every uploaded photo, as in "Full Images". */
+  /** Package still count. Null when the scope is "full" or "none". */
   photoCount: number | null;
+  /** count = package number, full = every uploaded photo, none = no photo requirement. */
+  photoScope: "count" | "full" | "none";
   twilight: TwilightSlot[];
   deliverables: OrderDeliverable[];
   galleryRelease: typeof ORDER_GALLERY_RELEASE;
@@ -134,10 +148,16 @@ function twilightRole(index: number): string {
   return `exterior-${index + 1}`;
 }
 
-function collectTexts(input: OrderEditInput): { texts: string[]; packageName: string; polishFromOrder: boolean } {
+function isShowcaseItem(id: string, name: string, catalogId?: string): boolean {
+  const blob = `${id} ${name} ${catalogId || ""}`.toLowerCase();
+  return blob.includes("listing-showcase") || blob.includes("the showcase");
+}
+
+function collectTexts(input: OrderEditInput): { texts: string[]; packageName: string; polishFromOrder: boolean; showcase: boolean } {
   const texts: string[] = [];
   const packageNames: string[] = [];
   let polishFromOrder = false;
+  let showcase = false;
   const items = [...asItems(input.lineItems), ...asItems(input.services)];
   for (const id of asIds(input.serviceIds)) items.push({ id, name: "" });
 
@@ -148,6 +168,7 @@ function collectTexts(input: OrderEditInput): { texts: string[]; packageName: st
       packageNames.push(catalog.name);
       for (const feature of catalog.features || []) texts.push(feature);
     }
+    if (isShowcaseItem(item.id, item.name, catalog?.id)) showcase = true;
     const blob = `${item.id} ${item.name}`.toLowerCase();
     if (blob.includes("iconic finish") || blob.includes("iconic polish") || blob.includes("iconic-finish")) {
       polishFromOrder = true;
@@ -157,6 +178,7 @@ function collectTexts(input: OrderEditInput): { texts: string[]; packageName: st
     texts,
     packageName: packageNames[0] || items.find((item) => item.name)?.name || "Custom order",
     polishFromOrder,
+    showcase,
   };
 }
 
@@ -179,10 +201,14 @@ export function planOrderEdits(input: OrderEditInput = {}): OrderEditPlan {
 
     const aerials = text.match(/(\d+)\s+aerial/i);
     if (aerials || /full aerials|aerial drone/i.test(text)) {
+      const previous = deliverables.get("aerials");
+      const stated = aerials ? Number(aerials[1]) : null;
+      const count = stated != null ? Math.max(stated, previous?.count || 0) : (previous?.count ?? null);
       deliverables.set("aerials", {
         id: "aerials",
-        label: aerials ? `${aerials[1]} aerial stills` : "Aerial stills",
+        label: count ? `${count} aerial stills` : "Aerial stills",
         kind: "capture",
+        count,
       });
     }
     if (/snap/i.test(text) && /reel/i.test(text)) {
@@ -207,6 +233,10 @@ export function planOrderEdits(input: OrderEditInput = {}): OrderEditPlan {
   }
 
   const iconicPolish = input.iconicPolish === true || polishFromOrder;
+  if (collected.showcase) {
+    photoCount = SHOWCASE_PHOTO_COUNT;
+    photoFull = false;
+  }
   const count = Math.min(8, Math.max(0, twilightCount));
   const twilight = Array.from({ length: count }, (_, index) => {
     const role = twilightRole(index);
@@ -219,6 +249,7 @@ export function planOrderEdits(input: OrderEditInput = {}): OrderEditPlan {
     polishFromOrder,
     photoPrompt: photoPrompt(iconicPolish),
     photoCount: photoFull ? null : photoCount,
+    photoScope: photoFull ? "full" : photoCount != null ? "count" : "none",
     twilight,
     deliverables: [...deliverables.values()],
     galleryRelease: ORDER_GALLERY_RELEASE,

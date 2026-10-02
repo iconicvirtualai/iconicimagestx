@@ -25,6 +25,10 @@ import {
 } from "../../shared/iconicStudio";
 import { isListingStoragePath, safeStorageFileName, contentTypeForUpload } from "../../shared/listingAccess";
 import {
+  orderQueueAdvancePlan,
+  type OrderQueueJob,
+} from "../../shared/orderEditQueue";
+import {
   orderEditDocId,
   orderEditDrafts,
   planOrderEdits,
@@ -204,16 +208,41 @@ export async function setIconicPolish(input: { listingId: string; iconicPolish: 
   return { iconicPolish: plan.iconicPolish, plan };
 }
 
+function jobUpdatedAtMs(data: FirebaseFirestore.DocumentData): number | null {
+  const value = data.updatedAt;
+  if (value && typeof value.toMillis === "function") return value.toMillis();
+  if (typeof value === "string" || typeof value === "number") {
+    const parsed = new Date(value).getTime();
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+}
+
+function queueJobsFromSnap(docs: FirebaseFirestore.QueryDocumentSnapshot[]): OrderQueueJob[] {
+  return docs.map((doc) => {
+    const data = doc.data() || {};
+    return {
+      id: doc.id,
+      origin: typeof data.origin === "string" ? data.origin : "",
+      status: typeof data.status === "string" ? data.status : "",
+      type: typeof data.type === "string" ? data.type : "",
+      sourcePath: typeof data.sourcePath === "string" ? data.sourcePath : "",
+      updatedAtMs: jobUpdatedAtMs(data),
+    };
+  });
+}
+
 /**
- * Write order-driven edit jobs, then run the next one that has a source photo.
- * One OpenAI call per request so the serverless limit can finish the upload.
+ * Write order-driven edit jobs without calling OpenAI.
+ * Failed jobs stay failed unless retryFailed is set (manual Run next).
  * Reels and gallery delivery are not queued here.
  */
-export async function queueOrderEdits(input: { listingId: string; createdBy: string }) {
+export async function prepareOrderEditJobs(input: { listingId: string; createdBy: string; retryFailed?: boolean }) {
   const { listing, plan } = await loadOrderEditContext(input.listingId);
   const frames = listingFrames(listing.data);
   const drafts = orderEditDrafts(plan, frames);
-  const settled = new Set(["review", "approved", "rejected", "processing"]);
+  const settled = new Set(["review", "approved", "rejected", "processing", "failed"]);
+  if (input.retryFailed) settled.delete("failed");
   let prepared = 0;
 
   for (const draft of drafts) {
@@ -251,42 +280,99 @@ export async function queueOrderEdits(input: { listingId: string; createdBy: str
   }
 
   const jobSnap = await db().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
-  const pending = jobSnap.docs.filter((doc) => {
-    const data = doc.data() || {};
-    return data.origin === "order" && data.status === "pending" && typeof data.sourcePath === "string" && data.sourcePath;
-  });
-  const waiting = jobSnap.docs.filter((doc) => {
-    const data = doc.data() || {};
-    return data.origin === "order" && data.status === "pending" && !data.sourcePath;
-  }).length;
+  const jobs = queueJobsFromSnap(jobSnap.docs);
+  const advance = orderQueueAdvancePlan(jobs);
+  const waiting = jobs.filter((job) => job.origin === "order" && job.status === "pending" && !job.sourcePath).length;
+  return { plan, prepared, pending: advance.runnable, waiting, shouldFollowUp: advance.shouldFollowUp };
+}
 
-  pending.sort((a, b) => {
-    const rank = (doc: FirebaseFirestore.QueryDocumentSnapshot) => (doc.data().type === "twilight" ? 0 : 1);
-    return rank(a) - rank(b);
-  });
-  const next = pending[0];
+async function claimOrderEdit(ref: FirebaseFirestore.DocumentReference, now = Date.now()) {
+  try {
+    await db().runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new Error("missing");
+      const data = snap.data() || {};
+      const claimable = orderQueueAdvancePlan([{
+        id: ref.id,
+        origin: "order",
+        status: String(data.status || ""),
+        type: String(data.type || ""),
+        sourcePath: typeof data.sourcePath === "string" ? data.sourcePath : "",
+        updatedAtMs: jobUpdatedAtMs(data),
+      }], now).nextId === ref.id;
+      if (!claimable) throw new Error("busy");
+      tx.update(ref, {
+        status: "processing",
+        note: "Editing this photo with OpenAI.",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+    return true;
+  } catch (err) {
+    if (err instanceof Error && (err.message === "busy" || err.message === "missing")) return false;
+    throw err;
+  }
+}
+
+/**
+ * Prepare order jobs, then run exactly one OpenAI edit.
+ * remaining / shouldFollowUp tell the caller to tick again.
+ */
+export async function advanceOrderEditQueue(input: { listingId: string; createdBy: string; retryFailed?: boolean }) {
+  const prepared = await prepareOrderEditJobs(input);
+  const jobSnap = await db().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
+  const advance = orderQueueAdvancePlan(queueJobsFromSnap(jobSnap.docs));
+  const waiting = queueJobsFromSnap(jobSnap.docs).filter((job) => job.origin === "order" && job.status === "pending" && !job.sourcePath).length;
+  if (!advance.nextId) {
+    return {
+      plan: prepared.plan,
+      prepared: prepared.prepared,
+      ran: null,
+      remaining: 0,
+      waiting,
+      shouldFollowUp: false,
+    };
+  }
+
+  const next = jobSnap.docs.find((doc) => doc.id === advance.nextId) || null;
   if (!next) {
-    return { plan, prepared, ran: null, remaining: 0, waiting };
+    return {
+      plan: prepared.plan,
+      prepared: prepared.prepared,
+      ran: null,
+      remaining: advance.runnable,
+      waiting,
+      shouldFollowUp: advance.shouldFollowUp,
+    };
+  }
+
+  const claimed = await claimOrderEdit(next.ref);
+  if (!claimed) {
+    const still = Math.max(0, advance.runnable - 1);
+    return {
+      plan: prepared.plan,
+      prepared: prepared.prepared,
+      ran: null,
+      remaining: still,
+      waiting,
+      shouldFollowUp: still > 0,
+    };
   }
 
   const data = next.data() || {};
-  await next.ref.update({
-    status: "processing",
-    note: "Editing this photo with OpenAI.",
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
   const fileName = String(data.sourcePath || "").split("/").pop() || "photo.jpg";
+  const beforeUrl = String(data.beforeUrl || data.sourceUrl || "");
   try {
     const saved = await runOpenAiEdit({
       listingId: input.listingId,
       sourcePath: String(data.sourcePath),
       fileName,
       contentType: "",
-      prompt: String(data.prompt || plan.photoPrompt),
+      prompt: String(data.prompt || prepared.plan.photoPrompt),
     });
     await next.ref.update({
       status: "review",
-      beforeUrl: data.beforeUrl || data.sourceUrl || "",
+      beforeUrl,
       afterUrl: saved.afterUrl,
       resultPath: saved.resultPath,
       placeholder: false,
@@ -294,15 +380,19 @@ export async function queueOrderEdits(input: { listingId: string; createdBy: str
       pipeline: ["pending", "processing", "review"],
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+    const remaining = Math.max(0, advance.remainingAfter);
     return {
-      plan,
-      prepared,
-      remaining: Math.max(0, pending.length - 1),
+      plan: prepared.plan,
+      prepared: prepared.prepared,
+      remaining,
       waiting,
+      shouldFollowUp: remaining > 0,
       ran: {
         jobId: next.id,
         status: "review" as const,
-        beforeUrl: String(data.beforeUrl || data.sourceUrl || ""),
+        slot: String(data.slot || ""),
+        type: String(data.type || ""),
+        beforeUrl,
         afterUrl: saved.afterUrl,
         resultPath: saved.resultPath,
         placeholder: false,
@@ -319,21 +409,47 @@ export async function queueOrderEdits(input: { listingId: string; createdBy: str
       note,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+    const remaining = Math.max(0, advance.remainingAfter);
     return {
-      plan,
-      prepared,
-      remaining: Math.max(0, pending.length - 1),
+      plan: prepared.plan,
+      prepared: prepared.prepared,
+      remaining,
       waiting,
+      shouldFollowUp: remaining > 0,
       ran: {
         jobId: next.id,
         status: "failed" as const,
-        beforeUrl: String(data.beforeUrl || data.sourceUrl || ""),
+        slot: String(data.slot || ""),
+        type: String(data.type || ""),
+        beforeUrl,
         afterUrl: "",
         placeholder: false,
         note,
       },
     };
   }
+}
+
+/** Manual "Run next" retries a failed frame, then edits one photo. */
+export async function queueOrderEdits(input: { listingId: string; createdBy: string }) {
+  return advanceOrderEditQueue({ ...input, retryFailed: true });
+}
+
+/** After a photographer upload, enqueue every order edit. The caller advances one photo per request. */
+export async function enqueueOrderEditsFromUpload(input: { listingId: string; createdBy: string }) {
+  return prepareOrderEditJobs({ ...input, retryFailed: false });
+}
+
+/** Next listing with a pending order edit that has a source photo. Used by the cron tick. */
+export async function nextOrderEditListingId(): Promise<string | null> {
+  const snap = await db().collection("editJobs").where("status", "==", "pending").limit(40).get();
+  for (const doc of snap.docs) {
+    const data = doc.data() || {};
+    if (data.origin === "order" && data.sourcePath && typeof data.listingId === "string" && data.listingId) {
+      return data.listingId;
+    }
+  }
+  return null;
 }
 
 /** Staff override for one frame. The default path is queueOrderEdits. */

@@ -26,7 +26,7 @@ import {
   saveListingBytes,
   serializeDoc,
 } from "../services/listingMedia";
-import { bumpRawIngestJob } from "../services/studioJobs";
+import { bumpRawIngestJob, enqueueOrderEditsFromUpload } from "../services/studioJobs";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -78,6 +78,15 @@ async function noteRawUpload(listingId: string, image: { path?: string; url?: st
     await bumpRawIngestJob({ listingId, image: { ...image, path: image.path }, uploadedBy });
   } catch (err) {
     console.error("[Studio] Raw upload saved, but the edit queue was not bumped.", err);
+  }
+}
+
+async function noteOrderEditQueue(listingId: string, uploadedBy: string) {
+  try {
+    return await enqueueOrderEditsFromUpload({ listingId, createdBy: uploadedBy });
+  } catch (err) {
+    console.error("[Studio] Upload saved, but order edits were not queued.", err);
+    return null;
   }
 }
 
@@ -182,7 +191,8 @@ router.post("/:id/photos", requirePhotographer, async (req: AuthenticatedRequest
         existingUrl: saved.url,
       });
       await noteRawUpload(listingId, registered.image, req.user!.uid);
-      return res.status(201).json({ success: true, ...registered });
+      const autoQueue = await noteOrderEditQueue(listingId, req.user!.uid);
+      return res.status(201).json({ success: true, ...registered, autoQueue });
     }
 
     const storagePath = req.body?.storagePath;
@@ -197,7 +207,8 @@ router.post("/:id/photos", requirePhotographer, async (req: AuthenticatedRequest
       uploadedBy: req.user!.uid,
     });
     await noteRawUpload(listingId, registered.image, req.user!.uid);
-    return res.status(201).json({ success: true, ...registered });
+    const autoQueue = await noteOrderEditQueue(listingId, req.user!.uid);
+    return res.status(201).json({ success: true, ...registered, autoQueue });
   } catch (err) {
     return sendKnownError(res, err, "Failed to save the uploaded photo.");
   }

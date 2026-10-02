@@ -7,8 +7,8 @@ import admin from "firebase-admin";
 import nodemailer from "nodemailer";
 import twilio from "twilio";
 import { google } from "googleapis";
-import Stripe from "stripe";
 import crypto, { randomUUID, randomBytes } from "crypto";
+import Stripe from "stripe";
 const STAFF_ROLES$1 = ["admin", "coordinator", "photographer", "editor"];
 function isStaffRole$1(role) {
   return typeof role === "string" && STAFF_ROLES$1.includes(role);
@@ -139,7 +139,7 @@ function clientNotifyBlockReason(env = process.env) {
   if (env.CLIENT_COMMS_ZONE === "RED") return "CLIENT_COMMS_ZONE=RED";
   return "CLIENT_NOTIFY_LIVE is not exactly true";
 }
-const db$k = () => admin.firestore();
+const db$l = () => admin.firestore();
 class EmailNotConfiguredError extends Error {
   code = "email_not_configured";
   constructor() {
@@ -176,7 +176,7 @@ async function sendEmail(options) {
   let htmlBody = getFallbackTemplate(template, variables);
   try {
     if (admin.apps.length) {
-      const templateDoc = await db$k().collection("emailTemplates").where("category", "==", template).where("isActive", "==", true).limit(1).get();
+      const templateDoc = await db$l().collection("emailTemplates").where("category", "==", template).where("isActive", "==", true).limit(1).get();
       if (!templateDoc.empty) {
         const tmpl = templateDoc.docs[0].data();
         if (!subjectOverride && typeof tmpl.subject === "string" && tmpl.subject.trim()) {
@@ -1490,12 +1490,12 @@ async function syncSquareInvoice(invoice, deps) {
     return { ok: false, error: err instanceof Error ? err.message : "Square invoice sync failed" };
   }
 }
-const db$j = () => admin.firestore();
+const db$k = () => admin.firestore();
 function squareInvoiceSynced(result) {
   return result.ok === true && result.skipped === false;
 }
 async function attachSquareInvoiceAfterBooking(invoiceId) {
-  const ref = db$j().collection("invoices").doc(invoiceId);
+  const ref = db$k().collection("invoices").doc(invoiceId);
   const snap = await ref.get();
   if (!snap.exists) {
     console.error("[Square] Invoice sync skipped: invoice missing", invoiceId);
@@ -1533,7 +1533,7 @@ async function attachSquareInvoiceAfterBooking(invoiceId) {
   return result;
 }
 const router$h = Router();
-const db$i = () => admin.firestore();
+const db$j = () => admin.firestore();
 function appUrl$2() {
   return process.env.APP_URL || "https://iconicimagestx.com";
 }
@@ -1648,7 +1648,7 @@ router$h.post("/", async (req, res) => {
       submittedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    const docRef = await db$i().collection("orderRequests").add(orderRequest);
+    const docRef = await db$j().collection("orderRequests").add(orderRequest);
     let invoiceId = null;
     try {
       const created = await createBookingInvoiceDraft({
@@ -1752,7 +1752,7 @@ router$h.post("/", async (req, res) => {
 });
 router$h.get("/", requireCoordinator, async (_req, res) => {
   try {
-    const snapshot = await db$i().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
+    const snapshot = await db$j().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
     const requests = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data()
@@ -1765,7 +1765,7 @@ router$h.get("/", requireCoordinator, async (_req, res) => {
 });
 router$h.get("/:id", requireCoordinator, async (req, res) => {
   try {
-    const doc = await db$i().collection("orderRequests").doc(req.params.id).get();
+    const doc = await db$j().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) {
       return res.status(404).json({ error: "Booking request not found." });
     }
@@ -1778,7 +1778,7 @@ router$h.get("/:id", requireCoordinator, async (req, res) => {
 router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
   try {
     const { assignedPhotographerId, assignedPhotographerName, scheduledDate, scheduledTime, internalNotes } = req.body;
-    const requestDoc = await db$i().collection("orderRequests").doc(req.params.id).get();
+    const requestDoc = await db$j().collection("orderRequests").doc(req.params.id).get();
     if (!requestDoc.exists) {
       return res.status(404).json({ error: "Booking request not found." });
     }
@@ -1818,11 +1818,11 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     }
     let photographer = null;
     if (assignedPhotographerId) {
-      const staffDoc = await db$i().collection("staff").doc(assignedPhotographerId).get();
+      const staffDoc = await db$j().collection("staff").doc(assignedPhotographerId).get();
       photographer = staffDoc.exists ? staffDoc.data() : null;
     }
     let clientId;
-    const existingClients = await db$i().collection("clients").where("email", "==", requestEmail).limit(1).get();
+    const existingClients = await db$j().collection("clients").where("email", "==", requestEmail).limit(1).get();
     if (!existingClients.empty) {
       clientId = existingClients.docs[0].id;
       await existingClients.docs[0].ref.update({
@@ -1831,7 +1831,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
     } else {
-      const clientRef = await db$i().collection("clients").add({
+      const clientRef = await db$j().collection("clients").add({
         firstName: requestFirstName,
         lastName: requestLastName,
         email: requestEmail,
@@ -1878,8 +1878,8 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    const orderRef = await db$i().collection("orders").add(orderData);
-    const appointmentRef = await db$i().collection("appointments").add({
+    const orderRef = await db$j().collection("orders").add(orderData);
+    const appointmentRef = await db$j().collection("appointments").add({
       orderId: orderRef.id,
       clientId,
       clientName: requestClientName,
@@ -1896,7 +1896,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    const galleryRef = await db$i().collection("galleries").add({
+    const galleryRef = await db$j().collection("galleries").add({
       orderId: orderRef.id,
       clientId,
       clientName: requestClientName,
@@ -1924,7 +1924,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       notes: internalNotes || request.vibeNote || ""
     }).catch(async (err) => {
       console.error("[Bookings] Calendar event creation failed:", err);
-      await db$i().collection("agentLogs").add({
+      await db$j().collection("agentLogs").add({
         agent: "nora",
         action: "Calendar event failed",
         summary: `Google Calendar event was not created for order ${orderRef.id}`,
@@ -1958,7 +1958,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     const listingId = existingInvoiceId(request.listingId);
     let invoiceId = linkedInvoiceId;
     if (linkedInvoiceId) {
-      const existingInvoice = await db$i().collection("invoices").doc(linkedInvoiceId).get();
+      const existingInvoice = await db$j().collection("invoices").doc(linkedInvoiceId).get();
       if (existingInvoice.exists) {
         await existingInvoice.ref.update({
           orderId: orderRef.id,
@@ -1973,7 +1973,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         console.error(`[Bookings] Confirm kept invoiceId ${linkedInvoiceId} but the invoice doc is missing. Not creating a second invoice.`);
       }
     } else {
-      const invoiceRef = db$i().collection("invoices").doc();
+      const invoiceRef = db$j().collection("invoices").doc();
       const draft = buildBookingInvoiceDraft({
         lineItems: requestLineItems,
         total: requestTotal,
@@ -2054,7 +2054,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
 router$h.patch("/:id/decline", requireCoordinator, async (req, res) => {
   try {
     const { reason } = req.body;
-    const doc = await db$i().collection("orderRequests").doc(req.params.id).get();
+    const doc = await db$j().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Not found." });
     await doc.ref.update({
       status: "declined",
@@ -2075,23 +2075,23 @@ async function stampDurableLinks(input) {
     orderInvoiceId: input.invoiceId
   });
   const now = admin.firestore.FieldValue.serverTimestamp();
-  const invoiceRef = db$i().collection("invoices").doc(plan.createId);
+  const invoiceRef = db$j().collection("invoices").doc(plan.createId);
   const invoiceSnap = await invoiceRef.get();
   if (invoiceSnap.exists && Object.keys(plan.invoiceFields).length > 0) {
     await invoiceRef.update({ ...plan.invoiceFields, updatedAt: now });
   }
   if (plan.orderFields) {
-    await db$i().collection("orders").doc(input.orderId).update({ ...plan.orderFields, updatedAt: now });
+    await db$j().collection("orders").doc(input.orderId).update({ ...plan.orderFields, updatedAt: now });
   }
   if (input.listingId && plan.listingFields) {
-    await db$i().collection("listings").doc(input.listingId).update({ ...plan.listingFields, updatedAt: now });
+    await db$j().collection("listings").doc(input.listingId).update({ ...plan.listingFields, updatedAt: now });
   }
 }
 async function linkClientIdByEmail(email) {
   try {
     const normalized = normalizeEmail(email);
     if (!normalized) return null;
-    const snap = await db$i().collection("clients").where("email", "==", normalized).limit(1).get();
+    const snap = await db$j().collection("clients").where("email", "==", normalized).limit(1).get();
     return snap.empty ? null : snap.docs[0].id;
   } catch (err) {
     console.error("[Bookings] Client lookup for invoice failed:", err);
@@ -2111,7 +2111,7 @@ async function createBookingInvoiceDraft(input) {
     promoCode: input.promoCode,
     promoDiscount: input.promoDiscount
   });
-  const invoiceRef = db$i().collection("invoices").doc();
+  const invoiceRef = db$j().collection("invoices").doc();
   await invoiceRef.set({
     ...draft,
     invoiceNumber: await generateInvoiceNumber(),
@@ -2123,7 +2123,7 @@ async function createBookingInvoiceDraft(input) {
 }
 async function generateInvoiceNumber() {
   const year = (/* @__PURE__ */ new Date()).getFullYear();
-  const snapshot = await db$i().collection("invoices").where("invoiceNumber", ">=", `INV-${year}-`).where("invoiceNumber", "<", `INV-${year + 1}`).get().catch((err) => {
+  const snapshot = await db$j().collection("invoices").where("invoiceNumber", ">=", `INV-${year}-`).where("invoiceNumber", "<", `INV-${year + 1}`).get().catch((err) => {
     console.error("[Bookings] Invoice number lookup failed:", err);
     return null;
   });
@@ -2136,11 +2136,11 @@ async function generateInvoiceNumber() {
   );
 }
 const router$g = Router();
-const db$h = () => admin.firestore();
+const db$i = () => admin.firestore();
 router$g.get("/", requireStaff, async (req, res) => {
   try {
     const { status, photographerId, limit = "50", startAfter } = req.query;
-    let query = db$h().collection("orders").orderBy("createdAt", "desc");
+    let query = db$i().collection("orders").orderBy("createdAt", "desc");
     if (status) query = query.where("status", "==", status);
     if (photographerId) {
       query = query.where("assignedPhotographerId", "==", photographerId);
@@ -2148,7 +2148,7 @@ router$g.get("/", requireStaff, async (req, res) => {
     const limitNum = Math.min(Number(limit), 200);
     query = query.limit(limitNum);
     if (startAfter) {
-      const cursorDoc = await db$h().collection("orders").doc(startAfter).get();
+      const cursorDoc = await db$i().collection("orders").doc(startAfter).get();
       if (cursorDoc.exists) {
         query = query.startAfter(cursorDoc);
       }
@@ -2171,10 +2171,10 @@ router$g.get("/dashboard", requireStaff, async (_req, res) => {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const [allOrders, todayOrders, monthTransactions, pendingRequests] = await Promise.all([
-      db$h().collection("orders").get(),
-      db$h().collection("orders").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(todayStart)).get(),
-      db$h().collection("transactions").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(monthStart)).where("status", "==", "completed").get(),
-      db$h().collection("orderRequests").where("status", "==", "new").get()
+      db$i().collection("orders").get(),
+      db$i().collection("orders").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(todayStart)).get(),
+      db$i().collection("transactions").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(monthStart)).where("status", "==", "completed").get(),
+      db$i().collection("orderRequests").where("status", "==", "new").get()
     ]);
     const statusCounts = {};
     allOrders.docs.forEach((d) => {
@@ -2200,23 +2200,23 @@ router$g.get("/dashboard", requireStaff, async (_req, res) => {
 });
 router$g.get("/:id", requireStaff, async (req, res) => {
   try {
-    const orderDoc = await db$h().collection("orders").doc(req.params.id).get();
+    const orderDoc = await db$i().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
     const order = { id: orderDoc.id, ...orderDoc.data() };
     const [gallery, invoice, appointment, messages] = await Promise.all([
-      db$h().collection("galleries").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
+      db$i().collection("galleries").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
         console.error("[Orders] Gallery lookup failed:", err);
         return null;
       }),
-      db$h().collection("invoices").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
+      db$i().collection("invoices").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
         console.error("[Orders] Invoice lookup failed:", err);
         return null;
       }),
-      db$h().collection("appointments").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
+      db$i().collection("appointments").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
         console.error("[Orders] Appointment lookup failed:", err);
         return null;
       }),
-      db$h().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "desc").limit(20).get().catch((err) => {
+      db$i().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "desc").limit(20).get().catch((err) => {
         console.error("[Orders] Messages lookup failed:", err);
         return null;
       })
@@ -2255,7 +2255,7 @@ router$g.patch("/:id", requireCoordinator, async (req, res) => {
         new Date(updates.scheduledDate)
       );
     }
-    await db$h().collection("orders").doc(req.params.id).update(updates);
+    await db$i().collection("orders").doc(req.params.id).update(updates);
     return res.json({ success: true });
   } catch (err) {
     console.error("[Orders] Update error:", err);
@@ -2276,7 +2276,7 @@ const VALID_TRANSITIONS = {
 router$g.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status, note } = req.body;
-    const orderDoc = await db$h().collection("orders").doc(req.params.id).get();
+    const orderDoc = await db$i().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
     const currentStatus = orderDoc.data().status;
     const validNext = VALID_TRANSITIONS[currentStatus] || [];
@@ -2294,14 +2294,14 @@ router$g.patch("/:id/status", requireCoordinator, async (req, res) => {
       updates.completedAt = admin.firestore.FieldValue.serverTimestamp();
     }
     await orderDoc.ref.update(updates);
-    const apptSnapshot = await db$h().collection("appointments").where("orderId", "==", req.params.id).limit(1).get();
+    const apptSnapshot = await db$i().collection("appointments").where("orderId", "==", req.params.id).limit(1).get();
     if (!apptSnapshot.empty) {
       const apptStatus = status === "in_progress" ? "in_progress" : status === "shot_complete" || status === "editing" ? "completed" : status === "cancelled" ? "cancelled" : void 0;
       if (apptStatus) {
         await apptSnapshot.docs[0].ref.update({ status: apptStatus });
       }
     }
-    await db$h().collection("agentLogs").add({
+    await db$i().collection("agentLogs").add({
       agent: "nora",
       action: `Order status changed: ${currentStatus} → ${status}`,
       summary: `Order ${req.params.id} transitioned to ${status}`,
@@ -2322,9 +2322,9 @@ router$g.patch("/:id/status", requireCoordinator, async (req, res) => {
 router$g.get("/:id/timeline", requireStaff, async (req, res) => {
   try {
     const [messages, editRequests, agentLogs] = await Promise.all([
-      db$h().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
-      db$h().collection("editRequests").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
-      db$h().collection("agentLogs").where("relatedId", "==", req.params.id).orderBy("createdAt", "asc").get()
+      db$i().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
+      db$i().collection("editRequests").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
+      db$i().collection("agentLogs").where("relatedId", "==", req.params.id).orderBy("createdAt", "asc").get()
     ]);
     const timeline = [
       ...messages.docs.map((d) => ({ type: "message", ...d.data(), id: d.id })),
@@ -2780,7 +2780,1499 @@ function decideClientGalleryLink(input) {
     message: `No gallery and no project uses ${input.id}. Checked galleries/${input.id}, listings/${input.id}, galleries with listingId ${input.id}, orders/${input.id}, and orderRequests/${input.id}. /studio/${input.id} opens a project whose Client Studio link is on. /gallery/${input.id} opens a delivery gallery. This app does not resolve Fotello ids. Copy the link from the project file or the gallery delivery URL.`
   };
 }
+const ORDER_GALLERY_RELEASE = "hold_until_order_complete";
+const SHOWCASE_PHOTO_COUNT = 30;
+const ICONIC_POLISH_INSTRUCTION = "Iconic Polish: if a fireplace is visible, add a realistic fire; if a driveway, street, or curb is visible, remove vehicles and debris and repair the pavement; remove clutter and personal items. Keep the architecture.";
+const PHOTO_BASE = "Prepare this listing photo. Balance color, clear window glare, and replace a blown-out sky when the sky is visible. Keep the architecture, furnishings, and camera angle.";
+function asItems(value) {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (typeof entry === "string") {
+      const name2 = entry.trim();
+      return name2 ? [{ id: "", name: name2 }] : [];
+    }
+    if (!entry || typeof entry !== "object") return [];
+    const row = entry;
+    const id = String(row.id || "").trim();
+    const name = String(row.name || row.label || "").trim();
+    return id || name ? [{ id, name }] : [];
+  });
+}
+function asIds(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry) => String(entry || "").trim()).filter(Boolean);
+}
+function packageByIdOrName(id, name) {
+  const idKey = id.toLowerCase();
+  const nameKey = name.toLowerCase();
+  return services.find((service) => service.id === id || nameKey && service.name.toLowerCase() === nameKey || service.id === idKey);
+}
+function twilightPrompt(role, polish) {
+  const place = role === "front" ? "front exterior" : role === "back" ? "rear exterior" : "exterior";
+  const request = [
+    `Convert this ${place} listing photo into a photoreal twilight.`,
+    "Turn on warm interior lights and landscape lighting.",
+    "Keep the architecture, landscaping, and camera angle.",
+    "Use a natural evening sky. Do not add people or text."
+  ];
+  if (polish) request.push(ICONIC_POLISH_INSTRUCTION);
+  return request.join(" ");
+}
+function photoPrompt(polish) {
+  return polish ? `${PHOTO_BASE} ${ICONIC_POLISH_INSTRUCTION}` : PHOTO_BASE;
+}
+function twilightRole(index) {
+  if (index === 0) return "front";
+  if (index === 1) return "back";
+  return `exterior-${index + 1}`;
+}
+function isShowcaseItem(id, name, catalogId) {
+  const blob = `${id} ${name} ${catalogId || ""}`.toLowerCase();
+  return blob.includes("listing-showcase") || blob.includes("the showcase");
+}
+function collectTexts(input) {
+  const texts = [];
+  const packageNames = [];
+  let polishFromOrder = false;
+  let showcase = false;
+  const items = [...asItems(input.lineItems), ...asItems(input.services)];
+  for (const id of asIds(input.serviceIds)) items.push({ id, name: "" });
+  for (const item of items) {
+    if (item.name) texts.push(item.name);
+    const catalog = packageByIdOrName(item.id, item.name);
+    if (catalog) {
+      packageNames.push(catalog.name);
+      for (const feature of catalog.features || []) texts.push(feature);
+    }
+    if (isShowcaseItem(item.id, item.name, catalog?.id)) showcase = true;
+    const blob = `${item.id} ${item.name}`.toLowerCase();
+    if (blob.includes("iconic finish") || blob.includes("iconic polish") || blob.includes("iconic-finish")) {
+      polishFromOrder = true;
+    }
+  }
+  return {
+    texts,
+    packageName: packageNames[0] || items.find((item) => item.name)?.name || "Custom order",
+    polishFromOrder,
+    showcase
+  };
+}
+function planOrderEdits(input = {}) {
+  const collected = collectTexts(input);
+  let twilightCount = 0;
+  let photoCount = null;
+  let photoFull = false;
+  let polishFromOrder = collected.polishFromOrder;
+  const deliverables = /* @__PURE__ */ new Map();
+  for (const text2 of collected.texts) {
+    const twilight2 = text2.match(/(\d+)\s+(?:iconic\s+)?twilight/i);
+    if (twilight2) twilightCount = Math.max(twilightCount, Number(twilight2[1]));
+    else if (/twilight/i.test(text2)) twilightCount = Math.max(twilightCount, 1);
+    const photos = text2.match(/(\d+)\s+(?:high-end\s+|iconic\s+)?(?:images|photos)\b/i);
+    if (photos) photoCount = Math.max(photoCount || 0, Number(photos[1]));
+    if (/full images/i.test(text2)) photoFull = true;
+    const aerials = text2.match(/(\d+)\s+aerial/i);
+    if (aerials || /full aerials|aerial drone/i.test(text2)) {
+      const previous = deliverables.get("aerials");
+      const stated = aerials ? Number(aerials[1]) : null;
+      const count2 = stated != null ? Math.max(stated, previous?.count || 0) : previous?.count ?? null;
+      deliverables.set("aerials", {
+        id: "aerials",
+        label: count2 ? `${count2} aerial stills` : "Aerial stills",
+        kind: "capture",
+        count: count2
+      });
+    }
+    if (/snap/i.test(text2) && /reel/i.test(text2)) {
+      deliverables.set("snap-reel", { id: "snap-reel", label: "Snap reel", kind: "video" });
+    }
+    if (/animated reel|walk-?through reel|3d animated/i.test(text2)) {
+      deliverables.set("animated-reel", { id: "animated-reel", label: "Animated walk-through reel", kind: "video" });
+    }
+    if (/cinematic/i.test(text2) && /video/i.test(text2)) {
+      deliverables.set("cinematic-video", { id: "cinematic-video", label: "Cinematic property video", kind: "video" });
+    }
+    if (/floor\s*plan|floorplan/i.test(text2)) {
+      deliverables.set("floorplan", { id: "floorplan", label: "Floor plan", kind: "floorplan" });
+    }
+    if (/matterport|\b3d tour\b/i.test(text2)) {
+      deliverables.set("tour-3d", { id: "tour-3d", label: "3D tour", kind: "capture" });
+    }
+    if (/same[- ]day/i.test(text2)) {
+      deliverables.set("same-day", { id: "same-day", label: "Same-day delivery", kind: "delivery" });
+    }
+    if (/iconic finish|iconic polish/i.test(text2)) polishFromOrder = true;
+  }
+  const iconicPolish = input.iconicPolish === true || polishFromOrder;
+  if (collected.showcase) {
+    photoCount = SHOWCASE_PHOTO_COUNT;
+    photoFull = false;
+  }
+  const count = Math.min(8, Math.max(0, twilightCount));
+  const twilight = Array.from({ length: count }, (_, index) => {
+    const role = twilightRole(index);
+    return { slot: `twilight-${role}`, role, prompt: twilightPrompt(role, iconicPolish) };
+  });
+  return {
+    packageName: collected.packageName,
+    iconicPolish,
+    polishFromOrder,
+    photoPrompt: photoPrompt(iconicPolish),
+    photoCount: photoFull ? null : photoCount,
+    photoScope: photoFull ? "full" : photoCount != null ? "count" : "none",
+    twilight,
+    deliverables: [...deliverables.values()],
+    galleryRelease: ORDER_GALLERY_RELEASE,
+    notes: [
+      "Image edits use the order. Photographers do not pick a preset per photo.",
+      "Reels, aerial capture, floor plans, and delivery are not OpenAI image edits.",
+      "The gallery stays held until the order is complete. This plan does not send it."
+    ]
+  };
+}
+function sourceScore(name, role) {
+  const normalized = name.toLowerCase();
+  if (role === "front" && /front|facade|elevation/.test(normalized)) return 5;
+  if (role === "back" && /back|rear|pool/.test(normalized)) return 5;
+  if (/exterior|outside/.test(normalized)) {
+    if (role === "front" || role === "back") return 2;
+    return 4;
+  }
+  if (/aerial|drone/.test(normalized)) return 0;
+  return 0;
+}
+function previewable(frame) {
+  if (frame.raw) return false;
+  if (frame.previewable === false) return false;
+  return Boolean(frame.path);
+}
+function orderEditDrafts(plan, frames) {
+  const usable = frames.filter(previewable);
+  const used = /* @__PURE__ */ new Set();
+  const drafts = [];
+  for (const slot of plan.twilight) {
+    let best = null;
+    let bestScore = 0;
+    for (const frame of usable) {
+      if (used.has(frame.path)) continue;
+      const score = sourceScore(frame.name || frame.path, slot.role);
+      if (score > bestScore) {
+        best = frame;
+        bestScore = score;
+      }
+    }
+    if (best && bestScore > 0) used.add(best.path);
+    const waiting = !best;
+    drafts.push({
+      slot: slot.slot,
+      origin: "order",
+      type: "twilight",
+      label: `Twilight · ${slot.role}`,
+      prompt: slot.prompt,
+      sourcePath: best?.path || "",
+      imageUrl: best?.url || "",
+      fileName: best?.name || `${slot.slot}.jpg`,
+      waitingNote: waiting ? `Waiting for a ${slot.role} exterior. The photographer is not asked to pick the edit.` : ""
+    });
+  }
+  for (const frame of usable) {
+    drafts.push({
+      slot: photoSlot(frame.path),
+      origin: "order",
+      type: "photo",
+      label: plan.iconicPolish ? "Photo · Iconic Polish" : "Photo",
+      prompt: plan.photoPrompt,
+      sourcePath: frame.path,
+      imageUrl: frame.url,
+      fileName: frame.name || "photo.jpg",
+      waitingNote: ""
+    });
+  }
+  return drafts;
+}
+function photoSlot(storagePath) {
+  let hash = 2166136261;
+  for (const char of storagePath) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `photo_${(hash >>> 0).toString(16)}`;
+}
+function orderEditDocId(listingId, slot) {
+  const clean = `${listingId}_${slot}`.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 700);
+  return `order_${clean}`;
+}
+const AERIAL_NAME = /aerial|drone/i;
+function galleryStatusNeedsReleaseGate(status) {
+  return RELEASED_GALLERY_STATUSES.includes(status);
+}
+function isAerialAssetName(value) {
+  return AERIAL_NAME.test(value);
+}
+function mediaBlob(media) {
+  return `${media.type || ""} ${media.title || ""} ${media.fileName || ""}`.toLowerCase();
+}
+function fileBlob(file) {
+  return `${file.name} ${file.path}`.toLowerCase();
+}
+function mediaMatchesDeliverable(id, media) {
+  const blob = mediaBlob(media);
+  const type = String(media.type || "").toLowerCase();
+  if (id === "snap-reel") {
+    if (/animated|walk-?through|cinematic/.test(blob)) return false;
+    return type === "reel" || /snap/.test(blob);
+  }
+  if (id === "animated-reel") return /animated|walk-?through/.test(blob);
+  if (id === "cinematic-video") return /cinematic/.test(blob);
+  if (id === "floorplan") return /floor\s*plan|floorplan/.test(blob);
+  if (id === "tour-3d") return type === "tour" || type === "matterport" || /matterport|3d tour/.test(blob);
+  return false;
+}
+function fileMatchesDeliverable(id, file) {
+  const blob = fileBlob(file);
+  if (id === "floorplan") return /floor\s*plan|floorplan/.test(blob);
+  if (id === "tour-3d") return /matterport|3d tour/.test(blob);
+  if (id === "snap-reel") return /snap/.test(blob) && /reel/.test(blob);
+  if (id === "animated-reel") return /animated|walk-?through/.test(blob);
+  if (id === "cinematic-video") return /cinematic/.test(blob);
+  return false;
+}
+function isTwilightJob(job) {
+  return job.type === "twilight" || String(job.slot || "").startsWith("twilight-");
+}
+function approvedJobs(evidence) {
+  return evidence.jobs.filter((job) => job.status === "approved");
+}
+function previewableUploads(files) {
+  return files.filter((file) => file.raw !== true && file.previewable !== false && !file.path.includes("/finals/"));
+}
+function unlinkedGalleryRelease() {
+  return {
+    galleryRelease: ORDER_GALLERY_RELEASE,
+    complete: true,
+    linked: false,
+    percent: 100,
+    required: 0,
+    satisfied: 0,
+    gaps: [],
+    message: "No package is linked to this gallery, so the order gate does not hold it."
+  };
+}
+function gapLine(id, label, required, satisfied) {
+  return { id, label, required, satisfied: Math.max(0, satisfied) };
+}
+function releaseMessage(complete, percent, gaps, required) {
+  if (required === 0) {
+    return "No image or file requirements are on this order. The gallery is not held.";
+  }
+  if (complete) {
+    return "Order plan is 100% complete. The gallery can be marked delivered or approved.";
+  }
+  const missing = gaps.map((gap) => gap.required > 1 || gap.satisfied > 0 ? `${gap.label} (${gap.satisfied}/${gap.required})` : gap.label);
+  return `Gallery stays held until the order is 100% complete (${percent}%). Missing: ${missing.join(", ")}.`;
+}
+function assessGalleryRelease(plan, evidence) {
+  const lines = [];
+  const approved = approvedJobs(evidence);
+  const twilightResults = new Set(
+    approved.filter(isTwilightJob).map((job) => job.resultPath).filter((path2) => Boolean(path2))
+  );
+  const photoSources = /* @__PURE__ */ new Set();
+  const aerialKeys = /* @__PURE__ */ new Set();
+  for (const job of approved) {
+    if (isTwilightJob(job)) continue;
+    const name = `${job.fileName || ""} ${job.sourcePath || ""} ${job.resultPath || ""}`;
+    if (isAerialAssetName(name)) {
+      const key2 = job.sourcePath || job.resultPath || job.slot || name;
+      aerialKeys.add(key2);
+      continue;
+    }
+    const key = job.sourcePath || job.resultPath || job.slot;
+    if (key) photoSources.add(key);
+  }
+  for (const final of evidence.finals) {
+    if (twilightResults.has(final.path)) continue;
+    const name = `${final.name} ${final.path}`;
+    if (isAerialAssetName(name)) {
+      aerialKeys.add(final.path || final.name);
+      continue;
+    }
+    const key = final.sourcePath || final.path;
+    if (!key || photoSources.has(key)) continue;
+    photoSources.add(key);
+  }
+  if (plan.photoScope === "count" && (plan.photoCount || 0) > 0) {
+    lines.push(gapLine("photos", "Photos", plan.photoCount || 0, photoSources.size));
+  } else if (plan.photoScope === "full") {
+    const uploads = previewableUploads(evidence.uploads).filter((file) => !isAerialAssetName(fileBlob(file)));
+    if (uploads.length === 0) {
+      lines.push(gapLine("photos", "Photos", 1, 0));
+    } else {
+      const satisfied2 = uploads.filter((file) => photoSources.has(file.path) || approved.some((job) => !isTwilightJob(job) && job.sourcePath === file.path)).length;
+      lines.push(gapLine("photos", "Photos", uploads.length, satisfied2));
+    }
+  }
+  if (plan.twilight.length > 0) {
+    const approvedSlots = new Set(approved.filter(isTwilightJob).map((job) => String(job.slot || "")));
+    const satisfied2 = plan.twilight.filter((slot) => approvedSlots.has(slot.slot)).length;
+    lines.push(gapLine("twilight", "Twilight renders", plan.twilight.length, satisfied2));
+  }
+  const aerial = plan.deliverables.find((item) => item.id === "aerials");
+  if (aerial) {
+    if (typeof aerial.count === "number" && aerial.count > 0) {
+      lines.push(gapLine("aerials", aerial.label, aerial.count, aerialKeys.size));
+    } else {
+      const uploads = previewableUploads(evidence.uploads).filter((file) => isAerialAssetName(fileBlob(file)));
+      if (uploads.length === 0) {
+        lines.push(gapLine("aerials", "Aerial stills", 1, 0));
+      } else {
+        const satisfied2 = uploads.filter((file) => aerialKeys.has(file.path) || approved.some((job) => job.sourcePath === file.path && isAerialAssetName(`${job.fileName || ""} ${job.sourcePath || ""}`))).length;
+        lines.push(gapLine("aerials", "Aerial stills", uploads.length, satisfied2));
+      }
+    }
+  }
+  const usedMedia = /* @__PURE__ */ new Set();
+  for (const item of plan.deliverables) {
+    if (item.id === "aerials" || item.kind === "delivery") continue;
+    if (item.kind !== "video" && item.kind !== "floorplan" && item.id !== "tour-3d") continue;
+    const fileHit = [...evidence.finals, ...evidence.uploads].some((file) => fileMatchesDeliverable(item.id, file));
+    let mediaHit = false;
+    if (!fileHit) {
+      for (let index = 0; index < evidence.media.length; index += 1) {
+        if (usedMedia.has(index)) continue;
+        if (!mediaMatchesDeliverable(item.id, evidence.media[index])) continue;
+        usedMedia.add(index);
+        mediaHit = true;
+        break;
+      }
+    }
+    lines.push(gapLine(item.id, item.label, 1, fileHit || mediaHit ? 1 : 0));
+  }
+  const measurable = lines.filter((line) => line.required > 0);
+  const gaps = measurable.filter((line) => line.satisfied < line.required);
+  const required = measurable.reduce((sum, line) => sum + line.required, 0);
+  const satisfied = measurable.reduce((sum, line) => sum + Math.min(line.satisfied, line.required), 0);
+  const percent = required === 0 ? 100 : Math.floor(satisfied / required * 100);
+  const complete = gaps.length === 0;
+  return {
+    galleryRelease: ORDER_GALLERY_RELEASE,
+    complete,
+    linked: true,
+    percent,
+    required,
+    satisfied,
+    gaps,
+    message: releaseMessage(complete, percent, gaps, required)
+  };
+}
+const ORDER_EDIT_RUN_PER_REQUEST = 1;
+const ORDER_EDIT_STALE_MS = 3 * 60 * 1e3;
+function orderEditClaimable(job, now = Date.now()) {
+  if (job.status === "pending") return true;
+  if (job.status !== "processing") return false;
+  if (job.updatedAtMs == null) return false;
+  return now - job.updatedAtMs >= ORDER_EDIT_STALE_MS;
+}
+function runnableOrderEdits(jobs, now = Date.now()) {
+  return jobs.filter((job) => job.origin === "order" && Boolean(job.sourcePath) && orderEditClaimable(job, now)).sort((a, b) => {
+    const rank = (job) => job.type === "twilight" ? 0 : 1;
+    return rank(a) - rank(b);
+  });
+}
+function orderQueueAdvancePlan(jobs, now = Date.now()) {
+  const runnable = runnableOrderEdits(jobs, now);
+  const next = runnable[0] || null;
+  const remainingAfter = next ? Math.max(0, runnable.length - ORDER_EDIT_RUN_PER_REQUEST) : 0;
+  return {
+    nextId: next?.id || null,
+    runnable: runnable.length,
+    remainingAfter,
+    shouldFollowUp: remainingAfter > 0,
+    perRequest: ORDER_EDIT_RUN_PER_REQUEST
+  };
+}
+function jsonSafe(value) {
+  if (value == null) return value;
+  if (typeof value === "object" && value && "toDate" in value && typeof value.toDate === "function") {
+    try {
+      return value.toDate().toISOString();
+    } catch {
+      return null;
+    }
+  }
+  if (Array.isArray(value)) return value.map((item) => jsonSafe(item));
+  if (typeof value === "object") {
+    const out = {};
+    for (const [key, nested] of Object.entries(value)) {
+      out[key] = jsonSafe(nested);
+    }
+    return out;
+  }
+  return value;
+}
+const db$h = () => admin.firestore();
+const bucket$1 = () => admin.storage().bucket();
+const BROWSER_ORIGINS = [
+  "https://iconicimagestx.vercel.app",
+  "https://iconicimagestx.com",
+  "https://www.iconicimagestx.com",
+  "http://localhost:8080",
+  "http://127.0.0.1:8080"
+];
+let corsAttempt = null;
+function ensureBucketCors() {
+  if (!corsAttempt) {
+    corsAttempt = bucket$1().setCorsConfiguration([{
+      origin: BROWSER_ORIGINS,
+      method: ["GET", "HEAD", "PUT", "POST", "DELETE", "OPTIONS"],
+      responseHeader: ["Content-Type", "Authorization", "Content-Length", "x-goog-resumable"],
+      maxAgeSeconds: 3600
+    }]).then(() => {
+      console.log("[Storage] Bucket CORS allows portal photo uploads.");
+    }).catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn("[Storage] Could not update bucket CORS:", message);
+    });
+  }
+  return corsAttempt;
+}
+function firebaseDownloadUrl(bucketName, storagePath, token) {
+  return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(storagePath)}?alt=media&token=${token}`;
+}
+async function createListingUploadUrl(listingId, fileName, contentType, folder) {
+  await ensureBucketCors();
+  const safeName = safeStorageFileName(fileName);
+  const resolvedType = contentTypeForUpload(safeName, contentType);
+  const storagePath = `listings/${listingId}/${folder}/${Date.now()}_${safeName}`;
+  const file = bucket$1().file(storagePath);
+  const [uploadUrl] = await file.getSignedUrl({
+    version: "v4",
+    action: "write",
+    expires: Date.now() + 15 * 60 * 1e3,
+    contentType: resolvedType
+  });
+  return { uploadUrl, storagePath, contentType: resolvedType };
+}
+async function saveListingBytes(listingId, fileName, contentType, folder, bytes) {
+  const safeName = safeStorageFileName(fileName);
+  const resolvedType = contentTypeForUpload(safeName, contentType);
+  const storagePath = `listings/${listingId}/${folder}/${Date.now()}_${safeName}`;
+  const token = randomUUID();
+  const file = bucket$1().file(storagePath);
+  await file.save(bytes, {
+    resumable: false,
+    metadata: {
+      contentType: resolvedType,
+      metadata: { firebaseStorageDownloadTokens: token }
+    }
+  });
+  const url = firebaseDownloadUrl(bucket$1().name, storagePath, token);
+  return { storagePath, contentType: resolvedType, url, token };
+}
+async function registerListingPhoto(options) {
+  const { listingId, storagePath, fileName, uploadedBy } = options;
+  if (!isListingStoragePath(listingId, storagePath)) {
+    throw Object.assign(new Error("Storage path is not inside this listing."), { status: 400 });
+  }
+  const listingRef = db$h().collection("listings").doc(listingId);
+  const listingSnap = await listingRef.get();
+  if (!listingSnap.exists) {
+    throw Object.assign(new Error("Listing not found."), { status: 404 });
+  }
+  const file = bucket$1().file(storagePath);
+  const [exists] = await file.exists();
+  if (!exists) {
+    throw Object.assign(new Error("Uploaded file was not found in storage."), { status: 400 });
+  }
+  let url = options.existingUrl || "";
+  if (!url) {
+    const [metadata] = await file.getMetadata();
+    const current = metadata.metadata?.firebaseStorageDownloadTokens;
+    const token = typeof current === "string" && current ? current.split(",")[0] : randomUUID();
+    if (!current) {
+      await file.setMetadata({
+        metadata: { firebaseStorageDownloadTokens: token },
+        contentType: contentTypeForUpload(fileName, options.contentType || metadata.contentType)
+      });
+    }
+    url = firebaseDownloadUrl(bucket$1().name, storagePath, token);
+  }
+  const image = {
+    url,
+    name: safeStorageFileName(fileName),
+    path: storagePath,
+    contentType: contentTypeForUpload(fileName, options.contentType),
+    uploadedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    uploadedBy,
+    ...studioImageExtra(options.extra)
+  };
+  const listing = listingSnap.data() || {};
+  const images = Array.isArray(listing.images) ? listing.images : [];
+  const already = images.find((item) => item?.path === storagePath);
+  if (!already) {
+    await listingRef.update({
+      images: admin.firestore.FieldValue.arrayUnion(image),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    await syncPlaytestGallery(listingId, listing, image);
+  }
+  return { image: already || image, listingId };
+}
+function studioImageExtra(extra) {
+  if (!extra || typeof extra !== "object") return {};
+  const src = extra;
+  const out = {};
+  if (src.studioApproved === true) out.studioApproved = true;
+  if (src.studioRole === "adjusted" || src.studioRole === "final") out.studioRole = src.studioRole;
+  if (typeof src.sourcePath === "string" && src.sourcePath.length <= 500) out.sourcePath = src.sourcePath;
+  return out;
+}
+async function syncPlaytestGallery(listingId, listing, image) {
+  const galleryIds = /* @__PURE__ */ new Set();
+  if (typeof listing.playtestGalleryId === "string" && listing.playtestGalleryId) {
+    galleryIds.add(listing.playtestGalleryId);
+  }
+  if (listing.playtest === true) {
+    const snap = await db$h().collection("galleries").where("listingId", "==", listingId).limit(5).get();
+    snap.docs.forEach((doc) => {
+      if (doc.data().playtest === true) galleryIds.add(doc.id);
+    });
+  }
+  if (galleryIds.size === 0) return;
+  const mediaItem = {
+    id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    url: image.url,
+    shareUrl: image.url,
+    fileName: image.name,
+    title: image.name,
+    type: image.contentType?.startsWith("video/") ? "video" : "photo",
+    storagePath: image.path,
+    downloadable: true,
+    uploadedBy: image.uploadedBy,
+    uploadedAt: image.uploadedAt
+  };
+  for (const galleryId of galleryIds) {
+    const ref = db$h().collection("galleries").doc(galleryId);
+    const snap = await ref.get();
+    if (!snap.exists || snap.data()?.playtest !== true) continue;
+    const items = Array.isArray(snap.data()?.mediaItems) ? snap.data().mediaItems : [];
+    if (items.some((item) => item?.storagePath === image.path)) continue;
+    await ref.update({
+      mediaItems: admin.firestore.FieldValue.arrayUnion(mediaItem),
+      status: "delivered",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+  }
+}
+function serializeDoc(id, data) {
+  return jsonSafe({ id, ...data });
+}
+const OPENAI_IMAGE_EDITS_URL = "https://api.openai.com/v1/images/edits";
+const OPENAI_IMAGE_EDIT_MODEL = "gpt-image-1";
+const OPENAI_IMAGE_EDIT_TIMEOUT_MS = 45e3;
+const MAX_SOURCE_BYTES = 2e7;
+class OpenAiEditError extends Error {
+  status;
+  constructor(message, status) {
+    super(message);
+    this.name = "OpenAiEditError";
+    this.status = status;
+  }
+}
+function readOpenAiApiKey(env) {
+  return typeof env.OPENAI_API_KEY === "string" ? env.OPENAI_API_KEY.trim() : "";
+}
+function imageSize(bytes) {
+  if (bytes.length >= 24 && bytes[0] === 137 && bytes.toString("ascii", 1, 4) === "PNG") {
+    return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+  }
+  if (bytes.length > 30 && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP") {
+    const format = bytes.toString("ascii", 12, 16);
+    if (format === "VP8X" && bytes.length >= 30) {
+      return { width: 1 + bytes.readUIntLE(24, 3), height: 1 + bytes.readUIntLE(27, 3) };
+    }
+    if (format === "VP8 " && bytes.length >= 30) {
+      return { width: bytes.readUInt16LE(26) & 16383, height: bytes.readUInt16LE(28) & 16383 };
+    }
+    if (format === "VP8L" && bytes.length >= 25) {
+      const bits = bytes.readUInt32LE(21);
+      return { width: (bits & 16383) + 1, height: (bits >> 14 & 16383) + 1 };
+    }
+  }
+  if (bytes.length > 4 && bytes[0] === 255 && bytes[1] === 216) {
+    let offset = 2;
+    while (offset + 9 < bytes.length) {
+      if (bytes[offset] !== 255) break;
+      const marker = bytes[offset + 1];
+      if (marker === 216 || marker === 217) {
+        offset += 2;
+        continue;
+      }
+      const size = bytes.readUInt16BE(offset + 2);
+      if (marker >= 192 && marker <= 195) {
+        return { height: bytes.readUInt16BE(offset + 5), width: bytes.readUInt16BE(offset + 7) };
+      }
+      if (size < 2) break;
+      offset += 2 + size;
+    }
+  }
+  return null;
+}
+function editSizeForImage(bytes) {
+  const size = imageSize(bytes);
+  return listingPhotoEditSize(size?.width ?? 0, size?.height ?? 0);
+}
+function imagePart(bytes, contentType) {
+  const type = contentType.includes("png") ? "image/png" : contentType.includes("webp") ? "image/webp" : "image/jpeg";
+  const extension = type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg";
+  return {
+    blob: new Blob([new Uint8Array(bytes)], { type }),
+    filename: `source.${extension}`
+  };
+}
+function isTimeoutError(err) {
+  if (!err || typeof err !== "object") return false;
+  const name = err.name;
+  return name === "TimeoutError" || name === "AbortError";
+}
+function openAiErrorNote(status, body) {
+  let message = "";
+  let code = "";
+  try {
+    const parsed = JSON.parse(body);
+    message = String(parsed.error?.message || "").trim();
+    code = String(parsed.error?.code || "").trim();
+  } catch {
+    message = "";
+  }
+  if (code === "moderation_blocked" || /moderation/i.test(message)) {
+    return "OpenAI blocked this edit. Revise the prompt and queue it again.";
+  }
+  if (status === 401) return "OpenAI rejected the API key. Check OPENAI_API_KEY on the server.";
+  if (status === 429) return "OpenAI rate limit reached. Wait a moment and queue the edit again.";
+  const detail = message.replace(/\s+/g, " ").slice(0, 180);
+  if (detail) return `OpenAI could not edit this photo (${status}). ${detail}`;
+  return `OpenAI could not edit this photo (${status}). Queue the edit again.`;
+}
+async function editListingPhotoWithOpenAI(input) {
+  const apiKey = input.apiKey.trim();
+  if (!apiKey) throw new OpenAiEditError("OPENAI_API_KEY is not configured on the server, so this photo was not edited.");
+  if (!input.bytes.length) throw new OpenAiEditError("The source photo was empty.");
+  if (input.bytes.length > MAX_SOURCE_BYTES) {
+    throw new OpenAiEditError("That photo is over 20 MB. Export a smaller JPEG and queue the edit again.");
+  }
+  const prompt = input.prompt.trim();
+  if (prompt.length < 3) throw new OpenAiEditError("Describe the AI edit.");
+  const file = imagePart(input.bytes, input.contentType);
+  const form = new FormData();
+  form.append("model", OPENAI_IMAGE_EDIT_MODEL);
+  form.append("prompt", prompt);
+  form.append("image", file.blob, file.filename);
+  form.append("n", "1");
+  form.append("size", editSizeForImage(input.bytes));
+  form.append("quality", "medium");
+  form.append("output_format", "jpeg");
+  form.append("output_compression", "85");
+  form.append("input_fidelity", "high");
+  const fetchImpl = input.fetchImpl || fetch;
+  const timeoutMs = input.timeoutMs ?? OPENAI_IMAGE_EDIT_TIMEOUT_MS;
+  let response;
+  try {
+    response = await fetchImpl(OPENAI_IMAGE_EDITS_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+      signal: AbortSignal.timeout(timeoutMs)
+    });
+  } catch (err) {
+    if (isTimeoutError(err)) throw new OpenAiEditError(AI_EDIT_TIMEOUT_NOTE);
+    throw new OpenAiEditError("Iconic Studio could not reach OpenAI. Queue the edit again.");
+  }
+  const body = await response.text();
+  if (!response.ok) throw new OpenAiEditError(openAiErrorNote(response.status, body), response.status);
+  let parsed;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    throw new OpenAiEditError("OpenAI returned an unreadable image edit.");
+  }
+  const encoded = parsed.data?.[0]?.b64_json || "";
+  if (!encoded) throw new OpenAiEditError("OpenAI returned no edited image.");
+  const bytes = Buffer.from(encoded, "base64");
+  if (bytes.length < 32) throw new OpenAiEditError("OpenAI returned an empty edited image.");
+  return { bytes, contentType: "image/jpeg" };
+}
 const db$g = () => admin.firestore();
+const bucket = () => admin.storage().bucket();
+function httpError$1(status, message) {
+  return Object.assign(new Error(message), { status });
+}
+async function bumpRawIngestJob(input) {
+  const file = {
+    path: input.image.path,
+    url: input.image.url || "",
+    name: input.image.name || input.image.path.split("/").pop() || "raw",
+    contentType: input.image.contentType || ""
+  };
+  const ref = db$g().collection("editJobs").doc(ingestJobId(input.listingId));
+  const snap = await ref.get();
+  if (!snap.exists) {
+    await ref.set({
+      kind: "raw_ingest",
+      type: "raw_ingest",
+      listingId: input.listingId,
+      status: "pending",
+      note: "Edits begin",
+      sourceFiles: [file],
+      fileCount: 1,
+      createdBy: input.uploadedBy,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    return { id: ref.id, created: true, fileCount: 1 };
+  }
+  const data = snap.data() || {};
+  const files = Array.isArray(data.sourceFiles) ? data.sourceFiles : [];
+  if (files.some((item) => item?.path === file.path)) {
+    return { id: ref.id, created: false, fileCount: files.length };
+  }
+  await ref.update({
+    sourceFiles: admin.firestore.FieldValue.arrayUnion(file),
+    fileCount: admin.firestore.FieldValue.increment(1),
+    status: "pending",
+    note: "Edits begin",
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  return { id: ref.id, created: false, fileCount: files.length + 1 };
+}
+async function loadListing$1(listingId) {
+  const snap = await db$g().collection("listings").doc(listingId).get();
+  if (!snap.exists) throw httpError$1(404, "Listing not found.");
+  return { id: snap.id, ref: snap.ref, data: snap.data() || {} };
+}
+async function listingsForRole(uid, role) {
+  if (role === "photographer") {
+    const [byUid, byIds] = await Promise.all([
+      db$g().collection("listings").where("photographerUid", "==", uid).limit(50).get(),
+      db$g().collection("listings").where("photographerIds", "array-contains", uid).limit(50).get()
+    ]);
+    const merged = /* @__PURE__ */ new Map();
+    for (const doc of [...byUid.docs, ...byIds.docs]) merged.set(doc.id, doc);
+    return [...merged.values()].map((doc) => ({ id: doc.id, data: doc.data() }));
+  }
+  const snap = await db$g().collection("listings").limit(80).get();
+  return snap.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
+}
+async function assertStudioAccess(uid, role, listingId) {
+  if (role !== "photographer") {
+    await loadListing$1(listingId);
+    return;
+  }
+  const mine = await listingsForRole(uid, "photographer");
+  if (!mine.some((item) => item.id === listingId)) {
+    throw httpError$1(403, "This job is not assigned to you.");
+  }
+}
+function listingFrames(data) {
+  return (Array.isArray(data.images) ? data.images : []).map((item, index) => frameFromListingImage(item, index)).filter((frame) => Boolean(frame));
+}
+async function downloadListingImage(listingId, sourcePath, fileName, contentType) {
+  if (!isListingStoragePath(listingId, sourcePath)) {
+    throw new OpenAiEditError("That photo is not stored on this listing.");
+  }
+  if (!isStudioPreviewable(fileName, contentType)) {
+    throw new OpenAiEditError("OpenAI can edit a JPEG, PNG, or WebP. RAW files stay in the queue until a preview exists.");
+  }
+  const file = bucket().file(sourcePath);
+  const [exists] = await file.exists();
+  if (!exists) throw new OpenAiEditError("Source photo was not found in storage.");
+  const [metadata] = await file.getMetadata();
+  const size = Number(metadata.size || 0);
+  if (size > 2e7) {
+    throw new OpenAiEditError("That photo is over 20 MB. Export a smaller JPEG and queue the edit again.");
+  }
+  const resolved = contentTypeForUpload(fileName, String(metadata.contentType || contentType || ""));
+  if (resolved !== "image/jpeg" && resolved !== "image/png" && resolved !== "image/webp") {
+    throw new OpenAiEditError("OpenAI can edit a JPEG, PNG, or WebP. RAW files stay in the queue until a preview exists.");
+  }
+  const [bytes] = await file.download();
+  return { bytes, contentType: resolved };
+}
+async function runOpenAiEdit(input) {
+  const apiKey = readOpenAiApiKey(process.env);
+  if (!apiKey) throw new OpenAiEditError(AI_EDIT_MISSING_KEY_NOTE);
+  const source = await downloadListingImage(input.listingId, input.sourcePath, input.fileName, input.contentType);
+  const edited = await editListingPhotoWithOpenAI({
+    apiKey,
+    prompt: realEstateEditPrompt(input.prompt),
+    bytes: source.bytes,
+    contentType: source.contentType
+  });
+  const base = input.fileName.replace(/\.\w+$/, "") || "edit";
+  const saved = await saveListingBytes(input.listingId, `${base}-ai.jpg`, "image/jpeg", "photos", edited.bytes);
+  return { afterUrl: saved.url, resultPath: saved.storagePath };
+}
+function failureNote(err) {
+  if (err instanceof OpenAiEditError) return err.message;
+  return "The AI edit failed before a finished image was saved.";
+}
+async function loadOrderEditContext(listingId) {
+  const listing = await loadListing$1(listingId);
+  let order = null;
+  const orderId = typeof listing.data.orderId === "string" ? listing.data.orderId : "";
+  if (orderId) {
+    const snap = await db$g().collection("orders").doc(orderId).get();
+    if (snap.exists) order = snap.data() || {};
+  }
+  const plan = planOrderEdits({
+    lineItems: listing.data.lineItems || order?.lineItems || order?.services,
+    services: listing.data.services,
+    serviceIds: listing.data.serviceIds,
+    iconicPolish: listing.data.iconicPolish === true
+  });
+  return { listing, plan };
+}
+async function setIconicPolish(input) {
+  const listing = await loadListing$1(input.listingId);
+  await listing.ref.update({
+    iconicPolish: input.iconicPolish,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  const { plan } = await loadOrderEditContext(input.listingId);
+  return { iconicPolish: plan.iconicPolish, plan };
+}
+function jobUpdatedAtMs(data) {
+  const value = data.updatedAt;
+  if (value && typeof value.toMillis === "function") return value.toMillis();
+  if (typeof value === "string" || typeof value === "number") {
+    const parsed = new Date(value).getTime();
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+}
+function queueJobsFromSnap(docs) {
+  return docs.map((doc) => {
+    const data = doc.data() || {};
+    return {
+      id: doc.id,
+      origin: typeof data.origin === "string" ? data.origin : "",
+      status: typeof data.status === "string" ? data.status : "",
+      type: typeof data.type === "string" ? data.type : "",
+      sourcePath: typeof data.sourcePath === "string" ? data.sourcePath : "",
+      updatedAtMs: jobUpdatedAtMs(data)
+    };
+  });
+}
+async function prepareOrderEditJobs(input) {
+  const { listing, plan } = await loadOrderEditContext(input.listingId);
+  const frames = listingFrames(listing.data);
+  const drafts = orderEditDrafts(plan, frames);
+  const settled = /* @__PURE__ */ new Set(["review", "approved", "rejected", "processing", "failed"]);
+  if (input.retryFailed) settled.delete("failed");
+  let prepared = 0;
+  for (const draft of drafts) {
+    const ref = db$g().collection("editJobs").doc(orderEditDocId(input.listingId, draft.slot));
+    const snap = await ref.get();
+    const current = snap.data() || {};
+    if (snap.exists && settled.has(String(current.status || ""))) continue;
+    const payload = {
+      kind: "ai_edit",
+      origin: "order",
+      slot: draft.slot,
+      type: draft.type,
+      label: draft.label,
+      listingId: input.listingId,
+      status: "pending",
+      provider: "openai",
+      model: OPENAI_IMAGE_EDIT_MODEL,
+      prompt: draft.prompt,
+      sourcePath: draft.sourcePath,
+      sourceUrl: draft.imageUrl,
+      beforeUrl: draft.imageUrl,
+      afterUrl: "",
+      resultPath: "",
+      placeholder: false,
+      iconicPolish: plan.iconicPolish,
+      note: draft.sourcePath ? "Queued from the order. OpenAI has not run this photo yet." : draft.waitingNote,
+      createdBy: input.createdBy,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+    if (!snap.exists) payload.createdAt = admin.firestore.FieldValue.serverTimestamp();
+    await ref.set(payload, { merge: true });
+    prepared += 1;
+  }
+  const jobSnap = await db$g().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
+  const jobs = queueJobsFromSnap(jobSnap.docs);
+  const advance = orderQueueAdvancePlan(jobs);
+  const waiting = jobs.filter((job) => job.origin === "order" && job.status === "pending" && !job.sourcePath).length;
+  return { plan, prepared, pending: advance.runnable, waiting, shouldFollowUp: advance.shouldFollowUp };
+}
+async function claimOrderEdit(ref, now = Date.now()) {
+  try {
+    await db$g().runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new Error("missing");
+      const data = snap.data() || {};
+      const claimable = orderQueueAdvancePlan([{
+        id: ref.id,
+        origin: "order",
+        status: String(data.status || ""),
+        type: String(data.type || ""),
+        sourcePath: typeof data.sourcePath === "string" ? data.sourcePath : "",
+        updatedAtMs: jobUpdatedAtMs(data)
+      }], now).nextId === ref.id;
+      if (!claimable) throw new Error("busy");
+      tx.update(ref, {
+        status: "processing",
+        note: "Editing this photo with OpenAI.",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    });
+    return true;
+  } catch (err) {
+    if (err instanceof Error && (err.message === "busy" || err.message === "missing")) return false;
+    throw err;
+  }
+}
+async function advanceOrderEditQueue(input) {
+  const prepared = await prepareOrderEditJobs(input);
+  const jobSnap = await db$g().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
+  const advance = orderQueueAdvancePlan(queueJobsFromSnap(jobSnap.docs));
+  const waiting = queueJobsFromSnap(jobSnap.docs).filter((job) => job.origin === "order" && job.status === "pending" && !job.sourcePath).length;
+  if (!advance.nextId) {
+    return {
+      plan: prepared.plan,
+      prepared: prepared.prepared,
+      ran: null,
+      remaining: 0,
+      waiting,
+      shouldFollowUp: false
+    };
+  }
+  const next = jobSnap.docs.find((doc) => doc.id === advance.nextId) || null;
+  if (!next) {
+    return {
+      plan: prepared.plan,
+      prepared: prepared.prepared,
+      ran: null,
+      remaining: advance.runnable,
+      waiting,
+      shouldFollowUp: advance.shouldFollowUp
+    };
+  }
+  const claimed = await claimOrderEdit(next.ref);
+  if (!claimed) {
+    const still = Math.max(0, advance.runnable - 1);
+    return {
+      plan: prepared.plan,
+      prepared: prepared.prepared,
+      ran: null,
+      remaining: still,
+      waiting,
+      shouldFollowUp: still > 0
+    };
+  }
+  const data = next.data() || {};
+  const fileName = String(data.sourcePath || "").split("/").pop() || "photo.jpg";
+  const beforeUrl = String(data.beforeUrl || data.sourceUrl || "");
+  try {
+    const saved = await runOpenAiEdit({
+      listingId: input.listingId,
+      sourcePath: String(data.sourcePath),
+      fileName,
+      contentType: "",
+      prompt: String(data.prompt || prepared.plan.photoPrompt)
+    });
+    await next.ref.update({
+      status: "review",
+      beforeUrl,
+      afterUrl: saved.afterUrl,
+      resultPath: saved.resultPath,
+      placeholder: false,
+      note: AI_EDIT_READY_NOTE,
+      pipeline: ["pending", "processing", "review"],
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    const remaining = Math.max(0, advance.remainingAfter);
+    return {
+      plan: prepared.plan,
+      prepared: prepared.prepared,
+      remaining,
+      waiting,
+      shouldFollowUp: remaining > 0,
+      ran: {
+        jobId: next.id,
+        status: "review",
+        slot: String(data.slot || ""),
+        type: String(data.type || ""),
+        beforeUrl,
+        afterUrl: saved.afterUrl,
+        resultPath: saved.resultPath,
+        placeholder: false,
+        note: AI_EDIT_READY_NOTE
+      }
+    };
+  } catch (err) {
+    const note = failureNote(err);
+    console.error("[Studio AI]", err instanceof Error ? err.message : err);
+    await next.ref.update({
+      status: "failed",
+      placeholder: false,
+      afterUrl: "",
+      note,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    const remaining = Math.max(0, advance.remainingAfter);
+    return {
+      plan: prepared.plan,
+      prepared: prepared.prepared,
+      remaining,
+      waiting,
+      shouldFollowUp: remaining > 0,
+      ran: {
+        jobId: next.id,
+        status: "failed",
+        slot: String(data.slot || ""),
+        type: String(data.type || ""),
+        beforeUrl,
+        afterUrl: "",
+        placeholder: false,
+        note
+      }
+    };
+  }
+}
+async function queueOrderEdits(input) {
+  return advanceOrderEditQueue({ ...input, retryFailed: true });
+}
+async function enqueueOrderEditsFromUpload(input) {
+  return prepareOrderEditJobs({ ...input, retryFailed: false });
+}
+async function nextOrderEditListingId() {
+  const snap = await db$g().collection("editJobs").where("status", "==", "pending").limit(40).get();
+  for (const doc of snap.docs) {
+    const data = doc.data() || {};
+    if (data.origin === "order" && data.sourcePath && typeof data.listingId === "string" && data.listingId) {
+      return data.listingId;
+    }
+  }
+  return null;
+}
+async function enqueueAiEdit(input) {
+  const listing = await loadListing$1(input.listingId);
+  const frame = listingFrames(listing.data).find((item) => item.path === input.sourcePath);
+  if (!frame) throw httpError$1(404, "That file is not on this listing.");
+  if (!isStudioPreviewable(frame.name, frame.contentType)) {
+    throw httpError$1(400, "Choose a JPEG, PNG, or WebP. RAW stays in the queue until a preview exists.");
+  }
+  const beforeUrl = frame.url || input.imageUrl;
+  const ref = await db$g().collection("editJobs").add({
+    kind: "ai_edit",
+    origin: "staff_override",
+    type: input.type,
+    listingId: input.listingId,
+    status: "processing",
+    provider: "openai",
+    model: OPENAI_IMAGE_EDIT_MODEL,
+    prompt: input.prompt,
+    sourcePath: input.sourcePath,
+    sourceUrl: beforeUrl,
+    beforeUrl,
+    afterUrl: "",
+    placeholder: false,
+    note: "Editing this photo with OpenAI.",
+    createdBy: input.createdBy,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  try {
+    const saved = await runOpenAiEdit({
+      listingId: input.listingId,
+      sourcePath: input.sourcePath,
+      fileName: frame.name,
+      contentType: frame.contentType,
+      prompt: input.prompt
+    });
+    await ref.update({
+      status: "review",
+      afterUrl: saved.afterUrl,
+      resultPath: saved.resultPath,
+      placeholder: false,
+      note: AI_EDIT_READY_NOTE,
+      pipeline: ["pending", "processing", "review"],
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    return {
+      id: ref.id,
+      status: "review",
+      provider: "openai",
+      beforeUrl,
+      afterUrl: saved.afterUrl,
+      resultPath: saved.resultPath,
+      placeholder: false,
+      note: AI_EDIT_READY_NOTE
+    };
+  } catch (err) {
+    const note = failureNote(err);
+    console.error("[Studio AI]", err instanceof Error ? err.message : err);
+    await ref.update({
+      status: "failed",
+      placeholder: false,
+      afterUrl: "",
+      note,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    return {
+      id: ref.id,
+      status: "failed",
+      provider: "openai",
+      beforeUrl,
+      afterUrl: "",
+      placeholder: false,
+      note
+    };
+  }
+}
+async function rejectStudioJob(input) {
+  const ref = db$g().collection("editJobs").doc(input.jobId);
+  const snap = await ref.get();
+  if (!snap.exists) throw httpError$1(404, "Edit job not found.");
+  const job = snap.data() || {};
+  if (job.listingId !== input.listingId) throw httpError$1(400, "That job is for a different listing.");
+  if (job.status === "approved") throw httpError$1(400, "Approved finals stay on the listing.");
+  const note = job.status === "failed" ? String(job.note || "Rejected.") : "Rejected before approval. The edited image was not added to the gallery.";
+  await ref.set({
+    status: "rejected",
+    rejectedBy: input.rejectedBy,
+    note,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  }, { merge: true });
+  return { id: input.jobId, status: "rejected", note };
+}
+async function saveAdjustedJpeg(input) {
+  if (!input.bytes.length) throw httpError$1(400, "Adjusted JPEG was empty.");
+  if (input.bytes.length > 45e5) throw httpError$1(413, "Adjusted JPEG is too large.");
+  if (!isListingStoragePath(input.listingId, input.sourcePath)) {
+    throw httpError$1(400, "sourcePath must belong to this listing.");
+  }
+  const adjustments = clampAdjustments(input.adjustments);
+  const saved = await saveListingBytes(
+    input.listingId,
+    input.fileName.replace(/\.\w+$/, "") + "-adjusted.jpg",
+    "image/jpeg",
+    "photos",
+    input.bytes
+  );
+  const registered = await registerListingPhoto({
+    listingId: input.listingId,
+    storagePath: saved.storagePath,
+    fileName: input.fileName.replace(/\.\w+$/, "") + "-adjusted.jpg",
+    contentType: "image/jpeg",
+    uploadedBy: input.uploadedBy,
+    existingUrl: saved.url,
+    extra: { studioRole: "adjusted", sourcePath: input.sourcePath }
+  });
+  const job = await db$g().collection("editJobs").add({
+    kind: "adjust",
+    type: "adjust",
+    listingId: input.listingId,
+    status: "review",
+    sourcePath: input.sourcePath,
+    resultPath: saved.storagePath,
+    beforeUrl: "",
+    afterUrl: saved.url,
+    adjustments,
+    provider: "canvas",
+    note: "Client-side JPEG saved to the listing photos folder.",
+    createdBy: input.uploadedBy,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  return { jobId: job.id, image: registered.image, adjustments };
+}
+async function copyToFinals(listingId, sourcePath, fileName) {
+  if (!isListingStoragePath(listingId, sourcePath)) {
+    throw httpError$1(400, "That file is not stored on this listing.");
+  }
+  if (sourcePath.includes("/finals/")) {
+    const file = bucket().file(sourcePath);
+    const [exists2] = await file.exists();
+    if (!exists2) throw httpError$1(400, "Final file was not found in storage.");
+    const [metadata2] = await file.getMetadata();
+    const current = metadata2.metadata?.firebaseStorageDownloadTokens;
+    const token2 = typeof current === "string" && current ? current.split(",")[0] : randomUUID();
+    return {
+      storagePath: sourcePath,
+      url: firebaseDownloadUrl(bucket().name, sourcePath, token2),
+      contentType: metadata2.contentType || "image/jpeg",
+      copied: false
+    };
+  }
+  if (isRawStudioFile(fileName, "")) {
+    throw httpError$1(400, `${fileName} is RAW. Import it for the AI queue, then approve a JPEG, PNG, or WebP final.`);
+  }
+  if (!isStudioPreviewable(fileName)) {
+    throw httpError$1(400, "Approve a JPEG, PNG, or WebP. RAW stays in the AI queue.");
+  }
+  const destPath = finalsObjectPath(listingId, fileName);
+  const source = bucket().file(sourcePath);
+  const [exists] = await source.exists();
+  if (!exists) throw httpError$1(400, "Source file was not found in storage.");
+  const dest = bucket().file(destPath);
+  await source.copy(dest);
+  const [metadata] = await source.getMetadata();
+  const token = randomUUID();
+  const contentType = metadata.contentType || "image/jpeg";
+  await dest.setMetadata({
+    contentType,
+    metadata: { firebaseStorageDownloadTokens: token }
+  });
+  return {
+    storagePath: destPath,
+    url: firebaseDownloadUrl(bucket().name, destPath, token),
+    contentType,
+    copied: true
+  };
+}
+async function addFinalToGalleries(listingId, listing, image) {
+  const ids = /* @__PURE__ */ new Set();
+  if (typeof listing.galleryId === "string" && listing.galleryId) ids.add(listing.galleryId);
+  if (typeof listing.playtestGalleryId === "string" && listing.playtestGalleryId) ids.add(listing.playtestGalleryId);
+  const snap = await db$g().collection("galleries").where("listingId", "==", listingId).limit(10).get();
+  snap.docs.forEach((doc) => ids.add(doc.id));
+  const updated = [];
+  for (const galleryId of ids) {
+    const ref = db$g().collection("galleries").doc(galleryId);
+    const gallerySnap = await ref.get();
+    if (!gallerySnap.exists) continue;
+    const data = gallerySnap.data() || {};
+    const items = Array.isArray(data.mediaItems) ? data.mediaItems : [];
+    if (items.some((item) => item?.storagePath === image.path)) {
+      updated.push(galleryId);
+      continue;
+    }
+    const mediaItem = {
+      id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      url: image.url,
+      shareUrl: image.url,
+      fileName: image.name,
+      title: image.name,
+      type: "photo",
+      storagePath: image.path,
+      downloadable: true,
+      isEdited: true,
+      isRaw: false,
+      uploadedBy: image.uploadedBy,
+      uploadedAt: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    await ref.update({
+      mediaItems: [...items, mediaItem],
+      status: galleryStatusAfterStudioAdd(typeof data.status === "string" ? data.status : void 0),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    updated.push(galleryId);
+  }
+  return updated;
+}
+async function approveStudioFinal(input) {
+  const listing = await loadListing$1(input.listingId);
+  const name = safeStorageFileName(input.fileName || input.sourcePath.split("/").pop() || "final.jpg");
+  const copied = await copyToFinals(input.listingId, input.sourcePath, name);
+  const registered = await registerListingPhoto({
+    listingId: input.listingId,
+    storagePath: copied.storagePath,
+    fileName: name,
+    contentType: copied.contentType,
+    uploadedBy: input.uploadedBy,
+    existingUrl: copied.url,
+    extra: { studioApproved: true, studioRole: "final", sourcePath: input.sourcePath }
+  });
+  const galleries = await addFinalToGalleries(input.listingId, listing.data, {
+    url: copied.url,
+    name,
+    path: copied.storagePath,
+    contentType: copied.contentType,
+    uploadedBy: input.uploadedBy
+  });
+  if (input.jobId) {
+    await db$g().collection("editJobs").doc(input.jobId).set({
+      status: "approved",
+      resultPath: copied.storagePath,
+      resultUrl: copied.url,
+      afterUrl: copied.url,
+      approvedBy: input.uploadedBy,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+  }
+  return {
+    image: registered.image,
+    galleries,
+    copied: copied.copied,
+    note: galleries.length ? "Final copied onto the listing and added to the gallery. No client email was sent." : "Final copied onto the listing images. No gallery is linked yet, and no client email was sent."
+  };
+}
+async function loadStudioWorkspace(input) {
+  const listings = await listingsForRole(input.uid, input.role);
+  const allowed = new Set(listings.map((item) => item.id));
+  const jobSnap = await db$g().collection("editJobs").limit(150).get();
+  const jobs = jobSnap.docs.map((doc) => jsonSafe({ id: doc.id, ...doc.data() })).filter((job) => {
+    const listingId = String(job.listingId || "");
+    if (input.role === "photographer") return allowed.has(listingId);
+    return true;
+  }).sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
+  let listing = null;
+  if (input.listingId) {
+    if (input.role === "photographer" && !allowed.has(input.listingId)) {
+      throw httpError$1(403, "This job is not assigned to you.");
+    }
+    const loaded = await loadListing$1(input.listingId);
+    const images = listingFrames(loaded.data);
+    let editPlan = null;
+    try {
+      editPlan = (await loadOrderEditContext(input.listingId)).plan;
+    } catch (err) {
+      console.error("[Studio AI] Order plan failed:", err instanceof Error ? err.message : err);
+    }
+    listing = {
+      id: loaded.id,
+      address: listingAddressLabel(loaded.data),
+      status: loaded.data.status || "",
+      galleryId: loaded.data.galleryId || loaded.data.playtestGalleryId || "",
+      iconicPolish: loaded.data.iconicPolish === true,
+      images,
+      editPlan
+    };
+  }
+  return {
+    flags: {
+      teamStudio: true,
+      agentUpsell: false,
+      outsidePhotographerSaas: false,
+      canvaBrand: false
+    },
+    listings: listings.map((item) => ({
+      id: item.id,
+      address: listingAddressLabel(item.data),
+      status: item.data.status || "",
+      imageCount: Array.isArray(item.data.images) ? item.data.images.length : 0
+    })),
+    jobs,
+    listing
+  };
+}
+const db$f = () => admin.firestore();
+function asMedia(value) {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const row = entry;
+    return [{
+      type: typeof row.type === "string" ? row.type : "",
+      title: typeof row.title === "string" ? row.title : "",
+      fileName: typeof row.fileName === "string" ? row.fileName : ""
+    }];
+  });
+}
+function filesFromListing(data) {
+  const images = Array.isArray(data.images) ? data.images : [];
+  const uploads = [];
+  const finals = [];
+  images.forEach((item, index) => {
+    const frame = frameFromListingImage(item, index);
+    if (!frame) return;
+    const sourcePath = item && typeof item === "object" && typeof item.sourcePath === "string" ? item.sourcePath : "";
+    const file = {
+      path: frame.path,
+      name: frame.name,
+      raw: frame.raw,
+      previewable: frame.previewable,
+      sourcePath
+    };
+    if (frame.studioApproved || frame.studioRole === "final" || frame.path.includes("/finals/")) finals.push(file);
+    if (!frame.path.includes("/finals/") && frame.studioRole !== "final") uploads.push(file);
+  });
+  return { uploads, finals };
+}
+async function galleryMediaForListing(listingId, listing, extra) {
+  const media = [
+    ...asMedia(extra?.mediaItems),
+    ...asMedia(extra?.videoLinks),
+    ...asMedia(extra?.tourLinks)
+  ];
+  const ids = /* @__PURE__ */ new Set();
+  if (typeof listing.galleryId === "string" && listing.galleryId) ids.add(listing.galleryId);
+  if (typeof listing.playtestGalleryId === "string" && listing.playtestGalleryId) ids.add(listing.playtestGalleryId);
+  const snap = await db$f().collection("galleries").where("listingId", "==", listingId).limit(10).get();
+  snap.docs.forEach((doc) => ids.add(doc.id));
+  for (const galleryId of ids) {
+    if (extra && galleryId === extra.id) continue;
+    const doc = await db$f().collection("galleries").doc(galleryId).get();
+    if (!doc.exists) continue;
+    const data = doc.data() || {};
+    media.push(...asMedia(data.mediaItems), ...asMedia(data.videoLinks), ...asMedia(data.tourLinks));
+  }
+  return media;
+}
+async function loadGalleryReleaseReport(listingId, gallery) {
+  const { listing, plan } = await loadOrderEditContext(listingId);
+  const files = filesFromListing(listing.data);
+  const jobSnap = await db$f().collection("editJobs").where("listingId", "==", listingId).limit(200).get();
+  const jobs = jobSnap.docs.map((doc) => {
+    const data = doc.data() || {};
+    return {
+      slot: typeof data.slot === "string" ? data.slot : "",
+      type: typeof data.type === "string" ? data.type : "",
+      status: typeof data.status === "string" ? data.status : "",
+      sourcePath: typeof data.sourcePath === "string" ? data.sourcePath : "",
+      resultPath: typeof data.resultPath === "string" ? data.resultPath : "",
+      fileName: typeof data.fileName === "string" ? data.fileName : ""
+    };
+  });
+  const evidence = {
+    jobs,
+    finals: files.finals,
+    uploads: files.uploads,
+    media: await galleryMediaForListing(listingId, listing.data, gallery)
+  };
+  const report = assessGalleryRelease(plan, evidence);
+  if (report.required === 0 && plan.photoScope === "none" && plan.twilight.length === 0 && plan.deliverables.length === 0) {
+    return unlinkedGalleryRelease();
+  }
+  return report;
+}
+async function loadGalleryReleaseForGallery(galleryId) {
+  const snap = await db$f().collection("galleries").doc(galleryId).get();
+  if (!snap.exists) {
+    throw Object.assign(new Error("Gallery not found."), { status: 404 });
+  }
+  const gallery = { id: snap.id, ...snap.data() || {} };
+  const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
+  if (listingId) {
+    const listingSnap = await db$f().collection("listings").doc(listingId).get();
+    if (listingSnap.exists) return loadGalleryReleaseReport(listingId, gallery);
+  }
+  const orderId = typeof gallery.orderId === "string" ? gallery.orderId.trim() : "";
+  let order = null;
+  if (orderId) {
+    const orderSnap = await db$f().collection("orders").doc(orderId).get();
+    if (orderSnap.exists) order = orderSnap.data() || {};
+  }
+  const plan = planOrderEdits({
+    lineItems: order?.lineItems || gallery.lineItems,
+    services: order?.services || gallery.services,
+    serviceIds: order?.serviceIds || gallery.serviceIds
+  });
+  if (plan.photoScope === "none" && plan.twilight.length === 0 && plan.deliverables.length === 0) {
+    return unlinkedGalleryRelease();
+  }
+  return assessGalleryRelease(plan, {
+    jobs: [],
+    finals: [],
+    uploads: [],
+    media: [...asMedia(gallery.mediaItems), ...asMedia(gallery.videoLinks), ...asMedia(gallery.tourLinks)]
+  });
+}
+const db$e = () => admin.firestore();
 function text$1(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -2790,7 +4282,7 @@ function docRecord(snap) {
 }
 async function galleriesWhere(field, id) {
   try {
-    const snap = await db$g().collection("galleries").where(field, "==", id).limit(8).get();
+    const snap = await db$e().collection("galleries").where(field, "==", id).limit(8).get();
     return snap.docs.map((doc) => docRecord(doc)).filter((doc) => Boolean(doc));
   } catch (err) {
     console.error(`[Galleries] ${field} lookup failed:`, err);
@@ -2799,7 +4291,7 @@ async function galleriesWhere(field, id) {
 }
 async function galleryById(id) {
   if (!id) return null;
-  return docRecord(await db$g().collection("galleries").doc(id).get());
+  return docRecord(await db$e().collection("galleries").doc(id).get());
 }
 async function relatedForListing(listing) {
   const related = await galleriesWhere("listingId", listing.id);
@@ -2813,8 +4305,8 @@ async function relatedForListing(listing) {
 }
 async function resolveClientGalleryLink(id) {
   const [gallerySnap, listingSnap] = await Promise.all([
-    db$g().collection("galleries").doc(id).get(),
-    db$g().collection("listings").doc(id).get()
+    db$e().collection("galleries").doc(id).get(),
+    db$e().collection("listings").doc(id).get()
   ]);
   const gallery = docRecord(gallerySnap);
   const listing = docRecord(listingSnap);
@@ -2846,8 +4338,8 @@ async function resolveClientGalleryLink(id) {
   }
   const relatedGalleries = await galleriesWhere("listingId", id);
   const [orderSnap, requestSnap] = await Promise.all([
-    db$g().collection("orders").doc(id).get(),
-    db$g().collection("orderRequests").doc(id).get()
+    db$e().collection("orders").doc(id).get(),
+    db$e().collection("orderRequests").doc(id).get()
   ]);
   const order = docRecord(orderSnap);
   const orderRequest = docRecord(requestSnap);
@@ -2858,7 +4350,7 @@ async function resolveClientGalleryLink(id) {
   let pointedListing = null;
   let pointedRelated = relatedGalleries;
   if (!pointedGallery && pointedListingId) {
-    pointedListing = docRecord(await db$g().collection("listings").doc(pointedListingId).get());
+    pointedListing = docRecord(await db$e().collection("listings").doc(pointedListingId).get());
     if (pointedListing) pointedRelated = await relatedForListing(pointedListing);
   }
   return decideClientGalleryLink({
@@ -2900,7 +4392,7 @@ const handlePublicGalleryLink = async (req, res) => {
   }
 };
 const router$f = Router();
-const db$f = () => admin.firestore();
+const db$d = () => admin.firestore();
 const storage = () => admin.storage().bucket();
 function appUrl$1() {
   return process.env.APP_URL || "https://iconicimagestx.com";
@@ -2915,13 +4407,32 @@ function addressLabel$2(address) {
   }
   return String(address);
 }
+function adminReady$3(res) {
+  if (admin.apps.length) return true;
+  res.status(503).json({
+    error: "Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT and FIREBASE_STORAGE_BUCKET."
+  });
+  return false;
+}
+async function holdIfOrderIncomplete(res, galleryId) {
+  const report = await loadGalleryReleaseForGallery(galleryId);
+  if (report.complete) return false;
+  res.status(409).json({
+    error: report.message,
+    galleryRelease: report.galleryRelease,
+    complete: false,
+    percent: report.percent,
+    gaps: report.gaps
+  });
+  return true;
+}
 async function invoiceForGallery(gallery) {
   if (typeof gallery.invoiceId === "string" && gallery.invoiceId) {
-    const doc = await db$f().collection("invoices").doc(gallery.invoiceId).get();
+    const doc = await db$d().collection("invoices").doc(gallery.invoiceId).get();
     if (doc.exists) return { id: doc.id, ...doc.data() };
   }
   if (typeof gallery.orderId === "string" && gallery.orderId) {
-    const snap = await db$f().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
+    const snap = await db$d().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
     if (!snap.empty) return { id: snap.docs[0].id, ...snap.docs[0].data() };
   }
   return null;
@@ -2929,7 +4440,7 @@ async function invoiceForGallery(gallery) {
 router$f.get("/", requireStaff, async (req, res) => {
   try {
     const { status, orderId } = req.query;
-    let query = db$f().collection("galleries").orderBy("createdAt", "desc");
+    let query = db$d().collection("galleries").orderBy("createdAt", "desc");
     if (status) query = query.where("status", "==", status);
     if (orderId) query = query.where("orderId", "==", orderId);
     const snapshot = await query.limit(100).get();
@@ -2940,7 +4451,7 @@ router$f.get("/", requireStaff, async (req, res) => {
 });
 router$f.get("/public/:id", async (req, res) => {
   try {
-    const doc = await db$f().collection("galleries").doc(req.params.id).get();
+    const doc = await db$d().collection("galleries").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Gallery not found." });
     const gallery = doc.data();
     const invoice = await invoiceForGallery(gallery);
@@ -2973,10 +4484,10 @@ router$f.get("/public/:id", async (req, res) => {
 router$f.get("/link/:id", handlePublicGalleryLink);
 router$f.get("/:id", requireAuth, async (req, res) => {
   try {
-    const doc = await db$f().collection("galleries").doc(req.params.id).get();
+    const doc = await db$d().collection("galleries").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Gallery not found." });
     const gallery = doc.data();
-    const staffDoc = await db$f().collection("staff").doc(req.user.uid).get();
+    const staffDoc = await db$d().collection("staff").doc(req.user.uid).get();
     if (!staffDoc.exists) {
       if (gallery.clientId !== req.user.uid) {
         return res.status(403).json({ error: "Access denied." });
@@ -2996,7 +4507,7 @@ router$f.post("/:id/upload-url", requirePhotographer, async (req, res) => {
     if (!fileName || !fileType) {
       return res.status(400).json({ error: "fileName and fileType required." });
     }
-    const galleryDoc = await db$f().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$d().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const folder = isRaw ? "raw" : "edited";
     const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -3029,7 +4540,7 @@ router$f.post("/:id/media", requirePhotographer, async (req, res) => {
     if (!storagePath || !fileName) {
       return res.status(400).json({ error: "storagePath and fileName required." });
     }
-    const galleryDoc = await db$f().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$d().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const file = storage().file(storagePath);
     const [url] = await file.getSignedUrl({
@@ -3066,7 +4577,7 @@ router$f.post("/:id/media-link", requireCoordinator, async (req, res) => {
   try {
     const { url, title, type = "video", embedUrl, thumbnailUrl, downloadable = false } = req.body;
     if (!url) return res.status(400).json({ error: "url required." });
-    const galleryDoc = await db$f().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$d().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const item = {
       id: `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
@@ -3092,6 +4603,18 @@ router$f.post("/:id/media-link", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to register media link." });
   }
 });
+router$f.get("/:id/release", requireCoordinator, async (req, res) => {
+  if (!adminReady$3(res)) return;
+  try {
+    const report = await loadGalleryReleaseForGallery(req.params.id);
+    return res.json(report);
+  } catch (err) {
+    const status = err.status;
+    if (status === 404) return res.status(404).json({ error: "Gallery not found." });
+    console.error("[Galleries] Release check error:", err);
+    return res.status(500).json({ error: "Failed to check gallery release." });
+  }
+});
 router$f.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status } = req.body;
@@ -3099,19 +4622,27 @@ router$f.patch("/:id/status", requireCoordinator, async (req, res) => {
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: "Invalid status." });
     }
-    await db$f().collection("galleries").doc(req.params.id).update({
+    if (galleryStatusNeedsReleaseGate(status)) {
+      if (!adminReady$3(res)) return;
+      if (await holdIfOrderIncomplete(res, req.params.id)) return;
+    }
+    await db$d().collection("galleries").doc(req.params.id).update({
       status,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
     return res.json({ success: true });
   } catch (err) {
+    const code = err.status;
+    if (code === 404) return res.status(404).json({ error: "Gallery not found." });
     return res.status(500).json({ error: "Failed to update gallery status." });
   }
 });
 router$f.post("/:id/deliver", requireCoordinator, async (req, res) => {
   try {
-    const galleryDoc = await db$f().collection("galleries").doc(req.params.id).get();
+    if (!adminReady$3(res)) return;
+    const galleryDoc = await db$d().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
+    if (await holdIfOrderIncomplete(res, req.params.id)) return;
     const gallery = galleryDoc.data();
     const linkedInvoice = await invoiceForGallery(gallery);
     const paid = invoiceAllowsDownload(linkedInvoice);
@@ -3130,15 +4661,15 @@ router$f.post("/:id/deliver", requireCoordinator, async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
     if (gallery.orderId) {
-      await db$f().collection("orders").doc(gallery.orderId).update({
+      await db$d().collection("orders").doc(gallery.orderId).update({
         status: "delivered",
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
     }
-    const clientDoc = await db$f().collection("clients").doc(gallery.clientId).get();
+    const clientDoc = await db$d().collection("clients").doc(gallery.clientId).get();
     const client = clientDoc.data();
     if (client?.email) {
-      const invoiceSnap = await db$f().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
+      const invoiceSnap = await db$d().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
       const invoice = invoiceSnap.empty ? null : invoiceSnap.docs[0].data();
       await sendEmail({
         to: client.email,
@@ -3167,7 +4698,7 @@ router$f.post("/:id/deliver", requireCoordinator, async (req, res) => {
 });
 router$f.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
   try {
-    const galleryDoc = await db$f().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$d().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const gallery = galleryDoc.data();
     const mediaItems = (gallery.mediaItems || []).filter(
@@ -3183,7 +4714,7 @@ router$f.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
   }
 });
 const router$e = Router();
-const db$e = () => admin.firestore();
+const db$c = () => admin.firestore();
 const stripe$1 = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
 });
@@ -3213,11 +4744,11 @@ async function paymentAlreadyRecorded({
   stripePaymentIntentId
 }) {
   if (squarePaymentId) {
-    const existing = await db$e().collection("transactions").where("squarePaymentId", "==", squarePaymentId).limit(1).get();
+    const existing = await db$c().collection("transactions").where("squarePaymentId", "==", squarePaymentId).limit(1).get();
     if (!existing.empty) return true;
   }
   if (stripePaymentIntentId) {
-    const existing = await db$e().collection("transactions").where("stripePaymentIntentId", "==", stripePaymentIntentId).limit(1).get();
+    const existing = await db$c().collection("transactions").where("stripePaymentIntentId", "==", stripePaymentIntentId).limit(1).get();
     if (!existing.empty) return true;
   }
   return false;
@@ -3228,11 +4759,11 @@ async function unlockGalleriesForInvoice({
   galleryId
 }) {
   const refs = /* @__PURE__ */ new Map();
-  if (galleryId) refs.set(galleryId, db$e().collection("galleries").doc(galleryId));
+  if (galleryId) refs.set(galleryId, db$c().collection("galleries").doc(galleryId));
   const lookups = [
-    db$e().collection("galleries").where("invoiceId", "==", invoiceId).get()
+    db$c().collection("galleries").where("invoiceId", "==", invoiceId).get()
   ];
-  if (orderId) lookups.push(db$e().collection("galleries").where("orderId", "==", orderId).get());
+  if (orderId) lookups.push(db$c().collection("galleries").where("orderId", "==", orderId).get());
   const snaps = await Promise.all(lookups);
   snaps.forEach((snap) => snap.docs.forEach((doc) => refs.set(doc.id, doc.ref)));
   await Promise.all([...refs.values()].map((ref) => ref.update({
@@ -3252,7 +4783,7 @@ async function applySuccessfulPayment({
   squarePaymentId,
   stripePaymentIntentId
 }) {
-  const invoiceRef = db$e().collection("invoices").doc(invoiceId);
+  const invoiceRef = db$c().collection("invoices").doc(invoiceId);
   const invoiceDoc = await invoiceRef.get();
   if (!invoiceDoc.exists) return;
   const invoice = invoiceDoc.data();
@@ -3286,7 +4817,7 @@ async function applySuccessfulPayment({
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   });
   if (resolvedOrderId) {
-    await db$e().collection("orders").doc(resolvedOrderId).update({
+    await db$c().collection("orders").doc(resolvedOrderId).update({
       depositPaid: admin.firestore.FieldValue.increment(amount),
       balanceDue: newAmountDue,
       paymentStatus: newAmountDue <= 0 ? "paid" : "partial",
@@ -3294,7 +4825,7 @@ async function applySuccessfulPayment({
     }).catch((err) => console.error("[Payments] Order balance update failed:", err));
   }
   if (resolvedClientId) {
-    await db$e().collection("clients").doc(resolvedClientId).update({
+    await db$c().collection("clients").doc(resolvedClientId).update({
       totalSpend: admin.firestore.FieldValue.increment(amount),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     }).catch((err) => console.error("[Payments] Client spend update failed:", err));
@@ -3306,7 +4837,7 @@ async function applySuccessfulPayment({
       galleryId: typeof invoice.galleryId === "string" ? invoice.galleryId : void 0
     });
   }
-  await db$e().collection("transactions").add({
+  await db$c().collection("transactions").add({
     type: "payment",
     orderId: resolvedOrderId,
     invoiceId,
@@ -3341,7 +4872,7 @@ router$e.post("/create-intent", requireAuth, async (req, res) => {
     }
     const { invoiceId, amount, currency = "usd" } = req.body;
     if (!invoiceId || !amount) return res.status(400).json({ error: "invoiceId and amount required." });
-    const invoiceDoc = await db$e().collection("invoices").doc(invoiceId).get();
+    const invoiceDoc = await db$c().collection("invoices").doc(invoiceId).get();
     if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
     const invoice = invoiceDoc.data();
     if (invoiceProvider(invoice) !== "stripe") {
@@ -3376,7 +4907,7 @@ router$e.post("/send-invoice", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
-    const invoiceDoc = await db$e().collection("invoices").doc(invoiceId).get();
+    const invoiceDoc = await db$c().collection("invoices").doc(invoiceId).get();
     if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
     const invoice = invoiceDoc.data();
     const provider = invoiceProvider(invoice);
@@ -3409,7 +4940,7 @@ router$e.post("/send-receipt", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
-    const invoiceDoc = await db$e().collection("invoices").doc(invoiceId).get();
+    const invoiceDoc = await db$c().collection("invoices").doc(invoiceId).get();
     if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
     const invoice = invoiceDoc.data();
     if (!invoiceAllowsDownload(invoice)) {
@@ -3433,7 +4964,7 @@ router$e.post("/send-receipt", requireCoordinator, async (req, res) => {
 });
 router$e.get("/invoice/:id", async (req, res) => {
   try {
-    const invoiceDoc = await db$e().collection("invoices").doc(req.params.id).get();
+    const invoiceDoc = await db$c().collection("invoices").doc(req.params.id).get();
     if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
     const invoice = invoiceDoc.data();
     const provider = invoiceProvider(invoice);
@@ -3464,7 +4995,7 @@ router$e.get("/invoice/:id", async (req, res) => {
 });
 router$e.post("/invoice/:id/checkout", async (req, res) => {
   try {
-    const invoiceDoc = await db$e().collection("invoices").doc(req.params.id).get();
+    const invoiceDoc = await db$c().collection("invoices").doc(req.params.id).get();
     if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
     const invoice = invoiceDoc.data();
     const amountDue = amountStillDue(invoice);
@@ -3652,25 +5183,25 @@ function squareSignatureValid(rawBody, received, key) {
 async function findInvoiceForSquarePayment(payment) {
   const noteId = invoiceIdFromSquareNote(payment.note || payment.payment_note);
   if (noteId) {
-    const byNote = await db$e().collection("invoices").doc(noteId).get();
+    const byNote = await db$c().collection("invoices").doc(noteId).get();
     if (byNote.exists) return byNote;
   }
   const referenceId = typeof payment.reference_id === "string" ? payment.reference_id : "";
   if (referenceId) {
-    const byReference = await db$e().collection("invoices").doc(referenceId).get();
+    const byReference = await db$c().collection("invoices").doc(referenceId).get();
     if (byReference.exists) return byReference;
   }
   if (typeof payment.order_id === "string" && payment.order_id) {
-    const bySquareOrder = await db$e().collection("invoices").where("squareOrderId", "==", payment.order_id).limit(1).get();
+    const bySquareOrder = await db$c().collection("invoices").where("squareOrderId", "==", payment.order_id).limit(1).get();
     if (!bySquareOrder.empty) return bySquareOrder.docs[0];
   }
   const linkId = payment.payment_link_id || payment.paymentLinkId;
   if (typeof linkId === "string" && linkId) {
-    const byLink = await db$e().collection("invoices").where("squarePaymentLinkId", "==", linkId).limit(1).get();
+    const byLink = await db$c().collection("invoices").where("squarePaymentLinkId", "==", linkId).limit(1).get();
     if (!byLink.empty) return byLink.docs[0];
   }
   if (typeof payment.id === "string" && payment.id) {
-    const byPayment = await db$e().collection("invoices").where("squarePaymentId", "==", payment.id).limit(1).get();
+    const byPayment = await db$c().collection("invoices").where("squarePaymentId", "==", payment.id).limit(1).get();
     if (!byPayment.empty) return byPayment.docs[0];
   }
   return null;
@@ -3692,7 +5223,7 @@ router$e.post("/square-webhook", async (req, res) => {
     if (!payment?.id || payment.status !== "COMPLETED") return res.json({ received: true });
     const invoiceDoc = await findInvoiceForSquarePayment(payment);
     if (!invoiceDoc) {
-      await db$e().collection("agentLogs").add({
+      await db$c().collection("agentLogs").add({
         agent: "travis",
         action: "Unmatched Square payment",
         summary: `Square payment ${payment.id} could not be matched to an invoice`,
@@ -3730,7 +5261,7 @@ router$e.post("/square-webhook", async (req, res) => {
 router$e.get("/transactions", requireCoordinator, async (req, res) => {
   try {
     const { startDate, endDate, limit = "50" } = req.query;
-    let query = db$e().collection("transactions").orderBy("createdAt", "desc");
+    let query = db$c().collection("transactions").orderBy("createdAt", "desc");
     if (startDate) {
       query = query.where(
         "createdAt",
@@ -3757,7 +5288,7 @@ router$e.get("/transactions", requireCoordinator, async (req, res) => {
 async function handleStripePaymentSucceeded(intent) {
   const { invoiceId, orderId, clientId, clientName } = intent.metadata;
   if (!invoiceId) return;
-  const invoiceDoc = await db$e().collection("invoices").doc(invoiceId).get();
+  const invoiceDoc = await db$c().collection("invoices").doc(invoiceId).get();
   if (!invoiceDoc.exists) return;
   if (invoiceProvider(invoiceDoc.data() || {}) !== "stripe") {
     console.warn(`[Payments] Ignored Stripe payment ${intent.id} for non-Stripe invoice ${invoiceId}`);
@@ -3776,7 +5307,7 @@ async function handleStripePaymentSucceeded(intent) {
 async function handleStripePaymentFailed(intent) {
   const { invoiceId } = intent.metadata;
   if (!invoiceId) return;
-  await db$e().collection("agentLogs").add({
+  await db$c().collection("agentLogs").add({
     agent: "travis",
     action: "Studio Noir payment failed",
     summary: `Stripe payment failed for invoice ${invoiceId}`,
@@ -3792,11 +5323,11 @@ async function handleStripePaymentFailed(intent) {
 async function handleStripeRefund(charge) {
   if (!charge.payment_intent) return;
   const intentId = typeof charge.payment_intent === "string" ? charge.payment_intent : charge.payment_intent.id;
-  const invoiceSnap = await db$e().collection("invoices").where("stripePaymentIntentId", "==", intentId).limit(1).get();
+  const invoiceSnap = await db$c().collection("invoices").where("stripePaymentIntentId", "==", intentId).limit(1).get();
   if (invoiceSnap.empty) return;
   const invoiceDoc = invoiceSnap.docs[0];
   const refundAmount = charge.amount_refunded / 100;
-  await db$e().collection("transactions").add({
+  await db$c().collection("transactions").add({
     type: "refund",
     invoiceId: invoiceDoc.id,
     clientId: invoiceDoc.data().clientId,
@@ -3811,7 +5342,7 @@ async function handleStripeRefund(charge) {
   });
 }
 const router$d = Router();
-const db$d = () => admin.firestore();
+const db$b = () => admin.firestore();
 const VSAI_API_BASE = "https://api.virtualstagingai.app/v1";
 const VSAI_API_KEY = process.env.VSAI_API_KEY || process.env.VIRTUAL_STAGING_AI_API_KEY || "";
 const VSAI_PRICE_CENTS = parseInt(process.env.VSAI_PRICE_CENTS || "1500", 10);
@@ -3869,7 +5400,7 @@ router$d.post("/create", requireAuth, async (req, res) => {
         error: `VSAI returned no render ID. Response: ${responseText}`
       });
     }
-    const jobRef = await db$d().collection("vsaiJobs").add({
+    const jobRef = await db$b().collection("vsaiJobs").add({
       userId,
       imageUrl,
       roomType,
@@ -3895,7 +5426,7 @@ router$d.post("/create", requireAuth, async (req, res) => {
 });
 router$d.get("/result/:jobId", requireAuth, async (req, res) => {
   try {
-    const jobDoc = await db$d().collection("vsaiJobs").doc(req.params.jobId).get();
+    const jobDoc = await db$b().collection("vsaiJobs").doc(req.params.jobId).get();
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
     const job = jobDoc.data();
     if (job.userId !== req.user.uid) {
@@ -3974,14 +5505,14 @@ router$d.post("/variation", requireAuth, async (req, res) => {
     if (!jobId) {
       return res.status(400).json({ error: "jobId required." });
     }
-    let rootJobDoc = await db$d().collection("vsaiJobs").doc(jobId).get();
+    let rootJobDoc = await db$b().collection("vsaiJobs").doc(jobId).get();
     if (!rootJobDoc.exists) return res.status(404).json({ error: "Job not found." });
     let rootJob = rootJobDoc.data();
     if (rootJob.userId !== req.user.uid) {
       return res.status(403).json({ error: "Access denied." });
     }
     while (rootJob.parentJobId) {
-      const parentDoc = await db$d().collection("vsaiJobs").doc(rootJob.parentJobId).get();
+      const parentDoc = await db$b().collection("vsaiJobs").doc(rootJob.parentJobId).get();
       if (!parentDoc.exists) break;
       rootJob = parentDoc.data();
     }
@@ -4025,7 +5556,7 @@ router$d.post("/variation", requireAuth, async (req, res) => {
         error: `VSAI variation error: ${responseText}`
       });
     }
-    const variationRef = await db$d().collection("vsaiJobs").add({
+    const variationRef = await db$b().collection("vsaiJobs").add({
       userId: req.user.uid,
       imageUrl: rootJob.imageUrl,
       roomType: resolvedRoomType,
@@ -4060,7 +5591,7 @@ router$d.post("/checkout", requireAuth, async (req, res) => {
     }
     const userId = req.user.uid;
     const jobDocs = await Promise.all(
-      jobIds.map((id) => db$d().collection("vsaiJobs").doc(id).get())
+      jobIds.map((id) => db$b().collection("vsaiJobs").doc(id).get())
     );
     for (let i = 0; i < jobDocs.length; i++) {
       const doc = jobDocs[i];
@@ -4144,7 +5675,7 @@ router$d.post(
         const jobIds = JSON.parse(session.metadata.jobIds || "[]");
         await Promise.all(
           jobIds.map(
-            (id) => db$d().collection("vsaiJobs").doc(id).update({
+            (id) => db$b().collection("vsaiJobs").doc(id).update({
               isPaid: true,
               paymentStatus: "paid",
               stripeSessionId: session.id,
@@ -4190,7 +5721,7 @@ function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
 }
 const router$c = Router();
-const db$c = () => admin.firestore();
+const db$a = () => admin.firestore();
 router$c.post("/email", requireStaff, async (req, res) => {
   try {
     const { to, subject, body, orderId, clientId } = req.body;
@@ -4205,7 +5736,7 @@ router$c.post("/email", requireStaff, async (req, res) => {
         message: body.trim()
       }
     });
-    await db$c().collection("messages").add({
+    await db$a().collection("messages").add({
       orderId: orderId || null,
       clientId: clientId || null,
       senderId: req.user.uid,
@@ -4225,20 +5756,20 @@ router$c.post("/email", requireStaff, async (req, res) => {
 });
 router$c.get("/:orderId", requireAuth, async (req, res) => {
   try {
-    const orderDoc = await db$c().collection("orders").doc(req.params.orderId).get();
+    const orderDoc = await db$a().collection("orders").doc(req.params.orderId).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
     const order = orderDoc.data();
-    const staffDoc = await db$c().collection("staff").doc(req.user.uid).get();
+    const staffDoc = await db$a().collection("staff").doc(req.user.uid).get();
     const isStaff = staffDoc.exists;
     if (!isStaff && order.clientId !== req.user.uid) {
       return res.status(403).json({ error: "Access denied." });
     }
-    const snapshot = await db$c().collection("messages").where("orderId", "==", req.params.orderId).orderBy("createdAt", "asc").limit(100).get();
+    const snapshot = await db$a().collection("messages").where("orderId", "==", req.params.orderId).orderBy("createdAt", "asc").limit(100).get();
     const messages = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     const unread = snapshot.docs.filter(
       (d) => !d.data().isRead && d.data().senderId !== req.user.uid
     );
-    const batch = db$c().batch();
+    const batch = db$a().batch();
     unread.forEach((d) => {
       batch.update(d.ref, {
         isRead: true,
@@ -4258,10 +5789,10 @@ router$c.post("/:orderId", requireAuth, async (req, res) => {
     if (!content?.trim()) {
       return res.status(400).json({ error: "Message content required." });
     }
-    const orderDoc = await db$c().collection("orders").doc(req.params.orderId).get();
+    const orderDoc = await db$a().collection("orders").doc(req.params.orderId).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
     const order = orderDoc.data();
-    const staffDoc = await db$c().collection("staff").doc(req.user.uid).get();
+    const staffDoc = await db$a().collection("staff").doc(req.user.uid).get();
     const isStaff = staffDoc.exists;
     if (!isStaff && order.clientId !== req.user.uid) {
       return res.status(403).json({ error: "Access denied." });
@@ -4273,7 +5804,7 @@ router$c.post("/:orderId", requireAuth, async (req, res) => {
       senderName = `${staff.firstName} ${staff.lastName}`.trim();
       senderType = "staff";
     } else {
-      const clientDoc = await db$c().collection("clients").doc(order.clientId).get();
+      const clientDoc = await db$a().collection("clients").doc(order.clientId).get();
       if (clientDoc.exists) {
         const client = clientDoc.data();
         senderName = `${client.firstName} ${client.lastName}`.trim();
@@ -4289,8 +5820,8 @@ router$c.post("/:orderId", requireAuth, async (req, res) => {
       isRead: false,
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    const docRef = await db$c().collection("messages").add(message);
-    await db$c().collection("agentLogs").add({
+    const docRef = await db$a().collection("messages").add(message);
+    await db$a().collection("agentLogs").add({
       agent: "nora",
       action: "New message",
       summary: `New message on order ${req.params.orderId} from ${senderName}`,
@@ -4309,7 +5840,7 @@ router$c.post("/:orderId", requireAuth, async (req, res) => {
 });
 router$c.get("/unread/count", requireStaff, async (_req, res) => {
   try {
-    const snapshot = await db$c().collection("messages").where("isRead", "==", false).where("senderType", "==", "client").get();
+    const snapshot = await db$a().collection("messages").where("isRead", "==", false).where("senderType", "==", "client").get();
     return res.json({ unreadCount: snapshot.size });
   } catch (err) {
     return res.status(500).json({ error: "Failed to get unread count." });
@@ -4322,17 +5853,17 @@ function visibleToPortalClient(record, identity) {
   if (!email) return false;
   return [record.email, record.clientEmail].some((value) => normalizeEmail(value) === email);
 }
-const db$b = () => admin.firestore();
+const db$9 = () => admin.firestore();
 async function upsertPortalClient(input) {
   const email = normalizeEmail(input.email);
   const firstName = cleanPersonName(input.firstName);
   const lastName = cleanPersonName(input.lastName);
   const phone = String(input.phone || "").trim().slice(0, 40);
   const now = admin.firestore.FieldValue.serverTimestamp();
-  const existing = email ? await db$b().collection("clients").where("email", "==", email).limit(5).get() : null;
+  const existing = email ? await db$9().collection("clients").where("email", "==", email).limit(5).get() : null;
   const linked = existing?.docs.find((doc) => doc.id !== input.uid);
   const linkedData = linked?.data() || {};
-  const uidRef = db$b().collection("clients").doc(input.uid);
+  const uidRef = db$9().collection("clients").doc(input.uid);
   const uidSnap = await uidRef.get();
   const previous = uidSnap.exists ? uidSnap.data() || {} : {};
   await uidRef.set({
@@ -4364,7 +5895,7 @@ async function upsertPortalClient(input) {
 }
 async function resolveClientIdentity(uid, email) {
   const ids = /* @__PURE__ */ new Set([uid]);
-  const direct = await db$b().collection("clients").doc(uid).get();
+  const direct = await db$9().collection("clients").doc(uid).get();
   let profile = direct.exists ? { id: direct.id, ...direct.data() } : null;
   const redirectId = typeof profile?._redirect === "string" ? profile._redirect : "";
   if (redirectId) ids.add(redirectId);
@@ -4372,39 +5903,20 @@ async function resolveClientIdentity(uid, email) {
   if (linkedId) ids.add(linkedId);
   const normalized = normalizeEmail(email || profile?.email);
   if (normalized) {
-    const matches = await db$b().collection("clients").where("email", "==", normalized).limit(10).get();
+    const matches = await db$9().collection("clients").where("email", "==", normalized).limit(10).get();
     for (const doc of matches.docs) {
       ids.add(doc.id);
       if (!profile) profile = { id: doc.id, ...doc.data() };
     }
   }
   if (redirectId && profile && !profile.email) {
-    const real = await db$b().collection("clients").doc(redirectId).get();
+    const real = await db$9().collection("clients").doc(redirectId).get();
     if (real.exists) profile = { id: real.id, ...real.data(), portalDocId: uid };
   }
   return { ids: [...ids], profile, email: normalized };
 }
-function jsonSafe(value) {
-  if (value == null) return value;
-  if (typeof value === "object" && value && "toDate" in value && typeof value.toDate === "function") {
-    try {
-      return value.toDate().toISOString();
-    } catch {
-      return null;
-    }
-  }
-  if (Array.isArray(value)) return value.map((item) => jsonSafe(item));
-  if (typeof value === "object") {
-    const out = {};
-    for (const [key, nested] of Object.entries(value)) {
-      out[key] = jsonSafe(nested);
-    }
-    return out;
-  }
-  return value;
-}
 const router$b = Router();
-const db$a = () => admin.firestore();
+const db$8 = () => admin.firestore();
 function addressText(value) {
   if (!value) return "";
   if (typeof value === "string") return value;
@@ -4418,7 +5930,7 @@ function addressText(value) {
 router$b.get("/", requireStaff, async (req, res) => {
   try {
     const { status, search, limit = "50" } = req.query;
-    let query = db$a().collection("clients").orderBy("createdAt", "desc");
+    let query = db$8().collection("clients").orderBy("createdAt", "desc");
     if (status) query = query.where("status", "==", status);
     const snapshot = await query.limit(Number(limit)).get();
     let clients = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -4454,7 +5966,7 @@ router$b.post("/register", async (req, res) => {
     const authHeader = req.headers.authorization;
     if (authHeader?.startsWith("Bearer ")) {
       const decoded = await admin.auth().verifyIdToken(authHeader.slice("Bearer ".length));
-      const staffDoc = await db$a().collection("staff").doc(decoded.uid).get();
+      const staffDoc = await db$8().collection("staff").doc(decoded.uid).get();
       if (staffDoc.exists && staffDoc.data()?.isActive !== false) {
         return res.status(403).json({ error: "Staff accounts cannot register as clients." });
       }
@@ -4471,7 +5983,7 @@ router$b.post("/register", async (req, res) => {
     if (password.length < 6) {
       return res.status(400).json({ error: "Password must be at least 6 characters." });
     }
-    const staffHit = await db$a().collection("staff").where("email", "==", email).limit(1).get();
+    const staffHit = await db$8().collection("staff").where("email", "==", email).limit(1).get();
     if (!staffHit.empty) {
       return res.status(403).json({ error: "This email is a staff login. Use the staff sign-in page." });
     }
@@ -4532,9 +6044,9 @@ router$b.get("/me/home", requireAuth, async (req, res) => {
     };
     for (const clientId of identity.ids) {
       const [gallerySnap, invoiceSnap, projectSnap] = await Promise.all([
-        db$a().collection("galleries").where("clientId", "==", clientId).limit(20).get(),
-        db$a().collection("invoices").where("clientId", "==", clientId).limit(20).get(),
-        db$a().collection("listings").where("clientId", "==", clientId).limit(20).get()
+        db$8().collection("galleries").where("clientId", "==", clientId).limit(20).get(),
+        db$8().collection("invoices").where("clientId", "==", clientId).limit(20).get(),
+        db$8().collection("listings").where("clientId", "==", clientId).limit(20).get()
       ]);
       for (const doc of gallerySnap.docs) {
         if (seenGallery.has(doc.id)) continue;
@@ -4582,13 +6094,13 @@ router$b.get("/me/home", requireAuth, async (req, res) => {
     };
     try {
       for (const clientId of identity.ids) {
-        const snap = await db$a().collection("orderRequests").where("clientId", "==", clientId).limit(20).get();
+        const snap = await db$8().collection("orderRequests").where("clientId", "==", clientId).limit(20).get();
         snap.docs.forEach(pushOrder);
       }
       if (identity.email) {
         const [byEmail, byClientEmail] = await Promise.all([
-          db$a().collection("orderRequests").where("email", "==", identity.email).limit(20).get(),
-          db$a().collection("orderRequests").where("clientEmail", "==", identity.email).limit(20).get()
+          db$8().collection("orderRequests").where("email", "==", identity.email).limit(20).get(),
+          db$8().collection("orderRequests").where("clientEmail", "==", identity.email).limit(20).get()
         ]);
         byEmail.docs.forEach(pushOrder);
         byClientEmail.docs.forEach(pushOrder);
@@ -4598,14 +6110,14 @@ router$b.get("/me/home", requireAuth, async (req, res) => {
     }
     if (identity.email) {
       try {
-        const byInvoiceEmail = await db$a().collection("invoices").where("clientEmail", "==", identity.email).limit(20).get();
+        const byInvoiceEmail = await db$8().collection("invoices").where("clientEmail", "==", identity.email).limit(20).get();
         byInvoiceEmail.docs.forEach(pushInvoice);
       } catch (invoiceErr) {
         console.error("[Clients] Invoice email lookup failed:", invoiceErr);
       }
     }
     if (identity.email) {
-      const byEmail = await db$a().collection("listings").where("clientEmail", "==", identity.email).limit(20).get();
+      const byEmail = await db$8().collection("listings").where("clientEmail", "==", identity.email).limit(20).get();
       for (const doc of byEmail.docs) {
         if (seenProject.has(doc.id)) continue;
         seenProject.add(doc.id);
@@ -4633,11 +6145,11 @@ router$b.get("/me/home", requireAuth, async (req, res) => {
 });
 router$b.get("/me", requireAuth, async (req, res) => {
   try {
-    const directDoc = await db$a().collection("clients").doc(req.user.uid).get();
+    const directDoc = await db$8().collection("clients").doc(req.user.uid).get();
     if (directDoc.exists) {
       const data = directDoc.data();
       if (data._redirect) {
-        const realDoc = await db$a().collection("clients").doc(data._redirect).get();
+        const realDoc = await db$8().collection("clients").doc(data._redirect).get();
         if (realDoc.exists) return res.json({ id: realDoc.id, ...realDoc.data() });
       }
       return res.json({ id: directDoc.id, ...data });
@@ -4649,11 +6161,11 @@ router$b.get("/me", requireAuth, async (req, res) => {
 });
 router$b.get("/:id", requireStaff, async (req, res) => {
   try {
-    const doc = await db$a().collection("clients").doc(req.params.id).get();
+    const doc = await db$8().collection("clients").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Client not found." });
     const [orders, invoices] = await Promise.all([
-      db$a().collection("orders").where("clientId", "==", req.params.id).orderBy("createdAt", "desc").limit(10).get(),
-      db$a().collection("invoices").where("clientId", "==", req.params.id).orderBy("createdAt", "desc").limit(10).get()
+      db$8().collection("orders").where("clientId", "==", req.params.id).orderBy("createdAt", "desc").limit(10).get(),
+      db$8().collection("invoices").where("clientId", "==", req.params.id).orderBy("createdAt", "desc").limit(10).get()
     ]);
     return res.json({
       client: { id: doc.id, ...doc.data() },
@@ -4670,11 +6182,11 @@ router$b.post("/", requireCoordinator, async (req, res) => {
     if (!firstName || !lastName || !email) {
       return res.status(400).json({ error: "firstName, lastName, and email required." });
     }
-    const existing = await db$a().collection("clients").where("email", "==", email.toLowerCase()).limit(1).get();
+    const existing = await db$8().collection("clients").where("email", "==", email.toLowerCase()).limit(1).get();
     if (!existing.empty) {
       return res.status(409).json({ error: "Client with this email already exists.", id: existing.docs[0].id });
     }
-    const ref = await db$a().collection("clients").add({
+    const ref = await db$8().collection("clients").add({
       firstName,
       lastName,
       email: email.toLowerCase().trim(),
@@ -4701,7 +6213,7 @@ router$b.patch("/:id", requireCoordinator, async (req, res) => {
     allowed.forEach((k) => {
       if (k in req.body) updates[k] = req.body[k];
     });
-    await db$a().collection("clients").doc(req.params.id).update(updates);
+    await db$8().collection("clients").doc(req.params.id).update(updates);
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ error: "Failed to update client." });
@@ -4723,8 +6235,8 @@ function readSetupSecret(headerValue) {
   if (Array.isArray(headerValue) && typeof headerValue[0] === "string") return headerValue[0].trim();
   return "";
 }
-const db$9 = () => admin.firestore();
-function httpError$1(status, error) {
+const db$7 = () => admin.firestore();
+function httpError(status, error) {
   return Object.assign(new Error(error), { status });
 }
 async function bootstrapPlaytest(input) {
@@ -4737,9 +6249,9 @@ async function bootstrapPlaytest(input) {
   const seedListing = input.seedListing !== false;
   const seedGallery = input.seedGallery !== false;
   const clientEmail = normalizeEmail(input.clientEmail);
-  if (!email || !email.includes("@")) throw httpError$1(400, "Photographer email is required.");
-  if (password.length < 6) throw httpError$1(400, "Photographer password must be at least 6 characters.");
-  if (!isStaffRole(role)) throw httpError$1(400, "Role must be admin, coordinator, photographer, or editor.");
+  if (!email || !email.includes("@")) throw httpError(400, "Photographer email is required.");
+  if (password.length < 6) throw httpError(400, "Photographer password must be at least 6 characters.");
+  if (!isStaffRole(role)) throw httpError(400, "Role must be admin, coordinator, photographer, or editor.");
   const photographer = await ensurePlaytestStaff({
     email,
     password,
@@ -4751,7 +6263,7 @@ async function bootstrapPlaytest(input) {
   let client = null;
   let clientStatus = clientEmail ? "not_found" : "skipped";
   if (clientEmail) {
-    const matches = await db$9().collection("clients").where("email", "==", clientEmail).limit(5).get();
+    const matches = await db$7().collection("clients").where("email", "==", clientEmail).limit(5).get();
     const preferred = matches.docs.find((doc) => doc.data().firebaseUid === doc.id) || matches.docs[0];
     if (preferred) {
       client = {
@@ -4802,9 +6314,9 @@ async function ensurePlaytestStaff(input) {
     const code = err.code;
     if (code !== "auth/email-already-exists") throw err;
     user = await admin.auth().getUserByEmail(input.email);
-    const existing = await db$9().collection("staff").doc(user.uid).get();
+    const existing = await db$7().collection("staff").doc(user.uid).get();
     if (existing.exists && existing.data()?.playtest !== true) {
-      throw httpError$1(409, "That email already belongs to a staff account that is not a playtest login. Use a different email.");
+      throw httpError(409, "That email already belongs to a staff account that is not a playtest login. Use a different email.");
     }
     await admin.auth().updateUser(user.uid, {
       password: input.password,
@@ -4828,7 +6340,7 @@ async function ensurePlaytestStaff(input) {
     staffPayload.createdAt = now;
     staffPayload.assignedOrders = [];
   }
-  await db$9().collection("staff").doc(user.uid).set(staffPayload, { merge: true });
+  await db$7().collection("staff").doc(user.uid).set(staffPayload, { merge: true });
   try {
     await admin.auth().setCustomUserClaims(user.uid, { isStaff: true, role: input.role });
   } catch (err) {
@@ -4846,7 +6358,7 @@ async function upsertPlaytestListing(photographerUid, client) {
   const id = `playtest-job-${photographerUid}`;
   const now = admin.firestore.FieldValue.serverTimestamp();
   const when = admin.firestore.Timestamp.now();
-  const ref = db$9().collection("listings").doc(id);
+  const ref = db$7().collection("listings").doc(id);
   const existing = await ref.get();
   const previousImages = existing.exists && Array.isArray(existing.data()?.images) ? existing.data().images : [];
   await ref.set({
@@ -4877,7 +6389,7 @@ async function upsertPlaytestDelivery(photographerUid, client, listingId) {
   const galleryId = `playtest-gallery-${client.id}`;
   const invoiceId = `playtest-invoice-${client.id}`;
   const now = admin.firestore.FieldValue.serverTimestamp();
-  const listingSnap = await db$9().collection("listings").doc(listingId).get();
+  const listingSnap = await db$7().collection("listings").doc(listingId).get();
   const images = listingSnap.exists && Array.isArray(listingSnap.data()?.images) ? listingSnap.data().images : [];
   const mediaItems = images.filter((image) => image?.url).map((image, index) => ({
     id: `playtest-media-${index}-${image.path || image.name || "photo"}`,
@@ -4891,7 +6403,7 @@ async function upsertPlaytestDelivery(photographerUid, client, listingId) {
     uploadedBy: image.uploadedBy || photographerUid,
     uploadedAt: image.uploadedAt || (/* @__PURE__ */ new Date()).toISOString()
   }));
-  await db$9().collection("galleries").doc(galleryId).set({
+  await db$7().collection("galleries").doc(galleryId).set({
     playtest: true,
     listingId,
     orderId,
@@ -4907,7 +6419,7 @@ async function upsertPlaytestDelivery(photographerUid, client, listingId) {
     createdAt: now,
     updatedAt: now
   }, { merge: true });
-  await db$9().collection("invoices").doc(invoiceId).set({
+  await db$7().collection("invoices").doc(invoiceId).set({
     playtest: true,
     invoiceNumber: `PLAY-${client.id.slice(0, 6).toUpperCase()}`,
     clientId: client.id,
@@ -4927,7 +6439,7 @@ async function upsertPlaytestDelivery(photographerUid, client, listingId) {
     createdAt: now,
     updatedAt: now
   }, { merge: true });
-  await db$9().collection("listings").doc(listingId).set({
+  await db$7().collection("listings").doc(listingId).set({
     playtestGalleryId: galleryId,
     clientId: client.id,
     clientEmail: client.email,
@@ -4940,10 +6452,10 @@ async function upsertPlaytestDelivery(photographerUid, client, listingId) {
   };
 }
 const router$a = Router();
-const db$8 = () => admin.firestore();
+const db$6 = () => admin.firestore();
 router$a.get("/", requireStaff, async (_req, res) => {
   try {
-    const snapshot = await db$8().collection("staff").where("isActive", "==", true).orderBy("firstName").get();
+    const snapshot = await db$6().collection("staff").where("isActive", "==", true).orderBy("firstName").get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
   } catch (err) {
     return res.status(500).json({ error: "Failed to fetch staff." });
@@ -4960,7 +6472,7 @@ router$a.post("/", requireAdmin, async (req, res) => {
       password: tempPassword,
       displayName: `${firstName} ${lastName}`
     });
-    await db$8().collection("staff").doc(userRecord.uid).set({
+    await db$6().collection("staff").doc(userRecord.uid).set({
       firebaseUid: userRecord.uid,
       firstName,
       lastName,
@@ -4992,7 +6504,7 @@ router$a.patch("/:id", requireAdmin, async (req, res) => {
     allowed.forEach((k) => {
       if (k in req.body) updates[k] = req.body[k];
     });
-    await db$8().collection("staff").doc(req.params.id).update(updates);
+    await db$6().collection("staff").doc(req.params.id).update(updates);
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ error: "Failed to update staff member." });
@@ -5041,7 +6553,7 @@ router$a.post("/setup", async (req, res) => {
         return res.status(403).json({ error: "Staff setup is disabled." });
       }
     }
-    const existing = await db$8().collection("staff").limit(1).get();
+    const existing = await db$6().collection("staff").limit(1).get();
     if (!existing.empty) {
       return res.status(403).json({ error: "Staff already configured." });
     }
@@ -5054,7 +6566,7 @@ router$a.post("/setup", async (req, res) => {
       password,
       displayName: `${firstName} ${lastName}`
     });
-    await db$8().collection("staff").doc(userRecord.uid).set({
+    await db$6().collection("staff").doc(userRecord.uid).set({
       firebaseUid: userRecord.uid,
       firstName,
       lastName,
@@ -5075,1064 +6587,6 @@ router$a.post("/setup", async (req, res) => {
     return res.status(500).json({ error: "Setup failed." });
   }
 });
-const db$7 = () => admin.firestore();
-const bucket$1 = () => admin.storage().bucket();
-const BROWSER_ORIGINS = [
-  "https://iconicimagestx.vercel.app",
-  "https://iconicimagestx.com",
-  "https://www.iconicimagestx.com",
-  "http://localhost:8080",
-  "http://127.0.0.1:8080"
-];
-let corsAttempt = null;
-function ensureBucketCors() {
-  if (!corsAttempt) {
-    corsAttempt = bucket$1().setCorsConfiguration([{
-      origin: BROWSER_ORIGINS,
-      method: ["GET", "HEAD", "PUT", "POST", "DELETE", "OPTIONS"],
-      responseHeader: ["Content-Type", "Authorization", "Content-Length", "x-goog-resumable"],
-      maxAgeSeconds: 3600
-    }]).then(() => {
-      console.log("[Storage] Bucket CORS allows portal photo uploads.");
-    }).catch((err) => {
-      const message = err instanceof Error ? err.message : String(err);
-      console.warn("[Storage] Could not update bucket CORS:", message);
-    });
-  }
-  return corsAttempt;
-}
-function firebaseDownloadUrl(bucketName, storagePath, token) {
-  return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(storagePath)}?alt=media&token=${token}`;
-}
-async function createListingUploadUrl(listingId, fileName, contentType, folder) {
-  await ensureBucketCors();
-  const safeName = safeStorageFileName(fileName);
-  const resolvedType = contentTypeForUpload(safeName, contentType);
-  const storagePath = `listings/${listingId}/${folder}/${Date.now()}_${safeName}`;
-  const file = bucket$1().file(storagePath);
-  const [uploadUrl] = await file.getSignedUrl({
-    version: "v4",
-    action: "write",
-    expires: Date.now() + 15 * 60 * 1e3,
-    contentType: resolvedType
-  });
-  return { uploadUrl, storagePath, contentType: resolvedType };
-}
-async function saveListingBytes(listingId, fileName, contentType, folder, bytes) {
-  const safeName = safeStorageFileName(fileName);
-  const resolvedType = contentTypeForUpload(safeName, contentType);
-  const storagePath = `listings/${listingId}/${folder}/${Date.now()}_${safeName}`;
-  const token = randomUUID();
-  const file = bucket$1().file(storagePath);
-  await file.save(bytes, {
-    resumable: false,
-    metadata: {
-      contentType: resolvedType,
-      metadata: { firebaseStorageDownloadTokens: token }
-    }
-  });
-  const url = firebaseDownloadUrl(bucket$1().name, storagePath, token);
-  return { storagePath, contentType: resolvedType, url, token };
-}
-async function registerListingPhoto(options) {
-  const { listingId, storagePath, fileName, uploadedBy } = options;
-  if (!isListingStoragePath(listingId, storagePath)) {
-    throw Object.assign(new Error("Storage path is not inside this listing."), { status: 400 });
-  }
-  const listingRef = db$7().collection("listings").doc(listingId);
-  const listingSnap = await listingRef.get();
-  if (!listingSnap.exists) {
-    throw Object.assign(new Error("Listing not found."), { status: 404 });
-  }
-  const file = bucket$1().file(storagePath);
-  const [exists] = await file.exists();
-  if (!exists) {
-    throw Object.assign(new Error("Uploaded file was not found in storage."), { status: 400 });
-  }
-  let url = options.existingUrl || "";
-  if (!url) {
-    const [metadata] = await file.getMetadata();
-    const current = metadata.metadata?.firebaseStorageDownloadTokens;
-    const token = typeof current === "string" && current ? current.split(",")[0] : randomUUID();
-    if (!current) {
-      await file.setMetadata({
-        metadata: { firebaseStorageDownloadTokens: token },
-        contentType: contentTypeForUpload(fileName, options.contentType || metadata.contentType)
-      });
-    }
-    url = firebaseDownloadUrl(bucket$1().name, storagePath, token);
-  }
-  const image = {
-    url,
-    name: safeStorageFileName(fileName),
-    path: storagePath,
-    contentType: contentTypeForUpload(fileName, options.contentType),
-    uploadedAt: (/* @__PURE__ */ new Date()).toISOString(),
-    uploadedBy,
-    ...studioImageExtra(options.extra)
-  };
-  const listing = listingSnap.data() || {};
-  const images = Array.isArray(listing.images) ? listing.images : [];
-  const already = images.find((item) => item?.path === storagePath);
-  if (!already) {
-    await listingRef.update({
-      images: admin.firestore.FieldValue.arrayUnion(image),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-    await syncPlaytestGallery(listingId, listing, image);
-  }
-  return { image: already || image, listingId };
-}
-function studioImageExtra(extra) {
-  if (!extra || typeof extra !== "object") return {};
-  const src = extra;
-  const out = {};
-  if (src.studioApproved === true) out.studioApproved = true;
-  if (src.studioRole === "adjusted" || src.studioRole === "final") out.studioRole = src.studioRole;
-  if (typeof src.sourcePath === "string" && src.sourcePath.length <= 500) out.sourcePath = src.sourcePath;
-  return out;
-}
-async function syncPlaytestGallery(listingId, listing, image) {
-  const galleryIds = /* @__PURE__ */ new Set();
-  if (typeof listing.playtestGalleryId === "string" && listing.playtestGalleryId) {
-    galleryIds.add(listing.playtestGalleryId);
-  }
-  if (listing.playtest === true) {
-    const snap = await db$7().collection("galleries").where("listingId", "==", listingId).limit(5).get();
-    snap.docs.forEach((doc) => {
-      if (doc.data().playtest === true) galleryIds.add(doc.id);
-    });
-  }
-  if (galleryIds.size === 0) return;
-  const mediaItem = {
-    id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    url: image.url,
-    shareUrl: image.url,
-    fileName: image.name,
-    title: image.name,
-    type: image.contentType?.startsWith("video/") ? "video" : "photo",
-    storagePath: image.path,
-    downloadable: true,
-    uploadedBy: image.uploadedBy,
-    uploadedAt: image.uploadedAt
-  };
-  for (const galleryId of galleryIds) {
-    const ref = db$7().collection("galleries").doc(galleryId);
-    const snap = await ref.get();
-    if (!snap.exists || snap.data()?.playtest !== true) continue;
-    const items = Array.isArray(snap.data()?.mediaItems) ? snap.data().mediaItems : [];
-    if (items.some((item) => item?.storagePath === image.path)) continue;
-    await ref.update({
-      mediaItems: admin.firestore.FieldValue.arrayUnion(mediaItem),
-      status: "delivered",
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-  }
-}
-function serializeDoc(id, data) {
-  return jsonSafe({ id, ...data });
-}
-const ORDER_GALLERY_RELEASE = "hold_until_order_complete";
-const ICONIC_POLISH_INSTRUCTION = "Iconic Polish: if a fireplace is visible, add a realistic fire; if a driveway, street, or curb is visible, remove vehicles and debris and repair the pavement; remove clutter and personal items. Keep the architecture.";
-const PHOTO_BASE = "Prepare this listing photo. Balance color, clear window glare, and replace a blown-out sky when the sky is visible. Keep the architecture, furnishings, and camera angle.";
-function asItems(value) {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((entry) => {
-    if (typeof entry === "string") {
-      const name2 = entry.trim();
-      return name2 ? [{ id: "", name: name2 }] : [];
-    }
-    if (!entry || typeof entry !== "object") return [];
-    const row = entry;
-    const id = String(row.id || "").trim();
-    const name = String(row.name || row.label || "").trim();
-    return id || name ? [{ id, name }] : [];
-  });
-}
-function asIds(value) {
-  if (!Array.isArray(value)) return [];
-  return value.map((entry) => String(entry || "").trim()).filter(Boolean);
-}
-function packageByIdOrName(id, name) {
-  const idKey = id.toLowerCase();
-  const nameKey = name.toLowerCase();
-  return services.find((service) => service.id === id || nameKey && service.name.toLowerCase() === nameKey || service.id === idKey);
-}
-function twilightPrompt(role, polish) {
-  const place = role === "front" ? "front exterior" : role === "back" ? "rear exterior" : "exterior";
-  const request = [
-    `Convert this ${place} listing photo into a photoreal twilight.`,
-    "Turn on warm interior lights and landscape lighting.",
-    "Keep the architecture, landscaping, and camera angle.",
-    "Use a natural evening sky. Do not add people or text."
-  ];
-  if (polish) request.push(ICONIC_POLISH_INSTRUCTION);
-  return request.join(" ");
-}
-function photoPrompt(polish) {
-  return polish ? `${PHOTO_BASE} ${ICONIC_POLISH_INSTRUCTION}` : PHOTO_BASE;
-}
-function twilightRole(index) {
-  if (index === 0) return "front";
-  if (index === 1) return "back";
-  return `exterior-${index + 1}`;
-}
-function collectTexts(input) {
-  const texts = [];
-  const packageNames = [];
-  let polishFromOrder = false;
-  const items = [...asItems(input.lineItems), ...asItems(input.services)];
-  for (const id of asIds(input.serviceIds)) items.push({ id, name: "" });
-  for (const item of items) {
-    if (item.name) texts.push(item.name);
-    const catalog = packageByIdOrName(item.id, item.name);
-    if (catalog) {
-      packageNames.push(catalog.name);
-      for (const feature of catalog.features || []) texts.push(feature);
-    }
-    const blob = `${item.id} ${item.name}`.toLowerCase();
-    if (blob.includes("iconic finish") || blob.includes("iconic polish") || blob.includes("iconic-finish")) {
-      polishFromOrder = true;
-    }
-  }
-  return {
-    texts,
-    packageName: packageNames[0] || items.find((item) => item.name)?.name || "Custom order",
-    polishFromOrder
-  };
-}
-function planOrderEdits(input = {}) {
-  const collected = collectTexts(input);
-  let twilightCount = 0;
-  let photoCount = null;
-  let photoFull = false;
-  let polishFromOrder = collected.polishFromOrder;
-  const deliverables = /* @__PURE__ */ new Map();
-  for (const text2 of collected.texts) {
-    const twilight2 = text2.match(/(\d+)\s+(?:iconic\s+)?twilight/i);
-    if (twilight2) twilightCount = Math.max(twilightCount, Number(twilight2[1]));
-    else if (/twilight/i.test(text2)) twilightCount = Math.max(twilightCount, 1);
-    const photos = text2.match(/(\d+)\s+(?:high-end\s+|iconic\s+)?(?:images|photos)\b/i);
-    if (photos) photoCount = Math.max(photoCount || 0, Number(photos[1]));
-    if (/full images/i.test(text2)) photoFull = true;
-    const aerials = text2.match(/(\d+)\s+aerial/i);
-    if (aerials || /full aerials|aerial drone/i.test(text2)) {
-      deliverables.set("aerials", {
-        id: "aerials",
-        label: aerials ? `${aerials[1]} aerial stills` : "Aerial stills",
-        kind: "capture"
-      });
-    }
-    if (/snap/i.test(text2) && /reel/i.test(text2)) {
-      deliverables.set("snap-reel", { id: "snap-reel", label: "Snap reel", kind: "video" });
-    }
-    if (/animated reel|walk-?through reel|3d animated/i.test(text2)) {
-      deliverables.set("animated-reel", { id: "animated-reel", label: "Animated walk-through reel", kind: "video" });
-    }
-    if (/cinematic/i.test(text2) && /video/i.test(text2)) {
-      deliverables.set("cinematic-video", { id: "cinematic-video", label: "Cinematic property video", kind: "video" });
-    }
-    if (/floor\s*plan|floorplan/i.test(text2)) {
-      deliverables.set("floorplan", { id: "floorplan", label: "Floor plan", kind: "floorplan" });
-    }
-    if (/matterport|\b3d tour\b/i.test(text2)) {
-      deliverables.set("tour-3d", { id: "tour-3d", label: "3D tour", kind: "capture" });
-    }
-    if (/same[- ]day/i.test(text2)) {
-      deliverables.set("same-day", { id: "same-day", label: "Same-day delivery", kind: "delivery" });
-    }
-    if (/iconic finish|iconic polish/i.test(text2)) polishFromOrder = true;
-  }
-  const iconicPolish = input.iconicPolish === true || polishFromOrder;
-  const count = Math.min(8, Math.max(0, twilightCount));
-  const twilight = Array.from({ length: count }, (_, index) => {
-    const role = twilightRole(index);
-    return { slot: `twilight-${role}`, role, prompt: twilightPrompt(role, iconicPolish) };
-  });
-  return {
-    packageName: collected.packageName,
-    iconicPolish,
-    polishFromOrder,
-    photoPrompt: photoPrompt(iconicPolish),
-    photoCount: photoFull ? null : photoCount,
-    twilight,
-    deliverables: [...deliverables.values()],
-    galleryRelease: ORDER_GALLERY_RELEASE,
-    notes: [
-      "Image edits use the order. Photographers do not pick a preset per photo.",
-      "Reels, aerial capture, floor plans, and delivery are not OpenAI image edits.",
-      "The gallery stays held until the order is complete. This plan does not send it."
-    ]
-  };
-}
-function sourceScore(name, role) {
-  const normalized = name.toLowerCase();
-  if (role === "front" && /front|facade|elevation/.test(normalized)) return 5;
-  if (role === "back" && /back|rear|pool/.test(normalized)) return 5;
-  if (/exterior|outside/.test(normalized)) {
-    if (role === "front" || role === "back") return 2;
-    return 4;
-  }
-  if (/aerial|drone/.test(normalized)) return 0;
-  return 0;
-}
-function previewable(frame) {
-  if (frame.raw) return false;
-  if (frame.previewable === false) return false;
-  return Boolean(frame.path);
-}
-function orderEditDrafts(plan, frames) {
-  const usable = frames.filter(previewable);
-  const used = /* @__PURE__ */ new Set();
-  const drafts = [];
-  for (const slot of plan.twilight) {
-    let best = null;
-    let bestScore = 0;
-    for (const frame of usable) {
-      if (used.has(frame.path)) continue;
-      const score = sourceScore(frame.name || frame.path, slot.role);
-      if (score > bestScore) {
-        best = frame;
-        bestScore = score;
-      }
-    }
-    if (best && bestScore > 0) used.add(best.path);
-    const waiting = !best;
-    drafts.push({
-      slot: slot.slot,
-      origin: "order",
-      type: "twilight",
-      label: `Twilight · ${slot.role}`,
-      prompt: slot.prompt,
-      sourcePath: best?.path || "",
-      imageUrl: best?.url || "",
-      fileName: best?.name || `${slot.slot}.jpg`,
-      waitingNote: waiting ? `Waiting for a ${slot.role} exterior. The photographer is not asked to pick the edit.` : ""
-    });
-  }
-  for (const frame of usable) {
-    drafts.push({
-      slot: photoSlot(frame.path),
-      origin: "order",
-      type: "photo",
-      label: plan.iconicPolish ? "Photo · Iconic Polish" : "Photo",
-      prompt: plan.photoPrompt,
-      sourcePath: frame.path,
-      imageUrl: frame.url,
-      fileName: frame.name || "photo.jpg",
-      waitingNote: ""
-    });
-  }
-  return drafts;
-}
-function photoSlot(storagePath) {
-  let hash = 2166136261;
-  for (const char of storagePath) {
-    hash ^= char.charCodeAt(0);
-    hash = Math.imul(hash, 16777619);
-  }
-  return `photo_${(hash >>> 0).toString(16)}`;
-}
-function orderEditDocId(listingId, slot) {
-  const clean = `${listingId}_${slot}`.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 700);
-  return `order_${clean}`;
-}
-const OPENAI_IMAGE_EDITS_URL = "https://api.openai.com/v1/images/edits";
-const OPENAI_IMAGE_EDIT_MODEL = "gpt-image-1";
-const OPENAI_IMAGE_EDIT_TIMEOUT_MS = 45e3;
-const MAX_SOURCE_BYTES = 2e7;
-class OpenAiEditError extends Error {
-  status;
-  constructor(message, status) {
-    super(message);
-    this.name = "OpenAiEditError";
-    this.status = status;
-  }
-}
-function readOpenAiApiKey(env) {
-  return typeof env.OPENAI_API_KEY === "string" ? env.OPENAI_API_KEY.trim() : "";
-}
-function imageSize(bytes) {
-  if (bytes.length >= 24 && bytes[0] === 137 && bytes.toString("ascii", 1, 4) === "PNG") {
-    return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
-  }
-  if (bytes.length > 30 && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP") {
-    const format = bytes.toString("ascii", 12, 16);
-    if (format === "VP8X" && bytes.length >= 30) {
-      return { width: 1 + bytes.readUIntLE(24, 3), height: 1 + bytes.readUIntLE(27, 3) };
-    }
-    if (format === "VP8 " && bytes.length >= 30) {
-      return { width: bytes.readUInt16LE(26) & 16383, height: bytes.readUInt16LE(28) & 16383 };
-    }
-    if (format === "VP8L" && bytes.length >= 25) {
-      const bits = bytes.readUInt32LE(21);
-      return { width: (bits & 16383) + 1, height: (bits >> 14 & 16383) + 1 };
-    }
-  }
-  if (bytes.length > 4 && bytes[0] === 255 && bytes[1] === 216) {
-    let offset = 2;
-    while (offset + 9 < bytes.length) {
-      if (bytes[offset] !== 255) break;
-      const marker = bytes[offset + 1];
-      if (marker === 216 || marker === 217) {
-        offset += 2;
-        continue;
-      }
-      const size = bytes.readUInt16BE(offset + 2);
-      if (marker >= 192 && marker <= 195) {
-        return { height: bytes.readUInt16BE(offset + 5), width: bytes.readUInt16BE(offset + 7) };
-      }
-      if (size < 2) break;
-      offset += 2 + size;
-    }
-  }
-  return null;
-}
-function editSizeForImage(bytes) {
-  const size = imageSize(bytes);
-  return listingPhotoEditSize(size?.width ?? 0, size?.height ?? 0);
-}
-function imagePart(bytes, contentType) {
-  const type = contentType.includes("png") ? "image/png" : contentType.includes("webp") ? "image/webp" : "image/jpeg";
-  const extension = type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg";
-  return {
-    blob: new Blob([new Uint8Array(bytes)], { type }),
-    filename: `source.${extension}`
-  };
-}
-function isTimeoutError(err) {
-  if (!err || typeof err !== "object") return false;
-  const name = err.name;
-  return name === "TimeoutError" || name === "AbortError";
-}
-function openAiErrorNote(status, body) {
-  let message = "";
-  let code = "";
-  try {
-    const parsed = JSON.parse(body);
-    message = String(parsed.error?.message || "").trim();
-    code = String(parsed.error?.code || "").trim();
-  } catch {
-    message = "";
-  }
-  if (code === "moderation_blocked" || /moderation/i.test(message)) {
-    return "OpenAI blocked this edit. Revise the prompt and queue it again.";
-  }
-  if (status === 401) return "OpenAI rejected the API key. Check OPENAI_API_KEY on the server.";
-  if (status === 429) return "OpenAI rate limit reached. Wait a moment and queue the edit again.";
-  const detail = message.replace(/\s+/g, " ").slice(0, 180);
-  if (detail) return `OpenAI could not edit this photo (${status}). ${detail}`;
-  return `OpenAI could not edit this photo (${status}). Queue the edit again.`;
-}
-async function editListingPhotoWithOpenAI(input) {
-  const apiKey = input.apiKey.trim();
-  if (!apiKey) throw new OpenAiEditError("OPENAI_API_KEY is not configured on the server, so this photo was not edited.");
-  if (!input.bytes.length) throw new OpenAiEditError("The source photo was empty.");
-  if (input.bytes.length > MAX_SOURCE_BYTES) {
-    throw new OpenAiEditError("That photo is over 20 MB. Export a smaller JPEG and queue the edit again.");
-  }
-  const prompt = input.prompt.trim();
-  if (prompt.length < 3) throw new OpenAiEditError("Describe the AI edit.");
-  const file = imagePart(input.bytes, input.contentType);
-  const form = new FormData();
-  form.append("model", OPENAI_IMAGE_EDIT_MODEL);
-  form.append("prompt", prompt);
-  form.append("image", file.blob, file.filename);
-  form.append("n", "1");
-  form.append("size", editSizeForImage(input.bytes));
-  form.append("quality", "medium");
-  form.append("output_format", "jpeg");
-  form.append("output_compression", "85");
-  form.append("input_fidelity", "high");
-  const fetchImpl = input.fetchImpl || fetch;
-  const timeoutMs = input.timeoutMs ?? OPENAI_IMAGE_EDIT_TIMEOUT_MS;
-  let response;
-  try {
-    response = await fetchImpl(OPENAI_IMAGE_EDITS_URL, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}` },
-      body: form,
-      signal: AbortSignal.timeout(timeoutMs)
-    });
-  } catch (err) {
-    if (isTimeoutError(err)) throw new OpenAiEditError(AI_EDIT_TIMEOUT_NOTE);
-    throw new OpenAiEditError("Iconic Studio could not reach OpenAI. Queue the edit again.");
-  }
-  const body = await response.text();
-  if (!response.ok) throw new OpenAiEditError(openAiErrorNote(response.status, body), response.status);
-  let parsed;
-  try {
-    parsed = JSON.parse(body);
-  } catch {
-    throw new OpenAiEditError("OpenAI returned an unreadable image edit.");
-  }
-  const encoded = parsed.data?.[0]?.b64_json || "";
-  if (!encoded) throw new OpenAiEditError("OpenAI returned no edited image.");
-  const bytes = Buffer.from(encoded, "base64");
-  if (bytes.length < 32) throw new OpenAiEditError("OpenAI returned an empty edited image.");
-  return { bytes, contentType: "image/jpeg" };
-}
-const db$6 = () => admin.firestore();
-const bucket = () => admin.storage().bucket();
-function httpError(status, message) {
-  return Object.assign(new Error(message), { status });
-}
-async function bumpRawIngestJob(input) {
-  const file = {
-    path: input.image.path,
-    url: input.image.url || "",
-    name: input.image.name || input.image.path.split("/").pop() || "raw",
-    contentType: input.image.contentType || ""
-  };
-  const ref = db$6().collection("editJobs").doc(ingestJobId(input.listingId));
-  const snap = await ref.get();
-  if (!snap.exists) {
-    await ref.set({
-      kind: "raw_ingest",
-      type: "raw_ingest",
-      listingId: input.listingId,
-      status: "pending",
-      note: "Edits begin",
-      sourceFiles: [file],
-      fileCount: 1,
-      createdBy: input.uploadedBy,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-    return { id: ref.id, created: true, fileCount: 1 };
-  }
-  const data = snap.data() || {};
-  const files = Array.isArray(data.sourceFiles) ? data.sourceFiles : [];
-  if (files.some((item) => item?.path === file.path)) {
-    return { id: ref.id, created: false, fileCount: files.length };
-  }
-  await ref.update({
-    sourceFiles: admin.firestore.FieldValue.arrayUnion(file),
-    fileCount: admin.firestore.FieldValue.increment(1),
-    status: "pending",
-    note: "Edits begin",
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
-  });
-  return { id: ref.id, created: false, fileCount: files.length + 1 };
-}
-async function loadListing$1(listingId) {
-  const snap = await db$6().collection("listings").doc(listingId).get();
-  if (!snap.exists) throw httpError(404, "Listing not found.");
-  return { id: snap.id, ref: snap.ref, data: snap.data() || {} };
-}
-async function listingsForRole(uid, role) {
-  if (role === "photographer") {
-    const [byUid, byIds] = await Promise.all([
-      db$6().collection("listings").where("photographerUid", "==", uid).limit(50).get(),
-      db$6().collection("listings").where("photographerIds", "array-contains", uid).limit(50).get()
-    ]);
-    const merged = /* @__PURE__ */ new Map();
-    for (const doc of [...byUid.docs, ...byIds.docs]) merged.set(doc.id, doc);
-    return [...merged.values()].map((doc) => ({ id: doc.id, data: doc.data() }));
-  }
-  const snap = await db$6().collection("listings").limit(80).get();
-  return snap.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
-}
-async function assertStudioAccess(uid, role, listingId) {
-  if (role !== "photographer") {
-    await loadListing$1(listingId);
-    return;
-  }
-  const mine = await listingsForRole(uid, "photographer");
-  if (!mine.some((item) => item.id === listingId)) {
-    throw httpError(403, "This job is not assigned to you.");
-  }
-}
-function listingFrames(data) {
-  return (Array.isArray(data.images) ? data.images : []).map((item, index) => frameFromListingImage(item, index)).filter((frame) => Boolean(frame));
-}
-async function downloadListingImage(listingId, sourcePath, fileName, contentType) {
-  if (!isListingStoragePath(listingId, sourcePath)) {
-    throw new OpenAiEditError("That photo is not stored on this listing.");
-  }
-  if (!isStudioPreviewable(fileName, contentType)) {
-    throw new OpenAiEditError("OpenAI can edit a JPEG, PNG, or WebP. RAW files stay in the queue until a preview exists.");
-  }
-  const file = bucket().file(sourcePath);
-  const [exists] = await file.exists();
-  if (!exists) throw new OpenAiEditError("Source photo was not found in storage.");
-  const [metadata] = await file.getMetadata();
-  const size = Number(metadata.size || 0);
-  if (size > 2e7) {
-    throw new OpenAiEditError("That photo is over 20 MB. Export a smaller JPEG and queue the edit again.");
-  }
-  const resolved = contentTypeForUpload(fileName, String(metadata.contentType || contentType || ""));
-  if (resolved !== "image/jpeg" && resolved !== "image/png" && resolved !== "image/webp") {
-    throw new OpenAiEditError("OpenAI can edit a JPEG, PNG, or WebP. RAW files stay in the queue until a preview exists.");
-  }
-  const [bytes] = await file.download();
-  return { bytes, contentType: resolved };
-}
-async function runOpenAiEdit(input) {
-  const apiKey = readOpenAiApiKey(process.env);
-  if (!apiKey) throw new OpenAiEditError(AI_EDIT_MISSING_KEY_NOTE);
-  const source = await downloadListingImage(input.listingId, input.sourcePath, input.fileName, input.contentType);
-  const edited = await editListingPhotoWithOpenAI({
-    apiKey,
-    prompt: realEstateEditPrompt(input.prompt),
-    bytes: source.bytes,
-    contentType: source.contentType
-  });
-  const base = input.fileName.replace(/\.\w+$/, "") || "edit";
-  const saved = await saveListingBytes(input.listingId, `${base}-ai.jpg`, "image/jpeg", "photos", edited.bytes);
-  return { afterUrl: saved.url, resultPath: saved.storagePath };
-}
-function failureNote(err) {
-  if (err instanceof OpenAiEditError) return err.message;
-  return "The AI edit failed before a finished image was saved.";
-}
-async function loadOrderEditContext(listingId) {
-  const listing = await loadListing$1(listingId);
-  let order = null;
-  const orderId = typeof listing.data.orderId === "string" ? listing.data.orderId : "";
-  if (orderId) {
-    const snap = await db$6().collection("orders").doc(orderId).get();
-    if (snap.exists) order = snap.data() || {};
-  }
-  const plan = planOrderEdits({
-    lineItems: listing.data.lineItems || order?.lineItems || order?.services,
-    services: listing.data.services,
-    serviceIds: listing.data.serviceIds,
-    iconicPolish: listing.data.iconicPolish === true
-  });
-  return { listing, plan };
-}
-async function setIconicPolish(input) {
-  const listing = await loadListing$1(input.listingId);
-  await listing.ref.update({
-    iconicPolish: input.iconicPolish,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
-  });
-  const { plan } = await loadOrderEditContext(input.listingId);
-  return { iconicPolish: plan.iconicPolish, plan };
-}
-async function queueOrderEdits(input) {
-  const { listing, plan } = await loadOrderEditContext(input.listingId);
-  const frames = listingFrames(listing.data);
-  const drafts = orderEditDrafts(plan, frames);
-  const settled = /* @__PURE__ */ new Set(["review", "approved", "rejected", "processing"]);
-  let prepared = 0;
-  for (const draft of drafts) {
-    const ref = db$6().collection("editJobs").doc(orderEditDocId(input.listingId, draft.slot));
-    const snap = await ref.get();
-    const current = snap.data() || {};
-    if (snap.exists && settled.has(String(current.status || ""))) continue;
-    const payload = {
-      kind: "ai_edit",
-      origin: "order",
-      slot: draft.slot,
-      type: draft.type,
-      label: draft.label,
-      listingId: input.listingId,
-      status: "pending",
-      provider: "openai",
-      model: OPENAI_IMAGE_EDIT_MODEL,
-      prompt: draft.prompt,
-      sourcePath: draft.sourcePath,
-      sourceUrl: draft.imageUrl,
-      beforeUrl: draft.imageUrl,
-      afterUrl: "",
-      resultPath: "",
-      placeholder: false,
-      iconicPolish: plan.iconicPolish,
-      note: draft.sourcePath ? "Queued from the order. OpenAI has not run this photo yet." : draft.waitingNote,
-      createdBy: input.createdBy,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    };
-    if (!snap.exists) payload.createdAt = admin.firestore.FieldValue.serverTimestamp();
-    await ref.set(payload, { merge: true });
-    prepared += 1;
-  }
-  const jobSnap = await db$6().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
-  const pending = jobSnap.docs.filter((doc) => {
-    const data2 = doc.data() || {};
-    return data2.origin === "order" && data2.status === "pending" && typeof data2.sourcePath === "string" && data2.sourcePath;
-  });
-  const waiting = jobSnap.docs.filter((doc) => {
-    const data2 = doc.data() || {};
-    return data2.origin === "order" && data2.status === "pending" && !data2.sourcePath;
-  }).length;
-  pending.sort((a, b) => {
-    const rank = (doc) => doc.data().type === "twilight" ? 0 : 1;
-    return rank(a) - rank(b);
-  });
-  const next = pending[0];
-  if (!next) {
-    return { plan, prepared, ran: null, remaining: 0, waiting };
-  }
-  const data = next.data() || {};
-  await next.ref.update({
-    status: "processing",
-    note: "Editing this photo with OpenAI.",
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
-  });
-  const fileName = String(data.sourcePath || "").split("/").pop() || "photo.jpg";
-  try {
-    const saved = await runOpenAiEdit({
-      listingId: input.listingId,
-      sourcePath: String(data.sourcePath),
-      fileName,
-      contentType: "",
-      prompt: String(data.prompt || plan.photoPrompt)
-    });
-    await next.ref.update({
-      status: "review",
-      beforeUrl: data.beforeUrl || data.sourceUrl || "",
-      afterUrl: saved.afterUrl,
-      resultPath: saved.resultPath,
-      placeholder: false,
-      note: AI_EDIT_READY_NOTE,
-      pipeline: ["pending", "processing", "review"],
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-    return {
-      plan,
-      prepared,
-      remaining: Math.max(0, pending.length - 1),
-      waiting,
-      ran: {
-        jobId: next.id,
-        status: "review",
-        beforeUrl: String(data.beforeUrl || data.sourceUrl || ""),
-        afterUrl: saved.afterUrl,
-        resultPath: saved.resultPath,
-        placeholder: false,
-        note: AI_EDIT_READY_NOTE
-      }
-    };
-  } catch (err) {
-    const note = failureNote(err);
-    console.error("[Studio AI]", err instanceof Error ? err.message : err);
-    await next.ref.update({
-      status: "failed",
-      placeholder: false,
-      afterUrl: "",
-      note,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-    return {
-      plan,
-      prepared,
-      remaining: Math.max(0, pending.length - 1),
-      waiting,
-      ran: {
-        jobId: next.id,
-        status: "failed",
-        beforeUrl: String(data.beforeUrl || data.sourceUrl || ""),
-        afterUrl: "",
-        placeholder: false,
-        note
-      }
-    };
-  }
-}
-async function enqueueAiEdit(input) {
-  const listing = await loadListing$1(input.listingId);
-  const frame = listingFrames(listing.data).find((item) => item.path === input.sourcePath);
-  if (!frame) throw httpError(404, "That file is not on this listing.");
-  if (!isStudioPreviewable(frame.name, frame.contentType)) {
-    throw httpError(400, "Choose a JPEG, PNG, or WebP. RAW stays in the queue until a preview exists.");
-  }
-  const beforeUrl = frame.url || input.imageUrl;
-  const ref = await db$6().collection("editJobs").add({
-    kind: "ai_edit",
-    origin: "staff_override",
-    type: input.type,
-    listingId: input.listingId,
-    status: "processing",
-    provider: "openai",
-    model: OPENAI_IMAGE_EDIT_MODEL,
-    prompt: input.prompt,
-    sourcePath: input.sourcePath,
-    sourceUrl: beforeUrl,
-    beforeUrl,
-    afterUrl: "",
-    placeholder: false,
-    note: "Editing this photo with OpenAI.",
-    createdBy: input.createdBy,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
-  });
-  try {
-    const saved = await runOpenAiEdit({
-      listingId: input.listingId,
-      sourcePath: input.sourcePath,
-      fileName: frame.name,
-      contentType: frame.contentType,
-      prompt: input.prompt
-    });
-    await ref.update({
-      status: "review",
-      afterUrl: saved.afterUrl,
-      resultPath: saved.resultPath,
-      placeholder: false,
-      note: AI_EDIT_READY_NOTE,
-      pipeline: ["pending", "processing", "review"],
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-    return {
-      id: ref.id,
-      status: "review",
-      provider: "openai",
-      beforeUrl,
-      afterUrl: saved.afterUrl,
-      resultPath: saved.resultPath,
-      placeholder: false,
-      note: AI_EDIT_READY_NOTE
-    };
-  } catch (err) {
-    const note = failureNote(err);
-    console.error("[Studio AI]", err instanceof Error ? err.message : err);
-    await ref.update({
-      status: "failed",
-      placeholder: false,
-      afterUrl: "",
-      note,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-    return {
-      id: ref.id,
-      status: "failed",
-      provider: "openai",
-      beforeUrl,
-      afterUrl: "",
-      placeholder: false,
-      note
-    };
-  }
-}
-async function rejectStudioJob(input) {
-  const ref = db$6().collection("editJobs").doc(input.jobId);
-  const snap = await ref.get();
-  if (!snap.exists) throw httpError(404, "Edit job not found.");
-  const job = snap.data() || {};
-  if (job.listingId !== input.listingId) throw httpError(400, "That job is for a different listing.");
-  if (job.status === "approved") throw httpError(400, "Approved finals stay on the listing.");
-  const note = job.status === "failed" ? String(job.note || "Rejected.") : "Rejected before approval. The edited image was not added to the gallery.";
-  await ref.set({
-    status: "rejected",
-    rejectedBy: input.rejectedBy,
-    note,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
-  }, { merge: true });
-  return { id: input.jobId, status: "rejected", note };
-}
-async function saveAdjustedJpeg(input) {
-  if (!input.bytes.length) throw httpError(400, "Adjusted JPEG was empty.");
-  if (input.bytes.length > 45e5) throw httpError(413, "Adjusted JPEG is too large.");
-  if (!isListingStoragePath(input.listingId, input.sourcePath)) {
-    throw httpError(400, "sourcePath must belong to this listing.");
-  }
-  const adjustments = clampAdjustments(input.adjustments);
-  const saved = await saveListingBytes(
-    input.listingId,
-    input.fileName.replace(/\.\w+$/, "") + "-adjusted.jpg",
-    "image/jpeg",
-    "photos",
-    input.bytes
-  );
-  const registered = await registerListingPhoto({
-    listingId: input.listingId,
-    storagePath: saved.storagePath,
-    fileName: input.fileName.replace(/\.\w+$/, "") + "-adjusted.jpg",
-    contentType: "image/jpeg",
-    uploadedBy: input.uploadedBy,
-    existingUrl: saved.url,
-    extra: { studioRole: "adjusted", sourcePath: input.sourcePath }
-  });
-  const job = await db$6().collection("editJobs").add({
-    kind: "adjust",
-    type: "adjust",
-    listingId: input.listingId,
-    status: "review",
-    sourcePath: input.sourcePath,
-    resultPath: saved.storagePath,
-    beforeUrl: "",
-    afterUrl: saved.url,
-    adjustments,
-    provider: "canvas",
-    note: "Client-side JPEG saved to the listing photos folder.",
-    createdBy: input.uploadedBy,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
-  });
-  return { jobId: job.id, image: registered.image, adjustments };
-}
-async function copyToFinals(listingId, sourcePath, fileName) {
-  if (!isListingStoragePath(listingId, sourcePath)) {
-    throw httpError(400, "That file is not stored on this listing.");
-  }
-  if (sourcePath.includes("/finals/")) {
-    const file = bucket().file(sourcePath);
-    const [exists2] = await file.exists();
-    if (!exists2) throw httpError(400, "Final file was not found in storage.");
-    const [metadata2] = await file.getMetadata();
-    const current = metadata2.metadata?.firebaseStorageDownloadTokens;
-    const token2 = typeof current === "string" && current ? current.split(",")[0] : randomUUID();
-    return {
-      storagePath: sourcePath,
-      url: firebaseDownloadUrl(bucket().name, sourcePath, token2),
-      contentType: metadata2.contentType || "image/jpeg",
-      copied: false
-    };
-  }
-  if (isRawStudioFile(fileName, "")) {
-    throw httpError(400, `${fileName} is RAW. Import it for the AI queue, then approve a JPEG, PNG, or WebP final.`);
-  }
-  if (!isStudioPreviewable(fileName)) {
-    throw httpError(400, "Approve a JPEG, PNG, or WebP. RAW stays in the AI queue.");
-  }
-  const destPath = finalsObjectPath(listingId, fileName);
-  const source = bucket().file(sourcePath);
-  const [exists] = await source.exists();
-  if (!exists) throw httpError(400, "Source file was not found in storage.");
-  const dest = bucket().file(destPath);
-  await source.copy(dest);
-  const [metadata] = await source.getMetadata();
-  const token = randomUUID();
-  const contentType = metadata.contentType || "image/jpeg";
-  await dest.setMetadata({
-    contentType,
-    metadata: { firebaseStorageDownloadTokens: token }
-  });
-  return {
-    storagePath: destPath,
-    url: firebaseDownloadUrl(bucket().name, destPath, token),
-    contentType,
-    copied: true
-  };
-}
-async function addFinalToGalleries(listingId, listing, image) {
-  const ids = /* @__PURE__ */ new Set();
-  if (typeof listing.galleryId === "string" && listing.galleryId) ids.add(listing.galleryId);
-  if (typeof listing.playtestGalleryId === "string" && listing.playtestGalleryId) ids.add(listing.playtestGalleryId);
-  const snap = await db$6().collection("galleries").where("listingId", "==", listingId).limit(10).get();
-  snap.docs.forEach((doc) => ids.add(doc.id));
-  const updated = [];
-  for (const galleryId of ids) {
-    const ref = db$6().collection("galleries").doc(galleryId);
-    const gallerySnap = await ref.get();
-    if (!gallerySnap.exists) continue;
-    const data = gallerySnap.data() || {};
-    const items = Array.isArray(data.mediaItems) ? data.mediaItems : [];
-    if (items.some((item) => item?.storagePath === image.path)) {
-      updated.push(galleryId);
-      continue;
-    }
-    const mediaItem = {
-      id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      url: image.url,
-      shareUrl: image.url,
-      fileName: image.name,
-      title: image.name,
-      type: "photo",
-      storagePath: image.path,
-      downloadable: true,
-      isEdited: true,
-      isRaw: false,
-      uploadedBy: image.uploadedBy,
-      uploadedAt: (/* @__PURE__ */ new Date()).toISOString()
-    };
-    await ref.update({
-      mediaItems: [...items, mediaItem],
-      status: galleryStatusAfterStudioAdd(typeof data.status === "string" ? data.status : void 0),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-    updated.push(galleryId);
-  }
-  return updated;
-}
-async function approveStudioFinal(input) {
-  const listing = await loadListing$1(input.listingId);
-  const name = safeStorageFileName(input.fileName || input.sourcePath.split("/").pop() || "final.jpg");
-  const copied = await copyToFinals(input.listingId, input.sourcePath, name);
-  const registered = await registerListingPhoto({
-    listingId: input.listingId,
-    storagePath: copied.storagePath,
-    fileName: name,
-    contentType: copied.contentType,
-    uploadedBy: input.uploadedBy,
-    existingUrl: copied.url,
-    extra: { studioApproved: true, studioRole: "final", sourcePath: input.sourcePath }
-  });
-  const galleries = await addFinalToGalleries(input.listingId, listing.data, {
-    url: copied.url,
-    name,
-    path: copied.storagePath,
-    contentType: copied.contentType,
-    uploadedBy: input.uploadedBy
-  });
-  if (input.jobId) {
-    await db$6().collection("editJobs").doc(input.jobId).set({
-      status: "approved",
-      resultPath: copied.storagePath,
-      resultUrl: copied.url,
-      afterUrl: copied.url,
-      approvedBy: input.uploadedBy,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-  }
-  return {
-    image: registered.image,
-    galleries,
-    copied: copied.copied,
-    note: galleries.length ? "Final copied onto the listing and added to the gallery. No client email was sent." : "Final copied onto the listing images. No gallery is linked yet, and no client email was sent."
-  };
-}
-async function loadStudioWorkspace(input) {
-  const listings = await listingsForRole(input.uid, input.role);
-  const allowed = new Set(listings.map((item) => item.id));
-  const jobSnap = await db$6().collection("editJobs").limit(150).get();
-  const jobs = jobSnap.docs.map((doc) => jsonSafe({ id: doc.id, ...doc.data() })).filter((job) => {
-    const listingId = String(job.listingId || "");
-    if (input.role === "photographer") return allowed.has(listingId);
-    return true;
-  }).sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
-  let listing = null;
-  if (input.listingId) {
-    if (input.role === "photographer" && !allowed.has(input.listingId)) {
-      throw httpError(403, "This job is not assigned to you.");
-    }
-    const loaded = await loadListing$1(input.listingId);
-    const images = listingFrames(loaded.data);
-    let editPlan = null;
-    try {
-      editPlan = (await loadOrderEditContext(input.listingId)).plan;
-    } catch (err) {
-      console.error("[Studio AI] Order plan failed:", err instanceof Error ? err.message : err);
-    }
-    listing = {
-      id: loaded.id,
-      address: listingAddressLabel(loaded.data),
-      status: loaded.data.status || "",
-      galleryId: loaded.data.galleryId || loaded.data.playtestGalleryId || "",
-      iconicPolish: loaded.data.iconicPolish === true,
-      images,
-      editPlan
-    };
-  }
-  return {
-    flags: {
-      teamStudio: true,
-      agentUpsell: false,
-      outsidePhotographerSaas: false,
-      canvaBrand: false
-    },
-    listings: listings.map((item) => ({
-      id: item.id,
-      address: listingAddressLabel(item.data),
-      status: item.data.status || "",
-      imageCount: Array.isArray(item.data.images) ? item.data.images.length : 0
-    })),
-    jobs,
-    listing
-  };
-}
 const router$9 = Router();
 const db$5 = () => admin.firestore();
 const DIRECT_UPLOAD_LIMIT = 3e6;
@@ -6177,6 +6631,14 @@ async function noteRawUpload(listingId, image, uploadedBy) {
     await bumpRawIngestJob({ listingId, image: { ...image, path: image.path }, uploadedBy });
   } catch (err) {
     console.error("[Studio] Raw upload saved, but the edit queue was not bumped.", err);
+  }
+}
+async function noteOrderEditQueue(listingId, uploadedBy) {
+  try {
+    return await enqueueOrderEditsFromUpload({ listingId, createdBy: uploadedBy });
+  } catch (err) {
+    console.error("[Studio] Upload saved, but order edits were not queued.", err);
+    return null;
   }
 }
 function sendKnownError$1(res, err, fallback) {
@@ -6272,7 +6734,8 @@ router$9.post("/:id/photos", requirePhotographer, async (req, res) => {
         existingUrl: saved.url
       });
       await noteRawUpload(listingId, registered2.image, req.user.uid);
-      return res.status(201).json({ success: true, ...registered2 });
+      const autoQueue2 = await noteOrderEditQueue(listingId, req.user.uid);
+      return res.status(201).json({ success: true, ...registered2, autoQueue: autoQueue2 });
     }
     const storagePath = req.body?.storagePath;
     if (!isListingStoragePath(listingId, storagePath)) {
@@ -6286,7 +6749,8 @@ router$9.post("/:id/photos", requirePhotographer, async (req, res) => {
       uploadedBy: req.user.uid
     });
     await noteRawUpload(listingId, registered.image, req.user.uid);
-    return res.status(201).json({ success: true, ...registered });
+    const autoQueue = await noteOrderEditQueue(listingId, req.user.uid);
+    return res.status(201).json({ success: true, ...registered, autoQueue });
   } catch (err) {
     return sendKnownError$1(res, err, "Failed to save the uploaded photo.");
   }
@@ -6927,6 +7391,31 @@ router$6.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update media job." });
   }
 });
+function studioQueueTickRequest(env, listingId) {
+  const secret = typeof env.CRON_SECRET === "string" ? env.CRON_SECRET.trim() : "";
+  const base = String(env.APP_URL || env.URL || "").trim().replace(/\/$/, "");
+  const id = listingId.trim();
+  if (!secret || !base || !id) return null;
+  return {
+    url: `${base}/api/studio/order-queue/tick`,
+    init: {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${secret}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ listingId: id, chain: true })
+    }
+  };
+}
+function kickStudioQueue(listingId, env = process.env) {
+  const request = studioQueueTickRequest(env, listingId);
+  if (!request) return { dispatched: false };
+  void fetch(request.url, request.init).catch((err) => {
+    console.error("[Studio queue] Follow-up tick failed:", err instanceof Error ? err.message : err);
+  });
+  return { dispatched: true };
+}
 const router$5 = Router();
 function adminReady(res) {
   if (admin.apps.length) return true;
@@ -6934,6 +7423,18 @@ function adminReady(res) {
     error: "Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT and FIREBASE_STORAGE_BUCKET."
   });
   return false;
+}
+function cronAuthorized(req) {
+  const secret = typeof process.env.CRON_SECRET === "string" ? process.env.CRON_SECRET.trim() : "";
+  return Boolean(secret) && req.headers.authorization === `Bearer ${secret}`;
+}
+function requireStaffOrQueueCron(req, res, next) {
+  if (cronAuthorized(req)) {
+    req.user = { uid: "studio-queue" };
+    req.staffRole = "admin";
+    return next();
+  }
+  return requireStaff(req, res, next);
 }
 function sendKnownError(res, err, fallback) {
   const status = err.status;
@@ -6952,6 +7453,14 @@ router$5.get("/workspace", requireStaff, async (req, res) => {
       role: req.staffRole || "",
       listingId: listingId || void 0
     });
+    if (payload.listing && typeof payload.listing.id === "string") {
+      try {
+        payload.listing.release = await loadGalleryReleaseReport(payload.listing.id);
+      } catch (err) {
+        console.error("[Studio] Gallery gate failed:", err instanceof Error ? err.message : err);
+        payload.listing.release = null;
+      }
+    }
     return res.json(payload);
   } catch (err) {
     return sendKnownError(res, err, "Failed to load Iconic Studio.");
@@ -6969,6 +7478,36 @@ router$5.post("/order-edits", requireStaff, async (req, res) => {
     return res.status(201).json(result);
   } catch (err) {
     return sendKnownError(res, err, "Failed to queue the order edits.");
+  }
+});
+router$5.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => {
+  let listingId = String(req.body?.listingId || "").trim();
+  if (listingId && !/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
+    return res.status(400).json({ error: "A valid listing id is required." });
+  }
+  if (!listingId && req.user?.uid !== "studio-queue") {
+    return res.status(400).json({ error: "A valid listing id is required." });
+  }
+  if (!adminReady(res)) return;
+  try {
+    if (!listingId) {
+      const found = await nextOrderEditListingId();
+      if (!found) {
+        return res.json({ prepared: 0, ran: null, remaining: 0, waiting: 0, shouldFollowUp: false });
+      }
+      listingId = found;
+    } else if (req.user?.uid !== "studio-queue") {
+      await assertStudioAccess(req.user.uid, req.staffRole || "", listingId);
+    }
+    const result = await advanceOrderEditQueue({
+      listingId,
+      createdBy: req.user.uid,
+      retryFailed: false
+    });
+    if (req.body?.chain === true && result.shouldFollowUp) kickStudioQueue(listingId);
+    return res.json(result);
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to advance the order edit queue.");
   }
 });
 router$5.post("/iconic-polish", requireStaff, async (req, res) => {

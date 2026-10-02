@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { fetchAssignedListings, uploadListingFile } from "@/lib/listingUpload";
-import { postIconicPolish } from "@/lib/studioApi";
+import { drainOrderEditQueue, postIconicPolish } from "@/lib/studioApi";
 import { iconicStudioHref } from "@shared/iconicStudio";
 import { PresentationShareButton } from "@/components/PresentationSharePanel";
 import { toast } from "sonner";
@@ -46,6 +46,7 @@ export default function AdminPhotographer() {
   const [uploading, setUploading] = React.useState(false);
   const [iconicPolish, setIconicPolish] = React.useState(false);
   const [uploadProgress, setUploadProgress] = React.useState(0);
+  const [queueNote, setQueueNote] = React.useState("");
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [selectedProject, setSelectedProject] = React.useState<string | null>(null);
 
@@ -112,6 +113,21 @@ export default function AdminPhotographer() {
       }
       toast.success(fileArray.length + " file(s) uploaded!");
       await loadAssignments();
+      setUploading(false);
+      setUploadProgress(0);
+      if (user) {
+        setQueueNote("Iconic Studio is editing the order, one photo at a time.");
+        try {
+          await drainOrderEditQueue(() => user.getIdToken(), projectId, (step) => {
+            if (step.ran?.status === "failed") setQueueNote(step.ran.note);
+            else if (step.shouldFollowUp) setQueueNote(`Auto-queue running. ${step.remaining} still queued.`);
+            else if (step.waiting) setQueueNote("Waiting on an exterior filename before twilight can run.");
+            else setQueueNote(step.ran ? "Order edits are ready for review in Iconic Studio." : "No photo is waiting to edit.");
+          });
+        } catch (err: unknown) {
+          setQueueNote(err instanceof Error ? err.message : "Auto-queue did not start.");
+        }
+      }
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Upload failed.");
     } finally {
@@ -255,7 +271,8 @@ export default function AdminPhotographer() {
           {/* UPLOADS */}
           {activeTab === "uploads" && (
             <div className="space-y-4">
-              <p className="text-xs text-gray-500 mb-4">Upload the shoot. Edits come from the order, not from picking a look per photo. Turn on Iconic Polish before you submit if this listing needs fireplace fire, clean driveways, and clutter removal.</p>
+              <p className="text-xs text-gray-500 mb-4">Upload the shoot. Edits come from the order, not from picking a look per photo. Turn on Iconic Polish before you submit if this listing needs fireplace fire, clean driveways, and clutter removal. After upload, Iconic Studio edits one photo at a time.</p>
+              {queueNote && <p className="mb-4 text-xs font-bold text-gray-600">{queueNote}</p>}
               <label className="mb-4 flex items-start gap-3 rounded-2xl border border-gray-100 bg-white p-4">
                 <input type="checkbox" className="mt-1" checked={iconicPolish} onChange={(event) => setIconicPolish(event.target.checked)} />
                 <span>

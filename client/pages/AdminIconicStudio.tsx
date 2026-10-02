@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,6 +10,7 @@ import {
   postStudioApprove,
   postStudioOrderEdits,
   postStudioReject,
+  drainOrderEditQueue,
 } from "@/lib/studioApi";
 import {
   iconicStudioHref,
@@ -18,6 +19,7 @@ import {
   type StudioAdjustments,
   type StudioFrame,
 } from "@shared/iconicStudio";
+import { assessGalleryRelease, type GalleryReleaseReport } from "@shared/galleryRelease";
 import { planOrderEdits, type OrderEditPlan } from "@shared/orderEditPlan";
 import { toast } from "sonner";
 import { PresentationSharePanel } from "@/components/PresentationSharePanel";
@@ -66,6 +68,9 @@ export default function AdminIconicStudio() {
   const [frames, setFrames] = useState<StudioFrame[]>([]);
   const [address, setAddress] = useState("Iconic Studio");
   const [editPlan, setEditPlan] = useState<OrderEditPlan | null>(null);
+  const [release, setRelease] = useState<GalleryReleaseReport | null>(null);
+  const draining = useRef(false);
+  const drainFailed = useRef(false);
 
   const applySample = useCallback(() => {
     const sample = sampleWorkspace();
@@ -75,6 +80,7 @@ export default function AdminIconicStudio() {
     setFrames(sample.frames);
     setAddress(sample.address);
     setEditPlan(sample.editPlan);
+    setRelease(assessGalleryRelease(sample.editPlan, { jobs: [], finals: [], uploads: [], media: [] }));
   }, []);
 
   const load = useCallback(async () => {
@@ -90,6 +96,7 @@ export default function AdminIconicStudio() {
       setFrames(nextFrames);
       setAddress(data.listing?.address || "Choose a listing");
       setEditPlan(data.listing?.editPlan || null);
+      setRelease(data.listing?.release || null);
       if (!listingId && data.listings?.[0]?.id) {
         navigate(iconicStudioHref(data.listings[0].id), { replace: true });
       }
@@ -105,6 +112,7 @@ export default function AdminIconicStudio() {
         setJobs([]);
         setFrames([]);
         setEditPlan(null);
+        setRelease(null);
       }
     } finally {
       setLoading(false);
@@ -112,8 +120,42 @@ export default function AdminIconicStudio() {
   }, [applySample, getToken, listingId, navigate]);
 
   useEffect(() => {
+    drainFailed.current = false;
+  }, [listingId]);
+
+  useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (loading || demo || !listingId || draining.current || drainFailed.current) return;
+    const pending = jobs.some((job) => (
+      job.listingId === listingId
+      && job.origin === "order"
+      && job.status === "pending"
+      && Boolean(job.sourcePath)
+    ));
+    if (!pending) return;
+    draining.current = true;
+    let cancelled = false;
+    void drainOrderEditQueue(
+      getToken,
+      listingId,
+      (step) => {
+        if (!cancelled && step.ran?.status === "failed") toast.error(step.ran.note);
+      },
+      () => cancelled,
+    ).catch((err) => {
+      drainFailed.current = true;
+      if (!cancelled) toast.error(err instanceof Error ? err.message : "Auto-queue stopped.");
+    }).finally(() => {
+      draining.current = false;
+      if (!cancelled) void load();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [demo, getToken, jobs, listingId, load, loading]);
 
   const onSelectListing = (id: string) => {
     if (!id) {
@@ -143,6 +185,7 @@ export default function AdminIconicStudio() {
           frames={frames}
           demo={demo}
           editPlan={editPlan}
+          release={release}
           onSelectListing={onSelectListing}
           onRunOrder={async () => {
             if (demo) {

@@ -16,6 +16,7 @@ import {
   LIFE_OF_THE_LISTING_CARE_SUMMARY_LABEL,
 } from "@shared/lifeOfTheListingCare";
 import { staffInvoicePath } from "@shared/staffInvoice";
+import type { GalleryReleaseReport } from "@shared/galleryRelease";
 
 // ─── Status system ────────────────────────────────────────────────────────────
 const ORDER_STATUSES = [
@@ -70,6 +71,7 @@ export default function AdminOrderDetail() {
   const [mediaLinkForm, setMediaLinkForm] = React.useState({ url: "", title: "", type: "video" });
   const [showCancel, setShowCancel] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<"details"|"invoice"|"gallery"|"history">("details");
+  const [release, setRelease] = React.useState<GalleryReleaseReport | null>(null);
 
   // Staff for assignment
   const [staff, setStaff] = React.useState<any[]>([]);
@@ -232,6 +234,31 @@ export default function AdminOrderDetail() {
     }
   };
 
+  const galleryId = order?.gallery?.id as string | undefined;
+
+  const loadRelease = React.useCallback(async (id: string) => {
+    if (!user) return;
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/galleries/${id}/release`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return;
+      setRelease(data as GalleryReleaseReport);
+    } catch {
+      setRelease(null);
+    }
+  }, [user]);
+
+  React.useEffect(() => {
+    if (!galleryId) {
+      setRelease(null);
+      return;
+    }
+    void loadRelease(galleryId);
+  }, [galleryId, loadRelease]);
+
   const handleDeliverGallery = async () => {
     const galleryId = order.gallery?.id;
     if (!galleryId) {
@@ -253,6 +280,7 @@ export default function AdminOrderDetail() {
       const result = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(result.error || "Could not deliver gallery.");
       toast.success("Gallery delivery sent.");
+      if (galleryId) void loadRelease(galleryId);
       if (result.deliveryUrl) window.open(result.deliveryUrl, "_blank", "noopener,noreferrer");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not deliver gallery.");
@@ -292,6 +320,7 @@ export default function AdminOrderDetail() {
       if (!res.ok) throw new Error(result.error || "Could not add media link.");
       setMediaLinkForm({ url: "", title: "", type: "video" });
       toast.success("Media link added to this gallery.");
+      if (galleryId) void loadRelease(galleryId);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not add media link.");
     } finally {
@@ -631,6 +660,18 @@ export default function AdminOrderDetail() {
       {activeTab === "gallery" && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <h3 className={`${labelCls} mb-4`}>Gallery & Deliverables</h3>
+          {release && (
+            <div className={`mb-4 rounded-xl border p-4 ${release.complete ? "border-teal-200 bg-teal-50" : "border-amber-200 bg-amber-50"}`}>
+              <p className={`text-sm font-bold ${release.complete ? "text-teal-900" : "text-amber-900"}`}>{release.message}</p>
+              {release.gaps.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {release.gaps.map((gap) => (
+                    <li key={gap.id} className="text-xs text-amber-900">{gap.label}: {gap.satisfied}/{gap.required}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
           <div className="mb-6 grid grid-cols-1 md:grid-cols-[160px_1fr_1fr_auto] gap-2">
             <select value={mediaLinkForm.type} onChange={e => setMediaLinkForm(f => ({ ...f, type: e.target.value }))} className={inputCls}>
               <option value="video">Video</option>
@@ -650,14 +691,14 @@ export default function AdminOrderDetail() {
                 className="flex items-center gap-2 text-[#0d9488] font-bold text-sm">
                 View Gallery <ExternalLink className="w-4 h-4" />
               </a>
-              <Button onClick={handleDeliverGallery} disabled={deliveringGallery} className="mt-4 rounded-xl bg-[#0d9488] hover:bg-[#0f766e] text-white text-xs font-bold">
+              <Button onClick={handleDeliverGallery} disabled={deliveringGallery || release?.complete === false} className="mt-4 rounded-xl bg-[#0d9488] hover:bg-[#0f766e] text-white text-xs font-bold">
                 <Send className="w-3.5 h-3.5 mr-1.5" /> Deliver Gallery
               </Button>
             </div>
           ) : (
             <div className="space-y-4">
               <p className="text-sm text-gray-400">Gallery not created yet. Photos will appear here once uploaded and processed.</p>
-              <Button onClick={handleDeliverGallery} disabled={deliveringGallery || !order.gallery?.id} className="rounded-xl bg-[#0d9488] hover:bg-[#0f766e] text-white text-xs font-bold">
+              <Button onClick={handleDeliverGallery} disabled={deliveringGallery || !order.gallery?.id || release?.complete === false} className="rounded-xl bg-[#0d9488] hover:bg-[#0f766e] text-white text-xs font-bold">
                 <Send className="w-3.5 h-3.5 mr-1.5" /> Deliver Gallery
               </Button>
             </div>

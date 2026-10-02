@@ -66,6 +66,12 @@ describe("Iconic Studio AI route", () => {
       body: JSON.stringify({ listingId: "project1234" }),
     });
     expect(order.status).toBe(401);
+    const tick = await fetch(`${baseUrl}/api/studio/order-queue/tick`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ listingId: "project1234" }),
+    });
+    expect(tick.status).toBe(401);
   });
 
   it("rejects an unknown edit type before touching storage", async () => {
@@ -80,6 +86,20 @@ describe("Iconic Studio AI route", () => {
     const data = await res.json();
     expect(res.status).toBe(400);
     expect(data.error).toMatch(/Unknown AI edit type/);
+  });
+
+  it("rejects a queue tick without a listing id before storage", async () => {
+    const res = await fetch(`${baseUrl}/api/studio/order-queue/tick`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer temp-admin-token",
+      },
+      body: JSON.stringify({ listingId: "short" }),
+    });
+    const data = await res.json();
+    expect(res.status).toBe(400);
+    expect(data.error).toMatch(/listing id/i);
   });
 
   it("returns a job stub path when Firebase Admin is not configured", async () => {

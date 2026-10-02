@@ -3,7 +3,7 @@ import AdminLayout from "@/components/AdminLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "react-router-dom";
 import { fetchAssignedListings, uploadListingFile } from "@/lib/listingUpload";
-import { postIconicPolish } from "@/lib/studioApi";
+import { drainOrderEditQueue, postIconicPolish } from "@/lib/studioApi";
 import { iconicStudioHref } from "@shared/iconicStudio";
 import { Upload, CheckCircle2, XCircle, Image as ImageIcon, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ export default function AdminUpload() {
   const [uploads, setUploads] = React.useState<Record<string, number>>({});
   const [uploading, setUploading] = React.useState(false);
   const [iconicPolish, setIconicPolish] = React.useState(false);
+  const [queueNote, setQueueNote] = React.useState("");
   const [jobsError, setJobsError] = React.useState("");
   const fileRef = React.useRef<HTMLInputElement>(null);
 
@@ -77,6 +78,20 @@ export default function AdminUpload() {
       setFiles([]);
       setUploads({});
       if (fileRef.current) fileRef.current.value = "";
+      setUploading(false);
+      if (user) {
+        setQueueNote("Iconic Studio is editing the order, one photo at a time.");
+        try {
+          await drainOrderEditQueue(() => user.getIdToken(), selectedJob, (step) => {
+            if (step.ran?.status === "failed") setQueueNote(step.ran.note);
+            else if (step.shouldFollowUp) setQueueNote(`Auto-queue running. ${step.remaining} still queued.`);
+            else if (step.waiting) setQueueNote("Waiting on an exterior filename before twilight can run.");
+            else setQueueNote(step.ran ? "Order edits are ready for review in Iconic Studio." : "No photo is waiting to edit.");
+          });
+        } catch (err: unknown) {
+          setQueueNote(err instanceof Error ? err.message : "Auto-queue did not start.");
+        }
+      }
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Some uploads failed. Please try again.");
     } finally {
@@ -203,6 +218,7 @@ export default function AdminUpload() {
         >
           {uploading ? "Uploading..." : `Upload ${files.length > 0 ? files.length + " " : ""}Photo${files.length !== 1 ? "s" : ""}`}
         </Button>
+        {queueNote && <p className="mt-3 text-xs font-bold text-gray-500">{queueNote}</p>}
       </div>
     </AdminLayout>
   );
