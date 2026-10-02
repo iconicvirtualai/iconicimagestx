@@ -2,13 +2,10 @@ import React, { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
-  Star, 
   Zap, 
   Camera, 
   Clock, 
   CheckCircle2, 
-  ArrowRight, 
-  Users, 
   ShieldCheck,
   TrendingUp,
   Award,
@@ -45,9 +42,7 @@ export default function AgentLandingPage() {
 
   const stats = [
     { label: "Listings Shot", value: "1,200+" },
-    { label: "Avg. ROI Increase", value: "34%" },
     { label: "Delivery Speed", value: "Next Day" },
-    { label: "Rating", value: "4.98/5" }
   ];
 
   const benefits = [
@@ -65,19 +60,6 @@ export default function AgentLandingPage() {
       icon: <Camera className="w-6 h-6 text-teal-500" />,
       title: "Premium Equipment",
       description: "We use 4K cinematic cameras and advanced lighting to make every room shine."
-    }
-  ];
-
-  const testimonials = [
-    {
-      name: "Sarah Jenkins",
-      role: "Top 1% Producer, Keller Williams",
-      content: "Iconic Images changed my business. My listings sell 40% faster now that I've switched to their cinematic reels."
-    },
-    {
-      name: "Michael Chen",
-      role: "Luxury Specialist",
-      content: "The quality is unmatched. They don't just take photos; they tell a story that luxury buyers resonate with."
     }
   ];
 
@@ -119,15 +101,6 @@ export default function AgentLandingPage() {
                   >
                     Book Your Iconic Launch
                   </Button>
-                  <div className="flex flex-col justify-center px-4">
-                    <div className="flex items-center gap-1">
-                      <span className="text-xl font-black text-black">4.98</span>
-                      {[1, 2, 3, 4, 5].map((i) => (
-                        <Star key={i} className="w-4 h-4 fill-green-500 text-green-500" />
-                      ))}
-                    </div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Trusted by 500+ Agents</p>
-                  </div>
                 </div>
               </motion.div>
 
@@ -139,17 +112,13 @@ export default function AgentLandingPage() {
               >
                 <div className="aspect-[4/5] rounded-[2rem] overflow-hidden shadow-2xl border-8 border-white">
                   <img 
-                    src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80" 
-                    alt="Luxury Real Estate" 
+                    src="/media/photos/luxury-exterior.jpg" 
+                    alt="Luxury home exterior" 
                     className="w-full h-full object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
                   <div className="absolute bottom-8 left-8 right-8 text-white">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
-                      <span className="text-xs font-bold uppercase tracking-widest">Recently Sold for $2.4M</span>
-                    </div>
-                    <p className="text-2xl font-black uppercase tracking-tight">The Legacy Package Experience</p>
+                    <p className="text-2xl font-black uppercase tracking-tight">Listing media</p>
                   </div>
                 </div>
                 
@@ -216,52 +185,9 @@ export default function AgentLandingPage() {
                 <p className="text-teal-50 font-medium text-lg max-w-xl mx-auto">
                   Refer a colleague and you both get <span className="font-black text-white underline">$50 OFF</span> your next shoot. It's our way of saying thanks for growing the Iconic community.
                 </p>
-                <Button className="bg-white text-teal-600 hover:bg-teal-50 font-black uppercase tracking-widest px-8 py-6 rounded-xl">
-                  Learn More About Referrals
+                <Button asChild className="bg-white text-teal-600 hover:bg-teal-50 font-black uppercase tracking-widest px-8 py-6 rounded-xl">
+                  <Link to="/contact">Ask About Referrals</Link>
                 </Button>
-              </div>
-            </div>
-          </section>
-
-          {/* Social Proof / Testimonials */}
-          <section className="py-24 px-6 overflow-hidden">
-            <div className="max-w-7xl mx-auto">
-              <div className="grid lg:grid-cols-2 gap-16 items-center">
-                <div className="space-y-8">
-                  <h2 className="text-4xl lg:text-6xl font-black uppercase tracking-tighter leading-[0.9]">
-                    Hear it from <span className="accent-text-bordered">The Experts</span>
-                  </h2>
-                  <div className="space-y-6">
-                    {testimonials.map((t, i) => (
-                      <div key={i} className="bg-white p-8 rounded-3xl border border-gray-100 shadow-lg space-y-4">
-                        <div className="flex gap-1">
-                          {[1,2,3,4,5].map(star => <Star key={star} className="w-4 h-4 fill-yellow-400 text-yellow-400" />)}
-                        </div>
-                        <p className="italic text-gray-700 text-lg font-medium">"{t.content}"</p>
-                        <div>
-                          <p className="font-black uppercase tracking-widest text-sm">{t.name}</p>
-                          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{t.role}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                
-                <div className="relative">
-                  <div className="aspect-video rounded-[2rem] bg-gray-100 overflow-hidden shadow-2xl flex items-center justify-center group cursor-pointer">
-                    <img 
-                      src="https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&q=80" 
-                      alt="Video Testimonial" 
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-all flex items-center justify-center">
-                      <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-2xl transition-transform group-hover:scale-110">
-                        <div className="w-0 h-0 border-t-[10px] border-t-transparent border-l-[18px] border-l-black border-b-[10px] border-b-transparent ml-1" />
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-center mt-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Watch: How 1 Iconic Shoot Sold a House in 3 Days</p>
-                </div>
               </div>
             </div>
           </section>
@@ -332,9 +258,6 @@ export default function AgentLandingPage() {
             <div className="max-w-5xl mx-auto space-y-16">
               <div className="text-center space-y-4">
                 <h2 className="text-4xl lg:text-6xl font-black uppercase tracking-tighter">Secure Your <span className="accent-text-bordered">Iconic Launch</span></h2>
-                <p className="text-gray-500 font-bold uppercase tracking-widest text-sm italic">
-                  "The best investment I make in every listing." — Top Agent
-                </p>
               </div>
               
               <div className="bg-[#fafafa] rounded-[3rem] p-8 lg:p-12 shadow-2xl border border-gray-100">

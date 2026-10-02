@@ -11,7 +11,6 @@ import SnapReelsStrip from "@/components/SnapReelsStrip";
 import RaisingTheStandard from "@/components/RaisingTheStandard";
 import ThisIsOurMarket from "@/components/ThisIsOurMarket";
 import TheNetwork from "@/components/TheNetwork";
-import TestimonialsSection from "@/components/TestimonialsSection";
 import FAQSection from "@/components/FAQSection";
 import PartnershipCTA from "@/components/PartnershipCTA";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
@@ -41,7 +40,6 @@ export default function Index() {
       )}
       <SnapReelsStrip />
       <FeaturesSection />
-      <TestimonialsSection />
       <FAQSection />
       <PartnershipCTA />
     </Layout>

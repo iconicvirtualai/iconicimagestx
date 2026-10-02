@@ -2,7 +2,7 @@ import { useState } from "react";
 import Layout from "@/components/Layout";
 import ChatWidget from "@/components/ChatWidget";
 import { Button } from "@/components/ui/button";
-import { Quote, MessageCircle, ArrowRight, Phone } from "lucide-react";
+import { MessageCircle, ArrowRight, Phone } from "lucide-react";
 import { toast } from "sonner";
 
 interface FormData {
@@ -80,7 +80,7 @@ export default function Contact() {
           <div className="container mx-auto px-4 max-w-6xl">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
 
-              {/* Left Side: Content & Testimonial */}
+              {/* Left Side */}
               <div className="space-y-10">
                 <div>
                   <div className="font-bold tracking-wider text-xs uppercase mb-5 accent-text-bordered">
@@ -130,28 +130,6 @@ export default function Contact() {
                   </div>
                 </div>
 
-                <div className="pt-10 border-t border-gray-100">
-                  <div className="flex gap-4 mb-6">
-                    <div className="bg-black p-1.5 rounded-lg">
-                      <Quote className="w-4 h-4 text-white fill-white" />
-                    </div>
-                  </div>
-                  <blockquote className="text-lg text-gray-700 leading-relaxed italic mb-6">
-                    "It's quick, cost-effective, and perfect for generating professional-quality videos.
-                    I can create multiple videos in minutes, maintaining a strong online presence."
-                  </blockquote>
-                  <div className="flex items-center gap-4">
-                    <img
-                      src="https://i.pravatar.cc/150?u=bryce"
-                      alt="Bryce Perez"
-                      className="w-14 h-14 rounded-full border-2 border-white shadow-sm"
-                    />
-                    <div>
-                      <h4 className="font-bold text-black text-base">Bryce Perez</h4>
-                      <p className="text-gray-400 text-xs">Founder, RE Media Company</p>
-                    </div>
-                  </div>
-                </div>
               </div>
 
               {/* Right Side: Contact Form */}
