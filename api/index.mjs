@@ -139,7 +139,7 @@ function clientNotifyBlockReason(env = process.env) {
   if (env.CLIENT_COMMS_ZONE === "RED") return "CLIENT_COMMS_ZONE=RED";
   return "CLIENT_NOTIFY_LIVE is not exactly true";
 }
-const db$j = () => admin.firestore();
+const db$k = () => admin.firestore();
 class EmailNotConfiguredError extends Error {
   code = "email_not_configured";
   constructor() {
@@ -176,7 +176,7 @@ async function sendEmail(options) {
   let htmlBody = getFallbackTemplate(template, variables);
   try {
     if (admin.apps.length) {
-      const templateDoc = await db$j().collection("emailTemplates").where("category", "==", template).where("isActive", "==", true).limit(1).get();
+      const templateDoc = await db$k().collection("emailTemplates").where("category", "==", template).where("isActive", "==", true).limit(1).get();
       if (!templateDoc.empty) {
         const tmpl = templateDoc.docs[0].data();
         if (!subjectOverride && typeof tmpl.subject === "string" && tmpl.subject.trim()) {
@@ -1068,7 +1068,7 @@ function planInvoiceLink(anchor) {
 }
 const CLOSED_STATUSES = /* @__PURE__ */ new Set(["void", "voided", "cancelled", "canceled"]);
 const SETTLED_STATUSES = /* @__PURE__ */ new Set(["paid", "comped"]);
-function statusOf(invoice) {
+function statusOf$1(invoice) {
   return String(invoice?.status || "").toLowerCase();
 }
 function numeric(value) {
@@ -1086,7 +1086,7 @@ function invoiceBalance(invoice) {
 }
 function invoiceAllowsDownload(invoice) {
   if (!invoice) return false;
-  const status = statusOf(invoice);
+  const status = statusOf$1(invoice);
   if (CLOSED_STATUSES.has(status)) return false;
   if (SETTLED_STATUSES.has(status)) return true;
   const { total, amountPaid, amountDue } = invoiceBalance(invoice);
@@ -1097,7 +1097,7 @@ function invoiceAllowsDownload(invoice) {
 }
 function amountStillDue(invoice) {
   if (!invoice) return 0;
-  const status = statusOf(invoice);
+  const status = statusOf$1(invoice);
   if (SETTLED_STATUSES.has(status) || CLOSED_STATUSES.has(status)) return 0;
   const { total, amountPaid, amountDue } = invoiceBalance(invoice);
   const computedDue = Math.max(0, total - amountPaid);
@@ -1438,12 +1438,12 @@ async function syncSquareInvoice(invoice, deps) {
     return { ok: false, error: err instanceof Error ? err.message : "Square invoice sync failed" };
   }
 }
-const db$i = () => admin.firestore();
+const db$j = () => admin.firestore();
 function squareInvoiceSynced(result) {
   return result.ok === true && result.skipped === false;
 }
 async function attachSquareInvoiceAfterBooking(invoiceId) {
-  const ref = db$i().collection("invoices").doc(invoiceId);
+  const ref = db$j().collection("invoices").doc(invoiceId);
   const snap = await ref.get();
   if (!snap.exists) {
     console.error("[Square] Invoice sync skipped: invoice missing", invoiceId);
@@ -1481,7 +1481,7 @@ async function attachSquareInvoiceAfterBooking(invoiceId) {
   return result;
 }
 const router$h = Router();
-const db$h = () => admin.firestore();
+const db$i = () => admin.firestore();
 function appUrl$2() {
   return process.env.APP_URL || "https://iconicimagestx.com";
 }
@@ -1596,7 +1596,7 @@ router$h.post("/", async (req, res) => {
       submittedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    const docRef = await db$h().collection("orderRequests").add(orderRequest);
+    const docRef = await db$i().collection("orderRequests").add(orderRequest);
     let invoiceId = null;
     try {
       const created = await createBookingInvoiceDraft({
@@ -1700,7 +1700,7 @@ router$h.post("/", async (req, res) => {
 });
 router$h.get("/", requireCoordinator, async (_req, res) => {
   try {
-    const snapshot = await db$h().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
+    const snapshot = await db$i().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
     const requests = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data()
@@ -1713,7 +1713,7 @@ router$h.get("/", requireCoordinator, async (_req, res) => {
 });
 router$h.get("/:id", requireCoordinator, async (req, res) => {
   try {
-    const doc = await db$h().collection("orderRequests").doc(req.params.id).get();
+    const doc = await db$i().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) {
       return res.status(404).json({ error: "Booking request not found." });
     }
@@ -1726,7 +1726,7 @@ router$h.get("/:id", requireCoordinator, async (req, res) => {
 router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
   try {
     const { assignedPhotographerId, assignedPhotographerName, scheduledDate, scheduledTime, internalNotes } = req.body;
-    const requestDoc = await db$h().collection("orderRequests").doc(req.params.id).get();
+    const requestDoc = await db$i().collection("orderRequests").doc(req.params.id).get();
     if (!requestDoc.exists) {
       return res.status(404).json({ error: "Booking request not found." });
     }
@@ -1766,11 +1766,11 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     }
     let photographer = null;
     if (assignedPhotographerId) {
-      const staffDoc = await db$h().collection("staff").doc(assignedPhotographerId).get();
+      const staffDoc = await db$i().collection("staff").doc(assignedPhotographerId).get();
       photographer = staffDoc.exists ? staffDoc.data() : null;
     }
     let clientId;
-    const existingClients = await db$h().collection("clients").where("email", "==", requestEmail).limit(1).get();
+    const existingClients = await db$i().collection("clients").where("email", "==", requestEmail).limit(1).get();
     if (!existingClients.empty) {
       clientId = existingClients.docs[0].id;
       await existingClients.docs[0].ref.update({
@@ -1779,7 +1779,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
     } else {
-      const clientRef = await db$h().collection("clients").add({
+      const clientRef = await db$i().collection("clients").add({
         firstName: requestFirstName,
         lastName: requestLastName,
         email: requestEmail,
@@ -1826,8 +1826,8 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    const orderRef = await db$h().collection("orders").add(orderData);
-    const appointmentRef = await db$h().collection("appointments").add({
+    const orderRef = await db$i().collection("orders").add(orderData);
+    const appointmentRef = await db$i().collection("appointments").add({
       orderId: orderRef.id,
       clientId,
       clientName: requestClientName,
@@ -1844,7 +1844,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    const galleryRef = await db$h().collection("galleries").add({
+    const galleryRef = await db$i().collection("galleries").add({
       orderId: orderRef.id,
       clientId,
       clientName: requestClientName,
@@ -1872,7 +1872,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       notes: internalNotes || request.vibeNote || ""
     }).catch(async (err) => {
       console.error("[Bookings] Calendar event creation failed:", err);
-      await db$h().collection("agentLogs").add({
+      await db$i().collection("agentLogs").add({
         agent: "nora",
         action: "Calendar event failed",
         summary: `Google Calendar event was not created for order ${orderRef.id}`,
@@ -1906,7 +1906,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     const listingId = existingInvoiceId(request.listingId);
     let invoiceId = linkedInvoiceId;
     if (linkedInvoiceId) {
-      const existingInvoice = await db$h().collection("invoices").doc(linkedInvoiceId).get();
+      const existingInvoice = await db$i().collection("invoices").doc(linkedInvoiceId).get();
       if (existingInvoice.exists) {
         await existingInvoice.ref.update({
           orderId: orderRef.id,
@@ -1921,7 +1921,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         console.error(`[Bookings] Confirm kept invoiceId ${linkedInvoiceId} but the invoice doc is missing. Not creating a second invoice.`);
       }
     } else {
-      const invoiceRef = db$h().collection("invoices").doc();
+      const invoiceRef = db$i().collection("invoices").doc();
       const draft = buildBookingInvoiceDraft({
         lineItems: requestLineItems,
         total: requestTotal,
@@ -2002,7 +2002,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
 router$h.patch("/:id/decline", requireCoordinator, async (req, res) => {
   try {
     const { reason } = req.body;
-    const doc = await db$h().collection("orderRequests").doc(req.params.id).get();
+    const doc = await db$i().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Not found." });
     await doc.ref.update({
       status: "declined",
@@ -2023,23 +2023,23 @@ async function stampDurableLinks(input) {
     orderInvoiceId: input.invoiceId
   });
   const now = admin.firestore.FieldValue.serverTimestamp();
-  const invoiceRef = db$h().collection("invoices").doc(plan.createId);
+  const invoiceRef = db$i().collection("invoices").doc(plan.createId);
   const invoiceSnap = await invoiceRef.get();
   if (invoiceSnap.exists && Object.keys(plan.invoiceFields).length > 0) {
     await invoiceRef.update({ ...plan.invoiceFields, updatedAt: now });
   }
   if (plan.orderFields) {
-    await db$h().collection("orders").doc(input.orderId).update({ ...plan.orderFields, updatedAt: now });
+    await db$i().collection("orders").doc(input.orderId).update({ ...plan.orderFields, updatedAt: now });
   }
   if (input.listingId && plan.listingFields) {
-    await db$h().collection("listings").doc(input.listingId).update({ ...plan.listingFields, updatedAt: now });
+    await db$i().collection("listings").doc(input.listingId).update({ ...plan.listingFields, updatedAt: now });
   }
 }
 async function linkClientIdByEmail(email) {
   try {
     const normalized = normalizeEmail(email);
     if (!normalized) return null;
-    const snap = await db$h().collection("clients").where("email", "==", normalized).limit(1).get();
+    const snap = await db$i().collection("clients").where("email", "==", normalized).limit(1).get();
     return snap.empty ? null : snap.docs[0].id;
   } catch (err) {
     console.error("[Bookings] Client lookup for invoice failed:", err);
@@ -2059,7 +2059,7 @@ async function createBookingInvoiceDraft(input) {
     promoCode: input.promoCode,
     promoDiscount: input.promoDiscount
   });
-  const invoiceRef = db$h().collection("invoices").doc();
+  const invoiceRef = db$i().collection("invoices").doc();
   await invoiceRef.set({
     ...draft,
     invoiceNumber: await generateInvoiceNumber(),
@@ -2071,7 +2071,7 @@ async function createBookingInvoiceDraft(input) {
 }
 async function generateInvoiceNumber() {
   const year = (/* @__PURE__ */ new Date()).getFullYear();
-  const snapshot = await db$h().collection("invoices").where("invoiceNumber", ">=", `INV-${year}-`).orderBy("invoiceNumber", "desc").limit(1).get().catch((err) => {
+  const snapshot = await db$i().collection("invoices").where("invoiceNumber", ">=", `INV-${year}-`).orderBy("invoiceNumber", "desc").limit(1).get().catch((err) => {
     console.error("[Bookings] Invoice number lookup failed:", err);
     return null;
   });
@@ -2083,11 +2083,11 @@ async function generateInvoiceNumber() {
   return `INV-${year}-${String(num).padStart(4, "0")}`;
 }
 const router$g = Router();
-const db$g = () => admin.firestore();
+const db$h = () => admin.firestore();
 router$g.get("/", requireStaff, async (req, res) => {
   try {
     const { status, photographerId, limit = "50", startAfter } = req.query;
-    let query = db$g().collection("orders").orderBy("createdAt", "desc");
+    let query = db$h().collection("orders").orderBy("createdAt", "desc");
     if (status) query = query.where("status", "==", status);
     if (photographerId) {
       query = query.where("assignedPhotographerId", "==", photographerId);
@@ -2095,7 +2095,7 @@ router$g.get("/", requireStaff, async (req, res) => {
     const limitNum = Math.min(Number(limit), 200);
     query = query.limit(limitNum);
     if (startAfter) {
-      const cursorDoc = await db$g().collection("orders").doc(startAfter).get();
+      const cursorDoc = await db$h().collection("orders").doc(startAfter).get();
       if (cursorDoc.exists) {
         query = query.startAfter(cursorDoc);
       }
@@ -2118,10 +2118,10 @@ router$g.get("/dashboard", requireStaff, async (_req, res) => {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const [allOrders, todayOrders, monthTransactions, pendingRequests] = await Promise.all([
-      db$g().collection("orders").get(),
-      db$g().collection("orders").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(todayStart)).get(),
-      db$g().collection("transactions").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(monthStart)).where("status", "==", "completed").get(),
-      db$g().collection("orderRequests").where("status", "==", "new").get()
+      db$h().collection("orders").get(),
+      db$h().collection("orders").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(todayStart)).get(),
+      db$h().collection("transactions").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(monthStart)).where("status", "==", "completed").get(),
+      db$h().collection("orderRequests").where("status", "==", "new").get()
     ]);
     const statusCounts = {};
     allOrders.docs.forEach((d) => {
@@ -2147,23 +2147,23 @@ router$g.get("/dashboard", requireStaff, async (_req, res) => {
 });
 router$g.get("/:id", requireStaff, async (req, res) => {
   try {
-    const orderDoc = await db$g().collection("orders").doc(req.params.id).get();
+    const orderDoc = await db$h().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
     const order = { id: orderDoc.id, ...orderDoc.data() };
     const [gallery, invoice, appointment, messages] = await Promise.all([
-      db$g().collection("galleries").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
+      db$h().collection("galleries").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
         console.error("[Orders] Gallery lookup failed:", err);
         return null;
       }),
-      db$g().collection("invoices").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
+      db$h().collection("invoices").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
         console.error("[Orders] Invoice lookup failed:", err);
         return null;
       }),
-      db$g().collection("appointments").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
+      db$h().collection("appointments").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
         console.error("[Orders] Appointment lookup failed:", err);
         return null;
       }),
-      db$g().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "desc").limit(20).get().catch((err) => {
+      db$h().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "desc").limit(20).get().catch((err) => {
         console.error("[Orders] Messages lookup failed:", err);
         return null;
       })
@@ -2202,7 +2202,7 @@ router$g.patch("/:id", requireCoordinator, async (req, res) => {
         new Date(updates.scheduledDate)
       );
     }
-    await db$g().collection("orders").doc(req.params.id).update(updates);
+    await db$h().collection("orders").doc(req.params.id).update(updates);
     return res.json({ success: true });
   } catch (err) {
     console.error("[Orders] Update error:", err);
@@ -2223,7 +2223,7 @@ const VALID_TRANSITIONS = {
 router$g.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status, note } = req.body;
-    const orderDoc = await db$g().collection("orders").doc(req.params.id).get();
+    const orderDoc = await db$h().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
     const currentStatus = orderDoc.data().status;
     const validNext = VALID_TRANSITIONS[currentStatus] || [];
@@ -2241,14 +2241,14 @@ router$g.patch("/:id/status", requireCoordinator, async (req, res) => {
       updates.completedAt = admin.firestore.FieldValue.serverTimestamp();
     }
     await orderDoc.ref.update(updates);
-    const apptSnapshot = await db$g().collection("appointments").where("orderId", "==", req.params.id).limit(1).get();
+    const apptSnapshot = await db$h().collection("appointments").where("orderId", "==", req.params.id).limit(1).get();
     if (!apptSnapshot.empty) {
       const apptStatus = status === "in_progress" ? "in_progress" : status === "shot_complete" || status === "editing" ? "completed" : status === "cancelled" ? "cancelled" : void 0;
       if (apptStatus) {
         await apptSnapshot.docs[0].ref.update({ status: apptStatus });
       }
     }
-    await db$g().collection("agentLogs").add({
+    await db$h().collection("agentLogs").add({
       agent: "nora",
       action: `Order status changed: ${currentStatus} → ${status}`,
       summary: `Order ${req.params.id} transitioned to ${status}`,
@@ -2269,9 +2269,9 @@ router$g.patch("/:id/status", requireCoordinator, async (req, res) => {
 router$g.get("/:id/timeline", requireStaff, async (req, res) => {
   try {
     const [messages, editRequests, agentLogs] = await Promise.all([
-      db$g().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
-      db$g().collection("editRequests").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
-      db$g().collection("agentLogs").where("relatedId", "==", req.params.id).orderBy("createdAt", "asc").get()
+      db$h().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
+      db$h().collection("editRequests").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
+      db$h().collection("agentLogs").where("relatedId", "==", req.params.id).orderBy("createdAt", "asc").get()
     ]);
     const timeline = [
       ...messages.docs.map((d) => ({ type: "message", ...d.data(), id: d.id })),
@@ -2288,6 +2288,564 @@ router$g.get("/:id/timeline", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch timeline." });
   }
 });
+const AI_EDIT_PRESETS = [
+  {
+    id: "virtual_stage",
+    label: "Virtual stage",
+    prompt: "Virtually stage this room with photoreal furniture, a rug, and simple decor scaled to the space. Leave the walls, windows, floors, ceiling, and camera angle unchanged."
+  },
+  {
+    id: "remove_clutter",
+    label: "Remove clutter",
+    prompt: "Remove clutter, personal items, cords, and small mess. Rebuild only the cleared floor and surfaces so they look clean. Keep the furniture that belongs, plus the architecture and lighting."
+  },
+  {
+    id: "remove_cars",
+    label: "Remove cars",
+    prompt: "Remove vehicles from the driveway, garage apron, and street. Rebuild the pavement, curb, and landscaping so the empty space looks natural."
+  },
+  {
+    id: "add_fire",
+    label: "Add fire",
+    prompt: "Add a realistic burning fire inside the existing fireplace only. Do not move the fireplace or change the rest of the room."
+  },
+  {
+    id: "add_tv",
+    label: "Add TV",
+    prompt: "Add one realistic flat-screen television on the main wall, sized to the room, with a dark screen. Do not change the wall, furniture, or camera."
+  },
+  {
+    id: "add_people",
+    label: "Add people",
+    prompt: "Add two or three casually dressed adults, small in the frame, who look natural in a listing photo and do not block the room. Keep faces generic and the architecture unchanged."
+  },
+  {
+    id: "twilight",
+    label: "Twilight",
+    prompt: "Convert this exterior listing photo into a photoreal twilight. Turn on warm interior and landscape lights. Keep the architecture and camera angle. Use a natural evening sky."
+  },
+  {
+    id: "free_text",
+    label: "AI edit",
+    prompt: ""
+  }
+];
+const AI_EDIT_MISSING_KEY_NOTE = "OPENAI_API_KEY is not configured on the server, so this photo was not edited.";
+const AI_EDIT_TIMEOUT_NOTE = "OpenAI took too long to edit this photo. The job was marked failed. Queue it again.";
+const AI_EDIT_READY_NOTE = "OpenAI edit is ready for review.";
+const RAW_EXT$1 = /\.(cr2|cr3|nef|nrw|arw|srf|sr2|dng|raw|rw2|orf|raf|pef|3fr|fff|iiq)$/i;
+const PREVIEW_EXT = /\.(jpe?g|png|webp|gif)$/i;
+function ingestJobId(listingId) {
+  return `ingest_${listingId}`;
+}
+function shouldBumpStudioQueue(storagePath) {
+  return storagePath.includes("/raw/");
+}
+function isRawStudioFile(name, contentType) {
+  if (RAW_EXT$1.test(name)) return true;
+  const type = String(contentType || "").toLowerCase();
+  return type.includes("raw") || type.includes("dng") || type.includes("canon-cr") || type.includes("nikon");
+}
+function isStudioPreviewable(name, contentType) {
+  if (isRawStudioFile(name, contentType)) return false;
+  const type = String(contentType || "").toLowerCase();
+  if (type === "image/jpeg" || type === "image/png" || type === "image/webp" || type === "image/gif") return true;
+  return PREVIEW_EXT.test(name);
+}
+function finalsObjectPath(listingId, fileName, now = Date.now()) {
+  return `listings/${listingId}/finals/${now}_${safeStorageFileName(fileName)}`;
+}
+function listingAddressLabel(listing) {
+  const source = listing?.address ?? listing?.shootLocation;
+  if (!source) return "Untitled listing";
+  if (typeof source === "string" && source.trim()) return source.trim();
+  if (typeof source === "object") {
+    const row = source;
+    const parts = [row.street, row.city, row.state, row.zip].map((part) => String(part || "").trim()).filter(Boolean);
+    if (parts.length) return parts.join(", ");
+  }
+  return "Untitled listing";
+}
+function clamp(value, min, max) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(max, Math.max(min, value));
+}
+function clampAdjustments(input) {
+  const source = input || {};
+  const rotate = source.rotate === 90 || source.rotate === 180 || source.rotate === 270 ? source.rotate : 0;
+  const crop = source.crop === "1:1" || source.crop === "4:5" || source.crop === "16:9" ? source.crop : "original";
+  return {
+    exposure: clamp(Number(source.exposure), -100, 100),
+    shadows: clamp(Number(source.shadows), -100, 100),
+    saturation: clamp(Number(source.saturation), -100, 100),
+    sharpness: clamp(Number(source.sharpness), 0, 100),
+    tint: clamp(Number(source.tint), -100, 100),
+    rotate,
+    crop
+  };
+}
+function presetPrompt(type) {
+  return AI_EDIT_PRESETS.find((preset) => preset.id === type)?.prompt || "";
+}
+function realEstateEditPrompt(userPrompt) {
+  const request = userPrompt.trim().replace(/\s+/g, " ");
+  return [
+    "Photoreal real-estate listing photo.",
+    "Edit only the supplied photograph.",
+    "Keep the same camera angle, architecture, windows, doors, flooring, and lighting.",
+    "Do not add text, logos, watermarks, borders, or an illustrated style.",
+    `Requested change: ${request}`
+  ].join(" ");
+}
+function listingPhotoEditSize(width, height) {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return "1536x1024";
+  }
+  const ratio = width / height;
+  if (ratio >= 1.15) return "1536x1024";
+  if (ratio <= 0.87) return "1024x1536";
+  return "1024x1024";
+}
+function resolveStudioApprovePath(job, fallbackPath = "") {
+  const fallback = String(fallbackPath || "").trim();
+  if (job.kind === "ai_edit") {
+    if (job.status === "failed") {
+      return { ok: false, error: "This AI edit failed. Queue it again before approving." };
+    }
+    if (job.status === "rejected") {
+      return { ok: false, error: "This AI edit was rejected." };
+    }
+    const resultPath2 = typeof job.resultPath === "string" ? job.resultPath.trim() : "";
+    if (job.placeholder === true || !resultPath2) {
+      return { ok: false, error: "This AI edit has no finished image to approve." };
+    }
+    return { ok: true, sourcePath: resultPath2 };
+  }
+  const resultPath = typeof job.resultPath === "string" ? job.resultPath.trim() : "";
+  const sourcePath = typeof job.sourcePath === "string" ? job.sourcePath.trim() : "";
+  const path2 = resultPath || sourcePath || fallback;
+  if (!path2) return { ok: false, error: "sourcePath is required." };
+  return { ok: true, sourcePath: path2 };
+}
+function parseAiEditRequest(body) {
+  if (!body || typeof body !== "object") return { ok: false, error: "Request body is required." };
+  const row = body;
+  const listingId = String(row.listingId || "").trim();
+  if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
+    return { ok: false, error: "A valid listing id is required." };
+  }
+  const type = String(row.type || "");
+  if (!AI_EDIT_PRESETS.some((preset) => preset.id === type)) {
+    return { ok: false, error: "Unknown AI edit type." };
+  }
+  const fallback = presetPrompt(type);
+  const prompt = String(row.prompt ?? fallback).trim().slice(0, 2e3);
+  if (type === "free_text" && prompt.length < 3) {
+    return { ok: false, error: "Describe the AI edit." };
+  }
+  const imageUrl = String(row.imageUrl || "").trim();
+  if (!/^https:\/\/.+/i.test(imageUrl)) {
+    return { ok: false, error: "imageUrl must be an https URL." };
+  }
+  const sourcePath = String(row.sourcePath || "").trim();
+  if (!isListingStoragePath(listingId, sourcePath)) {
+    return { ok: false, error: "sourcePath must be a photo, raw, or finals file on this listing." };
+  }
+  return {
+    ok: true,
+    value: {
+      listingId,
+      type,
+      prompt: prompt || fallback,
+      imageUrl,
+      sourcePath
+    }
+  };
+}
+function galleryStatusAfterStudioAdd(current) {
+  if (!current || current === "pending_upload" || current === "raw_uploaded" || current === "editing") {
+    return "ready_for_review";
+  }
+  return current;
+}
+function frameFromListingImage(raw, index = 0) {
+  if (!raw || typeof raw !== "object") return null;
+  const item = raw;
+  const path2 = typeof item.path === "string" ? item.path : "";
+  const url = typeof item.url === "string" ? item.url : "";
+  if (!path2 && !url) return null;
+  const name = typeof item.name === "string" && item.name.trim() ? item.name.trim() : path2.split("/").pop() || `photo-${index + 1}`;
+  const contentType = typeof item.contentType === "string" ? item.contentType : "";
+  return {
+    id: typeof item.id === "string" && item.id.trim() ? item.id.trim() : path2 || `idx-${index}`,
+    name,
+    path: path2,
+    url,
+    contentType,
+    raw: isRawStudioFile(name, contentType),
+    previewable: isStudioPreviewable(name, contentType),
+    studioApproved: item.studioApproved === true || path2.includes("/finals/"),
+    studioRole: typeof item.studioRole === "string" ? item.studioRole : void 0
+  };
+}
+const RELEASED_GALLERY_STATUSES = ["delivered", "approved"];
+const ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
+function invalidGalleryLinkMessage(id) {
+  if (ID_PATTERN.test(id)) return null;
+  return `“${id}” is not a gallery or project id. Shared links use the id from Copy Studio Link (/studio/{project id}) or the delivery URL (/gallery/{gallery id}).`;
+}
+function statusOf(doc) {
+  return typeof doc?.status === "string" ? doc.status : "";
+}
+function isReleased(doc) {
+  return RELEASED_GALLERY_STATUSES.includes(statusOf(doc));
+}
+function text$2(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function httpUrl(value) {
+  const url = text$2(value);
+  return url.startsWith("https://") || url.startsWith("http://") ? url : "";
+}
+function galleryResult(doc, via) {
+  const status = statusOf(doc) || "unknown";
+  const released = isReleased(doc);
+  const prefix = via ? `${via} ` : "";
+  const staffNote = released ? `${prefix}Gallery ${doc.id} is ${status}. Open /gallery/${doc.id}.` : `${prefix}Gallery ${doc.id} exists, but its status is “${status}”. Photos stay hidden until a coordinator sets it to delivered or approved. This is not a missing link. The delivery URL is /gallery/${doc.id}.`;
+  return {
+    ok: true,
+    kind: "gallery",
+    galleryId: doc.id,
+    released,
+    status,
+    staffNote
+  };
+}
+function addressOf(listing) {
+  const property = text$2(listing.propertyAddress);
+  if (property) return property;
+  const labeled = listingAddressLabel({
+    address: listing.address,
+    shootLocation: listing.shootLocation
+  });
+  return labeled === "Untitled listing" ? "" : labeled;
+}
+function servicesOf(listing) {
+  if (!Array.isArray(listing.services)) return [];
+  return listing.services.map((item) => {
+    if (typeof item === "string") return item.trim();
+    if (item && typeof item === "object" && typeof item.name === "string") {
+      return item.name.trim();
+    }
+    return "";
+  }).filter(Boolean).slice(0, 24);
+}
+function publicImages(listing) {
+  if (!Array.isArray(listing.images)) return [];
+  const images = [];
+  listing.images.forEach((item, index) => {
+    const frame = frameFromListingImage(item, index);
+    const url = httpUrl(frame?.url);
+    if (!frame || frame.raw || !url) return;
+    if (frame.path.includes("/raw/")) return;
+    images.push({ url, name: frame.name });
+  });
+  return images.slice(0, 200);
+}
+function publicVideos(listing) {
+  if (!Array.isArray(listing.videos)) return [];
+  const videos = [];
+  for (const item of listing.videos) {
+    if (!item || typeof item !== "object") continue;
+    const row = item;
+    const url = httpUrl(row.url);
+    if (!url || url.includes("/raw/")) continue;
+    videos.push({ url, name: text$2(row.name) || "Video" });
+  }
+  return videos.slice(0, 40);
+}
+function publicRevisions(listing) {
+  if (!Array.isArray(listing.revisions)) return [];
+  return listing.revisions.slice(0, 40).map((item, index) => {
+    const row = item && typeof item === "object" ? item : {};
+    const photoIndex = typeof row.photoIndex === "number" ? row.photoIndex : null;
+    return {
+      id: text$2(row.id) || `revision-${index + 1}`,
+      type: text$2(row.type) || "gallery",
+      photoIndex,
+      description: text$2(row.description),
+      status: text$2(row.status) || "pending",
+      createdAt: text$2(row.createdAt)
+    };
+  });
+}
+function invoiceOf(listing) {
+  const nested = listing.invoice;
+  if (nested && typeof nested === "object" && typeof nested.status === "string") {
+    return { status: nested.status };
+  }
+  const status = text$2(listing.invoiceStatus);
+  return status ? { status } : null;
+}
+function pickReleasedGallery(listing, related) {
+  const preferred = text$2(listing.galleryId) || text$2(listing.playtestGalleryId);
+  const released = related.filter((doc) => isReleased(doc));
+  if (preferred) {
+    const match = released.find((doc) => doc.id === preferred);
+    if (match) return match;
+  }
+  return released[0] || null;
+}
+function listingBlock(listing, related) {
+  const linked = related.slice(0, 3).map((doc) => `${doc.id} (${statusOf(doc) || "unknown"})`).join(", ");
+  const linkedSentence = linked ? ` Linked gallery: ${linked}.` : " No gallery document is linked to this project.";
+  if (listing.lockStudio === true) {
+    return {
+      ok: false,
+      httpStatus: 403,
+      code: "studio_locked",
+      message: `Project ${listing.id} exists in listings, but Lock Studio is on. Turn Lock Studio off on the project file before /studio/${listing.id} will open. This id is not missing.${linkedSentence}`
+    };
+  }
+  if (listing.studioEnabled === false) {
+    return {
+      ok: false,
+      httpStatus: 403,
+      code: "studio_disabled",
+      message: `Project ${listing.id} exists in listings, but Client Studio is turned off, so /studio/${listing.id} stays closed. Turn Client Studio on from the project file.${linkedSentence}`
+    };
+  }
+  return null;
+}
+function listingResult(listing, related) {
+  const blocked = listingBlock(listing, related);
+  if (blocked) return blocked;
+  const released = pickReleasedGallery(listing, related);
+  if (released) {
+    return {
+      ok: true,
+      kind: "listing",
+      openGalleryId: released.id,
+      project: publicProject(listing, related, null)
+    };
+  }
+  const pending = related.find((doc) => !isReleased(doc));
+  const notice = pending ? "Photos on the delivery gallery are not public yet. This page is the project studio." : null;
+  return {
+    ok: true,
+    kind: "listing",
+    openGalleryId: null,
+    project: publicProject(listing, related, notice)
+  };
+}
+function publicProject(listing, _related, notice) {
+  return {
+    id: listing.id,
+    address: addressOf(listing),
+    clientName: text$2(listing.clientName),
+    services: servicesOf(listing),
+    images: publicImages(listing),
+    videos: publicVideos(listing),
+    tourUrl: httpUrl(listing.tourUrl),
+    revisions: publicRevisions(listing),
+    lockDownloads: listing.lockDownloads === true,
+    requirePayment: listing.requirePayment === true,
+    invoice: invoiceOf(listing),
+    notice,
+    view: "public"
+  };
+}
+function pointerMessage(id, via, galleryId, listingId) {
+  const target = galleryId ? `gallery ${galleryId}` : listingId ? `project ${listingId}` : "a linked record";
+  return `${id} is ${via}, not a gallery link. It points at ${target}, and that document does not exist. Copy Studio Link from the project file, or use the delivery URL /gallery/{gallery id}.`;
+}
+function decideClientGalleryLink(input) {
+  const invalid = invalidGalleryLinkMessage(input.id);
+  if (invalid) {
+    return { ok: false, httpStatus: 400, code: "invalid_id", message: invalid };
+  }
+  if (input.gallery) return galleryResult(input.gallery);
+  if (input.listing) return listingResult(input.listing, input.relatedGalleries);
+  const releasedRelated = input.relatedGalleries.find((doc) => isReleased(doc));
+  if (releasedRelated) {
+    return galleryResult(releasedRelated, `No listings/${input.id} document. `);
+  }
+  if (input.relatedGalleries[0]) {
+    return galleryResult(
+      input.relatedGalleries[0],
+      `No listings/${input.id} document. A gallery is linked to that project id. `
+    );
+  }
+  const orderGallery = input.galleriesByOrderId.find((doc) => isReleased(doc)) || input.galleriesByOrderId[0] || null;
+  if (orderGallery) {
+    return galleryResult(orderGallery, `${input.id} is an order id. `);
+  }
+  if (input.pointedGallery) {
+    return galleryResult(input.pointedGallery, `${input.id} points at this gallery. `);
+  }
+  if (input.pointedListing) return listingResult(input.pointedListing, input.relatedGalleries);
+  if (input.order) {
+    const galleryId = text$2(input.order.galleryId);
+    const listingId = text$2(input.order.listingId);
+    if (galleryId || listingId) {
+      return {
+        ok: false,
+        httpStatus: 404,
+        code: "dangling_pointer",
+        message: pointerMessage(input.id, "an order", galleryId, listingId)
+      };
+    }
+    return {
+      ok: false,
+      httpStatus: 404,
+      code: "dangling_pointer",
+      message: `${input.id} is an order, not a client gallery link. It has no gallery id and no project id. Open the order in admin and copy the project studio link (/studio/{project id}) or the delivery link (/gallery/{gallery id}).`
+    };
+  }
+  if (input.orderRequest) {
+    const galleryId = text$2(input.orderRequest.galleryId);
+    const listingId = text$2(input.orderRequest.listingId);
+    if (galleryId || listingId) {
+      return {
+        ok: false,
+        httpStatus: 404,
+        code: "dangling_pointer",
+        message: pointerMessage(input.id, "an order request", galleryId, listingId)
+      };
+    }
+    return {
+      ok: false,
+      httpStatus: 404,
+      code: "dangling_pointer",
+      message: `${input.id} is an order request, not a client gallery link. It has no gallery id and no project id yet. Confirm the request or open the project, then share /studio/{project id} or /gallery/{gallery id}.`
+    };
+  }
+  return {
+    ok: false,
+    httpStatus: 404,
+    code: "unknown",
+    message: `No gallery and no project uses ${input.id}. Checked galleries/${input.id}, listings/${input.id}, galleries with listingId ${input.id}, orders/${input.id}, and orderRequests/${input.id}. /studio/${input.id} opens a project whose Client Studio link is on. /gallery/${input.id} opens a delivery gallery. This app does not resolve Fotello ids. Copy the link from the project file or the gallery delivery URL.`
+  };
+}
+const db$g = () => admin.firestore();
+function text$1(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function docRecord(snap) {
+  if (!snap.exists) return null;
+  return { id: snap.id, ...snap.data() || {} };
+}
+async function galleriesWhere(field, id) {
+  try {
+    const snap = await db$g().collection("galleries").where(field, "==", id).limit(8).get();
+    return snap.docs.map((doc) => docRecord(doc)).filter((doc) => Boolean(doc));
+  } catch (err) {
+    console.error(`[Galleries] ${field} lookup failed:`, err);
+    return [];
+  }
+}
+async function galleryById(id) {
+  if (!id) return null;
+  return docRecord(await db$g().collection("galleries").doc(id).get());
+}
+async function relatedForListing(listing) {
+  const related = await galleriesWhere("listingId", listing.id);
+  const extras = [text$1(listing.galleryId), text$1(listing.playtestGalleryId)];
+  for (const galleryId of extras) {
+    if (!galleryId || related.some((doc) => doc.id === galleryId)) continue;
+    const extra = await galleryById(galleryId);
+    if (extra) related.push(extra);
+  }
+  return related;
+}
+async function resolveClientGalleryLink(id) {
+  const [gallerySnap, listingSnap] = await Promise.all([
+    db$g().collection("galleries").doc(id).get(),
+    db$g().collection("listings").doc(id).get()
+  ]);
+  const gallery = docRecord(gallerySnap);
+  const listing = docRecord(listingSnap);
+  if (gallery) {
+    return decideClientGalleryLink({
+      id,
+      gallery,
+      listing: null,
+      relatedGalleries: [],
+      order: null,
+      orderRequest: null,
+      pointedGallery: null,
+      pointedListing: null,
+      galleriesByOrderId: []
+    });
+  }
+  if (listing) {
+    return decideClientGalleryLink({
+      id,
+      gallery: null,
+      listing,
+      relatedGalleries: await relatedForListing(listing),
+      order: null,
+      orderRequest: null,
+      pointedGallery: null,
+      pointedListing: null,
+      galleriesByOrderId: []
+    });
+  }
+  const relatedGalleries = await galleriesWhere("listingId", id);
+  const [orderSnap, requestSnap] = await Promise.all([
+    db$g().collection("orders").doc(id).get(),
+    db$g().collection("orderRequests").doc(id).get()
+  ]);
+  const order = docRecord(orderSnap);
+  const orderRequest = docRecord(requestSnap);
+  const galleriesByOrderId = order ? await galleriesWhere("orderId", id) : [];
+  const pointedGalleryId = text$1(orderRequest?.galleryId) || text$1(order?.galleryId);
+  const pointedListingId = text$1(orderRequest?.listingId) || text$1(order?.listingId);
+  const pointedGallery = pointedGalleryId ? await galleryById(pointedGalleryId) : null;
+  let pointedListing = null;
+  let pointedRelated = relatedGalleries;
+  if (!pointedGallery && pointedListingId) {
+    pointedListing = docRecord(await db$g().collection("listings").doc(pointedListingId).get());
+    if (pointedListing) pointedRelated = await relatedForListing(pointedListing);
+  }
+  return decideClientGalleryLink({
+    id,
+    gallery: null,
+    listing: null,
+    relatedGalleries: pointedRelated,
+    order,
+    orderRequest,
+    pointedGallery,
+    pointedListing,
+    galleriesByOrderId
+  });
+}
+const handlePublicGalleryLink = async (req, res) => {
+  const id = String(req.params.id || "");
+  const invalid = invalidGalleryLinkMessage(id);
+  if (invalid) {
+    return res.status(400).json({ code: "invalid_id", error: invalid, message: invalid });
+  }
+  if (!admin.apps.length) {
+    const message = "Gallery lookup is not configured on this server (Firebase Admin). This is not a missing gallery id.";
+    return res.status(503).json({ code: "lookup_unavailable", error: message, message });
+  }
+  try {
+    const result = await resolveClientGalleryLink(id);
+    if (result.ok === false) {
+      return res.status(result.httpStatus).json({
+        code: result.code,
+        error: result.message,
+        message: result.message
+      });
+    }
+    return res.json(result);
+  } catch (err) {
+    console.error("[Galleries] Link resolve error:", err);
+    const message = "Could not resolve this gallery link.";
+    return res.status(500).json({ code: "lookup_failed", error: message, message });
+  }
+};
 const router$f = Router();
 const db$f = () => admin.firestore();
 const storage = () => admin.storage().bucket();
@@ -2359,6 +2917,7 @@ router$f.get("/public/:id", async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch gallery." });
   }
 });
+router$f.get("/link/:id", handlePublicGalleryLink);
 router$f.get("/:id", requireAuth, async (req, res) => {
   try {
     const doc = await db$f().collection("galleries").doc(req.params.id).get();
@@ -4463,206 +5022,6 @@ router$a.post("/setup", async (req, res) => {
     return res.status(500).json({ error: "Setup failed." });
   }
 });
-const AI_EDIT_PRESETS = [
-  {
-    id: "virtual_stage",
-    label: "Virtual stage",
-    prompt: "Virtually stage this room with photoreal furniture, a rug, and simple decor scaled to the space. Leave the walls, windows, floors, ceiling, and camera angle unchanged."
-  },
-  {
-    id: "remove_clutter",
-    label: "Remove clutter",
-    prompt: "Remove clutter, personal items, cords, and small mess. Rebuild only the cleared floor and surfaces so they look clean. Keep the furniture that belongs, plus the architecture and lighting."
-  },
-  {
-    id: "remove_cars",
-    label: "Remove cars",
-    prompt: "Remove vehicles from the driveway, garage apron, and street. Rebuild the pavement, curb, and landscaping so the empty space looks natural."
-  },
-  {
-    id: "add_fire",
-    label: "Add fire",
-    prompt: "Add a realistic burning fire inside the existing fireplace only. Do not move the fireplace or change the rest of the room."
-  },
-  {
-    id: "add_tv",
-    label: "Add TV",
-    prompt: "Add one realistic flat-screen television on the main wall, sized to the room, with a dark screen. Do not change the wall, furniture, or camera."
-  },
-  {
-    id: "add_people",
-    label: "Add people",
-    prompt: "Add two or three casually dressed adults, small in the frame, who look natural in a listing photo and do not block the room. Keep faces generic and the architecture unchanged."
-  },
-  {
-    id: "twilight",
-    label: "Twilight",
-    prompt: "Convert this exterior listing photo into a photoreal twilight. Turn on warm interior and landscape lights. Keep the architecture and camera angle. Use a natural evening sky."
-  },
-  {
-    id: "free_text",
-    label: "AI edit",
-    prompt: ""
-  }
-];
-const AI_EDIT_MISSING_KEY_NOTE = "OPENAI_API_KEY is not configured on the server, so this photo was not edited.";
-const AI_EDIT_TIMEOUT_NOTE = "OpenAI took too long to edit this photo. The job was marked failed. Queue it again.";
-const AI_EDIT_READY_NOTE = "OpenAI edit is ready for review.";
-const RAW_EXT$1 = /\.(cr2|cr3|nef|nrw|arw|srf|sr2|dng|raw|rw2|orf|raf|pef|3fr|fff|iiq)$/i;
-const PREVIEW_EXT = /\.(jpe?g|png|webp|gif)$/i;
-function ingestJobId(listingId) {
-  return `ingest_${listingId}`;
-}
-function shouldBumpStudioQueue(storagePath) {
-  return storagePath.includes("/raw/");
-}
-function isRawStudioFile(name, contentType) {
-  if (RAW_EXT$1.test(name)) return true;
-  const type = String(contentType || "").toLowerCase();
-  return type.includes("raw") || type.includes("dng") || type.includes("canon-cr") || type.includes("nikon");
-}
-function isStudioPreviewable(name, contentType) {
-  if (isRawStudioFile(name, contentType)) return false;
-  const type = String(contentType || "").toLowerCase();
-  if (type === "image/jpeg" || type === "image/png" || type === "image/webp" || type === "image/gif") return true;
-  return PREVIEW_EXT.test(name);
-}
-function finalsObjectPath(listingId, fileName, now = Date.now()) {
-  return `listings/${listingId}/finals/${now}_${safeStorageFileName(fileName)}`;
-}
-function listingAddressLabel(listing) {
-  const source = listing?.address ?? listing?.shootLocation;
-  if (!source) return "Untitled listing";
-  if (typeof source === "string" && source.trim()) return source.trim();
-  if (typeof source === "object") {
-    const row = source;
-    const parts = [row.street, row.city, row.state, row.zip].map((part) => String(part || "").trim()).filter(Boolean);
-    if (parts.length) return parts.join(", ");
-  }
-  return "Untitled listing";
-}
-function clamp(value, min, max) {
-  if (!Number.isFinite(value)) return 0;
-  return Math.min(max, Math.max(min, value));
-}
-function clampAdjustments(input) {
-  const source = input || {};
-  const rotate = source.rotate === 90 || source.rotate === 180 || source.rotate === 270 ? source.rotate : 0;
-  const crop = source.crop === "1:1" || source.crop === "4:5" || source.crop === "16:9" ? source.crop : "original";
-  return {
-    exposure: clamp(Number(source.exposure), -100, 100),
-    shadows: clamp(Number(source.shadows), -100, 100),
-    saturation: clamp(Number(source.saturation), -100, 100),
-    sharpness: clamp(Number(source.sharpness), 0, 100),
-    tint: clamp(Number(source.tint), -100, 100),
-    rotate,
-    crop
-  };
-}
-function presetPrompt(type) {
-  return AI_EDIT_PRESETS.find((preset) => preset.id === type)?.prompt || "";
-}
-function realEstateEditPrompt(userPrompt) {
-  const request = userPrompt.trim().replace(/\s+/g, " ");
-  return [
-    "Photoreal real-estate listing photo.",
-    "Edit only the supplied photograph.",
-    "Keep the same camera angle, architecture, windows, doors, flooring, and lighting.",
-    "Do not add text, logos, watermarks, borders, or an illustrated style.",
-    `Requested change: ${request}`
-  ].join(" ");
-}
-function listingPhotoEditSize(width, height) {
-  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-    return "1536x1024";
-  }
-  const ratio = width / height;
-  if (ratio >= 1.15) return "1536x1024";
-  if (ratio <= 0.87) return "1024x1536";
-  return "1024x1024";
-}
-function resolveStudioApprovePath(job, fallbackPath = "") {
-  const fallback = String(fallbackPath || "").trim();
-  if (job.kind === "ai_edit") {
-    if (job.status === "failed") {
-      return { ok: false, error: "This AI edit failed. Queue it again before approving." };
-    }
-    if (job.status === "rejected") {
-      return { ok: false, error: "This AI edit was rejected." };
-    }
-    const resultPath2 = typeof job.resultPath === "string" ? job.resultPath.trim() : "";
-    if (job.placeholder === true || !resultPath2) {
-      return { ok: false, error: "This AI edit has no finished image to approve." };
-    }
-    return { ok: true, sourcePath: resultPath2 };
-  }
-  const resultPath = typeof job.resultPath === "string" ? job.resultPath.trim() : "";
-  const sourcePath = typeof job.sourcePath === "string" ? job.sourcePath.trim() : "";
-  const path2 = resultPath || sourcePath || fallback;
-  if (!path2) return { ok: false, error: "sourcePath is required." };
-  return { ok: true, sourcePath: path2 };
-}
-function parseAiEditRequest(body) {
-  if (!body || typeof body !== "object") return { ok: false, error: "Request body is required." };
-  const row = body;
-  const listingId = String(row.listingId || "").trim();
-  if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
-    return { ok: false, error: "A valid listing id is required." };
-  }
-  const type = String(row.type || "");
-  if (!AI_EDIT_PRESETS.some((preset) => preset.id === type)) {
-    return { ok: false, error: "Unknown AI edit type." };
-  }
-  const fallback = presetPrompt(type);
-  const prompt = String(row.prompt ?? fallback).trim().slice(0, 2e3);
-  if (type === "free_text" && prompt.length < 3) {
-    return { ok: false, error: "Describe the AI edit." };
-  }
-  const imageUrl = String(row.imageUrl || "").trim();
-  if (!/^https:\/\/.+/i.test(imageUrl)) {
-    return { ok: false, error: "imageUrl must be an https URL." };
-  }
-  const sourcePath = String(row.sourcePath || "").trim();
-  if (!isListingStoragePath(listingId, sourcePath)) {
-    return { ok: false, error: "sourcePath must be a photo, raw, or finals file on this listing." };
-  }
-  return {
-    ok: true,
-    value: {
-      listingId,
-      type,
-      prompt: prompt || fallback,
-      imageUrl,
-      sourcePath
-    }
-  };
-}
-function galleryStatusAfterStudioAdd(current) {
-  if (!current || current === "pending_upload" || current === "raw_uploaded" || current === "editing") {
-    return "ready_for_review";
-  }
-  return current;
-}
-function frameFromListingImage(raw, index = 0) {
-  if (!raw || typeof raw !== "object") return null;
-  const item = raw;
-  const path2 = typeof item.path === "string" ? item.path : "";
-  const url = typeof item.url === "string" ? item.url : "";
-  if (!path2 && !url) return null;
-  const name = typeof item.name === "string" && item.name.trim() ? item.name.trim() : path2.split("/").pop() || `photo-${index + 1}`;
-  const contentType = typeof item.contentType === "string" ? item.contentType : "";
-  return {
-    id: typeof item.id === "string" && item.id.trim() ? item.id.trim() : path2 || `idx-${index}`,
-    name,
-    path: path2,
-    url,
-    contentType,
-    raw: isRawStudioFile(name, contentType),
-    previewable: isStudioPreviewable(name, contentType),
-    studioApproved: item.studioApproved === true || path2.includes("/finals/"),
-    studioRole: typeof item.studioRole === "string" ? item.studioRole : void 0
-  };
-}
 const db$7 = () => admin.firestore();
 const bucket$1 = () => admin.storage().bucket();
 const BROWSER_ORIGINS = [
