@@ -35,6 +35,7 @@ import ClientInvoice from "./pages/ClientInvoice";
 import PublicGallery from "./pages/PublicGallery";
 import ListingPresentation from "./pages/ListingPresentation";
 import VirtualStaging from "./pages/VirtualStaging";
+import StockFootage from "./pages/StockFootage";
 import VirtualStagingSelection from "./pages/VirtualStagingSelection";
 import VirtualStagingAITool from "./pages/VirtualStagingAITool";
 import VirtualStagingProOrder from "./pages/VirtualStagingProOrder";
@@ -87,10 +88,10 @@ const App = () => (
             <Route path="/pricing-v1" element={<PricingV1 />} />
             <Route path="/socials" element={<Socials />} />
             <Route path="/agents" element={<AgentLandingPage />} />
-            {/* Resources and stock library stay off the public site until real packs exist. */}
+            {/* Resources stays off the public site. Stock Footage library is public again. */}
             <Route path="/insights" element={<Navigate to="/" replace />} />
             <Route path="/insights/prep" element={<Navigate to="/" replace />} />
-            <Route path="/stock-footage" element={<Navigate to="/" replace />} />
+            <Route path="/stock-footage" element={<StockFootage />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             {/* Shirt QR destination. /go/ matches here too (trailing slash is ignored). */}
