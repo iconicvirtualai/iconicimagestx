@@ -1,10 +1,8 @@
 import { motion } from "framer-motion";
-import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { Quote } from "lucide-react";
+import { FEATURED_REVIEW, reviewMonogram } from "@/lib/clientReviews";
 
 export default function RaisingTheStandard() {
-  const settings = useSiteSettings();
-
   return (
     <section className="py-24 bg-black overflow-hidden border-t border-white/5">
       <div className="container mx-auto px-4">
@@ -60,15 +58,15 @@ export default function RaisingTheStandard() {
               <div className="mt-12 p-8 rounded-3xl bg-white/5 border border-white/10 relative">
                 <Quote className="absolute -top-4 -left-4 w-10 h-10 text-teal-400/20 fill-teal-400/20" />
                 <p className="text-gray-300 italic mb-6 leading-relaxed">
-                  "Iconic didn't just give us a video; they gave us a completely new way to represent our properties. Their standard is levels above anything else we've tried."
+                  "{FEATURED_REVIEW.quote}"
                 </p>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-teal-500 flex items-center justify-center font-bold text-white shadow-lg">
-                    JD
+                  <div className="w-10 h-10 rounded-full bg-teal-500 flex items-center justify-center font-bold text-white text-xs shadow-lg" aria-hidden="true">
+                    {reviewMonogram(FEATURED_REVIEW.initials)}
                   </div>
                   <div>
-                    <p className="font-bold text-white text-sm">James Dalton</p>
-                    <p className="text-gray-500 text-xs uppercase tracking-wider">Luxury Estate Group</p>
+                    <p className="font-bold text-white text-sm">{FEATURED_REVIEW.initials}</p>
+                    <p className="text-gray-500 text-xs uppercase tracking-wider">{FEATURED_REVIEW.role}</p>
                   </div>
                 </div>
               </div>
