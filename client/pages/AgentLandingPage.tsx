@@ -112,8 +112,8 @@ export default function AgentLandingPage() {
               >
                 <div className="aspect-[4/5] rounded-[2rem] overflow-hidden shadow-2xl border-8 border-white">
                   <img 
-                    src="/media/photos/luxury-exterior.jpg" 
-                    alt="Luxury home exterior" 
+                    src="/media/launch/hero_day_exterior_alt.jpg"
+                    alt="Daytime three-quarter view of a luxury home exterior" 
                     className="w-full h-full object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />

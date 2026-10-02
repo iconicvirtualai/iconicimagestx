@@ -3,6 +3,7 @@ import Layout from "@/components/Layout";
 import { X } from "lucide-react";
 import { SNAP_REELS } from "@/lib/snapReels";
 import { AI_BEFORE_AFTER, AERIAL_STILLS, PRIMARY_SUITE_STILL } from "@/lib/beforeAfter";
+import { LAUNCH_STILLS } from "@/lib/launchStills";
 
 type Category = "All" | "People" | "Families" | "Studio" | "Holiday" | "Headshots" | "Listings" | "Aerial" | "Virtual Staging";
 
@@ -29,6 +30,12 @@ const PHOTOS: Photo[] = [
   { src: "/media/photos/headshot-gracepoint-1.jpg", alt: "Headshot against a brick wall", title: "Headshot", category: "Headshots" },
   { src: "/media/photos/headshot-gracepoint-4.jpg", alt: "Headshot in front of office windows", title: "Headshot", category: "Headshots" },
   { src: "/media/photos/website-hero-dan.jpg", alt: "Aerial of a luxury estate at dusk", title: "Aerial Estate", category: "Aerial" },
+  ...LAUNCH_STILLS.map((still) => ({
+    src: still.src,
+    alt: still.alt,
+    title: still.title,
+    category: still.group === "Aerial" ? "Aerial" as const : "Listings" as const,
+  })),
   { src: "/media/photos/drone-hero.jpg", alt: "Drone view of a waterfront luxury home", title: "Drone Hero", category: "Aerial" },
   { src: "/media/photos/luxury-exterior.jpg", alt: "Luxury home exterior", title: "Luxury Exterior", category: "Listings" },
   { src: "/media/photos/luxury-interior.jpg", alt: "Luxury interior living space", title: "Luxury Interior", category: "Listings" },

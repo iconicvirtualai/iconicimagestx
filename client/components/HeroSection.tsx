@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { HERO_STILL } from "@/lib/launchStills";
 
 const CAPABILITIES = [
   "Cinematic Filmmakers",
@@ -13,7 +13,6 @@ const CAPABILITIES = [
 ];
 
 export default function HeroSection() {
-  const settings = useSiteSettings();
   const [capabilityIndex, setCapabilityIndex] = useState(0);
 
   useEffect(() => {
@@ -28,8 +27,8 @@ export default function HeroSection() {
       {/* Background Image with Overlay */}
       <div className="absolute inset-0 z-0">
         <img
-          src="/media/photos/website-hero-dan.jpg"
-          alt="Aerial of a luxury estate at dusk"
+          src={HERO_STILL.src}
+          alt={HERO_STILL.alt}
           className="w-full h-full object-cover opacity-60"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black via-black/40 to-transparent"></div>

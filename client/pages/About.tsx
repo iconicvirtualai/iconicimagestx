@@ -2,16 +2,17 @@ import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Star, Zap, Rocket, MapPin, Award } from "lucide-react";
 import { Link } from "react-router-dom";
+import { launchStill } from "@/lib/launchStills";
 
 const ABOUT_FRAMES = [
-  { img: "/media/photos/drone-hero.jpg", label: "Aerial" },
-  { img: "/media/photos/luxury-exterior.jpg", label: "Listings" },
-  { img: "/media/photos/luxury-interior.jpg", label: "Interiors" },
+  { img: launchStill("aerial-neighborhood").src, label: "Aerial" },
+  { img: launchStill("hero-front").src, label: "Listings" },
+  { img: launchStill("kitchen-island").src, label: "Kitchen" },
   { img: "/media/before-after/twilight-pool-lifestyle.jpg", label: "Twilight" },
-  { img: "/media/photos/staged-living-room.jpg", label: "Staging" },
-  { img: "/media/photos/lifestyle-mtz04327.jpg", label: "Portraits" },
-  { img: "/media/before-after/aerial-estate.jpg", label: "Estates" },
-  { img: "/media/photos/listing-living-03.jpg", label: "Living" },
+  { img: launchStill("living-bright").src, label: "Living" },
+  { img: launchStill("pool").src, label: "Outdoor" },
+  { img: launchStill("aerial-property").src, label: "Estates" },
+  { img: launchStill("foyer").src, label: "Entry" },
 ];
 
 export default function About() {
@@ -119,7 +120,7 @@ export default function About() {
               <div className="relative">
                 <div className="absolute -top-10 -left-10 w-40 h-40 bg-teal-500/10 rounded-full blur-3xl"></div>
                 <div className="relative rounded-[2.5rem] overflow-hidden shadow-2xl bg-gray-900 aspect-square md:aspect-[4/5]">
-                  <img src="/media/photos/luxury-exterior.jpg" className="w-full h-full object-cover mix-blend-luminosity hover:mix-blend-normal transition-all duration-700" alt="Luxury home exterior" />
+                  <img src={launchStill("entry").src} className="w-full h-full object-cover mix-blend-luminosity hover:mix-blend-normal transition-all duration-700" alt={launchStill("entry").alt} />
                   <div className="absolute bottom-0 left-0 w-full p-8 bg-gradient-to-t from-black via-black/40 to-transparent">
                     <p className="text-teal-400 font-bold tracking-widest text-xs uppercase mb-1">Iconic still</p>
                     <h4 className="text-white text-3xl font-bold">LISTINGS</h4>

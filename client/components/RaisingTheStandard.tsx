@@ -1,9 +1,6 @@
 import { motion } from "framer-motion";
-import { useSiteSettings } from "@/hooks/useSiteSettings";
-import { Quote } from "lucide-react";
 
 export default function RaisingTheStandard() {
-  const settings = useSiteSettings();
 
   return (
     <section className="py-24 bg-black overflow-hidden border-t border-white/5">
@@ -54,23 +51,6 @@ export default function RaisingTheStandard() {
                 <p className="pt-4 text-lg md:text-xl font-normal border-t border-white/10 text-gray-500">
                   As the industry grows, it grows to the standard we’ve set.
                 </p>
-              </div>
-
-              {/* Testimonial Box */}
-              <div className="mt-12 p-8 rounded-3xl bg-white/5 border border-white/10 relative">
-                <Quote className="absolute -top-4 -left-4 w-10 h-10 text-teal-400/20 fill-teal-400/20" />
-                <p className="text-gray-300 italic mb-6 leading-relaxed">
-                  "Iconic didn't just give us a video; they gave us a completely new way to represent our properties. Their standard is levels above anything else we've tried."
-                </p>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-teal-500 flex items-center justify-center font-bold text-white shadow-lg">
-                    JD
-                  </div>
-                  <div>
-                    <p className="font-bold text-white text-sm">James Dalton</p>
-                    <p className="text-gray-500 text-xs uppercase tracking-wider">Luxury Estate Group</p>
-                  </div>
-                </div>
               </div>
             </motion.div>
           </div>
