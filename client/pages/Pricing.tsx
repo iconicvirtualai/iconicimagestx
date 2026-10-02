@@ -435,7 +435,7 @@ export default function Pricing() {
                 playsInline
                 className="w-full h-full object-cover opacity-[0.15]"
               >
-                <source src="https://videos.pexels.com/video-files/32821434/13990151_640_360_30fps.mp4" type="video/mp4" />
+                <source src="/media/video/content-web-clip.mp4" type="video/mp4" />
               </video>
               {/* Simplified Gradient Overlays for better visibility */}
               <div className="absolute inset-0 bg-gradient-to-b from-[#fafafa] via-transparent to-[#fafafa]"></div>

@@ -45,21 +45,21 @@ export default function FeaturedServices() {
       description:
         "End-to-end content creation from concept through post-production. We produce compelling photography, videography, and multimedia content.",
       image:
-        "https://images.unsplash.com/photo-1633356122544-f134324ef6db?w=800&h=600&fit=crop",
+        "/media/photos/luxury-interior.jpg",
     },
     {
       title: "Creative Direction",
       description:
         "Strategic visual storytelling that aligns with your brand identity. Our creative directors ensure consistency and impact across all media.",
       image:
-        "https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&h=600&fit=crop",
+        "/media/photos/lifestyle-mtz04327.jpg",
     },
     {
       title: "Media Licensing",
       description:
         "Access our extensive library of high-quality media assets. Licensing solutions tailored to your project needs and budget.",
       image:
-        "https://images.unsplash.com/photo-1611532736579-6b16e2b50449?w=800&h=600&fit=crop",
+        "/media/photos/drone-hero.jpg",
     },
   ];
 

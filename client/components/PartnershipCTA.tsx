@@ -16,17 +16,21 @@ export default function PartnershipCTA() {
 
           {/* Description */}
           <p className="text-xl md:text-2xl text-white/70 mb-12 max-w-2xl mx-auto leading-relaxed">
-            Whether you're looking for creative services, strategic partnership, 
-            or media licensing solutions, our team is ready to discuss your vision 
-            and bring it to life.
+            Listing photos, aerials, virtual staging, and Snap Reels.
+            Tell us the property and the date.
           </p>
 
           {/* CTA Button */}
-          <div className="flex justify-center">
+          <div className="flex flex-wrap items-center justify-center gap-4">
             <Link to="/book">
               <Button className="bg-white text-black hover:bg-gray-100 font-bold text-xl px-12 py-8 rounded-2xl transition-all hover:scale-105 flex items-center gap-2">
-                Get your free Iconic Video
+                Book a shoot
                 <ArrowRight className="w-6 h-6" />
+              </Button>
+            </Link>
+            <Link to="/pricing">
+              <Button className="bg-transparent text-white hover:bg-white/10 font-bold text-xl px-12 py-8 rounded-2xl border border-white/20">
+                See pricing
               </Button>
             </Link>
           </div>

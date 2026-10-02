@@ -1,7 +1,19 @@
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { Star, Zap, Rocket, MapPin, Quote, Award } from "lucide-react";
+import { Star, Zap, Rocket, MapPin, Award } from "lucide-react";
 import { Link } from "react-router-dom";
+import { launchStill } from "@/lib/launchStills";
+
+const ABOUT_FRAMES = [
+  { img: launchStill("aerial-neighborhood").src, label: "Aerial" },
+  { img: launchStill("hero-front").src, label: "Listings" },
+  { img: launchStill("kitchen-island").src, label: "Kitchen" },
+  { img: "/media/before-after/twilight-pool-lifestyle.jpg", label: "Twilight" },
+  { img: launchStill("living-bright").src, label: "Living" },
+  { img: launchStill("pool").src, label: "Outdoor" },
+  { img: launchStill("aerial-property").src, label: "Estates" },
+  { img: launchStill("foyer").src, label: "Entry" },
+];
 
 export default function About() {
   return (
@@ -28,25 +40,7 @@ export default function About() {
             {/* Moving Photo Carousel */}
             <div className="relative w-full overflow-hidden py-12">
               <div className="flex animate-scroll whitespace-nowrap">
-                {[
-                  { img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80", label: "Est. 2016" },
-                  { img: "https://images.unsplash.com/photo-1492691523567-61723c275df1?w=800&q=80", label: "The Engine" },
-                  { img: "https://images.unsplash.com/photo-1626544823126-bb212353394c?w=800&q=80", label: "Scale" },
-                  { img: "https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&q=80", label: "Growth" },
-                  { img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80", label: "Legacy" },
-                  { img: "https://images.unsplash.com/photo-1492691523567-61723c275df1?w=800&q=80", label: "Cinematic" },
-                  { img: "https://images.unsplash.com/photo-1626544823126-bb212353394c?w=800&q=80", label: "Elite" },
-                  { img: "https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&q=80", label: "Market Lead" },
-                  // Repeat for seamless loop
-                  { img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80", label: "Est. 2016" },
-                  { img: "https://images.unsplash.com/photo-1492691523567-61723c275df1?w=800&q=80", label: "The Engine" },
-                  { img: "https://images.unsplash.com/photo-1626544823126-bb212353394c?w=800&q=80", label: "Scale" },
-                  { img: "https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&q=80", label: "Growth" },
-                  { img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80", label: "Legacy" },
-                  { img: "https://images.unsplash.com/photo-1492691523567-61723c275df1?w=800&q=80", label: "Cinematic" },
-                  { img: "https://images.unsplash.com/photo-1626544823126-bb212353394c?w=800&q=80", label: "Elite" },
-                  { img: "https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=800&q=80", label: "Market Lead" },
-                ].map((item, i) => (
+                {[...ABOUT_FRAMES, ...ABOUT_FRAMES].map((item, i) => (
                   <div key={i} className="flex-shrink-0 mx-2 w-[184px] h-[184px] md:w-[268px] md:h-[268px] bg-gray-900 rounded-2xl border border-white/10 flex items-center justify-center relative overflow-hidden group">
                     <img src={item.img} className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-110 group-hover:opacity-60 transition-all duration-700" alt={item.label} />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
@@ -126,10 +120,10 @@ export default function About() {
               <div className="relative">
                 <div className="absolute -top-10 -left-10 w-40 h-40 bg-teal-500/10 rounded-full blur-3xl"></div>
                 <div className="relative rounded-[2.5rem] overflow-hidden shadow-2xl bg-gray-900 aspect-square md:aspect-[4/5]">
-                  <img src="https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fb694584c91da4099bb13e517f9890e59?format=webp&width=800&height=1200" className="w-full h-full object-cover mix-blend-luminosity hover:mix-blend-normal transition-all duration-700" alt="Cadi - Visionary Creator" />
+                  <img src={launchStill("entry").src} className="w-full h-full object-cover mix-blend-luminosity hover:mix-blend-normal transition-all duration-700" alt={launchStill("entry").alt} />
                   <div className="absolute bottom-0 left-0 w-full p-8 bg-gradient-to-t from-black via-black/40 to-transparent">
-                    <p className="text-teal-400 font-bold tracking-widest text-xs uppercase mb-1">Visionary Creator</p>
-                    <h4 className="text-white text-3xl font-bold">CADI</h4>
+                    <p className="text-teal-400 font-bold tracking-widest text-xs uppercase mb-1">Iconic still</p>
+                    <h4 className="text-white text-3xl font-bold">LISTINGS</h4>
                   </div>
                 </div>
               </div>
