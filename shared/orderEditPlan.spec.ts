@@ -18,6 +18,8 @@ describe("order edit plan", () => {
     const plan = planOrderEdits({ serviceIds: ["listing-showcase"] });
     expect(plan.packageName).toBe("The Showcase");
     expect(plan.photoCount).toBe(50);
+    expect(plan.photoScope).toBe("count");
+    expect(plan.deliverables.find((item) => item.id === "aerials")?.count).toBe(5);
     expect(plan.twilight.map((slot) => slot.role)).toEqual(["front", "back"]);
     expect(plan.twilight[0].prompt).toMatch(/front exterior/i);
     expect(plan.twilight[1].prompt).toMatch(/rear exterior/i);

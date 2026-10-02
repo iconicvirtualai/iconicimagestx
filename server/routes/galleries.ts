@@ -10,6 +10,8 @@ import { requireCoordinator, requirePhotographer, requireStaff, requireAuth, typ
 import { sendEmail } from "../services/email";
 import { sendSMS, SMS_TEMPLATES } from "../services/sms";
 import { invoiceAllowsDownload, publicMediaItem } from "../../shared/paymentAccess";
+import { galleryStatusNeedsReleaseGate } from "../../shared/galleryRelease";
+import { loadGalleryReleaseForGallery } from "../services/galleryReleaseGate";
 import { handlePublicGalleryLink } from "./galleryLink";
 
 const router = Router();
@@ -29,6 +31,30 @@ function addressLabel(address: unknown): string {
     return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "the property";
   }
   return String(address);
+}
+
+function adminReady(res: { status: (code: number) => { json: (body: unknown) => unknown } }) {
+  if (admin.apps.length) return true;
+  res.status(503).json({
+    error: "Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT and FIREBASE_STORAGE_BUCKET.",
+  });
+  return false;
+}
+
+async function holdIfOrderIncomplete(
+  res: { status: (code: number) => { json: (body: unknown) => unknown } },
+  galleryId: string,
+) {
+  const report = await loadGalleryReleaseForGallery(galleryId);
+  if (report.complete) return false;
+  res.status(409).json({
+    error: report.message,
+    galleryRelease: report.galleryRelease,
+    complete: false,
+    percent: report.percent,
+    gaps: report.gaps,
+  });
+  return true;
 }
 
 async function invoiceForGallery(gallery: Record<string, unknown>) {
@@ -254,12 +280,29 @@ router.post("/:id/media-link", requireCoordinator, async (req: AuthenticatedRequ
 
 // ─── PATCH /api/galleries/:id/status ─────────────────────────────────────────
 
+router.get("/:id/release", requireCoordinator, async (req, res) => {
+  if (!adminReady(res)) return;
+  try {
+    const report = await loadGalleryReleaseForGallery(req.params.id);
+    return res.json(report);
+  } catch (err) {
+    const status = (err as { status?: number }).status;
+    if (status === 404) return res.status(404).json({ error: "Gallery not found." });
+    console.error("[Galleries] Release check error:", err);
+    return res.status(500).json({ error: "Failed to check gallery release." });
+  }
+});
+
 router.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status } = req.body;
     const validStatuses = ["pending_upload","raw_uploaded","editing","ready_for_review","approved","delivered"];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: "Invalid status." });
+    }
+    if (galleryStatusNeedsReleaseGate(status)) {
+      if (!adminReady(res)) return;
+      if (await holdIfOrderIncomplete(res, req.params.id)) return;
     }
 
     await db().collection("galleries").doc(req.params.id).update({
@@ -269,6 +312,8 @@ router.patch("/:id/status", requireCoordinator, async (req, res) => {
 
     return res.json({ success: true });
   } catch (err) {
+    const code = (err as { status?: number }).status;
+    if (code === 404) return res.status(404).json({ error: "Gallery not found." });
     return res.status(500).json({ error: "Failed to update gallery status." });
   }
 });
@@ -277,8 +322,10 @@ router.patch("/:id/status", requireCoordinator, async (req, res) => {
 
 router.post("/:id/deliver", requireCoordinator, async (req, res) => {
   try {
+    if (!adminReady(res)) return;
     const galleryDoc = await db().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
+    if (await holdIfOrderIncomplete(res, req.params.id)) return;
 
     const gallery = galleryDoc.data()!;
     const linkedInvoice = await invoiceForGallery(gallery);

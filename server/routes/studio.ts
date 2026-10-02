@@ -3,20 +3,25 @@
  * Default edits come from the order (package line items + Iconic Polish).
  * POST /ai-edit is a staff override for one frame and calls OpenAI Images.
  * POST /order-edits writes those order jobs and runs the next photo.
+ * POST /order-queue/tick runs one queued photo and can chain the next tick.
  * Approve copies a finished JPEG/PNG/WebP onto the listing finals path.
- * It does not send the gallery or client email. Gallery release waits until
- * the order is complete, which this route does not decide.
+ * It does not send the gallery or client email. Delivery stays held until
+ * the order plan is 100% complete.
  */
 
 import { Router } from "express";
 import admin from "firebase-admin";
 import { parseAiEditRequest, resolveStudioApprovePath } from "../../shared/iconicStudio";
 import { requireStaff, type AuthenticatedRequest } from "../middleware/auth";
+import { loadGalleryReleaseReport } from "../services/galleryReleaseGate";
+import { kickStudioQueue } from "../services/studioQueueKick";
 import {
+  advanceOrderEditQueue,
   approveStudioFinal,
   assertStudioAccess,
   enqueueAiEdit,
   loadStudioWorkspace,
+  nextOrderEditListingId,
   queueOrderEdits,
   rejectStudioJob,
   saveAdjustedJpeg,
@@ -31,6 +36,20 @@ function adminReady(res: { status: (code: number) => { json: (body: unknown) => 
     error: "Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT and FIREBASE_STORAGE_BUCKET.",
   });
   return false;
+}
+
+function cronAuthorized(req: { headers: { authorization?: string } }) {
+  const secret = typeof process.env.CRON_SECRET === "string" ? process.env.CRON_SECRET.trim() : "";
+  return Boolean(secret) && req.headers.authorization === `Bearer ${secret}`;
+}
+
+function requireStaffOrQueueCron(req: AuthenticatedRequest, res: Parameters<typeof requireStaff>[1], next: Parameters<typeof requireStaff>[2]) {
+  if (cronAuthorized(req)) {
+    req.user = { uid: "studio-queue" } as AuthenticatedRequest["user"];
+    req.staffRole = "admin";
+    return next();
+  }
+  return requireStaff(req, res, next);
 }
 
 function sendKnownError(
@@ -55,6 +74,14 @@ router.get("/workspace", requireStaff, async (req: AuthenticatedRequest, res) =>
       role: req.staffRole || "",
       listingId: listingId || undefined,
     });
+    if (payload.listing && typeof payload.listing.id === "string") {
+      try {
+        payload.listing.release = await loadGalleryReleaseReport(payload.listing.id);
+      } catch (err) {
+        console.error("[Studio] Gallery gate failed:", err instanceof Error ? err.message : err);
+        payload.listing.release = null;
+      }
+    }
     return res.json(payload);
   } catch (err) {
     return sendKnownError(res, err, "Failed to load Iconic Studio.");
@@ -73,6 +100,37 @@ router.post("/order-edits", requireStaff, async (req: AuthenticatedRequest, res)
     return res.status(201).json(result);
   } catch (err) {
     return sendKnownError(res, err, "Failed to queue the order edits.");
+  }
+});
+
+router.post("/order-queue/tick", requireStaffOrQueueCron, async (req: AuthenticatedRequest, res) => {
+  let listingId = String(req.body?.listingId || "").trim();
+  if (listingId && !/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
+    return res.status(400).json({ error: "A valid listing id is required." });
+  }
+  if (!listingId && req.user?.uid !== "studio-queue") {
+    return res.status(400).json({ error: "A valid listing id is required." });
+  }
+  if (!adminReady(res)) return;
+  try {
+    if (!listingId) {
+      const found = await nextOrderEditListingId();
+      if (!found) {
+        return res.json({ prepared: 0, ran: null, remaining: 0, waiting: 0, shouldFollowUp: false });
+      }
+      listingId = found;
+    } else if (req.user?.uid !== "studio-queue") {
+      await assertStudioAccess(req.user!.uid, req.staffRole || "", listingId);
+    }
+    const result = await advanceOrderEditQueue({
+      listingId,
+      createdBy: req.user!.uid,
+      retryFailed: false,
+    });
+    if (req.body?.chain === true && result.shouldFollowUp) kickStudioQueue(listingId);
+    return res.json(result);
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to advance the order edit queue.");
   }
 });
 

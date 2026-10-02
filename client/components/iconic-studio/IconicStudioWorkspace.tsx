@@ -9,6 +9,7 @@ import {
   type StudioAdjustments,
   type StudioFrame,
 } from "@shared/iconicStudio";
+import type { GalleryReleaseReport } from "@shared/galleryRelease";
 import type { OrderEditPlan } from "@shared/orderEditPlan";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
@@ -73,6 +74,7 @@ export default function IconicStudioWorkspace({
   frames,
   demo = false,
   editPlan = null,
+  release = null,
   initialTab,
   onSelectListing,
   onAiEdit,
@@ -88,6 +90,7 @@ export default function IconicStudioWorkspace({
   frames: StudioFrame[];
   demo?: boolean;
   editPlan?: OrderEditPlan | null;
+  release?: GalleryReleaseReport | null;
   initialTab?: StudioTab;
   onSelectListing: (id: string) => void;
   onAiEdit: (input: { type: string; prompt: string; frame: StudioFrame }) => Promise<void>;
@@ -305,6 +308,10 @@ export default function IconicStudioWorkspace({
                 prompt={prompt}
                 busy={busy || !frame}
                 reviewJobs={reviewJobs}
+                pendingOrder={jobs.filter((job) => {
+                  if (listingId && job.listingId && job.listingId !== listingId) return false;
+                  return job.origin === "order" && Boolean(job.sourcePath) && (job.status === "pending" || job.status === "processing");
+                }).length}
                 sampleUrl={sampleUrl}
                 editPlan={editPlan}
                 onPrompt={setPrompt}
@@ -320,6 +327,7 @@ export default function IconicStudioWorkspace({
                 selected={frame}
                 frames={frames.filter((item) => item.studioApproved || item.studioRole === "final" || item.path.includes("/finals/"))}
                 busy={busy}
+                release={release}
                 onApprove={(item) => run(() => onApprove({ frame: item }))}
               />
             )}
@@ -416,6 +424,7 @@ function AiPanel({
   prompt,
   busy,
   reviewJobs,
+  pendingOrder = 0,
   sampleUrl,
   editPlan,
   onPrompt,
@@ -427,6 +436,7 @@ function AiPanel({
   prompt: string;
   busy?: boolean;
   reviewJobs: StudioJobView[];
+  pendingOrder?: number;
   sampleUrl: string;
   editPlan?: OrderEditPlan | null;
   onPrompt: (value: string) => void;
@@ -446,6 +456,11 @@ function AiPanel({
         <p className="mt-1 text-xs font-bold text-gray-700">{editPlan?.packageName || "No package on this listing yet"}</p>
         <p className="mt-1 text-[11px] leading-snug text-gray-500">
           {twilight}. {polish}. Uploaded photos use the order prompt. Shooters do not pick an edit per photo.
+        </p>
+        <p className="mt-1 text-[11px] text-gray-500">
+          {pendingOrder > 0
+            ? `Auto-queue has ${pendingOrder} photo${pendingOrder === 1 ? "" : "s"} left. Each OpenAI edit is its own request.`
+            : "Uploads auto-queue one OpenAI edit at a time. Run next stays available as a manual override."}
         </p>
         {editPlan && editPlan.deliverables.length > 0 && (
           <p className="mt-1 text-[11px] text-gray-500">
@@ -556,18 +571,37 @@ function GalleryPanel({
   selected,
   frames,
   busy,
+  release,
   onApprove,
 }: {
   selected: StudioFrame | null;
   frames: StudioFrame[];
   busy?: boolean;
+  release?: GalleryReleaseReport | null;
   onApprove: (frame: StudioFrame) => void;
 }) {
   return (
     <div className="space-y-3">
       <p className="text-xs text-gray-500">
-        Approve copies a JPEG, PNG, or WebP into the listing finals folder and adds it to the linked gallery. Delivered galleries stay delivered. No client email is sent.
+        Approve copies a JPEG, PNG, or WebP into the listing finals folder and adds it to the linked gallery. Staff can approve one frame at a time. No client email is sent.
       </p>
+      {release && (
+        <div
+          data-testid="studio-gallery-gate"
+          className={`rounded-xl border p-3 ${release.complete ? "border-teal-200 bg-teal-50" : "border-amber-200 bg-amber-50"}`}
+        >
+          <p className={`text-[11px] font-bold leading-snug ${release.complete ? "text-teal-900" : "text-amber-900"}`}>{release.message}</p>
+          {release.gaps.length > 0 && (
+            <ul className="mt-2 space-y-1">
+              {release.gaps.map((gap) => (
+                <li key={gap.id} className="text-[11px] text-amber-900">
+                  {gap.label}: {gap.satisfied}/{gap.required}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       {selected && !selected.raw && (
         <button type="button" disabled={busy} onClick={() => onApprove(selected)} className="w-full rounded-xl bg-[#0d9488] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-40">
           Approve selected and add to gallery

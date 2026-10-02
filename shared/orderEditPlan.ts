@@ -8,9 +8,9 @@
  * of the order.
  *
  * This module only plans image edits and records the other deliverables.
- * It does not call OpenAI, does not send a gallery, and does not mark an
- * order complete. Upload-time auto-queue and the "send the gallery only at
- * 100%" gate are follow-ons that should call this plan.
+ * It does not call OpenAI and it does not send a gallery. The upload
+ * auto-queue and the gallery release gate both call this plan. Release
+ * stays on hold_until_order_complete until approved finals match it.
  */
 
 import { services } from "../client/lib/services.ts";
@@ -34,6 +34,11 @@ export interface OrderDeliverable {
   label: string;
   /** Not an Images API edit. Capture, video, floor plan, or delivery. */
   kind: "capture" | "video" | "floorplan" | "delivery";
+  /**
+   * Expected file count when the package states one.
+   * Null means the full uploaded set (Full Aerials). Omitted for items that are one file.
+   */
+  count?: number | null;
 }
 
 export interface OrderEditPlan {
@@ -42,8 +47,10 @@ export interface OrderEditPlan {
   /** True when the order itself includes Iconic Finish or Iconic Polish. */
   polishFromOrder: boolean;
   photoPrompt: string;
-  /** Package still count. Null means every uploaded photo, as in "Full Images". */
+  /** Package still count. Null when the scope is "full" or "none". */
   photoCount: number | null;
+  /** count = package number, full = every uploaded photo, none = no photo requirement. */
+  photoScope: "count" | "full" | "none";
   twilight: TwilightSlot[];
   deliverables: OrderDeliverable[];
   galleryRelease: typeof ORDER_GALLERY_RELEASE;
@@ -179,10 +186,14 @@ export function planOrderEdits(input: OrderEditInput = {}): OrderEditPlan {
 
     const aerials = text.match(/(\d+)\s+aerial/i);
     if (aerials || /full aerials|aerial drone/i.test(text)) {
+      const previous = deliverables.get("aerials");
+      const stated = aerials ? Number(aerials[1]) : null;
+      const count = stated != null ? Math.max(stated, previous?.count || 0) : (previous?.count ?? null);
       deliverables.set("aerials", {
         id: "aerials",
-        label: aerials ? `${aerials[1]} aerial stills` : "Aerial stills",
+        label: count ? `${count} aerial stills` : "Aerial stills",
         kind: "capture",
+        count,
       });
     }
     if (/snap/i.test(text) && /reel/i.test(text)) {
@@ -219,6 +230,7 @@ export function planOrderEdits(input: OrderEditInput = {}): OrderEditPlan {
     polishFromOrder,
     photoPrompt: photoPrompt(iconicPolish),
     photoCount: photoFull ? null : photoCount,
+    photoScope: photoFull ? "full" : photoCount != null ? "count" : "none",
     twilight,
     deliverables: [...deliverables.values()],
     galleryRelease: ORDER_GALLERY_RELEASE,
