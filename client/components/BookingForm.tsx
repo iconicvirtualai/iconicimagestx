@@ -26,6 +26,7 @@ import {
 import {
   buildSubmittedLineItems,
   calculateSidebarTotal,
+  hasBookingSelection,
   sumLineItemPrices,
   type BookingPriceInput,
 } from "@shared/bookingPricing";
@@ -650,9 +651,15 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
       <div className="pt-4 border-t border-dashed border-gray-200">
         <div className="flex justify-between items-center mb-4">
           <span className="text-[10px] font-black uppercase text-gray-400">Total Estimate</span>
-          <span data-testid="booking-total" className="text-2xl font-black text-black" style={{ color: settings.global.primaryColor }}>
-            ${calculateTotal()}
-          </span>
+          {hasBookingSelection(bookingPriceInput()) ? (
+            <span data-testid="booking-total" className="text-2xl font-black text-black" style={{ color: settings.global.primaryColor }}>
+              ${calculateTotal()}
+            </span>
+          ) : (
+            <span data-testid="booking-total" className="text-sm font-bold uppercase tracking-widest text-gray-400">
+              Select a package
+            </span>
+          )}
         </div>
       </div>
     </div>

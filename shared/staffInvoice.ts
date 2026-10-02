@@ -69,6 +69,7 @@ export function professionalInvoiceNumber(stored: unknown, docId: string, now = 
   if (
     raw &&
     raw !== id &&
+    !/nan/i.test(raw) &&
     !/^[A-Za-z0-9]{20}$/.test(raw) &&
     PROFESSIONAL_INVOICE_NUMBER.test(raw)
   ) {

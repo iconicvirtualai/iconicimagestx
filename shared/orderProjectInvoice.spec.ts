@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildLinkedInvoiceDraft,
   draftInvoiceNumber,
+  isHumanInvoiceNumber,
+  nextSequentialInvoiceNumber,
+  presentInvoiceNumber,
   invoiceDraftFromOrder,
   invoiceDraftFromProject,
   listingLinkFields,
@@ -17,6 +20,42 @@ const ordersPage = readFileSync(new URL("../client/pages/AdminOrders.tsx", impor
 const projectPage = readFileSync(new URL("../client/pages/AdminListingFile.tsx", import.meta.url), "utf8");
 const clientLib = readFileSync(new URL("../client/lib/orderProjectInvoice.ts", import.meta.url), "utf8");
 const bookings = readFileSync(new URL("../server/routes/bookings.ts", import.meta.url), "utf8");
+const clientInvoice = readFileSync(new URL("../client/pages/ClientInvoice.tsx", import.meta.url), "utf8");
+const paymentsRoute = readFileSync(new URL("../server/routes/payments.ts", import.meta.url), "utf8");
+
+describe("human invoice numbers", () => {
+  const when = new Date("2026-10-02T00:00:00Z");
+
+  it("never turns a non-numeric suffix into NaN", () => {
+    const next = nextSequentialInvoiceNumber(
+      ["INV-2026-EQREQ1", "INV-2026-0NaN", "INV-2026-0007", "PLAY-ABC", "INV-2025-0099"],
+      2026,
+    );
+    expect(next).toBe("INV-2026-0008");
+    expect(next).not.toMatch(/nan/i);
+    expect(isHumanInvoiceNumber(next)).toBe(true);
+    expect(nextSequentialInvoiceNumber([], 2026)).toBe("INV-2026-0001");
+    expect(String(Number.NaN).padStart(4, "0")).toBe("0NaN");
+  });
+
+  it("replaces a stored NaN number with a stable id-based number", () => {
+    expect(presentInvoiceNumber("INV-2026-0NaN", "OxD4TIjwc6X6GY57XFIn", when)).toBe(
+      draftInvoiceNumber("OxD4TIjwc6X6GY57XFIn", when),
+    );
+    expect(presentInvoiceNumber("INV-2026-0007", "OxD4TIjwc6X6GY57XFIn", when)).toBe("INV-2026-0007");
+    expect(presentInvoiceNumber("INV-2026-0NaN", "OxD4TIjwc6X6GY57XFIn", when)).not.toMatch(/nan/i);
+  });
+
+  it("wires booking generation and the public invoice page off the NaN path", () => {
+    expect(bookings).toContain("nextSequentialInvoiceNumber");
+    expect(bookings).not.toContain("parseInt(last");
+    expect(paymentsRoute).toContain("presentInvoiceNumber(invoice.invoiceNumber, invoiceDoc.id)");
+    expect(clientInvoice).toContain("presentInvoiceNumber(invoice.invoiceNumber, invoiceId)");
+    expect(clientInvoice).toContain('href="/"');
+    expect(clientInvoice).toContain("Back to Home");
+    expect(clientInvoice).not.toContain('<Link to="/">');
+  });
+});
 
 describe("invoice button", () => {
   it("says Create Invoice until one is attached, then View Invoice", () => {

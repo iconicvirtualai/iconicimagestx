@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { packagesForStaffEditor } from "./bookingCatalog";
+import { draftInvoiceNumber } from "./orderProjectInvoice";
 import {
   billToAddressText,
   clientPaymentPath,
@@ -252,6 +253,10 @@ describe("staff editor save", () => {
     }, { id: docId, invoiceNumber: "INV-2026-0004" });
     expect(kept).not.toHaveProperty("invoiceNumber");
     expect(invoiceNumberForSave("PLAY-ABC123", docId)).toBeUndefined();
+    const when = new Date("2026-10-02T00:00:00Z");
+    expect(professionalInvoiceNumber("INV-2026-0NaN", docId, when)).toBe(draftInvoiceNumber(docId, when));
+    expect(professionalInvoiceNumber("INV-2026-0NaN", docId, when)).not.toMatch(/nan/i);
+    expect(invoiceNumberForSave("INV-2026-0NaN", docId, when)).toBe(draftInvoiceNumber(docId, when));
     expect(findStaffCatalogPackage({ name: "The Legacy" }, packagesForStaffEditor([]))?.id).toBe("listing-legacy");
 
     const merged = packagesForStaffEditor([

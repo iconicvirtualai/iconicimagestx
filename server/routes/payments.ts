@@ -12,6 +12,7 @@ import { requireCoordinator, requireAuth, type AuthenticatedRequest } from "../m
 import { sendEmail } from "../services/email";
 import { clientNotifyLive } from "../../shared/clientNotify";
 import { amountStillDue, invoiceAllowsDownload, invoiceIdFromSquareNote, squarePaymentNote } from "../../shared/paymentAccess";
+import { presentInvoiceNumber } from "../../shared/orderProjectInvoice";
 import { fetchPublishedSquareInvoiceUrl, resolveSquareCheckoutUrl, squareApiBaseUrl } from "../../shared/squareInvoice";
 
 const router = Router();
@@ -335,7 +336,7 @@ router.get("/invoice/:id", async (req: Request, res: Response) => {
     return res.json({
       id: invoiceDoc.id,
       paid: invoiceAllowsDownload(invoice),
-      invoiceNumber: invoice.invoiceNumber,
+      invoiceNumber: presentInvoiceNumber(invoice.invoiceNumber, invoiceDoc.id),
       clientName: invoice.clientName,
       lineItems: invoice.lineItems,
       subtotal: invoice.subtotal,

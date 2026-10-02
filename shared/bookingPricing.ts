@@ -47,6 +47,16 @@ export interface BookingLineItem {
   tier?: string;
 }
 
+/** True once the customer has picked something that has a real catalog price. */
+export function hasBookingSelection(input: BookingPriceInput): boolean {
+  if (input.selectedService) return true;
+  if ((input.selectedBasics || []).some(Boolean)) return true;
+  if ((input.selectedAddOns || []).some(Boolean)) return true;
+  if (input.premiumUpgrade) return true;
+  if ((input.virtualStagingCredits || 0) > 0) return true;
+  return input.specializedPhotography === "social" || input.specializedPhotography === "both";
+}
+
 export function calculateSidebarTotal(input: BookingPriceInput): number {
   void input.lifeOfTheListingCare;
 

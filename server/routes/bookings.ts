@@ -12,7 +12,7 @@ import { sendSMS, SMS_TEMPLATES } from "../services/sms";
 import { createCalendarBookingEvent } from "../services/calendar";
 import { lifeOfTheListingCareSelected } from "../../shared/lifeOfTheListingCare";
 import { buildBookingInvoiceDraft, existingInvoiceId } from "../../shared/bookingInvoice";
-import { planInvoiceLink } from "../../shared/orderProjectInvoice";
+import { nextSequentialInvoiceNumber, planInvoiceLink } from "../../shared/orderProjectInvoice";
 import { orderTotalLabel } from "../../shared/bookingPricing";
 import { normalizeEmail } from "../../shared/listingAccess";
 import { attachSquareInvoiceAfterBooking } from "../services/squareInvoices";
@@ -724,21 +724,21 @@ async function generateInvoiceNumber(): Promise<string> {
   const snapshot = await db()
     .collection("invoices")
     .where("invoiceNumber", ">=", `INV-${year}-`)
-    .orderBy("invoiceNumber", "desc")
-    .limit(1)
+    .where("invoiceNumber", "<", `INV-${year + 1}`)
     .get()
     .catch((err) => {
       console.error("[Bookings] Invoice number lookup failed:", err);
       return null;
     });
 
-  if (!snapshot || snapshot.empty) {
-    return `INV-${year}-0001`;
+  if (!snapshot) {
+    return `INV-${year}-${String(Date.now()).slice(-6)}`;
   }
 
-  const last = snapshot.docs[0].data().invoiceNumber as string;
-  const num = parseInt(last.split("-")[2] || "0") + 1;
-  return `INV-${year}-${String(num).padStart(4, "0")}`;
+  return nextSequentialInvoiceNumber(
+    snapshot.docs.map((entry) => entry.data().invoiceNumber),
+    year,
+  );
 }
 
 export default router;
