@@ -4,8 +4,25 @@ import HomepageBlazeLoop from "./HomepageBlazeLoop";
 import { HOMEPAGE_BLAZE_LOOP } from "@shared/homepageBlazeLoop";
 
 describe("HomepageBlazeLoop", () => {
-  it("renders nothing while slots are on hold", () => {
+  it("starts the homepage on the wired BUILT final", () => {
     const html = renderToString(<HomepageBlazeLoop />);
+    expect(html).toContain('data-testid="homepage-blaze-loop"');
+    expect(html).toContain('data-slot="BUILT"');
+    expect(html).toContain("/media/blaze/01_BUILT_v2.mp4");
+    expect(html).toContain("muted");
+    expect(html).toContain("autoplay");
+    expect(html).toContain("playsinline");
+    expect(html).not.toMatch(/\sloop[\s=>]/);
+    expect(html).not.toContain("#BEICONIC");
+    expect(html).not.toContain("/media/blaze/02_US_v3.mp4");
+  });
+
+  it("renders nothing when the only slot is still a hold", () => {
+    const html = renderToString(
+      <HomepageBlazeLoop
+        slots={[{ ...HOMEPAGE_BLAZE_LOOP[0], approval: "hold-not-final", src: "" }]}
+      />,
+    );
     expect(html).toBe("");
   });
 
@@ -51,24 +68,23 @@ describe("HomepageBlazeLoop", () => {
     expect(html).not.toMatch(/\bstreet\b/i);
   });
 
-  it("puts the closer under the Iconic mark and hashtag once", () => {
+  it("plays the closer file without painting a second burn-in", () => {
     const html = renderToString(
       <HomepageBlazeLoop
         slots={[
           {
             ...HOMEPAGE_BLAZE_LOOP[2],
             approval: "final",
-            src: "https://cdn.example/blaze/ten-years.mp4",
+            src: "/media/blaze/03_TEN_YEARS_v2.mp4",
           },
         ]}
       />,
     );
     expect(html).toContain('data-slot="TEN_YEARS"');
-    expect(html).toContain("Ten years. Still Iconic.");
-    expect(html).toContain("#BEICONIC");
-    expect(html).toContain('alt="Iconic"');
-    expect(html).toContain("/media/logos/logo-white-large.png");
-    expect(html.match(/#BEICONIC/g)).toHaveLength(1);
+    expect(html).toContain("/media/blaze/03_TEN_YEARS_v2.mp4");
+    expect(html).toContain('aria-label="Ten years. Still Iconic."');
+    expect(html).not.toContain("#BEICONIC");
+    expect(html).not.toContain("/media/logos/logo-white-large.png");
     expect(html).not.toMatch(/\bagent\b/i);
     expect(html).not.toMatch(/\b(street|lane|avenue)\b/i);
   });

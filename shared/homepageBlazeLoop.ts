@@ -1,46 +1,29 @@
 /**
- * Homepage blaze reel — autoplay loop slots. Structure only.
+ * Homepage blaze reel — muted autoplay, hard-cut, loops forever.
  *
- * Locked order when a cut is eventually green:
- *   1) BUILT.
- *   2) US.
- *   3) Ten years. Still Iconic.
+ * Sam green-lit these finals (2026-10-02). Order:
+ *   1) BUILT. v2          public/media/blaze/01_BUILT_v2.mp4
+ *   2) US. v3             public/media/blaze/02_US_v3.mp4
+ *   3) Ten years. v2      public/media/blaze/03_TEN_YEARS_v2.mp4
  *
- * Picture: about 10s each, 1080×1920, hard cuts at ~155 BPM, almost wordless.
- * Brand-safe only: no agent names, no street or address end cards.
- * Final bed is instrumental.
+ * Picture: 1080×1920, instrumental bed, almost wordless, brand-safe.
+ * Burn-ins are in the files, so the player does not paint a second line.
+ * The closer file already holds black for ~1.4s (about 7.2s–8.6s) with the
+ * Iconic mark, #BEICONIC, and "Ten years. Still Iconic." The player does not
+ * add another end card on top of that.
  *
- * HARD HOLD (Sam, 2026-10-02): do not hard-wire or swap any Drive draft or v2
- * MP4 into the homepage. The draft folder is not finals:
- * https://drive.google.com/drive/folders/1RgcroDWX5-oogMQzRCFhaRC2Kf3Upi-V
- *
- * US. is blocked on a brand-safe cut. A camera UI flashes on the Santa/elf
- * couch beat; Edith is cutting that beat. An earlier pass also still needs the
- * non-Iconic camera mark cropped or blurred. BUILT. still needs the short
- * bathroom-mirror beat.
- *
- * Every slot stays `approval: "hold-not-final"` and `src: ""`.
- * The player ignores a slot until approval is "final" and `src` is a non-Drive
- * URL. Drive hosts are refused even if someone flips approval.
- *
- * Swap path once a final is green:
- *   1. Set that slot's `approval` to "final".
- *   2. Set `src` to an HTTPS URL of the 1080×1920 MP4, or to a path under
- *      `public/media/video/blaze/` if the file is hosted with the site.
- *   3. Keep this array in BUILT → US → TEN_YEARS order.
- *   4. If the file already has the line burned in, set `overlayBurnIn` to false.
- *   5. Do not paste Google Drive preview links or commit those binaries.
- *
- * Draft file ids (comments only, never `src`):
- *   BUILT.       1CNneXdlqNm0d2SlrjomAVhtMMsO9O4C-
- *   US.          1UTpe1GIaAXmWp5VEaGnf612gyDwiDQll
- *   TEN_YEARS    1AT6XCrBJgmRC6ly3-MN_YsAK5RLOR1E7
+ * `durationMs` is a stall watchdog above the authored length. The hard cut
+ * follows each file's own end so the closer's black hold plays through.
  */
 
-export const BLAZE_SLOT_DURATION_MS = 10_000;
+/** Watchdog above the ~10.7s finals so the authored ending is not clipped. */
+export const BLAZE_SLOT_DURATION_MS = 12_000;
 
-/** Black hold on the closer so the line can be read on homepage autoplay. */
-export const BLAZE_END_CARD_HOLD_MS = 1_350;
+/**
+ * Black hold already inside 03_TEN_YEARS_v2.mp4, about 7.2s–8.6s.
+ * Player `endCardHoldMs` stays 0 so that hold is not doubled.
+ */
+export const BLAZE_CLOSER_FILE_HOLD_MS = 1_370;
 
 export const BLAZE_FRAME = { width: 1080, height: 1920 } as const;
 
@@ -69,14 +52,10 @@ export interface HomepageBlazeSlot {
   alt: string;
   durationMs: number;
   /**
-   * "hold-not-final" until a cut is green. The homepage will not play the slot
-   * while this is a hold, even if `src` is filled in.
+   * "final" plays on the homepage. "hold-not-final" skips the slot.
    */
   approval: BlazeSlotApproval;
-  /**
-   * Final MP4 URL. Stay empty on a hold.
-   * Draft Drive files stay in the file comment and must not be pasted here.
-   */
+  /** Public MP4 path or HTTPS URL. Drive hosts are refused. */
   src: string;
   /** Ms of black after the clip. 0 skips the end card and hard-cuts. */
   endCardHoldMs: number;
@@ -96,11 +75,11 @@ export const HOMEPAGE_BLAZE_LOOP: readonly HomepageBlazeSlot[] = [
     burnIn: "BUILT.",
     alt: "BUILT.",
     durationMs: BLAZE_SLOT_DURATION_MS,
-    approval: "hold-not-final",
-    src: "",
+    approval: "final",
+    src: "/media/blaze/01_BUILT_v2.mp4",
     endCardHoldMs: 0,
     showMark: false,
-    overlayBurnIn: true,
+    overlayBurnIn: false,
   },
   {
     id: "US",
@@ -108,11 +87,11 @@ export const HOMEPAGE_BLAZE_LOOP: readonly HomepageBlazeSlot[] = [
     burnIn: "US.",
     alt: "US.",
     durationMs: BLAZE_SLOT_DURATION_MS,
-    approval: "hold-not-final",
-    src: "",
+    approval: "final",
+    src: "/media/blaze/02_US_v3.mp4",
     endCardHoldMs: 0,
     showMark: false,
-    overlayBurnIn: true,
+    overlayBurnIn: false,
   },
   {
     id: "TEN_YEARS",
@@ -120,11 +99,11 @@ export const HOMEPAGE_BLAZE_LOOP: readonly HomepageBlazeSlot[] = [
     burnIn: "Ten years. Still Iconic.",
     alt: "Ten years. Still Iconic.",
     durationMs: BLAZE_SLOT_DURATION_MS,
-    approval: "hold-not-final",
-    src: "",
-    endCardHoldMs: BLAZE_END_CARD_HOLD_MS,
+    approval: "final",
+    src: "/media/blaze/03_TEN_YEARS_v2.mp4",
+    endCardHoldMs: 0,
     showMark: true,
-    overlayBurnIn: true,
+    overlayBurnIn: false,
   },
 ];
 

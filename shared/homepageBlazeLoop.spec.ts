@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  BLAZE_END_CARD_HOLD_MS,
+  BLAZE_CLOSER_FILE_HOLD_MS,
   BLAZE_HASHTAG,
   BLAZE_SLOT_DURATION_MS,
   HOMEPAGE_BLAZE_LOOP,
@@ -28,31 +28,32 @@ describe("homepage blaze loop slots", () => {
       "Ten years. Still Iconic.",
     ]);
     expect(HOMEPAGE_BLAZE_LOOP.every((slot) => slot.durationMs === BLAZE_SLOT_DURATION_MS)).toBe(true);
-    expect(BLAZE_SLOT_DURATION_MS).toBe(10_000);
+    expect(BLAZE_SLOT_DURATION_MS).toBe(12_000);
   });
 
-  it("holds the closer on black long enough to read, and only on that beat", () => {
+  it("leaves the closer's black hold inside the file instead of adding a second card", () => {
     const closer = HOMEPAGE_BLAZE_LOOP.find((slot) => slot.id === "TEN_YEARS");
-    expect(closer?.endCardHoldMs).toBe(BLAZE_END_CARD_HOLD_MS);
-    expect(BLAZE_END_CARD_HOLD_MS).toBeGreaterThanOrEqual(1_200);
-    expect(BLAZE_END_CARD_HOLD_MS).toBeLessThanOrEqual(1_500);
+    expect(closer?.endCardHoldMs).toBe(0);
+    expect(BLAZE_CLOSER_FILE_HOLD_MS).toBeGreaterThanOrEqual(1_200);
+    expect(BLAZE_CLOSER_FILE_HOLD_MS).toBeLessThanOrEqual(1_500);
     expect(HOMEPAGE_BLAZE_LOOP.filter((slot) => slot.showMark).map((slot) => slot.id)).toEqual([
       "TEN_YEARS",
     ]);
-    expect(HOMEPAGE_BLAZE_LOOP.filter((slot) => slot.endCardHoldMs > 0).map((slot) => slot.id)).toEqual([
-      "TEN_YEARS",
-    ]);
+    expect(HOMEPAGE_BLAZE_LOOP.every((slot) => slot.overlayBurnIn === false)).toBe(true);
   });
 
-  it("leaves every slot on hold with an empty src", () => {
-    expect(blazeLoopShouldRender()).toBe(false);
-    expect(playableBlazeSlots()).toEqual([]);
+  it("wires the three finals in locked order", () => {
+    expect(blazeLoopShouldRender()).toBe(true);
+    expect(playableBlazeSlots().map((slot) => slot.src)).toEqual([
+      "/media/blaze/01_BUILT_v2.mp4",
+      "/media/blaze/02_US_v3.mp4",
+      "/media/blaze/03_TEN_YEARS_v2.mp4",
+    ]);
     const shipped = JSON.stringify(HOMEPAGE_BLAZE_LOOP);
-    expect(shipped).not.toMatch(/drive\.google|googleusercontent|santa|elf|bathroom/i);
+    expect(shipped).not.toMatch(/drive\.google|googleusercontent/i);
     for (const slot of HOMEPAGE_BLAZE_LOOP) {
-      expect(slot.approval).toBe("hold-not-final");
-      expect(slot.src).toBe("");
-      expect(blazeSlotIsPlayable(slot)).toBe(false);
+      expect(slot.approval).toBe("final");
+      expect(blazeSlotIsPlayable(slot)).toBe(true);
     }
   });
 
@@ -73,12 +74,11 @@ describe("homepage blaze loop slots", () => {
     expect(playableBlazeSlots(shuffled).map((slot) => slot.id)).toEqual(["BUILT", "TEN_YEARS"]);
   });
 
-  it("hard-cuts through the series, holds the closer, then loops", () => {
+  it("hard-cuts through the series and loops to BUILT", () => {
     const slots = playableBlazeSlots(withFinalSrc);
     expect(blazeAdvance(slots, 0, "clip")).toEqual({ index: 1, phase: "clip" });
     expect(blazeAdvance(slots, 1, "clip")).toEqual({ index: 2, phase: "clip" });
-    expect(blazeAdvance(slots, 2, "clip")).toEqual({ index: 2, phase: "endcard" });
-    expect(blazeAdvance(slots, 2, "endcard")).toEqual({ index: 0, phase: "clip" });
+    expect(blazeAdvance(slots, 2, "clip")).toEqual({ index: 0, phase: "clip" });
   });
 
   it("loops a single approved slot without an end card", () => {

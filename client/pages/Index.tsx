@@ -23,7 +23,7 @@ export default function Index() {
   return (
     <Layout>
       <HeroSection />
-      {/* Hidden while blaze slots are hold-not-final. See shared/homepageBlazeLoop.ts */}
+      {/* Muted hard-cut loop: BUILT → US → Ten years. */}
       <HomepageBlazeLoop />
       {settings.homepage.showBeforeAfter && (
         <>

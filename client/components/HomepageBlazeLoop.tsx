@@ -36,8 +36,8 @@ function BurnIn({ slot, onBlack }: { slot: HomepageBlazeSlot; onBlack: boolean }
 }
 
 /**
- * Muted 9:16 hard-cut loop. Renders nothing while slots are on hold or src is
- * empty, so Drive drafts cannot land on the homepage as a broken or live frame.
+ * Muted 9:16 hard-cut loop of the wired finals. Plays each file through, then
+ * cuts. Burn-ins stay in the picture. A held or empty slot is skipped.
  */
 export default function HomepageBlazeLoop({ slots = HOMEPAGE_BLAZE_LOOP }: Props) {
   const playable = useMemo(() => playableBlazeSlots(slots), [slots]);
