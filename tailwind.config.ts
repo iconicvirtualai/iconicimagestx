@@ -58,10 +58,6 @@ export default {
           ring: "hsl(var(--sidebar-ring))",
         },
       },
-      fontFamily: {
-        archivo: ['"Archivo Black"', "sans-serif"],
-        montserrat: ["Montserrat", "sans-serif"],
-      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
