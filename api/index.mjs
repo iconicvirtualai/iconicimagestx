@@ -7042,6 +7042,14 @@ router$c.get("/unread/count", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to get unread count." });
   }
 });
+const PORTAL_ADDRESS_LIMITS = {
+  line1: 240,
+  line2: 240,
+  city: 120,
+  state: 50,
+  zip: 20
+};
+const PORTAL_FACT_TEXT_LIMIT = 1e3;
 const EMPTY = "Not on file yet";
 const FACT_DEFS = [
   { id: "beds", label: "Beds", keys: ["bedrooms", "beds"] },
@@ -7141,7 +7149,7 @@ function buildPortalListingDetail(sources) {
   const invoices = readInvoices(sources.invoices || []);
   const activity = buildActivity(sources, photos, videos, floorplans, tours, invoices);
   const status = text$2(listing.status) || text$2(sources.order?.status) || text$2(sources.orderRequest?.status) || "open";
-  return {
+  return applyStoredPortalData({
     id,
     title: address.formatted || "Listing",
     status,
@@ -7158,7 +7166,108 @@ function buildPortalListingDetail(sources) {
     website,
     invoices,
     activity
+  }, listing.portalData);
+}
+function portalFactsDraftFromDetail(detail) {
+  const facts = {};
+  for (const fact of FACT_DEFS) {
+    const shown = detail.facts.find((item) => item.id === fact.id);
+    facts[fact.id] = shown && !shown.empty ? shown.value : "";
+  }
+  return {
+    address: {
+      line1: detail.address.line1,
+      line2: detail.address.line2,
+      city: detail.address.city,
+      state: detail.address.state,
+      zip: detail.address.zip
+    },
+    facts
   };
+}
+function sanitizePortalListingFacts(value) {
+  const row = asRecord$1(value);
+  if (!row) return null;
+  const addressRow = asRecord$1(row.address);
+  const factsRow = asRecord$1(row.facts);
+  if (!addressRow || !factsRow) return null;
+  const facts = {};
+  for (const fact of FACT_DEFS) {
+    facts[fact.id] = Object.prototype.hasOwnProperty.call(factsRow, fact.id) ? clipText(factsRow[fact.id], PORTAL_FACT_TEXT_LIMIT) : "";
+  }
+  return { address: normalizeAddressLines(addressRow), facts };
+}
+function portalListingFactsWrite(detail, body, nowIso) {
+  const next = sanitizePortalListingFacts(body);
+  const current = sanitizePortalListingFacts(portalFactsDraftFromDetail(detail));
+  if (!next || !current) return { ok: false, error: "Say which listing facts to save." };
+  if (JSON.stringify(next) === JSON.stringify(current)) return { ok: true, changed: false };
+  return {
+    ok: true,
+    changed: true,
+    portalData: next,
+    activity: {
+      id: `portal-data-${nowIso}`,
+      at: nowIso,
+      kind: "data",
+      summary: "Listing facts updated"
+    }
+  };
+}
+function applyStoredPortalData(detail, stored) {
+  const saved = readStoredPortalData(stored);
+  if (!saved) return detail;
+  const address = saved.address ? {
+    ...detail.address,
+    ...saved.address,
+    formatted: formatPortalAddress(saved.address)
+  } : detail.address;
+  const facts = detail.facts.map((fact) => {
+    if (!Object.prototype.hasOwnProperty.call(saved.facts, fact.id)) return fact;
+    const value = saved.facts[fact.id];
+    return { ...fact, value: value || EMPTY, empty: !value };
+  });
+  return {
+    ...detail,
+    title: address.formatted || "Listing",
+    address,
+    facts
+  };
+}
+function readStoredPortalData(value) {
+  const row = asRecord$1(value);
+  if (!row) return null;
+  const addressRow = asRecord$1(row.address);
+  const factsRow = asRecord$1(row.facts);
+  if (!addressRow && !factsRow) return null;
+  const facts = {};
+  if (factsRow) {
+    for (const fact of FACT_DEFS) {
+      if (!Object.prototype.hasOwnProperty.call(factsRow, fact.id)) continue;
+      facts[fact.id] = clipText(factsRow[fact.id], PORTAL_FACT_TEXT_LIMIT);
+    }
+  }
+  return {
+    address: addressRow ? normalizeAddressLines(addressRow) : null,
+    facts
+  };
+}
+function normalizeAddressLines(row) {
+  return {
+    line1: clipText(row.line1, PORTAL_ADDRESS_LIMITS.line1),
+    line2: clipText(row.line2, PORTAL_ADDRESS_LIMITS.line2),
+    city: clipText(row.city, PORTAL_ADDRESS_LIMITS.city),
+    state: clipText(row.state, PORTAL_ADDRESS_LIMITS.state),
+    zip: clipText(row.zip, PORTAL_ADDRESS_LIMITS.zip)
+  };
+}
+function clipText(value, max) {
+  let raw = "";
+  if (typeof value === "string") raw = value;
+  else if (typeof value === "number" && Number.isFinite(value)) raw = String(value);
+  else if (typeof value === "boolean") raw = value ? "Yes" : "No";
+  else return "";
+  return raw.replace(/\u0000/g, "").trim().slice(0, max);
 }
 function applyPortalMediaChange(store, items, change, nowIso) {
   const bucket2 = items.filter((item) => item.kind === change.kind).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
@@ -7276,6 +7385,9 @@ function factText(value) {
   }
   return "";
 }
+function formatPortalAddress(address) {
+  return [address.line1, address.line2, [address.city, [address.state, address.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ")].filter(Boolean).join(", ");
+}
 function readAddress(records) {
   const address = {
     line1: "",
@@ -7291,7 +7403,7 @@ function readAddress(records) {
   for (const record of records) {
     fillAddress(address, addressFromRecord(record));
   }
-  address.formatted = [address.line1, address.line2, [address.city, [address.state, address.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ")].filter(Boolean).join(", ");
+  address.formatted = formatPortalAddress(address);
   const geo = address.lat != null && address.lng != null ? { lat: address.lat, lng: address.lng } : null;
   address.mapUrl = geo ? mapEmbedUrl(geo.lat, geo.lng) : null;
   return address;
@@ -7827,6 +7939,7 @@ async function appendPortalWrite(listingId, patch) {
     };
     if (patch.portalMedia) update.portalMedia = patch.portalMedia;
     if (patch.portalWebsite) update.portalWebsite = patch.portalWebsite;
+    if (patch.portalData) update.portalData = patch.portalData;
     tx.update(ref, update);
   });
 }
@@ -7876,6 +7989,24 @@ const handlePatchPortalMedia = async (req, res) => {
     return res.json(buildPortalListingDetail(await loadSources(listingId, refreshed)));
   } catch (err) {
     return sendKnownError$2(res, err, "Could not update that file.");
+  }
+};
+const handlePatchPortalData = async (req, res) => {
+  if (!adminReady$3(res)) return;
+  const listingId = listingIdFrom(req.params.id);
+  if (!listingId) return res.status(400).json({ error: "Listing id is not valid." });
+  try {
+    const listing = await authorizedListing(req, listingId);
+    const detail = buildPortalListingDetail(await loadSources(listingId, listing));
+    const write = portalListingFactsWrite(detail, req.body, (/* @__PURE__ */ new Date()).toISOString());
+    if (write.ok === false) return res.status(400).json({ error: write.error });
+    if (write.changed) {
+      await appendPortalWrite(listingId, { portalData: write.portalData, activity: write.activity });
+    }
+    const refreshed = await authorizedListing(req, listingId);
+    return res.json(buildPortalListingDetail(await loadSources(listingId, refreshed)));
+  } catch (err) {
+    return sendKnownError$2(res, err, "Could not save listing facts.");
   }
 };
 const handlePatchPortalWebsite = async (req, res) => {
@@ -8149,6 +8280,7 @@ router$b.get("/me/home", requireAuth, async (req, res) => {
   }
 });
 router$b.get("/me/listings/:id", requireAuth, handleGetPortalListing);
+router$b.patch("/me/listings/:id/data", requireAuth, handlePatchPortalData);
 router$b.patch("/me/listings/:id/media", requireAuth, handlePatchPortalMedia);
 router$b.patch("/me/listings/:id/website", requireAuth, handlePatchPortalWebsite);
 router$b.get("/me", requireAuth, async (req, res) => {

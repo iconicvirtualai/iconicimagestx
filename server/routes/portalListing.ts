@@ -2,6 +2,7 @@
  * Client listing file inside the portal.
  * Reads the listing, order, gallery, and invoice draft already saved at booking.
  * Hide/unhide and site style write portalMedia / portalWebsite on that listing.
+ * Data-tab edits write portalData. Coordinates already on the listing stay put.
  */
 
 import type { RequestHandler } from "express";
@@ -11,6 +12,7 @@ import { clientCanViewListing } from "../../shared/listingAccess";
 import {
   applyPortalMediaChange,
   buildPortalListingDetail,
+  portalListingFactsWrite,
   portalListingId,
   readMediaStore,
   sanitizeWebsiteSettings,
@@ -146,7 +148,7 @@ function mediaChange(body: unknown): PortalMediaChange | null {
   return null;
 }
 
-async function appendPortalWrite(listingId: string, patch: { portalMedia?: unknown; portalWebsite?: unknown; activity: { id: string; at: string; kind: string; summary: string } }) {
+async function appendPortalWrite(listingId: string, patch: { portalMedia?: unknown; portalWebsite?: unknown; portalData?: unknown; activity: { id: string; at: string; kind: string; summary: string } }) {
   const ref = db().collection("listings").doc(listingId);
   await db().runTransaction(async (tx) => {
     const snap = await tx.get(ref);
@@ -159,6 +161,7 @@ async function appendPortalWrite(listingId: string, patch: { portalMedia?: unkno
     };
     if (patch.portalMedia) update.portalMedia = patch.portalMedia;
     if (patch.portalWebsite) update.portalWebsite = patch.portalWebsite;
+    if (patch.portalData) update.portalData = patch.portalData;
     tx.update(ref, update);
   });
 }
@@ -212,6 +215,25 @@ export const handlePatchPortalMedia: RequestHandler = async (req: AuthenticatedR
     return res.json(buildPortalListingDetail(await loadSources(listingId, refreshed)));
   } catch (err) {
     return sendKnownError(res, err, "Could not update that file.");
+  }
+};
+
+export const handlePatchPortalData: RequestHandler = async (req: AuthenticatedRequest, res) => {
+  if (!adminReady(res)) return;
+  const listingId = listingIdFrom(req.params.id);
+  if (!listingId) return res.status(400).json({ error: "Listing id is not valid." });
+  try {
+    const listing = await authorizedListing(req, listingId);
+    const detail = buildPortalListingDetail(await loadSources(listingId, listing));
+    const write = portalListingFactsWrite(detail, req.body, new Date().toISOString());
+    if (write.ok === false) return res.status(400).json({ error: write.error });
+    if (write.changed) {
+      await appendPortalWrite(listingId, { portalData: write.portalData, activity: write.activity });
+    }
+    const refreshed = await authorizedListing(req, listingId);
+    return res.json(buildPortalListingDetail(await loadSources(listingId, refreshed)));
+  } catch (err) {
+    return sendKnownError(res, err, "Could not save listing facts.");
   }
 };
 

@@ -2,7 +2,8 @@
  * Client portal listing file.
  * Reads fields already stored on the listing, order, and gallery.
  * Hide/unhide keeps the file and only changes presentation visibility.
- * No public-record lookup, no payment publish.
+ * Owner edits to the Data tab are stored on the listing as portalData.
+ * Those edits do not geocode, look up public records, or publish payment.
  */
 
 export const PORTAL_LISTING_TABS = [
@@ -39,6 +40,28 @@ export interface PortalFact {
   value: string;
   empty: boolean;
 }
+
+/** Address lines and property facts an owner can save from the Data tab. */
+export interface PortalListingFactsDraft {
+  address: {
+    line1: string;
+    line2: string;
+    city: string;
+    state: string;
+    zip: string;
+  };
+  facts: Record<string, string>;
+}
+
+export const PORTAL_ADDRESS_LIMITS = {
+  line1: 240,
+  line2: 240,
+  city: 120,
+  state: 50,
+  zip: 20,
+} as const;
+
+export const PORTAL_FACT_TEXT_LIMIT = 1000;
 
 export interface PortalMediaItem {
   id: string;
@@ -204,6 +227,11 @@ export function portalListingOwnerApiPath(listingId: string): string {
   return `/api/clients/me/listings/${encodeURIComponent(listingId)}`;
 }
 
+/** Owner write for Data-tab facts. The public listing link does not accept this. */
+export function portalListingDataApiPath(listingId: string): string {
+  return `${portalListingOwnerApiPath(listingId)}/data`;
+}
+
 /** Invoice and payment lines are for the owning client. The link does not include them. */
 export function isInvoiceOrPaymentActivity(event: PortalActivityEvent): boolean {
   if (/^(invoice|payment)$/i.test(event.kind)) return true;
@@ -281,7 +309,7 @@ export function buildPortalListingDetail(sources: PortalListingSources): PortalL
   const activity = buildActivity(sources, photos, videos, floorplans, tours, invoices);
   const status = text(listing.status) || text(sources.order?.status) || text(sources.orderRequest?.status) || "open";
 
-  return {
+  return applyStoredPortalData({
     id,
     title: address.formatted || "Listing",
     status,
@@ -298,7 +326,129 @@ export function buildPortalListingDetail(sources: PortalListingSources): PortalL
     website,
     invoices,
     activity,
+  }, listing.portalData);
+}
+
+export function portalFactsDraftFromDetail(detail: PortalListingDetail): PortalListingFactsDraft {
+  const facts: Record<string, string> = {};
+  for (const fact of FACT_DEFS) {
+    const shown = detail.facts.find((item) => item.id === fact.id);
+    facts[fact.id] = shown && !shown.empty ? shown.value : "";
+  }
+  return {
+    address: {
+      line1: detail.address.line1,
+      line2: detail.address.line2,
+      city: detail.address.city,
+      state: detail.address.state,
+      zip: detail.address.zip,
+    },
+    facts,
   };
+}
+
+/**
+ * Full snapshot the Data form submits.
+ * Unknown keys are dropped. Missing fact ids become blank. Coordinates are not accepted.
+ */
+export function sanitizePortalListingFacts(value: unknown): PortalListingFactsDraft | null {
+  const row = asRecord(value);
+  if (!row) return null;
+  const addressRow = asRecord(row.address);
+  const factsRow = asRecord(row.facts);
+  if (!addressRow || !factsRow) return null;
+  const facts: Record<string, string> = {};
+  for (const fact of FACT_DEFS) {
+    facts[fact.id] = Object.prototype.hasOwnProperty.call(factsRow, fact.id)
+      ? clipText(factsRow[fact.id], PORTAL_FACT_TEXT_LIMIT)
+      : "";
+  }
+  return { address: normalizeAddressLines(addressRow), facts };
+}
+
+export function portalListingFactsWrite(
+  detail: PortalListingDetail,
+  body: unknown,
+  nowIso: string,
+): { ok: false; error: string }
+  | { ok: true; changed: false }
+  | { ok: true; changed: true; portalData: PortalListingFactsDraft; activity: PortalActivityEvent } {
+  const next = sanitizePortalListingFacts(body);
+  const current = sanitizePortalListingFacts(portalFactsDraftFromDetail(detail));
+  if (!next || !current) return { ok: false, error: "Say which listing facts to save." };
+  if (JSON.stringify(next) === JSON.stringify(current)) return { ok: true, changed: false };
+  return {
+    ok: true,
+    changed: true,
+    portalData: next,
+    activity: {
+      id: `portal-data-${nowIso}`,
+      at: nowIso,
+      kind: "data",
+      summary: "Listing facts updated",
+    },
+  };
+}
+
+function applyStoredPortalData(detail: PortalListingDetail, stored: unknown): PortalListingDetail {
+  const saved = readStoredPortalData(stored);
+  if (!saved) return detail;
+  const address = saved.address
+    ? {
+      ...detail.address,
+      ...saved.address,
+      formatted: formatPortalAddress(saved.address),
+    }
+    : detail.address;
+  const facts = detail.facts.map((fact) => {
+    if (!Object.prototype.hasOwnProperty.call(saved.facts, fact.id)) return fact;
+    const value = saved.facts[fact.id];
+    return { ...fact, value: value || EMPTY, empty: !value };
+  });
+  return {
+    ...detail,
+    title: address.formatted || "Listing",
+    address,
+    facts,
+  };
+}
+
+function readStoredPortalData(value: unknown): { address: PortalListingFactsDraft["address"] | null; facts: Record<string, string> } | null {
+  const row = asRecord(value);
+  if (!row) return null;
+  const addressRow = asRecord(row.address);
+  const factsRow = asRecord(row.facts);
+  if (!addressRow && !factsRow) return null;
+  const facts: Record<string, string> = {};
+  if (factsRow) {
+    for (const fact of FACT_DEFS) {
+      if (!Object.prototype.hasOwnProperty.call(factsRow, fact.id)) continue;
+      facts[fact.id] = clipText(factsRow[fact.id], PORTAL_FACT_TEXT_LIMIT);
+    }
+  }
+  return {
+    address: addressRow ? normalizeAddressLines(addressRow) : null,
+    facts,
+  };
+}
+
+function normalizeAddressLines(row: Record<string, unknown>): PortalListingFactsDraft["address"] {
+  return {
+    line1: clipText(row.line1, PORTAL_ADDRESS_LIMITS.line1),
+    line2: clipText(row.line2, PORTAL_ADDRESS_LIMITS.line2),
+    city: clipText(row.city, PORTAL_ADDRESS_LIMITS.city),
+    state: clipText(row.state, PORTAL_ADDRESS_LIMITS.state),
+    zip: clipText(row.zip, PORTAL_ADDRESS_LIMITS.zip),
+  };
+}
+
+function clipText(value: unknown, max: number): string {
+  let raw = "";
+  if (typeof value === "string") raw = value;
+  else if (typeof value === "number" && Number.isFinite(value)) raw = String(value);
+  else if (typeof value === "boolean") raw = value ? "Yes" : "No";
+  else return "";
+  return raw.replace(/\u0000/g, "").trim().slice(0, max);
 }
 
 export function applyPortalMediaChange(
@@ -444,6 +594,12 @@ function factText(value: unknown): string {
   return "";
 }
 
+function formatPortalAddress(address: { line1: string; line2: string; city: string; state: string; zip: string }): string {
+  return [address.line1, address.line2, [address.city, [address.state, address.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ")]
+    .filter(Boolean)
+    .join(", ");
+}
+
 function readAddress(records: Array<Record<string, unknown>>): PortalAddress {
   const address: PortalAddress = {
     line1: "",
@@ -461,9 +617,7 @@ function readAddress(records: Array<Record<string, unknown>>): PortalAddress {
     fillAddress(address, addressFromRecord(record));
   }
 
-  address.formatted = [address.line1, address.line2, [address.city, [address.state, address.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ")]
-    .filter(Boolean)
-    .join(", ");
+  address.formatted = formatPortalAddress(address);
   const geo = address.lat != null && address.lng != null ? { lat: address.lat, lng: address.lng } : null;
   address.mapUrl = geo ? mapEmbedUrl(geo.lat, geo.lng) : null;
   return address;

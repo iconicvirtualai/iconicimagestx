@@ -3,13 +3,18 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadPortalListingView } from "@/lib/portalListingRead";
 import {
+  PORTAL_ADDRESS_LIMITS,
+  PORTAL_FACT_TEXT_LIMIT,
   PORTAL_LISTING_TABS,
+  portalFactsDraftFromDetail,
+  portalListingDataApiPath,
   portalListingId,
   portalListingOwnerApiPath,
   portalListingPageMode,
   portalListingTab,
   visitorPortalListingDetail,
   type PortalListingDetail as PortalListingDetailModel,
+  type PortalListingFactsDraft,
   type PortalListingTabId,
   type PortalMediaItem,
   type PortalMediaKind,
@@ -28,11 +33,16 @@ export function PortalListingDetailView({
   saving,
   website,
   canEdit,
+  dataEditing,
+  dataDraft,
   onTab,
   onToggleEditing,
   onMedia,
   onWebsite,
   onWebsiteSave,
+  onDataEditing,
+  onDataDraft,
+  onDataSave,
 }: {
   detail: PortalListingDetailModel;
   tab: PortalListingTabId;
@@ -40,11 +50,16 @@ export function PortalListingDetailView({
   saving: boolean;
   website: PortalWebsiteSettings;
   canEdit: boolean;
+  dataEditing: boolean;
+  dataDraft: PortalListingFactsDraft;
   onTab: (tab: PortalListingTabId) => void;
   onToggleEditing: (kind: PortalMediaKind) => void;
   onMedia: (change: { kind: PortalMediaKind; id: string; hidden?: boolean; move?: "earlier" | "later" }) => void;
   onWebsite: (next: PortalWebsiteSettings) => void;
   onWebsiteSave: () => void;
+  onDataEditing: (editing: boolean) => void;
+  onDataDraft: (draft: PortalListingFactsDraft) => void;
+  onDataSave: () => void;
 }) {
   const mediaEditing = canEdit ? editing : null;
   const shown = canEdit ? detail : visitorPortalListingDetail(detail);
@@ -84,7 +99,18 @@ export function PortalListingDetailView({
       </div>
 
       <main className="max-w-5xl mx-auto px-4 py-8">
-        {tab === "data" && <DataTab detail={shown} />}
+        {tab === "data" && (
+          <DataTab
+            detail={shown}
+            canEdit={canEdit}
+            editing={dataEditing}
+            saving={saving}
+            draft={dataDraft}
+            onEditing={onDataEditing}
+            onDraft={onDataDraft}
+            onSave={onDataSave}
+          />
+        )}
         {tab === "photos" && (
           <MediaTab
             title="Photos"
@@ -153,6 +179,8 @@ export default function PortalListingDetail() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<PortalMediaKind | null>(null);
   const [canEdit, setCanEdit] = useState(false);
+  const [dataEditing, setDataEditing] = useState(false);
+  const [dataDraft, setDataDraft] = useState<PortalListingFactsDraft | null>(null);
   const tab = portalListingTab(searchParams.get("tab"));
   const mode = portalListingPageMode({
     loading,
@@ -178,6 +206,8 @@ export default function PortalListingDetail() {
           setDetail(null);
           setWebsite(null);
           setCanEdit(false);
+          setDataDraft(null);
+          setDataEditing(false);
           setMissing(true);
           return;
         }
@@ -185,11 +215,15 @@ export default function PortalListingDetail() {
           setDetail(null);
           setWebsite(null);
           setCanEdit(false);
+          setDataDraft(null);
+          setDataEditing(false);
           setError(loaded.message);
           return;
         }
         setDetail(loaded.detail);
         setWebsite(loaded.detail.website);
+        setDataDraft(portalFactsDraftFromDetail(loaded.detail));
+        setDataEditing(false);
         setCanEdit(loaded.canEdit);
         setEditing(null);
       } catch (err: unknown) {
@@ -197,6 +231,8 @@ export default function PortalListingDetail() {
           setDetail(null);
           setWebsite(null);
           setCanEdit(false);
+          setDataDraft(null);
+          setDataEditing(false);
           setError(err instanceof Error ? err.message : "Could not load this listing.");
         }
       } finally {
@@ -211,8 +247,8 @@ export default function PortalListingDetail() {
   if (!id || missing) return <NotFound />;
   if (loading || fetching) return <Pending />;
 
-  async function send(path: string, body: unknown) {
-    if (!canEdit || !user) return;
+  async function send(path: string, body: unknown): Promise<PortalListingDetailModel | null> {
+    if (!canEdit || !user) return null;
     setSaving(true);
     try {
       const token = await user.getIdToken();
@@ -225,8 +261,10 @@ export default function PortalListingDetail() {
       if (!res.ok) throw new Error(data.error || "Could not save.");
       setDetail(data);
       setWebsite(data.website);
+      return data;
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Could not save.");
+      return null;
     } finally {
       setSaving(false);
     }
@@ -262,6 +300,8 @@ export default function PortalListingDetail() {
           saving={saving}
           website={website}
           canEdit={canEdit}
+          dataEditing={dataEditing}
+          dataDraft={dataDraft ?? portalFactsDraftFromDetail(detail)}
           onTab={(next) => {
             const params = new URLSearchParams(searchParams);
             params.set("tab", next);
@@ -274,6 +314,20 @@ export default function PortalListingDetail() {
           onMedia={(change) => send(`${ownerApi}/media`, change)}
           onWebsite={setWebsite}
           onWebsiteSave={() => send(`${ownerApi}/website`, website)}
+          onDataEditing={(on) => {
+            if (!canEdit || saving) return;
+            setDataEditing(on);
+            setDataDraft(portalFactsDraftFromDetail(detail));
+          }}
+          onDataDraft={setDataDraft}
+          onDataSave={() => {
+            void (async () => {
+              const saved = await send(portalListingDataApiPath(id), dataDraft ?? portalFactsDraftFromDetail(detail));
+              if (!saved) return;
+              setDataDraft(portalFactsDraftFromDetail(saved));
+              setDataEditing(false);
+            })();
+          }}
         />
       )}
     </div>
@@ -288,18 +342,67 @@ function Pending() {
   );
 }
 
-function DataTab({ detail }: { detail: PortalListingDetailModel }) {
+function DataTab({
+  detail,
+  canEdit,
+  editing,
+  saving,
+  draft,
+  onEditing,
+  onDraft,
+  onSave,
+}: {
+  detail: PortalListingDetailModel;
+  canEdit: boolean;
+  editing: boolean;
+  saving: boolean;
+  draft: PortalListingFactsDraft;
+  onEditing: (editing: boolean) => void;
+  onDraft: (draft: PortalListingFactsDraft) => void;
+  onSave: () => void;
+}) {
+  const showEditor = canEdit && editing;
   const address = detail.address;
+  const addressDraft = draft.address;
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="listing-data">
+      {canEdit && (
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs text-gray-500">Facts stay read-only until Edit is on.</p>
+          <div className="flex items-center gap-3 shrink-0">
+            {showEditor && (
+              <Button type="button" className="bg-black text-white" data-testid="data-save" disabled={saving} onClick={onSave}>
+                {saving ? "Saving" : "Save"}
+              </Button>
+            )}
+            <label data-testid="data-edit-toggle" className="inline-flex items-center gap-2 cursor-pointer">
+              <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Edit</span>
+              <span className="relative inline-flex items-center">
+                <input
+                  type="checkbox"
+                  role="switch"
+                  aria-label="Edit listing facts"
+                  aria-checked={editing}
+                  checked={editing}
+                  disabled={saving}
+                  onChange={(event) => onEditing(event.target.checked)}
+                  className="peer sr-only"
+                />
+                <span className="block h-6 w-11 rounded-full bg-gray-200 peer-checked:bg-[#0d9488] peer-focus-visible:ring-2 peer-focus-visible:ring-[#0d9488] peer-disabled:opacity-50" />
+                <span className="pointer-events-none absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition peer-checked:translate-x-5" />
+              </span>
+            </label>
+          </div>
+        </div>
+      )}
       <section className="bg-white rounded-2xl border border-gray-100 p-5">
         <h2 className="text-xs font-black uppercase tracking-widest text-[#0d9488] mb-4">Address</h2>
         <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="Address line 1" value={address.line1} />
-          <Field label="Address line 2" value={address.line2} />
-          <Field label="City" value={address.city} />
-          <Field label="State" value={address.state} />
-          <Field label="Zip" value={address.zip} />
+          <AddressFact id="line1" label="Address line 1" value={showEditor ? addressDraft.line1 : address.line1} editing={showEditor} maxLength={PORTAL_ADDRESS_LIMITS.line1} onChange={(line1) => onDraft({ ...draft, address: { ...addressDraft, line1 } })} />
+          <AddressFact id="line2" label="Address line 2" value={showEditor ? addressDraft.line2 : address.line2} editing={showEditor} maxLength={PORTAL_ADDRESS_LIMITS.line2} onChange={(line2) => onDraft({ ...draft, address: { ...addressDraft, line2 } })} />
+          <AddressFact id="city" label="City" value={showEditor ? addressDraft.city : address.city} editing={showEditor} maxLength={PORTAL_ADDRESS_LIMITS.city} onChange={(city) => onDraft({ ...draft, address: { ...addressDraft, city } })} />
+          <AddressFact id="state" label="State" value={showEditor ? addressDraft.state : address.state} editing={showEditor} maxLength={PORTAL_ADDRESS_LIMITS.state} onChange={(state) => onDraft({ ...draft, address: { ...addressDraft, state } })} />
+          <AddressFact id="zip" label="Zip" value={showEditor ? addressDraft.zip : address.zip} editing={showEditor} maxLength={PORTAL_ADDRESS_LIMITS.zip} onChange={(zip) => onDraft({ ...draft, address: { ...addressDraft, zip } })} />
         </div>
         <div className="mt-5 overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 min-h-[220px]">
           {address.mapUrl ? (
@@ -312,17 +415,67 @@ function DataTab({ detail }: { detail: PortalListingDetailModel }) {
             </div>
           )}
         </div>
+        {showEditor && (
+          <p className="text-xs text-gray-500 mt-3">The map pin stays on the coordinates already saved with this order.</p>
+        )}
       </section>
       <section className="bg-white rounded-2xl border border-gray-100 p-5">
         <h2 className="text-xs font-black uppercase tracking-widest text-[#0d9488] mb-1">Property</h2>
         <p className="text-xs text-gray-500 mb-4">Shown from the booking and listing file. Public record lookups are not part of this page.</p>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {detail.facts.map((fact) => (
-            <Field key={fact.id} label={fact.label} value={fact.empty ? "" : fact.value} placeholder={fact.value} />
+            showEditor ? (
+              <label key={fact.id} className="block">
+                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{fact.label}</span>
+                <input
+                  data-testid={`data-field-${fact.id}`}
+                  value={draft.facts[fact.id] ?? ""}
+                  placeholder="Not on file yet"
+                  maxLength={PORTAL_FACT_TEXT_LIMIT}
+                  autoComplete="off"
+                  onChange={(event) => onDraft({ ...draft, facts: { ...draft.facts, [fact.id]: event.target.value } })}
+                  className="mt-1 w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold"
+                />
+              </label>
+            ) : (
+              <Field key={fact.id} label={fact.label} value={fact.empty ? "" : fact.value} placeholder={fact.value} />
+            )
           ))}
         </div>
       </section>
     </div>
+  );
+}
+
+function AddressFact({
+  id,
+  label,
+  value,
+  editing,
+  maxLength,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  editing: boolean;
+  maxLength: number;
+  onChange: (value: string) => void;
+}) {
+  if (!editing) return <Field label={label} value={value} />;
+  return (
+    <label className="block">
+      <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{label}</span>
+      <input
+        data-testid={`data-field-${id}`}
+        value={value}
+        placeholder="Not on file yet"
+        maxLength={maxLength}
+        autoComplete="off"
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-1 w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold"
+      />
+    </label>
   );
 }
 
