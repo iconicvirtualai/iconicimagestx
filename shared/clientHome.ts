@@ -1,0 +1,610 @@
+/**
+ * Client home dashboard data.
+ * Reads stored listings, invoices, and appointments. Does not price,
+ * collect payment, or change a booking.
+ */
+
+import { presentInvoiceNumber } from "./orderProjectInvoice.ts";
+
+const CHICAGO = "America/Chicago";
+
+const SUBMITTED = new Set([
+  "requested",
+  "request",
+  "new",
+  "pending",
+  "reviewed",
+  "needs_scheduled",
+  "unscheduled",
+]);
+
+const ACCEPTED = new Set([
+  "confirmed",
+  "scheduled",
+  "accepted",
+  "in_progress",
+  "completed",
+  "shot_complete",
+  "appt_scheduled",
+  "consult_scheduled",
+  "delivered",
+]);
+
+const INACTIVE = new Set([
+  "cancelled",
+  "canceled",
+  "declined",
+  "archived",
+  "no_show",
+]);
+
+export type AppointmentTone =
+  | "past"
+  | "submitted"
+  | "accepted"
+  | "change"
+  | "inactive"
+  | "unknown"
+  | "undated";
+
+export interface ClientListingCard {
+  id: string;
+  address: string;
+  status: string;
+  projectType: "" | "real_estate" | "business";
+  imageCount: number;
+  coverUrl: string | null;
+  createdAt: string | null;
+  appointmentDate: string | null;
+  href: string;
+}
+
+export interface ClientInvoiceLine {
+  name: string;
+  qty: number | null;
+  amount: number | null;
+}
+
+export interface ClientInvoiceStatement {
+  id: string;
+  invoiceNumber: string;
+  status: string;
+  clientName: string;
+  address: string;
+  createdAt: string | null;
+  issuedOn: string | null;
+  lineItems: ClientInvoiceLine[];
+  subtotal: number | null;
+  tax: number | null;
+  total: number | null;
+  amountPaid: number | null;
+  amountDue: number | null;
+}
+
+export interface ClientAppointment {
+  id: string;
+  address: string;
+  status: string;
+  date: string | null;
+  time: string;
+  requestedDate: string | null;
+  requestedTime: string;
+  approved: boolean;
+  createdAt: string | null;
+}
+
+export function addressText(value: unknown): string {
+  if (!value) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "object") {
+    const address = value as Record<string, unknown>;
+    if (typeof address.formatted === "string" && address.formatted.trim()) return address.formatted.trim();
+    if (typeof address.label === "string" && address.label.trim()) return address.label.trim();
+    return [address.street, address.city, address.state, address.zip]
+      .filter((part) => typeof part === "string" && part.trim())
+      .join(", ");
+  }
+  return "";
+}
+
+export function statusKey(value: unknown): string {
+  return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+export function humanStatus(value: unknown): string {
+  const key = statusKey(value);
+  if (!key) return "";
+  return key.replace(/_/g, " ");
+}
+
+/** Calendar day in America/Chicago. Date-only strings stay on that day. */
+export function calendarDateKey(value: unknown, timeZone = CHICAGO): string | null {
+  if (value == null || value === "") return null;
+  if (typeof value === "number" && Number.isFinite(value)) return instantDateKey(new Date(value), timeZone);
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : instantDateKey(value, timeZone);
+  if (typeof value === "object") {
+    const record = value as { seconds?: unknown; _seconds?: unknown };
+    const seconds = typeof record.seconds === "number"
+      ? record.seconds
+      : typeof record._seconds === "number"
+        ? record._seconds
+        : null;
+    if (seconds == null) return null;
+    return instantDateKey(new Date(seconds * 1000), timeZone);
+  }
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const textual = textualDateKey(trimmed);
+  if (textual) return textual;
+  if (/^\d{4}-\d{2}-\d{2}T00:00:00(?:\.000)?Z$/.test(trimmed)) return trimmed.slice(0, 10);
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return instantDateKey(parsed, timeZone);
+}
+
+export function formatPortalDate(value: unknown): string | null {
+  const key = calendarDateKey(value);
+  if (!key) return null;
+  const [year, month, day] = key.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
+export function clockTime(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed || /^tbd$/i.test(trimmed)) return null;
+  const match = trimmed.match(/^(\d{1,2})(?::(\d{2}))?(?::\d{2})?\s*(am|pm)?$/i);
+  if (!match) return null;
+  let hours = Number(match[1]);
+  const minutes = Number(match[2] || "0");
+  const meridiem = match[3]?.toLowerCase();
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes) || minutes > 59) return null;
+  if (meridiem === "pm" && hours < 12) hours += 12;
+  if (meridiem === "am" && hours === 12) hours = 0;
+  if (!meridiem && hours > 23) return null;
+  if (meridiem && hours > 23) return null;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+export function storedAmount(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return roundMoney(value);
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value.replace(/[$,\s]/g, ""));
+    if (Number.isFinite(parsed)) return roundMoney(parsed);
+  }
+  return null;
+}
+
+export function usd(value: number): string {
+  return value.toLocaleString("en-US", { style: "currency", currency: "USD" });
+}
+
+export function listingCoverUrl(images: unknown): string | null {
+  if (!Array.isArray(images)) return null;
+  for (const image of images) {
+    if (!image || typeof image !== "object") continue;
+    const record = image as { url?: unknown; thumbnailUrl?: unknown };
+    const candidate = typeof record.url === "string" ? record.url : record.thumbnailUrl;
+    if (typeof candidate === "string" && /^https?:\/\//i.test(candidate.trim())) return candidate.trim();
+  }
+  return null;
+}
+
+export function sortNewestFirst<T extends { createdAt?: string | null; id: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const aTime = a.createdAt ? Date.parse(a.createdAt) : Number.NaN;
+    const bTime = b.createdAt ? Date.parse(b.createdAt) : Number.NaN;
+    const aOk = Number.isFinite(aTime);
+    const bOk = Number.isFinite(bTime);
+    if (aOk && bOk && aTime !== bTime) return bTime - aTime;
+    if (aOk !== bOk) return aOk ? -1 : 1;
+    if (a.id === b.id) return 0;
+    return a.id < b.id ? 1 : -1;
+  });
+}
+
+/** Bean's listing file. No tab query; the listing page chooses its own default. */
+export function clientListingPath(listingId: string): string {
+  return `/portal/listings/${encodeURIComponent(listingId.trim())}`;
+}
+
+export function buildClientListing(id: string, data: Record<string, unknown>): ClientListingCard {
+  const images = data.images;
+  const projectType = data.projectType === "business" || data.projectType === "real_estate" ? data.projectType : "";
+  const status = typeof data.status === "string" && data.status.trim() ? data.status.trim() : "scheduled";
+  return {
+    id,
+    address: addressText(data.propertyAddress || data.address || data.shootLocation) || "Listing",
+    status,
+    projectType,
+    imageCount: Array.isArray(images) ? images.length : 0,
+    coverUrl: listingCoverUrl(images),
+    createdAt: isoStamp(data.createdAt),
+    appointmentDate: calendarDateKey(data.apptDate || data.appointmentDate || data.scheduledDate),
+    href: clientListingPath(id),
+  };
+}
+
+export function buildClientInvoice(id: string, data: Record<string, unknown>, now = new Date()): ClientInvoiceStatement {
+  const createdAt = isoStamp(data.createdAt);
+  const issuedAt = createdAt ? new Date(createdAt) : now;
+  return {
+    id,
+    invoiceNumber: presentInvoiceNumber(data.invoiceNumber, id, Number.isNaN(issuedAt.getTime()) ? now : issuedAt),
+    status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
+    clientName: text(data.clientName),
+    address: addressText(data.billToAddress || data.address || data.propertyAddress),
+    createdAt,
+    issuedOn: formatPortalDate(data.createdAt) || formatPortalDate(data.sentAt) || formatPortalDate(data.paidAt),
+    lineItems: storedLines(data.lineItems, data.services),
+    subtotal: storedAmount(data.subtotal),
+    tax: storedAmount(data.tax),
+    total: storedAmount(data.total),
+    amountPaid: storedAmount(data.amountPaid),
+    amountDue: storedAmount(data.amountDue),
+  };
+}
+
+/**
+ * Appointment fields the calendar can color.
+ * A different accepted time is orange only when the stored ask and the
+ * stored acceptance disagree and no approval stamp is on file.
+ */
+export function buildClientAppointment(
+  id: string,
+  data: Record<string, unknown>,
+  orderRequest?: Record<string, unknown> | null,
+): ClientAppointment {
+  const scheduledDate = firstDate(data.scheduledDate, data.appointmentDate);
+  const scheduledTime = firstTime(data.scheduledTime, data.appointmentTime, data.apptTime);
+  let requestedDate = firstDate(data.requestedDate, data.originalScheduledDate, data.originalDate, orderRequest?.requestedDate, orderRequest?.originalScheduledDate);
+  let requestedTime = firstTime(data.requestedTime, data.originalScheduledTime, data.originalTime, orderRequest?.requestedTime, orderRequest?.originalScheduledTime);
+
+  const requestScheduledDate = firstDate(orderRequest?.scheduledDate, orderRequest?.appointmentDate);
+  const requestScheduledTime = firstTime(orderRequest?.scheduledTime, orderRequest?.appointmentTime);
+  if (!requestedDate && requestScheduledDate && scheduledDate && requestScheduledDate !== scheduledDate) {
+    requestedDate = requestScheduledDate;
+  }
+  if (!requestedTime && requestScheduledTime && scheduledTime && clockTime(requestScheduledTime) !== clockTime(scheduledTime)) {
+    requestedTime = requestScheduledTime;
+  }
+
+  const proposedDate = firstDate(data.proposedDate, data.alternateDate, data.counterDate);
+  const proposedTime = firstTime(data.proposedTime, data.alternateTime, data.counterTime);
+  const status = typeof data.status === "string" ? data.status.trim() : "";
+  const iconicAccepted = ACCEPTED.has(statusKey(status)) || statusKey(status) === "pending_confirmation" || statusKey(status) === "rescheduled";
+
+  let date = scheduledDate;
+  let time = scheduledTime;
+  if (proposedDate && iconicAccepted && proposedDate !== (requestedDate || scheduledDate)) {
+    if (!requestedDate && scheduledDate) requestedDate = scheduledDate;
+    date = proposedDate;
+    if (proposedTime) time = proposedTime;
+  }
+  if (!date) date = requestedDate;
+  if (!time) time = requestedTime;
+
+  return {
+    id,
+    address: addressText(data.addressLabel || data.address) || "Appointment",
+    status,
+    date,
+    time,
+    requestedDate,
+    requestedTime,
+    approved: hasStamp(data.clientConfirmedAt) || hasStamp(data.changeApprovedAt) || hasStamp(data.agentApprovedAt) || hasStamp(orderRequest?.clientConfirmedAt) || hasStamp(orderRequest?.changeApprovedAt),
+    createdAt: isoStamp(data.createdAt),
+  };
+}
+
+/**
+ * Past appointments are grey. Upcoming blue means the agent submitted it,
+ * green means Iconic accepted it, orange means Iconic accepted a different
+ * time or date and the agent has not approved that change.
+ */
+export function appointmentTone(
+  appointment: Pick<ClientAppointment, "status" | "date" | "time" | "requestedDate" | "requestedTime" | "approved">,
+  today: string,
+): AppointmentTone {
+  if (!appointment.date) return "undated";
+  const todayKey = calendarDateKey(today) || today;
+  if (appointment.date < todayKey) return "past";
+
+  const status = statusKey(appointment.status);
+  if (INACTIVE.has(status)) return "inactive";
+  if (SUBMITTED.has(status)) return "submitted";
+
+  const dateDiffers = Boolean(appointment.requestedDate && appointment.requestedDate !== appointment.date);
+  const asked = clockTime(appointment.requestedTime);
+  const accepted = clockTime(appointment.time);
+  const timeDiffers = Boolean(asked && accepted && asked !== accepted);
+  const differs = dateDiffers || timeDiffers;
+  const waitingOnAgent = differs && !appointment.approved;
+
+  if (status === "pending_confirmation" && !appointment.approved) return "change";
+  if (ACCEPTED.has(status) || status === "rescheduled" || status === "pending_confirmation") {
+    return waitingOnAgent ? "change" : "accepted";
+  }
+  return "unknown";
+}
+
+export function appointmentSummary(
+  appointment: Pick<ClientAppointment, "status" | "date" | "time" | "requestedDate" | "requestedTime" | "approved">,
+  today: string,
+): string {
+  const tone = appointmentTone(appointment, today);
+  if (tone === "past") return "Past appointment.";
+  if (tone === "submitted") return "You submitted this appointment.";
+  if (tone === "accepted") return "Iconic accepted this appointment.";
+  if (tone === "inactive") return `This appointment is ${humanStatus(appointment.status) || "closed"}.`;
+  if (tone === "undated") return "No date is stored for this appointment.";
+  if (tone === "change") {
+    const asked = joinWhen(formatPortalDate(appointment.requestedDate), appointment.requestedTime);
+    const accepted = joinWhen(formatPortalDate(appointment.date), appointment.time);
+    if (asked && accepted && asked !== accepted) {
+      return `Iconic accepted ${accepted} instead of ${asked}. Your approval is still open.`;
+    }
+    return "Iconic accepted a different time. Your approval is still open.";
+  }
+  return appointment.status
+    ? `Status on file: ${humanStatus(appointment.status)}.`
+    : "Status is not stored on this appointment.";
+}
+
+export function invoicePdfLines(statement: ClientInvoiceStatement): string[] {
+  const lines = [
+    "ICONIC IMAGES",
+    `Invoice ${statement.invoiceNumber}`,
+  ];
+  if (statement.status) lines.push(`Status: ${humanStatus(statement.status)}`);
+  if (statement.clientName) lines.push(`Client: ${statement.clientName}`);
+  if (statement.issuedOn) lines.push(`Issued: ${statement.issuedOn}`);
+  if (statement.address) lines.push(`Address: ${statement.address}`);
+  lines.push("");
+  lines.push("Line items");
+  if (statement.lineItems.length === 0) {
+    lines.push("No line items are stored on this invoice.");
+  } else {
+    statement.lineItems.forEach((item) => {
+      const qty = item.qty != null ? ` x${item.qty}` : "";
+      const amount = item.amount != null ? `  ${usd(item.amount)}` : "";
+      lines.push(`${item.name}${qty}${amount}`);
+    });
+  }
+  lines.push("");
+  pushMoney(lines, "Subtotal", statement.subtotal);
+  pushMoney(lines, "Tax", statement.tax);
+  pushMoney(lines, "Total", statement.total);
+  pushMoney(lines, "Amount paid", statement.amountPaid);
+  pushMoney(lines, "Amount due", statement.amountDue);
+  return lines;
+}
+
+export function invoicePdfFilename(invoiceNumber: string): string {
+  const safe = invoiceNumber.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  return `${safe || "invoice"}.pdf`;
+}
+
+export function invoicePdf(statement: ClientInvoiceStatement): Uint8Array {
+  const pages = chunk(invoicePdfLines(statement).flatMap((line) => wrapLine(line, 88)), 40);
+  return pdfDocument(pages.length ? pages : [[]]);
+}
+
+function pushMoney(lines: string[], label: string, value: number | null) {
+  if (value == null) return;
+  lines.push(`${label}: ${usd(value)}`);
+}
+
+function storedLines(lineItems: unknown, services: unknown): ClientInvoiceLine[] {
+  const raw = Array.isArray(lineItems) ? lineItems : Array.isArray(services) ? services : [];
+  return raw.flatMap((item) => {
+    if (typeof item === "string" && item.trim()) return [{ name: item.trim(), qty: null, amount: null }];
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>;
+    const name = text(record.name) || text(record.label) || text(record.description);
+    const qty = storedQty(record.qty ?? record.quantity);
+    const amount = storedAmount(record.price ?? record.amount ?? record.total);
+    if (!name && amount == null && qty == null) return [];
+    return [{ name: name || "Line item", qty, amount }];
+  });
+}
+
+function storedQty(value: unknown): number | null {
+  const qty = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : Number.NaN;
+  if (!Number.isFinite(qty) || qty <= 0) return null;
+  return Math.round(qty);
+}
+
+function firstDate(...values: unknown[]): string | null {
+  for (const value of values) {
+    const key = calendarDateKey(value);
+    if (key) return key;
+  }
+  return null;
+}
+
+function firstTime(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim() && !/^tbd$/i.test(value.trim())) return value.trim();
+  }
+  return "";
+}
+
+function hasStamp(value: unknown): boolean {
+  if (value == null || value === false) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  return true;
+}
+
+function isoStamp(value: unknown): string | null {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
+  if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
+  return null;
+}
+
+function text(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function joinWhen(date: string | null, time: string): string {
+  return [date, time.trim()].filter(Boolean).join(" at ");
+}
+
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+const MONTHS: Record<string, number> = {
+  january: 1,
+  february: 2,
+  march: 3,
+  april: 4,
+  may: 5,
+  june: 6,
+  july: 7,
+  august: 8,
+  september: 9,
+  october: 10,
+  november: 11,
+  december: 12,
+};
+
+/** Booking dates are often stored as "Saturday, October 3, 2026" with no time. */
+function textualDateKey(value: string): string | null {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const long = value.match(/^(?:[A-Za-z]+,\s+)?([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})$/);
+  if (long) {
+    const month = MONTHS[long[1].toLowerCase()];
+    const day = Number(long[2]);
+    const year = Number(long[3]);
+    if (month && day >= 1 && day <= 31) return dateKey(year, month, day);
+  }
+  const slash = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slash) {
+    const month = Number(slash[1]);
+    const day = Number(slash[2]);
+    const year = Number(slash[3]);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) return dateKey(year, month, day);
+  }
+  return null;
+}
+
+/**
+ * UTC midnight is how a date-only value becomes a timestamp.
+ * A time of day is read in America/Chicago.
+ */
+function instantDateKey(date: Date, timeZone: string): string {
+  if (
+    date.getUTCHours() === 0 &&
+    date.getUTCMinutes() === 0 &&
+    date.getUTCSeconds() === 0 &&
+    date.getUTCMilliseconds() === 0
+  ) {
+    return dateKey(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+  }
+  return formatZoned(date, timeZone);
+}
+
+function dateKey(year: number, month: number, day: number): string {
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function formatZoned(date: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function wrapLine(line: string, width: number): string[] {
+  if (line.length <= width) return [line];
+  const parts: string[] = [];
+  let rest = line;
+  while (rest.length > width) {
+    let cut = rest.lastIndexOf(" ", width);
+    if (cut < 12) cut = width;
+    parts.push(rest.slice(0, cut));
+    rest = rest.slice(cut).trimStart();
+  }
+  if (rest) parts.push(rest);
+  return parts;
+}
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const pages: T[][] = [];
+  for (let index = 0; index < items.length; index += size) pages.push(items.slice(index, index + size));
+  return pages;
+}
+
+function pdfDocument(pages: string[][]): Uint8Array {
+  const chunks: string[] = [];
+  const offsets: number[] = [];
+  let cursor = 0;
+  const push = (value: string) => {
+    chunks.push(value);
+    cursor += value.length;
+  };
+  const addObj = (id: number, body: string) => {
+    offsets[id] = cursor;
+    push(`${id} 0 obj\n${body}\nendobj\n`);
+  };
+
+  const pageIds: number[] = [];
+  const contentIds: number[] = [];
+  let nextId = 4;
+  pages.forEach(() => {
+    pageIds.push(nextId++);
+    contentIds.push(nextId++);
+  });
+
+  push("%PDF-1.4\n");
+  addObj(1, "<< /Type /Catalog /Pages 2 0 R >>");
+  addObj(2, `<< /Type /Pages /Count ${pageIds.length} /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] >>`);
+  addObj(3, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+
+  pages.forEach((lines, index) => {
+    const stream = pageStream(lines);
+    addObj(
+      pageIds[index],
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents ${contentIds[index]} 0 R /Resources << /Font << /F1 3 0 R >> >> >>`,
+    );
+    addObj(contentIds[index], `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
+  });
+
+  const xrefAt = cursor;
+  let xref = `xref\n0 ${nextId}\n0000000000 65535 f \n`;
+  for (let id = 1; id < nextId; id++) {
+    xref += `${String(offsets[id]).padStart(10, "0")} 00000 n \n`;
+  }
+  xref += `trailer\n<< /Size ${nextId} /Root 1 0 R >>\nstartxref\n${xrefAt}\n%%EOF`;
+  push(xref);
+  return new TextEncoder().encode(chunks.join(""));
+}
+
+function pageStream(lines: string[]): string {
+  const commands = ["BT", "/F1 11 Tf", "14 TL", "54 740 Td"];
+  lines.forEach((line, index) => {
+    const textOp = `(${escapePdf(line)}) Tj`;
+    commands.push(index === 0 ? textOp : `T* ${textOp}`);
+  });
+  if (lines.length === 0) commands.push("() Tj");
+  commands.push("ET");
+  return commands.join("\n");
+}
+
+function escapePdf(value: string): string {
+  return value
+    .replace(/[^\x20-\x7E]/g, " ")
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)");
+}

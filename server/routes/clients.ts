@@ -9,49 +9,23 @@ import admin from "firebase-admin";
 import { requireCoordinator, requireStaff, requireAuth, type AuthenticatedRequest } from "../middleware/auth";
 import { cleanPersonName, normalizeEmail } from "../../shared/listingAccess";
 import { visibleToPortalClient } from "../../shared/listingWrite";
+import {
+  addressText,
+  buildClientAppointment,
+  buildClientInvoice,
+  buildClientListing,
+  sortNewestFirst,
+} from "../../shared/clientHome";
 import { resolveClientIdentity, upsertPortalClient } from "../services/clientAccounts";
 import { jsonSafe } from "../lib/firestoreJson";
 import { handleGetPortalListing, handlePatchPortalMedia, handlePatchPortalWebsite } from "./portalListing";
 
 const router = Router();
 const db = () => admin.firestore();
+const HOME_LIMIT = 100;
 
-function whenLabel(value: unknown): string {
-  if (!value) return "";
-  if (typeof value === "string") return value;
-  if (typeof value === "object" && value !== null && "toDate" in value && typeof (value as { toDate: () => Date }).toDate === "function") {
-    return (value as { toDate: () => Date }).toDate().toLocaleString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  }
-  return "";
-}
-
-function portalAppointment(id: string, data: FirebaseFirestore.DocumentData) {
-  const status = String(data.status || "requested");
-  return {
-    id,
-    address: addressText(data.addressLabel || data.address) || "Appointment",
-    status,
-    statusLabel: status === "requested" ? "Request received" : status.replace(/_/g, " "),
-    scheduledDate: whenLabel(data.scheduledDate),
-    scheduledTime: typeof data.scheduledTime === "string" ? data.scheduledTime : "",
-    createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : "",
-  };
-}
-
-function addressText(value: unknown): string {
-  if (!value) return "";
-  if (typeof value === "string") return value;
-  if (typeof value === "object") {
-    const address = value as Record<string, unknown>;
-    if (typeof address.formatted === "string" && address.formatted) return address.formatted;
-    return [address.street, address.city, address.state, address.zip].filter(Boolean).join(", ");
-  }
-  return String(value);
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? value as Record<string, unknown> : {};
 }
 
 // GET /api/clients — list (staff only)
@@ -157,7 +131,7 @@ router.post("/register", async (req, res) => {
   }
 });
 
-// GET /api/clients/me/home — galleries, invoices, and projects for the signed-in client
+// GET /api/clients/me/home — listings, invoices, and appointments for the signed-in client
 router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
   if (!adminReady(res)) return;
   try {
@@ -167,9 +141,12 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
     }
 
     const galleries: Record<string, unknown>[] = [];
-    const invoices: Record<string, unknown>[] = [];
-    const projects: Record<string, unknown>[] = [];
-    const appointments: Record<string, unknown>[] = [];
+    const invoices: ReturnType<typeof buildClientInvoice>[] = [];
+    const projects: ReturnType<typeof buildClientListing>[] = [];
+    const appointmentDocs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+    let listingsTruncated = false;
+    let invoicesTruncated = false;
+    let appointmentsTruncated = false;
     const seenGallery = new Set<string>();
     const seenInvoice = new Set<string>();
     const seenProject = new Set<string>();
@@ -177,27 +154,24 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
     const pushAppointment = (entry: FirebaseFirestore.QueryDocumentSnapshot) => {
       if (seenAppointment.has(entry.id)) return;
       seenAppointment.add(entry.id);
-      appointments.push(portalAppointment(entry.id, entry.data()));
+      appointmentDocs.push(entry);
     };
     const pushInvoice = (entry: FirebaseFirestore.QueryDocumentSnapshot) => {
       if (seenInvoice.has(entry.id)) return;
       seenInvoice.add(entry.id);
-      const data = entry.data();
-      invoices.push({
-        id: entry.id,
-        invoiceNumber: data.invoiceNumber || entry.id,
-        status: data.status || "draft",
-        total: data.total || 0,
-        amountDue: data.amountDue ?? data.total ?? 0,
-        href: `/invoice/${entry.id}`,
-      });
+      invoices.push(buildClientInvoice(entry.id, asRecord(jsonSafe(entry.data()))));
+    };
+    const pushListing = (entry: FirebaseFirestore.QueryDocumentSnapshot) => {
+      if (seenProject.has(entry.id)) return;
+      seenProject.add(entry.id);
+      projects.push(buildClientListing(entry.id, asRecord(jsonSafe(entry.data()))));
     };
 
     for (const clientId of identity.ids) {
       const [gallerySnap, invoiceSnap, projectSnap] = await Promise.all([
-        db().collection("galleries").where("clientId", "==", clientId).limit(20).get(),
-        db().collection("invoices").where("clientId", "==", clientId).limit(20).get(),
-        db().collection("listings").where("clientId", "==", clientId).limit(20).get(),
+        db().collection("galleries").where("clientId", "==", clientId).limit(HOME_LIMIT).get(),
+        db().collection("invoices").where("clientId", "==", clientId).limit(HOME_LIMIT).get(),
+        db().collection("listings").where("clientId", "==", clientId).limit(HOME_LIMIT).get(),
       ]);
       for (const doc of gallerySnap.docs) {
         if (seenGallery.has(doc.id)) continue;
@@ -211,22 +185,14 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
           href: `/gallery/${doc.id}`,
         });
       }
+      if (invoiceSnap.size >= HOME_LIMIT) invoicesTruncated = true;
       invoiceSnap.docs.forEach(pushInvoice);
-      for (const doc of projectSnap.docs) {
-        if (seenProject.has(doc.id)) continue;
-        seenProject.add(doc.id);
-        const data = doc.data();
-        projects.push({
-          id: doc.id,
-          address: addressText(data.propertyAddress || data.address || data.shootLocation) || "Project",
-          status: data.status || "scheduled",
-          imageCount: Array.isArray(data.images) ? data.images.length : 0,
-          href: `/studio/${doc.id}`,
-        });
-      }
+      if (projectSnap.size >= HOME_LIMIT) listingsTruncated = true;
+      projectSnap.docs.forEach(pushListing);
 
       try {
-        const appointmentSnap = await db().collection("appointments").where("clientId", "==", clientId).limit(20).get();
+        const appointmentSnap = await db().collection("appointments").where("clientId", "==", clientId).limit(HOME_LIMIT).get();
+        if (appointmentSnap.size >= HOME_LIMIT) appointmentsTruncated = true;
         appointmentSnap.docs.forEach(pushAppointment);
       } catch (appointmentErr) {
         console.error("[Clients] Appointment lookup failed:", appointmentErr);
@@ -253,13 +219,13 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
     };
     try {
       for (const clientId of identity.ids) {
-        const snap = await db().collection("orderRequests").where("clientId", "==", clientId).limit(20).get();
+        const snap = await db().collection("orderRequests").where("clientId", "==", clientId).limit(HOME_LIMIT).get();
         snap.docs.forEach(pushOrder);
       }
       if (identity.email) {
         const [byEmail, byClientEmail] = await Promise.all([
-          db().collection("orderRequests").where("email", "==", identity.email).limit(20).get(),
-          db().collection("orderRequests").where("clientEmail", "==", identity.email).limit(20).get(),
+          db().collection("orderRequests").where("email", "==", identity.email).limit(HOME_LIMIT).get(),
+          db().collection("orderRequests").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get(),
         ]);
         byEmail.docs.forEach(pushOrder);
         byClientEmail.docs.forEach(pushOrder);
@@ -270,7 +236,8 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
 
     if (identity.email) {
       try {
-        const byInvoiceEmail = await db().collection("invoices").where("clientEmail", "==", identity.email).limit(20).get();
+        const byInvoiceEmail = await db().collection("invoices").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get();
+        if (byInvoiceEmail.size >= HOME_LIMIT) invoicesTruncated = true;
         byInvoiceEmail.docs.forEach(pushInvoice);
       } catch (invoiceErr) {
         console.error("[Clients] Invoice email lookup failed:", invoiceErr);
@@ -279,36 +246,41 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
 
     if (identity.email) {
       try {
-        const appointmentsByEmail = await db().collection("appointments").where("clientEmail", "==", identity.email).limit(20).get();
+        const appointmentsByEmail = await db().collection("appointments").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get();
+        if (appointmentsByEmail.size >= HOME_LIMIT) appointmentsTruncated = true;
         appointmentsByEmail.docs.forEach(pushAppointment);
       } catch (appointmentErr) {
         console.error("[Clients] Appointment email lookup failed:", appointmentErr);
       }
 
-      const byEmail = await db().collection("listings").where("clientEmail", "==", identity.email).limit(20).get();
-      for (const doc of byEmail.docs) {
-        if (seenProject.has(doc.id)) continue;
-        seenProject.add(doc.id);
-        const data = doc.data();
-        projects.push({
-          id: doc.id,
-          address: addressText(data.propertyAddress || data.address || data.shootLocation) || "Project",
-          status: data.status || "scheduled",
-          imageCount: Array.isArray(data.images) ? data.images.length : 0,
-          href: `/studio/${doc.id}`,
-        });
-      }
+      const byEmail = await db().collection("listings").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get();
+      if (byEmail.size >= HOME_LIMIT) listingsTruncated = true;
+      byEmail.docs.forEach(pushListing);
     }
 
-    appointments.sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+    const requestIds = appointmentDocs
+      .map((entry) => entry.data().orderRequestId)
+      .filter((id): id is string => typeof id === "string" && id.trim().length > 0);
+    const orderRequests = await orderRequestsById(requestIds);
+    const appointments = appointmentDocs.map((entry) => {
+      const data = asRecord(jsonSafe(entry.data()));
+      const orderRequestId = typeof data.orderRequestId === "string" ? data.orderRequestId : "";
+      return buildClientAppointment(entry.id, data, orderRequests.get(orderRequestId) || null);
+    });
+    const listings = sortNewestFirst(projects);
+    const invoiceRows = sortNewestFirst(invoices);
 
     return res.json({
       profile: jsonSafe(identity.profile),
       appointments,
       orders,
       galleries,
-      invoices,
-      projects,
+      invoices: invoiceRows,
+      listings,
+      projects: listings,
+      listingsTruncated,
+      invoicesTruncated,
+      appointmentsTruncated,
     });
   } catch (err) {
     console.error("[Clients] Home error:", err);
@@ -409,5 +381,21 @@ router.patch("/:id", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update client." });
   }
 });
+
+async function orderRequestsById(ids: string[]): Promise<Map<string, Record<string, unknown>>> {
+  const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))].slice(0, HOME_LIMIT);
+  const map = new Map<string, Record<string, unknown>>();
+  if (unique.length === 0) return map;
+  try {
+    const snaps = await db().getAll(...unique.map((id) => db().collection("orderRequests").doc(id)));
+    snaps.forEach((snap) => {
+      if (!snap.exists) return;
+      map.set(snap.id, asRecord(jsonSafe(snap.data() || {})));
+    });
+  } catch (err) {
+    console.error("[Clients] Order request schedule lookup failed:", err);
+  }
+  return map;
+}
 
 export default router;
