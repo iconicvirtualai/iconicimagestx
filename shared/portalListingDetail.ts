@@ -204,7 +204,17 @@ export function portalListingOwnerApiPath(listingId: string): string {
   return `/api/clients/me/listings/${encodeURIComponent(listingId)}`;
 }
 
-/** Visitor payload for the link. Hidden files stay off this read. No payment action is added. */
+/** Invoice and payment lines are for the owning client. The link does not include them. */
+export function isInvoiceOrPaymentActivity(event: PortalActivityEvent): boolean {
+  if (/^(invoice|payment)$/i.test(event.kind)) return true;
+  return /\binvoice\b|\bpayment\b|\bamount due\b/i.test(event.summary);
+}
+
+/**
+ * Visitor payload for the link.
+ * Address, facts, and visible media stay. Invoices are empty.
+ * Invoice and payment activity is left out. Hidden files stay off this read.
+ */
 export function visitorPortalListingDetail(detail: PortalListingDetail): PortalListingDetail {
   return {
     ...detail,
@@ -212,6 +222,8 @@ export function visitorPortalListingDetail(detail: PortalListingDetail): PortalL
     videos: detail.videos.filter((item) => !item.hidden),
     tours: detail.tours.filter((item) => !item.hidden),
     floorplans: detail.floorplans.filter((item) => !item.hidden),
+    invoices: [],
+    activity: detail.activity.filter((event) => !isInvoiceOrPaymentActivity(event)),
   };
 }
 

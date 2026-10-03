@@ -91,7 +91,9 @@ describe("portal listing detail routes", () => {
     const sharedBody = await shared.json();
     if (shared.status === 200) {
       expect(sharedBody.id).toBe("listing1234");
-      expect(JSON.stringify(sharedBody)).not.toMatch(/pay now|\/invoice\//i);
+      expect(sharedBody.invoices).toEqual([]);
+      const body = JSON.stringify(sharedBody);
+      expect(body).not.toMatch(/invoiceNumber|amountDue|"total"|Payment recorded|\bInvoice\b/i);
     } else {
       expect(sharedBody.title).toBeUndefined();
       expect(sharedBody.photos).toBeUndefined();

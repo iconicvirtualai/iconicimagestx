@@ -103,11 +103,18 @@ describe("portal listing detail page", () => {
     expect(website).not.toContain("<select");
 
     const orders = render("orders", null, false);
-    expect(orders).toContain("INV-2026-100");
+    expect(orders).not.toContain("INV-2026-100");
+    expect(orders).not.toContain("draft");
+    expect(orders).not.toContain("Total");
+    expect(orders).not.toContain("Amount due");
     expect(orders).not.toContain("Pay now");
     expect(orders).not.toContain("View invoice");
     expect(orders).not.toContain("/invoice/");
-    expect(orders).not.toContain("Amount due");
+    const activity = render("activity", null, false);
+    expect(activity).toContain("Booking request received");
+    expect(activity).not.toContain("INV-2026-100");
+    expect(activity).not.toContain("Payment recorded");
+    expect(activity).not.toMatch(/Invoice /);
   });
 
   it("keeps a logged-out visitor on the listing route and uses not-found for a bad id", () => {

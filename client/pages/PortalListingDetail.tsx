@@ -8,6 +8,7 @@ import {
   portalListingOwnerApiPath,
   portalListingPageMode,
   portalListingTab,
+  visitorPortalListingDetail,
   type PortalListingDetail as PortalListingDetailModel,
   type PortalListingTabId,
   type PortalMediaItem,
@@ -46,6 +47,7 @@ export function PortalListingDetailView({
   onWebsiteSave: () => void;
 }) {
   const mediaEditing = canEdit ? editing : null;
+  const shown = canEdit ? detail : visitorPortalListingDetail(detail);
   return (
     <div className="min-h-screen bg-[#f6f7f8] text-black" data-testid="portal-listing-detail" data-can-edit={canEdit ? "true" : "false"}>
       <header className="bg-black text-white">
@@ -82,7 +84,7 @@ export function PortalListingDetailView({
       </div>
 
       <main className="max-w-5xl mx-auto px-4 py-8">
-        {tab === "data" && <DataTab detail={detail} />}
+        {tab === "data" && <DataTab detail={shown} />}
         {tab === "photos" && (
           <MediaTab
             title="Photos"
@@ -90,7 +92,7 @@ export function PortalListingDetailView({
             canEdit={canEdit}
             editing={mediaEditing === "photo"}
             saving={saving}
-            items={detail.photos}
+            items={shown.photos}
             onToggleEditing={() => onToggleEditing("photo")}
             onMedia={onMedia}
           />
@@ -102,14 +104,14 @@ export function PortalListingDetailView({
             canEdit={canEdit}
             editing={mediaEditing === "video"}
             saving={saving}
-            items={detail.videos}
+            items={shown.videos}
             onToggleEditing={() => onToggleEditing("video")}
             onMedia={onMedia}
           />
         )}
         {tab === "tours" && (
           <ToursTab
-            tours={detail.tours}
+            tours={shown.tours}
             canEdit={canEdit}
             editing={mediaEditing === "tour"}
             saving={saving}
@@ -124,15 +126,15 @@ export function PortalListingDetailView({
             canEdit={canEdit}
             editing={mediaEditing === "floorplan"}
             saving={saving}
-            items={detail.floorplans}
+            items={shown.floorplans}
             onToggleEditing={() => onToggleEditing("floorplan")}
             onMedia={onMedia}
           />
         )}
-        {tab === "marketing" && <MarketingTab detail={detail} />}
+        {tab === "marketing" && <MarketingTab detail={shown} />}
         {tab === "website" && <WebsiteTab website={website} canEdit={canEdit} saving={saving} onWebsite={onWebsite} onSave={onWebsiteSave} />}
-        {tab === "orders" && <OrdersTab detail={detail} />}
-        {tab === "activity" && <ActivityTab detail={detail} />}
+        {tab === "orders" && <OrdersTab detail={shown} />}
+        {tab === "activity" && <ActivityTab detail={shown} />}
       </main>
     </div>
   );
