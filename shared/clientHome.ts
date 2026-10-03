@@ -209,6 +209,11 @@ export function sortNewestFirst<T extends { createdAt?: string | null; id: strin
   });
 }
 
+/** Bean's listing file. No tab query; the listing page chooses its own default. */
+export function clientListingPath(listingId: string): string {
+  return `/portal/listings/${encodeURIComponent(listingId.trim())}`;
+}
+
 export function buildClientListing(id: string, data: Record<string, unknown>): ClientListingCard {
   const images = data.images;
   const projectType = data.projectType === "business" || data.projectType === "real_estate" ? data.projectType : "";
@@ -222,7 +227,7 @@ export function buildClientListing(id: string, data: Record<string, unknown>): C
     coverUrl: listingCoverUrl(images),
     createdAt: isoStamp(data.createdAt),
     appointmentDate: calendarDateKey(data.apptDate || data.appointmentDate || data.scheduledDate),
-    href: `/studio/${id}`,
+    href: clientListingPath(id),
   };
 }
 

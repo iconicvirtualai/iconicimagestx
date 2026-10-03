@@ -16,7 +16,7 @@ function listing(overrides: Partial<ClientListingCard> = {}): ClientListingCard 
     coverUrl: "https://files.example/cover.jpg",
     createdAt: "2026-09-02T00:00:00.000Z",
     appointmentDate: null,
-    href: "/studio/listing-1",
+    href: "/portal/listings/listing-1",
     ...overrides,
   };
 }
@@ -82,7 +82,10 @@ describe("client home dashboard", () => {
       ],
     });
     expect(html.indexOf("New Street")).toBeLessThan(html.indexOf("Old Street"));
-    expect(html).toContain('href="/studio/new"');
+    expect(html).toContain('href="/portal/listings/new"');
+    expect(html).toContain('href="/portal/listings/old"');
+    expect(html).not.toContain("/studio/");
+    expect(html).not.toContain("?tab=");
     expect(html).toContain("https://files.example/cover.jpg");
     expect(html).toContain("No photos yet");
     expect(html).toContain("Listings");

@@ -6,6 +6,7 @@ import {
   buildClientInvoice,
   buildClientListing,
   calendarDateKey,
+  clientListingPath,
   invoicePdf,
   invoicePdfLines,
   sortNewestFirst,
@@ -31,7 +32,9 @@ describe("client listing cards", () => {
       createdAt: "2026-09-01T15:00:00.000Z",
       images: [{ url: "https://files.example/cover.jpg" }, { url: "not-a-url" }],
     });
-    expect(card.href).toBe("/studio/listing-1");
+    expect(card.href).toBe("/portal/listings/listing-1");
+    expect(card.href).toBe(clientListingPath("listing-1"));
+    expect(card.href).not.toContain("?");
     expect(card.coverUrl).toBe("https://files.example/cover.jpg");
     expect(card.imageCount).toBe(2);
     expect(card.address).toBe("10 Oak St, Houston, TX");

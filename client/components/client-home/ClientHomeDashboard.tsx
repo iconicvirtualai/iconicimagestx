@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import {
   appointmentSummary,
   appointmentTone,
+  clientListingPath,
   humanStatus,
   invoicePdf,
   invoicePdfFilename,
@@ -191,7 +192,7 @@ export function ListingTile({ listing }: { listing: ClientListingCard }) {
 
   return (
     <Link
-      to={listing.href}
+      to={clientListingPath(listing.id)}
       className="rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-all overflow-hidden block"
     >
       <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
