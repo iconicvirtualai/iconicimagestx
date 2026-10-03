@@ -1604,10 +1604,10 @@ function formatZoned(date, timeZone) {
     day: "2-digit"
   }).format(date);
 }
-const PORTAL_LISTING_ID = /^[A-Za-z0-9_-]{4,128}$/;
+const PORTAL_LISTING_ID$1 = /^[A-Za-z0-9_-]{4,128}$/;
 const NEVER_FILL = /* @__PURE__ */ new Set(["images", "createdAt", "source", "id"]);
 function isPortalListingId(value) {
-  return PORTAL_LISTING_ID.test(value);
+  return PORTAL_LISTING_ID$1.test(value);
 }
 function bookingListingDocId(kind, rawId) {
   const safe = rawId.trim().replace(/[^A-Za-z0-9_-]/g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "");
@@ -7080,6 +7080,26 @@ const PORTAL_MARKETING_KIT = [
 const WEBSITE_FONTS = /* @__PURE__ */ new Set(["sans", "serif", "modern"]);
 const WEBSITE_COLORS = /* @__PURE__ */ new Set(["ink", "teal", "warm"]);
 const WEBSITE_STYLES = /* @__PURE__ */ new Set(["classic", "editorial", "minimal"]);
+const PORTAL_LISTING_ID = /^[A-Za-z0-9_-]{4,128}$/;
+function portalListingId(value) {
+  const id = text$2(value);
+  return PORTAL_LISTING_ID.test(id) ? id : "";
+}
+function isInvoiceOrPaymentActivity(event) {
+  if (/^(invoice|payment)$/i.test(event.kind)) return true;
+  return /\binvoice\b|\bpayment\b|\bamount due\b/i.test(event.summary);
+}
+function visitorPortalListingDetail(detail) {
+  return {
+    ...detail,
+    photos: detail.photos.filter((item) => !item.hidden),
+    videos: detail.videos.filter((item) => !item.hidden),
+    tours: detail.tours.filter((item) => !item.hidden),
+    floorplans: detail.floorplans.filter((item) => !item.hidden),
+    invoices: [],
+    activity: detail.activity.filter((event) => !isInvoiceOrPaymentActivity(event))
+  };
+}
 function defaultPortalWebsite() {
   return {
     font: "sans",
@@ -7691,8 +7711,7 @@ function adminReady$3(res) {
   return false;
 }
 function listingIdFrom(value) {
-  const id = typeof value === "string" ? value.trim() : "";
-  return /^[A-Za-z0-9_-]{4,128}$/.test(id) ? id : "";
+  return portalListingId(value);
 }
 function text$1(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -7811,6 +7830,20 @@ async function appendPortalWrite(listingId, patch) {
     tx.update(ref, update);
   });
 }
+const handleGetPublicPortalListing = async (req, res) => {
+  const listingId = portalListingId(req.params.id);
+  if (!listingId) return res.status(404).json({ error: "Listing not found." });
+  if (!adminReady$3(res)) return;
+  try {
+    const snap = await db$9().collection("listings").doc(listingId).get();
+    if (!snap.exists) return res.status(404).json({ error: "Listing not found." });
+    const listing = jsonSafe({ id: snap.id, ...snap.data() || {} });
+    const detail = visitorPortalListingDetail(buildPortalListingDetail(await loadSources(listingId, listing)));
+    return res.json(detail);
+  } catch (err) {
+    return sendKnownError$2(res, err, "Failed to load this listing.");
+  }
+};
 const handleGetPortalListing = async (req, res) => {
   if (!adminReady$3(res)) return;
   const listingId = listingIdFrom(req.params.id);
@@ -10925,6 +10958,7 @@ function createServer() {
   app.use("/api/vsai", router$d);
   app.use("/api/messages", router$c);
   app.use("/api/clients", router$b);
+  app.get("/api/portal/listings/:id", handleGetPublicPortalListing);
   app.use("/api/staff", router$a);
   app.use("/api", router);
   app.use("/api/listings", router$9);
