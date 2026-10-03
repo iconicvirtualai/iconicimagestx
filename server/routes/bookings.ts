@@ -11,6 +11,7 @@ import { sendEmail } from "../services/email";
 import { sendSMS, SMS_TEMPLATES } from "../services/sms";
 import { createCalendarBookingEvent } from "../services/calendar";
 import { attachBookingClient, createRequestedAppointment, sendFirebasePasswordEmail } from "../services/bookingClient";
+import { ensureBookingListingForRequest } from "../services/bookingListing";
 import { clientNotifyBlockReason, clientNotifyLive } from "../../shared/clientNotify";
 import { lifeOfTheListingCareSelected } from "../../shared/lifeOfTheListingCare";
 import { buildBookingInvoiceDraft, existingInvoiceId } from "../../shared/bookingInvoice";
@@ -226,6 +227,13 @@ router.post("/", async (req, res) => {
       invoiceId = null;
     }
 
+    // Listing doc for the home tile. Confirmation email and SMS are unchanged.
+    try {
+      await ensureBookingListingForRequest(docRef.id);
+    } catch (err) {
+      console.error("[Bookings] Listing ensure failed:", err);
+    }
+
     // Build access info line for emails
     const accessLine = accessMethod
       ? `${accessMethod}${lockboxCode ? ` — Code: ${lockboxCode}` : ""}`
@@ -437,12 +445,19 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
 
     const request = requestDoc.data()!;
     if (request.convertedToOrderId) {
+      let listingId = existingInvoiceId(request.listingId);
+      try {
+        const ensured = await ensureBookingListingForRequest(req.params.id);
+        if (ensured?.listingId) listingId = ensured.listingId;
+      } catch (err) {
+        console.error("[Bookings] Listing ensure failed:", err);
+      }
       try {
         await stampDurableLinks({
           invoiceId: existingInvoiceId(request.invoiceId),
           orderRequestId: req.params.id,
           orderId: String(request.convertedToOrderId),
-          listingId: existingInvoiceId(request.listingId),
+          listingId,
         });
       } catch (err) {
         console.error("[Bookings] Order/project/invoice link failed:", err);
@@ -665,7 +680,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
     }
 
     const linkedInvoiceId = existingInvoiceId(request.invoiceId);
-    const listingId = existingInvoiceId(request.listingId);
+    let listingId = existingInvoiceId(request.listingId);
     let invoiceId = linkedInvoiceId;
     if (linkedInvoiceId) {
       const existingInvoice = await db().collection("invoices").doc(linkedInvoiceId).get();
@@ -722,6 +737,13 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       invoiceId,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+
+    try {
+      const ensured = await ensureBookingListingForRequest(req.params.id);
+      if (ensured?.listingId) listingId = ensured.listingId;
+    } catch (err) {
+      console.error("[Bookings] Listing ensure failed:", err);
+    }
 
     try {
       await stampDurableLinks({
