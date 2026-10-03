@@ -19,7 +19,7 @@ import {
 import { resolveClientIdentity, upsertPortalClient } from "../services/clientAccounts";
 import { ensurePortalListingsForClient } from "../services/bookingListing";
 import { jsonSafe } from "../lib/firestoreJson";
-import { handleGetPortalListing, handlePatchPortalMedia, handlePatchPortalWebsite } from "./portalListing";
+import { handleGetPortalListing, handlePatchPortalData, handlePatchPortalMedia, handlePatchPortalWebsite } from "./portalListing";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -298,6 +298,7 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
 
 // GET /api/clients/me/listings/:id — listing file inside the client portal
 router.get("/me/listings/:id", requireAuth, handleGetPortalListing);
+router.patch("/me/listings/:id/data", requireAuth, handlePatchPortalData);
 router.patch("/me/listings/:id/media", requireAuth, handlePatchPortalMedia);
 router.patch("/me/listings/:id/website", requireAuth, handlePatchPortalWebsite);
 

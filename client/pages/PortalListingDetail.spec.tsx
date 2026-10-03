@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { renderToString } from "react-dom/server";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import PortalListingDetail, { PortalListingDetailView } from "./PortalListingDetail";
-import { buildPortalListingDetail, defaultPortalWebsite } from "@shared/portalListingDetail";
+import { buildPortalListingDetail, defaultPortalWebsite, portalFactsDraftFromDetail } from "@shared/portalListingDetail";
 
 vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => ({
@@ -34,6 +34,7 @@ function render(
   tab: "data" | "photos" | "marketing" | "orders" | "activity" | "website",
   editing: "photo" | null = null,
   canEdit = true,
+  dataEditing = false,
 ) {
   return renderToString(
     <MemoryRouter>
@@ -43,12 +44,17 @@ function render(
         editing={editing}
         saving={false}
         canEdit={canEdit}
+        dataEditing={dataEditing}
+        dataDraft={portalFactsDraftFromDetail(detail)}
         website={defaultPortalWebsite()}
         onTab={() => undefined}
         onToggleEditing={() => undefined}
         onMedia={() => undefined}
         onWebsite={() => undefined}
         onWebsiteSave={() => undefined}
+        onDataEditing={() => undefined}
+        onDataDraft={() => undefined}
+        onDataSave={() => undefined}
       />
     </MemoryRouter>,
   );
@@ -62,9 +68,33 @@ describe("portal listing detail page", () => {
     expect(html).toContain("77389");
     expect(html).toContain("Not on file yet");
     expect(html).toContain("Public record lookups are not part of this page.");
+    expect(html).toContain("data-edit-toggle");
+    expect(html).toContain('aria-checked="false"');
+    expect(html).not.toContain("data-field-line1");
+    expect(html).not.toContain("data-save");
     for (const tab of ["data", "photos", "video", "tours", "floorplans", "marketing", "website", "orders", "activity"]) {
       expect(html).toContain(`listing-tab-${tab}`);
     }
+  });
+
+  it("opens listing fact fields only while the data edit toggle is on", () => {
+    const editing = render("data", null, true, true);
+    expect(editing).toContain('aria-checked="true"');
+    expect(editing).toContain("data-save");
+    expect(editing).toContain("data-field-line1");
+    expect(editing).toContain("data-field-beds");
+    expect(editing).toContain("data-field-pool");
+    expect(editing).toContain("data-field-office");
+    expect(editing).toContain('value="18 Oak Hollow"');
+    expect(editing).toContain('value="3"');
+    expect(editing).toContain('placeholder="Not on file yet"');
+    expect(editing).not.toContain("Pay now");
+    expect(editing).not.toContain("Download");
+
+    const visitorEditing = render("data", null, false, true);
+    expect(visitorEditing).not.toContain("data-edit-toggle");
+    expect(visitorEditing).not.toContain("data-field-line1");
+    expect(visitorEditing).not.toContain("data-save");
   });
 
   it("shows a hidden photo only while editing", () => {
@@ -115,6 +145,17 @@ describe("portal listing detail page", () => {
     expect(activity).not.toContain("INV-2026-100");
     expect(activity).not.toContain("Payment recorded");
     expect(activity).not.toMatch(/Invoice /);
+
+    const data = render("data", null, false);
+    expect(data).toContain("18 Oak Hollow");
+    expect(data).toContain("Spring");
+    expect(data).not.toContain("data-edit-toggle");
+    expect(data).not.toContain("data-save");
+    expect(data).not.toContain("data-field-");
+    expect(data).not.toContain("Pay now");
+    expect(data).not.toContain("Download");
+    expect(data).not.toContain("INV-2026-100");
+    expect(data).not.toContain("View invoice");
   });
 
   it("keeps a logged-out visitor on the listing route and uses not-found for a bad id", () => {

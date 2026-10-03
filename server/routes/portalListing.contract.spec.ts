@@ -31,6 +31,8 @@ describe("portal listing detail routes", () => {
     const idAt = clients.indexOf('"/:id"');
     expect(listingAt).toBeGreaterThan(-1);
     expect(idAt).toBeGreaterThan(listingAt);
+    expect(clients).toContain('"/me/listings/:id/data"');
+    expect(clients).toContain("handlePatchPortalData");
 
     const source = [
       readFileSync(new URL("./portalListing.ts", import.meta.url), "utf8"),
@@ -56,6 +58,12 @@ describe("portal listing detail routes", () => {
       body: JSON.stringify({ font: "serif" }),
     });
     expect(website.status).toBe(401);
+    const data = await fetch(`${baseUrl}/api/clients/me/listings/listing1234/data`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address: { line1: "9 Main" }, facts: { beds: "4" } }),
+    });
+    expect(data.status).toBe(401);
 
     const index = readFileSync(new URL("../index.ts", import.meta.url), "utf8");
     expect(index).toContain('app.get("/api/portal/listings/:id", handleGetPublicPortalListing)');
@@ -107,5 +115,11 @@ describe("portal listing detail routes", () => {
       body: JSON.stringify({ kind: "photo", id: "front", hidden: true }),
     });
     expect(publicWrite.status).toBe(404);
+    const publicData = await fetch(`${baseUrl}/api/portal/listings/listing1234/data`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address: { line1: "9 Main" }, facts: { beds: "4" } }),
+    });
+    expect(publicData.status).toBe(404);
   });
 });

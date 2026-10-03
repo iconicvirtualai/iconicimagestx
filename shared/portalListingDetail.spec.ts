@@ -4,10 +4,14 @@ import {
   buildPortalListingDetail,
   hiddenPresentationKeys,
   mapEmbedUrl,
+  portalFactsDraftFromDetail,
+  portalListingDataApiPath,
+  portalListingFactsWrite,
   portalListingId,
   portalListingPageMode,
   portalListingTab,
   readMediaStore,
+  sanitizePortalListingFacts,
   sanitizeWebsiteSettings,
   visitorPortalListingDetail,
 } from "./portalListingDetail";
@@ -212,5 +216,74 @@ describe("portal listing detail", () => {
       amountDue: 450,
     });
     expect(detail.activity.map((event) => event.summary)).toContain("Invoice INV-2026-100 is draft");
+  });
+
+  it("saves owner fact edits over the booking values and leaves the map pin where it was", () => {
+    const detail = buildPortalListingDetail(sources());
+    const draft = portalFactsDraftFromDetail(detail);
+    expect(portalListingFactsWrite(detail, draft, "2026-04-08T15:00:00.000Z")).toEqual({ ok: true, changed: false });
+    expect(portalListingFactsWrite(detail, { facts: { beds: "9" } }, "2026-04-08T15:00:00.000Z")).toEqual({
+      ok: false,
+      error: "Say which listing facts to save.",
+    });
+
+    const sanitized = sanitizePortalListingFacts({
+      address: { line1: "  9 Main  ", lat: 1, city: "Houston", state: "TX", zip: "77002" },
+      facts: { beds: " 5 ", harId: "secret", sqft: 1800, pool: false },
+    });
+    expect(sanitized?.address).toEqual({ line1: "9 Main", line2: "", city: "Houston", state: "TX", zip: "77002" });
+    expect(sanitized?.facts.beds).toBe("5");
+    expect(sanitized?.facts.sqft).toBe("1800");
+    expect(sanitized?.facts.pool).toBe("No");
+    expect(sanitized?.facts.baths).toBe("");
+    expect(JSON.stringify(sanitized)).not.toContain("harId");
+    expect(JSON.stringify(sanitized)).not.toContain("lat");
+
+    const write = portalListingFactsWrite(detail, {
+      ...draft,
+      address: { ...draft.address, line1: "200 New St", city: "Houston", zip: "77002" },
+      facts: { ...draft.facts, beds: "5", lotSize: "0.4 acre", baths: "" },
+    }, "2026-04-08T16:00:00.000Z");
+    expect(write.ok).toBe(true);
+    if (!write.ok || !write.changed) return;
+    expect(write.activity.summary).toBe("Listing facts updated");
+    expect(write.portalData.facts.schools).toBe("Austin ISD");
+
+    const saved = buildPortalListingDetail({
+      ...sources(),
+      listing: { ...sources().listing, portalData: write.portalData },
+    });
+    expect(saved.address).toMatchObject({
+      line1: "200 New St",
+      city: "Houston",
+      zip: "77002",
+      lat: 30.2672,
+      lng: -97.7431,
+    });
+    expect(saved.address.mapUrl).toBe(mapEmbedUrl(30.2672, -97.7431));
+    expect(saved.title).toContain("200 New St");
+    expect(saved.facts.find((fact) => fact.id === "beds")?.value).toBe("5");
+    expect(saved.facts.find((fact) => fact.id === "baths")).toMatchObject({ empty: true, value: "Not on file yet" });
+    expect(saved.facts.find((fact) => fact.id === "lotSize")?.value).toBe("0.4 acre");
+    expect(saved.facts.find((fact) => fact.id === "sqft")?.value).toBe("2400");
+
+    const partial = buildPortalListingDetail({
+      ...sources(),
+      listing: {
+        ...sources().listing,
+        portalData: { facts: { beds: "" } },
+      },
+    });
+    expect(partial.facts.find((fact) => fact.id === "beds")).toMatchObject({ empty: true });
+    expect(partial.facts.find((fact) => fact.id === "baths")?.value).toBe("3");
+    expect(partial.address.line1).toBe("100 Playtest Lane");
+
+    const visitor = visitorPortalListingDetail(saved);
+    expect(visitor.address.line1).toBe("200 New St");
+    expect(visitor.facts.find((fact) => fact.id === "beds")?.value).toBe("5");
+    expect(visitor.facts.find((fact) => fact.id === "lotSize")?.value).toBe("0.4 acre");
+    expect(visitor.invoices).toEqual([]);
+    expect(JSON.stringify(visitor)).not.toMatch(/INV-2026-100|invoiceNumber|amountDue/);
+    expect(portalListingDataApiPath("listing1234")).toBe("/api/clients/me/listings/listing1234/data");
   });
 });
