@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { createOrder } from "@/lib/createOrder";
+import { bookingFollowUp } from "@/lib/bookingFollowUp";
 import { Link, useSearchParams } from "react-router-dom";
 import ChatWidget from "@/components/ChatWidget";
 import { SmsConsentField } from "@/components/SmsConsentField";
@@ -122,6 +123,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   const [searchParams] = useSearchParams();
   const [step, setStep] = useState<Step>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitNote, setSubmitNote] = useState("");
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [selectedDetailItem, setSelectedDetailItem] = useState<any>(null);
   const [showIconicPopup, setShowIconicPopup] = useState(false);
@@ -501,13 +503,14 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   const total = sumLineItemPrices(lineItems);
 
   try {
-    await createOrder({
+    const result = await createOrder({
       ...formData,
       lineItems,
       total,
       promoCode: appliedPromo?.code || null,
       promoDiscount: appliedPromo?.discount || 0,
     });
+    setSubmitNote(bookingFollowUp(result));
 
     setStep("success");
 
@@ -1538,8 +1541,8 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
             </div>
             <div className="space-y-3">
               <h2 className="text-4xl font-black tracking-tight uppercase text-black">YOU'RE IN</h2>
-              <p className="text-gray-500 font-medium max-w-sm mx-auto leading-relaxed text-sm">
-                We're sharpening the lenses and checking the weather. Expect a confirmation text shortly.
+              <p className="text-gray-500 font-medium max-w-md mx-auto leading-relaxed text-sm">
+                {submitNote || "We're sharpening the lenses and checking the weather. Expect a confirmation text shortly."}
               </p>
             </div>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
