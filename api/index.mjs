@@ -2536,11 +2536,11 @@ function statusOf(doc) {
 function isReleased(doc) {
   return RELEASED_GALLERY_STATUSES.includes(statusOf(doc));
 }
-function text$4(value) {
+function text$5(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function httpUrl(value) {
-  const url = text$4(value);
+  const url = text$5(value);
   return url.startsWith("https://") || url.startsWith("http://") ? url : "";
 }
 function galleryResult(doc, via) {
@@ -2558,7 +2558,7 @@ function galleryResult(doc, via) {
   };
 }
 function addressOf(listing) {
-  const property = text$4(listing.propertyAddress);
+  const property = text$5(listing.propertyAddress);
   if (property) return property;
   const labeled = listingAddressLabel({
     address: listing.address,
@@ -2596,7 +2596,7 @@ function publicVideos(listing) {
     const row = item;
     const url = httpUrl(row.url);
     if (!url || url.includes("/raw/")) continue;
-    videos.push({ url, name: text$4(row.name) || "Video" });
+    videos.push({ url, name: text$5(row.name) || "Video" });
   }
   return videos.slice(0, 40);
 }
@@ -2606,12 +2606,12 @@ function publicRevisions(listing) {
     const row = item && typeof item === "object" ? item : {};
     const photoIndex = typeof row.photoIndex === "number" ? row.photoIndex : null;
     return {
-      id: text$4(row.id) || `revision-${index + 1}`,
-      type: text$4(row.type) || "gallery",
+      id: text$5(row.id) || `revision-${index + 1}`,
+      type: text$5(row.type) || "gallery",
       photoIndex,
-      description: text$4(row.description),
-      status: text$4(row.status) || "pending",
-      createdAt: text$4(row.createdAt)
+      description: text$5(row.description),
+      status: text$5(row.status) || "pending",
+      createdAt: text$5(row.createdAt)
     };
   });
 }
@@ -2620,11 +2620,11 @@ function invoiceOf(listing) {
   if (nested && typeof nested === "object" && typeof nested.status === "string") {
     return { status: nested.status };
   }
-  const status = text$4(listing.invoiceStatus);
+  const status = text$5(listing.invoiceStatus);
   return status ? { status } : null;
 }
 function pickReleasedGallery(listing, related) {
-  const preferred = text$4(listing.galleryId) || text$4(listing.playtestGalleryId);
+  const preferred = text$5(listing.galleryId) || text$5(listing.playtestGalleryId);
   const released = related.filter((doc) => isReleased(doc));
   if (preferred) {
     const match = released.find((doc) => doc.id === preferred);
@@ -2678,7 +2678,7 @@ function publicProject(listing, _related, notice) {
   return {
     id: listing.id,
     address: addressOf(listing),
-    clientName: text$4(listing.clientName),
+    clientName: text$5(listing.clientName),
     services: servicesOf(listing),
     images: publicImages(listing),
     videos: publicVideos(listing),
@@ -2721,8 +2721,8 @@ function decideClientGalleryLink(input) {
   }
   if (input.pointedListing) return listingResult(input.pointedListing, input.relatedGalleries);
   if (input.order) {
-    const galleryId = text$4(input.order.galleryId);
-    const listingId = text$4(input.order.listingId);
+    const galleryId = text$5(input.order.galleryId);
+    const listingId = text$5(input.order.listingId);
     if (galleryId || listingId) {
       return {
         ok: false,
@@ -2739,8 +2739,8 @@ function decideClientGalleryLink(input) {
     };
   }
   if (input.orderRequest) {
-    const galleryId = text$4(input.orderRequest.galleryId);
-    const listingId = text$4(input.orderRequest.listingId);
+    const galleryId = text$5(input.orderRequest.galleryId);
+    const listingId = text$5(input.orderRequest.listingId);
     if (galleryId || listingId) {
       return {
         ok: false,
@@ -4256,7 +4256,7 @@ async function loadGalleryReleaseForGallery(galleryId) {
   });
 }
 const db$e = () => admin.firestore();
-function text$3(value) {
+function text$4(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function docRecord(snap) {
@@ -4278,7 +4278,7 @@ async function galleryById(id) {
 }
 async function relatedForListing(listing) {
   const related = await galleriesWhere("listingId", listing.id);
-  const extras = [text$3(listing.galleryId), text$3(listing.playtestGalleryId)];
+  const extras = [text$4(listing.galleryId), text$4(listing.playtestGalleryId)];
   for (const galleryId of extras) {
     if (!galleryId || related.some((doc) => doc.id === galleryId)) continue;
     const extra = await galleryById(galleryId);
@@ -4327,8 +4327,8 @@ async function resolveClientGalleryLink(id) {
   const order = docRecord(orderSnap);
   const orderRequest = docRecord(requestSnap);
   const galleriesByOrderId = order ? await galleriesWhere("orderId", id) : [];
-  const pointedGalleryId = text$3(orderRequest?.galleryId) || text$3(order?.galleryId);
-  const pointedListingId = text$3(orderRequest?.listingId) || text$3(order?.listingId);
+  const pointedGalleryId = text$4(orderRequest?.galleryId) || text$4(order?.galleryId);
+  const pointedListingId = text$4(orderRequest?.listingId) || text$4(order?.listingId);
   const pointedGallery = pointedGalleryId ? await galleryById(pointedGalleryId) : null;
   let pointedListing = null;
   let pointedRelated = relatedGalleries;
@@ -5900,6 +5900,282 @@ function visibleToPortalClient(record, identity) {
   if (!email) return false;
   return [record.email, record.clientEmail].some((value) => normalizeEmail(value) === email);
 }
+const CHICAGO = "America/Chicago";
+const ACCEPTED = /* @__PURE__ */ new Set([
+  "confirmed",
+  "scheduled",
+  "accepted",
+  "in_progress",
+  "completed",
+  "shot_complete",
+  "appt_scheduled",
+  "consult_scheduled",
+  "delivered"
+]);
+function addressText(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "object") {
+    const address = value;
+    if (typeof address.formatted === "string" && address.formatted.trim()) return address.formatted.trim();
+    if (typeof address.label === "string" && address.label.trim()) return address.label.trim();
+    return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
+  }
+  return "";
+}
+function statusKey(value) {
+  return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+function calendarDateKey(value, timeZone = CHICAGO) {
+  if (value == null || value === "") return null;
+  if (typeof value === "number" && Number.isFinite(value)) return instantDateKey(new Date(value), timeZone);
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : instantDateKey(value, timeZone);
+  if (typeof value === "object") {
+    const record = value;
+    const seconds = typeof record.seconds === "number" ? record.seconds : typeof record._seconds === "number" ? record._seconds : null;
+    if (seconds == null) return null;
+    return instantDateKey(new Date(seconds * 1e3), timeZone);
+  }
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const textual = textualDateKey(trimmed);
+  if (textual) return textual;
+  if (/^\d{4}-\d{2}-\d{2}T00:00:00(?:\.000)?Z$/.test(trimmed)) return trimmed.slice(0, 10);
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return instantDateKey(parsed, timeZone);
+}
+function formatPortalDate(value) {
+  const key = calendarDateKey(value);
+  if (!key) return null;
+  const [year, month, day] = key.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC"
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+function clockTime(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed || /^tbd$/i.test(trimmed)) return null;
+  const match = trimmed.match(/^(\d{1,2})(?::(\d{2}))?(?::\d{2})?\s*(am|pm)?$/i);
+  if (!match) return null;
+  let hours = Number(match[1]);
+  const minutes = Number(match[2] || "0");
+  const meridiem = match[3]?.toLowerCase();
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes) || minutes > 59) return null;
+  if (meridiem === "pm" && hours < 12) hours += 12;
+  if (meridiem === "am" && hours === 12) hours = 0;
+  if (!meridiem && hours > 23) return null;
+  if (meridiem && hours > 23) return null;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+function storedAmount(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return roundMoney(value);
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value.replace(/[$,\s]/g, ""));
+    if (Number.isFinite(parsed)) return roundMoney(parsed);
+  }
+  return null;
+}
+function listingCoverUrl(images) {
+  if (!Array.isArray(images)) return null;
+  for (const image of images) {
+    if (!image || typeof image !== "object") continue;
+    const record = image;
+    const candidate = typeof record.url === "string" ? record.url : record.thumbnailUrl;
+    if (typeof candidate === "string" && /^https?:\/\//i.test(candidate.trim())) return candidate.trim();
+  }
+  return null;
+}
+function sortNewestFirst(items) {
+  return [...items].sort((a, b) => {
+    const aTime = a.createdAt ? Date.parse(a.createdAt) : Number.NaN;
+    const bTime = b.createdAt ? Date.parse(b.createdAt) : Number.NaN;
+    const aOk = Number.isFinite(aTime);
+    const bOk = Number.isFinite(bTime);
+    if (aOk && bOk && aTime !== bTime) return bTime - aTime;
+    if (aOk !== bOk) return aOk ? -1 : 1;
+    if (a.id === b.id) return 0;
+    return a.id < b.id ? 1 : -1;
+  });
+}
+function clientListingPath(listingId) {
+  return `/portal/listings/${encodeURIComponent(listingId.trim())}`;
+}
+function buildClientListing(id, data) {
+  const images = data.images;
+  const projectType = data.projectType === "business" || data.projectType === "real_estate" ? data.projectType : "";
+  const status = typeof data.status === "string" && data.status.trim() ? data.status.trim() : "scheduled";
+  return {
+    id,
+    address: addressText(data.propertyAddress || data.address || data.shootLocation) || "Listing",
+    status,
+    projectType,
+    imageCount: Array.isArray(images) ? images.length : 0,
+    coverUrl: listingCoverUrl(images),
+    createdAt: isoStamp(data.createdAt),
+    appointmentDate: calendarDateKey(data.apptDate || data.appointmentDate || data.scheduledDate),
+    href: clientListingPath(id)
+  };
+}
+function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
+  const createdAt = isoStamp(data.createdAt);
+  const issuedAt = createdAt ? new Date(createdAt) : now;
+  return {
+    id,
+    invoiceNumber: presentInvoiceNumber(data.invoiceNumber, id, Number.isNaN(issuedAt.getTime()) ? now : issuedAt),
+    status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
+    clientName: text$3(data.clientName),
+    address: addressText(data.billToAddress || data.address || data.propertyAddress),
+    createdAt,
+    issuedOn: formatPortalDate(data.createdAt) || formatPortalDate(data.sentAt) || formatPortalDate(data.paidAt),
+    lineItems: storedLines(data.lineItems, data.services),
+    subtotal: storedAmount(data.subtotal),
+    tax: storedAmount(data.tax),
+    total: storedAmount(data.total),
+    amountPaid: storedAmount(data.amountPaid),
+    amountDue: storedAmount(data.amountDue)
+  };
+}
+function buildClientAppointment(id, data, orderRequest) {
+  const scheduledDate = firstDate(data.scheduledDate, data.appointmentDate);
+  const scheduledTime = firstTime(data.scheduledTime, data.appointmentTime, data.apptTime);
+  let requestedDate = firstDate(data.requestedDate, data.originalScheduledDate, data.originalDate, orderRequest?.requestedDate, orderRequest?.originalScheduledDate);
+  let requestedTime = firstTime(data.requestedTime, data.originalScheduledTime, data.originalTime, orderRequest?.requestedTime, orderRequest?.originalScheduledTime);
+  const requestScheduledDate = firstDate(orderRequest?.scheduledDate, orderRequest?.appointmentDate);
+  const requestScheduledTime = firstTime(orderRequest?.scheduledTime, orderRequest?.appointmentTime);
+  if (!requestedDate && requestScheduledDate && scheduledDate && requestScheduledDate !== scheduledDate) {
+    requestedDate = requestScheduledDate;
+  }
+  if (!requestedTime && requestScheduledTime && scheduledTime && clockTime(requestScheduledTime) !== clockTime(scheduledTime)) {
+    requestedTime = requestScheduledTime;
+  }
+  const proposedDate = firstDate(data.proposedDate, data.alternateDate, data.counterDate);
+  const proposedTime = firstTime(data.proposedTime, data.alternateTime, data.counterTime);
+  const status = typeof data.status === "string" ? data.status.trim() : "";
+  const iconicAccepted = ACCEPTED.has(statusKey(status)) || statusKey(status) === "pending_confirmation" || statusKey(status) === "rescheduled";
+  let date = scheduledDate;
+  let time = scheduledTime;
+  if (proposedDate && iconicAccepted && proposedDate !== (requestedDate || scheduledDate)) {
+    if (!requestedDate && scheduledDate) requestedDate = scheduledDate;
+    date = proposedDate;
+    if (proposedTime) time = proposedTime;
+  }
+  if (!date) date = requestedDate;
+  if (!time) time = requestedTime;
+  return {
+    id,
+    address: addressText(data.addressLabel || data.address) || "Appointment",
+    status,
+    date,
+    time,
+    requestedDate,
+    requestedTime,
+    approved: hasStamp(data.clientConfirmedAt) || hasStamp(data.changeApprovedAt) || hasStamp(data.agentApprovedAt) || hasStamp(orderRequest?.clientConfirmedAt) || hasStamp(orderRequest?.changeApprovedAt),
+    createdAt: isoStamp(data.createdAt)
+  };
+}
+function storedLines(lineItems, services2) {
+  const raw = Array.isArray(lineItems) ? lineItems : Array.isArray(services2) ? services2 : [];
+  return raw.flatMap((item) => {
+    if (typeof item === "string" && item.trim()) return [{ name: item.trim(), qty: null, amount: null }];
+    if (!item || typeof item !== "object") return [];
+    const record = item;
+    const name = text$3(record.name) || text$3(record.label) || text$3(record.description);
+    const qty = storedQty(record.qty ?? record.quantity);
+    const amount = storedAmount(record.price ?? record.amount ?? record.total);
+    if (!name && amount == null && qty == null) return [];
+    return [{ name: name || "Line item", qty, amount }];
+  });
+}
+function storedQty(value) {
+  const qty = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : Number.NaN;
+  if (!Number.isFinite(qty) || qty <= 0) return null;
+  return Math.round(qty);
+}
+function firstDate(...values) {
+  for (const value of values) {
+    const key = calendarDateKey(value);
+    if (key) return key;
+  }
+  return null;
+}
+function firstTime(...values) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim() && !/^tbd$/i.test(value.trim())) return value.trim();
+  }
+  return "";
+}
+function hasStamp(value) {
+  if (value == null || value === false) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  return true;
+}
+function isoStamp(value) {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
+  if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
+  return null;
+}
+function text$3(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function roundMoney(value) {
+  return Math.round(value * 100) / 100;
+}
+const MONTHS = {
+  january: 1,
+  february: 2,
+  march: 3,
+  april: 4,
+  may: 5,
+  june: 6,
+  july: 7,
+  august: 8,
+  september: 9,
+  october: 10,
+  november: 11,
+  december: 12
+};
+function textualDateKey(value) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const long = value.match(/^(?:[A-Za-z]+,\s+)?([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})$/);
+  if (long) {
+    const month = MONTHS[long[1].toLowerCase()];
+    const day = Number(long[2]);
+    const year = Number(long[3]);
+    if (month && day >= 1 && day <= 31) return dateKey(year, month, day);
+  }
+  const slash = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slash) {
+    const month = Number(slash[1]);
+    const day = Number(slash[2]);
+    const year = Number(slash[3]);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) return dateKey(year, month, day);
+  }
+  return null;
+}
+function instantDateKey(date, timeZone) {
+  if (date.getUTCHours() === 0 && date.getUTCMinutes() === 0 && date.getUTCSeconds() === 0 && date.getUTCMilliseconds() === 0) {
+    return dateKey(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+  }
+  return formatZoned(date, timeZone);
+}
+function dateKey(year, month, day) {
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+function formatZoned(date, timeZone) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
+}
 const EMPTY = "Not on file yet";
 const FACT_DEFS = [
   { id: "beds", label: "Beds", keys: ["bedrooms", "beds"] },
@@ -6087,12 +6363,12 @@ function text$2(value) {
 function boolOr(value, fallback) {
   return typeof value === "boolean" ? value : fallback;
 }
-function asRecord(value) {
+function asRecord$1(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : null;
 }
 function readFact(records, keys) {
   for (const record of records) {
-    const bags = [record, asRecord(record.property), asRecord(record.propertyDetails), asRecord(record.listingInfo), asRecord(record.details)];
+    const bags = [record, asRecord$1(record.property), asRecord$1(record.propertyDetails), asRecord$1(record.listingInfo), asRecord$1(record.details)];
     for (const bag of bags) {
       if (!bag) continue;
       for (const key of keys) {
@@ -6144,7 +6420,7 @@ function fillAddress(target, source) {
   if (target.lng == null && source.lng != null) target.lng = source.lng;
 }
 function addressFromRecord(record) {
-  const structured = asRecord(record.address) || asRecord(record.shootLocation) || asRecord(record.propertyAddress);
+  const structured = asRecord$1(record.address) || asRecord$1(record.shootLocation) || asRecord$1(record.propertyAddress);
   const parsed = parseAddressText(
     text$2(record.addressLine1) ? "" : addressString(record.address) || addressString(record.propertyAddress) || addressString(record.shootLocation) || text$2(structured?.formatted)
   );
@@ -6202,9 +6478,9 @@ function splitUnit(line1) {
   return { line1: match[1].trim(), line2: match[2].trim() };
 }
 function nestedCoord(record, axis) {
-  const geo = asRecord(record.geo) || asRecord(record.location) || asRecord(record.geometry);
+  const geo = asRecord$1(record.geo) || asRecord$1(record.location) || asRecord$1(record.geometry);
   if (!geo) return void 0;
-  const location = asRecord(geo.location) || geo;
+  const location = asRecord$1(geo.location) || geo;
   if (axis === "lat") return location.lat ?? location.latitude;
   return location.lng ?? location.longitude;
 }
@@ -6731,40 +7007,9 @@ const handlePatchPortalWebsite = async (req, res) => {
 };
 const router$b = Router();
 const db$8 = () => admin.firestore();
-function whenLabel(value) {
-  if (!value) return "";
-  if (typeof value === "string") return value;
-  if (typeof value === "object" && value !== null && "toDate" in value && typeof value.toDate === "function") {
-    return value.toDate().toLocaleString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      year: "numeric"
-    });
-  }
-  return "";
-}
-function portalAppointment(id, data) {
-  const status = String(data.status || "requested");
-  return {
-    id,
-    address: addressText(data.addressLabel || data.address) || "Appointment",
-    status,
-    statusLabel: status === "requested" ? "Request received" : status.replace(/_/g, " "),
-    scheduledDate: whenLabel(data.scheduledDate),
-    scheduledTime: typeof data.scheduledTime === "string" ? data.scheduledTime : "",
-    createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : ""
-  };
-}
-function addressText(value) {
-  if (!value) return "";
-  if (typeof value === "string") return value;
-  if (typeof value === "object") {
-    const address = value;
-    if (typeof address.formatted === "string" && address.formatted) return address.formatted;
-    return [address.street, address.city, address.state, address.zip].filter(Boolean).join(", ");
-  }
-  return String(value);
+const HOME_LIMIT = 100;
+function asRecord(value) {
+  return value && typeof value === "object" ? value : {};
 }
 router$b.get("/", requireStaff, async (req, res) => {
   try {
@@ -6865,7 +7110,10 @@ router$b.get("/me/home", requireAuth, async (req, res) => {
     const galleries = [];
     const invoices = [];
     const projects = [];
-    const appointments = [];
+    const appointmentDocs = [];
+    let listingsTruncated = false;
+    let invoicesTruncated = false;
+    let appointmentsTruncated = false;
     const seenGallery = /* @__PURE__ */ new Set();
     const seenInvoice = /* @__PURE__ */ new Set();
     const seenProject = /* @__PURE__ */ new Set();
@@ -6873,26 +7121,23 @@ router$b.get("/me/home", requireAuth, async (req, res) => {
     const pushAppointment = (entry) => {
       if (seenAppointment.has(entry.id)) return;
       seenAppointment.add(entry.id);
-      appointments.push(portalAppointment(entry.id, entry.data()));
+      appointmentDocs.push(entry);
     };
     const pushInvoice = (entry) => {
       if (seenInvoice.has(entry.id)) return;
       seenInvoice.add(entry.id);
-      const data = entry.data();
-      invoices.push({
-        id: entry.id,
-        invoiceNumber: data.invoiceNumber || entry.id,
-        status: data.status || "draft",
-        total: data.total || 0,
-        amountDue: data.amountDue ?? data.total ?? 0,
-        href: `/invoice/${entry.id}`
-      });
+      invoices.push(buildClientInvoice(entry.id, asRecord(jsonSafe(entry.data()))));
+    };
+    const pushListing = (entry) => {
+      if (seenProject.has(entry.id)) return;
+      seenProject.add(entry.id);
+      projects.push(buildClientListing(entry.id, asRecord(jsonSafe(entry.data()))));
     };
     for (const clientId of identity.ids) {
       const [gallerySnap, invoiceSnap, projectSnap] = await Promise.all([
-        db$8().collection("galleries").where("clientId", "==", clientId).limit(20).get(),
-        db$8().collection("invoices").where("clientId", "==", clientId).limit(20).get(),
-        db$8().collection("listings").where("clientId", "==", clientId).limit(20).get()
+        db$8().collection("galleries").where("clientId", "==", clientId).limit(HOME_LIMIT).get(),
+        db$8().collection("invoices").where("clientId", "==", clientId).limit(HOME_LIMIT).get(),
+        db$8().collection("listings").where("clientId", "==", clientId).limit(HOME_LIMIT).get()
       ]);
       for (const doc of gallerySnap.docs) {
         if (seenGallery.has(doc.id)) continue;
@@ -6906,21 +7151,13 @@ router$b.get("/me/home", requireAuth, async (req, res) => {
           href: `/gallery/${doc.id}`
         });
       }
+      if (invoiceSnap.size >= HOME_LIMIT) invoicesTruncated = true;
       invoiceSnap.docs.forEach(pushInvoice);
-      for (const doc of projectSnap.docs) {
-        if (seenProject.has(doc.id)) continue;
-        seenProject.add(doc.id);
-        const data = doc.data();
-        projects.push({
-          id: doc.id,
-          address: addressText(data.propertyAddress || data.address || data.shootLocation) || "Project",
-          status: data.status || "scheduled",
-          imageCount: Array.isArray(data.images) ? data.images.length : 0,
-          href: `/studio/${doc.id}`
-        });
-      }
+      if (projectSnap.size >= HOME_LIMIT) listingsTruncated = true;
+      projectSnap.docs.forEach(pushListing);
       try {
-        const appointmentSnap = await db$8().collection("appointments").where("clientId", "==", clientId).limit(20).get();
+        const appointmentSnap = await db$8().collection("appointments").where("clientId", "==", clientId).limit(HOME_LIMIT).get();
+        if (appointmentSnap.size >= HOME_LIMIT) appointmentsTruncated = true;
         appointmentSnap.docs.forEach(pushAppointment);
       } catch (appointmentErr) {
         console.error("[Clients] Appointment lookup failed:", appointmentErr);
@@ -6946,13 +7183,13 @@ router$b.get("/me/home", requireAuth, async (req, res) => {
     };
     try {
       for (const clientId of identity.ids) {
-        const snap = await db$8().collection("orderRequests").where("clientId", "==", clientId).limit(20).get();
+        const snap = await db$8().collection("orderRequests").where("clientId", "==", clientId).limit(HOME_LIMIT).get();
         snap.docs.forEach(pushOrder);
       }
       if (identity.email) {
         const [byEmail, byClientEmail] = await Promise.all([
-          db$8().collection("orderRequests").where("email", "==", identity.email).limit(20).get(),
-          db$8().collection("orderRequests").where("clientEmail", "==", identity.email).limit(20).get()
+          db$8().collection("orderRequests").where("email", "==", identity.email).limit(HOME_LIMIT).get(),
+          db$8().collection("orderRequests").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get()
         ]);
         byEmail.docs.forEach(pushOrder);
         byClientEmail.docs.forEach(pushOrder);
@@ -6962,7 +7199,8 @@ router$b.get("/me/home", requireAuth, async (req, res) => {
     }
     if (identity.email) {
       try {
-        const byInvoiceEmail = await db$8().collection("invoices").where("clientEmail", "==", identity.email).limit(20).get();
+        const byInvoiceEmail = await db$8().collection("invoices").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get();
+        if (byInvoiceEmail.size >= HOME_LIMIT) invoicesTruncated = true;
         byInvoiceEmail.docs.forEach(pushInvoice);
       } catch (invoiceErr) {
         console.error("[Clients] Invoice email lookup failed:", invoiceErr);
@@ -6970,33 +7208,36 @@ router$b.get("/me/home", requireAuth, async (req, res) => {
     }
     if (identity.email) {
       try {
-        const appointmentsByEmail = await db$8().collection("appointments").where("clientEmail", "==", identity.email).limit(20).get();
+        const appointmentsByEmail = await db$8().collection("appointments").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get();
+        if (appointmentsByEmail.size >= HOME_LIMIT) appointmentsTruncated = true;
         appointmentsByEmail.docs.forEach(pushAppointment);
       } catch (appointmentErr) {
         console.error("[Clients] Appointment email lookup failed:", appointmentErr);
       }
-      const byEmail = await db$8().collection("listings").where("clientEmail", "==", identity.email).limit(20).get();
-      for (const doc of byEmail.docs) {
-        if (seenProject.has(doc.id)) continue;
-        seenProject.add(doc.id);
-        const data = doc.data();
-        projects.push({
-          id: doc.id,
-          address: addressText(data.propertyAddress || data.address || data.shootLocation) || "Project",
-          status: data.status || "scheduled",
-          imageCount: Array.isArray(data.images) ? data.images.length : 0,
-          href: `/studio/${doc.id}`
-        });
-      }
+      const byEmail = await db$8().collection("listings").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get();
+      if (byEmail.size >= HOME_LIMIT) listingsTruncated = true;
+      byEmail.docs.forEach(pushListing);
     }
-    appointments.sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+    const requestIds = appointmentDocs.map((entry) => entry.data().orderRequestId).filter((id) => typeof id === "string" && id.trim().length > 0);
+    const orderRequests = await orderRequestsById(requestIds);
+    const appointments = appointmentDocs.map((entry) => {
+      const data = asRecord(jsonSafe(entry.data()));
+      const orderRequestId = typeof data.orderRequestId === "string" ? data.orderRequestId : "";
+      return buildClientAppointment(entry.id, data, orderRequests.get(orderRequestId) || null);
+    });
+    const listings = sortNewestFirst(projects);
+    const invoiceRows = sortNewestFirst(invoices);
     return res.json({
       profile: jsonSafe(identity.profile),
       appointments,
       orders,
       galleries,
-      invoices,
-      projects
+      invoices: invoiceRows,
+      listings,
+      projects: listings,
+      listingsTruncated,
+      invoicesTruncated,
+      appointmentsTruncated
     });
   } catch (err) {
     console.error("[Clients] Home error:", err);
@@ -7082,6 +7323,21 @@ router$b.patch("/:id", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update client." });
   }
 });
+async function orderRequestsById(ids) {
+  const unique2 = [...new Set(ids.map((id) => id.trim()).filter(Boolean))].slice(0, HOME_LIMIT);
+  const map = /* @__PURE__ */ new Map();
+  if (unique2.length === 0) return map;
+  try {
+    const snaps = await db$8().getAll(...unique2.map((id) => db$8().collection("orderRequests").doc(id)));
+    snaps.forEach((snap) => {
+      if (!snap.exists) return;
+      map.set(snap.id, asRecord(jsonSafe(snap.data() || {})));
+    });
+  } catch (err) {
+    console.error("[Clients] Order request schedule lookup failed:", err);
+  }
+  return map;
+}
 function secretsMatch(provided, expected) {
   if (typeof provided !== "string" || typeof expected !== "string") return false;
   if (!provided || !expected) return false;
