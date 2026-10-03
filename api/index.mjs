@@ -139,7 +139,7 @@ function clientNotifyBlockReason(env = process.env) {
   if (env.CLIENT_COMMS_ZONE === "RED") return "CLIENT_COMMS_ZONE=RED";
   return "CLIENT_NOTIFY_LIVE is not exactly true";
 }
-const db$m = () => admin.firestore();
+const db$n = () => admin.firestore();
 class EmailNotConfiguredError extends Error {
   code = "email_not_configured";
   constructor() {
@@ -176,7 +176,7 @@ async function sendEmail(options) {
   let htmlBody = getFallbackTemplate(template, variables);
   try {
     if (admin.apps.length) {
-      const templateDoc = await db$m().collection("emailTemplates").where("category", "==", template).where("isActive", "==", true).limit(1).get();
+      const templateDoc = await db$n().collection("emailTemplates").where("category", "==", template).where("isActive", "==", true).limit(1).get();
       if (!templateDoc.empty) {
         const tmpl = templateDoc.docs[0].data();
         if (!subjectOverride && typeof tmpl.subject === "string" && tmpl.subject.trim()) {
@@ -495,7 +495,7 @@ Reply to this text with any last-minute notes!`,
 View your gallery: ${galleryUrl}
 
 Questions or edits? Just reply here. — Iconic Images`,
-  photographerIntro: (photographerName, clientName, date) => `Hi ${clientName}! I'm ${photographerName}, your Iconic Images photographer for ${date}. Feel free to text me here with any questions before the shoot! 📸`,
+  photographerIntro: (photographerName, clientName2, date) => `Hi ${clientName2}! I'm ${photographerName}, your Iconic Images photographer for ${date}. Feel free to text me here with any questions before the shoot! 📸`,
   newBookingAlert: (address, date, services2) => `🔔 NEW BOOKING — Iconic Images
 
 📍 ${address}
@@ -508,11 +508,11 @@ function getPrivateKey() {
   return (process.env.GOOGLE_CALENDAR_PRIVATE_KEY || "").replace(/\\n/g, "\n");
 }
 function getAuth() {
-  const clientEmail = process.env.GOOGLE_CALENDAR_CLIENT_EMAIL;
+  const clientEmail2 = process.env.GOOGLE_CALENDAR_CLIENT_EMAIL;
   const privateKey = getPrivateKey();
-  if (!clientEmail || !privateKey) return null;
+  if (!clientEmail2 || !privateKey) return null;
   return new google.auth.JWT({
-    email: clientEmail,
+    email: clientEmail2,
     key: privateKey,
     scopes: ["https://www.googleapis.com/auth/calendar"]
   });
@@ -725,17 +725,17 @@ function clientCanViewListing(listing, identity) {
   const listingEmail = normalizeEmail(listing.clientEmail);
   return Boolean(email && listingEmail && email === listingEmail);
 }
-const db$l = () => admin.firestore();
+const db$m = () => admin.firestore();
 async function upsertPortalClient(input) {
   const email = normalizeEmail(input.email);
   const firstName = cleanPersonName(input.firstName);
   const lastName = cleanPersonName(input.lastName);
   const phone = String(input.phone || "").trim().slice(0, 40);
   const now = admin.firestore.FieldValue.serverTimestamp();
-  const existing = email ? await db$l().collection("clients").where("email", "==", email).limit(5).get() : null;
+  const existing = email ? await db$m().collection("clients").where("email", "==", email).limit(5).get() : null;
   const linked = existing?.docs.find((doc) => doc.id !== input.uid);
   const linkedData = linked?.data() || {};
-  const uidRef = db$l().collection("clients").doc(input.uid);
+  const uidRef = db$m().collection("clients").doc(input.uid);
   const uidSnap = await uidRef.get();
   const previous = uidSnap.exists ? uidSnap.data() || {} : {};
   await uidRef.set({
@@ -767,7 +767,7 @@ async function upsertPortalClient(input) {
 }
 async function resolveClientIdentity(uid, email) {
   const ids = /* @__PURE__ */ new Set([uid]);
-  const direct = await db$l().collection("clients").doc(uid).get();
+  const direct = await db$m().collection("clients").doc(uid).get();
   let profile = direct.exists ? { id: direct.id, ...direct.data() } : null;
   const redirectId = typeof profile?._redirect === "string" ? profile._redirect : "";
   if (redirectId) ids.add(redirectId);
@@ -775,14 +775,14 @@ async function resolveClientIdentity(uid, email) {
   if (linkedId) ids.add(linkedId);
   const normalized = normalizeEmail(email || profile?.email);
   if (normalized) {
-    const matches = await db$l().collection("clients").where("email", "==", normalized).limit(10).get();
+    const matches = await db$m().collection("clients").where("email", "==", normalized).limit(10).get();
     for (const doc of matches.docs) {
       ids.add(doc.id);
       if (!profile) profile = { id: doc.id, ...doc.data() };
     }
   }
   if (redirectId && profile && !profile.email) {
-    const real = await db$l().collection("clients").doc(redirectId).get();
+    const real = await db$m().collection("clients").doc(redirectId).get();
     if (real.exists) profile = { id: real.id, ...real.data(), portalDocId: uid };
   }
   return { ids: [...ids], profile, email: normalized };
@@ -811,7 +811,7 @@ function planBookingAccount(input) {
     skipReason: null
   };
 }
-const db$k = () => admin.firestore();
+const db$l = () => admin.firestore();
 function appUrl$3() {
   return process.env.APP_URL || process.env.FRONTEND_URL || "https://iconicimagestx.com";
 }
@@ -823,7 +823,7 @@ async function attachBookingClient(input) {
   const firstName = cleanPersonName(input.firstName) || "Client";
   const lastName = cleanPersonName(input.lastName);
   const phone = String(input.phone || "").trim().slice(0, 40);
-  const staffHit = await db$k().collection("staff").where("email", "==", email).limit(1).get();
+  const staffHit = await db$l().collection("staff").where("email", "==", email).limit(1).get();
   let authUid = null;
   if (staffHit.empty) {
     try {
@@ -905,7 +905,7 @@ async function sendFirebasePasswordEmail(email) {
 }
 async function createRequestedAppointment(input) {
   const now = admin.firestore.FieldValue.serverTimestamp();
-  await db$k().collection("appointments").add({
+  await db$l().collection("appointments").add({
     orderRequestId: input.orderRequestId,
     clientId: input.clientId,
     clientName: input.clientName,
@@ -923,8 +923,12 @@ async function createRequestedAppointment(input) {
     updatedAt: now
   });
 }
-function lifeOfTheListingCareSelected(value) {
-  return value === true;
+function visibleToPortalClient(record, identity) {
+  if (!record) return false;
+  if (record.clientId && identity.ids.includes(String(record.clientId))) return true;
+  const email = normalizeEmail(identity.email);
+  if (!email) return false;
+  return [record.email, record.clientEmail].some((value) => normalizeEmail(value) === email);
 }
 const services = [
   // Listings
@@ -1324,6 +1328,1133 @@ function presentInvoiceNumber(stored, invoiceId, now = /* @__PURE__ */ new Date(
   if (id) return draftInvoiceNumber(id, now);
   return `INV-${now.getFullYear()}-0001`;
 }
+const CHICAGO = "America/Chicago";
+const ACCEPTED = /* @__PURE__ */ new Set([
+  "confirmed",
+  "scheduled",
+  "accepted",
+  "in_progress",
+  "completed",
+  "shot_complete",
+  "appt_scheduled",
+  "consult_scheduled",
+  "delivered"
+]);
+function addressText(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "object") {
+    const address = value;
+    if (typeof address.formatted === "string" && address.formatted.trim()) return address.formatted.trim();
+    if (typeof address.label === "string" && address.label.trim()) return address.label.trim();
+    return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
+  }
+  return "";
+}
+function statusKey$1(value) {
+  return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+function calendarDateKey(value, timeZone = CHICAGO) {
+  if (value == null || value === "") return null;
+  if (typeof value === "number" && Number.isFinite(value)) return instantDateKey(new Date(value), timeZone);
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : instantDateKey(value, timeZone);
+  if (typeof value === "object") {
+    const record = value;
+    const seconds = typeof record.seconds === "number" ? record.seconds : typeof record._seconds === "number" ? record._seconds : null;
+    if (seconds == null) return null;
+    return instantDateKey(new Date(seconds * 1e3), timeZone);
+  }
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const textual = textualDateKey(trimmed);
+  if (textual) return textual;
+  if (/^\d{4}-\d{2}-\d{2}T00:00:00(?:\.000)?Z$/.test(trimmed)) return trimmed.slice(0, 10);
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return instantDateKey(parsed, timeZone);
+}
+function formatPortalDate(value) {
+  const key = calendarDateKey(value);
+  if (!key) return null;
+  const [year, month, day] = key.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC"
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+function clockTime(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed || /^tbd$/i.test(trimmed)) return null;
+  const match = trimmed.match(/^(\d{1,2})(?::(\d{2}))?(?::\d{2})?\s*(am|pm)?$/i);
+  if (!match) return null;
+  let hours = Number(match[1]);
+  const minutes = Number(match[2] || "0");
+  const meridiem = match[3]?.toLowerCase();
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes) || minutes > 59) return null;
+  if (meridiem === "pm" && hours < 12) hours += 12;
+  if (meridiem === "am" && hours === 12) hours = 0;
+  if (!meridiem && hours > 23) return null;
+  if (meridiem && hours > 23) return null;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+function storedAmount(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return roundMoney(value);
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value.replace(/[$,\s]/g, ""));
+    if (Number.isFinite(parsed)) return roundMoney(parsed);
+  }
+  return null;
+}
+function listingCoverUrl(images) {
+  if (!Array.isArray(images)) return null;
+  for (const image of images) {
+    if (!image || typeof image !== "object") continue;
+    const record = image;
+    const candidate = typeof record.url === "string" ? record.url : record.thumbnailUrl;
+    if (typeof candidate === "string" && /^https?:\/\//i.test(candidate.trim())) return candidate.trim();
+  }
+  return null;
+}
+function sortNewestFirst(items) {
+  return [...items].sort((a, b) => {
+    const aTime = a.createdAt ? Date.parse(a.createdAt) : Number.NaN;
+    const bTime = b.createdAt ? Date.parse(b.createdAt) : Number.NaN;
+    const aOk = Number.isFinite(aTime);
+    const bOk = Number.isFinite(bTime);
+    if (aOk && bOk && aTime !== bTime) return bTime - aTime;
+    if (aOk !== bOk) return aOk ? -1 : 1;
+    if (a.id === b.id) return 0;
+    return a.id < b.id ? 1 : -1;
+  });
+}
+function clientListingPath(listingId) {
+  return `/portal/listings/${encodeURIComponent(listingId.trim())}`;
+}
+function buildClientListing(id, data) {
+  const images = data.images;
+  const projectType2 = data.projectType === "business" || data.projectType === "real_estate" ? data.projectType : "";
+  const status = typeof data.status === "string" && data.status.trim() ? data.status.trim() : "scheduled";
+  return {
+    id,
+    address: addressText(data.propertyAddress || data.address || data.shootLocation) || "Listing",
+    status,
+    projectType: projectType2,
+    imageCount: Array.isArray(images) ? images.length : 0,
+    coverUrl: listingCoverUrl(images),
+    createdAt: isoStamp(data.createdAt),
+    appointmentDate: calendarDateKey(data.apptDate || data.appointmentDate || data.scheduledDate),
+    href: clientListingPath(id)
+  };
+}
+function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
+  const createdAt = isoStamp(data.createdAt);
+  const issuedAt = createdAt ? new Date(createdAt) : now;
+  return {
+    id,
+    invoiceNumber: presentInvoiceNumber(data.invoiceNumber, id, Number.isNaN(issuedAt.getTime()) ? now : issuedAt),
+    status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
+    clientName: text$7(data.clientName),
+    address: addressText(data.billToAddress || data.address || data.propertyAddress),
+    createdAt,
+    issuedOn: formatPortalDate(data.createdAt) || formatPortalDate(data.sentAt) || formatPortalDate(data.paidAt),
+    lineItems: storedLines(data.lineItems, data.services),
+    subtotal: storedAmount(data.subtotal),
+    tax: storedAmount(data.tax),
+    total: storedAmount(data.total),
+    amountPaid: storedAmount(data.amountPaid),
+    amountDue: storedAmount(data.amountDue)
+  };
+}
+function buildClientAppointment(id, data, orderRequest) {
+  const scheduledDate = firstDate(data.scheduledDate, data.appointmentDate);
+  const scheduledTime = firstTime(data.scheduledTime, data.appointmentTime, data.apptTime);
+  let requestedDate = firstDate(data.requestedDate, data.originalScheduledDate, data.originalDate, orderRequest?.requestedDate, orderRequest?.originalScheduledDate);
+  let requestedTime = firstTime(data.requestedTime, data.originalScheduledTime, data.originalTime, orderRequest?.requestedTime, orderRequest?.originalScheduledTime);
+  const requestScheduledDate = firstDate(orderRequest?.scheduledDate, orderRequest?.appointmentDate);
+  const requestScheduledTime = firstTime(orderRequest?.scheduledTime, orderRequest?.appointmentTime);
+  if (!requestedDate && requestScheduledDate && scheduledDate && requestScheduledDate !== scheduledDate) {
+    requestedDate = requestScheduledDate;
+  }
+  if (!requestedTime && requestScheduledTime && scheduledTime && clockTime(requestScheduledTime) !== clockTime(scheduledTime)) {
+    requestedTime = requestScheduledTime;
+  }
+  const proposedDate = firstDate(data.proposedDate, data.alternateDate, data.counterDate);
+  const proposedTime = firstTime(data.proposedTime, data.alternateTime, data.counterTime);
+  const status = typeof data.status === "string" ? data.status.trim() : "";
+  const iconicAccepted = ACCEPTED.has(statusKey$1(status)) || statusKey$1(status) === "pending_confirmation" || statusKey$1(status) === "rescheduled";
+  let date = scheduledDate;
+  let time = scheduledTime;
+  if (proposedDate && iconicAccepted && proposedDate !== (requestedDate || scheduledDate)) {
+    if (!requestedDate && scheduledDate) requestedDate = scheduledDate;
+    date = proposedDate;
+    if (proposedTime) time = proposedTime;
+  }
+  if (!date) date = requestedDate;
+  if (!time) time = requestedTime;
+  return {
+    id,
+    address: addressText(data.addressLabel || data.address) || "Appointment",
+    status,
+    date,
+    time,
+    requestedDate,
+    requestedTime,
+    approved: hasStamp(data.clientConfirmedAt) || hasStamp(data.changeApprovedAt) || hasStamp(data.agentApprovedAt) || hasStamp(orderRequest?.clientConfirmedAt) || hasStamp(orderRequest?.changeApprovedAt),
+    createdAt: isoStamp(data.createdAt)
+  };
+}
+function storedLines(lineItems, services2) {
+  const raw = Array.isArray(lineItems) ? lineItems : Array.isArray(services2) ? services2 : [];
+  return raw.flatMap((item) => {
+    if (typeof item === "string" && item.trim()) return [{ name: item.trim(), qty: null, amount: null }];
+    if (!item || typeof item !== "object") return [];
+    const record = item;
+    const name = text$7(record.name) || text$7(record.label) || text$7(record.description);
+    const qty = storedQty(record.qty ?? record.quantity);
+    const amount = storedAmount(record.price ?? record.amount ?? record.total);
+    if (!name && amount == null && qty == null) return [];
+    return [{ name: name || "Line item", qty, amount }];
+  });
+}
+function storedQty(value) {
+  const qty = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : Number.NaN;
+  if (!Number.isFinite(qty) || qty <= 0) return null;
+  return Math.round(qty);
+}
+function firstDate(...values) {
+  for (const value of values) {
+    const key = calendarDateKey(value);
+    if (key) return key;
+  }
+  return null;
+}
+function firstTime(...values) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim() && !/^tbd$/i.test(value.trim())) return value.trim();
+  }
+  return "";
+}
+function hasStamp(value) {
+  if (value == null || value === false) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  return true;
+}
+function isoStamp(value) {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
+  if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
+  return null;
+}
+function text$7(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function roundMoney(value) {
+  return Math.round(value * 100) / 100;
+}
+const MONTHS = {
+  january: 1,
+  february: 2,
+  march: 3,
+  april: 4,
+  may: 5,
+  june: 6,
+  july: 7,
+  august: 8,
+  september: 9,
+  october: 10,
+  november: 11,
+  december: 12
+};
+function textualDateKey(value) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const long = value.match(/^(?:[A-Za-z]+,\s+)?([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})$/);
+  if (long) {
+    const month = MONTHS[long[1].toLowerCase()];
+    const day = Number(long[2]);
+    const year = Number(long[3]);
+    if (month && day >= 1 && day <= 31) return dateKey(year, month, day);
+  }
+  const slash = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slash) {
+    const month = Number(slash[1]);
+    const day = Number(slash[2]);
+    const year = Number(slash[3]);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) return dateKey(year, month, day);
+  }
+  return null;
+}
+function instantDateKey(date, timeZone) {
+  if (date.getUTCHours() === 0 && date.getUTCMinutes() === 0 && date.getUTCSeconds() === 0 && date.getUTCMilliseconds() === 0) {
+    return dateKey(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+  }
+  return formatZoned(date, timeZone);
+}
+function dateKey(year, month, day) {
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+function formatZoned(date, timeZone) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
+}
+const PORTAL_LISTING_ID = /^[A-Za-z0-9_-]{4,128}$/;
+const NEVER_FILL = /* @__PURE__ */ new Set(["images", "createdAt", "source", "id"]);
+function isPortalListingId(value) {
+  return PORTAL_LISTING_ID.test(value);
+}
+function bookingListingDocId(kind, rawId) {
+  const safe = rawId.trim().replace(/[^A-Za-z0-9_-]/g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "");
+  if (!safe) return null;
+  let id = `bklist_${kind}_${safe}`;
+  if (id.length > 128) id = id.slice(0, 128).replace(/_+$/g, "");
+  return isPortalListingId(id) ? id : null;
+}
+function bookingListingGroups(input) {
+  const requests = cleanDocs(input.orderRequests);
+  const orders = cleanDocs(input.orders);
+  const invoices = cleanDocs(input.invoices);
+  const appointments = cleanDocs(input.appointments);
+  const galleries = cleanDocs(input.galleries);
+  const uf = new UnionFind();
+  for (const doc of requests) {
+    const node = nodeId("orderRequests", doc.id);
+    uf.touch(node);
+    uf.link(node, nodeId("listings", text$6(doc.data.listingId)));
+    uf.link(node, nodeId("orders", text$6(doc.data.orderId) || text$6(doc.data.convertedToOrderId)));
+    uf.link(node, nodeId("invoices", text$6(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$6(doc.data.galleryId)));
+  }
+  for (const doc of orders) {
+    const node = nodeId("orders", doc.id);
+    uf.touch(node);
+    uf.link(node, nodeId("orderRequests", text$6(doc.data.orderRequestId)));
+    uf.link(node, nodeId("listings", text$6(doc.data.listingId)));
+    uf.link(node, nodeId("invoices", text$6(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$6(doc.data.galleryId)));
+  }
+  for (const doc of invoices) {
+    const node = nodeId("invoices", doc.id);
+    uf.touch(node);
+    uf.link(node, nodeId("orderRequests", text$6(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$6(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$6(doc.data.listingId)));
+  }
+  for (const doc of appointments) {
+    const node = nodeId("appointments", doc.id);
+    uf.touch(node);
+    uf.link(node, nodeId("orderRequests", text$6(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$6(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$6(doc.data.listingId)));
+  }
+  for (const doc of galleries) {
+    const node = nodeId("galleries", doc.id);
+    uf.touch(node);
+    uf.link(node, nodeId("orderRequests", text$6(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$6(doc.data.orderId)));
+    uf.link(node, nodeId("invoices", text$6(doc.data.invoiceId)));
+    uf.link(node, nodeId("listings", text$6(doc.data.listingId)));
+  }
+  const groups = [];
+  for (const nodes of uf.components()) {
+    const orderRequestIds = idsWithPrefix(nodes, "orderRequests");
+    const orderIds = idsWithPrefix(nodes, "orders");
+    const invoiceIds = idsWithPrefix(nodes, "invoices");
+    const appointmentIds = idsWithPrefix(nodes, "appointments");
+    const galleryIds = idsWithPrefix(nodes, "galleries");
+    if (orderRequestIds.length + orderIds.length + invoiceIds.length + appointmentIds.length === 0) continue;
+    const stableId = stableListingId(orderRequestIds, orderIds, invoiceIds, appointmentIds);
+    if (!stableId) continue;
+    const group = {
+      stableId,
+      preferredListingIds: preferredListingIds({
+        orderRequests: requests.filter((doc) => orderRequestIds.includes(doc.id)),
+        orders: orders.filter((doc) => orderIds.includes(doc.id)),
+        invoices: invoices.filter((doc) => invoiceIds.includes(doc.id)),
+        appointments: appointments.filter((doc) => appointmentIds.includes(doc.id)),
+        galleries: galleries.filter((doc) => galleryIds.includes(doc.id))
+      }),
+      orderRequestIds,
+      orderIds,
+      invoiceIds,
+      appointmentIds,
+      galleryIds,
+      orderRequests: requests.filter((doc) => orderRequestIds.includes(doc.id)),
+      orders: orders.filter((doc) => orderIds.includes(doc.id)),
+      invoices: invoices.filter((doc) => invoiceIds.includes(doc.id)),
+      appointments: appointments.filter((doc) => appointmentIds.includes(doc.id)),
+      galleries: galleries.filter((doc) => galleryIds.includes(doc.id))
+    };
+    groups.push(group);
+  }
+  return groups.sort((a, b) => a.stableId < b.stableId ? -1 : a.stableId > b.stableId ? 1 : 0);
+}
+function planBookingListingGroup(group, existingListings, identity) {
+  const clients = clientsFor(group, identity);
+  const existing = chooseListing(group, cleanDocs(existingListings), clients);
+  const listingId = existing?.id || group.stableId;
+  if (!isPortalListingId(listingId)) return null;
+  const desired = desiredListingFields(group, identity);
+  return {
+    listingId,
+    create: !existing,
+    createFields: desired,
+    fillFields: existing ? fillEmptyListingFields(existing.data, desired) : {},
+    links: linksFor(group, listingId, cleanDocs(existingListings), clients)
+  };
+}
+function fillEmptyListingFields(existing, desired) {
+  const patch = {};
+  for (const [key, value] of Object.entries(desired)) {
+    if (NEVER_FILL.has(key) || !present(value) || !isEmpty(existing[key])) continue;
+    patch[key] = value;
+  }
+  return patch;
+}
+function clientOwnsListing(listing, clients) {
+  const clientId2 = text$6(listing.clientId);
+  const email = normalizeEmail(listing.clientEmail || listing.email);
+  if (!clientId2 && !email) return true;
+  if (clientId2 && clients.ids.includes(clientId2)) return true;
+  return Boolean(email && clients.emails.includes(email));
+}
+function desiredListingFields(group, identity) {
+  const fields = { images: [], source: "booking" };
+  const address = bestAddress(group);
+  const scheduleDate = firstScheduleDate(group);
+  const scheduleTime = firstScheduleTime(group);
+  const total = firstTotal(group);
+  const squareFootage = firstScalar(group, ["squareFootage", "sqft"]);
+  const names = serviceNames(group);
+  assign(fields, "orderRequestId", chosenId(group.orderRequests, group.orderRequestIds));
+  assign(fields, "orderId", chosenId(group.orders, group.orderIds, [...group.orderRequests, ...group.invoices], ["convertedToOrderId", "orderId"]));
+  assign(fields, "invoiceId", chosenInvoiceId(group));
+  assign(fields, "appointmentId", chosenId(group.appointments, group.appointmentIds));
+  assign(fields, "galleryId", chosenId(group.galleries, group.galleryIds, [...group.orderRequests, ...group.orders], ["galleryId"]));
+  assign(fields, "clientId", clientId(group, identity));
+  assign(fields, "clientEmail", clientEmail(group, identity));
+  assign(fields, "clientName", clientName(group));
+  assign(fields, "clientPhone", firstText$1(group, ["clientPhone", "phone"]));
+  if (address) {
+    fields.address = address;
+    fields.propertyAddress = address;
+    const label = addressText(address);
+    if (label) fields.addressLabel = label;
+  }
+  assign(fields, "projectType", projectType(group));
+  assign(fields, "status", listingStatus(group, Boolean(scheduleDate)));
+  assign(fields, "apptDate", scheduleDate);
+  assign(fields, "appointmentDate", scheduleDate);
+  assign(fields, "scheduledDate", scheduleDate);
+  assign(fields, "apptTime", scheduleTime);
+  assign(fields, "scheduledTime", scheduleTime);
+  if (names.length) fields.services = names;
+  if (total != null) fields.total = total;
+  if (squareFootage != null) fields.squareFootage = squareFootage;
+  assign(fields, "propertyStatus", firstText$1(group, ["propertyStatus"]));
+  assign(fields, "furnishingStatus", firstText$1(group, ["furnishingStatus"]));
+  assign(fields, "accessMethod", firstText$1(group, ["accessMethod"]));
+  assign(fields, "accessInfo", accessInfo(group));
+  assign(fields, "createdAt", groupCreatedAt(group));
+  return fields;
+}
+function chooseListing(group, listings, clients) {
+  const owned = listings.filter((doc) => isPortalListingId(doc.id) && clientOwnsListing(doc.data, clients) && listingMatches(doc, group));
+  for (const id of group.preferredListingIds) {
+    const found = owned.find((doc) => doc.id === id);
+    if (found) return found;
+  }
+  const stable = owned.find((doc) => doc.id === group.stableId);
+  if (stable) return stable;
+  return owned.sort((a, b) => a.id < b.id ? -1 : 1)[0] || null;
+}
+function listingMatches(doc, group) {
+  if (doc.id === group.stableId || group.preferredListingIds.includes(doc.id)) return true;
+  const requestId = text$6(doc.data.orderRequestId);
+  const orderId = text$6(doc.data.orderId);
+  const invoiceId = text$6(doc.data.invoiceId);
+  const appointmentId = text$6(doc.data.appointmentId);
+  return Boolean(
+    requestId && group.orderRequestIds.includes(requestId) || orderId && group.orderIds.includes(orderId) || invoiceId && group.invoiceIds.includes(invoiceId) || appointmentId && group.appointmentIds.includes(appointmentId)
+  );
+}
+function linksFor(group, listingId, listings, clients) {
+  const ownedIds = new Set(listings.filter((doc) => clientOwnsListing(doc.data, clients)).map((doc) => doc.id));
+  const links = [];
+  const push = (collection, docs) => {
+    for (const doc of docs) {
+      const current = text$6(doc.data.listingId);
+      if (current === listingId) continue;
+      if (current && isPortalListingId(current) && ownedIds.has(current)) continue;
+      links.push({ collection, id: doc.id });
+    }
+  };
+  push("orderRequests", group.orderRequests);
+  push("orders", group.orders);
+  push("invoices", group.invoices);
+  push("appointments", group.appointments);
+  push("galleries", group.galleries);
+  return links.sort((a, b) => a.collection === b.collection ? a.id < b.id ? -1 : 1 : a.collection < b.collection ? -1 : 1);
+}
+function clientsFor(group, identity) {
+  const ids = /* @__PURE__ */ new Set();
+  const emails = /* @__PURE__ */ new Set();
+  const addId = (value) => {
+    const id = text$6(value);
+    if (id) ids.add(id);
+  };
+  const addEmail = (value) => {
+    const email = normalizeEmail(value);
+    if (email) emails.add(email);
+  };
+  for (const id of identity?.ids || []) addId(id);
+  addEmail(identity?.email);
+  for (const doc of propertyDocs(group)) {
+    addId(doc.data.clientId);
+    addEmail(doc.data.clientEmail);
+    addEmail(doc.data.email);
+  }
+  return { ids: [...ids], emails: [...emails] };
+}
+function preferredListingIds(group) {
+  const ids = [];
+  const push = (value) => {
+    const id = text$6(value);
+    if (id && isPortalListingId(id) && !ids.includes(id)) ids.push(id);
+  };
+  for (const doc of [...group.orderRequests, ...group.orders, ...group.invoices, ...group.appointments, ...group.galleries]) {
+    push(doc.data.listingId);
+  }
+  return ids;
+}
+function stableListingId(requestIds, orderIds, invoiceIds, appointmentIds) {
+  const request = requestIds[0];
+  if (request) return bookingListingDocId("req", request);
+  const order = orderIds[0];
+  if (order) return bookingListingDocId("ord", order);
+  const invoice = invoiceIds[0];
+  if (invoice) return bookingListingDocId("inv", invoice);
+  const appointment = appointmentIds[0];
+  if (appointment) return bookingListingDocId("apt", appointment);
+  return null;
+}
+function bestAddress(group) {
+  for (const doc of propertyDocs(group)) {
+    for (const key of ["address", "propertyAddress", "shootLocation"]) {
+      const value = doc.data[key];
+      if (hasAddress(value) && typeof value === "object") return value;
+    }
+  }
+  for (const doc of propertyDocs(group)) {
+    for (const key of ["address", "propertyAddress", "shootLocation"]) {
+      if (typeof doc.data[key] === "string" && text$6(doc.data[key])) return text$6(doc.data[key]);
+    }
+    if (text$6(doc.data.addressLabel)) return text$6(doc.data.addressLabel);
+  }
+  return null;
+}
+function firstScheduleDate(group) {
+  for (const doc of [...group.appointments, ...group.orders, ...group.orderRequests, ...group.invoices]) {
+    for (const key of ["scheduledDate", "appointmentDate", "apptDate", "requestedDate"]) {
+      const day = calendarDateKey(doc.data[key]);
+      if (day) return day;
+    }
+  }
+  return null;
+}
+function firstScheduleTime(group) {
+  for (const doc of [...group.appointments, ...group.orders, ...group.orderRequests]) {
+    for (const key of ["scheduledTime", "appointmentTime", "apptTime", "requestedTime"]) {
+      const value = text$6(doc.data[key]);
+      if (value && !/^tbd$/i.test(value)) return value;
+    }
+  }
+  return "";
+}
+function groupCreatedAt(group) {
+  const fromRequest = earliestIso(group.orderRequests.map((doc) => doc.data.createdAt));
+  if (fromRequest) return fromRequest;
+  return earliestIso(propertyDocs(group).map((doc) => doc.data.createdAt));
+}
+function projectType(group) {
+  for (const doc of [...group.orderRequests, ...group.orders, ...group.invoices]) {
+    if (doc.data.projectType === "business") return "business";
+    if (doc.data.projectType === "real_estate") return "real_estate";
+    const service = doc.data.selectedService;
+    if (service && typeof service === "object") {
+      const category = text$6(service.category);
+      if (category === "business" || category === "branding") return "business";
+      if (category === "listings") return "real_estate";
+    }
+  }
+  return "real_estate";
+}
+function listingStatus(group, hasDate) {
+  const keys = [...group.orderRequests, ...group.orders, ...group.appointments].map((doc) => statusKey(doc.data.status));
+  if (keys.some((key) => key === "cancelled" || key === "canceled" || key === "declined")) return "cancelled";
+  if (keys.some((key) => key === "archived")) return "archived";
+  return hasDate ? "scheduled" : "unscheduled";
+}
+function serviceNames(group) {
+  for (const doc of [...group.orderRequests, ...group.orders, ...group.invoices]) {
+    const names = namesFrom(doc.data.lineItems ?? doc.data.services);
+    if (names.length) return names;
+  }
+  return [];
+}
+function namesFrom(value) {
+  if (!Array.isArray(value)) return [];
+  const names = [];
+  for (const item of value) {
+    if (typeof item === "string" && item.trim()) names.push(item.trim());
+    else if (item && typeof item === "object") {
+      const name = text$6(item.name);
+      if (name) names.push(name);
+    }
+    if (names.length >= 40) break;
+  }
+  return names;
+}
+function firstTotal(group) {
+  for (const doc of [...group.orders, ...group.invoices, ...group.orderRequests]) {
+    if (doc.data.total != null && doc.data.total !== "") {
+      const parsed = money$3(doc.data.total);
+      if (parsed != null) return parsed;
+    }
+    const pricing = doc.data.pricing;
+    if (pricing && typeof pricing === "object") {
+      const parsed = money$3(pricing.total);
+      if (pricing.total != null && pricing.total !== "" && parsed != null) return parsed;
+    }
+  }
+  return null;
+}
+function accessInfo(group) {
+  return [firstText$1(group, ["accessMethod"]), firstText$1(group, ["lockboxCode"])].filter(Boolean).join(" - ");
+}
+function clientId(group, identity) {
+  const bookingIds = propertyDocs(group).map((doc) => text$6(doc.data.clientId)).filter(Boolean);
+  const identityIds = (identity?.ids || []).map((id) => text$6(id)).filter(Boolean);
+  return bookingIds.find((id) => identityIds.includes(id)) || bookingIds[0] || identityIds[0] || "";
+}
+function clientEmail(group, identity) {
+  const identityEmail = normalizeEmail(identity?.email);
+  if (identityEmail) return identityEmail;
+  for (const doc of propertyDocs(group)) {
+    const email = normalizeEmail(doc.data.clientEmail || doc.data.email);
+    if (email) return email;
+  }
+  return "";
+}
+function clientName(group) {
+  for (const doc of propertyDocs(group)) {
+    if (text$6(doc.data.clientName)) return text$6(doc.data.clientName);
+    const joined = `${text$6(doc.data.firstName)} ${text$6(doc.data.lastName)}`.trim();
+    if (joined) return joined;
+  }
+  return "";
+}
+function chosenInvoiceId(group) {
+  const known = new Set(group.invoiceIds);
+  for (const doc of [...group.orderRequests, ...group.orders]) {
+    const id = text$6(doc.data.invoiceId);
+    if (id && known.has(id)) return id;
+  }
+  return newestDoc(group.invoices)?.id || group.invoiceIds[0] || "";
+}
+function chosenId(docs, ids, pointers = [], keys = []) {
+  const known = new Set(ids);
+  for (const doc of pointers) {
+    for (const key of keys) {
+      const id = text$6(doc.data[key]);
+      if (id && known.has(id)) return id;
+    }
+  }
+  return newestDoc(docs)?.id || ids[0] || "";
+}
+function propertyDocs(group) {
+  return [...group.orderRequests, ...group.orders, ...group.appointments, ...group.invoices, ...group.galleries];
+}
+function firstText$1(group, keys) {
+  for (const doc of propertyDocs(group)) {
+    for (const key of keys) {
+      const value = text$6(doc.data[key]);
+      if (value) return value;
+    }
+  }
+  return "";
+}
+function firstScalar(group, keys) {
+  for (const doc of propertyDocs(group)) {
+    for (const key of keys) {
+      const value = doc.data[key];
+      if (typeof value === "number" && Number.isFinite(value)) return value;
+      if (typeof value === "string" && value.trim()) return value.trim();
+    }
+  }
+  return null;
+}
+function newestDoc(docs) {
+  if (docs.length === 0) return null;
+  return [...docs].sort((a, b) => {
+    const left = readCreatedAt(a.data.createdAt) || "";
+    const right = readCreatedAt(b.data.createdAt) || "";
+    if (left !== right) return right.localeCompare(left);
+    return a.id < b.id ? -1 : 1;
+  })[0];
+}
+function earliestIso(values) {
+  let best = null;
+  for (const value of values) {
+    const iso = readCreatedAt(value);
+    if (!iso) continue;
+    if (!best || iso < best) best = iso;
+  }
+  return best;
+}
+function readCreatedAt(value) {
+  if (isSentinel$1(value)) return null;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Date.parse(value.trim());
+    return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
+  }
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
+  if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
+  if (value && typeof value === "object") {
+    const record = value;
+    if (typeof record.toDate === "function") {
+      try {
+        const date = record.toDate();
+        if (date instanceof Date && !Number.isNaN(date.getTime())) return date.toISOString();
+      } catch {
+        return null;
+      }
+    }
+    const seconds = typeof record.seconds === "number" ? record.seconds : typeof record._seconds === "number" ? record._seconds : null;
+    if (seconds != null) return new Date(seconds * 1e3).toISOString();
+  }
+  return null;
+}
+function hasAddress(value) {
+  if (typeof value === "string") return value.trim().length > 0;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value;
+  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$6(record[key]).length > 0);
+}
+function statusKey(value) {
+  return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+function money$3(value) {
+  const parsed = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value.replace(/[$,\s]/g, "")) : Number.NaN;
+  if (!Number.isFinite(parsed)) return null;
+  return Math.round(parsed * 100) / 100;
+}
+function assign(fields, key, value) {
+  if (!present(value)) return;
+  fields[key] = value;
+}
+function present(value) {
+  if (value == null || value === "") return false;
+  if (Array.isArray(value)) return value.length > 0;
+  return true;
+}
+function isEmpty(value) {
+  if (value == null || value === "") return true;
+  if (Array.isArray(value)) return value.length === 0;
+  if (typeof value === "object") {
+    if (value instanceof Date) return Number.isNaN(value.getTime());
+    if ("seconds" in value || "_seconds" in value || "toDate" in value) return false;
+    return Object.keys(value).length === 0;
+  }
+  return false;
+}
+function isSentinel$1(value) {
+  return Boolean(value && typeof value === "object" && "_methodName" in value);
+}
+function text$6(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function cleanDocs(docs) {
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const doc of docs || []) {
+    const id = text$6(doc?.id);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push({ id, data: doc.data && typeof doc.data === "object" ? doc.data : {} });
+  }
+  return out;
+}
+function nodeId(prefix, id) {
+  return id ? `${prefix}:${id}` : "";
+}
+function idsWithPrefix(nodes, prefix) {
+  const marker = `${prefix}:`;
+  return nodes.filter((node) => node.startsWith(marker)).map((node) => node.slice(marker.length)).sort();
+}
+class UnionFind {
+  parent = /* @__PURE__ */ new Map();
+  touch(id) {
+    if (id) this.find(id);
+  }
+  link(left, right) {
+    if (!left || !right) return;
+    const a = this.find(left);
+    const b = this.find(right);
+    if (a !== b) this.parent.set(b, a);
+  }
+  components() {
+    const grouped = /* @__PURE__ */ new Map();
+    for (const key of this.parent.keys()) {
+      const root = this.find(key);
+      const list = grouped.get(root) || [];
+      list.push(key);
+      grouped.set(root, list);
+    }
+    return [...grouped.values()];
+  }
+  find(id) {
+    const current = this.parent.get(id);
+    if (!current) {
+      this.parent.set(id, id);
+      return id;
+    }
+    if (current === id) return id;
+    const root = this.find(current);
+    this.parent.set(id, root);
+    return root;
+  }
+}
+const db$k = () => admin.firestore();
+const LINK_COLLECTIONS = /* @__PURE__ */ new Set([
+  "orderRequests",
+  "orders",
+  "invoices",
+  "appointments",
+  "galleries"
+]);
+const BLOCKED_FIELDS = /* @__PURE__ */ new Set([
+  "id",
+  "createdAt",
+  "requirePayment",
+  "paymentUrl",
+  "studioToken",
+  "lockDownloads",
+  "lockboxCode",
+  "notifications",
+  "passwordSetupLink"
+]);
+async function ensureBookingListingForRequest(orderRequestId) {
+  const id = orderRequestId.trim();
+  if (!id) return null;
+  const snap = await db$k().collection("orderRequests").doc(id).get();
+  if (!snap.exists) return null;
+  const request = asDoc(snap.id, snap.data());
+  const bundle = await hydrateBundle({
+    orderRequests: [request],
+    orders: [],
+    invoices: [],
+    appointments: [],
+    galleries: []
+  });
+  const identity = {
+    ids: text$5(request.data.clientId) ? [text$5(request.data.clientId)] : [],
+    email: normalizeEmail(request.data.clientEmail || request.data.email)
+  };
+  const plans = await plansFor(bundle, identity);
+  const primary = plans.find((plan) => plan.createFields.orderRequestId === id) || plans[0];
+  if (!primary) return null;
+  let created = false;
+  let listingId = primary.listingId;
+  for (const plan of plans) {
+    const result = await applyBookingListingPlan(plan);
+    if (plan.listingId === primary.listingId) {
+      listingId = result.listingId;
+      created = result.created;
+    }
+  }
+  return { listingId, created };
+}
+async function ensurePortalListingsForClient(identity) {
+  const ids = [...new Set(identity.ids.map((id) => id.trim()).filter(Boolean))];
+  const email = normalizeEmail(identity.email);
+  if (ids.length === 0 && !email) return { created: 0 };
+  const portal = { ids, email };
+  const seeds = await loadVisibleSeeds(portal);
+  const bundle = await hydrateBundle(seeds);
+  const plans = await plansFor(bundle, portal);
+  const results = await Promise.allSettled(plans.map((plan) => applyBookingListingPlan(plan)));
+  let created = 0;
+  results.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      if (result.value.created) created += 1;
+      return;
+    }
+    console.error(`[Listings] Ensure failed for ${plans[index]?.listingId || "booking"}:`, result.reason);
+  });
+  return { created };
+}
+async function plansFor(bundle, identity) {
+  const groups = bookingListingGroups(bundle);
+  const listings = await loadListingsForGroups(identity, groups);
+  return groups.map((group) => planBookingListingGroup(group, listings, identity)).filter((plan) => Boolean(plan));
+}
+async function applyBookingListingPlan(plan) {
+  if (!isPortalListingId(plan.listingId)) throw new Error("Listing id is not valid.");
+  const ref = db$k().collection("listings").doc(plan.listingId);
+  let created = false;
+  if (plan.create) {
+    try {
+      await ref.create({
+        ...plainFields(plan.createFields),
+        createdAt: timestampOrNow(plan.createFields.createdAt),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      created = true;
+      console.info(`[Listings] Created ${plan.listingId} for booking ${text$5(plan.createFields.orderRequestId) || text$5(plan.createFields.orderId) || text$5(plan.createFields.invoiceId)}`);
+    } catch (err) {
+      if (!alreadyExists(err)) throw err;
+      await fillListing(ref, plan.createFields);
+    }
+  } else if (Object.keys(plan.fillFields).length > 0) {
+    await fillListing(ref, plan.fillFields);
+  }
+  for (const link of plan.links) {
+    try {
+      await linkRecord(link.collection, link.id, plan.listingId);
+    } catch (err) {
+      console.error(`[Listings] Could not link ${link.collection}/${link.id} to ${plan.listingId}:`, err);
+    }
+  }
+  return { listingId: plan.listingId, created };
+}
+async function fillListing(ref, desired) {
+  const snap = await ref.get();
+  if (!snap.exists) return;
+  const patch = plainFields(fillEmptyListingFields(snap.data() || {}, desired));
+  if (Object.keys(patch).length === 0) return;
+  await ref.update({ ...patch, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+}
+async function linkRecord(collectionName, id, listingId) {
+  if (!LINK_COLLECTIONS.has(collectionName) || !id) return;
+  const ref = db$k().collection(collectionName).doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) return;
+  if (text$5(snap.data()?.listingId) === listingId) return;
+  await ref.update({
+    listingId,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+}
+async function loadVisibleSeeds(identity) {
+  const requests = /* @__PURE__ */ new Map();
+  const orders = /* @__PURE__ */ new Map();
+  const invoices = /* @__PURE__ */ new Map();
+  const appointments = /* @__PURE__ */ new Map();
+  const keep = (map, docs) => {
+    for (const doc of docs) {
+      if (!visibleToPortalClient({
+        clientId: text$5(doc.data.clientId),
+        email: text$5(doc.data.email),
+        clientEmail: text$5(doc.data.clientEmail)
+      }, identity)) continue;
+      if (!map.has(doc.id)) map.set(doc.id, doc);
+    }
+  };
+  const jobs = [];
+  const track = (job, map) => {
+    jobs.push(job.then((docs) => keep(map, docs)));
+  };
+  if (identity.ids.length) {
+    track(queryIn("orderRequests", "clientId", identity.ids), requests);
+    track(queryIn("orders", "clientId", identity.ids), orders);
+    track(queryIn("invoices", "clientId", identity.ids), invoices);
+    track(queryIn("appointments", "clientId", identity.ids), appointments);
+  }
+  if (identity.email) {
+    track(queryEqual("orderRequests", "email", identity.email), requests);
+    track(queryEqual("orderRequests", "clientEmail", identity.email), requests);
+    track(queryEqual("orders", "clientEmail", identity.email), orders);
+    track(queryEqual("invoices", "clientEmail", identity.email), invoices);
+    track(queryEqual("appointments", "clientEmail", identity.email), appointments);
+  }
+  await Promise.all(jobs);
+  return {
+    orderRequests: [...requests.values()],
+    orders: [...orders.values()],
+    invoices: [...invoices.values()],
+    appointments: [...appointments.values()],
+    galleries: []
+  };
+}
+async function hydrateBundle(seed) {
+  const requests = mapDocs(seed.orderRequests);
+  const orders = mapDocs(seed.orders);
+  const invoices = mapDocs(seed.invoices);
+  const appointments = mapDocs(seed.appointments);
+  const galleries = mapDocs(seed.galleries);
+  const requestIds = new Set(requests.keys());
+  for (const doc of [...orders.values(), ...invoices.values(), ...appointments.values()]) {
+    const id = text$5(doc.data.orderRequestId);
+    if (id) requestIds.add(id);
+  }
+  await readMissing("orderRequests", requestIds, requests);
+  const orderIds = new Set(orders.keys());
+  for (const doc of requests.values()) {
+    const id = text$5(doc.data.convertedToOrderId) || text$5(doc.data.orderId);
+    if (id) orderIds.add(id);
+  }
+  for (const doc of [...invoices.values(), ...appointments.values()]) {
+    const id = text$5(doc.data.orderId);
+    if (id) orderIds.add(id);
+  }
+  await readMissing("orders", orderIds, orders);
+  const invoiceIds = new Set(invoices.keys());
+  for (const doc of [...requests.values(), ...orders.values()]) {
+    const id = text$5(doc.data.invoiceId);
+    if (id) invoiceIds.add(id);
+  }
+  await readMissing("invoices", invoiceIds, invoices);
+  mergeDocs(invoices, await queryIn("invoices", "orderRequestId", [...requests.keys()]));
+  mergeDocs(invoices, await queryIn("invoices", "orderId", [...orders.keys()]));
+  mergeDocs(appointments, await queryIn("appointments", "orderRequestId", [...requests.keys()]));
+  mergeDocs(appointments, await queryIn("appointments", "orderId", [...orders.keys()]));
+  const galleryIds = new Set(galleries.keys());
+  for (const doc of [...requests.values(), ...orders.values()]) {
+    const id = text$5(doc.data.galleryId);
+    if (id) galleryIds.add(id);
+  }
+  await readMissing("galleries", galleryIds, galleries);
+  mergeDocs(galleries, await queryIn("galleries", "orderId", [...orders.keys()]));
+  mergeDocs(galleries, await queryIn("galleries", "orderRequestId", [...requests.keys()]));
+  return {
+    orderRequests: [...requests.values()],
+    orders: [...orders.values()],
+    invoices: [...invoices.values()],
+    appointments: [...appointments.values()],
+    galleries: [...galleries.values()]
+  };
+}
+async function loadListingsForGroups(identity, groups) {
+  const found = /* @__PURE__ */ new Map();
+  const email = normalizeEmail(identity.email);
+  if (identity.ids.length) mergeDocs(found, await queryIn("listings", "clientId", identity.ids));
+  if (email) mergeDocs(found, await queryEqual("listings", "clientEmail", email));
+  const directIds = /* @__PURE__ */ new Set();
+  const requestIds = /* @__PURE__ */ new Set();
+  const orderIds = /* @__PURE__ */ new Set();
+  const invoiceIds = /* @__PURE__ */ new Set();
+  for (const group of groups) {
+    if (isPortalListingId(group.stableId)) directIds.add(group.stableId);
+    group.preferredListingIds.forEach((id) => {
+      if (isPortalListingId(id)) directIds.add(id);
+    });
+    group.orderRequestIds.forEach((id) => requestIds.add(id));
+    group.orderIds.forEach((id) => orderIds.add(id));
+    group.invoiceIds.forEach((id) => invoiceIds.add(id));
+  }
+  await readMissing("listings", directIds, found);
+  mergeDocs(found, await queryIn("listings", "orderRequestId", [...requestIds]));
+  mergeDocs(found, await queryIn("listings", "orderId", [...orderIds]));
+  mergeDocs(found, await queryIn("listings", "invoiceId", [...invoiceIds]));
+  return [...found.values()];
+}
+async function readMissing(collectionName, ids, into) {
+  const missing = [...ids].filter((id) => id && !into.has(id)).slice(0, 100);
+  if (missing.length === 0) return;
+  const snaps = await db$k().getAll(...missing.map((id) => db$k().collection(collectionName).doc(id)));
+  snaps.forEach((snap) => {
+    if (!snap.exists || into.has(snap.id)) return;
+    into.set(snap.id, asDoc(snap.id, snap.data()));
+  });
+}
+async function queryIn(collectionName, field, values) {
+  const unique2 = [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+  const docs = [];
+  for (const part of chunk(unique2, 30)) {
+    const snap = await db$k().collection(collectionName).where(field, "in", part).limit(100).get();
+    snap.docs.forEach((doc) => docs.push(asDoc(doc.id, doc.data())));
+  }
+  return docs;
+}
+async function queryEqual(collectionName, field, value) {
+  if (!value) return [];
+  const snap = await db$k().collection(collectionName).where(field, "==", value).limit(100).get();
+  return snap.docs.map((doc) => asDoc(doc.id, doc.data()));
+}
+function mergeDocs(into, docs) {
+  for (const doc of docs) {
+    if (doc.id && !into.has(doc.id)) into.set(doc.id, doc);
+  }
+}
+function mapDocs(docs) {
+  const map = /* @__PURE__ */ new Map();
+  mergeDocs(map, docs);
+  return map;
+}
+function asDoc(id, data) {
+  return { id, data: data || {} };
+}
+function plainFields(fields) {
+  const out = {};
+  for (const [key, value] of Object.entries(fields)) {
+    if (!allowedField(key) || value == null || value === "") continue;
+    const plain = plainValue(value);
+    if (plain == null) continue;
+    out[key] = plain;
+  }
+  return out;
+}
+function plainValue(value) {
+  if (isSentinel(value)) return null;
+  if (Array.isArray(value)) return value.map((item) => plainValue(item));
+  if (value && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype) {
+    const nested = {};
+    for (const [key, item] of Object.entries(value)) {
+      if (item === void 0 || isSentinel(item)) continue;
+      nested[key] = plainValue(item);
+    }
+    return nested;
+  }
+  return value;
+}
+function allowedField(key) {
+  if (BLOCKED_FIELDS.has(key)) return false;
+  if (/cubicasa/i.test(key) || /payment/i.test(key)) return false;
+  if (/^square/i.test(key) && key !== "squareFootage") return false;
+  return true;
+}
+function timestampOrNow(value) {
+  if (typeof value === "string" && value.trim()) {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) return admin.firestore.Timestamp.fromDate(date);
+  }
+  return admin.firestore.FieldValue.serverTimestamp();
+}
+function alreadyExists(err) {
+  const code = err.code;
+  return code === 6 || code === "already-exists" || code === "ALREADY_EXISTS";
+}
+function isSentinel(value) {
+  return Boolean(value && typeof value === "object" && "_methodName" in value);
+}
+function text$5(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function chunk(items, size) {
+  const out = [];
+  for (let index = 0; index < items.length; index += size) out.push(items.slice(index, index + size));
+  return out;
+}
+function lifeOfTheListingCareSelected(value) {
+  return value === true;
+}
 const router$h = Router();
 const db$j = () => admin.firestore();
 function appUrl$2() {
@@ -1397,12 +2528,12 @@ router$h.post("/", async (req, res) => {
     if (!lineItems || !Array.isArray(lineItems) || lineItems.length === 0) {
       return res.status(400).json({ error: "No services selected." });
     }
-    const clientName = `${firstName} ${lastName}`.trim();
+    const clientName2 = `${firstName} ${lastName}`.trim();
     const displayAddress = addressLabel$3(address);
     const orderRequest = {
       firstName,
       lastName,
-      clientName,
+      clientName: clientName2,
       email: email.toLowerCase().trim(),
       phone,
       address,
@@ -1470,7 +2601,7 @@ router$h.post("/", async (req, res) => {
         await createRequestedAppointment({
           orderRequestId: docRef.id,
           clientId: account.clientId,
-          clientName,
+          clientName: clientName2,
           clientEmail: normalizedEmail,
           clientPhone: String(phone || ""),
           address,
@@ -1489,7 +2620,7 @@ router$h.post("/", async (req, res) => {
       const created = await createBookingInvoiceDraft({
         orderRequestId: docRef.id,
         email,
-        clientName,
+        clientName: clientName2,
         lineItems,
         pricing,
         total,
@@ -1510,6 +2641,11 @@ router$h.post("/", async (req, res) => {
       console.error("[Bookings] Invoice draft create failed:", err);
       invoiceId = null;
     }
+    try {
+      await ensureBookingListingForRequest(docRef.id);
+    } catch (err) {
+      console.error("[Bookings] Listing ensure failed:", err);
+    }
     const accessLine = accessMethod ? `${accessMethod}${lockboxCode ? ` — Code: ${lockboxCode}` : ""}` : "Not specified";
     let clientEmailStatus = "failed";
     let officeEmailStatus = "failed";
@@ -1519,7 +2655,7 @@ router$h.post("/", async (req, res) => {
       to: email,
       template: "booking_received",
       variables: {
-        clientName,
+        clientName: clientName2,
         address: displayAddress,
         total: money$2(total),
         requestId: docRef.id,
@@ -1539,7 +2675,7 @@ router$h.post("/", async (req, res) => {
       to: "photos@iconicimagestx.com",
       template: "booking_received",
       variables: {
-        clientName,
+        clientName: clientName2,
         address: displayAddress,
         total: money$2(total),
         requestId: docRef.id,
@@ -1572,13 +2708,13 @@ router$h.post("/", async (req, res) => {
       });
     }
     if (process.env.ADMIN_PHONE) {
-      const serviceNames = lineItems.map((i) => i.name).join(", ");
+      const serviceNames2 = lineItems.map((i) => i.name).join(", ");
       await sendSMS({
         to: process.env.ADMIN_PHONE,
         body: SMS_TEMPLATES.newBookingAlert(
           displayAddress,
           scheduledDate || "TBD",
-          serviceNames
+          serviceNames2
         )
       }).catch((err) => console.error("[Bookings] Admin SMS alert failed:", err));
     }
@@ -1593,7 +2729,7 @@ router$h.post("/", async (req, res) => {
           to: email,
           template: "account_password_setup",
           variables: {
-            clientName,
+            clientName: clientName2,
             clientEmail: normalizedEmail,
             setupUrl: account.passwordSetupLink,
             portalUrl: `${appUrl$2()}/portal`
@@ -1678,12 +2814,19 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     }
     const request = requestDoc.data();
     if (request.convertedToOrderId) {
+      let listingId2 = existingInvoiceId(request.listingId);
+      try {
+        const ensured = await ensureBookingListingForRequest(req.params.id);
+        if (ensured?.listingId) listingId2 = ensured.listingId;
+      } catch (err) {
+        console.error("[Bookings] Listing ensure failed:", err);
+      }
       try {
         await stampDurableLinks({
           invoiceId: existingInvoiceId(request.invoiceId),
           orderRequestId: req.params.id,
           orderId: String(request.convertedToOrderId),
-          listingId: existingInvoiceId(request.listingId)
+          listingId: listingId2
         });
       } catch (err) {
         console.error("[Bookings] Order/project/invoice link failed:", err);
@@ -1715,11 +2858,11 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       const staffDoc = await db$j().collection("staff").doc(assignedPhotographerId).get();
       photographer = staffDoc.exists ? staffDoc.data() : null;
     }
-    let clientId;
+    let clientId2;
     const attachedClientId = typeof request.clientId === "string" ? request.clientId.trim() : "";
     const attachedClient = attachedClientId ? await db$j().collection("clients").doc(attachedClientId).get() : null;
     if (attachedClient?.exists) {
-      clientId = attachedClient.id;
+      clientId2 = attachedClient.id;
       await attachedClient.ref.update({
         totalOrders: admin.firestore.FieldValue.increment(1),
         lastOrderAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -1728,7 +2871,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     } else {
       const existingClients = await db$j().collection("clients").where("email", "==", requestEmail).limit(1).get();
       if (!existingClients.empty) {
-        clientId = existingClients.docs[0].id;
+        clientId2 = existingClients.docs[0].id;
         await existingClients.docs[0].ref.update({
           totalOrders: admin.firestore.FieldValue.increment(1),
           lastOrderAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -1750,12 +2893,12 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
-        clientId = clientRef.id;
+        clientId2 = clientRef.id;
       }
     }
     const orderData = {
       orderRequestId: req.params.id,
-      clientId,
+      clientId: clientId2,
       clientName: requestClientName,
       clientEmail: requestEmail,
       clientPhone: requestPhone,
@@ -1788,7 +2931,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     const confirmedAppointment = {
       orderId: orderRef.id,
       orderRequestId: req.params.id,
-      clientId,
+      clientId: clientId2,
       clientName: requestClientName,
       clientEmail: requestEmail,
       clientPhone: requestPhone,
@@ -1815,7 +2958,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     }
     const galleryRef = await db$j().collection("galleries").add({
       orderId: orderRef.id,
-      clientId,
+      clientId: clientId2,
       clientName: requestClientName,
       address: requestAddress,
       addressLabel: requestAddressLabel,
@@ -1872,14 +3015,14 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       ]);
     }
     const linkedInvoiceId = existingInvoiceId(request.invoiceId);
-    const listingId = existingInvoiceId(request.listingId);
+    let listingId = existingInvoiceId(request.listingId);
     let invoiceId = linkedInvoiceId;
     if (linkedInvoiceId) {
       const existingInvoice = await db$j().collection("invoices").doc(linkedInvoiceId).get();
       if (existingInvoice.exists) {
         await existingInvoice.ref.update({
           orderId: orderRef.id,
-          clientId,
+          clientId: clientId2,
           galleryId: galleryRef.id,
           clientName: requestClientName,
           clientEmail: requestEmail,
@@ -1896,7 +3039,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         total: requestTotal,
         pricing: request.pricing,
         clientEmail: requestEmail,
-        clientId,
+        clientId: clientId2,
         clientName: requestClientName,
         orderRequestId: req.params.id,
         promoCode: request.promoCode,
@@ -1921,11 +3064,17 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     await requestDoc.ref.update({
       status: "confirmed",
       convertedToOrderId: orderRef.id,
-      clientId,
+      clientId: clientId2,
       galleryId: galleryRef.id,
       invoiceId,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
+    try {
+      const ensured = await ensureBookingListingForRequest(req.params.id);
+      if (ensured?.listingId) listingId = ensured.listingId;
+    } catch (err) {
+      console.error("[Bookings] Listing ensure failed:", err);
+    }
     try {
       await stampDurableLinks({
         invoiceId,
@@ -1952,7 +3101,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     return res.json({
       success: true,
       orderId: orderRef.id,
-      clientId,
+      clientId: clientId2,
       invoiceId,
       message: "Booking confirmed and order created."
     });
@@ -2009,13 +3158,13 @@ async function linkClientIdByEmail(email) {
   }
 }
 async function createBookingInvoiceDraft(input) {
-  const clientId = input.clientId || await linkClientIdByEmail(input.email);
+  const clientId2 = input.clientId || await linkClientIdByEmail(input.email);
   const draft = buildBookingInvoiceDraft({
     lineItems: input.lineItems,
     total: input.total,
     pricing: input.pricing,
     clientEmail: input.email,
-    clientId,
+    clientId: clientId2,
     clientName: input.clientName,
     orderRequestId: input.orderRequestId,
     promoCode: input.promoCode,
@@ -2029,7 +3178,7 @@ async function createBookingInvoiceDraft(input) {
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   });
-  return { invoiceId: invoiceRef.id, clientId };
+  return { invoiceId: invoiceRef.id, clientId: clientId2 };
 }
 async function generateInvoiceNumber() {
   const year = (/* @__PURE__ */ new Date()).getFullYear();
@@ -2536,11 +3685,11 @@ function statusOf(doc) {
 function isReleased(doc) {
   return RELEASED_GALLERY_STATUSES.includes(statusOf(doc));
 }
-function text$5(value) {
+function text$4(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function httpUrl(value) {
-  const url = text$5(value);
+  const url = text$4(value);
   return url.startsWith("https://") || url.startsWith("http://") ? url : "";
 }
 function galleryResult(doc, via) {
@@ -2558,7 +3707,7 @@ function galleryResult(doc, via) {
   };
 }
 function addressOf(listing) {
-  const property = text$5(listing.propertyAddress);
+  const property = text$4(listing.propertyAddress);
   if (property) return property;
   const labeled = listingAddressLabel({
     address: listing.address,
@@ -2596,7 +3745,7 @@ function publicVideos(listing) {
     const row = item;
     const url = httpUrl(row.url);
     if (!url || url.includes("/raw/")) continue;
-    videos.push({ url, name: text$5(row.name) || "Video" });
+    videos.push({ url, name: text$4(row.name) || "Video" });
   }
   return videos.slice(0, 40);
 }
@@ -2606,12 +3755,12 @@ function publicRevisions(listing) {
     const row = item && typeof item === "object" ? item : {};
     const photoIndex = typeof row.photoIndex === "number" ? row.photoIndex : null;
     return {
-      id: text$5(row.id) || `revision-${index + 1}`,
-      type: text$5(row.type) || "gallery",
+      id: text$4(row.id) || `revision-${index + 1}`,
+      type: text$4(row.type) || "gallery",
       photoIndex,
-      description: text$5(row.description),
-      status: text$5(row.status) || "pending",
-      createdAt: text$5(row.createdAt)
+      description: text$4(row.description),
+      status: text$4(row.status) || "pending",
+      createdAt: text$4(row.createdAt)
     };
   });
 }
@@ -2620,11 +3769,11 @@ function invoiceOf(listing) {
   if (nested && typeof nested === "object" && typeof nested.status === "string") {
     return { status: nested.status };
   }
-  const status = text$5(listing.invoiceStatus);
+  const status = text$4(listing.invoiceStatus);
   return status ? { status } : null;
 }
 function pickReleasedGallery(listing, related) {
-  const preferred = text$5(listing.galleryId) || text$5(listing.playtestGalleryId);
+  const preferred = text$4(listing.galleryId) || text$4(listing.playtestGalleryId);
   const released = related.filter((doc) => isReleased(doc));
   if (preferred) {
     const match = released.find((doc) => doc.id === preferred);
@@ -2678,7 +3827,7 @@ function publicProject(listing, _related, notice) {
   return {
     id: listing.id,
     address: addressOf(listing),
-    clientName: text$5(listing.clientName),
+    clientName: text$4(listing.clientName),
     services: servicesOf(listing),
     images: publicImages(listing),
     videos: publicVideos(listing),
@@ -2721,8 +3870,8 @@ function decideClientGalleryLink(input) {
   }
   if (input.pointedListing) return listingResult(input.pointedListing, input.relatedGalleries);
   if (input.order) {
-    const galleryId = text$5(input.order.galleryId);
-    const listingId = text$5(input.order.listingId);
+    const galleryId = text$4(input.order.galleryId);
+    const listingId = text$4(input.order.listingId);
     if (galleryId || listingId) {
       return {
         ok: false,
@@ -2739,8 +3888,8 @@ function decideClientGalleryLink(input) {
     };
   }
   if (input.orderRequest) {
-    const galleryId = text$5(input.orderRequest.galleryId);
-    const listingId = text$5(input.orderRequest.listingId);
+    const galleryId = text$4(input.orderRequest.galleryId);
+    const listingId = text$4(input.orderRequest.listingId);
     if (galleryId || listingId) {
       return {
         ok: false,
@@ -4256,7 +5405,7 @@ async function loadGalleryReleaseForGallery(galleryId) {
   });
 }
 const db$e = () => admin.firestore();
-function text$4(value) {
+function text$3(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function docRecord(snap) {
@@ -4278,7 +5427,7 @@ async function galleryById(id) {
 }
 async function relatedForListing(listing) {
   const related = await galleriesWhere("listingId", listing.id);
-  const extras = [text$4(listing.galleryId), text$4(listing.playtestGalleryId)];
+  const extras = [text$3(listing.galleryId), text$3(listing.playtestGalleryId)];
   for (const galleryId of extras) {
     if (!galleryId || related.some((doc) => doc.id === galleryId)) continue;
     const extra = await galleryById(galleryId);
@@ -4327,8 +5476,8 @@ async function resolveClientGalleryLink(id) {
   const order = docRecord(orderSnap);
   const orderRequest = docRecord(requestSnap);
   const galleriesByOrderId = order ? await galleriesWhere("orderId", id) : [];
-  const pointedGalleryId = text$4(orderRequest?.galleryId) || text$4(order?.galleryId);
-  const pointedListingId = text$4(orderRequest?.listingId) || text$4(order?.listingId);
+  const pointedGalleryId = text$3(orderRequest?.galleryId) || text$3(order?.galleryId);
+  const pointedListingId = text$3(orderRequest?.listingId) || text$3(order?.listingId);
   const pointedGallery = pointedGalleryId ? await galleryById(pointedGalleryId) : null;
   let pointedListing = null;
   let pointedRelated = relatedGalleries;
@@ -4823,8 +5972,8 @@ async function unlockGalleriesForInvoice({
 async function applySuccessfulPayment({
   invoiceId,
   orderId,
-  clientId,
-  clientName,
+  clientId: clientId2,
+  clientName: clientName2,
   amount,
   method,
   squarePaymentId,
@@ -4835,7 +5984,7 @@ async function applySuccessfulPayment({
   if (!invoiceDoc.exists) return;
   const invoice = invoiceDoc.data();
   const resolvedOrderId = orderId || invoice.orderId || "";
-  const resolvedClientId = clientId || invoice.clientId || "";
+  const resolvedClientId = clientId2 || invoice.clientId || "";
   const sameSquare = Boolean(squarePaymentId) && invoice.squarePaymentId === squarePaymentId;
   const sameStripe = Boolean(stripePaymentIntentId) && invoice.stripePaymentIntentId === stripePaymentIntentId;
   const duplicate = sameSquare || sameStripe || await paymentAlreadyRecorded({ squarePaymentId, stripePaymentIntentId });
@@ -4889,7 +6038,7 @@ async function applySuccessfulPayment({
     orderId: resolvedOrderId,
     invoiceId,
     clientId: resolvedClientId,
-    clientName: clientName || invoice.clientName,
+    clientName: clientName2 || invoice.clientName,
     amount,
     paymentMethod: method,
     status: "completed",
@@ -5333,7 +6482,7 @@ router$e.get("/transactions", requireCoordinator, async (req, res) => {
   }
 });
 async function handleStripePaymentSucceeded(intent) {
-  const { invoiceId, orderId, clientId, clientName } = intent.metadata;
+  const { invoiceId, orderId, clientId: clientId2, clientName: clientName2 } = intent.metadata;
   if (!invoiceId) return;
   const invoiceDoc = await db$c().collection("invoices").doc(invoiceId).get();
   if (!invoiceDoc.exists) return;
@@ -5344,8 +6493,8 @@ async function handleStripePaymentSucceeded(intent) {
   await applySuccessfulPayment({
     invoiceId,
     orderId,
-    clientId,
-    clientName,
+    clientId: clientId2,
+    clientName: clientName2,
     amount: intent.amount_received / 100,
     method: "stripe",
     stripePaymentIntentId: intent.id
@@ -5771,7 +6920,7 @@ const router$c = Router();
 const db$a = () => admin.firestore();
 router$c.post("/email", requireStaff, async (req, res) => {
   try {
-    const { to, subject, body, orderId, clientId } = req.body;
+    const { to, subject, body, orderId, clientId: clientId2 } = req.body;
     if (!to || !body?.trim()) {
       return res.status(400).json({ error: "Email recipient and body required." });
     }
@@ -5785,7 +6934,7 @@ router$c.post("/email", requireStaff, async (req, res) => {
     });
     await db$a().collection("messages").add({
       orderId: orderId || null,
-      clientId: clientId || null,
+      clientId: clientId2 || null,
       senderId: req.user.uid,
       senderType: "staff",
       senderName: req.user.email || "Iconic Images",
@@ -5893,289 +7042,6 @@ router$c.get("/unread/count", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to get unread count." });
   }
 });
-function visibleToPortalClient(record, identity) {
-  if (!record) return false;
-  if (record.clientId && identity.ids.includes(String(record.clientId))) return true;
-  const email = normalizeEmail(identity.email);
-  if (!email) return false;
-  return [record.email, record.clientEmail].some((value) => normalizeEmail(value) === email);
-}
-const CHICAGO = "America/Chicago";
-const ACCEPTED = /* @__PURE__ */ new Set([
-  "confirmed",
-  "scheduled",
-  "accepted",
-  "in_progress",
-  "completed",
-  "shot_complete",
-  "appt_scheduled",
-  "consult_scheduled",
-  "delivered"
-]);
-function addressText(value) {
-  if (!value) return "";
-  if (typeof value === "string") return value.trim();
-  if (typeof value === "object") {
-    const address = value;
-    if (typeof address.formatted === "string" && address.formatted.trim()) return address.formatted.trim();
-    if (typeof address.label === "string" && address.label.trim()) return address.label.trim();
-    return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
-  }
-  return "";
-}
-function statusKey(value) {
-  return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
-}
-function calendarDateKey(value, timeZone = CHICAGO) {
-  if (value == null || value === "") return null;
-  if (typeof value === "number" && Number.isFinite(value)) return instantDateKey(new Date(value), timeZone);
-  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : instantDateKey(value, timeZone);
-  if (typeof value === "object") {
-    const record = value;
-    const seconds = typeof record.seconds === "number" ? record.seconds : typeof record._seconds === "number" ? record._seconds : null;
-    if (seconds == null) return null;
-    return instantDateKey(new Date(seconds * 1e3), timeZone);
-  }
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const textual = textualDateKey(trimmed);
-  if (textual) return textual;
-  if (/^\d{4}-\d{2}-\d{2}T00:00:00(?:\.000)?Z$/.test(trimmed)) return trimmed.slice(0, 10);
-  const parsed = new Date(trimmed);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return instantDateKey(parsed, timeZone);
-}
-function formatPortalDate(value) {
-  const key = calendarDateKey(value);
-  if (!key) return null;
-  const [year, month, day] = key.split("-").map(Number);
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC"
-  }).format(new Date(Date.UTC(year, month - 1, day)));
-}
-function clockTime(value) {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  if (!trimmed || /^tbd$/i.test(trimmed)) return null;
-  const match = trimmed.match(/^(\d{1,2})(?::(\d{2}))?(?::\d{2})?\s*(am|pm)?$/i);
-  if (!match) return null;
-  let hours = Number(match[1]);
-  const minutes = Number(match[2] || "0");
-  const meridiem = match[3]?.toLowerCase();
-  if (!Number.isFinite(hours) || !Number.isFinite(minutes) || minutes > 59) return null;
-  if (meridiem === "pm" && hours < 12) hours += 12;
-  if (meridiem === "am" && hours === 12) hours = 0;
-  if (!meridiem && hours > 23) return null;
-  if (meridiem && hours > 23) return null;
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
-}
-function storedAmount(value) {
-  if (typeof value === "number" && Number.isFinite(value)) return roundMoney(value);
-  if (typeof value === "string" && value.trim()) {
-    const parsed = Number(value.replace(/[$,\s]/g, ""));
-    if (Number.isFinite(parsed)) return roundMoney(parsed);
-  }
-  return null;
-}
-function listingCoverUrl(images) {
-  if (!Array.isArray(images)) return null;
-  for (const image of images) {
-    if (!image || typeof image !== "object") continue;
-    const record = image;
-    const candidate = typeof record.url === "string" ? record.url : record.thumbnailUrl;
-    if (typeof candidate === "string" && /^https?:\/\//i.test(candidate.trim())) return candidate.trim();
-  }
-  return null;
-}
-function sortNewestFirst(items) {
-  return [...items].sort((a, b) => {
-    const aTime = a.createdAt ? Date.parse(a.createdAt) : Number.NaN;
-    const bTime = b.createdAt ? Date.parse(b.createdAt) : Number.NaN;
-    const aOk = Number.isFinite(aTime);
-    const bOk = Number.isFinite(bTime);
-    if (aOk && bOk && aTime !== bTime) return bTime - aTime;
-    if (aOk !== bOk) return aOk ? -1 : 1;
-    if (a.id === b.id) return 0;
-    return a.id < b.id ? 1 : -1;
-  });
-}
-function clientListingPath(listingId) {
-  return `/portal/listings/${encodeURIComponent(listingId.trim())}`;
-}
-function buildClientListing(id, data) {
-  const images = data.images;
-  const projectType = data.projectType === "business" || data.projectType === "real_estate" ? data.projectType : "";
-  const status = typeof data.status === "string" && data.status.trim() ? data.status.trim() : "scheduled";
-  return {
-    id,
-    address: addressText(data.propertyAddress || data.address || data.shootLocation) || "Listing",
-    status,
-    projectType,
-    imageCount: Array.isArray(images) ? images.length : 0,
-    coverUrl: listingCoverUrl(images),
-    createdAt: isoStamp(data.createdAt),
-    appointmentDate: calendarDateKey(data.apptDate || data.appointmentDate || data.scheduledDate),
-    href: clientListingPath(id)
-  };
-}
-function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
-  const createdAt = isoStamp(data.createdAt);
-  const issuedAt = createdAt ? new Date(createdAt) : now;
-  return {
-    id,
-    invoiceNumber: presentInvoiceNumber(data.invoiceNumber, id, Number.isNaN(issuedAt.getTime()) ? now : issuedAt),
-    status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
-    clientName: text$3(data.clientName),
-    address: addressText(data.billToAddress || data.address || data.propertyAddress),
-    createdAt,
-    issuedOn: formatPortalDate(data.createdAt) || formatPortalDate(data.sentAt) || formatPortalDate(data.paidAt),
-    lineItems: storedLines(data.lineItems, data.services),
-    subtotal: storedAmount(data.subtotal),
-    tax: storedAmount(data.tax),
-    total: storedAmount(data.total),
-    amountPaid: storedAmount(data.amountPaid),
-    amountDue: storedAmount(data.amountDue)
-  };
-}
-function buildClientAppointment(id, data, orderRequest) {
-  const scheduledDate = firstDate(data.scheduledDate, data.appointmentDate);
-  const scheduledTime = firstTime(data.scheduledTime, data.appointmentTime, data.apptTime);
-  let requestedDate = firstDate(data.requestedDate, data.originalScheduledDate, data.originalDate, orderRequest?.requestedDate, orderRequest?.originalScheduledDate);
-  let requestedTime = firstTime(data.requestedTime, data.originalScheduledTime, data.originalTime, orderRequest?.requestedTime, orderRequest?.originalScheduledTime);
-  const requestScheduledDate = firstDate(orderRequest?.scheduledDate, orderRequest?.appointmentDate);
-  const requestScheduledTime = firstTime(orderRequest?.scheduledTime, orderRequest?.appointmentTime);
-  if (!requestedDate && requestScheduledDate && scheduledDate && requestScheduledDate !== scheduledDate) {
-    requestedDate = requestScheduledDate;
-  }
-  if (!requestedTime && requestScheduledTime && scheduledTime && clockTime(requestScheduledTime) !== clockTime(scheduledTime)) {
-    requestedTime = requestScheduledTime;
-  }
-  const proposedDate = firstDate(data.proposedDate, data.alternateDate, data.counterDate);
-  const proposedTime = firstTime(data.proposedTime, data.alternateTime, data.counterTime);
-  const status = typeof data.status === "string" ? data.status.trim() : "";
-  const iconicAccepted = ACCEPTED.has(statusKey(status)) || statusKey(status) === "pending_confirmation" || statusKey(status) === "rescheduled";
-  let date = scheduledDate;
-  let time = scheduledTime;
-  if (proposedDate && iconicAccepted && proposedDate !== (requestedDate || scheduledDate)) {
-    if (!requestedDate && scheduledDate) requestedDate = scheduledDate;
-    date = proposedDate;
-    if (proposedTime) time = proposedTime;
-  }
-  if (!date) date = requestedDate;
-  if (!time) time = requestedTime;
-  return {
-    id,
-    address: addressText(data.addressLabel || data.address) || "Appointment",
-    status,
-    date,
-    time,
-    requestedDate,
-    requestedTime,
-    approved: hasStamp(data.clientConfirmedAt) || hasStamp(data.changeApprovedAt) || hasStamp(data.agentApprovedAt) || hasStamp(orderRequest?.clientConfirmedAt) || hasStamp(orderRequest?.changeApprovedAt),
-    createdAt: isoStamp(data.createdAt)
-  };
-}
-function storedLines(lineItems, services2) {
-  const raw = Array.isArray(lineItems) ? lineItems : Array.isArray(services2) ? services2 : [];
-  return raw.flatMap((item) => {
-    if (typeof item === "string" && item.trim()) return [{ name: item.trim(), qty: null, amount: null }];
-    if (!item || typeof item !== "object") return [];
-    const record = item;
-    const name = text$3(record.name) || text$3(record.label) || text$3(record.description);
-    const qty = storedQty(record.qty ?? record.quantity);
-    const amount = storedAmount(record.price ?? record.amount ?? record.total);
-    if (!name && amount == null && qty == null) return [];
-    return [{ name: name || "Line item", qty, amount }];
-  });
-}
-function storedQty(value) {
-  const qty = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : Number.NaN;
-  if (!Number.isFinite(qty) || qty <= 0) return null;
-  return Math.round(qty);
-}
-function firstDate(...values) {
-  for (const value of values) {
-    const key = calendarDateKey(value);
-    if (key) return key;
-  }
-  return null;
-}
-function firstTime(...values) {
-  for (const value of values) {
-    if (typeof value === "string" && value.trim() && !/^tbd$/i.test(value.trim())) return value.trim();
-  }
-  return "";
-}
-function hasStamp(value) {
-  if (value == null || value === false) return false;
-  if (typeof value === "string") return value.trim().length > 0;
-  return true;
-}
-function isoStamp(value) {
-  if (typeof value === "string" && value.trim()) return value.trim();
-  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
-  if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
-  return null;
-}
-function text$3(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-function roundMoney(value) {
-  return Math.round(value * 100) / 100;
-}
-const MONTHS = {
-  january: 1,
-  february: 2,
-  march: 3,
-  april: 4,
-  may: 5,
-  june: 6,
-  july: 7,
-  august: 8,
-  september: 9,
-  october: 10,
-  november: 11,
-  december: 12
-};
-function textualDateKey(value) {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  const long = value.match(/^(?:[A-Za-z]+,\s+)?([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})$/);
-  if (long) {
-    const month = MONTHS[long[1].toLowerCase()];
-    const day = Number(long[2]);
-    const year = Number(long[3]);
-    if (month && day >= 1 && day <= 31) return dateKey(year, month, day);
-  }
-  const slash = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (slash) {
-    const month = Number(slash[1]);
-    const day = Number(slash[2]);
-    const year = Number(slash[3]);
-    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) return dateKey(year, month, day);
-  }
-  return null;
-}
-function instantDateKey(date, timeZone) {
-  if (date.getUTCHours() === 0 && date.getUTCMinutes() === 0 && date.getUTCSeconds() === 0 && date.getUTCMilliseconds() === 0) {
-    return dateKey(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
-  }
-  return formatZoned(date, timeZone);
-}
-function dateKey(year, month, day) {
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-}
-function formatZoned(date, timeZone) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).format(date);
-}
 const EMPTY = "Not on file yet";
 const FACT_DEFS = [
   { id: "beds", label: "Beds", keys: ["bedrooms", "beds"] },
@@ -7107,6 +7973,11 @@ router$b.get("/me/home", requireAuth, async (req, res) => {
     if (!identity.profile) {
       return res.status(404).json({ error: "Client profile not found." });
     }
+    try {
+      await ensurePortalListingsForClient({ ids: identity.ids, email: identity.email });
+    } catch (err) {
+      console.error("[Clients] Listing ensure failed:", err);
+    }
     const galleries = [];
     const invoices = [];
     const projects = [];
@@ -7133,11 +8004,11 @@ router$b.get("/me/home", requireAuth, async (req, res) => {
       seenProject.add(entry.id);
       projects.push(buildClientListing(entry.id, asRecord(jsonSafe(entry.data()))));
     };
-    for (const clientId of identity.ids) {
+    for (const clientId2 of identity.ids) {
       const [gallerySnap, invoiceSnap, projectSnap] = await Promise.all([
-        db$8().collection("galleries").where("clientId", "==", clientId).limit(HOME_LIMIT).get(),
-        db$8().collection("invoices").where("clientId", "==", clientId).limit(HOME_LIMIT).get(),
-        db$8().collection("listings").where("clientId", "==", clientId).limit(HOME_LIMIT).get()
+        db$8().collection("galleries").where("clientId", "==", clientId2).limit(HOME_LIMIT).get(),
+        db$8().collection("invoices").where("clientId", "==", clientId2).limit(HOME_LIMIT).get(),
+        db$8().collection("listings").where("clientId", "==", clientId2).limit(HOME_LIMIT).get()
       ]);
       for (const doc of gallerySnap.docs) {
         if (seenGallery.has(doc.id)) continue;
@@ -7156,7 +8027,7 @@ router$b.get("/me/home", requireAuth, async (req, res) => {
       if (projectSnap.size >= HOME_LIMIT) listingsTruncated = true;
       projectSnap.docs.forEach(pushListing);
       try {
-        const appointmentSnap = await db$8().collection("appointments").where("clientId", "==", clientId).limit(HOME_LIMIT).get();
+        const appointmentSnap = await db$8().collection("appointments").where("clientId", "==", clientId2).limit(HOME_LIMIT).get();
         if (appointmentSnap.size >= HOME_LIMIT) appointmentsTruncated = true;
         appointmentSnap.docs.forEach(pushAppointment);
       } catch (appointmentErr) {
@@ -7182,8 +8053,8 @@ router$b.get("/me/home", requireAuth, async (req, res) => {
       });
     };
     try {
-      for (const clientId of identity.ids) {
-        const snap = await db$8().collection("orderRequests").where("clientId", "==", clientId).limit(HOME_LIMIT).get();
+      for (const clientId2 of identity.ids) {
+        const snap = await db$8().collection("orderRequests").where("clientId", "==", clientId2).limit(HOME_LIMIT).get();
         snap.docs.forEach(pushOrder);
       }
       if (identity.email) {
@@ -7367,7 +8238,7 @@ async function bootstrapPlaytest(input) {
   const role = photographerInput.role || "photographer";
   const seedListing = input.seedListing !== false;
   const seedGallery = input.seedGallery !== false;
-  const clientEmail = normalizeEmail(input.clientEmail);
+  const clientEmail2 = normalizeEmail(input.clientEmail);
   if (!email || !email.includes("@")) throw httpError(400, "Photographer email is required.");
   if (password.length < 6) throw httpError(400, "Photographer password must be at least 6 characters.");
   if (!isStaffRole(role)) throw httpError(400, "Role must be admin, coordinator, photographer, or editor.");
@@ -7380,15 +8251,15 @@ async function bootstrapPlaytest(input) {
     phone: String(photographerInput.phone || "").trim()
   });
   let client = null;
-  let clientStatus = clientEmail ? "not_found" : "skipped";
-  if (clientEmail) {
-    const matches = await db$7().collection("clients").where("email", "==", clientEmail).limit(5).get();
+  let clientStatus = clientEmail2 ? "not_found" : "skipped";
+  if (clientEmail2) {
+    const matches = await db$7().collection("clients").where("email", "==", clientEmail2).limit(5).get();
     const preferred = matches.docs.find((doc) => doc.data().firebaseUid === doc.id) || matches.docs[0];
     if (preferred) {
       client = {
         id: preferred.id,
-        email: clientEmail,
-        name: `${preferred.data().firstName || ""} ${preferred.data().lastName || ""}`.trim() || clientEmail
+        email: clientEmail2,
+        name: `${preferred.data().firstName || ""} ${preferred.data().lastName || ""}`.trim() || clientEmail2
       };
       clientStatus = "linked";
     }
@@ -7407,7 +8278,7 @@ async function bootstrapPlaytest(input) {
   const origin = process.env.APP_URL || "https://iconicimagestx.vercel.app";
   return {
     photographer,
-    client: client ? { ...client, status: clientStatus } : { status: clientStatus, email: clientEmail || null },
+    client: client ? { ...client, status: clientStatus } : { status: clientStatus, email: clientEmail2 || null },
     listing,
     gallery: gallery ? { ...gallery, url: `${origin}${gallery.urlPath}` } : null,
     invoice: invoice ? { ...invoice, url: `${origin}${invoice.urlPath}` } : null,
@@ -8928,7 +9799,7 @@ router$3.post("/remind/:orderId", requireStaff, async (req, res) => {
 });
 router$3.post("/conversation", requireStaff, async (req, res) => {
   try {
-    const { orderId, photographerPhone, photographerName, clientPhone, clientName } = req.body;
+    const { orderId, photographerPhone, photographerName, clientPhone, clientName: clientName2 } = req.body;
     if (!orderId || !photographerPhone || !clientPhone) {
       return res.status(400).json({ error: "orderId, photographerPhone, clientPhone required." });
     }
@@ -8939,9 +9810,9 @@ router$3.post("/conversation", requireStaff, async (req, res) => {
     const appUrl2 = process.env.APP_URL || process.env.VERCEL_URL || "";
     const webhookUrl = appUrl2 ? `${appUrl2}/api/sms/webhook` : void 0;
     const result = await createMaskedConversation(
-      `Order ${orderId} — ${photographerName || "Photographer"} + ${clientName || "Client"}`,
+      `Order ${orderId} — ${photographerName || "Photographer"} + ${clientName2 || "Client"}`,
       { phone: photographerPhone, name: photographerName },
-      { phone: clientPhone, name: clientName },
+      { phone: clientPhone, name: clientName2 },
       webhookUrl
     );
     await db$1().collection("conversations").add({
@@ -8951,7 +9822,7 @@ router$3.post("/conversation", requireStaff, async (req, res) => {
       photographerName: photographerName || null,
       photographerParticipantSid: result.photographerParticipantSid,
       clientPhone: normalisePhone(clientPhone),
-      clientName: clientName || null,
+      clientName: clientName2 || null,
       clientParticipantSid: result.clientParticipantSid,
       status: "active",
       createdBy: req.user.uid,
@@ -8959,7 +9830,7 @@ router$3.post("/conversation", requireStaff, async (req, res) => {
     });
     await sendConversationMessage(
       result.conversationSid,
-      `Hi! This is a private message channel for your Iconic Images appointment. ${photographerName || "Your photographer"} and ${clientName || "your client"} are connected here. Neither party can see each other's phone number. 📸`
+      `Hi! This is a private message channel for your Iconic Images appointment. ${photographerName || "Your photographer"} and ${clientName2 || "your client"} are connected here. Neither party can see each other's phone number. 📸`
     );
     return res.json({ success: true, ...result });
   } catch (err) {
@@ -9649,7 +10520,7 @@ function buildPresentation(source) {
   const photos = collectPresentationPhotos(source);
   const { address, street, locality } = addressParts(listing);
   const agentName = agentNameOf(listing);
-  const clientName = text(listing?.clientName);
+  const clientName2 = text(listing?.clientName);
   const origin = source.origin || "";
   const path2 = presentationPath(source.token);
   const pageUrl = origin ? `${origin.replace(/\/$/, "")}${path2}` : path2;
@@ -9664,7 +10535,7 @@ function buildPresentation(source) {
     street,
     locality,
     agentName,
-    clientName,
+    clientName: clientName2,
     price: priceOf(listing),
     beds: countOf(listing?.bedrooms),
     baths: countOf(listing?.bathrooms),
