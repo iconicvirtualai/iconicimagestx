@@ -17,6 +17,7 @@ import {
   sortNewestFirst,
 } from "../../shared/clientHome";
 import { resolveClientIdentity, upsertPortalClient } from "../services/clientAccounts";
+import { ensurePortalListingsForClient } from "../services/bookingListing";
 import { jsonSafe } from "../lib/firestoreJson";
 import { handleGetPortalListing, handlePatchPortalMedia, handlePatchPortalWebsite } from "./portalListing";
 
@@ -138,6 +139,13 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
     const identity = await resolveClientIdentity(req.user!.uid, req.user!.email);
     if (!identity.profile) {
       return res.status(404).json({ error: "Client profile not found." });
+    }
+
+    // Tiles still come from listings. This only adds a listing doc when a booking already has an order.
+    try {
+      await ensurePortalListingsForClient({ ids: identity.ids, email: identity.email });
+    } catch (err) {
+      console.error("[Clients] Listing ensure failed:", err);
     }
 
     const galleries: Record<string, unknown>[] = [];
