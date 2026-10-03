@@ -4,10 +4,18 @@ import { useAuth } from "@/contexts/AuthContext";
 import { clientPortalAction, staffHomePath } from "@shared/staffAccess";
 import { Button } from "@/components/ui/button";
 import Footer from "@/components/Footer";
-import { ClipboardList, FolderOpen, Image, LogOut, Receipt } from "lucide-react";
+import { CalendarClock, ClipboardList, FolderOpen, Image, LogOut, Receipt } from "lucide-react";
 
 interface PortalHome {
   profile?: { firstName?: string; lastName?: string; email?: string };
+  appointments?: Array<{
+    id: string;
+    address: string;
+    status: string;
+    statusLabel: string;
+    scheduledDate: string;
+    scheduledTime: string;
+  }>;
   orders?: Array<{ id: string; address: string; status: string; href?: string }>;
   galleries: Array<{ id: string; title: string; address?: string; status: string; href: string }>;
   invoices: Array<{ id: string; invoiceNumber: string; status: string; total: number; amountDue: number; href: string }>;
@@ -76,7 +84,7 @@ export default function ClientPortal() {
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Iconic Images</p>
             <h1 className="text-3xl font-black mt-2">Hello, {firstName}</h1>
-            <p className="text-gray-400 text-sm mt-1">Galleries, invoices, and projects for your account.</p>
+            <p className="text-gray-400 text-sm mt-1">Appointment requests, galleries, invoices, and projects for your account.</p>
           </div>
           <Button
             variant="outline"
@@ -105,6 +113,23 @@ export default function ClientPortal() {
           </div>
         ) : (
           <>
+            <Section
+              icon={<CalendarClock className="w-4 h-4" />}
+              title="Appointments"
+              empty="No appointment requests yet. A booking made with this email shows up here."
+            >
+              {(home?.appointments || []).map((appointment) => (
+                <div key={appointment.id} className="bg-white rounded-2xl border border-gray-100 p-5">
+                  <p className="font-black">{appointment.address}</p>
+                  <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">
+                    {appointment.statusLabel}
+                    {appointment.scheduledDate ? ` · ${appointment.scheduledDate}` : ""}
+                    {appointment.scheduledTime ? ` · ${appointment.scheduledTime}` : ""}
+                  </p>
+                </div>
+              ))}
+            </Section>
+
             <Section
               icon={<ClipboardList className="w-4 h-4" />}
               title="Orders"

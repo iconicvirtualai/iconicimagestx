@@ -15,6 +15,33 @@ import { jsonSafe } from "../lib/firestoreJson";
 const router = Router();
 const db = () => admin.firestore();
 
+function whenLabel(value: unknown): string {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "object" && value !== null && "toDate" in value && typeof (value as { toDate: () => Date }).toDate === "function") {
+    return (value as { toDate: () => Date }).toDate().toLocaleString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+  return "";
+}
+
+function portalAppointment(id: string, data: FirebaseFirestore.DocumentData) {
+  const status = String(data.status || "requested");
+  return {
+    id,
+    address: addressText(data.addressLabel || data.address) || "Appointment",
+    status,
+    statusLabel: status === "requested" ? "Request received" : status.replace(/_/g, " "),
+    scheduledDate: whenLabel(data.scheduledDate),
+    scheduledTime: typeof data.scheduledTime === "string" ? data.scheduledTime : "",
+    createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : "",
+  };
+}
+
 function addressText(value: unknown): string {
   if (!value) return "";
   if (typeof value === "string") return value;
@@ -141,9 +168,16 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
     const galleries: Record<string, unknown>[] = [];
     const invoices: Record<string, unknown>[] = [];
     const projects: Record<string, unknown>[] = [];
+    const appointments: Record<string, unknown>[] = [];
     const seenGallery = new Set<string>();
     const seenInvoice = new Set<string>();
     const seenProject = new Set<string>();
+    const seenAppointment = new Set<string>();
+    const pushAppointment = (entry: FirebaseFirestore.QueryDocumentSnapshot) => {
+      if (seenAppointment.has(entry.id)) return;
+      seenAppointment.add(entry.id);
+      appointments.push(portalAppointment(entry.id, entry.data()));
+    };
     const pushInvoice = (entry: FirebaseFirestore.QueryDocumentSnapshot) => {
       if (seenInvoice.has(entry.id)) return;
       seenInvoice.add(entry.id);
@@ -188,6 +222,13 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
           imageCount: Array.isArray(data.images) ? data.images.length : 0,
           href: `/studio/${doc.id}`,
         });
+      }
+
+      try {
+        const appointmentSnap = await db().collection("appointments").where("clientId", "==", clientId).limit(20).get();
+        appointmentSnap.docs.forEach(pushAppointment);
+      } catch (appointmentErr) {
+        console.error("[Clients] Appointment lookup failed:", appointmentErr);
       }
     }
 
@@ -236,6 +277,13 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
     }
 
     if (identity.email) {
+      try {
+        const appointmentsByEmail = await db().collection("appointments").where("clientEmail", "==", identity.email).limit(20).get();
+        appointmentsByEmail.docs.forEach(pushAppointment);
+      } catch (appointmentErr) {
+        console.error("[Clients] Appointment email lookup failed:", appointmentErr);
+      }
+
       const byEmail = await db().collection("listings").where("clientEmail", "==", identity.email).limit(20).get();
       for (const doc of byEmail.docs) {
         if (seenProject.has(doc.id)) continue;
@@ -251,8 +299,11 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
       }
     }
 
+    appointments.sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+
     return res.json({
       profile: jsonSafe(identity.profile),
+      appointments,
       orders,
       galleries,
       invoices,

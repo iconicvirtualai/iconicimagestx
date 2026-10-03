@@ -171,6 +171,14 @@ function getFallbackTemplate(
       <p style="color:#888;font-size:13px;">Confirmation ID: <strong>${vars.requestId}</strong> — keep this for your records.</p>
       <p style="color:#888;font-size:13px;">If any details look incorrect, simply reply to this email and we'll sort it out.</p>
     `),
+    account_password_setup: base(`
+      <h2 style="color:#0d9488;">Set your portal password</h2>
+      <p>Hi ${vars.clientName},</p>
+      <p>We created a client portal login for <strong>${vars.clientEmail || "your email"}</strong> so you can see this appointment request.</p>
+      <p>This email is only for your password. Your appointment request details are in a separate email.</p>
+      <p><a href="${vars.setupUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Set your password</a></p>
+      <p style="color:#888;font-size:13px;">After that, sign in at <a href="${vars.portalUrl}">${vars.portalUrl}</a>.</p>
+    `),
     order_confirmed: base(`
       <h2>Your appointment is confirmed!</h2>
       <p>Hi ${vars.clientName},</p>

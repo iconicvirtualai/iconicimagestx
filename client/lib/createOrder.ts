@@ -67,5 +67,16 @@ export async function createOrder(formData: any) {
   }
 
   console.log("ORDER CREATED:", data.requestId);
-  return { success: true, requestId: data.requestId };
+  return {
+    success: true,
+    requestId: data.requestId as string,
+    accountCreated: Boolean(data.accountCreated),
+    notifications: (data.notifications || null) as {
+      appointmentEmail?: string;
+      sms?: string;
+      passwordSetup?: string;
+      accountAttached?: boolean;
+      accountSkipReason?: string | null;
+    } | null,
+  };
 }

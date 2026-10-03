@@ -10,6 +10,8 @@ import { requireCoordinator, type AuthenticatedRequest } from "../middleware/aut
 import { sendEmail } from "../services/email";
 import { sendSMS, SMS_TEMPLATES } from "../services/sms";
 import { createCalendarBookingEvent } from "../services/calendar";
+import { attachBookingClient, createRequestedAppointment, sendFirebasePasswordEmail } from "../services/bookingClient";
+import { clientNotifyBlockReason, clientNotifyLive } from "../../shared/clientNotify";
 import { lifeOfTheListingCareSelected } from "../../shared/lifeOfTheListingCare";
 import { buildBookingInvoiceDraft, existingInvoiceId } from "../../shared/bookingInvoice";
 import { nextSequentialInvoiceNumber, planInvoiceLink } from "../../shared/orderProjectInvoice";
@@ -149,6 +151,51 @@ router.post("/", async (req, res) => {
 
     const docRef = await db().collection("orderRequests").add(orderRequest);
 
+    const normalizedEmail = orderRequest.email;
+    let account: Awaited<ReturnType<typeof attachBookingClient>> = {
+      clientId: null,
+      createdAccount: false,
+      passwordSetupLink: null,
+      skipReason: null,
+    };
+    try {
+      account = await attachBookingClient({
+        email: normalizedEmail,
+        firstName,
+        lastName,
+        phone,
+        preparePasswordLink: clientNotifyLive(),
+      });
+    } catch (err) {
+      console.error("[Bookings] Account attach failed:", err);
+    }
+
+    if (account.clientId) {
+      try {
+        await docRef.update({
+          clientId: account.clientId,
+          clientEmail: normalizedEmail,
+          portalAttached: true,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        await createRequestedAppointment({
+          orderRequestId: docRef.id,
+          clientId: account.clientId,
+          clientName,
+          clientEmail: normalizedEmail,
+          clientPhone: String(phone || ""),
+          address,
+          addressLabel: displayAddress,
+          scheduledDate: typeof scheduledDate === "string" ? scheduledDate : null,
+          scheduledTime: typeof scheduledTime === "string" ? scheduledTime : null,
+          services: lineItems,
+          notes: typeof vibeNote === "string" ? vibeNote : "",
+        });
+      } catch (err) {
+        console.error("[Bookings] Appointment attach failed:", err);
+      }
+    }
+
     let invoiceId: string | null = null;
     try {
       const created = await createBookingInvoiceDraft({
@@ -160,12 +207,17 @@ router.post("/", async (req, res) => {
         total,
         promoCode,
         promoDiscount,
+        clientId: account.clientId,
       });
       invoiceId = created.invoiceId;
       try {
         await docRef.update({
           invoiceId: created.invoiceId,
-          ...(created.clientId ? { clientId: created.clientId } : {}),
+          ...(account.clientId
+            ? { clientId: account.clientId }
+            : created.clientId
+              ? { clientId: created.clientId }
+              : {}),
         });
       } catch (linkErr) {
         console.error("[Bookings] Invoice link update failed:", linkErr);
@@ -180,9 +232,14 @@ router.post("/", async (req, res) => {
       ? `${accessMethod}${lockboxCode ? ` — Code: ${lockboxCode}` : ""}`
       : "Not specified";
 
+    let clientEmailStatus: "sent" | "failed" = "failed";
+    let officeEmailStatus: "sent" | "failed" = "failed";
+    let passwordSetupStatus: "sent" | "failed" | "not_needed" | "gated" = account.createdAccount ? "gated" : "not_needed";
+    let smsStatus: "sent" | "failed" | "skipped" | "not_configured" = phone ? "failed" : "skipped";
+
     // Order-received confirmation to the client. booking_received is excluded from the
     // RED blast kill and sends even when CLIENT_NOTIFY_LIVE is unset.
-    await sendEmail({
+    clientEmailStatus = await sendEmail({
       to: email,
       template: "booking_received",
       variables: {
@@ -198,11 +255,14 @@ router.post("/", async (req, res) => {
         squareFootage: squareFootage ? `${squareFootage} sq ft` : "",
         dashboardUrl: `${appUrl()}/admin/order-request/${docRef.id}`,
       },
-    }).catch((err) => console.error("[Bookings] Confirmation email failed:", err));
+    }).then((result) => (result.sent ? "sent" as const : "failed" as const)).catch((err) => {
+      console.error("[Bookings] Confirmation email failed:", err);
+      return "failed" as const;
+    });
 
 
     // Send the same complete order notification to the office
-    await sendEmail({
+    officeEmailStatus = await sendEmail({
       to: "photos@iconicimagestx.com",
       template: "booking_received",
       variables: {
@@ -218,12 +278,15 @@ router.post("/", async (req, res) => {
         squareFootage: squareFootage ? `${squareFootage} sq ft` : "",
         dashboardUrl: `${appUrl()}/admin/order-request/${docRef.id}`,
       },
-    }).catch((err) => console.error("[Bookings] Office notification email failed:", err));
+    }).then((result) => (result.sent ? "sent" as const : "failed" as const)).catch((err) => {
+      console.error("[Bookings] Office notification email failed:", err);
+      return "failed" as const;
+    });
 
     // Order-received SMS to the client. Same carve-out as booking_received:
     // not blocked by RED or a missing CLIENT_NOTIFY_LIVE.
     if (phone) {
-      await sendSMS({
+      smsStatus = await sendSMS({
         to: phone,
         kind: "booking_confirmation",
         body: SMS_TEMPLATES.bookingConfirmation(
@@ -232,7 +295,11 @@ router.post("/", async (req, res) => {
           displayAddress,
           money(total)
         ),
-      }).catch((err) => console.error("[Bookings] Confirmation SMS failed:", err));
+      }).then((result) => ("suppressed" in result && result.suppressed ? "failed" as const : "sent" as const)).catch((err) => {
+        console.error("[Bookings] Confirmation SMS failed:", err);
+        const message = err instanceof Error ? err.message : String(err);
+        return /TWILIO_|not configured|not set/i.test(message) ? "not_configured" as const : "failed" as const;
+      });
     }
 
     // Send SMS alert to coordinator/admin if ADMIN_PHONE is set
@@ -250,6 +317,61 @@ router.post("/", async (req, res) => {
       }).catch((err) => console.error("[Bookings] Admin SMS alert failed:", err));
     }
 
+    // Password setup is not the order-received confirmation. It follows the
+    // same CLIENT_NOTIFY_LIVE / RED gate as other portal mail. The link is
+    // not stored on the order request.
+    if (account.createdAccount) {
+      if (!clientNotifyLive()) {
+        passwordSetupStatus = "gated";
+        console.info(
+          `[Bookings] Password-setup email not sent for request ${docRef.id}. ${clientNotifyBlockReason()}.`,
+        );
+      } else if (account.passwordSetupLink) {
+        passwordSetupStatus = await sendEmail({
+          to: email,
+          template: "account_password_setup",
+          variables: {
+            clientName,
+            clientEmail: normalizedEmail,
+            setupUrl: account.passwordSetupLink,
+            portalUrl: `${appUrl()}/portal`,
+          },
+        }).then((result) => (result.sent ? "sent" as const : "failed" as const)).catch(async (err) => {
+          console.error("[Bookings] Password setup email failed:", err);
+          try {
+            await sendFirebasePasswordEmail(normalizedEmail);
+            return "sent" as const;
+          } catch (fallbackErr) {
+            console.error("[Bookings] Firebase password email fallback failed:", fallbackErr);
+            return "failed" as const;
+          }
+        });
+      } else {
+        try {
+          await sendFirebasePasswordEmail(normalizedEmail);
+          passwordSetupStatus = "sent";
+        } catch (err) {
+          console.error("[Bookings] Firebase password email fallback failed:", err);
+          passwordSetupStatus = "failed";
+        }
+      }
+    }
+
+    const notifications = {
+      appointmentEmail: clientEmailStatus,
+      officeEmail: officeEmailStatus,
+      sms: smsStatus,
+      passwordSetup: passwordSetupStatus,
+      accountCreated: account.createdAccount,
+      accountAttached: Boolean(account.clientId),
+      accountSkipReason: account.skipReason,
+    };
+
+    await docRef.update({
+      notifications,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }).catch((err) => console.error("[Bookings] Notification status was not saved:", err));
+
     // Square is best-effort after the emailed total is already fixed.
     // A timeout or API error must not fail the booking or change that total.
     if (invoiceId) {
@@ -264,6 +386,8 @@ router.post("/", async (req, res) => {
       success: true,
       requestId: docRef.id,
       invoiceId,
+      accountCreated: account.createdAccount,
+      notifications,
       message: "Booking request received. We'll confirm shortly!",
     });
   } catch (err) {
@@ -367,40 +491,54 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       photographer = staffDoc.exists ? staffDoc.data()! : null;
     }
 
-    // Find or create client record
+    // Find or create client record. Prefer the portal account attached at submit.
     let clientId: string;
-    const existingClients = await db()
-      .collection("clients")
-      .where("email", "==", requestEmail)
-      .limit(1)
-      .get();
+    const attachedClientId = typeof request.clientId === "string" ? request.clientId.trim() : "";
+    const attachedClient = attachedClientId
+      ? await db().collection("clients").doc(attachedClientId).get()
+      : null;
 
-    if (!existingClients.empty) {
-      clientId = existingClients.docs[0].id;
-      // Update last activity
-      await existingClients.docs[0].ref.update({
+    if (attachedClient?.exists) {
+      clientId = attachedClient.id;
+      await attachedClient.ref.update({
         totalOrders: admin.firestore.FieldValue.increment(1),
         lastOrderAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     } else {
-      // Create new client record
-      const clientRef = await db().collection("clients").add({
-        firstName: requestFirstName,
-        lastName: requestLastName,
-        email: requestEmail,
-        phone: requestPhone,
-        address: request.address,
-        totalOrders: 1,
-        totalSpend: 0,
-        lastOrderAt: admin.firestore.FieldValue.serverTimestamp(),
-        status: "active",
-        portalAccess: false,
-        tags: [],
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-      clientId = clientRef.id;
+      const existingClients = await db()
+        .collection("clients")
+        .where("email", "==", requestEmail)
+        .limit(1)
+        .get();
+
+      if (!existingClients.empty) {
+        clientId = existingClients.docs[0].id;
+        // Update last activity
+        await existingClients.docs[0].ref.update({
+          totalOrders: admin.firestore.FieldValue.increment(1),
+          lastOrderAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } else {
+        // Create new client record
+        const clientRef = await db().collection("clients").add({
+          firstName: requestFirstName,
+          lastName: requestLastName,
+          email: requestEmail,
+          phone: requestPhone,
+          address: request.address,
+          totalOrders: 1,
+          totalSpend: 0,
+          lastOrderAt: admin.firestore.FieldValue.serverTimestamp(),
+          status: "active",
+          portalAccess: false,
+          tags: [],
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        clientId = clientRef.id;
+      }
     }
 
     // Create Order document
@@ -437,11 +575,18 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
 
     const orderRef = await db().collection("orders").add(orderData);
 
-    // Create Appointment document
-    const appointmentRef = await db().collection("appointments").add({
+    // Promote the request appointment when the public form already created one.
+    const existingAppointment = await db().collection("appointments")
+      .where("orderRequestId", "==", req.params.id)
+      .limit(1)
+      .get();
+    const confirmedAppointment = {
       orderId: orderRef.id,
+      orderRequestId: req.params.id,
       clientId,
       clientName: requestClientName,
+      clientEmail: requestEmail,
+      clientPhone: requestPhone,
       address: requestAddress,
       addressLabel: requestAddressLabel,
       scheduledDate: confirmDate ? admin.firestore.Timestamp.fromDate(confirmDate) : null,
@@ -452,9 +597,19 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       status: "confirmed",
       notes: request.vibeNote || "",
       internalNotes: internalNotes || "",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    };
+    const appointmentRef = existingAppointment.empty
+      ? db().collection("appointments").doc()
+      : existingAppointment.docs[0].ref;
+    if (existingAppointment.empty) {
+      await appointmentRef.set({
+        ...confirmedAppointment,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } else {
+      await appointmentRef.update(confirmedAppointment);
+    }
 
     // Create Gallery placeholder
     const galleryRef = await db().collection("galleries").add({
@@ -695,8 +850,9 @@ async function createBookingInvoiceDraft(input: {
   total: unknown;
   promoCode?: string | null;
   promoDiscount?: unknown;
+  clientId?: string | null;
 }): Promise<{ invoiceId: string; clientId: string | null }> {
-  const clientId = await linkClientIdByEmail(input.email);
+  const clientId = input.clientId || await linkClientIdByEmail(input.email);
   const draft = buildBookingInvoiceDraft({
     lineItems: input.lineItems,
     total: input.total,

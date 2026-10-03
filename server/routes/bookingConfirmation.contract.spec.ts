@@ -37,6 +37,38 @@ describe("live order confirmation emails", () => {
     expect(blocks[0]).toContain("portalUrl:");
   });
 
+  it("attaches a portal account and keeps password setup off the order-received email", () => {
+    expect(bookings).toContain("attachBookingClient");
+    expect(bookings).toContain("createRequestedAppointment");
+    expect(bookings).toContain('template: "account_password_setup"');
+    expect(bookings).toContain("sendFirebasePasswordEmail");
+    expect(bookings).toContain("SMS_TEMPLATES.bookingConfirmation");
+    expect(email).toContain("account_password_setup:");
+    const received = sendBlocks(bookings, "booking_received").join("\n");
+    expect(received).not.toContain("account_password_setup");
+    expect(received).not.toContain("setupUrl");
+    expect(bookings).not.toContain("BOOKING_NOTIFY_LIVE");
+    expect(bookings).not.toContain("bookingNotificationsLive");
+    expect(bookings).not.toContain("appointmentReminder");
+    expect(bookings).not.toContain('template: "invoice"');
+  });
+
+  it("sends booking confirms before the password-setup gate", () => {
+    const receivedAt = bookings.indexOf('template: "booking_received"');
+    const smsAt = bookings.indexOf('kind: "booking_confirmation"');
+    const gateAt = bookings.indexOf("if (!clientNotifyLive())");
+    const passwordAt = bookings.indexOf('template: "account_password_setup"');
+    expect(receivedAt).toBeGreaterThan(-1);
+    expect(smsAt).toBeGreaterThan(receivedAt);
+    expect(gateAt).toBeGreaterThan(smsAt);
+    expect(passwordAt).toBeGreaterThan(gateAt);
+    expect(bookings.slice(receivedAt, smsAt)).not.toContain("clientNotifyLive(");
+    const notificationsAt = bookings.indexOf("const notifications = {");
+    const saved = bookings.slice(notificationsAt, bookings.indexOf("await docRef.update({", notificationsAt));
+    expect(saved).not.toContain("passwordSetupLink");
+    expect(saved).not.toContain("setupUrl");
+  });
+
   it("still resolves those categories through the shared email sender", () => {
     expect(email).toContain('.where("category", "==", template)');
     expect(email).toContain('.where("isActive", "==", true)');
