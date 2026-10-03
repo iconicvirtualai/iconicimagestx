@@ -11,6 +11,7 @@ import { cleanPersonName, normalizeEmail } from "../../shared/listingAccess";
 import { visibleToPortalClient } from "../../shared/listingWrite";
 import { resolveClientIdentity, upsertPortalClient } from "../services/clientAccounts";
 import { jsonSafe } from "../lib/firestoreJson";
+import { handleGetPortalListing, handlePatchPortalMedia, handlePatchPortalWebsite } from "./portalListing";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -314,6 +315,11 @@ router.get("/me/home", requireAuth, async (req: AuthenticatedRequest, res) => {
     return res.status(500).json({ error: "Failed to load your portal." });
   }
 });
+
+// GET /api/clients/me/listings/:id — listing file inside the client portal
+router.get("/me/listings/:id", requireAuth, handleGetPortalListing);
+router.patch("/me/listings/:id/media", requireAuth, handlePatchPortalMedia);
+router.patch("/me/listings/:id/website", requireAuth, handlePatchPortalWebsite);
 
 // GET /api/clients/me — client gets their own profile
 router.get("/me", requireAuth, async (req: AuthenticatedRequest, res) => {

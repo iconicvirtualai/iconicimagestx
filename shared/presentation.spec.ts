@@ -85,6 +85,21 @@ describe("listing presentation", () => {
     expect(photos[0].room).toBe("Primary suite");
   });
 
+  it("drops photos the client hid and keeps the file available to the portal", () => {
+    const photos = collectPresentationPhotos({
+      token: "abcdefghijklmnopqrstuv",
+      listing: {
+        portalMedia: { photos: { living: { hidden: true, order: 1 } } },
+        images: [
+          { id: "living", name: "living.jpg", path: "listings/abc/photos/living.jpg", url: "https://cdn.example/living.jpg", contentType: "image/jpeg" },
+          { id: "kitchen", name: "kitchen.jpg", path: "listings/abc/photos/kitchen.jpg", url: "https://cdn.example/kitchen.jpg", contentType: "image/jpeg", hiddenFromPresentation: true },
+          { id: "yard", name: "yard.jpg", path: "listings/abc/photos/yard.jpg", url: "https://cdn.example/yard.jpg", contentType: "image/jpeg" },
+        ],
+      },
+    });
+    expect(photos.map((photo) => photo.id)).toEqual(["yard"]);
+  });
+
   it("hides a presentation the staff turned off", () => {
     expect(buildPresentation({
       token: "abcdefghijklmnopqrstuv",

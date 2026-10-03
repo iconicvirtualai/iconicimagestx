@@ -6,6 +6,7 @@
  */
 
 import { frameFromListingImage, listingAddressLabel } from "./iconicStudio";
+import { hiddenPresentationKeys, rowHiddenFromPresentation } from "./portalListingDetail";
 
 export const PRESENTATION_PREVIEW_TOKEN = "preview";
 export const PRESENTATION_PATH = "/present";
@@ -175,7 +176,7 @@ function pushDraft(
   });
 }
 
-function listingDrafts(listing: Record<string, unknown> | null | undefined): DraftPhoto[] {
+function listingDrafts(listing: Record<string, unknown> | null | undefined, hidden: Set<string>): DraftPhoto[] {
   if (!listing || !Array.isArray(listing.images)) return [];
   const folders = folderMap(listing);
   const drafts: DraftPhoto[] = [];
@@ -188,12 +189,13 @@ function listingDrafts(listing: Record<string, unknown> | null | undefined): Dra
     row.name = row.name || frame.name;
     row.contentType = row.contentType || frame.contentType;
     row.id = row.id || frame.id;
+    if (rowHiddenFromPresentation(row, hidden)) return;
     pushDraft(drafts, row, index, folders);
   });
   return drafts;
 }
 
-function galleryDrafts(galleries: Array<Record<string, unknown>> | undefined, start: number): DraftPhoto[] {
+function galleryDrafts(galleries: Array<Record<string, unknown>> | undefined, start: number, hidden: Set<string>): DraftPhoto[] {
   const drafts: DraftPhoto[] = [];
   let index = start;
   for (const gallery of galleries || []) {
@@ -202,7 +204,9 @@ function galleryDrafts(galleries: Array<Record<string, unknown>> | undefined, st
       if (!Array.isArray(bucket)) continue;
       for (const item of bucket) {
         if (!item || typeof item !== "object") continue;
-        pushDraft(drafts, item as Record<string, unknown>, index, new Map());
+        const row = item as Record<string, unknown>;
+        if (rowHiddenFromPresentation(row, hidden)) continue;
+        pushDraft(drafts, row, index, new Map());
         index += 1;
       }
     }
@@ -243,8 +247,9 @@ function dedupe(drafts: DraftPhoto[]): PresentationPhoto[] {
 }
 
 export function collectPresentationPhotos(source: PresentationSource): PresentationPhoto[] {
-  const fromListing = listingDrafts(source.listing);
-  const fromGalleries = galleryDrafts(source.galleries, fromListing.length);
+  const hidden = hiddenPresentationKeys(source.listing);
+  const fromListing = listingDrafts(source.listing, hidden);
+  const fromGalleries = galleryDrafts(source.galleries, fromListing.length, hidden);
   return dedupe(preferFinals([...fromListing, ...fromGalleries]));
 }
 

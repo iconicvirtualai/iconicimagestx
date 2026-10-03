@@ -23,6 +23,19 @@ export type AuthUserType = "staff" | "client" | null;
 
 export const CLIENT_HOME_PATH = "/portal/home";
 
+/** Where a signed-in client may return after portal login. */
+export function clientReturnPath(pathname?: string | null): string {
+  if (!pathname) return CLIENT_HOME_PATH;
+  const pathOnly = pathname.split("?")[0].split("#")[0];
+  if (!pathOnly.startsWith("/") || pathOnly.startsWith("//") || pathOnly.includes("..")) return CLIENT_HOME_PATH;
+  const allowed = pathOnly === CLIENT_HOME_PATH
+    || pathOnly.startsWith("/portal/listings/")
+    || pathOnly.startsWith("/gallery/")
+    || pathOnly.startsWith("/invoice/")
+    || pathOnly.startsWith("/studio/");
+  return allowed ? pathname : CLIENT_HOME_PATH;
+}
+
 /**
  * Portal client record. Missing portalAccess is allowed (older docs).
  * An explicit false or an inactive status is not a portal login.
