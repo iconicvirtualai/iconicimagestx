@@ -66,6 +66,7 @@ import AdminStudio from "./pages/AdminStudio";
 import AdminIconicStudio from "./pages/AdminIconicStudio";
 import Login from "./pages/Login";
 import ClientPortal from "./pages/ClientPortal";
+import PortalListingDetail from "./pages/PortalListingDetail";
 
 const queryClient = new QueryClient();
 
@@ -123,6 +124,7 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/portal" element={<Login />} />
             <Route path="/portal/home" element={<ClientPortal />} />
+            <Route path="/portal/listings/:listingId" element={<PortalListingDetail />} />
             <Route path="/admin/login" element={<AdminLogin />} />
 
             {/* ─── Admin / Staff ────────────────────────────────────────── */}

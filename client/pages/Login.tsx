@@ -1,20 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { clientLoginAction, staffHomePath } from "@shared/staffAccess";
+import { clientLoginAction, clientReturnPath, staffHomePath } from "@shared/staffAccess";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import Footer from "@/components/Footer";
-
-function clientDestination(pathname?: string) {
-  if (!pathname) return "/portal/home";
-  const allowed = ["/portal/home", "/gallery/", "/invoice/", "/studio/"];
-  if (pathname === "/portal/home" || allowed.some((prefix) => pathname.startsWith(prefix))) {
-    return pathname;
-  }
-  return "/portal/home";
-}
 
 export default function Login() {
   const { signIn, user, userType, staffProfile, loading, resetPassword, registerClient } = useAuth();
@@ -38,12 +29,12 @@ export default function Login() {
       navigate(staffHomePath(staffProfile?.role));
       return;
     }
-    const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
+    const from = (location.state as { from?: { pathname?: string; search?: string } } | null)?.from;
     const action = clientLoginAction({
       loading,
       hasUser: Boolean(user),
       isClient: userType === "client",
-      destination: clientDestination(from),
+      destination: clientReturnPath(from ? `${from.pathname || ""}${from.search || ""}` : ""),
     });
     if (action.type === "redirect") {
       navigate(action.path);

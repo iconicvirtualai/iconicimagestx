@@ -3,6 +3,7 @@ import {
   CLIENT_HOME_PATH,
   INITIAL_AUTH_SESSION,
   clientLoginAction,
+  clientReturnPath,
   clientPortalAction,
   isActiveClientRecord,
   isActiveStaffRecord,
@@ -14,6 +15,15 @@ import {
 } from "./staffAccess";
 import { isHostedDeployment, isLocalAdminHost, isTempAdminClientEnabled, isTempAdminEnabled } from "./tempAdmin";
 import { amountStillDue, invoiceAllowsDownload, invoiceIdFromSquareNote, publicMediaItem, squarePaymentNote } from "./paymentAccess";
+
+describe("client return path", () => {
+  it("sends a listing file back to itself and other pages home", () => {
+    expect(clientReturnPath("/portal/listings/listing1234?tab=photos")).toBe("/portal/listings/listing1234?tab=photos");
+    expect(clientReturnPath("/portal/home")).toBe("/portal/home");
+    expect(clientReturnPath("/admin/listing/listing1234")).toBe(CLIENT_HOME_PATH);
+    expect(clientReturnPath("/portal/listings/../admin")).toBe(CLIENT_HOME_PATH);
+  });
+});
 
 describe("temp admin gates", () => {
   it("stays off unless the explicit flag is set", () => {

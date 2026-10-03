@@ -218,6 +218,11 @@ export default function ClientStudio() {
             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Iconic Images</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tight">{address || "Your Gallery"}</h1>
+          {listingId && (
+            <Link to={`/portal/listings/${listingId}`} className="inline-block mt-3 text-[10px] font-black uppercase tracking-widest text-[#0d9488]">
+              Listing file
+            </Link>
+          )}
           {project.clientName && <p className="text-gray-400 mt-1">{project.clientName}</p>}
           {project.services && Array.isArray(project.services) && (
             <div className="flex flex-wrap gap-2 mt-3">
