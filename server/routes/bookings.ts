@@ -17,7 +17,6 @@ import { buildBookingInvoiceDraft, existingInvoiceId } from "../../shared/bookin
 import { nextSequentialInvoiceNumber, planInvoiceLink } from "../../shared/orderProjectInvoice";
 import { orderTotalLabel } from "../../shared/bookingPricing";
 import { normalizeEmail } from "../../shared/listingAccess";
-import { attachSquareInvoiceAfterBooking } from "../services/squareInvoices";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -372,15 +371,7 @@ router.post("/", async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }).catch((err) => console.error("[Bookings] Notification status was not saved:", err));
 
-    // Square is best-effort after the emailed total is already fixed.
-    // A timeout or API error must not fail the booking or change that total.
-    if (invoiceId) {
-      try {
-        await attachSquareInvoiceAfterBooking(invoiceId);
-      } catch (err) {
-        console.error("[Bookings] Square invoice sync failed:", err);
-      }
-    }
+    // Firestore draft stays for staff. Square billing waits until after the shoot.
 
     return res.status(201).json({
       success: true,
@@ -758,13 +749,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       },
     }).catch((err) => console.error("[Bookings] Confirmation email failed:", err));
 
-    if (invoiceId) {
-      try {
-        await attachSquareInvoiceAfterBooking(invoiceId);
-      } catch (err) {
-        console.error("[Bookings] Square invoice sync failed:", err);
-      }
-    }
+    // Confirm schedules the shoot. Square billing waits until after the shoot.
 
     return res.json({
       success: true,

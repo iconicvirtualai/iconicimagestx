@@ -1,11 +1,17 @@
 /**
  * Persist a Square invoice on an existing Firestore invoice.
- * Failures are logged and swallowed by the booking route. This never
- * writes invoice total, line items, or amount due.
+ * The default phase is booking, which returns before any Square HTTP.
+ * Pass "post-shoot" only from an explicit after-shoot billing action.
+ * Failures are logged. This never writes invoice total, line items, or amount due.
  */
 
 import admin from "firebase-admin";
-import { syncSquareInvoice, type SquareSyncResult } from "../../shared/squareInvoice";
+import {
+  squareInvoiceSyncAllowed,
+  syncSquareInvoice,
+  type SquareInvoiceSyncPhase,
+  type SquareSyncResult,
+} from "../../shared/squareInvoice";
 
 const db = () => admin.firestore();
 
@@ -15,7 +21,14 @@ function squareInvoiceSynced(
   return result.ok === true && result.skipped === false;
 }
 
-export async function attachSquareInvoiceAfterBooking(invoiceId: string): Promise<SquareSyncResult> {
+export async function attachSquareInvoiceAfterBooking(
+  invoiceId: string,
+  phase: SquareInvoiceSyncPhase = "booking",
+): Promise<SquareSyncResult> {
+  if (!squareInvoiceSyncAllowed(phase)) {
+    return { ok: true, skipped: true, reason: "before-shoot" };
+  }
+
   const ref = db().collection("invoices").doc(invoiceId);
   const snap = await ref.get();
   if (!snap.exists) {
