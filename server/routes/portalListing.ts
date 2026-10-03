@@ -11,8 +11,10 @@ import { clientCanViewListing } from "../../shared/listingAccess";
 import {
   applyPortalMediaChange,
   buildPortalListingDetail,
+  portalListingId,
   readMediaStore,
   sanitizeWebsiteSettings,
+  visitorPortalListingDetail,
   type PortalListingSources,
   type PortalMediaChange,
   type PortalMediaKind,
@@ -31,8 +33,7 @@ function adminReady(res: { status: (code: number) => { json: (body: unknown) => 
 }
 
 function listingIdFrom(value: unknown): string {
-  const id = typeof value === "string" ? value.trim() : "";
-  return /^[A-Za-z0-9_-]{4,128}$/.test(id) ? id : "";
+  return portalListingId(value);
 }
 
 function text(value: unknown): string {
@@ -161,6 +162,22 @@ async function appendPortalWrite(listingId: string, patch: { portalMedia?: unkno
     tx.update(ref, update);
   });
 }
+
+/** Link read. No session. Writes stay on the authenticated client routes. */
+export const handleGetPublicPortalListing: RequestHandler = async (req, res) => {
+  const listingId = portalListingId(req.params.id);
+  if (!listingId) return res.status(404).json({ error: "Listing not found." });
+  if (!adminReady(res)) return;
+  try {
+    const snap = await db().collection("listings").doc(listingId).get();
+    if (!snap.exists) return res.status(404).json({ error: "Listing not found." });
+    const listing = jsonSafe({ id: snap.id, ...(snap.data() || {}) }) as Record<string, unknown>;
+    const detail = visitorPortalListingDetail(buildPortalListingDetail(await loadSources(listingId, listing)));
+    return res.json(detail);
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to load this listing.");
+  }
+};
 
 export const handleGetPortalListing: RequestHandler = async (req: AuthenticatedRequest, res) => {
   if (!adminReady(res)) return;

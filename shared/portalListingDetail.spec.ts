@@ -4,9 +4,12 @@ import {
   buildPortalListingDetail,
   hiddenPresentationKeys,
   mapEmbedUrl,
+  portalListingId,
+  portalListingPageMode,
   portalListingTab,
   readMediaStore,
   sanitizeWebsiteSettings,
+  visitorPortalListingDetail,
 } from "./portalListingDetail";
 
 const listingId = "listing1234";
@@ -167,5 +170,23 @@ describe("portal listing detail", () => {
     });
     expect(portalListingTab("photos")).toBe("photos");
     expect(portalListingTab("har")).toBe("data");
+  });
+
+  it("treats a listing link as public and keeps a malformed id off the page", () => {
+    expect(portalListingPageMode({ loading: true, isClient: false })).toBe("pending");
+    expect(portalListingPageMode({ loading: false, isClient: false })).toBe("public");
+    expect(portalListingPageMode({ loading: false, isClient: true })).toBe("owner-check");
+    expect(portalListingId("listing1234")).toBe("listing1234");
+    expect(portalListingId("no")).toBe("");
+    expect(portalListingId("")).toBe("");
+    expect(portalListingId("../admin")).toBe("");
+
+    const detail = buildPortalListingDetail(sources());
+    const visitor = visitorPortalListingDetail(detail);
+    expect(visitor.photos.map((photo) => photo.id)).not.toContain("living");
+    expect(visitor.photos.map((photo) => photo.id)).toContain("kitchen");
+    expect(visitor.photos.some((photo) => photo.hidden)).toBe(false);
+    expect(visitor.title).toBe(detail.title);
+    expect(JSON.stringify(visitor)).not.toMatch(/pay now|\/invoice\//i);
   });
 });

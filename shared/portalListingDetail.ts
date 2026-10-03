@@ -172,8 +172,47 @@ const WEBSITE_FONTS = new Set(["sans", "serif", "modern"]);
 const WEBSITE_COLORS = new Set(["ink", "teal", "warm"]);
 const WEBSITE_STYLES = new Set(["classic", "editorial", "minimal"]);
 
+const PORTAL_LISTING_ID = /^[A-Za-z0-9_-]{4,128}$/;
+
 export function portalListingPath(listingId: string): string {
   return `/portal/listings/${encodeURIComponent(listingId)}`;
+}
+
+/** Shared by the page and the public read. Empty or malformed ids are not listings. */
+export function portalListingId(value: unknown): string {
+  const id = text(value);
+  return PORTAL_LISTING_ID.test(id) ? id : "";
+}
+
+export type PortalListingPageMode = "pending" | "owner-check" | "public";
+
+/**
+ * A listing link can be read without a session.
+ * Only a resolved client session may check ownership. Portal home stays behind its own gate.
+ */
+export function portalListingPageMode(input: { loading: boolean; isClient: boolean }): PortalListingPageMode {
+  if (input.loading) return "pending";
+  if (input.isClient) return "owner-check";
+  return "public";
+}
+
+export function portalListingPublicApiPath(listingId: string): string {
+  return `/api/portal/listings/${encodeURIComponent(listingId)}`;
+}
+
+export function portalListingOwnerApiPath(listingId: string): string {
+  return `/api/clients/me/listings/${encodeURIComponent(listingId)}`;
+}
+
+/** Visitor payload for the link. Hidden files stay off this read. No payment action is added. */
+export function visitorPortalListingDetail(detail: PortalListingDetail): PortalListingDetail {
+  return {
+    ...detail,
+    photos: detail.photos.filter((item) => !item.hidden),
+    videos: detail.videos.filter((item) => !item.hidden),
+    tours: detail.tours.filter((item) => !item.hidden),
+    floorplans: detail.floorplans.filter((item) => !item.hidden),
+  };
 }
 
 export function portalListingTab(value: unknown): PortalListingTabId {
