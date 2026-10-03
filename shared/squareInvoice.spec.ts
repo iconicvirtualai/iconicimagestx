@@ -12,6 +12,7 @@ import {
   buildSquareOrderPricing,
   preferredSquareCheckoutUrl,
   resolveSquareCheckoutUrl,
+  squareInvoiceSyncAllowed,
   syncSquareInvoice,
   type SquareClientDeps,
   type SquareInvoiceSource,
@@ -20,6 +21,7 @@ import {
 const bookings = readFileSync(new URL("../server/routes/bookings.ts", import.meta.url), "utf8");
 const payments = readFileSync(new URL("../server/routes/payments.ts", import.meta.url), "utf8");
 const squareService = readFileSync(new URL("../server/services/squareInvoices.ts", import.meta.url), "utf8");
+const apiBundle = readFileSync(new URL("../api/index.mjs", import.meta.url), "utf8");
 
 const selection: BookingPriceInput = {
   selectedService: "listing-showcase",
@@ -229,19 +231,52 @@ describe("checkout prefers the Square invoice URL", () => {
   });
 });
 
-describe("booking still emails its own total when Square is attached", () => {
-  it("syncs after the emailed total and cannot fail the 201", () => {
+describe("Square stays off until after the shoot", () => {
+  it("allows a Square customer, order, invoice, and publish only after the shoot", () => {
+    expect(squareInvoiceSyncAllowed("booking")).toBe(false);
+    expect(squareInvoiceSyncAllowed("confirm")).toBe(false);
+    expect(squareInvoiceSyncAllowed("post-shoot")).toBe(true);
+  });
+
+  it("keeps public booking and staff confirm off Square while the draft and confirmations stay", () => {
     const postStart = bookings.indexOf('router.post("/",');
     const postEnd = bookings.indexOf('router.get("/",');
     const post = bookings.slice(postStart, postEnd);
+    const confirmStart = bookings.indexOf('router.patch("/:id/confirm"');
+    const confirmEnd = bookings.indexOf('router.patch("/:id/decline"');
+    const confirm = bookings.slice(confirmStart, confirmEnd);
 
-    expect(post.indexOf("total: money(total)")).toBeLessThan(post.indexOf("attachSquareInvoiceAfterBooking"));
-    expect(post.indexOf("attachSquareInvoiceAfterBooking")).toBeLessThan(
-      post.indexOf("[Bookings] Square invoice sync failed:"),
-    );
-    expect(post.indexOf("[Bookings] Square invoice sync failed:")).toBeLessThan(post.indexOf("return res.status(201)"));
+    for (const handler of [post, confirm]) {
+      expect(handler).not.toContain("attachSquareInvoiceAfterBooking");
+      expect(handler).not.toContain("syncSquareInvoice");
+      expect(handler).not.toContain("/v2/customers");
+      expect(handler).not.toContain("/v2/orders");
+      expect(handler).not.toContain("/v2/invoices");
+      expect(handler).not.toContain("/publish");
+    }
+
+    expect(post).toContain("createBookingInvoiceDraft");
+    expect(post).toContain('template: "booking_received"');
+    expect(post).toContain('kind: "booking_confirmation"');
+    expect(post).toContain("total: money(total)");
+    expect(post).toContain("return res.status(201)");
     expect(post).not.toContain("connect.squareup.com");
     expect(post).not.toContain("SQUARE_ACCESS_TOKEN");
-    expect(post).toContain("total: money(total)");
+    expect(confirm).toContain('template: "order_confirmed"');
+
+    const gateAt = squareService.indexOf("squareInvoiceSyncAllowed");
+    const syncAt = squareService.indexOf("syncSquareInvoice(");
+    expect(gateAt).toBeGreaterThan(-1);
+    expect(syncAt).toBeGreaterThan(gateAt);
+    expect(squareService).toContain('reason: "before-shoot"');
+    expect(squareService).toContain('phase: SquareInvoiceSyncPhase = "booking"');
+
+    expect(apiBundle).not.toContain("attachSquareInvoiceAfterBooking");
+    expect(apiBundle).not.toContain("SHARE_MANUALLY");
+    expect(apiBundle).not.toContain("/v2/customers");
+    expect(apiBundle).not.toContain("/publish");
+    expect(apiBundle).toContain("createBookingInvoiceDraft");
+    expect(apiBundle).toContain('template: "booking_received"');
+    expect(apiBundle).toContain('kind: "booking_confirmation"');
   });
 });

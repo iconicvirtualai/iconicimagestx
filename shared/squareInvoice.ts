@@ -1,8 +1,9 @@
 /**
  * Square invoice sync for a Firestore invoice that already exists.
  * Charge cents are copied from the invoice total. This module never
- * changes that total, and it never sends the invoice through Square
- * (delivery_method SHARE_MANUALLY) so client notify gates stay in force.
+ * changes that total. Invoices use delivery_method SHARE_MANUALLY so
+ * Square does not email the buyer. Publish still notifies the seller,
+ * so booking and confirm must not call this. Call it only after the shoot.
  */
 
 import { normalizeBookingLineItems } from "./bookingPricing.ts";
@@ -55,7 +56,14 @@ export type SquareSyncResult =
   | {
       ok: true;
       skipped: true;
-      reason: "already-synced" | "not-configured" | "nothing-due" | "stripe" | "missing-email" | "total-mismatch";
+      reason:
+        | "already-synced"
+        | "not-configured"
+        | "nothing-due"
+        | "stripe"
+        | "missing-email"
+        | "total-mismatch"
+        | "before-shoot";
     }
   | {
       ok: true;
@@ -76,6 +84,13 @@ export function squareApiBaseUrl(environment: string | undefined): string {
 
 export function squareConfigured(env: Record<string, string | undefined>): boolean {
   return Boolean(env.SQUARE_ACCESS_TOKEN && env.SQUARE_LOCATION_ID);
+}
+
+/** Book and schedule, then shoot, then bill. Square customer, order, invoice, and publish wait. */
+export type SquareInvoiceSyncPhase = "booking" | "confirm" | "post-shoot";
+
+export function squareInvoiceSyncAllowed(phase: SquareInvoiceSyncPhase): boolean {
+  return phase === "post-shoot";
 }
 
 export function squareInvoiceAlreadySynced(invoice: { squareInvoiceId?: unknown }): boolean {
