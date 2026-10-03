@@ -41,7 +41,7 @@ describe("portal listing detail routes", () => {
     expect(source).not.toMatch(/cubicasa\.com/i);
   });
 
-  it("requires a client session before reading a listing file", async () => {
+  it("requires a client session to edit, and reads a listing link without one", async () => {
     const res = await fetch(`${baseUrl}/api/clients/me/listings/listing1234`);
     expect(res.status).toBe(401);
     const media = await fetch(`${baseUrl}/api/clients/me/listings/listing1234/media`, {
@@ -50,5 +50,62 @@ describe("portal listing detail routes", () => {
       body: JSON.stringify({ kind: "photo", id: "front", hidden: true }),
     });
     expect(media.status).toBe(401);
+    const website = await fetch(`${baseUrl}/api/clients/me/listings/listing1234/website`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ font: "serif" }),
+    });
+    expect(website.status).toBe(401);
+
+    const index = readFileSync(new URL("../index.ts", import.meta.url), "utf8");
+    expect(index).toContain('app.get("/api/portal/listings/:id", handleGetPublicPortalListing)');
+    expect(index).not.toContain('app.get("/api/portal/listings"');
+    expect(index).not.toContain('"/api/portal/home"');
+
+    const handler = readFileSync(new URL("./portalListing.ts", import.meta.url), "utf8");
+    const start = handler.indexOf("export const handleGetPublicPortalListing");
+    const end = handler.indexOf("export const handleGetPortalListing");
+    const pub = handler.slice(start, end);
+    expect(pub).toContain("visitorPortalListingDetail");
+    expect(pub).not.toContain("clientCanViewListing");
+    expect(pub).not.toContain("authorizedListing");
+    expect(handler).toContain("authorizedListing");
+
+    const app = readFileSync(new URL("../../client/App.tsx", import.meta.url), "utf8");
+    expect(app).toContain('path="/portal/listings/:listingId"');
+    expect(app).not.toContain('path="/portal/listings"');
+    expect(app).toContain('path="/portal/home"');
+
+    const home = readFileSync(new URL("../../client/pages/ClientPortal.tsx", import.meta.url), "utf8");
+    expect(home).toContain('to="/portal"');
+
+    const missingId = await fetch(`${baseUrl}/api/portal/listings/no`);
+    expect(missingId.status).toBe(404);
+    const missingBody = await missingId.json();
+    expect(missingBody.title).toBeUndefined();
+    expect(missingBody.photos).toBeUndefined();
+
+    const shared = await fetch(`${baseUrl}/api/portal/listings/listing1234`);
+    expect(shared.status).not.toBe(401);
+    expect([200, 404, 503]).toContain(shared.status);
+    const sharedBody = await shared.json();
+    if (shared.status === 200) {
+      expect(sharedBody.id).toBe("listing1234");
+      expect(sharedBody.invoices).toEqual([]);
+      const body = JSON.stringify(sharedBody);
+      expect(body).not.toMatch(/invoiceNumber|amountDue|"total"|Payment recorded|\bInvoice\b/i);
+    } else {
+      expect(sharedBody.title).toBeUndefined();
+      expect(sharedBody.photos).toBeUndefined();
+    }
+
+    const bare = await fetch(`${baseUrl}/api/portal/listings`);
+    expect(bare.status).toBe(404);
+    const publicWrite = await fetch(`${baseUrl}/api/portal/listings/listing1234/media`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "photo", id: "front", hidden: true }),
+    });
+    expect(publicWrite.status).toBe(404);
   });
 });

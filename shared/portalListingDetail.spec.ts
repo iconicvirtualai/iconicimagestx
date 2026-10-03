@@ -4,9 +4,12 @@ import {
   buildPortalListingDetail,
   hiddenPresentationKeys,
   mapEmbedUrl,
+  portalListingId,
+  portalListingPageMode,
   portalListingTab,
   readMediaStore,
   sanitizeWebsiteSettings,
+  visitorPortalListingDetail,
 } from "./portalListingDetail";
 
 const listingId = "listing1234";
@@ -167,5 +170,47 @@ describe("portal listing detail", () => {
     });
     expect(portalListingTab("photos")).toBe("photos");
     expect(portalListingTab("har")).toBe("data");
+  });
+
+  it("treats a listing link as public and keeps a malformed id off the page", () => {
+    expect(portalListingPageMode({ loading: true, isClient: false })).toBe("pending");
+    expect(portalListingPageMode({ loading: false, isClient: false })).toBe("public");
+    expect(portalListingPageMode({ loading: false, isClient: true })).toBe("owner-check");
+    expect(portalListingId("listing1234")).toBe("listing1234");
+    expect(portalListingId("no")).toBe("");
+    expect(portalListingId("")).toBe("");
+    expect(portalListingId("../admin")).toBe("");
+
+    const detail = buildPortalListingDetail(sources());
+    const visitor = visitorPortalListingDetail({
+      ...detail,
+      activity: [
+        ...detail.activity,
+        { id: "pay1", at: "2026-04-06T15:00:00.000Z", kind: "invoice", summary: "Payment recorded on INV-2026-100" },
+        { id: "web1", at: "2026-04-07T15:00:00.000Z", kind: "website", summary: "Listing site style updated" },
+      ],
+    });
+    expect(visitor.address.line1).toBe("100 Playtest Lane");
+    expect(visitor.facts.find((fact) => fact.id === "beds")?.value).toBe("4");
+    expect(visitor.photos.map((photo) => photo.id)).not.toContain("living");
+    expect(visitor.photos.map((photo) => photo.id)).toContain("kitchen");
+    expect(visitor.photos.some((photo) => photo.hidden)).toBe(false);
+    expect(visitor.title).toBe(detail.title);
+    expect(visitor.invoices).toEqual([]);
+    const summaries = visitor.activity.map((event) => event.summary);
+    expect(summaries).toContain("Booking request received");
+    expect(summaries).toContain("Photo uploaded: kitchen.jpg");
+    expect(summaries).toContain("Listing site style updated");
+    expect(summaries.join(" ")).not.toMatch(/invoice|payment|amount due/i);
+    const body = JSON.stringify(visitor);
+    expect(body).not.toMatch(/INV-2026-100/);
+    expect(body).not.toMatch(/"invoiceNumber"|"amountDue"|"total"/);
+    expect(detail.invoices[0]).toMatchObject({
+      invoiceNumber: "INV-2026-100",
+      status: "draft",
+      total: 450,
+      amountDue: 450,
+    });
+    expect(detail.activity.map((event) => event.summary)).toContain("Invoice INV-2026-100 is draft");
   });
 });

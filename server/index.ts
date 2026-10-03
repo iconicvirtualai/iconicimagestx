@@ -33,6 +33,7 @@ import { listCalendarScheduleEvents, verifyCalendarWriteAccess } from "./service
 import { clientNotifyLive } from "../shared/clientNotify";
 import { requireAdmin, requireStaff } from "./middleware/auth";
 import { handleListingPhotoUpload } from "./routes/listingPhotos";
+import { handleGetPublicPortalListing } from "./routes/portalListing";
 import presentationsRouter from "./routes/presentations";
 
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
@@ -205,6 +206,7 @@ export function createServer() {
   app.use("/api/vsai", vsaiRouter);
   app.use("/api/messages", messagingRouter);
   app.use("/api/clients", clientsRouter);
+  app.get("/api/portal/listings/:id", handleGetPublicPortalListing);
   app.use("/api/staff", staffRouter);
   app.use("/api", presentationsRouter);
   app.use("/api/listings", listingsRouter);

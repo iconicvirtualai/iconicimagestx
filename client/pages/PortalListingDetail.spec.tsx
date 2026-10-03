@@ -1,8 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { renderToString } from "react-dom/server";
-import { MemoryRouter } from "react-router-dom";
-import { PortalListingDetailView } from "./PortalListingDetail";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import PortalListingDetail, { PortalListingDetailView } from "./PortalListingDetail";
 import { buildPortalListingDetail, defaultPortalWebsite } from "@shared/portalListingDetail";
+
+vi.mock("@/contexts/AuthContext", () => ({
+  useAuth: () => ({
+    user: null,
+    userType: null,
+    staffProfile: null,
+    loading: false,
+    signOutUser: async () => undefined,
+  }),
+}));
 
 const detail = buildPortalListingDetail({
   listing: {
@@ -20,7 +30,11 @@ const detail = buildPortalListingDetail({
   invoices: [{ id: "inv1", invoiceNumber: "INV-2026-100", status: "draft", total: 100, amountDue: 100 }],
 });
 
-function render(tab: "data" | "photos" | "marketing" | "orders" | "activity" | "website", editing: "photo" | null = null) {
+function render(
+  tab: "data" | "photos" | "marketing" | "orders" | "activity" | "website",
+  editing: "photo" | null = null,
+  canEdit = true,
+) {
   return renderToString(
     <MemoryRouter>
       <PortalListingDetailView
@@ -28,6 +42,7 @@ function render(tab: "data" | "photos" | "marketing" | "orders" | "activity" | "
         tab={tab}
         editing={editing}
         saving={false}
+        canEdit={canEdit}
         website={defaultPortalWebsite()}
         onTab={() => undefined}
         onToggleEditing={() => undefined}
@@ -71,5 +86,57 @@ describe("portal listing detail page", () => {
     expect(orders).not.toContain("Pay now");
     expect(render("activity")).toContain("Booking request received");
     expect(render("website")).toContain("Save site style");
+  });
+
+  it("gives a visitor the listing without edit, hide, site save, or a pay action", () => {
+    const photos = render("photos", "photo", false);
+    expect(photos).toContain("front.jpg");
+    expect(photos).not.toContain("back.jpg");
+    expect(photos).not.toContain("Edit");
+    expect(photos).not.toContain("Hide");
+    expect(photos).not.toContain("/portal/home");
+    expect(photos).toContain('data-can-edit="false"');
+
+    const website = render("website", null, false);
+    expect(website).toContain("Sans");
+    expect(website).not.toContain("Save site style");
+    expect(website).not.toContain("<select");
+
+    const orders = render("orders", null, false);
+    expect(orders).not.toContain("INV-2026-100");
+    expect(orders).not.toContain("draft");
+    expect(orders).not.toContain("Total");
+    expect(orders).not.toContain("Amount due");
+    expect(orders).not.toContain("Pay now");
+    expect(orders).not.toContain("View invoice");
+    expect(orders).not.toContain("/invoice/");
+    const activity = render("activity", null, false);
+    expect(activity).toContain("Booking request received");
+    expect(activity).not.toContain("INV-2026-100");
+    expect(activity).not.toContain("Payment recorded");
+    expect(activity).not.toMatch(/Invoice /);
+  });
+
+  it("keeps a logged-out visitor on the listing route and uses not-found for a bad id", () => {
+    const pending = renderToString(
+      <MemoryRouter initialEntries={["/portal/listings/listing1234"]}>
+        <Routes>
+          <Route path="/portal/listings/:listingId" element={<PortalListingDetail />} />
+          <Route path="/portal" element={<p>Portal login</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(pending).toContain("animate-spin");
+    expect(pending).not.toContain("Portal login");
+
+    const missing = renderToString(
+      <MemoryRouter initialEntries={["/portal/listings/no"]}>
+        <Routes>
+          <Route path="/portal/listings/:listingId" element={<PortalListingDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(missing).toContain("Oops! Page not found");
+    expect(missing).not.toContain("portal-listing-detail");
   });
 });
