@@ -85,7 +85,6 @@ export interface PortalInvoiceSummary {
   status: string;
   total: number;
   amountDue: number;
-  href: string;
 }
 
 export interface PortalActivityEvent {
@@ -738,7 +737,6 @@ function readInvoices(invoices: Array<Record<string, unknown>>): PortalInvoiceSu
       status: text(invoice.status) || "draft",
       total,
       amountDue: invoice.amountDue == null ? total : money(invoice.amountDue),
-      href: `/invoice/${id}`,
     });
   }
   return summaries;

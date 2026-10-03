@@ -65,6 +65,9 @@ describe("portal listing detail page", () => {
     const orders = render("orders");
     expect(orders).toContain("INV-2026-100");
     expect(orders).toContain("draft");
+    expect(orders).toContain("Total");
+    expect(orders).not.toContain("View invoice");
+    expect(orders).not.toContain("/invoice/");
     expect(orders).not.toContain("Pay now");
     expect(render("activity")).toContain("Booking request received");
     expect(render("website")).toContain("Save site style");

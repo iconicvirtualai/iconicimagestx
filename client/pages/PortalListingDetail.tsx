@@ -490,8 +490,7 @@ function OrdersTab({ detail }: { detail: PortalListingDetailModel }) {
                 <p className="font-black">{invoice.invoiceNumber}</p>
                 <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">{invoice.status.replace(/_/g, " ")}</p>
               </div>
-              <p className="text-sm text-gray-600 mt-2">Total {money(invoice.total)} · Due {money(invoice.amountDue)}</p>
-              <Link to={invoice.href} className="inline-block mt-3 text-sm font-bold text-[#0d9488]">View invoice</Link>
+              <p className="text-sm text-gray-600 mt-2">Total {money(invoice.total)}</p>
             </article>
           ))}
         </div>

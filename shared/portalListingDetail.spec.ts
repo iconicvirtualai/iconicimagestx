@@ -138,7 +138,8 @@ describe("portal listing detail", () => {
     expect(detail.photos.some((photo) => photo.id === "angle")).toBe(true);
     expect(detail.floorplans.map((plan) => plan.name)).toEqual(["level1.jpg"]);
     expect(detail.marketing.map((card) => card.status)).toEqual(["not_connected", "not_connected", "not_connected"]);
-    expect(detail.invoices[0]).toMatchObject({ invoiceNumber: "INV-2026-100", status: "draft", href: "/invoice/inv1" });
+    expect(detail.invoices[0]).toMatchObject({ invoiceNumber: "INV-2026-100", status: "draft", total: 450 });
+    expect(JSON.stringify(detail.invoices)).not.toContain("/invoice/");
   });
 
   it("orders activity from the booking forward and skips internal notes", () => {
