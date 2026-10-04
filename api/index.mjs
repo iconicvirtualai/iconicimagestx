@@ -1604,6 +1604,68 @@ function formatZoned(date, timeZone) {
     day: "2-digit"
   }).format(date);
 }
+const ADDRESS_LIMIT = 300;
+const PLACE_ID_LIMIT = 300;
+function serviceLocationFromInput(value) {
+  if (typeof value === "string") {
+    const formatted2 = clip(value, ADDRESS_LIMIT);
+    return formatted2 ? { kind: "text", formatted: formatted2 } : null;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const row = value;
+  const formatted = clip(firstString(row, ["formatted", "description", "label"]), ADDRESS_LIMIT);
+  const placeId = clip(firstString(row, ["placeId", "place_id"]), PLACE_ID_LIMIT);
+  const lat = readCoord$1(row.lat ?? row.latitude, "lat");
+  const lng = readCoord$1(row.lng ?? row.longitude, "lng");
+  if (formatted && placeId && lat != null && lng != null) {
+    return { kind: "picked", place: { placeId, formatted, lat, lng } };
+  }
+  if (formatted) return { kind: "text", formatted };
+  return null;
+}
+function storedServiceLocationFields(value) {
+  const location = serviceLocationFromInput(value);
+  if (!location) return { address: "" };
+  if (location.kind === "text") return { address: location.formatted };
+  const { place } = location;
+  return {
+    address: place,
+    lat: place.lat,
+    lng: place.lng,
+    latitude: place.lat,
+    longitude: place.lng,
+    placeId: place.placeId
+  };
+}
+function storedRecordPin(record) {
+  if (!record) return null;
+  for (const key of ["address", "propertyAddress", "shootLocation"]) {
+    const location = serviceLocationFromInput(record[key]);
+    if (location?.kind === "picked") return { lat: location.place.lat, lng: location.place.lng };
+  }
+  const lat = readCoord$1(record.lat ?? record.latitude, "lat");
+  const lng = readCoord$1(record.lng ?? record.longitude, "lng");
+  if (lat != null && lng != null) return { lat, lng };
+  return null;
+}
+function firstString(row, keys) {
+  for (const key of keys) {
+    const value = row[key];
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  return "";
+}
+function clip(value, limit) {
+  if (typeof value !== "string") return "";
+  return value.trim().slice(0, limit);
+}
+function readCoord$1(value, axis) {
+  const number = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
+  if (!Number.isFinite(number)) return null;
+  if (axis === "lat" && (number < -90 || number > 90)) return null;
+  if (axis === "lng" && (number < -180 || number > 180)) return null;
+  return number;
+}
 const PORTAL_LISTING_ID$1 = /^[A-Za-z0-9_-]{4,128}$/;
 const NEVER_FILL = /* @__PURE__ */ new Set(["images", "createdAt", "source", "id"]);
 function isPortalListingId(value) {
@@ -1747,6 +1809,13 @@ function desiredListingFields(group, identity) {
     const label = addressText(address);
     if (label) fields.addressLabel = label;
   }
+  const pin = firstStoredServicePin(group);
+  if (pin) {
+    fields.lat = pin.lat;
+    fields.lng = pin.lng;
+    fields.latitude = pin.lat;
+    fields.longitude = pin.lng;
+  }
   assign(fields, "projectType", projectType(group));
   assign(fields, "status", listingStatus(group, Boolean(scheduleDate)));
   assign(fields, "apptDate", scheduleDate);
@@ -1842,6 +1911,13 @@ function stableListingId(requestIds, orderIds, invoiceIds, appointmentIds) {
   if (invoice) return bookingListingDocId("inv", invoice);
   const appointment = appointmentIds[0];
   if (appointment) return bookingListingDocId("apt", appointment);
+  return null;
+}
+function firstStoredServicePin(group) {
+  for (const doc of [...group.orderRequests, ...group.orders, ...group.appointments]) {
+    const pin = storedRecordPin(doc.data);
+    if (pin) return pin;
+  }
   return null;
 }
 function bestAddress(group) {
@@ -2529,14 +2605,21 @@ router$h.post("/", async (req, res) => {
       return res.status(400).json({ error: "No services selected." });
     }
     const clientName2 = `${firstName} ${lastName}`.trim();
-    const displayAddress = addressLabel$3(address);
+    const locationFields = storedServiceLocationFields(address);
+    const savedAddress = locationFields.address;
+    if (!savedAddress) {
+      return res.status(400).json({ error: "Missing required fields." });
+    }
+    const displayAddress = addressLabel$3(savedAddress);
+    const { address: _savedAddress, ...storedPin } = locationFields;
     const orderRequest = {
       firstName,
       lastName,
       clientName: clientName2,
       email: email.toLowerCase().trim(),
       phone,
-      address,
+      address: savedAddress,
+      ...storedPin,
       lineItems,
       pricing: pricing || {},
       total: Number(total) || 0,
@@ -2604,7 +2687,7 @@ router$h.post("/", async (req, res) => {
           clientName: clientName2,
           clientEmail: normalizedEmail,
           clientPhone: String(phone || ""),
-          address,
+          address: savedAddress,
           addressLabel: displayAddress,
           scheduledDate: typeof scheduledDate === "string" ? scheduledDate : null,
           scheduledTime: typeof scheduledTime === "string" ? scheduledTime : null,
@@ -2844,8 +2927,16 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     const requestFirstName = request.firstName || request.clientName?.split(" ")?.[0] || "Client";
     const requestLastName = request.lastName || request.clientName?.split(" ")?.slice(1).join(" ") || "";
     const requestClientName = request.clientName || `${requestFirstName} ${requestLastName}`.trim() || "Client";
-    const requestAddress = request.address || request.propertyAddress || "";
+    const locationFields = storedServiceLocationFields(request.address || request.propertyAddress || "");
+    const requestAddress = locationFields.address || "";
     const requestAddressLabel = addressLabel$3(requestAddress);
+    const storedPin = locationFields.lat == null ? {} : {
+      lat: locationFields.lat,
+      lng: locationFields.lng,
+      latitude: locationFields.latitude,
+      longitude: locationFields.longitude,
+      placeId: locationFields.placeId
+    };
     const requestLineItems = Array.isArray(request.lineItems) && request.lineItems.length > 0 ? request.lineItems : Array.isArray(request.services) ? request.services.map((service) => typeof service === "string" ? { name: service, price: 0 } : service) : [];
     const requestTotal = Number(request.total ?? request.pricing?.total ?? 0) || 0;
     const confirmDate = toDate$1(scheduledDate || request.scheduledDate || request.appointmentDate || request.requestedDate);
@@ -2883,7 +2974,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
           lastName: requestLastName,
           email: requestEmail,
           phone: requestPhone,
-          address: request.address,
+          address: requestAddress,
           totalOrders: 1,
           totalSpend: 0,
           lastOrderAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -2904,6 +2995,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       clientPhone: requestPhone,
       address: requestAddress,
       addressLabel: requestAddressLabel,
+      ...storedPin,
       services: requestLineItems,
       addOns: [],
       pricing: request.pricing || {},
