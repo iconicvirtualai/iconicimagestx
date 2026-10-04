@@ -6,6 +6,7 @@
  */
 
 import { lifeOfTheListingCareSelected } from "@shared/lifeOfTheListingCare";
+import { orderAddressFromBooking } from "@shared/serviceLocation";
 
 export async function createOrder(formData: any) {
   const lineItems = formData.lineItems || [];
@@ -17,7 +18,10 @@ export async function createOrder(formData: any) {
     lastName:               formData.lastName               || "",
     email:                  formData.email                  || "",
     phone:                  formData.phone                  || "",
-    address:                formData.address                || "",
+    address:                orderAddressFromBooking({
+                              address: formData.address,
+                              servicePlace: formData.servicePlace,
+                            }),
     lineItems,
     total,
     pricing:                formData.pricing                || { subtotal: total, total },

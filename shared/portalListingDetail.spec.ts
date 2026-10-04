@@ -108,6 +108,38 @@ describe("portal listing detail", () => {
     expect(JSON.stringify(detail)).not.toContain("Lockbox");
   });
 
+  it("pins the map from stored coordinates and not from a typed address", () => {
+    const typed = buildPortalListingDetail({
+      listing: {
+        id: listingId,
+        address: "100 Main St, Austin, TX 78701, USA",
+      },
+    });
+    expect(typed.address.line1).toContain("100 Main");
+    expect(typed.address.lat).toBeNull();
+    expect(typed.address.lng).toBeNull();
+    expect(typed.address.mapUrl).toBeNull();
+
+    const picked = buildPortalListingDetail({
+      listing: {
+        id: listingId,
+        address: "100 Main St, Austin, TX 78701, USA",
+      },
+      orderRequest: {
+        id: "reqPin",
+        address: {
+          formatted: "100 Main St, Austin, TX 78701, USA",
+          placeId: "ChIJpicked",
+          lat: 30.2672,
+          lng: -97.7431,
+        },
+      },
+    });
+    expect(picked.address.lat).toBe(30.2672);
+    expect(picked.address.lng).toBe(-97.7431);
+    expect(picked.address.mapUrl).toBe(mapEmbedUrl(30.2672, -97.7431));
+  });
+
   it("keeps a hidden photo on file and out of the presentation set", () => {
     const detail = buildPortalListingDetail(sources());
     const living = detail.photos.find((photo) => photo.id === "living");

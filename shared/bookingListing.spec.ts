@@ -313,6 +313,42 @@ describe("booking listing docs", () => {
     expect(bookingListingDocId("ord", "order9")).toBe("bklist_ord_order9");
   });
 
+  it("copies a picked service pin onto the listing and leaves typed text unpinned", () => {
+    const picked = planBookingListings({
+      orderRequests: [{
+        id: "reqPin",
+        data: {
+          email: QUINN,
+          address: {
+            formatted: "100 Main St, Austin, TX 78701, USA",
+            placeId: "ChIJpicked",
+            lat: 30.2672,
+            lng: -97.7431,
+          },
+        },
+      }],
+    });
+    expect(picked[0].createFields.address).toMatchObject({
+      formatted: "100 Main St, Austin, TX 78701, USA",
+      lat: 30.2672,
+      lng: -97.7431,
+    });
+    expect(picked[0].createFields.lat).toBe(30.2672);
+    expect(picked[0].createFields.lng).toBe(-97.7431);
+
+    const typed = planBookingListings({
+      orderRequests: [{
+        id: "reqText",
+        data: { email: QUINN, address: "100 Main St, Austin, TX 78701, USA" },
+      }],
+    });
+    expect(typed[0].createFields.address).toBe("100 Main St, Austin, TX 78701, USA");
+    expect(typed[0].createFields.lat).toBeUndefined();
+    expect(typed[0].createFields.lng).toBeUndefined();
+    expect(typed[0].createFields.latitude).toBeUndefined();
+    expect(typed[0].createFields.longitude).toBeUndefined();
+  });
+
   it("keeps home tiles on listings and does not change booking confirmation mail", () => {
     expect(bookings).toContain("ensureBookingListingForRequest(docRef.id)");
     expect(bookings).toContain("ensureBookingListingForRequest(req.params.id)");
@@ -321,6 +357,7 @@ describe("booking listing docs", () => {
     expect(service).not.toContain("sendEmail");
     expect(service).not.toContain("sendSMS");
     expect(service).not.toContain("cubicasa.com");
+    expect(bookings).not.toContain("geocode");
     expect(bookings.match(/template: "booking_received"/g)).toHaveLength(2);
     expect(bookings.match(/template: "order_confirmed"/g)).toHaveLength(1);
     expect(bookings).toContain("SMS_TEMPLATES.bookingConfirmation");
