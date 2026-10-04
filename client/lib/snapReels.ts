@@ -21,8 +21,24 @@ export const SNAP_REELS = [
   },
 ] as const;
 
-/** Homepage strip keeps a tight row of three. */
-export const SNAP_REEL_STRIP = SNAP_REELS.slice(0, 3);
+/** Homepage strip: three marketing snaps. Logo and #BEICONIC end card stay in the files. */
+export const SNAP_REEL_STRIP = [
+  {
+    src: "/media/videos/snap-reels/MariasWay_MarketingSnap_v1.mp4",
+    title: "Marias Way",
+    vibe: "Evening light through the house, paced for a vertical scroll",
+  },
+  {
+    src: "/media/videos/snap-reels/HeronWing_MarketingSnap_v1.mp4",
+    title: "Heron Wing",
+    vibe: "Clean lines and still water, cut for the feed",
+  },
+  {
+    src: "/media/videos/snap-reels/BlueLake_MarketingSnap_v1.mp4",
+    title: "Blue Lake",
+    vibe: "Golden hour from the terrace to the lake",
+  },
+] as const;
 
-/** Features bento uses the extra marketing cut so the strip stays at three. */
+/** Features bento keeps Grand Arrival. It is not part of the homepage strip. */
 export const FEATURED_SNAP_REEL = SNAP_REELS[3];
