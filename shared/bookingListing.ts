@@ -6,6 +6,7 @@
 
 import { addressText, calendarDateKey } from "./clientHome.ts";
 import { normalizeEmail } from "./listingAccess.ts";
+import { storedRecordPin } from "./serviceLocation.ts";
 
 export const PORTAL_LISTING_ID = /^[A-Za-z0-9_-]{4,128}$/;
 
@@ -232,6 +233,13 @@ function desiredListingFields(group: BookingListingGroup, identity?: BookingList
     const label = addressText(address);
     if (label) fields.addressLabel = label;
   }
+  const pin = firstStoredServicePin(group);
+  if (pin) {
+    fields.lat = pin.lat;
+    fields.lng = pin.lng;
+    fields.latitude = pin.lat;
+    fields.longitude = pin.lng;
+  }
   assign(fields, "projectType", projectType(group));
   assign(fields, "status", listingStatus(group, Boolean(scheduleDate)));
   assign(fields, "apptDate", scheduleDate);
@@ -341,6 +349,14 @@ function stableListingId(requestIds: string[], orderIds: string[], invoiceIds: s
   if (invoice) return bookingListingDocId("inv", invoice);
   const appointment = appointmentIds[0];
   if (appointment) return bookingListingDocId("apt", appointment);
+  return null;
+}
+
+function firstStoredServicePin(group: BookingListingGroup): { lat: number; lng: number } | null {
+  for (const doc of [...group.orderRequests, ...group.orders, ...group.appointments]) {
+    const pin = storedRecordPin(doc.data);
+    if (pin) return pin;
+  }
   return null;
 }
 

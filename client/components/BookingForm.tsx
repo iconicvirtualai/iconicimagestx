@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -37,6 +37,8 @@ import {
   LIFE_OF_THE_LISTING_CARE_PRICE_LABEL,
   LIFE_OF_THE_LISTING_CARE_SUMMARY_LABEL,
 } from "@shared/lifeOfTheListingCare";
+import ServiceLocationField from "@/components/ServiceLocationField";
+import type { PickedServiceLocation } from "@shared/serviceLocation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
@@ -140,6 +142,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     email: "",
     phone: "",
     address: "",
+    servicePlace: null as PickedServiceLocation | null,
     sqft: "",
     serviceDate: undefined as Date | undefined,
     serviceTime: "9:00 AM",
@@ -191,53 +194,6 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
       cancelled = true;
     };
   }, []);
-
-  // Address autocomplete — proxied through our server (key stays server-side)
-  const [addressSearchValue, setAddressSearchValue] = useState("");
-  const [addressSuggestions, setAddressSuggestions] = useState<
-    { place_id: string; description: string; main_text: string; secondary: string }[]
-  >([]);
-  const addressDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Fetch suggestions whenever the input changes
-  useEffect(() => {
-    if (addressDebounceRef.current) clearTimeout(addressDebounceRef.current);
-
-    if (!addressSearchValue || addressSearchValue.length < 3) {
-      setAddressSuggestions([]);
-      return;
-    }
-
-    addressDebounceRef.current = setTimeout(async () => {
-      try {
-        const res = await fetch(
-          `/api/places/autocomplete?input=${encodeURIComponent(addressSearchValue)}`
-        );
-        if (!res.ok) return;
-        const data = await res.json();
-        setAddressSuggestions(data.suggestions || []);
-      } catch {
-        setAddressSuggestions([]);
-      }
-    }, 300);
-
-    return () => {
-      if (addressDebounceRef.current) clearTimeout(addressDebounceRef.current);
-    };
-  }, [addressSearchValue]);
-
-  const handleSelectAddress = (description: string) => {
-    setAddressSearchValue(description);
-    setAddressSuggestions([]);
-    updateFormData({ address: description });
-  };
-
-  // Keep search input in sync if address is pre-filled (e.g. from URL params)
-  useEffect(() => {
-    if (formData.address && !addressSearchValue) {
-      setAddressSearchValue(formData.address);
-    }
-  }, [formData.address]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Check for pre-filled service from pricing page or props
   useEffect(() => {
@@ -394,6 +350,10 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
       toast.error("Please select a Campaign Tier or Basics package");
       return;
     }
+    if (step === 3 && !formData.servicePlace) {
+      toast.error("Choose the service location from the address list.");
+      return;
+    }
 
     // Check if we should show the Iconic Finish popup
       if (step === 1) {
@@ -495,6 +455,14 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   if (e) e.preventDefault();
   if (!formData.smsConsent) {
     toast.error("Check the box to agree to Iconic Images booking and appointment text messages.");
+    return;
+  }
+  const bookedService = services.find((item) => item.id === formData.selectedService);
+  const skipsServiceLocation = Boolean(
+    bookedService && ["branding", "business", "growth", "studio"].includes(bookedService.category),
+  );
+  if (!skipsServiceLocation && !formData.servicePlace) {
+    toast.error("Choose the service location from the address list.");
     return;
   }
   console.log("STEP 1: submit clicked");
@@ -1042,40 +1010,16 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
 
             <div className="space-y-6">
                <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                  <label htmlFor="service-location" className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
                     <MapPin className="w-3 h-3" /> Property Address
                   </label>
-                  <div className="relative">
-                    <Input
-                      type="text"
-                      placeholder="123 Luxury Lane, Houston, TX"
-                      className={`h-14 rounded-xl border-gray-100 focus:border-black text-[15px] px-5 w-full bg-white ${lightControlText}`}
-                      value={addressSearchValue || formData.address}
-                      onChange={(e) => {
-                        setAddressSearchValue(e.target.value);
-                        updateFormData({ address: e.target.value });
-                      }}
-                    />
-                    {addressSuggestions.length > 0 && (
-                      <div className="absolute z-[100] left-0 right-0 top-full mt-2 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden max-h-64 overflow-y-auto">
-                        {addressSuggestions.map(({ place_id, description, main_text, secondary }) => (
-                          <button
-                            key={place_id}
-                            type="button"
-                            onClick={() => handleSelectAddress(description)}
-                            className="w-full px-5 py-3.5 text-left hover:bg-teal-50 transition-colors border-b border-gray-50 last:border-none group flex flex-col gap-0.5"
-                          >
-                            <p className="font-bold text-[13px] text-black group-hover:text-teal-700 transition-colors leading-tight">
-                              {main_text || description}
-                            </p>
-                            {secondary && (
-                              <p className="text-[11px] text-gray-400 font-medium leading-tight">{secondary}</p>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <ServiceLocationField
+                    query={formData.address}
+                    picked={formData.servicePlace}
+                    placeholder="123 Luxury Lane, Houston, TX"
+                    className={`h-14 rounded-xl border-gray-100 focus:border-black text-[15px] px-5 w-full bg-white ${lightControlText}`}
+                    onChange={({ query, picked }) => updateFormData({ address: query, servicePlace: picked })}
+                  />
                </div>
 
                <div className="grid grid-cols-2 gap-6">
@@ -1555,6 +1499,8 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                   setExpandedCategories(["listings"]);
                   setFormData(prev => ({
                     ...prev,
+                    address: "",
+                    servicePlace: null,
                     selectedService: "",
                     selectedBasics: [],
                     selectedAddOns: [],

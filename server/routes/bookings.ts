@@ -18,6 +18,7 @@ import { buildBookingInvoiceDraft, existingInvoiceId } from "../../shared/bookin
 import { nextSequentialInvoiceNumber, planInvoiceLink } from "../../shared/orderProjectInvoice";
 import { orderTotalLabel } from "../../shared/bookingPricing";
 import { normalizeEmail } from "../../shared/listingAccess";
+import { storedServiceLocationFields } from "../../shared/serviceLocation";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -105,7 +106,13 @@ router.post("/", async (req, res) => {
     }
 
     const clientName = `${firstName} ${lastName}`.trim();
-    const displayAddress = addressLabel(address);
+    const locationFields = storedServiceLocationFields(address);
+    const savedAddress = locationFields.address;
+    if (!savedAddress) {
+      return res.status(400).json({ error: "Missing required fields." });
+    }
+    const displayAddress = addressLabel(savedAddress);
+    const { address: _savedAddress, ...storedPin } = locationFields;
 
     const orderRequest = {
       firstName,
@@ -113,7 +120,8 @@ router.post("/", async (req, res) => {
       clientName,
       email: email.toLowerCase().trim(),
       phone,
-      address,
+      address: savedAddress,
+      ...storedPin,
       lineItems,
       pricing: pricing || {},
       total: Number(total) || 0,
@@ -184,7 +192,7 @@ router.post("/", async (req, res) => {
           clientName,
           clientEmail: normalizedEmail,
           clientPhone: String(phone || ""),
-          address,
+          address: savedAddress,
           addressLabel: displayAddress,
           scheduledDate: typeof scheduledDate === "string" ? scheduledDate : null,
           scheduledTime: typeof scheduledTime === "string" ? scheduledTime : null,
@@ -476,8 +484,16 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
     const requestFirstName = request.firstName || request.clientName?.split(" ")?.[0] || "Client";
     const requestLastName = request.lastName || request.clientName?.split(" ")?.slice(1).join(" ") || "";
     const requestClientName = request.clientName || `${requestFirstName} ${requestLastName}`.trim() || "Client";
-    const requestAddress = request.address || request.propertyAddress || "";
+    const locationFields = storedServiceLocationFields(request.address || request.propertyAddress || "");
+    const requestAddress = locationFields.address || "";
     const requestAddressLabel = addressLabel(requestAddress);
+    const storedPin = locationFields.lat == null ? {} : {
+      lat: locationFields.lat,
+      lng: locationFields.lng,
+      latitude: locationFields.latitude,
+      longitude: locationFields.longitude,
+      placeId: locationFields.placeId,
+    };
     const requestLineItems = Array.isArray(request.lineItems) && request.lineItems.length > 0
       ? request.lineItems
       : Array.isArray(request.services)
@@ -533,7 +549,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
           lastName: requestLastName,
           email: requestEmail,
           phone: requestPhone,
-          address: request.address,
+          address: requestAddress,
           totalOrders: 1,
           totalSpend: 0,
           lastOrderAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -556,6 +572,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       clientPhone: requestPhone,
       address: requestAddress,
       addressLabel: requestAddressLabel,
+      ...storedPin,
       services: requestLineItems,
       addOns: [],
       pricing: request.pricing || {},
