@@ -159,6 +159,13 @@ service cloud.firestore {
       allow create, update, delete: if isStaff();
     }
 
+    // Invoice presets (processing, fees, travel, tax, promotions).
+    // Staff edit the list. Choosing one fills an invoice amount. It does not charge anyone.
+    match /invoicePresets/{presetId} {
+      allow read: if isStaff();
+      allow create, update, delete: if isCoordinator();
+    }
+
     // ─── Email Templates ─────────────────────────────────────────────────────
 
     match /emailTemplates/{templateId} {

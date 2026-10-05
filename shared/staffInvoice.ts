@@ -7,6 +7,17 @@ import { normalizeBookingLineItems, type BookingLineItem } from "./bookingPricin
 import { cleanPersonName, normalizeEmail } from "./listingAccess.ts";
 import { draftInvoiceNumber } from "./orderProjectInvoice.ts";
 import type { StaffCatalogPackage } from "./bookingCatalog.ts";
+import {
+  adjustmentKind,
+  invoiceAdjustmentLine,
+  isPromoInvoiceLine,
+  type InvoiceAdjustmentKind,
+} from "./invoiceFace.ts";
+import {
+  presetFilledAmount,
+  type InvoicePreset,
+  type InvoicePresetKind,
+} from "./invoicePresets.ts";
 
 export interface StaffServiceLine {
   id?: string;
@@ -29,6 +40,20 @@ export interface StaffInvoiceForm {
   promoCode: string;
   promoDiscount: number;
   tax: number;
+  /** Dollar amounts. Omitted or 0 means that charge is not on the invoice. */
+  processing?: number;
+  fees?: number;
+  travel?: number;
+  processingPresetId?: string;
+  feesPresetId?: string;
+  travelPresetId?: string;
+  taxPresetId?: string;
+  promoPresetId?: string;
+  processingOverridden?: boolean;
+  feesOverridden?: boolean;
+  travelOverridden?: boolean;
+  taxOverridden?: boolean;
+  promoOverridden?: boolean;
 }
 
 /** Billing fields written onto the existing invoices doc. Links stay untouched. */
@@ -45,6 +70,19 @@ export interface InvoiceBillingPatch {
   total: number;
   amountDue: number;
   invoiceNumber?: string;
+  processing?: number;
+  fees?: number;
+  travel?: number;
+  processingPresetId?: string | null;
+  feesPresetId?: string | null;
+  travelPresetId?: string | null;
+  taxPresetId?: string | null;
+  promoPresetId?: string | null;
+  processingOverridden?: boolean;
+  feesOverridden?: boolean;
+  travelOverridden?: boolean;
+  taxOverridden?: boolean;
+  promoOverridden?: boolean;
 }
 
 export function staffInvoicePath(invoiceId: string): string {
@@ -175,9 +213,7 @@ export function billToAddressText(address: unknown): string {
 }
 
 export function isPromoLine(item: { id?: string; name?: string }): boolean {
-  const name = String(item.name || "");
-  const id = String(item.id || "");
-  return name.startsWith("Promo Code:") || id.startsWith("promo-");
+  return isPromoInvoiceLine(item);
 }
 
 function requiredId(value: unknown): string {
@@ -189,6 +225,11 @@ function cents(value: unknown): number {
   const amount = Number(value);
   if (!Number.isFinite(amount)) return 0;
   return Math.round(amount * 100) / 100;
+}
+
+function storedCharge(value: unknown): number {
+  if (value == null || value === "") return 0;
+  return cents(Math.max(0, Number(value) || 0));
 }
 
 function promoCodeFromLine(item: { id?: string; name?: string }): string {
@@ -206,7 +247,7 @@ export function splitStaffInvoiceLines(lineItems: unknown, promoCode?: unknown, 
   promoDiscount: number;
 } {
   const lines = normalizeBookingLineItems(lineItems);
-  const services = lines.filter((item) => !isPromoLine(item));
+  const services = lines.filter((item) => !isPromoLine(item) && !adjustmentKind(item));
   const promoLines = lines.filter((item) => isPromoLine(item));
   const fromLines = promoLines.reduce((sum, item) => sum + Math.abs(item.price), 0);
   const codeFromLine = promoLines.map(promoCodeFromLine).find(Boolean) || "";
@@ -220,7 +261,7 @@ export function splitStaffInvoiceLines(lineItems: unknown, promoCode?: unknown, 
 }
 
 function serviceRows(services: unknown): BookingLineItem[] {
-  return normalizeBookingLineItems(services).filter((item) => !isPromoLine(item) && (item.name.trim() || item.price !== 0));
+  return normalizeBookingLineItems(services).filter((item) => !isPromoLine(item) && !adjustmentKind(item) && (item.name.trim() || item.price !== 0));
 }
 
 function withPromoLine(services: BookingLineItem[], promoCode: string, promoDiscount: number): BookingLineItem[] {
@@ -249,31 +290,141 @@ function personName(order: { clientName?: unknown; firstName?: unknown; lastName
  */
 export function staffInvoiceSavePatch(
   form: StaffInvoiceForm,
-  existing: { amountPaid?: unknown; invoiceNumber?: unknown; id?: unknown } = {},
+  existing: {
+    amountPaid?: unknown;
+    invoiceNumber?: unknown;
+    id?: unknown;
+    processing?: unknown;
+    fees?: unknown;
+    travel?: unknown;
+  } = {},
 ): InvoiceBillingPatch {
-  const services = serviceRows(form.services);
-  const promoCode = form.promoCode.trim();
-  const promoDiscount = cents(Math.max(0, Number(form.promoDiscount) || 0));
-  const tax = cents(Math.max(0, Number(form.tax) || 0));
-  const subtotal = cents(services.reduce((sum, item) => sum + item.price, 0));
-  const total = cents(Math.max(0, subtotal - promoDiscount) + tax);
-  const amountPaid = cents(Math.max(0, Number(existing.amountPaid) || 0));
+  const totals = invoiceTotals(form, existing.amountPaid);
   const patch: InvoiceBillingPatch = {
     clientName: cleanPersonName(form.clientName) || "Client",
     clientEmail: normalizeEmail(form.clientEmail),
     billToAddress: form.billToAddress.trim(),
     notes: form.notes.trim(),
-    lineItems: withPromoLine(services, promoCode, promoDiscount),
-    subtotal,
-    tax,
-    promoCode: promoCode || null,
-    promoDiscount,
-    total,
-    amountDue: cents(Math.max(0, total - amountPaid)),
+    lineItems: withAdjustmentLines(withPromoLine(totals.services, totals.promoCode, totals.promoDiscount), totals),
+    subtotal: totals.subtotal,
+    tax: totals.tax,
+    promoCode: totals.promoCode || null,
+    promoDiscount: totals.promoDiscount,
+    total: totals.total,
+    amountDue: totals.amountDue,
+    processingPresetId: optionalId(form.processingPresetId),
+    feesPresetId: optionalId(form.feesPresetId),
+    travelPresetId: optionalId(form.travelPresetId),
+    taxPresetId: optionalId(form.taxPresetId),
+    promoPresetId: optionalId(form.promoPresetId),
+    processingOverridden: Boolean(form.processingOverridden),
+    feesOverridden: Boolean(form.feesOverridden),
+    travelOverridden: Boolean(form.travelOverridden),
+    taxOverridden: Boolean(form.taxOverridden),
+    promoOverridden: Boolean(form.promoOverridden),
   };
+  const processing = chargeForSave(totals.processing, existing.processing);
+  const fees = chargeForSave(totals.fees, existing.fees);
+  const travel = chargeForSave(totals.travel, existing.travel);
+  if (processing !== undefined) patch.processing = processing;
+  if (fees !== undefined) patch.fees = fees;
+  if (travel !== undefined) patch.travel = travel;
   const invoiceNumber = invoiceNumberForSave(existing.invoiceNumber, typeof existing.id === "string" ? existing.id : "");
   if (invoiceNumber) patch.invoiceNumber = invoiceNumber;
   return patch;
+}
+
+/**
+ * Fill preset-linked amounts from the current service subtotal.
+ * A manual override keeps the typed dollars. Percent presets recompute when the subtotal changes.
+ */
+export function repriceInvoiceAdjustments(form: StaffInvoiceForm, presets: InvoicePreset[]): StaffInvoiceForm {
+  const subtotal = cents(serviceRows(form.services).reduce((sum, item) => sum + item.price, 0));
+  const next: StaffInvoiceForm = { ...form };
+  let changed = false;
+  const fill = (
+    kind: InvoicePresetKind,
+    presetId: string | undefined,
+    overridden: boolean | undefined,
+    current: number,
+    write: (amount: number) => void,
+  ) => {
+    if (overridden) return;
+    const id = String(presetId || "").trim();
+    if (!id) return;
+    const preset = presets.find((item) => item.id === id && item.kind === kind);
+    if (!preset) return;
+    const amount = presetFilledAmount(preset, subtotal);
+    if (amount === cents(current)) return;
+    write(amount);
+    changed = true;
+  };
+  fill("processing", form.processingPresetId, form.processingOverridden, Number(form.processing) || 0, (amount) => {
+    next.processing = amount;
+  });
+  fill("fees", form.feesPresetId, form.feesOverridden, Number(form.fees) || 0, (amount) => {
+    next.fees = amount;
+  });
+  fill("travel", form.travelPresetId, form.travelOverridden, Number(form.travel) || 0, (amount) => {
+    next.travel = amount;
+  });
+  fill("tax", form.taxPresetId, form.taxOverridden, Number(form.tax) || 0, (amount) => {
+    next.tax = amount;
+  });
+  fill("promotions", form.promoPresetId, form.promoOverridden, Number(form.promoDiscount) || 0, (amount) => {
+    next.promoDiscount = amount;
+  });
+  return changed ? next : form;
+}
+
+function invoiceTotals(form: StaffInvoiceForm, amountPaid: unknown) {
+  const services = serviceRows(form.services);
+  const promoCode = form.promoCode.trim();
+  const promoDiscount = cents(Math.max(0, Number(form.promoDiscount) || 0));
+  const tax = cents(Math.max(0, Number(form.tax) || 0));
+  const processing = cents(Math.max(0, Number(form.processing) || 0));
+  const fees = cents(Math.max(0, Number(form.fees) || 0));
+  const travel = cents(Math.max(0, Number(form.travel) || 0));
+  const subtotal = cents(services.reduce((sum, item) => sum + item.price, 0));
+  const total = cents(Math.max(0, subtotal - promoDiscount) + tax + processing + fees + travel);
+  return {
+    services,
+    promoCode,
+    promoDiscount,
+    tax,
+    processing,
+    fees,
+    travel,
+    subtotal,
+    total,
+    amountDue: cents(Math.max(0, total - cents(Math.max(0, Number(amountPaid) || 0)))),
+  };
+}
+
+/** Keep a charge field off the invoice until it has an amount or was already stored. */
+function chargeForSave(amount: number, existing: unknown): number | undefined {
+  if (amount > 0) return amount;
+  if (existing == null || existing === "") return undefined;
+  const prior = Number(existing);
+  if (!Number.isFinite(prior)) return undefined;
+  return 0;
+}
+
+function optionalId(value: unknown): string | null {
+  const id = typeof value === "string" ? value.trim() : "";
+  return id || null;
+}
+
+function withAdjustmentLines(
+  lines: BookingLineItem[],
+  totals: { processing: number; fees: number; travel: number },
+): BookingLineItem[] {
+  const next = lines.filter((item) => !adjustmentKind(item));
+  const kinds: InvoiceAdjustmentKind[] = ["processing", "fees", "travel"];
+  for (const kind of kinds) {
+    if (totals[kind] > 0) next.push(invoiceAdjustmentLine(kind, totals[kind]));
+  }
+  return next;
 }
 
 /**
@@ -296,7 +447,16 @@ export function orderServiceInvoicePatch(
     clientEmail?: unknown;
     address?: unknown;
   },
-  existing: { amountPaid?: unknown; tax?: unknown; clientName?: unknown; clientEmail?: unknown; billToAddress?: unknown } = {},
+  existing: {
+    amountPaid?: unknown;
+    tax?: unknown;
+    clientName?: unknown;
+    clientEmail?: unknown;
+    billToAddress?: unknown;
+    processing?: unknown;
+    fees?: unknown;
+    travel?: unknown;
+  } = {},
 ): Partial<InvoiceBillingPatch> {
   const patch: Partial<InvoiceBillingPatch> = {};
   const name = personName(order);
@@ -308,8 +468,15 @@ export function orderServiceInvoicePatch(
 
   if (!Array.isArray(order.lineItems)) return patch;
 
-  const lineItems = normalizeBookingLineItems(order.lineItems).filter((item) => item.name.trim() || item.price !== 0);
-  const services = lineItems.filter((item) => !isPromoLine(item));
+  const lineItems = withAdjustmentLines(
+    normalizeBookingLineItems(order.lineItems).filter((item) => (item.name.trim() || item.price !== 0) && !adjustmentKind(item)),
+    {
+      processing: storedCharge(existing.processing),
+      fees: storedCharge(existing.fees),
+      travel: storedCharge(existing.travel),
+    },
+  );
+  const services = lineItems.filter((item) => !isPromoLine(item) && !adjustmentKind(item));
   const subtotal = cents(services.reduce((sum, item) => sum + item.price, 0));
   const tax = order.pricing && order.pricing.tax != null && order.pricing.tax !== ""
     ? cents(Math.max(0, Number(order.pricing.tax) || 0))
