@@ -1092,6 +1092,7 @@ const services = [
     description: "Bright white room at Studio 105. Rate confirmed when the hold is set."
   }
 ];
+const APPRENTICESHIP_OVERAGE_LABEL = "$25 per 15-minute increment";
 const APPRENTICESHIP_RULES = [
   "Apprentices are learning.",
   "We do not make additional trips.",
@@ -1186,6 +1187,223 @@ const basicsList = [
 ];
 basicsList.filter((item) => isApprenticeshipPackage(item.id));
 basicsList.filter((item) => !isApprenticeshipPackage(item.id));
+const addOns = [
+  {
+    category: "Speed & Social",
+    items: [
+      {
+        id: "same-day",
+        name: "Same-Day Delivery",
+        price: 50,
+        description: "Photos, Twilight Render and Snap Reel by 7PM (Basic Edits).",
+        features: ["Photos by 7PM", "Snap Reel by 7PM", "Twilight Renders by 7PM"]
+      },
+      {
+        id: "basic-reel",
+        name: "Basic Reel",
+        price: 125,
+        description: "A high-impact 15s vertical video optimized for social media.",
+        features: ["15-Second Vertical Video", "Trending Audio Integration", "Fast-Paced Editing Style"]
+      }
+    ]
+  },
+  {
+    category: "The Space",
+    items: [
+      {
+        id: "aerial-drone",
+        name: "Aerial Drone Stills",
+        price: 99,
+        description: "Capture the property and its surroundings from a unique perspective.",
+        features: ["5 High-Res Aerial Photos", "Neighborhood Context Shots", "Professional Color Grading"]
+      },
+      {
+        id: "matterport-3d",
+        name: "Matterport 3D Tour",
+        price: 200,
+        description: "A fully immersive 3D walkthrough experience for remote buyers.",
+        features: ["Full 3D Interior Model", "Dollhouse View", "Interactive Floor Navigation"]
+      },
+      {
+        id: "basic-video",
+        name: "Basic Video",
+        price: 300,
+        description: "A professional cinematic walkthrough of the property interior.",
+        features: ["60-Second 4K Video", "Interior & Exterior Highlights", "Licensed Background Music"]
+      },
+      {
+        id: "aerial-premium",
+        name: "Aerial Premium Video",
+        price: 550,
+        description: "The ultimate drone experience with cinematic sweeps and tracking shots.",
+        features: ["90-Second 4K Aerial Film", "Dynamic Tracking Shots", "Advanced Neighborhood Highlights"]
+      },
+      {
+        id: "floorplan-2d",
+        name: "2D Floor Plan",
+        price: 75,
+        description: "Accurate dimensions and layout visualization for buyers.",
+        features: ["Precise Room Measurements", "Clean Schematic Layout", "PDF & JPG Deliverables"]
+      },
+      {
+        id: "amenity-addon",
+        name: "Amenity",
+        price: 50,
+        description: "Capture the shared spaces and community features that add value.",
+        features: ["Pool & Clubhouse Shots", "Parks & Shared Spaces", "Community Context"]
+      }
+    ]
+  },
+  {
+    category: "The Brand",
+    items: [
+      {
+        id: "agent-intro",
+        name: "Agent Intro/Outro",
+        price: 75,
+        description: "Put a face to the brand with a professional on-camera introduction.",
+        features: ["On-Camera Greeting", "Professional Audio Setup", "Call-to-Action Closing"]
+      }
+    ]
+  }
+];
+const ICONIC_FINISH_PRICE = 75;
+const VIRTUAL_STAGING_UNIT_PRICE = 35;
+const SPECIALIZED_SOCIAL_PRICE = 85;
+const SPECIALIZED_BOTH_PRICE = 125;
+const ICONIC_FINISH_NAME = "Iconic Finish (Premium Upgrade)";
+const SPECIALIZED_SOCIAL_NAME = "Social Media Optimized Photography";
+const SPECIALIZED_BOTH_NAME = "MLS + Social Media Optimized Photography";
+const PROMO_DISCOUNTS = {
+  ICONICAI: 35,
+  NEWYEAR: 50
+};
+function promoDiscountFor(raw) {
+  const code = raw.trim().toUpperCase();
+  if (code === "ICONICAI") return { code, discount: PROMO_DISCOUNTS.ICONICAI };
+  if (code === "NEWYEAR") return { code, discount: PROMO_DISCOUNTS.NEWYEAR };
+  return null;
+}
+const UPGRADES = [
+  {
+    id: "iconic-finish",
+    name: ICONIC_FINISH_NAME,
+    price: ICONIC_FINISH_PRICE,
+    description: "Premium digital finish charged at $75 when selected."
+  },
+  {
+    id: "virtual-staging",
+    name: "Virtual Staging",
+    price: VIRTUAL_STAGING_UNIT_PRICE,
+    description: "Per credit. The booking line extends this unit price by the credit count."
+  },
+  {
+    id: "specialized-social",
+    name: SPECIALIZED_SOCIAL_NAME,
+    price: SPECIALIZED_SOCIAL_PRICE,
+    description: "Social-optimized photo set."
+  },
+  {
+    id: "specialized-both",
+    name: SPECIALIZED_BOTH_NAME,
+    price: SPECIALIZED_BOTH_PRICE,
+    description: "MLS and social-optimized photo set."
+  }
+];
+function serviceCategory(service) {
+  if (service.category === "listings") return "photography";
+  return "marketing";
+}
+function addonCategory(id) {
+  if (id === "basic-reel" || id === "basic-video" || id === "aerial-premium") return "video";
+  if (id === "matterport-3d") return "virtual_staging";
+  return "addon";
+}
+function upgradeCategory(id) {
+  if (id === "virtual-staging") return "virtual_staging";
+  return "addon";
+}
+function bookingPackageSeedDocs() {
+  const docs = [];
+  let sortOrder = 0;
+  for (const service of services) {
+    docs.push({
+      id: service.id,
+      name: service.name,
+      tier: "campaign",
+      price: service.price,
+      description: service.description,
+      includedServices: service.features || [],
+      isActive: true,
+      sortOrder: sortOrder++,
+      category: serviceCategory(service),
+      bookingId: service.id,
+      bookingKind: "service",
+      source: "booking-form-hardcoded",
+      serviceCategory: service.category
+    });
+  }
+  for (const basic of basicsList) {
+    docs.push({
+      id: basic.id,
+      name: basic.name,
+      tier: "basic",
+      price: basic.price,
+      description: basic.description,
+      includedServices: basic.features || [],
+      isActive: true,
+      sortOrder: sortOrder++,
+      category: "photography",
+      bookingId: basic.id,
+      bookingKind: "basic",
+      source: "booking-form-hardcoded",
+      ...basic.cardTitle ? { cardTitle: basic.cardTitle } : {},
+      ...basic.kicker ? { kicker: basic.kicker } : {},
+      ...basic.aside ? { aside: basic.aside } : {},
+      ...basic.appointmentLimit ? {
+        appointmentLimit: basic.appointmentLimit,
+        overage: APPRENTICESHIP_OVERAGE_LABEL,
+        rules: basic.rules || []
+      } : {}
+    });
+  }
+  for (const category of addOns) {
+    for (const item of category.items) {
+      docs.push({
+        id: item.id,
+        name: item.name,
+        tier: "addon",
+        price: item.price,
+        description: item.description,
+        includedServices: item.features || [],
+        isActive: true,
+        sortOrder: sortOrder++,
+        category: addonCategory(item.id),
+        bookingId: item.id,
+        bookingKind: "addon",
+        source: "booking-form-hardcoded",
+        addonGroup: category.category
+      });
+    }
+  }
+  for (const upgrade of UPGRADES) {
+    docs.push({
+      id: upgrade.id,
+      name: upgrade.name,
+      tier: "addon",
+      price: upgrade.price,
+      description: upgrade.description,
+      includedServices: [],
+      isActive: true,
+      sortOrder: sortOrder++,
+      category: upgradeCategory(upgrade.id),
+      bookingId: upgrade.id,
+      bookingKind: "upgrade",
+      source: "booking-form-hardcoded"
+    });
+  }
+  return docs;
+}
 const BOOKING_PACKAGE_CATEGORY_ORDER = [
   "photography",
   "video",
@@ -1193,7 +1411,157 @@ const BOOKING_PACKAGE_CATEGORY_ORDER = [
   "marketing",
   "addon"
 ];
-new Set(BOOKING_PACKAGE_CATEGORY_ORDER);
+const PACKAGE_CATEGORIES = new Set(BOOKING_PACKAGE_CATEGORY_ORDER);
+const PACKAGE_KINDS = /* @__PURE__ */ new Set(["service", "basic", "addon", "upgrade"]);
+const PACKAGE_TIERS = /* @__PURE__ */ new Set(["basic", "standard", "premium", "campaign", "addon"]);
+function finiteCatalogNumber(value) {
+  if (value == null || value === "") return void 0;
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : void 0;
+}
+function catalogText(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+const SERVICE_CATEGORIES = /* @__PURE__ */ new Set(["listings", "branding", "business", "growth", "studio"]);
+function catalogStringList(value, fallback) {
+  if (!Array.isArray(value)) return fallback;
+  const list = value.map((entry) => catalogText(entry)).filter(Boolean);
+  return list.length > 0 ? list : fallback;
+}
+function catalogServiceCategory(value, fallback) {
+  const raw = catalogText(value);
+  if (SERVICE_CATEGORIES.has(raw)) return raw;
+  return fallback;
+}
+function withCatalogNotes(item, doc, current) {
+  const appointmentLimit = catalogText(doc.appointmentLimit) || current?.appointmentLimit;
+  const overage = catalogText(doc.overage) || current?.overage;
+  const cardTitle = catalogText(doc.cardTitle) || current?.cardTitle;
+  const kicker = catalogText(doc.kicker) || current?.kicker;
+  const aside = catalogText(doc.aside) || current?.aside;
+  const addonGroup = catalogText(doc.addonGroup) || current?.addonGroup;
+  const serviceCategory2 = catalogServiceCategory(doc.serviceCategory, current?.serviceCategory);
+  const rules = catalogStringList(doc.rules, current?.rules);
+  return {
+    ...item,
+    ...appointmentLimit ? { appointmentLimit } : {},
+    ...overage ? { overage } : {},
+    ...cardTitle ? { cardTitle } : {},
+    ...kicker ? { kicker } : {},
+    ...aside ? { aside } : {},
+    ...addonGroup ? { addonGroup } : {},
+    ...serviceCategory2 ? { serviceCategory: serviceCategory2 } : {},
+    ...rules?.length ? { rules } : {}
+  };
+}
+function packagesForStaffEditor(liveDocs = [], options) {
+  const byId = /* @__PURE__ */ new Map();
+  for (const seed of bookingPackageSeedDocs()) {
+    byId.set(seed.id, withCatalogNotes(
+      { ...seed, includedServices: [...seed.includedServices] },
+      seed
+    ));
+  }
+  for (const doc of liveDocs) {
+    const id = catalogText(doc.id || doc.bookingId);
+    if (!id) continue;
+    const current = byId.get(id);
+    const name = catalogText(doc.name) || current?.name || "";
+    if (!name) continue;
+    const categoryRaw = catalogText(doc.category);
+    const kindRaw = catalogText(doc.bookingKind);
+    const tierRaw = catalogText(doc.tier);
+    const included = Array.isArray(doc.includedServices) ? doc.includedServices.map((entry) => catalogText(entry)).filter(Boolean) : current?.includedServices ?? [];
+    byId.set(id, withCatalogNotes({
+      id,
+      name,
+      price: finiteCatalogNumber(doc.price) ?? current?.price ?? 0,
+      description: catalogText(doc.description) || current?.description || "",
+      category: PACKAGE_CATEGORIES.has(categoryRaw) ? categoryRaw : current?.category ?? "addon",
+      bookingKind: PACKAGE_KINDS.has(kindRaw) ? kindRaw : current?.bookingKind ?? "addon",
+      tier: PACKAGE_TIERS.has(tierRaw) ? tierRaw : current?.tier ?? "addon",
+      includedServices: included,
+      sortOrder: finiteCatalogNumber(doc.sortOrder) ?? current?.sortOrder ?? 1e3,
+      isActive: doc.isActive === false ? false : doc.isActive === true ? true : current?.isActive ?? true,
+      bookingId: catalogText(doc.bookingId) || current?.bookingId || id
+    }, doc, current));
+  }
+  const items = [...byId.values()].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+  return options?.includeInactive ? items : items.filter((item) => item.isActive);
+}
+function chargeCatalog(input) {
+  return input.catalog ?? packagesForStaffEditor([]);
+}
+function findCatalogItem(catalog, id) {
+  const key = id.trim();
+  if (!key) return void 0;
+  return catalog.find((item) => item.isActive !== false && (item.id === key || item.bookingId === key));
+}
+function roundMoney$1(value) {
+  return Math.round(value * 100) / 100;
+}
+function catalogLineName(pkg, qty = 1) {
+  if (pkg.id === "virtual-staging" || pkg.bookingId === "virtual-staging") {
+    return qty === 1 ? pkg.name : `${pkg.name} (${qty} credits)`;
+  }
+  if (pkg.appointmentLimit && !pkg.name.includes(pkg.appointmentLimit)) {
+    return `${pkg.name} (${pkg.appointmentLimit})`;
+  }
+  return pkg.name;
+}
+function pushCatalogLine(items, pkg, qty = 1) {
+  const count = qty > 0 ? qty : 1;
+  const unitPrice = roundMoney$1(pkg.price);
+  const line = {
+    id: pkg.bookingId || pkg.id,
+    name: catalogLineName(pkg, count),
+    unitPrice,
+    qty: count,
+    price: roundMoney$1(unitPrice * count)
+  };
+  if (pkg.description) line.description = pkg.description;
+  if (pkg.category) line.category = pkg.category;
+  if (pkg.bookingKind) line.bookingKind = pkg.bookingKind;
+  if (pkg.tier) line.tier = pkg.tier;
+  items.push(line);
+}
+function buildSubmittedLineItems(input) {
+  const catalog = chargeCatalog(input);
+  const items = [];
+  const seen = /* @__PURE__ */ new Set();
+  const pushOnce = (pkg, qty = 1) => {
+    if (!pkg) return;
+    const key = pkg.bookingId || pkg.id;
+    if (seen.has(key)) return;
+    seen.add(key);
+    pushCatalogLine(items, pkg, qty);
+  };
+  pushOnce(findCatalogItem(catalog, input.selectedService || ""));
+  for (const id of input.selectedBasics || []) {
+    pushOnce(findCatalogItem(catalog, id));
+  }
+  for (const id of input.selectedAddOns || []) {
+    pushOnce(findCatalogItem(catalog, id));
+  }
+  if (input.premiumUpgrade) pushOnce(findCatalogItem(catalog, "iconic-finish"));
+  const credits = input.virtualStagingCredits || 0;
+  if (credits > 0) pushOnce(findCatalogItem(catalog, "virtual-staging"), credits);
+  if (input.specializedPhotography === "social") pushOnce(findCatalogItem(catalog, "specialized-social"));
+  if (input.specializedPhotography === "both") pushOnce(findCatalogItem(catalog, "specialized-both"));
+  if (input.promo) {
+    items.push({
+      id: `promo-${input.promo.code}`,
+      name: `Promo Code: ${input.promo.code}`,
+      unitPrice: -input.promo.discount,
+      qty: 1,
+      price: -input.promo.discount
+    });
+  }
+  return items;
+}
+function sumLineItemPrices(items) {
+  return items.reduce((sum, item) => sum + item.price, 0);
+}
 function orderTotalLabel(value) {
   return `$${(Number(value) || 0).toFixed(2)}`;
 }
@@ -1224,6 +1592,61 @@ function normalizeBookingLineItems(items) {
 }
 function optionalLineText(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+function textList(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry) => optionalLineText(entry)).filter(Boolean);
+}
+function resolveSubmittedBooking(body, catalog) {
+  const list = catalog ?? packagesForStaffEditor([]);
+  const posted = normalizeBookingLineItems(body.lineItems);
+  const postedIds = posted.map((item) => item.id).filter((id) => Boolean(id));
+  const kindIds = (kind) => postedIds.filter((id) => findCatalogItem(list, id)?.bookingKind === kind);
+  const selectedService = optionalLineText(body.selectedService) || kindIds("service")[0] || "";
+  const selectedBasics = [.../* @__PURE__ */ new Set([...textList(body.selectedBasics), ...kindIds("basic")])].filter((id) => id !== selectedService);
+  const claimed = /* @__PURE__ */ new Set([selectedService, ...selectedBasics]);
+  const selectedAddOns = [.../* @__PURE__ */ new Set([...textList(body.selectedAddOns), ...kindIds("addon")])].filter((id) => !claimed.has(id));
+  const premiumUpgrade = body.premiumUpgrade === true || postedIds.includes("iconic-finish");
+  const creditsBody = Number(body.virtualStagingCredits);
+  const creditsLine = posted.find((item) => item.id === "virtual-staging")?.qty || 0;
+  const virtualStagingCredits = Number.isFinite(creditsBody) && creditsBody > 0 ? Math.round(creditsBody) : creditsLine;
+  let specialized = optionalLineText(body.specializedPhotography);
+  if (specialized !== "social" && specialized !== "both" && specialized !== "mls") {
+    if (postedIds.includes("specialized-both")) specialized = "both";
+    else if (postedIds.includes("specialized-social")) specialized = "social";
+    else specialized = "";
+  }
+  const promo = promoDiscountFor(optionalLineText(body.promoCode));
+  const lineItems = buildSubmittedLineItems({
+    selectedService,
+    selectedBasics,
+    selectedAddOns,
+    premiumUpgrade,
+    virtualStagingCredits,
+    specializedPhotography: specialized,
+    promo,
+    lifeOfTheListingCare: Boolean(body.lifeOfTheListingCare),
+    catalog: list
+  });
+  return {
+    lineItems,
+    total: roundMoney$1(sumLineItemPrices(lineItems)),
+    promoCode: promo?.code ?? null,
+    promoDiscount: promo?.discount ?? 0,
+    selectedService: selectedService || null,
+    selectedBasics,
+    selectedAddOns,
+    specializedPhotography: specialized || null,
+    virtualStagingCredits,
+    premiumUpgrade
+  };
+}
+function chargedServiceLines(items) {
+  return items.filter((item) => {
+    const id = String(item.id || "");
+    const name = String(item.name || "");
+    return !id.startsWith("promo-") && !name.startsWith("Promo Code:");
+  });
 }
 function buildBookingInvoiceDraft(input) {
   const total = Number(input.total) || 0;
@@ -2770,6 +3193,15 @@ function toDate$1(value) {
 function money$2(value) {
   return orderTotalLabel(value);
 }
+async function loadBookingCatalog() {
+  try {
+    const snap = await db$k().collection("packages").get();
+    return packagesForStaffEditor(snap.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
+  } catch (err) {
+    console.error("[Bookings] Catalog read failed — using the seeded catalog", err);
+    return packagesForStaffEditor([]);
+  }
+}
 router$k.post("/", async (req, res) => {
   try {
     const {
@@ -2778,12 +3210,7 @@ router$k.post("/", async (req, res) => {
       email,
       phone,
       address,
-      lineItems,
-      pricing,
-      total,
       vibeNote,
-      promoCode,
-      promoDiscount,
       scheduledDate,
       scheduledTime,
       photographerPreference,
@@ -2793,11 +3220,6 @@ router$k.post("/", async (req, res) => {
       propertyStatus,
       furnishingStatus,
       // Additional fields from booking form (previously dropped)
-      specializedPhotography,
-      virtualStagingCredits,
-      selectedService,
-      selectedBasics,
-      selectedAddOns,
       leadSource,
       marketingDoing,
       resultsBothering,
@@ -2809,7 +3231,19 @@ router$k.post("/", async (req, res) => {
     if (!firstName || !lastName || !email || !phone || !address) {
       return res.status(400).json({ error: "Missing required fields." });
     }
-    if (!lineItems || !Array.isArray(lineItems) || lineItems.length === 0) {
+    const catalog = await loadBookingCatalog();
+    const resolved = resolveSubmittedBooking(req.body, catalog);
+    const lineItems = resolved.lineItems;
+    const total = resolved.total;
+    const promoCode = resolved.promoCode;
+    const promoDiscount = resolved.promoDiscount;
+    const pricing = { subtotal: total, tax: 0, total };
+    const selectedService = resolved.selectedService;
+    const selectedBasics = resolved.selectedBasics;
+    const selectedAddOns = resolved.selectedAddOns;
+    const specializedPhotography = resolved.specializedPhotography;
+    const virtualStagingCredits = resolved.virtualStagingCredits;
+    if (chargedServiceLines(lineItems).length === 0) {
       return res.status(400).json({ error: "No services selected." });
     }
     const clientName2 = `${firstName} ${lastName}`.trim();
