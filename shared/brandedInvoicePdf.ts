@@ -3,6 +3,7 @@
  * Black header, yellow rule, blue total. No payment link and no checkout call.
  */
 
+import { iconicBusinessFooterLines } from "./iconicBusiness.ts";
 import { invoiceFaceRows, type InvoiceFace } from "./invoiceFace.ts";
 
 export interface BrandedInvoicePdfInput {
@@ -11,6 +12,8 @@ export interface BrandedInvoicePdfInput {
   billToAddress: string;
   status: string;
   face: InvoiceFace;
+  /** Business identity lines. Defaults to the Iconic contact block already on file. */
+  footerLines?: string[];
 }
 
 export function brandedInvoicePdfFilename(invoiceNumber: string): string {
@@ -85,17 +88,26 @@ function layout(input: BrandedInvoicePdfInput): Op[] {
   }
 
   y -= 10;
-  const boxY = Math.max(92, y - 48);
+  const boxY = Math.max(156, y - 48);
   ops.push(rect(36, boxY, 540, 48, ...BLUE));
   ops.push(text(52, boxY + 28, 8, "F2", ...YELLOW, "TOTAL"));
   ops.push(text(400, boxY + 16, 16, "F2", ...WHITE, money(input.face.total)));
 
-  ops.push(rect(0, 0, PAGE_W, 78, ...BLACK));
-  ops.push(rect(0, 78, PAGE_W, 4, ...YELLOW));
-  ops.push(text(36, 48, 8, "F2", ...YELLOW, "PAYMENT"));
-  ops.push(text(36, 28, 11, "F1", ...WHITE, `Amount paid  ${money(input.face.amountPaid)}`));
-  ops.push(text(340, 48, 8, "F2", ...YELLOW, "AMOUNT DUE"));
-  ops.push(text(340, 26, 14, "F2", ...WHITE, money(input.face.amountDue)));
+  const footerLines = (input.footerLines && input.footerLines.length > 0
+    ? input.footerLines
+    : iconicBusinessFooterLines()
+  ).slice(0, 8);
+  ops.push(rect(0, 0, PAGE_W, 136, ...BLACK));
+  ops.push(rect(0, 136, PAGE_W, 4, ...YELLOW));
+  ops.push(text(36, 116, 8, "F2", ...YELLOW, "PAYMENT"));
+  ops.push(text(36, 100, 11, "F1", ...WHITE, `Amount paid  ${money(input.face.amountPaid)}`));
+  ops.push(text(340, 116, 8, "F2", ...YELLOW, "AMOUNT DUE"));
+  ops.push(text(340, 98, 14, "F2", ...WHITE, money(input.face.amountDue)));
+  let footerY = 78;
+  footerLines.forEach((line, index) => {
+    ops.push(text(36, footerY, 8, index === 0 ? "F2" : "F1", ...WHITE, clip(line, 90)));
+    footerY -= 10;
+  });
   return ops;
 }
 

@@ -13,13 +13,13 @@ import {
   Receipt,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { downloadBrandedInvoice } from "@/lib/downloadBrandedInvoice";
 import {
   appointmentSummary,
   appointmentTone,
+  clientInvoicePdfInput,
   clientListingPath,
   humanStatus,
-  invoicePdf,
-  invoicePdfFilename,
   sortNewestFirst,
   usd,
   type AppointmentTone,
@@ -336,18 +336,7 @@ function MoneyRow({ label, value }: { label: string; value: number | null }) {
 }
 
 export function downloadInvoicePdf(invoice: ClientInvoiceStatement) {
-  const bytes = invoicePdf(invoice);
-  const copy = new ArrayBuffer(bytes.byteLength);
-  new Uint8Array(copy).set(bytes);
-  const blob = new Blob([copy], { type: "application/pdf" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = invoicePdfFilename(invoice.invoiceNumber);
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+  downloadBrandedInvoice(clientInvoicePdfInput(invoice));
 }
 
 function ScheduleCalendar({

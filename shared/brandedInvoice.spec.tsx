@@ -1,12 +1,13 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { InvoiceFaceSummary } from "@/components/invoice/BrandedInvoice";
+import { BrandedInvoiceShell, InvoiceFaceSummary } from "@/components/invoice/BrandedInvoice";
 import { brandedInvoicePdf } from "./brandedInvoicePdf";
 import { invoiceFaceFromStored, invoiceFaceRows } from "./invoiceFace";
 import { parseInvoicePreset, presetFilledAmount, presetOptionLabel } from "./invoicePresets";
 
 const clientInvoice = readFileSync(new URL("../client/pages/ClientInvoice.tsx", import.meta.url), "utf8");
+const orderHistory = readFileSync(new URL("../client/components/client-home/ClientHomeDashboard.tsx", import.meta.url), "utf8");
 const brandedInvoice = readFileSync(new URL("../client/components/invoice/BrandedInvoice.tsx", import.meta.url), "utf8");
 const payments = readFileSync(new URL("../server/routes/payments.ts", import.meta.url), "utf8");
 const presetsPage = readFileSync(new URL("../client/pages/AdminInvoicePresets.tsx", import.meta.url), "utf8");
@@ -114,6 +115,12 @@ describe("branded invoice pdf", () => {
     expect(pdf).toContain("TOTAL");
     expect(pdf).toContain("PAYMENT");
     expect(pdf).toContain("AMOUNT DUE");
+    expect(pdf).toContain("Iconic Images Photography, LLC");
+    expect(pdf).toContain("2219 Sawdust Rd. #1304");
+    expect(pdf).toContain("photos@iconicimagestx.com");
+    expect(pdf).toContain("cadi@iconicimagestx.com");
+    expect(pdf).toContain("281-356-0965");
+    expect(pdf).toContain("iconicimagestx.com");
     expect(pdf).not.toContain("Processing");
     expect(pdf).not.toContain("checkout");
     expect(pdf).not.toContain("Pay Securely");
@@ -149,6 +156,9 @@ describe("client invoice page", () => {
     expect(clientInvoice).toContain("presentInvoiceNumber(invoice.invoiceNumber, invoiceId)");
     expect(clientInvoice).toContain('fetch(`/api/payments/invoice/${invoiceId}/checkout`');
     expect(clientInvoice).toContain("Pay Securely");
+    expect(clientInvoice).toContain("ICONIC_DOWNLOAD_LOCK.message");
+    expect(orderHistory).toContain("downloadBrandedInvoice(clientInvoicePdfInput(invoice))");
+    expect(orderHistory).not.toContain('to="/invoice/');
     expect(clientInvoice).toContain('href="/"');
     expect(clientInvoice).toContain("Back to Home");
     const checkout = payments.slice(payments.indexOf('router.post("/invoice/:id/checkout"'));
@@ -157,6 +167,24 @@ describe("client invoice page", () => {
     expect(presetsLib).toContain('const COLLECTION = "invoicePresets"');
     expect(presetsPage).toContain("createInvoicePreset");
     expect(rules).toContain("match /invoicePresets/{presetId}");
+  });
+});
+
+describe("invoice business footer", () => {
+  it("prints the business identity already on file under the payment block", () => {
+    const html = renderToStaticMarkup(
+      <BrandedInvoiceShell invoiceNumber="INV-2026-1" amountPaid={0} amountDue={10}>
+        <p>Body</p>
+      </BrandedInvoiceShell>,
+    );
+    expect(html).toContain('data-testid="invoice-business-footer"');
+    expect(html).toContain("Iconic Images Photography, LLC");
+    expect(html).toContain("2219 Sawdust Rd. #1304");
+    expect(html).toContain("Spring, TX 77380");
+    expect(html).toContain("281-356-0965");
+    expect(html).toContain("photos@iconicimagestx.com");
+    expect(html).toContain("cadi@iconicimagestx.com");
+    expect(html).toContain("iconicimagestx.com");
   });
 });
 

@@ -1,4 +1,5 @@
 import * as React from "react";
+import { iconicBusinessFooterLines } from "@shared/iconicBusiness";
 import type { InvoiceFace, InvoiceFaceLine } from "@shared/invoiceFace";
 import { invoiceFaceRows } from "@shared/invoiceFace";
 
@@ -50,6 +51,11 @@ export function BrandedInvoiceShell({
             <p className="text-[10px] font-black uppercase tracking-widest text-[#FFD700]">Amount due</p>
             <p className="mt-1 text-2xl font-black">{money(amountDue)}</p>
           </div>
+        </div>
+        <div className="mt-5 border-t border-white/15 pt-4 text-xs leading-relaxed text-white/75" data-testid="invoice-business-footer">
+          {iconicBusinessFooterLines().map((line, index) => (
+            <p key={line} className={index === 0 ? "font-black text-white" : undefined}>{line}</p>
+          ))}
         </div>
         {footer ? <div className="mt-5 space-y-3">{footer}</div> : null}
       </footer>

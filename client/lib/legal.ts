@@ -1,13 +1,15 @@
+import { ICONIC_BUSINESS } from "@shared/iconicBusiness";
+
 /** Public legal identity already used on the site. */
 export const LEGAL = {
-  entity: "Iconic Images Photography, LLC",
-  brand: "Iconic Images",
-  brandSite: "Iconic Images TX",
-  email: "photos@iconicimagestx.com",
-  additionalEmail: "cadi@iconicimagestx.com",
-  phoneDisplay: "281-356-0965",
-  phoneHref: "tel:281-356-0965",
-  addressLine1: "2219 Sawdust Rd. #1304",
-  addressLine2: "Spring, TX 77380",
+  entity: ICONIC_BUSINESS.entity,
+  brand: ICONIC_BUSINESS.brand,
+  brandSite: ICONIC_BUSINESS.brandSite,
+  email: ICONIC_BUSINESS.email,
+  additionalEmail: ICONIC_BUSINESS.additionalEmail,
+  phoneDisplay: ICONIC_BUSINESS.phoneDisplay,
+  phoneHref: `tel:${ICONIC_BUSINESS.phoneDisplay}`,
+  addressLine1: ICONIC_BUSINESS.addressLine1,
+  addressLine2: ICONIC_BUSINESS.addressLine2,
   lastUpdated: "October 1, 2026",
 } as const;

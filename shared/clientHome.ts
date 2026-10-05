@@ -4,6 +4,9 @@
  * collect payment, or change a booking.
  */
 
+import { brandedInvoicePdf, brandedInvoicePdfFilename, type BrandedInvoicePdfInput } from "./brandedInvoicePdf.ts";
+import { iconicBusinessFooterLines } from "./iconicBusiness.ts";
+import { invoiceFaceFromStored } from "./invoiceFace.ts";
 import { presentInvoiceNumber } from "./orderProjectInvoice.ts";
 import {
   formatShootDateLabel,
@@ -80,6 +83,9 @@ export interface ClientInvoiceLine {
   name: string;
   qty: number | null;
   amount: number | null;
+  id?: string;
+  category?: string;
+  description?: string;
 }
 
 export interface ClientInvoiceStatement {
@@ -92,6 +98,12 @@ export interface ClientInvoiceStatement {
   issuedOn: string | null;
   lineItems: ClientInvoiceLine[];
   subtotal: number | null;
+  /** Null when the invoice has no stored processing amount. */
+  processing: number | null;
+  fees: number | null;
+  travel: number | null;
+  promoDiscount: number | null;
+  promoCode: string;
   tax: number | null;
   total: number | null;
   amountPaid: number | null;
@@ -272,6 +284,11 @@ export function buildClientInvoice(id: string, data: Record<string, unknown>, no
     issuedOn: formatPortalDate(data.createdAt) || formatPortalDate(data.sentAt) || formatPortalDate(data.paidAt),
     lineItems: storedLines(data.lineItems, data.services),
     subtotal: storedAmount(data.subtotal),
+    processing: storedAmount(data.processing),
+    fees: storedAmount(data.fees),
+    travel: storedAmount(data.travel),
+    promoDiscount: storedAmount(data.promoDiscount),
+    promoCode: text(data.promoCode),
     tax: storedAmount(data.tax),
     total: storedAmount(data.total),
     amountPaid: storedAmount(data.amountPaid),
@@ -385,48 +402,44 @@ export function appointmentSummary(
     : "Status is not stored on this appointment.";
 }
 
-export function invoicePdfLines(statement: ClientInvoiceStatement): string[] {
-  const lines = [
-    "ICONIC IMAGES",
-    `Invoice ${statement.invoiceNumber}`,
-  ];
-  if (statement.status) lines.push(`Status: ${humanStatus(statement.status)}`);
-  if (statement.clientName) lines.push(`Client: ${statement.clientName}`);
-  if (statement.issuedOn) lines.push(`Issued: ${statement.issuedOn}`);
-  if (statement.address) lines.push(`Address: ${statement.address}`);
-  lines.push("");
-  lines.push("Line items");
-  if (statement.lineItems.length === 0) {
-    lines.push("No line items are stored on this invoice.");
-  } else {
-    statement.lineItems.forEach((item) => {
-      const qty = item.qty != null ? ` x${item.qty}` : "";
-      const amount = item.amount != null ? `  ${usd(item.amount)}` : "";
-      lines.push(`${item.name}${qty}${amount}`);
-    });
-  }
-  lines.push("");
-  pushMoney(lines, "Subtotal", statement.subtotal);
-  pushMoney(lines, "Tax", statement.tax);
-  pushMoney(lines, "Total", statement.total);
-  pushMoney(lines, "Amount paid", statement.amountPaid);
-  pushMoney(lines, "Amount due", statement.amountDue);
-  return lines;
+/** Same branded PDF the client invoice page downloads. */
+export function clientInvoicePdfInput(statement: ClientInvoiceStatement): BrandedInvoicePdfInput {
+  const face = invoiceFaceFromStored({
+    lineItems: statement.lineItems.map((item) => ({
+      id: item.id,
+      name: item.name,
+      description: item.description,
+      category: item.category,
+      qty: item.qty ?? 1,
+      price: item.amount ?? 0,
+    })),
+    subtotal: statement.subtotal,
+    processing: statement.processing,
+    fees: statement.fees,
+    travel: statement.travel,
+    promoDiscount: statement.promoDiscount,
+    promoCode: statement.promoCode,
+    tax: statement.tax,
+    total: statement.total,
+    amountPaid: statement.amountPaid,
+    amountDue: statement.amountDue,
+  });
+  return {
+    invoiceNumber: statement.invoiceNumber,
+    clientName: statement.clientName,
+    billToAddress: statement.address,
+    status: humanStatus(statement.status),
+    face,
+    footerLines: iconicBusinessFooterLines(),
+  };
 }
 
 export function invoicePdfFilename(invoiceNumber: string): string {
-  const safe = invoiceNumber.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
-  return `${safe || "invoice"}.pdf`;
+  return brandedInvoicePdfFilename(invoiceNumber);
 }
 
 export function invoicePdf(statement: ClientInvoiceStatement): Uint8Array {
-  const pages = chunk(invoicePdfLines(statement).flatMap((line) => wrapLine(line, 88)), 40);
-  return pdfDocument(pages.length ? pages : [[]]);
-}
-
-function pushMoney(lines: string[], label: string, value: number | null) {
-  if (value == null) return;
-  lines.push(`${label}: ${usd(value)}`);
+  return brandedInvoicePdf(clientInvoicePdfInput(statement));
 }
 
 function storedLines(lineItems: unknown, services: unknown): ClientInvoiceLine[] {
@@ -435,11 +448,19 @@ function storedLines(lineItems: unknown, services: unknown): ClientInvoiceLine[]
     if (typeof item === "string" && item.trim()) return [{ name: item.trim(), qty: null, amount: null }];
     if (!item || typeof item !== "object") return [];
     const record = item as Record<string, unknown>;
-    const name = text(record.name) || text(record.label) || text(record.description);
+    const named = text(record.name) || text(record.label);
+    const description = text(record.description);
+    const name = named || description;
     const qty = storedQty(record.qty ?? record.quantity);
     const amount = storedAmount(record.price ?? record.amount ?? record.total);
     if (!name && amount == null && qty == null) return [];
-    return [{ name: name || "Line item", qty, amount }];
+    const line: ClientInvoiceLine = { name: name || "Line item", qty, amount };
+    const id = text(record.id);
+    const category = text(record.category);
+    if (id) line.id = id;
+    if (category) line.category = category;
+    if (named && description) line.description = description;
+    return [line];
   });
 }
 
@@ -553,86 +574,3 @@ function formatZoned(date: Date, timeZone: string): string {
   }).format(date);
 }
 
-function wrapLine(line: string, width: number): string[] {
-  if (line.length <= width) return [line];
-  const parts: string[] = [];
-  let rest = line;
-  while (rest.length > width) {
-    let cut = rest.lastIndexOf(" ", width);
-    if (cut < 12) cut = width;
-    parts.push(rest.slice(0, cut));
-    rest = rest.slice(cut).trimStart();
-  }
-  if (rest) parts.push(rest);
-  return parts;
-}
-
-function chunk<T>(items: T[], size: number): T[][] {
-  const pages: T[][] = [];
-  for (let index = 0; index < items.length; index += size) pages.push(items.slice(index, index + size));
-  return pages;
-}
-
-function pdfDocument(pages: string[][]): Uint8Array {
-  const chunks: string[] = [];
-  const offsets: number[] = [];
-  let cursor = 0;
-  const push = (value: string) => {
-    chunks.push(value);
-    cursor += value.length;
-  };
-  const addObj = (id: number, body: string) => {
-    offsets[id] = cursor;
-    push(`${id} 0 obj\n${body}\nendobj\n`);
-  };
-
-  const pageIds: number[] = [];
-  const contentIds: number[] = [];
-  let nextId = 4;
-  pages.forEach(() => {
-    pageIds.push(nextId++);
-    contentIds.push(nextId++);
-  });
-
-  push("%PDF-1.4\n");
-  addObj(1, "<< /Type /Catalog /Pages 2 0 R >>");
-  addObj(2, `<< /Type /Pages /Count ${pageIds.length} /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] >>`);
-  addObj(3, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
-
-  pages.forEach((lines, index) => {
-    const stream = pageStream(lines);
-    addObj(
-      pageIds[index],
-      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents ${contentIds[index]} 0 R /Resources << /Font << /F1 3 0 R >> >> >>`,
-    );
-    addObj(contentIds[index], `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
-  });
-
-  const xrefAt = cursor;
-  let xref = `xref\n0 ${nextId}\n0000000000 65535 f \n`;
-  for (let id = 1; id < nextId; id++) {
-    xref += `${String(offsets[id]).padStart(10, "0")} 00000 n \n`;
-  }
-  xref += `trailer\n<< /Size ${nextId} /Root 1 0 R >>\nstartxref\n${xrefAt}\n%%EOF`;
-  push(xref);
-  return new TextEncoder().encode(chunks.join(""));
-}
-
-function pageStream(lines: string[]): string {
-  const commands = ["BT", "/F1 11 Tf", "14 TL", "54 740 Td"];
-  lines.forEach((line, index) => {
-    const textOp = `(${escapePdf(line)}) Tj`;
-    commands.push(index === 0 ? textOp : `T* ${textOp}`);
-  });
-  if (lines.length === 0) commands.push("() Tj");
-  commands.push("ET");
-  return commands.join("\n");
-}
-
-function escapePdf(value: string): string {
-  return value
-    .replace(/[^\x20-\x7E]/g, " ")
-    .replace(/\\/g, "\\\\")
-    .replace(/\(/g, "\\(")
-    .replace(/\)/g, "\\)");
-}
