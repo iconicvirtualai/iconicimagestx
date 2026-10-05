@@ -109,7 +109,7 @@ function Showcase({ listing, street, locality }: { listing: ClientListingCard; s
           {locality ? (
             <p data-part="locality" className={`text-right text-[13px] font-medium text-neutral-900 ${TIGHT}`}>{locality}</p>
           ) : null}
-          <div data-part="amenities" className="mt-3 flex items-start justify-between gap-3">
+          <div data-part="amenities" className="mt-3 flex items-center justify-between gap-3">
             <div className="grid grid-cols-2 gap-x-4 gap-y-2">
               <Amenity icon={<BedIcon />} count={listing.beds} label="Beds" />
               <Amenity icon={<GarageIcon />} count={listing.garage} label="Garage" />
@@ -117,8 +117,8 @@ function Showcase({ listing, street, locality }: { listing: ClientListingCard; s
               <Amenity icon={<PoolIcon />} count={listing.pool} label="Pool" />
             </div>
             <div className="flex items-center gap-3 pt-0.5 text-neutral-800">
-              <span aria-label="Drone" className="inline-flex h-[18px] w-[18px]"><DroneIcon /></span>
-              <span aria-label="Video" className="inline-flex h-[18px] w-[18px]"><VideoIcon /></span>
+              <span aria-label="Drone" className="inline-flex h-5 w-5"><DroneIcon /></span>
+              <span aria-label="Video" className="inline-flex h-5 w-5"><VideoIcon /></span>
             </div>
           </div>
           <div className="mt-auto flex justify-end pt-4">
@@ -140,20 +140,21 @@ function Legacy({ listing, street, locality }: { listing: ClientListingCard; str
         <Photo listing={listing} label="" rounded="rounded-none" dark />
         <div
           data-part="pill"
-          className="absolute bottom-0 left-3 right-3 flex min-h-[52px] translate-y-1/2 items-center justify-center rounded-full px-5 py-3"
+          className="absolute bottom-0 left-3 right-3 grid min-h-[54px] translate-y-1/2 grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-full px-4 py-2.5"
           style={{ background: LEGACY_PILL }}
         >
+          <span />
           <p
-            className={`truncate px-16 text-center text-[26px] font-semibold leading-none tracking-[0.04em] text-[#e3c36e] ${TIGHT}`}
+            className={`max-w-[15rem] truncate text-center text-[26px] font-semibold leading-none tracking-[0.04em] text-[#e3c36e] ${TIGHT}`}
             style={{ fontFamily: SERIF }}
           >
             {street}
           </p>
           {locality ? (
-            <p data-part="locality" className={`absolute right-4 max-w-[46%] text-right text-[10px] font-medium leading-tight text-white ${TIGHT}`}>
+            <p data-part="locality" className={`justify-self-end text-right text-[10px] font-medium leading-tight text-white whitespace-nowrap ${TIGHT}`}>
               {locality}
             </p>
-          ) : null}
+          ) : <span />}
         </div>
       </div>
       <div className="flex flex-1 flex-col px-4 pb-4 pt-10 text-white">
@@ -223,7 +224,7 @@ function Amenity({
 }) {
   return (
     <span aria-label={count ? `${count} ${label}` : label} className={`inline-flex items-center gap-1.5 ${light ? "text-white" : "text-neutral-800"}`}>
-      <span aria-hidden className="inline-flex h-[18px] w-[18px] shrink-0">{icon}</span>
+      <span aria-hidden className="inline-flex h-5 w-5 shrink-0">{icon}</span>
       {count ? <span className={`text-[13px] font-semibold leading-none ${TIGHT}`}>{count}</span> : null}
     </span>
   );
