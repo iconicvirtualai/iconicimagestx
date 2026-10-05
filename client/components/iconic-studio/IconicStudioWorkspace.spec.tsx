@@ -76,6 +76,64 @@ describe("Iconic Studio staff shell", () => {
     expect(html).not.toContain("After · placeholder");
   });
 
+  it("shows inspection notes on a flagged review job and still leaves approval to staff", () => {
+    const html = renderToString(
+      <IconicStudioWorkspace
+        listings={[{ id: "sampledemo", address: "100 Sample Lane", imageCount: 1 }]}
+        jobs={[{
+          id: "job-flag",
+          listingId: "sampledemo",
+          origin: "order",
+          type: "photo",
+          label: "Listing photo",
+          status: "review",
+          beforeUrl: "https://cdn.example/before.jpg",
+          afterUrl: "https://cdn.example/after.jpg",
+          placeholder: false,
+          note: "OpenAI edit is ready for review.",
+          sourcePath: "listings/sampledemo/photos/front.jpg",
+          resultPath: "listings/sampledemo/photos/front-ai.jpg",
+          inspection: {
+            status: "flag",
+            notes: [
+              "Photographer reflected in a doorway or glass.",
+              "Double exposure.",
+            ],
+          },
+        }, {
+          id: "job-pass",
+          listingId: "sampledemo",
+          origin: "order",
+          type: "photo",
+          label: "Kitchen",
+          status: "review",
+          beforeUrl: "https://cdn.example/kitchen-before.jpg",
+          afterUrl: "https://cdn.example/kitchen-after.jpg",
+          placeholder: false,
+          note: "OpenAI edit is ready for review.",
+          inspection: { status: "pass", notes: [] },
+        }]}
+        listingId="sampledemo"
+        address="100 Sample Lane"
+        frames={sampleStudioFrames()}
+        initialTab="ai"
+        onSelectListing={() => undefined}
+        onAiEdit={async () => undefined}
+        onSaveAdjust={async () => undefined}
+        onApprove={async () => undefined}
+        onReject={async () => undefined}
+      />,
+    );
+    expect(html).toContain("studio-inspection-notes");
+    expect(html).toContain("Photographer reflected in a doorway or glass.");
+    expect(html).toContain("Double exposure.");
+    expect(html).toContain("Listing photo");
+    expect(html).toContain("review");
+    expect(html).toContain("Approve final");
+    expect(html).toContain("Reject");
+    expect(html.match(/studio-inspection-notes/g)).toHaveLength(1);
+  });
+
   it("shows the gallery gate and the missing package counts", () => {
     const plan = planOrderEdits({ serviceIds: ["listing-showcase"] });
     const release = assessGalleryRelease(plan, { jobs: [], finals: [], uploads: [], media: [] });
