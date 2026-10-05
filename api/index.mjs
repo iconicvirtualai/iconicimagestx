@@ -139,7 +139,7 @@ function clientNotifyBlockReason(env = process.env) {
   if (env.CLIENT_COMMS_ZONE === "RED") return "CLIENT_COMMS_ZONE=RED";
   return "CLIENT_NOTIFY_LIVE is not exactly true";
 }
-const db$n = () => admin.firestore();
+const db$o = () => admin.firestore();
 class EmailNotConfiguredError extends Error {
   code = "email_not_configured";
   constructor() {
@@ -176,7 +176,7 @@ async function sendEmail(options) {
   let htmlBody = getFallbackTemplate(template, variables);
   try {
     if (admin.apps.length) {
-      const templateDoc = await db$n().collection("emailTemplates").where("category", "==", template).where("isActive", "==", true).limit(1).get();
+      const templateDoc = await db$o().collection("emailTemplates").where("category", "==", template).where("isActive", "==", true).limit(1).get();
       if (!templateDoc.empty) {
         const tmpl = templateDoc.docs[0].data();
         if (!subjectOverride && typeof tmpl.subject === "string" && tmpl.subject.trim()) {
@@ -725,17 +725,17 @@ function clientCanViewListing(listing, identity) {
   const listingEmail = normalizeEmail(listing.clientEmail);
   return Boolean(email && listingEmail && email === listingEmail);
 }
-const db$m = () => admin.firestore();
+const db$n = () => admin.firestore();
 async function upsertPortalClient(input) {
   const email = normalizeEmail(input.email);
   const firstName = cleanPersonName(input.firstName);
   const lastName = cleanPersonName(input.lastName);
   const phone = String(input.phone || "").trim().slice(0, 40);
   const now = admin.firestore.FieldValue.serverTimestamp();
-  const existing = email ? await db$m().collection("clients").where("email", "==", email).limit(5).get() : null;
+  const existing = email ? await db$n().collection("clients").where("email", "==", email).limit(5).get() : null;
   const linked = existing?.docs.find((doc) => doc.id !== input.uid);
   const linkedData = linked?.data() || {};
-  const uidRef = db$m().collection("clients").doc(input.uid);
+  const uidRef = db$n().collection("clients").doc(input.uid);
   const uidSnap = await uidRef.get();
   const previous = uidSnap.exists ? uidSnap.data() || {} : {};
   await uidRef.set({
@@ -767,7 +767,7 @@ async function upsertPortalClient(input) {
 }
 async function resolveClientIdentity(uid, email) {
   const ids = /* @__PURE__ */ new Set([uid]);
-  const direct = await db$m().collection("clients").doc(uid).get();
+  const direct = await db$n().collection("clients").doc(uid).get();
   let profile = direct.exists ? { id: direct.id, ...direct.data() } : null;
   const redirectId = typeof profile?._redirect === "string" ? profile._redirect : "";
   if (redirectId) ids.add(redirectId);
@@ -775,14 +775,14 @@ async function resolveClientIdentity(uid, email) {
   if (linkedId) ids.add(linkedId);
   const normalized = normalizeEmail(email || profile?.email);
   if (normalized) {
-    const matches = await db$m().collection("clients").where("email", "==", normalized).limit(10).get();
+    const matches = await db$n().collection("clients").where("email", "==", normalized).limit(10).get();
     for (const doc of matches.docs) {
       ids.add(doc.id);
       if (!profile) profile = { id: doc.id, ...doc.data() };
     }
   }
   if (redirectId && profile && !profile.email) {
-    const real = await db$m().collection("clients").doc(redirectId).get();
+    const real = await db$n().collection("clients").doc(redirectId).get();
     if (real.exists) profile = { id: real.id, ...real.data(), portalDocId: uid };
   }
   return { ids: [...ids], profile, email: normalized };
@@ -811,7 +811,7 @@ function planBookingAccount(input) {
     skipReason: null
   };
 }
-const db$l = () => admin.firestore();
+const db$m = () => admin.firestore();
 function appUrl$3() {
   return process.env.APP_URL || process.env.FRONTEND_URL || "https://iconicimagestx.com";
 }
@@ -823,7 +823,7 @@ async function attachBookingClient(input) {
   const firstName = cleanPersonName(input.firstName) || "Client";
   const lastName = cleanPersonName(input.lastName);
   const phone = String(input.phone || "").trim().slice(0, 40);
-  const staffHit = await db$l().collection("staff").where("email", "==", email).limit(1).get();
+  const staffHit = await db$m().collection("staff").where("email", "==", email).limit(1).get();
   let authUid = null;
   if (staffHit.empty) {
     try {
@@ -905,7 +905,7 @@ async function sendFirebasePasswordEmail(email) {
 }
 async function createRequestedAppointment(input) {
   const now = admin.firestore.FieldValue.serverTimestamp();
-  await db$l().collection("appointments").add({
+  await db$m().collection("appointments").add({
     orderRequestId: input.orderRequestId,
     clientId: input.clientId,
     clientName: input.clientName,
@@ -1457,7 +1457,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
     id,
     invoiceNumber: presentInvoiceNumber(data.invoiceNumber, id, Number.isNaN(issuedAt.getTime()) ? now : issuedAt),
     status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
-    clientName: text$7(data.clientName),
+    clientName: text$8(data.clientName),
     address: addressText(data.billToAddress || data.address || data.propertyAddress),
     createdAt,
     issuedOn: formatPortalDate(data.createdAt) || formatPortalDate(data.sentAt) || formatPortalDate(data.paidAt),
@@ -1513,7 +1513,7 @@ function storedLines(lineItems, services2) {
     if (typeof item === "string" && item.trim()) return [{ name: item.trim(), qty: null, amount: null }];
     if (!item || typeof item !== "object") return [];
     const record = item;
-    const name = text$7(record.name) || text$7(record.label) || text$7(record.description);
+    const name = text$8(record.name) || text$8(record.label) || text$8(record.description);
     const qty = storedQty(record.qty ?? record.quantity);
     const amount = storedAmount(record.price ?? record.amount ?? record.total);
     if (!name && amount == null && qty == null) return [];
@@ -1549,7 +1549,7 @@ function isoStamp(value) {
   if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
   return null;
 }
-function text$7(value) {
+function text$8(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function roundMoney(value) {
@@ -1688,40 +1688,40 @@ function bookingListingGroups(input) {
   for (const doc of requests) {
     const node = nodeId("orderRequests", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("listings", text$6(doc.data.listingId)));
-    uf.link(node, nodeId("orders", text$6(doc.data.orderId) || text$6(doc.data.convertedToOrderId)));
-    uf.link(node, nodeId("invoices", text$6(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$6(doc.data.galleryId)));
+    uf.link(node, nodeId("listings", text$7(doc.data.listingId)));
+    uf.link(node, nodeId("orders", text$7(doc.data.orderId) || text$7(doc.data.convertedToOrderId)));
+    uf.link(node, nodeId("invoices", text$7(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$7(doc.data.galleryId)));
   }
   for (const doc of orders) {
     const node = nodeId("orders", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$6(doc.data.orderRequestId)));
-    uf.link(node, nodeId("listings", text$6(doc.data.listingId)));
-    uf.link(node, nodeId("invoices", text$6(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$6(doc.data.galleryId)));
+    uf.link(node, nodeId("orderRequests", text$7(doc.data.orderRequestId)));
+    uf.link(node, nodeId("listings", text$7(doc.data.listingId)));
+    uf.link(node, nodeId("invoices", text$7(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$7(doc.data.galleryId)));
   }
   for (const doc of invoices) {
     const node = nodeId("invoices", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$6(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$6(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$6(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$7(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$7(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$7(doc.data.listingId)));
   }
   for (const doc of appointments) {
     const node = nodeId("appointments", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$6(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$6(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$6(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$7(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$7(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$7(doc.data.listingId)));
   }
   for (const doc of galleries) {
     const node = nodeId("galleries", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$6(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$6(doc.data.orderId)));
-    uf.link(node, nodeId("invoices", text$6(doc.data.invoiceId)));
-    uf.link(node, nodeId("listings", text$6(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$7(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$7(doc.data.orderId)));
+    uf.link(node, nodeId("invoices", text$7(doc.data.invoiceId)));
+    uf.link(node, nodeId("listings", text$7(doc.data.listingId)));
   }
   const groups = [];
   for (const nodes of uf.components()) {
@@ -1780,7 +1780,7 @@ function fillEmptyListingFields(existing, desired) {
   return patch;
 }
 function clientOwnsListing(listing, clients) {
-  const clientId2 = text$6(listing.clientId);
+  const clientId2 = text$7(listing.clientId);
   const email = normalizeEmail(listing.clientEmail || listing.email);
   if (!clientId2 && !email) return true;
   if (clientId2 && clients.ids.includes(clientId2)) return true;
@@ -1845,10 +1845,10 @@ function chooseListing(group, listings, clients) {
 }
 function listingMatches(doc, group) {
   if (doc.id === group.stableId || group.preferredListingIds.includes(doc.id)) return true;
-  const requestId = text$6(doc.data.orderRequestId);
-  const orderId = text$6(doc.data.orderId);
-  const invoiceId = text$6(doc.data.invoiceId);
-  const appointmentId = text$6(doc.data.appointmentId);
+  const requestId = text$7(doc.data.orderRequestId);
+  const orderId = text$7(doc.data.orderId);
+  const invoiceId = text$7(doc.data.invoiceId);
+  const appointmentId = text$7(doc.data.appointmentId);
   return Boolean(
     requestId && group.orderRequestIds.includes(requestId) || orderId && group.orderIds.includes(orderId) || invoiceId && group.invoiceIds.includes(invoiceId) || appointmentId && group.appointmentIds.includes(appointmentId)
   );
@@ -1858,7 +1858,7 @@ function linksFor(group, listingId, listings, clients) {
   const links = [];
   const push = (collection, docs) => {
     for (const doc of docs) {
-      const current = text$6(doc.data.listingId);
+      const current = text$7(doc.data.listingId);
       if (current === listingId) continue;
       if (current && isPortalListingId(current) && ownedIds.has(current)) continue;
       links.push({ collection, id: doc.id });
@@ -1875,7 +1875,7 @@ function clientsFor(group, identity) {
   const ids = /* @__PURE__ */ new Set();
   const emails = /* @__PURE__ */ new Set();
   const addId = (value) => {
-    const id = text$6(value);
+    const id = text$7(value);
     if (id) ids.add(id);
   };
   const addEmail = (value) => {
@@ -1894,7 +1894,7 @@ function clientsFor(group, identity) {
 function preferredListingIds(group) {
   const ids = [];
   const push = (value) => {
-    const id = text$6(value);
+    const id = text$7(value);
     if (id && isPortalListingId(id) && !ids.includes(id)) ids.push(id);
   };
   for (const doc of [...group.orderRequests, ...group.orders, ...group.invoices, ...group.appointments, ...group.galleries]) {
@@ -1929,9 +1929,9 @@ function bestAddress(group) {
   }
   for (const doc of propertyDocs(group)) {
     for (const key of ["address", "propertyAddress", "shootLocation"]) {
-      if (typeof doc.data[key] === "string" && text$6(doc.data[key])) return text$6(doc.data[key]);
+      if (typeof doc.data[key] === "string" && text$7(doc.data[key])) return text$7(doc.data[key]);
     }
-    if (text$6(doc.data.addressLabel)) return text$6(doc.data.addressLabel);
+    if (text$7(doc.data.addressLabel)) return text$7(doc.data.addressLabel);
   }
   return null;
 }
@@ -1947,7 +1947,7 @@ function firstScheduleDate(group) {
 function firstScheduleTime(group) {
   for (const doc of [...group.appointments, ...group.orders, ...group.orderRequests]) {
     for (const key of ["scheduledTime", "appointmentTime", "apptTime", "requestedTime"]) {
-      const value = text$6(doc.data[key]);
+      const value = text$7(doc.data[key]);
       if (value && !/^tbd$/i.test(value)) return value;
     }
   }
@@ -1964,7 +1964,7 @@ function projectType(group) {
     if (doc.data.projectType === "real_estate") return "real_estate";
     const service = doc.data.selectedService;
     if (service && typeof service === "object") {
-      const category = text$6(service.category);
+      const category = text$7(service.category);
       if (category === "business" || category === "branding") return "business";
       if (category === "listings") return "real_estate";
     }
@@ -1990,7 +1990,7 @@ function namesFrom(value) {
   for (const item of value) {
     if (typeof item === "string" && item.trim()) names.push(item.trim());
     else if (item && typeof item === "object") {
-      const name = text$6(item.name);
+      const name = text$7(item.name);
       if (name) names.push(name);
     }
     if (names.length >= 40) break;
@@ -2015,8 +2015,8 @@ function accessInfo(group) {
   return [firstText$1(group, ["accessMethod"]), firstText$1(group, ["lockboxCode"])].filter(Boolean).join(" - ");
 }
 function clientId(group, identity) {
-  const bookingIds = propertyDocs(group).map((doc) => text$6(doc.data.clientId)).filter(Boolean);
-  const identityIds = (identity?.ids || []).map((id) => text$6(id)).filter(Boolean);
+  const bookingIds = propertyDocs(group).map((doc) => text$7(doc.data.clientId)).filter(Boolean);
+  const identityIds = (identity?.ids || []).map((id) => text$7(id)).filter(Boolean);
   return bookingIds.find((id) => identityIds.includes(id)) || bookingIds[0] || identityIds[0] || "";
 }
 function clientEmail(group, identity) {
@@ -2030,8 +2030,8 @@ function clientEmail(group, identity) {
 }
 function clientName(group) {
   for (const doc of propertyDocs(group)) {
-    if (text$6(doc.data.clientName)) return text$6(doc.data.clientName);
-    const joined = `${text$6(doc.data.firstName)} ${text$6(doc.data.lastName)}`.trim();
+    if (text$7(doc.data.clientName)) return text$7(doc.data.clientName);
+    const joined = `${text$7(doc.data.firstName)} ${text$7(doc.data.lastName)}`.trim();
     if (joined) return joined;
   }
   return "";
@@ -2039,7 +2039,7 @@ function clientName(group) {
 function chosenInvoiceId(group) {
   const known = new Set(group.invoiceIds);
   for (const doc of [...group.orderRequests, ...group.orders]) {
-    const id = text$6(doc.data.invoiceId);
+    const id = text$7(doc.data.invoiceId);
     if (id && known.has(id)) return id;
   }
   return newestDoc(group.invoices)?.id || group.invoiceIds[0] || "";
@@ -2048,7 +2048,7 @@ function chosenId(docs, ids, pointers = [], keys = []) {
   const known = new Set(ids);
   for (const doc of pointers) {
     for (const key of keys) {
-      const id = text$6(doc.data[key]);
+      const id = text$7(doc.data[key]);
       if (id && known.has(id)) return id;
     }
   }
@@ -2060,7 +2060,7 @@ function propertyDocs(group) {
 function firstText$1(group, keys) {
   for (const doc of propertyDocs(group)) {
     for (const key of keys) {
-      const value = text$6(doc.data[key]);
+      const value = text$7(doc.data[key]);
       if (value) return value;
     }
   }
@@ -2121,7 +2121,7 @@ function hasAddress(value) {
   if (typeof value === "string") return value.trim().length > 0;
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record = value;
-  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$6(record[key]).length > 0);
+  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$7(record[key]).length > 0);
 }
 function statusKey(value) {
   return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
@@ -2153,14 +2153,14 @@ function isEmpty(value) {
 function isSentinel$1(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$6(value) {
+function text$7(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function cleanDocs(docs) {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
   for (const doc of docs || []) {
-    const id = text$6(doc?.id);
+    const id = text$7(doc?.id);
     if (!id || seen.has(id)) continue;
     seen.add(id);
     out.push({ id, data: doc.data && typeof doc.data === "object" ? doc.data : {} });
@@ -2207,7 +2207,7 @@ class UnionFind {
     return root;
   }
 }
-const db$k = () => admin.firestore();
+const db$l = () => admin.firestore();
 const LINK_COLLECTIONS = /* @__PURE__ */ new Set([
   "orderRequests",
   "orders",
@@ -2229,7 +2229,7 @@ const BLOCKED_FIELDS = /* @__PURE__ */ new Set([
 async function ensureBookingListingForRequest(orderRequestId) {
   const id = orderRequestId.trim();
   if (!id) return null;
-  const snap = await db$k().collection("orderRequests").doc(id).get();
+  const snap = await db$l().collection("orderRequests").doc(id).get();
   if (!snap.exists) return null;
   const request = asDoc(snap.id, snap.data());
   const bundle = await hydrateBundle({
@@ -2240,7 +2240,7 @@ async function ensureBookingListingForRequest(orderRequestId) {
     galleries: []
   });
   const identity = {
-    ids: text$5(request.data.clientId) ? [text$5(request.data.clientId)] : [],
+    ids: text$6(request.data.clientId) ? [text$6(request.data.clientId)] : [],
     email: normalizeEmail(request.data.clientEmail || request.data.email)
   };
   const plans = await plansFor(bundle, identity);
@@ -2283,7 +2283,7 @@ async function plansFor(bundle, identity) {
 }
 async function applyBookingListingPlan(plan) {
   if (!isPortalListingId(plan.listingId)) throw new Error("Listing id is not valid.");
-  const ref = db$k().collection("listings").doc(plan.listingId);
+  const ref = db$l().collection("listings").doc(plan.listingId);
   let created = false;
   if (plan.create) {
     try {
@@ -2293,7 +2293,7 @@ async function applyBookingListingPlan(plan) {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
       created = true;
-      console.info(`[Listings] Created ${plan.listingId} for booking ${text$5(plan.createFields.orderRequestId) || text$5(plan.createFields.orderId) || text$5(plan.createFields.invoiceId)}`);
+      console.info(`[Listings] Created ${plan.listingId} for booking ${text$6(plan.createFields.orderRequestId) || text$6(plan.createFields.orderId) || text$6(plan.createFields.invoiceId)}`);
     } catch (err) {
       if (!alreadyExists(err)) throw err;
       await fillListing(ref, plan.createFields);
@@ -2319,10 +2319,10 @@ async function fillListing(ref, desired) {
 }
 async function linkRecord(collectionName, id, listingId) {
   if (!LINK_COLLECTIONS.has(collectionName) || !id) return;
-  const ref = db$k().collection(collectionName).doc(id);
+  const ref = db$l().collection(collectionName).doc(id);
   const snap = await ref.get();
   if (!snap.exists) return;
-  if (text$5(snap.data()?.listingId) === listingId) return;
+  if (text$6(snap.data()?.listingId) === listingId) return;
   await ref.update({
     listingId,
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -2336,9 +2336,9 @@ async function loadVisibleSeeds(identity) {
   const keep = (map, docs) => {
     for (const doc of docs) {
       if (!visibleToPortalClient({
-        clientId: text$5(doc.data.clientId),
-        email: text$5(doc.data.email),
-        clientEmail: text$5(doc.data.clientEmail)
+        clientId: text$6(doc.data.clientId),
+        email: text$6(doc.data.email),
+        clientEmail: text$6(doc.data.clientEmail)
       }, identity)) continue;
       if (!map.has(doc.id)) map.set(doc.id, doc);
     }
@@ -2377,23 +2377,23 @@ async function hydrateBundle(seed) {
   const galleries = mapDocs(seed.galleries);
   const requestIds = new Set(requests.keys());
   for (const doc of [...orders.values(), ...invoices.values(), ...appointments.values()]) {
-    const id = text$5(doc.data.orderRequestId);
+    const id = text$6(doc.data.orderRequestId);
     if (id) requestIds.add(id);
   }
   await readMissing("orderRequests", requestIds, requests);
   const orderIds = new Set(orders.keys());
   for (const doc of requests.values()) {
-    const id = text$5(doc.data.convertedToOrderId) || text$5(doc.data.orderId);
+    const id = text$6(doc.data.convertedToOrderId) || text$6(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   for (const doc of [...invoices.values(), ...appointments.values()]) {
-    const id = text$5(doc.data.orderId);
+    const id = text$6(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   await readMissing("orders", orderIds, orders);
   const invoiceIds = new Set(invoices.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$5(doc.data.invoiceId);
+    const id = text$6(doc.data.invoiceId);
     if (id) invoiceIds.add(id);
   }
   await readMissing("invoices", invoiceIds, invoices);
@@ -2403,7 +2403,7 @@ async function hydrateBundle(seed) {
   mergeDocs(appointments, await queryIn("appointments", "orderId", [...orders.keys()]));
   const galleryIds = new Set(galleries.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$5(doc.data.galleryId);
+    const id = text$6(doc.data.galleryId);
     if (id) galleryIds.add(id);
   }
   await readMissing("galleries", galleryIds, galleries);
@@ -2444,7 +2444,7 @@ async function loadListingsForGroups(identity, groups) {
 async function readMissing(collectionName, ids, into) {
   const missing = [...ids].filter((id) => id && !into.has(id)).slice(0, 100);
   if (missing.length === 0) return;
-  const snaps = await db$k().getAll(...missing.map((id) => db$k().collection(collectionName).doc(id)));
+  const snaps = await db$l().getAll(...missing.map((id) => db$l().collection(collectionName).doc(id)));
   snaps.forEach((snap) => {
     if (!snap.exists || into.has(snap.id)) return;
     into.set(snap.id, asDoc(snap.id, snap.data()));
@@ -2454,14 +2454,14 @@ async function queryIn(collectionName, field, values) {
   const unique2 = [...new Set(values.map((value) => value.trim()).filter(Boolean))];
   const docs = [];
   for (const part of chunk(unique2, 30)) {
-    const snap = await db$k().collection(collectionName).where(field, "in", part).limit(100).get();
+    const snap = await db$l().collection(collectionName).where(field, "in", part).limit(100).get();
     snap.docs.forEach((doc) => docs.push(asDoc(doc.id, doc.data())));
   }
   return docs;
 }
 async function queryEqual(collectionName, field, value) {
   if (!value) return [];
-  const snap = await db$k().collection(collectionName).where(field, "==", value).limit(100).get();
+  const snap = await db$l().collection(collectionName).where(field, "==", value).limit(100).get();
   return snap.docs.map((doc) => asDoc(doc.id, doc.data()));
 }
 function mergeDocs(into, docs) {
@@ -2520,7 +2520,7 @@ function alreadyExists(err) {
 function isSentinel(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$5(value) {
+function text$6(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function chunk(items, size) {
@@ -2531,8 +2531,8 @@ function chunk(items, size) {
 function lifeOfTheListingCareSelected(value) {
   return value === true;
 }
-const router$h = Router();
-const db$j = () => admin.firestore();
+const router$i = Router();
+const db$k = () => admin.firestore();
 function appUrl$2() {
   return process.env.APP_URL || "https://iconicimagestx.com";
 }
@@ -2562,7 +2562,7 @@ function toDate$1(value) {
 function money$2(value) {
   return orderTotalLabel(value);
 }
-router$h.post("/", async (req, res) => {
+router$i.post("/", async (req, res) => {
   try {
     const {
       firstName,
@@ -2654,7 +2654,7 @@ router$h.post("/", async (req, res) => {
       submittedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    const docRef = await db$j().collection("orderRequests").add(orderRequest);
+    const docRef = await db$k().collection("orderRequests").add(orderRequest);
     const normalizedEmail = orderRequest.email;
     let account = {
       clientId: null,
@@ -2863,9 +2863,9 @@ router$h.post("/", async (req, res) => {
     return res.status(500).json({ error: "Failed to submit booking request." });
   }
 });
-router$h.get("/", requireCoordinator, async (_req, res) => {
+router$i.get("/", requireCoordinator, async (_req, res) => {
   try {
-    const snapshot = await db$j().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
+    const snapshot = await db$k().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
     const requests = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data()
@@ -2876,9 +2876,9 @@ router$h.get("/", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking requests." });
   }
 });
-router$h.get("/:id", requireCoordinator, async (req, res) => {
+router$i.get("/:id", requireCoordinator, async (req, res) => {
   try {
-    const doc = await db$j().collection("orderRequests").doc(req.params.id).get();
+    const doc = await db$k().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) {
       return res.status(404).json({ error: "Booking request not found." });
     }
@@ -2888,10 +2888,10 @@ router$h.get("/:id", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking request." });
   }
 });
-router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
+router$i.patch("/:id/confirm", requireCoordinator, async (req, res) => {
   try {
     const { assignedPhotographerId, assignedPhotographerName, scheduledDate, scheduledTime, internalNotes } = req.body;
-    const requestDoc = await db$j().collection("orderRequests").doc(req.params.id).get();
+    const requestDoc = await db$k().collection("orderRequests").doc(req.params.id).get();
     if (!requestDoc.exists) {
       return res.status(404).json({ error: "Booking request not found." });
     }
@@ -2946,12 +2946,12 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     }
     let photographer = null;
     if (assignedPhotographerId) {
-      const staffDoc = await db$j().collection("staff").doc(assignedPhotographerId).get();
+      const staffDoc = await db$k().collection("staff").doc(assignedPhotographerId).get();
       photographer = staffDoc.exists ? staffDoc.data() : null;
     }
     let clientId2;
     const attachedClientId = typeof request.clientId === "string" ? request.clientId.trim() : "";
-    const attachedClient = attachedClientId ? await db$j().collection("clients").doc(attachedClientId).get() : null;
+    const attachedClient = attachedClientId ? await db$k().collection("clients").doc(attachedClientId).get() : null;
     if (attachedClient?.exists) {
       clientId2 = attachedClient.id;
       await attachedClient.ref.update({
@@ -2960,7 +2960,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
     } else {
-      const existingClients = await db$j().collection("clients").where("email", "==", requestEmail).limit(1).get();
+      const existingClients = await db$k().collection("clients").where("email", "==", requestEmail).limit(1).get();
       if (!existingClients.empty) {
         clientId2 = existingClients.docs[0].id;
         await existingClients.docs[0].ref.update({
@@ -2969,7 +2969,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
       } else {
-        const clientRef = await db$j().collection("clients").add({
+        const clientRef = await db$k().collection("clients").add({
           firstName: requestFirstName,
           lastName: requestLastName,
           email: requestEmail,
@@ -3018,8 +3018,8 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    const orderRef = await db$j().collection("orders").add(orderData);
-    const existingAppointment = await db$j().collection("appointments").where("orderRequestId", "==", req.params.id).limit(1).get();
+    const orderRef = await db$k().collection("orders").add(orderData);
+    const existingAppointment = await db$k().collection("appointments").where("orderRequestId", "==", req.params.id).limit(1).get();
     const confirmedAppointment = {
       orderId: orderRef.id,
       orderRequestId: req.params.id,
@@ -3039,7 +3039,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       internalNotes: internalNotes || "",
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    const appointmentRef = existingAppointment.empty ? db$j().collection("appointments").doc() : existingAppointment.docs[0].ref;
+    const appointmentRef = existingAppointment.empty ? db$k().collection("appointments").doc() : existingAppointment.docs[0].ref;
     if (existingAppointment.empty) {
       await appointmentRef.set({
         ...confirmedAppointment,
@@ -3048,7 +3048,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     } else {
       await appointmentRef.update(confirmedAppointment);
     }
-    const galleryRef = await db$j().collection("galleries").add({
+    const galleryRef = await db$k().collection("galleries").add({
       orderId: orderRef.id,
       clientId: clientId2,
       clientName: requestClientName,
@@ -3076,7 +3076,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       notes: internalNotes || request.vibeNote || ""
     }).catch(async (err) => {
       console.error("[Bookings] Calendar event creation failed:", err);
-      await db$j().collection("agentLogs").add({
+      await db$k().collection("agentLogs").add({
         agent: "nora",
         action: "Calendar event failed",
         summary: `Google Calendar event was not created for order ${orderRef.id}`,
@@ -3110,7 +3110,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     let listingId = existingInvoiceId(request.listingId);
     let invoiceId = linkedInvoiceId;
     if (linkedInvoiceId) {
-      const existingInvoice = await db$j().collection("invoices").doc(linkedInvoiceId).get();
+      const existingInvoice = await db$k().collection("invoices").doc(linkedInvoiceId).get();
       if (existingInvoice.exists) {
         await existingInvoice.ref.update({
           orderId: orderRef.id,
@@ -3125,7 +3125,7 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         console.error(`[Bookings] Confirm kept invoiceId ${linkedInvoiceId} but the invoice doc is missing. Not creating a second invoice.`);
       }
     } else {
-      const invoiceRef = db$j().collection("invoices").doc();
+      const invoiceRef = db$k().collection("invoices").doc();
       const draft = buildBookingInvoiceDraft({
         lineItems: requestLineItems,
         total: requestTotal,
@@ -3202,10 +3202,10 @@ router$h.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to confirm booking." });
   }
 });
-router$h.patch("/:id/decline", requireCoordinator, async (req, res) => {
+router$i.patch("/:id/decline", requireCoordinator, async (req, res) => {
   try {
     const { reason } = req.body;
-    const doc = await db$j().collection("orderRequests").doc(req.params.id).get();
+    const doc = await db$k().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Not found." });
     await doc.ref.update({
       status: "declined",
@@ -3226,23 +3226,23 @@ async function stampDurableLinks(input) {
     orderInvoiceId: input.invoiceId
   });
   const now = admin.firestore.FieldValue.serverTimestamp();
-  const invoiceRef = db$j().collection("invoices").doc(plan.createId);
+  const invoiceRef = db$k().collection("invoices").doc(plan.createId);
   const invoiceSnap = await invoiceRef.get();
   if (invoiceSnap.exists && Object.keys(plan.invoiceFields).length > 0) {
     await invoiceRef.update({ ...plan.invoiceFields, updatedAt: now });
   }
   if (plan.orderFields) {
-    await db$j().collection("orders").doc(input.orderId).update({ ...plan.orderFields, updatedAt: now });
+    await db$k().collection("orders").doc(input.orderId).update({ ...plan.orderFields, updatedAt: now });
   }
   if (input.listingId && plan.listingFields) {
-    await db$j().collection("listings").doc(input.listingId).update({ ...plan.listingFields, updatedAt: now });
+    await db$k().collection("listings").doc(input.listingId).update({ ...plan.listingFields, updatedAt: now });
   }
 }
 async function linkClientIdByEmail(email) {
   try {
     const normalized = normalizeEmail(email);
     if (!normalized) return null;
-    const snap = await db$j().collection("clients").where("email", "==", normalized).limit(1).get();
+    const snap = await db$k().collection("clients").where("email", "==", normalized).limit(1).get();
     return snap.empty ? null : snap.docs[0].id;
   } catch (err) {
     console.error("[Bookings] Client lookup for invoice failed:", err);
@@ -3262,7 +3262,7 @@ async function createBookingInvoiceDraft(input) {
     promoCode: input.promoCode,
     promoDiscount: input.promoDiscount
   });
-  const invoiceRef = db$j().collection("invoices").doc();
+  const invoiceRef = db$k().collection("invoices").doc();
   await invoiceRef.set({
     ...draft,
     invoiceNumber: await generateInvoiceNumber(),
@@ -3274,7 +3274,7 @@ async function createBookingInvoiceDraft(input) {
 }
 async function generateInvoiceNumber() {
   const year = (/* @__PURE__ */ new Date()).getFullYear();
-  const snapshot = await db$j().collection("invoices").where("invoiceNumber", ">=", `INV-${year}-`).where("invoiceNumber", "<", `INV-${year + 1}`).get().catch((err) => {
+  const snapshot = await db$k().collection("invoices").where("invoiceNumber", ">=", `INV-${year}-`).where("invoiceNumber", "<", `INV-${year + 1}`).get().catch((err) => {
     console.error("[Bookings] Invoice number lookup failed:", err);
     return null;
   });
@@ -3286,12 +3286,12 @@ async function generateInvoiceNumber() {
     year
   );
 }
-const router$g = Router();
-const db$i = () => admin.firestore();
-router$g.get("/", requireStaff, async (req, res) => {
+const router$h = Router();
+const db$j = () => admin.firestore();
+router$h.get("/", requireStaff, async (req, res) => {
   try {
     const { status, photographerId, limit = "50", startAfter } = req.query;
-    let query = db$i().collection("orders").orderBy("createdAt", "desc");
+    let query = db$j().collection("orders").orderBy("createdAt", "desc");
     if (status) query = query.where("status", "==", status);
     if (photographerId) {
       query = query.where("assignedPhotographerId", "==", photographerId);
@@ -3299,7 +3299,7 @@ router$g.get("/", requireStaff, async (req, res) => {
     const limitNum = Math.min(Number(limit), 200);
     query = query.limit(limitNum);
     if (startAfter) {
-      const cursorDoc = await db$i().collection("orders").doc(startAfter).get();
+      const cursorDoc = await db$j().collection("orders").doc(startAfter).get();
       if (cursorDoc.exists) {
         query = query.startAfter(cursorDoc);
       }
@@ -3316,16 +3316,16 @@ router$g.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch orders." });
   }
 });
-router$g.get("/dashboard", requireStaff, async (_req, res) => {
+router$h.get("/dashboard", requireStaff, async (_req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const [allOrders, todayOrders, monthTransactions, pendingRequests] = await Promise.all([
-      db$i().collection("orders").get(),
-      db$i().collection("orders").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(todayStart)).get(),
-      db$i().collection("transactions").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(monthStart)).where("status", "==", "completed").get(),
-      db$i().collection("orderRequests").where("status", "==", "new").get()
+      db$j().collection("orders").get(),
+      db$j().collection("orders").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(todayStart)).get(),
+      db$j().collection("transactions").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(monthStart)).where("status", "==", "completed").get(),
+      db$j().collection("orderRequests").where("status", "==", "new").get()
     ]);
     const statusCounts = {};
     allOrders.docs.forEach((d) => {
@@ -3349,25 +3349,25 @@ router$g.get("/dashboard", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch dashboard stats." });
   }
 });
-router$g.get("/:id", requireStaff, async (req, res) => {
+router$h.get("/:id", requireStaff, async (req, res) => {
   try {
-    const orderDoc = await db$i().collection("orders").doc(req.params.id).get();
+    const orderDoc = await db$j().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
     const order = { id: orderDoc.id, ...orderDoc.data() };
     const [gallery, invoice, appointment, messages] = await Promise.all([
-      db$i().collection("galleries").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
+      db$j().collection("galleries").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
         console.error("[Orders] Gallery lookup failed:", err);
         return null;
       }),
-      db$i().collection("invoices").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
+      db$j().collection("invoices").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
         console.error("[Orders] Invoice lookup failed:", err);
         return null;
       }),
-      db$i().collection("appointments").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
+      db$j().collection("appointments").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
         console.error("[Orders] Appointment lookup failed:", err);
         return null;
       }),
-      db$i().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "desc").limit(20).get().catch((err) => {
+      db$j().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "desc").limit(20).get().catch((err) => {
         console.error("[Orders] Messages lookup failed:", err);
         return null;
       })
@@ -3384,7 +3384,7 @@ router$g.get("/:id", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch order." });
   }
 });
-router$g.patch("/:id", requireCoordinator, async (req, res) => {
+router$h.patch("/:id", requireCoordinator, async (req, res) => {
   try {
     const allowed = [
       "status",
@@ -3406,7 +3406,7 @@ router$g.patch("/:id", requireCoordinator, async (req, res) => {
         new Date(updates.scheduledDate)
       );
     }
-    await db$i().collection("orders").doc(req.params.id).update(updates);
+    await db$j().collection("orders").doc(req.params.id).update(updates);
     return res.json({ success: true });
   } catch (err) {
     console.error("[Orders] Update error:", err);
@@ -3424,10 +3424,10 @@ const VALID_TRANSITIONS = {
   completed: [],
   cancelled: []
 };
-router$g.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$h.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status, note } = req.body;
-    const orderDoc = await db$i().collection("orders").doc(req.params.id).get();
+    const orderDoc = await db$j().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
     const currentStatus = orderDoc.data().status;
     const validNext = VALID_TRANSITIONS[currentStatus] || [];
@@ -3445,14 +3445,14 @@ router$g.patch("/:id/status", requireCoordinator, async (req, res) => {
       updates.completedAt = admin.firestore.FieldValue.serverTimestamp();
     }
     await orderDoc.ref.update(updates);
-    const apptSnapshot = await db$i().collection("appointments").where("orderId", "==", req.params.id).limit(1).get();
+    const apptSnapshot = await db$j().collection("appointments").where("orderId", "==", req.params.id).limit(1).get();
     if (!apptSnapshot.empty) {
       const apptStatus = status === "in_progress" ? "in_progress" : status === "shot_complete" || status === "editing" ? "completed" : status === "cancelled" ? "cancelled" : void 0;
       if (apptStatus) {
         await apptSnapshot.docs[0].ref.update({ status: apptStatus });
       }
     }
-    await db$i().collection("agentLogs").add({
+    await db$j().collection("agentLogs").add({
       agent: "nora",
       action: `Order status changed: ${currentStatus} → ${status}`,
       summary: `Order ${req.params.id} transitioned to ${status}`,
@@ -3470,12 +3470,12 @@ router$g.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update order status." });
   }
 });
-router$g.get("/:id/timeline", requireStaff, async (req, res) => {
+router$h.get("/:id/timeline", requireStaff, async (req, res) => {
   try {
     const [messages, editRequests, agentLogs] = await Promise.all([
-      db$i().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
-      db$i().collection("editRequests").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
-      db$i().collection("agentLogs").where("relatedId", "==", req.params.id).orderBy("createdAt", "asc").get()
+      db$j().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
+      db$j().collection("editRequests").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
+      db$j().collection("agentLogs").where("relatedId", "==", req.params.id).orderBy("createdAt", "asc").get()
     ]);
     const timeline = [
       ...messages.docs.map((d) => ({ type: "message", ...d.data(), id: d.id })),
@@ -3777,11 +3777,11 @@ function statusOf(doc) {
 function isReleased(doc) {
   return RELEASED_GALLERY_STATUSES.includes(statusOf(doc));
 }
-function text$4(value) {
+function text$5(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function httpUrl(value) {
-  const url = text$4(value);
+  const url = text$5(value);
   return url.startsWith("https://") || url.startsWith("http://") ? url : "";
 }
 function galleryResult(doc, via) {
@@ -3799,7 +3799,7 @@ function galleryResult(doc, via) {
   };
 }
 function addressOf(listing) {
-  const property = text$4(listing.propertyAddress);
+  const property = text$5(listing.propertyAddress);
   if (property) return property;
   const labeled = listingAddressLabel({
     address: listing.address,
@@ -3837,7 +3837,7 @@ function publicVideos(listing) {
     const row = item;
     const url = httpUrl(row.url);
     if (!url || url.includes("/raw/")) continue;
-    videos.push({ url, name: text$4(row.name) || "Video" });
+    videos.push({ url, name: text$5(row.name) || "Video" });
   }
   return videos.slice(0, 40);
 }
@@ -3847,12 +3847,12 @@ function publicRevisions(listing) {
     const row = item && typeof item === "object" ? item : {};
     const photoIndex = typeof row.photoIndex === "number" ? row.photoIndex : null;
     return {
-      id: text$4(row.id) || `revision-${index + 1}`,
-      type: text$4(row.type) || "gallery",
+      id: text$5(row.id) || `revision-${index + 1}`,
+      type: text$5(row.type) || "gallery",
       photoIndex,
-      description: text$4(row.description),
-      status: text$4(row.status) || "pending",
-      createdAt: text$4(row.createdAt)
+      description: text$5(row.description),
+      status: text$5(row.status) || "pending",
+      createdAt: text$5(row.createdAt)
     };
   });
 }
@@ -3861,11 +3861,11 @@ function invoiceOf(listing) {
   if (nested && typeof nested === "object" && typeof nested.status === "string") {
     return { status: nested.status };
   }
-  const status = text$4(listing.invoiceStatus);
+  const status = text$5(listing.invoiceStatus);
   return status ? { status } : null;
 }
 function pickReleasedGallery(listing, related) {
-  const preferred = text$4(listing.galleryId) || text$4(listing.playtestGalleryId);
+  const preferred = text$5(listing.galleryId) || text$5(listing.playtestGalleryId);
   const released = related.filter((doc) => isReleased(doc));
   if (preferred) {
     const match = released.find((doc) => doc.id === preferred);
@@ -3919,7 +3919,7 @@ function publicProject(listing, _related, notice) {
   return {
     id: listing.id,
     address: addressOf(listing),
-    clientName: text$4(listing.clientName),
+    clientName: text$5(listing.clientName),
     services: servicesOf(listing),
     images: publicImages(listing),
     videos: publicVideos(listing),
@@ -3962,8 +3962,8 @@ function decideClientGalleryLink(input) {
   }
   if (input.pointedListing) return listingResult(input.pointedListing, input.relatedGalleries);
   if (input.order) {
-    const galleryId = text$4(input.order.galleryId);
-    const listingId = text$4(input.order.listingId);
+    const galleryId = text$5(input.order.galleryId);
+    const listingId = text$5(input.order.listingId);
     if (galleryId || listingId) {
       return {
         ok: false,
@@ -3980,8 +3980,8 @@ function decideClientGalleryLink(input) {
     };
   }
   if (input.orderRequest) {
-    const galleryId = text$4(input.orderRequest.galleryId);
-    const listingId = text$4(input.orderRequest.listingId);
+    const galleryId = text$5(input.orderRequest.galleryId);
+    const listingId = text$5(input.orderRequest.listingId);
     if (galleryId || listingId) {
       return {
         ok: false,
@@ -4434,7 +4434,7 @@ function jsonSafe(value) {
   }
   return value;
 }
-const db$h = () => admin.firestore();
+const db$i = () => admin.firestore();
 const bucket$1 = () => admin.storage().bucket();
 const BROWSER_ORIGINS = [
   "https://iconicimagestx.vercel.app",
@@ -4498,7 +4498,7 @@ async function registerListingPhoto(options) {
   if (!isListingStoragePath(listingId, storagePath)) {
     throw Object.assign(new Error("Storage path is not inside this listing."), { status: 400 });
   }
-  const listingRef = db$h().collection("listings").doc(listingId);
+  const listingRef = db$i().collection("listings").doc(listingId);
   const listingSnap = await listingRef.get();
   if (!listingSnap.exists) {
     throw Object.assign(new Error("Listing not found."), { status: 404 });
@@ -4557,7 +4557,7 @@ async function syncPlaytestGallery(listingId, listing, image) {
     galleryIds.add(listing.playtestGalleryId);
   }
   if (listing.playtest === true) {
-    const snap = await db$h().collection("galleries").where("listingId", "==", listingId).limit(5).get();
+    const snap = await db$i().collection("galleries").where("listingId", "==", listingId).limit(5).get();
     snap.docs.forEach((doc) => {
       if (doc.data().playtest === true) galleryIds.add(doc.id);
     });
@@ -4576,7 +4576,7 @@ async function syncPlaytestGallery(listingId, listing, image) {
     uploadedAt: image.uploadedAt
   };
   for (const galleryId of galleryIds) {
-    const ref = db$h().collection("galleries").doc(galleryId);
+    const ref = db$i().collection("galleries").doc(galleryId);
     const snap = await ref.get();
     if (!snap.exists || snap.data()?.playtest !== true) continue;
     const items = Array.isArray(snap.data()?.mediaItems) ? snap.data().mediaItems : [];
@@ -4835,7 +4835,7 @@ async function inspectFinishedListingJpeg(input) {
   }
   return parseDeliveryInspection(body) || deliveryInspection("flag", [INSPECTION_FAILED_NOTE]);
 }
-const db$g = () => admin.firestore();
+const db$h = () => admin.firestore();
 const bucket = () => admin.storage().bucket();
 function httpError$1(status, message) {
   return Object.assign(new Error(message), { status });
@@ -4847,7 +4847,7 @@ async function bumpRawIngestJob(input) {
     name: input.image.name || input.image.path.split("/").pop() || "raw",
     contentType: input.image.contentType || ""
   };
-  const ref = db$g().collection("editJobs").doc(ingestJobId(input.listingId));
+  const ref = db$h().collection("editJobs").doc(ingestJobId(input.listingId));
   const snap = await ref.get();
   if (!snap.exists) {
     await ref.set({
@@ -4879,21 +4879,21 @@ async function bumpRawIngestJob(input) {
   return { id: ref.id, created: false, fileCount: files.length + 1 };
 }
 async function loadListing$1(listingId) {
-  const snap = await db$g().collection("listings").doc(listingId).get();
+  const snap = await db$h().collection("listings").doc(listingId).get();
   if (!snap.exists) throw httpError$1(404, "Listing not found.");
   return { id: snap.id, ref: snap.ref, data: snap.data() || {} };
 }
 async function listingsForRole(uid, role) {
   if (role === "photographer") {
     const [byUid, byIds] = await Promise.all([
-      db$g().collection("listings").where("photographerUid", "==", uid).limit(50).get(),
-      db$g().collection("listings").where("photographerIds", "array-contains", uid).limit(50).get()
+      db$h().collection("listings").where("photographerUid", "==", uid).limit(50).get(),
+      db$h().collection("listings").where("photographerIds", "array-contains", uid).limit(50).get()
     ]);
     const merged = /* @__PURE__ */ new Map();
     for (const doc of [...byUid.docs, ...byIds.docs]) merged.set(doc.id, doc);
     return [...merged.values()].map((doc) => ({ id: doc.id, data: doc.data() }));
   }
-  const snap = await db$g().collection("listings").limit(80).get();
+  const snap = await db$h().collection("listings").limit(80).get();
   return snap.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
 }
 async function assertStudioAccess(uid, role, listingId) {
@@ -4965,7 +4965,7 @@ async function loadOrderEditContext(listingId) {
   let order = null;
   const orderId = typeof listing.data.orderId === "string" ? listing.data.orderId : "";
   if (orderId) {
-    const snap = await db$g().collection("orders").doc(orderId).get();
+    const snap = await db$h().collection("orders").doc(orderId).get();
     if (snap.exists) order = snap.data() || {};
   }
   const plan = planOrderEdits({
@@ -5015,7 +5015,7 @@ async function prepareOrderEditJobs(input) {
   if (input.retryFailed) settled.delete("failed");
   let prepared = 0;
   for (const draft of drafts) {
-    const ref = db$g().collection("editJobs").doc(orderEditDocId(input.listingId, draft.slot));
+    const ref = db$h().collection("editJobs").doc(orderEditDocId(input.listingId, draft.slot));
     const snap = await ref.get();
     const current = snap.data() || {};
     if (snap.exists && settled.has(String(current.status || ""))) continue;
@@ -5045,15 +5045,15 @@ async function prepareOrderEditJobs(input) {
     await ref.set(payload, { merge: true });
     prepared += 1;
   }
-  const jobSnap = await db$g().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
+  const jobSnap = await db$h().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
   const jobs = queueJobsFromSnap(jobSnap.docs);
-  const advance = orderQueueAdvancePlan(jobs);
+  const advance2 = orderQueueAdvancePlan(jobs);
   const waiting = jobs.filter((job) => job.origin === "order" && job.status === "pending" && !job.sourcePath).length;
-  return { plan, prepared, pending: advance.runnable, waiting, shouldFollowUp: advance.shouldFollowUp };
+  return { plan, prepared, pending: advance2.runnable, waiting, shouldFollowUp: advance2.shouldFollowUp };
 }
 async function claimOrderEdit(ref, now = Date.now()) {
   try {
-    await db$g().runTransaction(async (tx) => {
+    await db$h().runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       if (!snap.exists) throw new Error("missing");
       const data = snap.data() || {};
@@ -5080,10 +5080,10 @@ async function claimOrderEdit(ref, now = Date.now()) {
 }
 async function advanceOrderEditQueue(input) {
   const prepared = await prepareOrderEditJobs(input);
-  const jobSnap = await db$g().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
-  const advance = orderQueueAdvancePlan(queueJobsFromSnap(jobSnap.docs));
+  const jobSnap = await db$h().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
+  const advance2 = orderQueueAdvancePlan(queueJobsFromSnap(jobSnap.docs));
   const waiting = queueJobsFromSnap(jobSnap.docs).filter((job) => job.origin === "order" && job.status === "pending" && !job.sourcePath).length;
-  if (!advance.nextId) {
+  if (!advance2.nextId) {
     return {
       plan: prepared.plan,
       prepared: prepared.prepared,
@@ -5093,20 +5093,20 @@ async function advanceOrderEditQueue(input) {
       shouldFollowUp: false
     };
   }
-  const next = jobSnap.docs.find((doc) => doc.id === advance.nextId) || null;
+  const next = jobSnap.docs.find((doc) => doc.id === advance2.nextId) || null;
   if (!next) {
     return {
       plan: prepared.plan,
       prepared: prepared.prepared,
       ran: null,
-      remaining: advance.runnable,
+      remaining: advance2.runnable,
       waiting,
-      shouldFollowUp: advance.shouldFollowUp
+      shouldFollowUp: advance2.shouldFollowUp
     };
   }
   const claimed = await claimOrderEdit(next.ref);
   if (!claimed) {
-    const still = Math.max(0, advance.runnable - 1);
+    const still = Math.max(0, advance2.runnable - 1);
     return {
       plan: prepared.plan,
       prepared: prepared.prepared,
@@ -5146,7 +5146,7 @@ async function advanceOrderEditQueue(input) {
     } catch (err) {
       console.error("[Studio inspection] The edit is in review, but the inspection note was not stored.", err instanceof Error ? err.message : err);
     }
-    const remaining = Math.max(0, advance.remainingAfter);
+    const remaining = Math.max(0, advance2.remainingAfter);
     return {
       plan: prepared.plan,
       prepared: prepared.prepared,
@@ -5176,7 +5176,7 @@ async function advanceOrderEditQueue(input) {
       note,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    const remaining = Math.max(0, advance.remainingAfter);
+    const remaining = Math.max(0, advance2.remainingAfter);
     return {
       plan: prepared.plan,
       prepared: prepared.prepared,
@@ -5203,7 +5203,7 @@ async function enqueueOrderEditsFromUpload(input) {
   return prepareOrderEditJobs({ ...input, retryFailed: false });
 }
 async function nextOrderEditListingId() {
-  const snap = await db$g().collection("editJobs").where("status", "==", "pending").limit(40).get();
+  const snap = await db$h().collection("editJobs").where("status", "==", "pending").limit(40).get();
   for (const doc of snap.docs) {
     const data = doc.data() || {};
     if (data.origin === "order" && data.sourcePath && typeof data.listingId === "string" && data.listingId) {
@@ -5220,7 +5220,7 @@ async function enqueueAiEdit(input) {
     throw httpError$1(400, "Choose a JPEG, PNG, or WebP. RAW stays in the queue until a preview exists.");
   }
   const beforeUrl = frame.url || input.imageUrl;
-  const ref = await db$g().collection("editJobs").add({
+  const ref = await db$h().collection("editJobs").add({
     kind: "ai_edit",
     origin: "staff_override",
     type: input.type,
@@ -5288,7 +5288,7 @@ async function enqueueAiEdit(input) {
   }
 }
 async function rejectStudioJob(input) {
-  const ref = db$g().collection("editJobs").doc(input.jobId);
+  const ref = db$h().collection("editJobs").doc(input.jobId);
   const snap = await ref.get();
   if (!snap.exists) throw httpError$1(404, "Edit job not found.");
   const job = snap.data() || {};
@@ -5326,7 +5326,7 @@ async function saveAdjustedJpeg(input) {
     existingUrl: saved.url,
     extra: { studioRole: "adjusted", sourcePath: input.sourcePath }
   });
-  const job = await db$g().collection("editJobs").add({
+  const job = await db$h().collection("editJobs").add({
     kind: "adjust",
     type: "adjust",
     listingId: input.listingId,
@@ -5392,11 +5392,11 @@ async function addFinalToGalleries(listingId, listing, image) {
   const ids = /* @__PURE__ */ new Set();
   if (typeof listing.galleryId === "string" && listing.galleryId) ids.add(listing.galleryId);
   if (typeof listing.playtestGalleryId === "string" && listing.playtestGalleryId) ids.add(listing.playtestGalleryId);
-  const snap = await db$g().collection("galleries").where("listingId", "==", listingId).limit(10).get();
+  const snap = await db$h().collection("galleries").where("listingId", "==", listingId).limit(10).get();
   snap.docs.forEach((doc) => ids.add(doc.id));
   const updated = [];
   for (const galleryId of ids) {
-    const ref = db$g().collection("galleries").doc(galleryId);
+    const ref = db$h().collection("galleries").doc(galleryId);
     const gallerySnap = await ref.get();
     if (!gallerySnap.exists) continue;
     const data = gallerySnap.data() || {};
@@ -5449,7 +5449,7 @@ async function approveStudioFinal(input) {
     uploadedBy: input.uploadedBy
   });
   if (input.jobId) {
-    await db$g().collection("editJobs").doc(input.jobId).set({
+    await db$h().collection("editJobs").doc(input.jobId).set({
       status: "approved",
       resultPath: copied.storagePath,
       resultUrl: copied.url,
@@ -5468,7 +5468,7 @@ async function approveStudioFinal(input) {
 async function loadStudioWorkspace(input) {
   const listings = await listingsForRole(input.uid, input.role);
   const allowed = new Set(listings.map((item) => item.id));
-  const jobSnap = await db$g().collection("editJobs").limit(150).get();
+  const jobSnap = await db$h().collection("editJobs").limit(150).get();
   const jobs = jobSnap.docs.map((doc) => jsonSafe({ id: doc.id, ...doc.data() })).filter((job) => {
     const listingId = String(job.listingId || "");
     if (input.role === "photographer") return allowed.has(listingId);
@@ -5514,7 +5514,7 @@ async function loadStudioWorkspace(input) {
     listing
   };
 }
-const db$f = () => admin.firestore();
+const db$g = () => admin.firestore();
 function asMedia(value) {
   if (!Array.isArray(value)) return [];
   return value.flatMap((entry) => {
@@ -5556,11 +5556,11 @@ async function galleryMediaForListing(listingId, listing, extra) {
   const ids = /* @__PURE__ */ new Set();
   if (typeof listing.galleryId === "string" && listing.galleryId) ids.add(listing.galleryId);
   if (typeof listing.playtestGalleryId === "string" && listing.playtestGalleryId) ids.add(listing.playtestGalleryId);
-  const snap = await db$f().collection("galleries").where("listingId", "==", listingId).limit(10).get();
+  const snap = await db$g().collection("galleries").where("listingId", "==", listingId).limit(10).get();
   snap.docs.forEach((doc) => ids.add(doc.id));
   for (const galleryId of ids) {
     if (extra && galleryId === extra.id) continue;
-    const doc = await db$f().collection("galleries").doc(galleryId).get();
+    const doc = await db$g().collection("galleries").doc(galleryId).get();
     if (!doc.exists) continue;
     const data = doc.data() || {};
     media.push(...asMedia(data.mediaItems), ...asMedia(data.videoLinks), ...asMedia(data.tourLinks));
@@ -5570,7 +5570,7 @@ async function galleryMediaForListing(listingId, listing, extra) {
 async function loadGalleryReleaseReport(listingId, gallery) {
   const { listing, plan } = await loadOrderEditContext(listingId);
   const files = filesFromListing(listing.data);
-  const jobSnap = await db$f().collection("editJobs").where("listingId", "==", listingId).limit(200).get();
+  const jobSnap = await db$g().collection("editJobs").where("listingId", "==", listingId).limit(200).get();
   const jobs = jobSnap.docs.map((doc) => {
     const data = doc.data() || {};
     return {
@@ -5595,20 +5595,20 @@ async function loadGalleryReleaseReport(listingId, gallery) {
   return report;
 }
 async function loadGalleryReleaseForGallery(galleryId) {
-  const snap = await db$f().collection("galleries").doc(galleryId).get();
+  const snap = await db$g().collection("galleries").doc(galleryId).get();
   if (!snap.exists) {
     throw Object.assign(new Error("Gallery not found."), { status: 404 });
   }
   const gallery = { id: snap.id, ...snap.data() || {} };
   const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
   if (listingId) {
-    const listingSnap = await db$f().collection("listings").doc(listingId).get();
+    const listingSnap = await db$g().collection("listings").doc(listingId).get();
     if (listingSnap.exists) return loadGalleryReleaseReport(listingId, gallery);
   }
   const orderId = typeof gallery.orderId === "string" ? gallery.orderId.trim() : "";
   let order = null;
   if (orderId) {
-    const orderSnap = await db$f().collection("orders").doc(orderId).get();
+    const orderSnap = await db$g().collection("orders").doc(orderId).get();
     if (orderSnap.exists) order = orderSnap.data() || {};
   }
   const plan = planOrderEdits({
@@ -5626,8 +5626,8 @@ async function loadGalleryReleaseForGallery(galleryId) {
     media: [...asMedia(gallery.mediaItems), ...asMedia(gallery.videoLinks), ...asMedia(gallery.tourLinks)]
   });
 }
-const db$e = () => admin.firestore();
-function text$3(value) {
+const db$f = () => admin.firestore();
+function text$4(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function docRecord(snap) {
@@ -5636,7 +5636,7 @@ function docRecord(snap) {
 }
 async function galleriesWhere(field, id) {
   try {
-    const snap = await db$e().collection("galleries").where(field, "==", id).limit(8).get();
+    const snap = await db$f().collection("galleries").where(field, "==", id).limit(8).get();
     return snap.docs.map((doc) => docRecord(doc)).filter((doc) => Boolean(doc));
   } catch (err) {
     console.error(`[Galleries] ${field} lookup failed:`, err);
@@ -5645,11 +5645,11 @@ async function galleriesWhere(field, id) {
 }
 async function galleryById(id) {
   if (!id) return null;
-  return docRecord(await db$e().collection("galleries").doc(id).get());
+  return docRecord(await db$f().collection("galleries").doc(id).get());
 }
 async function relatedForListing(listing) {
   const related = await galleriesWhere("listingId", listing.id);
-  const extras = [text$3(listing.galleryId), text$3(listing.playtestGalleryId)];
+  const extras = [text$4(listing.galleryId), text$4(listing.playtestGalleryId)];
   for (const galleryId of extras) {
     if (!galleryId || related.some((doc) => doc.id === galleryId)) continue;
     const extra = await galleryById(galleryId);
@@ -5659,8 +5659,8 @@ async function relatedForListing(listing) {
 }
 async function resolveClientGalleryLink(id) {
   const [gallerySnap, listingSnap] = await Promise.all([
-    db$e().collection("galleries").doc(id).get(),
-    db$e().collection("listings").doc(id).get()
+    db$f().collection("galleries").doc(id).get(),
+    db$f().collection("listings").doc(id).get()
   ]);
   const gallery = docRecord(gallerySnap);
   const listing = docRecord(listingSnap);
@@ -5692,19 +5692,19 @@ async function resolveClientGalleryLink(id) {
   }
   const relatedGalleries = await galleriesWhere("listingId", id);
   const [orderSnap, requestSnap] = await Promise.all([
-    db$e().collection("orders").doc(id).get(),
-    db$e().collection("orderRequests").doc(id).get()
+    db$f().collection("orders").doc(id).get(),
+    db$f().collection("orderRequests").doc(id).get()
   ]);
   const order = docRecord(orderSnap);
   const orderRequest = docRecord(requestSnap);
   const galleriesByOrderId = order ? await galleriesWhere("orderId", id) : [];
-  const pointedGalleryId = text$3(orderRequest?.galleryId) || text$3(order?.galleryId);
-  const pointedListingId = text$3(orderRequest?.listingId) || text$3(order?.listingId);
+  const pointedGalleryId = text$4(orderRequest?.galleryId) || text$4(order?.galleryId);
+  const pointedListingId = text$4(orderRequest?.listingId) || text$4(order?.listingId);
   const pointedGallery = pointedGalleryId ? await galleryById(pointedGalleryId) : null;
   let pointedListing = null;
   let pointedRelated = relatedGalleries;
   if (!pointedGallery && pointedListingId) {
-    pointedListing = docRecord(await db$e().collection("listings").doc(pointedListingId).get());
+    pointedListing = docRecord(await db$f().collection("listings").doc(pointedListingId).get());
     if (pointedListing) pointedRelated = await relatedForListing(pointedListing);
   }
   return decideClientGalleryLink({
@@ -5745,8 +5745,8 @@ const handlePublicGalleryLink = async (req, res) => {
     return res.status(500).json({ code: "lookup_failed", error: message, message });
   }
 };
-const router$f = Router();
-const db$d = () => admin.firestore();
+const router$g = Router();
+const db$e = () => admin.firestore();
 const storage = () => admin.storage().bucket();
 function appUrl$1() {
   return process.env.APP_URL || "https://iconicimagestx.com";
@@ -5761,7 +5761,7 @@ function addressLabel$2(address) {
   }
   return String(address);
 }
-function adminReady$4(res) {
+function adminReady$5(res) {
   if (admin.apps.length) return true;
   res.status(503).json({
     error: "Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT and FIREBASE_STORAGE_BUCKET."
@@ -5782,19 +5782,19 @@ async function holdIfOrderIncomplete(res, galleryId) {
 }
 async function invoiceForGallery(gallery) {
   if (typeof gallery.invoiceId === "string" && gallery.invoiceId) {
-    const doc = await db$d().collection("invoices").doc(gallery.invoiceId).get();
+    const doc = await db$e().collection("invoices").doc(gallery.invoiceId).get();
     if (doc.exists) return { id: doc.id, ...doc.data() };
   }
   if (typeof gallery.orderId === "string" && gallery.orderId) {
-    const snap = await db$d().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
+    const snap = await db$e().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
     if (!snap.empty) return { id: snap.docs[0].id, ...snap.docs[0].data() };
   }
   return null;
 }
-router$f.get("/", requireStaff, async (req, res) => {
+router$g.get("/", requireStaff, async (req, res) => {
   try {
     const { status, orderId } = req.query;
-    let query = db$d().collection("galleries").orderBy("createdAt", "desc");
+    let query = db$e().collection("galleries").orderBy("createdAt", "desc");
     if (status) query = query.where("status", "==", status);
     if (orderId) query = query.where("orderId", "==", orderId);
     const snapshot = await query.limit(100).get();
@@ -5803,9 +5803,9 @@ router$f.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch galleries." });
   }
 });
-router$f.get("/public/:id", async (req, res) => {
+router$g.get("/public/:id", async (req, res) => {
   try {
-    const doc = await db$d().collection("galleries").doc(req.params.id).get();
+    const doc = await db$e().collection("galleries").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Gallery not found." });
     const gallery = doc.data();
     const invoice = await invoiceForGallery(gallery);
@@ -5835,13 +5835,13 @@ router$f.get("/public/:id", async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch gallery." });
   }
 });
-router$f.get("/link/:id", handlePublicGalleryLink);
-router$f.get("/:id", requireAuth, async (req, res) => {
+router$g.get("/link/:id", handlePublicGalleryLink);
+router$g.get("/:id", requireAuth, async (req, res) => {
   try {
-    const doc = await db$d().collection("galleries").doc(req.params.id).get();
+    const doc = await db$e().collection("galleries").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Gallery not found." });
     const gallery = doc.data();
-    const staffDoc = await db$d().collection("staff").doc(req.user.uid).get();
+    const staffDoc = await db$e().collection("staff").doc(req.user.uid).get();
     if (!staffDoc.exists) {
       if (gallery.clientId !== req.user.uid) {
         return res.status(403).json({ error: "Access denied." });
@@ -5855,13 +5855,13 @@ router$f.get("/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch gallery." });
   }
 });
-router$f.post("/:id/upload-url", requirePhotographer, async (req, res) => {
+router$g.post("/:id/upload-url", requirePhotographer, async (req, res) => {
   try {
     const { fileName: fileName2, fileType, isRaw: isRaw2 = false } = req.body;
     if (!fileName2 || !fileType) {
       return res.status(400).json({ error: "fileName and fileType required." });
     }
-    const galleryDoc = await db$d().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$e().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const folder = isRaw2 ? "raw" : "edited";
     const safeName = fileName2.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -5880,7 +5880,7 @@ router$f.post("/:id/upload-url", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to generate upload URL." });
   }
 });
-router$f.post("/:id/media", requirePhotographer, async (req, res) => {
+router$g.post("/:id/media", requirePhotographer, async (req, res) => {
   try {
     const {
       storagePath,
@@ -5894,7 +5894,7 @@ router$f.post("/:id/media", requirePhotographer, async (req, res) => {
     if (!storagePath || !fileName2) {
       return res.status(400).json({ error: "storagePath and fileName required." });
     }
-    const galleryDoc = await db$d().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$e().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const file = storage().file(storagePath);
     const [url] = await file.getSignedUrl({
@@ -5927,11 +5927,11 @@ router$f.post("/:id/media", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to register media." });
   }
 });
-router$f.post("/:id/media-link", requireCoordinator, async (req, res) => {
+router$g.post("/:id/media-link", requireCoordinator, async (req, res) => {
   try {
     const { url, title, type = "video", embedUrl, thumbnailUrl, downloadable = false } = req.body;
     if (!url) return res.status(400).json({ error: "url required." });
-    const galleryDoc = await db$d().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$e().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const item = {
       id: `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
@@ -5957,8 +5957,8 @@ router$f.post("/:id/media-link", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to register media link." });
   }
 });
-router$f.get("/:id/release", requireCoordinator, async (req, res) => {
-  if (!adminReady$4(res)) return;
+router$g.get("/:id/release", requireCoordinator, async (req, res) => {
+  if (!adminReady$5(res)) return;
   try {
     const report = await loadGalleryReleaseForGallery(req.params.id);
     return res.json(report);
@@ -5969,7 +5969,7 @@ router$f.get("/:id/release", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to check gallery release." });
   }
 });
-router$f.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$g.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status } = req.body;
     const validStatuses = ["pending_upload", "raw_uploaded", "editing", "ready_for_review", "approved", "delivered"];
@@ -5977,10 +5977,10 @@ router$f.patch("/:id/status", requireCoordinator, async (req, res) => {
       return res.status(400).json({ error: "Invalid status." });
     }
     if (galleryStatusNeedsReleaseGate(status)) {
-      if (!adminReady$4(res)) return;
+      if (!adminReady$5(res)) return;
       if (await holdIfOrderIncomplete(res, req.params.id)) return;
     }
-    await db$d().collection("galleries").doc(req.params.id).update({
+    await db$e().collection("galleries").doc(req.params.id).update({
       status,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -5991,10 +5991,10 @@ router$f.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update gallery status." });
   }
 });
-router$f.post("/:id/deliver", requireCoordinator, async (req, res) => {
+router$g.post("/:id/deliver", requireCoordinator, async (req, res) => {
   try {
-    if (!adminReady$4(res)) return;
-    const galleryDoc = await db$d().collection("galleries").doc(req.params.id).get();
+    if (!adminReady$5(res)) return;
+    const galleryDoc = await db$e().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     if (await holdIfOrderIncomplete(res, req.params.id)) return;
     const gallery = galleryDoc.data();
@@ -6015,15 +6015,15 @@ router$f.post("/:id/deliver", requireCoordinator, async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
     if (gallery.orderId) {
-      await db$d().collection("orders").doc(gallery.orderId).update({
+      await db$e().collection("orders").doc(gallery.orderId).update({
         status: "delivered",
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
     }
-    const clientDoc = await db$d().collection("clients").doc(gallery.clientId).get();
+    const clientDoc = await db$e().collection("clients").doc(gallery.clientId).get();
     const client = clientDoc.data();
     if (client?.email) {
-      const invoiceSnap = await db$d().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
+      const invoiceSnap = await db$e().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
       const invoice = invoiceSnap.empty ? null : invoiceSnap.docs[0].data();
       await sendEmail({
         to: client.email,
@@ -6050,9 +6050,9 @@ router$f.post("/:id/deliver", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to deliver gallery." });
   }
 });
-router$f.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
+router$g.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
   try {
-    const galleryDoc = await db$d().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$e().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const gallery = galleryDoc.data();
     const mediaItems = (gallery.mediaItems || []).filter(
@@ -6131,8 +6131,8 @@ async function fetchPublishedSquareInvoiceUrl(squareInvoiceId, deps) {
   if (!result.ok) return null;
   return publicUrlOf(result.body);
 }
-const router$e = Router();
-const db$c = () => admin.firestore();
+const router$f = Router();
+const db$d = () => admin.firestore();
 const stripe$1 = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
 });
@@ -6162,11 +6162,11 @@ async function paymentAlreadyRecorded({
   stripePaymentIntentId
 }) {
   if (squarePaymentId) {
-    const existing = await db$c().collection("transactions").where("squarePaymentId", "==", squarePaymentId).limit(1).get();
+    const existing = await db$d().collection("transactions").where("squarePaymentId", "==", squarePaymentId).limit(1).get();
     if (!existing.empty) return true;
   }
   if (stripePaymentIntentId) {
-    const existing = await db$c().collection("transactions").where("stripePaymentIntentId", "==", stripePaymentIntentId).limit(1).get();
+    const existing = await db$d().collection("transactions").where("stripePaymentIntentId", "==", stripePaymentIntentId).limit(1).get();
     if (!existing.empty) return true;
   }
   return false;
@@ -6177,11 +6177,11 @@ async function unlockGalleriesForInvoice({
   galleryId
 }) {
   const refs = /* @__PURE__ */ new Map();
-  if (galleryId) refs.set(galleryId, db$c().collection("galleries").doc(galleryId));
+  if (galleryId) refs.set(galleryId, db$d().collection("galleries").doc(galleryId));
   const lookups = [
-    db$c().collection("galleries").where("invoiceId", "==", invoiceId).get()
+    db$d().collection("galleries").where("invoiceId", "==", invoiceId).get()
   ];
-  if (orderId) lookups.push(db$c().collection("galleries").where("orderId", "==", orderId).get());
+  if (orderId) lookups.push(db$d().collection("galleries").where("orderId", "==", orderId).get());
   const snaps = await Promise.all(lookups);
   snaps.forEach((snap) => snap.docs.forEach((doc) => refs.set(doc.id, doc.ref)));
   await Promise.all([...refs.values()].map((ref) => ref.update({
@@ -6201,7 +6201,7 @@ async function applySuccessfulPayment({
   squarePaymentId,
   stripePaymentIntentId
 }) {
-  const invoiceRef = db$c().collection("invoices").doc(invoiceId);
+  const invoiceRef = db$d().collection("invoices").doc(invoiceId);
   const invoiceDoc = await invoiceRef.get();
   if (!invoiceDoc.exists) return;
   const invoice = invoiceDoc.data();
@@ -6235,7 +6235,7 @@ async function applySuccessfulPayment({
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   });
   if (resolvedOrderId) {
-    await db$c().collection("orders").doc(resolvedOrderId).update({
+    await db$d().collection("orders").doc(resolvedOrderId).update({
       depositPaid: admin.firestore.FieldValue.increment(amount),
       balanceDue: newAmountDue,
       paymentStatus: newAmountDue <= 0 ? "paid" : "partial",
@@ -6243,7 +6243,7 @@ async function applySuccessfulPayment({
     }).catch((err) => console.error("[Payments] Order balance update failed:", err));
   }
   if (resolvedClientId) {
-    await db$c().collection("clients").doc(resolvedClientId).update({
+    await db$d().collection("clients").doc(resolvedClientId).update({
       totalSpend: admin.firestore.FieldValue.increment(amount),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     }).catch((err) => console.error("[Payments] Client spend update failed:", err));
@@ -6255,7 +6255,7 @@ async function applySuccessfulPayment({
       galleryId: typeof invoice.galleryId === "string" ? invoice.galleryId : void 0
     });
   }
-  await db$c().collection("transactions").add({
+  await db$d().collection("transactions").add({
     type: "payment",
     orderId: resolvedOrderId,
     invoiceId,
@@ -6283,14 +6283,14 @@ async function applySuccessfulPayment({
     }).catch(console.error);
   }
 }
-router$e.post("/create-intent", requireAuth, async (req, res) => {
+router$f.post("/create-intent", requireAuth, async (req, res) => {
   try {
     if (!stripeReady()) {
       return res.status(503).json({ error: "Studio Noir Stripe payments are not configured yet." });
     }
     const { invoiceId, amount, currency = "usd" } = req.body;
     if (!invoiceId || !amount) return res.status(400).json({ error: "invoiceId and amount required." });
-    const invoiceDoc = await db$c().collection("invoices").doc(invoiceId).get();
+    const invoiceDoc = await db$d().collection("invoices").doc(invoiceId).get();
     if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
     const invoice = invoiceDoc.data();
     if (invoiceProvider(invoice) !== "stripe") {
@@ -6321,11 +6321,11 @@ router$e.post("/create-intent", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to create payment intent." });
   }
 });
-router$e.post("/send-invoice", requireCoordinator, async (req, res) => {
+router$f.post("/send-invoice", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
-    const invoiceDoc = await db$c().collection("invoices").doc(invoiceId).get();
+    const invoiceDoc = await db$d().collection("invoices").doc(invoiceId).get();
     if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
     const invoice = invoiceDoc.data();
     const provider = invoiceProvider(invoice);
@@ -6354,11 +6354,11 @@ router$e.post("/send-invoice", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send invoice." });
   }
 });
-router$e.post("/send-receipt", requireCoordinator, async (req, res) => {
+router$f.post("/send-receipt", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
-    const invoiceDoc = await db$c().collection("invoices").doc(invoiceId).get();
+    const invoiceDoc = await db$d().collection("invoices").doc(invoiceId).get();
     if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
     const invoice = invoiceDoc.data();
     if (!invoiceAllowsDownload(invoice)) {
@@ -6380,9 +6380,9 @@ router$e.post("/send-receipt", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send receipt." });
   }
 });
-router$e.get("/invoice/:id", async (req, res) => {
+router$f.get("/invoice/:id", async (req, res) => {
   try {
-    const invoiceDoc = await db$c().collection("invoices").doc(req.params.id).get();
+    const invoiceDoc = await db$d().collection("invoices").doc(req.params.id).get();
     if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
     const invoice = invoiceDoc.data();
     const provider = invoiceProvider(invoice);
@@ -6411,9 +6411,9 @@ router$e.get("/invoice/:id", async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch invoice." });
   }
 });
-router$e.post("/invoice/:id/checkout", async (req, res) => {
+router$f.post("/invoice/:id/checkout", async (req, res) => {
   try {
-    const invoiceDoc = await db$c().collection("invoices").doc(req.params.id).get();
+    const invoiceDoc = await db$d().collection("invoices").doc(req.params.id).get();
     if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
     const invoice = invoiceDoc.data();
     const amountDue = amountStillDue(invoice);
@@ -6541,7 +6541,7 @@ router$e.post("/invoice/:id/checkout", async (req, res) => {
     return res.status(500).json({ error: "Failed to start checkout." });
   }
 });
-router$e.post("/webhook", async (req, res) => {
+router$f.post("/webhook", async (req, res) => {
   const sig = req.headers["stripe-signature"];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
   let event;
@@ -6601,30 +6601,30 @@ function squareSignatureValid(rawBody, received, key) {
 async function findInvoiceForSquarePayment(payment) {
   const noteId = invoiceIdFromSquareNote(payment.note || payment.payment_note);
   if (noteId) {
-    const byNote = await db$c().collection("invoices").doc(noteId).get();
+    const byNote = await db$d().collection("invoices").doc(noteId).get();
     if (byNote.exists) return byNote;
   }
   const referenceId = typeof payment.reference_id === "string" ? payment.reference_id : "";
   if (referenceId) {
-    const byReference = await db$c().collection("invoices").doc(referenceId).get();
+    const byReference = await db$d().collection("invoices").doc(referenceId).get();
     if (byReference.exists) return byReference;
   }
   if (typeof payment.order_id === "string" && payment.order_id) {
-    const bySquareOrder = await db$c().collection("invoices").where("squareOrderId", "==", payment.order_id).limit(1).get();
+    const bySquareOrder = await db$d().collection("invoices").where("squareOrderId", "==", payment.order_id).limit(1).get();
     if (!bySquareOrder.empty) return bySquareOrder.docs[0];
   }
   const linkId = payment.payment_link_id || payment.paymentLinkId;
   if (typeof linkId === "string" && linkId) {
-    const byLink = await db$c().collection("invoices").where("squarePaymentLinkId", "==", linkId).limit(1).get();
+    const byLink = await db$d().collection("invoices").where("squarePaymentLinkId", "==", linkId).limit(1).get();
     if (!byLink.empty) return byLink.docs[0];
   }
   if (typeof payment.id === "string" && payment.id) {
-    const byPayment = await db$c().collection("invoices").where("squarePaymentId", "==", payment.id).limit(1).get();
+    const byPayment = await db$d().collection("invoices").where("squarePaymentId", "==", payment.id).limit(1).get();
     if (!byPayment.empty) return byPayment.docs[0];
   }
   return null;
 }
-router$e.post("/square-webhook", async (req, res) => {
+router$f.post("/square-webhook", async (req, res) => {
   try {
     const rawBody = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : JSON.stringify(req.body || {});
     const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
@@ -6641,7 +6641,7 @@ router$e.post("/square-webhook", async (req, res) => {
     if (!payment?.id || payment.status !== "COMPLETED") return res.json({ received: true });
     const invoiceDoc = await findInvoiceForSquarePayment(payment);
     if (!invoiceDoc) {
-      await db$c().collection("agentLogs").add({
+      await db$d().collection("agentLogs").add({
         agent: "travis",
         action: "Unmatched Square payment",
         summary: `Square payment ${payment.id} could not be matched to an invoice`,
@@ -6676,10 +6676,10 @@ router$e.post("/square-webhook", async (req, res) => {
     return res.status(500).json({ error: "Square webhook handler failed." });
   }
 });
-router$e.get("/transactions", requireCoordinator, async (req, res) => {
+router$f.get("/transactions", requireCoordinator, async (req, res) => {
   try {
     const { startDate, endDate, limit = "50" } = req.query;
-    let query = db$c().collection("transactions").orderBy("createdAt", "desc");
+    let query = db$d().collection("transactions").orderBy("createdAt", "desc");
     if (startDate) {
       query = query.where(
         "createdAt",
@@ -6706,7 +6706,7 @@ router$e.get("/transactions", requireCoordinator, async (req, res) => {
 async function handleStripePaymentSucceeded(intent) {
   const { invoiceId, orderId, clientId: clientId2, clientName: clientName2 } = intent.metadata;
   if (!invoiceId) return;
-  const invoiceDoc = await db$c().collection("invoices").doc(invoiceId).get();
+  const invoiceDoc = await db$d().collection("invoices").doc(invoiceId).get();
   if (!invoiceDoc.exists) return;
   if (invoiceProvider(invoiceDoc.data() || {}) !== "stripe") {
     console.warn(`[Payments] Ignored Stripe payment ${intent.id} for non-Stripe invoice ${invoiceId}`);
@@ -6725,7 +6725,7 @@ async function handleStripePaymentSucceeded(intent) {
 async function handleStripePaymentFailed(intent) {
   const { invoiceId } = intent.metadata;
   if (!invoiceId) return;
-  await db$c().collection("agentLogs").add({
+  await db$d().collection("agentLogs").add({
     agent: "travis",
     action: "Studio Noir payment failed",
     summary: `Stripe payment failed for invoice ${invoiceId}`,
@@ -6741,11 +6741,11 @@ async function handleStripePaymentFailed(intent) {
 async function handleStripeRefund(charge) {
   if (!charge.payment_intent) return;
   const intentId = typeof charge.payment_intent === "string" ? charge.payment_intent : charge.payment_intent.id;
-  const invoiceSnap = await db$c().collection("invoices").where("stripePaymentIntentId", "==", intentId).limit(1).get();
+  const invoiceSnap = await db$d().collection("invoices").where("stripePaymentIntentId", "==", intentId).limit(1).get();
   if (invoiceSnap.empty) return;
   const invoiceDoc = invoiceSnap.docs[0];
   const refundAmount = charge.amount_refunded / 100;
-  await db$c().collection("transactions").add({
+  await db$d().collection("transactions").add({
     type: "refund",
     invoiceId: invoiceDoc.id,
     clientId: invoiceDoc.data().clientId,
@@ -6759,15 +6759,15 @@ async function handleStripeRefund(charge) {
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   });
 }
-const router$d = Router();
-const db$b = () => admin.firestore();
+const router$e = Router();
+const db$c = () => admin.firestore();
 const VSAI_API_BASE = "https://api.virtualstagingai.app/v1";
 const VSAI_API_KEY = process.env.VSAI_API_KEY || process.env.VIRTUAL_STAGING_AI_API_KEY || "";
 const VSAI_PRICE_CENTS = parseInt(process.env.VSAI_PRICE_CENTS || "1500", 10);
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
 });
-router$d.post("/create", requireAuth, async (req, res) => {
+router$e.post("/create", requireAuth, async (req, res) => {
   try {
     if (!VSAI_API_KEY) {
       console.error("[VSAI] VSAI_API_KEY is not set");
@@ -6818,7 +6818,7 @@ router$d.post("/create", requireAuth, async (req, res) => {
         error: `VSAI returned no render ID. Response: ${responseText}`
       });
     }
-    const jobRef = await db$b().collection("vsaiJobs").add({
+    const jobRef = await db$c().collection("vsaiJobs").add({
       userId,
       imageUrl,
       roomType,
@@ -6842,9 +6842,9 @@ router$d.post("/create", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$d.get("/result/:jobId", requireAuth, async (req, res) => {
+router$e.get("/result/:jobId", requireAuth, async (req, res) => {
   try {
-    const jobDoc = await db$b().collection("vsaiJobs").doc(req.params.jobId).get();
+    const jobDoc = await db$c().collection("vsaiJobs").doc(req.params.jobId).get();
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
     const job = jobDoc.data();
     if (job.userId !== req.user.uid) {
@@ -6917,20 +6917,20 @@ router$d.get("/result/:jobId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$d.post("/variation", requireAuth, async (req, res) => {
+router$e.post("/variation", requireAuth, async (req, res) => {
   try {
     const { jobId, style: newStyle, roomType: newRoomType } = req.body;
     if (!jobId) {
       return res.status(400).json({ error: "jobId required." });
     }
-    let rootJobDoc = await db$b().collection("vsaiJobs").doc(jobId).get();
+    let rootJobDoc = await db$c().collection("vsaiJobs").doc(jobId).get();
     if (!rootJobDoc.exists) return res.status(404).json({ error: "Job not found." });
     let rootJob = rootJobDoc.data();
     if (rootJob.userId !== req.user.uid) {
       return res.status(403).json({ error: "Access denied." });
     }
     while (rootJob.parentJobId) {
-      const parentDoc = await db$b().collection("vsaiJobs").doc(rootJob.parentJobId).get();
+      const parentDoc = await db$c().collection("vsaiJobs").doc(rootJob.parentJobId).get();
       if (!parentDoc.exists) break;
       rootJob = parentDoc.data();
     }
@@ -6974,7 +6974,7 @@ router$d.post("/variation", requireAuth, async (req, res) => {
         error: `VSAI variation error: ${responseText}`
       });
     }
-    const variationRef = await db$b().collection("vsaiJobs").add({
+    const variationRef = await db$c().collection("vsaiJobs").add({
       userId: req.user.uid,
       imageUrl: rootJob.imageUrl,
       roomType: resolvedRoomType,
@@ -7001,7 +7001,7 @@ router$d.post("/variation", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$d.post("/checkout", requireAuth, async (req, res) => {
+router$e.post("/checkout", requireAuth, async (req, res) => {
   try {
     const { jobIds, successUrl, cancelUrl } = req.body;
     if (!jobIds || !Array.isArray(jobIds) || jobIds.length === 0) {
@@ -7009,7 +7009,7 @@ router$d.post("/checkout", requireAuth, async (req, res) => {
     }
     const userId = req.user.uid;
     const jobDocs = await Promise.all(
-      jobIds.map((id) => db$b().collection("vsaiJobs").doc(id).get())
+      jobIds.map((id) => db$c().collection("vsaiJobs").doc(id).get())
     );
     for (let i = 0; i < jobDocs.length; i++) {
       const doc = jobDocs[i];
@@ -7070,7 +7070,7 @@ router$d.post("/checkout", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$d.post(
+router$e.post(
   "/webhook/stripe",
   // Raw body needed — mount before express.json() parses it
   async (req, res) => {
@@ -7093,7 +7093,7 @@ router$d.post(
         const jobIds = JSON.parse(session.metadata.jobIds || "[]");
         await Promise.all(
           jobIds.map(
-            (id) => db$b().collection("vsaiJobs").doc(id).update({
+            (id) => db$c().collection("vsaiJobs").doc(id).update({
               isPaid: true,
               paymentStatus: "paid",
               stripeSessionId: session.id,
@@ -7108,7 +7108,7 @@ router$d.post(
     res.json({ received: true });
   }
 );
-router$d.get("/options", (_req, res) => {
+router$e.get("/options", (_req, res) => {
   return res.json({
     roomTypes: [
       { value: "living", label: "Living Room" },
@@ -7138,9 +7138,9 @@ router$d.get("/options", (_req, res) => {
 function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
 }
-const router$c = Router();
-const db$a = () => admin.firestore();
-router$c.post("/email", requireStaff, async (req, res) => {
+const router$d = Router();
+const db$b = () => admin.firestore();
+router$d.post("/email", requireStaff, async (req, res) => {
   try {
     const { to, subject, body, orderId, clientId: clientId2 } = req.body;
     if (!to || !body?.trim()) {
@@ -7154,7 +7154,7 @@ router$c.post("/email", requireStaff, async (req, res) => {
         message: body.trim()
       }
     });
-    await db$a().collection("messages").add({
+    await db$b().collection("messages").add({
       orderId: orderId || null,
       clientId: clientId2 || null,
       senderId: req.user.uid,
@@ -7172,22 +7172,22 @@ router$c.post("/email", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to send email." });
   }
 });
-router$c.get("/:orderId", requireAuth, async (req, res) => {
+router$d.get("/:orderId", requireAuth, async (req, res) => {
   try {
-    const orderDoc = await db$a().collection("orders").doc(req.params.orderId).get();
+    const orderDoc = await db$b().collection("orders").doc(req.params.orderId).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
     const order = orderDoc.data();
-    const staffDoc = await db$a().collection("staff").doc(req.user.uid).get();
+    const staffDoc = await db$b().collection("staff").doc(req.user.uid).get();
     const isStaff = staffDoc.exists;
     if (!isStaff && order.clientId !== req.user.uid) {
       return res.status(403).json({ error: "Access denied." });
     }
-    const snapshot = await db$a().collection("messages").where("orderId", "==", req.params.orderId).orderBy("createdAt", "asc").limit(100).get();
+    const snapshot = await db$b().collection("messages").where("orderId", "==", req.params.orderId).orderBy("createdAt", "asc").limit(100).get();
     const messages = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     const unread = snapshot.docs.filter(
       (d) => !d.data().isRead && d.data().senderId !== req.user.uid
     );
-    const batch = db$a().batch();
+    const batch = db$b().batch();
     unread.forEach((d) => {
       batch.update(d.ref, {
         isRead: true,
@@ -7201,16 +7201,16 @@ router$c.get("/:orderId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch messages." });
   }
 });
-router$c.post("/:orderId", requireAuth, async (req, res) => {
+router$d.post("/:orderId", requireAuth, async (req, res) => {
   try {
     const { content, attachments } = req.body;
     if (!content?.trim()) {
       return res.status(400).json({ error: "Message content required." });
     }
-    const orderDoc = await db$a().collection("orders").doc(req.params.orderId).get();
+    const orderDoc = await db$b().collection("orders").doc(req.params.orderId).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
     const order = orderDoc.data();
-    const staffDoc = await db$a().collection("staff").doc(req.user.uid).get();
+    const staffDoc = await db$b().collection("staff").doc(req.user.uid).get();
     const isStaff = staffDoc.exists;
     if (!isStaff && order.clientId !== req.user.uid) {
       return res.status(403).json({ error: "Access denied." });
@@ -7222,7 +7222,7 @@ router$c.post("/:orderId", requireAuth, async (req, res) => {
       senderName = `${staff.firstName} ${staff.lastName}`.trim();
       senderType = "staff";
     } else {
-      const clientDoc = await db$a().collection("clients").doc(order.clientId).get();
+      const clientDoc = await db$b().collection("clients").doc(order.clientId).get();
       if (clientDoc.exists) {
         const client = clientDoc.data();
         senderName = `${client.firstName} ${client.lastName}`.trim();
@@ -7238,8 +7238,8 @@ router$c.post("/:orderId", requireAuth, async (req, res) => {
       isRead: false,
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    const docRef = await db$a().collection("messages").add(message);
-    await db$a().collection("agentLogs").add({
+    const docRef = await db$b().collection("messages").add(message);
+    await db$b().collection("agentLogs").add({
       agent: "nora",
       action: "New message",
       summary: `New message on order ${req.params.orderId} from ${senderName}`,
@@ -7256,14 +7256,226 @@ router$c.post("/:orderId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to send message." });
   }
 });
-router$c.get("/unread/count", requireStaff, async (_req, res) => {
+router$d.get("/unread/count", requireStaff, async (_req, res) => {
   try {
-    const snapshot = await db$a().collection("messages").where("isRead", "==", false).where("senderType", "==", "client").get();
+    const snapshot = await db$b().collection("messages").where("isRead", "==", false).where("senderType", "==", "client").get();
     return res.json({ unreadCount: snapshot.size });
   } catch (err) {
     return res.status(500).json({ error: "Failed to get unread count." });
   }
 });
+const PHOTO_EDIT_NOTE_LIMIT = 2e3;
+const PHOTO_EDIT_REQUEST_LIMIT = 100;
+const PHOTO_EDIT_REPLACEMENT_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const STATUSES = /* @__PURE__ */ new Set(["requested", "sent_out", "received_back"]);
+const REPLACEMENT_TYPES$1 = new Set(PHOTO_EDIT_REPLACEMENT_TYPES);
+function text$3(value, limit) {
+  if (typeof value !== "string") return "";
+  return value.replace(/\s+/g, " ").trim().slice(0, limit);
+}
+function noteText(value) {
+  if (typeof value !== "string") return "";
+  return value.replace(/\r\n/g, "\n").trim().slice(0, PHOTO_EDIT_NOTE_LIMIT);
+}
+function stamp(value) {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 40) return "";
+  const parsed = Date.parse(trimmed);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : "";
+}
+function idText(value, limit = 80) {
+  const id = text$3(value, limit);
+  return /^[A-Za-z0-9_-]{8,80}$/.test(id) ? id : "";
+}
+function photoIdText(value) {
+  if (typeof value !== "string") return "";
+  const id = value.trim().slice(0, 180);
+  if (!id || /[\u0000-\u001f]/.test(id)) return "";
+  return id;
+}
+function sortRequests(requests) {
+  return [...requests].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id));
+}
+function timelineEntry(value) {
+  const row = value && typeof value === "object" ? value : null;
+  if (!row || !STATUSES.has(row.status)) return null;
+  const at = stamp(row.at);
+  const actorId = text$3(row.actorId, 128);
+  if (!at || !actorId) return null;
+  if (row.actor !== "client" && row.actor !== "staff") return null;
+  return { status: row.status, at, actor: row.actor, actorId };
+}
+function replacementEntry(value, listingId) {
+  if (!value || typeof value !== "object") return null;
+  const row = value;
+  const name = text$3(row.name, 180);
+  const path2 = typeof row.path === "string" ? row.path.trim() : "";
+  const contentType = typeof row.contentType === "string" ? row.contentType.trim().toLowerCase() : "";
+  const attachedAt = stamp(row.attachedAt);
+  const attachedBy = text$3(row.attachedBy, 128);
+  const url = httpsUrl(row.url);
+  if (!name || !attachedAt || !attachedBy || !url || !REPLACEMENT_TYPES$1.has(contentType)) return null;
+  if (!replacementPath(listingId, path2)) return null;
+  return {
+    name,
+    url,
+    path: path2,
+    contentType,
+    attachedAt,
+    attachedBy
+  };
+}
+function httpsUrl(value) {
+  if (typeof value !== "string" || value.length > 2e3) return "";
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== "https:") return "";
+    return url.toString();
+  } catch {
+    return "";
+  }
+}
+function replacementPath(listingId, storagePath) {
+  if (!listingId || storagePath.includes("..") || storagePath.includes("\\") || storagePath.startsWith("/")) return false;
+  const prefix = `listings/${listingId}/replacements/`;
+  if (!storagePath.startsWith(prefix)) return false;
+  const rest = storagePath.slice(prefix.length);
+  return rest.length > 0 && !rest.includes("/");
+}
+function parseRequest(value) {
+  const row = value && typeof value === "object" ? value : null;
+  if (!row) return null;
+  const id = idText(row.id);
+  const listingId = idText(row.listingId, 128) || text$3(row.listingId, 128);
+  const photoId = photoIdText(row.photoId);
+  const note = noteText(row.note);
+  const clientId2 = text$3(row.clientId, 128);
+  const createdAt = stamp(row.createdAt);
+  const updatedAt = stamp(row.updatedAt);
+  if (!id || !listingId || !photoId || !note || !clientId2 || !createdAt || !updatedAt) return null;
+  if (!/^[A-Za-z0-9_-]{4,128}$/.test(listingId)) return null;
+  if (!STATUSES.has(row.status)) return null;
+  const timeline = Array.isArray(row.timeline) ? row.timeline.map(timelineEntry).filter((entry) => Boolean(entry)) : [];
+  if (timeline.length === 0) return null;
+  return {
+    id,
+    listingId,
+    photoId,
+    photoName: text$3(row.photoName, 180) || "Photo",
+    photoUrl: httpsUrl(row.photoUrl),
+    note,
+    status: row.status,
+    timeline,
+    replacement: replacementEntry(row.replacement, listingId),
+    clientId: clientId2,
+    createdAt,
+    updatedAt
+  };
+}
+function readPhotoEditRequests(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = /* @__PURE__ */ new Set();
+  const requests = [];
+  for (const item of value) {
+    const request = parseRequest(item);
+    if (!request || seen.has(request.id)) continue;
+    seen.add(request.id);
+    requests.push(request);
+  }
+  return sortRequests(requests);
+}
+function openPhotoEditForPhoto(requests, photoId) {
+  return requests.find((request) => request.photoId === photoId && request.status !== "received_back") || null;
+}
+function createPhotoEditRequest(input) {
+  const id = idText(input.id);
+  const listingId = text$3(input.listingId, 128);
+  const photoId = photoIdText(input.photoId);
+  const note = noteText(input.note);
+  const clientId2 = text$3(input.clientId, 128);
+  const at = stamp(input.at);
+  if (!id) return { ok: false, status: 400, error: "Could not save that edit request." };
+  if (!/^[A-Za-z0-9_-]{4,128}$/.test(listingId)) return { ok: false, status: 400, error: "Listing id is not valid." };
+  if (!photoId || !input.knownPhotoIds.includes(photoId)) {
+    return { ok: false, status: 400, error: "That photo is not on this listing." };
+  }
+  if (!note) return { ok: false, status: 400, error: "Add a note for the change you want." };
+  if (!clientId2) return { ok: false, status: 400, error: "Sign in again before requesting an edit." };
+  if (!at) return { ok: false, status: 400, error: "Could not save that edit request." };
+  if (input.existing.length >= PHOTO_EDIT_REQUEST_LIMIT) {
+    return { ok: false, status: 409, error: "This listing already has the maximum number of photo edit requests." };
+  }
+  if (openPhotoEditForPhoto(input.existing, photoId)) {
+    return { ok: false, status: 409, error: "This photo already has an open edit request." };
+  }
+  const request = {
+    id,
+    listingId,
+    photoId,
+    photoName: text$3(input.photoName, 180) || "Photo",
+    photoUrl: httpsUrl(input.photoUrl),
+    note,
+    status: "requested",
+    timeline: [{ status: "requested", at, actor: "client", actorId: clientId2 }],
+    replacement: null,
+    clientId: clientId2,
+    createdAt: at,
+    updatedAt: at
+  };
+  return { ok: true, request, requests: sortRequests([...input.existing, request]) };
+}
+function advancePhotoEditRequest(input) {
+  const requestId = idText(input.requestId);
+  const actorId = text$3(input.actorId, 128);
+  const at = stamp(input.at);
+  if (!requestId || !actorId || !at) return { ok: false, status: 400, error: "Could not update that edit request." };
+  const current = input.requests.find((request2) => request2.id === requestId);
+  if (!current) return { ok: false, status: 404, error: "Edit request not found." };
+  if (input.to === "sent_out" && current.status !== "requested") {
+    return {
+      ok: false,
+      status: 400,
+      error: current.status === "sent_out" ? "This request is already sent out." : "This request is already received back."
+    };
+  }
+  if (input.to === "received_back" && current.status !== "sent_out") {
+    return {
+      ok: false,
+      status: 400,
+      error: current.status === "requested" ? "Mark this request sent out before marking it received back." : "This request is already received back."
+    };
+  }
+  const request = {
+    ...current,
+    status: input.to,
+    updatedAt: at,
+    timeline: [...current.timeline, { status: input.to, at, actor: "staff", actorId }]
+  };
+  return {
+    ok: true,
+    request,
+    requests: sortRequests(input.requests.map((item) => item.id === request.id ? request : item))
+  };
+}
+function attachPhotoEditReplacement(input) {
+  const requestId = idText(input.requestId);
+  const current = input.requests.find((request2) => request2.id === requestId);
+  if (!current) return { ok: false, status: 404, error: "Edit request not found." };
+  if (current.listingId !== input.listingId) return { ok: false, status: 404, error: "Edit request not found." };
+  const replacement = replacementEntry(input.replacement, input.listingId);
+  if (!replacement) return { ok: false, status: 400, error: "Attach a JPG, PNG, or WebP file." };
+  const request = {
+    ...current,
+    replacement,
+    updatedAt: replacement.attachedAt
+  };
+  return {
+    ok: true,
+    request,
+    requests: sortRequests(input.requests.map((item) => item.id === request.id ? request : item))
+  };
+}
 const PORTAL_ADDRESS_LIMITS = {
   line1: 240,
   line2: 240,
@@ -7327,7 +7539,8 @@ function visitorPortalListingDetail(detail) {
     tours: detail.tours.filter((item) => !item.hidden),
     floorplans: detail.floorplans.filter((item) => !item.hidden),
     invoices: [],
-    activity: detail.activity.filter((event) => !isInvoiceOrPaymentActivity(event))
+    activity: detail.activity.filter((event) => !isInvoiceOrPaymentActivity(event)),
+    photoEditRequests: []
   };
 }
 function defaultPortalWebsite() {
@@ -7387,7 +7600,8 @@ function buildPortalListingDetail(sources) {
     marketing: PORTAL_MARKETING_KIT,
     website,
     invoices,
-    activity
+    activity,
+    photoEditRequests: readPhotoEditRequests(listing.photoEditRequests)
   }, listing.portalData);
 }
 function portalFactsDraftFromDetail(detail) {
@@ -8037,9 +8251,114 @@ function portalTimestamp(value) {
 function mediaLabel(item) {
   return item.name || item.kind;
 }
+const BUCKET$1 = process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET || "iconic-images-aicon.firebasestorage.app";
+const REPLACEMENT_LIMIT = 4e6;
+const REPLACEMENT_TYPES = /* @__PURE__ */ new Set(["image/jpeg", "image/png", "image/webp"]);
+class PhotoEditRequestError extends Error {
+  status;
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
+const db$a = () => admin.firestore();
+async function writeRequests(listingId, change) {
+  const ref = db$a().collection("listings").doc(listingId);
+  let saved = null;
+  await db$a().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw new PhotoEditRequestError(404, "Listing not found.");
+    const result = change(readPhotoEditRequests(snap.data()?.photoEditRequests));
+    if (result.ok === false) throw new PhotoEditRequestError(result.status, result.error);
+    tx.update(ref, {
+      photoEditRequests: result.requests,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    saved = result.request;
+  });
+  if (!saved) throw new PhotoEditRequestError(500, "Could not save the photo edit request.");
+  return saved;
+}
+async function filePhotoEditRequest(input) {
+  return writeRequests(input.listingId, (existing) => createPhotoEditRequest({
+    id: randomUUID(),
+    listingId: input.listingId,
+    photoId: input.photoId,
+    photoName: input.photoName,
+    photoUrl: input.photoUrl,
+    note: input.note,
+    clientId: input.clientId,
+    at: input.at,
+    knownPhotoIds: input.knownPhotoIds,
+    existing
+  }));
+}
+async function markPhotoEditRequest(input) {
+  return writeRequests(input.listingId, (requests) => advancePhotoEditRequest({
+    requests,
+    requestId: input.requestId,
+    to: input.to,
+    actorId: input.actorId,
+    at: input.at
+  }));
+}
+function decodeReplacementBytes(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim().replace(/^data:[^;]+;base64,/, "").replace(/\s/g, "");
+  if (!trimmed || trimmed.length > 8e6 || !/^[A-Za-z0-9+/=]+$/.test(trimmed)) return null;
+  const bytes = Buffer.from(trimmed, "base64");
+  return bytes.length ? bytes : null;
+}
+async function savePhotoEditReplacement(input) {
+  const contentType = input.contentType.trim().toLowerCase();
+  if (!REPLACEMENT_TYPES.has(contentType)) {
+    throw new PhotoEditRequestError(415, "Attach a JPG, PNG, or WebP file.");
+  }
+  if (!input.bytes.length) throw new PhotoEditRequestError(400, "The replacement file was empty.");
+  if (input.bytes.length > REPLACEMENT_LIMIT) {
+    throw new PhotoEditRequestError(413, "That replacement is over 4 MB.");
+  }
+  if (!admin.apps.length) {
+    throw new PhotoEditRequestError(503, "File storage is not configured.");
+  }
+  const existing = await db$a().collection("listings").doc(input.listingId).get();
+  if (!existing.exists) throw new PhotoEditRequestError(404, "Listing not found.");
+  const known = readPhotoEditRequests(existing.data()?.photoEditRequests);
+  if (!known.some((request) => request.id === input.requestId)) {
+    throw new PhotoEditRequestError(404, "Edit request not found.");
+  }
+  const name = safeStorageFileName(input.fileName);
+  const storagePath = `listings/${input.listingId}/replacements/${Date.now()}_${name}`;
+  if (!replacementPath(input.listingId, storagePath)) {
+    throw new PhotoEditRequestError(400, "Could not store that replacement.");
+  }
+  const token = randomUUID();
+  const bucket2 = admin.storage().bucket(BUCKET$1);
+  await bucket2.file(storagePath).save(input.bytes, {
+    resumable: false,
+    metadata: {
+      contentType,
+      metadata: { firebaseStorageDownloadTokens: token }
+    }
+  });
+  const url = firebaseDownloadUrl(bucket2.name, storagePath, token);
+  return writeRequests(input.listingId, (requests) => attachPhotoEditReplacement({
+    requests,
+    requestId: input.requestId,
+    listingId: input.listingId,
+    replacement: {
+      name,
+      url,
+      path: storagePath,
+      contentType,
+      attachedAt: input.at,
+      attachedBy: input.actorId
+    }
+  }));
+}
 const db$9 = () => admin.firestore();
 const KINDS = /* @__PURE__ */ new Set(["photo", "video", "floorplan", "tour"]);
-function adminReady$3(res) {
+function adminReady$4(res) {
   if (admin.apps.length) return true;
   res.status(503).json({ error: "Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT." });
   return false;
@@ -8050,8 +8369,8 @@ function listingIdFrom(value) {
 function text$1(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function sendKnownError$2(res, err, fallback) {
-  const status = err.status;
+function sendKnownError$3(res, err, fallback) {
+  const status = err instanceof PhotoEditRequestError ? err.status : err.status;
   if (status && status >= 400 && status < 500) {
     return res.status(status).json({ error: err instanceof Error ? err.message : fallback });
   }
@@ -8168,7 +8487,7 @@ async function appendPortalWrite(listingId, patch) {
 const handleGetPublicPortalListing = async (req, res) => {
   const listingId = portalListingId(req.params.id);
   if (!listingId) return res.status(404).json({ error: "Listing not found." });
-  if (!adminReady$3(res)) return;
+  if (!adminReady$4(res)) return;
   try {
     const snap = await db$9().collection("listings").doc(listingId).get();
     if (!snap.exists) return res.status(404).json({ error: "Listing not found." });
@@ -8176,11 +8495,11 @@ const handleGetPublicPortalListing = async (req, res) => {
     const detail = visitorPortalListingDetail(buildPortalListingDetail(await loadSources(listingId, listing)));
     return res.json(detail);
   } catch (err) {
-    return sendKnownError$2(res, err, "Failed to load this listing.");
+    return sendKnownError$3(res, err, "Failed to load this listing.");
   }
 };
 const handleGetPortalListing = async (req, res) => {
-  if (!adminReady$3(res)) return;
+  if (!adminReady$4(res)) return;
   const listingId = listingIdFrom(req.params.id);
   if (!listingId) return res.status(400).json({ error: "Listing id is not valid." });
   try {
@@ -8188,11 +8507,11 @@ const handleGetPortalListing = async (req, res) => {
     const detail = buildPortalListingDetail(await loadSources(listingId, listing));
     return res.json(detail);
   } catch (err) {
-    return sendKnownError$2(res, err, "Failed to load this listing.");
+    return sendKnownError$3(res, err, "Failed to load this listing.");
   }
 };
 const handlePatchPortalMedia = async (req, res) => {
-  if (!adminReady$3(res)) return;
+  if (!adminReady$4(res)) return;
   const listingId = listingIdFrom(req.params.id);
   if (!listingId) return res.status(400).json({ error: "Listing id is not valid." });
   const change = mediaChange(req.body);
@@ -8210,11 +8529,11 @@ const handlePatchPortalMedia = async (req, res) => {
     const refreshed = await authorizedListing(req, listingId);
     return res.json(buildPortalListingDetail(await loadSources(listingId, refreshed)));
   } catch (err) {
-    return sendKnownError$2(res, err, "Could not update that file.");
+    return sendKnownError$3(res, err, "Could not update that file.");
   }
 };
 const handlePatchPortalData = async (req, res) => {
-  if (!adminReady$3(res)) return;
+  if (!adminReady$4(res)) return;
   const listingId = listingIdFrom(req.params.id);
   if (!listingId) return res.status(400).json({ error: "Listing id is not valid." });
   try {
@@ -8228,11 +8547,40 @@ const handlePatchPortalData = async (req, res) => {
     const refreshed = await authorizedListing(req, listingId);
     return res.json(buildPortalListingDetail(await loadSources(listingId, refreshed)));
   } catch (err) {
-    return sendKnownError$2(res, err, "Could not save listing facts.");
+    return sendKnownError$3(res, err, "Could not save listing facts.");
+  }
+};
+const handleCreatePhotoEditRequest = async (req, res) => {
+  if (!adminReady$4(res)) return;
+  const listingId = listingIdFrom(req.params.id);
+  if (!listingId) return res.status(400).json({ error: "Listing id is not valid." });
+  const body = req.body && typeof req.body === "object" ? req.body : {};
+  const photoId = text$1(body.photoId);
+  const note = typeof body.note === "string" ? body.note : "";
+  if (!photoId) return res.status(400).json({ error: "Choose one photo." });
+  try {
+    const listing = await authorizedListing(req, listingId);
+    const detail = buildPortalListingDetail(await loadSources(listingId, listing));
+    const photo = detail.photos.find((item) => item.id === photoId);
+    if (!photo) return res.status(400).json({ error: "That photo is not on this listing." });
+    await filePhotoEditRequest({
+      listingId,
+      photoId,
+      photoName: photo.name,
+      photoUrl: photo.url,
+      note,
+      clientId: req.user.uid,
+      knownPhotoIds: detail.photos.map((item) => item.id),
+      at: (/* @__PURE__ */ new Date()).toISOString()
+    });
+    const refreshed = await authorizedListing(req, listingId);
+    return res.status(201).json(buildPortalListingDetail(await loadSources(listingId, refreshed)));
+  } catch (err) {
+    return sendKnownError$3(res, err, "Could not save that edit request.");
   }
 };
 const handlePatchPortalWebsite = async (req, res) => {
-  if (!adminReady$3(res)) return;
+  if (!adminReady$4(res)) return;
   const listingId = listingIdFrom(req.params.id);
   if (!listingId) return res.status(400).json({ error: "Listing id is not valid." });
   try {
@@ -8254,16 +8602,16 @@ const handlePatchPortalWebsite = async (req, res) => {
     const refreshed = await authorizedListing(req, listingId);
     return res.json(buildPortalListingDetail(await loadSources(listingId, refreshed)));
   } catch (err) {
-    return sendKnownError$2(res, err, "Could not save the listing site.");
+    return sendKnownError$3(res, err, "Could not save the listing site.");
   }
 };
-const router$b = Router();
+const router$c = Router();
 const db$8 = () => admin.firestore();
 const HOME_LIMIT = 100;
 function asRecord(value) {
   return value && typeof value === "object" ? value : {};
 }
-router$b.get("/", requireStaff, async (req, res) => {
+router$c.get("/", requireStaff, async (req, res) => {
   try {
     const { status, search, limit = "50" } = req.query;
     let query = db$8().collection("clients").orderBy("createdAt", "desc");
@@ -8283,15 +8631,15 @@ router$b.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch clients." });
   }
 });
-function adminReady$2(res) {
+function adminReady$3(res) {
   if (admin.apps.length) return true;
   res.status(503).json({
     error: "Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT."
   });
   return false;
 }
-router$b.post("/register", async (req, res) => {
-  if (!adminReady$2(res)) return;
+router$c.post("/register", async (req, res) => {
+  if (!adminReady$3(res)) return;
   const firstName = cleanPersonName(req.body?.firstName);
   const lastName = cleanPersonName(req.body?.lastName);
   const phone = String(req.body?.phone || "").trim().slice(0, 40);
@@ -8352,8 +8700,8 @@ router$b.post("/register", async (req, res) => {
     return res.status(500).json({ error: "Could not create the client account." });
   }
 });
-router$b.get("/me/home", requireAuth, async (req, res) => {
-  if (!adminReady$2(res)) return;
+router$c.get("/me/home", requireAuth, async (req, res) => {
+  if (!adminReady$3(res)) return;
   try {
     const identity = await resolveClientIdentity(req.user.uid, req.user.email);
     if (!identity.profile) {
@@ -8501,11 +8849,12 @@ router$b.get("/me/home", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to load your portal." });
   }
 });
-router$b.get("/me/listings/:id", requireAuth, handleGetPortalListing);
-router$b.patch("/me/listings/:id/data", requireAuth, handlePatchPortalData);
-router$b.patch("/me/listings/:id/media", requireAuth, handlePatchPortalMedia);
-router$b.patch("/me/listings/:id/website", requireAuth, handlePatchPortalWebsite);
-router$b.get("/me", requireAuth, async (req, res) => {
+router$c.get("/me/listings/:id", requireAuth, handleGetPortalListing);
+router$c.patch("/me/listings/:id/data", requireAuth, handlePatchPortalData);
+router$c.patch("/me/listings/:id/media", requireAuth, handlePatchPortalMedia);
+router$c.patch("/me/listings/:id/website", requireAuth, handlePatchPortalWebsite);
+router$c.post("/me/listings/:id/photo-edit-requests", requireAuth, handleCreatePhotoEditRequest);
+router$c.get("/me", requireAuth, async (req, res) => {
   try {
     const directDoc = await db$8().collection("clients").doc(req.user.uid).get();
     if (directDoc.exists) {
@@ -8521,7 +8870,7 @@ router$b.get("/me", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch profile." });
   }
 });
-router$b.get("/:id", requireStaff, async (req, res) => {
+router$c.get("/:id", requireStaff, async (req, res) => {
   try {
     const doc = await db$8().collection("clients").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Client not found." });
@@ -8538,7 +8887,7 @@ router$b.get("/:id", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch client." });
   }
 });
-router$b.post("/", requireCoordinator, async (req, res) => {
+router$c.post("/", requireCoordinator, async (req, res) => {
   try {
     const { firstName, lastName, email, phone, address, notes, tags } = req.body;
     if (!firstName || !lastName || !email) {
@@ -8568,7 +8917,7 @@ router$b.post("/", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to create client." });
   }
 });
-router$b.patch("/:id", requireCoordinator, async (req, res) => {
+router$c.patch("/:id", requireCoordinator, async (req, res) => {
   try {
     const allowed = ["firstName", "lastName", "phone", "address", "status", "notes", "tags", "company"];
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
@@ -8828,9 +9177,9 @@ async function upsertPlaytestDelivery(photographerUid, client, listingId) {
     invoice: { id: invoiceId, urlPath: `/invoice/${invoiceId}`, status: "sent", amountDue: 150 }
   };
 }
-const router$a = Router();
+const router$b = Router();
 const db$6 = () => admin.firestore();
-router$a.get("/", requireStaff, async (_req, res) => {
+router$b.get("/", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$6().collection("staff").where("isActive", "==", true).orderBy("firstName").get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -8838,7 +9187,7 @@ router$a.get("/", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch staff." });
   }
 });
-router$a.post("/", requireAdmin, async (req, res) => {
+router$b.post("/", requireAdmin, async (req, res) => {
   try {
     const { firstName, lastName, email, phone, role, tempPassword } = req.body;
     if (!firstName || !lastName || !email || !role || !tempPassword) {
@@ -8874,7 +9223,7 @@ router$a.post("/", requireAdmin, async (req, res) => {
     return res.status(500).json({ error: "Failed to create staff member." });
   }
 });
-router$a.patch("/:id", requireAdmin, async (req, res) => {
+router$b.patch("/:id", requireAdmin, async (req, res) => {
   try {
     const allowed = ["firstName", "lastName", "phone", "role", "isActive"];
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
@@ -8902,7 +9251,7 @@ function requireSetupSecret(req, res) {
   }
   return true;
 }
-router$a.post("/playtest", async (req, res) => {
+router$b.post("/playtest", async (req, res) => {
   if (!requireSetupSecret(req, res)) return;
   if (!admin.apps.length) {
     return res.status(503).json({
@@ -8921,7 +9270,7 @@ router$a.post("/playtest", async (req, res) => {
     return res.status(500).json({ error: "Playtest setup failed." });
   }
 });
-router$a.post("/setup", async (req, res) => {
+router$b.post("/setup", async (req, res) => {
   try {
     if (isHostedDeployment(liveServerEnv())) {
       const secret = process.env.STAFF_SETUP_SECRET;
@@ -8992,10 +9341,10 @@ function kickStudioQueue(listingId, env = process.env) {
   });
   return { dispatched: true };
 }
-const router$9 = Router();
+const router$a = Router();
 const db$5 = () => admin.firestore();
 const DIRECT_UPLOAD_LIMIT = 3e6;
-function adminReady$1(res) {
+function adminReady$2(res) {
   if (admin.apps.length) return true;
   res.status(503).json({
     error: "Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT and FIREBASE_STORAGE_BUCKET."
@@ -9052,7 +9401,7 @@ function followUploadWithQueue(listingId, autoQueue) {
   });
   if (decision.kick) kickStudioQueue(listingId);
 }
-function sendKnownError$1(res, err, fallback) {
+function sendKnownError$2(res, err, fallback) {
   const status = err.status;
   if (status && status >= 400 && status < 500) {
     return res.status(status).json({ error: err instanceof Error ? err.message : fallback });
@@ -9060,8 +9409,8 @@ function sendKnownError$1(res, err, fallback) {
   console.error("[Listings]", err);
   return res.status(500).json({ error: fallback });
 }
-router$9.get("/assigned", requirePhotographer, async (req, res) => {
-  if (!adminReady$1(res)) return;
+router$a.get("/assigned", requirePhotographer, async (req, res) => {
+  if (!adminReady$2(res)) return;
   try {
     const uid = req.user.uid;
     const role = req.staffRole || "";
@@ -9089,8 +9438,8 @@ router$9.get("/assigned", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to load assigned jobs." });
   }
 });
-router$9.get("/:id", requireAuth, async (req, res) => {
-  if (!adminReady$1(res)) return;
+router$a.get("/:id", requireAuth, async (req, res) => {
+  if (!adminReady$2(res)) return;
   try {
     const listing = await assertListingAccess(req, req.params.id);
     const staffDoc = await db$5().collection("staff").doc(req.user.uid).get();
@@ -9101,11 +9450,11 @@ router$9.get("/:id", requireAuth, async (req, res) => {
     }
     return res.json(payload);
   } catch (err) {
-    return sendKnownError$1(res, err, "Failed to load listing.");
+    return sendKnownError$2(res, err, "Failed to load listing.");
   }
 });
-router$9.post("/:id/photos/upload-url", requirePhotographer, async (req, res) => {
-  if (!adminReady$1(res)) return;
+router$a.post("/:id/photos/upload-url", requirePhotographer, async (req, res) => {
+  if (!adminReady$2(res)) return;
   try {
     const fileName2 = safeStorageFileName(req.body?.fileName);
     if (!fileName2) ;
@@ -9119,11 +9468,11 @@ router$9.post("/:id/photos/upload-url", requirePhotographer, async (req, res) =>
     );
     return res.json(ticket);
   } catch (err) {
-    return sendKnownError$1(res, err, "Failed to prepare the upload. Check FIREBASE_STORAGE_BUCKET.");
+    return sendKnownError$2(res, err, "Failed to prepare the upload. Check FIREBASE_STORAGE_BUCKET.");
   }
 });
-router$9.post("/:id/photos", requirePhotographer, async (req, res) => {
-  if (!adminReady$1(res)) return;
+router$a.post("/:id/photos", requirePhotographer, async (req, res) => {
+  if (!adminReady$2(res)) return;
   try {
     const listingId = req.params.id;
     await assertListingAccess(req, listingId);
@@ -9165,10 +9514,10 @@ router$9.post("/:id/photos", requirePhotographer, async (req, res) => {
     followUploadWithQueue(listingId, autoQueue);
     return res.status(201).json({ success: true, ...registered, autoQueue });
   } catch (err) {
-    return sendKnownError$1(res, err, "Failed to save the uploaded photo.");
+    return sendKnownError$2(res, err, "Failed to save the uploaded photo.");
   }
 });
-const router$8 = Router();
+const router$9 = Router();
 const db$4 = () => admin.firestore();
 function mailchimpConfig() {
   const apiKey = process.env.MAILCHIMP_API_KEY || "";
@@ -9196,7 +9545,7 @@ async function mailchimpRequest(path2, init = {}) {
   }
   return data;
 }
-router$8.get("/", requireCoordinator, async (_req, res) => {
+router$9.get("/", requireCoordinator, async (_req, res) => {
   try {
     const snapshot = await db$4().collection("campaigns").orderBy("createdAt", "desc").limit(50).get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -9204,7 +9553,7 @@ router$8.get("/", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch campaigns." });
   }
 });
-router$8.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
+router$9.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
   try {
     const { apiKey, serverPrefix } = mailchimpConfig();
     if (!apiKey || !serverPrefix) {
@@ -9235,7 +9584,7 @@ router$8.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
     });
   }
 });
-router$8.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
+router$9.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
   try {
     const { listId, audience = "all" } = req.body;
     if (!listId) return res.status(400).json({ error: "listId required." });
@@ -9298,7 +9647,7 @@ router$8.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: err instanceof Error ? err.message : "Failed to sync Mailchimp." });
   }
 });
-router$8.post("/", requireCoordinator, async (req, res) => {
+router$9.post("/", requireCoordinator, async (req, res) => {
   try {
     const { name, type, subject, body, audience, audienceIds, scheduledAt } = req.body;
     if (!name || !body || !audience) {
@@ -9323,7 +9672,7 @@ router$8.post("/", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to create campaign." });
   }
 });
-router$8.post("/:id/send", requireCoordinator, async (req, res) => {
+router$9.post("/:id/send", requireCoordinator, async (req, res) => {
   try {
     const campaignDoc = await db$4().collection("campaigns").doc(req.params.id).get();
     if (!campaignDoc.exists) return res.status(404).json({ error: "Campaign not found." });
@@ -9389,7 +9738,7 @@ router$8.post("/:id/send", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send campaign." });
   }
 });
-const router$7 = Router();
+const router$8 = Router();
 const db$3 = () => admin.firestore();
 function isAgentAuthorized(req) {
   const serviceKey = req.headers["x-agent-key"];
@@ -9441,7 +9790,7 @@ async function loadOrderForAppointment(appointment) {
   const orderDoc = await db$3().collection("orders").doc(String(appointment.orderId)).get();
   return orderDoc.exists ? { id: orderDoc.id, ref: orderDoc.ref, data: orderDoc.data() || {} } : null;
 }
-router$7.get("/briefing", requireStaff, async (_req, res) => {
+router$8.get("/briefing", requireStaff, async (_req, res) => {
   try {
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
@@ -9640,9 +9989,9 @@ async function runReminderSweep(req, res) {
     return res.status(500).json({ error: "Failed to run reminder sweep." });
   }
 }
-router$7.get("/run-reminders", runReminderSweep);
-router$7.post("/run-reminders", runReminderSweep);
-router$7.get("/logs", requireStaff, async (req, res) => {
+router$8.get("/run-reminders", runReminderSweep);
+router$8.post("/run-reminders", runReminderSweep);
+router$8.get("/logs", requireStaff, async (req, res) => {
   try {
     const { agent, status, requiresReview, limit = "50" } = req.query;
     let query = db$3().collection("agentLogs").orderBy("createdAt", "desc");
@@ -9657,7 +10006,7 @@ router$7.get("/logs", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch agent logs." });
   }
 });
-router$7.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
+router$8.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
   try {
     const { notes } = req.body;
     await db$3().collection("agentLogs").doc(req.params.id).update({
@@ -9672,7 +10021,7 @@ router$7.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to resolve flag." });
   }
 });
-router$7.post("/log", async (req, res) => {
+router$8.post("/log", async (req, res) => {
   try {
     if (!isAgentAuthorized(req)) {
       return res.status(401).json({ error: "Invalid agent key." });
@@ -9710,9 +10059,9 @@ router$7.post("/log", async (req, res) => {
     return res.status(500).json({ error: "Failed to log agent action." });
   }
 });
-const router$6 = Router();
+const router$7 = Router();
 const db$2 = () => admin.firestore();
-router$6.get("/", requireStaff, async (req, res) => {
+router$7.get("/", requireStaff, async (req, res) => {
   try {
     const { status, listingId, orderId, limit = "100" } = req.query;
     let q = db$2().collection("mediaJobs").orderBy("createdAt", "desc");
@@ -9726,7 +10075,7 @@ router$6.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch media jobs." });
   }
 });
-router$6.post("/", requireStaff, async (req, res) => {
+router$7.post("/", requireStaff, async (req, res) => {
   try {
     const {
       listingId,
@@ -9785,7 +10134,7 @@ router$6.post("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to create media job." });
   }
 });
-router$6.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$7.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status, resultItems = [], error = "", requiresHumanReview } = req.body;
     const valid = ["queued", "processing", "ready_for_review", "completed", "failed", "cancelled"];
@@ -9804,8 +10153,8 @@ router$6.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update media job." });
   }
 });
-const router$5 = Router();
-function adminReady(res) {
+const router$6 = Router();
+function adminReady$1(res) {
   if (admin.apps.length) return true;
   res.status(503).json({
     error: "Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT and FIREBASE_STORAGE_BUCKET."
@@ -9824,7 +10173,7 @@ function requireStaffOrQueueCron(req, res, next) {
   }
   return requireStaff(req, res, next);
 }
-function sendKnownError(res, err, fallback) {
+function sendKnownError$1(res, err, fallback) {
   const status = err.status;
   if (status && status >= 400 && status < 500) {
     return res.status(status).json({ error: err instanceof Error ? err.message : fallback });
@@ -9832,8 +10181,8 @@ function sendKnownError(res, err, fallback) {
   console.error("[Studio]", err);
   return res.status(500).json({ error: fallback });
 }
-router$5.get("/workspace", requireStaff, async (req, res) => {
-  if (!adminReady(res)) return;
+router$6.get("/workspace", requireStaff, async (req, res) => {
+  if (!adminReady$1(res)) return;
   try {
     const listingId = typeof req.query.listingId === "string" ? req.query.listingId : "";
     const payload = await loadStudioWorkspace({
@@ -9851,24 +10200,24 @@ router$5.get("/workspace", requireStaff, async (req, res) => {
     }
     return res.json(payload);
   } catch (err) {
-    return sendKnownError(res, err, "Failed to load Iconic Studio.");
+    return sendKnownError$1(res, err, "Failed to load Iconic Studio.");
   }
 });
-router$5.post("/order-edits", requireStaff, async (req, res) => {
+router$6.post("/order-edits", requireStaff, async (req, res) => {
   const listingId = String(req.body?.listingId || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
   }
-  if (!adminReady(res)) return;
+  if (!adminReady$1(res)) return;
   try {
     await assertStudioAccess(req.user.uid, req.staffRole || "", listingId);
     const result = await queueOrderEdits({ listingId, createdBy: req.user.uid });
     return res.status(201).json(result);
   } catch (err) {
-    return sendKnownError(res, err, "Failed to queue the order edits.");
+    return sendKnownError$1(res, err, "Failed to queue the order edits.");
   }
 });
-router$5.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => {
+router$6.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => {
   let listingId = String(req.body?.listingId || "").trim();
   if (listingId && !/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -9876,7 +10225,7 @@ router$5.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => 
   if (!listingId && req.user?.uid !== "studio-queue") {
     return res.status(400).json({ error: "A valid listing id is required." });
   }
-  if (!adminReady(res)) return;
+  if (!adminReady$1(res)) return;
   try {
     if (!listingId) {
       const found = await nextOrderEditListingId();
@@ -9895,10 +10244,10 @@ router$5.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => 
     if (req.body?.chain === true && result.shouldFollowUp) kickStudioQueue(listingId);
     return res.json(result);
   } catch (err) {
-    return sendKnownError(res, err, "Failed to advance the order edit queue.");
+    return sendKnownError$1(res, err, "Failed to advance the order edit queue.");
   }
 });
-router$5.post("/iconic-polish", requireStaff, async (req, res) => {
+router$6.post("/iconic-polish", requireStaff, async (req, res) => {
   const listingId = String(req.body?.listingId || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -9906,19 +10255,19 @@ router$5.post("/iconic-polish", requireStaff, async (req, res) => {
   if (typeof req.body?.iconicPolish !== "boolean") {
     return res.status(400).json({ error: "iconicPolish must be true or false." });
   }
-  if (!adminReady(res)) return;
+  if (!adminReady$1(res)) return;
   try {
     await assertStudioAccess(req.user.uid, req.staffRole || "", listingId);
     const result = await setIconicPolish({ listingId, iconicPolish: req.body.iconicPolish });
     return res.json(result);
   } catch (err) {
-    return sendKnownError(res, err, "Failed to save Iconic Polish.");
+    return sendKnownError$1(res, err, "Failed to save Iconic Polish.");
   }
 });
-router$5.post("/ai-edit", requireStaff, async (req, res) => {
+router$6.post("/ai-edit", requireStaff, async (req, res) => {
   const parsed = parseAiEditRequest(req.body);
   if (parsed.ok === false) return res.status(400).json({ error: parsed.error });
-  if (!adminReady(res)) return;
+  if (!adminReady$1(res)) return;
   try {
     await assertStudioAccess(req.user.uid, req.staffRole || "", parsed.value.listingId);
     const job = await enqueueAiEdit({ ...parsed.value, createdBy: req.user.uid });
@@ -9932,11 +10281,11 @@ router$5.post("/ai-edit", requireStaff, async (req, res) => {
       note: job.note
     });
   } catch (err) {
-    return sendKnownError(res, err, "Failed to enqueue the AI edit.");
+    return sendKnownError$1(res, err, "Failed to enqueue the AI edit.");
   }
 });
-router$5.post("/adjust", requireStaff, async (req, res) => {
-  if (!adminReady(res)) return;
+router$6.post("/adjust", requireStaff, async (req, res) => {
+  if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
     const sourcePath = String(req.body?.sourcePath || "");
@@ -9955,11 +10304,11 @@ router$5.post("/adjust", requireStaff, async (req, res) => {
     });
     return res.status(201).json({ success: true, ...saved });
   } catch (err) {
-    return sendKnownError(res, err, "Failed to save the adjustment.");
+    return sendKnownError$1(res, err, "Failed to save the adjustment.");
   }
 });
-router$5.post("/reject", requireStaff, async (req, res) => {
-  if (!adminReady(res)) return;
+router$6.post("/reject", requireStaff, async (req, res) => {
+  if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
     const jobId = String(req.body?.jobId || "");
@@ -9972,11 +10321,11 @@ router$5.post("/reject", requireStaff, async (req, res) => {
     });
     return res.json({ success: true, ...result });
   } catch (err) {
-    return sendKnownError(res, err, "Failed to reject the edit.");
+    return sendKnownError$1(res, err, "Failed to reject the edit.");
   }
 });
-router$5.post("/approve", requireStaff, async (req, res) => {
-  if (!adminReady(res)) return;
+router$6.post("/approve", requireStaff, async (req, res) => {
+  if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
     const jobId = typeof req.body?.jobId === "string" ? req.body.jobId : "";
@@ -10003,10 +10352,10 @@ router$5.post("/approve", requireStaff, async (req, res) => {
     });
     return res.json({ success: true, ...result });
   } catch (err) {
-    return sendKnownError(res, err, "Failed to approve the final.");
+    return sendKnownError$1(res, err, "Failed to approve the final.");
   }
 });
-const router$4 = Router();
+const router$5 = Router();
 const GOOGLE_KEY = process.env.GOOGLE_MAPS_API_KEY || "";
 function fromGoogle(p) {
   return {
@@ -10033,7 +10382,7 @@ function fromNominatim(r, idx) {
     secondary: parts.slice(1).join(", ")
   };
 }
-router$4.get("/autocomplete", async (req, res) => {
+router$5.get("/autocomplete", async (req, res) => {
   const input = (req.query.input || "").trim();
   if (!input || input.length < 2) {
     return res.json({ suggestions: [] });
@@ -10069,7 +10418,7 @@ router$4.get("/autocomplete", async (req, res) => {
     return res.json({ suggestions: [] });
   }
 });
-router$4.get("/distance", async (req, res) => {
+router$5.get("/distance", async (req, res) => {
   const destination = (req.query.destination || "").trim();
   const origin = (req.query.origin || process.env.STUDIO_ADDRESS || "The Woodlands, TX 77380").trim();
   if (!destination) {
@@ -10096,7 +10445,7 @@ router$4.get("/distance", async (req, res) => {
     return res.status(500).json({ error: "Failed to calculate distance." });
   }
 });
-const router$3 = Router();
+const router$4 = Router();
 const db$1 = () => admin.firestore();
 function addressLabel(address) {
   if (!address) return "the property";
@@ -10115,7 +10464,7 @@ async function findOrderLikeDocument(id) {
   if (orderDoc.exists) return orderDoc;
   return null;
 }
-router$3.post("/send", requireStaff, async (req, res) => {
+router$4.post("/send", requireStaff, async (req, res) => {
   try {
     const { to, body, orderId } = req.body;
     if (!to || !body) return res.status(400).json({ error: "to and body required." });
@@ -10153,7 +10502,7 @@ router$3.post("/send", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$3.post("/remind/:orderId", requireStaff, async (req, res) => {
+router$4.post("/remind/:orderId", requireStaff, async (req, res) => {
   try {
     const { type = "24h" } = req.body;
     const orderDoc = await findOrderLikeDocument(req.params.orderId);
@@ -10195,7 +10544,7 @@ router$3.post("/remind/:orderId", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$3.post("/conversation", requireStaff, async (req, res) => {
+router$4.post("/conversation", requireStaff, async (req, res) => {
   try {
     const { orderId, photographerPhone, photographerName, clientPhone, clientName: clientName2 } = req.body;
     if (!orderId || !photographerPhone || !clientPhone) {
@@ -10237,7 +10586,7 @@ router$3.post("/conversation", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$3.get("/conversations", requireStaff, async (_req, res) => {
+router$4.get("/conversations", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$1().collection("conversations").orderBy("createdAt", "desc").limit(50).get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -10245,7 +10594,7 @@ router$3.get("/conversations", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch conversations." });
   }
 });
-router$3.post("/conversation/:id/close", requireStaff, async (req, res) => {
+router$4.post("/conversation/:id/close", requireStaff, async (req, res) => {
   try {
     const convoDoc = await db$1().collection("conversations").doc(req.params.id).get();
     if (!convoDoc.exists) return res.status(404).json({ error: "Conversation not found." });
@@ -10257,7 +10606,7 @@ router$3.post("/conversation/:id/close", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$3.post("/webhook", express_raw_or_json, async (req, res) => {
+router$4.post("/webhook", express_raw_or_json, async (req, res) => {
   try {
     const authToken = process.env.TWILIO_AUTH_TOKEN;
     if (authToken && process.env.NODE_ENV === "production") {
@@ -10318,7 +10667,7 @@ router$3.post("/webhook", express_raw_or_json, async (req, res) => {
     return res.status(200).send("");
   }
 });
-router$3.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
+router$4.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
   try {
     const campaignDoc = await db$1().collection("campaigns").doc(req.params.id).get();
     if (!campaignDoc.exists) return res.status(404).json({ error: "Campaign not found." });
@@ -10361,7 +10710,7 @@ router$3.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$3.post("/opt-out", async (req, res) => {
+router$4.post("/opt-out", async (req, res) => {
   try {
     const { From, Body } = req.body;
     if (!From) return res.status(200).send("");
@@ -10380,8 +10729,8 @@ router$3.post("/opt-out", async (req, res) => {
 function express_raw_or_json(req, _res, next) {
   next();
 }
-const router$2 = Router();
-router$2.post("/", async (req, res) => {
+const router$3 = Router();
+router$3.post("/", async (req, res) => {
   try {
     const { name, email, subject, message, phone } = req.body;
     if (!name || !email || !subject || !message) {
@@ -10439,7 +10788,7 @@ function createRateLimiter(options) {
     check(key) {
       const now = options.now ? options.now() : Date.now();
       const windowStart = now - options.windowMs;
-      const recent = (hits.get(key) ?? []).filter((stamp) => stamp > windowStart);
+      const recent = (hits.get(key) ?? []).filter((stamp2) => stamp2 > windowStart);
       if (recent.length >= options.max) {
         const retryAfterSec = Math.max(1, Math.ceil((recent[0] + options.windowMs - now) / 1e3));
         hits.set(key, recent);
@@ -10587,12 +10936,12 @@ async function deliverLiveChat(input) {
     notConfigured ? "not_configured" : "failed"
   );
 }
-const router$1 = Router();
+const router$2 = Router();
 const liveChatLimiter = createRateLimiter({
   windowMs: LIVE_CHAT_WINDOW_MS,
   max: LIVE_CHAT_MAX_PER_WINDOW
 });
-router$1.post("/live-chat", async (req, res) => {
+router$2.post("/live-chat", async (req, res) => {
   const parsed = parseLiveChatBody(req.body);
   if (parsed.ok === false) {
     return res.status(400).json({ error: parsed.error });
@@ -11023,7 +11372,7 @@ ${next}`;
 function escapeHtml$1(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
-const router = Router();
+const router$1 = Router();
 const db = () => admin.firestore();
 function originOf(req) {
   const configured = process.env.APP_URL;
@@ -11067,7 +11416,7 @@ async function loadPresentation(token, origin) {
   const galleries = await galleriesForListing(listing.id, listing);
   return buildPresentation({ token, listing, galleries, origin });
 }
-router.get("/presentations/:token", async (req, res) => {
+router$1.get("/presentations/:token", async (req, res) => {
   const token = String(req.params.token || "");
   if (!isPresentationToken(token)) {
     return res.status(400).json({ error: "That presentation link is not valid." });
@@ -11083,7 +11432,7 @@ router.get("/presentations/:token", async (req, res) => {
     return res.status(500).json({ error: "This presentation could not be opened." });
   }
 });
-router.get("/presentations/shell/:token", async (req, res) => {
+router$1.get("/presentations/shell/:token", async (req, res) => {
   const rendered = await renderPresentationShell(String(req.params.token || ""), originOf(req));
   res.status(rendered.status).type("html").send(rendered.html);
 });
@@ -11104,7 +11453,7 @@ async function renderPresentationShell(token, origin) {
     return { status: 500, html: "<!doctype html><title>Presentation</title><p>This presentation could not be opened.</p>" };
   }
 }
-router.post("/listings/:id/presentation", requireStaff, async (req, res) => {
+router$1.post("/listings/:id/presentation", requireStaff, async (req, res) => {
   const listingId = String(req.params.id || "");
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -11199,6 +11548,67 @@ function escapeHtml(value) {
 function escapeAttr(value) {
   return escapeHtml(value).replace(/"/g, "&quot;");
 }
+const router = Router();
+function adminReady(res) {
+  if (admin.apps.length) return true;
+  res.status(503).json({ error: "Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT." });
+  return false;
+}
+function sendKnownError(res, err, fallback) {
+  const status = err instanceof PhotoEditRequestError ? err.status : err.status;
+  if (status && status >= 400 && status < 500 || status === 503) {
+    return res.status(status).json({ error: err instanceof Error ? err.message : fallback });
+  }
+  console.error("[Photo edit request]", err);
+  return res.status(500).json({ error: fallback });
+}
+async function advance(req, res, to) {
+  if (!adminReady(res)) return;
+  const listingId = portalListingId(req.params.id);
+  const requestId = typeof req.params.requestId === "string" ? req.params.requestId.trim() : "";
+  if (!listingId || !requestId) return res.status(400).json({ error: "That edit request could not be found." });
+  try {
+    const request = await markPhotoEditRequest({
+      listingId,
+      requestId,
+      to,
+      actorId: req.user.uid,
+      at: (/* @__PURE__ */ new Date()).toISOString()
+    });
+    return res.json({ request });
+  } catch (err) {
+    return sendKnownError(res, err, "Could not update that edit request.");
+  }
+}
+router.post("/listings/:id/photo-edit-requests/:requestId/sent", requireStaff, async (req, res) => {
+  return advance(req, res, "sent_out");
+});
+router.post("/listings/:id/photo-edit-requests/:requestId/received", requireStaff, async (req, res) => {
+  return advance(req, res, "received_back");
+});
+router.post("/listings/:id/photo-edit-requests/:requestId/replacement", requireStaff, async (req, res) => {
+  if (!adminReady(res)) return;
+  const listingId = portalListingId(req.params.id);
+  const requestId = typeof req.params.requestId === "string" ? req.params.requestId.trim() : "";
+  if (!listingId || !requestId) return res.status(400).json({ error: "That edit request could not be found." });
+  const body = req.body && typeof req.body === "object" ? req.body : {};
+  const bytes = decodeReplacementBytes(body.dataBase64);
+  if (!bytes) return res.status(400).json({ error: "The replacement file was empty." });
+  try {
+    const request = await savePhotoEditReplacement({
+      listingId,
+      requestId,
+      fileName: typeof body.fileName === "string" ? body.fileName : "replacement.jpg",
+      contentType: typeof body.contentType === "string" ? body.contentType : "",
+      bytes,
+      actorId: req.user.uid,
+      at: (/* @__PURE__ */ new Date()).toISOString()
+    });
+    return res.json({ request });
+  } catch (err) {
+    return sendKnownError(res, err, "Could not attach that replacement.");
+  }
+});
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
 const API_BUILD_MARKER = "auth-square-2026-09-28";
 if (!admin.apps.length) {
@@ -11316,25 +11726,26 @@ function createServer() {
   app.get("/api/client-notify", (_req, res) => {
     res.json({ live: clientNotifyLive() });
   });
-  app.use("/api/bookings", router$h);
-  app.use("/api/orders", router$g);
-  app.use("/api/galleries", router$f);
-  app.use("/api/payments", router$e);
-  app.use("/api/vsai", router$d);
-  app.use("/api/messages", router$c);
-  app.use("/api/clients", router$b);
+  app.use("/api/bookings", router$i);
+  app.use("/api/orders", router$h);
+  app.use("/api/galleries", router$g);
+  app.use("/api/payments", router$f);
+  app.use("/api/vsai", router$e);
+  app.use("/api/messages", router$d);
+  app.use("/api/clients", router$c);
   app.get("/api/portal/listings/:id", handleGetPublicPortalListing);
-  app.use("/api/staff", router$a);
+  app.use("/api/staff", router$b);
+  app.use("/api", router$1);
+  app.use("/api/listings", router$a);
   app.use("/api", router);
-  app.use("/api/listings", router$9);
-  app.use("/api/campaigns", router$8);
-  app.use("/api/agents", router$7);
-  app.use("/api/media-jobs", router$6);
-  app.use("/api/studio", router$5);
-  app.use("/api/places", router$4);
-  app.use("/api/sms", router$3);
-  app.use("/api/contact", router$1);
+  app.use("/api/campaigns", router$9);
+  app.use("/api/agents", router$8);
+  app.use("/api/media-jobs", router$7);
+  app.use("/api/studio", router$6);
+  app.use("/api/places", router$5);
+  app.use("/api/sms", router$4);
   app.use("/api/contact", router$2);
+  app.use("/api/contact", router$3);
   app.use(
     (err, _req, res, _next) => {
       console.error("[Server] Unhandled error:", err);
