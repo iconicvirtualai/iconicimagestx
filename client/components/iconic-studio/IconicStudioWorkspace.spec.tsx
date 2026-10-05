@@ -158,5 +158,33 @@ describe("Iconic Studio staff shell", () => {
     expect(html).toContain("Twilight renders (0/2)");
     expect(html).toContain("5 aerial stills (0/5)");
     expect(html).toContain("held until the order is 100%");
+    expect(html).toContain("Open delivery queue");
+  });
+
+  it("shows the Iconic delivery label from the linked gallery", () => {
+    const html = renderToString(
+      <IconicStudioWorkspace
+        listings={[{ id: "sampledemo", address: "100 Sample Lane", imageCount: 1 }]}
+        jobs={[]}
+        listingId="sampledemo"
+        address="100 Sample Lane"
+        frames={sampleStudioFrames()}
+        delivery={{
+          galleryId: "galleryUndeliver1",
+          galleryStatus: "ready_for_review",
+          deliveryStatus: "undelivered",
+          label: "Undelivered",
+        }}
+        initialTab="gallery"
+        onSelectListing={() => undefined}
+        onAiEdit={async () => undefined}
+        onSaveAdjust={async () => undefined}
+        onApprove={async () => undefined}
+      />,
+    );
+    expect(html).toContain("studio-delivery-status");
+    expect(html).toContain("Delivery · Undelivered");
+    expect(html).toContain("/admin/delivery");
+    expect(html.toLowerCase()).not.toContain("autohdr");
   });
 });

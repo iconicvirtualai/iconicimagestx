@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 import { useAuth } from "@/contexts/AuthContext";
-import IconicStudioWorkspace, { type StudioJobView } from "@/components/iconic-studio/IconicStudioWorkspace";
+import IconicStudioWorkspace, { type StudioDeliveryView, type StudioJobView } from "@/components/iconic-studio/IconicStudioWorkspace";
 import {
   fetchStudioWorkspace,
   postStudioAdjust,
@@ -69,6 +69,7 @@ export default function AdminIconicStudio() {
   const [address, setAddress] = useState("Iconic Studio");
   const [editPlan, setEditPlan] = useState<OrderEditPlan | null>(null);
   const [release, setRelease] = useState<GalleryReleaseReport | null>(null);
+  const [delivery, setDelivery] = useState<StudioDeliveryView | null>(null);
   const draining = useRef(false);
   const drainFailed = useRef(false);
 
@@ -81,6 +82,12 @@ export default function AdminIconicStudio() {
     setAddress(sample.address);
     setEditPlan(sample.editPlan);
     setRelease(assessGalleryRelease(sample.editPlan, { jobs: [], finals: [], uploads: [], media: [] }));
+    setDelivery({
+      galleryId: "samplegallery",
+      galleryStatus: "ready_for_review",
+      deliveryStatus: "undelivered",
+      label: "Undelivered",
+    });
   }, []);
 
   const load = useCallback(async () => {
@@ -97,6 +104,7 @@ export default function AdminIconicStudio() {
       setAddress(data.listing?.address || "Choose a listing");
       setEditPlan(data.listing?.editPlan || null);
       setRelease(data.listing?.release || null);
+      setDelivery(data.listing?.delivery || null);
       if (!listingId && data.listings?.[0]?.id) {
         navigate(iconicStudioHref(data.listings[0].id), { replace: true });
       }
@@ -113,6 +121,7 @@ export default function AdminIconicStudio() {
         setFrames([]);
         setEditPlan(null);
         setRelease(null);
+        setDelivery(null);
       }
     } finally {
       setLoading(false);
@@ -186,6 +195,7 @@ export default function AdminIconicStudio() {
           demo={demo}
           editPlan={editPlan}
           release={release}
+          delivery={delivery}
           onSelectListing={onSelectListing}
           onRunOrder={async () => {
             if (demo) {

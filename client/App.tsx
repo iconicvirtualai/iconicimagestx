@@ -67,6 +67,7 @@ import AdminTeam from "./pages/AdminTeam";
 import AdminStudio from "./pages/AdminStudio";
 import AdminStudioScratch from "./pages/AdminStudioScratch";
 import AdminIconicStudio from "./pages/AdminIconicStudio";
+import AdminDeliveryQueue from "./pages/AdminDeliveryQueue";
 import Login from "./pages/Login";
 import ClientPortal from "./pages/ClientPortal";
 import PortalListingDetail from "./pages/PortalListingDetail";
@@ -137,6 +138,7 @@ const App = () => (
             <Route path="/admin/studio/scratch" element={<ProtectedRoute requiredRole="coordinator"><AdminStudioScratch /></ProtectedRoute>} />
             <Route path="/admin/iconic-studio" element={<ProtectedRoute requiredRole="staff"><AdminIconicStudio /></ProtectedRoute>} />
             <Route path="/admin/iconic-studio/:listingId" element={<ProtectedRoute requiredRole="staff"><AdminIconicStudio /></ProtectedRoute>} />
+            <Route path="/admin/delivery" element={<ProtectedRoute requiredRole="staff"><AdminDeliveryQueue /></ProtectedRoute>} />
             <Route path="/admin/listings" element={<ProtectedRoute requiredRole="coordinator"><AdminListings /></ProtectedRoute>} />
             <Route path="/admin/listing/:id" element={<ProtectedRoute requiredRole="staff"><AdminListingFile /></ProtectedRoute>} />
             <Route path="/admin/customers" element={<ProtectedRoute requiredRole="coordinator"><AdminCustomerCenter /></ProtectedRoute>} />

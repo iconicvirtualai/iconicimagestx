@@ -1,5 +1,6 @@
 import type { GalleryReleaseReport } from "@shared/galleryRelease";
 import type { StudioAdjustments } from "@shared/iconicStudio";
+import type { MediaDeliveryStatus } from "@shared/mediaDelivery";
 import type { OrderEditPlan } from "@shared/orderEditPlan";
 
 type TokenGetter = () => Promise<string>;
@@ -21,6 +22,12 @@ export interface StudioWorkspaceResponse {
     iconicPolish?: boolean;
     editPlan?: OrderEditPlan | null;
     release?: GalleryReleaseReport | null;
+    delivery?: {
+      galleryId: string;
+      galleryStatus: string;
+      deliveryStatus: MediaDeliveryStatus;
+      label: string;
+    } | null;
     images: Array<Record<string, unknown>>;
   } | null;
 }

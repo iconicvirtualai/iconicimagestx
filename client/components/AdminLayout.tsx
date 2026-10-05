@@ -16,12 +16,12 @@ import {
   LogOut,
   Camera,
   ImagePlay,
+  Images,
   Bot,
   Settings,
   CreditCard,
   Upload,
   Aperture,
-  Images,
   Package,
 } from "lucide-react";
 import { mostSpecificNavHref } from "@/lib/adminNav";
@@ -63,6 +63,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     items: [
       { label: "Iconic Studio",   href: "/admin/iconic-studio",    icon: Aperture,        roles: ALL_STAFF },
       { label: "Scratch Pad",     href: "/admin/studio/scratch",   icon: Images,          roles: COORD_UP },
+      { label: "Delivery",        href: "/admin/delivery",         icon: Images,          roles: ALL_STAFF },
       { label: "Photographer",    href: "/admin/photographer",     icon: Camera,          roles: PHOTO_UP },
       { label: "Upload",          href: "/admin/upload",           icon: Upload,          roles: PHOTO_UP },
     ],

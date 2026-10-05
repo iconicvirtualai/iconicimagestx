@@ -7,13 +7,18 @@
  * Approve copies a finished JPEG/PNG/WebP onto the listing finals path.
  * It does not send the gallery or client email. Delivery stays held until
  * the order plan is 100% complete.
+ * GET /delivery-queue lists galleries with Iconic labels Pending,
+ * Undelivered, and Delivered. POST /delivery-queue/move writes those
+ * labels through the gallery status or the gallery deliver path.
  */
 
 import { Router } from "express";
 import admin from "firebase-admin";
 import { parseAiEditRequest, resolveStudioApprovePath } from "../../shared/iconicStudio";
-import { requireStaff, type AuthenticatedRequest } from "../middleware/auth";
+import { isMediaDeliveryStatus } from "../../shared/mediaDelivery";
+import { requireCoordinator, requireStaff, type AuthenticatedRequest } from "../middleware/auth";
 import { loadGalleryReleaseReport } from "../services/galleryReleaseGate";
+import { listMediaDeliveryQueue, moveMediaDelivery } from "../services/mediaDeliveryQueue";
 import { kickStudioQueue } from "../services/studioQueueKick";
 import {
   advanceOrderEditQueue,
@@ -85,6 +90,52 @@ router.get("/workspace", requireStaff, async (req: AuthenticatedRequest, res) =>
     return res.json(payload);
   } catch (err) {
     return sendKnownError(res, err, "Failed to load Iconic Studio.");
+  }
+});
+
+router.get("/delivery-queue", requireStaff, async (req: AuthenticatedRequest, res) => {
+  if (!adminReady(res)) return;
+  try {
+    const rows = await listMediaDeliveryQueue({
+      uid: req.user!.uid,
+      role: req.staffRole || "",
+    });
+    return res.json({ rows });
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to load the delivery queue.");
+  }
+});
+
+router.post("/delivery-queue/move", requireCoordinator, async (req: AuthenticatedRequest, res) => {
+  const galleryId = String(req.body?.galleryId || "").trim();
+  const status = String(req.body?.status || "").trim();
+  if (!/^[A-Za-z0-9_-]{8,128}$/.test(galleryId)) {
+    return res.status(400).json({ error: "A valid gallery id is required." });
+  }
+  if (!isMediaDeliveryStatus(status)) {
+    return res.status(400).json({ error: "Status must be pending, undelivered, or delivered." });
+  }
+  if (!adminReady(res)) return;
+  try {
+    const result = await moveMediaDelivery({
+      galleryId,
+      status,
+      expiresInDays: Number(req.body?.expiresInDays),
+    });
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    const code = (err as { status?: number }).status;
+    const report = (err as { report?: { galleryRelease?: string; percent?: number; gaps?: unknown[] } }).report;
+    if (code === 409 && report) {
+      return res.status(409).json({
+        error: err instanceof Error ? err.message : "Gallery stays held.",
+        galleryRelease: report.galleryRelease,
+        complete: false,
+        percent: report.percent,
+        gaps: report.gaps,
+      });
+    }
+    return sendKnownError(res, err, "Failed to update delivery.");
   }
 });
 

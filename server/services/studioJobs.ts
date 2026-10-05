@@ -23,6 +23,7 @@ import {
   type StudioAdjustments,
   type StudioFrame,
 } from "../../shared/iconicStudio";
+import { MEDIA_DELIVERY_LABELS, mediaDeliveryFromGalleryStatus } from "../../shared/mediaDelivery";
 import { isListingStoragePath, safeStorageFileName, contentTypeForUpload } from "../../shared/listingAccess";
 import {
   orderQueueAdvancePlan,
@@ -103,7 +104,36 @@ async function loadListing(listingId: string) {
   return { id: snap.id, ref: snap.ref, data: snap.data() || {} };
 }
 
-async function listingsForRole(uid: string, role: string) {
+async function listingDelivery(listingId: string, data: FirebaseFirestore.DocumentData) {
+  try {
+    const ids: string[] = [];
+    const push = (value: unknown) => {
+      if (typeof value === "string" && value.trim()) ids.push(value.trim());
+    };
+    push(data.galleryId);
+    push(data.playtestGalleryId);
+    const snap = await db().collection("galleries").where("listingId", "==", listingId).limit(5).get();
+    snap.docs.forEach((doc) => ids.push(doc.id));
+    for (const galleryId of [...new Set(ids)]) {
+      const doc = await db().collection("galleries").doc(galleryId).get();
+      if (!doc.exists) continue;
+      const galleryStatus = typeof doc.data()?.status === "string" ? doc.data()!.status as string : "";
+      const deliveryStatus = mediaDeliveryFromGalleryStatus(galleryStatus);
+      return {
+        galleryId: doc.id,
+        galleryStatus,
+        deliveryStatus,
+        label: MEDIA_DELIVERY_LABELS[deliveryStatus],
+      };
+    }
+    return null;
+  } catch (err) {
+    console.error("[Studio] Delivery status failed:", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+export async function listingsForRole(uid: string, role: string) {
   if (role === "photographer") {
     const [byUid, byIds] = await Promise.all([
       db().collection("listings").where("photographerUid", "==", uid).limit(50).get(),
@@ -802,6 +832,7 @@ export async function loadStudioWorkspace(input: {
       iconicPolish: loaded.data.iconicPolish === true,
       images,
       editPlan,
+      delivery: await listingDelivery(loaded.id, loaded.data),
     };
   }
 

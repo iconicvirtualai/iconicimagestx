@@ -7,8 +7,6 @@
 import { Router } from "express";
 import admin from "firebase-admin";
 import { requireCoordinator, requirePhotographer, requireStaff, requireAuth, type AuthenticatedRequest } from "../middleware/auth";
-import { sendEmail } from "../services/email";
-import { sendSMS, SMS_TEMPLATES } from "../services/sms";
 import {
   ICONIC_DOWNLOAD_LOCK,
   clientGalleryDownloadsUnlocked,
@@ -16,27 +14,13 @@ import {
   type GalleryDownloadGate,
 } from "../../shared/paymentAccess";
 import { galleryStatusNeedsReleaseGate } from "../../shared/galleryRelease";
+import { deliverGalleryToClient } from "../services/galleryDeliver";
 import { loadGalleryReleaseForGallery } from "../services/galleryReleaseGate";
 import { handlePublicGalleryLink } from "./galleryLink";
 
 const router = Router();
 const db = () => admin.firestore();
 const storage = () => admin.storage().bucket();
-
-function appUrl() {
-  return process.env.APP_URL || "https://iconicimagestx.com";
-}
-
-function addressLabel(address: unknown): string {
-  if (!address) return "the property";
-  if (typeof address === "string") return address;
-  if (typeof address === "object") {
-    const a = address as Record<string, unknown>;
-    if (typeof a.formatted === "string" && a.formatted) return a.formatted;
-    return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "the property";
-  }
-  return String(address);
-}
 
 function adminReady(res: { status: (code: number) => { json: (body: unknown) => unknown } }) {
   if (admin.apps.length) return true;
@@ -364,78 +348,26 @@ router.patch("/:id/status", requireCoordinator, async (req, res) => {
 router.post("/:id/deliver", requireCoordinator, async (req, res) => {
   try {
     if (!adminReady(res)) return;
-    const galleryDoc = await db().collection("galleries").doc(req.params.id).get();
-    if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
-    if (await holdIfOrderIncomplete(res, req.params.id)) return;
-
-    const gallery = galleryDoc.data()!;
     // Ignore body.downloadEnabled. The order screen always sends true, and
     // that must not skip the invoice. Unlock is paid, comped, zero-dollar,
     // or an existing staff release. Booking still does not collect up front.
-    const gate = await downloadGateForGallery(gallery);
-    const downloadEnabled = clientGalleryDownloadsUnlocked(gate);
-    const expiresInDays = Number(req.body?.expiresInDays) > 0 ? Number(req.body.expiresInDays) : 30;
-
-    const expiresAt = admin.firestore.Timestamp.fromDate(
-      new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000)
-    );
-
-    // Build delivery URL (client portal)
-    const deliveryUrl = `${appUrl()}/gallery/${req.params.id}`;
-
-    await galleryDoc.ref.update({
-      status: "delivered",
-      deliveryUrl,
-      downloadEnabled,
-      expiresAt,
-      deliveredAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    const result = await deliverGalleryToClient(req.params.id, {
+      expiresInDays: Number(req.body?.expiresInDays),
     });
-
-    // Update order status
-    if (gallery.orderId) {
-      await db().collection("orders").doc(gallery.orderId).update({
-        status: "delivered",
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    }
-
-    // Get client info for email
-    const clientDoc = await db().collection("clients").doc(gallery.clientId).get();
-    const client = clientDoc.data();
-
-    if (client?.email) {
-      // Get invoice for payment link
-      const invoiceSnap = await db()
-        .collection("invoices")
-        .where("orderId", "==", gallery.orderId)
-        .limit(1)
-        .get();
-      const invoice = invoiceSnap.empty ? null : invoiceSnap.docs[0].data();
-
-      await sendEmail({
-        to: client.email,
-        template: "gallery_delivery",
-        variables: {
-          clientName: gallery.clientName,
-          address: gallery.addressLabel || addressLabel(gallery.address),
-          galleryUrl: deliveryUrl,
-          invoiceAmount: invoice ? `$${invoice.total.toFixed(2)}` : "",
-          paymentUrl: invoice ? `${appUrl()}/invoice/${invoiceSnap.docs[0].id}` : "",
-          expiresAt: `${expiresInDays} days`,
-        },
-      });
-    }
-
-    if (client?.phone) {
-      await sendSMS({
-        to: client.phone,
-        body: SMS_TEMPLATES.photosDelivered(gallery.clientName || client.name || "there", deliveryUrl),
-      }).catch((err) => console.error("[Galleries] Delivery SMS failed:", err));
-    }
-
-    return res.json({ success: true, deliveryUrl });
+    return res.json({ success: true, deliveryUrl: result.deliveryUrl });
   } catch (err) {
+    const code = (err as { status?: number }).status;
+    const report = (err as { report?: { galleryRelease?: string; percent?: number; gaps?: unknown[] } }).report;
+    if (code === 404) return res.status(404).json({ error: "Gallery not found." });
+    if (code === 409 && report) {
+      return res.status(409).json({
+        error: err instanceof Error ? err.message : "Gallery stays held.",
+        galleryRelease: report.galleryRelease,
+        complete: false,
+        percent: report.percent,
+        gaps: report.gaps,
+      });
+    }
     console.error("[Galleries] Deliver error:", err);
     return res.status(500).json({ error: "Failed to deliver gallery." });
   }
