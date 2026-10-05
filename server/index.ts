@@ -29,6 +29,7 @@ import placesRouter from "./routes/places";
 import smsRouter from "./routes/sms";
 import contactRouter from "./routes/contact";
 import liveChatRouter from "./routes/liveChat";
+import contactThreadsRouter from "./routes/contactThreads";
 import { listCalendarScheduleEvents, verifyCalendarWriteAccess } from "./services/calendar";
 import { clientNotifyLive } from "../shared/clientNotify";
 import { requireAdmin, requireStaff } from "./middleware/auth";
@@ -216,6 +217,8 @@ export function createServer() {
   app.use("/api/studio", studioRouter);
   app.use("/api/places", placesRouter);
   app.use("/api/sms", smsRouter);
+  // Portal contact threads. Separate from live-chat email/SMS delivery.
+  app.use("/api/contact", contactThreadsRouter);
   app.use("/api/contact", liveChatRouter);
   app.use("/api/contact", contactRouter);
 

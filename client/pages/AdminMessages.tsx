@@ -15,6 +15,7 @@ import {
   ExternalLink,
   Inbox,
   Mail,
+  MessageCircle,
   MessageSquare,
   Phone,
   Send,
@@ -31,6 +32,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
+import ContactLiveChat from "@/components/ContactLiveChat";
 import { useAuth } from "@/contexts/AuthContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -75,7 +77,7 @@ interface MailchimpList {
   unsubscribeCount: number;
 }
 
-type Tab = "sweep" | "inbox" | "sms" | "compose" | "campaigns";
+type Tab = "sweep" | "contact" | "inbox" | "sms" | "compose" | "campaigns";
 
 const sweepChannels = [
   {
@@ -455,9 +457,10 @@ export default function AdminMessages() {
         {/* ─── Left sidebar: tabs + thread list ─────────────────────────── */}
         <div className="w-80 flex flex-col border-r border-gray-700 bg-gray-900">
           {/* Tabs */}
-          <div className="flex border-b border-gray-700">
+          <div className="flex border-b border-gray-700 overflow-x-auto">
             {[
               { id: "sweep" as Tab, icon: Bot, label: "Sweep" },
+              { id: "contact" as Tab, icon: MessageCircle, label: "Chat" },
               { id: "inbox" as Tab, icon: MessageSquare, label: "Inbox" },
               { id: "sms" as Tab, icon: Smartphone, label: "SMS" },
               { id: "compose" as Tab, icon: Send, label: "Compose" },
@@ -466,7 +469,7 @@ export default function AdminMessages() {
               <button
                 key={id}
                 onClick={() => setTab(id)}
-                className={`flex-1 py-3 flex flex-col items-center gap-1 text-xs transition-colors ${
+                className={`flex-1 min-w-[52px] py-3 flex flex-col items-center gap-1 text-[10px] transition-colors ${
                   tab === id
                     ? "text-teal-400 border-b-2 border-teal-400"
                     : "text-gray-400 hover:text-gray-200"
@@ -586,6 +589,12 @@ export default function AdminMessages() {
             </div>
           )}
 
+          {tab === "contact" && (
+            <div className="flex-1 p-4 text-sm text-gray-400 leading-relaxed">
+              Site contact chats are on the right. A reply stays in that thread and is not emailed or texted.
+            </div>
+          )}
+
           {/* Compose / Campaigns / Sweep — no list needed */}
           {(tab === "compose" || tab === "campaigns" || tab === "sweep") && (
             <div className="flex-1 flex items-center justify-center p-4 text-gray-600 text-sm text-center">
@@ -595,7 +604,9 @@ export default function AdminMessages() {
         </div>
 
         {/* ─── Right panel ─────────────────────────────────────────────────── */}
-        <div className="flex-1 flex flex-col bg-gray-950">
+        <div className="flex-1 flex flex-col bg-gray-950 min-w-0">
+
+          {tab === "contact" && <ContactLiveChat />}
 
           {/* ── Sweep tab ── */}
           {tab === "sweep" && (

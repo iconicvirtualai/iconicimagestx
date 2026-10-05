@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { X, Send, User } from "lucide-react";
+import type { ContactThreadMessage, ContactThreadView } from "@shared/contactThread";
 
 interface Message {
   id: string;
@@ -14,8 +15,17 @@ interface ContactInfo {
   phone: string;
 }
 
+interface StoredThread {
+  threadId: string;
+  accessToken: string;
+  fingerprint: string;
+}
+
 const STORAGE_KEY = "iconic-live-chat-contact";
+const THREAD_KEY = "iconic-live-chat-thread";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const WELCOME = "Hi — send a note and the Iconic Images team can reply in this chat.";
+const POLL_MS = 2000;
 
 function loadContact(): ContactInfo | null {
   try {
@@ -40,15 +50,74 @@ function saveContact(contact: ContactInfo) {
   }
 }
 
+function contactFingerprint(contact: ContactInfo): string {
+  return [
+    contact.name.trim().toLowerCase(),
+    contact.email.trim().toLowerCase(),
+    contact.phone.replace(/\D/g, ""),
+  ].join("|");
+}
+
+function loadThread(fingerprint: string): StoredThread | null {
+  try {
+    const raw = sessionStorage.getItem(THREAD_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<StoredThread>;
+    if (
+      typeof parsed.threadId !== "string"
+      || typeof parsed.accessToken !== "string"
+      || parsed.fingerprint !== fingerprint
+    ) {
+      return null;
+    }
+    return {
+      threadId: parsed.threadId,
+      accessToken: parsed.accessToken,
+      fingerprint: parsed.fingerprint,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveThread(thread: StoredThread) {
+  try {
+    sessionStorage.setItem(THREAD_KEY, JSON.stringify(thread));
+  } catch {
+    // The open chat still holds the token in memory for this page view.
+  }
+}
+
+function clearThread() {
+  try {
+    sessionStorage.removeItem(THREAD_KEY);
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+function mapMessages(messages: ContactThreadMessage[]): Message[] {
+  return messages.map((message) => ({
+    id: message.id,
+    text: message.text,
+    sender: message.sender === "staff" ? "support" : "user",
+    timestamp: new Date(message.createdAt),
+  }));
+}
+
+async function readThread(creds: StoredThread): Promise<ContactThreadView | null> {
+  const response = await fetch(`/api/contact/threads/${encodeURIComponent(creds.threadId)}`, {
+    cache: "no-store",
+    headers: { "X-Contact-Thread-Token": creds.accessToken },
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error("Couldn't refresh this chat.");
+  const data = (await response.json()) as { thread?: ContactThreadView };
+  return data.thread ?? null;
+}
+
 export default function ChatWidget({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "welcome",
-      text: "Hi — send a note and the Iconic Images team will follow up by email or phone.",
-      sender: "support",
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [contact, setContact] = useState<ContactInfo | null>(null);
   const [editingContact, setEditingContact] = useState(false);
@@ -56,13 +125,19 @@ export default function ChatWidget({ isOpen, onClose }: { isOpen: boolean; onClo
   const [contactError, setContactError] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [threadVersion, setThreadVersion] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const credsRef = useRef<StoredThread | null>(null);
+  const newestRef = useRef("");
 
   useEffect(() => {
     const saved = loadContact();
     if (saved) {
       setContact(saved);
       setContactDraft(saved);
+      const thread = loadThread(contactFingerprint(saved));
+      credsRef.current = thread;
+      if (thread) setThreadVersion(1);
     }
   }, []);
 
@@ -71,6 +146,39 @@ export default function ChatWidget({ isOpen, onClose }: { isOpen: boolean; onClo
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, isOpen, error]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const creds = credsRef.current;
+    if (!creds) return;
+
+    let cancelled = false;
+    const pull = async () => {
+      try {
+        const thread = await readThread(creds);
+        if (cancelled) return;
+        if (!thread) {
+          credsRef.current = null;
+          clearThread();
+          return;
+        }
+        if (thread.updatedAt < newestRef.current) return;
+        newestRef.current = thread.updatedAt;
+        setMessages(mapMessages(thread.messages));
+      } catch {
+        // Keep the last transcript on a blip. The next poll retries.
+      }
+    };
+
+    void pull();
+    const timer = window.setInterval(() => {
+      void pull();
+    }, POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [isOpen, threadVersion]);
 
   const needsContact = !contact || editingContact;
 
@@ -92,11 +200,51 @@ export default function ChatWidget({ isOpen, onClose }: { isOpen: boolean; onClo
       return;
     }
     const next = { name, email, phone };
+    const fingerprint = contactFingerprint(next);
+    const saved = loadThread(fingerprint);
+    if (!saved) {
+      credsRef.current = null;
+      clearThread();
+      setMessages([]);
+      newestRef.current = "";
+    } else {
+      credsRef.current = saved;
+    }
     setContact(next);
     setContactDraft(next);
     saveContact(next);
     setEditingContact(false);
     setContactError("");
+    setThreadVersion((version) => version + 1);
+  };
+
+  const applyThread = (thread: ContactThreadView, accessToken: string, fingerprint: string) => {
+    const stored = { threadId: thread.id, accessToken, fingerprint };
+    credsRef.current = stored;
+    saveThread(stored);
+    newestRef.current = thread.updatedAt;
+    setMessages(mapMessages(thread.messages));
+    setThreadVersion((version) => version + 1);
+  };
+
+  const postMessage = async (text: string, creds: StoredThread | null) => {
+    const response = await fetch("/api/contact/threads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: contact?.name,
+        email: contact?.email,
+        phone: contact?.phone,
+        message: text,
+        ...(creds ? { threadId: creds.threadId, accessToken: creds.accessToken } : {}),
+      }),
+    });
+    const data = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      thread?: ContactThreadView;
+      accessToken?: string;
+    };
+    return { response, data };
   };
 
   const handleSendMessage = async () => {
@@ -107,34 +255,22 @@ export default function ChatWidget({ isOpen, onClose }: { isOpen: boolean; onClo
     setError("");
 
     try {
-      const response = await fetch("/api/contact/live-chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: contact.name,
-          email: contact.email,
-          phone: contact.phone,
-          message: text,
-        }),
-      });
-      const data = (await response.json().catch(() => ({}))) as { error?: string; message?: string };
-      if (!response.ok) {
-        throw new Error(data.error || "We couldn't deliver your message.");
+      const fingerprint = contactFingerprint(contact);
+      const creds = credsRef.current?.fingerprint === fingerprint ? credsRef.current : null;
+      let { response, data } = await postMessage(text, creds);
+      if (response.status === 404 && creds) {
+        credsRef.current = null;
+        clearThread();
+        ({ response, data } = await postMessage(text, null));
+      }
+      if (!response.ok || !data.thread || !data.accessToken) {
+        throw new Error(data.error || "We couldn't save your message.");
       }
 
-      const confirmation =
-        typeof data.message === "string" && data.message.trim()
-          ? data.message.trim()
-          : "We got your message. A teammate will reply by email or phone.";
-      const now = Date.now();
-      setMessages((prev) => [
-        ...prev,
-        { id: `${now}`, text, sender: "user", timestamp: new Date() },
-        { id: `${now}-ok`, text: confirmation, sender: "support", timestamp: new Date() },
-      ]);
+      applyThread(data.thread, data.accessToken, fingerprint);
       setInputValue("");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "We couldn't deliver your message.";
+      const message = err instanceof Error ? err.message : "We couldn't save your message.";
       setError(`${message} Your message is still here — try again, or call 281-356-0965.`);
     } finally {
       setSending(false);
@@ -156,7 +292,7 @@ export default function ChatWidget({ isOpen, onClose }: { isOpen: boolean; onClo
           </div>
           <div>
             <h4 className="font-bold">Iconic Support</h4>
-            <p className="text-xs text-teal-100 font-medium">We'll reply by email or phone</p>
+            <p className="text-xs text-teal-100 font-medium">Replies show up in this chat</p>
           </div>
         </div>
         <button
@@ -171,8 +307,16 @@ export default function ChatWidget({ isOpen, onClose }: { isOpen: boolean; onClo
 
       <div
         ref={scrollRef}
+        role="log"
+        aria-live="polite"
+        aria-relevant="additions"
         className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50/50"
       >
+        <div className="flex justify-start">
+          <div className="max-w-[80%] px-4 py-3 rounded-2xl text-sm bg-white text-gray-800 border border-gray-100 shadow-sm rounded-bl-none">
+            {WELCOME}
+          </div>
+        </div>
         {messages.map((msg) => (
           <div
             key={msg.id}
@@ -275,6 +419,7 @@ export default function ChatWidget({ isOpen, onClose }: { isOpen: boolean; onClo
                 <Send className="w-5 h-5" />
               </button>
             </form>
+            <p className="text-[11px] text-gray-500 mt-2">Replies show up here. This chat does not send email or text.</p>
             {error ? (
               <p role="alert" className="text-xs text-red-600 mt-2">{error}</p>
             ) : null}
