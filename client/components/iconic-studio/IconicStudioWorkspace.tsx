@@ -10,6 +10,7 @@ import {
   type StudioFrame,
 } from "@shared/iconicStudio";
 import type { GalleryReleaseReport } from "@shared/galleryRelease";
+import type { MediaDeliveryStatus } from "@shared/mediaDelivery";
 import type { OrderEditPlan } from "@shared/orderEditPlan";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
@@ -43,6 +44,13 @@ export interface StudioListingOption {
   address: string;
   status?: string;
   imageCount?: number;
+}
+
+export interface StudioDeliveryView {
+  galleryId: string;
+  galleryStatus: string;
+  deliveryStatus: MediaDeliveryStatus;
+  label: string;
 }
 
 const TABS = [
@@ -79,6 +87,7 @@ export default function IconicStudioWorkspace({
   demo = false,
   editPlan = null,
   release = null,
+  delivery = null,
   initialTab,
   onSelectListing,
   onAiEdit,
@@ -95,6 +104,7 @@ export default function IconicStudioWorkspace({
   demo?: boolean;
   editPlan?: OrderEditPlan | null;
   release?: GalleryReleaseReport | null;
+  delivery?: StudioDeliveryView | null;
   initialTab?: StudioTab;
   onSelectListing: (id: string) => void;
   onAiEdit: (input: { type: string; prompt: string; frame: StudioFrame }) => Promise<void>;
@@ -332,6 +342,7 @@ export default function IconicStudioWorkspace({
                 frames={frames.filter((item) => item.studioApproved || item.studioRole === "final" || item.path.includes("/finals/"))}
                 busy={busy}
                 release={release}
+                delivery={delivery}
                 onApprove={(item) => run(() => onApprove({ frame: item }))}
               />
             )}
@@ -591,12 +602,14 @@ function GalleryPanel({
   frames,
   busy,
   release,
+  delivery,
   onApprove,
 }: {
   selected: StudioFrame | null;
   frames: StudioFrame[];
   busy?: boolean;
   release?: GalleryReleaseReport | null;
+  delivery?: StudioDeliveryView | null;
   onApprove: (frame: StudioFrame) => void;
 }) {
   return (
@@ -636,7 +649,16 @@ function GalleryPanel({
           </button>
         </div>
       ))}
-      <p className="text-[11px] text-gray-400">Mark ready for deliver happens when the gallery is still in upload or editing.</p>
+      {delivery ? (
+        <p data-testid="studio-delivery-status" className="text-[11px] font-bold text-gray-600">
+          {`Delivery · ${delivery.label}. `}
+          <a href="/admin/delivery" className="underline">Open delivery queue</a>
+        </p>
+      ) : (
+        <p className="text-[11px] text-gray-400">
+          Adding a final marks an upload or editing gallery ready for deliver. <a href="/admin/delivery" className="underline">Open delivery queue</a>
+        </p>
+      )}
     </div>
   );
 }

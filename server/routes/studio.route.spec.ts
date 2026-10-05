@@ -72,6 +72,37 @@ describe("Iconic Studio AI route", () => {
       body: JSON.stringify({ listingId: "project1234" }),
     });
     expect(tick.status).toBe(401);
+    const queue = await fetch(`${baseUrl}/api/studio/delivery-queue`);
+    expect(queue.status).toBe(401);
+    const move = await fetch(`${baseUrl}/api/studio/delivery-queue/move`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ galleryId: "gallery1234", status: "delivered" }),
+    });
+    expect(move.status).toBe(401);
+  });
+
+  it("rejects a delivery move that is not Pending, Undelivered, or Delivered", async () => {
+    const res = await fetch(`${baseUrl}/api/studio/delivery-queue/move`, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer temp-admin-token",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ galleryId: "gallery1234", status: "hdr_processing" }),
+    });
+    const data = await res.json();
+    expect(res.status).toBe(400);
+    expect(data.error).toMatch(/pending, undelivered, or delivered/);
+  });
+
+  it("does not open Firebase for the delivery queue when Admin is not configured", async () => {
+    const res = await fetch(`${baseUrl}/api/studio/delivery-queue`, {
+      headers: { Authorization: "Bearer temp-admin-token" },
+    });
+    const data = await res.json();
+    expect(res.status).toBe(503);
+    expect(data.error).toMatch(/Firebase Admin is not configured/);
   });
 
   it("rejects an unknown edit type before touching storage", async () => {
