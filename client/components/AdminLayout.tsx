@@ -21,7 +21,9 @@ import {
   CreditCard,
   Upload,
   Aperture,
+  Images,
 } from "lucide-react";
+import { mostSpecificNavHref } from "@/lib/adminNav";
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -58,6 +60,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     label: "Photography",
     items: [
       { label: "Iconic Studio",   href: "/admin/iconic-studio",    icon: Aperture,        roles: ALL_STAFF },
+      { label: "Scratch Pad",     href: "/admin/studio/scratch",   icon: Images,          roles: COORD_UP },
       { label: "My Jobs",         href: "/admin/photographer",     icon: Camera,          roles: PHOTO_UP },
       { label: "Upload",          href: "/admin/upload",           icon: Upload,          roles: PHOTO_UP },
     ],
@@ -121,9 +124,6 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
     navigate("/admin/login");
   };
 
-  const isActive = (href: string) =>
-    location.pathname === href || location.pathname.startsWith(href + "/");
-
   // Filter nav items by current user's role
   const visibleGroups = navGroups
     .map((group) => ({
@@ -131,6 +131,10 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
       items: group.items.filter((item) => item.roles.includes(role)),
     }))
     .filter((group) => group.items.length > 0);
+  const activeHref = mostSpecificNavHref(
+    location.pathname,
+    visibleGroups.flatMap((group) => group.items.map((item) => item.href)),
+  );
 
   return (
     <div className="flex h-screen bg-[#f4f7f8]">
@@ -164,7 +168,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
               <div className="space-y-0.5">
                 {group.items.map((item) => {
                   const Icon = item.icon;
-                  const active = isActive(item.href);
+                  const active = item.href === activeHref;
                   return (
                     <Link
                       key={item.label}

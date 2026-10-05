@@ -3,6 +3,7 @@ import {
   ORDER_GALLERY_RELEASE,
   orderEditDocId,
   orderEditDrafts,
+  orderExteriorTwilightPrompt,
   planOrderEdits,
 } from "./orderEditPlan";
 
@@ -86,6 +87,12 @@ describe("order edit plan", () => {
     expect(drafts.some((draft) => draft.sourcePath.includes("frame.CR2"))).toBe(false);
     expect(drafts.filter((draft) => draft.type === "photo")).toHaveLength(3);
     expect(orderEditDocId("job123456", "twilight-front")).toBe("order_job123456_twilight-front");
+  });
+
+  it("exposes the exterior twilight line the scratch pad reuses", () => {
+    expect(orderExteriorTwilightPrompt()).toBe(
+      "Convert this exterior listing photo into a photoreal twilight. Turn on warm interior lights and landscape lighting. Keep the architecture, landscaping, and camera angle. Use a natural evening sky. Do not add people or text.",
+    );
   });
 
   it("does not invent a twilight source when no exterior filename matches", () => {
