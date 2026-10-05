@@ -17,6 +17,14 @@ function listing(overrides: Partial<ClientListingCard> = {}): ClientListingCard 
     createdAt: "2026-09-02T00:00:00.000Z",
     appointmentDate: null,
     href: "/portal/listings/listing-1",
+    look: null,
+    street: "10 Oak Street",
+    locality: "",
+    shootDateLabel: "",
+    beds: "",
+    baths: "",
+    garage: "",
+    pool: "",
     ...overrides,
   };
 }
@@ -92,6 +100,71 @@ describe("client home dashboard", () => {
     expect(html).toContain("Order history");
     expect(html).toContain("Schedule");
     expect(html).not.toContain("/invoice/");
+  });
+
+  it("renders each package as its own listing card", () => {
+    const html = view({
+      listings: [
+        listing({
+          id: "photos",
+          look: "just-photos",
+          address: "123 Main Street, Conroe, TX 77304",
+          street: "123 Main Street",
+          locality: "Conroe, TX 77304",
+          shootDateLabel: "01.01.2026",
+        }),
+        listing({
+          id: "essentials",
+          look: "essentials",
+          address: "123 Main Street, Conroe, TX 77304",
+          street: "123 Main Street",
+          locality: "Conroe, TX 77304",
+          shootDateLabel: "01.01.2026",
+        }),
+        listing({
+          id: "showcase",
+          look: "showcase",
+          address: "123 Main Street, Conroe, TX 77304",
+          street: "123 Main Street",
+          locality: "Conroe, TX 77304",
+          shootDateLabel: "01.01.2026",
+          beds: "3",
+          baths: "2",
+          garage: "3",
+          pool: "Y",
+        }),
+        listing({
+          id: "legacy",
+          look: "legacy",
+          address: "123 Main St., Conroe, TX 77304",
+          street: "123 Main St.",
+          locality: "Conroe, TX 77304",
+          shootDateLabel: "01.01.2026",
+          beds: "3",
+          baths: "3",
+          garage: "2",
+          pool: "Y",
+        }),
+      ],
+    });
+
+    expect(html).toContain('data-look="just-photos"');
+    expect(html).toContain("JUST PHOTOS");
+    expect(html).toContain("123 Main Street | Conroe, TX 77304");
+    expect(html).toContain('data-look="essentials"');
+    expect(html).toContain("ESSENTIALS");
+    expect(html).toContain('data-look="showcase"');
+    expect(html).toContain("THE SHOWCASE");
+    expect(html).toContain("123 MAIN STREET");
+    expect(html).toContain('aria-label="Drone"');
+    expect(html).toContain('aria-label="Video"');
+    expect(html).toContain('data-look="legacy"');
+    expect(html).toContain("LEGACY");
+    expect(html).toContain("123 MAIN ST.");
+    expect(html).toContain("Shoot Date: 01.01.2026");
+    expect(html).toContain('href="/portal/listings/photos"');
+    expect(html).toContain('href="/portal/listings/legacy"');
+    expect(html).not.toContain("Real Estate");
   });
 
   it("shows an empty listings state instead of sample properties", () => {

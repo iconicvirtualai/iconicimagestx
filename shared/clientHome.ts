@@ -5,6 +5,13 @@
  */
 
 import { presentInvoiceNumber } from "./orderProjectInvoice.ts";
+import {
+  formatShootDateLabel,
+  listingCardAddress,
+  listingCardAmenities,
+  resolveListingCardLook,
+  type ListingCardLook,
+} from "./listingCard.ts";
 
 const CHICAGO = "America/Chicago";
 
@@ -57,6 +64,16 @@ export interface ClientListingCard {
   createdAt: string | null;
   appointmentDate: string | null;
   href: string;
+  /** Package look. Null keeps the plain project tile. */
+  look: ListingCardLook | null;
+  street: string;
+  locality: string;
+  /** Shoot day printed MM.DD.YYYY. Empty when no date is stored. */
+  shootDateLabel: string;
+  beds: string;
+  baths: string;
+  garage: string;
+  pool: string;
 }
 
 export interface ClientInvoiceLine {
@@ -218,6 +235,9 @@ export function buildClientListing(id: string, data: Record<string, unknown>): C
   const images = data.images;
   const projectType = data.projectType === "business" || data.projectType === "real_estate" ? data.projectType : "";
   const status = typeof data.status === "string" && data.status.trim() ? data.status.trim() : "scheduled";
+  const appointmentDate = calendarDateKey(data.shootDate || data.apptDate || data.appointmentDate || data.scheduledDate);
+  const addressParts = listingCardAddress(data);
+  const amenities = listingCardAmenities(data);
   return {
     id,
     address: addressText(data.propertyAddress || data.address || data.shootLocation) || "Listing",
@@ -226,8 +246,16 @@ export function buildClientListing(id: string, data: Record<string, unknown>): C
     imageCount: Array.isArray(images) ? images.length : 0,
     coverUrl: listingCoverUrl(images),
     createdAt: isoStamp(data.createdAt),
-    appointmentDate: calendarDateKey(data.apptDate || data.appointmentDate || data.scheduledDate),
+    appointmentDate,
     href: clientListingPath(id),
+    look: resolveListingCardLook(data),
+    street: addressParts.street,
+    locality: addressParts.locality,
+    shootDateLabel: formatShootDateLabel(appointmentDate, data.shootDate),
+    beds: amenities.beds,
+    baths: amenities.baths,
+    garage: amenities.garage,
+    pool: amenities.pool,
   };
 }
 

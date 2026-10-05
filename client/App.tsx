@@ -42,6 +42,7 @@ import VirtualStagingAITool from "./pages/VirtualStagingAITool";
 import VirtualStagingProOrder from "./pages/VirtualStagingProOrder";
 import VirtualStagingCheckout from "./pages/VirtualStagingCheckout";
 import Go from "./pages/Go";
+import ListingCardPreview from "./pages/ListingCardPreview";
 import NotFound from "./pages/NotFound";
 
 // Admin / ops pages
@@ -107,6 +108,7 @@ const App = () => (
             <Route path="/terms" element={<Terms />} />
             {/* Shirt QR destination. /go/ matches here too (trailing slash is ignored). */}
             <Route path="/go" element={<Go />} />
+            <Route path="/listing-cards" element={<ProtectedRoute requiredRole="coordinator"><ListingCardPreview /></ProtectedRoute>} />
             {/* Bare paths have no project id. Studio 105 is the public studio page. */}
             <Route path="/studio" element={<Navigate to="/studio-105" replace />} />
             <Route path="/gallery" element={<Navigate to="/studio-105" replace />} />
