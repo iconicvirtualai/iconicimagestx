@@ -1329,6 +1329,202 @@ function presentInvoiceNumber(stored, invoiceId, now = /* @__PURE__ */ new Date(
   if (id) return draftInvoiceNumber(id, now);
   return `INV-${now.getFullYear()}-0001`;
 }
+const RANK = {
+  "just-photos": 1,
+  essentials: 2,
+  showcase: 3,
+  legacy: 4
+};
+const DIRECT_PACKAGE_KEYS = ["package", "packageName", "packageId", "selectedPackage", "selectedService", "serviceId"];
+function listingCardLookFromValue(value) {
+  if (typeof value === "string" || typeof value === "number") return lookFromText(String(value));
+  if (Array.isArray(value)) return bestLook(value);
+  if (value && typeof value === "object") {
+    const record = value;
+    return bestLook(record.id, record.packageId, record.name, record.title, record.label);
+  }
+  return null;
+}
+function resolveListingCardLook(data) {
+  for (const key of DIRECT_PACKAGE_KEYS) {
+    if (!hasValue(data[key])) continue;
+    return listingCardLookFromValue(data[key]);
+  }
+  return bestLook(data.serviceIds, data.services, data.lineItems, data.selectedBasics);
+}
+function listingCardAddress(data) {
+  const records = addressRecords(data);
+  let street = "";
+  let city = "";
+  let state = "";
+  let zip = "";
+  for (const record of records) {
+    if (!street) street = firstText$2(record, ["street", "line1", "addressLine1", "streetAddress"]);
+    if (!city) city = firstText$2(record, ["city"]);
+    if (!state) state = firstText$2(record, ["state"]);
+    if (!zip) zip = firstText$2(record, ["zip", "postalCode"]);
+  }
+  let locality = joinLocality(city, state, zip);
+  if (!street || !locality) {
+    const parsed = parseAddressLine(addressString$1(data));
+    if (!street) street = parsed.street;
+    if (!locality) locality = parsed.locality;
+  }
+  return { street, locality };
+}
+function listingCardAmenities(data) {
+  return {
+    beds: countLabel(readRaw(data, ["bedrooms", "beds", "bedCount"])),
+    baths: countLabel(readRaw(data, ["bathrooms", "baths", "bathCount"])),
+    garage: countLabel(readRaw(data, ["garage", "garages", "garageSpaces", "garageCount"])),
+    pool: poolLabel(readRaw(data, ["pool", "hasPool"]))
+  };
+}
+function formatShootDateLabel(isoDay, raw) {
+  if (isoDay && /^\d{4}-\d{2}-\d{2}$/.test(isoDay)) {
+    const [year, month, day] = isoDay.split("-");
+    return `${month}.${day}.${year}`;
+  }
+  if (typeof raw === "string" && /^\d{2}\.\d{2}\.\d{4}$/.test(raw.trim())) return raw.trim();
+  return "";
+}
+function bestLook(...values) {
+  let best = null;
+  const visit = (value) => {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    const look = value && typeof value === "object" ? listingCardLookFromValue(value) : lookFromText(value == null ? "" : String(value));
+    if (look && (!best || RANK[look] > RANK[best])) best = look;
+  };
+  values.forEach(visit);
+  return best;
+}
+function lookFromText(raw) {
+  const value = raw.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
+  if (!value) return null;
+  if (/market\s+leader/.test(value) || /\blegacy\b/.test(value)) return "legacy";
+  if (/showcase/.test(value)) return "showcase";
+  if (/essentials?\b/.test(value)) return "essentials";
+  if (/\bjust\s+photos\b/.test(value) || /\bphotos?\s+only\b/.test(value) || /^photos\s+\d+\b/.test(value) || /\b\d+\s+photos?\b/.test(value) || /\bapprentice/.test(value)) return "just-photos";
+  return null;
+}
+function hasValue(value) {
+  if (value == null) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  return true;
+}
+function addressRecords(data) {
+  const records = [data];
+  for (const key of ["address", "propertyAddress", "shootLocation"]) {
+    const nested = asRecord$3(data[key]);
+    if (nested) records.push(nested);
+  }
+  return records;
+}
+function addressString$1(data) {
+  for (const key of ["address", "propertyAddress", "shootLocation", "addressLabel"]) {
+    const value = data[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+    const record = asRecord$3(value);
+    if (!record) continue;
+    const formatted = firstText$2(record, ["formatted", "label"]);
+    if (formatted) return formatted;
+  }
+  return "";
+}
+function parseAddressLine(raw) {
+  const trimmed = raw.trim();
+  if (!trimmed) return { street: "", locality: "" };
+  const piped = trimmed.split(/\s*\|\s*/);
+  if (piped.length === 2 && piped[0] && piped[1]) return { street: piped[0], locality: piped[1] };
+  const parts = trimmed.split(",").map((part) => part.trim()).filter(Boolean).filter((part) => !/^(usa|u\.s\.a\.|united states)$/i.test(part));
+  if (parts.length >= 3) {
+    const last = parts[parts.length - 1];
+    const stateZip = last.match(/^([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+    if (stateZip) {
+      return {
+        street: parts.slice(0, -2).join(", "),
+        locality: `${parts[parts.length - 2]}, ${stateZip[1].toUpperCase()} ${stateZip[2]}`
+      };
+    }
+    if (/^\d{5}(?:-\d{4})?$/.test(last) && /^[A-Za-z]{2}$/.test(parts[parts.length - 2] || "")) {
+      return {
+        street: parts.slice(0, -3).join(", "),
+        locality: `${parts[parts.length - 3]}, ${parts[parts.length - 2].toUpperCase()} ${last}`
+      };
+    }
+    if (/^[A-Za-z]{2}$/.test(last)) {
+      return {
+        street: parts.slice(0, -2).join(", "),
+        locality: `${parts[parts.length - 2]}, ${last.toUpperCase()}`
+      };
+    }
+  }
+  return { street: trimmed, locality: "" };
+}
+function joinLocality(city, state, zip) {
+  const region = [state.length === 2 ? state.toUpperCase() : state, zip].filter(Boolean).join(" ");
+  return [city, region].filter(Boolean).join(", ");
+}
+function readRaw(data, keys) {
+  for (const record of factRecords(data)) {
+    for (const key of keys) {
+      const value = record[key];
+      if (value == null || value === "") continue;
+      return value;
+    }
+  }
+  return void 0;
+}
+function factRecords(data) {
+  const records = [data];
+  for (const key of ["property", "details", "facts", "propertyFacts", "homeFacts"]) {
+    const nested = asRecord$3(data[key]);
+    if (nested) records.push(nested);
+  }
+  const portal = asRecord$3(data.portalData);
+  if (portal) {
+    records.push(portal);
+    const facts = asRecord$3(portal.facts);
+    if (facts) records.push(facts);
+  }
+  return records;
+}
+function countLabel(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "string") {
+    const match = value.trim().match(/\d+(?:\.\d+)?/);
+    return match ? match[0] : "";
+  }
+  return "";
+}
+function poolLabel(value) {
+  if (value === true) return "Y";
+  if (value === false || value == null || value === "") return "";
+  if (typeof value === "number") {
+    if (!Number.isFinite(value) || value <= 0) return "";
+    return value === 1 ? "Y" : String(value);
+  }
+  const text2 = String(value).trim();
+  if (/^(y|yes|true)$/i.test(text2)) return "Y";
+  if (/^(n|no|false|0)$/i.test(text2)) return "";
+  if (/^\d+(?:\.\d+)?$/.test(text2)) return text2 === "1" || text2 === "1.0" ? "Y" : text2;
+  return "";
+}
+function firstText$2(record, keys) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+function asRecord$3(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value;
+}
 const CHICAGO = "America/Chicago";
 const ACCEPTED = /* @__PURE__ */ new Set([
   "confirmed",
@@ -1439,6 +1635,9 @@ function buildClientListing(id, data) {
   const images = data.images;
   const projectType2 = data.projectType === "business" || data.projectType === "real_estate" ? data.projectType : "";
   const status = typeof data.status === "string" && data.status.trim() ? data.status.trim() : "scheduled";
+  const appointmentDate = calendarDateKey(data.shootDate || data.apptDate || data.appointmentDate || data.scheduledDate);
+  const addressParts2 = listingCardAddress(data);
+  const amenities = listingCardAmenities(data);
   return {
     id,
     address: addressText(data.propertyAddress || data.address || data.shootLocation) || "Listing",
@@ -1447,8 +1646,16 @@ function buildClientListing(id, data) {
     imageCount: Array.isArray(images) ? images.length : 0,
     coverUrl: listingCoverUrl(images),
     createdAt: isoStamp(data.createdAt),
-    appointmentDate: calendarDateKey(data.apptDate || data.appointmentDate || data.scheduledDate),
-    href: clientListingPath(id)
+    appointmentDate,
+    href: clientListingPath(id),
+    look: resolveListingCardLook(data),
+    street: addressParts2.street,
+    locality: addressParts2.locality,
+    shootDateLabel: formatShootDateLabel(appointmentDate, data.shootDate),
+    beds: amenities.beds,
+    baths: amenities.baths,
+    garage: amenities.garage,
+    pool: amenities.pool
   };
 }
 function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
@@ -2532,7 +2739,7 @@ function chunk(items, size) {
 function lifeOfTheListingCareSelected(value) {
   return value === true;
 }
-const router$j = Router();
+const router$k = Router();
 const db$k = () => admin.firestore();
 function appUrl$2() {
   return process.env.APP_URL || "https://iconicimagestx.com";
@@ -2563,7 +2770,7 @@ function toDate$1(value) {
 function money$2(value) {
   return orderTotalLabel(value);
 }
-router$j.post("/", async (req, res) => {
+router$k.post("/", async (req, res) => {
   try {
     const {
       firstName,
@@ -2864,7 +3071,7 @@ router$j.post("/", async (req, res) => {
     return res.status(500).json({ error: "Failed to submit booking request." });
   }
 });
-router$j.get("/", requireCoordinator, async (_req, res) => {
+router$k.get("/", requireCoordinator, async (_req, res) => {
   try {
     const snapshot = await db$k().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
     const requests = snapshot.docs.map((doc) => ({
@@ -2877,7 +3084,7 @@ router$j.get("/", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking requests." });
   }
 });
-router$j.get("/:id", requireCoordinator, async (req, res) => {
+router$k.get("/:id", requireCoordinator, async (req, res) => {
   try {
     const doc = await db$k().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) {
@@ -2889,7 +3096,7 @@ router$j.get("/:id", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking request." });
   }
 });
-router$j.patch("/:id/confirm", requireCoordinator, async (req, res) => {
+router$k.patch("/:id/confirm", requireCoordinator, async (req, res) => {
   try {
     const { assignedPhotographerId, assignedPhotographerName, scheduledDate, scheduledTime, internalNotes } = req.body;
     const requestDoc = await db$k().collection("orderRequests").doc(req.params.id).get();
@@ -3203,7 +3410,7 @@ router$j.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to confirm booking." });
   }
 });
-router$j.patch("/:id/decline", requireCoordinator, async (req, res) => {
+router$k.patch("/:id/decline", requireCoordinator, async (req, res) => {
   try {
     const { reason } = req.body;
     const doc = await db$k().collection("orderRequests").doc(req.params.id).get();
@@ -3287,9 +3494,9 @@ async function generateInvoiceNumber() {
     year
   );
 }
-const router$i = Router();
+const router$j = Router();
 const db$j = () => admin.firestore();
-router$i.get("/", requireStaff, async (req, res) => {
+router$j.get("/", requireStaff, async (req, res) => {
   try {
     const { status, photographerId, limit = "50", startAfter } = req.query;
     let query = db$j().collection("orders").orderBy("createdAt", "desc");
@@ -3317,7 +3524,7 @@ router$i.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch orders." });
   }
 });
-router$i.get("/dashboard", requireStaff, async (_req, res) => {
+router$j.get("/dashboard", requireStaff, async (_req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -3350,7 +3557,7 @@ router$i.get("/dashboard", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch dashboard stats." });
   }
 });
-router$i.get("/:id", requireStaff, async (req, res) => {
+router$j.get("/:id", requireStaff, async (req, res) => {
   try {
     const orderDoc = await db$j().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
@@ -3385,7 +3592,7 @@ router$i.get("/:id", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch order." });
   }
 });
-router$i.patch("/:id", requireCoordinator, async (req, res) => {
+router$j.patch("/:id", requireCoordinator, async (req, res) => {
   try {
     const allowed = [
       "status",
@@ -3425,7 +3632,7 @@ const VALID_TRANSITIONS = {
   completed: [],
   cancelled: []
 };
-router$i.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$j.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status, note } = req.body;
     const orderDoc = await db$j().collection("orders").doc(req.params.id).get();
@@ -3471,7 +3678,7 @@ router$i.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update order status." });
   }
 });
-router$i.get("/:id/timeline", requireStaff, async (req, res) => {
+router$j.get("/:id/timeline", requireStaff, async (req, res) => {
   try {
     const [messages, editRequests, agentLogs] = await Promise.all([
       db$j().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
@@ -4042,6 +4249,9 @@ function twilightPrompt(role, polish) {
   ];
   if (polish) request.push(ICONIC_POLISH_INSTRUCTION);
   return request.join(" ");
+}
+function orderExteriorTwilightPrompt() {
+  return twilightPrompt("exterior", false);
 }
 function photoPrompt(polish) {
   return polish ? `${PHOTO_BASE} ${ICONIC_POLISH_INSTRUCTION}` : PHOTO_BASE;
@@ -4662,12 +4872,12 @@ function editSizeForImage(bytes) {
   const size = imageSize(bytes);
   return listingPhotoEditSize(size?.width ?? 0, size?.height ?? 0);
 }
-function imagePart(bytes, contentType) {
+function imagePart(bytes, contentType, filename) {
   const type = contentType.includes("png") ? "image/png" : contentType.includes("webp") ? "image/webp" : "image/jpeg";
   const extension = type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg";
   return {
     blob: new Blob([new Uint8Array(bytes)], { type }),
-    filename: `source.${extension}`
+    filename: filename || `source.${extension}`
   };
 }
 function isTimeoutError(err) {
@@ -4703,11 +4913,25 @@ async function editListingPhotoWithOpenAI(input) {
   }
   const prompt = input.prompt.trim();
   if (prompt.length < 3) throw new OpenAiEditError("Describe the AI edit.");
+  const references = input.references || [];
+  for (const reference of references) {
+    if (reference.bytes.length > MAX_SOURCE_BYTES) {
+      throw new OpenAiEditError("A reference image is over 20 MB.");
+    }
+  }
   const file = imagePart(input.bytes, input.contentType);
   const form = new FormData();
   form.append("model", OPENAI_IMAGE_EDIT_MODEL);
   form.append("prompt", prompt);
-  form.append("image", file.blob, file.filename);
+  if (!references.length) {
+    form.append("image", file.blob, file.filename);
+  } else {
+    form.append("image[]", file.blob, file.filename);
+    for (const reference of references) {
+      const extra = imagePart(reference.bytes, reference.contentType, reference.filename);
+      form.append("image[]", extra.blob, extra.filename);
+    }
+  }
   form.append("n", "1");
   form.append("size", editSizeForImage(input.bytes));
   form.append("quality", "medium");
@@ -5746,7 +5970,7 @@ const handlePublicGalleryLink = async (req, res) => {
     return res.status(500).json({ code: "lookup_failed", error: message, message });
   }
 };
-const router$h = Router();
+const router$i = Router();
 const db$e = () => admin.firestore();
 const storage = () => admin.storage().bucket();
 function appUrl$1() {
@@ -5792,7 +6016,7 @@ async function invoiceForGallery(gallery) {
   }
   return null;
 }
-router$h.get("/", requireStaff, async (req, res) => {
+router$i.get("/", requireStaff, async (req, res) => {
   try {
     const { status, orderId } = req.query;
     let query = db$e().collection("galleries").orderBy("createdAt", "desc");
@@ -5804,7 +6028,7 @@ router$h.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch galleries." });
   }
 });
-router$h.get("/public/:id", async (req, res) => {
+router$i.get("/public/:id", async (req, res) => {
   try {
     const doc = await db$e().collection("galleries").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Gallery not found." });
@@ -5836,8 +6060,8 @@ router$h.get("/public/:id", async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch gallery." });
   }
 });
-router$h.get("/link/:id", handlePublicGalleryLink);
-router$h.get("/:id", requireAuth, async (req, res) => {
+router$i.get("/link/:id", handlePublicGalleryLink);
+router$i.get("/:id", requireAuth, async (req, res) => {
   try {
     const doc = await db$e().collection("galleries").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Gallery not found." });
@@ -5856,7 +6080,7 @@ router$h.get("/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch gallery." });
   }
 });
-router$h.post("/:id/upload-url", requirePhotographer, async (req, res) => {
+router$i.post("/:id/upload-url", requirePhotographer, async (req, res) => {
   try {
     const { fileName: fileName2, fileType, isRaw: isRaw2 = false } = req.body;
     if (!fileName2 || !fileType) {
@@ -5881,7 +6105,7 @@ router$h.post("/:id/upload-url", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to generate upload URL." });
   }
 });
-router$h.post("/:id/media", requirePhotographer, async (req, res) => {
+router$i.post("/:id/media", requirePhotographer, async (req, res) => {
   try {
     const {
       storagePath,
@@ -5928,7 +6152,7 @@ router$h.post("/:id/media", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to register media." });
   }
 });
-router$h.post("/:id/media-link", requireCoordinator, async (req, res) => {
+router$i.post("/:id/media-link", requireCoordinator, async (req, res) => {
   try {
     const { url, title, type = "video", embedUrl, thumbnailUrl, downloadable = false } = req.body;
     if (!url) return res.status(400).json({ error: "url required." });
@@ -5958,7 +6182,7 @@ router$h.post("/:id/media-link", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to register media link." });
   }
 });
-router$h.get("/:id/release", requireCoordinator, async (req, res) => {
+router$i.get("/:id/release", requireCoordinator, async (req, res) => {
   if (!adminReady$5(res)) return;
   try {
     const report = await loadGalleryReleaseForGallery(req.params.id);
@@ -5970,7 +6194,7 @@ router$h.get("/:id/release", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to check gallery release." });
   }
 });
-router$h.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$i.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status } = req.body;
     const validStatuses = ["pending_upload", "raw_uploaded", "editing", "ready_for_review", "approved", "delivered"];
@@ -5992,7 +6216,7 @@ router$h.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update gallery status." });
   }
 });
-router$h.post("/:id/deliver", requireCoordinator, async (req, res) => {
+router$i.post("/:id/deliver", requireCoordinator, async (req, res) => {
   try {
     if (!adminReady$5(res)) return;
     const galleryDoc = await db$e().collection("galleries").doc(req.params.id).get();
@@ -6051,7 +6275,7 @@ router$h.post("/:id/deliver", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to deliver gallery." });
   }
 });
-router$h.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
+router$i.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
   try {
     const galleryDoc = await db$e().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
@@ -6132,7 +6356,7 @@ async function fetchPublishedSquareInvoiceUrl(squareInvoiceId, deps) {
   if (!result.ok) return null;
   return publicUrlOf(result.body);
 }
-const router$g = Router();
+const router$h = Router();
 const db$d = () => admin.firestore();
 const stripe$1 = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
@@ -6284,7 +6508,7 @@ async function applySuccessfulPayment({
     }).catch(console.error);
   }
 }
-router$g.post("/create-intent", requireAuth, async (req, res) => {
+router$h.post("/create-intent", requireAuth, async (req, res) => {
   try {
     if (!stripeReady()) {
       return res.status(503).json({ error: "Studio Noir Stripe payments are not configured yet." });
@@ -6322,7 +6546,7 @@ router$g.post("/create-intent", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to create payment intent." });
   }
 });
-router$g.post("/send-invoice", requireCoordinator, async (req, res) => {
+router$h.post("/send-invoice", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
@@ -6355,7 +6579,7 @@ router$g.post("/send-invoice", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send invoice." });
   }
 });
-router$g.post("/send-receipt", requireCoordinator, async (req, res) => {
+router$h.post("/send-receipt", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
@@ -6381,7 +6605,7 @@ router$g.post("/send-receipt", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send receipt." });
   }
 });
-router$g.get("/invoice/:id", async (req, res) => {
+router$h.get("/invoice/:id", async (req, res) => {
   try {
     const invoiceDoc = await db$d().collection("invoices").doc(req.params.id).get();
     if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
@@ -6412,7 +6636,7 @@ router$g.get("/invoice/:id", async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch invoice." });
   }
 });
-router$g.post("/invoice/:id/checkout", async (req, res) => {
+router$h.post("/invoice/:id/checkout", async (req, res) => {
   try {
     const invoiceDoc = await db$d().collection("invoices").doc(req.params.id).get();
     if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
@@ -6542,7 +6766,7 @@ router$g.post("/invoice/:id/checkout", async (req, res) => {
     return res.status(500).json({ error: "Failed to start checkout." });
   }
 });
-router$g.post("/webhook", async (req, res) => {
+router$h.post("/webhook", async (req, res) => {
   const sig = req.headers["stripe-signature"];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
   let event;
@@ -6625,7 +6849,7 @@ async function findInvoiceForSquarePayment(payment) {
   }
   return null;
 }
-router$g.post("/square-webhook", async (req, res) => {
+router$h.post("/square-webhook", async (req, res) => {
   try {
     const rawBody = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : JSON.stringify(req.body || {});
     const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
@@ -6677,7 +6901,7 @@ router$g.post("/square-webhook", async (req, res) => {
     return res.status(500).json({ error: "Square webhook handler failed." });
   }
 });
-router$g.get("/transactions", requireCoordinator, async (req, res) => {
+router$h.get("/transactions", requireCoordinator, async (req, res) => {
   try {
     const { startDate, endDate, limit = "50" } = req.query;
     let query = db$d().collection("transactions").orderBy("createdAt", "desc");
@@ -6760,7 +6984,7 @@ async function handleStripeRefund(charge) {
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   });
 }
-const router$f = Router();
+const router$g = Router();
 const db$c = () => admin.firestore();
 const VSAI_API_BASE = "https://api.virtualstagingai.app/v1";
 const VSAI_API_KEY = process.env.VSAI_API_KEY || process.env.VIRTUAL_STAGING_AI_API_KEY || "";
@@ -6768,7 +6992,7 @@ const VSAI_PRICE_CENTS = parseInt(process.env.VSAI_PRICE_CENTS || "1500", 10);
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
 });
-router$f.post("/create", requireAuth, async (req, res) => {
+router$g.post("/create", requireAuth, async (req, res) => {
   try {
     if (!VSAI_API_KEY) {
       console.error("[VSAI] VSAI_API_KEY is not set");
@@ -6843,7 +7067,7 @@ router$f.post("/create", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$f.get("/result/:jobId", requireAuth, async (req, res) => {
+router$g.get("/result/:jobId", requireAuth, async (req, res) => {
   try {
     const jobDoc = await db$c().collection("vsaiJobs").doc(req.params.jobId).get();
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
@@ -6918,7 +7142,7 @@ router$f.get("/result/:jobId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$f.post("/variation", requireAuth, async (req, res) => {
+router$g.post("/variation", requireAuth, async (req, res) => {
   try {
     const { jobId, style: newStyle, roomType: newRoomType } = req.body;
     if (!jobId) {
@@ -7002,7 +7226,7 @@ router$f.post("/variation", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$f.post("/checkout", requireAuth, async (req, res) => {
+router$g.post("/checkout", requireAuth, async (req, res) => {
   try {
     const { jobIds, successUrl, cancelUrl } = req.body;
     if (!jobIds || !Array.isArray(jobIds) || jobIds.length === 0) {
@@ -7071,7 +7295,7 @@ router$f.post("/checkout", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$f.post(
+router$g.post(
   "/webhook/stripe",
   // Raw body needed — mount before express.json() parses it
   async (req, res) => {
@@ -7109,7 +7333,7 @@ router$f.post(
     res.json({ received: true });
   }
 );
-router$f.get("/options", (_req, res) => {
+router$g.get("/options", (_req, res) => {
   return res.json({
     roomTypes: [
       { value: "living", label: "Living Room" },
@@ -7139,9 +7363,9 @@ router$f.get("/options", (_req, res) => {
 function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
 }
-const router$e = Router();
+const router$f = Router();
 const db$b = () => admin.firestore();
-router$e.post("/email", requireStaff, async (req, res) => {
+router$f.post("/email", requireStaff, async (req, res) => {
   try {
     const { to, subject, body, orderId, clientId: clientId2 } = req.body;
     if (!to || !body?.trim()) {
@@ -7173,7 +7397,7 @@ router$e.post("/email", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to send email." });
   }
 });
-router$e.get("/:orderId", requireAuth, async (req, res) => {
+router$f.get("/:orderId", requireAuth, async (req, res) => {
   try {
     const orderDoc = await db$b().collection("orders").doc(req.params.orderId).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
@@ -7202,7 +7426,7 @@ router$e.get("/:orderId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch messages." });
   }
 });
-router$e.post("/:orderId", requireAuth, async (req, res) => {
+router$f.post("/:orderId", requireAuth, async (req, res) => {
   try {
     const { content, attachments } = req.body;
     if (!content?.trim()) {
@@ -7257,7 +7481,7 @@ router$e.post("/:orderId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to send message." });
   }
 });
-router$e.get("/unread/count", requireStaff, async (_req, res) => {
+router$f.get("/unread/count", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$b().collection("messages").where("isRead", "==", false).where("senderType", "==", "client").get();
     return res.json({ unreadCount: snapshot.size });
@@ -8606,13 +8830,13 @@ const handlePatchPortalWebsite = async (req, res) => {
     return sendKnownError$3(res, err, "Could not save the listing site.");
   }
 };
-const router$d = Router();
+const router$e = Router();
 const db$8 = () => admin.firestore();
 const HOME_LIMIT = 100;
 function asRecord$1(value) {
   return value && typeof value === "object" ? value : {};
 }
-router$d.get("/", requireStaff, async (req, res) => {
+router$e.get("/", requireStaff, async (req, res) => {
   try {
     const { status, search, limit = "50" } = req.query;
     let query = db$8().collection("clients").orderBy("createdAt", "desc");
@@ -8639,7 +8863,7 @@ function adminReady$3(res) {
   });
   return false;
 }
-router$d.post("/register", async (req, res) => {
+router$e.post("/register", async (req, res) => {
   if (!adminReady$3(res)) return;
   const firstName = cleanPersonName(req.body?.firstName);
   const lastName = cleanPersonName(req.body?.lastName);
@@ -8701,7 +8925,7 @@ router$d.post("/register", async (req, res) => {
     return res.status(500).json({ error: "Could not create the client account." });
   }
 });
-router$d.get("/me/home", requireAuth, async (req, res) => {
+router$e.get("/me/home", requireAuth, async (req, res) => {
   if (!adminReady$3(res)) return;
   try {
     const identity = await resolveClientIdentity(req.user.uid, req.user.email);
@@ -8850,12 +9074,12 @@ router$d.get("/me/home", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to load your portal." });
   }
 });
-router$d.get("/me/listings/:id", requireAuth, handleGetPortalListing);
-router$d.patch("/me/listings/:id/data", requireAuth, handlePatchPortalData);
-router$d.patch("/me/listings/:id/media", requireAuth, handlePatchPortalMedia);
-router$d.patch("/me/listings/:id/website", requireAuth, handlePatchPortalWebsite);
-router$d.post("/me/listings/:id/photo-edit-requests", requireAuth, handleCreatePhotoEditRequest);
-router$d.get("/me", requireAuth, async (req, res) => {
+router$e.get("/me/listings/:id", requireAuth, handleGetPortalListing);
+router$e.patch("/me/listings/:id/data", requireAuth, handlePatchPortalData);
+router$e.patch("/me/listings/:id/media", requireAuth, handlePatchPortalMedia);
+router$e.patch("/me/listings/:id/website", requireAuth, handlePatchPortalWebsite);
+router$e.post("/me/listings/:id/photo-edit-requests", requireAuth, handleCreatePhotoEditRequest);
+router$e.get("/me", requireAuth, async (req, res) => {
   try {
     const directDoc = await db$8().collection("clients").doc(req.user.uid).get();
     if (directDoc.exists) {
@@ -8871,7 +9095,7 @@ router$d.get("/me", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch profile." });
   }
 });
-router$d.get("/:id", requireStaff, async (req, res) => {
+router$e.get("/:id", requireStaff, async (req, res) => {
   try {
     const doc = await db$8().collection("clients").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Client not found." });
@@ -8888,7 +9112,7 @@ router$d.get("/:id", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch client." });
   }
 });
-router$d.post("/", requireCoordinator, async (req, res) => {
+router$e.post("/", requireCoordinator, async (req, res) => {
   try {
     const { firstName, lastName, email, phone, address, notes, tags } = req.body;
     if (!firstName || !lastName || !email) {
@@ -8918,7 +9142,7 @@ router$d.post("/", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to create client." });
   }
 });
-router$d.patch("/:id", requireCoordinator, async (req, res) => {
+router$e.patch("/:id", requireCoordinator, async (req, res) => {
   try {
     const allowed = ["firstName", "lastName", "phone", "address", "status", "notes", "tags", "company"];
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
@@ -8957,9 +9181,9 @@ function secretsMatch(provided, expected) {
   }
   return crypto.timingSafeEqual(left, right);
 }
-function readSetupSecret(headerValue) {
-  if (typeof headerValue === "string") return headerValue.trim();
-  if (Array.isArray(headerValue) && typeof headerValue[0] === "string") return headerValue[0].trim();
+function readSetupSecret(headerValue2) {
+  if (typeof headerValue2 === "string") return headerValue2.trim();
+  if (Array.isArray(headerValue2) && typeof headerValue2[0] === "string") return headerValue2[0].trim();
   return "";
 }
 const db$7 = () => admin.firestore();
@@ -9178,9 +9402,9 @@ async function upsertPlaytestDelivery(photographerUid, client, listingId) {
     invoice: { id: invoiceId, urlPath: `/invoice/${invoiceId}`, status: "sent", amountDue: 150 }
   };
 }
-const router$c = Router();
+const router$d = Router();
 const db$6 = () => admin.firestore();
-router$c.get("/", requireStaff, async (_req, res) => {
+router$d.get("/", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$6().collection("staff").where("isActive", "==", true).orderBy("firstName").get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -9188,7 +9412,7 @@ router$c.get("/", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch staff." });
   }
 });
-router$c.post("/", requireAdmin, async (req, res) => {
+router$d.post("/", requireAdmin, async (req, res) => {
   try {
     const { firstName, lastName, email, phone, role, tempPassword } = req.body;
     if (!firstName || !lastName || !email || !role || !tempPassword) {
@@ -9224,7 +9448,7 @@ router$c.post("/", requireAdmin, async (req, res) => {
     return res.status(500).json({ error: "Failed to create staff member." });
   }
 });
-router$c.patch("/:id", requireAdmin, async (req, res) => {
+router$d.patch("/:id", requireAdmin, async (req, res) => {
   try {
     const allowed = ["firstName", "lastName", "phone", "role", "isActive"];
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
@@ -9252,7 +9476,7 @@ function requireSetupSecret(req, res) {
   }
   return true;
 }
-router$c.post("/playtest", async (req, res) => {
+router$d.post("/playtest", async (req, res) => {
   if (!requireSetupSecret(req, res)) return;
   if (!admin.apps.length) {
     return res.status(503).json({
@@ -9271,7 +9495,7 @@ router$c.post("/playtest", async (req, res) => {
     return res.status(500).json({ error: "Playtest setup failed." });
   }
 });
-router$c.post("/setup", async (req, res) => {
+router$d.post("/setup", async (req, res) => {
   try {
     if (isHostedDeployment(liveServerEnv())) {
       const secret = process.env.STAFF_SETUP_SECRET;
@@ -9342,7 +9566,7 @@ function kickStudioQueue(listingId, env = process.env) {
   });
   return { dispatched: true };
 }
-const router$b = Router();
+const router$c = Router();
 const db$5 = () => admin.firestore();
 const DIRECT_UPLOAD_LIMIT = 3e6;
 function adminReady$2(res) {
@@ -9410,7 +9634,7 @@ function sendKnownError$2(res, err, fallback) {
   console.error("[Listings]", err);
   return res.status(500).json({ error: fallback });
 }
-router$b.get("/assigned", requirePhotographer, async (req, res) => {
+router$c.get("/assigned", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const uid = req.user.uid;
@@ -9439,7 +9663,7 @@ router$b.get("/assigned", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to load assigned jobs." });
   }
 });
-router$b.get("/:id", requireAuth, async (req, res) => {
+router$c.get("/:id", requireAuth, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const listing = await assertListingAccess(req, req.params.id);
@@ -9454,7 +9678,7 @@ router$b.get("/:id", requireAuth, async (req, res) => {
     return sendKnownError$2(res, err, "Failed to load listing.");
   }
 });
-router$b.post("/:id/photos/upload-url", requirePhotographer, async (req, res) => {
+router$c.post("/:id/photos/upload-url", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const fileName2 = safeStorageFileName(req.body?.fileName);
@@ -9472,7 +9696,7 @@ router$b.post("/:id/photos/upload-url", requirePhotographer, async (req, res) =>
     return sendKnownError$2(res, err, "Failed to prepare the upload. Check FIREBASE_STORAGE_BUCKET.");
   }
 });
-router$b.post("/:id/photos", requirePhotographer, async (req, res) => {
+router$c.post("/:id/photos", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const listingId = req.params.id;
@@ -9518,7 +9742,7 @@ router$b.post("/:id/photos", requirePhotographer, async (req, res) => {
     return sendKnownError$2(res, err, "Failed to save the uploaded photo.");
   }
 });
-const router$a = Router();
+const router$b = Router();
 const db$4 = () => admin.firestore();
 function mailchimpConfig() {
   const apiKey = process.env.MAILCHIMP_API_KEY || "";
@@ -9546,7 +9770,7 @@ async function mailchimpRequest(path2, init = {}) {
   }
   return data;
 }
-router$a.get("/", requireCoordinator, async (_req, res) => {
+router$b.get("/", requireCoordinator, async (_req, res) => {
   try {
     const snapshot = await db$4().collection("campaigns").orderBy("createdAt", "desc").limit(50).get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -9554,7 +9778,7 @@ router$a.get("/", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch campaigns." });
   }
 });
-router$a.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
+router$b.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
   try {
     const { apiKey, serverPrefix } = mailchimpConfig();
     if (!apiKey || !serverPrefix) {
@@ -9585,7 +9809,7 @@ router$a.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
     });
   }
 });
-router$a.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
+router$b.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
   try {
     const { listId, audience = "all" } = req.body;
     if (!listId) return res.status(400).json({ error: "listId required." });
@@ -9648,7 +9872,7 @@ router$a.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: err instanceof Error ? err.message : "Failed to sync Mailchimp." });
   }
 });
-router$a.post("/", requireCoordinator, async (req, res) => {
+router$b.post("/", requireCoordinator, async (req, res) => {
   try {
     const { name, type, subject, body, audience, audienceIds, scheduledAt } = req.body;
     if (!name || !body || !audience) {
@@ -9673,7 +9897,7 @@ router$a.post("/", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to create campaign." });
   }
 });
-router$a.post("/:id/send", requireCoordinator, async (req, res) => {
+router$b.post("/:id/send", requireCoordinator, async (req, res) => {
   try {
     const campaignDoc = await db$4().collection("campaigns").doc(req.params.id).get();
     if (!campaignDoc.exists) return res.status(404).json({ error: "Campaign not found." });
@@ -9739,7 +9963,7 @@ router$a.post("/:id/send", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send campaign." });
   }
 });
-const router$9 = Router();
+const router$a = Router();
 const db$3 = () => admin.firestore();
 function isAgentAuthorized(req) {
   const serviceKey = req.headers["x-agent-key"];
@@ -9791,7 +10015,7 @@ async function loadOrderForAppointment(appointment) {
   const orderDoc = await db$3().collection("orders").doc(String(appointment.orderId)).get();
   return orderDoc.exists ? { id: orderDoc.id, ref: orderDoc.ref, data: orderDoc.data() || {} } : null;
 }
-router$9.get("/briefing", requireStaff, async (_req, res) => {
+router$a.get("/briefing", requireStaff, async (_req, res) => {
   try {
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
@@ -9990,9 +10214,9 @@ async function runReminderSweep(req, res) {
     return res.status(500).json({ error: "Failed to run reminder sweep." });
   }
 }
-router$9.get("/run-reminders", runReminderSweep);
-router$9.post("/run-reminders", runReminderSweep);
-router$9.get("/logs", requireStaff, async (req, res) => {
+router$a.get("/run-reminders", runReminderSweep);
+router$a.post("/run-reminders", runReminderSweep);
+router$a.get("/logs", requireStaff, async (req, res) => {
   try {
     const { agent, status, requiresReview, limit = "50" } = req.query;
     let query = db$3().collection("agentLogs").orderBy("createdAt", "desc");
@@ -10007,7 +10231,7 @@ router$9.get("/logs", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch agent logs." });
   }
 });
-router$9.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
+router$a.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
   try {
     const { notes } = req.body;
     await db$3().collection("agentLogs").doc(req.params.id).update({
@@ -10022,7 +10246,7 @@ router$9.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to resolve flag." });
   }
 });
-router$9.post("/log", async (req, res) => {
+router$a.post("/log", async (req, res) => {
   try {
     if (!isAgentAuthorized(req)) {
       return res.status(401).json({ error: "Invalid agent key." });
@@ -10060,9 +10284,9 @@ router$9.post("/log", async (req, res) => {
     return res.status(500).json({ error: "Failed to log agent action." });
   }
 });
-const router$8 = Router();
+const router$9 = Router();
 const db$2 = () => admin.firestore();
-router$8.get("/", requireStaff, async (req, res) => {
+router$9.get("/", requireStaff, async (req, res) => {
   try {
     const { status, listingId, orderId, limit = "100" } = req.query;
     let q = db$2().collection("mediaJobs").orderBy("createdAt", "desc");
@@ -10076,7 +10300,7 @@ router$8.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch media jobs." });
   }
 });
-router$8.post("/", requireStaff, async (req, res) => {
+router$9.post("/", requireStaff, async (req, res) => {
   try {
     const {
       listingId,
@@ -10135,7 +10359,7 @@ router$8.post("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to create media job." });
   }
 });
-router$8.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$9.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status, resultItems = [], error = "", requiresHumanReview } = req.body;
     const valid = ["queued", "processing", "ready_for_review", "completed", "failed", "cancelled"];
@@ -10154,7 +10378,7 @@ router$8.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update media job." });
   }
 });
-const router$7 = Router();
+const router$8 = Router();
 function adminReady$1(res) {
   if (admin.apps.length) return true;
   res.status(503).json({
@@ -10182,7 +10406,7 @@ function sendKnownError$1(res, err, fallback) {
   console.error("[Studio]", err);
   return res.status(500).json({ error: fallback });
 }
-router$7.get("/workspace", requireStaff, async (req, res) => {
+router$8.get("/workspace", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = typeof req.query.listingId === "string" ? req.query.listingId : "";
@@ -10204,7 +10428,7 @@ router$7.get("/workspace", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to load Iconic Studio.");
   }
 });
-router$7.post("/order-edits", requireStaff, async (req, res) => {
+router$8.post("/order-edits", requireStaff, async (req, res) => {
   const listingId = String(req.body?.listingId || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -10218,7 +10442,7 @@ router$7.post("/order-edits", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to queue the order edits.");
   }
 });
-router$7.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => {
+router$8.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => {
   let listingId = String(req.body?.listingId || "").trim();
   if (listingId && !/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -10248,7 +10472,7 @@ router$7.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => 
     return sendKnownError$1(res, err, "Failed to advance the order edit queue.");
   }
 });
-router$7.post("/iconic-polish", requireStaff, async (req, res) => {
+router$8.post("/iconic-polish", requireStaff, async (req, res) => {
   const listingId = String(req.body?.listingId || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -10265,7 +10489,7 @@ router$7.post("/iconic-polish", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to save Iconic Polish.");
   }
 });
-router$7.post("/ai-edit", requireStaff, async (req, res) => {
+router$8.post("/ai-edit", requireStaff, async (req, res) => {
   const parsed = parseAiEditRequest(req.body);
   if (parsed.ok === false) return res.status(400).json({ error: parsed.error });
   if (!adminReady$1(res)) return;
@@ -10285,7 +10509,7 @@ router$7.post("/ai-edit", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to enqueue the AI edit.");
   }
 });
-router$7.post("/adjust", requireStaff, async (req, res) => {
+router$8.post("/adjust", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
@@ -10308,7 +10532,7 @@ router$7.post("/adjust", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to save the adjustment.");
   }
 });
-router$7.post("/reject", requireStaff, async (req, res) => {
+router$8.post("/reject", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
@@ -10325,7 +10549,7 @@ router$7.post("/reject", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to reject the edit.");
   }
 });
-router$7.post("/approve", requireStaff, async (req, res) => {
+router$8.post("/approve", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
@@ -10355,6 +10579,157 @@ router$7.post("/approve", requireStaff, async (req, res) => {
   } catch (err) {
     return sendKnownError$1(res, err, "Failed to approve the final.");
   }
+});
+const GRASS_REFERENCE_PUBLIC_PATH = "/studio/grass-reference.jpg";
+const GRASS_REFERENCE_RELATIVE_PATH = "public/studio/grass-reference.jpg";
+const SCRATCH_MAX_BYTES = 4e6;
+const SCRATCH_PROMPT_MAX = 2e3;
+const SCRATCH_PROMPT_HEADER = "x-scratch-prompt";
+const SCRATCH_NAME_HEADER = "x-scratch-filename";
+const SCRATCH_ACTION_HEADER = "x-scratch-action";
+const SCRATCH_ACTIONS = ["edit", "revise", "twilight", "grass"];
+const GRASS_REPLACE_PROMPT = "Replace the lawn in the first image with healthy, even grass that matches the second image, the grass reference. Keep the house, hardscape, trees, sky, lighting, and camera angle. Change only the lawn.";
+const GRASS_REFERENCE_MISSING_NOTE = "Grass reference is missing. Add Cadi's lawn JPEG at public/studio/grass-reference.jpg (or set STUDIO_GRASS_REFERENCE_PATH).";
+function decodeScratchHeader(value) {
+  if (!value) return "";
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+function parseScratchEdit(input) {
+  const type = input.contentType.split(";")[0].trim().toLowerCase();
+  if (type !== "image/jpeg") return { ok: false, error: "Scratch pad edits JPEGs. Drop a .jpg." };
+  if (!input.byteLength) return { ok: false, error: "That photo was empty." };
+  if (input.byteLength > SCRATCH_MAX_BYTES) {
+    return { ok: false, error: "That photo is too large for the scratch pad. Export a smaller JPEG." };
+  }
+  const action = input.action.trim().toLowerCase();
+  if (!SCRATCH_ACTIONS.includes(action)) {
+    return { ok: false, error: "Unknown scratch action." };
+  }
+  if (action === "twilight") {
+    return { ok: true, action: "twilight", prompt: orderExteriorTwilightPrompt(), attachGrass: false };
+  }
+  if (action === "grass") {
+    return { ok: true, action: "grass", prompt: GRASS_REPLACE_PROMPT, attachGrass: true };
+  }
+  const userPrompt = input.prompt.trim().replace(/\s+/g, " ").slice(0, SCRATCH_PROMPT_MAX);
+  if (userPrompt.length < 3) return { ok: false, error: "Describe the edit." };
+  return { ok: true, action, prompt: userPrompt, attachGrass: false };
+}
+function scratchDownloadName(fileName2) {
+  const baseName = fileName2.split(/[/\\]/).pop() || "scratch";
+  const base = baseName.replace(/\.[^.]+$/, "").replace(/[^\w.-]+/g, "-").replace(/^[-.]+|[-.]+$/g, "").slice(0, 80);
+  return `${base || "scratch"}-edit.jpg`;
+}
+function grassReferenceCandidates(env = process.env, cwd = process.cwd()) {
+  const override = typeof env.STUDIO_GRASS_REFERENCE_PATH === "string" ? env.STUDIO_GRASS_REFERENCE_PATH.trim() : "";
+  if (override) return [override];
+  return [
+    path.join(cwd, GRASS_REFERENCE_RELATIVE_PATH),
+    path.join(cwd, "dist/spa/studio/grass-reference.jpg")
+  ];
+}
+function isJpeg(bytes) {
+  return bytes.length > 32 && bytes[0] === 255 && bytes[1] === 216;
+}
+async function readGrassReference(env = process.env) {
+  for (const filePath of grassReferenceCandidates(env)) {
+    try {
+      const bytes = await fs.readFile(filePath);
+      if (isJpeg(bytes)) return { bytes, contentType: "image/jpeg", path: filePath };
+    } catch {
+    }
+  }
+  throw new OpenAiEditError(GRASS_REFERENCE_MISSING_NOTE, 503);
+}
+async function grassReferenceStatus(env = process.env) {
+  try {
+    await readGrassReference(env);
+    return {
+      ready: true,
+      publicPath: GRASS_REFERENCE_PUBLIC_PATH,
+      note: "Using the lawn reference at /studio/grass-reference.jpg."
+    };
+  } catch (err) {
+    return {
+      ready: false,
+      publicPath: GRASS_REFERENCE_PUBLIC_PATH,
+      note: err instanceof Error ? err.message : GRASS_REFERENCE_MISSING_NOTE
+    };
+  }
+}
+async function editScratchPhoto(input) {
+  const parsed = parseScratchEdit({
+    action: input.action,
+    prompt: input.prompt,
+    byteLength: input.bytes.length,
+    contentType: input.contentType
+  });
+  if (parsed.ok === false) throw new OpenAiEditError(parsed.error, 400);
+  let references;
+  if (parsed.attachGrass) {
+    const grass = input.readGrass ? await input.readGrass() : await readGrassReference(input.env);
+    references = [{ bytes: grass.bytes, contentType: grass.contentType, filename: "grass-reference.jpg" }];
+  }
+  const apiKey = readOpenAiApiKey(input.env ?? process.env);
+  if (!apiKey) throw new OpenAiEditError(AI_EDIT_MISSING_KEY_NOTE, 503);
+  const edited = await editListingPhotoWithOpenAI({
+    apiKey,
+    prompt: realEstateEditPrompt(parsed.prompt),
+    bytes: input.bytes,
+    contentType: "image/jpeg",
+    references,
+    fetchImpl: input.fetchImpl
+  });
+  return {
+    bytes: edited.bytes,
+    contentType: edited.contentType,
+    downloadName: scratchDownloadName(input.fileName || "scratch.jpg")
+  };
+}
+const router$7 = Router();
+function headerValue(value) {
+  if (Array.isArray(value)) return value[0] || "";
+  return value || "";
+}
+router$7.get("/", requireCoordinator, async (_req, res) => {
+  const grass = await grassReferenceStatus();
+  return res.json({ grass, twilightPrompt: orderExteriorTwilightPrompt() });
+});
+router$7.post(
+  "/",
+  requireCoordinator,
+  express.raw({ type: "image/jpeg", limit: "4mb" }),
+  async (req, res) => {
+    try {
+      const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+      const edited = await editScratchPhoto({
+        action: headerValue(req.headers[SCRATCH_ACTION_HEADER]) || "edit",
+        prompt: decodeScratchHeader(headerValue(req.headers[SCRATCH_PROMPT_HEADER])),
+        fileName: decodeScratchHeader(headerValue(req.headers[SCRATCH_NAME_HEADER])),
+        bytes,
+        contentType: headerValue(req.headers["content-type"]) || ""
+      });
+      res.setHeader("Content-Type", edited.contentType);
+      res.setHeader("Content-Disposition", `attachment; filename="${edited.downloadName}"`);
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(200).send(edited.bytes);
+    } catch (err) {
+      const status = err instanceof OpenAiEditError && err.status ? err.status : 502;
+      const message = err instanceof Error ? err.message : "The scratch edit failed.";
+      if (status >= 500) console.error("[Studio scratch]", message);
+      return res.status(status).json({ error: message });
+    }
+  }
+);
+router$7.use((err, _req, res, next) => {
+  if (err?.type === "entity.too.large" || err?.status === 413) {
+    return res.status(413).json({ error: "That photo is too large for the scratch pad. Export a smaller JPEG." });
+  }
+  return next(err);
 });
 const router$6 = Router();
 const GOOGLE_KEY = process.env.GOOGLE_MAPS_API_KEY || "";
@@ -12019,22 +12394,23 @@ function createServer() {
   app.get("/api/client-notify", (_req, res) => {
     res.json({ live: clientNotifyLive() });
   });
-  app.use("/api/bookings", router$j);
-  app.use("/api/orders", router$i);
-  app.use("/api/galleries", router$h);
-  app.use("/api/payments", router$g);
-  app.use("/api/vsai", router$f);
-  app.use("/api/messages", router$e);
-  app.use("/api/clients", router$d);
+  app.use("/api/bookings", router$k);
+  app.use("/api/orders", router$j);
+  app.use("/api/galleries", router$i);
+  app.use("/api/payments", router$h);
+  app.use("/api/vsai", router$g);
+  app.use("/api/messages", router$f);
+  app.use("/api/clients", router$e);
   app.get("/api/portal/listings/:id", handleGetPublicPortalListing);
-  app.use("/api/staff", router$c);
+  app.use("/api/staff", router$d);
   app.use("/api", router$1);
-  app.use("/api/listings", router$b);
+  app.use("/api/listings", router$c);
   app.use("/api", router);
-  app.use("/api/campaigns", router$a);
-  app.use("/api/agents", router$9);
-  app.use("/api/media-jobs", router$8);
-  app.use("/api/studio", router$7);
+  app.use("/api/campaigns", router$b);
+  app.use("/api/agents", router$a);
+  app.use("/api/media-jobs", router$9);
+  app.use("/api/studio", router$8);
+  app.use("/api/studio/scratch", router$7);
   app.use("/api/places", router$6);
   app.use("/api/sms", router$5);
   app.use("/api/contact", router$2);
