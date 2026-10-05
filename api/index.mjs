@@ -2104,6 +2104,11 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
     issuedOn: formatPortalDate(data.createdAt) || formatPortalDate(data.sentAt) || formatPortalDate(data.paidAt),
     lineItems: storedLines(data.lineItems, data.services),
     subtotal: storedAmount(data.subtotal),
+    processing: storedAmount(data.processing),
+    fees: storedAmount(data.fees),
+    travel: storedAmount(data.travel),
+    promoDiscount: storedAmount(data.promoDiscount),
+    promoCode: text$8(data.promoCode),
     tax: storedAmount(data.tax),
     total: storedAmount(data.total),
     amountPaid: storedAmount(data.amountPaid),
@@ -2154,11 +2159,19 @@ function storedLines(lineItems, services2) {
     if (typeof item === "string" && item.trim()) return [{ name: item.trim(), qty: null, amount: null }];
     if (!item || typeof item !== "object") return [];
     const record = item;
-    const name = text$8(record.name) || text$8(record.label) || text$8(record.description);
+    const named = text$8(record.name) || text$8(record.label);
+    const description = text$8(record.description);
+    const name = named || description;
     const qty = storedQty(record.qty ?? record.quantity);
     const amount = storedAmount(record.price ?? record.amount ?? record.total);
     if (!name && amount == null && qty == null) return [];
-    return [{ name: name || "Line item", qty, amount }];
+    const line = { name: name || "Line item", qty, amount };
+    const id = text$8(record.id);
+    const category = text$8(record.category);
+    if (id) line.id = id;
+    if (category) line.category = category;
+    if (named && description) line.description = description;
+    return [line];
   });
 }
 function storedQty(value) {
@@ -7408,6 +7421,14 @@ router$h.get("/invoice/:id", async (req, res) => {
       total: invoice.total,
       amountPaid: invoice.amountPaid,
       amountDue: invoice.amountDue,
+      processing: invoice.processing ?? null,
+      fees: invoice.fees ?? null,
+      travel: invoice.travel ?? null,
+      promoDiscount: invoice.promoDiscount ?? null,
+      promoCode: invoice.promoCode ?? null,
+      billToAddress: typeof invoice.billToAddress === "string" ? invoice.billToAddress : null,
+      notes: typeof invoice.notes === "string" ? invoice.notes : null,
+      clientEmail: invoice.clientEmail || null,
       status: invoice.status,
       paymentProvider: provider,
       stripePaymentIntentId: invoice.stripePaymentIntentId || null,
