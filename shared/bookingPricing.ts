@@ -230,10 +230,34 @@ export interface ResolvedBookingSubmission {
   premiumUpgrade: boolean;
 }
 
+function rawPrice(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) return Number(value);
+  return undefined;
+}
+
+/**
+ * public/ordericonic.html posts `{ name, price }` lines and free-text package
+ * labels. Those labels are not catalog ids (Hollywood, photo counts, studio,
+ * and several add-ons are not in the catalog at all). When the catalog rebuild
+ * has no service, keep posted lines that already have a name and a price.
+ */
+function pricedPostedLines(items: unknown): BookingLineItem[] {
+  if (!Array.isArray(items)) return [];
+  return normalizeBookingLineItems(items).filter((item, index) => {
+    if (!item.name.trim()) return false;
+    const raw = items[index];
+    if (!raw || typeof raw !== "object") return false;
+    return rawPrice((raw as Record<string, unknown>).price) !== undefined;
+  });
+}
+
 /**
  * Rebuild a public booking from the catalog.
- * Client line prices are ignored. Selection ids, and catalog ids already on
- * the posted lines, are priced from `catalog` (the seed catalog when omitted).
+ * Client line prices are ignored when a catalog id matches. Selection ids, and
+ * catalog ids already on the posted lines, are priced from `catalog` (the seed
+ * catalog when omitted). If that rebuild has no service, posted name+price
+ * lines are kept so the temporary order page can submit.
  */
 export function resolveSubmittedBooking(
   body: Record<string, unknown>,
@@ -268,7 +292,7 @@ export function resolveSubmittedBooking(
   }
 
   const promo = promoDiscountFor(optionalLineText(body.promoCode));
-  const lineItems = buildSubmittedLineItems({
+  let lineItems = buildSubmittedLineItems({
     selectedService,
     selectedBasics,
     selectedAddOns,
@@ -279,6 +303,28 @@ export function resolveSubmittedBooking(
     lifeOfTheListingCare: Boolean(body.lifeOfTheListingCare),
     catalog: list,
   });
+
+  if (chargedServiceLines(lineItems).length === 0) {
+    const temporary = pricedPostedLines(body.lineItems);
+    const alreadyDiscounted = temporary.some((item) => {
+      const id = String(item.id || "");
+      return id.startsWith("promo-") || item.name.startsWith("Promo Code:");
+    });
+    if (chargedServiceLines(temporary).length > 0) {
+      lineItems = promo && !alreadyDiscounted
+        ? [
+            ...temporary,
+            {
+              id: `promo-${promo.code}`,
+              name: `Promo Code: ${promo.code}`,
+              unitPrice: -promo.discount,
+              qty: 1,
+              price: -promo.discount,
+            },
+          ]
+        : temporary;
+    }
+  }
 
   return {
     lineItems,
