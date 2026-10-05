@@ -12,7 +12,7 @@
   "functions": {
     "api/index.mjs": {
       "maxDuration": 60,
-      "includeFiles": "dist/spa/index.html"
+      "includeFiles": "{dist/spa/index.html,public/studio/grass-reference.jpg}"
     }
   },
   "redirects": [

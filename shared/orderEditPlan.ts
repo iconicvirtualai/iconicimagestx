@@ -138,6 +138,11 @@ function twilightPrompt(role: string, polish: boolean): string {
   return request.join(" ");
 }
 
+/** Same exterior twilight line an order slot uses when the photo is not marked front or back. */
+export function orderExteriorTwilightPrompt(): string {
+  return twilightPrompt("exterior", false);
+}
+
 function photoPrompt(polish: boolean): string {
   return polish ? `${PHOTO_BASE} ${ICONIC_POLISH_INSTRUCTION}` : PHOTO_BASE;
 }

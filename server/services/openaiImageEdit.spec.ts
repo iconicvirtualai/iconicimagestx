@@ -75,6 +75,28 @@ describe("OpenAI image edit request", () => {
     expect(fetchImpl).toHaveBeenCalledOnce();
   });
 
+  it("sends a reference image as an extra image[] part", async () => {
+    const jpeg = Buffer.from("edited-jpeg-bytes-that-are-long-enough");
+    const fetchImpl = vi.fn(async (_url: string, init: RequestInit) => {
+      const form = init.body as FormData;
+      expect(form.get("image")).toBeNull();
+      const images = form.getAll("image[]");
+      expect(images).toHaveLength(2);
+      expect((images[0] as File).name).toBe("source.png");
+      expect((images[1] as File).name).toBe("grass-reference.jpg");
+      return new Response(JSON.stringify({ data: [{ b64_json: jpeg.toString("base64") }] }), { status: 200 });
+    });
+    await editListingPhotoWithOpenAI({
+      apiKey: "sk-test",
+      prompt: "Replace the lawn with the reference grass",
+      bytes: png(1800, 1200),
+      contentType: "image/png",
+      references: [{ bytes: png(80, 40), contentType: "image/jpeg", filename: "grass-reference.jpg" }],
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+
   it("turns auth, moderation, and timeout failures into readable notes", async () => {
     expect(openAiErrorNote(401, JSON.stringify({ error: { message: "Incorrect API key" } })))
       .toMatch(/OPENAI_API_KEY/);

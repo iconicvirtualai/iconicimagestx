@@ -93,7 +93,7 @@ export function editSizeForImage(bytes: Buffer): ListingEditSize {
   return listingPhotoEditSize(size?.width ?? 0, size?.height ?? 0);
 }
 
-function imagePart(bytes: Buffer, contentType: string): { blob: Blob; filename: string } {
+function imagePart(bytes: Buffer, contentType: string, filename?: string): { blob: Blob; filename: string } {
   const type = contentType.includes("png")
     ? "image/png"
     : contentType.includes("webp")
@@ -102,7 +102,7 @@ function imagePart(bytes: Buffer, contentType: string): { blob: Blob; filename: 
   const extension = type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg";
   return {
     blob: new Blob([new Uint8Array(bytes)], { type }),
-    filename: `source.${extension}`,
+    filename: filename || `source.${extension}`,
   };
 }
 
@@ -137,6 +137,8 @@ export async function editListingPhotoWithOpenAI(input: {
   prompt: string;
   bytes: Buffer;
   contentType: string;
+  /** Extra inputs, such as the scratch-pad grass reference. One image stays a single `image` part. */
+  references?: Array<{ bytes: Buffer; contentType: string; filename?: string }>;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
 }): Promise<{ bytes: Buffer; contentType: "image/jpeg" }> {
@@ -148,12 +150,26 @@ export async function editListingPhotoWithOpenAI(input: {
   }
   const prompt = input.prompt.trim();
   if (prompt.length < 3) throw new OpenAiEditError("Describe the AI edit.");
+  const references = input.references || [];
+  for (const reference of references) {
+    if (reference.bytes.length > MAX_SOURCE_BYTES) {
+      throw new OpenAiEditError("A reference image is over 20 MB.");
+    }
+  }
 
   const file = imagePart(input.bytes, input.contentType);
   const form = new FormData();
   form.append("model", OPENAI_IMAGE_EDIT_MODEL);
   form.append("prompt", prompt);
-  form.append("image", file.blob, file.filename);
+  if (!references.length) {
+    form.append("image", file.blob, file.filename);
+  } else {
+    form.append("image[]", file.blob, file.filename);
+    for (const reference of references) {
+      const extra = imagePart(reference.bytes, reference.contentType, reference.filename);
+      form.append("image[]", extra.blob, extra.filename);
+    }
+  }
   form.append("n", "1");
   form.append("size", editSizeForImage(input.bytes));
   form.append("quality", "medium");
