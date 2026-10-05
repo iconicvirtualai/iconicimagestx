@@ -1,10 +1,18 @@
 import * as React from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 import { useAuth } from "@/contexts/AuthContext";
-import { Link } from "react-router-dom";
+import { PhotographerJobBanner } from "@/components/photographer/PhotographerPortal";
 import { fetchAssignedListings, uploadListingFile } from "@/lib/listingUpload";
-import { drainOrderEditQueue, postIconicPolish } from "@/lib/studioApi";
-import { iconicStudioHref } from "@shared/iconicStudio";
+import { drainOrderEditQueue, fetchStudioWorkspace, postIconicPolish } from "@/lib/studioApi";
+import {
+  PHOTOGRAPHER_UPLOAD_ACCEPT,
+  buildPhotographerPortal,
+  chicagoDateKey,
+  photographerAcceptsFile,
+  photographerUploadFolder,
+  type PhotographerStudioJob,
+} from "@shared/photographerPortal";
 import { Upload, CheckCircle2, XCircle, Image as ImageIcon, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -12,56 +20,87 @@ import { PresentationSharePanel } from "@/components/PresentationSharePanel";
 
 export default function AdminUpload() {
   const { user } = useAuth();
-  const [jobs, setJobs] = React.useState<any[]>([]);
-  const [selectedJob, setSelectedJob] = React.useState<string>("");
+  const [params, setParams] = useSearchParams();
+  const [listings, setListings] = React.useState<Array<Record<string, unknown>>>([]);
+  const [studioJobs, setStudioJobs] = React.useState<PhotographerStudioJob[]>([]);
+  const [selectedJob, setSelectedJob] = React.useState(params.get("job") || "");
   const [files, setFiles] = React.useState<File[]>([]);
   const [uploads, setUploads] = React.useState<Record<string, number>>({});
   const [uploading, setUploading] = React.useState(false);
-  const [iconicPolish, setIconicPolish] = React.useState(false);
+  const [iconicPolish, setIconicPolish] = React.useState(params.get("polish") === "1");
   const [queueNote, setQueueNote] = React.useState("");
   const [jobsError, setJobsError] = React.useState("");
   const fileRef = React.useRef<HTMLInputElement>(null);
 
   const loadJobs = React.useCallback(async () => {
     if (!user) return;
-    try {
-      const list = await fetchAssignedListings();
-      const active = list.filter((job) => !["archived", "cancelled"].includes(String(job.status || "")));
-      const next = active.length > 0 ? active : list;
-      setJobs(next);
+    const [assigned, studio] = await Promise.allSettled([
+      fetchAssignedListings(),
+      fetchStudioWorkspace(undefined, () => user.getIdToken()),
+    ]);
+    if (assigned.status === "fulfilled") {
+      setListings(assigned.value);
       setJobsError("");
-      setSelectedJob((current) => current || String(next[0]?.id || ""));
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to load your assigned jobs.";
+    } else {
+      const message = assigned.reason instanceof Error ? assigned.reason.message : "Failed to load your assigned jobs.";
       setJobsError(message);
       toast.error(message);
     }
+    if (studio.status === "fulfilled") setStudioJobs((studio.value.jobs || []) as PhotographerStudioJob[]);
   }, [user]);
 
   React.useEffect(() => {
     loadJobs();
   }, [loadJobs]);
 
-  const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) return;
-    const arr = Array.from(e.target.files).filter((f) => f.type.startsWith("image/"));
-    setFiles((prev) => [...prev, ...arr]);
+  const jobs = React.useMemo(
+    () => buildPhotographerPortal({ listings, studioJobs, today: chicagoDateKey(new Date()) }),
+    [listings, studioJobs],
+  );
+
+  React.useEffect(() => {
+    if (!jobs.length) return;
+    setSelectedJob((current) => {
+      if (current && jobs.some((job) => job.id === current)) return current;
+      const requested = params.get("job") || "";
+      if (requested && jobs.some((job) => job.id === requested)) return requested;
+      const needsUpload = jobs.find((job) => job.action.kind === "upload");
+      return needsUpload?.id || jobs[0].id;
+    });
+  }, [jobs, params]);
+
+  const chooseJob = (id: string) => {
+    setSelectedJob(id);
+    const next = new URLSearchParams(params);
+    next.set("job", id);
+    if (iconicPolish) next.set("polish", "1");
+    else next.delete("polish");
+    setParams(next, { replace: true });
   };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    const arr = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/"));
-    setFiles((prev) => [...prev, ...arr]);
+  const addFiles = (list: File[]) => {
+    const accepted = list.filter((file) => photographerAcceptsFile(file.name, file.type));
+    if (accepted.length !== list.length) toast.error("Only photos and RAW frames can be uploaded.");
+    if (accepted.length) setFiles((prev) => [...prev, ...accepted]);
+  };
+
+  const handleFiles = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files) return;
+    addFiles(Array.from(event.target.files));
+  };
+
+  const handleDrop = (event: React.DragEvent) => {
+    event.preventDefault();
+    addFiles(Array.from(event.dataTransfer.files));
   };
 
   const removeFile = (idx: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== idx));
+    setFiles((prev) => prev.filter((_, index) => index !== idx));
   };
 
   const handleUpload = async () => {
     if (!selectedJob || files.length === 0) return;
     setUploading(true);
-
     try {
       if (user) {
         await postIconicPolish(() => user.getIdToken(), { listingId: selectedJob, iconicPolish });
@@ -70,17 +109,17 @@ export default function AdminUpload() {
         await uploadListingFile({
           listingId: selectedJob,
           file,
-          folder: "photos",
+          folder: photographerUploadFolder(file.name, file.type),
           onProgress: (pct) => setUploads((prev) => ({ ...prev, [file.name]: pct })),
         });
       }
-      toast.success(`${files.length} photo${files.length > 1 ? "s" : ""} uploaded successfully!`);
+      toast.success(`${files.length} file${files.length === 1 ? "" : "s"} uploaded.`);
       setFiles([]);
       setUploads({});
       if (fileRef.current) fileRef.current.value = "";
-      setUploading(false);
+      setQueueNote("Iconic Studio is editing the order, one photo at a time.");
+      await loadJobs();
       if (user) {
-        setQueueNote("Iconic Studio is editing the order, one photo at a time.");
         try {
           await drainOrderEditQueue(() => user.getIdToken(), selectedJob, (step) => {
             if (step.ran?.status === "failed") setQueueNote(step.ran.note);
@@ -88,6 +127,7 @@ export default function AdminUpload() {
             else if (step.waiting) setQueueNote("Waiting on an exterior filename before twilight can run.");
             else setQueueNote(step.ran ? "Order edits are ready for review in Iconic Studio." : "No photo is waiting to edit.");
           });
+          await loadJobs();
         } catch (err: unknown) {
           setQueueNote(err instanceof Error ? err.message : "Auto-queue did not start.");
         }
@@ -99,46 +139,56 @@ export default function AdminUpload() {
     }
   };
 
-  const selectedJobData = jobs.find((j) => j.id === selectedJob);
+  const selected = jobs.find((job) => job.id === selectedJob);
 
   return (
     <AdminLayout title="Upload Photos">
-      <div className="w-full min-w-0">
-        {/* Job selector */}
-        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 mb-6">
-          <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3">
-            Select Job
+      <div className="w-full min-w-0" data-testid="photographer-upload">
+        <p className="mb-4 text-sm text-gray-500">
+          Pick the job, then drop the shoot. Status for every assigned job stays on the{" "}
+          <Link to="/admin/photographer" className="font-bold text-[#0d9488]">photographer portal</Link>.
+        </p>
+
+        <div className="mb-6 rounded-[2rem] border border-gray-100 bg-white p-6 shadow-sm">
+          <label htmlFor="photographer-job" className="mb-3 block text-[10px] font-black uppercase tracking-widest text-gray-500">
+            Select job
           </label>
           {jobs.length === 0 ? (
-            <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
-              <FolderOpen className="w-5 h-5 text-gray-300" />
+            <div className="flex items-center gap-3 rounded-xl bg-gray-50 p-4">
+              <FolderOpen className="h-5 w-5 text-gray-300" />
               <div>
-                <p className="text-sm text-gray-400 font-bold">No active jobs assigned to you.</p>
-                <p className="text-xs text-gray-400 mt-1">A playtest job appears here after the secret staff bootstrap assigns one to this login.</p>
-                {jobsError && <p className="text-xs text-red-500 mt-1">{jobsError}</p>}
+                <p className="text-sm font-bold text-gray-500">
+                  {jobsError ? "Assigned jobs did not load." : "No jobs are assigned to this login."}
+                </p>
+                <p className="mt-1 text-xs text-gray-400">
+                  {jobsError
+                    ? "Refresh this page. The uploader needs the job list before a shoot can be saved."
+                    : "Assigned shoots show up here after the office puts you on the job."}
+                </p>
+                {jobsError && <p className="mt-1 text-xs text-red-500">{jobsError}</p>}
               </div>
             </div>
           ) : (
             <select
+              id="photographer-job"
               value={selectedJob}
-              onChange={(e) => setSelectedJob(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-black focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30"
+              onChange={(event) => chooseJob(event.target.value)}
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-bold text-black focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30"
             >
-              {jobs.map((j) => (
-                <option key={j.id} value={j.id}>
-                  {j.propertyAddress || "Unnamed listing"} — {j.status}
+              {jobs.map((job) => (
+                <option key={job.id} value={job.id}>
+                  {job.address} — {job.action.statusLabel}
                 </option>
               ))}
             </select>
           )}
-          {selectedJobData && (
-            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-2">
-              Listing ID: {selectedJob}
-              {" · "}
-              <Link to={iconicStudioHref(selectedJob)} className="text-[#0d9488]">Open Iconic Studio</Link>
-            </p>
-          )}
         </div>
+
+        {selected && (
+          <div className="mb-6">
+            <PhotographerJobBanner job={selected} />
+          </div>
+        )}
 
         {selectedJob && (
           <div className="mb-6 max-w-md">
@@ -146,47 +196,53 @@ export default function AdminUpload() {
           </div>
         )}
 
-        {/* Drop zone */}
         <div
           onDrop={handleDrop}
-          onDragOver={(e) => e.preventDefault()}
+          onDragOver={(event) => event.preventDefault()}
           onClick={() => fileRef.current?.click()}
-          className="border-2 border-dashed border-gray-200 rounded-[2rem] p-12 text-center cursor-pointer hover:border-[#0d9488] hover:bg-[#0d9488]/5 transition-all mb-6"
+          className="mb-6 cursor-pointer rounded-[2rem] border-2 border-dashed border-gray-200 p-12 text-center transition-all hover:border-[#0d9488] hover:bg-[#0d9488]/5"
         >
-          <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFiles} />
-          <Upload className="w-10 h-10 text-gray-300 mx-auto mb-4" />
-          <p className="font-black text-sm text-gray-500 uppercase tracking-widest mb-1">
-            Drop photos here or click to browse
+          <input
+            ref={fileRef}
+            type="file"
+            accept={PHOTOGRAPHER_UPLOAD_ACCEPT}
+            multiple
+            className="hidden"
+            onChange={handleFiles}
+          />
+          <Upload className="mx-auto mb-4 h-10 w-10 text-gray-300" />
+          <p className="mb-1 text-sm font-black uppercase tracking-widest text-gray-500">
+            {selected ? `Drop the shoot for ${selected.address}` : "Drop photos here or click to browse"}
           </p>
-          <p className="text-xs text-gray-400">JPEG, PNG, WEBP supported</p>
+          <p className="text-xs text-gray-400">JPEG, PNG, WebP, and RAW. RAW stays in the raw folder until a preview exists.</p>
         </div>
 
-        {/* File list */}
         {files.length > 0 && (
-          <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
-                {files.length} photo{files.length > 1 ? "s" : ""} selected
+          <div className="mb-6 rounded-[2rem] border border-gray-100 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+                {files.length} file{files.length === 1 ? "" : "s"} selected
               </p>
-              <button onClick={() => setFiles([])} className="text-[10px] font-black text-red-400 hover:text-red-600 uppercase tracking-widest">
+              <button type="button" onClick={() => setFiles([])} className="text-[10px] font-black uppercase tracking-widest text-red-400 hover:text-red-600">
                 Clear all
               </button>
             </div>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {files.map((f, i) => (
-                <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-                  <ImageIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                  <p className="text-xs font-bold text-gray-700 flex-1 truncate">{f.name}</p>
-                  <span className="text-[10px] text-gray-400 font-bold">{(f.size / 1024 / 1024).toFixed(1)} MB</span>
-                  {uploads[f.name] !== undefined ? (
-                    uploads[f.name] === 100 ? (
-                      <CheckCircle2 className="w-4 h-4 text-teal-500" />
+            <div className="max-h-64 space-y-2 overflow-y-auto">
+              {files.map((file, index) => (
+                <div key={`${file.name}-${index}`} className="flex items-center gap-3 rounded-xl bg-gray-50 p-3">
+                  <ImageIcon className="h-4 w-4 shrink-0 text-gray-400" />
+                  <p className="flex-1 truncate text-xs font-bold text-gray-700">{file.name}</p>
+                  <span className="text-[10px] font-bold text-gray-400">{photographerUploadFolder(file.name, file.type)}</span>
+                  <span className="text-[10px] font-bold text-gray-400">{(file.size / 1024 / 1024).toFixed(1)} MB</span>
+                  {uploads[file.name] !== undefined ? (
+                    uploads[file.name] === 100 ? (
+                      <CheckCircle2 className="h-4 w-4 text-teal-500" />
                     ) : (
-                      <span className="text-[10px] font-black text-[#0d9488]">{uploads[f.name]}%</span>
+                      <span className="text-[10px] font-black text-[#0d9488]">{uploads[file.name]}%</span>
                     )
                   ) : (
-                    <button onClick={(e) => { e.stopPropagation(); removeFile(i); }}>
-                      <XCircle className="w-4 h-4 text-gray-300 hover:text-red-400 transition-colors" />
+                    <button type="button" onClick={(event) => { event.stopPropagation(); removeFile(index); }}>
+                      <XCircle className="h-4 w-4 text-gray-300 transition-colors hover:text-red-400" />
                     </button>
                   )}
                 </div>
@@ -205,18 +261,21 @@ export default function AdminUpload() {
           <span>
             <span className="block text-xs font-black uppercase tracking-widest">Iconic Polish</span>
             <span className="mt-1 block text-xs text-gray-500">
-              Turn this on before you submit. It adds fireplace fire, clean driveways, and clutter removal on top of the order. You do not pick an edit for each photo.
+              Turn this on before you submit. It adds fireplace fire, clean driveways, and clutter removal on top of the order.
             </span>
           </span>
         </label>
 
-        {/* Upload button */}
         <Button
           onClick={handleUpload}
           disabled={uploading || files.length === 0 || !selectedJob}
-          className="w-full bg-[#0d9488] hover:bg-[#0f766e] text-white font-black rounded-xl py-4 text-sm uppercase tracking-widest disabled:opacity-40"
+          className="w-full rounded-xl bg-[#0d9488] py-4 text-sm font-black uppercase tracking-widest text-white hover:bg-[#0f766e] disabled:opacity-40"
         >
-          {uploading ? "Uploading..." : `Upload ${files.length > 0 ? files.length + " " : ""}Photo${files.length !== 1 ? "s" : ""}`}
+          {uploading
+            ? "Uploading..."
+            : selected?.action.kind === "upload"
+              ? `Upload the shoot${files.length ? ` (${files.length})` : ""}`
+              : `Add ${files.length > 0 ? `${files.length} ` : ""}photo${files.length === 1 ? "" : "s"}`}
         </Button>
         {queueNote && <p className="mt-3 text-xs font-bold text-gray-500">{queueNote}</p>}
       </div>
