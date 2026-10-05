@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { studioQueueTickRequest } from "./studioQueueKick";
+import {
+  PHOTOGRAPHER_UPLOAD_BROWSER_DRAINS_QUEUE,
+  studioQueueTickRequest,
+  uploadQueueKickDecision,
+} from "./studioQueueKick";
 
 describe("studio queue follow-up", () => {
   it("builds one chained tick when the app URL and cron secret are set", () => {
@@ -17,5 +21,30 @@ describe("studio queue follow-up", () => {
     expect(studioQueueTickRequest({ APP_URL: "https://iconicimagestx.com" }, "listing1234")).toBeNull();
     expect(studioQueueTickRequest({ CRON_SECRET: "cron-secret" }, "listing1234")).toBeNull();
     expect(studioQueueTickRequest({ APP_URL: "https://iconicimagestx.com", CRON_SECRET: "cron-secret" }, "  ")).toBeNull();
+  });
+});
+
+describe("upload queue kick decision", () => {
+  it("does not start a second queue when the upload page already drains", () => {
+    expect(PHOTOGRAPHER_UPLOAD_BROWSER_DRAINS_QUEUE).toBe(true);
+    expect(uploadQueueKickDecision({
+      browserDrainsQueue: PHOTOGRAPHER_UPLOAD_BROWSER_DRAINS_QUEUE,
+      pendingWithSourcePhoto: 4,
+    })).toEqual({ kick: false });
+  });
+
+  it("kicks only when the browser is not draining and a source photo is pending", () => {
+    expect(uploadQueueKickDecision({
+      browserDrainsQueue: false,
+      pendingWithSourcePhoto: 1,
+    })).toEqual({ kick: true });
+    expect(uploadQueueKickDecision({
+      browserDrainsQueue: false,
+      pendingWithSourcePhoto: 0,
+    })).toEqual({ kick: false });
+    expect(uploadQueueKickDecision({
+      browserDrainsQueue: false,
+      pendingWithSourcePhoto: Number.NaN,
+    })).toEqual({ kick: false });
   });
 });

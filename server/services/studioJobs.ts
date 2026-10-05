@@ -37,10 +37,13 @@ import {
 import { jsonSafe } from "../lib/firestoreJson";
 import { firebaseDownloadUrl, registerListingPhoto, saveListingBytes } from "./listingMedia";
 import {
+  INSPECTION_FAILED_NOTE,
   OPENAI_IMAGE_EDIT_MODEL,
   OpenAiEditError,
   editListingPhotoWithOpenAI,
+  inspectFinishedListingJpeg,
   readOpenAiApiKey,
+  type DeliveryInspection,
 } from "./openaiImageEdit";
 
 const db = () => admin.firestore();
@@ -173,7 +176,20 @@ async function runOpenAiEdit(input: {
   });
   const base = input.fileName.replace(/\.\w+$/, "") || "edit";
   const saved = await saveListingBytes(input.listingId, `${base}-ai.jpg`, "image/jpeg", "photos", edited.bytes);
-  return { afterUrl: saved.url, resultPath: saved.storagePath };
+  return { afterUrl: saved.url, resultPath: saved.storagePath, bytes: edited.bytes };
+}
+
+/** Inspection never fails the edit that already saved. */
+async function inspectOrderEditJpeg(bytes: Buffer): Promise<DeliveryInspection> {
+  try {
+    return await inspectFinishedListingJpeg({
+      apiKey: readOpenAiApiKey(process.env),
+      bytes,
+    });
+  } catch (err) {
+    console.error("[Studio inspection]", err instanceof Error ? err.message : err);
+    return { status: "flag", notes: [INSPECTION_FAILED_NOTE] };
+  }
 }
 
 function failureNote(err: unknown): string {
@@ -380,6 +396,15 @@ export async function advanceOrderEditQueue(input: { listingId: string; createdB
       pipeline: ["pending", "processing", "review"],
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+    const inspection = await inspectOrderEditJpeg(saved.bytes);
+    try {
+      await next.ref.update({
+        inspection,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (err) {
+      console.error("[Studio inspection] The edit is in review, but the inspection note was not stored.", err instanceof Error ? err.message : err);
+    }
     const remaining = Math.max(0, advance.remainingAfter);
     return {
       plan: prepared.plan,
@@ -397,6 +422,7 @@ export async function advanceOrderEditQueue(input: { listingId: string; createdB
         resultPath: saved.resultPath,
         placeholder: false,
         note: AI_EDIT_READY_NOTE,
+        inspection,
       },
     };
   } catch (err) {

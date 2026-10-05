@@ -32,6 +32,10 @@ export interface StudioJobView {
   origin?: string;
   label?: string;
   slot?: string;
+  inspection?: {
+    status?: string;
+    notes?: string[];
+  };
 }
 
 export interface StudioListingOption {
@@ -530,6 +534,21 @@ function AiPanel({
                 </div>
                 {job.note && (
                   <p className={`mt-2 text-[11px] leading-snug ${job.status === "failed" ? "text-red-700" : "text-gray-500"}`}>{job.note}</p>
+                )}
+                {Array.isArray(job.inspection?.notes) && job.inspection.notes.length > 0 && (
+                  <div data-testid="studio-inspection-notes" className="mt-2">
+                    <p className={labelCls}>Inspection</p>
+                    <ul className="mt-1 space-y-1">
+                      {job.inspection.notes.map((note, index) => (
+                        <li
+                          key={`${index}-${note}`}
+                          className={`text-[11px] leading-snug ${job.inspection?.status === "flag" ? "text-amber-800" : "text-gray-500"}`}
+                        >
+                          {note}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
                 <div className="mt-2 flex gap-2">
                   {canApprove && (

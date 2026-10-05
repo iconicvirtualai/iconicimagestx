@@ -1,6 +1,7 @@
 /**
  * Iconic Studio image edits via OpenAI's Images API.
  * POST https://api.openai.com/v1/images/edits with gpt-image-1.
+ * A finished order JPEG is inspected with the same API key via chat completions.
  * The API key stays on the server. This does not train a model or use Assistants.
  */
 
@@ -9,6 +10,30 @@ import { AI_EDIT_TIMEOUT_NOTE, listingPhotoEditSize, type ListingEditSize } from
 export const OPENAI_IMAGE_EDITS_URL = "https://api.openai.com/v1/images/edits";
 export const OPENAI_IMAGE_EDIT_MODEL = "gpt-image-1";
 export const OPENAI_IMAGE_EDIT_TIMEOUT_MS = 45_000;
+export const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
+export const OPENAI_INSPECTION_MODEL = "gpt-4o-mini";
+export const OPENAI_INSPECTION_TIMEOUT_MS = 20_000;
+
+/** Issues a finished listing JPEG may be flagged for. Nothing else. */
+export const DELIVERY_INSPECTION_NOTES = [
+  "Photographer visible in a mirror or shadow.",
+  "Photographer reflected in a doorway or glass.",
+  "Inconsistent color.",
+  "Double exposure.",
+  "Frame is too poor to deliver.",
+] as const;
+
+export const INSPECTION_MISSING_KEY_NOTE = "Inspection skipped. Review this photo.";
+export const INSPECTION_FAILED_NOTE = "Inspection did not finish. Review this photo.";
+
+export interface DeliveryInspection {
+  status: "pass" | "flag";
+  notes: string[];
+}
+
+export function deliveryInspection(status: DeliveryInspection["status"], notes: readonly string[]): DeliveryInspection {
+  return { status, notes: [...notes] };
+}
 
 const MAX_SOURCE_BYTES = 20_000_000;
 
@@ -165,4 +190,121 @@ export async function editListingPhotoWithOpenAI(input: {
   const bytes = Buffer.from(encoded, "base64");
   if (bytes.length < 32) throw new OpenAiEditError("OpenAI returned an empty edited image.");
   return { bytes, contentType: "image/jpeg" };
+}
+
+function canonicalInspectionNotes(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const found: string[] = [];
+  for (const item of raw) {
+    if (typeof item !== "string") continue;
+    const text = item.trim().toLowerCase();
+    const match = DELIVERY_INSPECTION_NOTES.find((note) => note.toLowerCase() === text);
+    if (match && !found.includes(match)) found.push(match);
+  }
+  return found;
+}
+
+function inspectionObject(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+/**
+ * Read a pass/flag result from model JSON or a chat completion body.
+ * Pass drops notes. Flag keeps only the five delivery issues.
+ * Returns null when the payload is not that shape.
+ */
+export function parseDeliveryInspection(body: unknown): DeliveryInspection | null {
+  let value = body;
+  if (typeof value === "string") {
+    const trimmed = value.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+    try {
+      value = JSON.parse(trimmed);
+    } catch {
+      return null;
+    }
+  }
+  const row = inspectionObject(value);
+  if (!row) return null;
+
+  if (Array.isArray(row.choices)) {
+    const message = inspectionObject(inspectionObject(row.choices[0])?.message);
+    const content = message?.content;
+    if (typeof content !== "string") return null;
+    return parseDeliveryInspection(content);
+  }
+
+  if (row.status !== "pass" && row.status !== "flag") return null;
+  if (row.status === "pass") return deliveryInspection("pass", []);
+  const notes = canonicalInspectionNotes(row.notes);
+  if (!notes.length) return null;
+  return deliveryInspection("flag", notes);
+}
+
+const INSPECTION_PROMPT = [
+  "Inspect this finished real-estate listing JPEG.",
+  "Look only for: a photographer in a mirror or shadow; a doorway or glass reflection of the photographer; inconsistent color; a double exposure; a frame too poor to deliver.",
+  "Do not comment on staging, sky, furniture, or other edits.",
+  "Do not approve or reject the photo.",
+  "Reply with JSON only: {\"status\":\"pass\" or \"flag\",\"notes\":string[]}.",
+  "Use status flag only when one of those issues is visible. Otherwise pass.",
+  "When status is pass, notes must be an empty array.",
+  "When status is flag, copy notes exactly from this list:",
+  ...DELIVERY_INSPECTION_NOTES,
+].join(" ");
+
+/**
+ * Second OpenAI look at a finished order JPEG.
+ * A missing key or a failed call stays a review note. It does not throw.
+ */
+export async function inspectFinishedListingJpeg(input: {
+  apiKey: string;
+  bytes: Buffer;
+  fetchImpl?: typeof fetch;
+  timeoutMs?: number;
+}): Promise<DeliveryInspection> {
+  const apiKey = input.apiKey.trim();
+  if (!apiKey) return deliveryInspection("flag", [INSPECTION_MISSING_KEY_NOTE]);
+  if (!input.bytes.length) return deliveryInspection("flag", [INSPECTION_FAILED_NOTE]);
+
+  const fetchImpl = input.fetchImpl || fetch;
+  const timeoutMs = input.timeoutMs ?? OPENAI_INSPECTION_TIMEOUT_MS;
+  let response: Response;
+  try {
+    response = await fetchImpl(OPENAI_CHAT_COMPLETIONS_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: OPENAI_INSPECTION_MODEL,
+        temperature: 0,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: INSPECTION_PROMPT },
+              {
+                type: "image_url",
+                image_url: { url: `data:image/jpeg;base64,${input.bytes.toString("base64")}` },
+              },
+            ],
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (err) {
+    console.error("[Studio inspection]", err instanceof Error ? err.message : err);
+    return deliveryInspection("flag", [INSPECTION_FAILED_NOTE]);
+  }
+
+  const body = await response.text();
+  if (!response.ok) {
+    console.error("[Studio inspection] OpenAI did not inspect the finished photo.", response.status);
+    return deliveryInspection("flag", [INSPECTION_FAILED_NOTE]);
+  }
+  return parseDeliveryInspection(body) || deliveryInspection("flag", [INSPECTION_FAILED_NOTE]);
 }

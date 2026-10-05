@@ -1,13 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 import { AI_EDIT_TIMEOUT_NOTE } from "../../shared/iconicStudio";
 import {
+  DELIVERY_INSPECTION_NOTES,
+  INSPECTION_FAILED_NOTE,
+  INSPECTION_MISSING_KEY_NOTE,
+  OPENAI_CHAT_COMPLETIONS_URL,
   OPENAI_IMAGE_EDIT_MODEL,
   OPENAI_IMAGE_EDITS_URL,
+  OPENAI_INSPECTION_MODEL,
   OpenAiEditError,
   editListingPhotoWithOpenAI,
   editSizeForImage,
   imageSize,
+  inspectFinishedListingJpeg,
   openAiErrorNote,
+  parseDeliveryInspection,
   readOpenAiApiKey,
 } from "./openaiImageEdit";
 
@@ -95,5 +102,131 @@ describe("OpenAI image edit request", () => {
       contentType: "image/jpeg",
       fetchImpl: vi.fn() as unknown as typeof fetch,
     })).rejects.toBeInstanceOf(OpenAiEditError);
+  });
+});
+
+describe("finished JPEG delivery inspection", () => {
+  it("keeps a pass or flag result to status and notes", () => {
+    expect(parseDeliveryInspection({
+      status: "pass",
+      notes: ["Double exposure."],
+      approved: true,
+    })).toEqual({ status: "pass", notes: [] });
+
+    expect(parseDeliveryInspection(JSON.stringify({
+      status: "flag",
+      notes: [
+        "Double exposure.",
+        "not a delivery issue",
+        "double exposure.",
+        "Inconsistent color.",
+      ],
+      rejected: true,
+    }))).toEqual({
+      status: "flag",
+      notes: ["Double exposure.", "Inconsistent color."],
+    });
+
+    expect(parseDeliveryInspection({ status: "approved", notes: [] })).toBeNull();
+    expect(parseDeliveryInspection("not json")).toBeNull();
+    expect(parseDeliveryInspection({ status: "flag", notes: [] })).toBeNull();
+    expect(DELIVERY_INSPECTION_NOTES).toEqual([
+      "Photographer visible in a mirror or shadow.",
+      "Photographer reflected in a doorway or glass.",
+      "Inconsistent color.",
+      "Double exposure.",
+      "Frame is too poor to deliver.",
+    ]);
+  });
+
+  it("reads the same shape from a chat completion body", () => {
+    const parsed = parseDeliveryInspection(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            status: "flag",
+            notes: ["Photographer reflected in a doorway or glass."],
+          }),
+        },
+      }],
+    }));
+    expect(parsed).toEqual({
+      status: "flag",
+      notes: ["Photographer reflected in a doorway or glass."],
+    });
+    expect(Object.keys(parsed || {}).sort()).toEqual(["notes", "status"]);
+  });
+
+  it("flags a finished jpeg and does not call the image edit endpoint", async () => {
+    const jpeg = Buffer.from("finished-jpeg-bytes");
+    const fetchImpl = vi.fn(async (url: string, init: RequestInit) => {
+      expect(url).toBe(OPENAI_CHAT_COMPLETIONS_URL);
+      expect(url).not.toBe(OPENAI_IMAGE_EDITS_URL);
+      expect((init.headers as Record<string, string>).Authorization).toBe("Bearer sk-test");
+      const body = JSON.parse(String(init.body));
+      expect(body.model).toBe(OPENAI_INSPECTION_MODEL);
+      const instruction = String(body.messages[0].content[0].text);
+      expect(instruction).toMatch(/mirror or shadow/i);
+      expect(instruction).toMatch(/doorway or glass/i);
+      expect(instruction).toMatch(/inconsistent color/i);
+      expect(instruction).toMatch(/double exposure/i);
+      expect(instruction).toMatch(/too poor to deliver/i);
+      expect(instruction).toMatch(/do not approve or reject/i);
+      expect(instruction).not.toMatch(/autoenhance/i);
+      expect(body.messages[0].content[1].image_url.url).toBe(
+        `data:image/jpeg;base64,${jpeg.toString("base64")}`,
+      );
+      return new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              status: "flag",
+              notes: ["Frame is too poor to deliver.", "Photographer visible in a mirror or shadow."],
+            }),
+          },
+        }],
+      }), { status: 200 });
+    });
+
+    const result = await inspectFinishedListingJpeg({
+      apiKey: "sk-test",
+      bytes: jpeg,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    expect(result).toEqual({
+      status: "flag",
+      notes: [
+        "Frame is too poor to deliver.",
+        "Photographer visible in a mirror or shadow.",
+      ],
+    });
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+
+  it("leaves a short review note when the key is missing or the call fails", async () => {
+    const skipped = vi.fn();
+    await expect(inspectFinishedListingJpeg({
+      apiKey: " ",
+      bytes: Buffer.from("finished-jpeg"),
+      fetchImpl: skipped as unknown as typeof fetch,
+    })).resolves.toEqual({ status: "flag", notes: [INSPECTION_MISSING_KEY_NOTE] });
+    expect(skipped).not.toHaveBeenCalled();
+
+    const failed = vi.fn(async () => new Response("nope", { status: 500 }));
+    await expect(inspectFinishedListingJpeg({
+      apiKey: "sk-test",
+      bytes: Buffer.from("finished-jpeg"),
+      fetchImpl: failed as unknown as typeof fetch,
+    })).resolves.toEqual({ status: "flag", notes: [INSPECTION_FAILED_NOTE] });
+
+    const timeout = vi.fn(async () => {
+      throw Object.assign(new Error("aborted"), { name: "TimeoutError" });
+    });
+    await expect(inspectFinishedListingJpeg({
+      apiKey: "sk-test",
+      bytes: Buffer.from("finished-jpeg"),
+      fetchImpl: timeout as unknown as typeof fetch,
+    })).resolves.toEqual({ status: "flag", notes: [INSPECTION_FAILED_NOTE] });
   });
 });

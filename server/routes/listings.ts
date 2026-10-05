@@ -27,6 +27,11 @@ import {
   serializeDoc,
 } from "../services/listingMedia";
 import { bumpRawIngestJob, enqueueOrderEditsFromUpload } from "../services/studioJobs";
+import {
+  PHOTOGRAPHER_UPLOAD_BROWSER_DRAINS_QUEUE,
+  kickStudioQueue,
+  uploadQueueKickDecision,
+} from "../services/studioQueueKick";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -88,6 +93,19 @@ async function noteOrderEditQueue(listingId: string, uploadedBy: string) {
     console.error("[Studio] Upload saved, but order edits were not queued.", err);
     return null;
   }
+}
+
+/**
+ * Upload and My Jobs already drain the order queue after this register.
+ * Kick the existing server queue only when that browser drain is absent
+ * and pending order work has a source photo.
+ */
+function followUploadWithQueue(listingId: string, autoQueue: { pending?: number } | null) {
+  const decision = uploadQueueKickDecision({
+    browserDrainsQueue: PHOTOGRAPHER_UPLOAD_BROWSER_DRAINS_QUEUE,
+    pendingWithSourcePhoto: autoQueue?.pending ?? 0,
+  });
+  if (decision.kick) kickStudioQueue(listingId);
 }
 
 function sendKnownError(res: { status: (code: number) => { json: (body: unknown) => unknown } }, err: unknown, fallback: string) {
@@ -192,6 +210,7 @@ router.post("/:id/photos", requirePhotographer, async (req: AuthenticatedRequest
       });
       await noteRawUpload(listingId, registered.image, req.user!.uid);
       const autoQueue = await noteOrderEditQueue(listingId, req.user!.uid);
+      followUploadWithQueue(listingId, autoQueue);
       return res.status(201).json({ success: true, ...registered, autoQueue });
     }
 
@@ -208,6 +227,7 @@ router.post("/:id/photos", requirePhotographer, async (req: AuthenticatedRequest
     });
     await noteRawUpload(listingId, registered.image, req.user!.uid);
     const autoQueue = await noteOrderEditQueue(listingId, req.user!.uid);
+    followUploadWithQueue(listingId, autoQueue);
     return res.status(201).json({ success: true, ...registered, autoQueue });
   } catch (err) {
     return sendKnownError(res, err, "Failed to save the uploaded photo.");
