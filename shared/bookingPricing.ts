@@ -1,26 +1,18 @@
 /**
  * Customer booking totals.
  *
- * calculateSidebarTotal matches BookingForm calculateTotal(), including the
- * Math.max(0, …) promo floor.
- * buildSubmittedLineItems matches handleBookNow's line list. Its `price`
- * fields are the extended amounts, and sumLineItemPrices is the submitted total.
- * Those two paths stay as they are today. Life of the Listing Care is accepted
- * on the input and never added to either number.
+ * Prices come from the booking catalog (seed, overlaid with Firestore `packages`
+ * when a catalog is passed). calculateSidebarTotal matches the booking form
+ * total, including the Math.max(0, …) promo floor. buildSubmittedLineItems is
+ * the submitted line list. Its `price` fields are the extended amounts, and
+ * sumLineItemPrices is the submitted total. Life of the Listing Care is
+ * accepted on the input and never added to either number.
  */
 
-import { services } from "../client/lib/services.ts";
 import {
-  ICONIC_FINISH_NAME,
-  ICONIC_FINISH_PRICE,
-  SPECIALIZED_BOTH_NAME,
-  SPECIALIZED_BOTH_PRICE,
-  SPECIALIZED_SOCIAL_NAME,
-  SPECIALIZED_SOCIAL_PRICE,
-  VIRTUAL_STAGING_UNIT_PRICE,
-  basicLineName,
-  basicsList,
-  findAddOn,
+  packagesForStaffEditor,
+  promoDiscountFor,
+  type StaffCatalogPackage,
 } from "./bookingCatalog.ts";
 
 export interface BookingPriceInput {
@@ -32,6 +24,8 @@ export interface BookingPriceInput {
   specializedPhotography?: string;
   promo?: { code: string; discount: number } | null;
   lifeOfTheListingCare?: boolean;
+  /** Active packages. Omit to charge the seed catalog. */
+  catalog?: StaffCatalogPackage[];
 }
 
 export interface BookingLineItem {
@@ -47,130 +41,103 @@ export interface BookingLineItem {
   tier?: string;
 }
 
-/** True once the customer has picked something that has a real catalog price. */
+function chargeCatalog(input: BookingPriceInput): StaffCatalogPackage[] {
+  return input.catalog ?? packagesForStaffEditor([]);
+}
+
+function findCatalogItem(catalog: StaffCatalogPackage[], id: string): StaffCatalogPackage | undefined {
+  const key = id.trim();
+  if (!key) return undefined;
+  return catalog.find((item) => item.isActive !== false && (item.id === key || item.bookingId === key));
+}
+
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function catalogLineName(pkg: StaffCatalogPackage, qty = 1): string {
+  if (pkg.id === "virtual-staging" || pkg.bookingId === "virtual-staging") {
+    return qty === 1 ? pkg.name : `${pkg.name} (${qty} credits)`;
+  }
+  if (pkg.appointmentLimit && !pkg.name.includes(pkg.appointmentLimit)) {
+    return `${pkg.name} (${pkg.appointmentLimit})`;
+  }
+  return pkg.name;
+}
+
+function pushCatalogLine(items: BookingLineItem[], pkg: StaffCatalogPackage, qty = 1): void {
+  const count = qty > 0 ? qty : 1;
+  const unitPrice = roundMoney(pkg.price);
+  const line: BookingLineItem = {
+    id: pkg.bookingId || pkg.id,
+    name: catalogLineName(pkg, count),
+    unitPrice,
+    qty: count,
+    price: roundMoney(unitPrice * count),
+  };
+  if (pkg.description) line.description = pkg.description;
+  if (pkg.category) line.category = pkg.category;
+  if (pkg.bookingKind) line.bookingKind = pkg.bookingKind;
+  if (pkg.tier) line.tier = pkg.tier;
+  items.push(line);
+}
+
+/** True once the customer has picked something the catalog can price. */
 export function hasBookingSelection(input: BookingPriceInput): boolean {
-  if (input.selectedService) return true;
-  if ((input.selectedBasics || []).some(Boolean)) return true;
-  if ((input.selectedAddOns || []).some(Boolean)) return true;
-  if (input.premiumUpgrade) return true;
-  if ((input.virtualStagingCredits || 0) > 0) return true;
-  return input.specializedPhotography === "social" || input.specializedPhotography === "both";
+  const catalog = input.catalog;
+  const known = (id?: string) => {
+    const key = String(id || "").trim();
+    if (!key) return false;
+    return catalog ? Boolean(findCatalogItem(catalog, key)) : true;
+  };
+  if (known(input.selectedService)) return true;
+  if ((input.selectedBasics || []).some((id) => known(id))) return true;
+  if ((input.selectedAddOns || []).some((id) => known(id))) return true;
+  if (input.premiumUpgrade && (!catalog || findCatalogItem(catalog, "iconic-finish"))) return true;
+  if ((input.virtualStagingCredits || 0) > 0 && (!catalog || findCatalogItem(catalog, "virtual-staging"))) return true;
+  if (input.specializedPhotography === "social") return !catalog || Boolean(findCatalogItem(catalog, "specialized-social"));
+  if (input.specializedPhotography === "both") return !catalog || Boolean(findCatalogItem(catalog, "specialized-both"));
+  return false;
 }
 
 export function calculateSidebarTotal(input: BookingPriceInput): number {
   void input.lifeOfTheListingCare;
-
-  let total = 0;
-  const selectedServiceData = services.find((service) => service.id === input.selectedService);
-  if (selectedServiceData) total += selectedServiceData.price;
-
-  for (const id of input.selectedBasics || []) {
-    const basic = basicsList.find((item) => item.id === id);
-    if (basic) total += basic.price;
-  }
-
-  for (const id of input.selectedAddOns || []) {
-    const addon = findAddOn(id);
-    if (addon) total += addon.price;
-  }
-
-  if (input.premiumUpgrade) total += ICONIC_FINISH_PRICE;
-  if ((input.virtualStagingCredits || 0) > 0) {
-    total += (input.virtualStagingCredits || 0) * VIRTUAL_STAGING_UNIT_PRICE;
-  }
-
-  if (input.specializedPhotography === "social") total += SPECIALIZED_SOCIAL_PRICE;
-  if (input.specializedPhotography === "both") total += SPECIALIZED_BOTH_PRICE;
-
-  if (input.promo) {
-    total = Math.max(0, total - input.promo.discount);
-  }
-
-  return total;
+  const items = buildSubmittedLineItems({ ...input, promo: null });
+  let total = sumLineItemPrices(items);
+  if (input.promo) total = Math.max(0, total - input.promo.discount);
+  return roundMoney(total);
 }
 
 export function buildSubmittedLineItems(input: BookingPriceInput): BookingLineItem[] {
   void input.lifeOfTheListingCare;
-
-  const selectedServiceData = services.find((service) => service.id === input.selectedService);
+  const catalog = chargeCatalog(input);
   const items: BookingLineItem[] = [];
+  const seen = new Set<string>();
+  const pushOnce = (pkg: StaffCatalogPackage | undefined, qty = 1) => {
+    if (!pkg) return;
+    const key = pkg.bookingId || pkg.id;
+    if (seen.has(key)) return;
+    seen.add(key);
+    pushCatalogLine(items, pkg, qty);
+  };
 
-  if (selectedServiceData) {
-    items.push({
-      id: selectedServiceData.id,
-      name: selectedServiceData.name,
-      unitPrice: selectedServiceData.price,
-      qty: 1,
-      price: selectedServiceData.price,
-    });
-  }
+  pushOnce(findCatalogItem(catalog, input.selectedService || ""));
 
   for (const id of input.selectedBasics || []) {
-    const basic = basicsList.find((item) => item.id === id);
-    if (basic) {
-      items.push({
-        id: basic.id,
-        name: basicLineName(basic),
-        unitPrice: basic.price,
-        qty: 1,
-        price: basic.price,
-      });
-    }
+    pushOnce(findCatalogItem(catalog, id));
   }
 
   for (const id of input.selectedAddOns || []) {
-    const addon = findAddOn(id);
-    if (addon) {
-      items.push({
-        id: addon.id,
-        name: addon.name,
-        unitPrice: addon.price,
-        qty: 1,
-        price: addon.price,
-      });
-    }
+    pushOnce(findCatalogItem(catalog, id));
   }
 
-  if (input.premiumUpgrade) {
-    items.push({
-      id: "iconic-finish",
-      name: ICONIC_FINISH_NAME,
-      unitPrice: ICONIC_FINISH_PRICE,
-      qty: 1,
-      price: ICONIC_FINISH_PRICE,
-    });
-  }
+  if (input.premiumUpgrade) pushOnce(findCatalogItem(catalog, "iconic-finish"));
 
   const credits = input.virtualStagingCredits || 0;
-  if (credits > 0) {
-    items.push({
-      id: "virtual-staging",
-      name: `Virtual Staging (${credits} credits)`,
-      unitPrice: VIRTUAL_STAGING_UNIT_PRICE,
-      qty: credits,
-      price: credits * VIRTUAL_STAGING_UNIT_PRICE,
-    });
-  }
+  if (credits > 0) pushOnce(findCatalogItem(catalog, "virtual-staging"), credits);
 
-  if (input.specializedPhotography === "social") {
-    items.push({
-      id: "specialized-social",
-      name: SPECIALIZED_SOCIAL_NAME,
-      unitPrice: SPECIALIZED_SOCIAL_PRICE,
-      qty: 1,
-      price: SPECIALIZED_SOCIAL_PRICE,
-    });
-  }
-
-  if (input.specializedPhotography === "both") {
-    items.push({
-      id: "specialized-both",
-      name: SPECIALIZED_BOTH_NAME,
-      unitPrice: SPECIALIZED_BOTH_PRICE,
-      qty: 1,
-      price: SPECIALIZED_BOTH_PRICE,
-    });
-  }
+  if (input.specializedPhotography === "social") pushOnce(findCatalogItem(catalog, "specialized-social"));
+  if (input.specializedPhotography === "both") pushOnce(findCatalogItem(catalog, "specialized-both"));
 
   if (input.promo) {
     items.push({
@@ -243,4 +210,94 @@ export function normalizeBookingLineItems(items: unknown): BookingLineItem[] {
 
 function optionalLineText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function textList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry) => optionalLineText(entry)).filter(Boolean);
+}
+
+export interface ResolvedBookingSubmission {
+  lineItems: BookingLineItem[];
+  total: number;
+  promoCode: string | null;
+  promoDiscount: number;
+  selectedService: string | null;
+  selectedBasics: string[];
+  selectedAddOns: string[];
+  specializedPhotography: string | null;
+  virtualStagingCredits: number;
+  premiumUpgrade: boolean;
+}
+
+/**
+ * Rebuild a public booking from the catalog.
+ * Client line prices are ignored. Selection ids, and catalog ids already on
+ * the posted lines, are priced from `catalog` (the seed catalog when omitted).
+ */
+export function resolveSubmittedBooking(
+  body: Record<string, unknown>,
+  catalog?: StaffCatalogPackage[],
+): ResolvedBookingSubmission {
+  const list = catalog ?? packagesForStaffEditor([]);
+  const posted = normalizeBookingLineItems(body.lineItems);
+  const postedIds = posted.map((item) => item.id).filter((id): id is string => Boolean(id));
+  const kindIds = (kind: StaffCatalogPackage["bookingKind"]) =>
+    postedIds.filter((id) => findCatalogItem(list, id)?.bookingKind === kind);
+
+  const selectedService = optionalLineText(body.selectedService)
+    || kindIds("service")[0]
+    || "";
+  const selectedBasics = [...new Set([...textList(body.selectedBasics), ...kindIds("basic")])]
+    .filter((id) => id !== selectedService);
+  const claimed = new Set([selectedService, ...selectedBasics]);
+  const selectedAddOns = [...new Set([...textList(body.selectedAddOns), ...kindIds("addon")])]
+    .filter((id) => !claimed.has(id));
+  const premiumUpgrade = body.premiumUpgrade === true || postedIds.includes("iconic-finish");
+  const creditsBody = Number(body.virtualStagingCredits);
+  const creditsLine = posted.find((item) => item.id === "virtual-staging")?.qty || 0;
+  const virtualStagingCredits = Number.isFinite(creditsBody) && creditsBody > 0
+    ? Math.round(creditsBody)
+    : creditsLine;
+
+  let specialized = optionalLineText(body.specializedPhotography);
+  if (specialized !== "social" && specialized !== "both" && specialized !== "mls") {
+    if (postedIds.includes("specialized-both")) specialized = "both";
+    else if (postedIds.includes("specialized-social")) specialized = "social";
+    else specialized = "";
+  }
+
+  const promo = promoDiscountFor(optionalLineText(body.promoCode));
+  const lineItems = buildSubmittedLineItems({
+    selectedService,
+    selectedBasics,
+    selectedAddOns,
+    premiumUpgrade,
+    virtualStagingCredits,
+    specializedPhotography: specialized,
+    promo,
+    lifeOfTheListingCare: Boolean(body.lifeOfTheListingCare),
+    catalog: list,
+  });
+
+  return {
+    lineItems,
+    total: roundMoney(sumLineItemPrices(lineItems)),
+    promoCode: promo?.code ?? null,
+    promoDiscount: promo?.discount ?? 0,
+    selectedService: selectedService || null,
+    selectedBasics,
+    selectedAddOns,
+    specializedPhotography: specialized || null,
+    virtualStagingCredits,
+    premiumUpgrade,
+  };
+}
+
+export function chargedServiceLines(items: Array<{ id?: string; name?: string }>): Array<{ id?: string; name?: string }> {
+  return items.filter((item) => {
+    const id = String(item.id || "");
+    const name = String(item.name || "");
+    return !id.startsWith("promo-") && !name.startsWith("Promo Code:");
+  });
 }

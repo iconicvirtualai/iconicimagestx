@@ -2,18 +2,23 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { SMS_TEMPLATES } from "../server/services/sms";
 import {
+  bookingOffer,
   bookingPackageSeedDocs,
-  findCatalogPriceMismatches,
+  catalogPackageSaveData,
   hardcodedChargePrice,
+  newCatalogPackageData,
+  packagesForStaffEditor,
   promoDiscountFor,
   PROMO_DISCOUNTS,
 } from "./bookingCatalog";
+import { bookingEmbedAvailability } from "./bookingEmbeds";
 import {
   buildSubmittedLineItems,
   calculateSidebarTotal,
   hasBookingSelection,
   normalizeBookingLineItems,
   orderTotalLabel,
+  resolveSubmittedBooking,
   separatePromoDiscount,
   sumLineItemPrices,
   type BookingPriceInput,
@@ -24,6 +29,9 @@ const catalogSource = readFileSync(new URL("./bookingCatalog.ts", import.meta.ur
 const rules = readFileSync(new URL("../firestore.rules", import.meta.url), "utf8");
 const adminPricing = readFileSync(new URL("../client/pages/AdminCurrentPricing.tsx", import.meta.url), "utf8");
 const packageSchema = readFileSync(new URL("../client/lib/schema.ts", import.meta.url), "utf8");
+const catalogPage = readFileSync(new URL("../client/pages/AdminBookingCatalog.tsx", import.meta.url), "utf8");
+const appPage = readFileSync(new URL("../client/App.tsx", import.meta.url), "utf8");
+const bookingsRoute = readFileSync(new URL("../server/routes/bookings.ts", import.meta.url), "utf8");
 
 const fixedSelection: BookingPriceInput = {
   selectedService: "listing-showcase",
@@ -131,6 +139,9 @@ describe("booking total contract", () => {
     expect(bookingForm).toContain("buildSubmittedLineItems(bookingPriceInput())");
     expect(bookingForm).toContain("sumLineItemPrices(lineItems)");
     expect(bookingForm).toContain("promoDiscountFor(promoInput)");
+    expect(bookingForm).toContain("bookingOffer(catalog)");
+    expect(bookingForm).toContain('collection(db, "packages")');
+    expect(bookingForm).not.toContain("charging hardcoded prices");
     expect(bookingForm).not.toContain("lifeOfTheListingCarePrice");
   });
 
@@ -164,17 +175,120 @@ describe("booking catalog parity", () => {
     }
   });
 
-  it("logs a catalog mismatch without changing the charged price", () => {
-    const mismatches = findCatalogPriceMismatches([
-      { id: "listing-showcase", price: 1 },
-      { id: "photos-35", price: 150 },
-      { bookingId: "unknown-sku", price: 10 },
+  it("charges a maintained catalog price and hides a package that staff turned off", () => {
+    const catalog = packagesForStaffEditor([
+      { id: "listing-showcase", price: 600, name: "Showcase Plus" },
+      { id: "photos-35", price: 140 },
+      { id: "iconic-finish", price: 80 },
+      { id: "aerial-drone", isActive: false },
     ]);
-    expect(mismatches).toEqual([
-      { id: "listing-showcase", hardcodedPrice: 549, catalogPrice: 1 },
+    const input: BookingPriceInput = {
+      selectedService: "listing-showcase",
+      selectedBasics: ["photos-35"],
+      selectedAddOns: ["aerial-drone"],
+      premiumUpgrade: true,
+      catalog,
+    };
+    expect(calculateSidebarTotal(input)).toBe(820);
+    expect(buildSubmittedLineItems(input).map((item) => [item.id, item.name, item.price])).toEqual([
+      ["listing-showcase", "Showcase Plus", 600],
+      ["photos-35", "35 Photos", 140],
+      ["iconic-finish", "Iconic Finish (Premium Upgrade)", 80],
     ]);
+    expect(bookingOffer(catalog).services.some((item) => item.id === "aerial-drone")).toBe(false);
+    expect(bookingOffer(catalog).addOns.some((group) => group.items.some((item) => item.id === "aerial-drone"))).toBe(false);
+    expect(hasBookingSelection({ selectedAddOns: ["aerial-drone"], catalog })).toBe(false);
     expect(calculateSidebarTotal({ selectedService: "listing-showcase" })).toBe(549);
-    expect(bookingForm).toContain("charging hardcoded prices");
+    expect(sumLineItemPrices(buildSubmittedLineItems({
+      selectedBasics: ["aerial-drone"],
+      selectedAddOns: ["aerial-drone"],
+    }))).toBe(99);
+  });
+
+  it("lets staff add a package the booking form can select", () => {
+    const created = newCatalogPackageData({
+      id: "Dusk Hero",
+      name: "Dusk Hero",
+      price: 120,
+      description: "One dusk frame.",
+      bookingKind: "addon",
+      category: "addon",
+      addonGroup: "The Space",
+    });
+    expect(created.ok).toBe(false);
+
+    const draft = newCatalogPackageData({
+      id: "dusk-hero",
+      name: "Dusk Hero",
+      price: 120,
+      description: "One dusk frame.",
+      bookingKind: "addon",
+      category: "addon",
+      addonGroup: "The Space",
+    });
+    expect(draft.ok).toBe(true);
+    if (!draft.ok) return;
+    const catalog = packagesForStaffEditor([draft.data]);
+    const group = bookingOffer(catalog).addOns.find((entry) => entry.category === "The Space");
+    expect(group?.items.some((item) => item.id === "dusk-hero" && item.price === 120)).toBe(true);
+    expect(calculateSidebarTotal({ selectedAddOns: ["dusk-hero"], catalog })).toBe(120);
+
+    const saved = catalogPackageSaveData(catalog.find((item) => item.id === "photos-35")!, {
+      name: "35 Photos",
+      price: 160,
+      description: "Updated photo set.",
+      isActive: false,
+      sortOrder: 4,
+    });
+    expect(saved.ok).toBe(true);
+    if (!saved.ok) return;
+    expect(saved.data).toMatchObject({ price: 160, isActive: false, source: "booking-catalog" });
+    const hidden = packagesForStaffEditor([saved.data]);
+    expect(hidden.some((item) => item.id === "photos-35")).toBe(false);
+    expect(packagesForStaffEditor([saved.data], { includeInactive: true }).some((item) => item.id === "photos-35")).toBe(true);
+  });
+
+  it("resolves a booking submission from the catalog and ignores posted prices", () => {
+    const catalog = packagesForStaffEditor([
+      { id: "listing-essentials", price: 260 },
+      { id: "iconic-finish", price: 90 },
+    ]);
+    const resolved = resolveSubmittedBooking({
+      selectedService: "listing-essentials",
+      premiumUpgrade: true,
+      promoCode: "newyear",
+      promoDiscount: 500,
+      lineItems: [{ id: "listing-essentials", name: "hack", price: 1 }],
+      lifeOfTheListingCare: true,
+    }, catalog);
+
+    expect(resolved.promoCode).toBe("NEWYEAR");
+    expect(resolved.promoDiscount).toBe(50);
+    expect(resolved.total).toBe(300);
+    expect(resolved.lineItems.map((item) => [item.id, item.price])).toEqual([
+      ["listing-essentials", 260],
+      ["iconic-finish", 90],
+      ["promo-NEWYEAR", -50],
+    ]);
+    expect(resolved.lineItems.some((item) => /life of the listing/i.test(item.name))).toBe(false);
+
+    const fromLines = resolveSubmittedBooking({
+      lineItems: [
+        { id: "aerial-drone", name: "Drone", price: 1, qty: 1 },
+        { id: "virtual-staging", name: "Staging", price: 1, qty: 3 },
+      ],
+    });
+    expect(fromLines.selectedAddOns).toEqual(["aerial-drone"]);
+    expect(fromLines.virtualStagingCredits).toBe(3);
+    expect(fromLines.total).toBe(99 + 105);
+    expect(bookingEmbedAvailability().status).toBe("deferred");
+    expect(catalogPage).toContain("packagesForStaffEditor");
+    expect(catalogPage).toContain("catalogPackageSaveData");
+    expect(catalogPage).toContain("bookingEmbedAvailability");
+    expect(bookingEmbedAvailability().reason).toMatch(/later pass/i);
+    expect(appPage).toContain('path="/admin/booking-catalog"');
+    expect(bookingsRoute).toContain("resolveSubmittedBooking");
+    expect(bookingsRoute).toContain("loadBookingCatalog");
   });
 
   it("prices apprenticeship packages at the hard time caps and seeds them with the basics", () => {

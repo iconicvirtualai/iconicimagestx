@@ -16,7 +16,8 @@ import { clientNotifyBlockReason, clientNotifyLive } from "../../shared/clientNo
 import { lifeOfTheListingCareSelected } from "../../shared/lifeOfTheListingCare";
 import { buildBookingInvoiceDraft, existingInvoiceId } from "../../shared/bookingInvoice";
 import { nextSequentialInvoiceNumber, planInvoiceLink } from "../../shared/orderProjectInvoice";
-import { orderTotalLabel } from "../../shared/bookingPricing";
+import { chargedServiceLines, orderTotalLabel, resolveSubmittedBooking } from "../../shared/bookingPricing";
+import { packagesForStaffEditor } from "../../shared/bookingCatalog";
 import { normalizeEmail } from "../../shared/listingAccess";
 import { storedServiceLocationFields } from "../../shared/serviceLocation";
 
@@ -56,6 +57,16 @@ function money(value: unknown): string {
   return orderTotalLabel(value);
 }
 
+async function loadBookingCatalog() {
+  try {
+    const snap = await db().collection("packages").get();
+    return packagesForStaffEditor(snap.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
+  } catch (err) {
+    console.error("[Bookings] Catalog read failed — using the seeded catalog", err);
+    return packagesForStaffEditor([]);
+  }
+}
+
 // ─── POST /api/bookings — Public booking form submission ────────────────────
 // No auth required — this is the public-facing booking form
 
@@ -67,12 +78,7 @@ router.post("/", async (req, res) => {
       email,
       phone,
       address,
-      lineItems,
-      pricing,
-      total,
       vibeNote,
-      promoCode,
-      promoDiscount,
       scheduledDate,
       scheduledTime,
       photographerPreference,
@@ -82,11 +88,6 @@ router.post("/", async (req, res) => {
       propertyStatus,
       furnishingStatus,
       // Additional fields from booking form (previously dropped)
-      specializedPhotography,
-      virtualStagingCredits,
-      selectedService,
-      selectedBasics,
-      selectedAddOns,
       leadSource,
       marketingDoing,
       resultsBothering,
@@ -101,7 +102,20 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: "Missing required fields." });
     }
 
-    if (!lineItems || !Array.isArray(lineItems) || lineItems.length === 0) {
+    const catalog = await loadBookingCatalog();
+    const resolved = resolveSubmittedBooking(req.body, catalog);
+    const lineItems = resolved.lineItems;
+    const total = resolved.total;
+    const promoCode = resolved.promoCode;
+    const promoDiscount = resolved.promoDiscount;
+    const pricing = { subtotal: total, tax: 0, total };
+    const selectedService = resolved.selectedService;
+    const selectedBasics = resolved.selectedBasics;
+    const selectedAddOns = resolved.selectedAddOns;
+    const specializedPhotography = resolved.specializedPhotography;
+    const virtualStagingCredits = resolved.virtualStagingCredits;
+
+    if (chargedServiceLines(lineItems).length === 0) {
       return res.status(400).json({ error: "No services selected." });
     }
 

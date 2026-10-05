@@ -48,6 +48,7 @@ export async function createOrder(formData: any) {
     selectedService:        formData.selectedService        || null,
     selectedBasics:         Array.isArray(formData.selectedBasics) ? formData.selectedBasics : [],
     selectedAddOns:         Array.isArray(formData.selectedAddOns) ? formData.selectedAddOns : [],
+    premiumUpgrade:         Boolean(formData.premiumUpgrade),
     // Promo is also a single negative line item. This field is a record of that
     // discount and must not be subtracted again from `total`.
     promoCode:              formData.promoCode              || null,

@@ -1,8 +1,12 @@
 /**
- * Hardcoded booking catalog.
- * Prices come from the public booking form lists and client/lib/services.ts.
+ * Booking package catalog.
+ *
+ * The seed list is what `pnpm seed:booking-catalog` writes into Firestore
+ * `packages`. Staff edits on those docs are the prices the booking form and
+ * the booking submit charge. A missing doc falls back to this seed.
  * Do not seed or charge from AdminCurrentPricing — those numbers disagree.
  * Life of the Listing Care is intentionally absent: it stays an unpriced boolean.
+ * External site embeds are a later pass. See shared/bookingEmbeds.ts.
  */
 
 import { services, type Service } from "../client/lib/services.ts";
@@ -346,6 +350,13 @@ export interface BookingPackageSeed {
   appointmentLimit?: string;
   overage?: string;
   rules?: string[];
+  /** Campaign group on the booking form. Present on service packages. */
+  serviceCategory?: Service["category"];
+  /** Add-on column on the booking form. Present on add-on packages. */
+  addonGroup?: string;
+  cardTitle?: string;
+  kicker?: string;
+  aside?: string;
 }
 
 function serviceCategory(service: Service): BookingPackageCategory {
@@ -383,6 +394,7 @@ export function bookingPackageSeedDocs(): BookingPackageSeed[] {
       bookingId: service.id,
       bookingKind: "service",
       source: "booking-form-hardcoded",
+      serviceCategory: service.category,
     });
   }
 
@@ -400,6 +412,9 @@ export function bookingPackageSeedDocs(): BookingPackageSeed[] {
       bookingId: basic.id,
       bookingKind: "basic",
       source: "booking-form-hardcoded",
+      ...(basic.cardTitle ? { cardTitle: basic.cardTitle } : {}),
+      ...(basic.kicker ? { kicker: basic.kicker } : {}),
+      ...(basic.aside ? { aside: basic.aside } : {}),
       ...(basic.appointmentLimit
         ? {
             appointmentLimit: basic.appointmentLimit,
@@ -425,6 +440,7 @@ export function bookingPackageSeedDocs(): BookingPackageSeed[] {
         bookingId: item.id,
         bookingKind: "addon",
         source: "booking-form-hardcoded",
+        addonGroup: category.category,
       });
     }
   }
@@ -485,6 +501,14 @@ export interface StaffCatalogPackage {
   sortOrder: number;
   isActive: boolean;
   bookingId: string;
+  appointmentLimit?: string;
+  overage?: string;
+  rules?: string[];
+  serviceCategory?: Service["category"];
+  addonGroup?: string;
+  cardTitle?: string;
+  kicker?: string;
+  aside?: string;
 }
 
 const PACKAGE_CATEGORIES = new Set<string>(BOOKING_PACKAGE_CATEGORY_ORDER);
@@ -501,16 +525,58 @@ function catalogText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+const SERVICE_CATEGORIES = new Set<string>(["listings", "branding", "business", "growth", "studio"]);
+
+function catalogStringList(value: unknown, fallback: string[] | undefined): string[] | undefined {
+  if (!Array.isArray(value)) return fallback;
+  const list = value.map((entry) => catalogText(entry)).filter(Boolean);
+  return list.length > 0 ? list : fallback;
+}
+
+function catalogServiceCategory(value: unknown, fallback?: Service["category"]): Service["category"] | undefined {
+  const raw = catalogText(value);
+  if (SERVICE_CATEGORIES.has(raw)) return raw as Service["category"];
+  return fallback;
+}
+
+function withCatalogNotes(item: StaffCatalogPackage, doc: Record<string, unknown>, current?: StaffCatalogPackage): StaffCatalogPackage {
+  const appointmentLimit = catalogText(doc.appointmentLimit) || current?.appointmentLimit;
+  const overage = catalogText(doc.overage) || current?.overage;
+  const cardTitle = catalogText(doc.cardTitle) || current?.cardTitle;
+  const kicker = catalogText(doc.kicker) || current?.kicker;
+  const aside = catalogText(doc.aside) || current?.aside;
+  const addonGroup = catalogText(doc.addonGroup) || current?.addonGroup;
+  const serviceCategory = catalogServiceCategory(doc.serviceCategory, current?.serviceCategory);
+  const rules = catalogStringList(doc.rules, current?.rules);
+  return {
+    ...item,
+    ...(appointmentLimit ? { appointmentLimit } : {}),
+    ...(overage ? { overage } : {}),
+    ...(cardTitle ? { cardTitle } : {}),
+    ...(kicker ? { kicker } : {}),
+    ...(aside ? { aside } : {}),
+    ...(addonGroup ? { addonGroup } : {}),
+    ...(serviceCategory ? { serviceCategory } : {}),
+    ...(rules?.length ? { rules } : {}),
+  };
+}
+
 /**
- * Options for the staff invoice picker.
+ * Active packages for the invoice picker and the booking form.
  * The seed is the same list `pnpm seed:booking-catalog` writes into `packages`.
  * Live package docs overlay name, price, description, and the other catalog fields.
- * Public booking totals stay on the hardcoded lists and are not read from here.
+ * Booking charges this list. A missing live doc keeps the seed price.
  */
-export function packagesForStaffEditor(liveDocs: Array<Record<string, unknown>> = []): StaffCatalogPackage[] {
+export function packagesForStaffEditor(
+  liveDocs: Array<Record<string, unknown>> = [],
+  options?: { includeInactive?: boolean },
+): StaffCatalogPackage[] {
   const byId = new Map<string, StaffCatalogPackage>();
   for (const seed of bookingPackageSeedDocs()) {
-    byId.set(seed.id, { ...seed, includedServices: [...seed.includedServices] });
+    byId.set(seed.id, withCatalogNotes(
+      { ...seed, includedServices: [...seed.includedServices] },
+      seed as unknown as Record<string, unknown>,
+    ));
   }
 
   for (const doc of liveDocs) {
@@ -525,7 +591,7 @@ export function packagesForStaffEditor(liveDocs: Array<Record<string, unknown>> 
     const included = Array.isArray(doc.includedServices)
       ? doc.includedServices.map((entry) => catalogText(entry)).filter(Boolean)
       : current?.includedServices ?? [];
-    byId.set(id, {
+    byId.set(id, withCatalogNotes({
       id,
       name,
       price: finiteCatalogNumber(doc.price) ?? current?.price ?? 0,
@@ -543,10 +609,214 @@ export function packagesForStaffEditor(liveDocs: Array<Record<string, unknown>> 
       sortOrder: finiteCatalogNumber(doc.sortOrder) ?? current?.sortOrder ?? 1000,
       isActive: doc.isActive === false ? false : doc.isActive === true ? true : current?.isActive ?? true,
       bookingId: catalogText(doc.bookingId) || current?.bookingId || id,
-    });
+    }, doc, current));
   }
 
-  return [...byId.values()]
-    .filter((item) => item.isActive)
+  const items = [...byId.values()]
     .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+  return options?.includeInactive ? items : items.filter((item) => item.isActive);
+}
+
+export interface BookingOfferService {
+  id: string;
+  name: string;
+  category: Service["category"];
+  price: number;
+  description: string;
+  features?: string[];
+  isPopular?: boolean;
+  highlights?: string;
+  phase?: 1 | 2;
+}
+
+export interface BookingOffer {
+  services: BookingOfferService[];
+  basics: CatalogItem[];
+  photoOnlyPackages: CatalogItem[];
+  apprenticeshipPackages: CatalogItem[];
+  addOns: Array<{ category: string; items: CatalogItem[] }>;
+  iconicFinish?: CatalogItem;
+  virtualStaging?: CatalogItem;
+  specializedSocial?: CatalogItem;
+  specializedBoth?: CatalogItem;
+}
+
+function offerItem(pkg: StaffCatalogPackage, presentation?: CatalogItem): CatalogItem {
+  return {
+    id: pkg.id,
+    name: pkg.name,
+    price: pkg.price,
+    description: pkg.description || presentation?.description || "",
+    features: pkg.includedServices.length ? pkg.includedServices : presentation?.features,
+    appointmentLimit: pkg.appointmentLimit || presentation?.appointmentLimit,
+    aside: pkg.aside || presentation?.aside,
+    kicker: pkg.kicker || presentation?.kicker,
+    cardTitle: pkg.cardTitle || presentation?.cardTitle,
+    rules: pkg.rules?.length ? pkg.rules : presentation?.rules,
+  };
+}
+
+/** Selectable booking lists. Prices, names, and active flags come from the catalog. */
+export function bookingOffer(catalog: StaffCatalogPackage[] = packagesForStaffEditor([])): BookingOffer {
+  const servicesOut: BookingOfferService[] = [];
+  const basics: CatalogItem[] = [];
+  const addOnBuckets = new Map<string, CatalogItem[]>();
+
+  for (const pkg of catalog) {
+    if (pkg.bookingKind === "service") {
+      const known = services.find((entry) => entry.id === pkg.id || entry.id === pkg.bookingId);
+      const category = pkg.serviceCategory || known?.category;
+      if (!category || !SERVICE_CATEGORIES.has(category)) continue;
+      servicesOut.push({
+        id: pkg.id,
+        name: pkg.name,
+        category,
+        price: pkg.price,
+        description: pkg.description || known?.description || "",
+        features: pkg.includedServices.length ? pkg.includedServices : known?.features,
+        isPopular: known?.isPopular,
+        highlights: known?.highlights,
+        phase: known?.phase,
+      });
+      continue;
+    }
+
+    if (pkg.bookingKind === "basic") {
+      const known = basicsList.find((entry) => entry.id === pkg.id || entry.id === pkg.bookingId);
+      basics.push(offerItem(pkg, known));
+      continue;
+    }
+
+    if (pkg.bookingKind === "addon") {
+      const known = findAddOn(pkg.id) || findAddOn(pkg.bookingId);
+      const group = pkg.addonGroup || addOns.find((entry) => entry.items.some((item) => item.id === pkg.id || item.id === pkg.bookingId))?.category || "More";
+      const list = addOnBuckets.get(group) || [];
+      list.push(offerItem(pkg, known));
+      addOnBuckets.set(group, list);
+    }
+  }
+
+  const orderedGroups = [
+    ...addOns.map((entry) => entry.category),
+    ...[...addOnBuckets.keys()].filter((group) => !addOns.some((entry) => entry.category === group)),
+  ];
+  const upgrade = (id: string) => {
+    const pkg = catalog.find((entry) => entry.id === id || entry.bookingId === id);
+    return pkg ? offerItem(pkg, UPGRADES.find((entry) => entry.id === id)) : undefined;
+  };
+
+  return {
+    services: servicesOut,
+    basics,
+    photoOnlyPackages: basics.filter((item) => !isApprenticeshipPackage(item.id)),
+    apprenticeshipPackages: basics.filter((item) => isApprenticeshipPackage(item.id)),
+    addOns: orderedGroups
+      .filter((group) => addOnBuckets.has(group))
+      .map((category) => ({ category, items: addOnBuckets.get(category) || [] })),
+    iconicFinish: upgrade("iconic-finish"),
+    virtualStaging: upgrade("virtual-staging"),
+    specializedSocial: upgrade("specialized-social"),
+    specializedBoth: upgrade("specialized-both"),
+  };
+}
+
+export interface CatalogPackageEdits {
+  name: string;
+  price: number;
+  description: string;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+export interface CatalogPackageDraft {
+  id: string;
+  name: string;
+  price: number;
+  description: string;
+  bookingKind: BookingCatalogKind;
+  category: BookingPackageCategory;
+  serviceCategory?: string;
+  addonGroup?: string;
+}
+
+export type CatalogWriteResult =
+  | { ok: true; id: string; data: Record<string, unknown> }
+  | { ok: false; error: string };
+
+function moneyAmount(value: number): number | undefined {
+  if (!Number.isFinite(value) || value < 0) return undefined;
+  return Math.round(value * 100) / 100;
+}
+
+/** Fields written back onto an existing `packages` doc. Seed notes stay unless the editor replaces them. */
+export function catalogPackageSaveData(item: StaffCatalogPackage, edits: CatalogPackageEdits): CatalogWriteResult {
+  const name = edits.name.trim();
+  if (!name) return { ok: false, error: "Package name is required." };
+  const price = moneyAmount(Number(edits.price));
+  if (price == null) return { ok: false, error: "Price must be zero or more." };
+  const sortOrder = Number(edits.sortOrder);
+  const data: Record<string, unknown> = {
+    name,
+    price,
+    description: edits.description.trim(),
+    isActive: edits.isActive,
+    sortOrder: Number.isFinite(sortOrder) ? sortOrder : item.sortOrder,
+    tier: item.tier,
+    category: item.category,
+    bookingId: item.bookingId || item.id,
+    bookingKind: item.bookingKind,
+    includedServices: item.includedServices,
+    source: "booking-catalog",
+  };
+  if (item.appointmentLimit) data.appointmentLimit = item.appointmentLimit;
+  if (item.overage) data.overage = item.overage;
+  if (item.rules?.length) data.rules = item.rules;
+  if (item.serviceCategory) data.serviceCategory = item.serviceCategory;
+  if (item.addonGroup) data.addonGroup = item.addonGroup;
+  if (item.cardTitle) data.cardTitle = item.cardTitle;
+  if (item.kicker) data.kicker = item.kicker;
+  if (item.aside) data.aside = item.aside;
+  return { ok: true, id: item.id, data };
+}
+
+const PACKAGE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/** A new product in the same `packages` collection the booking form reads. */
+export function newCatalogPackageData(draft: CatalogPackageDraft): CatalogWriteResult {
+  const id = draft.id.trim().toLowerCase();
+  if (!PACKAGE_ID.test(id)) {
+    return { ok: false, error: "Use a short id with lowercase letters, numbers, and dashes." };
+  }
+  const name = draft.name.trim();
+  if (!name) return { ok: false, error: "Package name is required." };
+  const price = moneyAmount(Number(draft.price));
+  if (price == null) return { ok: false, error: "Price must be zero or more." };
+  if (!PACKAGE_KINDS.has(draft.bookingKind)) return { ok: false, error: "Choose a package kind." };
+  if (!PACKAGE_CATEGORIES.has(draft.category)) return { ok: false, error: "Choose a category." };
+  const serviceCategory = catalogServiceCategory(draft.serviceCategory);
+  if (draft.bookingKind === "service" && !serviceCategory) {
+    return { ok: false, error: "Choose which booking group this package belongs in." };
+  }
+  const tier: BookingPackageTier = draft.bookingKind === "service"
+    ? "campaign"
+    : draft.bookingKind === "basic"
+      ? "basic"
+      : "addon";
+  const data: Record<string, unknown> = {
+    name,
+    price,
+    description: draft.description.trim(),
+    isActive: true,
+    sortOrder: 1000,
+    tier,
+    category: draft.category,
+    bookingId: id,
+    bookingKind: draft.bookingKind,
+    includedServices: [],
+    source: "booking-catalog",
+  };
+  if (serviceCategory) data.serviceCategory = serviceCategory;
+  const addonGroup = catalogText(draft.addonGroup);
+  if (draft.bookingKind === "addon") data.addonGroup = addonGroup || "More";
+  return { ok: true, id, data };
 }

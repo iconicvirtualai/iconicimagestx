@@ -363,10 +363,14 @@ export interface Package {
   isFeatured?: boolean;
   sortOrder: number;
   category: "photography" | "video" | "virtual_staging" | "marketing" | "addon";
-  /** Booking-form id when this package was seeded from the hardcoded catalog. */
+  /** Booking-form id when this package was seeded from the catalog. */
   bookingId?: string;
   bookingKind?: "service" | "basic" | "addon" | "upgrade";
-  source?: "booking-form-hardcoded";
+  source?: "booking-form-hardcoded" | "booking-catalog";
+  /** Campaign group on the booking form. */
+  serviceCategory?: "listings" | "branding" | "business" | "growth" | "studio";
+  /** Add-on column on the booking form. */
+  addonGroup?: string;
   /** Hard appointment cap. Present on The Apprenticeship Program packages. */
   appointmentLimit?: string;
   /** Overage label, for example "$25 per 15-minute increment". */
