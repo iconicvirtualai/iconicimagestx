@@ -25,7 +25,7 @@ import {
   FileText,
   ChevronLeft,
   ChevronRight,
-  X
+  X,
 } from "lucide-react";
 import {
   format,
@@ -41,14 +41,32 @@ import {
   parseISO,
 } from "date-fns";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+import {
+  ICONIC_CALENDAR_ROSTER,
+  calendarRoster,
+  classifyCalendarEvent,
+  countUnassignedShoots,
+  dayLoadCue,
+  dayOpsSummary,
+  recordHasTwilight,
+  scheduleBlockDateKeys,
+  shooterCuesForDay,
+  textHasTwilight,
+  type CalendarRosterPerson,
+  type ShooterCue,
+} from "@shared/scheduleBoard";
+import {
+  ScheduleCalendarChip,
+  ScheduleDayShoots,
+  ScheduleDayStrip,
+  TwilightLabel,
+} from "@/components/schedule/ScheduleAvailability";
 
 interface Appointment {
   id: string;
   clientName: string;
   address: string;
-  apptDate: any; // Date string or Timestamp
+  apptDate: Date | null;
   apptTime: string;
   services: string[];
   total: number;
@@ -60,18 +78,17 @@ interface Appointment {
   city?: string;
   googleCalendarUrl?: string | null;
   source?: string;
+  twilight: boolean;
 }
 
-const DEFAULT_CALENDAR_SOURCES = [
-  { id: "mike@iconicimagestx.com", name: "Mike Luna" },
-  { id: "armando@iconicimagestx.com", name: "Armando" },
-  { id: "pedro@iconicimagestx.com", name: "Pedro" },
-  { id: "steven@iconicimagestx.com", name: "Steven" },
-  { id: "cadi@iconicimagestx.com", name: "Cadi" },
-  { id: "daniel@iconicimagestx.com", name: "Daniel" },
-];
+interface ScheduleBlock {
+  id: string;
+  photographerName: string;
+  dateKey: string;
+  kind: "hold" | "unavailable";
+}
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+type CalendarSync = "checking" | "live" | "partial" | "offline";
 
 function parseDate(d: any): Date | null {
   return toDate(d);
@@ -81,37 +98,75 @@ function fmtCurrency(n: number): string {
   return "$" + (n || 0).toLocaleString("en-US", { minimumFractionDigits: 2 });
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+function orderLabel(appt: Appointment) {
+  if (appt.source === "google-calendar") return "Calendar";
+  return `#${appt.orderNumber || ""}`;
+}
+
+function visibleServices(services: string[]) {
+  return services.filter((service) => !textHasTwilight(service) && !/^calendar$/i.test(service.trim()));
+}
+
+function shortPhotographerNames(names: string[]) {
+  if (names.length === 0) return "Unassigned";
+  return names.map((name) => name.split(" ")[0]).join(", ");
+}
+
+function isBlockOnDay(dateKey: string, day: Date) {
+  return isSameDay(new Date(`${dateKey}T12:00:00-06:00`), day);
+}
+
+function syncNote(sync: CalendarSync) {
+  if (sync === "checking") return "Checking team calendars.";
+  if (sync === "offline") return "Team calendars offline. Availability uses Iconic bookings.";
+  if (sync === "partial") return "Some team calendars did not respond.";
+  return "Team calendars connected.";
+}
 
 export default function AdminSchedule() {
   const { user } = useAuth();
-  const [viewMode, setViewMode] = React.useState<"calendar" | "list">("list");
+  const [viewMode, setViewMode] = React.useState<"calendar" | "list">("calendar");
   const [rawAppointments, setRawAppointments] = React.useState<any[]>([]);
   const [rawListings, setRawListings] = React.useState<any[]>([]);
   const [rawOrderRequests, setRawOrderRequests] = React.useState<any[]>([]);
   const [calendarEvents, setCalendarEvents] = React.useState<any[]>([]);
+  const [calendarSync, setCalendarSync] = React.useState<CalendarSync>("checking");
   const [staff, setStaff] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [currentMonth, setCurrentMonth] = React.useState(new Date());
-  const [collapsedDates, setCollapsedDates] = React.useState<Set<string>>(new Set());
+  const [selectedDay, setSelectedDay] = React.useState(new Date());
+  const [collapseOverrides, setCollapseOverrides] = React.useState<Record<string, boolean>>({});
   const [selectedAppt, setSelectedAppt] = React.useState<Appointment | null>(null);
 
+  const roster = React.useMemo(() => {
+    const staffCalendars = staff.map((person) => ({
+      id: person.googleCalendarId || person.calendarId || person.calendarEmail || person.email,
+      name: staffDisplayName(person) || person.email,
+    }));
+    return calendarRoster(ICONIC_CALENDAR_ROSTER.concat(staffCalendars));
+  }, [staff]);
+
   React.useEffect(() => {
+    const ready = () => setLoading(false);
+    const fail = (label: string) => (error: Error) => {
+      console.warn(`[AdminSchedule] ${label} snapshot unavailable:`, error);
+      ready();
+    };
     const unsubAppointments = onSnapshot(collection(db, "appointments"), (snap) => {
       setRawAppointments(snap.docs.map(doc => ({ id: doc.id, source: "appointment", ...doc.data() })));
-      setLoading(false);
-    });
+      ready();
+    }, fail("appointments"));
     const unsubListings = onSnapshot(collection(db, "listings"), (snap) => {
       setRawListings(snap.docs.map(doc => ({ id: doc.id, source: "listing", ...doc.data() })));
-    });
+    }, fail("listings"));
     const unsubOrderRequests = onSnapshot(collection(db, "orderRequests"), (snap) => {
       setRawOrderRequests(snap.docs.map(doc => ({ id: doc.id, source: "order-request", ...doc.data() })));
-      setLoading(false);
-    });
+      ready();
+    }, fail("order requests"));
     const unsubStaff = onSnapshot(collection(db, "staff"), (snap) => {
       setStaff(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setLoading(false);
-    });
+      ready();
+    }, fail("staff"));
 
     return () => { unsubAppointments(); unsubListings(); unsubOrderRequests(); unsubStaff(); };
   }, []);
@@ -120,22 +175,16 @@ export default function AdminSchedule() {
     let cancelled = false;
 
     async function loadCalendarEvents() {
-      if (!user?.getIdToken) return;
+      if (!user?.getIdToken) {
+        if (!cancelled) {
+          setCalendarEvents([]);
+          setCalendarSync("offline");
+        }
+        return;
+      }
       const startDate = startOfWeek(startOfMonth(currentMonth));
       const endDate = endOfWeek(endOfMonth(currentMonth));
-      const staffCalendars = staff
-        .map((person) => ({
-          id: person.googleCalendarId || person.calendarId || person.calendarEmail || person.email,
-          name: staffDisplayName(person) || person.email,
-        }))
-        .filter((item) => item.id);
-      const calendars = Array.from(
-        new Map(
-          DEFAULT_CALENDAR_SOURCES.concat(staffCalendars)
-            .filter((item) => item.id)
-            .map((item) => [item.id.toLowerCase(), item])
-        ).values()
-      );
+      setCalendarSync("checking");
 
       try {
         const token = await user.getIdToken();
@@ -146,25 +195,34 @@ export default function AdminSchedule() {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            calendars,
+            calendars: roster,
             timeMin: startDate.toISOString(),
             timeMax: endDate.toISOString(),
           }),
         });
         if (!response.ok) throw new Error(await response.text());
         const data = await response.json();
-        if (!cancelled) setCalendarEvents(Array.isArray(data.events) ? data.events : []);
+        const events = Array.isArray(data.events) ? data.events : [];
+        if (cancelled) return;
+        setCalendarEvents(events);
+        const failures = Number(data.readFailures) || 0;
+        if (!data.configured || (failures > 0 && events.length === 0)) setCalendarSync("offline");
+        else if (failures > 0) setCalendarSync("partial");
+        else setCalendarSync("live");
       } catch (error) {
         console.warn("[AdminSchedule] Google Calendar sync unavailable:", error);
-        if (!cancelled) setCalendarEvents([]);
+        if (!cancelled) {
+          setCalendarEvents([]);
+          setCalendarSync("offline");
+        }
       }
     }
 
     loadCalendarEvents();
     return () => { cancelled = true; };
-  }, [currentMonth, staff, user]);
+  }, [currentMonth, roster, user]);
 
-  const appointments = React.useMemo(() => {
+  const { appointments, blocks } = React.useMemo(() => {
     const visibleAppointments = rawAppointments.filter(isScheduledRecord);
     const appointmentKeys = new Set(visibleAppointments.flatMap(scheduleRecordKeys));
     const fallbackListings = rawListings.filter((item) => isScheduledRecord(item) && !scheduleRecordKeys(item).some((key) => appointmentKeys.has(key)));
@@ -175,7 +233,9 @@ export default function AdminSchedule() {
       return !keys.some((key) => appointmentKeys.has(key) || listingKeys.has(key));
     });
     const localAppointments = visibleAppointments.concat(fallbackListings, fallbackOrderRequests).map((record) => normalizeAppointment(record, staff));
-    const googleAppointments = calendarEvents.map(normalizeCalendarAppointment).filter((item): item is Appointment => Boolean(item));
+    const parsedGoogle = calendarEvents.map(parseGoogleScheduleEvent);
+    const googleAppointments = parsedGoogle.flatMap((item) => item.appointment ? [item.appointment] : []);
+    const googleBlocks = parsedGoogle.flatMap((item) => item.blocks);
     const usedGoogleIds = new Set<string>();
 
     const data = localAppointments.map((appointment) => {
@@ -186,6 +246,7 @@ export default function AdminSchedule() {
         ...appointment,
         photographerNames: appointment.photographerNames.length > 0 ? appointment.photographerNames : match.photographerNames,
         googleCalendarUrl: match.googleCalendarUrl,
+        twilight: appointment.twilight || match.twilight,
       };
     }).concat(googleAppointments.filter((event) => !usedGoogleIds.has(event.id)));
 
@@ -196,36 +257,60 @@ export default function AdminSchedule() {
       return (a.apptTime || "").localeCompare(b.apptTime || "");
     });
 
-    return data;
+    return { appointments: data, blocks: googleBlocks };
   }, [rawAppointments, rawListings, rawOrderRequests, calendarEvents, staff]);
 
-  React.useEffect(() => {
-    const dates = new Set<string>();
-    appointments.forEach(a => {
-      if (a.apptDate) dates.add(format(a.apptDate, "yyyy-MM-dd"));
-    });
-    setCollapsedDates(dates);
-  }, [appointments]);
+  const todayKey = format(new Date(), "yyyy-MM-dd");
+
+  const isDateCollapsed = React.useCallback((dateStr: string) => {
+    if (dateStr in collapseOverrides) return collapseOverrides[dateStr];
+    return dateStr < todayKey;
+  }, [collapseOverrides, todayKey]);
 
   const toggleDateCollapse = (dateStr: string) => {
-    const next = new Set(collapsedDates);
-    if (next.has(dateStr)) next.delete(dateStr);
-    else next.add(dateStr);
-    setCollapsedDates(next);
+    setSelectedDay(parseISO(dateStr));
+    setCollapseOverrides((current) => ({ ...current, [dateStr]: !isDateCollapsed(dateStr) }));
   };
 
+  const showMonth = (nextMonth: Date, day?: Date) => {
+    setCurrentMonth(nextMonth);
+    setSelectedDay(day || startOfMonth(nextMonth));
+  };
+
+  const cuesForDay = React.useCallback((day: Date): ShooterCue[] => {
+    const dayShoots = appointments.filter((appt) => appt.apptDate && isSameDay(appt.apptDate, day));
+    const dayBlocks = blocks.filter((block) => isBlockOnDay(block.dateKey, day));
+    return shooterCuesForDay({ roster, shoots: dayShoots, blocks: dayBlocks });
+  }, [appointments, blocks, roster]);
+
+  const selectedShoots = appointments.filter((appt) => appt.apptDate && isSameDay(appt.apptDate, selectedDay));
+  const selectedCues = cuesForDay(selectedDay);
+  const selectedSummary = dayOpsSummary({
+    shootCount: selectedShoots.length,
+    twilightCount: selectedShoots.filter((appt) => appt.twilight).length,
+    openCount: selectedCues.filter((cue) => cue.status === "open").length,
+    unassignedCount: countUnassignedShoots(selectedShoots, roster),
+  });
+
+  const monthAppointments = appointments.filter((appt) => appt.apptDate && isSameMonth(appt.apptDate, currentMonth));
   const groupedByDate = React.useMemo(() => {
     const groups: Record<string, Appointment[]> = {};
-    appointments.forEach(a => {
-      if (!a.apptDate) return;
-      const key = format(a.apptDate, "yyyy-MM-dd");
+    monthAppointments.forEach((appt) => {
+      if (!appt.apptDate) return;
+      const key = format(appt.apptDate, "yyyy-MM-dd");
       if (!groups[key]) groups[key] = [];
-      groups[key].push(a);
+      groups[key].push(appt);
     });
     return groups;
-  }, [appointments]);
+  }, [monthAppointments]);
 
-  const sortedDateKeys = Object.keys(groupedByDate).sort().reverse();
+  const sortedDateKeys = Object.keys(groupedByDate).sort((a, b) => {
+    const aUpcoming = a >= todayKey;
+    const bUpcoming = b >= todayKey;
+    if (aUpcoming !== bUpcoming) return aUpcoming ? -1 : 1;
+    if (aUpcoming) return a.localeCompare(b);
+    return b.localeCompare(a);
+  });
 
   return (
     <AdminLayout title="Schedule">
@@ -234,16 +319,17 @@ export default function AdminSchedule() {
           <OperationsStatsGrid />
         </div>
 
-        {/* View Toggle & Controls */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
+        <div className="mb-6 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
           <div className="flex bg-gray-100 p-1 rounded-xl">
-            <button 
+            <button
+              type="button"
               onClick={() => setViewMode("list")}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${viewMode === "list" ? "bg-white text-black shadow-sm" : "text-gray-500 hover:text-black"}`}
             >
               <List className="w-4 h-4" /> Line Item View
             </button>
-            <button 
+            <button
+              type="button"
               onClick={() => setViewMode("calendar")}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${viewMode === "calendar" ? "bg-white text-black shadow-sm" : "text-gray-500 hover:text-black"}`}
             >
@@ -251,156 +337,183 @@ export default function AdminSchedule() {
             </button>
           </div>
 
-          {viewMode === "calendar" && (
-            <div className="flex items-center gap-4 bg-white border border-gray-100 rounded-xl px-4 py-2 shadow-sm">
-              <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1 hover:bg-gray-50 rounded-lg text-gray-400 hover:text-black transition-colors">
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <span className="text-sm font-black uppercase tracking-widest min-w-[140px] text-center">
-                {format(currentMonth, "MMMM yyyy")}
-              </span>
-              <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-1 hover:bg-gray-50 rounded-lg text-gray-400 hover:text-black transition-colors">
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </div>
-          )}
+          <div className="flex items-center gap-2 rounded-xl border border-gray-100 bg-white px-3 py-2 shadow-sm">
+            <button type="button" onClick={() => showMonth(subMonths(currentMonth, 1))} className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-gray-50 hover:text-black" aria-label="Previous month">
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <span className="min-w-[140px] text-center text-sm font-black uppercase tracking-widest">
+              {format(currentMonth, "MMMM yyyy")}
+            </span>
+            <button type="button" onClick={() => showMonth(addMonths(currentMonth, 1))} className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-gray-50 hover:text-black" aria-label="Next month">
+              <ChevronRight className="w-5 h-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => showMonth(new Date(), new Date())}
+              className="ml-1 rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[#0d9488] hover:bg-[#0d9488]/10"
+            >
+              Today
+            </button>
+          </div>
         </div>
+
+        <ScheduleDayStrip
+          dayLabel={format(selectedDay, "EEEE, MMMM d")}
+          summary={selectedSummary}
+          syncNote={syncNote(calendarSync)}
+          shooters={selectedCues}
+        />
 
         {loading ? (
           <div className="flex items-center justify-center py-24">
             <div className="w-8 h-8 border-4 border-[#0d9488] border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : (
-          <>
-            {viewMode === "list" ? (
-              <div className="space-y-4">
-                {sortedDateKeys.length === 0 ? (
-                  <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-12 text-center">
-                    <CalendarIcon className="w-12 h-12 text-gray-200 mx-auto mb-4" />
-                    <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">No scheduled appointments found</p>
-                  </div>
-                ) : (
-                  sortedDateKeys.map(dateStr => {
-                    const appts = groupedByDate[dateStr];
-                    const isCollapsed = collapsedDates.has(dateStr);
-                    return (
-                      <div key={dateStr} className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                        {/* Group Header */}
-                        <div 
-                          onClick={() => toggleDateCollapse(dateStr)}
-                          className="px-8 py-5 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-50"
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className="bg-[#0d9488]/10 p-2 rounded-xl">
-                              <CalendarIcon className="w-5 h-5 text-[#0d9488]" />
-                            </div>
-                            <div>
-                              <h3 className="text-sm font-black uppercase tracking-widest text-black">
-                                {format(parseISO(dateStr), "EEEE, MMMM do, yyyy")}
-                              </h3>
-                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                                {appts.length} Appointment{appts.length !== 1 ? "s" : ""}
-                              </p>
-                            </div>
-                          </div>
-                          {isCollapsed ? <ChevronDown className="w-5 h-5 text-gray-300" /> : <ChevronUp className="w-5 h-5 text-gray-300" />}
+        ) : viewMode === "list" ? (
+          <div className="space-y-4">
+            {sortedDateKeys.length === 0 ? (
+              <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-12 text-center">
+                <CalendarIcon className="w-12 h-12 text-gray-200 mx-auto mb-4" />
+                <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">No shoots this month</p>
+              </div>
+            ) : (
+              sortedDateKeys.map(dateStr => {
+                const appts = groupedByDate[dateStr];
+                const collapsed = isDateCollapsed(dateStr);
+                const day = parseISO(dateStr);
+                const cues = cuesForDay(day);
+                const summary = dayOpsSummary({
+                  shootCount: appts.length,
+                  twilightCount: appts.filter((appt) => appt.twilight).length,
+                  openCount: cues.filter((cue) => cue.status === "open").length,
+                  unassignedCount: countUnassignedShoots(appts, roster),
+                });
+                return (
+                  <div key={dateStr} className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div
+                      onClick={() => toggleDateCollapse(dateStr)}
+                      className="px-6 py-5 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-50 sm:px-8"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="bg-[#0d9488]/10 p-2 rounded-xl">
+                          <CalendarIcon className="w-5 h-5 text-[#0d9488]" />
                         </div>
+                        <div>
+                          <h3 className="text-sm font-black uppercase tracking-widest text-black">
+                            {format(day, "EEEE, MMMM do, yyyy")}
+                          </h3>
+                          <p className="text-[11px] font-bold text-gray-500">
+                            {summary}
+                          </p>
+                        </div>
+                      </div>
+                      {collapsed ? <ChevronDown className="w-5 h-5 text-gray-300" /> : <ChevronUp className="w-5 h-5 text-gray-300" />}
+                    </div>
 
-                        {/* Appointment List */}
-                        {!isCollapsed && (
-                          <div className="divide-y divide-gray-50 bg-white">
-                            {appts.map(appt => (
-                              <div key={appt.id} className="p-8 hover:bg-gray-50/50 transition-colors group">
-                                <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                                  {/* Info Primary */}
-                                  <div className="lg:col-span-1">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${appt.projectType === "business" ? "bg-black text-white" : "bg-[#0d9488] text-white"}`}>
-                                        {appt.projectType === "business" ? "Business" : "Real Estate"}
+                    {!collapsed && (
+                      <div className="divide-y divide-gray-50 bg-white">
+                        {appts.map(appt => (
+                          <div key={appt.id} className="p-6 hover:bg-gray-50/50 transition-colors group sm:p-8">
+                            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
+                              <div className="lg:col-span-1">
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${appt.projectType === "business" ? "bg-black text-white" : "bg-[#0d9488] text-white"}`}>
+                                    {appt.projectType === "business" ? "Business" : "Real Estate"}
+                                  </span>
+                                  {appt.twilight ? <TwilightLabel /> : null}
+                                  <span className="text-[10px] font-mono text-gray-400">{orderLabel(appt)}</span>
+                                </div>
+                                <h4 className="text-lg font-black text-black mb-1">{appt.clientName}</h4>
+                                <div className="flex items-center gap-2 text-sm font-bold text-[#0d9488]">
+                                  <Clock className="w-3.5 h-3.5" />
+                                  {appt.apptTime}
+                                  {appt.duration ? <span className="text-gray-400">{appt.duration}</span> : null}
+                                </div>
+                              </div>
+
+                              <div className="lg:col-span-2 space-y-4">
+                                <div className="flex items-start gap-3">
+                                  <MapPin className="w-4 h-4 text-gray-300 mt-0.5" />
+                                  <p className="text-sm font-bold text-gray-600 leading-relaxed">{appt.address}</p>
+                                </div>
+                                <div className="flex items-start gap-3">
+                                  <FileText className="w-4 h-4 text-gray-300 mt-0.5" />
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {visibleServices(appt.services).map((service, index) => (
+                                      <span key={`${service}-${index}`} className="text-[10px] font-bold bg-gray-100 text-gray-500 px-2 py-0.5 rounded-lg border border-gray-200/50">
+                                        {service}
                                       </span>
-                                      <span className="text-[10px] font-mono text-gray-400">#{appt.orderNumber}</span>
-                                    </div>
-                                    <h4 className="text-lg font-black text-black mb-1">{appt.clientName}</h4>
-                                    <div className="flex items-center gap-2 text-xs font-bold text-[#0d9488]">
-                                      <Clock className="w-3.5 h-3.5" />
-                                      {appt.apptTime}
-                                      {appt.apptDate && (
-                                        <span className="text-gray-300 ml-1">
-                                          • {format(appt.apptDate, "MMM d")}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  {/* Address & Services */}
-                                  <div className="lg:col-span-2 space-y-4">
-                                    <div className="flex items-start gap-3">
-                                      <MapPin className="w-4 h-4 text-gray-300 mt-0.5" />
-                                      <p className="text-sm font-bold text-gray-600 leading-relaxed">{appt.address}</p>
-                                    </div>
-                                    <div className="flex items-start gap-3">
-                                      <FileText className="w-4 h-4 text-gray-300 mt-0.5" />
-                                      <div className="flex flex-wrap gap-1.5">
-                                        {appt.services.map((s, i) => (
-                                          <span key={i} className="text-[10px] font-bold bg-gray-100 text-gray-500 px-2 py-0.5 rounded-lg border border-gray-200/50">
-                                            {s}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Staff & Total */}
-                                  <div className="lg:col-span-1 flex flex-col justify-between items-end">
-                                    <div className="text-right">
-                                      <div className="flex items-center justify-end gap-2 text-gray-400 mb-1">
-                                        <User className="w-3.5 h-3.5" />
-                                        <span className="text-[10px] font-black uppercase tracking-widest">Assigned</span>
-                                      </div>
-                                      <p className="text-sm font-bold text-black italic">
-                                        {appt.photographerNames.join(", ") || "Unassigned"}
-                                      </p>
-                                    </div>
-                                    <div className="text-right mt-4">
-                                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Order Total</p>
-                                      <p className="text-xl font-black text-[#0d9488]">{fmtCurrency(appt.total)}</p>
-                                    </div>
+                                    ))}
                                   </div>
                                 </div>
                               </div>
-                            ))}
+
+                              <div className="lg:col-span-1 flex flex-col justify-between items-start lg:items-end">
+                                <div className="lg:text-right">
+                                  <div className="flex items-center gap-2 text-gray-400 mb-1 lg:justify-end">
+                                    <User className="w-3.5 h-3.5" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest">Assigned</span>
+                                  </div>
+                                  <p className="text-sm font-bold text-black">
+                                    {appt.photographerNames.join(", ") || "Unassigned"}
+                                  </p>
+                                </div>
+                                <div className="lg:text-right mt-4">
+                                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Order Total</p>
+                                  <p className="text-xl font-black text-[#0d9488]">{fmtCurrency(appt.total)}</p>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                        )}
+                        ))}
                       </div>
-                    );
-                  })
-                )}
-              </div>
-            ) : (
-              <CalendarView 
-                appointments={appointments} 
-                currentMonth={currentMonth} 
-                onSelectAppt={setSelectedAppt}
-              />
+                    )}
+                  </div>
+                );
+              })
             )}
+          </div>
+        ) : (
+          <>
+            <ScheduleDayShoots
+              shoots={selectedShoots.map((appt) => ({
+                id: appt.id,
+                time: appt.apptTime,
+                clientName: appt.clientName,
+                address: appt.address,
+                photographers: shortPhotographerNames(appt.photographerNames),
+                twilight: appt.twilight,
+              }))}
+              onSelect={(id) => {
+                const match = selectedShoots.find((appt) => appt.id === id);
+                if (match) setSelectedAppt(match);
+              }}
+            />
+            <CalendarView
+              appointments={appointments}
+              blocks={blocks}
+              roster={roster}
+              currentMonth={currentMonth}
+              selectedDay={selectedDay}
+              onSelectDay={setSelectedDay}
+              onSelectAppt={setSelectedAppt}
+            />
           </>
         )}
       </div>
 
-      {/* Details Popup */}
       {selectedAppt && (
         <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="bg-black text-white px-8 py-6 flex items-center justify-between">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-1">Appointment Details</p>
-                <h3 className="text-xl font-bold">#{selectedAppt.orderNumber}</h3>
+                <h3 className="text-xl font-bold">{orderLabel(selectedAppt)}</h3>
               </div>
-              <button onClick={() => setSelectedAppt(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+              <button type="button" onClick={() => setSelectedAppt(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors" aria-label="Close appointment">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="p-8 space-y-6">
               <div className="grid grid-cols-2 gap-6">
                 <div>
@@ -409,9 +522,12 @@ export default function AdminSchedule() {
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Type</p>
-                  <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${selectedAppt.projectType === "business" ? "bg-black text-white" : "bg-[#0d9488] text-white"}`}>
-                    {selectedAppt.projectType === "business" ? "Business" : "Real Estate"}
-                  </span>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${selectedAppt.projectType === "business" ? "bg-black text-white" : "bg-[#0d9488] text-white"}`}>
+                      {selectedAppt.projectType === "business" ? "Business" : "Real Estate"}
+                    </span>
+                    {selectedAppt.twilight ? <TwilightLabel /> : null}
+                  </div>
                 </div>
               </div>
 
@@ -428,7 +544,10 @@ export default function AdminSchedule() {
                     <Clock className="w-3.5 h-3.5" />
                     <span className="text-[10px] font-black uppercase tracking-widest">Time</span>
                   </div>
-                  <p className="text-sm font-bold text-black">{selectedAppt.apptTime}</p>
+                  <p className="text-sm font-bold text-black">
+                    {selectedAppt.apptTime}
+                    {selectedAppt.duration ? ` · ${selectedAppt.duration}` : ""}
+                  </p>
                 </div>
               </div>
 
@@ -446,9 +565,10 @@ export default function AdminSchedule() {
                   <span className="text-[10px] font-black uppercase tracking-widest">Services</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {selectedAppt.services.map((s, i) => (
-                    <span key={i} className="text-[10px] font-bold bg-gray-100 text-gray-600 px-3 py-1 rounded-xl border border-gray-200">
-                      {s}
+                  {selectedAppt.twilight ? <TwilightLabel /> : null}
+                  {visibleServices(selectedAppt.services).map((service, index) => (
+                    <span key={`${service}-${index}`} className="text-[10px] font-bold bg-gray-100 text-gray-600 px-3 py-1 rounded-xl border border-gray-200">
+                      {service}
                     </span>
                   ))}
                 </div>
@@ -457,17 +577,23 @@ export default function AdminSchedule() {
               <div className="grid grid-cols-2 gap-6 pt-4 border-t border-gray-100">
                 <div>
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Assigned Photographer</p>
-                  <p className="text-sm font-bold text-black italic">{selectedAppt.photographerNames.join(", ") || "Unassigned"}</p>
+                  <p className="text-sm font-bold text-black">{selectedAppt.photographerNames.join(", ") || "Unassigned"}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total</p>
                   <p className="text-xl font-black text-[#0d9488]">{fmtCurrency(selectedAppt.total)}</p>
                 </div>
               </div>
+
+              {selectedAppt.googleCalendarUrl ? (
+                <a href={selectedAppt.googleCalendarUrl} target="_blank" rel="noreferrer" className="inline-block text-xs font-bold text-[#0d9488] underline">
+                  Open calendar event
+                </a>
+              ) : null}
             </div>
 
             <div className="px-8 pb-8 flex gap-3">
-              <Button onClick={() => setSelectedAppt(null)} className="flex-1 bg-black text-white rounded-2xl h-12 font-bold uppercase tracking-widest text-xs">Close</Button>
+              <Button type="button" onClick={() => setSelectedAppt(null)} className="flex-1 bg-black text-white rounded-2xl h-12 font-bold uppercase tracking-widest text-xs">Close</Button>
             </div>
           </div>
         </div>
@@ -500,6 +626,7 @@ function normalizeAppointment(record: any, staff: any[]): Appointment {
     city,
     googleCalendarUrl: record.googleCalendarUrl || null,
     source: record.source || "appointment",
+    twilight: recordHasTwilight(services, [record.notes, record.vibeNote, record.serviceNote, record.internalNotes]),
   };
 }
 
@@ -513,11 +640,52 @@ function scheduleRecordKeys(record: any) {
   ].filter(Boolean).map(String);
 }
 
+function parseGoogleScheduleEvent(event: any): { appointment: Appointment | null; blocks: ScheduleBlock[] } {
+  const kind = classifyCalendarEvent({
+    summary: event.summary,
+    description: event.description,
+    location: event.location,
+    transparency: event.transparency,
+    eventType: event.eventType,
+    allDay: Boolean(event.allDay),
+    status: event.status,
+    start: event.start,
+    end: event.end,
+  });
+  const dateKeys = kind === "free" ? [] : scheduleBlockDateKeys(event.start, event.end, Boolean(event.allDay));
+
+  if (kind === "shoot") {
+    const appointment = normalizeCalendarAppointment(event);
+    if (!appointment) return { appointment: null, blocks: [] };
+    return {
+      appointment: {
+        ...appointment,
+        twilight: recordHasTwilight(appointment.services, [event.summary, event.description]),
+      },
+      blocks: [],
+    };
+  }
+
+  if (kind === "hold" || kind === "unavailable") {
+    return {
+      appointment: null,
+        blocks: dateKeys.map((dateKey) => ({
+          id: `${event.calendarId}-${event.id}-${dateKey}`,
+          photographerName: String(event.photographerName || ""),
+          dateKey,
+          kind,
+        })),
+    };
+  }
+
+  return { appointment: null, blocks: [] };
+}
+
 function normalizeCalendarAppointment(event: any): Appointment | null {
   const apptDate = parseDate(event.start);
   if (!apptDate) return null;
-  const parts = String(event.summary || "").split(/\s+[—-]\s+/).map((part) => part.trim()).filter(Boolean);
-  const clientName = parts[0] || "Google Calendar Appointment";
+  const parts = String(event.summary || "").split(/\s+[—-]\s+/).map((part: string) => part.trim()).filter(Boolean);
+  const clientName = parts[0]?.replace(/^Iconic Images:\s*/i, "") || "Calendar appointment";
   const address = event.location || parts[1] || "No address";
   const services = parts.slice(2);
 
@@ -531,16 +699,17 @@ function normalizeCalendarAppointment(event: any): Appointment | null {
       minute: "2-digit",
       timeZone: "America/Chicago",
     }),
-    services: services.length ? services : ["Google Calendar"],
+    services: services.length ? services : ["Calendar"],
     total: 0,
     projectType: "real_estate",
     photographerNames: event.photographerName ? [event.photographerName] : [],
     status: "scheduled",
-    orderNumber: "GCal",
+    orderNumber: "Calendar",
     duration: calendarDuration(event.start, event.end),
     city: extractCity(address),
     googleCalendarUrl: event.htmlLink || null,
     source: "google-calendar",
+    twilight: false,
   };
 }
 
@@ -590,73 +759,100 @@ function extractCity(address: any) {
   return "TBD";
 }
 
-// ─── Calendar View ───────────────────────────────────────────────────────────
-
-function CalendarView({ appointments, currentMonth, onSelectAppt }: any) {
+function CalendarView({
+  appointments,
+  blocks,
+  roster,
+  currentMonth,
+  selectedDay,
+  onSelectDay,
+  onSelectAppt,
+}: {
+  appointments: Appointment[];
+  blocks: ScheduleBlock[];
+  roster: CalendarRosterPerson[];
+  currentMonth: Date;
+  selectedDay: Date;
+  onSelectDay: (day: Date) => void;
+  onSelectAppt: (appt: Appointment) => void;
+}) {
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(monthStart);
   const startDate = startOfWeek(monthStart);
   const endDate = endOfWeek(monthEnd);
-
   const days = eachDayOfInterval({ start: startDate, end: endDate });
 
   return (
-    <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl overflow-hidden">
-      {/* Days of Week Header */}
-      <div className="grid grid-cols-7 border-b border-gray-50">
-        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => (
-          <div key={day} className="py-4 text-center">
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">{day}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Calendar Grid */}
-      <div className="grid grid-cols-7 auto-rows-[minmax(120px,1fr)]">
-        {days.map((day, i) => {
-          const appts = appointments.filter((a: any) => a.apptDate && isSameDay(a.apptDate, day));
-          const isCurrentMonth = isSameMonth(day, monthStart);
-          const isTodayDate = isSameDay(day, new Date());
-
-          return (
-            <div 
-              key={day.toString()} 
-              className={`border-r border-b border-gray-50 p-2 flex flex-col gap-1 transition-colors ${!isCurrentMonth ? "bg-gray-50/30 opacity-40" : ""} ${isTodayDate ? "bg-[#0d9488]/5" : ""}`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className={`text-xs font-black ${isTodayDate ? "bg-[#0d9488] text-white w-6 h-6 flex items-center justify-center rounded-lg shadow-sm" : "text-gray-400"}`}>
-                  {format(day, "d")}
-                </span>
-                {appts.length > 0 && (
-                  <span className="text-[9px] font-black text-[#0d9488] bg-[#0d9488]/10 px-1.5 py-0.5 rounded-md">
-                    {appts.length}
-                  </span>
-                )}
-              </div>
-
-              <div className="flex-1 space-y-1 overflow-y-auto max-h-[100px] scrollbar-hide">
-                {appts.map((a: any) => (
-                  <div 
-                    key={a.id}
-                    onClick={() => onSelectAppt(a)}
-                    className={`p-1.5 rounded-lg border cursor-pointer hover:scale-[1.02] transition-transform shadow-sm flex flex-col gap-0.5 ${a.projectType === "business" ? "bg-black border-black text-white" : "bg-[#0d9488] border-[#0d9488] text-white"}`}
-                  >
-                    <div className="flex items-center gap-1">
-                      <span className="text-[7px] font-black opacity-80">{a.projectType === "business" ? "(B)" : "(RE)"}</span>
-                      <span className="text-[8px] font-black truncate">#{a.orderNumber}</span>
-                    </div>
-                    <div className="text-[8px] font-bold opacity-90 truncate leading-none">
-                      {a.apptTime} • {a.duration}
-                    </div>
-                    <div className="text-[7px] font-medium opacity-70 truncate leading-none">
-                      {a.photographerNames.join(", ") || "Unassigned"} • {a.city}
-                    </div>
-                  </div>
-                ))}
-              </div>
+    <div className="overflow-x-auto">
+      <div className="min-w-[760px] bg-white rounded-[2.5rem] border border-gray-100 shadow-xl overflow-hidden">
+        <div className="grid grid-cols-7 border-b border-gray-50">
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => (
+            <div key={day} className="py-4 text-center">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">{day}</span>
             </div>
-          );
-        })}
+          ))}
+        </div>
+
+        <div className="grid grid-cols-7 auto-rows-[minmax(148px,auto)]">
+          {days.map((day) => {
+            const appts = appointments.filter((appt) => appt.apptDate && isSameDay(appt.apptDate, day));
+            const dayBlocks = blocks.filter((block) => isBlockOnDay(block.dateKey, day));
+            const cues = shooterCuesForDay({ roster, shoots: appts, blocks: dayBlocks });
+            const cue = dayLoadCue({
+              cues,
+              twilightShootCount: appts.filter((appt) => appt.twilight).length,
+            });
+            const isCurrentMonth = isSameMonth(day, monthStart);
+            const isTodayDate = isSameDay(day, new Date());
+            const isSelected = isSameDay(day, selectedDay);
+            const twilightCue = cue === "Twilight" || Boolean(cue && cue.includes("twilight"));
+
+            return (
+              <div
+                key={day.toISOString()}
+                onClick={() => onSelectDay(day)}
+                className={`flex cursor-pointer flex-col gap-1 border-b border-r border-gray-50 p-2 transition-colors ${!isCurrentMonth ? "bg-gray-50/30 opacity-50" : ""} ${isTodayDate ? "bg-[#0d9488]/5" : ""} ${isSelected ? "ring-2 ring-inset ring-[#0d9488]" : ""}`}
+              >
+                <div className="mb-1 flex items-center justify-between gap-1">
+                  <span className={`text-sm font-black ${isTodayDate ? "flex h-7 w-7 items-center justify-center rounded-lg bg-[#0d9488] text-white shadow-sm" : "text-gray-500"}`}>
+                    {format(day, "d")}
+                  </span>
+                  {appts.length > 0 ? (
+                    <span className="rounded-md bg-[#0d9488]/10 px-1.5 py-0.5 text-[10px] font-black text-[#0d9488]">
+                      {appts.length}
+                    </span>
+                  ) : null}
+                </div>
+                {cue ? (
+                  <div className={`text-[10px] font-black uppercase tracking-widest ${twilightCue ? "text-[#9a6b24]" : "text-gray-400"}`}>
+                    {cue}
+                  </div>
+                ) : null}
+
+                <div className="flex flex-1 flex-col gap-1">
+                  {appts.map((appt) => (
+                    <div
+                      key={appt.id}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onSelectDay(day);
+                        onSelectAppt(appt);
+                      }}
+                    >
+                      <ScheduleCalendarChip
+                        time={appt.apptTime}
+                        clientName={appt.clientName}
+                        photographer={shortPhotographerNames(appt.photographerNames)}
+                        twilight={appt.twilight}
+                        business={appt.projectType === "business"}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
