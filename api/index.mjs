@@ -624,13 +624,31 @@ async function verifyCalendarWriteAccess() {
     eventId: eventId || null
   };
 }
+function toCalendarScheduleEvent(event, source) {
+  const allDay = Boolean(event.start?.date && !event.start?.dateTime);
+  return {
+    id: event.id || `${source.id}-${event.iCalUID || event.htmlLink || event.summary}`,
+    calendarId: source.id,
+    photographerName: source.name || source.id,
+    summary: event.summary || "Untitled appointment",
+    location: event.location || "",
+    description: event.description || "",
+    start: event.start?.dateTime || event.start?.date || null,
+    end: event.end?.dateTime || event.end?.date || null,
+    htmlLink: event.htmlLink || null,
+    allDay,
+    transparency: event.transparency || null,
+    eventType: event.eventType || null,
+    status: event.status || null
+  };
+}
 async function listCalendarScheduleEvents({
   calendars,
   timeMin,
   timeMax
 }) {
   const auth = getAuth();
-  if (!auth) return [];
+  if (!auth) return { configured: false, events: [], readFailures: 0 };
   const calendar = google.calendar({ version: "v3", auth });
   const uniqueCalendars = Array.from(
     new Map(
@@ -647,24 +665,16 @@ async function listCalendarScheduleEvents({
         orderBy: "startTime",
         maxResults: 250
       });
-      return (response.data.items || []).map((event) => ({
-        id: event.id || `${source.id}-${event.iCalUID || event.htmlLink || event.summary}`,
-        calendarId: source.id,
-        photographerName: source.name || source.id,
-        summary: event.summary || "Untitled appointment",
-        location: event.location || "",
-        description: event.description || "",
-        start: event.start?.dateTime || event.start?.date || null,
-        end: event.end?.dateTime || event.end?.date || null,
-        htmlLink: event.htmlLink || null
-      }));
+      return (response.data.items || []).map((event) => toCalendarScheduleEvent(event, source));
     })
   );
-  return results.flatMap((result, index) => {
+  const events = results.flatMap((result, index) => {
     if (result.status === "fulfilled") return result.value;
     console.error(`[Calendar] Failed to read ${uniqueCalendars[index]?.id}:`, result.reason);
     return [];
   });
+  const readFailures = results.filter((result) => result.status === "rejected").length;
+  return { configured: true, events, readFailures };
 }
 const PLAYTEST_ADDRESS = "100 Playtest Lane, Austin, TX 78701";
 const STAFF_ROLES = ["admin", "coordinator", "photographer", "editor"];
@@ -13270,8 +13280,8 @@ function createServer() {
       if (!timeMin || !timeMax) {
         return res.status(400).json({ error: "timeMin and timeMax are required." });
       }
-      const events = await listCalendarScheduleEvents({ calendars, timeMin, timeMax });
-      return res.json({ events });
+      const schedule = await listCalendarScheduleEvents({ calendars, timeMin, timeMax });
+      return res.json(schedule);
     } catch (error) {
       console.error("[Calendar] Schedule sync failed:", error);
       return res.status(500).json({
