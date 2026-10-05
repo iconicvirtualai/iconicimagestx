@@ -1607,6 +1607,20 @@ function textList(value) {
   if (!Array.isArray(value)) return [];
   return value.map((entry) => optionalLineText(entry)).filter(Boolean);
 }
+function rawPrice(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) return Number(value);
+  return void 0;
+}
+function pricedPostedLines(items) {
+  if (!Array.isArray(items)) return [];
+  return normalizeBookingLineItems(items).filter((item, index) => {
+    if (!item.name.trim()) return false;
+    const raw = items[index];
+    if (!raw || typeof raw !== "object") return false;
+    return rawPrice(raw.price) !== void 0;
+  });
+}
 function resolveSubmittedBooking(body, catalog) {
   const list = catalog ?? packagesForStaffEditor([]);
   const posted = normalizeBookingLineItems(body.lineItems);
@@ -1627,7 +1641,7 @@ function resolveSubmittedBooking(body, catalog) {
     else specialized = "";
   }
   const promo = promoDiscountFor(optionalLineText(body.promoCode));
-  const lineItems = buildSubmittedLineItems({
+  let lineItems = buildSubmittedLineItems({
     selectedService,
     selectedBasics,
     selectedAddOns,
@@ -1638,6 +1652,25 @@ function resolveSubmittedBooking(body, catalog) {
     lifeOfTheListingCare: Boolean(body.lifeOfTheListingCare),
     catalog: list
   });
+  if (chargedServiceLines(lineItems).length === 0) {
+    const temporary = pricedPostedLines(body.lineItems);
+    const alreadyDiscounted = temporary.some((item) => {
+      const id = String(item.id || "");
+      return id.startsWith("promo-") || item.name.startsWith("Promo Code:");
+    });
+    if (chargedServiceLines(temporary).length > 0) {
+      lineItems = promo && !alreadyDiscounted ? [
+        ...temporary,
+        {
+          id: `promo-${promo.code}`,
+          name: `Promo Code: ${promo.code}`,
+          unitPrice: -promo.discount,
+          qty: 1,
+          price: -promo.discount
+        }
+      ] : temporary;
+    }
+  }
   return {
     lineItems,
     total: roundMoney$1(sumLineItemPrices(lineItems)),
