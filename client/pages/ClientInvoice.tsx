@@ -4,6 +4,7 @@ import { AlertCircle, CheckCircle2, CreditCard, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Footer from "@/components/Footer";
 import { presentInvoiceNumber } from "@shared/orderProjectInvoice";
+import { ICONIC_DOWNLOAD_LOCK } from "@shared/paymentAccess";
 
 function money(value: number) {
   return "$" + (Number(value) || 0).toLocaleString("en-US", { minimumFractionDigits: 2 });
@@ -134,7 +135,7 @@ export default function ClientInvoice() {
                 </Button>
                 <div className="flex items-start gap-3 text-gray-500 bg-gray-50 border border-gray-100 rounded-xl p-4">
                   <Lock className="w-5 h-5 mt-0.5" />
-                  <p className="text-xs leading-relaxed">{invoice.canPayOnline ? `Downloads stay locked until payment is recorded. Checkout is handled securely by ${providerLabel}.` : `${providerLabel} checkout is not configured yet. Please contact Iconic Images to complete payment.`}</p>
+                  <p className="text-xs leading-relaxed">{invoice.canPayOnline ? `${ICONIC_DOWNLOAD_LOCK.message} Checkout is handled securely by ${providerLabel}.` : `${providerLabel} checkout is not configured yet. Please contact Iconic Images to complete payment.`}</p>
                 </div>
               </div>
             )}

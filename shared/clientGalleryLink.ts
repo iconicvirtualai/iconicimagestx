@@ -5,6 +5,7 @@
  */
 
 import { frameFromListingImage, listingAddressLabel } from "./iconicStudio";
+import { clientGalleryDownloadsUnlocked } from "./paymentAccess";
 
 export const RELEASED_GALLERY_STATUSES = ["delivered", "approved"] as const;
 
@@ -48,6 +49,8 @@ export interface PublicStudioProject {
   }>;
   lockDownloads: boolean;
   requirePayment: boolean;
+  /** True when the owning client may download. Shared links still do not offer downloads. */
+  downloadsUnlocked: boolean;
   invoice: { status: string } | null;
   notice: string | null;
   /** Marks the share payload so the page does not write it back over the listing. */
@@ -257,6 +260,7 @@ function listingResult(listing: GalleryLinkDoc, related: GalleryLinkDoc[]): Clie
 }
 
 function publicProject(listing: GalleryLinkDoc, _related: GalleryLinkDoc[], notice: string | null): PublicStudioProject {
+  const invoice = invoiceOf(listing);
   return {
     id: listing.id,
     address: addressOf(listing),
@@ -268,7 +272,13 @@ function publicProject(listing: GalleryLinkDoc, _related: GalleryLinkDoc[], noti
     revisions: publicRevisions(listing),
     lockDownloads: listing.lockDownloads === true,
     requirePayment: listing.requirePayment === true,
-    invoice: invoiceOf(listing),
+    downloadsUnlocked: clientGalleryDownloadsUnlocked({
+      invoice,
+      downloadEnabled: listing.downloadEnabled,
+      downloadsReleased: listing.downloadsReleased,
+      lockDownloads: listing.lockDownloads,
+    }),
+    invoice,
     notice,
     view: "public",
   };

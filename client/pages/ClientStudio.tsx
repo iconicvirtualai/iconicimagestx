@@ -10,6 +10,8 @@ import {
   ChevronLeft, ChevronRight, X, Edit3, Share2, ExternalLink,
   Star, Check, Layers, Zap,
 } from "lucide-react";
+import { clientGalleryDownloadsUnlocked, studioOffersDownloads } from "@shared/paymentAccess";
+import { GalleryDownloadLockNotice } from "@/components/GalleryDownloadLock";
 
 function fmtAddr(a: any): string {
   if (!a) return "";
@@ -87,8 +89,14 @@ export default function ClientStudio() {
             try {
               const snap = await getDoc(doc(db, "listings", listingId));
               if (snap.exists()) {
-                next = { id: snap.id, ...snap.data() };
-                if (data.project.notice && !next.notice) next.notice = data.project.notice;
+                const raw = { id: snap.id, ...snap.data() } as Record<string, unknown>;
+                next = {
+                  ...data.project,
+                  ...raw,
+                  view: "owner",
+                  downloadsUnlocked: data.project.downloadsUnlocked,
+                  notice: raw.notice || data.project.notice || null,
+                };
               }
             } catch (err) {
               console.warn("[ClientStudio] Signed-in listing read failed.", err);
@@ -202,7 +210,16 @@ export default function ClientStudio() {
   const images: any[] = project.images || [];
   const videos: any[] = project.videos || [];
   const tours: any[] = project.tourUrl ? [{ url: project.tourUrl }] : [];
-  const locked = project.lockDownloads && project.requirePayment && !(project.invoice?.status === "paid");
+  const downloadsUnlocked = typeof project.downloadsUnlocked === "boolean"
+    ? project.downloadsUnlocked
+    : clientGalleryDownloadsUnlocked({
+      invoice: project.invoice,
+      downloadEnabled: project.downloadEnabled,
+      downloadsReleased: project.downloadsReleased,
+      lockDownloads: project.lockDownloads,
+    });
+  const canDownloadFiles = studioOffersDownloads(project.view, downloadsUnlocked);
+  const locked = !downloadsUnlocked;
   const address = fmtAddr(project.address || project.shootLocation);
   const revisions: any[] = project.revisions || [];
 
@@ -261,15 +278,7 @@ export default function ClientStudio() {
           </div>
         )}
 
-        {locked && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 mb-6 flex items-center gap-3">
-            <Lock className="w-5 h-5 text-yellow-600 flex-shrink-0" />
-            <div>
-              <p className="text-sm font-bold text-yellow-800">Downloads are locked</p>
-              <p className="text-xs text-yellow-600">Please complete payment to download your photos. Contact us if you have questions.</p>
-            </div>
-          </div>
-        )}
+        {locked && <GalleryDownloadLockNotice />}
 
         {/* PHOTOS */}
         {activeTab === "photos" && (
@@ -282,7 +291,7 @@ export default function ClientStudio() {
                   onClick={() => setSelectedPhoto(i)}>
                   <img src={img.url} alt={img.name || `Photo ${i+1}`} className="w-full h-full object-cover" loading="lazy" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                    {!locked && <button className="p-2 bg-white rounded-lg"><Download className="w-4 h-4 text-black" /></button>}
+                    {canDownloadFiles && <button className="p-2 bg-white rounded-lg"><Download className="w-4 h-4 text-black" /></button>}
                     {canRevise && (
                       <button onClick={e => { e.stopPropagation(); setSelectedPhoto(i); setRevisionType("single"); setShowRevision(true); }}
                         className="p-2 bg-white rounded-lg"><Edit3 className="w-4 h-4 text-black" /></button>
@@ -388,7 +397,7 @@ export default function ClientStudio() {
         )}
 
         {/* Gallery-wide actions */}
-        {activeTab === "photos" && images.length > 0 && !locked && (
+        {activeTab === "photos" && images.length > 0 && canDownloadFiles && (
           <div className="mt-8 flex justify-center gap-3">
             <button className="flex items-center gap-2 px-6 py-3 bg-black text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-800">
               <Download className="w-4 h-4" /> Download All Photos
@@ -412,7 +421,7 @@ export default function ClientStudio() {
           <img src={images[selectedPhoto]?.url} alt="" className="max-w-[90vw] max-h-[90vh] object-contain" />
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3">
             <span className="text-white text-xs font-bold">{selectedPhoto + 1} / {images.length}</span>
-            {!locked && <a href={images[selectedPhoto]?.url} download className="px-3 py-1.5 bg-white text-black rounded-lg text-[10px] font-bold">Download</a>}
+            {canDownloadFiles && <a href={images[selectedPhoto]?.url} download className="px-3 py-1.5 bg-white text-black rounded-lg text-[10px] font-bold">Download</a>}
             {canRevise && (
               <button onClick={() => { setRevisionType("single"); setShowRevision(true); }} className="px-3 py-1.5 bg-white/20 text-white rounded-lg text-[10px] font-bold">Request Edit</button>
             )}

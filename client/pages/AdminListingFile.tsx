@@ -829,6 +829,7 @@ export default function AdminListingFile() {
           {/* Security */}
           <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-5">
             <h3 className={`${labelCls} mb-4 flex items-center gap-2`}><Lock className="w-3.5 h-3.5" /> Security</h3>
+            <p className="text-[10px] text-gray-400 mb-3">Lock Downloads on keeps client files locked until the invoice is paid. Turning it off releases downloads. Iconic still invoices after the shoot.</p>
             <div className="space-y-3">
               <Toggle label="Lock Downloads" value={!!project.lockDownloads} onChange={v => patch({ lockDownloads: v })} />
               <Toggle label="Lock Studio" value={!!project.lockStudio} onChange={v => patch({ lockStudio: v })} />

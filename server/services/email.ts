@@ -191,9 +191,9 @@ function getFallbackTemplate(
     gallery_delivery: base(`
       <h2>Your gallery is ready! 🎉</h2>
       <p>Hi ${vars.clientName},</p>
-      <p>Your photos for <strong>${vars.address}</strong> are edited and ready for download.</p>
-      ${vars.invoiceAmount ? `<p>Please complete your payment of <strong>${vars.invoiceAmount}</strong> to download your files.</p>` : ""}
-      <p><a href="${vars.galleryUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">View Gallery & Download</a></p>
+      <p>Your photos for <strong>${vars.address}</strong> are edited and waiting in your Iconic Images gallery.</p>
+      ${vars.invoiceAmount ? `<p>Iconic Images invoices after the shoot. Downloads stay locked until the <strong>${vars.invoiceAmount}</strong> invoice is paid.</p>` : `<p>Downloads open from your gallery once that invoice is paid, or when our team releases the files.</p>`}
+      <p><a href="${vars.galleryUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">View Gallery</a></p>
       <p style="color:#999;font-size:12px;">Gallery available for ${vars.expiresAt}.</p>
     `),
     invoice: base(`

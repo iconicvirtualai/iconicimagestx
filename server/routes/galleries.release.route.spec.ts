@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import type { Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createServer } from "../index";
@@ -50,6 +51,27 @@ describe("gallery release gate route", () => {
       body: JSON.stringify({ status: "delivered" }),
     });
     expect(status.status).toBe(401);
+    const downloads = await fetch(`${baseUrl}/api/galleries/gallery1234/downloads`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ released: true }),
+    });
+    expect(downloads.status).toBe(401);
+  });
+
+  it("keeps delivery from treating a request flag as a staff release", () => {
+    const source = readFileSync(new URL("./galleries.ts", import.meta.url), "utf8");
+    expect(source).toContain('"/:id/downloads"');
+    expect(source).toContain("downloadsReleased");
+    expect(source).not.toContain("req.body.downloadEnabled");
+    expect(source).not.toContain("req.body?.downloadEnabled");
+    expect(source).toContain("Ignore body.downloadEnabled");
+
+    const rules = readFileSync(new URL("../../firestore.rules", import.meta.url), "utf8");
+    const start = rules.indexOf("match /galleries/{galleryId}");
+    const block = start === -1 ? "" : rules.slice(start, rules.indexOf("match /", start + 20));
+    expect(block).toContain("resource.data.downloadEnabled == true");
+    expect(block).toContain("resource.data.status in ['delivered', 'approved']");
   });
 
   it("does not open Firebase when Admin is not configured", async () => {

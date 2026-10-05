@@ -10,7 +10,9 @@ import {
   invalidGalleryLinkMessage,
   type ClientGalleryLinkResult,
   type GalleryLinkDoc,
+  type PublicStudioProject,
 } from "../../shared/clientGalleryLink";
+import { clientGalleryDownloadsUnlocked } from "../../shared/paymentAccess";
 
 const db = () => admin.firestore();
 
@@ -58,7 +60,7 @@ export async function resolveClientGalleryLink(id: string): Promise<ClientGaller
   const listing = docRecord(listingSnap);
 
   if (gallery) {
-    return decideClientGalleryLink({
+    return finishGalleryLink(decideClientGalleryLink({
       id,
       gallery,
       listing: null,
@@ -68,11 +70,11 @@ export async function resolveClientGalleryLink(id: string): Promise<ClientGaller
       pointedGallery: null,
       pointedListing: null,
       galleriesByOrderId: [],
-    });
+    }));
   }
 
   if (listing) {
-    return decideClientGalleryLink({
+    return finishGalleryLink(decideClientGalleryLink({
       id,
       gallery: null,
       listing,
@@ -82,7 +84,7 @@ export async function resolveClientGalleryLink(id: string): Promise<ClientGaller
       pointedGallery: null,
       pointedListing: null,
       galleriesByOrderId: [],
-    });
+    }));
   }
 
   const relatedGalleries = await galleriesWhere("listingId", id);
@@ -103,7 +105,7 @@ export async function resolveClientGalleryLink(id: string): Promise<ClientGaller
     if (pointedListing) pointedRelated = await relatedForListing(pointedListing);
   }
 
-  return decideClientGalleryLink({
+  return finishGalleryLink(decideClientGalleryLink({
     id,
     gallery: null,
     listing: null,
@@ -113,7 +115,49 @@ export async function resolveClientGalleryLink(id: string): Promise<ClientGaller
     pointedGallery,
     pointedListing,
     galleriesByOrderId,
-  });
+  }));
+}
+
+async function invoiceForListing(listing: GalleryLinkDoc): Promise<Record<string, unknown> | null> {
+  const invoiceId = text(listing.invoiceId);
+  if (invoiceId) {
+    const doc = await db().collection("invoices").doc(invoiceId).get();
+    if (doc.exists) return { id: doc.id, ...(doc.data() || {}) };
+  }
+  const orderId = text(listing.orderId);
+  if (!orderId) return null;
+  try {
+    const snap = await db().collection("invoices").where("orderId", "==", orderId).limit(1).get();
+    if (snap.empty) return null;
+    return { id: snap.docs[0].id, ...(snap.docs[0].data() || {}) };
+  } catch (err) {
+    console.error("[Galleries] Invoice lookup failed:", err);
+    return null;
+  }
+}
+
+/** Replace the listing-only download flag with the post-shoot invoice and gallery release. */
+async function finishGalleryLink(result: ClientGalleryLinkResult): Promise<ClientGalleryLinkResult> {
+  if (!result.ok || result.kind !== "listing") return result;
+  const listing = docRecord(await db().collection("listings").doc(result.project.id).get());
+  if (!listing) return result;
+  const [invoice, related] = await Promise.all([
+    invoiceForListing(listing),
+    relatedForListing(listing),
+  ]);
+  const status = typeof invoice?.status === "string" ? invoice.status : "";
+  const invoiceForGate = invoice || (result.project.invoice ? { status: result.project.invoice.status } : null);
+  const project: PublicStudioProject = {
+    ...result.project,
+    invoice: status ? { status } : result.project.invoice,
+    downloadsUnlocked: clientGalleryDownloadsUnlocked({
+      invoice: invoiceForGate,
+      downloadEnabled: listing.downloadEnabled === true || related.some((doc) => doc.downloadEnabled === true),
+      downloadsReleased: listing.downloadsReleased === true || related.some((doc) => doc.downloadsReleased === true),
+      lockDownloads: listing.lockDownloads,
+    }),
+  };
+  return { ...result, project };
 }
 
 export const handlePublicGalleryLink: RequestHandler = async (req, res) => {

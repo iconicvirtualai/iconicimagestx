@@ -4,6 +4,8 @@ import { Copy, Download, ExternalLink, Image, Link2, Lock, AlertCircle, CreditCa
 import { Button } from "@/components/ui/button";
 import Footer from "@/components/Footer";
 import { toast } from "sonner";
+import { ICONIC_DOWNLOAD_LOCK } from "@shared/paymentAccess";
+import { GalleryDownloadLockNotice } from "@/components/GalleryDownloadLock";
 
 export default function PublicGallery() {
   const { galleryId } = useParams<{ galleryId: string }>();
@@ -99,20 +101,15 @@ export default function PublicGallery() {
 
       <main className="max-w-6xl mx-auto px-4 py-8">
         {needsPayment && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <Lock className="w-5 h-5 text-yellow-700 mt-0.5" />
-              <div>
-                <p className="text-sm font-black text-yellow-900">This delivery stays locked until the invoice is paid.</p>
-                <p className="text-xs text-yellow-700 mt-1">Photos, videos, and tour links unlock after Square records the payment.</p>
-              </div>
-            </div>
-            {gallery.invoiceId && (
+          <GalleryDownloadLockNotice
+            title={gallery.lockTitle || ICONIC_DOWNLOAD_LOCK.title}
+            message={gallery.lockMessage || ICONIC_DOWNLOAD_LOCK.message}
+            action={gallery.invoiceId ? (
               <Button asChild className="bg-black hover:bg-gray-800 text-white rounded-xl">
                 <Link to={`/invoice/${gallery.invoiceId}`}><CreditCard className="w-4 h-4 mr-2" /> View Invoice</Link>
               </Button>
-            )}
-          </div>
+            ) : null}
+          />
         )}
 
         {gallery.status !== "delivered" && gallery.status !== "approved" ? (
