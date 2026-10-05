@@ -38,6 +38,34 @@ describe("client listing cards", () => {
     expect(card.coverUrl).toBe("https://files.example/cover.jpg");
     expect(card.imageCount).toBe(2);
     expect(card.address).toBe("10 Oak St, Houston, TX");
+    expect(card.look).toBeNull();
+  });
+
+  it("chooses the card look from the stored package", () => {
+    expect(buildClientListing("photos", { package: "Photos Only" }).look).toBe("just-photos");
+    expect(buildClientListing("just", { packageName: "Just Photos" }).look).toBe("just-photos");
+    expect(buildClientListing("essentials", { services: ["The Essentials"] }).look).toBe("essentials");
+    expect(buildClientListing("showcase", { serviceIds: ["listing-showcase"] }).look).toBe("showcase");
+    expect(buildClientListing("legacy", { selectedService: "listing-legacy" }).look).toBe("legacy");
+    expect(buildClientListing("leader", { package: "The Market Leader" }).look).toBe("legacy");
+    expect(buildClientListing("other", { services: ["The Refresh"] }).look).toBeNull();
+
+    const showcase = buildClientListing("styled", {
+      package: "The Showcase",
+      address: "123 Main Street, Conroe, TX 77304",
+      apptDate: "2026-01-01",
+      bedrooms: 3,
+      bathrooms: 2,
+      garage: 3,
+      pool: true,
+    });
+    expect(showcase.street).toBe("123 Main Street");
+    expect(showcase.locality).toBe("Conroe, TX 77304");
+    expect(showcase.shootDateLabel).toBe("01.01.2026");
+    expect(showcase.beds).toBe("3");
+    expect(showcase.baths).toBe("2");
+    expect(showcase.garage).toBe("3");
+    expect(showcase.pool).toBe("Y");
   });
 
   it("sorts newest listings first and leaves undated ones after", () => {

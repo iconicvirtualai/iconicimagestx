@@ -27,6 +27,7 @@ import {
   type ClientInvoiceStatement,
   type ClientListingCard,
 } from "@shared/clientHome";
+import { ListingPackageCard } from "@/components/listing-card/ListingPackageCard";
 
 export type ClientHomeSection = "listings" | "orders" | "schedule";
 
@@ -181,6 +182,7 @@ function ListingGrid({ listings, truncated }: { listings: ClientListingCard[]; t
 }
 
 export function ListingTile({ listing }: { listing: ClientListingCard }) {
+  if (listing.look) return <ListingPackageCard listing={listing} />;
   const badge = LISTING_BADGE[listing.status] ?? {
     label: humanStatus(listing.status) || "Status not stored",
     badge: "bg-gray-100 text-gray-500",
