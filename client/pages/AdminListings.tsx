@@ -14,7 +14,15 @@ import {
 } from "firebase/firestore";
 import { toast } from "sonner";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
+import StaffActionQueue from "@/components/StaffActionQueue";
 import { choosePortalClient, listingAppointmentDate } from "@shared/listingWrite";
+import {
+  LISTING_QUEUE,
+  countListingQueue,
+  listingNextAction,
+  listingStatusChips,
+  type ListingQueueId,
+} from "@/lib/staffListQueue";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type ProjectType = "real_estate" | "business";
@@ -158,6 +166,7 @@ export default function AdminListings() {
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<string[]>(["in_progress"]);
   const [typeFilter, setTypeFilter] = React.useState<"all" | "real_estate" | "business">("all");
+  const [queueFilter, setQueueFilter] = React.useState<ListingQueueId | null>(null);
 
   // Selection
   const [selection, setSelection] = React.useState<Set<string>>(new Set());
@@ -442,6 +451,7 @@ export default function AdminListings() {
     setSearch("");
     setStatusFilter(["in_progress"]);
     setTypeFilter("all");
+    setQueueFilter(null);
   };
 
   // Bulk Actions
@@ -470,6 +480,7 @@ export default function AdminListings() {
   };
 
   const toggleStatusFilter = (val: string) => {
+    setQueueFilter(null);
     if (val === "all") {
       setStatusFilter(["all"]);
       return;
@@ -483,16 +494,25 @@ export default function AdminListings() {
     }
   };
 
+  const selectType = (value: "all" | "real_estate" | "business") => {
+    setTypeFilter(value);
+    const allowed = new Set(listingStatusChips(value).map((chip) => chip.value));
+    setStatusFilter((current) => {
+      const next = current.filter((status) => allowed.has(status));
+      return next.length === 0 ? ["all"] : next;
+    });
+  };
+
   // ─── Filtered + sorted list ─────────────────────────────────────────────────
-  const filtered = React.useMemo(() => {
-    let result = projects.filter(p => {
+  const queueNow = React.useMemo(() => new Date(), [projects]);
+  const narrowed = React.useMemo(() => {
+    return projects.filter(p => {
       const loc = p.address || p.shootLocation || "";
       const matchSearch = !search.trim() ||
         loc.toLowerCase().includes(search.toLowerCase()) ||
         (p.clientName || "").toLowerCase().includes(search.toLowerCase()) ||
         p.id.toLowerCase().includes(search.toLowerCase());
 
-      const matchStatus = statusFilter.includes("all") || statusFilter.includes(p.status || "unscheduled");
       const matchType = typeFilter === "all" || p.projectType === typeFilter;
 
       // Advanced: client name filter
@@ -527,7 +547,16 @@ export default function AdminListings() {
         }
       }
 
-      return matchSearch && matchStatus && matchType && matchClient && matchPhotographer && matchService && matchDate;
+      return matchSearch && matchType && matchClient && matchPhotographer && matchService && matchDate;
+    });
+  }, [projects, search, typeFilter, dateFrom, dateTo, dateField, clientFilter, photographerFilter, serviceFilter]);
+
+  const queueCounts = React.useMemo(() => countListingQueue(narrowed, queueNow), [narrowed, queueNow]);
+
+  const filtered = React.useMemo(() => {
+    const result = narrowed.filter(p => {
+      if (queueFilter) return listingNextAction(p, queueNow) === queueFilter;
+      return statusFilter.includes("all") || statusFilter.includes(p.status || "unscheduled");
     });
 
     // Sort
@@ -548,7 +577,7 @@ export default function AdminListings() {
     });
 
     return result;
-  }, [projects, search, statusFilter, typeFilter, dateFrom, dateTo, dateField, clientFilter, photographerFilter, serviceFilter, sortBy, sortDir]);
+  }, [narrowed, queueFilter, queueNow, statusFilter, sortBy, sortDir]);
 
   // ─── Stats summary ─────────────────────────────────────────────────────────
   const stats = React.useMemo(() => {
@@ -567,6 +596,10 @@ export default function AdminListings() {
 
   const currentStatuses = projectType === "real_estate" ? RE_STATUSES : BIZ_STATUSES;
   const filteredServices = services.filter(s => !s.type || s.type === "both" || s.type === projectType);
+  const statusChips = listingStatusChips(typeFilter);
+  const advancedCount = [dateFrom, dateTo, clientFilter.trim(), photographerFilter, serviceFilter].filter(Boolean).length
+    + (sortBy !== "createdAt" || sortDir !== "desc" ? 1 : 0);
+  const activeQueue = LISTING_QUEUE.find((item) => item.id === queueFilter);
 
   return (
     <AdminLayout title="Projects">
@@ -591,6 +624,9 @@ export default function AdminListings() {
           >
             <Filter className="w-4 h-4 mr-2" />
             Filters
+            {advancedCount > 0 && (
+              <span className="ml-2 rounded-full bg-[#0d9488] px-1.5 py-0.5 text-[9px] font-black text-white">{advancedCount}</span>
+            )}
             {showAdvanced ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />}
           </Button>
           <Button
@@ -602,23 +638,32 @@ export default function AdminListings() {
         </div>
       </div>
 
+      <StaffActionQueue
+        items={LISTING_QUEUE.map((item) => ({ ...item, count: queueCounts[item.id] }))}
+        activeId={queueFilter}
+        onSelect={(id) => setQueueFilter((current) => (current === id ? null : id as ListingQueueId))}
+        note={activeQueue
+          ? `${activeQueue.hint}. Status chips are paused until you pick one or clear this queue.`
+          : "Counts follow search, project type, and the extra filters. Status chips do not hide this queue."}
+      />
+
       {/* Type + Status filter row */}
-      <div className="flex flex-wrap gap-2 mb-4">
+      <div className={`flex flex-wrap gap-2 mb-4 ${queueFilter ? "opacity-60" : ""}`}>
         <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mr-4">
           {[["all", "All"], ["real_estate", "Real Estate"], ["business", "Business"]]
             .map(([v, l]) => (
-              <button key={v} onClick={() => setTypeFilter(v as any)}
+              <button key={v} onClick={() => selectType(v as "all" | "real_estate" | "business")}
                 className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${typeFilter === v ? "bg-white text-black shadow-sm" : "text-gray-500 hover:text-black"}`}
               >{l}</button>
             ))}
         </div>
         <div className="flex flex-wrap gap-2">
-          {["all", "unscheduled", "scheduled", "in_progress", "delivered", "paid", "archived", "cancelled"].map(s => {
-            const active = statusFilter.includes(s);
+          {statusChips.map((chip) => {
+            const active = !queueFilter && statusFilter.includes(chip.value);
             return (
-              <button key={s} onClick={() => toggleStatusFilter(s)}
+              <button key={chip.value} onClick={() => toggleStatusFilter(chip.value)}
                 className={`px-4 py-2 rounded-lg font-bold text-[10px] uppercase tracking-widest whitespace-nowrap transition-all ${active ? "bg-[#0d9488] text-white" : "bg-white border border-slate-200 text-gray-600 hover:border-[#0d9488]"}`}
-              >{s.replace(/_/g, " ")}</button>
+              >{chip.label}</button>
             );
           })}
         </div>
@@ -732,15 +777,28 @@ export default function AdminListings() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-24">
-          <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">No projects found</p>
-          <Button onClick={() => setShowModal(true)} className="bg-[#0d9488] hover:bg-[#0f766e] text-white font-bold rounded-xl">
-            Create your first project
-          </Button>
+          <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">
+            {projects.length === 0 ? "No projects found" : "No projects match these filters"}
+          </p>
+          {projects.length === 0 ? (
+            <Button onClick={() => setShowModal(true)} className="bg-[#0d9488] hover:bg-[#0f766e] text-white font-bold rounded-xl">
+              Create your first project
+            </Button>
+          ) : statusFilter.length === 1 && statusFilter[0] === "in_progress" && !queueFilter ? (
+            <Button variant="outline" onClick={() => setStatusFilter(["all"])} className="rounded-xl font-bold">
+              Show all projects
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={resetFilters} className="rounded-xl font-bold">
+              Clear filters
+            </Button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-24">
           {filtered.map(p => {
             const badge = getBadge(p.status || "unscheduled", p.projectType);
+            const nextAction = LISTING_QUEUE.find((item) => item.id === listingNextAction(p, queueNow));
             const loc = p.address || p.shootLocation || "—";
             const isRE = p.projectType !== "business";
             const isSelected = selection.has(p.id);
@@ -777,6 +835,9 @@ export default function AdminListings() {
                   <p className="text-xs text-gray-500 mb-2 flex items-center gap-1.5">
                     <User className="w-3 h-3" /> {p.clientName || "—"}
                   </p>
+                  {nextAction && (
+                    <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-[#0d9488]">{nextAction.label}</p>
+                  )}
                   {p.apptDate && (
                     <p className="text-xs text-gray-500 mb-3 flex items-center gap-1.5">
                       <Calendar className="w-3 h-3" /> {fmtDate(p.apptDate)}
