@@ -4594,6 +4594,21 @@ function serializeDoc(id, data) {
 const OPENAI_IMAGE_EDITS_URL = "https://api.openai.com/v1/images/edits";
 const OPENAI_IMAGE_EDIT_MODEL = "gpt-image-1";
 const OPENAI_IMAGE_EDIT_TIMEOUT_MS = 45e3;
+const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
+const OPENAI_INSPECTION_MODEL = "gpt-4o-mini";
+const OPENAI_INSPECTION_TIMEOUT_MS = 2e4;
+const DELIVERY_INSPECTION_NOTES = [
+  "Photographer visible in a mirror or shadow.",
+  "Photographer reflected in a doorway or glass.",
+  "Inconsistent color.",
+  "Double exposure.",
+  "Frame is too poor to deliver."
+];
+const INSPECTION_MISSING_KEY_NOTE = "Inspection skipped. Review this photo.";
+const INSPECTION_FAILED_NOTE = "Inspection did not finish. Review this photo.";
+function deliveryInspection(status, notes) {
+  return { status, notes: [...notes] };
+}
 const MAX_SOURCE_BYTES = 2e7;
 class OpenAiEditError extends Error {
   status;
@@ -4726,6 +4741,100 @@ async function editListingPhotoWithOpenAI(input) {
   if (bytes.length < 32) throw new OpenAiEditError("OpenAI returned an empty edited image.");
   return { bytes, contentType: "image/jpeg" };
 }
+function canonicalInspectionNotes(raw) {
+  if (!Array.isArray(raw)) return [];
+  const found = [];
+  for (const item of raw) {
+    if (typeof item !== "string") continue;
+    const text2 = item.trim().toLowerCase();
+    const match = DELIVERY_INSPECTION_NOTES.find((note) => note.toLowerCase() === text2);
+    if (match && !found.includes(match)) found.push(match);
+  }
+  return found;
+}
+function inspectionObject(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value;
+}
+function parseDeliveryInspection(body) {
+  let value = body;
+  if (typeof value === "string") {
+    const trimmed = value.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+    try {
+      value = JSON.parse(trimmed);
+    } catch {
+      return null;
+    }
+  }
+  const row = inspectionObject(value);
+  if (!row) return null;
+  if (Array.isArray(row.choices)) {
+    const message = inspectionObject(inspectionObject(row.choices[0])?.message);
+    const content = message?.content;
+    if (typeof content !== "string") return null;
+    return parseDeliveryInspection(content);
+  }
+  if (row.status !== "pass" && row.status !== "flag") return null;
+  if (row.status === "pass") return deliveryInspection("pass", []);
+  const notes = canonicalInspectionNotes(row.notes);
+  if (!notes.length) return null;
+  return deliveryInspection("flag", notes);
+}
+const INSPECTION_PROMPT = [
+  "Inspect this finished real-estate listing JPEG.",
+  "Look only for: a photographer in a mirror or shadow; a doorway or glass reflection of the photographer; inconsistent color; a double exposure; a frame too poor to deliver.",
+  "Do not comment on staging, sky, furniture, or other edits.",
+  "Do not approve or reject the photo.",
+  'Reply with JSON only: {"status":"pass" or "flag","notes":string[]}.',
+  "Use status flag only when one of those issues is visible. Otherwise pass.",
+  "When status is pass, notes must be an empty array.",
+  "When status is flag, copy notes exactly from this list:",
+  ...DELIVERY_INSPECTION_NOTES
+].join(" ");
+async function inspectFinishedListingJpeg(input) {
+  const apiKey = input.apiKey.trim();
+  if (!apiKey) return deliveryInspection("flag", [INSPECTION_MISSING_KEY_NOTE]);
+  if (!input.bytes.length) return deliveryInspection("flag", [INSPECTION_FAILED_NOTE]);
+  const fetchImpl = input.fetchImpl || fetch;
+  const timeoutMs = input.timeoutMs ?? OPENAI_INSPECTION_TIMEOUT_MS;
+  let response;
+  try {
+    response = await fetchImpl(OPENAI_CHAT_COMPLETIONS_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: OPENAI_INSPECTION_MODEL,
+        temperature: 0,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: INSPECTION_PROMPT },
+              {
+                type: "image_url",
+                image_url: { url: `data:image/jpeg;base64,${input.bytes.toString("base64")}` }
+              }
+            ]
+          }
+        ]
+      }),
+      signal: AbortSignal.timeout(timeoutMs)
+    });
+  } catch (err) {
+    console.error("[Studio inspection]", err instanceof Error ? err.message : err);
+    return deliveryInspection("flag", [INSPECTION_FAILED_NOTE]);
+  }
+  const body = await response.text();
+  if (!response.ok) {
+    console.error("[Studio inspection] OpenAI did not inspect the finished photo.", response.status);
+    return deliveryInspection("flag", [INSPECTION_FAILED_NOTE]);
+  }
+  return parseDeliveryInspection(body) || deliveryInspection("flag", [INSPECTION_FAILED_NOTE]);
+}
 const db$g = () => admin.firestore();
 const bucket = () => admin.storage().bucket();
 function httpError$1(status, message) {
@@ -4834,7 +4943,18 @@ async function runOpenAiEdit(input) {
   });
   const base = input.fileName.replace(/\.\w+$/, "") || "edit";
   const saved = await saveListingBytes(input.listingId, `${base}-ai.jpg`, "image/jpeg", "photos", edited.bytes);
-  return { afterUrl: saved.url, resultPath: saved.storagePath };
+  return { afterUrl: saved.url, resultPath: saved.storagePath, bytes: edited.bytes };
+}
+async function inspectOrderEditJpeg(bytes) {
+  try {
+    return await inspectFinishedListingJpeg({
+      apiKey: readOpenAiApiKey(process.env),
+      bytes
+    });
+  } catch (err) {
+    console.error("[Studio inspection]", err instanceof Error ? err.message : err);
+    return { status: "flag", notes: [INSPECTION_FAILED_NOTE] };
+  }
 }
 function failureNote(err) {
   if (err instanceof OpenAiEditError) return err.message;
@@ -5017,6 +5137,15 @@ async function advanceOrderEditQueue(input) {
       pipeline: ["pending", "processing", "review"],
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
+    const inspection = await inspectOrderEditJpeg(saved.bytes);
+    try {
+      await next.ref.update({
+        inspection,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    } catch (err) {
+      console.error("[Studio inspection] The edit is in review, but the inspection note was not stored.", err instanceof Error ? err.message : err);
+    }
     const remaining = Math.max(0, advance.remainingAfter);
     return {
       plan: prepared.plan,
@@ -5033,7 +5162,8 @@ async function advanceOrderEditQueue(input) {
         afterUrl: saved.afterUrl,
         resultPath: saved.resultPath,
         placeholder: false,
-        note: AI_EDIT_READY_NOTE
+        note: AI_EDIT_READY_NOTE,
+        inspection
       }
     };
   } catch (err) {
@@ -8834,6 +8964,34 @@ router$a.post("/setup", async (req, res) => {
     return res.status(500).json({ error: "Setup failed." });
   }
 });
+function uploadQueueKickDecision(input) {
+  return { kick: false };
+}
+function studioQueueTickRequest(env, listingId) {
+  const secret = typeof env.CRON_SECRET === "string" ? env.CRON_SECRET.trim() : "";
+  const base = String(env.APP_URL || env.URL || "").trim().replace(/\/$/, "");
+  const id = listingId.trim();
+  if (!secret || !base || !id) return null;
+  return {
+    url: `${base}/api/studio/order-queue/tick`,
+    init: {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${secret}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ listingId: id, chain: true })
+    }
+  };
+}
+function kickStudioQueue(listingId, env = process.env) {
+  const request = studioQueueTickRequest(env, listingId);
+  if (!request) return { dispatched: false };
+  void fetch(request.url, request.init).catch((err) => {
+    console.error("[Studio queue] Follow-up tick failed:", err instanceof Error ? err.message : err);
+  });
+  return { dispatched: true };
+}
 const router$9 = Router();
 const db$5 = () => admin.firestore();
 const DIRECT_UPLOAD_LIMIT = 3e6;
@@ -8887,6 +9045,12 @@ async function noteOrderEditQueue(listingId, uploadedBy) {
     console.error("[Studio] Upload saved, but order edits were not queued.", err);
     return null;
   }
+}
+function followUploadWithQueue(listingId, autoQueue) {
+  const decision = uploadQueueKickDecision({
+    pendingWithSourcePhoto: autoQueue?.pending ?? 0
+  });
+  if (decision.kick) kickStudioQueue(listingId);
 }
 function sendKnownError$1(res, err, fallback) {
   const status = err.status;
@@ -8982,6 +9146,7 @@ router$9.post("/:id/photos", requirePhotographer, async (req, res) => {
       });
       await noteRawUpload(listingId, registered2.image, req.user.uid);
       const autoQueue2 = await noteOrderEditQueue(listingId, req.user.uid);
+      followUploadWithQueue(listingId, autoQueue2);
       return res.status(201).json({ success: true, ...registered2, autoQueue: autoQueue2 });
     }
     const storagePath = req.body?.storagePath;
@@ -8997,6 +9162,7 @@ router$9.post("/:id/photos", requirePhotographer, async (req, res) => {
     });
     await noteRawUpload(listingId, registered.image, req.user.uid);
     const autoQueue = await noteOrderEditQueue(listingId, req.user.uid);
+    followUploadWithQueue(listingId, autoQueue);
     return res.status(201).json({ success: true, ...registered, autoQueue });
   } catch (err) {
     return sendKnownError$1(res, err, "Failed to save the uploaded photo.");
@@ -9638,31 +9804,6 @@ router$6.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update media job." });
   }
 });
-function studioQueueTickRequest(env, listingId) {
-  const secret = typeof env.CRON_SECRET === "string" ? env.CRON_SECRET.trim() : "";
-  const base = String(env.APP_URL || env.URL || "").trim().replace(/\/$/, "");
-  const id = listingId.trim();
-  if (!secret || !base || !id) return null;
-  return {
-    url: `${base}/api/studio/order-queue/tick`,
-    init: {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${secret}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ listingId: id, chain: true })
-    }
-  };
-}
-function kickStudioQueue(listingId, env = process.env) {
-  const request = studioQueueTickRequest(env, listingId);
-  if (!request) return { dispatched: false };
-  void fetch(request.url, request.init).catch((err) => {
-    console.error("[Studio queue] Follow-up tick failed:", err instanceof Error ? err.message : err);
-  });
-  return { dispatched: true };
-}
 const router$5 = Router();
 function adminReady(res) {
   if (admin.apps.length) return true;
