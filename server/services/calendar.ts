@@ -30,7 +30,31 @@ export interface CalendarScheduleEvent {
   start: string | null;
   end: string | null;
   htmlLink: string | null;
+  allDay: boolean;
+  transparency: string | null;
+  eventType: string | null;
+  status: string | null;
 }
+
+export interface CalendarScheduleRead {
+  configured: boolean;
+  events: CalendarScheduleEvent[];
+  readFailures: number;
+}
+
+type CalendarApiEvent = {
+  id?: string | null;
+  iCalUID?: string | null;
+  htmlLink?: string | null;
+  summary?: string | null;
+  location?: string | null;
+  description?: string | null;
+  transparency?: string | null;
+  eventType?: string | null;
+  status?: string | null;
+  start?: { dateTime?: string | null; date?: string | null } | null;
+  end?: { dateTime?: string | null; date?: string | null } | null;
+};
 
 function getPrivateKey() {
   return (process.env.GOOGLE_CALENDAR_PRIVATE_KEY || "").replace(/\\n/g, "\n");
@@ -174,6 +198,25 @@ export async function verifyCalendarWriteAccess() {
   };
 }
 
+export function toCalendarScheduleEvent(event: CalendarApiEvent, source: CalendarSource): CalendarScheduleEvent {
+  const allDay = Boolean(event.start?.date && !event.start?.dateTime);
+  return {
+    id: event.id || `${source.id}-${event.iCalUID || event.htmlLink || event.summary}`,
+    calendarId: source.id,
+    photographerName: source.name || source.id,
+    summary: event.summary || "Untitled appointment",
+    location: event.location || "",
+    description: event.description || "",
+    start: event.start?.dateTime || event.start?.date || null,
+    end: event.end?.dateTime || event.end?.date || null,
+    htmlLink: event.htmlLink || null,
+    allDay,
+    transparency: event.transparency || null,
+    eventType: event.eventType || null,
+    status: event.status || null,
+  };
+}
+
 export async function listCalendarScheduleEvents({
   calendars,
   timeMin,
@@ -182,9 +225,9 @@ export async function listCalendarScheduleEvents({
   calendars: CalendarSource[];
   timeMin: string;
   timeMax: string;
-}) {
+}): Promise<CalendarScheduleRead> {
   const auth = getAuth();
-  if (!auth) return [];
+  if (!auth) return { configured: false, events: [], readFailures: 0 };
 
   const calendar = google.calendar({ version: "v3", auth });
   const uniqueCalendars = Array.from(
@@ -206,23 +249,16 @@ export async function listCalendarScheduleEvents({
         maxResults: 250,
       });
 
-      return (response.data.items || []).map((event): CalendarScheduleEvent => ({
-        id: event.id || `${source.id}-${event.iCalUID || event.htmlLink || event.summary}`,
-        calendarId: source.id,
-        photographerName: source.name || source.id,
-        summary: event.summary || "Untitled appointment",
-        location: event.location || "",
-        description: event.description || "",
-        start: event.start?.dateTime || event.start?.date || null,
-        end: event.end?.dateTime || event.end?.date || null,
-        htmlLink: event.htmlLink || null,
-      }));
+      return (response.data.items || []).map((event) => toCalendarScheduleEvent(event, source));
     })
   );
 
-  return results.flatMap((result, index) => {
+  const events = results.flatMap((result, index) => {
     if (result.status === "fulfilled") return result.value;
     console.error(`[Calendar] Failed to read ${uniqueCalendars[index]?.id}:`, result.reason);
     return [];
   });
+  const readFailures = results.filter((result) => result.status === "rejected").length;
+
+  return { configured: true, events, readFailures };
 }

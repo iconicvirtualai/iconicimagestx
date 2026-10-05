@@ -165,8 +165,8 @@ export function createServer() {
         return res.status(400).json({ error: "timeMin and timeMax are required." });
       }
 
-      const events = await listCalendarScheduleEvents({ calendars, timeMin, timeMax });
-      return res.json({ events });
+      const schedule = await listCalendarScheduleEvents({ calendars, timeMin, timeMax });
+      return res.json(schedule);
     } catch (error) {
       console.error("[Calendar] Schedule sync failed:", error);
       return res.status(500).json({
