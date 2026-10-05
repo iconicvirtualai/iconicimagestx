@@ -8,9 +8,13 @@ import {
   collection, onSnapshot, doc, updateDoc, addDoc, writeBatch, serverTimestamp,
 } from "firebase/firestore";
 import { toast } from "sonner";
+import StaffActionQueue from "@/components/StaffActionQueue";
 import {
   asTags, clientInitials, clientName, normEmail, type ClientRecord,
 } from "@/lib/clientRecords";
+import {
+  CLIENT_QUEUE, clientNextAction, countClientQueue, type ClientQueueId,
+} from "@/lib/staffListQueue";
 
 const labelCls = "block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1";
 const inputCls = "w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30";
@@ -44,6 +48,8 @@ export default function AdminCustomerCenter() {
   const [search, setSearch] = React.useState("");
   const [groupFilter, setGroupFilter] = React.useState("all");
   const [tagFilter, setTagFilter] = React.useState("all");
+  const [statusFilter, setStatusFilter] = React.useState("all");
+  const [queueFilter, setQueueFilter] = React.useState<ClientQueueId | null>(null);
   const [selection, setSelection] = React.useState<Set<string>>(new Set());
   const [editing, setEditing] = React.useState<ClientRecord | null | "new">(null);
   const [form, setForm] = React.useState(EMPTY_FORM);
@@ -78,25 +84,42 @@ export default function AdminCustomerCenter() {
     [clients],
   );
 
-  const filtered = React.useMemo(() => {
+  const matchesDirectory = React.useCallback((client: ClientRecord) => {
+    if (groupFilter !== "all" && (client.group || "") !== groupFilter) return false;
+    if (tagFilter !== "all" && !asTags(client.tags).some((tag) => tag.toLowerCase() === tagFilter.toLowerCase())) return false;
+    if (statusFilter !== "all" && (client.status || "active") !== statusFilter) return false;
     const query = search.trim().toLowerCase();
-    return clients
-      .filter((client) => {
-        if (groupFilter !== "all" && (client.group || "") !== groupFilter) return false;
-        if (tagFilter !== "all" && !asTags(client.tags).some((tag) => tag.toLowerCase() === tagFilter.toLowerCase())) return false;
-        if (!query) return true;
-        const haystack = [
-          clientName(client),
-          client.email,
-          client.phone,
-          client.company,
-          client.group,
-          ...asTags(client.tags),
-        ].join(" ").toLowerCase();
-        return haystack.includes(query);
-      })
-      .sort((a, b) => clientName(a).localeCompare(clientName(b)));
-  }, [clients, search, groupFilter, tagFilter]);
+    if (!query) return true;
+    const haystack = [
+      clientName(client),
+      client.email,
+      client.phone,
+      client.company,
+      client.group,
+      client.status,
+      ...asTags(client.tags),
+    ].join(" ").toLowerCase();
+    return haystack.includes(query);
+  }, [groupFilter, search, statusFilter, tagFilter]);
+
+  const directory = React.useMemo(
+    () => clients.filter(matchesDirectory).sort((a, b) => clientName(a).localeCompare(clientName(b))),
+    [clients, matchesDirectory],
+  );
+  const queueCounts = React.useMemo(() => countClientQueue(directory), [directory]);
+  const filtered = React.useMemo(() => {
+    if (!queueFilter) return directory;
+    return directory.filter((client) => clientNextAction(client) === queueFilter);
+  }, [directory, queueFilter]);
+
+  const filtersActive = search.trim() !== "" || groupFilter !== "all" || tagFilter !== "all" || statusFilter !== "all" || queueFilter !== null;
+  const clearFilters = () => {
+    setSearch("");
+    setGroupFilter("all");
+    setTagFilter("all");
+    setStatusFilter("all");
+    setQueueFilter(null);
+  };
 
   const selectedClients = clients.filter((client) => selection.has(client.id));
 
@@ -276,7 +299,25 @@ export default function AdminCustomerCenter() {
           <option value="all">All tags</option>
           {tags.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
         </select>
+        <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={inputCls + " xl:max-w-[180px]"} aria-label="Status">
+          <option value="all">All statuses</option>
+          <option value="active">Active</option>
+          <option value="vip">VIP</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        {filtersActive && (
+          <button type="button" onClick={clearFilters} className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-[#0d9488]">
+            Clear filters
+          </button>
+        )}
       </div>
+
+      <StaffActionQueue
+        items={CLIENT_QUEUE.map((item) => ({ ...item, count: queueCounts[item.id] }))}
+        activeId={queueFilter}
+        onSelect={(id) => setQueueFilter((current) => (current === id ? null : id as ClientQueueId))}
+        note={queueFilter ? CLIENT_QUEUE.find((item) => item.id === queueFilter)?.hint : "Counts follow the search, group, tag, and status filters."}
+      />
 
       {error && (
         <div className="mb-4 rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-sm font-bold text-red-700">{error}</div>
@@ -309,11 +350,20 @@ export default function AdminCustomerCenter() {
                 <tr>
                   <td colSpan={7} className="px-6 py-16 text-center">
                     <Users className="mx-auto mb-3 h-8 w-8 text-gray-300" />
-                    <p className="text-xs font-black uppercase tracking-widest text-gray-400">No clients match</p>
+                    <p className="text-xs font-black uppercase tracking-widest text-gray-400">
+                      {clients.length === 0 ? "No clients yet" : "No clients match"}
+                    </p>
+                    {clients.length > 0 && filtersActive && (
+                      <button type="button" onClick={clearFilters} className="mt-3 text-[10px] font-black uppercase tracking-widest text-[#0d9488]">
+                        Clear filters
+                      </button>
+                    )}
                   </td>
                 </tr>
               )}
-              {filtered.map((client) => (
+              {filtered.map((client) => {
+                const nextLabel = CLIENT_QUEUE.find((item) => item.id === clientNextAction(client))?.label;
+                return (
                 <tr key={client.id} className="border-b border-gray-50 last:border-0 hover:bg-[#f0fdfa]/40">
                   <td className="px-4 py-4">
                     <input
@@ -336,6 +386,11 @@ export default function AdminCustomerCenter() {
                       <span>
                         <span className="block font-black text-black underline-offset-2 hover:underline">{clientName(client)}</span>
                         {client.company && <span className="block text-[10px] font-bold uppercase tracking-widest text-gray-400">{client.company}</span>}
+                        {nextLabel && (
+                          <span className="mt-1 block text-[10px] font-black uppercase tracking-widest text-[#0d9488]">
+                            {nextLabel}
+                          </span>
+                        )}
                       </span>
                     </button>
                   </td>
@@ -368,7 +423,8 @@ export default function AdminCustomerCenter() {
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
