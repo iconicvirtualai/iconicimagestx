@@ -1,5 +1,7 @@
 /**
- * Seed the public `packages` collection from the hardcoded booking catalog.
+ * Seed the public `packages` collection from the booking catalog.
+ * Existing staff prices are overwritten by this seed. Day-to-day edits belong
+ * in the booking catalog screen, which the booking form charges from.
  *
  *   pnpm seed:booking-catalog
  *

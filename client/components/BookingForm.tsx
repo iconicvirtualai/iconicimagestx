@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -7,7 +7,6 @@ import { bookingFollowUp } from "@/lib/bookingFollowUp";
 import { Link, useSearchParams } from "react-router-dom";
 import ChatWidget from "@/components/ChatWidget";
 import { SmsConsentField } from "@/components/SmsConsentField";
-import { services } from "@/lib/services";
 import { db } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
 import {
@@ -15,14 +14,12 @@ import {
   APPRENTICESHIP_OVERAGE_LABEL,
   APPRENTICESHIP_PROGRAM_NAME,
   APPRENTICESHIP_RULES,
-  addOns,
-  apprenticeshipPackages,
-  basicsList,
-  findCatalogPriceMismatches,
+  bookingOffer,
   isApprenticeshipPackage,
   isExclusivePhotoPackage,
-  photoOnlyPackages,
+  packagesForStaffEditor,
   promoDiscountFor,
+  type StaffCatalogPackage,
 } from "@shared/bookingCatalog";
 import {
   buildSubmittedLineItems,
@@ -173,22 +170,29 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     specializedPhotography: "mls" as "mls" | "social" | "both",
   });
 
-  // Catalog is display/admin parity only. A failed read or a price that
-  // disagrees with the hardcoded lists never changes the charged total.
+  const [catalog, setCatalog] = useState<StaffCatalogPackage[]>(() => packagesForStaffEditor([]));
+  const offer = useMemo(() => bookingOffer(catalog), [catalog]);
+  const services = offer.services;
+  const addOns = offer.addOns;
+  const photoOnlyPackages = offer.photoOnlyPackages;
+  const apprenticeshipPackages = offer.apprenticeshipPackages;
+  const basicsList = offer.basics;
+  const iconicFinishPrice = offer.iconicFinish?.price ?? 0;
+  const virtualStagingUnitPrice = offer.virtualStaging?.price ?? 0;
+  const specializedSocialPrice = offer.specializedSocial?.price ?? 0;
+  const specializedBothPrice = offer.specializedBoth?.price ?? 0;
+
+  // Booking prices come from the packages catalog. A failed read keeps the seed.
   useEffect(() => {
     let cancelled = false;
     getDocs(collection(db, "packages"))
       .then((snap) => {
         if (cancelled) return;
-        const mismatches = findCatalogPriceMismatches(
-          snap.docs.map((entry) => ({ id: entry.id, ...entry.data() })),
-        );
-        if (mismatches.length > 0) {
-          console.warn("[Booking] Catalog price mismatch — charging hardcoded prices", mismatches);
-        }
+        setCatalog(packagesForStaffEditor(snap.docs.map((entry) => ({ id: entry.id, ...entry.data() }))));
       })
       .catch((err) => {
-        console.warn("[Booking] Catalog read failed — charging hardcoded prices", err);
+        console.warn("[Booking] Catalog read failed — using the seeded catalog", err);
+        if (!cancelled) setCatalog(packagesForStaffEditor([]));
       });
     return () => {
       cancelled = true;
@@ -239,7 +243,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
       }));
       setShowBasics(true);
     }
-  }, [searchParams, initialServiceId]);
+  }, [searchParams, initialServiceId, services]);
 
   const updateFormData = (data: Partial<typeof formData>) => {
     setFormData(prev => ({ ...prev, ...data }));
@@ -325,7 +329,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
       setSelectedDetailItem({
         name: "✨ Iconic Finish (Premium)",
         description: "The ultimate digital polish for your listing. We touch up every detail to ensure it stands out in the crowd.",
-        price: 75,
+        price: iconicFinishPrice,
         features: [
           "Remove Dirt & Debris",
           "Remove Reflections and Harsh Shadows",
@@ -377,7 +381,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
       const isMarketLeader = formData.selectedService === "listing-market-leader";
       const isBasics = formData.selectedBasics.length > 0;
 
-      if ((isListing && !isMarketLeader) || isBasics) {
+      if (offer.iconicFinish && ((isListing && !isMarketLeader) || isBasics)) {
         if (!formData.premiumUpgrade) {
           setShowIconicPopup(true);
           return;
@@ -449,6 +453,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     specializedPhotography: formData.specializedPhotography,
     promo: appliedPromo,
     lifeOfTheListingCare: formData.lifeOfTheListingCare,
+    catalog,
   });
 
   const handleBookNow = async (e?: React.FormEvent) => {
@@ -547,19 +552,19 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
         {formData.premiumUpgrade && (
           <div className="flex justify-between items-center text-[11px]">
             <span className="text-gray-500 italic">✨ Iconic Finish (Premium) (Next Day Delivery)</span>
-            <span className="font-bold text-black">$75</span>
+            <span className="font-bold text-black">${iconicFinishPrice}</span>
           </div>
         )}
         {formData.specializedPhotography !== "mls" && (
           <div className="flex justify-between items-center text-[11px]">
-            <span className="text-gray-500 italic">📸 Specialized: {formData.specializedPhotography === "social" ? "Social Media Optimized" : "MLS + Social Media Optimized"}</span>
-            <span className="font-bold text-black">${formData.specializedPhotography === "social" ? 85 : 125}</span>
+            <span className="text-gray-500 italic">📸 Specialized: {formData.specializedPhotography === "social" ? (offer.specializedSocial?.name || "Social Media Optimized") : (offer.specializedBoth?.name || "MLS + Social Media Optimized")}</span>
+            <span className="font-bold text-black">${formData.specializedPhotography === "social" ? specializedSocialPrice : specializedBothPrice}</span>
           </div>
         )}
         {formData.virtualStagingCredits > 0 && (
           <div className="flex justify-between items-center text-[11px]">
-            <span className="text-gray-500 italic">🏠 Virtual Staging ({formData.virtualStagingCredits} credits)</span>
-            <span className="font-bold text-black">${formData.virtualStagingCredits * 35}</span>
+            <span className="text-gray-500 italic">🏠 {offer.virtualStaging?.name || "Virtual Staging"} ({formData.virtualStagingCredits} credits)</span>
+            <span className="font-bold text-black">${formData.virtualStagingCredits * virtualStagingUnitPrice}</span>
           </div>
         )}
         {formData.selectedAddOns.length > 0 && (
@@ -874,7 +879,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
             className="space-y-10"
           >
             {/* Iconic Upgrade Section */}
-            {!apprenticeshipOnly && ((selectedServiceData && selectedServiceData.id !== "listing-market-leader") || formData.selectedBasics.length > 0) && (
+            {!apprenticeshipOnly && offer.iconicFinish && ((selectedServiceData && selectedServiceData.id !== "listing-market-leader") || formData.selectedBasics.length > 0) && (
               <div className="bg-black rounded-[2rem] p-8 text-white relative overflow-hidden">
                  <div className="absolute top-0 right-0 p-8 opacity-10">
                     <Sparkles className="w-24 h-24" />
@@ -894,7 +899,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                       <div className="flex-1">
                         <div className="flex justify-between items-center gap-2 mb-0.5">
                            <span className="text-[11px] md:text-[13px] font-black uppercase tracking-widest leading-tight">Yes, Add Premium Editing (Next Day Delivery)</span>
-                           <span className="text-sm font-black text-teal-400 whitespace-nowrap">+$75</span>
+                           <span className="text-sm font-black text-teal-400 whitespace-nowrap">+${iconicFinishPrice}</span>
                         </div>
                         <p className="text-[10px] text-gray-400 leading-relaxed">
                           The ultimate digital polish. Remove dirt, debris, reflections, and add flawless landscaping.
@@ -916,9 +921,13 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {[
                     { id: "mls", name: "Standard MLS", price: 0, description: "Optimized for MLS (Free/Standard)" },
-                    { id: "social", name: "Social Media Optimized", price: 85, description: "vertical, detailed, and lifestyle" },
-                    { id: "both", name: "Both Styles", price: 125, description: "MLS + Social Media Optimized" }
-                  ].map((style) => (
+                    offer.specializedSocial
+                      ? { id: "social", name: offer.specializedSocial.name, price: specializedSocialPrice, description: offer.specializedSocial.description }
+                      : null,
+                    offer.specializedBoth
+                      ? { id: "both", name: offer.specializedBoth.name, price: specializedBothPrice, description: offer.specializedBoth.description }
+                      : null,
+                  ].filter((style): style is { id: string; name: string; price: number; description: string } => Boolean(style)).map((style) => (
                     <button
                       key={style.id}
                       onClick={() => updateFormData({ specializedPhotography: style.id as any })}
@@ -1111,7 +1120,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                           key={status}
                           onClick={() => {
                             updateFormData({ furnishingStatus: status });
-                            if (status === "Unfurnished" && !apprenticeshipSelected) {
+                            if (status === "Unfurnished" && !apprenticeshipSelected && offer.virtualStaging) {
                               setShowVirtualStagingPopup(true);
                             }
                           }}
@@ -1702,7 +1711,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                   }}
                   className="bg-black hover:bg-gray-800 text-white font-black py-8 text-sm rounded-2xl transition-all shadow-xl group"
                 >
-                   UPGRADE TO ICONIC FINISH (+$75)
+                   UPGRADE TO ICONIC FINISH (+${iconicFinishPrice})
                    <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Button>
                 <button
@@ -1744,7 +1753,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
              <div className="bg-gray-50 rounded-2xl p-6 flex items-center justify-between border border-gray-100">
                 <div className="space-y-1">
                    <h4 className="text-xs font-black uppercase text-black tracking-widest">Staging Credits</h4>
-                   <p className="text-[10px] text-gray-400 font-bold">$35 Per Image</p>
+                   <p className="text-[10px] text-gray-400 font-bold">${virtualStagingUnitPrice} Per Image</p>
                 </div>
                 <div className="flex items-center gap-4">
                    <button
