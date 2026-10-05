@@ -298,50 +298,51 @@ describe("booking catalog parity", () => {
     expect(bookingsRoute).toContain("loadBookingCatalog");
   });
 
-  it("prices the temporary ordericonic payload from published labels and ignores client prices", () => {
+  it("keeps ordericonic name+price lines when no catalog id matches", () => {
     const html = readFileSync(new URL("../public/ordericonic.html", import.meta.url), "utf8");
     const basePrices = jsNumberMap(html, "basePrices");
     const addonPrices = jsNumberMap(html, "addonPrices");
-    const addonLabels = Object.keys(addonPrices);
+    const addonLines = Object.entries(addonPrices).map(([name, price]) => ({ name, price }));
 
     expect(html).toContain("selectedService:p.value");
     expect(html).toContain("selectedAddOns:addons");
+    expect(html).toContain("lineItems");
     expect(html).toContain(">Studio booking / pre-sale</option>");
     expect(Object.keys(basePrices).length).toBeGreaterThan(0);
+    expect(basePrices["The Essentials — $249"]).toBe(249);
 
     for (const [label, price] of Object.entries(basePrices)) {
+      const lineItems = [{ name: label, price }, ...addonLines];
       const resolved = resolveSubmittedBooking({
         selectedService: label,
-        selectedAddOns: addonLabels,
-        lineItems: [
-          { name: label, price: 1 },
-          ...addonLabels.map((name) => ({ name, price: 1 })),
-          { name: "Invented discount", price: -1000 },
-        ],
-        total: 1,
+        selectedAddOns: addonLines.map((item) => item.name),
+        lineItems,
+        total: lineItems.reduce((sum, item) => sum + item.price, 0),
         leadSource: "Iconic temporary booking page",
       });
-      expect(chargedServiceLines(resolved.lineItems).map((item) => [item.name, item.price])).toEqual([
-        [label, price],
-        ...Object.entries(addonPrices),
-      ]);
-      expect(resolved.total).toBe(price + Object.values(addonPrices).reduce((sum, amount) => sum + amount, 0));
+      expect(chargedServiceLines(resolved.lineItems).map((item) => [item.name, item.price])).toEqual(
+        lineItems.map((item) => [item.name, item.price]),
+      );
+      expect(resolved.total).toBe(lineItems.reduce((sum, item) => sum + item.price, 0));
       expect(resolved.selectedService).toBe(label);
     }
 
     const studio = resolveSubmittedBooking({
       selectedService: "Studio booking / pre-sale",
-      lineItems: [{ name: "Studio booking / pre-sale", price: 5000 }],
+      lineItems: [
+        { name: "Studio booking / pre-sale", price: 0 },
+        { name: "Same-Day Delivery $50", price: 50 },
+      ],
       selectedAddOns: ["Same-Day Delivery $50"],
     });
     expect(studio.lineItems.map((item) => [item.name, item.price])).toEqual([
       ["Studio booking / pre-sale", 0],
       ["Same-Day Delivery $50", 50],
     ]);
-    expect(chargedServiceLines(studio.lineItems).length).toBeGreaterThan(0);
+    expect(chargedServiceLines(studio.lineItems)).toHaveLength(2);
 
     const fromLinesOnly = resolveSubmittedBooking({
-      lineItems: [{ name: "Hollywood — $199", price: 1 }],
+      lineItems: [{ name: "Hollywood — $199", price: 199 }],
     });
     expect(fromLinesOnly.total).toBe(199);
     expect(chargedServiceLines(fromLinesOnly.lineItems)).toHaveLength(1);
@@ -349,7 +350,7 @@ describe("booking catalog parity", () => {
     const withPromo = resolveSubmittedBooking({
       selectedService: "Hollywood — $199",
       promoCode: "newyear",
-      lineItems: [{ name: "Hollywood — $199", price: 1 }],
+      lineItems: [{ name: "Hollywood — $199", price: 199 }],
     });
     expect(withPromo.total).toBe(149);
     expect(withPromo.lineItems.map((item) => item.id ?? item.name)).toEqual([
@@ -357,18 +358,24 @@ describe("booking catalog parity", () => {
       "promo-NEWYEAR",
     ]);
 
-    const unknown = resolveSubmittedBooking({
-      selectedService: "Custom free shoot",
-      selectedAddOns: ["Not a real add-on"],
-      lineItems: [{ name: "Custom free shoot", price: 1 }],
+    const labelWithoutLines = resolveSubmittedBooking({
+      selectedService: "The Essentials — $249",
+      selectedAddOns: ["Same-Day Delivery $50"],
     });
-    expect(chargedServiceLines(unknown.lineItems)).toHaveLength(0);
+    expect(chargedServiceLines(labelWithoutLines.lineItems)).toHaveLength(0);
+    expect(chargedServiceLines(resolveSubmittedBooking({
+      lineItems: [{ name: "   ", price: 10 }, { price: 20 }],
+    }).lineItems)).toHaveLength(0);
 
     const catalogWins = resolveSubmittedBooking({
       selectedService: "listing-showcase",
-      lineItems: [{ name: "Hollywood — $199", price: 199 }],
+      lineItems: [
+        { id: "listing-showcase", name: "hack", price: 1 },
+        { name: "Hollywood — $199", price: 199 },
+      ],
     });
     expect(catalogWins.lineItems.map((item) => [item.id, item.price])).toEqual([["listing-showcase", 549]]);
+    expect(catalogWins.total).toBe(549);
   });
 
   it("prices apprenticeship packages at the hard time caps and seeds them with the basics", () => {
