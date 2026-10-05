@@ -79,6 +79,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
 
       { label: "Billing", href: "/admin/billing", icon: CreditCard, roles: ADMIN_ONLY },
       { label: "Client Billing", href: "/admin/client-billing", icon: CreditCard, roles: ADMIN_ONLY },
+      { label: "Invoice Presets", href: "/admin/invoice-presets", icon: DollarSign, roles: COORD_UP },
     ],
   },
   {

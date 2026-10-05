@@ -11,6 +11,7 @@ import {
   professionalInvoiceNumber,
   splitStaffInvoiceLines,
   staffInvoicePath,
+  repriceInvoiceAdjustments,
   staffInvoiceSavePatch,
   staffServiceFromPackage,
   staffServiceQty,
@@ -49,6 +50,11 @@ describe("staff invoice routes", () => {
     expect(editorPage).toContain(">Description<");
     expect(editorPage).toContain(">Quantity<");
     expect(editorPage).toContain("Discount amount");
+    expect(editorPage).toContain("INVOICE_PRESET_KIND_LABELS");
+    expect(editorPage).toContain("watchInvoicePresets");
+    expect(editorPage).toContain('to="/admin/invoice-presets"');
+    expect(editorPage).toContain("BrandedInvoiceShell");
+    expect(editorPage).not.toContain("Pay Securely");
     expect(editorPage).not.toMatch(/Firestore/);
     expect(editorPage).not.toContain("Office invoice");
     const saveFn = editorPage.slice(editorPage.indexOf("const handleSave"), editorPage.indexOf("const copyPaymentLink"));
@@ -277,5 +283,98 @@ describe("staff editor save", () => {
 
   it("reads a formatted booking address", () => {
     expect(billToAddressText({ formatted: "100 Congress Ave, Austin, TX" })).toBe("100 Congress Ave, Austin, TX");
+  });
+
+  it("leaves processing off the invoice until staff put an amount on it", () => {
+    const patch = staffInvoiceSavePatch({
+      clientName: "Ada",
+      clientEmail: "ada@example.com",
+      billToAddress: "",
+      notes: "",
+      services: [{ name: "Photos", price: 200 }],
+      promoCode: "",
+      promoDiscount: 0,
+      tax: 0,
+    }, { amountPaid: 0 });
+    expect(patch).not.toHaveProperty("processing");
+    expect(patch).not.toHaveProperty("fees");
+    expect(patch).not.toHaveProperty("travel");
+    expect(patch.lineItems.map((item) => item.name)).toEqual(["Photos"]);
+    expect(patch.total).toBe(200);
+  });
+
+  it("adds a processing line and fee only from the amounts staff entered", () => {
+    const patch = staffInvoiceSavePatch({
+      clientName: "Ada",
+      clientEmail: "ada@example.com",
+      billToAddress: "",
+      notes: "",
+      services: [{ name: "Photos", price: 200 }],
+      promoCode: "SPRING",
+      promoDiscount: 20,
+      tax: 8,
+      processing: 6,
+      fees: 10,
+      travel: 0,
+      processingPresetId: "proc-1",
+      feesPresetId: "fee-1",
+    }, { amountPaid: 50 });
+    expect(patch.subtotal).toBe(200);
+    expect(patch.processing).toBe(6);
+    expect(patch.fees).toBe(10);
+    expect(patch).not.toHaveProperty("travel");
+    expect(patch.lineItems.map((item) => [item.name, item.price])).toEqual([
+      ["Photos", 200],
+      ["Promo Code: SPRING", -20],
+      ["Processing", 6],
+      ["Fees", 10],
+    ]);
+    expect(patch.total).toBe(204);
+    expect(patch.amountDue).toBe(154);
+  });
+
+  it("keeps an existing processing amount when order services are saved", () => {
+    const patch = orderServiceInvoicePatch({
+      lineItems: [{ name: "Photos", price: 200 }],
+      pricing: { tax: 0 },
+    }, { amountPaid: 0, tax: 0, processing: 6, fees: 0, travel: 15 });
+    expect(patch.lineItems?.map((item) => [item.name, item.price])).toEqual([
+      ["Photos", 200],
+      ["Processing", 6],
+      ["Travel", 15],
+    ]);
+    expect(patch.subtotal).toBe(200);
+    expect(patch.total).toBe(221);
+    expect(patch).not.toHaveProperty("processing");
+  });
+
+  it("reprices a percent preset from the subtotal and keeps a typed override", () => {
+    const presets = [
+      { id: "fee-pct", kind: "fees" as const, name: "Office fee", mode: "percent" as const, amount: 10, active: true, sortOrder: 1 },
+      { id: "flat-tax", kind: "tax" as const, name: "Tax", mode: "flat" as const, amount: 5, active: true, sortOrder: 1 },
+    ];
+    const repriced = repriceInvoiceAdjustments({
+      clientName: "Ada",
+      clientEmail: "ada@example.com",
+      billToAddress: "",
+      notes: "",
+      services: [{ name: "Photos", price: 80 }],
+      promoCode: "",
+      promoDiscount: 0,
+      tax: 1,
+      taxPresetId: "flat-tax",
+      fees: 0,
+      feesPresetId: "fee-pct",
+      processing: 4,
+      processingOverridden: true,
+      processingPresetId: "ignored",
+    }, presets);
+    expect(repriced.fees).toBe(8);
+    expect(repriced.tax).toBe(5);
+    expect(repriced.processing).toBe(4);
+
+    const held = repriceInvoiceAdjustments({ ...repriced, fees: 3, feesOverridden: true, services: [{ name: "Photos", price: 200 }] }, presets);
+    expect(held.fees).toBe(3);
+    expect(held.tax).toBe(5);
   });
 });

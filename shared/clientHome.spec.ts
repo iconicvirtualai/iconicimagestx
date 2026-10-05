@@ -7,8 +7,8 @@ import {
   buildClientListing,
   calendarDateKey,
   clientListingPath,
+  clientInvoicePdfInput,
   invoicePdf,
-  invoicePdfLines,
   sortNewestFirst,
 } from "./clientHome.ts";
 
@@ -169,22 +169,37 @@ describe("invoice statements", () => {
       lineItems: [{ name: "Photos", qty: 1, price: 250 }],
       createdAt: "2026-09-15T18:00:00.000Z",
     });
-    const lines = invoicePdfLines(statement);
-    expect(lines).toContain("Invoice INV-2026-1042");
-    expect(lines).toContain("Photos x1  $250.00");
-    expect(lines).toContain("Total: $250.00");
-    expect(lines.join("\n")).not.toContain("Tax:");
-    expect(lines.join("\n")).not.toContain("Pay");
-    expect(lines.join("\n")).not.toContain("http");
+    const pdf = new TextDecoder().decode(invoicePdf(statement));
+    expect(pdf).toContain("INV-2026-1042");
+    expect(pdf).toContain("Photos");
+    expect(pdf).toContain("ICONIC IMAGES");
+    expect(pdf).toContain("LINE ITEMS");
+    expect(pdf).toContain("TOTAL");
+    expect(pdf).toContain("PAYMENT");
+    expect(pdf).toContain("Iconic Images Photography, LLC");
+    expect(pdf).toContain("2219 Sawdust Rd. #1304");
+    expect(pdf).toContain("Spring, TX 77380");
+    expect(pdf).toContain("281-356-0965");
+    expect(pdf).toContain("photos@iconicimagestx.com");
+    expect(pdf).toContain("iconicimagestx.com");
+    expect(pdf).not.toContain("Processing");
+    expect(pdf).not.toContain("Pay Securely");
+    expect(pdf).not.toContain("checkout");
+    expect(pdf).not.toContain("http");
+    expect(statement.processing).toBeNull();
   });
 
-  it("says when an invoice has no stored line items", () => {
-    const lines = invoicePdfLines(buildClientInvoice("inv_2", { invoiceNumber: "INV-2026-2", status: "sent" }));
-    expect(lines).toContain("No line items are stored on this invoice.");
-    expect(lines.join("\n")).not.toContain("$0.00");
+  it("says when an invoice has no stored line items and does not invent processing", () => {
+    const statement = buildClientInvoice("inv_2", { invoiceNumber: "INV-2026-2", status: "sent" });
+    const input = clientInvoicePdfInput(statement);
+    expect(input.face.services).toEqual([]);
+    expect(input.face.processing).toBeNull();
+    const pdf = new TextDecoder().decode(invoicePdf(statement));
+    expect(pdf).toContain("No line items yet");
+    expect(pdf).not.toContain("Processing");
   });
 
-  it("downloads a pdf of the stored invoice", () => {
+  it("downloads the branded pdf of the stored invoice", () => {
     const statement = buildClientInvoice("inv_3", {
       invoiceNumber: "INV-2026-9",
       status: "paid",
@@ -194,10 +209,35 @@ describe("invoice statements", () => {
     });
     const pdf = new TextDecoder().decode(invoicePdf(statement));
     expect(pdf.startsWith("%PDF-1.4")).toBe(true);
-    expect(pdf).toContain("Invoice INV-2026-9");
+    expect(pdf).toContain("INV-2026-9");
     expect(pdf).toContain("Twilight");
     expect(pdf).toContain("Ada \\(Agent\\)");
+    expect(pdf).toContain("AMOUNT DUE");
+    expect(pdf).toContain("Iconic Images Photography, LLC");
     expect(pdf).not.toContain("Pay securely");
     expect(pdf).not.toContain("checkout");
+  });
+
+  it("keeps a stored processing amount on the branded order-history pdf and hides the adjustment line", () => {
+    const statement = buildClientInvoice("inv_4", {
+      invoiceNumber: "INV-2026-0008",
+      clientName: "Marty",
+      subtotal: 100,
+      processing: 6,
+      total: 106,
+      amountDue: 106,
+      lineItems: [
+        { name: "Photos", price: 100 },
+        { id: "adjustment-processing", name: "Processing", price: 6, category: "adjustment-processing" },
+      ],
+    });
+    const input = clientInvoicePdfInput(statement);
+    expect(statement.processing).toBe(6);
+    expect(input.face.processing).toBe(6);
+    expect(input.face.services.map((line) => line.name)).toEqual(["Photos"]);
+    const pdf = new TextDecoder().decode(invoicePdf(statement));
+    expect(pdf).toContain("Processing");
+    expect(pdf).toContain("$6.00");
+    expect(pdf).toContain("Photos");
   });
 });
