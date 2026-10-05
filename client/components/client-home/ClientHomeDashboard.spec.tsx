@@ -102,6 +102,9 @@ describe("client home dashboard", () => {
     expect(html).toContain("https://files.example/cover.jpg");
     expect(html).toContain("No photos yet");
     expect(html).toContain("Listings");
+    expect(html).toContain("xl:grid-cols-2");
+    expect(html).toContain("items-start");
+    expect(html).not.toContain("2xl:grid-cols-4");
     expect(html).toContain("Order history");
     expect(html).toContain("Schedule");
     expect(html).not.toContain("/invoice/");
