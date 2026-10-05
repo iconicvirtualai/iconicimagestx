@@ -14,7 +14,16 @@ import {
   staffLoginAction,
 } from "./staffAccess";
 import { isHostedDeployment, isLocalAdminHost, isTempAdminClientEnabled, isTempAdminEnabled } from "./tempAdmin";
-import { amountStillDue, invoiceAllowsDownload, invoiceIdFromSquareNote, publicMediaItem, squarePaymentNote } from "./paymentAccess";
+import {
+  ICONIC_DOWNLOAD_LOCK,
+  amountStillDue,
+  clientGalleryDownloadsUnlocked,
+  invoiceAllowsDownload,
+  invoiceIdFromSquareNote,
+  publicMediaItem,
+  squarePaymentNote,
+  studioOffersDownloads,
+} from "./paymentAccess";
 
 describe("client return path", () => {
   it("sends a listing file back to itself and other pages home", () => {
@@ -330,10 +339,45 @@ describe("invoice download gate", () => {
     expect(invoiceIdFromSquareNote("no id here")).toBeNull();
   });
 
+  it("does not treat a status-only invoice as a zero-dollar invoice", () => {
+    expect(invoiceAllowsDownload({ status: "sent" })).toBe(false);
+    expect(invoiceAllowsDownload({ status: "draft" })).toBe(false);
+    expect(invoiceAllowsDownload({ status: "paid" })).toBe(true);
+  });
+
+  it("keeps client downloads locked until the invoice is paid or staff releases them", () => {
+    const unpaid = { status: "sent", total: 400, amountPaid: 0, amountDue: 400 };
+    expect(clientGalleryDownloadsUnlocked({})).toBe(false);
+    expect(clientGalleryDownloadsUnlocked({ invoice: null })).toBe(false);
+    expect(clientGalleryDownloadsUnlocked({ invoice: unpaid, lockDownloads: true })).toBe(false);
+    const paymentToggleOff = { invoice: unpaid, lockDownloads: true, requirePayment: false };
+    expect(clientGalleryDownloadsUnlocked(paymentToggleOff)).toBe(false);
+    expect(clientGalleryDownloadsUnlocked({ invoice: { status: "partial", total: 400, amountPaid: 100, amountDue: 300 } })).toBe(false);
+
+    expect(clientGalleryDownloadsUnlocked({ invoice: { status: "paid", total: 400, amountDue: 400 } })).toBe(true);
+    expect(clientGalleryDownloadsUnlocked({ invoice: { status: "comped", total: 400, amountDue: 400 } })).toBe(true);
+    expect(clientGalleryDownloadsUnlocked({ invoice: { status: "sent", total: 0, amountPaid: 0, amountDue: 0 } })).toBe(true);
+    expect(clientGalleryDownloadsUnlocked({ invoice: unpaid, downloadsReleased: true, lockDownloads: true })).toBe(true);
+    expect(clientGalleryDownloadsUnlocked({ invoice: unpaid, lockDownloads: false })).toBe(true);
+    expect(clientGalleryDownloadsUnlocked({ invoice: unpaid, downloadEnabled: true })).toBe(true);
+    expect(ICONIC_DOWNLOAD_LOCK.message).toMatch(/Iconic Images/);
+    expect(ICONIC_DOWNLOAD_LOCK.message).toMatch(/after the shoot/);
+    expect(ICONIC_DOWNLOAD_LOCK.message).not.toMatch(/Aryeo/i);
+  });
+
+  it("does not offer downloads on a shared studio link", () => {
+    expect(studioOffersDownloads("public", true)).toBe(false);
+    expect(studioOffersDownloads("public", false)).toBe(false);
+    expect(studioOffersDownloads("owner", true)).toBe(true);
+    expect(studioOffersDownloads("owner", false)).toBe(false);
+  });
+
   it("strips delivery URLs until payment is recorded", () => {
-    const item = { id: "1", type: "photo", url: "https://files.example/photo.jpg", fileName: "photo.jpg" };
+    const item = { id: "1", type: "photo", url: "https://files.example/photo.jpg", storagePath: "galleries/secret/photo.jpg", fileName: "photo.jpg" };
     expect(publicMediaItem(item, false).url).toBeNull();
+    expect(publicMediaItem(item, false)).not.toHaveProperty("storagePath");
     expect(publicMediaItem(item, true).url).toBe("https://files.example/photo.jpg");
+    expect(publicMediaItem(item, true)).not.toHaveProperty("storagePath");
     const tour = { id: "2", type: "tour", shareUrl: "https://my.matterport.com/show/?m=abc", title: "Tour" };
     expect(publicMediaItem(tour, false).shareUrl).toBeNull();
     expect(publicMediaItem(tour, true).shareUrl).toContain("matterport");

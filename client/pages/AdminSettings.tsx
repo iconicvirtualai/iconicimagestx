@@ -180,8 +180,8 @@ export default function AdminSettings() {
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
               <h3 className={`${labelCls} text-sm mb-2`}>Default Security for New Projects</h3>
               <p className="text-xs text-gray-400 mb-4">These defaults are applied to every new project when created.</p>
-              <Toggle label="Lock Downloads" description="Prevent clients from downloading until payment" value={settings.defaultLockDownloads} onChange={v => set("defaultLockDownloads", v)} />
-              <Toggle label="Require Payment" description="Invoice must be paid before gallery access" value={settings.defaultRequirePayment} onChange={v => set("defaultRequirePayment", v)} />
+              <Toggle label="Lock Downloads" description="On keeps client downloads locked until the post-shoot invoice is paid. Off releases them." value={settings.defaultLockDownloads} onChange={v => set("defaultLockDownloads", v)} />
+              <Toggle label="Require Payment" description="Gallery downloads stay locked until the invoice is paid or staff releases them." value={settings.defaultRequirePayment} onChange={v => set("defaultRequirePayment", v)} />
               <Toggle label="Lock Studio" description="Disable client editing studio access" value={settings.defaultLockStudio} onChange={v => set("defaultLockStudio", v)} />
               <Toggle label="Social Permission" description="Allow clients to share on social media" value={settings.defaultSocialPermission} onChange={v => set("defaultSocialPermission", v)} />
             </div>

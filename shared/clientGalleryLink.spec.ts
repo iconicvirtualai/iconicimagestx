@@ -49,6 +49,7 @@ describe("decideClientGalleryLink", () => {
     expect(result.project.videos).toEqual([{ url: "https://cdn.example/walkthrough.mp4", name: "Walkthrough" }]);
     expect(result.project.tourUrl).toBe("");
     expect(result.project.view).toBe("public");
+    expect(result.project.downloadsUnlocked).toBe(false);
     expect(result.project.clientName).toBe("Ada Agent");
     expect(JSON.stringify(result.project)).not.toContain("ada@example.com");
     expect(JSON.stringify(result.project)).not.toContain("javascript:");
@@ -109,6 +110,35 @@ describe("decideClientGalleryLink", () => {
     if (result.ok !== true || result.kind !== "gallery") throw new Error("expected the gallery");
     expect(result.released).toBe(true);
     expect(result.galleryId).toBe("galleryDelivered1");
+  });
+
+  it("unlocks the owning client only after payment or a staff release", () => {
+    const paid = decideClientGalleryLink({
+      ...empty,
+      id: LISTING_ID,
+      listing: listing({ invoiceStatus: "paid", lockDownloads: true }),
+    });
+    expect(paid.ok).toBe(true);
+    if (paid.ok !== true || paid.kind !== "listing") throw new Error("expected the listing studio");
+    expect(paid.project.downloadsUnlocked).toBe(true);
+    expect(paid.project.view).toBe("public");
+
+    const released = decideClientGalleryLink({
+      ...empty,
+      id: LISTING_ID,
+      listing: listing({ lockDownloads: true, invoiceStatus: "sent", downloadsReleased: true }),
+    });
+    if (released.ok !== true || released.kind !== "listing") throw new Error("expected the listing studio");
+    expect(released.project.downloadsUnlocked).toBe(true);
+
+    const locked = decideClientGalleryLink({
+      ...empty,
+      id: LISTING_ID,
+      listing: listing({ lockDownloads: true, requirePayment: false, invoiceStatus: "sent" }),
+    });
+    if (locked.ok !== true || locked.kind !== "listing") throw new Error("expected the listing studio");
+    expect(locked.project.downloadsUnlocked).toBe(false);
+    expect(locked.project.images).toEqual([{ url: "https://cdn.example/final.jpg", name: "front.jpg" }]);
   });
 
   it("says when the project exists but Client Studio is off or locked", () => {

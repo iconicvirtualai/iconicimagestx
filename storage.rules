@@ -16,7 +16,8 @@ service firebase.storage {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
-    // Gallery files are served to clients through signed URLs after the invoice is paid.
+    // Gallery objects stay on staff accounts. The gallery API hands the owning
+    // client a token URL after the post-shoot invoice is paid or staff releases downloads.
     match /galleries/{allPaths=**} {
       allow read, write: if isActiveStaff();
     }

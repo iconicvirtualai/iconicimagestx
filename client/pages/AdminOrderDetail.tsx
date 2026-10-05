@@ -68,6 +68,7 @@ export default function AdminOrderDetail() {
   const [saving, setSaving] = React.useState(false);
   const [sendingInvoice, setSendingInvoice] = React.useState(false);
   const [deliveringGallery, setDeliveringGallery] = React.useState(false);
+  const [releasingDownloads, setReleasingDownloads] = React.useState(false);
   const [mediaLinkForm, setMediaLinkForm] = React.useState({ url: "", title: "", type: "video" });
   const [showCancel, setShowCancel] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<"details"|"invoice"|"gallery"|"history">("details");
@@ -286,6 +287,43 @@ export default function AdminOrderDetail() {
       toast.error(err instanceof Error ? err.message : "Could not deliver gallery.");
     } finally {
       setDeliveringGallery(false);
+    }
+  };
+
+  const handleReleaseDownloads = async (released: boolean) => {
+    const galleryId = order.gallery?.id;
+    if (!galleryId) {
+      toast.error("No gallery is attached to this order yet.");
+      return;
+    }
+    setReleasingDownloads(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/galleries/${galleryId}/downloads`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ released }),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(result.error || "Could not update gallery downloads.");
+      setOrder((prev: any) => prev?.gallery ? {
+        ...prev,
+        gallery: {
+          ...prev.gallery,
+          downloadsReleased: result.downloadsReleased === true,
+          downloadEnabled: result.downloadEnabled === true,
+        },
+      } : prev);
+      toast.success(released
+        ? "Downloads released. The invoice is still billed after the shoot."
+        : "Staff release cleared. Downloads follow the invoice again.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not update gallery downloads.");
+    } finally {
+      setReleasingDownloads(false);
     }
   };
 
@@ -684,6 +722,32 @@ export default function AdminOrderDetail() {
             <Button onClick={handleAddMediaLink} disabled={saving || !order.gallery?.id} className="rounded-xl bg-black hover:bg-gray-900 text-white text-xs font-bold">
               <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Link
             </Button>
+          </div>
+          <div className="mb-6 rounded-xl border border-gray-100 bg-gray-50 p-4">
+            <p className="text-sm font-bold text-black">Client downloads</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Files stay locked until the invoice is paid. Release them here when Iconic is handing the gallery over before that payment. Billing still happens after the shoot. The project Lock Downloads switch also releases files when it is off.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                {order.gallery?.downloadsReleased
+                  ? "Staff release is on"
+                  : order.invoice?.status === "paid" || order.invoice?.status === "comped"
+                    ? "Open — invoice is paid"
+                    : "Locked until the invoice is paid"}
+              </span>
+              {!(order.invoice?.status === "paid" || order.invoice?.status === "comped") && (
+                order.gallery?.downloadsReleased ? (
+                  <Button type="button" onClick={() => handleReleaseDownloads(false)} disabled={releasingDownloads || !order.gallery?.id} variant="outline" className="rounded-xl text-xs font-bold">
+                    Lock downloads again
+                  </Button>
+                ) : (
+                  <Button type="button" onClick={() => handleReleaseDownloads(true)} disabled={releasingDownloads || !order.gallery?.id} className="rounded-xl bg-black hover:bg-gray-900 text-white text-xs font-bold">
+                    Release downloads
+                  </Button>
+                )
+              )}
+            </div>
           </div>
           {order.gallery?.deliveryUrl || order.gallery?.galleryUrl ? (
             <div className="p-4 bg-gray-50 rounded-xl">

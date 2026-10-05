@@ -95,11 +95,14 @@ service cloud.firestore {
     // ─── Galleries ───────────────────────────────────────────────────────────
 
     match /galleries/{galleryId} {
-      // Client can read their own gallery once delivered
+      // Owning clients read a delivered gallery only after downloads are open.
+      // downloadEnabled is set when the post-shoot invoice is paid or staff
+      // releases the files. Booking does not require payment before the shoot.
       allow read: if isStaff() ||
         (isAuthenticated() &&
-          get(/databases/$(database)/documents/galleries/$(galleryId)).data.clientId == request.auth.uid &&
-          get(/databases/$(database)/documents/galleries/$(galleryId)).data.status in ['delivered', 'approved']);
+          resource.data.clientId == request.auth.uid &&
+          resource.data.status in ['delivered', 'approved'] &&
+          resource.data.downloadEnabled == true);
       allow create, update: if isPhotographer();
       allow delete: if isAdmin();
     }

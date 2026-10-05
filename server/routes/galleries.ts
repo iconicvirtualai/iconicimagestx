@@ -9,7 +9,12 @@ import admin from "firebase-admin";
 import { requireCoordinator, requirePhotographer, requireStaff, requireAuth, type AuthenticatedRequest } from "../middleware/auth";
 import { sendEmail } from "../services/email";
 import { sendSMS, SMS_TEMPLATES } from "../services/sms";
-import { invoiceAllowsDownload, publicMediaItem } from "../../shared/paymentAccess";
+import {
+  ICONIC_DOWNLOAD_LOCK,
+  clientGalleryDownloadsUnlocked,
+  publicMediaItem,
+  type GalleryDownloadGate,
+} from "../../shared/paymentAccess";
 import { galleryStatusNeedsReleaseGate } from "../../shared/galleryRelease";
 import { loadGalleryReleaseForGallery } from "../services/galleryReleaseGate";
 import { handlePublicGalleryLink } from "./galleryLink";
@@ -69,6 +74,61 @@ async function invoiceForGallery(gallery: Record<string, unknown>) {
   return null;
 }
 
+async function listingDownloadFlags(gallery: Record<string, unknown>) {
+  const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
+  if (!listingId) return { lockDownloads: undefined as unknown, downloadsReleased: false };
+  const listing = await db().collection("listings").doc(listingId).get();
+  if (!listing.exists) return { lockDownloads: undefined as unknown, downloadsReleased: false };
+  const data = listing.data() || {};
+  return {
+    lockDownloads: data.lockDownloads,
+    downloadsReleased: data.downloadsReleased === true,
+  };
+}
+
+async function downloadGateForGallery(gallery: Record<string, unknown>): Promise<GalleryDownloadGate & { invoice: Record<string, unknown> | null }> {
+  const invoice = await invoiceForGallery(gallery);
+  const listing = await listingDownloadFlags(gallery);
+  return {
+    invoice,
+    downloadEnabled: gallery.downloadEnabled,
+    downloadsReleased: gallery.downloadsReleased === true || listing.downloadsReleased,
+    lockDownloads: listing.lockDownloads,
+  };
+}
+
+function clientGalleryPayload(id: string, gallery: Record<string, unknown>, gate: GalleryDownloadGate & { invoice: Record<string, unknown> | null }) {
+  const unlocked = clientGalleryDownloadsUnlocked(gate);
+  const invoice = gate.invoice;
+  const showMedia = ["delivered", "approved"].includes(String(gallery.status || ""));
+  const media = [
+    ...(Array.isArray(gallery.mediaItems) ? gallery.mediaItems : []),
+    ...(Array.isArray(gallery.videoLinks) ? gallery.videoLinks : []),
+    ...(Array.isArray(gallery.tourLinks) ? gallery.tourLinks : []),
+  ];
+  return {
+    id,
+    title: gallery.title,
+    address: gallery.address,
+    clientName: gallery.clientName,
+    status: gallery.status,
+    deliveredAt: gallery.deliveredAt || null,
+    expiresAt: gallery.expiresAt || null,
+    downloadEnabled: unlocked,
+    paymentRequired: !unlocked,
+    invoiceId: invoice?.id || null,
+    invoiceStatus: invoice?.status || null,
+    lockTitle: unlocked ? null : ICONIC_DOWNLOAD_LOCK.title,
+    lockMessage: unlocked ? null : ICONIC_DOWNLOAD_LOCK.message,
+    mediaItems: showMedia
+      ? media.map((item) => publicMediaItem(
+        item && typeof item === "object" ? item as Record<string, unknown> : {},
+        unlocked,
+      ))
+      : [],
+  };
+}
+
 // ─── GET /api/galleries — List galleries ─────────────────────────────────────
 
 router.get("/", requireStaff, async (req, res) => {
@@ -94,31 +154,8 @@ router.get("/public/:id", async (req, res) => {
     if (!doc.exists) return res.status(404).json({ error: "Gallery not found." });
 
     const gallery = doc.data()!;
-    const invoice = await invoiceForGallery(gallery);
-    const invoiceStatus = (invoice as any)?.status || null;
-    const paid = invoiceAllowsDownload(invoice);
-    const canDownload = paid;
-
-    return res.json({
-      id: doc.id,
-      title: gallery.title,
-      address: gallery.address,
-      clientName: gallery.clientName,
-      status: gallery.status,
-      deliveredAt: gallery.deliveredAt || null,
-      expiresAt: gallery.expiresAt || null,
-      downloadEnabled: canDownload,
-      paymentRequired: !paid,
-      invoiceId: (invoice as any)?.id || null,
-      invoiceStatus,
-      mediaItems: ["delivered", "approved"].includes(gallery.status)
-        ? [
-            ...(gallery.mediaItems || []),
-            ...(gallery.videoLinks || []),
-            ...(gallery.tourLinks || []),
-          ].map((item: any) => publicMediaItem(item, canDownload))
-        : [],
-    });
+    const gate = await downloadGateForGallery(gallery);
+    return res.json(clientGalleryPayload(doc.id, gallery, gate));
   } catch (err) {
     console.error("[Galleries] Public fetch error:", err);
     return res.status(500).json({ error: "Failed to fetch gallery." });
@@ -139,7 +176,9 @@ router.get("/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
 
     const gallery = doc.data()!;
 
-    // Clients can only access delivered galleries that belong to them
+    // Clients can only access delivered galleries that belong to them.
+    // Staff still receive the stored document. Clients get the same
+    // download lock as the public delivery link.
     const staffDoc = await db().collection("staff").doc(req.user!.uid).get();
     if (!staffDoc.exists) {
       if (gallery.clientId !== req.user!.uid) {
@@ -148,6 +187,8 @@ router.get("/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
       if (!["delivered", "approved"].includes(gallery.status)) {
         return res.status(403).json({ error: "Gallery not yet available." });
       }
+      const gate = await downloadGateForGallery(gallery);
+      return res.json(clientGalleryPayload(doc.id, gallery, gate));
     }
 
     return res.json({ id: doc.id, ...gallery });
@@ -328,9 +369,11 @@ router.post("/:id/deliver", requireCoordinator, async (req, res) => {
     if (await holdIfOrderIncomplete(res, req.params.id)) return;
 
     const gallery = galleryDoc.data()!;
-    const linkedInvoice = await invoiceForGallery(gallery);
-    const paid = invoiceAllowsDownload(linkedInvoice);
-    const downloadEnabled = paid;
+    // Ignore body.downloadEnabled. The order screen always sends true, and
+    // that must not skip the invoice. Unlock is paid, comped, zero-dollar,
+    // or an existing staff release. Booking still does not collect up front.
+    const gate = await downloadGateForGallery(gallery);
+    const downloadEnabled = clientGalleryDownloadsUnlocked(gate);
     const expiresInDays = Number(req.body?.expiresInDays) > 0 ? Number(req.body.expiresInDays) : 30;
 
     const expiresAt = admin.firestore.Timestamp.fromDate(
@@ -395,6 +438,50 @@ router.post("/:id/deliver", requireCoordinator, async (req, res) => {
   } catch (err) {
     console.error("[Galleries] Deliver error:", err);
     return res.status(500).json({ error: "Failed to deliver gallery." });
+  }
+});
+
+// ─── PATCH /api/galleries/:id/downloads — Staff release or re-lock ───────────
+// Does not create or publish a Square invoice. Billing stays after the shoot.
+
+router.patch("/:id/downloads", requireCoordinator, async (req: AuthenticatedRequest, res) => {
+  if (!adminReady(res)) return;
+  try {
+    if (typeof req.body?.released !== "boolean") {
+      return res.status(400).json({ error: "released must be true or false." });
+    }
+    const released = req.body.released === true;
+    const galleryDoc = await db().collection("galleries").doc(req.params.id).get();
+    if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
+
+    const gallery = galleryDoc.data() || {};
+    const invoice = await invoiceForGallery(gallery);
+    const listing = await listingDownloadFlags(gallery);
+    const downloadEnabled = clientGalleryDownloadsUnlocked({
+      invoice,
+      downloadEnabled: false,
+      downloadsReleased: released,
+      lockDownloads: listing.lockDownloads,
+    });
+
+    await galleryDoc.ref.update({
+      downloadsReleased: released,
+      downloadEnabled,
+      downloadsReleasedAt: released ? admin.firestore.FieldValue.serverTimestamp() : null,
+      downloadsReleasedBy: released ? req.user?.uid || null : null,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return res.json({
+      success: true,
+      downloadsReleased: released,
+      downloadEnabled,
+      lockTitle: downloadEnabled ? null : ICONIC_DOWNLOAD_LOCK.title,
+      lockMessage: downloadEnabled ? null : ICONIC_DOWNLOAD_LOCK.message,
+    });
+  } catch (err) {
+    console.error("[Galleries] Download release error:", err);
+    return res.status(500).json({ error: "Failed to update gallery downloads." });
   }
 });
 
