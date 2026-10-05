@@ -172,7 +172,7 @@ function ListingGrid({ listings, truncated }: { listings: ClientListingCard[]; t
   return (
     <div>
       <SectionHeading title="Listings" note={truncated ? "Showing the latest listings stored for this account." : ""} />
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
         {listings.map((listing) => (
           <ListingTile key={listing.id} listing={listing} />
         ))}
@@ -195,11 +195,11 @@ export function ListingTile({ listing }: { listing: ClientListingCard }) {
   return (
     <Link
       to={clientListingPath(listing.id)}
-      className="rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-all overflow-hidden block"
+      className="block min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md"
     >
-      <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
+      <div className="relative aspect-video overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
         {listing.coverUrl ? (
-          <img src={listing.coverUrl} alt="" className="w-full h-full object-cover" />
+          <img src={listing.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             {isBusiness ? <Building2 className="w-8 h-8 text-gray-300" /> : <Home className="w-8 h-8 text-gray-300" />}

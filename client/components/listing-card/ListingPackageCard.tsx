@@ -30,7 +30,7 @@ export function ListingPackageCard({ listing }: { listing: ClientListingCard }) 
       to={clientListingPath(listing.id)}
       data-look={look}
       aria-label={`${lookLabel(look)} listing, ${listing.address}`}
-      className={`block h-full rounded-[22px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 ${TIGHT} ${
+      className={`block min-w-0 w-full rounded-[22px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 ${TIGHT} ${
         look === "legacy" ? "focus-visible:outline-[#7aa2ff]" : "focus-visible:outline-black"
       }`}
     >
@@ -75,7 +75,7 @@ function Essentials({ listing, street, locality }: { listing: ClientListingCard;
           data-part="pill"
           className="absolute bottom-0 left-3 right-3 flex translate-y-1/2 items-center justify-center rounded-full bg-black px-5 py-3"
         >
-          <p className={`truncate text-center text-[15px] font-semibold tracking-[0.14em] text-white ${TIGHT}`}>{street}</p>
+          <p className={`w-full min-w-0 truncate text-center text-[15px] font-semibold tracking-[0.14em] text-white ${TIGHT}`}>{street}</p>
         </div>
       </div>
       <div className="flex flex-1 flex-col px-4 pb-4 pt-9">
@@ -102,7 +102,7 @@ function Showcase({ listing, street, locality }: { listing: ClientListingCard; s
             className="absolute bottom-0 left-4 right-4 flex translate-y-1/2 items-center justify-center rounded-full px-4 py-3"
             style={{ background: SHOWCASE_PILL }}
           >
-            <p className={`truncate text-center text-[14px] font-medium tracking-[0.22em] text-white ${TIGHT}`}>{street}</p>
+            <p className={`w-full min-w-0 truncate text-center text-[14px] font-medium tracking-[0.08em] text-white sm:tracking-[0.22em] ${TIGHT}`}>{street}</p>
           </div>
         </div>
         <div className="flex flex-1 flex-col px-4 pb-4 pt-8">
@@ -140,24 +140,23 @@ function Legacy({ listing, street, locality }: { listing: ClientListingCard; str
         <Photo listing={listing} label="" rounded="rounded-none" dark />
         <div
           data-part="pill"
-          className="absolute bottom-0 left-3 right-3 grid min-h-[54px] translate-y-1/2 grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-full px-4 py-2.5"
+          className="absolute bottom-0 left-3 right-3 flex min-h-[54px] translate-y-1/2 items-center justify-center overflow-hidden rounded-full px-5 py-2.5"
           style={{ background: LEGACY_PILL }}
         >
-          <span />
           <p
-            className={`max-w-[15rem] truncate text-center text-[26px] font-semibold leading-none tracking-[0.04em] text-[#e3c36e] ${TIGHT}`}
+            className={`w-full min-w-0 truncate text-center text-[20px] font-semibold leading-none tracking-[0.04em] text-[#e3c36e] sm:text-[26px] ${TIGHT}`}
             style={{ fontFamily: SERIF }}
           >
             {street}
           </p>
-          {locality ? (
-            <p data-part="locality" className={`justify-self-end text-right text-[10px] font-medium leading-tight text-white whitespace-nowrap ${TIGHT}`}>
-              {locality}
-            </p>
-          ) : <span />}
         </div>
       </div>
-      <div className="flex flex-1 flex-col px-4 pb-4 pt-10 text-white">
+      <div className="flex flex-1 flex-col px-4 pb-4 pt-9 text-white">
+        {locality ? (
+          <p data-part="locality" className={`-mt-0.5 mb-3 text-right text-[10px] font-medium leading-tight text-white ${TIGHT}`}>
+            {locality}
+          </p>
+        ) : null}
         <div data-part="amenities" className="flex items-center justify-between gap-2">
           <Amenity icon={<BedIcon />} count={listing.beds} label="Beds" light />
           <Amenity icon={<BathIcon />} count={listing.baths} label="Baths" light />
@@ -189,9 +188,9 @@ function Photo({
   dark?: boolean;
 }) {
   return (
-    <div data-part="photo" className={`relative aspect-[16/10] overflow-hidden ${rounded} ${dark ? "bg-[#1a1c24]" : "bg-gradient-to-b from-sky-500 via-sky-300 to-emerald-700"}`}>
+    <div data-part="photo" className={`relative aspect-[16/10] w-full overflow-hidden ${rounded} ${dark ? "bg-[#1a1c24]" : "bg-gradient-to-b from-sky-500 via-sky-300 to-emerald-700"}`}>
       {listing.coverUrl ? (
-        <img src={listing.coverUrl} alt="" className="h-full w-full object-cover" />
+        <img src={listing.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
       ) : null}
       {label ? (
         <p className={`absolute left-3 top-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.75)] ${TIGHT}`}>
