@@ -1607,6 +1607,57 @@ function textList(value) {
   if (!Array.isArray(value)) return [];
   return value.map((entry) => optionalLineText(entry)).filter(Boolean);
 }
+const TEMPORARY_ORDER_PAGE_PACKAGES = {
+  "The Essentials — $249": 249,
+  "The Showcase — $549": 549,
+  "The Legacy — $899": 899,
+  "The Market Leader — $1,599": 1599,
+  "Hollywood — $199": 199,
+  "Hall of Fame — $299": 299,
+  "Red Carpet — $599": 599,
+  "Luxe Video — $785": 785,
+  "Luxe 3D Tour — $785": 785,
+  "Photos Only — 18 photos — $139": 139,
+  "Photos Only — 25 photos — $169": 169,
+  "Photos Only — 40 photos — $199": 199,
+  "Studio booking / pre-sale": 0
+};
+const TEMPORARY_ORDER_PAGE_ADDONS = {
+  "Same-Day Delivery $50": 50,
+  "Basic Reel $125": 125,
+  "Matterport 3D Tour $200": 200,
+  "Basic Video $300": 300,
+  "Aerial Premium Video $550": 550,
+  "2D Floor Plan $75": 75,
+  "Amenity $50": 50,
+  "Grass replacement $25": 25,
+  "Iconic Polish $75": 75,
+  "Agent intro/outro $59/video": 59,
+  "Essentials Aerial Upgrade $89": 89
+};
+function publishedTemporaryPrice(table, label) {
+  return Object.prototype.hasOwnProperty.call(table, label) ? table[label] : void 0;
+}
+function temporaryOrderPageLines(body) {
+  const postedNames = normalizeBookingLineItems(body.lineItems).map((item) => item.name);
+  const labels = [
+    optionalLineText(body.selectedService),
+    ...postedNames,
+    ...textList(body.selectedAddOns)
+  ];
+  const items = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const label of labels) {
+    if (!label || seen.has(label)) continue;
+    const packagePrice = publishedTemporaryPrice(TEMPORARY_ORDER_PAGE_PACKAGES, label);
+    const addonPrice = publishedTemporaryPrice(TEMPORARY_ORDER_PAGE_ADDONS, label);
+    const price = packagePrice !== void 0 ? packagePrice : addonPrice;
+    if (price === void 0) continue;
+    seen.add(label);
+    items.push({ name: label, unitPrice: price, qty: 1, price });
+  }
+  return items;
+}
 function resolveSubmittedBooking(body, catalog) {
   const list = catalog ?? packagesForStaffEditor([]);
   const posted = normalizeBookingLineItems(body.lineItems);
@@ -1627,7 +1678,7 @@ function resolveSubmittedBooking(body, catalog) {
     else specialized = "";
   }
   const promo = promoDiscountFor(optionalLineText(body.promoCode));
-  const lineItems = buildSubmittedLineItems({
+  let lineItems = buildSubmittedLineItems({
     selectedService,
     selectedBasics,
     selectedAddOns,
@@ -1638,6 +1689,21 @@ function resolveSubmittedBooking(body, catalog) {
     lifeOfTheListingCare: Boolean(body.lifeOfTheListingCare),
     catalog: list
   });
+  if (chargedServiceLines(lineItems).length === 0) {
+    const temporary = temporaryOrderPageLines(body);
+    if (temporary.length > 0) {
+      lineItems = promo ? [
+        ...temporary,
+        {
+          id: `promo-${promo.code}`,
+          name: `Promo Code: ${promo.code}`,
+          unitPrice: -promo.discount,
+          qty: 1,
+          price: -promo.discount
+        }
+      ] : temporary;
+    }
+  }
   return {
     lineItems,
     total: roundMoney$1(sumLineItemPrices(lineItems)),

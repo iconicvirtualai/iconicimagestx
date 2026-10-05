@@ -15,6 +15,7 @@ import { bookingEmbedAvailability } from "./bookingEmbeds";
 import {
   buildSubmittedLineItems,
   calculateSidebarTotal,
+  chargedServiceLines,
   hasBookingSelection,
   normalizeBookingLineItems,
   orderTotalLabel,
@@ -43,6 +44,12 @@ const fixedSelection: BookingPriceInput = {
   promo: { code: "ICONICAI", discount: PROMO_DISCOUNTS.ICONICAI },
   lifeOfTheListingCare: true,
 };
+
+function jsNumberMap(source: string, name: string): Record<string, number> {
+  const match = source.match(new RegExp(`const ${name}=(\\{[^}]+\\})`));
+  if (!match) throw new Error(`missing ${name}`);
+  return JSON.parse(match[1].replace(/'/g, '"')) as Record<string, number>;
+}
 
 describe("booking total contract", () => {
   it("keeps sidebar, submitted total, and email/SMS amount on the same number", () => {
@@ -289,6 +296,79 @@ describe("booking catalog parity", () => {
     expect(appPage).toContain('path="/admin/booking-catalog"');
     expect(bookingsRoute).toContain("resolveSubmittedBooking");
     expect(bookingsRoute).toContain("loadBookingCatalog");
+  });
+
+  it("prices the temporary ordericonic payload from published labels and ignores client prices", () => {
+    const html = readFileSync(new URL("../public/ordericonic.html", import.meta.url), "utf8");
+    const basePrices = jsNumberMap(html, "basePrices");
+    const addonPrices = jsNumberMap(html, "addonPrices");
+    const addonLabels = Object.keys(addonPrices);
+
+    expect(html).toContain("selectedService:p.value");
+    expect(html).toContain("selectedAddOns:addons");
+    expect(html).toContain(">Studio booking / pre-sale</option>");
+    expect(Object.keys(basePrices).length).toBeGreaterThan(0);
+
+    for (const [label, price] of Object.entries(basePrices)) {
+      const resolved = resolveSubmittedBooking({
+        selectedService: label,
+        selectedAddOns: addonLabels,
+        lineItems: [
+          { name: label, price: 1 },
+          ...addonLabels.map((name) => ({ name, price: 1 })),
+          { name: "Invented discount", price: -1000 },
+        ],
+        total: 1,
+        leadSource: "Iconic temporary booking page",
+      });
+      expect(chargedServiceLines(resolved.lineItems).map((item) => [item.name, item.price])).toEqual([
+        [label, price],
+        ...Object.entries(addonPrices),
+      ]);
+      expect(resolved.total).toBe(price + Object.values(addonPrices).reduce((sum, amount) => sum + amount, 0));
+      expect(resolved.selectedService).toBe(label);
+    }
+
+    const studio = resolveSubmittedBooking({
+      selectedService: "Studio booking / pre-sale",
+      lineItems: [{ name: "Studio booking / pre-sale", price: 5000 }],
+      selectedAddOns: ["Same-Day Delivery $50"],
+    });
+    expect(studio.lineItems.map((item) => [item.name, item.price])).toEqual([
+      ["Studio booking / pre-sale", 0],
+      ["Same-Day Delivery $50", 50],
+    ]);
+    expect(chargedServiceLines(studio.lineItems).length).toBeGreaterThan(0);
+
+    const fromLinesOnly = resolveSubmittedBooking({
+      lineItems: [{ name: "Hollywood — $199", price: 1 }],
+    });
+    expect(fromLinesOnly.total).toBe(199);
+    expect(chargedServiceLines(fromLinesOnly.lineItems)).toHaveLength(1);
+
+    const withPromo = resolveSubmittedBooking({
+      selectedService: "Hollywood — $199",
+      promoCode: "newyear",
+      lineItems: [{ name: "Hollywood — $199", price: 1 }],
+    });
+    expect(withPromo.total).toBe(149);
+    expect(withPromo.lineItems.map((item) => item.id ?? item.name)).toEqual([
+      "Hollywood — $199",
+      "promo-NEWYEAR",
+    ]);
+
+    const unknown = resolveSubmittedBooking({
+      selectedService: "Custom free shoot",
+      selectedAddOns: ["Not a real add-on"],
+      lineItems: [{ name: "Custom free shoot", price: 1 }],
+    });
+    expect(chargedServiceLines(unknown.lineItems)).toHaveLength(0);
+
+    const catalogWins = resolveSubmittedBooking({
+      selectedService: "listing-showcase",
+      lineItems: [{ name: "Hollywood — $199", price: 199 }],
+    });
+    expect(catalogWins.lineItems.map((item) => [item.id, item.price])).toEqual([["listing-showcase", 549]]);
   });
 
   it("prices apprenticeship packages at the hard time caps and seeds them with the basics", () => {

@@ -231,9 +231,72 @@ export interface ResolvedBookingSubmission {
 }
 
 /**
+ * Labels posted by public/ordericonic.html. That page is not the catalog
+ * booking form: it sends package and add-on names, not catalog ids.
+ * Prices are the amounts printed on that page. Client-supplied prices are ignored.
+ * "Studio booking / pre-sale" is a real option with no printed price.
+ */
+const TEMPORARY_ORDER_PAGE_PACKAGES: Record<string, number> = {
+  "The Essentials — $249": 249,
+  "The Showcase — $549": 549,
+  "The Legacy — $899": 899,
+  "The Market Leader — $1,599": 1599,
+  "Hollywood — $199": 199,
+  "Hall of Fame — $299": 299,
+  "Red Carpet — $599": 599,
+  "Luxe Video — $785": 785,
+  "Luxe 3D Tour — $785": 785,
+  "Photos Only — 18 photos — $139": 139,
+  "Photos Only — 25 photos — $169": 169,
+  "Photos Only — 40 photos — $199": 199,
+  "Studio booking / pre-sale": 0,
+};
+
+const TEMPORARY_ORDER_PAGE_ADDONS: Record<string, number> = {
+  "Same-Day Delivery $50": 50,
+  "Basic Reel $125": 125,
+  "Matterport 3D Tour $200": 200,
+  "Basic Video $300": 300,
+  "Aerial Premium Video $550": 550,
+  "2D Floor Plan $75": 75,
+  "Amenity $50": 50,
+  "Grass replacement $25": 25,
+  "Iconic Polish $75": 75,
+  "Agent intro/outro $59/video": 59,
+  "Essentials Aerial Upgrade $89": 89,
+};
+
+function publishedTemporaryPrice(table: Record<string, number>, label: string): number | undefined {
+  return Object.prototype.hasOwnProperty.call(table, label) ? table[label] : undefined;
+}
+
+function temporaryOrderPageLines(body: Record<string, unknown>): BookingLineItem[] {
+  const postedNames = normalizeBookingLineItems(body.lineItems).map((item) => item.name);
+  const labels = [
+    optionalLineText(body.selectedService),
+    ...postedNames,
+    ...textList(body.selectedAddOns),
+  ];
+  const items: BookingLineItem[] = [];
+  const seen = new Set<string>();
+  for (const label of labels) {
+    if (!label || seen.has(label)) continue;
+    const packagePrice = publishedTemporaryPrice(TEMPORARY_ORDER_PAGE_PACKAGES, label);
+    const addonPrice = publishedTemporaryPrice(TEMPORARY_ORDER_PAGE_ADDONS, label);
+    const price = packagePrice !== undefined ? packagePrice : addonPrice;
+    if (price === undefined) continue;
+    seen.add(label);
+    items.push({ name: label, unitPrice: price, qty: 1, price });
+  }
+  return items;
+}
+
+/**
  * Rebuild a public booking from the catalog.
  * Client line prices are ignored. Selection ids, and catalog ids already on
  * the posted lines, are priced from `catalog` (the seed catalog when omitted).
+ * When that produces no service, published labels from the temporary order
+ * page are priced from the tables above. Unknown names stay unpriced.
  */
 export function resolveSubmittedBooking(
   body: Record<string, unknown>,
@@ -268,7 +331,7 @@ export function resolveSubmittedBooking(
   }
 
   const promo = promoDiscountFor(optionalLineText(body.promoCode));
-  const lineItems = buildSubmittedLineItems({
+  let lineItems = buildSubmittedLineItems({
     selectedService,
     selectedBasics,
     selectedAddOns,
@@ -279,6 +342,24 @@ export function resolveSubmittedBooking(
     lifeOfTheListingCare: Boolean(body.lifeOfTheListingCare),
     catalog: list,
   });
+
+  if (chargedServiceLines(lineItems).length === 0) {
+    const temporary = temporaryOrderPageLines(body);
+    if (temporary.length > 0) {
+      lineItems = promo
+        ? [
+            ...temporary,
+            {
+              id: `promo-${promo.code}`,
+              name: `Promo Code: ${promo.code}`,
+              unitPrice: -promo.discount,
+              qty: 1,
+              price: -promo.discount,
+            },
+          ]
+        : temporary;
+    }
+  }
 
   return {
     lineItems,
