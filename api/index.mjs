@@ -267,9 +267,9 @@ function getFallbackTemplate(type, vars) {
     gallery_delivery: base(`
       <h2>Your gallery is ready! 🎉</h2>
       <p>Hi ${vars.clientName},</p>
-      <p>Your photos for <strong>${vars.address}</strong> are edited and ready for download.</p>
-      ${vars.invoiceAmount ? `<p>Please complete your payment of <strong>${vars.invoiceAmount}</strong> to download your files.</p>` : ""}
-      <p><a href="${vars.galleryUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">View Gallery & Download</a></p>
+      <p>Your photos for <strong>${vars.address}</strong> are edited and waiting in your Iconic Images gallery.</p>
+      ${vars.invoiceAmount ? `<p>Iconic Images invoices after the shoot. Downloads stay locked until the <strong>${vars.invoiceAmount}</strong> invoice is paid.</p>` : `<p>Downloads open from your gallery once that invoice is paid, or when our team releases the files.</p>`}
+      <p><a href="${vars.galleryUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">View Gallery</a></p>
       <p style="color:#999;font-size:12px;">Gallery available for ${vars.expiresAt}.</p>
     `),
     invoice: base(`
@@ -3723,11 +3723,23 @@ function invoiceAllowsDownload(invoice) {
   const status = statusOf$1(invoice);
   if (CLOSED_STATUSES.has(status)) return false;
   if (SETTLED_STATUSES.has(status)) return true;
+  const hasMoney = ["total", "amountDue", "amountPaid"].some((key) => numeric(invoice[key]) != null);
+  if (!hasMoney) return false;
   const { total, amountPaid, amountDue } = invoiceBalance(invoice);
   const statedDue = numeric(invoice.amountDue);
   if (total <= 0 && (statedDue == null || statedDue <= 0)) return true;
   if (statedDue != null && statedDue <= 0 && amountPaid <= 0 && total > 0) return false;
   return amountDue <= 0 && amountPaid > 0;
+}
+const ICONIC_DOWNLOAD_LOCK = {
+  title: "Your Iconic files are locked",
+  message: "Iconic Images invoices after the shoot. Downloads open when that invoice is paid, or when our team releases the gallery."
+};
+function clientGalleryDownloadsUnlocked(gate = {}) {
+  if (gate.downloadsReleased === true) return true;
+  if (gate.lockDownloads === false) return true;
+  if (gate.downloadEnabled === true) return true;
+  return invoiceAllowsDownload(gate.invoice);
 }
 function amountStillDue(invoice) {
   if (!invoice) return 0;
@@ -4124,6 +4136,7 @@ function listingResult(listing, related) {
   };
 }
 function publicProject(listing, _related, notice) {
+  const invoice = invoiceOf(listing);
   return {
     id: listing.id,
     address: addressOf(listing),
@@ -4135,7 +4148,13 @@ function publicProject(listing, _related, notice) {
     revisions: publicRevisions(listing),
     lockDownloads: listing.lockDownloads === true,
     requirePayment: listing.requirePayment === true,
-    invoice: invoiceOf(listing),
+    downloadsUnlocked: clientGalleryDownloadsUnlocked({
+      invoice,
+      downloadEnabled: listing.downloadEnabled,
+      downloadsReleased: listing.downloadsReleased,
+      lockDownloads: listing.lockDownloads
+    }),
+    invoice,
     notice,
     view: "public"
   };
@@ -5890,7 +5909,7 @@ async function resolveClientGalleryLink(id) {
   const gallery = docRecord(gallerySnap);
   const listing = docRecord(listingSnap);
   if (gallery) {
-    return decideClientGalleryLink({
+    return finishGalleryLink(decideClientGalleryLink({
       id,
       gallery,
       listing: null,
@@ -5900,10 +5919,10 @@ async function resolveClientGalleryLink(id) {
       pointedGallery: null,
       pointedListing: null,
       galleriesByOrderId: []
-    });
+    }));
   }
   if (listing) {
-    return decideClientGalleryLink({
+    return finishGalleryLink(decideClientGalleryLink({
       id,
       gallery: null,
       listing,
@@ -5913,7 +5932,7 @@ async function resolveClientGalleryLink(id) {
       pointedGallery: null,
       pointedListing: null,
       galleriesByOrderId: []
-    });
+    }));
   }
   const relatedGalleries = await galleriesWhere("listingId", id);
   const [orderSnap, requestSnap] = await Promise.all([
@@ -5932,7 +5951,7 @@ async function resolveClientGalleryLink(id) {
     pointedListing = docRecord(await db$f().collection("listings").doc(pointedListingId).get());
     if (pointedListing) pointedRelated = await relatedForListing(pointedListing);
   }
-  return decideClientGalleryLink({
+  return finishGalleryLink(decideClientGalleryLink({
     id,
     gallery: null,
     listing: null,
@@ -5942,7 +5961,46 @@ async function resolveClientGalleryLink(id) {
     pointedGallery,
     pointedListing,
     galleriesByOrderId
-  });
+  }));
+}
+async function invoiceForListing(listing) {
+  const invoiceId = text$4(listing.invoiceId);
+  if (invoiceId) {
+    const doc = await db$f().collection("invoices").doc(invoiceId).get();
+    if (doc.exists) return { id: doc.id, ...doc.data() || {} };
+  }
+  const orderId = text$4(listing.orderId);
+  if (!orderId) return null;
+  try {
+    const snap = await db$f().collection("invoices").where("orderId", "==", orderId).limit(1).get();
+    if (snap.empty) return null;
+    return { id: snap.docs[0].id, ...snap.docs[0].data() || {} };
+  } catch (err) {
+    console.error("[Galleries] Invoice lookup failed:", err);
+    return null;
+  }
+}
+async function finishGalleryLink(result) {
+  if (!result.ok || result.kind !== "listing") return result;
+  const listing = docRecord(await db$f().collection("listings").doc(result.project.id).get());
+  if (!listing) return result;
+  const [invoice, related] = await Promise.all([
+    invoiceForListing(listing),
+    relatedForListing(listing)
+  ]);
+  const status = typeof invoice?.status === "string" ? invoice.status : "";
+  const invoiceForGate = invoice || (result.project.invoice ? { status: result.project.invoice.status } : null);
+  const project = {
+    ...result.project,
+    invoice: status ? { status } : result.project.invoice,
+    downloadsUnlocked: clientGalleryDownloadsUnlocked({
+      invoice: invoiceForGate,
+      downloadEnabled: listing.downloadEnabled === true || related.some((doc) => doc.downloadEnabled === true),
+      downloadsReleased: listing.downloadsReleased === true || related.some((doc) => doc.downloadsReleased === true),
+      lockDownloads: listing.lockDownloads
+    })
+  };
+  return { ...result, project };
 }
 const handlePublicGalleryLink = async (req, res) => {
   const id = String(req.params.id || "");
@@ -6016,6 +6074,56 @@ async function invoiceForGallery(gallery) {
   }
   return null;
 }
+async function listingDownloadFlags(gallery) {
+  const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
+  if (!listingId) return { lockDownloads: void 0, downloadsReleased: false };
+  const listing = await db$e().collection("listings").doc(listingId).get();
+  if (!listing.exists) return { lockDownloads: void 0, downloadsReleased: false };
+  const data = listing.data() || {};
+  return {
+    lockDownloads: data.lockDownloads,
+    downloadsReleased: data.downloadsReleased === true
+  };
+}
+async function downloadGateForGallery(gallery) {
+  const invoice = await invoiceForGallery(gallery);
+  const listing = await listingDownloadFlags(gallery);
+  return {
+    invoice,
+    downloadEnabled: gallery.downloadEnabled,
+    downloadsReleased: gallery.downloadsReleased === true || listing.downloadsReleased,
+    lockDownloads: listing.lockDownloads
+  };
+}
+function clientGalleryPayload(id, gallery, gate) {
+  const unlocked = clientGalleryDownloadsUnlocked(gate);
+  const invoice = gate.invoice;
+  const showMedia = ["delivered", "approved"].includes(String(gallery.status || ""));
+  const media = [
+    ...Array.isArray(gallery.mediaItems) ? gallery.mediaItems : [],
+    ...Array.isArray(gallery.videoLinks) ? gallery.videoLinks : [],
+    ...Array.isArray(gallery.tourLinks) ? gallery.tourLinks : []
+  ];
+  return {
+    id,
+    title: gallery.title,
+    address: gallery.address,
+    clientName: gallery.clientName,
+    status: gallery.status,
+    deliveredAt: gallery.deliveredAt || null,
+    expiresAt: gallery.expiresAt || null,
+    downloadEnabled: unlocked,
+    paymentRequired: !unlocked,
+    invoiceId: invoice?.id || null,
+    invoiceStatus: invoice?.status || null,
+    lockTitle: unlocked ? null : ICONIC_DOWNLOAD_LOCK.title,
+    lockMessage: unlocked ? null : ICONIC_DOWNLOAD_LOCK.message,
+    mediaItems: showMedia ? media.map((item) => publicMediaItem(
+      item && typeof item === "object" ? item : {},
+      unlocked
+    )) : []
+  };
+}
 router$i.get("/", requireStaff, async (req, res) => {
   try {
     const { status, orderId } = req.query;
@@ -6033,28 +6141,8 @@ router$i.get("/public/:id", async (req, res) => {
     const doc = await db$e().collection("galleries").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Gallery not found." });
     const gallery = doc.data();
-    const invoice = await invoiceForGallery(gallery);
-    const invoiceStatus = invoice?.status || null;
-    const paid = invoiceAllowsDownload(invoice);
-    const canDownload = paid;
-    return res.json({
-      id: doc.id,
-      title: gallery.title,
-      address: gallery.address,
-      clientName: gallery.clientName,
-      status: gallery.status,
-      deliveredAt: gallery.deliveredAt || null,
-      expiresAt: gallery.expiresAt || null,
-      downloadEnabled: canDownload,
-      paymentRequired: !paid,
-      invoiceId: invoice?.id || null,
-      invoiceStatus,
-      mediaItems: ["delivered", "approved"].includes(gallery.status) ? [
-        ...gallery.mediaItems || [],
-        ...gallery.videoLinks || [],
-        ...gallery.tourLinks || []
-      ].map((item) => publicMediaItem(item, canDownload)) : []
-    });
+    const gate = await downloadGateForGallery(gallery);
+    return res.json(clientGalleryPayload(doc.id, gallery, gate));
   } catch (err) {
     console.error("[Galleries] Public fetch error:", err);
     return res.status(500).json({ error: "Failed to fetch gallery." });
@@ -6074,6 +6162,8 @@ router$i.get("/:id", requireAuth, async (req, res) => {
       if (!["delivered", "approved"].includes(gallery.status)) {
         return res.status(403).json({ error: "Gallery not yet available." });
       }
+      const gate = await downloadGateForGallery(gallery);
+      return res.json(clientGalleryPayload(doc.id, gallery, gate));
     }
     return res.json({ id: doc.id, ...gallery });
   } catch (err) {
@@ -6223,9 +6313,8 @@ router$i.post("/:id/deliver", requireCoordinator, async (req, res) => {
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     if (await holdIfOrderIncomplete(res, req.params.id)) return;
     const gallery = galleryDoc.data();
-    const linkedInvoice = await invoiceForGallery(gallery);
-    const paid = invoiceAllowsDownload(linkedInvoice);
-    const downloadEnabled = paid;
+    const gate = await downloadGateForGallery(gallery);
+    const downloadEnabled = clientGalleryDownloadsUnlocked(gate);
     const expiresInDays = Number(req.body?.expiresInDays) > 0 ? Number(req.body.expiresInDays) : 30;
     const expiresAt = admin.firestore.Timestamp.fromDate(
       new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1e3)
@@ -6273,6 +6362,43 @@ router$i.post("/:id/deliver", requireCoordinator, async (req, res) => {
   } catch (err) {
     console.error("[Galleries] Deliver error:", err);
     return res.status(500).json({ error: "Failed to deliver gallery." });
+  }
+});
+router$i.patch("/:id/downloads", requireCoordinator, async (req, res) => {
+  if (!adminReady$5(res)) return;
+  try {
+    if (typeof req.body?.released !== "boolean") {
+      return res.status(400).json({ error: "released must be true or false." });
+    }
+    const released = req.body.released === true;
+    const galleryDoc = await db$e().collection("galleries").doc(req.params.id).get();
+    if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
+    const gallery = galleryDoc.data() || {};
+    const invoice = await invoiceForGallery(gallery);
+    const listing = await listingDownloadFlags(gallery);
+    const downloadEnabled = clientGalleryDownloadsUnlocked({
+      invoice,
+      downloadEnabled: false,
+      downloadsReleased: released,
+      lockDownloads: listing.lockDownloads
+    });
+    await galleryDoc.ref.update({
+      downloadsReleased: released,
+      downloadEnabled,
+      downloadsReleasedAt: released ? admin.firestore.FieldValue.serverTimestamp() : null,
+      downloadsReleasedBy: released ? req.user?.uid || null : null,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    return res.json({
+      success: true,
+      downloadsReleased: released,
+      downloadEnabled,
+      lockTitle: downloadEnabled ? null : ICONIC_DOWNLOAD_LOCK.title,
+      lockMessage: downloadEnabled ? null : ICONIC_DOWNLOAD_LOCK.message
+    });
+  } catch (err) {
+    console.error("[Galleries] Download release error:", err);
+    return res.status(500).json({ error: "Failed to update gallery downloads." });
   }
 });
 router$i.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
