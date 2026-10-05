@@ -318,4 +318,31 @@ describe("portal listing detail", () => {
     expect(JSON.stringify(visitor)).not.toMatch(/INV-2026-100|invoiceNumber|amountDue/);
     expect(portalListingDataApiPath("listing1234")).toBe("/api/clients/me/listings/listing1234/data");
   });
+
+  it("keeps a photo edit note on the owner listing and off the public link", () => {
+    const detail = buildPortalListingDetail({
+      listing: {
+        id: listingId,
+        images: [{ id: "front", name: "front.jpg", url: "https://cdn.example/front.jpg", contentType: "image/jpeg" }],
+        photoEditRequests: [{
+          id: "req-front1",
+          listingId,
+          photoId: "front",
+          photoName: "front.jpg",
+          note: "Warm the sky on the left.",
+          status: "requested",
+          timeline: [{ status: "requested", at: "2026-04-02T15:00:00.000Z", actor: "client", actorId: "client123" }],
+          replacement: null,
+          clientId: "client123",
+          createdAt: "2026-04-02T15:00:00.000Z",
+          updatedAt: "2026-04-02T15:00:00.000Z",
+        }],
+      },
+    });
+    expect(detail.photoEditRequests.map((request) => request.photoId)).toEqual(["front"]);
+    expect(detail.photoEditRequests[0].note).toBe("Warm the sky on the left.");
+    const visitor = visitorPortalListingDetail(detail);
+    expect(visitor.photoEditRequests).toEqual([]);
+    expect(JSON.stringify(visitor)).not.toContain("Warm the sky on the left.");
+  });
 });

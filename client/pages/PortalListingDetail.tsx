@@ -21,6 +21,11 @@ import {
   type PortalTourItem,
   type PortalWebsiteSettings,
 } from "@shared/portalListingDetail";
+import {
+  PHOTO_EDIT_NOTE_LIMIT,
+  photoEditStatusLabel,
+  type PhotoEditRequest,
+} from "@shared/photoEditRequest";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Eye, EyeOff, MapPin } from "lucide-react";
 import { toast } from "sonner";
@@ -43,6 +48,7 @@ export function PortalListingDetailView({
   onDataEditing,
   onDataDraft,
   onDataSave,
+  onRequestPhotoEdit,
 }: {
   detail: PortalListingDetailModel;
   tab: PortalListingTabId;
@@ -60,6 +66,7 @@ export function PortalListingDetailView({
   onDataEditing: (editing: boolean) => void;
   onDataDraft: (draft: PortalListingFactsDraft) => void;
   onDataSave: () => void;
+  onRequestPhotoEdit: (photoId: string, note: string) => Promise<boolean>;
 }) {
   const mediaEditing = canEdit ? editing : null;
   const shown = canEdit ? detail : visitorPortalListingDetail(detail);
@@ -121,6 +128,8 @@ export function PortalListingDetailView({
             items={shown.photos}
             onToggleEditing={() => onToggleEditing("photo")}
             onMedia={onMedia}
+            photoEditRequests={shown.photoEditRequests || []}
+            onRequestPhotoEdit={canEdit ? onRequestPhotoEdit : undefined}
           />
         )}
         {tab === "video" && (
@@ -247,13 +256,13 @@ export default function PortalListingDetail() {
   if (!id || missing) return <NotFound />;
   if (loading || fetching) return <Pending />;
 
-  async function send(path: string, body: unknown): Promise<PortalListingDetailModel | null> {
+  async function send(path: string, body: unknown, method: "PATCH" | "POST" = "PATCH"): Promise<PortalListingDetailModel | null> {
     if (!canEdit || !user) return null;
     setSaving(true);
     try {
       const token = await user.getIdToken();
       const res = await fetch(path, {
-        method: "PATCH",
+        method,
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
@@ -320,6 +329,10 @@ export default function PortalListingDetail() {
             setDataDraft(portalFactsDraftFromDetail(detail));
           }}
           onDataDraft={setDataDraft}
+          onRequestPhotoEdit={async (photoId, note) => {
+            const saved = await send(`${ownerApi}/photo-edit-requests`, { photoId, note }, "POST");
+            return Boolean(saved);
+          }}
           onDataSave={() => {
             void (async () => {
               const saved = await send(portalListingDataApiPath(id), dataDraft ?? portalFactsDraftFromDetail(detail));
@@ -488,6 +501,87 @@ function Field({ label, value, placeholder = "—" }: { label: string; value: st
   );
 }
 
+function PhotoEditNote({
+  item,
+  requests,
+  saving,
+  onRequest,
+}: {
+  item: PortalMediaItem;
+  requests: PhotoEditRequest[];
+  saving: boolean;
+  onRequest?: (photoId: string, note: string) => Promise<boolean>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState("");
+  const mine = requests.filter((request) => request.photoId === item.id);
+  const pending = mine.some((request) => request.status !== "received_back");
+  if (!onRequest && mine.length === 0) return null;
+  return (
+    <div className="mt-3 space-y-2">
+      {mine.map((request) => (
+        <div key={request.id} data-testid={`photo-edit-status-${request.id}`} className="rounded-xl bg-gray-50 px-3 py-2">
+          <p className="text-[10px] font-black uppercase tracking-widest text-[#0d9488]">{photoEditStatusLabel(request.status)}</p>
+          <p className="text-sm text-gray-700 mt-1">{request.note}</p>
+          <ol className="mt-2 space-y-1">
+            {request.timeline.map((entry) => (
+              <li key={`${entry.status}-${entry.at}`} className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                {photoEditStatusLabel(entry.status)}
+              </li>
+            ))}
+          </ol>
+          {request.replacement && (
+            <a href={request.replacement.url} target="_blank" rel="noopener noreferrer" className="inline-block mt-2 text-xs font-bold text-[#0d9488]">
+              {request.replacement.name}
+            </a>
+          )}
+        </div>
+      ))}
+      {onRequest && !pending && !open && (
+        <Button type="button" size="sm" variant="outline" data-testid={`photo-edit-open-${item.id}`} onClick={() => setOpen(true)}>
+          Request edit
+        </Button>
+      )}
+      {onRequest && !pending && open && (
+        <div>
+          <label className="text-[10px] font-black uppercase tracking-widest text-gray-400" htmlFor={`photo-edit-note-${item.id}`}>
+            Note
+          </label>
+          <textarea
+            id={`photo-edit-note-${item.id}`}
+            data-testid={`photo-edit-note-${item.id}`}
+            value={note}
+            maxLength={PHOTO_EDIT_NOTE_LIMIT}
+            rows={3}
+            placeholder="What should change on this photo?"
+            onChange={(event) => setNote(event.target.value)}
+            className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
+          />
+          <p className="mt-1 text-[10px] text-gray-400">The note is saved on this photo. It does not send a message or create a charge.</p>
+          <div className="mt-2 flex gap-2">
+            <Button type="button" size="sm" variant="outline" onClick={() => { setOpen(false); setNote(""); }}>Cancel</Button>
+            <Button
+              type="button"
+              size="sm"
+              data-testid={`photo-edit-submit-${item.id}`}
+              disabled={saving || !note.trim()}
+              onClick={() => {
+                void onRequest(item.id, note).then((ok) => {
+                  if (!ok) return;
+                  setNote("");
+                  setOpen(false);
+                });
+              }}
+            >
+              Send request
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MediaTab({
   title,
   empty,
@@ -497,6 +591,8 @@ function MediaTab({
   saving,
   onToggleEditing,
   onMedia,
+  photoEditRequests = [],
+  onRequestPhotoEdit,
 }: {
   title: string;
   empty: string;
@@ -506,6 +602,8 @@ function MediaTab({
   saving: boolean;
   onToggleEditing: () => void;
   onMedia: (change: { kind: PortalMediaKind; id: string; hidden?: boolean; move?: "earlier" | "later" }) => void;
+  photoEditRequests?: PhotoEditRequest[];
+  onRequestPhotoEdit?: (photoId: string, note: string) => Promise<boolean>;
 }) {
   const showEditor = canEdit && editing;
   const visible = showEditor ? items : items.filter((item) => !item.hidden);
@@ -553,6 +651,14 @@ function MediaTab({
                   <Button type="button" size="sm" variant="outline" disabled={saving || index === 0} onClick={() => onMedia({ kind: item.kind, id: item.id, move: "earlier" })}>Earlier</Button>
                   <Button type="button" size="sm" variant="outline" disabled={saving || index === visible.length - 1} onClick={() => onMedia({ kind: item.kind, id: item.id, move: "later" })}>Later</Button>
                 </div>
+              )}
+              {item.kind === "photo" && (
+                <PhotoEditNote
+                  item={item}
+                  requests={photoEditRequests}
+                  saving={saving}
+                  onRequest={onRequestPhotoEdit}
+                />
               )}
             </article>
           ))}

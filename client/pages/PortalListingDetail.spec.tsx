@@ -55,6 +55,7 @@ function render(
         onDataEditing={() => undefined}
         onDataDraft={() => undefined}
         onDataSave={() => undefined}
+        onRequestPhotoEdit={async () => false}
       />
     </MemoryRouter>,
   );
@@ -95,6 +96,86 @@ describe("portal listing detail page", () => {
     expect(visitorEditing).not.toContain("data-edit-toggle");
     expect(visitorEditing).not.toContain("data-field-line1");
     expect(visitorEditing).not.toContain("data-save");
+  });
+
+  it("lets the owner request an edit on one visible photo", () => {
+    const html = render("photos");
+    expect(html).toContain("photo-edit-open-front");
+    expect(html).toContain("Request edit");
+    expect(html).not.toContain("Pay now");
+
+    const requested = buildPortalListingDetail({
+      listing: {
+        id: "listing1234",
+        images: [{ id: "front", name: "front.jpg", url: "https://cdn.example/front.jpg", contentType: "image/jpeg" }],
+        photoEditRequests: [{
+          id: "req-front1",
+          listingId: "listing1234",
+          photoId: "front",
+          photoName: "front.jpg",
+          note: "Warm the sky on the left.",
+          status: "requested",
+          timeline: [{ status: "requested", at: "2026-04-02T15:00:00.000Z", actor: "client", actorId: "client123" }],
+          replacement: null,
+          clientId: "client123",
+          createdAt: "2026-04-02T15:00:00.000Z",
+          updatedAt: "2026-04-02T15:00:00.000Z",
+        }],
+      },
+    });
+    const owner = renderToString(
+      <MemoryRouter>
+        <PortalListingDetailView
+          detail={requested}
+          tab="photos"
+          editing={null}
+          saving={false}
+          canEdit
+          dataEditing={false}
+          dataDraft={portalFactsDraftFromDetail(requested)}
+          website={defaultPortalWebsite()}
+          onTab={() => undefined}
+          onToggleEditing={() => undefined}
+          onMedia={() => undefined}
+          onWebsite={() => undefined}
+          onWebsiteSave={() => undefined}
+          onDataEditing={() => undefined}
+          onDataDraft={() => undefined}
+          onDataSave={() => undefined}
+          onRequestPhotoEdit={async () => false}
+        />
+      </MemoryRouter>,
+    );
+    expect(owner).toContain("Warm the sky on the left.");
+    expect(owner).toContain("Requested");
+    expect(owner).not.toContain("photo-edit-open-front");
+
+    const visitor = renderToString(
+      <MemoryRouter>
+        <PortalListingDetailView
+          detail={requested}
+          tab="photos"
+          editing={null}
+          saving={false}
+          canEdit={false}
+          dataEditing={false}
+          dataDraft={portalFactsDraftFromDetail(requested)}
+          website={defaultPortalWebsite()}
+          onTab={() => undefined}
+          onToggleEditing={() => undefined}
+          onMedia={() => undefined}
+          onWebsite={() => undefined}
+          onWebsiteSave={() => undefined}
+          onDataEditing={() => undefined}
+          onDataDraft={() => undefined}
+          onDataSave={() => undefined}
+          onRequestPhotoEdit={async () => false}
+        />
+      </MemoryRouter>,
+    );
+    expect(visitor).not.toContain("Warm the sky on the left.");
+    expect(visitor).not.toContain("Request edit");
+    expect(visitor).not.toContain("photo-edit-open-front");
   });
 
   it("shows a hidden photo only while editing", () => {

@@ -32,7 +32,12 @@ describe("portal listing detail routes", () => {
     expect(listingAt).toBeGreaterThan(-1);
     expect(idAt).toBeGreaterThan(listingAt);
     expect(clients).toContain('"/me/listings/:id/data"');
+    expect(clients).toContain('"/me/listings/:id/photo-edit-requests"');
+    expect(clients).toContain("handleCreatePhotoEditRequest");
     expect(clients).toContain("handlePatchPortalData");
+    const editAt = clients.indexOf('"/me/listings/:id/photo-edit-requests"');
+    expect(editAt).toBeGreaterThan(-1);
+    expect(editAt).toBeLessThan(idAt);
 
     const source = [
       readFileSync(new URL("./portalListing.ts", import.meta.url), "utf8"),
@@ -64,9 +69,32 @@ describe("portal listing detail routes", () => {
       body: JSON.stringify({ address: { line1: "9 Main" }, facts: { beds: "4" } }),
     });
     expect(data.status).toBe(401);
+    const photoEdit = await fetch(`${baseUrl}/api/clients/me/listings/listing1234/photo-edit-requests`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ photoId: "front", note: "Warm the sky on the left." }),
+    });
+    expect(photoEdit.status).toBe(401);
+    const sent = await fetch(`${baseUrl}/api/listings/listing1234/photo-edit-requests/req-front1/sent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    expect(sent.status).toBe(401);
+    const received = await fetch(`${baseUrl}/api/listings/listing1234/photo-edit-requests/req-front1/received`, {
+      method: "POST",
+    });
+    expect(received.status).toBe(401);
+    const replacement = await fetch(`${baseUrl}/api/listings/listing1234/photo-edit-requests/req-front1/replacement`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fileName: "front.jpg", contentType: "image/jpeg", dataBase64: "aGVsbG8=" }),
+    });
+    expect(replacement.status).toBe(401);
 
     const index = readFileSync(new URL("../index.ts", import.meta.url), "utf8");
     expect(index).toContain('app.get("/api/portal/listings/:id", handleGetPublicPortalListing)');
+    expect(index).toContain("photoEditRequestsRouter");
     expect(index).not.toContain('app.get("/api/portal/listings"');
     expect(index).not.toContain('"/api/portal/home"');
 
