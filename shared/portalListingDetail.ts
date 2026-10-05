@@ -6,6 +6,8 @@
  * Those edits do not geocode, look up public records, or publish payment.
  */
 
+import { readPhotoEditRequests, type PhotoEditRequest } from "./photoEditRequest";
+
 export const PORTAL_LISTING_TABS = [
   { id: "data", label: "Data" },
   { id: "photos", label: "Photos" },
@@ -138,6 +140,7 @@ export interface PortalListingDetail {
   website: PortalWebsiteSettings;
   invoices: PortalInvoiceSummary[];
   activity: PortalActivityEvent[];
+  photoEditRequests: PhotoEditRequest[];
 }
 
 export interface PortalListingSources {
@@ -252,6 +255,7 @@ export function visitorPortalListingDetail(detail: PortalListingDetail): PortalL
     floorplans: detail.floorplans.filter((item) => !item.hidden),
     invoices: [],
     activity: detail.activity.filter((event) => !isInvoiceOrPaymentActivity(event)),
+    photoEditRequests: [],
   };
 }
 
@@ -326,6 +330,7 @@ export function buildPortalListingDetail(sources: PortalListingSources): PortalL
     website,
     invoices,
     activity,
+    photoEditRequests: readPhotoEditRequests(listing.photoEditRequests),
   }, listing.portalData);
 }
 

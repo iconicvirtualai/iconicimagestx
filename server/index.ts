@@ -35,6 +35,7 @@ import { requireAdmin, requireStaff } from "./middleware/auth";
 import { handleListingPhotoUpload } from "./routes/listingPhotos";
 import { handleGetPublicPortalListing } from "./routes/portalListing";
 import presentationsRouter from "./routes/presentations";
+import photoEditRequestsRouter from "./routes/photoEditRequests";
 
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
 const API_BUILD_MARKER = "auth-square-2026-09-28";
@@ -210,6 +211,7 @@ export function createServer() {
   app.use("/api/staff", staffRouter);
   app.use("/api", presentationsRouter);
   app.use("/api/listings", listingsRouter);
+  app.use("/api", photoEditRequestsRouter);
   app.use("/api/campaigns", campaignsRouter);
   app.use("/api/agents", agentsRouter);
   app.use("/api/media-jobs", mediaJobsRouter);

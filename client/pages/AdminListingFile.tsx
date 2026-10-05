@@ -20,6 +20,7 @@ import {
 import { ensureLinkedInvoice, resolveLinkedInvoice } from "@/lib/orderProjectInvoice";
 import { staffInvoicePath } from "@shared/staffInvoice";
 import { PresentationShareButton, PresentationSharePanel } from "@/components/PresentationSharePanel";
+import { PhotoEditRequestStaff } from "@/components/PhotoEditRequestStaff";
 
 // ─── Status systems ───────────────────────────────────────────────────────────
 const RE_STATUSES = ["unscheduled", "scheduled", "in_progress", "delivered", "paid", "archived"];
@@ -595,6 +596,13 @@ export default function AdminListingFile() {
                       </div>
                     ))}
                   </div>
+                )}
+                {id && (
+                  <PhotoEditRequestStaff
+                    listingId={id}
+                    requests={project.photoEditRequests}
+                    getToken={async () => (user ? user.getIdToken() : undefined)}
+                  />
                 )}
               </div>
             )}

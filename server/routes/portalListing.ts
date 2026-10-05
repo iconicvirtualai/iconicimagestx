@@ -23,6 +23,7 @@ import {
 } from "../../shared/portalListingDetail";
 import { jsonSafe } from "../lib/firestoreJson";
 import { resolveClientIdentity } from "../services/clientAccounts";
+import { filePhotoEditRequest, PhotoEditRequestError } from "../services/photoEditRequests";
 
 const db = () => admin.firestore();
 
@@ -43,7 +44,7 @@ function text(value: unknown): string {
 }
 
 function sendKnownError(res: { status: (code: number) => { json: (body: unknown) => unknown } }, err: unknown, fallback: string) {
-  const status = (err as { status?: number }).status;
+  const status = err instanceof PhotoEditRequestError ? err.status : (err as { status?: number }).status;
   if (status && status >= 400 && status < 500) {
     return res.status(status).json({ error: err instanceof Error ? err.message : fallback });
   }
@@ -234,6 +235,37 @@ export const handlePatchPortalData: RequestHandler = async (req: AuthenticatedRe
     return res.json(buildPortalListingDetail(await loadSources(listingId, refreshed)));
   } catch (err) {
     return sendKnownError(res, err, "Could not save listing facts.");
+  }
+};
+
+/** Owner files a note on one photo already shown on this listing. */
+export const handleCreatePhotoEditRequest: RequestHandler = async (req: AuthenticatedRequest, res) => {
+  if (!adminReady(res)) return;
+  const listingId = listingIdFrom(req.params.id);
+  if (!listingId) return res.status(400).json({ error: "Listing id is not valid." });
+  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const photoId = text(body.photoId);
+  const note = typeof body.note === "string" ? body.note : "";
+  if (!photoId) return res.status(400).json({ error: "Choose one photo." });
+  try {
+    const listing = await authorizedListing(req, listingId);
+    const detail = buildPortalListingDetail(await loadSources(listingId, listing));
+    const photo = detail.photos.find((item) => item.id === photoId);
+    if (!photo) return res.status(400).json({ error: "That photo is not on this listing." });
+    await filePhotoEditRequest({
+      listingId,
+      photoId,
+      photoName: photo.name,
+      photoUrl: photo.url,
+      note,
+      clientId: req.user!.uid,
+      knownPhotoIds: detail.photos.map((item) => item.id),
+      at: new Date().toISOString(),
+    });
+    const refreshed = await authorizedListing(req, listingId);
+    return res.status(201).json(buildPortalListingDetail(await loadSources(listingId, refreshed)));
+  } catch (err) {
+    return sendKnownError(res, err, "Could not save that edit request.");
   }
 };
 
