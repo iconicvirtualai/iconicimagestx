@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ICONIC_POLISH_INSTRUCTION,
-  orderExteriorTwilightPrompt,
+  ICONIC_POLISH_TREATMENTS,
 } from "@shared/orderEditPlan";
 import {
   AI_EDIT_PRESETS,
@@ -9,15 +9,11 @@ import {
   adjustmentCssFilter,
   type StudioAdjustments,
 } from "@shared/iconicStudio";
-import {
-  GRASS_REFERENCE_PUBLIC_PATH,
-  type ScratchAction,
-} from "@shared/studioScratch";
+import { type ScratchAction } from "@shared/studioScratch";
+import { SCRATCH_SORT_DEFAULT, type ScratchSortMode } from "@/lib/scratchSort";
 import { Slider } from "@/components/ui/slider";
 
-export type ScratchApplyScope = "photo" | "set";
 export type ScratchExportDestination = "gallery" | "dropbox" | "drive" | "zip";
-export type ScratchSection = "ai" | "finetune" | "presets";
 
 export interface ScratchFrameView {
   id: string;
@@ -29,6 +25,7 @@ export interface ScratchFrameView {
   selected: boolean;
   focused: boolean;
   lastAction?: string;
+  canRevert?: boolean;
 }
 
 const labelCls =
@@ -36,21 +33,21 @@ const labelCls =
 const gold = "#c4a46a";
 const teal = "#0d9488";
 
-const SECTIONS: Array<{ id: ScratchSection; label: string }> = [
-  { id: "ai", label: "AI settings" },
-  { id: "finetune", label: "Finetune" },
-  { id: "presets", label: "Presets" },
-];
+const PRESETS = AI_EDIT_PRESETS.filter(
+  (preset) =>
+    preset.id !== "free_text" &&
+    preset.id !== "twilight" &&
+    preset.id !== "add_people",
+);
 
-const PRESETS = [
-  ...AI_EDIT_PRESETS.filter(
-    (preset) => preset.id !== "free_text" && preset.id !== "twilight",
-  ),
-  {
-    id: "iconic_polish",
-    label: "Iconic Polish",
-    prompt: ICONIC_POLISH_INSTRUCTION,
-  },
+const SORTS: Array<{ id: ScratchSortMode; label: string }> = [
+  { id: "name-asc", label: "Filename" },
+  { id: "name-desc", label: "Filename, high to low" },
+  { id: "date-asc", label: "Date shot, oldest first" },
+  { id: "date-desc", label: "Date shot, newest first" },
+  { id: "size-desc", label: "Size, large to small" },
+  { id: "size-asc", label: "Size, small to large" },
+  { id: "upload", label: "Upload order" },
 ];
 
 const CROPS: Array<{ id: StudioAdjustments["crop"]; label: string }> = [
@@ -76,56 +73,28 @@ function actionLabel(action?: string) {
   return "";
 }
 
-function ScopedApply({
-  name,
+function ApplyButton({
   testId,
-  applyTestId,
-  applyLabel,
+  label,
   disabled,
   onApply,
 }: {
-  name: string;
   testId: string;
-  applyTestId: string;
-  applyLabel: string;
+  label: string;
   disabled?: boolean;
-  onApply: (scope: ScratchApplyScope) => void;
+  onApply: () => void;
 }) {
-  const [scope, setScope] = useState<ScratchApplyScope>("photo");
   return (
-    <div
+    <button
+      type="button"
       data-testid={testId}
-      className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2"
+      disabled={disabled}
+      onClick={onApply}
+      className="rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-40"
+      style={{ backgroundColor: teal }}
     >
-      <label className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-gray-500">
-        <input
-          type="radio"
-          name={name}
-          checked={scope === "photo"}
-          onChange={() => setScope("photo")}
-        />
-        This photo
-      </label>
-      <label className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-gray-500">
-        <input
-          type="radio"
-          name={name}
-          checked={scope === "set"}
-          onChange={() => setScope("set")}
-        />
-        All photos in the set
-      </label>
-      <button
-        type="button"
-        data-testid={applyTestId}
-        disabled={disabled}
-        onClick={() => onApply(scope)}
-        className="rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-40"
-        style={{ backgroundColor: teal }}
-      >
-        {applyLabel}
-      </button>
-    </div>
+      {label}
+    </button>
   );
 }
 
@@ -137,13 +106,16 @@ export default function StudioScratchPad({
   progress,
   grassReady,
   grassNote,
+  sortMode = SCRATCH_SORT_DEFAULT,
   onPrompt,
   onRevision,
   onAddFiles,
   onSelect,
+  onSort,
   onRun,
   onApplyPreset,
   onApplyFinetune,
+  onRevertFinetune,
   onDownload,
   onExport,
   onRemove,
@@ -155,36 +127,36 @@ export default function StudioScratchPad({
   progress: string;
   grassReady: boolean;
   grassNote: string;
+  sortMode?: ScratchSortMode;
   onPrompt: (value: string) => void;
   onRevision: (value: string) => void;
   onAddFiles: (files: File[]) => void;
   onSelect: (id: string, mode: "replace" | "toggle" | "range") => void;
-  onRun: (action: ScratchAction, scope: ScratchApplyScope) => void;
-  onApplyPreset: (presetPrompt: string, scope: ScratchApplyScope) => void;
-  onApplyFinetune: (
-    adjustments: StudioAdjustments,
-    scope: ScratchApplyScope,
-    useOriginal: boolean,
-  ) => Promise<boolean>;
+  onSort: (mode: ScratchSortMode) => void;
+  onRun: (action: ScratchAction) => void;
+  onApplyPreset: (presetPrompt: string) => void;
+  onApplyFinetune: (adjustments: StudioAdjustments) => Promise<boolean>;
+  onRevertFinetune: () => void;
   onDownload: () => void;
   onExport: (destination: ScratchExportDestination) => void;
   onRemove: (id: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
-  const [section, setSection] = useState<ScratchSection>("ai");
   const [showAfter, setShowAfter] = useState(true);
   const [adjustments, setAdjustments] =
     useState<StudioAdjustments>(DEFAULT_ADJUSTMENTS);
   const focus = frames.find((frame) => frame.focused) || frames[0] || null;
   const setReady = frames.length > 0;
+  const checkedCount = frames.filter((frame) => frame.selected).length;
   const editedCount = frames.filter((frame) => frame.afterUrl).length;
-  const twilightPrompt = orderExteriorTwilightPrompt();
+  const canRevert = frames.some((frame) => frame.selected && frame.canRevert);
   const displayUrl = focus
     ? showAfter && focus.afterUrl
       ? focus.afterUrl
       : focus.beforeUrl
     : "";
+  const applyLocked = busy || checkedCount === 0;
 
   useEffect(() => {
     setShowAfter(true);
@@ -199,18 +171,11 @@ export default function StudioScratchPad({
     setAdjustments((current) => ({ ...current, [key]: value }));
   };
 
-  const applyFinetune = (scope: ScratchApplyScope) => {
-    const useOriginal = Boolean(focus?.afterUrl) && !showAfter;
-    void onApplyFinetune(adjustments, scope, useOriginal).then((applied) => {
-      if (applied) setAdjustments(DEFAULT_ADJUSTMENTS);
-    });
-  };
-
   return (
     <div
       data-testid="scratch-pad"
       data-layout="center-photo bottom-filmstrip right-panel"
-      className="flex h-[calc(100vh-8.75rem)] min-h-[640px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-[#161616]"
+      className="flex min-h-[640px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-[#161616] lg:h-[calc(100vh-8.75rem)]"
       onDragOver={(event) => {
         event.preventDefault();
         setDragOver(true);
@@ -237,6 +202,7 @@ export default function StudioScratchPad({
             {frames.length === 0
               ? "No set yet"
               : `${frames.length} in this set`}
+            {checkedCount ? ` · ${checkedCount} checked` : ""}
             {progress ? ` · ${progress}` : ""}
             {focus?.lastAction ? ` · ${actionLabel(focus.lastAction)}` : ""}
           </p>
@@ -313,11 +279,11 @@ export default function StudioScratchPad({
         ) : null}
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-col lg:flex-1 lg:flex-row">
+        <div className="flex min-w-0 flex-col lg:min-h-0 lg:flex-1">
           <section
             data-testid="scratch-viewer"
-            className="relative flex min-h-[240px] flex-1 items-center justify-center bg-[#1c1c1c]"
+            className="relative flex min-h-[240px] flex-1 items-center justify-center overflow-hidden bg-[#1c1c1c]"
           >
             {!focus ? (
               <button
@@ -397,10 +363,36 @@ export default function StudioScratchPad({
             ) : null}
           </section>
 
+          {setReady ? (
+            <div className="flex items-center justify-between gap-3 border-t border-white/10 bg-[#111] px-3 py-2">
+              <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400">
+                Sort
+                <select
+                  data-testid="scratch-sort"
+                  value={sortMode}
+                  onChange={(event) =>
+                    onSort(event.target.value as ScratchSortMode)
+                  }
+                  className="rounded-lg border border-white/15 bg-[#0a0a0a] px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-white"
+                >
+                  {SORTS.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="text-right text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                Check the frames to edit. Nothing is added to an order or a
+                gallery.
+              </p>
+            </div>
+          ) : null}
+
           <footer
             data-testid="scratch-filmstrip"
             data-position="bottom"
-            className="flex h-[5.75rem] shrink-0 items-center gap-2 overflow-x-auto border-t border-white/10 bg-[#0a0a0a] px-3"
+            className="scrollbar-hide flex h-[5.75rem] shrink-0 items-center gap-2 overflow-x-auto border-t border-white/10 bg-[#0a0a0a] px-3"
           >
             <button
               type="button"
@@ -415,37 +407,43 @@ export default function StudioScratchPad({
               </p>
             ) : (
               frames.map((frame) => (
-                <button
+                <div
                   key={frame.id}
-                  type="button"
-                  data-testid={`scratch-frame-${frame.id}`}
-                  data-selected={frame.selected ? "true" : "false"}
-                  data-focused={frame.focused ? "true" : "false"}
-                  title={frame.name}
-                  onClick={() => onSelect(frame.id, "replace")}
-                  className={`h-14 w-[4.5rem] shrink-0 overflow-hidden rounded-lg border-2 ${
-                    frame.status === "failed"
-                      ? "border-red-500"
-                      : frame.focused
-                        ? "border-[#c4a46a]"
-                        : frame.selected
-                          ? "border-[#0d9488]"
-                          : "border-transparent"
-                  }`}
+                  className="relative h-14 w-[4.5rem] shrink-0"
                 >
-                  <img
-                    src={frame.afterUrl || frame.beforeUrl}
-                    alt=""
-                    className="h-full w-full object-cover"
+                  <button
+                    type="button"
+                    data-testid={`scratch-frame-${frame.id}`}
+                    data-selected={frame.selected ? "true" : "false"}
+                    data-focused={frame.focused ? "true" : "false"}
+                    title={frame.name}
+                    onClick={() => onSelect(frame.id, "replace")}
+                    className={`h-full w-full overflow-hidden rounded-lg border-2 ${
+                      frame.status === "failed"
+                        ? "border-red-500"
+                        : frame.focused
+                          ? "border-[#c4a46a]"
+                          : frame.selected
+                            ? "border-[#0d9488]"
+                            : "border-transparent"
+                    }`}
+                  >
+                    <img
+                      src={frame.afterUrl || frame.beforeUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                    <span className="sr-only">{frame.name}</span>
+                  </button>
+                  <input
+                    type="checkbox"
+                    data-testid={`scratch-check-${frame.id}`}
+                    checked={frame.selected}
+                    aria-label={`Include ${frame.name}`}
+                    onChange={() => onSelect(frame.id, "toggle")}
+                    className="absolute left-1 top-1 z-10 h-3.5 w-3.5 accent-[#0d9488]"
                   />
-                  <span className="sr-only">
-                    {frame.status === "editing"
-                      ? "Editing"
-                      : frame.status === "failed"
-                        ? "Failed"
-                        : frame.name}
-                  </span>
-                </button>
+                </div>
               ))
             )}
           </footer>
@@ -462,120 +460,120 @@ export default function StudioScratchPad({
             >
               Adjust enhancement
             </h2>
-            <p className="mt-1 text-[11px] leading-snug text-gray-500">
-              Each tool is optional. Applying one does not run the others.
-            </p>
           </div>
-          <div
-            role="tablist"
-            aria-label="Adjust enhancement"
-            className="grid grid-cols-3 border-b border-slate-100"
-          >
-            {SECTIONS.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                role="tab"
-                aria-selected={section === item.id}
-                data-testid={`scratch-section-${item.id}`}
-                onClick={() => setSection(item.id)}
-                className={`px-2 py-3 text-[10px] font-black uppercase tracking-widest ${
-                  section === item.id
-                    ? "text-[#0d9488] shadow-[inset_0_-2px_0_#0d9488]"
-                    : "text-gray-400"
-                }`}
+          <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto p-4">
+            <section data-testid="scratch-panel-ai" data-active="true">
+              <h3
+                data-testid="scratch-section-ai"
+                className="text-[10px] font-black uppercase tracking-widest text-[#0d9488]"
               >
-                {item.label}
-              </button>
-            ))}
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            <div
-              data-testid="scratch-panel-ai"
-              data-active={section === "ai" ? "true" : "false"}
-              className={section === "ai" ? "space-y-5" : "hidden"}
-            >
-              <p className="text-xs leading-relaxed text-gray-500">
-                Command, grass, and twilight stay off until you apply that tool.
-                Photos stay in this browser. Nothing is added to an order or a
-                gallery.
+                AI settings
+              </h3>
+              <p className="mt-2 text-[11px] leading-snug text-gray-500">
+                Applies to the checked photos. Each tool runs on its own.
               </p>
-              <section className="rounded-xl border border-slate-200 p-3">
-                <label className="block">
-                  <span className={labelCls}>Edit request</span>
-                  <textarea
-                    data-testid="scratch-prompt"
-                    value={prompt}
-                    onChange={(event) => onPrompt(event.target.value)}
-                    rows={3}
-                    placeholder="Brighten the interior and clear the window glare."
-                    className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#0d9488]"
-                  />
-                </label>
-                <ScopedApply
-                  name="scope-edit"
-                  testId="scratch-scope-edit"
-                  applyTestId="scratch-run"
-                  applyLabel="Apply edit"
-                  disabled={busy || !setReady}
-                  onApply={(scope) => onRun("edit", scope)}
-                />
-              </section>
-              <section className="rounded-xl border border-slate-200 p-3">
-                <p className={labelCls}>Twilight conversion</p>
-                <p
-                  data-testid="scratch-twilight-prompt"
-                  className="mt-2 line-clamp-4 text-xs leading-relaxed text-gray-500"
-                >
-                  {twilightPrompt}
-                </p>
-                <ScopedApply
-                  name="scope-twilight"
-                  testId="scratch-scope-twilight"
-                  applyTestId="scratch-twilight"
-                  applyLabel="Apply twilight"
-                  disabled={busy || !setReady}
-                  onApply={(scope) => onRun("twilight", scope)}
-                />
-              </section>
-              <section className="rounded-xl border border-slate-200 p-3">
-                <p className={labelCls}>Grass replacement</p>
-                {grassReady ? (
-                  <img
-                    src={GRASS_REFERENCE_PUBLIC_PATH}
-                    alt="Grass reference lawn"
-                    data-testid="scratch-grass-preview"
-                    className="mt-2 h-16 w-28 rounded-lg object-cover"
-                  />
-                ) : null}
-                <p
-                  data-testid="scratch-grass-note"
-                  className="mt-2 text-xs leading-relaxed text-gray-500"
-                >
-                  {grassNote}
-                </p>
-                <ScopedApply
-                  name="scope-grass"
-                  testId="scratch-scope-grass"
-                  applyTestId="scratch-grass"
-                  applyLabel="Apply grass"
-                  disabled={busy || !grassReady || !setReady}
-                  onApply={(scope) => onRun("grass", scope)}
-                />
-              </section>
-            </div>
 
-            <div
-              data-testid="scratch-panel-finetune"
-              data-active={section === "finetune" ? "true" : "false"}
-              className={section === "finetune" ? "space-y-5" : "hidden"}
+              <label className="mt-4 block">
+                <span className={labelCls}>Edit request</span>
+                <textarea
+                  data-testid="scratch-prompt"
+                  value={prompt}
+                  onChange={(event) => onPrompt(event.target.value)}
+                  rows={2}
+                  placeholder="Brighten the interior and clear the window glare."
+                  className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#0d9488]"
+                />
+              </label>
+              <div className="mt-2">
+                <ApplyButton
+                  testId="scratch-run"
+                  label="Apply edit"
+                  disabled={applyLocked}
+                  onApply={() => onRun("edit")}
+                />
+              </div>
+
+              <div
+                data-testid="scratch-polish"
+                className="mt-5 border-t border-slate-100 pt-4"
+              >
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-900">
+                  Iconic Polish
+                </p>
+                <ul
+                  data-testid="scratch-polish-rules"
+                  className="mt-2 space-y-1"
+                >
+                  {ICONIC_POLISH_TREATMENTS.map((treatment) => (
+                    <li
+                      key={treatment}
+                      className="text-[11px] font-medium text-gray-600"
+                    >
+                      {treatment}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-[11px] leading-snug text-gray-500">
+                  Does not add people or move the camera. Grass replacement is a
+                  separate $25 add-on, included only on classic packages. It is
+                  not this polish.
+                </p>
+                <div className="mt-2">
+                  <ApplyButton
+                    testId="scratch-apply-polish"
+                    label="Apply polish"
+                    disabled={applyLocked}
+                    onApply={() => onApplyPreset(ICONIC_POLISH_INSTRUCTION)}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+                <p className={labelCls}>Twilight conversion</p>
+                <ApplyButton
+                  testId="scratch-twilight"
+                  label="Apply twilight"
+                  disabled={applyLocked}
+                  onApply={() => onRun("twilight")}
+                />
+              </div>
+
+              <div className="mt-4 border-t border-slate-100 pt-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className={labelCls}>Grass replacement</p>
+                  <ApplyButton
+                    testId="scratch-grass"
+                    label="Apply grass"
+                    disabled={busy || !grassReady || checkedCount === 0}
+                    onApply={() => onRun("grass")}
+                  />
+                </div>
+                <p className="mt-2 text-[11px] leading-snug text-gray-500">
+                  $25 add-on, included only on classic packages. Not Iconic
+                  Polish.
+                </p>
+                {!grassReady ? (
+                  <p
+                    data-testid="scratch-grass-note"
+                    className="mt-1 text-[11px] leading-snug text-gray-500"
+                  >
+                    {grassNote}
+                  </p>
+                ) : null}
+              </div>
+            </section>
+
+            <details
+              data-testid="scratch-section-finetune"
+              className="mt-5 border-t border-slate-100 pt-3"
             >
-              <p className="text-xs leading-relaxed text-gray-500">
-                Sliders preview on the photo. Apply writes a JPEG in this
-                browser. The revision box is a separate pass on an edit you
-                already ran.
-              </p>
-              <section className="space-y-4 rounded-xl border border-slate-200 p-3">
+              <summary className="cursor-pointer text-[10px] font-black uppercase tracking-widest text-gray-400">
+                Finetune
+              </summary>
+              <div
+                data-testid="scratch-panel-finetune"
+                className="mt-3 space-y-3"
+              >
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -648,20 +646,27 @@ export default function StudioScratchPad({
                   max={100}
                   onChange={(value) => setSlider("tint", value)}
                 />
-                <p className="text-[11px] text-gray-500">
-                  Sharpness is written into the JPEG on apply. The preview shows
-                  exposure, shadows, saturation, tint, crop, and rotate.
-                </p>
-                <ScopedApply
-                  name="scope-finetune"
-                  testId="scratch-scope-finetune"
-                  applyTestId="scratch-finetune"
-                  applyLabel="Apply finetune"
-                  disabled={busy || !setReady}
-                  onApply={applyFinetune}
-                />
-              </section>
-              <section className="rounded-xl border border-slate-200 p-3">
+                <div className="flex flex-wrap gap-2">
+                  <ApplyButton
+                    testId="scratch-finetune"
+                    label="Apply finetune"
+                    disabled={applyLocked}
+                    onApply={() => {
+                      void onApplyFinetune(adjustments).then((applied) => {
+                        if (applied) setAdjustments(DEFAULT_ADJUSTMENTS);
+                      });
+                    }}
+                  />
+                  <button
+                    type="button"
+                    data-testid="scratch-revert"
+                    disabled={busy || !canRevert}
+                    onClick={onRevertFinetune}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-gray-700 disabled:opacity-40"
+                  >
+                    Revert
+                  </button>
+                </div>
                 <label className="block">
                   <span className={labelCls}>Additional adjustments</span>
                   <textarea
@@ -673,49 +678,45 @@ export default function StudioScratchPad({
                     className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#0d9488]"
                   />
                 </label>
-                <p className="mt-2 text-xs text-gray-500">
-                  Uses the current result. A photo with no edit yet is skipped.
-                </p>
-                <ScopedApply
-                  name="scope-revise"
-                  testId="scratch-scope-revise"
-                  applyTestId="scratch-revise"
-                  applyLabel="Apply revision"
+                <ApplyButton
+                  testId="scratch-revise"
+                  label="Apply revision"
                   disabled={busy || editedCount === 0}
-                  onApply={(scope) => onRun("revise", scope)}
+                  onApply={() => onRun("revise")}
                 />
-              </section>
-            </div>
+              </div>
+            </details>
 
-            <div
-              data-testid="scratch-panel-presets"
-              data-active={section === "presets" ? "true" : "false"}
-              className={section === "presets" ? "space-y-3" : "hidden"}
+            <details
+              data-testid="scratch-section-presets"
+              className="mt-4 border-t border-slate-100 pt-3"
             >
-              <p className="text-xs leading-relaxed text-gray-500">
-                Iconic presets. Leave them off. Applying one sends only that
-                preset.
-              </p>
-              {PRESETS.map((preset) => (
-                <section
-                  key={preset.id}
-                  data-testid={`scratch-preset-${preset.id}`}
-                  className="rounded-xl border border-slate-200 p-3"
-                >
-                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-900">
-                    {preset.label}
-                  </p>
-                  <ScopedApply
-                    name={`scope-preset-${preset.id}`}
-                    testId={`scratch-scope-preset-${preset.id}`}
-                    applyTestId={`scratch-apply-preset-${preset.id}`}
-                    applyLabel="Apply preset"
-                    disabled={busy || !setReady}
-                    onApply={(scope) => onApplyPreset(preset.prompt, scope)}
-                  />
-                </section>
-              ))}
-            </div>
+              <summary className="cursor-pointer text-[10px] font-black uppercase tracking-widest text-gray-400">
+                Presets
+              </summary>
+              <div
+                data-testid="scratch-panel-presets"
+                className="mt-3 space-y-2"
+              >
+                {PRESETS.map((preset) => (
+                  <div
+                    key={preset.id}
+                    data-testid={`scratch-preset-${preset.id}`}
+                    className="flex items-center justify-between gap-2"
+                  >
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-700">
+                      {preset.label}
+                    </p>
+                    <ApplyButton
+                      testId={`scratch-apply-preset-${preset.id}`}
+                      label="Apply"
+                      disabled={applyLocked}
+                      onApply={() => onApplyPreset(preset.prompt)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </details>
           </div>
         </aside>
       </div>

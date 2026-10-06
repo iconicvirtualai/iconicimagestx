@@ -1,13 +1,21 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import AdminLayout from "@/components/AdminLayout";
 import StudioScratchPad, {
-  type ScratchApplyScope,
   type ScratchExportDestination,
   type ScratchFrameView,
 } from "@/components/studio-scratch/StudioScratchPad";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchScratchStatus, postScratchEdit } from "@/lib/scratchApi";
-import { compressScratchJpeg, loadScratchImage } from "@/lib/scratchPhoto";
+import {
+  compressScratchJpeg,
+  loadScratchImage,
+  readJpegShotTime,
+} from "@/lib/scratchPhoto";
+import {
+  SCRATCH_SORT_DEFAULT,
+  sortScratchItems,
+  type ScratchSortMode,
+} from "@/lib/scratchSort";
 import { renderAdjustedJpeg } from "@/lib/studioCanvas";
 import {
   adjustmentsAreNeutral,
@@ -23,6 +31,14 @@ import {
 } from "@shared/studioScratch";
 import { toast } from "sonner";
 
+interface FinetuneSnapshot {
+  afterUrl?: string;
+  afterBytes?: Uint8Array;
+  downloadName?: string;
+  lastAction?: string;
+  status: "ready" | "done" | "failed";
+}
+
 interface ScratchItem {
   id: string;
   name: string;
@@ -34,6 +50,10 @@ interface ScratchItem {
   afterBytes?: Uint8Array;
   downloadName?: string;
   lastAction?: string;
+  uploadIndex: number;
+  byteSize: number;
+  shotAt: number;
+  preFinetune?: FinetuneSnapshot;
 }
 
 function dataUrlBytes(dataUrl: string): Uint8Array {
@@ -59,6 +79,10 @@ function downloadBytes(name: string, bytes: Uint8Array, type: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
+function revokeUrl(url?: string) {
+  if (url) URL.revokeObjectURL(url);
+}
+
 export default function AdminStudioScratch() {
   const { user } = useAuth();
   const getToken = useCallback(() => {
@@ -69,6 +93,7 @@ export default function AdminStudioScratch() {
     return user.getIdToken();
   }, [user]);
 
+  const uploadSeq = useRef(0);
   const [items, setItems] = useState<ScratchItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [anchorId, setAnchorId] = useState<string | null>(null);
@@ -79,6 +104,8 @@ export default function AdminStudioScratch() {
   const [progress, setProgress] = useState("");
   const [grassReady, setGrassReady] = useState(false);
   const [grassNote, setGrassNote] = useState("Checking the lawn reference…");
+  const [sortMode, setSortMode] =
+    useState<ScratchSortMode>(SCRATCH_SORT_DEFAULT);
 
   useEffect(() => {
     let cancel = false;
@@ -130,12 +157,18 @@ export default function AdminStudioScratch() {
       }
       try {
         const source = await compressScratchJpeg(file);
+        const shotAt = (await readJpegShotTime(file)) ?? file.lastModified;
+        const uploadIndex = uploadSeq.current;
+        uploadSeq.current += 1;
         added.push({
           id: crypto.randomUUID(),
           name: file.name,
           beforeUrl: URL.createObjectURL(file),
           source,
           status: "ready",
+          uploadIndex,
+          byteSize: file.size,
+          shotAt,
         });
       } catch (err) {
         toast.error(
@@ -146,8 +179,15 @@ export default function AdminStudioScratch() {
       }
     }
     if (!added.length) return;
-    setItems((current) => [...current, ...added]);
-    setSelectedIds((current) => [...current, ...added.map((item) => item.id)]);
+    const next = sortScratchItems(sortMode, [...items, ...added]);
+    setItems(next);
+    if (!items.length) {
+      const first = next[0];
+      setSelectedIds(first ? [first.id] : []);
+      setAnchorId(first?.id || null);
+      setFocusId(first?.id || null);
+      return;
+    }
     setAnchorId(added[0].id);
     setFocusId(added[0].id);
   };
@@ -165,11 +205,22 @@ export default function AdminStudioScratch() {
     setFocusId(next.focusId);
   };
 
+  const onSort = (mode: ScratchSortMode) => {
+    setSortMode(mode);
+    setItems((current) => sortScratchItems(mode, current));
+  };
+
   const onRemove = (id: string) => {
     const item = items.find((entry) => entry.id === id);
     if (item) {
       URL.revokeObjectURL(item.beforeUrl);
       if (item.afterUrl) URL.revokeObjectURL(item.afterUrl);
+      if (
+        item.preFinetune?.afterUrl &&
+        item.preFinetune.afterUrl !== item.afterUrl
+      ) {
+        URL.revokeObjectURL(item.preFinetune.afterUrl);
+      }
     }
     const remaining = items.filter((entry) => entry.id !== id);
     setItems(remaining);
@@ -185,20 +236,13 @@ export default function AdminStudioScratch() {
     if (anchorId === id) setAnchorId(remaining[0]?.id || null);
   };
 
-  const targetsFor = (scope: ScratchApplyScope) => {
-    if (scope === "set") return items;
-    const focus = focusId || items[0]?.id;
-    return items.filter((item) => item.id === focus);
-  };
+  const checkedItems = () =>
+    items.filter((item) => selectedIds.includes(item.id));
 
-  const run = async (
-    action: ScratchAction,
-    scope: ScratchApplyScope,
-    promptOverride?: string,
-  ) => {
-    const targets = targetsFor(scope);
+  const run = async (action: ScratchAction, promptOverride?: string) => {
+    const targets = checkedItems();
     if (!targets.length) {
-      toast.error("Choose a photo first.");
+      toast.error("Check a photo in the filmstrip.");
       return;
     }
     const text = (
@@ -240,7 +284,13 @@ export default function AdminStudioScratch() {
         setItems((current) =>
           current.map((item) => {
             if (item.id !== job.id) return item;
-            if (item.afterUrl) URL.revokeObjectURL(item.afterUrl);
+            revokeUrl(item.afterUrl);
+            if (
+              item.preFinetune?.afterUrl &&
+              item.preFinetune.afterUrl !== item.afterUrl
+            ) {
+              revokeUrl(item.preFinetune.afterUrl);
+            }
             return {
               ...item,
               status: "done",
@@ -249,6 +299,7 @@ export default function AdminStudioScratch() {
               afterBytes: result.bytes,
               downloadName: result.downloadName,
               lastAction: action,
+              preFinetune: undefined,
             };
           }),
         );
@@ -312,18 +363,14 @@ export default function AdminStudioScratch() {
     toast.message("Export to…", { description });
   };
 
-  const applyFinetune = async (
-    adjustments: StudioAdjustments,
-    scope: ScratchApplyScope,
-    useOriginal: boolean,
-  ) => {
+  const applyFinetune = async (adjustments: StudioAdjustments) => {
     if (adjustmentsAreNeutral(adjustments)) {
       toast.error("Move a finetune control before applying.");
       return false;
     }
-    const targets = targetsFor(scope);
+    const targets = checkedItems();
     if (!targets.length) {
-      toast.error("Choose a photo first.");
+      toast.error("Check a photo in the filmstrip.");
       return false;
     }
     setBusy(true);
@@ -334,11 +381,7 @@ export default function AdminStudioScratch() {
       setProgress(`${index} of ${targets.length}`);
       patch(job.id, { status: "editing", error: undefined });
       try {
-        const sourceUrl =
-          scope === "photo" && useOriginal
-            ? job.beforeUrl
-            : job.afterUrl || job.beforeUrl;
-        const image = await loadScratchImage(sourceUrl);
+        const image = await loadScratchImage(job.afterUrl || job.beforeUrl);
         const dataUrl = renderAdjustedJpeg(image, adjustments);
         const bytes = dataUrlBytes(dataUrl);
         const afterUrl = URL.createObjectURL(bytesBlob(bytes, "image/jpeg"));
@@ -346,7 +389,15 @@ export default function AdminStudioScratch() {
         setItems((current) =>
           current.map((item) => {
             if (item.id !== job.id) return item;
-            if (item.afterUrl) URL.revokeObjectURL(item.afterUrl);
+            const snapshot = item.preFinetune ?? {
+              afterUrl: item.afterUrl,
+              afterBytes: item.afterBytes,
+              downloadName: item.downloadName,
+              lastAction: item.lastAction,
+              status: item.afterBytes ? ("done" as const) : ("ready" as const),
+            };
+            if (item.afterUrl && item.afterUrl !== snapshot.afterUrl)
+              revokeUrl(item.afterUrl);
             return {
               ...item,
               status: "done",
@@ -355,6 +406,7 @@ export default function AdminStudioScratch() {
               afterBytes: bytes,
               downloadName: scratchDownloadName(item.name),
               lastAction: "finetune",
+              preFinetune: snapshot,
             };
           }),
         );
@@ -369,6 +421,36 @@ export default function AdminStudioScratch() {
     return applied;
   };
 
+  const revertFinetune = () => {
+    const targets = checkedItems().filter((item) => item.preFinetune);
+    if (!checkedItems().length) {
+      toast.error("Check a photo in the filmstrip.");
+      return;
+    }
+    if (!targets.length) {
+      toast.error("No finetune to revert on the checked photos.");
+      return;
+    }
+    setItems((current) =>
+      current.map((item) => {
+        if (!selectedIds.includes(item.id) || !item.preFinetune) return item;
+        if (item.afterUrl && item.afterUrl !== item.preFinetune.afterUrl)
+          revokeUrl(item.afterUrl);
+        const previous = item.preFinetune;
+        return {
+          ...item,
+          afterUrl: previous.afterUrl,
+          afterBytes: previous.afterBytes,
+          downloadName: previous.downloadName,
+          lastAction: previous.lastAction,
+          status: previous.status,
+          preFinetune: undefined,
+          error: undefined,
+        };
+      }),
+    );
+  };
+
   const frames: ScratchFrameView[] = items.map((item) => ({
     id: item.id,
     name: item.name,
@@ -379,10 +461,11 @@ export default function AdminStudioScratch() {
     selected: selectedIds.includes(item.id),
     focused: item.id === focusId,
     lastAction: item.lastAction,
+    canRevert: Boolean(item.preFinetune),
   }));
 
   return (
-    <AdminLayout title="Scratch Pad">
+    <AdminLayout title="Scratch Pad" mainClassName="scrollbar-hide">
       <StudioScratchPad
         frames={frames}
         prompt={prompt}
@@ -391,19 +474,22 @@ export default function AdminStudioScratch() {
         progress={progress}
         grassReady={grassReady}
         grassNote={grassNote}
+        sortMode={sortMode}
         onPrompt={setPrompt}
         onRevision={setRevision}
         onAddFiles={(files) => {
           void addFiles(files);
         }}
         onSelect={onSelect}
-        onRun={(action, scope) => {
-          void run(action, scope);
+        onSort={onSort}
+        onRun={(action) => {
+          void run(action);
         }}
-        onApplyPreset={(presetPrompt, scope) => {
-          void run("edit", scope, presetPrompt);
+        onApplyPreset={(presetPrompt) => {
+          void run("edit", presetPrompt);
         }}
         onApplyFinetune={applyFinetune}
+        onRevertFinetune={revertFinetune}
         onDownload={onDownload}
         onExport={onExport}
         onRemove={onRemove}
