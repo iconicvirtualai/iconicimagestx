@@ -1,9 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { renderToString } from "react-dom/server";
 import { ICONIC_POLISH_TREATMENTS } from "@shared/orderEditPlan";
-import { AI_EDIT_PRESETS } from "@shared/iconicStudio";
 import { orderExteriorTwilightPrompt } from "@shared/orderEditPlan";
 import StudioScratchPad, { type ScratchFrameView } from "./StudioScratchPad";
+
+const TOOLS = [
+  "Grass Replacement",
+  "Twilight Conversions",
+  "Driveway Clean Up",
+  "Cord Removal",
+  "Photographer Removal",
+  "TV Screens Added",
+  "Fire Added",
+  "Landscaping",
+  "Virtual Staging",
+  "Remove clutter",
+  "Iconic Polish",
+];
 
 const frames: ScratchFrameView[] = [
   {
@@ -31,7 +44,6 @@ function render(grassReady = false, withFrames = true) {
   return renderToString(
     <StudioScratchPad
       frames={withFrames ? frames : []}
-      prompt="Clear the glare"
       revision=""
       busy={false}
       progress=""
@@ -41,13 +53,12 @@ function render(grassReady = false, withFrames = true) {
           ? "Using the lawn reference at /studio/grass-reference.jpg."
           : "Grass reference is missing."
       }
-      onPrompt={() => undefined}
       onRevision={() => undefined}
       onAddFiles={() => undefined}
       onSelect={() => undefined}
       onSort={() => undefined}
-      onRun={() => undefined}
-      onApplyPreset={() => undefined}
+      onProcessSet={() => undefined}
+      onProcessSelection={() => undefined}
       onApplyFinetune={async () => false}
       onRevertFinetune={() => undefined}
       onDownload={() => undefined}
@@ -73,9 +84,14 @@ describe("scratch pad view", () => {
     expect(html).toContain('data-selected="true"');
     expect(html).toContain('data-testid="scratch-adjust"');
     expect(html).toContain("Adjust enhancement");
-    expect(html).toContain("AI settings");
-    expect(html).toContain("Finetune");
-    expect(html).toContain("Presets");
+    expect(html).toContain('data-testid="scratch-tab-basic"');
+    expect(html).toContain('data-testid="scratch-tab-advanced"');
+    expect(html).toContain('data-testid="scratch-tab-finetune"');
+    expect(html).toContain("Basic");
+    expect(html).toContain("Advanced");
+    expect(html).toContain("Fine-tune");
+    expect(html).not.toContain("AI settings");
+    expect(html).not.toContain("AI Settings");
     expect(html).toContain('data-testid="scratch-compare"');
     expect(html).toContain("Before");
     expect(html).toContain("After");
@@ -95,22 +111,21 @@ describe("scratch pad view", () => {
     expect(html).not.toContain("All photos in the set");
   });
 
-  it("leads with AI settings, polish rules, sort, and filmstrip checks", () => {
+  it("uses Basic, Advanced, and Fine-tune instead of AI settings", () => {
     const html = render(true);
-    const aiAt = html.indexOf('data-testid="scratch-section-ai"');
-    const finetuneAt = html.indexOf('data-testid="scratch-section-finetune"');
-    expect(aiAt).toBeGreaterThan(-1);
-    expect(aiAt).toBeLessThan(finetuneAt);
+    expect(html).toContain('data-testid="scratch-process-basic"');
+    expect(html).toContain('data-testid="scratch-reprocess-basic"');
+    expect(html).toContain(">Process<");
+    expect(html).toContain(">Reprocess<");
     expect(html).toContain('data-testid="scratch-sort"');
     expect(html).toContain("Filename");
     expect(html).toContain("Date shot, oldest first");
     expect(html).toContain("Date shot, newest first");
     expect(html).toContain("Size, large to small");
     expect(html).toContain("Upload order");
-    expect(html).toContain('data-testid="scratch-prompt"');
-    expect(html).toContain('data-testid="scratch-twilight"');
     expect(html).not.toContain(orderExteriorTwilightPrompt());
-    expect(html).toContain('data-testid="scratch-grass"');
+    expect(html).toContain('data-testid="scratch-tool-grass"');
+    expect(html).toContain('data-testid="scratch-tool-twilight"');
     expect(html).not.toContain('data-testid="scratch-grass-preview"');
     expect(html).not.toContain("Using the lawn reference");
     expect(html).toContain("$25 add-on");
@@ -119,19 +134,14 @@ describe("scratch pad view", () => {
     for (const treatment of ICONIC_POLISH_TREATMENTS) {
       expect(html).toContain(treatment);
     }
+    for (const label of TOOLS) {
+      expect(html).toContain(label);
+    }
+    expect(html).toContain('data-testid="scratch-advanced-prompt"');
+    expect(html).toContain('data-testid="scratch-process-advanced"');
     expect(html).toContain('data-testid="scratch-revert"');
     expect(html).toContain('data-testid="scratch-revision"');
-    for (const preset of AI_EDIT_PRESETS) {
-      if (
-        preset.id === "free_text" ||
-        preset.id === "twilight" ||
-        preset.id === "add_people"
-      ) {
-        expect(html).not.toContain(`data-testid="scratch-preset-${preset.id}"`);
-        continue;
-      }
-      expect(html).toContain(`data-testid="scratch-preset-${preset.id}"`);
-    }
+    expect(html).not.toContain('data-testid="scratch-preset-add_people"');
     expect(html).toContain("Nothing is added to an order or a gallery");
   });
 
@@ -148,6 +158,7 @@ describe("scratch pad view", () => {
     expect(html).not.toContain('data-testid="scratch-actions"');
     expect(html).not.toContain('data-testid="scratch-sort"');
     expect(html).toContain('data-position="bottom"');
-    expect(html).toContain("AI settings");
+    expect(html).toContain("Basic");
+    expect(html).not.toContain("AI settings");
   });
 });

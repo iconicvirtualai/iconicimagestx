@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import AdminLayout from "@/components/AdminLayout";
 import StudioScratchPad, {
+  type ScratchEditStep,
   type ScratchExportDestination,
   type ScratchFrameView,
 } from "@/components/studio-scratch/StudioScratchPad";
@@ -27,7 +28,6 @@ import {
   scratchDownloadName,
   scratchJpegAllowed,
   scratchSelection,
-  type ScratchAction,
 } from "@shared/studioScratch";
 import { toast } from "sonner";
 
@@ -98,7 +98,6 @@ export default function AdminStudioScratch() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [anchorId, setAnchorId] = useState<string | null>(null);
   const [focusId, setFocusId] = useState<string | null>(null);
-  const [prompt, setPrompt] = useState("");
   const [revision, setRevision] = useState("");
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
@@ -239,75 +238,93 @@ export default function AdminStudioScratch() {
   const checkedItems = () =>
     items.filter((item) => selectedIds.includes(item.id));
 
-  const run = async (action: ScratchAction, promptOverride?: string) => {
-    const targets = checkedItems();
+  const runSteps = async (
+    targets: ScratchItem[],
+    steps: ScratchEditStep[],
+    options: { fromOriginal: boolean; label?: string; emptyNote: string },
+  ) => {
     if (!targets.length) {
-      toast.error("Check a photo in the filmstrip.");
+      toast.error(options.emptyNote);
       return;
     }
-    const text = (
-      promptOverride ?? (action === "revise" ? revision : prompt)
-    ).trim();
-    if ((action === "edit" || action === "revise") && text.length < 3) {
-      toast.error(
-        action === "revise" ? "Describe the revision." : "Describe the edit.",
-      );
-      return;
-    }
-    const jobs = targets.filter(
-      (item) => action !== "revise" || item.afterBytes,
+    const runnable = steps.filter(
+      (step) =>
+        step.action === "twilight" ||
+        step.action === "grass" ||
+        step.prompt.trim().length >= 3,
     );
-    if (action === "revise" && !jobs.length) {
-      toast.error("Apply a first edit before a revision.");
+    if (!runnable.length) {
+      toast.error("Choose a tool or write a request.");
       return;
+    }
+    if (runnable.some((step) => step.action === "revise")) {
+      const editable = targets.filter((item) => item.afterBytes);
+      if (!editable.length) {
+        toast.error("Apply a first edit before a final request.");
+        return;
+      }
     }
     setBusy(true);
     let index = 0;
-    for (const job of jobs) {
+    for (const job of targets) {
       index += 1;
-      setProgress(`${index} of ${jobs.length}`);
-      patch(job.id, { status: "editing", error: undefined });
-      try {
-        const body =
-          action === "revise" && job.afterBytes
-            ? bytesBlob(job.afterBytes, "image/jpeg")
-            : job.source;
-        const result = await postScratchEdit(getToken, {
-          body,
-          action,
-          prompt: text,
-          fileName: job.name,
-        });
-        const afterUrl = URL.createObjectURL(
-          bytesBlob(result.bytes, "image/jpeg"),
-        );
-        setItems((current) =>
-          current.map((item) => {
-            if (item.id !== job.id) return item;
-            revokeUrl(item.afterUrl);
-            if (
-              item.preFinetune?.afterUrl &&
-              item.preFinetune.afterUrl !== item.afterUrl
-            ) {
-              revokeUrl(item.preFinetune.afterUrl);
-            }
-            return {
-              ...item,
-              status: "done",
-              error: undefined,
-              afterUrl,
-              afterBytes: result.bytes,
-              downloadName: result.downloadName,
-              lastAction: action,
-              preFinetune: undefined,
-            };
-          }),
-        );
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "The edit failed.";
-        patch(job.id, { status: "failed", error: message });
-        toast.error(`${job.name}: ${message}`);
+      setProgress(`${index} of ${targets.length}`);
+      if (
+        runnable.some((step) => step.action === "revise") &&
+        !job.afterBytes
+      ) {
+        continue;
       }
+      patch(job.id, { status: "editing", error: undefined });
+      let working = options.fromOriginal ? undefined : job.afterBytes;
+      let produced = false;
+      let error: string | undefined;
+      let downloadName = job.downloadName;
+      let lastAction = options.label || runnable[runnable.length - 1].action;
+      for (const step of runnable) {
+        if (step.action === "revise" && !working) break;
+        try {
+          const result = await postScratchEdit(getToken, {
+            body: working ? bytesBlob(working, "image/jpeg") : job.source,
+            action: step.action,
+            prompt: step.prompt,
+            fileName: job.name,
+          });
+          working = result.bytes;
+          produced = true;
+          downloadName = result.downloadName;
+          lastAction = options.label || step.action;
+        } catch (err) {
+          error = err instanceof Error ? err.message : "The edit failed.";
+          toast.error(`${job.name}: ${error}`);
+          break;
+        }
+      }
+      if (!produced || !working) continue;
+      const afterUrl = URL.createObjectURL(bytesBlob(working, "image/jpeg"));
+      const bytes = working;
+      setItems((current) =>
+        current.map((item) => {
+          if (item.id !== job.id) return item;
+          revokeUrl(item.afterUrl);
+          if (
+            item.preFinetune?.afterUrl &&
+            item.preFinetune.afterUrl !== item.afterUrl
+          ) {
+            revokeUrl(item.preFinetune.afterUrl);
+          }
+          return {
+            ...item,
+            status: error ? "failed" : "done",
+            error,
+            afterUrl,
+            afterBytes: bytes,
+            downloadName,
+            lastAction,
+            preFinetune: undefined,
+          };
+        }),
+      );
     }
     setProgress("");
     setBusy(false);
@@ -468,25 +485,30 @@ export default function AdminStudioScratch() {
     <AdminLayout title="Scratch Pad" mainClassName="scrollbar-hide">
       <StudioScratchPad
         frames={frames}
-        prompt={prompt}
         revision={revision}
         busy={busy}
         progress={progress}
         grassReady={grassReady}
         grassNote={grassNote}
         sortMode={sortMode}
-        onPrompt={setPrompt}
         onRevision={setRevision}
         onAddFiles={(files) => {
           void addFiles(files);
         }}
         onSelect={onSelect}
         onSort={onSort}
-        onRun={(action) => {
-          void run(action);
+        onProcessSet={(steps, label) => {
+          void runSteps(items, steps, {
+            fromOriginal: true,
+            label,
+            emptyNote: "Upload photos before processing.",
+          });
         }}
-        onApplyPreset={(presetPrompt) => {
-          void run("edit", presetPrompt);
+        onProcessSelection={(steps) => {
+          void runSteps(checkedItems(), steps, {
+            fromOriginal: false,
+            emptyNote: "Check a photo in the filmstrip.",
+          });
         }}
         onApplyFinetune={applyFinetune}
         onRevertFinetune={revertFinetune}
