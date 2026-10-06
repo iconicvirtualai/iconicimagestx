@@ -2,94 +2,13 @@ import { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { staffHomePath } from "@shared/staffAccess";
-import {
-  LayoutDashboard,
-  Home,
-  CalendarDays,
-  ShoppingBag,
-  Users,
-  UserCircle,
-  Palette,
-  DollarSign,
-  Mail,
-  MessageSquare,
-  LogOut,
-  Camera,
-  ImagePlay,
-  Images,
-  Bot,
-  Settings,
-  CreditCard,
-  Upload,
-  Aperture,
-  Package,
-} from "lucide-react";
-import { mostSpecificNavHref } from "@/lib/adminNav";
+import { LogOut } from "lucide-react";
+import { mostSpecificNavHref, navGroups } from "@/lib/adminNav";
 
 interface AdminLayoutProps {
   children: ReactNode;
   title?: string;
 }
-
-interface NavItem {
-  label: string;
-  href: string;
-  icon: React.ElementType;
-  roles: string[]; // which roles see this item
-}
-
-const ALL_STAFF = ["admin", "coordinator", "photographer", "editor"];
-const ADMIN_ONLY = ["admin"];
-const COORD_UP = ["admin", "coordinator"];
-const PHOTO_UP = ["admin", "coordinator", "photographer"];
-const EDITOR_UP = ["admin", "coordinator", "editor"];
-
-const navGroups: { label: string; items: NavItem[] }[] = [
-  {
-    label: "Operations",
-    items: [
-      { label: "Dashboard",       href: "/admin/dashboard",        icon: LayoutDashboard, roles: COORD_UP },
-      { label: "Studio",          href: "/admin/studio",           icon: Camera,          roles: ALL_STAFF },
-      { label: "Orders",          href: "/admin/orders",        icon: ShoppingBag,     roles: COORD_UP },
-      { label: "Booking catalog", href: "/admin/booking-catalog", icon: Package,         roles: COORD_UP },
-      { label: "Schedule",        href: "/admin/schedule",        icon: CalendarDays,    roles: COORD_UP },
-      { label: "Projects",        href: "/admin/listings",         icon: Home,            roles: COORD_UP },
-      { label: "Clients",         href: "/admin/customers",        icon: Users,           roles: COORD_UP },
-      { label: "Communications",  href: "/admin/communications",  icon: MessageSquare,   roles: COORD_UP },
-    ],
-  },
-  {
-    label: "Photography",
-    items: [
-      { label: "Iconic Studio",   href: "/admin/iconic-studio",    icon: Aperture,        roles: ALL_STAFF },
-      { label: "Scratch Pad",     href: "/admin/studio/scratch",   icon: Images,          roles: COORD_UP },
-      { label: "Delivery",        href: "/admin/delivery",         icon: Images,          roles: ALL_STAFF },
-      { label: "Photographer",    href: "/admin/photographer",     icon: Camera,          roles: PHOTO_UP },
-      { label: "Upload",          href: "/admin/upload",           icon: Upload,          roles: PHOTO_UP },
-    ],
-  },
-  {
-    label: "Settings",
-    items: [
-      { label: "Team",            href: "/admin/team",             icon: UserCircle,      roles: ADMIN_ONLY },
-      { label: "Pricing",         href: "/admin/current-pricing",  icon: DollarSign,      roles: ADMIN_ONLY },
-      { label: "Email Templates", href: "/admin/email-templates",  icon: Mail,            roles: ADMIN_ONLY },
-      { label: "Site Editor",     href: "/admin/edit-site",        icon: Palette,         roles: ADMIN_ONLY },
-      { label: "Revenue", href: "/admin/revenue", icon: DollarSign, roles: ADMIN_ONLY },
-
-      { label: "Billing", href: "/admin/billing", icon: CreditCard, roles: ADMIN_ONLY },
-      { label: "Client Billing", href: "/admin/client-billing", icon: CreditCard, roles: ADMIN_ONLY },
-      { label: "Invoice Presets", href: "/admin/invoice-presets", icon: DollarSign, roles: COORD_UP },
-    ],
-  },
-  {
-    label: "AICON",
-    items: [
-      { label: "AI Agents",       href: "/admin/aicon",            icon: Bot,             roles: COORD_UP },
-      { label: "Automation",      href: "/admin/automation",       icon: Settings,        roles: ADMIN_ONLY },
-    ],
-  },
-];
 
 const ROLE_BADGE: Record<string, { label: string; color: string }> = {
   admin:        { label: "Owner",        color: "bg-teal-500/20 text-teal-400" },
