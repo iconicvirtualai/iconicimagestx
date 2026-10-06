@@ -4,10 +4,22 @@ const TARGET_BYTES = 3_200_000;
 function toJpegBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error("Could not encode this JPEG."))),
+      (blob) =>
+        blob ? resolve(blob) : reject(new Error("Could not encode this JPEG.")),
       "image/jpeg",
       quality,
     );
+  });
+}
+
+/** Load a scratch blob URL without CORS mode so finetune can read the pixels. */
+export function loadScratchImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () =>
+      reject(new Error("Could not load this photo for finetune."));
+    image.src = url;
   });
 }
 
@@ -42,7 +54,9 @@ export async function compressScratchJpeg(file: File): Promise<Blob> {
     blob = await toJpegBlob(canvas, quality);
   }
   if (blob.size > 4_000_000) {
-    throw new Error(`${file.name} is still too large after resizing. Export a smaller JPEG.`);
+    throw new Error(
+      `${file.name} is still too large after resizing. Export a smaller JPEG.`,
+    );
   }
   return blob;
 }
