@@ -8,28 +8,54 @@ import {
 } from "./listingCard.ts";
 
 describe("listing card package looks", () => {
-  it("maps photos only and just photos to the plain card", () => {
+  it("maps photo-count packages to just photos and apprenticeship on its own", () => {
     expect(listingCardLookFromValue("Photos Only")).toBe("just-photos");
     expect(listingCardLookFromValue("Just Photos")).toBe("just-photos");
     expect(listingCardLookFromValue("photos-35")).toBe("just-photos");
     expect(listingCardLookFromValue("35 Photos")).toBe("just-photos");
-    expect(listingCardLookFromValue("The Apprenticeship Program — 25 Photos")).toBe("just-photos");
+    expect(listingCardLookFromValue("The Apprenticeship Program — 25 Photos")).toBe("apprenticeship");
+    expect(listingCardLookFromValue("apprentice-50")).toBe("apprenticeship");
   });
 
-  it("maps the three named tiers, and market leader onto legacy", () => {
+  it("maps each of the sixteen package names and ids", () => {
     expect(listingCardLookFromValue("The Essentials")).toBe("essentials");
     expect(listingCardLookFromValue("listing-essentials")).toBe("essentials");
     expect(listingCardLookFromValue("THE SHOWCASE")).toBe("showcase");
     expect(listingCardLookFromValue("listing-showcase")).toBe("showcase");
     expect(listingCardLookFromValue("The Legacy")).toBe("legacy");
     expect(listingCardLookFromValue("listing-legacy")).toBe("legacy");
-    expect(listingCardLookFromValue("The Market Leader")).toBe("legacy");
-    expect(listingCardLookFromValue("listing-market-leader")).toBe("legacy");
+    expect(listingCardLookFromValue("The Market Leader")).toBe("market-leader");
+    expect(listingCardLookFromValue("listing-market-leader")).toBe("market-leader");
+    expect(listingCardLookFromValue("The Refresh")).toBe("refresh");
+    expect(listingCardLookFromValue("branding-refresh")).toBe("refresh");
+    expect(listingCardLookFromValue("The Content Partner")).toBe("content-partner");
+    expect(listingCardLookFromValue("branding-content-partner")).toBe("content-partner");
+    expect(listingCardLookFromValue("The Local Legend")).toBe("local-legend");
+    expect(listingCardLookFromValue("branding-local-legend")).toBe("local-legend");
+    expect(listingCardLookFromValue("The Baseline")).toBe("baseline");
+    expect(listingCardLookFromValue("business-baseline")).toBe("baseline");
+    expect(listingCardLookFromValue("The Growth Engine")).toBe("growth-engine");
+    expect(listingCardLookFromValue("business-growth-engine")).toBe("growth-engine");
+    expect(listingCardLookFromValue("The Professional Suite")).toBe("professional-suite");
+    expect(listingCardLookFromValue("business-professional-suite")).toBe("professional-suite");
+    expect(listingCardLookFromValue("The Signature Tier")).toBe("signature-tier");
+    expect(listingCardLookFromValue("business-signature-tier")).toBe("signature-tier");
+    expect(listingCardLookFromValue("The Iconic Partnership")).toBe("iconic-partnership");
+    expect(listingCardLookFromValue("business-iconic-partnership")).toBe("iconic-partnership");
+    expect(listingCardLookFromValue("The Connected Core")).toBe("connected-core");
+    expect(listingCardLookFromValue("business-connected-core")).toBe("connected-core");
+    expect(listingCardLookFromValue("The Authority Stack")).toBe("authority-stack");
+    expect(listingCardLookFromValue("business-authority-stack")).toBe("authority-stack");
   });
 
-  it("does not invent a look for add-ons or other products", () => {
+  it("does not invent a look for add-ons or strategic packages", () => {
     expect(listingCardLookFromValue("Aerial Drone Stills")).toBeNull();
-    expect(listingCardLookFromValue("The Refresh")).toBeNull();
+    expect(listingCardLookFromValue("The Foundation")).toBeNull();
+    expect(listingCardLookFromValue("growth-foundation")).toBeNull();
+    expect(listingCardLookFromValue("The Evolution")).toBeNull();
+    expect(listingCardLookFromValue("growth-evolution")).toBeNull();
+    expect(listingCardLookFromValue("The Bundle")).toBeNull();
+    expect(listingCardLookFromValue("growth-bundle")).toBeNull();
     expect(listingCardLookFromValue("")).toBeNull();
   });
 
