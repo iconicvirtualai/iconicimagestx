@@ -9,11 +9,16 @@ import {
   EDIT_TOOLS,
   PREFERENCES,
   SKY_PRESETS,
+  STAGING_ANGLES,
+  STAGING_FURNITURE,
+  STAGING_ROOMS,
+  STAGING_STYLES,
   STUDIO_CORE,
   STUDIO_EXTRAS,
   editInstructionSteps,
   isLocalStudioTool,
   preferenceSteps,
+  stagingApi,
   studioSteps,
   type ScratchDeskMode,
   type ScratchEditStep,
@@ -21,9 +26,10 @@ import {
   type ScratchPreference,
   type ScratchStudioTool,
   type SkyPreset,
+  type StagingRequest,
 } from "./scratchDesk";
 
-export type { ScratchEditStep, ScratchDeskMode };
+export type { ScratchEditStep, ScratchDeskMode, StagingRequest };
 
 export type ScratchExportDestination = "gallery" | "dropbox" | "drive" | "zip";
 
@@ -68,11 +74,10 @@ const MODES: Array<{ id: ScratchDeskMode; label: string }> = [
   { id: "upload", label: "Upload" },
   { id: "edit", label: "Edit" },
   { id: "studio", label: "Studio" },
-  { id: "coordinator", label: "Coordinator" },
+  { id: "staging", label: "Virtual Staging" },
 ];
 
 const teal = "#0d9488";
-const gold = "#c4a46a";
 
 function formatLook(key: keyof ScratchLook, value: number) {
   if (key === "exposure") return `${value > 0 ? "+" : ""}${(value / 100).toFixed(2)}`;
@@ -96,6 +101,7 @@ export default function StudioScratchPad({
   onClearSelection,
   onSort,
   onProcess,
+  onStage,
   onCommitJpeg,
   onRevert,
   onDownload,
@@ -118,6 +124,7 @@ export default function StudioScratchPad({
   onClearSelection: () => void;
   onSort: (mode: ScratchSortMode) => void;
   onProcess: (request: { steps: ScratchEditStep[]; fromOriginal: boolean; label?: string }) => void;
+  onStage: (request: StagingRequest) => void;
   onCommitJpeg: (dataUrl: string, frameId: string, label: string) => void;
   onRevert: () => void;
   onDownload: () => void;
@@ -147,13 +154,33 @@ export default function StudioScratchPad({
   const [autoLabel, setAutoLabel] = useState(true);
   const [brandedFloor, setBrandedFloor] = useState<string>();
   const [dragOver, setDragOver] = useState(false);
+  const [roomId, setRoomId] = useState("living");
+  const [furnitureId, setFurnitureId] = useState("sofa");
+  const [angleId, setAngleId] = useState("single");
+  const [stageStyle, setStageStyle] = useState("modern");
+  const [stageIntensity, setStageIntensity] = useState(70);
+  const [stageDensity, setStageDensity] = useState(60);
+  const [stageNotes, setStageNotes] = useState("");
+  const [stageAiNotes, setStageAiNotes] = useState("");
+  const [compare, setCompare] = useState(50);
   const drawing = useRef(false);
 
   const focus = frames.find((frame) => frame.focused) || frames[0] || null;
   const checked = frames.filter((frame) => frame.selected).length;
   const displayUrl = focus ? (showAfter && focus.afterUrl ? focus.afterUrl : focus.beforeUrl) : "";
   const preferenceMeta = PREFERENCES.find((item) => item.id === preference) || PREFERENCES[1];
+  const stageMeta = stagingApi({ roomId, styleId: stageStyle });
   const grassBlocked = !grassReady && (preference === "grass" || studioTool === "grass");
+  const stageRequest = (): StagingRequest => ({
+    roomId,
+    furnitureId,
+    angleId,
+    styleId: stageStyle,
+    intensity: stageIntensity,
+    density: stageDensity,
+    notes: stageNotes,
+    aiNotes: stageAiNotes,
+  });
 
   const takePhotos = (list: FileList | File[] | null) => {
     const files = Array.from(list || []);
@@ -244,7 +271,7 @@ export default function StudioScratchPad({
       className="flex h-[100vh] min-h-[640px] flex-col overflow-hidden bg-[#070b0c] text-white"
     >
       <header className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
-        <p className="text-[10px] font-black uppercase tracking-[0.22em]" style={{ color: gold }}>Scratch pad</p>
+        <p className="text-sm font-black uppercase tracking-[0.18em] text-white">Scratch pad</p>
         <div data-testid="scratch-modes" className="flex items-center gap-1 rounded-full border border-white/10 bg-black/40 p-1">
           {MODES.map((item) => (
             <button
@@ -267,7 +294,7 @@ export default function StudioScratchPad({
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
         <aside className="scrollbar-hide flex w-full shrink-0 flex-col border-b border-white/10 bg-[#0c1214] p-3 lg:w-60 lg:overflow-y-auto lg:border-b-0 lg:border-r">
-          {mode === "upload" || mode === "coordinator" ? (
+          {mode === "upload" ? (
             <UploadPrefs
               preference={preference}
               notes={notes}
@@ -339,6 +366,24 @@ export default function StudioScratchPad({
               {!grassReady ? <p data-testid="scratch-grass-note" className="mt-2 text-[11px] text-gray-400">{grassNote}</p> : null}
             </div>
           ) : null}
+          {mode === "staging" ? (
+            <StagingSetup
+              roomId={roomId}
+              furnitureId={furnitureId}
+              angleId={angleId}
+              styleId={stageStyle}
+              notes={stageNotes}
+              busy={busy}
+              ready={checked > 0}
+              onRoom={setRoomId}
+              onFurniture={setFurnitureId}
+              onAngle={setAngleId}
+              onStyle={setStageStyle}
+              onNotes={setStageNotes}
+              onBrowse={() => photoInput.current?.click()}
+              onSubmit={() => onStage(stageRequest())}
+            />
+          ) : null}
         </aside>
 
         <section
@@ -357,11 +402,20 @@ export default function StudioScratchPad({
             takePhotos(event.dataTransfer.files);
           }}
         >
-          {mode === "upload" || mode === "coordinator" ? (
+          {mode === "staging" ? (
+            <StagingCanvas
+              focus={focus}
+              styleLabel={stageMeta.styleLabel}
+              zoom={zoom}
+              compare={compare}
+              onZoom={setZoom}
+              onCompare={setCompare}
+            />
+          ) : mode === "upload" ? (
             <div className="flex min-h-0 flex-1 flex-col p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                  {mode === "coordinator" ? "Coordinator" : "Upload workspace"}
+                  Upload workspace
                 </p>
                 <span className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white" style={{ backgroundColor: teal }}>
                   {preferenceMeta.kicker ? `${preferenceMeta.kicker} · ` : ""}{preferenceMeta.label}
@@ -374,8 +428,8 @@ export default function StudioScratchPad({
                 className="flex min-h-0 flex-1 flex-col items-center justify-center rounded-3xl border-2 border-transparent px-6 text-center"
                 style={{
                   background: dragOver
-                    ? "linear-gradient(#10211f,#10211f) padding-box, linear-gradient(120deg,#0d9488,#c4a46a,#14b8a6,#0f766e) border-box"
-                    : "linear-gradient(#0c1214,#0c1214) padding-box, linear-gradient(120deg,#0d9488,#c4a46a,#14b8a6,#0f766e) border-box",
+                    ? "linear-gradient(#10211f,#10211f) padding-box, linear-gradient(120deg,#0d9488,#5eead4,#14b8a6,#0f766e) border-box"
+                    : "linear-gradient(#0c1214,#0c1214) padding-box, linear-gradient(120deg,#0d9488,#5eead4,#14b8a6,#0f766e) border-box",
                 }}
               >
                 <span className="text-sm font-black uppercase tracking-widest">Drag and drop your files to begin</span>
@@ -447,9 +501,27 @@ export default function StudioScratchPad({
           )}
         </section>
 
-        {mode === "edit" || mode === "studio" ? (
+        {mode === "edit" || mode === "studio" || mode === "staging" ? (
           <aside data-testid="scratch-options" className="flex w-full shrink-0 flex-col border-t border-white/10 bg-[#0c1214] lg:min-h-0 lg:w-72 lg:overflow-hidden lg:border-l lg:border-t-0">
-            {mode === "edit" ? (
+            {mode === "staging" ? (
+              <StagingOptions
+                roomLabel={stageMeta.roomLabel}
+                styleId={stageStyle}
+                styleLabel={stageMeta.styleLabel}
+                intensity={stageIntensity}
+                density={stageDensity}
+                aiNotes={stageAiNotes}
+                busy={busy}
+                ready={checked > 0}
+                onStyle={setStageStyle}
+                onIntensity={setStageIntensity}
+                onDensity={setStageDensity}
+                onAiNotes={setStageAiNotes}
+                onApply={() => onStage(stageRequest())}
+                onExport={onExport}
+                onDownload={onDownload}
+              />
+            ) : mode === "edit" ? (
               <EditOptions
                 look={look}
                 instruction={instruction}
@@ -524,7 +596,7 @@ export default function StudioScratchPad({
                 data-selected={frame.selected ? "true" : "false"}
                 data-focused={frame.focused ? "true" : "false"}
                 onClick={() => onSelect(frame.id, "replace")}
-                className={`h-full w-full overflow-hidden rounded-lg border-2 ${frame.focused ? "border-[#c4a46a]" : frame.selected ? "border-[#0d9488]" : "border-transparent"}`}
+                className={`h-full w-full overflow-hidden rounded-lg border-2 ${frame.focused ? "border-white" : frame.selected ? "border-[#0d9488]" : "border-transparent"}`}
               >
                 <img src={frame.afterUrl || frame.beforeUrl} alt="" className="h-full w-full object-cover" />
                 <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-black/75 px-1 py-0.5 text-left text-[8px] font-bold text-white">{frame.name}</span>
@@ -553,8 +625,234 @@ export default function StudioScratchPad({
         {grassBlocked ? <p data-testid="scratch-grass-note" className="mt-2 text-[11px] text-gray-400">{grassNote}</p> : null}
       </footer>
 
-      <input ref={photoInput} data-testid="scratch-file" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png,.tif,.tiff,.raw,.cr2,.nef,.arw,.dng" multiple className="hidden" onChange={(event) => { takePhotos(event.target.files); event.target.value = ""; }} />
+      <input ref={photoInput} data-testid="scratch-file" type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp,.tif,.tiff,.raw,.cr2,.nef,.arw,.dng" multiple className="hidden" onChange={(event) => { takePhotos(event.target.files); event.target.value = ""; }} />
       <input ref={floorInput} data-testid="scratch-floorplan-file" type="file" accept="image/jpeg,image/png,image/svg+xml,.pdf,.jpg,.png,.svg" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) onAddFloorplan(file); event.target.value = ""; }} />
+    </div>
+  );
+}
+
+function Chip({
+  testId,
+  active,
+  label,
+  onClick,
+}: {
+  testId: string;
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      aria-pressed={active}
+      onClick={onClick}
+      className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${active ? "text-white" : "bg-white/5 text-gray-300"}`}
+      style={active ? { backgroundColor: teal } : undefined}
+    >
+      {label}
+    </button>
+  );
+}
+
+function StagingSetup({
+  roomId,
+  furnitureId,
+  angleId,
+  styleId,
+  notes,
+  busy,
+  ready,
+  onRoom,
+  onFurniture,
+  onAngle,
+  onStyle,
+  onNotes,
+  onBrowse,
+  onSubmit,
+}: {
+  roomId: string;
+  furnitureId: string;
+  angleId: string;
+  styleId: string;
+  notes: string;
+  busy: boolean;
+  ready: boolean;
+  onRoom: (id: string) => void;
+  onFurniture: (id: string) => void;
+  onAngle: (id: string) => void;
+  onStyle: (id: string) => void;
+  onNotes: (value: string) => void;
+  onBrowse: () => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <div data-testid="scratch-staging-setup" className="flex min-h-0 flex-1 flex-col">
+      <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Staging setup</p>
+      <button type="button" data-testid="scratch-staging-drop" onClick={onBrowse} className="mt-3 rounded-2xl border border-dashed border-[#0d9488]/60 px-3 py-4 text-left text-[11px] font-bold text-gray-300">
+        Drag empty room photo · JPG PNG WEBP
+      </button>
+      <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Room type</p>
+      <div className="mt-2 flex flex-wrap gap-1">
+        {STAGING_ROOMS.map((item) => (
+          <Chip key={item.id} testId={`scratch-stage-room-${item.id}`} active={roomId === item.id} label={item.label} onClick={() => onRoom(item.id)} />
+        ))}
+      </div>
+      <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Furniture pack</p>
+      <div className="mt-2 flex flex-wrap gap-1">
+        {STAGING_FURNITURE.map((item) => (
+          <Chip key={item.id} testId={`scratch-stage-pack-${item.id}`} active={furnitureId === item.id} label={item.label} onClick={() => onFurniture(item.id)} />
+        ))}
+      </div>
+      <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Multi-angle</p>
+      <div className="mt-2 flex flex-wrap gap-1">
+        {STAGING_ANGLES.map((item) => (
+          <Chip key={item.id} testId={`scratch-stage-angle-${item.id}`} active={angleId === item.id} label={item.label} onClick={() => onAngle(item.id)} />
+        ))}
+      </div>
+      <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Style preference</p>
+      <div className="mt-2 flex flex-wrap gap-1">
+        {STAGING_STYLES.map((item) => (
+          <Chip key={item.id} testId={`scratch-stage-pref-${item.id}`} active={styleId === item.id} label={item.label} onClick={() => onStyle(item.id)} />
+        ))}
+      </div>
+      <label className="mt-4 block">
+        <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Notes</span>
+        <textarea data-testid="scratch-stage-notes" value={notes} rows={3} maxLength={500} onChange={(event) => onNotes(event.target.value)} placeholder="OpenAI / special instructions. Sent with Submit / Stage." className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-white outline-none focus:border-[#0d9488]" />
+      </label>
+      <button type="button" data-testid="scratch-stage-submit" disabled={busy || !ready} onClick={onSubmit} className="mt-auto rounded-full py-3 text-[11px] font-black uppercase tracking-widest text-white disabled:opacity-40" style={{ backgroundColor: teal }}>
+        Submit / Stage
+      </button>
+    </div>
+  );
+}
+
+function StagingCanvas({
+  focus,
+  styleLabel,
+  zoom,
+  compare,
+  onZoom,
+  onCompare,
+}: {
+  focus: ScratchFrameView | null;
+  styleLabel: string;
+  zoom: "fit" | "100" | "200";
+  compare: number;
+  onZoom: (zoom: "fit" | "100" | "200") => void;
+  onCompare: (value: number) => void;
+}) {
+  const before = focus?.beforeUrl || "";
+  const after = focus?.afterUrl || "";
+  const width = zoom === "100" ? "100%" : zoom === "200" ? "200%" : undefined;
+  return (
+    <div className="flex min-h-0 flex-1 flex-col p-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Staging canvas{focus ? ` · ${focus.name}` : ""}</p>
+        <div className="flex items-center gap-2">
+          <div data-testid="scratch-stage-toggle" className="flex rounded-full bg-black/50 p-1">
+            <button type="button" data-testid="scratch-stage-before" onClick={() => onCompare(0)} className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${compare < 50 ? "text-white" : "text-gray-400"}`} style={compare < 50 ? { backgroundColor: teal } : undefined}>Before</button>
+            <button type="button" data-testid="scratch-stage-after" onClick={() => onCompare(100)} className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${compare >= 50 ? "text-white" : "text-gray-400"}`} style={compare >= 50 ? { backgroundColor: teal } : undefined}>After</button>
+          </div>
+          <div className="flex rounded-full bg-black/50 p-1">
+            {(["fit", "100", "200"] as const).map((value) => (
+              <button key={value} type="button" onClick={() => onZoom(value)} className={`rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-widest ${zoom === value ? "text-white" : "text-gray-400"}`} style={zoom === value ? { backgroundColor: teal } : undefined}>{value === "fit" ? "Fit" : `${value}%`}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div data-testid="scratch-stage-viewer" className="relative flex min-h-0 flex-1 items-center justify-center overflow-auto rounded-2xl bg-[#101618]">
+        {focus ? (
+          <div className={`relative ${zoom === "fit" ? "h-full w-full" : ""}`} style={{ width }}>
+            <img src={compare >= 100 && after ? after : before} alt={focus.name} className={zoom === "fit" ? "h-full w-full object-contain" : "w-full object-contain"} />
+            {after && compare > 0 && compare < 100 ? (
+              <img src={after} alt="" className="absolute inset-0 h-full w-full object-contain" style={{ clipPath: `inset(0 ${100 - compare}% 0 0)` }} />
+            ) : null}
+            {after ? (
+              <input data-testid="scratch-stage-compare" type="range" min={0} max={100} value={compare} onChange={(event) => onCompare(Number(event.target.value))} className="absolute inset-x-8 bottom-4 accent-[#0d9488]" />
+            ) : null}
+          </div>
+        ) : (
+          <p className="text-sm font-black uppercase tracking-widest text-gray-400">Drop an empty room photo</p>
+        )}
+      </div>
+      <p data-testid="scratch-stage-status" className="mt-2 text-[10px] font-bold uppercase tracking-widest text-teal-200">
+        {focus ? `${focus.name} · Virtual staging · ${styleLabel}${after ? " · ready to Export" : ""}` : "Virtual staging · add a room photo"}
+      </p>
+    </div>
+  );
+}
+
+function StagingOptions({
+  roomLabel,
+  styleId,
+  styleLabel,
+  intensity,
+  density,
+  aiNotes,
+  busy,
+  ready,
+  onStyle,
+  onIntensity,
+  onDensity,
+  onAiNotes,
+  onApply,
+  onExport,
+  onDownload,
+}: {
+  roomLabel: string;
+  styleId: string;
+  styleLabel: string;
+  intensity: number;
+  density: number;
+  aiNotes: string;
+  busy: boolean;
+  ready: boolean;
+  onStyle: (id: string) => void;
+  onIntensity: (value: number) => void;
+  onDensity: (value: number) => void;
+  onAiNotes: (value: string) => void;
+  onApply: () => void;
+  onExport: (destination: ScratchExportDestination) => void;
+  onDownload: () => void;
+}) {
+  return (
+    <div data-testid="scratch-staging-options" className="flex flex-col lg:min-h-0 lg:flex-1">
+      <div className="p-3 lg:scrollbar-hide lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Tool options</p>
+        <p data-testid="scratch-stage-chip" className="mt-3 rounded-xl border border-[#0d9488]/40 bg-[#0d9488]/10 px-3 py-2 text-xs font-black text-white">
+          Virtual staging · {styleLabel} {roomLabel}
+        </p>
+        <label className="mt-4 block text-[10px] font-black uppercase tracking-widest text-gray-500">
+          Intensity {intensity}
+          <input data-testid="scratch-stage-intensity" type="range" min={0} max={100} value={intensity} onChange={(event) => onIntensity(Number(event.target.value))} className="mt-1 w-full accent-[#0d9488]" />
+        </label>
+        <label className="mt-3 block text-[10px] font-black uppercase tracking-widest text-gray-500">
+          Furniture density {density}
+          <input data-testid="scratch-stage-density" type="range" min={0} max={100} value={density} onChange={(event) => onDensity(Number(event.target.value))} className="mt-1 w-full accent-[#0d9488]" />
+        </label>
+        <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Style presets</p>
+        <div className="mt-2 grid grid-cols-3 gap-2">
+          {STAGING_STYLES.map((item) => (
+            <button key={item.id} type="button" data-testid={`scratch-stage-style-${item.id}`} aria-pressed={styleId === item.id} onClick={() => onStyle(item.id)} className={`overflow-hidden rounded-xl border text-left ${styleId === item.id ? "border-[#0d9488]" : "border-white/10"}`}>
+              <span className="block h-10" style={{ background: styleId === item.id ? "linear-gradient(160deg,#0f766e,#042f2e)" : "linear-gradient(160deg,#1f2937,#111827)" }} />
+              <span className="block px-1 py-1 text-[9px] font-black uppercase tracking-wide text-gray-200">{item.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="shrink-0 border-t border-white/10 p-3">
+        <label className="block">
+          <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">AI notes</span>
+          <textarea data-testid="scratch-stage-ai-notes" value={aiNotes} rows={2} maxLength={500} onChange={(event) => onAiNotes(event.target.value)} placeholder="OpenAI guidance for the checked photos." className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-white outline-none focus:border-[#0d9488]" />
+        </label>
+        <button type="button" data-testid="scratch-stage-apply" disabled={busy || !ready} onClick={onApply} className="mt-3 w-full rounded-full py-3 text-[11px] font-black uppercase tracking-widest text-white disabled:opacity-40" style={{ backgroundColor: teal }}>Apply</button>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <button type="button" data-testid="scratch-stage-process" disabled={busy || !ready} onClick={onApply} className="rounded-full border border-white/15 py-2 text-[10px] font-black uppercase tracking-widest">Process</button>
+          <ExportButtons onExport={onExport} onDownload={onDownload} />
+        </div>
+      </div>
     </div>
   );
 }

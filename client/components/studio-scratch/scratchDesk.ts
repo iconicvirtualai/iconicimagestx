@@ -7,7 +7,7 @@ export interface ScratchEditStep {
   prompt: string;
 }
 
-export type ScratchDeskMode = "upload" | "edit" | "studio" | "coordinator";
+export type ScratchDeskMode = "upload" | "edit" | "studio" | "staging";
 export type ScratchPreference =
   | "full-basic"
   | "full-iconic"
@@ -154,4 +154,69 @@ export function studioSteps(
     return steps;
   }
   return withNotes(prompt, options.instruction);
+}
+
+export const STAGING_ROOMS = [
+  { id: "living", label: "Living Room", api: "living" },
+  { id: "bed", label: "Bedroom", api: "bed" },
+  { id: "dining", label: "Dining", api: "dining" },
+  { id: "kitchen", label: "Kitchen", api: "kitchen" },
+  { id: "office", label: "Home Office", api: "home_office" },
+  { id: "bathroom", label: "Bathroom", api: "bathroom" },
+  { id: "patio", label: "Patio", api: "outdoor" },
+  { id: "kids", label: "Kids Room", api: "kids_room" },
+] as const;
+
+export const STAGING_FURNITURE = [
+  { id: "sofa", label: "Sofa set" },
+  { id: "dining", label: "Dining set" },
+  { id: "bedroom", label: "Bedroom set" },
+  { id: "office", label: "Office set" },
+  { id: "mixed", label: "Mixed" },
+] as const;
+
+export const STAGING_ANGLES = [
+  { id: "single", label: "Single angle" },
+  { id: "corner", label: "Corner pair" },
+  { id: "wide", label: "Wide + detail" },
+] as const;
+
+export const STAGING_STYLES = [
+  { id: "modern", label: "Modern", api: "modern" },
+  { id: "scandinavian", label: "Scandinavian", api: "scandinavian" },
+  { id: "midcentury", label: "Mid-Century", api: "mid-century modern" },
+  { id: "coastal", label: "Coastal", api: "coastal" },
+  { id: "farmhouse", label: "Farmhouse", api: "farmhouse" },
+  { id: "luxury", label: "Luxury", api: "luxury" },
+] as const;
+
+export interface StagingRequest {
+  roomId: string;
+  furnitureId: string;
+  angleId: string;
+  styleId: string;
+  intensity: number;
+  density: number;
+  notes: string;
+  aiNotes: string;
+}
+
+export function stagingApi(request: Pick<StagingRequest, "roomId" | "styleId">) {
+  const room = STAGING_ROOMS.find((item) => item.id === request.roomId) || STAGING_ROOMS[0];
+  const style = STAGING_STYLES.find((item) => item.id === request.styleId) || STAGING_STYLES[0];
+  return { roomType: room.api, style: style.api, roomLabel: room.label, styleLabel: style.label };
+}
+
+export function stagingGuidance(request: StagingRequest): string | null {
+  const furniture = STAGING_FURNITURE.find((item) => item.id === request.furnitureId);
+  const angle = STAGING_ANGLES.find((item) => item.id === request.angleId);
+  const lines: string[] = [];
+  if (furniture && furniture.id !== "sofa") lines.push(`Furniture pack: ${furniture.label}.`);
+  if (angle && angle.id !== "single") lines.push(`Shoot plan: ${angle.label}.`);
+  if (request.intensity !== 70) lines.push(`Staging intensity ${request.intensity} of 100.`);
+  if (request.density !== 60) lines.push(`Furniture density ${request.density} of 100.`);
+  const notes = [request.notes, request.aiNotes].map((item) => item.trim()).filter((item) => item.length >= 3);
+  if (notes.length) lines.push(`Special instructions: ${notes.join(" ")}`);
+  if (!lines.length) return null;
+  return `Refine this virtual staging. Keep the architecture and camera angle. Do not add anyone. ${lines.join(" ")}`;
 }

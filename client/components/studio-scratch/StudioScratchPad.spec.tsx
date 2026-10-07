@@ -43,6 +43,7 @@ function render(mode: ScratchDeskMode = "upload", grassReady = true) {
       onClearSelection={() => undefined}
       onSort={() => undefined}
       onProcess={() => undefined}
+      onStage={() => undefined}
       onCommitJpeg={() => undefined}
       onRevert={() => undefined}
       onDownload={() => undefined}
@@ -60,7 +61,9 @@ describe("scratch pad desk", () => {
     expect(html).toContain('data-testid="scratch-mode-upload"');
     expect(html).toContain('data-testid="scratch-mode-edit"');
     expect(html).toContain('data-testid="scratch-mode-studio"');
-    expect(html).toContain('data-testid="scratch-mode-coordinator"');
+    expect(html).toContain('data-testid="scratch-mode-staging"');
+    expect(html).not.toContain('data-testid="scratch-mode-coordinator"');
+    expect(html).not.toContain("#c4a46a");
     expect(html).not.toContain('data-testid="scratch-tab-basic"');
     expect(html).not.toContain("AI settings");
     expect(html).not.toContain("Add people");
@@ -124,6 +127,7 @@ describe("scratch pad desk", () => {
         onClearSelection={() => undefined}
         onSort={() => undefined}
         onProcess={() => undefined}
+        onStage={() => undefined}
         onCommitJpeg={() => undefined}
         onRevert={() => undefined}
         onDownload={() => undefined}
@@ -134,5 +138,27 @@ describe("scratch pad desk", () => {
     expect(floor).toContain('data-testid="scratch-floorplan-drop"');
     expect(floor).toContain("Replace Cubi footer");
     expect(floor).toContain("Grass reference is missing.");
+  });
+
+  it("shows the virtual staging desk and sends both note fields", () => {
+    const html = render("staging");
+    expect(html).toContain('data-testid="scratch-staging-setup"');
+    expect(html).toContain('data-testid="scratch-stage-room-living"');
+    expect(html).toContain('data-testid="scratch-stage-pack-sofa"');
+    expect(html).toContain('data-testid="scratch-stage-angle-single"');
+    expect(html).toContain('data-testid="scratch-stage-pref-modern"');
+    expect(html).toContain('data-testid="scratch-stage-notes"');
+    expect(html).toContain('data-testid="scratch-stage-submit"');
+    expect(html).toContain('data-testid="scratch-stage-before"');
+    expect(html).toContain('data-testid="scratch-stage-after"');
+    expect(html).toContain('data-testid="scratch-stage-intensity"');
+    expect(html).toContain('data-testid="scratch-stage-density"');
+    expect(html).toContain('data-testid="scratch-stage-style-scandinavian"');
+    expect(html).toContain('data-testid="scratch-stage-ai-notes"');
+    expect(html).toContain('data-testid="scratch-stage-apply"');
+    expect(html).toContain('data-testid="scratch-stage-process"');
+    expect(html).toContain("JPG PNG WEBP");
+    expect(html).not.toContain("Coordinator");
+    expect(html).not.toContain("#c4a46a");
   });
 });

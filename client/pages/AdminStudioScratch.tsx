@@ -4,9 +4,13 @@ import StudioScratchPad, {
   type ScratchEditStep,
   type ScratchExportDestination,
   type ScratchFrameView,
+  type StagingRequest,
 } from "@/components/studio-scratch/StudioScratchPad";
+import { stagingApi, stagingGuidance } from "@/components/studio-scratch/scratchDesk";
 import { useAuth } from "@/contexts/AuthContext";
+import { auth, storage } from "@/lib/firebase";
 import { fetchScratchStatus, postScratchEdit } from "@/lib/scratchApi";
+import { pollVsaiJob } from "@/lib/scratchStaging";
 import { compressScratchJpeg, readJpegShotTime } from "@/lib/scratchPhoto";
 import {
   SCRATCH_SORT_DEFAULT,
@@ -20,6 +24,7 @@ import {
   scratchDownloadName,
   scratchSelection,
 } from "@shared/studioScratch";
+import { getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage";
 import { toast } from "sonner";
 
 interface FinetuneSnapshot {
@@ -77,7 +82,7 @@ function revokeUrl(url?: string) {
 
 function fileCard(name: string) {
   const safe = name.replace(/[<>&"]/g, "");
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500"><rect width="800" height="500" fill="#111418"/><text x="40" y="250" fill="#c4a46a" font-size="28" font-family="sans-serif">${safe}</text></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500"><rect width="800" height="500" fill="#111418"/><text x="40" y="250" fill="#e5e7eb" font-size="28" font-family="sans-serif">${safe}</text></svg>`;
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
@@ -347,6 +352,108 @@ export default function AdminStudioScratch() {
     setBusy(false);
   };
 
+  const commitStaged = (job: ScratchItem, bytes: Uint8Array, downloadName: string, error?: string) => {
+    const afterUrl = URL.createObjectURL(bytesBlob(bytes, "image/jpeg"));
+    setItems((current) =>
+      current.map((item) => {
+        if (item.id !== job.id) return item;
+        revokeUrl(item.afterUrl);
+        if (item.preFinetune?.afterUrl && item.preFinetune.afterUrl !== item.afterUrl) {
+          revokeUrl(item.preFinetune.afterUrl);
+        }
+        return {
+          ...item,
+          status: error ? "failed" : "done",
+          error,
+          afterUrl,
+          afterBytes: bytes,
+          downloadName,
+          lastAction: "staging",
+          preFinetune: undefined,
+        };
+      }),
+    );
+  };
+
+  const runStaging = async (request: StagingRequest) => {
+    const targets = checkedItems();
+    if (!targets.length) {
+      toast.error("Check a photo in the filmstrip.");
+      return;
+    }
+    const user = auth.currentUser;
+    if (!user) {
+      toast.error("Sign in again before virtual staging.");
+      return;
+    }
+    const api = stagingApi(request);
+    const guidance = stagingGuidance(request);
+    setBusy(true);
+    let index = 0;
+    for (const job of targets) {
+      index += 1;
+      setProgress(`Staging ${index} of ${targets.length}`);
+      if (!job.editable) {
+        toast.message(`${job.name} needs a JPEG, PNG, or WEBP before staging.`);
+        continue;
+      }
+      patch(job.id, { status: "editing", error: undefined });
+      try {
+        const blob = job.afterBytes ? bytesBlob(job.afterBytes, "image/jpeg") : job.source;
+        const stored = storageRef(storage, `vsai-uploads/${user.uid}/${Date.now()}-${job.id}.jpg`);
+        await uploadBytes(stored, blob);
+        const imageUrl = await getDownloadURL(stored);
+        const token = await getToken();
+        const created = await fetch("/api/vsai/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ imageUrl, roomType: api.roomType, style: api.style }),
+        });
+        const createdData = await created.json().catch(() => ({}));
+        if (!created.ok) throw new Error(createdData.error || "Virtual staging did not start.");
+        await pollVsaiJob(async () => {
+          const res = await fetch(`/api/vsai/result/${createdData.jobId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || "Could not check the staging job.");
+          return data;
+        }, (ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+        const fileRes = await fetch(`/api/vsai/result/${createdData.jobId}/file`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!fileRes.ok) {
+          const data = await fileRes.json().catch(() => ({}));
+          throw new Error(data.error || "The staged photo could not be saved on this pad.");
+        }
+        const downloaded = new Uint8Array(await fileRes.arrayBuffer());
+        const stagedFile = new File([downloaded], `${job.id}.jpg`, {
+          type: fileRes.headers.get("content-type") || "image/jpeg",
+        });
+        const jpeg = await compressScratchJpeg(stagedFile);
+        let bytes = new Uint8Array(await jpeg.arrayBuffer());
+        let downloadName = scratchDownloadName(job.name);
+        if (guidance) {
+          const revised = await postScratchEdit(getToken, {
+            body: bytesBlob(bytes, "image/jpeg"),
+            action: "revise",
+            prompt: guidance,
+            fileName: job.name,
+          });
+          bytes = new Uint8Array(revised.bytes);
+          downloadName = revised.downloadName;
+        }
+        commitStaged(job, bytes, downloadName);
+      } catch (err) {
+        const error = err instanceof Error ? err.message : "Virtual staging failed.";
+        toast.error(`${job.name}: ${error}`);
+        patch(job.id, { status: "failed", error });
+      }
+    }
+    setProgress("");
+    setBusy(false);
+  };
+
   const onDownload = () => {
     const focus = items.find((item) => item.id === focusId) || items[0];
     if (!focus) return;
@@ -499,6 +606,9 @@ export default function AdminStudioScratch() {
             label: request.label,
             emptyNote: "Check a photo in the filmstrip.",
           });
+        }}
+        onStage={(request) => {
+          void runStaging(request);
         }}
         onCommitJpeg={commitJpeg}
         onRevert={revertFinetune}
