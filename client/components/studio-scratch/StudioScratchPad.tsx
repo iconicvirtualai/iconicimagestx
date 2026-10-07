@@ -1,110 +1,29 @@
-import { useEffect, useRef, useState } from "react";
-import {
-  ICONIC_POLISH_INSTRUCTION,
-  ICONIC_POLISH_TREATMENTS,
-} from "@shared/orderEditPlan";
-import {
-  AI_EDIT_PRESETS,
-  DEFAULT_ADJUSTMENTS,
-  adjustmentCssFilter,
-  type StudioAdjustments,
-} from "@shared/iconicStudio";
-import { type ScratchAction } from "@shared/studioScratch";
+import { useRef, useState } from "react";
+import { ICONIC_POLISH_TREATMENTS } from "@shared/orderEditPlan";
 import { SCRATCH_SORT_DEFAULT, type ScratchSortMode } from "@/lib/scratchSort";
-import { Slider } from "@/components/ui/slider";
+import { bakeMarkup, bakeStrokes, type MarkupPoint, type ScratchStroke } from "@/lib/scratchBrush";
+import { brandFloorplan } from "@/lib/floorplanBrand";
+import { loadScratchImage } from "@/lib/scratchPhoto";
+import { lookCss, lookIsNeutral, NEUTRAL_LOOK, renderScratchLook, type ScratchLook } from "@/lib/scratchLook";
+import {
+  EDIT_TOOLS,
+  PREFERENCES,
+  SKY_PRESETS,
+  STUDIO_CORE,
+  STUDIO_EXTRAS,
+  editInstructionSteps,
+  isLocalStudioTool,
+  preferenceSteps,
+  studioSteps,
+  type ScratchDeskMode,
+  type ScratchEditStep,
+  type ScratchEditTool,
+  type ScratchPreference,
+  type ScratchStudioTool,
+  type SkyPreset,
+} from "./scratchDesk";
 
-export interface ScratchEditStep {
-  action: ScratchAction;
-  prompt: string;
-}
-
-type ScratchTab = "basic" | "advanced" | "finetune";
-
-const BASIC_BATCH_PROMPT =
-  "Prepare this listing photo as the first edit batch. Balance color and exposure, clear window glare, and replace a blown-out sky when the sky is visible. Keep the architecture, furnishings, and camera angle. Do not add people.";
-
-function presetPrompt(id: string): string {
-  return AI_EDIT_PRESETS.find((preset) => preset.id === id)?.prompt ?? "";
-}
-
-const ADVANCED_TOOLS: Array<{
-  id: string;
-  label: string;
-  action: ScratchAction;
-  prompt: string;
-}> = [
-  {
-    id: "grass",
-    label: "Grass Replacement",
-    action: "grass",
-    prompt: "Replace the lawn.",
-  },
-  {
-    id: "twilight",
-    label: "Twilight Conversions",
-    action: "twilight",
-    prompt: "Convert to twilight.",
-  },
-  {
-    id: "driveway",
-    label: "Driveway Clean Up",
-    action: "edit",
-    prompt:
-      "Clean the driveway. Remove dirt, stains, debris, and tire marks, and repair patchy pavement so it looks even. Keep the house, landscaping, and camera angle.",
-  },
-  {
-    id: "cords",
-    label: "Cord Removal",
-    action: "edit",
-    prompt:
-      "Remove visible cords, cables, and powerlines. Rebuild only the surfaces and sky they covered. Keep the architecture and camera angle.",
-  },
-  {
-    id: "photographer",
-    label: "Photographer Removal",
-    action: "edit",
-    prompt:
-      "Remove the photographer and any camera, tripod, or reflection of the photographer. Rebuild only that area. Do not add anyone to the photo.",
-  },
-  {
-    id: "tv",
-    label: "TV Screens Added",
-    action: "edit",
-    prompt: presetPrompt("add_tv"),
-  },
-  {
-    id: "fire",
-    label: "Fire Added",
-    action: "edit",
-    prompt:
-      "Add a realistic fire in the existing fireplace or firepit only. Do not add a new structure, move the architecture, or change the camera.",
-  },
-  {
-    id: "landscaping",
-    label: "Landscaping",
-    action: "edit",
-    prompt:
-      "Improve the landscaping with neat, photoreal beds, trimmed shrubs, and healthy plants that fit the existing yard. Do not move the house or the camera.",
-  },
-  {
-    id: "virtual_stage",
-    label: "Virtual Staging",
-    action: "edit",
-    prompt: presetPrompt("virtual_stage"),
-  },
-  {
-    id: "clutter",
-    label: "Remove clutter",
-    action: "edit",
-    prompt: presetPrompt("remove_clutter"),
-  },
-  {
-    id: "polish",
-    label: "Iconic Polish",
-    action: "edit",
-    prompt: ICONIC_POLISH_INSTRUCTION,
-  },
-];
+export type { ScratchEditStep, ScratchDeskMode };
 
 export type ScratchExportDestination = "gallery" | "dropbox" | "drive" | "zip";
 
@@ -119,12 +38,8 @@ export interface ScratchFrameView {
   focused: boolean;
   lastAction?: string;
   canRevert?: boolean;
+  editable?: boolean;
 }
-
-const labelCls =
-  "text-[10px] font-black uppercase tracking-widest text-gray-400";
-const gold = "#c4a46a";
-const teal = "#0d9488";
 
 const SORTS: Array<{ id: ScratchSortMode; label: string }> = [
   { id: "name-asc", label: "Filename" },
@@ -136,751 +51,784 @@ const SORTS: Array<{ id: ScratchSortMode; label: string }> = [
   { id: "upload", label: "Upload order" },
 ];
 
-const CROPS: Array<{ id: StudioAdjustments["crop"]; label: string }> = [
-  { id: "original", label: "Original" },
-  { id: "1:1", label: "1:1" },
-  { id: "4:5", label: "4:5" },
-  { id: "16:9", label: "16:9" },
+const LOOK_ROWS: Array<{ key: keyof ScratchLook; label: string; min: number; max: number }> = [
+  { key: "exposure", label: "Exposure", min: -100, max: 100 },
+  { key: "highlights", label: "Highlights", min: -100, max: 100 },
+  { key: "shadows", label: "Shadows", min: -100, max: 100 },
+  { key: "blacks", label: "Blacks", min: -100, max: 100 },
+  { key: "whites", label: "Whites", min: -100, max: 100 },
+  { key: "temperature", label: "Temperature", min: -100, max: 100 },
+  { key: "vibrance", label: "Vibrance", min: -100, max: 100 },
+  { key: "saturation", label: "Saturation", min: -100, max: 100 },
+  { key: "sharpness", label: "Sharpness", min: 0, max: 100 },
+  { key: "hue", label: "Hue", min: -100, max: 100 },
 ];
 
-function cropFrameClass(crop: StudioAdjustments["crop"]) {
-  if (crop === "1:1") return "aspect-square h-[78%] max-h-full";
-  if (crop === "4:5") return "aspect-[4/5] h-[78%] max-h-full";
-  if (crop === "16:9") return "aspect-video w-[92%] max-h-full";
-  return "h-full w-full";
-}
+const MODES: Array<{ id: ScratchDeskMode; label: string }> = [
+  { id: "upload", label: "Upload" },
+  { id: "edit", label: "Edit" },
+  { id: "studio", label: "Studio" },
+  { id: "coordinator", label: "Coordinator" },
+];
 
-function actionLabel(action?: string) {
-  if (action === "twilight") return "Twilight";
-  if (action === "grass") return "Grass";
-  if (action === "revise") return "Revision";
-  if (action === "finetune") return "Fine-tune";
-  if (action === "batch") return "Batch";
-  if (action === "reprocess") return "Reprocess";
-  if (action === "edit") return "Edit";
-  return "";
-}
+const teal = "#0d9488";
+const gold = "#c4a46a";
 
-function ApplyButton({
-  testId,
-  label,
-  disabled,
-  onApply,
-}: {
-  testId: string;
-  label: string;
-  disabled?: boolean;
-  onApply: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      data-testid={testId}
-      disabled={disabled}
-      onClick={onApply}
-      className="rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-40"
-      style={{ backgroundColor: teal }}
-    >
-      {label}
-    </button>
-  );
+function formatLook(key: keyof ScratchLook, value: number) {
+  if (key === "exposure") return `${value > 0 ? "+" : ""}${(value / 100).toFixed(2)}`;
+  return `${value > 0 ? "+" : ""}${value}`;
 }
 
 export default function StudioScratchPad({
   frames,
-  revision,
   busy,
   progress,
   grassReady,
   grassNote,
   sortMode = SCRATCH_SORT_DEFAULT,
-  onRevision,
+  initialMode = "upload",
+  initialStudioTool = "sky",
+  floorplanUrl,
   onAddFiles,
+  onAddFloorplan,
   onSelect,
+  onSelectAll,
+  onClearSelection,
   onSort,
-  onProcessSet,
-  onProcessSelection,
-  onApplyFinetune,
-  onRevertFinetune,
+  onProcess,
+  onCommitJpeg,
+  onRevert,
   onDownload,
   onExport,
   onRemove,
 }: {
   frames: ScratchFrameView[];
-  revision: string;
   busy: boolean;
   progress: string;
   grassReady: boolean;
   grassNote: string;
   sortMode?: ScratchSortMode;
-  onRevision: (value: string) => void;
+  initialMode?: ScratchDeskMode;
+  initialStudioTool?: ScratchStudioTool;
+  floorplanUrl?: string;
   onAddFiles: (files: File[]) => void;
+  onAddFloorplan: (file: File) => void;
   onSelect: (id: string, mode: "replace" | "toggle" | "range") => void;
+  onSelectAll: () => void;
+  onClearSelection: () => void;
   onSort: (mode: ScratchSortMode) => void;
-  onProcessSet: (
-    steps: ScratchEditStep[],
-    label: "batch" | "reprocess",
-  ) => void;
-  onProcessSelection: (steps: ScratchEditStep[]) => void;
-  onApplyFinetune: (adjustments: StudioAdjustments) => Promise<boolean>;
-  onRevertFinetune: () => void;
+  onProcess: (request: { steps: ScratchEditStep[]; fromOriginal: boolean; label?: string }) => void;
+  onCommitJpeg: (dataUrl: string, frameId: string, label: string) => void;
+  onRevert: () => void;
   onDownload: () => void;
   onExport: (destination: ScratchExportDestination) => void;
   onRemove: (id: string) => void;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [dragOver, setDragOver] = useState(false);
+  const photoInput = useRef<HTMLInputElement>(null);
+  const floorInput = useRef<HTMLInputElement>(null);
+  const [mode, setMode] = useState<ScratchDeskMode>(initialMode);
+  const [preference, setPreference] = useState<ScratchPreference>("full-iconic");
+  const [notes, setNotes] = useState("");
+  const [instruction, setInstruction] = useState("");
+  const [surface, setSurface] = useState<"whole" | "tool">("whole");
+  const [editTool, setEditTool] = useState<ScratchEditTool>("brush");
+  const [studioTool, setStudioTool] = useState<ScratchStudioTool>(initialStudioTool);
+  const [skyPreset, setSkyPreset] = useState<SkyPreset>("dramatic");
+  const [intensity, setIntensity] = useState(72);
+  const [blend, setBlend] = useState(38);
+  const [look, setLook] = useState<ScratchLook>(NEUTRAL_LOOK);
+  const [zoom, setZoom] = useState<"fit" | "100" | "200">("fit");
   const [showAfter, setShowAfter] = useState(true);
-  const [tab, setTab] = useState<ScratchTab>("basic");
-  const [tools, setTools] = useState<string[]>([]);
-  const [custom, setCustom] = useState("");
-  const [adjustments, setAdjustments] =
-    useState<StudioAdjustments>(DEFAULT_ADJUSTMENTS);
+  const [strokes, setStrokes] = useState<ScratchStroke[]>([]);
+  const [marks, setMarks] = useState<MarkupPoint[]>([]);
+  const [labelText, setLabelText] = useState("Label");
+  const [replaceFooter, setReplaceFooter] = useState(true);
+  const [logoBar, setLogoBar] = useState(true);
+  const [autoLabel, setAutoLabel] = useState(true);
+  const [brandedFloor, setBrandedFloor] = useState<string>();
+  const [dragOver, setDragOver] = useState(false);
+  const drawing = useRef(false);
+
   const focus = frames.find((frame) => frame.focused) || frames[0] || null;
-  const setReady = frames.length > 0;
-  const checkedCount = frames.filter((frame) => frame.selected).length;
-  const editedCount = frames.filter((frame) => frame.afterUrl).length;
-  const canRevert = frames.some((frame) => frame.selected && frame.canRevert);
-  const displayUrl = focus
-    ? showAfter && focus.afterUrl
-      ? focus.afterUrl
-      : focus.beforeUrl
-    : "";
-  const applyLocked = busy || checkedCount === 0;
-  const advancedSteps = (): ScratchEditStep[] => {
-    const steps = ADVANCED_TOOLS.filter((tool) => tools.includes(tool.id)).map(
-      (tool) => ({ action: tool.action, prompt: tool.prompt }),
-    );
-    const text = custom.trim();
-    if (text.length >= 3) steps.push({ action: "edit", prompt: text });
-    return steps;
-  };
-  const toggleTool = (id: string) => {
-    setTools((current) =>
-      current.includes(id)
-        ? current.filter((entry) => entry !== id)
-        : [...current, id],
-    );
-  };
+  const checked = frames.filter((frame) => frame.selected).length;
+  const displayUrl = focus ? (showAfter && focus.afterUrl ? focus.afterUrl : focus.beforeUrl) : "";
+  const preferenceMeta = PREFERENCES.find((item) => item.id === preference) || PREFERENCES[1];
+  const grassBlocked = !grassReady && (preference === "grass" || studioTool === "grass");
 
-  useEffect(() => {
-    setShowAfter(true);
-  }, [focus?.id, focus?.afterUrl]);
-
-  const takeFiles = (list: FileList | File[] | null) => {
+  const takePhotos = (list: FileList | File[] | null) => {
     const files = Array.from(list || []);
     if (files.length) onAddFiles(files);
   };
 
-  const setSlider = (key: keyof StudioAdjustments, value: number) => {
-    setAdjustments((current) => ({ ...current, [key]: value }));
+  const sendProcess = (steps: ScratchEditStep[] | null, fromOriginal: boolean, label?: string) => {
+    if (!steps?.length) return;
+    if (steps.some((step) => step.action === "grass") && !grassReady) return;
+    onProcess({ steps, fromOriginal, label });
+  };
+
+  const commitFocused = async (dataUrl: string, label: string) => {
+    if (!focus) return;
+    onCommitJpeg(dataUrl, focus.id, label);
+  };
+
+  const applyLook = async () => {
+    if (!focus) return;
+    if (surface === "tool") {
+      if (!strokes.length) return;
+      const image = await loadScratchImage(displayUrl);
+      await commitFocused(bakeStrokes(image, strokes), editTool);
+      setStrokes([]);
+      return;
+    }
+    if (lookIsNeutral(look)) return;
+    const image = await loadScratchImage(displayUrl);
+    await commitFocused(renderScratchLook(image, look), "finetune");
+    setLook(NEUTRAL_LOOK);
+  };
+
+  const applyStudio = async () => {
+    if (studioTool === "floorplan") {
+      if (!floorplanUrl) return;
+      const image = await loadScratchImage(floorplanUrl);
+      setBrandedFloor(brandFloorplan(image, { replaceFooter, logoBar, autoLabel }));
+      return;
+    }
+    if (isLocalStudioTool(studioTool)) {
+      if (!focus || !marks.length) return;
+      const image = await loadScratchImage(displayUrl);
+      await commitFocused(bakeMarkup(image, marks), studioTool);
+      setMarks([]);
+      return;
+    }
+    sendProcess(studioSteps(studioTool, { skyPreset, intensity, blend, instruction }), false, studioTool);
+  };
+
+  const onCanvasPointer = (event: React.PointerEvent<HTMLDivElement>, kind: "stroke" | "mark") => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const point = {
+      x: Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width)),
+      y: Math.min(1, Math.max(0, (event.clientY - bounds.top) / bounds.height)),
+    };
+    if (kind === "mark") {
+      const markKind = studioTool === "pins" ? "pin"
+        : studioTool === "lines" ? "line"
+          : studioTool === "shapes" ? "shape"
+            : studioTool === "logos" ? "logo"
+              : "text";
+      setMarks((current) => [...current, { ...point, kind: markKind, text: labelText }]);
+      return;
+    }
+    if (event.type === "pointerdown") {
+      drawing.current = true;
+      setStrokes((current) => [...current, { tool: editTool, points: [point] }]);
+      return;
+    }
+    if (!drawing.current || event.type === "pointerup" || event.type === "pointerleave") {
+      drawing.current = false;
+      return;
+    }
+    setStrokes((current) => {
+      const next = current.slice();
+      const last = next[next.length - 1];
+      if (!last) return current;
+      next[next.length - 1] = { ...last, points: [...last.points, point] };
+      return next;
+    });
   };
 
   return (
     <div
       data-testid="scratch-pad"
-      data-layout="center-photo bottom-filmstrip right-panel"
-      className="flex min-h-[640px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-[#161616] lg:h-[calc(100vh-8.75rem)]"
-      onDragOver={(event) => {
-        event.preventDefault();
-        setDragOver(true);
-      }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={(event) => {
-        event.preventDefault();
-        setDragOver(false);
-        takeFiles(event.dataTransfer.files);
-      }}
+      data-layout="center-canvas bottom-filmstrip side-tools"
+      data-mode={mode}
+      className="flex h-[100vh] min-h-[640px] flex-col overflow-hidden bg-[#070b0c] text-white"
     >
-      <header className="relative z-20 flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
-        <div className="min-w-0">
-          <p
-            className="text-[10px] font-black uppercase tracking-[0.18em]"
-            style={{ color: gold }}
-          >
-            Scratch pad
-          </p>
-          <p className="truncate text-sm font-black text-white">
-            {focus?.name || "Scratch pad"}
-          </p>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
-            {frames.length === 0
-              ? "No set yet"
-              : `${frames.length} in this set`}
-            {checkedCount ? ` · ${checkedCount} checked` : ""}
-            {progress ? ` · ${progress}` : ""}
-            {focus?.lastAction ? ` · ${actionLabel(focus.lastAction)}` : ""}
-          </p>
+      <header className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+        <p className="text-[10px] font-black uppercase tracking-[0.22em]" style={{ color: gold }}>Scratch pad</p>
+        <div data-testid="scratch-modes" className="flex items-center gap-1 rounded-full border border-white/10 bg-black/40 p-1">
+          {MODES.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              data-testid={`scratch-mode-${item.id}`}
+              data-active={mode === item.id ? "true" : "false"}
+              onClick={() => setMode(item.id)}
+              className={`rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-widest ${mode === item.id ? "text-white" : "text-gray-400"}`}
+              style={mode === item.id ? { backgroundColor: teal } : undefined}
+            >
+              {item.label}
+            </button>
+          ))}
         </div>
-        {setReady ? (
-          <div
-            data-testid="scratch-actions"
-            className="flex shrink-0 items-center gap-2"
-          >
-            <button
-              type="button"
-              data-testid="scratch-delete"
-              disabled={!focus || busy}
-              onClick={() => focus && onRemove(focus.id)}
-              className="rounded-lg border border-white/15 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-40"
-            >
-              Delete
-            </button>
-            <details data-testid="scratch-export" className="relative">
-              <summary className="flex cursor-pointer list-none items-center rounded-lg border border-white/15 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white [&::-webkit-details-marker]:hidden">
-                Export to…
-              </summary>
-              <div className="absolute right-0 z-30 mt-2 w-60 rounded-xl border border-slate-200 bg-white p-1 text-left shadow-xl">
-                <button
-                  type="button"
-                  data-testid="scratch-export-gallery"
-                  onClick={() => onExport("gallery")}
-                  className="block w-full rounded-lg px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-gray-700 hover:bg-slate-50"
-                >
-                  Gallery
-                </button>
-                <button
-                  type="button"
-                  data-testid="scratch-export-dropbox"
-                  onClick={() => onExport("dropbox")}
-                  className="block w-full rounded-lg px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-gray-700 hover:bg-slate-50"
-                >
-                  Dropbox
-                </button>
-                <button
-                  type="button"
-                  data-testid="scratch-export-drive"
-                  onClick={() => onExport("drive")}
-                  className="block w-full rounded-lg px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-gray-700 hover:bg-slate-50"
-                >
-                  Google Drive
-                </button>
-                <button
-                  type="button"
-                  data-testid="scratch-download-zip"
-                  disabled={editedCount === 0}
-                  onClick={() => onExport("zip")}
-                  className="block w-full rounded-lg px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-gray-700 hover:bg-slate-50 disabled:opacity-40"
-                >
-                  Edited set (.zip)
-                </button>
-                <p className="px-3 py-2 text-[10px] leading-relaxed text-gray-400">
-                  Gallery, Dropbox, and Google Drive are not connected here. The
-                  zip downloads edits already in this browser.
-                </p>
-              </div>
-            </details>
-            <button
-              type="button"
-              data-testid="scratch-download"
-              disabled={!focus}
-              onClick={onDownload}
-              className="rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-40"
-              style={{ backgroundColor: teal }}
-            >
-              Download
-            </button>
-          </div>
-        ) : null}
+        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+          {frames.length} files · {checked} selected{progress ? ` · ${progress}` : ""}
+        </p>
       </header>
 
-      <div className="flex min-h-0 flex-col lg:flex-1 lg:flex-row">
-        <div className="flex min-w-0 flex-col lg:min-h-0 lg:flex-1">
-          <section
-            data-testid="scratch-viewer"
-            className="relative flex min-h-[240px] flex-1 items-center justify-center overflow-hidden bg-[#1c1c1c]"
-          >
-            {!focus ? (
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
+        <aside className="scrollbar-hide flex w-full shrink-0 flex-col border-b border-white/10 bg-[#0c1214] p-3 lg:w-60 lg:overflow-y-auto lg:border-b-0 lg:border-r">
+          {mode === "upload" || mode === "coordinator" ? (
+            <UploadPrefs
+              preference={preference}
+              notes={notes}
+              busy={busy}
+              ready={checked > 0}
+              grassReady={grassReady}
+              grassNote={grassNote}
+              onPreference={setPreference}
+              onNotes={setNotes}
+              onProcess={() => sendProcess(preferenceSteps(preference, notes), true, "batch")}
+            />
+          ) : null}
+          {mode === "edit" ? (
+            <div data-testid="scratch-edit-tools">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Tools</p>
+              <div className="mt-3 flex flex-col gap-2">
+                {EDIT_TOOLS.map((tool) => (
+                  <button
+                    key={tool.id}
+                    type="button"
+                    data-testid={`scratch-edit-tool-${tool.id}`}
+                    aria-pressed={editTool === tool.id}
+                    onClick={() => { setEditTool(tool.id); setSurface("tool"); }}
+                    className={`rounded-xl px-2 py-3 text-[10px] font-black uppercase tracking-widest ${editTool === tool.id && surface === "tool" ? "text-white" : "bg-white/5 text-gray-300"}`}
+                    style={editTool === tool.id && surface === "tool" ? { backgroundColor: teal } : undefined}
+                  >
+                    {tool.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {mode === "studio" ? (
+            <div data-testid="scratch-studio-tools">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Studio tools</p>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {STUDIO_CORE.map((tool) => (
+                  <button
+                    key={tool.id}
+                    type="button"
+                    data-testid={`scratch-studio-${tool.id}`}
+                    aria-pressed={studioTool === tool.id}
+                    disabled={tool.id === "grass" && !grassReady}
+                    onClick={() => setStudioTool(tool.id)}
+                    className={`rounded-xl px-1 py-3 text-[9px] font-black uppercase leading-tight tracking-wide disabled:opacity-40 ${studioTool === tool.id ? "text-white" : "bg-white/5 text-gray-300"}`}
+                    style={studioTool === tool.id ? { backgroundColor: teal } : undefined}
+                  >
+                    {tool.label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Extras</p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {STUDIO_EXTRAS.map((tool) => (
+                  <button
+                    key={tool.id}
+                    type="button"
+                    data-testid={`scratch-studio-${tool.id}`}
+                    aria-pressed={studioTool === tool.id}
+                    onClick={() => setStudioTool(tool.id)}
+                    className={`rounded-xl px-2 py-3 text-[9px] font-black uppercase leading-tight tracking-wide ${studioTool === tool.id ? "text-white" : "bg-white/5 text-gray-300"}`}
+                    style={studioTool === tool.id ? { backgroundColor: teal } : undefined}
+                  >
+                    {tool.label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-4 text-[11px] leading-snug text-gray-500">Select a tool, tune the options on the right, then apply to the checked frames.</p>
+              {!grassReady ? <p data-testid="scratch-grass-note" className="mt-2 text-[11px] text-gray-400">{grassNote}</p> : null}
+            </div>
+          ) : null}
+        </aside>
+
+        <section
+          data-testid="scratch-canvas"
+          className="flex min-h-[280px] min-w-0 flex-1 flex-col lg:min-h-0"
+          onDragOver={(event) => { event.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(event) => {
+            event.preventDefault();
+            setDragOver(false);
+            if (mode === "studio" && studioTool === "floorplan") {
+              const file = event.dataTransfer.files?.[0];
+              if (file) onAddFloorplan(file);
+              return;
+            }
+            takePhotos(event.dataTransfer.files);
+          }}
+        >
+          {mode === "upload" || mode === "coordinator" ? (
+            <div className="flex min-h-0 flex-1 flex-col p-4">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                  {mode === "coordinator" ? "Coordinator" : "Upload workspace"}
+                </p>
+                <span className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white" style={{ backgroundColor: teal }}>
+                  {preferenceMeta.kicker ? `${preferenceMeta.kicker} · ` : ""}{preferenceMeta.label}
+                </span>
+              </div>
               <button
                 type="button"
                 data-testid="scratch-drop"
-                onClick={() => inputRef.current?.click()}
-                className={`mx-6 flex min-h-[280px] w-full max-w-xl flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 text-center ${
-                  dragOver ? "border-[#0d9488] bg-white/5" : "border-white/20"
-                }`}
+                onClick={() => photoInput.current?.click()}
+                className="flex min-h-0 flex-1 flex-col items-center justify-center rounded-3xl border-2 border-transparent px-6 text-center"
+                style={{
+                  background: dragOver
+                    ? "linear-gradient(#10211f,#10211f) padding-box, linear-gradient(120deg,#0d9488,#c4a46a,#14b8a6,#0f766e) border-box"
+                    : "linear-gradient(#0c1214,#0c1214) padding-box, linear-gradient(120deg,#0d9488,#c4a46a,#14b8a6,#0f766e) border-box",
+                }}
               >
-                <span className="text-sm font-black uppercase tracking-widest text-white">
-                  Drop JPEGs here
-                </span>
-                <span className="mt-2 max-w-sm text-xs text-gray-400">
-                  Photos stay in this browser. Nothing is added to an order or a
-                  gallery. JPEG only. RAW and HDR brackets are the next pass.
-                </span>
+                <span className="text-sm font-black uppercase tracking-widest">Drag and drop your files to begin</span>
+                <span className="mt-2 text-xs text-gray-400">or click here to upload</span>
+                <span className="mt-4 text-[10px] font-black uppercase tracking-widest text-gray-500">JPG · PNG · RAW · TIFF</span>
+                <span className="mt-3 max-w-md text-[11px] leading-snug text-gray-500">Photos stay in this browser. Nothing is added to an order or a gallery. JPEG and PNG enter the edit queue. RAW and TIFF wait for a JPEG.</span>
               </button>
-            ) : (
-              <>
-                <div
-                  className={`flex items-center justify-center overflow-hidden ${cropFrameClass(adjustments.crop)}`}
-                  style={{ transform: `rotate(${adjustments.rotate}deg)` }}
-                >
+              <p className="mt-3 text-right text-[10px] font-bold uppercase tracking-widest text-teal-200">
+                {checked > 0 ? `Ready to queue · ${preferenceMeta.label} on ${checked} frame${checked === 1 ? "" : "s"}` : "Add frames, then Process the checked set"}
+              </p>
+            </div>
+          ) : (
+            <div className="flex min-h-0 flex-1 flex-col p-3">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                    {mode === "studio" ? "Studio canvas" : "Edit canvas"}
+                    {focus ? ` · ${focus.name}` : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {mode === "edit" ? (
+                    <div className="flex rounded-full bg-black/50 p-1">
+                      <button type="button" data-testid="scratch-surface-whole" aria-pressed={surface === "whole"} onClick={() => setSurface("whole")} className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${surface === "whole" ? "text-white" : "text-gray-400"}`} style={surface === "whole" ? { backgroundColor: teal } : undefined}>Whole photo</button>
+                      <button type="button" data-testid="scratch-surface-tool" aria-pressed={surface === "tool"} onClick={() => setSurface("tool")} className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${surface === "tool" ? "text-white" : "text-gray-400"}`} style={surface === "tool" ? { backgroundColor: teal } : undefined}>Tool</button>
+                    </div>
+                  ) : null}
+                  {focus?.afterUrl ? (
+                    <div data-testid="scratch-compare" className="flex rounded-full bg-black/50 p-1">
+                      <button type="button" onClick={() => setShowAfter(false)} className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${showAfter ? "text-gray-400" : "bg-white text-black"}`}>Before</button>
+                      <button type="button" onClick={() => setShowAfter(true)} className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${showAfter ? "bg-white text-black" : "text-gray-400"}`}>After</button>
+                    </div>
+                  ) : null}
+                  <div className="flex rounded-full bg-black/50 p-1">
+                    {(["fit", "100", "200"] as const).map((value) => (
+                      <button key={value} type="button" onClick={() => setZoom(value)} className={`rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-widest ${zoom === value ? "text-white" : "text-gray-400"}`} style={zoom === value ? { backgroundColor: teal } : undefined}>{value === "fit" ? "Fit" : `${value}%`}</button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div
+                data-testid="scratch-viewer"
+                className="relative flex min-h-0 flex-1 items-center justify-center overflow-auto rounded-2xl bg-[#101618]"
+                onPointerDown={mode === "edit" && surface === "tool" ? (event) => onCanvasPointer(event, "stroke") : mode === "studio" && isLocalStudioTool(studioTool) && studioTool !== "floorplan" ? (event) => onCanvasPointer(event, "mark") : undefined}
+                onPointerMove={mode === "edit" && surface === "tool" ? (event) => onCanvasPointer(event, "stroke") : undefined}
+                onPointerUp={() => { drawing.current = false; }}
+                onPointerLeave={() => { drawing.current = false; }}
+              >
+                {mode === "studio" && studioTool === "floorplan" ? (
+                  <FloorplanStage url={brandedFloor || floorplanUrl} branded={Boolean(brandedFloor)} onBrowse={() => floorInput.current?.click()} />
+                ) : focus ? (
                   <img
                     src={displayUrl}
                     alt={focus.name}
-                    className={
-                      adjustments.crop === "original"
-                        ? "max-h-full max-w-full object-contain"
-                        : "h-full w-full object-cover"
-                    }
-                    style={{ filter: adjustmentCssFilter(adjustments) }}
+                    className={zoom === "fit" ? "max-h-full max-w-full object-contain" : "max-w-none object-contain"}
+                    style={{
+                      filter: mode === "edit" && surface === "whole" ? lookCss(look) : undefined,
+                      width: zoom === "100" ? "100%" : zoom === "200" ? "200%" : undefined,
+                    }}
                   />
-                </div>
-                {focus.afterUrl ? (
-                  <div
-                    data-testid="scratch-compare"
-                    className="absolute left-3 top-3 flex rounded-lg bg-black/70 p-1"
-                  >
-                    <button
-                      type="button"
-                      aria-pressed={!showAfter}
-                      onClick={() => setShowAfter(false)}
-                      className={`rounded-md px-3 py-1.5 text-[10px] font-black uppercase tracking-widest ${showAfter ? "text-gray-300" : "bg-white text-black"}`}
-                    >
-                      Before
-                    </button>
-                    <button
-                      type="button"
-                      aria-pressed={showAfter}
-                      onClick={() => setShowAfter(true)}
-                      className={`rounded-md px-3 py-1.5 text-[10px] font-black uppercase tracking-widest ${showAfter ? "bg-white text-black" : "text-gray-300"}`}
-                    >
-                      After
-                    </button>
-                  </div>
                 ) : (
-                  <p className="absolute bottom-3 left-3 rounded-lg bg-black/70 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-gray-300">
-                    No edit yet
-                  </p>
+                  <button type="button" onClick={() => photoInput.current?.click()} className="text-sm font-black uppercase tracking-widest text-gray-400">Drop JPEGs here</button>
                 )}
-                {focus.status === "editing" ? (
-                  <p className="absolute right-3 top-3 rounded-lg bg-black/70 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white">
-                    Editing…
-                  </p>
+                {focus?.status === "failed" && focus.error ? (
+                  <p data-testid="scratch-error" className="absolute inset-x-0 bottom-0 bg-red-950/90 px-4 py-2 text-sm text-red-100">{focus.error}</p>
                 ) : null}
-              </>
-            )}
-            {focus?.status === "failed" && focus.error ? (
-              <p
-                data-testid="scratch-error"
-                className="absolute inset-x-0 bottom-0 bg-red-950/90 px-4 py-3 text-sm text-red-100"
-              >
-                {focus.error}
-              </p>
-            ) : null}
-          </section>
-
-          {setReady ? (
-            <div className="flex items-center justify-between gap-3 border-t border-white/10 bg-[#111] px-3 py-2">
-              <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400">
-                Sort
-                <select
-                  data-testid="scratch-sort"
-                  value={sortMode}
-                  onChange={(event) =>
-                    onSort(event.target.value as ScratchSortMode)
-                  }
-                  className="rounded-lg border border-white/15 bg-[#0a0a0a] px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-white"
-                >
-                  {SORTS.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <p className="text-right text-[10px] font-bold uppercase tracking-widest text-gray-500">
-                Check the frames to edit. Nothing is added to an order or a
-                gallery.
-              </p>
+              </div>
             </div>
-          ) : null}
+          )}
+        </section>
 
-          <footer
-            data-testid="scratch-filmstrip"
-            data-position="bottom"
-            className="scrollbar-hide flex h-[5.75rem] shrink-0 items-center gap-2 overflow-x-auto border-t border-white/10 bg-[#0a0a0a] px-3"
-          >
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-dashed border-white/20 text-[10px] font-black uppercase tracking-widest text-gray-400"
-            >
-              Add
-            </button>
-            {frames.length === 0 ? (
-              <p className="text-xs text-gray-500">
-                The edit set shows up here. Click a frame to open it.
-              </p>
+        {mode === "edit" || mode === "studio" ? (
+          <aside data-testid="scratch-options" className="flex w-full shrink-0 flex-col border-t border-white/10 bg-[#0c1214] lg:min-h-0 lg:w-72 lg:overflow-hidden lg:border-l lg:border-t-0">
+            {mode === "edit" ? (
+              <EditOptions
+                look={look}
+                instruction={instruction}
+                busy={busy}
+                canRevert={Boolean(focus?.canRevert)}
+                onLook={(key, value) => setLook((current) => ({ ...current, [key]: value }))}
+                onReset={() => setLook(NEUTRAL_LOOK)}
+                onInstruction={setInstruction}
+                onApply={() => { void applyLook(); }}
+                onProcess={() => sendProcess(editInstructionSteps(instruction), false, "edit")}
+                onRevert={onRevert}
+                onExport={onExport}
+                onDownload={onDownload}
+              />
             ) : (
-              frames.map((frame) => (
-                <div
-                  key={frame.id}
-                  className="relative h-14 w-[4.5rem] shrink-0"
-                >
-                  <button
-                    type="button"
-                    data-testid={`scratch-frame-${frame.id}`}
-                    data-selected={frame.selected ? "true" : "false"}
-                    data-focused={frame.focused ? "true" : "false"}
-                    title={frame.name}
-                    onClick={() => onSelect(frame.id, "replace")}
-                    className={`h-full w-full overflow-hidden rounded-lg border-2 ${
-                      frame.status === "failed"
-                        ? "border-red-500"
-                        : frame.focused
-                          ? "border-[#c4a46a]"
-                          : frame.selected
-                            ? "border-[#0d9488]"
-                            : "border-transparent"
-                    }`}
-                  >
-                    <img
-                      src={frame.afterUrl || frame.beforeUrl}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                    <span className="sr-only">{frame.name}</span>
-                  </button>
-                  <input
-                    type="checkbox"
-                    data-testid={`scratch-check-${frame.id}`}
-                    checked={frame.selected}
-                    aria-label={`Include ${frame.name}`}
-                    onChange={() => onSelect(frame.id, "toggle")}
-                    className="absolute left-1 top-1 z-10 h-3.5 w-3.5 accent-[#0d9488]"
-                  />
-                </div>
-              ))
+              <StudioOptions
+                tool={studioTool}
+                skyPreset={skyPreset}
+                intensity={intensity}
+                blend={blend}
+                instruction={instruction}
+                labelText={labelText}
+                grassReady={grassReady}
+                grassNote={grassNote}
+                replaceFooter={replaceFooter}
+                logoBar={logoBar}
+                autoLabel={autoLabel}
+                busy={busy}
+                onSkyPreset={setSkyPreset}
+                onIntensity={setIntensity}
+                onBlend={setBlend}
+                onInstruction={setInstruction}
+                onLabel={setLabelText}
+                onReplaceFooter={setReplaceFooter}
+                onLogoBar={setLogoBar}
+                onAutoLabel={setAutoLabel}
+                onApply={() => { void applyStudio(); }}
+                onProcess={() => {
+                  const steps = studioSteps(studioTool, { skyPreset, intensity, blend, instruction });
+                  sendProcess(steps || editInstructionSteps(instruction), false, studioTool);
+                }}
+                onExport={onExport}
+                onDownload={onDownload}
+              />
             )}
-          </footer>
-        </div>
-
-        <aside
-          data-testid="scratch-adjust"
-          className="flex max-h-[46vh] w-full shrink-0 flex-col border-t border-slate-200 bg-white lg:max-h-none lg:w-[22.5rem] lg:border-l lg:border-t-0"
-        >
-          <div className="border-b border-slate-100 px-4 py-3">
-            <h2
-              className="text-sm font-black uppercase tracking-widest"
-              style={{ color: gold }}
-            >
-              Adjust enhancement
-            </h2>
-          </div>
-          <div
-            data-testid="scratch-tabs"
-            className="grid grid-cols-3 border-b border-slate-100"
-          >
-            {(
-              [
-                ["basic", "Basic"],
-                ["advanced", "Advanced"],
-                ["finetune", "Fine-tune"],
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                data-testid={`scratch-tab-${id}`}
-                data-active={tab === id ? "true" : "false"}
-                onClick={() => setTab(id)}
-                className={`px-2 py-3 text-[10px] font-black uppercase tracking-widest ${
-                  tab === id ? "text-[#0d9488]" : "text-gray-400"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto p-4">
-            <section data-testid="scratch-panel-basic" hidden={tab !== "basic"}>
-              <p className="text-[11px] leading-snug text-gray-500">
-                First batch for every photo in this set. Balances color and runs
-                the trained edit. Reprocess runs that batch again.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <ApplyButton
-                  testId="scratch-process-basic"
-                  label="Process"
-                  disabled={busy || !setReady}
-                  onApply={() =>
-                    onProcessSet(
-                      [{ action: "edit", prompt: BASIC_BATCH_PROMPT }],
-                      "batch",
-                    )
-                  }
-                />
-                <ApplyButton
-                  testId="scratch-reprocess-basic"
-                  label="Reprocess"
-                  disabled={busy || !setReady}
-                  onApply={() =>
-                    onProcessSet(
-                      [{ action: "edit", prompt: BASIC_BATCH_PROMPT }],
-                      "reprocess",
-                    )
-                  }
-                />
-              </div>
-            </section>
-
-            <section
-              data-testid="scratch-panel-advanced"
-              hidden={tab !== "advanced"}
-              className="space-y-2"
-            >
-              <p className="text-[11px] leading-snug text-gray-500">
-                Applies to the checked photos. Turn on the tools, then process
-                the selection.
-              </p>
-              {ADVANCED_TOOLS.map((tool) => {
-                const pressed = tools.includes(tool.id);
-                const grassLocked = tool.id === "grass" && !grassReady;
-                return (
-                  <div key={tool.id}>
-                    <button
-                      type="button"
-                      data-testid={`scratch-tool-${tool.id}`}
-                      aria-pressed={pressed}
-                      disabled={busy || grassLocked}
-                      onClick={() => toggleTool(tool.id)}
-                      className={`w-full rounded-lg px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest disabled:opacity-40 ${
-                        pressed
-                          ? "bg-[#0d9488] text-white"
-                          : "bg-gray-100 text-gray-700"
-                      }`}
-                    >
-                      {tool.label}
-                    </button>
-                    {tool.id === "grass" ? (
-                      <div className="px-1 py-2">
-                        <p className="text-[11px] leading-snug text-gray-500">
-                          $25 add-on, included only on classic packages. Not
-                          Iconic Polish.
-                        </p>
-                        {!grassReady ? (
-                          <p
-                            data-testid="scratch-grass-note"
-                            className="mt-1 text-[11px] leading-snug text-gray-500"
-                          >
-                            {grassNote}
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : null}
-                    {tool.id === "polish" ? (
-                      <div data-testid="scratch-polish" className="px-1 py-2">
-                        <ul
-                          data-testid="scratch-polish-rules"
-                          className="space-y-1"
-                        >
-                          {ICONIC_POLISH_TREATMENTS.map((treatment) => (
-                            <li
-                              key={treatment}
-                              className="text-[11px] font-medium text-gray-600"
-                            >
-                              {treatment}
-                            </li>
-                          ))}
-                        </ul>
-                        <p className="mt-2 text-[11px] leading-snug text-gray-500">
-                          Does not add people or move the camera. Grass
-                          replacement is a separate $25 add-on, included only on
-                          classic packages. It is not this polish.
-                        </p>
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
-              <label className="block pt-2">
-                <span className={labelCls}>Custom text</span>
-                <textarea
-                  data-testid="scratch-advanced-prompt"
-                  value={custom}
-                  onChange={(event) => setCustom(event.target.value)}
-                  rows={2}
-                  placeholder="Brighten the interior and clear the window glare."
-                  className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#0d9488]"
-                />
-              </label>
-              <ApplyButton
-                testId="scratch-process-advanced"
-                label="Process"
-                disabled={applyLocked || advancedSteps().length === 0}
-                onApply={() => onProcessSelection(advancedSteps())}
-              />
-            </section>
-
-            <section
-              data-testid="scratch-panel-finetune"
-              hidden={tab !== "finetune"}
-              className="space-y-3"
-            >
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setAdjustments((current) => ({
-                      ...current,
-                      rotate: ((current.rotate + 90) %
-                        360) as StudioAdjustments["rotate"],
-                    }))
-                  }
-                  className="rounded-lg bg-gray-100 px-3 py-2 text-[10px] font-black uppercase tracking-widest"
-                >
-                  Rotate
-                </button>
-                {CROPS.map((crop) => (
-                  <button
-                    key={crop.id}
-                    type="button"
-                    onClick={() =>
-                      setAdjustments((current) => ({
-                        ...current,
-                        crop: crop.id,
-                      }))
-                    }
-                    className={`rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-widest ${adjustments.crop === crop.id ? "bg-[#0d9488] text-white" : "bg-gray-100"}`}
-                  >
-                    {crop.label}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setAdjustments(DEFAULT_ADJUSTMENTS)}
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-gray-600"
-                >
-                  Reset
-                </button>
-              </div>
-              <SliderRow
-                label="Exposure"
-                value={adjustments.exposure}
-                min={-100}
-                max={100}
-                onChange={(value) => setSlider("exposure", value)}
-              />
-              <SliderRow
-                label="Shadows"
-                value={adjustments.shadows}
-                min={-100}
-                max={100}
-                onChange={(value) => setSlider("shadows", value)}
-              />
-              <SliderRow
-                label="Saturation"
-                value={adjustments.saturation}
-                min={-100}
-                max={100}
-                onChange={(value) => setSlider("saturation", value)}
-              />
-              <SliderRow
-                label="Sharpness"
-                value={adjustments.sharpness}
-                min={0}
-                max={100}
-                onChange={(value) => setSlider("sharpness", value)}
-              />
-              <SliderRow
-                label="Tint"
-                value={adjustments.tint}
-                min={-100}
-                max={100}
-                onChange={(value) => setSlider("tint", value)}
-              />
-              <div className="flex flex-wrap gap-2">
-                <ApplyButton
-                  testId="scratch-finetune"
-                  label="Apply finetune"
-                  disabled={applyLocked}
-                  onApply={() => {
-                    void onApplyFinetune(adjustments).then((applied) => {
-                      if (applied) setAdjustments(DEFAULT_ADJUSTMENTS);
-                    });
-                  }}
-                />
-                <button
-                  type="button"
-                  data-testid="scratch-revert"
-                  disabled={busy || !canRevert}
-                  onClick={onRevertFinetune}
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-gray-700 disabled:opacity-40"
-                >
-                  Revert
-                </button>
-              </div>
-              <label className="block">
-                <span className={labelCls}>Final request</span>
-                <textarea
-                  data-testid="scratch-revision"
-                  value={revision}
-                  onChange={(event) => onRevision(event.target.value)}
-                  rows={2}
-                  placeholder="Warm the sky a little more and leave the house unchanged."
-                  className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#0d9488]"
-                />
-              </label>
-              <ApplyButton
-                testId="scratch-revise"
-                label="Apply request"
-                disabled={
-                  busy || editedCount === 0 || revision.trim().length < 3
-                }
-                onApply={() =>
-                  onProcessSelection([
-                    { action: "revise", prompt: revision.trim() },
-                  ])
-                }
-              />
-            </section>
-          </div>
-        </aside>
+          </aside>
+        ) : null}
       </div>
 
-      <input
-        ref={inputRef}
-        data-testid="scratch-file"
-        type="file"
-        accept="image/jpeg,.jpg,.jpeg"
-        multiple
-        className="hidden"
-        onChange={(event) => {
-          takeFiles(event.target.files);
-          event.target.value = "";
-        }}
-      />
+      <footer data-testid="scratch-filmstrip" data-position="bottom" className="border-t border-white/10 bg-[#070b0c] px-3 py-2">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Filmstrip · batch queue</p>
+            <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+              Sort
+              <select data-testid="scratch-sort" value={sortMode} onChange={(event) => onSort(event.target.value as ScratchSortMode)} className="rounded-lg border border-white/15 bg-black px-2 py-1 text-[10px] text-white">
+                {SORTS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+              </select>
+            </label>
+          </div>
+          <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest">
+            <button type="button" data-testid="scratch-select-all" onClick={onSelectAll} className="text-gray-300">Select all</button>
+            <button type="button" data-testid="scratch-clear" onClick={onClearSelection} className="text-gray-500">Clear</button>
+          </div>
+        </div>
+        <div className="scrollbar-hide flex items-center gap-2 overflow-x-auto">
+          {frames.map((frame) => (
+            <div key={frame.id} className="relative h-16 w-24 shrink-0">
+              <button
+                type="button"
+                data-testid={`scratch-frame-${frame.id}`}
+                data-selected={frame.selected ? "true" : "false"}
+                data-focused={frame.focused ? "true" : "false"}
+                onClick={() => onSelect(frame.id, "replace")}
+                className={`h-full w-full overflow-hidden rounded-lg border-2 ${frame.focused ? "border-[#c4a46a]" : frame.selected ? "border-[#0d9488]" : "border-transparent"}`}
+              >
+                <img src={frame.afterUrl || frame.beforeUrl} alt="" className="h-full w-full object-cover" />
+                <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-black/75 px-1 py-0.5 text-left text-[8px] font-bold text-white">{frame.name}</span>
+              </button>
+              <input
+                type="checkbox"
+                data-testid={`scratch-check-${frame.id}`}
+                checked={frame.selected}
+                aria-label={`Include ${frame.name}`}
+                onChange={() => onSelect(frame.id, "toggle")}
+                className="absolute left-1 top-1 h-3.5 w-3.5 accent-[#0d9488]"
+              />
+              {frame.editable === false ? <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[8px] font-black uppercase text-gray-300">Raw</span> : null}
+            </div>
+          ))}
+          <button type="button" data-testid="scratch-add" onClick={() => photoInput.current?.click()} className="flex h-16 w-20 shrink-0 items-center justify-center rounded-lg border border-dashed border-white/20 text-[10px] font-black uppercase tracking-widest text-gray-400">Add</button>
+          {mode === "studio" && studioTool === "floorplan" ? (
+            <button type="button" data-testid="scratch-floorplan-add" onClick={() => floorInput.current?.click()} className="flex h-16 w-36 shrink-0 flex-col items-center justify-center rounded-lg border border-dashed border-[#0d9488]/50 text-[10px] font-black uppercase tracking-widest text-teal-200">
+              Drop Cubi PDF / PNG
+            </button>
+          ) : null}
+          {focus ? (
+            <button type="button" data-testid="scratch-delete" onClick={() => onRemove(focus.id)} className="ml-auto text-[10px] font-black uppercase tracking-widest text-gray-500">Delete</button>
+          ) : null}
+        </div>
+        {grassBlocked ? <p data-testid="scratch-grass-note" className="mt-2 text-[11px] text-gray-400">{grassNote}</p> : null}
+      </footer>
+
+      <input ref={photoInput} data-testid="scratch-file" type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png,.tif,.tiff,.raw,.cr2,.nef,.arw,.dng" multiple className="hidden" onChange={(event) => { takePhotos(event.target.files); event.target.value = ""; }} />
+      <input ref={floorInput} data-testid="scratch-floorplan-file" type="file" accept="image/jpeg,image/png,image/svg+xml,.pdf,.jpg,.png,.svg" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) onAddFloorplan(file); event.target.value = ""; }} />
     </div>
   );
 }
 
-function SliderRow({
-  label,
-  value,
-  min,
-  max,
-  onChange,
+function UploadPrefs({
+  preference,
+  notes,
+  busy,
+  ready,
+  grassReady,
+  grassNote,
+  onPreference,
+  onNotes,
+  onProcess,
 }: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  onChange: (value: number) => void;
+  preference: ScratchPreference;
+  notes: string;
+  busy: boolean;
+  ready: boolean;
+  grassReady: boolean;
+  grassNote: string;
+  onPreference: (id: ScratchPreference) => void;
+  onNotes: (value: string) => void;
+  onProcess: () => void;
 }) {
   return (
-    <label className="block">
-      <span className="flex items-center justify-between">
-        <span className={labelCls}>{label}</span>
-        <span className="text-[10px] font-bold text-gray-500">{value}</span>
-      </span>
-      <Slider
-        aria-label={label}
-        min={min}
-        max={max}
-        step={1}
-        value={[value]}
-        onValueChange={(next) => onChange(next[0] ?? 0)}
-        className="mt-2"
-      />
-    </label>
+    <div data-testid="scratch-upload-prefs" className="flex min-h-0 flex-1 flex-col">
+      <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Edit preferences <span className="float-right normal-case tracking-normal">pick one</span></p>
+      <div className="mt-3 space-y-2">
+        {PREFERENCES.map((item) => {
+          const active = preference === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              data-testid={`scratch-pref-${item.id}`}
+              aria-pressed={active}
+              disabled={item.id === "grass" && !grassReady}
+              onClick={() => onPreference(item.id)}
+              className={`flex w-full items-center justify-between rounded-full px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest disabled:opacity-40 ${active ? "text-white" : "bg-white/5 text-gray-300"}`}
+              style={active ? { backgroundColor: teal } : undefined}
+            >
+              <span>{item.kicker ? `${item.kicker} · ` : ""}{item.label}</span>
+              {active ? <span aria-hidden>✓</span> : null}
+            </button>
+          );
+        })}
+      </div>
+      {preference === "polish" || preference === "full-iconic" ? (
+        <ul data-testid="scratch-polish-rules" className="mt-3 space-y-1">
+          {ICONIC_POLISH_TREATMENTS.map((treatment) => (
+            <li key={treatment} className="text-[10px] text-gray-400">{treatment}</li>
+          ))}
+          <li className="text-[10px] leading-snug text-gray-500">Does not add anyone or move the camera. Grass replacement is a separate $25 add-on, included only on classic packages. It is not this polish.</li>
+        </ul>
+      ) : null}
+      {!grassReady ? <p data-testid="scratch-grass-note" className="mt-2 text-[11px] text-gray-400">{grassNote}</p> : null}
+      <label className="mt-4 block">
+        <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Order notes / special instructions</span>
+        <textarea
+          data-testid="scratch-instruction-upload"
+          value={notes}
+          maxLength={500}
+          rows={5}
+          onChange={(event) => onNotes(event.target.value)}
+          placeholder="Notes for this batch. They go to the edit with Process."
+          className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-white outline-none focus:border-[#0d9488]"
+        />
+        <span className="mt-1 block text-[10px] text-gray-500">{notes.length}/500 · Sent with Process</span>
+      </label>
+      <button
+        type="button"
+        data-testid="scratch-process"
+        disabled={busy || !ready || (preference === "grass" && !grassReady)}
+        onClick={onProcess}
+        className="mt-auto rounded-full py-3 text-[11px] font-black uppercase tracking-widest text-white disabled:opacity-40"
+        style={{ backgroundColor: teal }}
+      >
+        Process
+      </button>
+    </div>
+  );
+}
+
+function EditOptions({
+  look,
+  instruction,
+  busy,
+  canRevert,
+  onLook,
+  onReset,
+  onInstruction,
+  onApply,
+  onProcess,
+  onRevert,
+  onExport,
+  onDownload,
+}: {
+  look: ScratchLook;
+  instruction: string;
+  busy: boolean;
+  canRevert: boolean;
+  onLook: (key: keyof ScratchLook, value: number) => void;
+  onReset: () => void;
+  onInstruction: (value: string) => void;
+  onApply: () => void;
+  onProcess: () => void;
+  onRevert: () => void;
+  onExport: (destination: ScratchExportDestination) => void;
+  onDownload: () => void;
+}) {
+  return (
+    <div data-testid="scratch-adjustments" className="flex flex-col lg:min-h-0 lg:flex-1">
+      <div className="p-3 lg:scrollbar-hide lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Adjustments</p>
+          <button type="button" onClick={onReset} className="text-[10px] font-black uppercase tracking-widest text-gray-500">Reset all</button>
+        </div>
+        <div className="mt-3 space-y-3">
+          {LOOK_ROWS.map((row) => (
+            <label key={row.key} className="block">
+              <span className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-500">
+                {row.label}
+                <span>{formatLook(row.key, look[row.key])}</span>
+              </span>
+              <input
+                data-testid={`scratch-look-${row.key}`}
+                type="range"
+                min={row.min}
+                max={row.max}
+                value={look[row.key]}
+                onChange={(event) => onLook(row.key, Number(event.target.value))}
+                className="mt-1 w-full accent-[#0d9488]"
+              />
+            </label>
+          ))}
+        </div>
+      </div>
+      <div className="shrink-0 border-t border-white/10 p-3">
+        <label className="block">
+          <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Custom instruction</span>
+          <textarea data-testid="scratch-instruction-edit" value={instruction} rows={2} onChange={(event) => onInstruction(event.target.value)} placeholder="Final request for the checked photos. Process sends it." className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-white outline-none focus:border-[#0d9488]" />
+        </label>
+        <button type="button" data-testid="scratch-apply" disabled={busy} onClick={onApply} className="mt-3 w-full rounded-full py-3 text-[11px] font-black uppercase tracking-widest text-white disabled:opacity-40" style={{ backgroundColor: teal }}>Apply</button>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <button type="button" data-testid="scratch-process-edit" disabled={busy} onClick={onProcess} className="rounded-full border border-white/15 py-2 text-[10px] font-black uppercase tracking-widest">Process</button>
+          <ExportButtons onExport={onExport} onDownload={onDownload} />
+        </div>
+        <button type="button" data-testid="scratch-revert" disabled={busy || !canRevert} onClick={onRevert} className="mt-2 w-full rounded-full border border-white/15 py-2 text-[10px] font-black uppercase tracking-widest text-gray-300 disabled:opacity-40">Revert</button>
+      </div>
+    </div>
+  );
+}
+
+function StudioOptions(props: {
+  tool: ScratchStudioTool;
+  skyPreset: SkyPreset;
+  intensity: number;
+  blend: number;
+  instruction: string;
+  labelText: string;
+  grassReady: boolean;
+  grassNote: string;
+  replaceFooter: boolean;
+  logoBar: boolean;
+  autoLabel: boolean;
+  busy: boolean;
+  onSkyPreset: (id: SkyPreset) => void;
+  onIntensity: (value: number) => void;
+  onBlend: (value: number) => void;
+  onInstruction: (value: string) => void;
+  onLabel: (value: string) => void;
+  onReplaceFooter: (value: boolean) => void;
+  onLogoBar: (value: boolean) => void;
+  onAutoLabel: (value: boolean) => void;
+  onApply: () => void;
+  onProcess: () => void;
+  onExport: (destination: ScratchExportDestination) => void;
+  onDownload: () => void;
+}) {
+  const toolLabel = [...STUDIO_CORE, ...STUDIO_EXTRAS].find((item) => item.id === props.tool)?.label || "Tool";
+  return (
+    <div data-testid="scratch-studio-options" className="flex flex-col lg:min-h-0 lg:flex-1">
+      <div className="p-3 lg:scrollbar-hide lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+      <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Tool options</p>
+      <p className="mt-2 text-sm font-black">{toolLabel}</p>
+      {props.tool === "sky" ? (
+        <div className="mt-3">
+          <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500">Intensity {props.intensity}</label>
+          <input data-testid="scratch-sky-intensity" type="range" min={0} max={100} value={props.intensity} onChange={(event) => props.onIntensity(Number(event.target.value))} className="mt-1 w-full accent-[#0d9488]" />
+          <label className="mt-3 block text-[10px] font-black uppercase tracking-widest text-gray-500">Blend / feather {props.blend}</label>
+          <input data-testid="scratch-sky-blend" type="range" min={0} max={100} value={props.blend} onChange={(event) => props.onBlend(Number(event.target.value))} className="mt-1 w-full accent-[#0d9488]" />
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {SKY_PRESETS.map((preset) => (
+              <button key={preset.id} type="button" data-testid={`scratch-sky-${preset.id}`} aria-pressed={props.skyPreset === preset.id} onClick={() => props.onSkyPreset(preset.id)} className={`rounded-lg px-2 py-2 text-[10px] font-black uppercase tracking-widest ${props.skyPreset === preset.id ? "text-white" : "bg-white/5 text-gray-300"}`} style={props.skyPreset === preset.id ? { backgroundColor: teal } : undefined}>{preset.label}</button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {props.tool === "text" ? (
+        <label className="mt-3 block">
+          <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Label</span>
+          <input data-testid="scratch-markup-text" value={props.labelText} onChange={(event) => props.onLabel(event.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs" />
+        </label>
+      ) : null}
+      {props.tool === "floorplan" ? (
+        <div data-testid="scratch-floorplan-options" className="mt-3 space-y-2 text-[11px] text-gray-300">
+          <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Cubi → Iconic</p>
+          <p>Drop the Cubi export, then Apply. The footer bar is replaced in this browser.</p>
+          <label className="flex items-center justify-between gap-2"><span>Replace Cubi footer</span><input data-testid="scratch-floorplan-footer" type="checkbox" checked={props.replaceFooter} onChange={(event) => props.onReplaceFooter(event.target.checked)} className="accent-[#0d9488]" /></label>
+          <label className="flex items-center justify-between gap-2"><span>Iconic logo bar</span><input type="checkbox" checked={props.logoBar} onChange={(event) => props.onLogoBar(event.target.checked)} className="accent-[#0d9488]" /></label>
+          <label className="flex items-center justify-between gap-2"><span>Auto-label floorplan</span><input type="checkbox" checked={props.autoLabel} onChange={(event) => props.onAutoLabel(event.target.checked)} className="accent-[#0d9488]" /></label>
+          <p className="text-[10px] uppercase tracking-widest text-gray-500">Accepts PDF, PNG, JPG, SVG</p>
+        </div>
+      ) : null}
+      {props.tool === "grass" && !props.grassReady ? <p data-testid="scratch-grass-note" className="mt-2 text-[11px] text-gray-400">{props.grassNote}</p> : null}
+      {props.tool === "grass" ? <p className="mt-2 text-[11px] leading-snug text-gray-500">$25 add-on, included only on classic packages. Not Iconic Polish. The lawn file stays on the server.</p> : null}
+      </div>
+      <div className="shrink-0 border-t border-white/10 p-3">
+      <label className="block">
+        <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Custom instruction</span>
+        <textarea data-testid="scratch-instruction-studio" value={props.instruction} rows={2} onChange={(event) => props.onInstruction(event.target.value)} placeholder="Extra direction for the checked photos. Process sends it." className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs outline-none focus:border-[#0d9488]" />
+      </label>
+      <button type="button" data-testid="scratch-apply-studio" disabled={props.busy || (props.tool === "grass" && !props.grassReady)} onClick={props.onApply} className="mt-3 w-full rounded-full py-3 text-[11px] font-black uppercase tracking-widest text-white disabled:opacity-40" style={{ backgroundColor: teal }}>Apply</button>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <button type="button" data-testid="scratch-process-studio" disabled={props.busy} onClick={props.onProcess} className="rounded-full border border-white/15 py-2 text-[10px] font-black uppercase tracking-widest">Process</button>
+        <ExportButtons onExport={props.onExport} onDownload={props.onDownload} />
+      </div>
+      </div>
+    </div>
+  );
+}
+
+function FloorplanStage({ url, branded, onBrowse }: { url?: string; branded: boolean; onBrowse: () => void }) {
+  if (!url) {
+    return (
+      <button type="button" data-testid="scratch-floorplan-drop" onClick={onBrowse} className="m-6 flex h-64 w-full max-w-xl flex-col items-center justify-center rounded-2xl border border-dashed border-[#0d9488]/60 text-center">
+        <span className="text-sm font-black uppercase tracking-widest">Drop Cubi export</span>
+        <span className="mt-2 text-[11px] text-gray-400">PNG, JPG, or SVG. Apply replaces the footer with the Iconic bar.</span>
+      </button>
+    );
+  }
+  return (
+    <div data-testid="scratch-floorplan-preview" className="relative max-h-full max-w-full">
+      <img src={url} alt="Floor plan" className="max-h-full max-w-full object-contain" />
+      <p className="absolute bottom-3 left-3 rounded-full bg-black/80 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-teal-200">
+        {branded ? "Iconic bar applied" : "Cubi footer out · Iconic bar on Apply"}
+      </p>
+      {branded ? (
+        <a data-testid="scratch-floorplan-download" href={url} download="iconic-floorplan.jpg" className="absolute bottom-3 right-3 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white" style={{ backgroundColor: teal }}>
+          Download floor plan
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
+function ExportButtons({
+  onExport,
+  onDownload,
+}: {
+  onExport: (destination: ScratchExportDestination) => void;
+  onDownload: () => void;
+}) {
+  return (
+    <details data-testid="scratch-export" className="relative">
+      <summary className="cursor-pointer list-none rounded-full border border-white/15 py-2 text-center text-[10px] font-black uppercase tracking-widest [&::-webkit-details-marker]:hidden">Export</summary>
+      <div className="absolute right-0 z-20 mt-2 w-44 rounded-xl border border-white/10 bg-[#101618] p-1 shadow-xl">
+        <button type="button" data-testid="scratch-export-gallery" onClick={() => onExport("gallery")} className="block w-full rounded-lg px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-gray-300">Gallery</button>
+        <button type="button" data-testid="scratch-export-dropbox" onClick={() => onExport("dropbox")} className="block w-full rounded-lg px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-gray-300">Dropbox</button>
+        <button type="button" data-testid="scratch-export-drive" onClick={() => onExport("drive")} className="block w-full rounded-lg px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-gray-300">Google Drive</button>
+        <button type="button" data-testid="scratch-download-zip" onClick={() => onExport("zip")} className="block w-full rounded-lg px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-gray-300">Edited set (.zip)</button>
+        <button type="button" data-testid="scratch-download" onClick={onDownload} className="block w-full rounded-lg px-3 py-2 text-left text-[10px] font-black uppercase tracking-widest text-white">Download</button>
+      </div>
+    </details>
   );
 }

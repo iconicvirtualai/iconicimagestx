@@ -7,26 +7,17 @@ import StudioScratchPad, {
 } from "@/components/studio-scratch/StudioScratchPad";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchScratchStatus, postScratchEdit } from "@/lib/scratchApi";
-import {
-  compressScratchJpeg,
-  loadScratchImage,
-  readJpegShotTime,
-} from "@/lib/scratchPhoto";
+import { compressScratchJpeg, readJpegShotTime } from "@/lib/scratchPhoto";
 import {
   SCRATCH_SORT_DEFAULT,
   sortScratchItems,
   type ScratchSortMode,
 } from "@/lib/scratchSort";
-import { renderAdjustedJpeg } from "@/lib/studioCanvas";
-import {
-  adjustmentsAreNeutral,
-  type StudioAdjustments,
-} from "@shared/iconicStudio";
+import { isRawStudioFile } from "@shared/iconicStudio";
 import { zipStored } from "@shared/zipStore";
 import {
   SCRATCH_MAX_FILES,
   scratchDownloadName,
-  scratchJpegAllowed,
   scratchSelection,
 } from "@shared/studioScratch";
 import { toast } from "sonner";
@@ -53,6 +44,7 @@ interface ScratchItem {
   uploadIndex: number;
   byteSize: number;
   shotAt: number;
+  editable: boolean;
   preFinetune?: FinetuneSnapshot;
 }
 
@@ -83,6 +75,12 @@ function revokeUrl(url?: string) {
   if (url) URL.revokeObjectURL(url);
 }
 
+function fileCard(name: string) {
+  const safe = name.replace(/[<>&"]/g, "");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500"><rect width="800" height="500" fill="#111418"/><text x="40" y="250" fill="#c4a46a" font-size="28" font-family="sans-serif">${safe}</text></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
 export default function AdminStudioScratch() {
   const { user } = useAuth();
   const getToken = useCallback(() => {
@@ -98,7 +96,7 @@ export default function AdminStudioScratch() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [anchorId, setAnchorId] = useState<string | null>(null);
   const [focusId, setFocusId] = useState<string | null>(null);
-  const [revision, setRevision] = useState("");
+  const [floorplanUrl, setFloorplanUrl] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
   const [grassReady, setGrassReady] = useState(false);
@@ -149,31 +147,46 @@ export default function AdminStudioScratch() {
       );
     const added: ScratchItem[] = [];
     for (const file of accepted) {
-      const check = scratchJpegAllowed(file.name, file.type);
-      if (check.ok === false) {
-        toast.error(`${file.name}: ${check.error}`);
+      const uploadIndex = uploadSeq.current;
+      uploadSeq.current += 1;
+      const shotAt = (await readJpegShotTime(file).catch(() => null)) ?? file.lastModified;
+      const base = {
+        id: crypto.randomUUID(),
+        name: file.name,
+        status: "ready" as const,
+        uploadIndex,
+        byteSize: file.size,
+        shotAt,
+      };
+      if (isRawStudioFile(file.name, file.type)) {
+        added.push({
+          ...base,
+          beforeUrl: fileCard(file.name),
+          source: file,
+          editable: false,
+        });
+        toast.message(`${file.name} is in the batch. Process still needs a JPEG.`);
         continue;
       }
       try {
         const source = await compressScratchJpeg(file);
-        const shotAt = (await readJpegShotTime(file)) ?? file.lastModified;
-        const uploadIndex = uploadSeq.current;
-        uploadSeq.current += 1;
         added.push({
-          id: crypto.randomUUID(),
-          name: file.name,
+          ...base,
           beforeUrl: URL.createObjectURL(file),
           source,
-          status: "ready",
-          uploadIndex,
-          byteSize: file.size,
-          shotAt,
+          editable: true,
         });
       } catch (err) {
-        toast.error(
+        added.push({
+          ...base,
+          beforeUrl: fileCard(file.name),
+          source: file,
+          editable: false,
+        });
+        toast.message(
           err instanceof Error
-            ? err.message
-            : `${file.name} could not be prepared.`,
+            ? `${file.name} is in the batch. ${err.message}`
+            : `${file.name} is in the batch. Process still needs a JPEG.`,
         );
       }
     }
@@ -269,6 +282,10 @@ export default function AdminStudioScratch() {
     for (const job of targets) {
       index += 1;
       setProgress(`${index} of ${targets.length}`);
+      if (!job.editable) {
+        toast.message(`${job.name} is waiting on a JPEG before Process.`);
+        continue;
+      }
       if (
         runnable.some((step) => step.action === "revise") &&
         !job.afterBytes
@@ -380,62 +397,32 @@ export default function AdminStudioScratch() {
     toast.message("Export to…", { description });
   };
 
-  const applyFinetune = async (adjustments: StudioAdjustments) => {
-    if (adjustmentsAreNeutral(adjustments)) {
-      toast.error("Move a finetune control before applying.");
-      return false;
-    }
-    const targets = checkedItems();
-    if (!targets.length) {
-      toast.error("Check a photo in the filmstrip.");
-      return false;
-    }
-    setBusy(true);
-    let index = 0;
-    let applied = false;
-    for (const job of targets) {
-      index += 1;
-      setProgress(`${index} of ${targets.length}`);
-      patch(job.id, { status: "editing", error: undefined });
-      try {
-        const image = await loadScratchImage(job.afterUrl || job.beforeUrl);
-        const dataUrl = renderAdjustedJpeg(image, adjustments);
-        const bytes = dataUrlBytes(dataUrl);
-        const afterUrl = URL.createObjectURL(bytesBlob(bytes, "image/jpeg"));
-        applied = true;
-        setItems((current) =>
-          current.map((item) => {
-            if (item.id !== job.id) return item;
-            const snapshot = item.preFinetune ?? {
-              afterUrl: item.afterUrl,
-              afterBytes: item.afterBytes,
-              downloadName: item.downloadName,
-              lastAction: item.lastAction,
-              status: item.afterBytes ? ("done" as const) : ("ready" as const),
-            };
-            if (item.afterUrl && item.afterUrl !== snapshot.afterUrl)
-              revokeUrl(item.afterUrl);
-            return {
-              ...item,
-              status: "done",
-              error: undefined,
-              afterUrl,
-              afterBytes: bytes,
-              downloadName: scratchDownloadName(item.name),
-              lastAction: "finetune",
-              preFinetune: snapshot,
-            };
-          }),
-        );
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Finetune failed.";
-        patch(job.id, { status: "failed", error: message });
-        toast.error(`${job.name}: ${message}`);
-      }
-    }
-    setProgress("");
-    setBusy(false);
-    return applied;
+  const commitJpeg = (dataUrl: string, frameId: string, label: string) => {
+    const bytes = dataUrlBytes(dataUrl);
+    const afterUrl = URL.createObjectURL(bytesBlob(bytes, "image/jpeg"));
+    setItems((current) =>
+      current.map((item) => {
+        if (item.id !== frameId) return item;
+        const snapshot = item.preFinetune ?? {
+          afterUrl: item.afterUrl,
+          afterBytes: item.afterBytes,
+          downloadName: item.downloadName,
+          lastAction: item.lastAction,
+          status: item.afterBytes ? ("done" as const) : ("ready" as const),
+        };
+        if (item.afterUrl && item.afterUrl !== snapshot.afterUrl) revokeUrl(item.afterUrl);
+        return {
+          ...item,
+          status: "done",
+          error: undefined,
+          afterUrl,
+          afterBytes: bytes,
+          downloadName: scratchDownloadName(item.name),
+          lastAction: label,
+          preFinetune: snapshot,
+        };
+      }),
+    );
   };
 
   const revertFinetune = () => {
@@ -479,39 +466,42 @@ export default function AdminStudioScratch() {
     focused: item.id === focusId,
     lastAction: item.lastAction,
     canRevert: Boolean(item.preFinetune),
+    editable: item.editable,
   }));
 
   return (
-    <AdminLayout title="Scratch Pad" mainClassName="scrollbar-hide">
+    <AdminLayout mainClassName="scrollbar-hide">
       <StudioScratchPad
         frames={frames}
-        revision={revision}
         busy={busy}
         progress={progress}
         grassReady={grassReady}
         grassNote={grassNote}
         sortMode={sortMode}
-        onRevision={setRevision}
+        floorplanUrl={floorplanUrl}
         onAddFiles={(files) => {
           void addFiles(files);
         }}
-        onSelect={onSelect}
-        onSort={onSort}
-        onProcessSet={(steps, label) => {
-          void runSteps(items, steps, {
-            fromOriginal: true,
-            label,
-            emptyNote: "Upload photos before processing.",
-          });
+        onAddFloorplan={(file) => {
+          if (floorplanUrl) URL.revokeObjectURL(floorplanUrl);
+          setFloorplanUrl(URL.createObjectURL(file));
         }}
-        onProcessSelection={(steps) => {
-          void runSteps(checkedItems(), steps, {
-            fromOriginal: false,
+        onSelect={onSelect}
+        onSelectAll={() => {
+          setSelectedIds(items.map((item) => item.id));
+          if (!focusId && items[0]) setFocusId(items[0].id);
+        }}
+        onClearSelection={() => setSelectedIds([])}
+        onSort={onSort}
+        onProcess={(request) => {
+          void runSteps(checkedItems(), request.steps, {
+            fromOriginal: request.fromOriginal,
+            label: request.label,
             emptyNote: "Check a photo in the filmstrip.",
           });
         }}
-        onApplyFinetune={applyFinetune}
-        onRevertFinetune={revertFinetune}
+        onCommitJpeg={commitJpeg}
+        onRevert={revertFinetune}
         onDownload={onDownload}
         onExport={onExport}
         onRemove={onRemove}
