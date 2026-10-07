@@ -113,6 +113,15 @@
 }
 
 @layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
   .admin-decor-wash {
     background:
       radial-gradient(380px 240px at 100% 0%, rgba(13, 148, 136, 0.1), transparent 70%),

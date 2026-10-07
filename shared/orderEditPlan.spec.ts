@@ -66,6 +66,10 @@ describe("order edit plan", () => {
     expect(flagged.iconicPolish).toBe(true);
     expect(flagged.photoPrompt).toMatch(/fireplace/i);
     expect(flagged.photoPrompt).toMatch(/driveway/i);
+    expect(flagged.photoPrompt).toMatch(/dirt and debris/i);
+    expect(flagged.photoPrompt).toMatch(/powerlines/i);
+    expect(flagged.photoPrompt).toMatch(/curb appeal/i);
+    expect(flagged.photoPrompt).toMatch(/do not add people/i);
 
     const ordered = planOrderEdits({
       lineItems: [{ id: "iconic-finish", name: "Iconic Finish (Premium Upgrade)" }],
