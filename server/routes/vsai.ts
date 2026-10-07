@@ -246,6 +246,33 @@ router.get("/result/:jobId", requireAuth, async (req: AuthenticatedRequest, res)
   }
 });
 
+// ─── GET /api/vsai/result/:jobId/file ────────────────────────────────────────
+// Same-origin bytes for the scratch pad. The public tool displays resultUrl
+// directly; the pad needs the JPEG so Download, zip, and a note revision work.
+
+router.get("/result/:jobId/file", requireAuth, async (req: AuthenticatedRequest, res) => {
+  try {
+    const jobDoc = await db().collection("vsaiJobs").doc(req.params.jobId).get();
+    if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
+    const job = jobDoc.data()!;
+    if (job.userId !== req.user!.uid) return res.status(403).json({ error: "Access denied." });
+    if (job.status !== "completed" || !job.resultUrl) {
+      return res.status(409).json({ error: "The staged photo is not ready yet." });
+    }
+    const image = await fetch(job.resultUrl);
+    if (!image.ok) {
+      return res.status(502).json({ error: `Could not read the staged photo (${image.status}).` });
+    }
+    const bytes = Buffer.from(await image.arrayBuffer());
+    res.setHeader("Content-Type", image.headers.get("content-type") || "image/jpeg");
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    return res.send(bytes);
+  } catch (err) {
+    console.error("[VSAI] Result file error:", err);
+    return res.status(500).json({ error: String(err) });
+  }
+});
+
 // ─── POST /api/vsai/variation ─────────────────────────────────────────────────
 // Calls POST /v1/render/create-variation?render_id={id}
 // - render_id is a QUERY PARAM (not body)

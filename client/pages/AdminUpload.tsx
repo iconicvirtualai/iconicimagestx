@@ -17,6 +17,7 @@ import { Upload, CheckCircle2, XCircle, Image as ImageIcon, FolderOpen } from "l
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { PresentationSharePanel } from "@/components/PresentationSharePanel";
+import { ICONIC_POLISH_TREATMENTS } from "@shared/orderEditPlan";
 
 export default function AdminUpload() {
   const { user } = useAuth();
@@ -261,7 +262,7 @@ export default function AdminUpload() {
           <span>
             <span className="block text-xs font-black uppercase tracking-widest">Iconic Polish</span>
             <span className="mt-1 block text-xs text-gray-500">
-              Turn this on before you submit. It adds fireplace fire, clean driveways, and clutter removal on top of the order.
+              Turn this on before you submit. It adds the full Iconic Polish on top of the order: {ICONIC_POLISH_TREATMENTS.join("; ")}. It does not add people. Standalone grass replacement is a separate edit.
             </span>
           </span>
         </label>

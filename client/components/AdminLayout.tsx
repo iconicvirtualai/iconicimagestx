@@ -29,6 +29,8 @@ import { mostSpecificNavHref } from "@/lib/adminNav";
 interface AdminLayoutProps {
   children: ReactNode;
   title?: string;
+  /** Hides the main-column scrollbar. The column still scrolls. */
+  mainClassName?: string;
 }
 
 interface NavItem {
@@ -98,7 +100,7 @@ const ROLE_BADGE: Record<string, { label: string; color: string }> = {
   editor:       { label: "Editor",       color: "bg-orange-500/20 text-orange-400" },
 };
 
-export default function AdminLayout({ children, title }: AdminLayoutProps) {
+export default function AdminLayout({ children, title, mainClassName }: AdminLayoutProps) {
   const { user, staffProfile, loading, isStaff, signOutUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -163,7 +165,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
         </div>
 
         {/* Navigation */}
-        <nav className="relative flex-1 px-3 py-5 space-y-5 overflow-y-auto">
+        <nav className="scrollbar-hide relative flex-1 px-3 py-5 space-y-5 overflow-y-auto">
           {visibleGroups.map((group) => (
             <div key={group.label}>
               <p className="text-[9px] font-black text-gray-600 uppercase tracking-[0.15em] px-3 mb-2">
@@ -219,7 +221,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
       </aside>
 
       {/* Main Content */}
-      <main className="relative ml-60 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
+      <main className={`relative ml-60 min-w-0 flex-1 overflow-y-auto overflow-x-hidden ${mainClassName || ""}`}>
         <AdminDecor />
         <div className="relative z-[1] min-h-full w-full">
           {title && (

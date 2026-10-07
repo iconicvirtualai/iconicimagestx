@@ -11,6 +11,7 @@ import {
   type PhotographerTab,
   type PhotographerTone,
 } from "@shared/photographerPortal";
+import { ICONIC_POLISH_TREATMENTS } from "@shared/orderEditPlan";
 
 const TONE_CLASS: Record<PhotographerTone, string> = {
   action: "bg-yellow-100 text-yellow-800",
@@ -167,7 +168,7 @@ export function PhotographerPortal({
           <span>
             <span className="block text-xs font-black uppercase tracking-widest">Iconic Polish</span>
             <span className="mt-1 block text-xs text-gray-500">
-              Applies to the next upload. It adds fireplace fire, clean driveways, and clutter removal on top of the order. The gallery stays with the office.
+              Applies to the next upload. It adds the full Iconic Polish on top of the order: {ICONIC_POLISH_TREATMENTS.join("; ")}. It does not add people. Standalone grass replacement is a separate edit. The gallery stays with the office.
             </span>
           </span>
         </label>
