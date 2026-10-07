@@ -3,14 +3,14 @@ import { useNavigate } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 import { Button } from "@/components/ui/button";
 import {
-  Search, Plus, ArrowRight, Calendar, User, Home, Building2,
+  Search, Plus, Home, Building2,
   X, Check, Upload, Filter, ChevronDown, ChevronUp, RotateCcw,
   Archive, Trash2, ExternalLink, RefreshCw,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import {
   collection, onSnapshot, addDoc, serverTimestamp, getDocs, query, orderBy,
-  writeBatch, doc,
+  writeBatch, doc, updateDoc,
 } from "firebase/firestore";
 import { toast } from "sonner";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
@@ -23,6 +23,8 @@ import {
   listingStatusChips,
   type ListingQueueId,
 } from "@/lib/staffListQueue";
+import { buildAdminOrderTile, type AdminStudioId } from "@shared/adminOrderTile";
+import { AdminOrderTile } from "@/components/admin/AdminOrderTile";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type ProjectType = "real_estate" | "business";
@@ -96,11 +98,6 @@ const BIZ_STATUSES = [
   { value: "archived", label: "Archived", badge: "bg-gray-100 text-gray-400" },
   { value: "cancelled", label: "Cancelled", badge: "bg-red-100 text-red-700" },
 ];
-
-function getBadge(status: string, projectType?: string) {
-  const list = projectType === "business" ? BIZ_STATUSES : RE_STATUSES;
-  return list.find(s => s.value === status) ?? { label: status ?? "Unknown", badge: "bg-gray-100 text-gray-500" };
-}
 
 // ─── Blank forms ──────────────────────────────────────────────────────────────
 const BLANK_RE = {
@@ -508,10 +505,12 @@ export default function AdminListings() {
   const narrowed = React.useMemo(() => {
     return projects.filter(p => {
       const loc = p.address || p.shootLocation || "";
+      const tile = buildAdminOrderTile(p as unknown as Record<string, unknown>);
       const matchSearch = !search.trim() ||
-        loc.toLowerCase().includes(search.toLowerCase()) ||
-        (p.clientName || "").toLowerCase().includes(search.toLowerCase()) ||
-        p.id.toLowerCase().includes(search.toLowerCase());
+        [loc, p.clientName, p.id, tile.packageName, tile.skinLabel, tile.orderCode, tile.clientName, tile.channel]
+          .join(" ")
+          .toLowerCase()
+          .includes(search.toLowerCase());
 
       const matchType = typeFilter === "all" || p.projectType === typeFilter;
 
@@ -587,12 +586,6 @@ export default function AdminListings() {
     const scheduled = filtered.filter(p => p.status === "scheduled" || p.status === "appt_scheduled" || p.status === "consult_scheduled").length;
     return { total, totalRevenue, paid, scheduled };
   }, [filtered]);
-
-  const fmtDate = (ts: any) => {
-    if (!ts) return null;
-    if (ts.toDate) return ts.toDate().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  };
 
   const currentStatuses = projectType === "real_estate" ? RE_STATUSES : BIZ_STATUSES;
   const filteredServices = services.filter(s => !s.type || s.type === "both" || s.type === projectType);
@@ -795,60 +788,31 @@ export default function AdminListings() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-24">
+        <div className="grid grid-cols-1 items-start gap-6 pb-24 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map(p => {
-            const badge = getBadge(p.status || "unscheduled", p.projectType);
             const nextAction = LISTING_QUEUE.find((item) => item.id === listingNextAction(p, queueNow));
-            const loc = p.address || p.shootLocation || "—";
-            const isRE = p.projectType !== "business";
-            const isSelected = selection.has(p.id);
+            const order = buildAdminOrderTile(p as unknown as Record<string, unknown>);
+            const setStudio = async (studio: AdminStudioId) => {
+              try {
+                await updateDoc(doc(db, "listings", p.id), { studio, updatedAt: serverTimestamp() });
+              } catch (err) {
+                console.error(err);
+                toast.error("Could not update the studio.");
+              }
+            };
 
             return (
-              <div key={p.id} className={`rounded-2xl border transition-all overflow-hidden relative group ${isSelected ? "border-[#0d9488] ring-2 ring-[#0d9488]/20" : "border-slate-200 bg-white shadow-sm hover:shadow-md"}`}>
-                {/* Checkbox overlay */}
-                <div
-                  onClick={(e) => { e.stopPropagation(); toggleSelect(p.id); }}
-                  className={`absolute top-3 left-3 z-10 w-6 h-6 rounded-lg border-2 flex items-center justify-center cursor-pointer transition-all ${isSelected ? "bg-[#0d9488] border-[#0d9488]" : "bg-black/20 border-white/40 opacity-0 group-hover:opacity-100"}`}
-                >
-                  {isSelected && <Check className="w-4 h-4 text-white" />}
-                </div>
-
-                <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
-                  {p.images && p.images.length > 0 ? (
-                    <img src={p.images[0].url} alt={loc} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      {isRE ? <Home className="w-8 h-8 text-gray-300" /> : <Building2 className="w-8 h-8 text-gray-300" />}
-                    </div>
-                  )}
-                  <div className="absolute top-3 left-12">
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${isRE ? "bg-[#0d9488]/90 text-white" : "bg-black/80 text-white"}`}>
-                      {isRE ? "Real Estate" : "Business"}
-                    </span>
-                  </div>
-                  <div className="absolute top-3 right-3">
-                    <span className={`px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest ${badge.badge}`}>{badge.label}</span>
-                  </div>
-                </div>
-                <div className="p-4" onClick={() => toggleSelect(p.id)}>
-                  <h3 className="font-bold text-sm text-black mb-1 line-clamp-1">{loc}</h3>
-                  <p className="text-xs text-gray-500 mb-2 flex items-center gap-1.5">
-                    <User className="w-3 h-3" /> {p.clientName || "—"}
-                  </p>
-                  {nextAction && (
-                    <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-[#0d9488]">{nextAction.label}</p>
-                  )}
-                  {p.apptDate && (
-                    <p className="text-xs text-gray-500 mb-3 flex items-center gap-1.5">
-                      <Calendar className="w-3 h-3" /> {fmtDate(p.apptDate)}
-                    </p>
-                  )}
-                  <button onClick={(e) => { e.stopPropagation(); navigate(`/admin/listing/${p.id}`); }}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[#0d9488]/10 hover:bg-[#0d9488]/20 text-[#0d9488] rounded-lg font-bold text-xs uppercase tracking-widest transition-colors"
-                  >
-                    Open Project <ArrowRight className="w-3 h-3" />
-                  </button>
-                </div>
+              <div key={p.id} className="min-w-0">
+                <AdminOrderTile
+                  order={order}
+                  selected={selection.has(p.id)}
+                  onOpen={() => navigate(`/admin/listing/${p.id}`)}
+                  onToggleSelect={() => toggleSelect(p.id)}
+                  onStudioChange={order.studio ? setStudio : undefined}
+                />
+                {nextAction ? (
+                  <p className="mt-2 px-1 text-[10px] font-black uppercase tracking-widest text-[#0d9488]">{nextAction.label}</p>
+                ) : null}
               </div>
             );
           })}
