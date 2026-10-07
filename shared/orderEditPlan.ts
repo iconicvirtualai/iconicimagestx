@@ -24,8 +24,26 @@ export const ORDER_GALLERY_RELEASE = "hold_until_order_complete" as const;
  */
 export const SHOWCASE_PHOTO_COUNT = 30;
 
-export const ICONIC_POLISH_INSTRUCTION =
-  "Iconic Polish: if a fireplace is visible, add a realistic fire; if a driveway, street, or curb is visible, remove vehicles and debris and repair the pavement; remove clutter and personal items. Keep the architecture.";
+/**
+ * Iconic Polish treatments Cadi confirmed from the pricing card.
+ * "Add grass" is part of this full polish. Standalone grass replacement
+ * stays a separate $25 classic-package add-on and is not a substitute for it.
+ */
+export const ICONIC_POLISH_TREATMENTS = [
+  "Remove dirt and debris",
+  "Remove harsh shadows and reflections",
+  "Remove cords and powerlines",
+  "Clean driveways",
+  "Add grass",
+  "Add curb appeal",
+  "Add TVs and screens",
+  "Firepits and fireplaces",
+] as const;
+
+export const ICONIC_POLISH_LIMITS =
+  "Keep the architecture and camera angle. Do not add people. Standalone grass replacement is a separate edit, not a substitute for this full polish.";
+
+export const ICONIC_POLISH_INSTRUCTION = `Iconic Polish: ${ICONIC_POLISH_TREATMENTS.join("; ")}. ${ICONIC_POLISH_LIMITS}`;
 
 const PHOTO_BASE =
   "Prepare this listing photo. Balance color, clear window glare, and replace a blown-out sky when the sky is visible. Keep the architecture, furnishings, and camera angle.";

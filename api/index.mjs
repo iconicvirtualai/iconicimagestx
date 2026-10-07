@@ -4723,7 +4723,18 @@ function decideClientGalleryLink(input) {
 }
 const ORDER_GALLERY_RELEASE = "hold_until_order_complete";
 const SHOWCASE_PHOTO_COUNT = 30;
-const ICONIC_POLISH_INSTRUCTION = "Iconic Polish: if a fireplace is visible, add a realistic fire; if a driveway, street, or curb is visible, remove vehicles and debris and repair the pavement; remove clutter and personal items. Keep the architecture.";
+const ICONIC_POLISH_TREATMENTS = [
+  "Remove dirt and debris",
+  "Remove harsh shadows and reflections",
+  "Remove cords and powerlines",
+  "Clean driveways",
+  "Add grass",
+  "Add curb appeal",
+  "Add TVs and screens",
+  "Firepits and fireplaces"
+];
+const ICONIC_POLISH_LIMITS = "Keep the architecture and camera angle. Do not add people. Standalone grass replacement is a separate edit, not a substitute for this full polish.";
+const ICONIC_POLISH_INSTRUCTION = `Iconic Polish: ${ICONIC_POLISH_TREATMENTS.join("; ")}. ${ICONIC_POLISH_LIMITS}`;
 const PHOTO_BASE = "Prepare this listing photo. Balance color, clear window glare, and replace a blown-out sky when the sky is visible. Keep the architecture, furnishings, and camera angle.";
 function asItems(value) {
   if (!Array.isArray(value)) return [];
@@ -7979,6 +7990,28 @@ router$g.get("/result/:jobId", requireAuth, async (req, res) => {
     });
   } catch (err) {
     console.error("[VSAI] Poll error:", err);
+    return res.status(500).json({ error: String(err) });
+  }
+});
+router$g.get("/result/:jobId/file", requireAuth, async (req, res) => {
+  try {
+    const jobDoc = await db$d().collection("vsaiJobs").doc(req.params.jobId).get();
+    if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
+    const job = jobDoc.data();
+    if (job.userId !== req.user.uid) return res.status(403).json({ error: "Access denied." });
+    if (job.status !== "completed" || !job.resultUrl) {
+      return res.status(409).json({ error: "The staged photo is not ready yet." });
+    }
+    const image = await fetch(job.resultUrl);
+    if (!image.ok) {
+      return res.status(502).json({ error: `Could not read the staged photo (${image.status}).` });
+    }
+    const bytes = Buffer.from(await image.arrayBuffer());
+    res.setHeader("Content-Type", image.headers.get("content-type") || "image/jpeg");
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    return res.send(bytes);
+  } catch (err) {
+    console.error("[VSAI] Result file error:", err);
     return res.status(500).json({ error: String(err) });
   }
 });
