@@ -82,6 +82,8 @@ describe("scratch pad desk", () => {
     expect(html).toContain('data-testid="scratch-pref-twilight"');
     expect(html).toContain('data-testid="scratch-pref-grass"');
     expect(html).toContain('data-testid="scratch-instruction-upload"');
+    expect(html).toContain("OpenAI / special instructions");
+    expect(html).not.toContain("Order notes / special instructions");
     expect(html).toContain('data-testid="scratch-process"');
     expect(html).toContain("JPG · PNG · RAW · TIFF");
     for (const treatment of ICONIC_POLISH_TREATMENTS) expect(html).toContain(treatment);
@@ -98,6 +100,8 @@ describe("scratch pad desk", () => {
     expect(html).toContain('data-testid="scratch-look-exposure"');
     expect(html).toContain('data-testid="scratch-look-hue"');
     expect(html).toContain('data-testid="scratch-instruction-edit"');
+    expect(html).toContain("OpenAI / special instructions");
+    expect(html).not.toContain("Custom instruction");
     expect(html).toContain('data-testid="scratch-apply"');
     expect(html).toContain('data-testid="scratch-revert"');
     expect(html).toContain('data-testid="scratch-export"');
@@ -110,6 +114,8 @@ describe("scratch pad desk", () => {
     expect(html).toContain('data-testid="scratch-studio-floorplan"');
     expect(html).toContain('data-testid="scratch-sky-dramatic"');
     expect(html).toContain('data-testid="scratch-instruction-studio"');
+    expect(html).toContain("OpenAI / special instructions");
+    expect(html).not.toContain("Custom instruction");
     expect(html).not.toContain('data-testid="scratch-grass-preview"');
     const floor = renderToString(
       <StudioScratchPad
@@ -148,6 +154,8 @@ describe("scratch pad desk", () => {
     expect(html).toContain('data-testid="scratch-stage-angle-single"');
     expect(html).toContain('data-testid="scratch-stage-pref-modern"');
     expect(html).toContain('data-testid="scratch-stage-notes"');
+    expect(html).toContain("OpenAI / special instructions");
+    expect(html).not.toContain(">Notes<");
     expect(html).toContain('data-testid="scratch-stage-submit"');
     expect(html).toContain('data-testid="scratch-stage-before"');
     expect(html).toContain('data-testid="scratch-stage-after"');
@@ -155,6 +163,8 @@ describe("scratch pad desk", () => {
     expect(html).toContain('data-testid="scratch-stage-density"');
     expect(html).toContain('data-testid="scratch-stage-style-scandinavian"');
     expect(html).toContain('data-testid="scratch-stage-ai-notes"');
+    expect(html).toContain("OpenAI notes");
+    expect(html).not.toContain(">AI notes<");
     expect(html).toContain('data-testid="scratch-stage-apply"');
     expect(html).toContain('data-testid="scratch-stage-process"');
     expect(html).toContain("JPG PNG WEBP");

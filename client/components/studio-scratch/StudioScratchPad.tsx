@@ -718,7 +718,7 @@ function StagingSetup({
         ))}
       </div>
       <label className="mt-4 block">
-        <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Notes</span>
+        <span className="text-[10px] font-black normal-case tracking-widest text-gray-500">OpenAI / special instructions</span>
         <textarea data-testid="scratch-stage-notes" value={notes} rows={3} maxLength={500} onChange={(event) => onNotes(event.target.value)} placeholder="OpenAI / special instructions. Sent with Submit / Stage." className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-white outline-none focus:border-[#0d9488]" />
       </label>
       <button type="button" data-testid="scratch-stage-submit" disabled={busy || !ready} onClick={onSubmit} className="mt-auto rounded-full py-3 text-[11px] font-black uppercase tracking-widest text-white disabled:opacity-40" style={{ backgroundColor: teal }}>
@@ -844,8 +844,8 @@ function StagingOptions({
       </div>
       <div className="shrink-0 border-t border-white/10 p-3">
         <label className="block">
-          <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">AI notes</span>
-          <textarea data-testid="scratch-stage-ai-notes" value={aiNotes} rows={2} maxLength={500} onChange={(event) => onAiNotes(event.target.value)} placeholder="OpenAI guidance for the checked photos." className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-white outline-none focus:border-[#0d9488]" />
+          <span className="text-[10px] font-black normal-case tracking-widest text-gray-500">OpenAI notes</span>
+          <textarea data-testid="scratch-stage-ai-notes" value={aiNotes} rows={2} maxLength={500} onChange={(event) => onAiNotes(event.target.value)} placeholder="OpenAI notes for the checked photos." className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-white outline-none focus:border-[#0d9488]" />
         </label>
         <button type="button" data-testid="scratch-stage-apply" disabled={busy || !ready} onClick={onApply} className="mt-3 w-full rounded-full py-3 text-[11px] font-black uppercase tracking-widest text-white disabled:opacity-40" style={{ backgroundColor: teal }}>Apply</button>
         <div className="mt-2 grid grid-cols-2 gap-2">
@@ -911,14 +911,14 @@ function UploadPrefs({
       ) : null}
       {!grassReady ? <p data-testid="scratch-grass-note" className="mt-2 text-[11px] text-gray-400">{grassNote}</p> : null}
       <label className="mt-4 block">
-        <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Order notes / special instructions</span>
+        <span className="text-[10px] font-black normal-case tracking-widest text-gray-500">OpenAI / special instructions</span>
         <textarea
           data-testid="scratch-instruction-upload"
           value={notes}
           maxLength={500}
           rows={5}
           onChange={(event) => onNotes(event.target.value)}
-          placeholder="Notes for this batch. They go to the edit with Process."
+          placeholder="OpenAI / special instructions. Sent with Process."
           className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-white outline-none focus:border-[#0d9488]"
         />
         <span className="mt-1 block text-[10px] text-gray-500">{notes.length}/500 · Sent with Process</span>
@@ -993,8 +993,8 @@ function EditOptions({
       </div>
       <div className="shrink-0 border-t border-white/10 p-3">
         <label className="block">
-          <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Custom instruction</span>
-          <textarea data-testid="scratch-instruction-edit" value={instruction} rows={2} onChange={(event) => onInstruction(event.target.value)} placeholder="Final request for the checked photos. Process sends it." className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-white outline-none focus:border-[#0d9488]" />
+          <span className="text-[10px] font-black normal-case tracking-widest text-gray-500">OpenAI / special instructions</span>
+          <textarea data-testid="scratch-instruction-edit" value={instruction} rows={2} onChange={(event) => onInstruction(event.target.value)} placeholder="OpenAI / special instructions. Process sends it." className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-white outline-none focus:border-[#0d9488]" />
         </label>
         <button type="button" data-testid="scratch-apply" disabled={busy} onClick={onApply} className="mt-3 w-full rounded-full py-3 text-[11px] font-black uppercase tracking-widest text-white disabled:opacity-40" style={{ backgroundColor: teal }}>Apply</button>
         <div className="mt-2 grid grid-cols-2 gap-2">
@@ -1073,8 +1073,8 @@ function StudioOptions(props: {
       </div>
       <div className="shrink-0 border-t border-white/10 p-3">
       <label className="block">
-        <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Custom instruction</span>
-        <textarea data-testid="scratch-instruction-studio" value={props.instruction} rows={2} onChange={(event) => props.onInstruction(event.target.value)} placeholder="Extra direction for the checked photos. Process sends it." className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs outline-none focus:border-[#0d9488]" />
+        <span className="text-[10px] font-black normal-case tracking-widest text-gray-500">OpenAI / special instructions</span>
+        <textarea data-testid="scratch-instruction-studio" value={props.instruction} rows={2} onChange={(event) => props.onInstruction(event.target.value)} placeholder="OpenAI / special instructions. Process sends it." className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs outline-none focus:border-[#0d9488]" />
       </label>
       <button type="button" data-testid="scratch-apply-studio" disabled={props.busy || (props.tool === "grass" && !props.grassReady)} onClick={props.onApply} className="mt-3 w-full rounded-full py-3 text-[11px] font-black uppercase tracking-widest text-white disabled:opacity-40" style={{ backgroundColor: teal }}>Apply</button>
       <div className="mt-2 grid grid-cols-2 gap-2">
