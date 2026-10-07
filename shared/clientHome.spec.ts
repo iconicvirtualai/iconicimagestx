@@ -47,8 +47,11 @@ describe("client listing cards", () => {
     expect(buildClientListing("essentials", { services: ["The Essentials"] }).look).toBe("essentials");
     expect(buildClientListing("showcase", { serviceIds: ["listing-showcase"] }).look).toBe("showcase");
     expect(buildClientListing("legacy", { selectedService: "listing-legacy" }).look).toBe("legacy");
-    expect(buildClientListing("leader", { package: "The Market Leader" }).look).toBe("legacy");
-    expect(buildClientListing("other", { services: ["The Refresh"] }).look).toBeNull();
+    expect(buildClientListing("leader", { package: "The Market Leader" }).look).toBe("market-leader");
+    expect(buildClientListing("refresh", { services: ["The Refresh"] }).look).toBe("refresh");
+    expect(buildClientListing("legend", { packageName: "The Local Legend" }).look).toBe("local-legend");
+    expect(buildClientListing("stack", { selectedService: "business-authority-stack" }).look).toBe("authority-stack");
+    expect(buildClientListing("strategic", { package: "The Foundation" }).look).toBeNull();
 
     const showcase = buildClientListing("styled", {
       package: "The Showcase",

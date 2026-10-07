@@ -172,7 +172,7 @@ function ListingGrid({ listings, truncated }: { listings: ClientListingCard[]; t
   return (
     <div>
       <SectionHeading title="Listings" note={truncated ? "Showing the latest listings stored for this account." : ""} />
-      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
+      <div className="grid items-start gap-6 [grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),360px))]">
         {listings.map((listing) => (
           <ListingTile key={listing.id} listing={listing} />
         ))}

@@ -1,10 +1,16 @@
 /**
- * Package look for a client listing tile.
- * Four looks only: Just Photos, Essentials, Showcase, Legacy.
- * Market Leader uses the Legacy look. Other names do not get a card of their own.
+ * Address, amenities, and shoot date for a client project tile.
+ * Package identity, skin label, and price display live in packageSkins.ts.
+ * Foundation, Evolution, and Bundle stay on the plain project tile.
  */
 
-export type ListingCardLook = "just-photos" | "essentials" | "showcase" | "legacy";
+import {
+  resolvePackageSkin,
+  resolvePackageSkinFromOrder,
+  type ListingCardLook,
+} from "./packageSkins.ts";
+
+export { LISTING_CARD_LOOKS, type ListingCardLook } from "./packageSkins.ts";
 
 export interface ListingCardAddress {
   street: string;
@@ -18,32 +24,13 @@ export interface ListingCardAmenities {
   pool: string;
 }
 
-const RANK: Record<ListingCardLook, number> = {
-  "just-photos": 1,
-  essentials: 2,
-  showcase: 3,
-  legacy: 4,
-};
-
-const DIRECT_PACKAGE_KEYS = ["package", "packageName", "packageId", "selectedPackage", "selectedService", "serviceId"] as const;
-
 export function listingCardLookFromValue(value: unknown): ListingCardLook | null {
-  if (typeof value === "string" || typeof value === "number") return lookFromText(String(value));
-  if (Array.isArray(value)) return bestLook(value);
-  if (value && typeof value === "object") {
-    const record = value as Record<string, unknown>;
-    return bestLook(record.id, record.packageId, record.name, record.title, record.label);
-  }
-  return null;
+  return resolvePackageSkin(value)?.look ?? null;
 }
 
 /** The listing package, or the service list when no package field is stored. */
 export function resolveListingCardLook(data: Record<string, unknown>): ListingCardLook | null {
-  for (const key of DIRECT_PACKAGE_KEYS) {
-    if (!hasValue(data[key])) continue;
-    return listingCardLookFromValue(data[key]);
-  }
-  return bestLook(data.serviceIds, data.services, data.lineItems, data.selectedBasics);
+  return resolvePackageSkinFromOrder(data)?.look ?? null;
 }
 
 export function listingCardAddress(data: Record<string, unknown>): ListingCardAddress {
@@ -84,45 +71,6 @@ export function formatShootDateLabel(isoDay: string | null, raw?: unknown): stri
   }
   if (typeof raw === "string" && /^\d{2}\.\d{2}\.\d{4}$/.test(raw.trim())) return raw.trim();
   return "";
-}
-
-function bestLook(...values: unknown[]): ListingCardLook | null {
-  let best: ListingCardLook | null = null;
-  const visit = (value: unknown) => {
-    if (Array.isArray(value)) {
-      value.forEach(visit);
-      return;
-    }
-    const look = value && typeof value === "object"
-      ? listingCardLookFromValue(value)
-      : lookFromText(value == null ? "" : String(value));
-    if (look && (!best || RANK[look] > RANK[best])) best = look;
-  };
-  values.forEach(visit);
-  return best;
-}
-
-function lookFromText(raw: string): ListingCardLook | null {
-  const value = raw.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
-  if (!value) return null;
-  if (/market\s+leader/.test(value) || /\blegacy\b/.test(value)) return "legacy";
-  if (/showcase/.test(value)) return "showcase";
-  if (/essentials?\b/.test(value)) return "essentials";
-  if (
-    /\bjust\s+photos\b/.test(value)
-    || /\bphotos?\s+only\b/.test(value)
-    || /^photos\s+\d+\b/.test(value)
-    || /\b\d+\s+photos?\b/.test(value)
-    || /\bapprentice/.test(value)
-  ) return "just-photos";
-  return null;
-}
-
-function hasValue(value: unknown): boolean {
-  if (value == null) return false;
-  if (typeof value === "string") return value.trim().length > 0;
-  if (Array.isArray(value)) return value.length > 0;
-  return true;
 }
 
 function addressRecords(data: Record<string, unknown>): Record<string, unknown>[] {
