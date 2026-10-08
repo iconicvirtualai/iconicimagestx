@@ -31,6 +31,12 @@ import {
   type AuthSessionState,
 } from "@shared/staffAccess";
 import { isTempAdminClientEnabled } from "@shared/tempAdmin";
+import {
+  firebaseErrorCode,
+  passwordResetActionCodeSettings,
+  passwordResetSendError,
+  type PasswordResetAudience,
+} from "@shared/passwordReset";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -59,7 +65,7 @@ interface AuthContextValue {
   // Auth actions
   signIn: (email: string, password: string) => Promise<void>;
   signOutUser: () => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
+  resetPassword: (email: string, audience?: PasswordResetAudience) => Promise<void>;
 
   // Client portal registration. Creates Firebase Auth + clients/{uid}.
   registerClient: (
@@ -259,10 +265,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Password reset
-  const resetPassword = async (email: string) => {
+  // Firebase sends the reset email. The continue URL brings them back to
+  // the sign-in page on this site after the in-app handler saves the password.
+  const resetPassword = async (email: string, audience: PasswordResetAudience = "admin") => {
     setError(null);
-    await sendPasswordResetEmail(auth, email);
+    const trimmed = email.trim();
+    const origin = window.location.origin;
+    try {
+      await sendPasswordResetEmail(auth, trimmed, passwordResetActionCodeSettings(origin, audience));
+    } catch (err: unknown) {
+      const host = (() => {
+        try {
+          return new URL(origin).host;
+        } catch {
+          return undefined;
+        }
+      })();
+      const message = passwordResetSendError(firebaseErrorCode(err), host);
+      setError(message);
+      throw new Error(message);
+    }
   };
 
   const refreshProfile = async () => {
