@@ -26,6 +26,7 @@ import {
   photoEditStatusLabel,
   type PhotoEditRequest,
 } from "@shared/photoEditRequest";
+import { WebsiteBuilder } from "@/components/listing-site/WebsiteBuilder";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Eye, EyeOff, MapPin } from "lucide-react";
 import { toast } from "sonner";
@@ -167,7 +168,16 @@ export function PortalListingDetailView({
           />
         )}
         {tab === "marketing" && <MarketingTab detail={shown} />}
-        {tab === "website" && <WebsiteTab website={website} canEdit={canEdit} saving={saving} onWebsite={onWebsite} onSave={onWebsiteSave} />}
+        {tab === "website" && (
+          <WebsiteBuilder
+            detail={shown}
+            website={website}
+            canEdit={canEdit}
+            saving={saving}
+            onWebsite={onWebsite}
+            onSave={onWebsiteSave}
+          />
+        )}
         {tab === "orders" && <OrdersTab detail={shown} />}
         {tab === "activity" && <ActivityTab detail={shown} />}
       </main>
@@ -739,98 +749,6 @@ function MarketingTab({ detail }: { detail: PortalListingDetailModel }) {
         ))}
       </div>
     </section>
-  );
-}
-
-function WebsiteTab({
-  website,
-  canEdit,
-  saving,
-  onWebsite,
-  onSave,
-}: {
-  website: PortalWebsiteSettings;
-  canEdit: boolean;
-  saving: boolean;
-  onWebsite: (next: PortalWebsiteSettings) => void;
-  onSave: () => void;
-}) {
-  const swatch = website.color === "teal" ? "#0d9488" : website.color === "warm" ? "#9a3412" : "#111111";
-  const fontLabel = website.font === "serif" ? "Serif" : website.font === "modern" ? "Modern" : "Sans";
-  const colorLabel = website.color === "teal" ? "Teal" : website.color === "warm" ? "Warm" : "Ink";
-  const styleLabel = website.style === "editorial" ? "Editorial" : website.style === "minimal" ? "Minimal" : "Classic";
-  return (
-    <section className="bg-white rounded-2xl border border-gray-100 p-5">
-      <h2 className="text-xs font-black uppercase tracking-widest text-[#0d9488] mb-1">Listing site</h2>
-      <p className="text-xs text-gray-500 mb-5">Font, color, and which media the listing site should show. The public page is not generated from here yet.</p>
-      {canEdit ? (
-        <div className="grid sm:grid-cols-3 gap-4">
-          <Choice label="Font" value={website.font} options={[["sans", "Sans"], ["serif", "Serif"], ["modern", "Modern"]]} onChange={(font) => onWebsite({ ...website, font: font as PortalWebsiteSettings["font"] })} />
-          <Choice label="Color" value={website.color} options={[["ink", "Ink"], ["teal", "Teal"], ["warm", "Warm"]]} onChange={(color) => onWebsite({ ...website, color: color as PortalWebsiteSettings["color"] })} />
-          <Choice label="Style" value={website.style} options={[["classic", "Classic"], ["editorial", "Editorial"], ["minimal", "Minimal"]]} onChange={(style) => onWebsite({ ...website, style: style as PortalWebsiteSettings["style"] })} />
-        </div>
-      ) : (
-        <div className="grid sm:grid-cols-3 gap-4">
-          <Field label="Font" value={fontLabel} />
-          <Field label="Color" value={colorLabel} />
-          <Field label="Style" value={styleLabel} />
-        </div>
-      )}
-      <div className="mt-5 rounded-2xl border border-gray-100 p-5" style={{ color: swatch }}>
-        <p className={`text-lg font-black ${website.font === "serif" ? "font-serif" : "font-sans"}`}>Sample listing title</p>
-        <p className="text-xs uppercase tracking-widest mt-1">{website.style} · {website.color}</p>
-      </div>
-      <div className="mt-5 grid sm:grid-cols-2 gap-3">
-        {canEdit ? (
-          <>
-            <Toggle label="Show photos" checked={website.showPhotos} onChange={(showPhotos) => onWebsite({ ...website, showPhotos })} />
-            <Toggle label="Show video" checked={website.showVideo} onChange={(showVideo) => onWebsite({ ...website, showVideo })} />
-            <Toggle label="Show virtual tours" checked={website.showTours} onChange={(showTours) => onWebsite({ ...website, showTours })} />
-            <Toggle label="Show floorplans" checked={website.showFloorplans} onChange={(showFloorplans) => onWebsite({ ...website, showFloorplans })} />
-          </>
-        ) : (
-          <>
-            <Field label="Photos" value={website.showPhotos ? "Shown" : "Hidden"} />
-            <Field label="Video" value={website.showVideo ? "Shown" : "Hidden"} />
-            <Field label="Virtual tours" value={website.showTours ? "Shown" : "Hidden"} />
-            <Field label="Floorplans" value={website.showFloorplans ? "Shown" : "Hidden"} />
-          </>
-        )}
-      </div>
-      {canEdit && (
-        <Button type="button" className="mt-6 bg-black text-white" disabled={saving} onClick={onSave}>Save site style</Button>
-      )}
-    </section>
-  );
-}
-
-function Choice({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: Array<[string, string]>;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="block">
-      <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{label}</span>
-      <select value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold">
-        {options.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-      </select>
-    </label>
-  );
-}
-
-function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
-  return (
-    <label className="flex items-center justify-between gap-3 bg-gray-50 rounded-xl px-3 py-3">
-      <span className="text-sm font-bold">{label}</span>
-      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
-    </label>
   );
 }
 

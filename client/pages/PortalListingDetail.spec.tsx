@@ -196,7 +196,7 @@ describe("portal listing detail page", () => {
     expect(orders).not.toContain("/invoice/");
     expect(orders).not.toContain("Pay now");
     expect(render("activity")).toContain("Booking request received");
-    expect(render("website")).toContain("Save site style");
+    expect(render("website")).toContain("Save listing site");
   });
 
   it("gives a visitor the listing without edit, hide, site save, or a pay action", () => {
@@ -209,8 +209,8 @@ describe("portal listing detail page", () => {
     expect(photos).toContain('data-can-edit="false"');
 
     const website = render("website", null, false);
-    expect(website).toContain("Sans");
-    expect(website).not.toContain("Save site style");
+    expect(website).toContain("Two-Up");
+    expect(website).not.toContain("Save listing site");
     expect(website).not.toContain("<select");
 
     const orders = render("orders", null, false);
