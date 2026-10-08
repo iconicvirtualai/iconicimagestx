@@ -118,7 +118,7 @@ export default function AdminUpload() {
       setFiles([]);
       setUploads({});
       if (fileRef.current) fileRef.current.value = "";
-      setQueueNote("Iconic Studio is editing the order, one photo at a time.");
+      setQueueNote("Studio is editing the order, one photo at a time.");
       await loadJobs();
       if (user) {
         try {
@@ -126,7 +126,7 @@ export default function AdminUpload() {
             if (step.ran?.status === "failed") setQueueNote(step.ran.note);
             else if (step.shouldFollowUp) setQueueNote(`Auto-queue running. ${step.remaining} still queued.`);
             else if (step.waiting) setQueueNote("Waiting on an exterior filename before twilight can run.");
-            else setQueueNote(step.ran ? "Order edits are ready for review in Iconic Studio." : "No photo is waiting to edit.");
+            else setQueueNote(step.ran ? "Order edits are ready for review in Studio." : "No photo is waiting to edit.");
           });
           await loadJobs();
         } catch (err: unknown) {

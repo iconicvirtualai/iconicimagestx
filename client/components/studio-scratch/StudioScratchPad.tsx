@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { ICONIC_POLISH_TREATMENTS } from "@shared/orderEditPlan";
+import type { StudioOrderTrayJob } from "@shared/studioOrderTray";
 import { SCRATCH_SORT_DEFAULT, type ScratchSortMode } from "@/lib/scratchSort";
 import { bakeMarkup, bakeStrokes, type MarkupPoint, type ScratchStroke } from "@/lib/scratchBrush";
 import { brandFloorplan } from "@/lib/floorplanBrand";
@@ -91,6 +92,11 @@ export default function StudioScratchPad({
   grassReady,
   grassNote,
   listingLabel = "",
+  orderJobs = [],
+  orderBusy = false,
+  onApproveOrder,
+  onRejectOrder,
+  onRunOrder,
   sortMode = SCRATCH_SORT_DEFAULT,
   initialMode = "upload",
   initialStudioTool = "sky",
@@ -115,6 +121,11 @@ export default function StudioScratchPad({
   grassReady: boolean;
   grassNote: string;
   listingLabel?: string;
+  orderJobs?: StudioOrderTrayJob[];
+  orderBusy?: boolean;
+  onApproveOrder?: (jobId: string) => void;
+  onRejectOrder?: (jobId: string) => void;
+  onRunOrder?: () => void;
   sortMode?: ScratchSortMode;
   initialMode?: ScratchDeskMode;
   initialStudioTool?: ScratchStudioTool;
@@ -300,6 +311,41 @@ export default function StudioScratchPad({
           {frames.length} files · {checked} selected{progress ? ` · ${progress}` : ""}
         </p>
       </header>
+      {orderJobs.length > 0 ? (
+        <div data-testid="scratch-order-tray" className="flex max-h-36 shrink-0 gap-2 overflow-x-auto border-b border-white/10 bg-[#101618] px-3 py-2">
+          {orderJobs.some((job) => job.origin === "order" && job.status === "pending" && job.sourcePath) ? (
+            <button
+              type="button"
+              data-testid="scratch-order-run"
+              disabled={orderBusy || !onRunOrder}
+              onClick={onRunOrder}
+              className="shrink-0 self-center rounded-full px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-40"
+              style={{ backgroundColor: teal }}
+            >
+              {orderBusy ? "Editing…" : "Run next order edit"}
+            </button>
+          ) : null}
+          {orderJobs.map((job) => (
+            <article key={job.id} data-testid={`scratch-order-${job.id}`} className="w-56 shrink-0 rounded-xl border border-white/10 bg-black/40 p-2">
+              <p className="truncate text-[10px] font-black uppercase tracking-widest text-gray-200">{job.label} · {job.status}</p>
+              {job.afterUrl ? <img src={job.afterUrl} alt="" className="mt-2 h-16 w-full rounded object-cover" /> : null}
+              {job.note ? <p className={`mt-1 line-clamp-2 text-[11px] ${job.status === "failed" ? "text-red-300" : "text-gray-400"}`}>{job.note}</p> : null}
+              <div className="mt-2 flex gap-2">
+                {job.canApprove ? (
+                  <button type="button" data-testid={`scratch-order-approve-${job.id}`} disabled={orderBusy} onClick={() => onApproveOrder?.(job.id)} className="rounded-lg bg-[#0d9488] px-2 py-1 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-40">
+                    Approve
+                  </button>
+                ) : null}
+                {job.canReject ? (
+                  <button type="button" data-testid={`scratch-order-reject-${job.id}`} disabled={orderBusy} onClick={() => onRejectOrder?.(job.id)} className="rounded-lg border border-white/20 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-gray-200 disabled:opacity-40">
+                    Reject
+                  </button>
+                ) : null}
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
         <aside className="scrollbar-hide flex w-full shrink-0 flex-col border-b border-white/10 bg-[#0c1214] p-3 lg:w-60 lg:overflow-y-auto lg:border-b-0 lg:border-r">

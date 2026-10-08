@@ -92,7 +92,7 @@ export default function AdminPhotographer() {
         completed += 1;
       }
       toast.success(`${fileArray.length} file${fileArray.length === 1 ? "" : "s"} uploaded.`);
-      setQueueNote("Iconic Studio is editing the order, one photo at a time.");
+      setQueueNote("Studio is editing the order, one photo at a time.");
       await load();
       if (user) {
         try {
@@ -100,7 +100,7 @@ export default function AdminPhotographer() {
             if (step.ran?.status === "failed") setQueueNote(step.ran.note);
             else if (step.shouldFollowUp) setQueueNote(`Auto-queue running. ${step.remaining} still queued.`);
             else if (step.waiting) setQueueNote("Waiting on an exterior filename before twilight can run.");
-            else setQueueNote(step.ran ? "Order edits are ready for review in Iconic Studio." : "No photo is waiting to edit.");
+            else setQueueNote(step.ran ? "Order edits are ready for review in Studio." : "No photo is waiting to edit.");
           });
           await load();
         } catch (err: unknown) {
