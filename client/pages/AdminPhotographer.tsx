@@ -52,7 +52,7 @@ export default function AdminPhotographer() {
         setStudioNote("");
       } else {
         setStudioJobs([]);
-        setStudioNote("Iconic Studio status did not load. Uploads still save on the job.");
+        setStudioNote("Studio status did not load. Uploads still save on the job.");
       }
     } finally {
       setLoading(false);

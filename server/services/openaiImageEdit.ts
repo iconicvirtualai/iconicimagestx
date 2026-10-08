@@ -189,7 +189,7 @@ export async function editListingPhotoWithOpenAI(input: {
     });
   } catch (err) {
     if (isTimeoutError(err)) throw new OpenAiEditError(AI_EDIT_TIMEOUT_NOTE);
-    throw new OpenAiEditError("Iconic Studio could not reach OpenAI. Queue the edit again.");
+    throw new OpenAiEditError("Studio could not reach OpenAI. Queue the edit again.");
   }
 
   const body = await response.text();

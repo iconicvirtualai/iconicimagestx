@@ -51,7 +51,7 @@ export interface OrderQueueTickResult {
 
 async function authorizedHeaders(getToken: TokenGetter) {
   const token = await getToken();
-  if (!token) throw new Error("Sign in again before opening Iconic Studio.");
+  if (!token) throw new Error("Sign in again before opening Studio.");
   return {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
@@ -61,7 +61,7 @@ async function authorizedHeaders(getToken: TokenGetter) {
 async function readJson(res: Response) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const error = new Error(data.error || `Iconic Studio request failed (${res.status}).`);
+    const error = new Error(data.error || `Studio request failed (${res.status}).`);
     (error as Error & { status?: number }).status = res.status;
     throw error;
   }

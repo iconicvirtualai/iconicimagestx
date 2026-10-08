@@ -6,6 +6,7 @@ import {
   STUDIO_FLAGS,
   adjustmentCssFilter,
   presetPrompt,
+  visibleStudioNote,
   type StudioAdjustments,
   type StudioFrame,
 } from "@shared/iconicStudio";
@@ -156,7 +157,7 @@ export default function IconicStudioWorkspace({
     try {
       await work();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Iconic Studio could not finish that action.");
+      toast.error(err instanceof Error ? err.message : "Studio could not finish that action.");
     } finally {
       setBusy(false);
     }
@@ -289,7 +290,7 @@ export default function IconicStudioWorkspace({
         </section>
 
         <aside data-testid="studio-tools" className="flex w-full flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white lg:w-80">
-          <div role="tablist" aria-label="Iconic Studio tools" className="grid grid-cols-4 border-b border-gray-100">
+          <div role="tablist" aria-label="Studio tools" className="grid grid-cols-4 border-b border-gray-100">
             {TABS.map((item) => (
               <button
                 key={item.id}
@@ -528,6 +529,8 @@ function AiPanel({
             const before = job.beforeUrl || "";
             const after = job.afterUrl || "";
             const canApprove = job.status === "review" && !job.placeholder && Boolean(after);
+            const note = visibleStudioNote(job.note || "");
+            const inspectionNotes = (job.inspection?.notes || []).map((item) => visibleStudioNote(item)).filter(Boolean);
             return (
               <article key={job.id} className="rounded-xl border border-gray-100 p-2">
                 <p className="text-[10px] font-black uppercase tracking-widest">{job.label || job.type || "edit"} · {job.status}</p>
@@ -543,19 +546,19 @@ function AiPanel({
                     </figcaption>
                   </figure>
                 </div>
-                {job.note && (
-                  <p className={`mt-2 text-[11px] leading-snug ${job.status === "failed" ? "text-red-700" : "text-gray-500"}`}>{job.note}</p>
-                )}
-                {Array.isArray(job.inspection?.notes) && job.inspection.notes.length > 0 && (
+                {note ? (
+                  <p className={`mt-2 text-[11px] leading-snug ${job.status === "failed" ? "text-red-700" : "text-gray-500"}`}>{note}</p>
+                ) : null}
+                {inspectionNotes.length > 0 && (
                   <div data-testid="studio-inspection-notes" className="mt-2">
                     <p className={labelCls}>Inspection</p>
                     <ul className="mt-1 space-y-1">
-                      {job.inspection.notes.map((note, index) => (
+                      {inspectionNotes.map((item, index) => (
                         <li
-                          key={`${index}-${note}`}
+                          key={`${index}-${item}`}
                           className={`text-[11px] leading-snug ${job.inspection?.status === "flag" ? "text-amber-800" : "text-gray-500"}`}
                         >
-                          {note}
+                          {item}
                         </li>
                       ))}
                     </ul>

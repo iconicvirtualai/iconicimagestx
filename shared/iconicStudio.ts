@@ -77,6 +77,23 @@ export const AI_EDIT_TIMEOUT_NOTE =
 
 export const AI_EDIT_READY_NOTE = "OpenAI edit is ready for review.";
 
+export const EMPTY_LISTING_PHOTOS_NOTE = "No listing photos yet.";
+
+/** Staff-facing job notes. Stored dev leftovers stay off the review card. */
+export function visibleStudioNote(note: string): string {
+  const text = note.trim();
+  if (!text) return "";
+  if (/\bTODO\b/i.test(text) || text.includes("OPENAI_API_KEY")) return "";
+  return text;
+}
+
+export function framesFromListingImages(images: unknown): StudioFrame[] {
+  if (!Array.isArray(images)) return [];
+  return images
+    .map((item, index) => frameFromListingImage(item, index))
+    .filter((frame): frame is StudioFrame => Boolean(frame));
+}
+
 export const AI_EDIT_SAMPLE_NOTE =
   "Sample layout only. Queue AI Edit calls OpenAI when this listing is loaded from the studio.";
 

@@ -27,7 +27,8 @@ describe("staff delivery queue", () => {
     expect(html).toContain("22 River Road, Austin, TX");
     expect(html).toContain('href="/admin/studio/editing?listingId=listingReady001"');
     expect(html).not.toContain("/admin/iconic-studio");
-    expect(html).toContain("Iconic Studio: 1 in review · 1 approved");
+    expect(html).toContain("Studio: 1 in review · 1 approved");
+    expect(html).not.toContain("Iconic Studio");
     expect(html).toContain("No gallery is linked yet");
     expect(html).toContain("delivery-move-galleryUndeliver1-delivered");
     expect(html).not.toContain("delivery-move-galleryDelivered1-delivered");
@@ -39,6 +40,7 @@ describe("staff delivery queue", () => {
     expect(filtered).toContain("22 River Road, Austin, TX");
     expect(filtered).not.toContain("10 Oak Street");
     expect(filtered).not.toContain("Mark Delivered");
-    expect(filtered).toContain("Iconic Studio");
+    expect(filtered).toContain("Studio: 1 in review · 1 approved");
+    expect(filtered).not.toContain("Iconic Studio");
   });
 });

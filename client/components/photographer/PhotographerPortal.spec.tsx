@@ -69,7 +69,9 @@ describe("photographer portal view", () => {
     const html = renderPortal({ tab: "all" });
     expect(html).toContain("88 River Road");
     expect(html).toContain("Editing now");
-    expect(html).toContain("Iconic Studio is editing 1 photo.");
+    expect(html).toContain("Studio is editing 1 photo.");
+    expect(html).toContain("In Studio");
+    expect(html).not.toContain("Iconic Studio");
     expect(html).toContain('href="/admin/studio/editing?listingId=editing-job"');
     expect(html).not.toContain("/admin/iconic-studio");
     expect(html).toContain("Add photos");

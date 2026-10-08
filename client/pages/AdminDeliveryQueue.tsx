@@ -89,7 +89,7 @@ export default function AdminDeliveryQueue() {
   return (
     <AdminLayout title="Delivery">
       <p className="mb-6 max-w-2xl text-xs text-gray-500">
-        Pending, Undelivered, and Delivered follow the gallery on each Iconic Studio job.
+        Pending, Undelivered, and Delivered follow the gallery on each Studio job.
         Mark Delivered uses the same hold as sending the gallery to the client.
       </p>
       {demo && (

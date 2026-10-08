@@ -42,6 +42,7 @@ const jobs = [
     status: "review",
     placeholder: true,
     afterUrl: "https://example.com/ph.jpg",
+    note: "TODO: OPENAI_API_KEY is set, but Iconic Studio does not call the images API in this version.",
   },
 ];
 
@@ -63,6 +64,7 @@ describe("studio order tray", () => {
       note: "OpenAI timed out.",
     });
     expect(tray.find((job) => job.id === "placeholder-1")?.canApprove).toBe(false);
+    expect(tray.find((job) => job.id === "placeholder-1")?.note).toBe("");
     expect(listingOrderQueuePending(tray)).toBe(true);
   });
 

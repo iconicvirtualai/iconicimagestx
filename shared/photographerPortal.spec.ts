@@ -93,7 +93,7 @@ describe("photographer portal jobs", () => {
     expect(job.imageCount).toBe(2);
     expect(job.action.statusLabel).toBe("Editing now");
     expect(job.action.kind).toBe("wait");
-    expect(job.studio.headline).toBe("Iconic Studio is editing 1 photo.");
+    expect(job.studio.headline).toBe("Studio is editing 1 photo.");
     expect(job.studio.counts.map((count) => count.label)).toEqual(["Editing", "Queued"]);
     expect(jobNeedsPhotographer(job)).toBe(false);
   });

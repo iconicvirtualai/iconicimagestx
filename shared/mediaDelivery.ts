@@ -117,8 +117,8 @@ export function studioQueueLine(studio: MediaDeliveryStudio): string {
   if (studio.review) parts.push(`${studio.review} in review`);
   if (studio.approved) parts.push(`${studio.approved} approved`);
   if (studio.failed) parts.push(`${studio.failed} failed`);
-  if (!parts.length) return "No Iconic Studio jobs on this listing.";
-  return `Iconic Studio: ${parts.join(" · ")}`;
+  if (!parts.length) return "No Studio jobs on this listing.";
+  return `Studio: ${parts.join(" · ")}`;
 }
 
 export function deliveryNotice(row: Pick<MediaDeliveryRow, "galleryId" | "galleryStatus">): string | null {

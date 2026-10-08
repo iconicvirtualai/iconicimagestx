@@ -58,7 +58,7 @@ export default function AdminIconicStudio() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const getToken = useCallback(() => {
-    if (!user) return Promise.reject(new Error("Sign in again before opening Iconic Studio."));
+    if (!user) return Promise.reject(new Error("Sign in again before opening Studio."));
     return user.getIdToken();
   }, [user]);
   const [loading, setLoading] = useState(true);
@@ -66,7 +66,7 @@ export default function AdminIconicStudio() {
   const [listings, setListings] = useState<Array<{ id: string; address: string; status?: string; imageCount?: number }>>([]);
   const [jobs, setJobs] = useState<StudioJobView[]>([]);
   const [frames, setFrames] = useState<StudioFrame[]>([]);
-  const [address, setAddress] = useState("Iconic Studio");
+  const [address, setAddress] = useState("Studio");
   const [editPlan, setEditPlan] = useState<OrderEditPlan | null>(null);
   const [release, setRelease] = useState<GalleryReleaseReport | null>(null);
   const [delivery, setDelivery] = useState<StudioDeliveryView | null>(null);
@@ -109,7 +109,7 @@ export default function AdminIconicStudio() {
         navigate(iconicStudioHref(data.listings[0].id), { replace: true });
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Could not load Iconic Studio.";
+      const message = err instanceof Error ? err.message : "Could not load Studio.";
       const missingAdmin = /not configured|failed to fetch|503/i.test(message);
       if (missingAdmin) {
         applySample();
@@ -177,14 +177,14 @@ export default function AdminIconicStudio() {
   const shareListingId = listingId || (demo ? "sampledemo" : "");
 
   return (
-    <AdminLayout title="Iconic Studio">
+    <AdminLayout title="Studio">
       {shareListingId && (
         <div className="mb-4 max-w-md">
           <PresentationSharePanel listingId={shareListingId} getToken={getToken} demo={demo || shareListingId === "sampledemo"} />
         </div>
       )}
       {loading ? (
-        <p className="text-sm font-bold text-gray-500">Loading Iconic Studio...</p>
+        <p className="text-sm font-bold text-gray-500">Loading Studio...</p>
       ) : (
         <IconicStudioWorkspace
           listings={listings}
