@@ -41,8 +41,8 @@ describe("Iconic Studio flags and navigation", () => {
     expect(canOpenIconicStudio("admin")).toBe(true);
     expect(canOpenIconicStudio("client")).toBe(false);
     expect(canOpenIconicStudio(undefined)).toBe(false);
-    expect(iconicStudioHref()).toBe("/admin/iconic-studio");
-    expect(iconicStudioHref("job_12345678")).toBe("/admin/iconic-studio/job_12345678");
+    expect(iconicStudioHref()).toBe("/admin/studio/editing");
+    expect(iconicStudioHref("job_12345678")).toBe("/admin/studio/editing?listingId=job_12345678");
   });
 });
 

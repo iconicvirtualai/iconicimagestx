@@ -107,7 +107,7 @@ describe("photographer portal jobs", () => {
     expect(job.action.kind).toBe("review");
     expect(job.action.statusLabel).toBe("Needs a look");
     expect(job.studio.headline).toContain("failed");
-    expect(job.studioHref).toBe("/admin/iconic-studio/job-1");
+    expect(job.studioHref).toBe("/admin/studio/editing?listingId=job-1");
   });
 
   it("asks for review when Iconic Studio finishes a photo", () => {

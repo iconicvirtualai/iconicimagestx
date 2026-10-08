@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 import StudioScratchPad, {
   type ScratchEditStep,
@@ -10,6 +11,13 @@ import { stagingApi, stagingGuidance } from "@/components/studio-scratch/scratch
 import { useAuth } from "@/contexts/AuthContext";
 import { auth, storage } from "@/lib/firebase";
 import { fetchScratchStatus, postScratchEdit } from "@/lib/scratchApi";
+import {
+  drainOrderEditQueue,
+  fetchStudioWorkspace,
+  postStudioApprove,
+  postStudioOrderEdits,
+  postStudioReject,
+} from "@/lib/studioApi";
 import { pollVsaiJob } from "@/lib/scratchStaging";
 import { compressScratchJpeg, readJpegShotTime } from "@/lib/scratchPhoto";
 import {
@@ -17,7 +25,13 @@ import {
   sortScratchItems,
   type ScratchSortMode,
 } from "@/lib/scratchSort";
-import { isRawStudioFile } from "@shared/iconicStudio";
+import { frameFromListingImage, isRawStudioFile, type StudioFrame } from "@shared/iconicStudio";
+import { studioEditorListingId } from "@shared/studioEditorHref";
+import {
+  listingOrderQueuePending,
+  studioOrderTrayJobs,
+  type StudioOrderTrayJob,
+} from "@shared/studioOrderTray";
 import { zipStored } from "@shared/zipStore";
 import {
   SCRATCH_MAX_FILES,
@@ -80,6 +94,45 @@ function revokeUrl(url?: string) {
   if (url) URL.revokeObjectURL(url);
 }
 
+function revokeScratchItem(item: ScratchItem) {
+  revokeUrl(item.beforeUrl);
+  revokeUrl(item.afterUrl);
+  if (item.preFinetune?.afterUrl && item.preFinetune.afterUrl !== item.afterUrl) {
+    revokeUrl(item.preFinetune.afterUrl);
+  }
+}
+
+async function listingPhotoItem(frame: StudioFrame, uploadIndex: number): Promise<ScratchItem> {
+  const base: ScratchItem = {
+    id: frame.id || crypto.randomUUID(),
+    name: frame.name,
+    status: "ready",
+    uploadIndex,
+    byteSize: 0,
+    shotAt: 0,
+    editable: false,
+    beforeUrl: frame.url || fileCard(frame.name),
+    source: new Blob(),
+  };
+  if (frame.raw || !frame.previewable || !frame.url) return base;
+  try {
+    const response = await fetch(frame.url);
+    if (!response.ok) return base;
+    const blob = await response.blob();
+    const file = new File([blob], frame.name, { type: blob.type || frame.contentType || "image/jpeg" });
+    const source = await compressScratchJpeg(file);
+    return {
+      ...base,
+      beforeUrl: URL.createObjectURL(blob),
+      source,
+      byteSize: source.size,
+      editable: true,
+    };
+  } catch {
+    return base;
+  }
+}
+
 function fileCard(name: string) {
   const safe = name.replace(/[<>&"]/g, "");
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500"><rect width="800" height="500" fill="#111418"/><text x="40" y="250" fill="#e5e7eb" font-size="28" font-family="sans-serif">${safe}</text></svg>`;
@@ -87,6 +140,8 @@ function fileCard(name: string) {
 }
 
 export default function AdminStudioScratch() {
+  const [searchParams] = useSearchParams();
+  const listingId = studioEditorListingId(searchParams.toString());
   const { user } = useAuth();
   const getToken = useCallback(() => {
     if (!user)
@@ -108,6 +163,133 @@ export default function AdminStudioScratch() {
   const [grassNote, setGrassNote] = useState("Checking the lawn reference…");
   const [sortMode, setSortMode] =
     useState<ScratchSortMode>(SCRATCH_SORT_DEFAULT);
+  const [listingLabel, setListingLabel] = useState("");
+  const [orderJobs, setOrderJobs] = useState<StudioOrderTrayJob[]>([]);
+  const [orderBusy, setOrderBusy] = useState(false);
+  const sortModeRef = useRef(sortMode);
+  sortModeRef.current = sortMode;
+  const loadedListing = useRef("");
+  const draining = useRef(false);
+  const drainFailed = useRef(false);
+
+  const refreshOrderJobs = useCallback(async () => {
+    if (!listingId) {
+      setOrderJobs([]);
+      return;
+    }
+    const data = await fetchStudioWorkspace(listingId, getToken);
+    setOrderJobs(studioOrderTrayJobs(data.jobs, listingId));
+  }, [getToken, listingId]);
+
+  useEffect(() => {
+    if (!listingId) {
+      loadedListing.current = "";
+      setListingLabel("");
+      setOrderJobs([]);
+      setProgress((current) => (current === "Loading listing photos…" ? "" : current));
+      return;
+    }
+    if (loadedListing.current === listingId) return;
+    let cancel = false;
+    setListingLabel("Loading listing photos…");
+    setProgress("Loading listing photos…");
+    void fetchStudioWorkspace(listingId, getToken)
+      .then(async (data) => {
+        if (cancel) return;
+        setOrderJobs(studioOrderTrayJobs(data.jobs, listingId));
+        const address = data.listing?.address || listingId;
+        const frames = (data.listing?.images || [])
+          .map((item, index) => frameFromListingImage(item, index))
+          .filter((frame): frame is StudioFrame => Boolean(frame));
+        const slice = frames.slice(0, SCRATCH_MAX_FILES);
+        const added: ScratchItem[] = [];
+        for (const frame of slice) {
+          if (cancel) break;
+          const uploadIndex = uploadSeq.current;
+          uploadSeq.current += 1;
+          added.push(await listingPhotoItem(frame, uploadIndex));
+        }
+        if (cancel) {
+          for (const item of added) revokeScratchItem(item);
+          return;
+        }
+        loadedListing.current = listingId;
+        setListingLabel(address);
+        if (frames.length > SCRATCH_MAX_FILES) {
+          toast.message(`${address}: showing ${SCRATCH_MAX_FILES} of ${frames.length} photos.`);
+        } else if (!added.length) {
+          toast.message(`${address} has no photos in Studio yet.`);
+        }
+        setItems((current) => {
+          for (const item of current) revokeScratchItem(item);
+          return sortScratchItems(sortModeRef.current, added);
+        });
+        const first = added[0];
+        setSelectedIds(first ? [first.id] : []);
+        setAnchorId(first?.id || null);
+        setFocusId(first?.id || null);
+      })
+      .catch((err: unknown) => {
+        if (cancel) return;
+        setListingLabel(listingId);
+        toast.error(err instanceof Error ? err.message : "Could not load this listing in Studio.");
+      })
+      .finally(() => {
+        if (!cancel) {
+          setProgress((current) => (current === "Loading listing photos…" ? "" : current));
+        }
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [getToken, listingId]);
+
+  useEffect(() => {
+    drainFailed.current = false;
+  }, [listingId]);
+
+  useEffect(() => {
+    if (!listingId || orderBusy || draining.current || drainFailed.current) return;
+    if (!listingOrderQueuePending(orderJobs)) return;
+    draining.current = true;
+    let cancelled = false;
+    void drainOrderEditQueue(
+      getToken,
+      listingId,
+      (step) => {
+        if (cancelled) return;
+        if (step.ran?.status === "failed") toast.error(step.ran.note);
+        else if (step.shouldFollowUp) setProgress(`Order edit · ${step.remaining} left`);
+      },
+      () => cancelled,
+    ).catch((err: unknown) => {
+      drainFailed.current = true;
+      if (!cancelled) toast.error(err instanceof Error ? err.message : "Auto-queue stopped.");
+    }).finally(() => {
+      draining.current = false;
+      if (cancelled) return;
+      setProgress((current) => (current.startsWith("Order edit") ? "" : current));
+      void refreshOrderJobs().catch((err: unknown) => {
+        toast.error(err instanceof Error ? err.message : "Could not refresh the order edits.");
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [getToken, listingId, orderBusy, orderJobs, refreshOrderJobs]);
+
+  const runOrderAction = async (work: () => Promise<void>) => {
+    if (!listingId) return;
+    setOrderBusy(true);
+    try {
+      await work();
+      await refreshOrderJobs();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "That order edit did not finish.");
+    } finally {
+      setOrderBusy(false);
+    }
+  };
 
   useEffect(() => {
     let cancel = false;
@@ -584,6 +766,41 @@ export default function AdminStudioScratch() {
         progress={progress}
         grassReady={grassReady}
         grassNote={grassNote}
+        listingLabel={listingLabel}
+        orderJobs={orderJobs}
+        orderBusy={orderBusy}
+        onApproveOrder={(jobId) => {
+          const job = orderJobs.find((item) => item.id === jobId);
+          if (!job) return;
+          void runOrderAction(async () => {
+            const sourcePath = job.resultPath || job.sourcePath;
+            const result = await postStudioApprove(getToken, {
+              listingId,
+              jobId: job.id,
+              sourcePath,
+              fileName: sourcePath.split("/").pop() || "final.jpg",
+            });
+            toast.success(result.note || "Final added to the gallery.");
+          });
+        }}
+        onRejectOrder={(jobId) => {
+          void runOrderAction(async () => {
+            const result = await postStudioReject(getToken, { listingId, jobId });
+            toast.success(result.note || "Edit rejected.");
+          });
+        }}
+        onRunOrder={() => {
+          void runOrderAction(async () => {
+            const result = await postStudioOrderEdits(getToken, listingId);
+            if (!result.ran) {
+              toast.message(result.waiting ? "Waiting on an exterior photo before twilight can run." : "No photo is waiting to edit.");
+            } else if (result.ran.status === "failed") {
+              toast.error(result.ran.note);
+            } else {
+              toast.success("Order edit is ready for review.");
+            }
+          });
+        }}
         sortMode={sortMode}
         floorplanUrl={floorplanUrl}
         onAddFiles={(files) => {

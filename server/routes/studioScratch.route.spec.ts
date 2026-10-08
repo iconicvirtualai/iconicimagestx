@@ -67,7 +67,7 @@ describe("coordinator scratch route", () => {
     expect(`${route}\n${service}`).not.toMatch(/studioJobs|galleryReleaseGate|square|enqueueAiEdit|payments/);
     const app = fs.readFileSync(path.join(process.cwd(), "client/App.tsx"), "utf8");
     expect(app).toMatch(/path="\/admin\/studio\/scratch"/);
-    expect(app).toMatch(/requiredRole="coordinator"><AdminStudioScratch/);
+    expect(app).toMatch(/requiredRole="staff"><AdminStudioScratch/);
   });
 
   it("requires a coordinator before it edits", async () => {

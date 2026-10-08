@@ -8,7 +8,9 @@
  */
 
 import { isListingStoragePath, safeStorageFileName } from "./listingAccess";
+import { studioEditorHref } from "./studioEditorHref";
 
+/** Previous staff editor path. Live links use studioEditorHref. */
 export const ICONIC_STUDIO_PATH = "/admin/iconic-studio";
 
 /** Team studio is on. Later products stay flagged off in this PR. */
@@ -129,9 +131,9 @@ export interface AiEditRequest {
   sourcePath: string;
 }
 
+/** Staff editor for a listing. Old /admin/iconic-studio paths redirect to the same URL. */
 export function iconicStudioHref(listingId?: string): string {
-  if (!listingId) return ICONIC_STUDIO_PATH;
-  return `${ICONIC_STUDIO_PATH}/${encodeURIComponent(listingId)}`;
+  return studioEditorHref(listingId);
 }
 
 export function canOpenIconicStudio(role: string | undefined): boolean {

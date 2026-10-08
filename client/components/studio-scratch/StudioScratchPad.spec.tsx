@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { renderToString } from "react-dom/server";
 import { ICONIC_POLISH_TREATMENTS } from "@shared/orderEditPlan";
 import { orderExteriorTwilightPrompt } from "@shared/orderEditPlan";
+import type { StudioOrderTrayJob } from "@shared/studioOrderTray";
 import StudioScratchPad, { type ScratchDeskMode, type ScratchFrameView } from "./StudioScratchPad";
 
 const frames: ScratchFrameView[] = [
@@ -54,6 +55,97 @@ function render(mode: ScratchDeskMode = "upload", grassReady = true) {
 }
 
 describe("scratch pad desk", () => {
+  it("names the listing whose photos were opened", () => {
+    const html = renderToString(
+      <StudioScratchPad
+        frames={frames}
+        busy={false}
+        progress=""
+        grassReady
+        grassNote="ok"
+        listingLabel="10 Oak Street, Austin, TX"
+        onAddFiles={() => undefined}
+        onAddFloorplan={() => undefined}
+        onSelect={() => undefined}
+        onSelectAll={() => undefined}
+        onClearSelection={() => undefined}
+        onSort={() => undefined}
+        onProcess={() => undefined}
+        onStage={() => undefined}
+        onCommitJpeg={() => undefined}
+        onRevert={() => undefined}
+        onDownload={() => undefined}
+        onExport={() => undefined}
+        onRemove={() => undefined}
+      />,
+    );
+    expect(html).toContain('data-testid="scratch-listing"');
+    expect(html).toContain("10 Oak Street, Austin, TX");
+  });
+
+  it("shows approve and reject for a listing order edit that is ready for review", () => {
+    const orderJobs: StudioOrderTrayJob[] = [
+      {
+        id: "review-1",
+        listingId: "job-1",
+        status: "review",
+        origin: "order",
+        sourcePath: "listings/job-1/photos/front.jpg",
+        resultPath: "listings/job-1/edits/front.jpg",
+        label: "Front",
+        note: "Ready",
+        afterUrl: "https://example.com/after.jpg",
+        placeholder: false,
+        canApprove: true,
+        canReject: true,
+      },
+      {
+        id: "pending-1",
+        listingId: "job-1",
+        status: "pending",
+        origin: "order",
+        sourcePath: "listings/job-1/photos/yard.jpg",
+        resultPath: "",
+        label: "Yard",
+        note: "",
+        afterUrl: "",
+        placeholder: false,
+        canApprove: false,
+        canReject: false,
+      },
+    ];
+    const html = renderToString(
+      <StudioScratchPad
+        frames={frames}
+        busy={false}
+        progress=""
+        grassReady
+        grassNote="ok"
+        orderJobs={orderJobs}
+        onAddFiles={() => undefined}
+        onAddFloorplan={() => undefined}
+        onSelect={() => undefined}
+        onSelectAll={() => undefined}
+        onClearSelection={() => undefined}
+        onSort={() => undefined}
+        onProcess={() => undefined}
+        onStage={() => undefined}
+        onCommitJpeg={() => undefined}
+        onRevert={() => undefined}
+        onDownload={() => undefined}
+        onExport={() => undefined}
+        onRemove={() => undefined}
+      />,
+    );
+    expect(html).toContain('data-testid="scratch-order-tray"');
+    expect(html).toContain('data-testid="scratch-order-run"');
+    expect(html).toContain("Run next order edit");
+    expect(html).toContain('data-testid="scratch-order-approve-review-1"');
+    expect(html).toContain('data-testid="scratch-order-reject-review-1"');
+    expect(html).toContain("https://example.com/after.jpg");
+    expect(html).not.toContain('data-testid="scratch-order-approve-pending-1"');
+  });
+
   it("puts the filmstrip on the bottom and the mode switch on top", () => {
     const html = render();
     expect(html).toContain('data-layout="center-canvas bottom-filmstrip side-tools"');
