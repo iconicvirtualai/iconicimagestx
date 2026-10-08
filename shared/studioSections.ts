@@ -1,7 +1,7 @@
 /**
  * Staff Studio information architecture.
  * One Studio home, three subsections. Photo editing is the existing scratch pad.
- * Job-specific Iconic Studio links stay on /admin/iconic-studio/:listingId.
+ * Job links open /admin/studio/editing. Old Iconic Studio and operations URLs redirect there.
  */
 
 import { STUDIO_SCRATCH_PATH } from "./studioScratch";
@@ -11,13 +11,13 @@ export const STUDIO_PHOTO_EDITING_ALIAS = "/admin/studio/editing";
 export const STUDIO_PROJECTS_PATH = "/admin/studio/projects";
 export const STUDIO_MARKETING_PATH = "/admin/studio/marketing";
 
-/** Previous operations upload screen. Not a top-level nav item. */
+/** Previous operations upload screen. The route redirects to the editor. */
 export const STUDIO_OPERATIONS_PATH = "/admin/studio/operations";
 
 export const STUDIO_DELIVERY_PATH = "/admin/delivery";
 export const STUDIO_LISTINGS_PATH = "/admin/listings";
 
-/** Bare Iconic Studio index. Listing ids are not redirected. */
+/** Previous Iconic Studio index. The route redirects to the editor. */
 export const ICONIC_STUDIO_INDEX_PATH = "/admin/iconic-studio";
 
 export type StudioSectionId = "editing" | "projects" | "marketing";

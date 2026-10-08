@@ -236,8 +236,8 @@ function decideAction(input: {
   if (studio.failed > 0) {
     return {
       kind: "review",
-      label: "Open Iconic Studio",
-      detail: "An edit failed. Open Iconic Studio and read the note on that photo.",
+      label: "Open Studio",
+      detail: "An edit failed. Open Studio and read the note on that photo.",
       statusLabel: "Needs a look",
       tone: "action",
     };
@@ -254,8 +254,8 @@ function decideAction(input: {
   if (studio.waitingOnPhoto > 0 && imageCount > 0) {
     return {
       kind: "review",
-      label: "Open Iconic Studio",
-      detail: "An edit is waiting on an exterior photo. Open Iconic Studio to see which frame it needs.",
+      label: "Open Studio",
+      detail: "An edit is waiting on an exterior photo. Open Studio to see which frame it needs.",
       statusLabel: "Waiting on a photo",
       tone: "action",
     };
@@ -263,8 +263,8 @@ function decideAction(input: {
   if (studio.rejected > 0 && studio.editing === 0 && studio.queued === 0) {
     return {
       kind: "review",
-      label: "Open Iconic Studio",
-      detail: "An edit was rejected. Open Iconic Studio if that photo needs a new upload.",
+      label: "Open Studio",
+      detail: "An edit was rejected. Open Studio if that photo needs a new upload.",
       statusLabel: "Needs a look",
       tone: "action",
     };
@@ -295,8 +295,8 @@ function decideAction(input: {
   if (studio.editing > 0 || studio.queued > 0) {
     return {
       kind: "wait",
-      label: "Open Iconic Studio",
-      detail: "Photos are in. Iconic Studio edits them one at a time from the order.",
+      label: "Open Studio",
+      detail: "Photos are in. Studio edits them one at a time from the order.",
       statusLabel: studio.editing > 0 ? "Editing now" : "In the queue",
       tone: "wait",
     };
@@ -313,8 +313,8 @@ function decideAction(input: {
   }
   return {
     kind: "wait",
-    label: "Open Iconic Studio",
-    detail: "Photos are on the job. Iconic Studio edits from the order.",
+    label: "Open Studio",
+    detail: "Photos are on the job. Studio edits from the order.",
     statusLabel: "Photos received",
     tone: "wait",
   };
@@ -359,7 +359,7 @@ export function rollupStudio(listingId: string, imageCount: number, jobs: Photog
 }
 
 function studioHeadline(rollup: Omit<PhotographerStudioRollup, "headline" | "counts">, imageCount: number): string {
-  if (rollup.failed > 0) return `${plural(rollup.failed, "edit")} failed. Open Iconic Studio.`;
+  if (rollup.failed > 0) return `${plural(rollup.failed, "edit")} failed. Open Studio.`;
   if (rollup.review > 0) return `${plural(rollup.review, "edit")} ${rollup.review === 1 ? "is" : "are"} ready to review.`;
   if (rollup.rejected > 0 && rollup.editing === 0 && rollup.queued === 0) {
     return `${plural(rollup.rejected, "edit")} ${rollup.rejected === 1 ? "was" : "were"} rejected.`;

@@ -105,7 +105,7 @@ export default function MediaDeliveryQueue({
                         href={iconicStudioHref(row.listingId)}
                         className="rounded-lg border border-gray-200 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-gray-600"
                       >
-                        Iconic Studio
+                        Studio
                       </a>
                     )}
                     {canMove && row.moves.map((status) => (

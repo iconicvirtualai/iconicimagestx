@@ -54,6 +54,34 @@ function render(mode: ScratchDeskMode = "upload", grassReady = true) {
 }
 
 describe("scratch pad desk", () => {
+  it("names the listing whose photos were opened", () => {
+    const html = renderToString(
+      <StudioScratchPad
+        frames={frames}
+        busy={false}
+        progress=""
+        grassReady
+        grassNote="ok"
+        listingLabel="10 Oak Street, Austin, TX"
+        onAddFiles={() => undefined}
+        onAddFloorplan={() => undefined}
+        onSelect={() => undefined}
+        onSelectAll={() => undefined}
+        onClearSelection={() => undefined}
+        onSort={() => undefined}
+        onProcess={() => undefined}
+        onStage={() => undefined}
+        onCommitJpeg={() => undefined}
+        onRevert={() => undefined}
+        onDownload={() => undefined}
+        onExport={() => undefined}
+        onRemove={() => undefined}
+      />,
+    );
+    expect(html).toContain('data-testid="scratch-listing"');
+    expect(html).toContain("10 Oak Street, Austin, TX");
+  });
+
   it("puts the filmstrip on the bottom and the mode switch on top", () => {
     const html = render();
     expect(html).toContain('data-layout="center-canvas bottom-filmstrip side-tools"');

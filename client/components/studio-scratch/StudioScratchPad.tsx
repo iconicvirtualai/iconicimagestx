@@ -90,6 +90,7 @@ export default function StudioScratchPad({
   progress,
   grassReady,
   grassNote,
+  listingLabel = "",
   sortMode = SCRATCH_SORT_DEFAULT,
   initialMode = "upload",
   initialStudioTool = "sky",
@@ -113,6 +114,7 @@ export default function StudioScratchPad({
   progress: string;
   grassReady: boolean;
   grassNote: string;
+  listingLabel?: string;
   sortMode?: ScratchSortMode;
   initialMode?: ScratchDeskMode;
   initialStudioTool?: ScratchStudioTool;
@@ -271,7 +273,14 @@ export default function StudioScratchPad({
       className="flex h-[100vh] min-h-[640px] flex-col overflow-hidden bg-[#070b0c] text-white"
     >
       <header className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
-        <p className="text-sm font-black uppercase tracking-[0.18em] text-white">Scratch pad</p>
+        <div className="min-w-0">
+          <p className="text-sm font-black uppercase tracking-[0.18em] text-white">Scratch pad</p>
+          {listingLabel ? (
+            <p data-testid="scratch-listing" className="truncate text-[10px] font-bold uppercase tracking-widest text-teal-200">
+              {listingLabel}
+            </p>
+          ) : null}
+        </div>
         <div data-testid="scratch-modes" className="flex items-center gap-1 rounded-full border border-white/10 bg-black/40 p-1">
           {MODES.map((item) => (
             <button

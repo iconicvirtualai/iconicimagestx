@@ -66,12 +66,11 @@ import AdminPhotographer from "./pages/AdminPhotographer";
 import AdminUpload from "./pages/AdminUpload";
 import AdminEditor from "./pages/AdminEditor";
 import AdminTeam from "./pages/AdminTeam";
-import AdminStudio from "./pages/AdminStudio";
 import AdminStudioHome from "./pages/AdminStudioHome";
 import AdminStudioProjects from "./pages/AdminStudioProjects";
 import AdminStudioMarketing from "./pages/AdminStudioMarketing";
 import AdminStudioScratch from "./pages/AdminStudioScratch";
-import AdminIconicStudio from "./pages/AdminIconicStudio";
+import LegacyStudioRedirect from "./components/studio/LegacyStudioRedirect";
 import AdminDeliveryQueue from "./pages/AdminDeliveryQueue";
 import Login from "./pages/Login";
 import ClientPortal from "./pages/ClientPortal";
@@ -141,13 +140,13 @@ const App = () => (
             {/* ─── Admin / Staff ────────────────────────────────────────── */}
             <Route path="/admin/dashboard" element={<ProtectedRoute requiredRole="coordinator"><AdminDashboard /></ProtectedRoute>} />
             <Route path="/admin/studio" element={<ProtectedRoute requiredRole="staff"><AdminStudioHome /></ProtectedRoute>} />
-            <Route path="/admin/studio/editing" element={<ProtectedRoute requiredRole="coordinator"><AdminStudioScratch /></ProtectedRoute>} />
-            <Route path="/admin/studio/scratch" element={<ProtectedRoute requiredRole="coordinator"><AdminStudioScratch /></ProtectedRoute>} />
+            <Route path="/admin/studio/editing" element={<ProtectedRoute requiredRole="staff"><AdminStudioScratch /></ProtectedRoute>} />
+            <Route path="/admin/studio/scratch" element={<ProtectedRoute requiredRole="staff"><AdminStudioScratch /></ProtectedRoute>} />
             <Route path="/admin/studio/projects" element={<ProtectedRoute requiredRole="staff"><AdminStudioProjects /></ProtectedRoute>} />
             <Route path="/admin/studio/marketing" element={<ProtectedRoute requiredRole="staff"><AdminStudioMarketing /></ProtectedRoute>} />
-            <Route path="/admin/studio/operations" element={<ProtectedRoute requiredRole="staff"><AdminStudio /></ProtectedRoute>} />
-            <Route path="/admin/iconic-studio" element={<Navigate to="/admin/studio" replace />} />
-            <Route path="/admin/iconic-studio/:listingId" element={<ProtectedRoute requiredRole="staff"><AdminIconicStudio /></ProtectedRoute>} />
+            <Route path="/admin/studio/operations" element={<LegacyStudioRedirect />} />
+            <Route path="/admin/iconic-studio" element={<LegacyStudioRedirect />} />
+            <Route path="/admin/iconic-studio/:listingId" element={<LegacyStudioRedirect />} />
             <Route path="/admin/delivery" element={<ProtectedRoute requiredRole="staff"><AdminDeliveryQueue /></ProtectedRoute>} />
             <Route path="/admin/listings" element={<ProtectedRoute requiredRole="coordinator"><AdminListings /></ProtectedRoute>} />
             <Route path="/admin/listing/:id" element={<ProtectedRoute requiredRole="staff"><AdminListingFile /></ProtectedRoute>} />

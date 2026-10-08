@@ -388,7 +388,7 @@ function JobCard({
         )}
         {job.action.kind !== "review" && (
           <Link to={job.studioHref} className={studioBtn}>
-            <Camera className="h-3.5 w-3.5" /> Iconic Studio
+            <Camera className="h-3.5 w-3.5" /> Studio
           </Link>
         )}
         <Link to={uploadHref} className={quietBtn}>

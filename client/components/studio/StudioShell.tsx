@@ -61,7 +61,7 @@ export function StudioProjectsPanel() {
     <div data-testid="studio-projects">
       <p className="mb-8 max-w-2xl text-xs text-gray-400">
         Jobs after approve and submit. Galleries and the download hold stay on the screens that already run them.
-        A photographer upload still opens that job in Iconic Studio.
+        A photographer upload still opens that job in Studio.
       </p>
       <StudioSectionNav active="projects" />
       <div className="grid gap-4 md:grid-cols-2">
