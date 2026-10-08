@@ -75,6 +75,8 @@ import AdminDeliveryQueue from "./pages/AdminDeliveryQueue";
 import Login from "./pages/Login";
 import ClientPortal from "./pages/ClientPortal";
 import PortalListingDetail from "./pages/PortalListingDetail";
+import ListingSitePage from "./pages/ListingSitePage";
+import ListingSiteDemo from "./pages/ListingSiteDemo";
 
 const queryClient = new QueryClient();
 
@@ -134,6 +136,9 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/portal" element={<Login />} />
             <Route path="/portal/home" element={<ClientPortal />} />
+            <Route path="/site/demo/builder" element={<ListingSiteDemo mode="builder" />} />
+            <Route path="/site/demo" element={<ListingSiteDemo mode="site" />} />
+            <Route path="/portal/listings/:listingId/site" element={<ListingSitePage />} />
             <Route path="/portal/listings/:listingId" element={<PortalListingDetail />} />
             <Route path="/admin/login" element={<AdminLogin />} />
 

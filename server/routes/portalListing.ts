@@ -285,7 +285,7 @@ export const handlePatchPortalWebsite: RequestHandler = async (req: Authenticate
           id: `portal-website-${new Date().toISOString()}`,
           at: new Date().toISOString(),
           kind: "website",
-          summary: "Listing site style updated",
+          summary: "Listing site updated",
         },
       });
     }

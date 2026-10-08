@@ -7,6 +7,13 @@
  */
 
 import { readPhotoEditRequests, type PhotoEditRequest } from "./photoEditRequest";
+import {
+  defaultListingWebsite,
+  sanitizeListingWebsite,
+  type PortalWebsiteSettings,
+} from "./listingSite";
+
+export type { PortalWebsiteSettings };
 
 export const PORTAL_LISTING_TABS = [
   { id: "data", label: "Data" },
@@ -74,6 +81,8 @@ export interface PortalMediaItem {
   hidden: boolean;
   order: number;
   uploadedAt: string;
+  /** Iconic Polish delivery, such as a grass replacement. Empty when the photo has one version. */
+  polishedUrl?: string;
 }
 
 export interface PortalTourItem extends PortalMediaItem {
@@ -92,16 +101,6 @@ export interface PortalMediaStore {
   videos: Record<string, PortalMediaPrefs>;
   floorplans: Record<string, PortalMediaPrefs>;
   tours: Record<string, PortalMediaPrefs>;
-}
-
-export interface PortalWebsiteSettings {
-  font: "sans" | "serif" | "modern";
-  color: "ink" | "teal" | "warm";
-  style: "classic" | "editorial" | "minimal";
-  showPhotos: boolean;
-  showVideo: boolean;
-  showTours: boolean;
-  showFloorplans: boolean;
 }
 
 export interface PortalInvoiceSummary {
@@ -194,10 +193,6 @@ export const PORTAL_MARKETING_KIT: PortalMarketingCard[] = [
   },
 ];
 
-const WEBSITE_FONTS = new Set(["sans", "serif", "modern"]);
-const WEBSITE_COLORS = new Set(["ink", "teal", "warm"]);
-const WEBSITE_STYLES = new Set(["classic", "editorial", "minimal"]);
-
 const PORTAL_LISTING_ID = /^[A-Za-z0-9_-]{4,128}$/;
 
 export function portalListingPath(listingId: string): string {
@@ -269,15 +264,7 @@ export function emptyPortalMediaStore(): PortalMediaStore {
 }
 
 export function defaultPortalWebsite(): PortalWebsiteSettings {
-  return {
-    font: "sans",
-    color: "ink",
-    style: "classic",
-    showPhotos: true,
-    showVideo: true,
-    showTours: true,
-    showFloorplans: true,
-  };
+  return defaultListingWebsite();
 }
 
 export function hiddenPresentationKeys(listing: Record<string, unknown> | null | undefined): Set<string> {
@@ -511,19 +498,7 @@ export function applyPortalMediaChange(
 }
 
 export function sanitizeWebsiteSettings(value: unknown, base = defaultPortalWebsite()): PortalWebsiteSettings {
-  const row = value && typeof value === "object" ? value as Record<string, unknown> : {};
-  const font = text(row.font);
-  const color = text(row.color);
-  const style = text(row.style);
-  return {
-    font: WEBSITE_FONTS.has(font) ? font as PortalWebsiteSettings["font"] : base.font,
-    color: WEBSITE_COLORS.has(color) ? color as PortalWebsiteSettings["color"] : base.color,
-    style: WEBSITE_STYLES.has(style) ? style as PortalWebsiteSettings["style"] : base.style,
-    showPhotos: boolOr(row.showPhotos, base.showPhotos),
-    showVideo: boolOr(row.showVideo, base.showVideo),
-    showTours: boolOr(row.showTours, base.showTours),
-    showFloorplans: boolOr(row.showFloorplans, base.showFloorplans),
-  };
+  return sanitizeListingWebsite(value, base);
 }
 
 export function readMediaStore(value: unknown): PortalMediaStore {
@@ -563,10 +538,6 @@ function readWebsite(value: unknown): PortalWebsiteSettings {
 
 function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
-}
-
-function boolOr(value: unknown, fallback: boolean): boolean {
-  return typeof value === "boolean" ? value : fallback;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -821,6 +792,7 @@ function finishMedia(
       url,
       contentType: text(row.contentType).toLowerCase(),
       hidden: pref?.hidden === true || row.hiddenFromPresentation === true || row.portalHidden === true,
+      polishedUrl: safeHttpUrl(row.polishedUrl) || safeHttpUrl(row.grassUrl) || safeHttpUrl(row.alternateUrl),
       order: pref?.order ?? index,
       uploadedAt: portalTimestamp(row.uploadedAt || row.createdAt),
     });
