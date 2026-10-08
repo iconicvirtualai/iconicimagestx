@@ -70,7 +70,7 @@ export default function MediaDeliveryQueue({
       {visible.length === 0 ? (
         <div className="rounded-2xl border border-gray-100 bg-white px-6 py-16 text-center">
           <p className="text-sm font-bold uppercase tracking-widest text-gray-400">No jobs in this delivery state</p>
-          <p className="mt-2 text-xs text-gray-400">Galleries and Iconic Studio jobs show up here.</p>
+          <p className="mt-2 text-xs text-gray-400">Galleries and Studio jobs show up here.</p>
         </div>
       ) : (
         <div className="space-y-3">

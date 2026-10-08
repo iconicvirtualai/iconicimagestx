@@ -120,7 +120,7 @@ export function PhotographerPortal({
         <Stat label="Waiting on you" value={summary.needsYou} onClick={() => onTab("next")} active={tab === "next"} />
         <Stat label="Today" value={summary.today} onClick={() => onTab("today")} active={tab === "today"} />
         <Stat label="Upcoming" value={summary.upcoming} onClick={() => onTab("upcoming")} active={tab === "upcoming"} />
-        <Stat label="In Iconic Studio" value={summary.inStudio} />
+        <Stat label="In Studio" value={summary.inStudio} />
       </div>
 
       <div role="tablist" aria-label="Photographer jobs" className="mb-6 flex gap-1 overflow-x-auto rounded-2xl bg-gray-100 p-1">

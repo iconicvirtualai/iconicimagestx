@@ -21,7 +21,8 @@ describe("Iconic Studio staff shell", () => {
         onApprove={async () => undefined}
       />,
     );
-    expect(html).toContain("Iconic Studio tools");
+    expect(html).toContain("Studio tools");
+    expect(html).not.toContain("Iconic Studio");
     expect(html).toContain("Adjust");
     expect(html).toContain("AI");
     expect(html).toContain("Brand");

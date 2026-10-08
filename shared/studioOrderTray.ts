@@ -4,6 +4,8 @@
  * then approve or reject the result. Scratch-pad edits stay separate.
  */
 
+import { visibleStudioNote } from "./iconicStudio";
+
 export interface StudioOrderTrayJob {
   id: string;
   listingId: string;
@@ -47,7 +49,7 @@ export function studioOrderTrayJobs(jobs: unknown, listingId: string): StudioOrd
       sourcePath,
       resultPath: text(job.resultPath),
       label: text(job.label) || text(job.type) || "edit",
-      note: text(job.note),
+      note: visibleStudioNote(text(job.note)),
       afterUrl,
       placeholder,
       canApprove: status === "review" && !placeholder && Boolean(afterUrl),

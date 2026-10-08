@@ -246,7 +246,7 @@ function decideAction(input: {
     return {
       kind: "review",
       label: "Review edits",
-      detail: "Iconic Studio finished photos on this job. Approve the ones that look right.",
+      detail: "Studio finished photos on this job. Approve the ones that look right.",
       statusLabel: "Ready to review",
       tone: "review",
     };
@@ -364,12 +364,12 @@ function studioHeadline(rollup: Omit<PhotographerStudioRollup, "headline" | "cou
   if (rollup.rejected > 0 && rollup.editing === 0 && rollup.queued === 0) {
     return `${plural(rollup.rejected, "edit")} ${rollup.rejected === 1 ? "was" : "were"} rejected.`;
   }
-  if (rollup.editing > 0) return `Iconic Studio is editing ${plural(rollup.editing, "photo")}.`;
-  if (rollup.queued > 0) return `Iconic Studio has ${plural(rollup.queued, "photo")} queued.`;
+  if (rollup.editing > 0) return `Studio is editing ${plural(rollup.editing, "photo")}.`;
+  if (rollup.queued > 0) return `Studio has ${plural(rollup.queued, "photo")} queued.`;
   if (rollup.waitingOnPhoto > 0) return "An edit is waiting on an exterior photo.";
   if (rollup.approved > 0) return `${plural(rollup.approved, "edit")} ${rollup.approved === 1 ? "is" : "are"} approved.`;
   if (imageCount > 0) {
-    return `${plural(imageCount, "photo")} ${imageCount === 1 ? "is" : "are"} on the job. Iconic Studio has not queued an edit.`;
+    return `${plural(imageCount, "photo")} ${imageCount === 1 ? "is" : "are"} on the job. Studio has not queued an edit.`;
   }
   return "No photos on this job yet.";
 }

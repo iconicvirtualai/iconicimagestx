@@ -25,7 +25,12 @@ import {
   sortScratchItems,
   type ScratchSortMode,
 } from "@/lib/scratchSort";
-import { frameFromListingImage, isRawStudioFile, type StudioFrame } from "@shared/iconicStudio";
+import {
+  EMPTY_LISTING_PHOTOS_NOTE,
+  framesFromListingImages,
+  isRawStudioFile,
+  type StudioFrame,
+} from "@shared/iconicStudio";
 import { studioEditorListingId } from "@shared/studioEditorHref";
 import {
   listingOrderQueuePending,
@@ -116,7 +121,7 @@ async function listingPhotoItem(frame: StudioFrame, uploadIndex: number): Promis
   };
   if (frame.raw || !frame.previewable || !frame.url) return base;
   try {
-    const response = await fetch(frame.url);
+    const response = await fetch(frame.url, { signal: AbortSignal.timeout(10000) });
     if (!response.ok) return base;
     const blob = await response.blob();
     const file = new File([blob], frame.name, { type: blob.type || frame.contentType || "image/jpeg" });
@@ -164,6 +169,7 @@ export default function AdminStudioScratch() {
   const [sortMode, setSortMode] =
     useState<ScratchSortMode>(SCRATCH_SORT_DEFAULT);
   const [listingLabel, setListingLabel] = useState("");
+  const [emptyNote, setEmptyNote] = useState("");
   const [orderJobs, setOrderJobs] = useState<StudioOrderTrayJob[]>([]);
   const [orderBusy, setOrderBusy] = useState(false);
   const sortModeRef = useRef(sortMode);
@@ -185,6 +191,7 @@ export default function AdminStudioScratch() {
     if (!listingId) {
       loadedListing.current = "";
       setListingLabel("");
+      setEmptyNote("");
       setOrderJobs([]);
       setProgress((current) => (current === "Loading listing photos…" ? "" : current));
       return;
@@ -192,38 +199,73 @@ export default function AdminStudioScratch() {
     if (loadedListing.current === listingId) return;
     let cancel = false;
     setListingLabel("Loading listing photos…");
+    setEmptyNote("");
     setProgress("Loading listing photos…");
+    const leavePhotoLoading = () => {
+      setProgress((current) => (current === "Loading listing photos…" ? "" : current));
+    };
     void fetchStudioWorkspace(listingId, getToken)
       .then(async (data) => {
         if (cancel) return;
         setOrderJobs(studioOrderTrayJobs(data.jobs, listingId));
         const address = data.listing?.address || listingId;
-        const frames = (data.listing?.images || [])
-          .map((item, index) => frameFromListingImage(item, index))
-          .filter((frame): frame is StudioFrame => Boolean(frame));
+        const frames = framesFromListingImages(data.listing?.images);
         const slice = frames.slice(0, SCRATCH_MAX_FILES);
-        const added: ScratchItem[] = [];
-        for (const frame of slice) {
-          if (cancel) break;
+        setListingLabel(address);
+        leavePhotoLoading();
+        if (slice.length === 0) {
+          loadedListing.current = listingId;
+          setEmptyNote(EMPTY_LISTING_PHOTOS_NOTE);
+          setItems((current) => {
+            for (const item of current) revokeScratchItem(item);
+            return [];
+          });
+          setSelectedIds([]);
+          setAnchorId(null);
+          setFocusId(null);
+          return;
+        }
+        setEmptyNote("");
+        if (frames.length > SCRATCH_MAX_FILES) {
+          toast.message(`${address}: showing ${SCRATCH_MAX_FILES} of ${frames.length} photos.`);
+        }
+        const shells: ScratchItem[] = slice.map((frame) => {
           const uploadIndex = uploadSeq.current;
           uploadSeq.current += 1;
-          added.push(await listingPhotoItem(frame, uploadIndex));
+          return {
+            id: frame.id,
+            name: frame.name,
+            status: "ready",
+            uploadIndex,
+            byteSize: 0,
+            shotAt: 0,
+            editable: false,
+            beforeUrl: frame.url || fileCard(frame.name),
+            source: new Blob(),
+          };
+        });
+        setItems((current) => {
+          for (const item of current) revokeScratchItem(item);
+          return shells;
+        });
+        const firstShell = shells[0];
+        setSelectedIds(firstShell ? [firstShell.id] : []);
+        setAnchorId(firstShell?.id || null);
+        setFocusId(firstShell?.id || null);
+        const added: ScratchItem[] = [];
+        for (let index = 0; index < slice.length; index += 1) {
+          if (cancel) break;
+          const frame = slice[index];
+          const shell = shells[index];
+          const hydrated = await listingPhotoItem(frame, shell.uploadIndex);
+          added.push({ ...hydrated, id: shell.id });
         }
         if (cancel) {
           for (const item of added) revokeScratchItem(item);
           return;
         }
         loadedListing.current = listingId;
-        setListingLabel(address);
-        if (frames.length > SCRATCH_MAX_FILES) {
-          toast.message(`${address}: showing ${SCRATCH_MAX_FILES} of ${frames.length} photos.`);
-        } else if (!added.length) {
-          toast.message(`${address} has no photos in Studio yet.`);
-        }
-        setItems((current) => {
-          for (const item of current) revokeScratchItem(item);
-          return sortScratchItems(sortModeRef.current, added);
-        });
+        setItems(() => sortScratchItems(sortModeRef.current, added));
         const first = added[0];
         setSelectedIds(first ? [first.id] : []);
         setAnchorId(first?.id || null);
@@ -767,6 +809,7 @@ export default function AdminStudioScratch() {
         grassReady={grassReady}
         grassNote={grassNote}
         listingLabel={listingLabel}
+        emptyNote={emptyNote}
         orderJobs={orderJobs}
         orderBusy={orderBusy}
         onApproveOrder={(jobId) => {

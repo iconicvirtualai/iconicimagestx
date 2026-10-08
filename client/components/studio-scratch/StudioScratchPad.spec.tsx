@@ -143,7 +143,59 @@ describe("scratch pad desk", () => {
     expect(html).toContain('data-testid="scratch-order-approve-review-1"');
     expect(html).toContain('data-testid="scratch-order-reject-review-1"');
     expect(html).toContain("https://example.com/after.jpg");
+    expect(html).toContain("Ready");
     expect(html).not.toContain('data-testid="scratch-order-approve-pending-1"');
+  });
+
+  it("shows the order tray and an empty photo note once listing photos have loaded", () => {
+    const html = renderToString(
+      <StudioScratchPad
+        frames={[]}
+        busy={false}
+        progress=""
+        grassReady
+        grassNote="ok"
+        listingLabel="1234 Main Street"
+        emptyNote="No listing photos yet."
+        orderJobs={[
+          {
+            id: "review-1",
+            listingId: "job-1",
+            status: "review",
+            origin: "order",
+            sourcePath: "listings/job-1/photos/front.jpg",
+            resultPath: "listings/job-1/edits/front.jpg",
+            label: "Front",
+            note: "Ready",
+            afterUrl: "https://example.com/after.jpg",
+            placeholder: false,
+            canApprove: true,
+            canReject: true,
+          },
+        ]}
+        onAddFiles={() => undefined}
+        onAddFloorplan={() => undefined}
+        onSelect={() => undefined}
+        onSelectAll={() => undefined}
+        onClearSelection={() => undefined}
+        onSort={() => undefined}
+        onProcess={() => undefined}
+        onStage={() => undefined}
+        onCommitJpeg={() => undefined}
+        onRevert={() => undefined}
+        onDownload={() => undefined}
+        onExport={() => undefined}
+        onRemove={() => undefined}
+      />,
+    );
+    expect(html).toContain('data-testid="scratch-order-tray"');
+    expect(html).toContain('data-testid="scratch-order-approve-review-1"');
+    expect(html).toContain('data-testid="scratch-order-reject-review-1"');
+    expect(html).toContain('data-testid="scratch-empty-photos"');
+    expect(html).toContain("No listing photos yet.");
+    expect(html).toContain("1234 Main Street");
+    expect(html).toMatch(/0(?:<!-- -->)? files/);
+    expect(html).not.toContain("Loading listing photos");
   });
 
   it("puts the filmstrip on the bottom and the mode switch on top", () => {

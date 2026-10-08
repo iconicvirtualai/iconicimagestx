@@ -89,7 +89,7 @@ router.get("/workspace", requireStaff, async (req: AuthenticatedRequest, res) =>
     }
     return res.json(payload);
   } catch (err) {
-    return sendKnownError(res, err, "Failed to load Iconic Studio.");
+    return sendKnownError(res, err, "Failed to load Studio.");
   }
 });
 

@@ -5952,7 +5952,7 @@ async function editListingPhotoWithOpenAI(input) {
     });
   } catch (err) {
     if (isTimeoutError(err)) throw new OpenAiEditError(AI_EDIT_TIMEOUT_NOTE);
-    throw new OpenAiEditError("Iconic Studio could not reach OpenAI. Queue the edit again.");
+    throw new OpenAiEditError("Studio could not reach OpenAI. Queue the edit again.");
   }
   const body = await response.text();
   if (!response.ok) throw new OpenAiEditError(openAiErrorNote(response.status, body), response.status);
@@ -11735,7 +11735,7 @@ router$8.get("/workspace", requireStaff, async (req, res) => {
     }
     return res.json(payload);
   } catch (err) {
-    return sendKnownError$1(res, err, "Failed to load Iconic Studio.");
+    return sendKnownError$1(res, err, "Failed to load Studio.");
   }
 });
 router$8.get("/delivery-queue", requireStaff, async (req, res) => {

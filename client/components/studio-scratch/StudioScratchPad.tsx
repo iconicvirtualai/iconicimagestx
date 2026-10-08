@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { visibleStudioNote } from "@shared/iconicStudio";
 import { ICONIC_POLISH_TREATMENTS } from "@shared/orderEditPlan";
 import type { StudioOrderTrayJob } from "@shared/studioOrderTray";
 import { SCRATCH_SORT_DEFAULT, type ScratchSortMode } from "@/lib/scratchSort";
@@ -92,6 +93,7 @@ export default function StudioScratchPad({
   grassReady,
   grassNote,
   listingLabel = "",
+  emptyNote = "",
   orderJobs = [],
   orderBusy = false,
   onApproveOrder,
@@ -121,6 +123,7 @@ export default function StudioScratchPad({
   grassReady: boolean;
   grassNote: string;
   listingLabel?: string;
+  emptyNote?: string;
   orderJobs?: StudioOrderTrayJob[];
   orderBusy?: boolean;
   onApproveOrder?: (jobId: string) => void;
@@ -325,11 +328,13 @@ export default function StudioScratchPad({
               {orderBusy ? "Editing…" : "Run next order edit"}
             </button>
           ) : null}
-          {orderJobs.map((job) => (
+          {orderJobs.map((job) => {
+            const note = visibleStudioNote(job.note);
+            return (
             <article key={job.id} data-testid={`scratch-order-${job.id}`} className="w-56 shrink-0 rounded-xl border border-white/10 bg-black/40 p-2">
               <p className="truncate text-[10px] font-black uppercase tracking-widest text-gray-200">{job.label} · {job.status}</p>
               {job.afterUrl ? <img src={job.afterUrl} alt="" className="mt-2 h-16 w-full rounded object-cover" /> : null}
-              {job.note ? <p className={`mt-1 line-clamp-2 text-[11px] ${job.status === "failed" ? "text-red-300" : "text-gray-400"}`}>{job.note}</p> : null}
+              {note ? <p className={`mt-1 line-clamp-2 text-[11px] ${job.status === "failed" ? "text-red-300" : "text-gray-400"}`}>{note}</p> : null}
               <div className="mt-2 flex gap-2">
                 {job.canApprove ? (
                   <button type="button" data-testid={`scratch-order-approve-${job.id}`} disabled={orderBusy} onClick={() => onApproveOrder?.(job.id)} className="rounded-lg bg-[#0d9488] px-2 py-1 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-40">
@@ -343,8 +348,14 @@ export default function StudioScratchPad({
                 ) : null}
               </div>
             </article>
-          ))}
+            );
+          })}
         </div>
+      ) : null}
+      {emptyNote ? (
+        <p data-testid="scratch-empty-photos" className="border-b border-white/10 bg-[#101618] px-4 py-2 text-xs text-gray-300">
+          {emptyNote}
+        </p>
       ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">

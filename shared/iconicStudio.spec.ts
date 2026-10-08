@@ -10,7 +10,9 @@ import {
   clampAdjustments,
   cropRect,
   finalsObjectPath,
+  EMPTY_LISTING_PHOTOS_NOTE,
   frameFromListingImage,
+  framesFromListingImages,
   galleryStatusAfterStudioAdd,
   iconicStudioHref,
   isRawStudioFile,
@@ -18,6 +20,7 @@ import {
   listingAddressLabel,
   listingPhotoEditSize,
   parseAiEditRequest,
+  visibleStudioNote,
   presetPrompt,
   realEstateEditPrompt,
   resolveStudioApprovePath,
@@ -78,6 +81,20 @@ describe("Iconic Studio queue and files", () => {
     expect(frame?.studioApproved).toBe(true);
     expect(frame?.previewable).toBe(true);
     expect(frameFromListingImage({ note: "empty" })).toBeNull();
+  });
+
+  it("treats a missing gallery photo list as empty", () => {
+    expect(framesFromListingImages(undefined)).toEqual([]);
+    expect(framesFromListingImages(null)).toEqual([]);
+    expect(framesFromListingImages([])).toEqual([]);
+    expect(framesFromListingImages([{ note: "empty" }])).toEqual([]);
+    expect(EMPTY_LISTING_PHOTOS_NOTE).toBe("No listing photos yet.");
+  });
+
+  it("hides stored dev notes and keeps a real review note", () => {
+    expect(visibleStudioNote("TODO: OPENAI_API_KEY is set, but Iconic Studio does not call the images API in this version.")).toBe("");
+    expect(visibleStudioNote("OPENAI_API_KEY is not configured on the server, so this photo was not edited.")).toBe("");
+    expect(visibleStudioNote("OpenAI edit is ready for review.")).toBe("OpenAI edit is ready for review.");
   });
 });
 
