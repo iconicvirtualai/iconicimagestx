@@ -4,6 +4,7 @@ import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, limit, getDocs } from "firebase/firestore";
 import { AlertCircle, CreditCard, FileText } from "lucide-react";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
+import { formatChicagoDate } from "@shared/clientHome";
 
 interface Invoice {
   id: string;
@@ -146,7 +147,7 @@ export default function AdminBilling() {
                   {invoices.map((invoice) => (
                     <tr key={invoice.id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-3 px-4 text-gray-900 font-medium">
-                        {new Date(invoice.date).toLocaleDateString()}
+                        {formatChicagoDate(invoice.date) || "—"}
                       </td>
                       <td className="py-3 px-4 text-gray-700">
                         {invoice.description}

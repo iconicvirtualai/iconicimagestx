@@ -5,6 +5,7 @@
  */
 
 import { addressText } from "./addressText.ts";
+import { formatChicagoDate } from "./clientHome.ts";
 import { packagesForStaffEditor, type StaffCatalogPackage } from "./bookingCatalog.ts";
 import { orderChargeSummary, orderServiceLines, cleanPackageName, type OrderServiceLine } from "./orderPackageLines.ts";
 
@@ -277,7 +278,15 @@ function firstText(record: Record<string, unknown>, keys: string[]): string {
 }
 
 function firstDate(record: Record<string, unknown>, keys: string[]): string {
-  return firstText(record, keys);
+  for (const key of keys) {
+    const value = record[key];
+    const values = Array.isArray(value) ? value : [value];
+    for (const entry of values) {
+      const formatted = formatChicagoDate(entry);
+      if (formatted) return formatted;
+    }
+  }
+  return NOT_PROVIDED;
 }
 
 function addressPart(value: unknown, keys: string[]): string {

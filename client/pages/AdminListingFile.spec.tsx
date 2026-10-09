@@ -20,12 +20,13 @@ const PLACES = {
   placeId: "place_congress",
 };
 
-function renderListing(address: unknown) {
+function renderListing(address: unknown, extra: Record<string, unknown> = {}) {
   const project: Record<string, unknown> = {
     id: "bklist_req_m6dPeawQ4RQ63gA7LAMl",
     projectType: "real_estate",
     status: "scheduled",
     clientName: "QA Tester",
+    ...extra,
   };
   if (address !== undefined) project.address = address;
   return renderToString(
@@ -44,6 +45,10 @@ function heading(html: string): string {
   return html.match(/<h1 class="text-2xl[^"]*text-white">([^<]*)<\/h1>/)?.[1] ?? "";
 }
 
+function pressed(html: string, label: string): string | undefined {
+  return html.match(new RegExp(`aria-label="${label}" aria-pressed="(true|false)"`))?.[1];
+}
+
 describe("admin listing page address", () => {
   it("renders a legacy string address", () => {
     const html = renderListing("456 QA Lane");
@@ -60,6 +65,33 @@ describe("admin listing page address", () => {
     expect(html).not.toContain("place_congress");
     expect(html).not.toContain("[object Object]");
     expect(html).not.toContain("Minified React error");
+  });
+
+  it("shows a date-only shoot on the Chicago calendar day", () => {
+    const html = renderListing("456 QA Lane", { apptDate: "2026-11-17", apptTime: "9:00 AM" });
+    expect(html).toContain("Nov 17, 2026");
+    expect(html).toContain("9:00 AM");
+    expect(html).not.toContain("Nov 16, 2026");
+  });
+
+  it("shows a UTC-midnight timestamp on that same calendar day", () => {
+    const html = renderListing("456 QA Lane", { apptDate: "2026-11-17T00:00:00.000Z", apptTime: "9:00 AM" });
+    expect(html).toContain("Nov 17, 2026");
+    expect(html).not.toContain("Nov 16, 2026");
+  });
+
+  it("treats a missing gallery lock as locked until paid", () => {
+    const html = renderListing("456 QA Lane");
+    expect(pressed(html, "Lock Downloads")).toBe("true");
+    expect(pressed(html, "Require Payment")).toBe("true");
+    expect(pressed(html, "Lock Studio")).toBe("false");
+  });
+
+  it("keeps an explicit download release off", () => {
+    const html = renderListing("456 QA Lane", { lockDownloads: false, requirePayment: false, lockStudio: true });
+    expect(pressed(html, "Lock Downloads")).toBe("false");
+    expect(pressed(html, "Require Payment")).toBe("false");
+    expect(pressed(html, "Lock Studio")).toBe("true");
   });
 
   it("renders a placeholder when the address is missing", () => {

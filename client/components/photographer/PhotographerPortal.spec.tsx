@@ -45,7 +45,6 @@ function renderPortal(overrides: Partial<Parameters<typeof PhotographerPortal>[0
         payRate={75}
         onUpload={() => undefined}
         {...overrides}
-        jobs={jobs}
       />
     </MemoryRouter>,
   );
@@ -67,6 +66,8 @@ describe("photographer portal view", () => {
 
   it("shows Iconic Studio progress on the all-jobs list", () => {
     const html = renderPortal({ tab: "all" });
+    expect(html).toContain('data-testid="photographer-tab-all"');
+    expect(html).toContain('aria-selected="true"');
     expect(html).toContain("88 River Road");
     expect(html).toContain("Editing now");
     expect(html).toContain("Studio is editing 1 photo.");

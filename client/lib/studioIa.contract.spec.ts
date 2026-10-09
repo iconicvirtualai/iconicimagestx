@@ -35,5 +35,6 @@ describe("studio information architecture routes", () => {
     expect(app).toContain('path="/admin/booking-catalog"');
     expect(app).toContain('path="/admin/invoice-presets"');
     expect(app).toContain('path="/admin/listings"');
+    expect(app).toContain('path="/admin" element={<Navigate to="/admin/dashboard" replace />}');
   });
 });

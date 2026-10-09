@@ -33,6 +33,23 @@ describe("photographer portal jobs", () => {
     expect(chicagoDateKey(new Date("2026-10-05T04:59:00.000Z"))).toBe("2026-10-04");
   });
 
+  it("keeps a date-only shoot and a UTC-midnight timestamp on November 17", () => {
+    const today = "2026-11-16";
+    const [fromDay] = buildPhotographerPortal({
+      today,
+      listings: [listing({ id: "day", apptDate: "2026-11-17" })],
+    });
+    const [fromMidnight] = buildPhotographerPortal({
+      today,
+      listings: [listing({ id: "midnight", apptDate: "2026-11-17T00:00:00.000Z" })],
+    });
+    expect(fromDay.when).toBe("upcoming");
+    expect(fromDay.dateLabel).toBe("Tue, Nov 17");
+    expect(fromMidnight.when).toBe("upcoming");
+    expect(fromMidnight.dateLabel).toBe("Tue, Nov 17");
+    expect(fromMidnight.dateLabel).not.toContain("16");
+  });
+
   it("asks for an upload when today's shoot has no photos", () => {
     const [job] = buildPhotographerPortal({ today: TODAY, listings: [listing()] });
     expect(job.when).toBe("today");

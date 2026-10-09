@@ -31,14 +31,15 @@ const LINK_COLLECTIONS = new Set<BookingListingCollection>([
 const BLOCKED_FIELDS = new Set([
   "id",
   "createdAt",
-  "requirePayment",
   "paymentUrl",
   "studioToken",
-  "lockDownloads",
   "lockboxCode",
   "notifications",
   "passwordSetupLink",
 ]);
+
+/** Written on a new booking project. Fill of an existing project skips these. */
+const LOCK_FIELDS = new Set(["lockDownloads", "requirePayment", "lockStudio"]);
 
 export async function ensureBookingListingForRequest(orderRequestId: string): Promise<{ listingId: string; created: boolean } | null> {
   const id = orderRequestId.trim();
@@ -360,6 +361,7 @@ function plainValue(value: unknown): unknown {
 }
 
 function allowedField(key: string): boolean {
+  if (LOCK_FIELDS.has(key)) return true;
   if (BLOCKED_FIELDS.has(key)) return false;
   if (/cubicasa/i.test(key) || /payment/i.test(key)) return false;
   if (/^square/i.test(key) && key !== "squareFootage") return false;

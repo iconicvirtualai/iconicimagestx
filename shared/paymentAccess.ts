@@ -62,6 +62,18 @@ export interface GalleryDownloadGate {
   downloadsReleased?: unknown;
   /** Listing switch. False is a staff release. Missing stays locked. */
   lockDownloads?: unknown;
+  /** Listing switch. Missing means payment is required. False does not open files. */
+  requirePayment?: unknown;
+}
+
+/** Missing means locked. Explicit false is the staff release. */
+export function lockDownloadsOn(value: unknown): boolean {
+  return value !== false;
+}
+
+/** Missing means the invoice is required before files open. */
+export function requirePaymentOn(value: unknown): boolean {
+  return value !== false;
 }
 
 /**

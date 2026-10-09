@@ -81,7 +81,7 @@ describe("office new order email", () => {
       adminUrl: "https://iconicimagestx.com/admin/order-request/6y4F0RVWBQw5z5IJxbWe",
       catalog,
     });
-    expect(email.subject).toBe("New order ORD-L-00534 — Hollywood — 123 Main St, Conroe, TX — 2026-10-12");
+    expect(email.subject).toBe("New order ORD-L-00534 — Hollywood — 123 Main St, Conroe, TX — Oct 12, 2026");
     expect(email.text).not.toContain(NOT_PROVIDED);
     expect(email.html).toContain("Hollywood");
     for (const label of officeOrderEmailFieldLabels()) {
@@ -114,12 +114,22 @@ describe("office new order email", () => {
     expect(email.text).toContain("Tax: $8.00");
     expect(email.text).toContain("Total: $257.00");
     expect(email.text).toContain("Payment: Unpaid");
-    expect(email.text).toContain("Requested date: 2026-10-12");
+    expect(email.text).toContain("Requested date: Oct 12, 2026");
     expect(email.text).toContain("Requested time: Morning");
     expect(email.text).toContain("Square footage: 2400");
     expect(email.text).toContain("Occupancy: Vacant");
     expect(email.text).toContain("Notes: Shoot the backyard");
     expect(email.text).toContain("Booked via: Site");
+  });
+
+  it("keeps a UTC-midnight requested date on that calendar day", () => {
+    const email = officeNewOrderEmail({
+      ...saved,
+      scheduledDate: "2026-11-17T00:00:00.000Z",
+    }, { catalog });
+    expect(email.subject).toContain("Nov 17, 2026");
+    expect(email.subject).not.toContain("Nov 16");
+    expect(email.text).toContain("Requested date: Nov 17, 2026");
   });
 
   it("prints a Google Places address in the subject and body", () => {

@@ -1,5 +1,6 @@
 import * as React from "react";
 import { recordAddressText } from "@shared/addressText";
+import { calendarDateKey, formatChicagoDate } from "@shared/clientHome";
 import AdminLayout from "@/components/AdminLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { db, storage } from "@/lib/firebase";
@@ -199,9 +200,9 @@ function UploadPortal({ listings, user, isAdmin, isEditor }: any) {
   const filtered = listings.filter((l: any) => {
     if (isAdmin || isEditor) return true;
     // Photographers restricted to Today + Prev 2 Days
-    const date = l.apptDate?.toDate ? l.apptDate.toDate() : new Date(l.apptDate);
-    const twoDaysAgo = startOfDay(subDays(new Date(), 2));
-    return date >= twoDaysAgo;
+    const day = calendarDateKey(l.apptDate);
+    const cutoff = calendarDateKey(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000));
+    return Boolean(day && cutoff && day >= cutoff);
   });
 
   const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -292,7 +293,7 @@ function UploadPortal({ listings, user, isAdmin, isEditor }: any) {
                   ID: {l.id.substring(0, 6)}
                 </span>
                 <span className="text-[9px] font-bold text-gray-400">
-                  {l.apptDate?.toDate ? format(l.apptDate.toDate(), "MMM d") : format(new Date(l.apptDate), "MMM d")}
+                  {formatChicagoDate(l.apptDate, "compact") || "—"}
                 </span>
               </div>
             </button>
@@ -694,7 +695,7 @@ function EditingStudio({ listings, apiKey, user }: { listings: any[], apiKey: st
                 <div className="hidden sm:block text-right">
                   <p className={labelCls}>Uploaded At</p>
                   <p className="text-[10px] font-black text-black mt-1">
-                    {l.updatedAt?.toDate ? format(l.updatedAt.toDate(), "MMM d, h:mm a") : '—'}
+                    {l.updatedAt?.toDate ? l.updatedAt.toDate().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" }) : "—"}
                   </p>
                   <div className="mt-4 flex flex-col items-end gap-1">
                     <p className={labelCls}>Processing Log</p>

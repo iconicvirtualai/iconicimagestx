@@ -19,6 +19,8 @@ import {
 } from "@shared/orderProjectInvoice";
 import { ensureLinkedInvoice, resolveLinkedInvoice } from "@/lib/orderProjectInvoice";
 import { addressText, recordAddressText } from "@shared/addressText";
+import { calendarDateKey, formatChicagoDate } from "@shared/clientHome";
+import { lockDownloadsOn, requirePaymentOn } from "@shared/paymentAccess";
 import { staffInvoicePath } from "@shared/staffInvoice";
 import { PresentationShareButton, PresentationSharePanel } from "@/components/PresentationSharePanel";
 import { PhotoEditRequestStaff } from "@/components/PhotoEditRequestStaff";
@@ -76,6 +78,9 @@ function Toggle({ label, value, onChange, disabled }: {
     <div className="flex items-center justify-between">
       <span className="text-xs font-bold text-gray-700">{label}</span>
       <button
+        type="button"
+        aria-label={label}
+        aria-pressed={value}
         onClick={() => !disabled && onChange(!value)}
         disabled={disabled}
         className={`w-10 h-6 rounded-full transition-colors relative flex-shrink-0 ${value ? "bg-[#0d9488]" : "bg-gray-200"} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
@@ -357,13 +362,13 @@ export default function AdminListingFile({
   // Auto-status logic
   React.useEffect(() => {
     if (!project || !id) return;
-    const now = new Date();
-    const apptDate = project.apptDate?.toDate ? project.apptDate.toDate() : project.apptDate ? new Date(project.apptDate) : null;
+    const apptKey = calendarDateKey(project.apptDate);
+    const todayKey = calendarDateKey(new Date());
     const currentStatus = project.status;
 
     let newStatus: string | null = null;
 
-    if (apptDate && currentStatus === "scheduled" && now > apptDate) {
+    if (apptKey && todayKey && currentStatus === "scheduled" && todayKey > apptKey) {
       // Past appointment time but no media uploaded yet
       newStatus = "in_progress";
     }
@@ -467,11 +472,7 @@ export default function AdminListingFile({
   const images: any[] = project.images || [];
   const coverPhoto = images.length > 0 ? images[0].url : null;
 
-  const fmtDate = (v: any) => {
-    if (!v) return "—";
-    if (v.toDate) return v.toDate().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    return new Date(v).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  };
+  const fmtDate = (v: unknown) => formatChicagoDate(v) || "—";
 
   return (
     <AdminLayout title={isRE ? "Real Estate Project" : "Business Project"}>
@@ -844,9 +845,9 @@ export default function AdminListingFile({
             <h3 className={`${labelCls} mb-4 flex items-center gap-2`}><Lock className="w-3.5 h-3.5" /> Security</h3>
             <p className="text-[10px] text-gray-400 mb-3">Lock Downloads on keeps client files locked until the invoice is paid. Turning it off releases downloads. Iconic still invoices after the shoot.</p>
             <div className="space-y-3">
-              <Toggle label="Lock Downloads" value={!!project.lockDownloads} onChange={v => patch({ lockDownloads: v })} />
-              <Toggle label="Lock Studio" value={!!project.lockStudio} onChange={v => patch({ lockStudio: v })} />
-              <Toggle label="Require Payment" value={!!project.requirePayment} onChange={v => patch({ requirePayment: v })} />
+              <Toggle label="Lock Downloads" value={lockDownloadsOn(project.lockDownloads)} onChange={v => patch({ lockDownloads: v })} />
+              <Toggle label="Lock Studio" value={project.lockStudio === true} onChange={v => patch({ lockStudio: v })} />
+              <Toggle label="Require Payment" value={requirePaymentOn(project.requirePayment)} onChange={v => patch({ requirePayment: v })} />
               <Toggle label="Social Permission" value={!!project.socialPermission} onChange={v => patch({ socialPermission: v })} />
             </div>
           </div>

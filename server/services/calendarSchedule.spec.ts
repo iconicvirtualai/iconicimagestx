@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toCalendarScheduleEvent } from "./calendar";
+import { bookingEventTimes, toCalendarScheduleEvent } from "./calendar";
 
 describe("calendar schedule events", () => {
   it("keeps all-day, transparency, type, and status for availability", () => {
@@ -40,5 +40,16 @@ describe("calendar schedule events", () => {
     expect(event.start).toBe("2026-10-08T18:30:00-05:00");
     expect(event.location).toBe("10 Oak St");
     expect(event.transparency).toBeNull();
+  });
+});
+
+describe("booking calendar times", () => {
+  it("keeps a UTC-midnight shoot and a late Chicago evening on November 17", () => {
+    expect(bookingEventTimes(new Date("2026-11-17T00:00:00.000Z"), "9:00 AM")).toMatchObject({
+      start: "2026-11-17T09:00:00",
+      end: "2026-11-17T10:30:00",
+    });
+    expect(bookingEventTimes(new Date("2026-11-18T03:00:00.000Z"), "9:00 PM")?.start).toBe("2026-11-17T21:00:00");
+    expect(bookingEventTimes(null, "9:00 AM")).toBeNull();
   });
 });

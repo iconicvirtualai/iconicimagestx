@@ -12,6 +12,7 @@ import { requireCoordinator, requireAuth, type AuthenticatedRequest } from "../m
 import { sendEmail } from "../services/email";
 import { clientNotifyLive } from "../../shared/clientNotify";
 import { addressText } from "../../shared/addressText";
+import { bookingDateLabel } from "../../shared/clientHome";
 import { amountStillDue, invoiceAllowsDownload, invoiceIdFromSquareNote, squarePaymentNote } from "../../shared/paymentAccess";
 import { presentInvoiceNumber } from "../../shared/orderProjectInvoice";
 import { fetchPublishedSquareInvoiceUrl, resolveSquareCheckoutUrl, squareApiBaseUrl } from "../../shared/squareInvoice";
@@ -274,9 +275,7 @@ router.post("/send-invoice", requireCoordinator, async (req, res) => {
         invoiceNumber: invoice.invoiceNumber,
         amount: money(invoice.total),
         paymentUrl,
-        dueDate: invoice.dueDate
-          ? (invoice.dueDate as admin.firestore.Timestamp).toDate().toLocaleDateString()
-          : "Upon receipt",
+        dueDate: bookingDateLabel(invoice.dueDate, "Upon receipt"),
       },
     });
 

@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { toast } from "sonner";
 import { listingAppointmentDate } from "@shared/listingWrite";
+import { formatChicagoDate } from "@shared/clientHome";
 import {
   invoiceDraftFromOrder,
   listingLinkFields,
@@ -41,33 +42,9 @@ import {
 function fmtAddr(a: unknown): string {
   return addressText(a) || "—";
 }
-function fmtDate(ts: any): string {
+function fmtDate(ts: unknown): string {
   if (!ts) return "—";
-  if (typeof ts === "string" && ts.includes(",")) return ts;
-
-  const options: Intl.DateTimeFormatOptions = {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "America/Chicago"
-  };
-
-  if (ts.toDate) return ts.toDate().toLocaleDateString("en-US", options);
-
-  // If it's a YYYY-MM-DD string, add noon to prevent timezone shifts
-  let dateObj: Date;
-  if (typeof ts === "string" && /^\d{4}-\d{2}-\d{2}$/.test(ts)) {
-    dateObj = new Date(ts + "T12:00:00");
-  } else {
-    dateObj = new Date(ts);
-  }
-
-  try {
-    return isNaN(dateObj.getTime()) ? String(ts) : dateObj.toLocaleDateString("en-US", options);
-  } catch {
-    return String(ts);
-  }
+  return formatChicagoDate(ts, "long") || (typeof ts === "string" ? ts : "—");
 }
 
 function fmtTimeStandard(timeStr: string | any): string {

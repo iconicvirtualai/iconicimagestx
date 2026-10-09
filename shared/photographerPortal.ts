@@ -6,6 +6,7 @@
  */
 
 import { recordAddressText } from "./addressText.ts";
+import { calendarDateKey, formatChicagoDate } from "./clientHome.ts";
 import { iconicStudioHref, isRawStudioFile } from "./iconicStudio";
 
 const CHICAGO = "America/Chicago";
@@ -191,7 +192,8 @@ function buildJob(
   const listingStatus = asText(listing.status).toLowerCase().replace(/\s+/g, "_");
   const address = photographerAddress(listing);
   const appointment = readListingAppointment(listing);
-  const when = appointmentBucket(appointment, today);
+  const appointmentDay = listingAppointmentDay(listing);
+  const when = appointmentBucket(appointmentDay, today);
   const imageCount = Array.isArray(listing.images) ? listing.images.length : 0;
   const studio = rollupStudio(id, imageCount, studioJobs);
   const action = decideAction({ listingStatus, when, imageCount, studio });
@@ -202,7 +204,7 @@ function buildJob(
     listingStatus,
     officeStatus: listingStatus ? listingStatus.replace(/_/g, " ") : "not set",
     when,
-    dateLabel: appointment ? formatPortalDate(appointment) : "No shoot time",
+    dateLabel: appointmentDay ? formatChicagoDate(appointmentDay, "compact") || "No shoot time" : "No shoot time",
     timeLabel: asText(listing.apptTime) || "Time not set",
     durationLabel: durationLabel(listing.appointmentDuration),
     servicesLabel: servicesLabel(listing.services),
@@ -438,20 +440,18 @@ function readListingAppointment(listing: PhotographerListingInput): Date | null 
   return null;
 }
 
-function appointmentBucket(date: Date | null, today: string): PhotographerWhen {
-  if (!date) return "unscheduled";
-  const key = chicagoDateKey(date);
-  if (key === today) return "today";
-  return key > today ? "upcoming" : "past";
+function listingAppointmentDay(listing: PhotographerListingInput): string | null {
+  for (const field of DATE_FIELDS) {
+    const day = calendarDateKey(listing[field]);
+    if (day) return day;
+  }
+  return null;
 }
 
-function formatPortalDate(date: Date): string {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: CHICAGO,
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  }).format(date);
+function appointmentBucket(day: string | null, today: string): PhotographerWhen {
+  if (!day) return "unscheduled";
+  if (day === today) return "today";
+  return day > today ? "upcoming" : "past";
 }
 
 function servicesLabel(services: unknown): string {

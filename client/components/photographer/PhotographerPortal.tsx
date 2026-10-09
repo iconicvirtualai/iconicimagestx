@@ -123,12 +123,13 @@ export function PhotographerPortal({
         <Stat label="In Studio" value={summary.inStudio} />
       </div>
 
-      <div role="tablist" aria-label="Photographer jobs" className="mb-6 flex gap-1 overflow-x-auto rounded-2xl bg-gray-100 p-1">
+      <div role="tablist" aria-label="Photographer jobs" className="mb-6 flex w-full min-w-0 flex-wrap gap-1 rounded-2xl bg-gray-100 p-1">
         {TABS.map((item) => (
           <button
             key={item.id}
             type="button"
             role="tab"
+            data-testid={`photographer-tab-${item.id}`}
             aria-selected={tab === item.id}
             onClick={() => onTab(item.id)}
             className={`shrink-0 whitespace-nowrap rounded-xl px-5 py-2 text-[10px] font-black uppercase tracking-widest ${tab === item.id ? "bg-white text-black shadow-sm" : "text-gray-400 hover:text-gray-700"}`}

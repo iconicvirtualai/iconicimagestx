@@ -15,6 +15,7 @@ import {
   LayoutGrid,
 } from "lucide-react";
 import { recordAddressText } from "@shared/addressText";
+import { formatChicagoDate } from "@shared/clientHome";
 import { db } from "@/lib/firebase";
 import {
   collection,
@@ -436,7 +437,7 @@ export default function AdminDashboard() {
                   </div>
                   <div className="flex items-center justify-between">
                     <p className="text-[10px] text-gray-500 truncate">{recordAddressText(r) || "Consultation"}</p>
-                    <p className="text-[10px] text-gray-600 flex-shrink-0 ml-2">{new Date(r.createdAt?.toDate ? r.createdAt.toDate() : r.createdAt).toLocaleDateString()}</p>
+                    <p className="text-[10px] text-gray-600 flex-shrink-0 ml-2">{formatChicagoDate(r.createdAt?.toDate ? r.createdAt.toDate() : r.createdAt) || ""}</p>
                   </div>
                 </div>
               ))}

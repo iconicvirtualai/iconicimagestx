@@ -11,6 +11,7 @@ import {
   Star, Check, Layers, Zap,
 } from "lucide-react";
 import { addressText } from "@shared/addressText";
+import { formatChicagoDate } from "@shared/clientHome";
 import { clientGalleryDownloadsUnlocked, studioOffersDownloads } from "@shared/paymentAccess";
 import { GalleryDownloadLockNotice } from "@/components/GalleryDownloadLock";
 
@@ -364,7 +365,7 @@ export default function ClientStudio() {
                       </span>
                       <span className="text-[10px] text-gray-400">{r.type === "single" ? `Photo #${(r.photoIndex || 0) + 1}` : "Full Gallery"}</span>
                     </div>
-                    <span className="text-[10px] text-gray-400">{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ""}</span>
+                    <span className="text-[10px] text-gray-400">{formatChicagoDate(r.createdAt) || ""}</span>
                   </div>
                   <p className="text-sm text-gray-700">{r.description}</p>
                 </div>

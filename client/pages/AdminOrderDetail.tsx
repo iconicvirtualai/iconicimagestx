@@ -16,6 +16,7 @@ import {
   LIFE_OF_THE_LISTING_CARE_SUMMARY_LABEL,
 } from "@shared/lifeOfTheListingCare";
 import { addressText } from "@shared/addressText";
+import { formatChicagoDate } from "@shared/clientHome";
 import { staffInvoicePath } from "@shared/staffInvoice";
 import { orderChargeSummary, orderServiceLines } from "@shared/orderPackageLines";
 import type { GalleryReleaseReport } from "@shared/galleryRelease";
@@ -41,10 +42,8 @@ function fmtAddress(addr: unknown): string {
   return addressText(addr) || "—";
 }
 
-function fmtDate(ts: any): string {
-  if (!ts) return "—";
-  if (ts.toDate) return ts.toDate().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
-  return new Date(ts).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+function fmtDate(ts: unknown): string {
+  return formatChicagoDate(ts, "weekday") || "—";
 }
 
 function fmtCurrency(n: number): string {

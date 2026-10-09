@@ -6,7 +6,7 @@
 
 import { addressText } from "./addressText.ts";
 import { frameFromListingImage } from "./iconicStudio";
-import { clientGalleryDownloadsUnlocked } from "./paymentAccess";
+import { clientGalleryDownloadsUnlocked, lockDownloadsOn, requirePaymentOn } from "./paymentAccess";
 
 export const RELEASED_GALLERY_STATUSES = ["delivered", "approved"] as const;
 
@@ -268,8 +268,8 @@ function publicProject(listing: GalleryLinkDoc, _related: GalleryLinkDoc[], noti
     videos: publicVideos(listing),
     tourUrl: httpUrl(listing.tourUrl),
     revisions: publicRevisions(listing),
-    lockDownloads: listing.lockDownloads === true,
-    requirePayment: listing.requirePayment === true,
+    lockDownloads: lockDownloadsOn(listing.lockDownloads),
+    requirePayment: requirePaymentOn(listing.requirePayment),
     downloadsUnlocked: clientGalleryDownloadsUnlocked({
       invoice,
       downloadEnabled: listing.downloadEnabled,

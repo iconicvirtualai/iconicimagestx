@@ -9,6 +9,7 @@ import { Router } from "express";
 import admin from "firebase-admin";
 import { requireStaff, requireCoordinator, type AuthenticatedRequest } from "../middleware/auth";
 import { recordAddressText } from "../../shared/addressText";
+import { bookingDateLabel } from "../../shared/clientHome";
 import { sendSMS, SMS_TEMPLATES, normalisePhone } from "../services/sms";
 
 const router = Router();
@@ -267,7 +268,7 @@ async function runReminderSweep(req: any, res: any) {
 
         const body = type === "1h"
           ? SMS_TEMPLATES.appointmentReminder1h(name, String(time))
-          : SMS_TEMPLATES.appointmentReminder24h(name, scheduledDate.toLocaleDateString("en-US"), String(time), address);
+          : SMS_TEMPLATES.appointmentReminder24h(name, bookingDateLabel(scheduledDate, "your scheduled date"), String(time), address);
 
         try {
           const result = await sendSMS({ to: String(phone), body });

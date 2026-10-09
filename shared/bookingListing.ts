@@ -65,7 +65,22 @@ interface ClientMatch {
   emails: string[];
 }
 
-const NEVER_FILL = new Set(["images", "createdAt", "source", "id"]);
+const NEVER_FILL = new Set([
+  "images",
+  "createdAt",
+  "source",
+  "id",
+  "lockDownloads",
+  "requirePayment",
+  "lockStudio",
+]);
+
+/** New booking projects start locked until the invoice is paid. Existing rows are not rewritten. */
+export const NEW_BOOKING_LOCKS = {
+  lockDownloads: true,
+  requirePayment: true,
+  lockStudio: false,
+} as const;
 
 export function isPortalListingId(value: string): boolean {
   return PORTAL_LISTING_ID.test(value);
@@ -180,10 +195,11 @@ export function planBookingListingGroup(
   const listingId = existing?.id || group.stableId;
   if (!isPortalListingId(listingId)) return null;
   const desired = desiredListingFields(group, identity);
+  const createFields = existing ? desired : { ...desired, ...NEW_BOOKING_LOCKS };
   return {
     listingId,
     create: !existing,
-    createFields: desired,
+    createFields,
     fillFields: existing ? fillEmptyListingFields(existing.data, desired) : {},
     links: linksFor(group, listingId, cleanDocs(existingListings), clients),
   };
