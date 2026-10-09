@@ -483,8 +483,7 @@ export function resolvePackageSkin(value: unknown): PackageSkin | null {
 export function resolvePackageSkinFromOrder(data: Record<string, unknown>): PackageSkin | null {
   for (const key of DIRECT_PACKAGE_KEYS) {
     if (!hasValue(data[key])) continue;
-    const skin = resolvePackageSkin(data[key]);
-    if (skin) return skin;
+    return resolvePackageSkin(data[key]);
   }
   const look = bestLook(data.serviceIds, data.services, data.lineItems, data.selectedBasics);
   return look ? packageSkin(look) : null;

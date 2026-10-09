@@ -105,9 +105,9 @@ export function officeNewOrderEmail(
 
   const subjectCore = `New order ${orderNumber} — ${packageName} — ${address === NOT_PROVIDED ? NOT_PROVIDED : addressText(saved.address) || address} — ${requestedDate}`;
   const subject = isTestOrder(clientName, notes) ? `[TEST] ${subjectCore}` : subjectCore;
-  const text = fields.map(([label, value]) => `${label}: ${value}`).join("\n");
+  const plain = fields.map(([label, value]) => `${label}: ${value}`).join("\n");
   const html = `<div style="font-family:Arial,sans-serif;max-width:640px;color:#111"><h1 style="font-size:18px">${escapeHtml(subject)}</h1><table style="width:100%;border-collapse:collapse">${fields.map(([label, value]) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:bold;vertical-align:top">${escapeHtml(label)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:pre-wrap">${escapeHtml(value)}</td></tr>`).join("")}</table></div>`;
-  return { subject, text, html };
+  return { subject, text: plain, html };
 }
 
 export function officeOrderEmailFieldLabels(): readonly string[] {
@@ -220,11 +220,8 @@ export function describeDeliverables(features: string[]): {
 }
 
 function featureMatch(features: string[], pattern: RegExp): string {
-  for (const feature of features) {
-    const match = feature.match(pattern);
-    if (match?.[1] || match?.[0]) return (match[1] || match[0]).trim();
-  }
-  return NOT_PROVIDED;
+  const hit = features.find((feature) => pattern.test(feature));
+  return hit ? hit.trim() : NOT_PROVIDED;
 }
 
 function isAddOn(line: OrderServiceLine, catalog: StaffCatalogPackage[]): boolean {

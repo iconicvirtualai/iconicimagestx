@@ -6,6 +6,7 @@ vi.mock("./email", () => ({
 }));
 
 import { sendEmail } from "./email";
+import type { OrderPackageRepair } from "../../shared/orderPackageRepair";
 import { notifyOfficeOfOrder } from "./officeOrderNotify";
 import { runOrderPackageBackfill } from "./orderPackageRepair";
 
@@ -78,7 +79,7 @@ describe("office new order delivery", () => {
 describe("order package backfill", () => {
   it("repairs empty lines and sends nothing", async () => {
     sendEmailMock.mockClear();
-    const write = vi.fn(async () => undefined);
+    const write = vi.fn(async (_patch: OrderPackageRepair) => undefined);
     const result = await runOrderPackageBackfill({
       id: "6y4F0RVWBQw5z5IJxbWe",
       clientName: "TEST ORDER Sytoya",
@@ -90,7 +91,7 @@ describe("order package backfill", () => {
     }, write);
     expect(result.updated).toBe(true);
     expect(write).toHaveBeenCalledTimes(1);
-    expect(write.mock.calls[0][0].lineItems[0]).toMatchObject({ name: "Hollywood", price: 199 });
+    expect(write.mock.calls[0]?.[0]?.lineItems[0]).toMatchObject({ name: "Hollywood", price: 199 });
     expect(sendEmailMock).not.toHaveBeenCalled();
 
     const repairSource = readFileSync(new URL("./orderPackageRepair.ts", import.meta.url), "utf8");

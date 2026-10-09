@@ -406,17 +406,17 @@ export function resolveSubmittedBooking(
     catalog: list,
   });
 
-  const posted = pricedPostedLines(body.lineItems);
+  const pricedPosted = pricedPostedLines(body.lineItems);
   const unresolved = [selectedService, ...selectedBasics, ...selectedAddOns]
     .filter((label) => label && !findCatalogItem(list, label));
   for (const label of unresolved) {
-    const fallback = fallbackSubmittedLine(label, posted, body);
+    const fallback = fallbackSubmittedLine(label, pricedPosted, body);
     if (!fallback) continue;
     lineItems = insertServiceLine(lineItems, fallback);
   }
 
   if (chargedServiceLines(lineItems).length === 0) {
-    const temporary = posted.map((item) => adoptPostedLine(list, item));
+    const temporary = pricedPosted.map((item) => adoptPostedLine(list, item));
     const alreadyDiscounted = temporary.some((item) => {
       const id = String(item.id || "");
       return id.startsWith("promo-") || item.name.startsWith("Promo Code:");
@@ -465,7 +465,7 @@ export function resolveSubmittedBooking(
   };
 }
 
-export function chargedServiceLines(items: Array<{ id?: string; name?: string }>): Array<{ id?: string; name?: string }> {
+export function chargedServiceLines<T extends { id?: string; name?: string }>(items: T[]): T[] {
   return items.filter((item) => {
     const id = String(item.id || "");
     const name = String(item.name || "");
