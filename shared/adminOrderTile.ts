@@ -6,6 +6,7 @@
 
 import { addressText, calendarDateKey } from "./clientHome.ts";
 import { formatShootDateLabel } from "./listingCard.ts";
+import { cleanPackageName, orderChargeSummary, orderServiceLines } from "./orderPackageLines.ts";
 import {
   clientSkinLabel,
   packagePriceDisplay,
@@ -67,13 +68,17 @@ const DELIVERY_LABEL: Record<AdminDeliveryState, AdminOrderTileModel["deliveryLa
 };
 
 export function buildAdminOrderTile(record: Record<string, unknown>): AdminOrderTileModel {
-  const skin = resolvePackageSkinFromOrder(record);
-  const kind = orderKind(record, skin);
-  const studio = kind === "business" ? studioFromRecord(record) : null;
+  const lines = orderServiceLines(record);
+  const priced = lines.length > 0 ? { ...record, lineItems: lines, services: lines } : record;
+  const skin = resolvePackageSkinFromOrder(priced);
+  const kind = orderKind(priced, skin);
+  const studio = kind === "business" ? studioFromRecord(priced) : null;
   const heroUrl = heroFromRecord(record) || (kind === "business" ? BUSINESS_HERO : LISTING_HERO);
   const paid = paidState(record);
   const delivery = deliveryState(record);
-  const packageName = skin?.title || "Custom order";
+  const named = lines[0] ? cleanPackageName(lines[0].name) : "";
+  const packageName = skin?.title || named || "Custom order";
+  const charges = orderChargeSummary(record, lines);
   return {
     id: text(record.id) || packageName,
     orderCode: orderCode(kind, record),
@@ -83,7 +88,7 @@ export function buildAdminOrderTile(record: Record<string, unknown>): AdminOrder
     heroAlt: `${packageName} order`,
     packageName,
     skinLabel: skin ? clientSkinLabel(skin) : "Client skin: Custom",
-    priceLabel: skin ? packagePriceDisplay(skin) : "—",
+    priceLabel: skin ? packagePriceDisplay(skin) : (lines.length > 0 || charges.total > 0 ? tilePrice(charges.total) : "—"),
     priceNote: skin?.priceNote || "",
     paid,
     paidLabel: PAID_LABEL[paid],
@@ -180,7 +185,16 @@ function clientName(record: Record<string, unknown>): string {
 function appointmentLabel(record: Record<string, unknown>): string {
   const raw = record.appointmentDate ?? record.apptDate ?? record.scheduledDate ?? record.requestedDate;
   const key = calendarDateKey(raw);
-  return formatShootDateLabel(key, typeof raw === "string" ? raw : undefined) || "—";
+  const date = formatShootDateLabel(key, typeof raw === "string" ? raw : undefined);
+  const time = text(record.scheduledTime || record.appointmentTime || record.requestedTime);
+  const photographer = text(record.assignedPhotographerName || record.photographerName || record.photographerPreference);
+  return [date, time, photographer].filter(Boolean).join(" · ") || "—";
+}
+
+function tilePrice(amount: number): string {
+  const rounded = Math.round(amount * 100) / 100;
+  if (Number.isInteger(rounded)) return `$${rounded.toLocaleString("en-US")}`;
+  return `$${rounded.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function locationLabel(kind: PackageKind, record: Record<string, unknown>): string {

@@ -60,13 +60,31 @@ describe("admin order tiles share packageSkins", () => {
     expect(tile.studio).toBe("offsite");
   });
 
-  it("leaves foundation off the catalog instead of inventing a price", () => {
+  it("leaves foundation off the catalog and shows the stored package and price", () => {
     const record = { package: "The Foundation", total: 100, projectType: "business" };
     expect(resolvePackageSkinFromOrder(record)).toBeNull();
     expect(buildAdminOrderTile(record)).toMatchObject({
-      packageName: "Custom order",
+      packageName: "The Foundation",
       skinLabel: "Client skin: Custom",
-      priceLabel: "—",
+      priceLabel: "$100",
     });
+  });
+
+  it("shows a Hollywood booking from its package label and price when it is not a client skin", () => {
+    const tile = buildAdminOrderTile({
+      id: "6y4F0RVWBQw5z5IJxbWe",
+      selectedService: "Hollywood — $199",
+      total: 199,
+      clientName: "Sytoya Harvin",
+      scheduledDate: "2026-10-12",
+      scheduledTime: "Morning",
+      photographerPreference: "Armando",
+      services: [],
+    });
+    expect(tile.packageName).toBe("Hollywood");
+    expect(tile.priceLabel).toBe("$199");
+    expect(tile.appointmentDate).toContain("10.12.2026");
+    expect(tile.appointmentDate).toContain("Morning");
+    expect(tile.appointmentDate).toContain("Armando");
   });
 });

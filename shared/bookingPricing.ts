@@ -45,10 +45,48 @@ function chargeCatalog(input: BookingPriceInput): StaffCatalogPackage[] {
   return input.catalog ?? packagesForStaffEditor([]);
 }
 
+function catalogMatchKey(raw: string): string {
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/[—–]/g, " ")
+    .replace(/\$/g, " ")
+    .replace(/[_/]+/g, " ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function stripTrailingPrice(key: string): string {
+  return key.replace(/\s+\d+\s+video$/, "").replace(/\s+\d[\d\s]*$/, "").trim();
+}
+
+function labeledPrice(raw: string): number | undefined {
+  const match = raw.match(/\$\s*([0-9][0-9,]*)/);
+  if (!match) return undefined;
+  const amount = Number(match[1].replace(/,/g, ""));
+  return Number.isFinite(amount) ? amount : undefined;
+}
+
 function findCatalogItem(catalog: StaffCatalogPackage[], id: string): StaffCatalogPackage | undefined {
   const key = id.trim();
   if (!key) return undefined;
-  return catalog.find((item) => item.isActive !== false && (item.id === key || item.bookingId === key));
+  const active = catalog.filter((item) => item.isActive !== false);
+  const direct = active.find((item) => item.id === key || item.bookingId === key);
+  if (direct) return direct;
+
+  const wanted = catalogMatchKey(key);
+  const stripped = stripTrailingPrice(wanted);
+  const matches = active.filter((item) => {
+    const name = catalogMatchKey(item.name);
+    const title = item.cardTitle ? catalogMatchKey(item.cardTitle) : "";
+    return name === wanted || name === stripped || (title !== "" && (title === wanted || title === stripped));
+  });
+  if (matches.length === 1) return matches[0];
+  const price = labeledPrice(key);
+  if (price == null) return undefined;
+  const priced = matches.filter((item) => item.price === price);
+  return priced.length === 1 ? priced[0] : undefined;
 }
 
 function roundMoney(value: number): number {
@@ -65,7 +103,7 @@ function catalogLineName(pkg: StaffCatalogPackage, qty = 1): string {
   return pkg.name;
 }
 
-function pushCatalogLine(items: BookingLineItem[], pkg: StaffCatalogPackage, qty = 1): void {
+function catalogLine(pkg: StaffCatalogPackage, qty = 1): BookingLineItem {
   const count = qty > 0 ? qty : 1;
   const unitPrice = roundMoney(pkg.price);
   const line: BookingLineItem = {
@@ -79,7 +117,15 @@ function pushCatalogLine(items: BookingLineItem[], pkg: StaffCatalogPackage, qty
   if (pkg.category) line.category = pkg.category;
   if (pkg.bookingKind) line.bookingKind = pkg.bookingKind;
   if (pkg.tier) line.tier = pkg.tier;
-  items.push(line);
+  return line;
+}
+
+function pushCatalogLine(items: BookingLineItem[], pkg: StaffCatalogPackage, qty = 1): void {
+  items.push(catalogLine(pkg, qty));
+}
+
+function warnUncatalogedPackage(name: string, price: number): void {
+  console.warn(`[Bookings] Package not in catalog; keeping submitted line "${name}" at ${price}.`);
 }
 
 /** True once the customer has picked something the catalog can price. */
@@ -252,6 +298,62 @@ function pricedPostedLines(items: unknown): BookingLineItem[] {
   });
 }
 
+function nestedTotal(pricing: unknown): number | undefined {
+  if (!pricing || typeof pricing !== "object") return undefined;
+  return rawPrice((pricing as { total?: unknown }).total);
+}
+
+function postedLineForLabel(label: string, posted: BookingLineItem[]): BookingLineItem | undefined {
+  const wanted = catalogMatchKey(label);
+  const stripped = stripTrailingPrice(wanted);
+  return posted.find((item) => {
+    const name = catalogMatchKey(item.name);
+    return name === wanted || name === stripped || stripTrailingPrice(name) === stripped;
+  });
+}
+
+function adoptPostedLine(catalog: StaffCatalogPackage[], item: BookingLineItem): BookingLineItem {
+  const match = (item.id && findCatalogItem(catalog, item.id)) || findCatalogItem(catalog, item.name);
+  if (match) return catalogLine(match, item.qty);
+  warnUncatalogedPackage(item.name, item.price);
+  return item;
+}
+
+function fallbackSubmittedLine(
+  label: string,
+  posted: BookingLineItem[],
+  body: Record<string, unknown>,
+): BookingLineItem | null {
+  const match = postedLineForLabel(label, posted);
+  const price = match?.price ?? labeledPrice(label) ?? (
+    chargedServiceLines(posted).length === 0
+      ? rawPrice(body.total) ?? nestedTotal(body.pricing)
+      : undefined
+  );
+  if (price == null) return null;
+  const name = match?.name?.trim() || label;
+  warnUncatalogedPackage(name, price);
+  return {
+    name,
+    unitPrice: match?.unitPrice ?? price,
+    qty: match?.qty || 1,
+    price,
+  };
+}
+
+function insertServiceLine(items: BookingLineItem[], line: BookingLineItem): BookingLineItem[] {
+  const key = catalogMatchKey(line.name);
+  if (items.some((item) => catalogMatchKey(item.name) === key || catalogMatchKey(item.id || "") === key)) {
+    return items;
+  }
+  const promoAt = items.findIndex((item) => {
+    const id = String(item.id || "");
+    return id.startsWith("promo-") || item.name.startsWith("Promo Code:");
+  });
+  if (promoAt === -1) return [...items, line];
+  return [...items.slice(0, promoAt), line, ...items.slice(promoAt)];
+}
+
 /**
  * Rebuild a public booking from the catalog.
  * Client line prices are ignored when a catalog id matches. Selection ids, and
@@ -304,8 +406,17 @@ export function resolveSubmittedBooking(
     catalog: list,
   });
 
+  const pricedPosted = pricedPostedLines(body.lineItems);
+  const unresolved = [selectedService, ...selectedBasics, ...selectedAddOns]
+    .filter((label) => label && !findCatalogItem(list, label));
+  for (const label of unresolved) {
+    const fallback = fallbackSubmittedLine(label, pricedPosted, body);
+    if (!fallback) continue;
+    lineItems = insertServiceLine(lineItems, fallback);
+  }
+
   if (chargedServiceLines(lineItems).length === 0) {
-    const temporary = pricedPostedLines(body.lineItems);
+    const temporary = pricedPosted.map((item) => adoptPostedLine(list, item));
     const alreadyDiscounted = temporary.some((item) => {
       const id = String(item.id || "");
       return id.startsWith("promo-") || item.name.startsWith("Promo Code:");
@@ -326,6 +437,20 @@ export function resolveSubmittedBooking(
     }
   }
 
+  if (chargedServiceLines(lineItems).length === 0 && selectedService) {
+    const submitted = rawPrice(body.total) ?? nestedTotal(body.pricing) ?? labeledPrice(selectedService);
+    if (submitted != null) {
+      const name = selectedService;
+      warnUncatalogedPackage(name, submitted);
+      lineItems = insertServiceLine(lineItems, {
+        name,
+        unitPrice: submitted,
+        qty: 1,
+        price: submitted,
+      });
+    }
+  }
+
   return {
     lineItems,
     total: roundMoney(sumLineItemPrices(lineItems)),
@@ -340,7 +465,7 @@ export function resolveSubmittedBooking(
   };
 }
 
-export function chargedServiceLines(items: Array<{ id?: string; name?: string }>): Array<{ id?: string; name?: string }> {
+export function chargedServiceLines<T extends { id?: string; name?: string }>(items: T[]): T[] {
   return items.filter((item) => {
     const id = String(item.id || "");
     const name = String(item.name || "");

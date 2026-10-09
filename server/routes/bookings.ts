@@ -16,7 +16,9 @@ import { clientNotifyBlockReason, clientNotifyLive } from "../../shared/clientNo
 import { lifeOfTheListingCareSelected } from "../../shared/lifeOfTheListingCare";
 import { buildBookingInvoiceDraft, existingInvoiceId } from "../../shared/bookingInvoice";
 import { nextSequentialInvoiceNumber, planInvoiceLink } from "../../shared/orderProjectInvoice";
-import { chargedServiceLines, orderTotalLabel, resolveSubmittedBooking } from "../../shared/bookingPricing";
+import { chargedServiceLines, normalizeBookingLineItems, orderTotalLabel, resolveSubmittedBooking, sumLineItemPrices } from "../../shared/bookingPricing";
+import { planOrderPackageRepair } from "../../shared/orderPackageRepair";
+import { notifyOfficeOfOrder } from "../services/officeOrderNotify";
 import { packagesForStaffEditor } from "../../shared/bookingCatalog";
 import { normalizeEmail } from "../../shared/listingAccess";
 import { storedServiceLocationFields } from "../../shared/serviceLocation";
@@ -386,9 +388,25 @@ router.post("/", async (req, res) => {
       }
     }
 
+    let officeAlertStatus: "sent" | "failed" | "skipped" = "skipped";
+    try {
+      const savedSnap = await docRef.get();
+      const savedOrder = { id: savedSnap.id, ...(savedSnap.data() || {}) } as Record<string, unknown>;
+      const alert = await notifyOfficeOfOrder({
+        isNewOrder: true,
+        saved: savedOrder,
+        adminUrl: `${appUrl()}/admin/order-request/${savedSnap.id}`,
+      });
+      officeAlertStatus = alert.sent ? "sent" : "skipped";
+    } catch (err) {
+      console.error("[Bookings] Office new-order email failed:", err);
+      officeAlertStatus = "failed";
+    }
+
     const notifications = {
       appointmentEmail: clientEmailStatus,
       officeEmail: officeEmailStatus,
+      officeAlert: officeAlertStatus,
       sms: smsStatus,
       passwordSetup: passwordSetupStatus,
       accountCreated: account.createdAccount,
@@ -508,12 +526,13 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       longitude: locationFields.longitude,
       placeId: locationFields.placeId,
     };
-    const requestLineItems = Array.isArray(request.lineItems) && request.lineItems.length > 0
-      ? request.lineItems
-      : Array.isArray(request.services)
-        ? request.services.map((service: unknown) => typeof service === "string" ? { name: service, price: 0 } : service)
-        : [];
-    const requestTotal = Number(request.total ?? request.pricing?.total ?? 0) || 0;
+    const requestLineItems = linesForConfirmedOrder(request);
+    const lineSum = sumLineItemPrices(requestLineItems.filter((item) => {
+      const id = String(item.id || "");
+      return !id.startsWith("promo-") && !item.name.startsWith("Promo Code:");
+    }));
+    const requestTotal = Number(request.total ?? request.pricing?.total ?? lineSum) || lineSum;
+    const requestSubtotal = lineSum || Number(request.pricing?.subtotal) || requestTotal;
     const confirmDate = toDate(scheduledDate || request.scheduledDate || request.appointmentDate || request.requestedDate);
     const confirmTime = scheduledTime || request.scheduledTime || request.appointmentTime || request.requestedTime || null;
 
@@ -588,8 +607,11 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       addressLabel: requestAddressLabel,
       ...storedPin,
       services: requestLineItems,
+      lineItems: requestLineItems,
+      selectedService: request.selectedService || null,
       addOns: [],
-      pricing: request.pricing || {},
+      subtotal: requestSubtotal,
+      pricing: { ...(request.pricing || {}), subtotal: requestSubtotal, tax: Number(request.pricing?.tax) || 0, total: requestTotal },
       total: requestTotal,
       depositPaid: 0,
       balanceDue: requestTotal,
@@ -733,7 +755,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       const draft = buildBookingInvoiceDraft({
         lineItems: requestLineItems,
         total: requestTotal,
-        pricing: request.pricing,
+        pricing: { subtotal: requestSubtotal, tax: Number(request.pricing?.tax) || 0 },
         clientEmail: requestEmail,
         clientId,
         clientName: requestClientName,
@@ -865,6 +887,17 @@ async function stampDurableLinks(input: {
   if (input.listingId && plan.listingFields) {
     await db().collection("listings").doc(input.listingId).update({ ...plan.listingFields, updatedAt: now });
   }
+}
+
+function linesForConfirmedOrder(request: Record<string, unknown>) {
+  const raw = Array.isArray(request.lineItems) && request.lineItems.length > 0
+    ? request.lineItems
+    : Array.isArray(request.services)
+      ? request.services.map((service: unknown) => typeof service === "string" ? { name: service, price: 0 } : service)
+      : [];
+  const stored = normalizeBookingLineItems(raw).filter((item) => item.name.trim());
+  if (chargedServiceLines(stored).length > 0) return stored;
+  return planOrderPackageRepair(request)?.lineItems ?? stored;
 }
 
 async function linkClientIdByEmail(email: string): Promise<string | null> {

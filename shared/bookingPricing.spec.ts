@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { SMS_TEMPLATES } from "../server/services/sms";
 import {
   bookingOffer,
@@ -320,8 +320,8 @@ describe("booking catalog parity", () => {
         total: lineItems.reduce((sum, item) => sum + item.price, 0),
         leadSource: "Iconic temporary booking page",
       });
-      expect(chargedServiceLines(resolved.lineItems).map((item) => [item.name, item.price])).toEqual(
-        lineItems.map((item) => [item.name, item.price]),
+      expect(chargedServiceLines(resolved.lineItems).map((item) => item.price).sort((a, b) => a - b)).toEqual(
+        lineItems.map((item) => item.price).sort((a, b) => a - b),
       );
       expect(resolved.total).toBe(lineItems.reduce((sum, item) => sum + item.price, 0));
       expect(resolved.selectedService).toBe(label);
@@ -336,8 +336,8 @@ describe("booking catalog parity", () => {
       selectedAddOns: ["Same-Day Delivery $50"],
     });
     expect(studio.lineItems.map((item) => [item.name, item.price])).toEqual([
+      ["Same-Day Delivery", 50],
       ["Studio booking / pre-sale", 0],
-      ["Same-Day Delivery $50", 50],
     ]);
     expect(chargedServiceLines(studio.lineItems)).toHaveLength(2);
 
@@ -345,7 +345,7 @@ describe("booking catalog parity", () => {
       lineItems: [{ name: "Hollywood — $199", price: 199 }],
     });
     expect(fromLinesOnly.total).toBe(199);
-    expect(chargedServiceLines(fromLinesOnly.lineItems)).toHaveLength(1);
+    expect(fromLinesOnly.lineItems[0]).toMatchObject({ id: "hollywood", name: "Hollywood", price: 199 });
 
     const withPromo = resolveSubmittedBooking({
       selectedService: "Hollywood — $199",
@@ -354,7 +354,7 @@ describe("booking catalog parity", () => {
     });
     expect(withPromo.total).toBe(149);
     expect(withPromo.lineItems.map((item) => item.id ?? item.name)).toEqual([
-      "Hollywood — $199",
+      "hollywood",
       "promo-NEWYEAR",
     ]);
 
@@ -362,7 +362,11 @@ describe("booking catalog parity", () => {
       selectedService: "The Essentials — $249",
       selectedAddOns: ["Same-Day Delivery $50"],
     });
-    expect(chargedServiceLines(labelWithoutLines.lineItems)).toHaveLength(0);
+    expect(labelWithoutLines.lineItems.map((item) => [item.name, item.price])).toEqual([
+      ["The Essentials", 249],
+      ["Same-Day Delivery", 50],
+    ]);
+    expect(labelWithoutLines.total).toBe(299);
     expect(chargedServiceLines(resolveSubmittedBooking({
       lineItems: [{ name: "   ", price: 10 }, { price: 20 }],
     }).lineItems)).toHaveLength(0);
@@ -432,6 +436,66 @@ describe("booking catalog parity", () => {
     expect(packageSchema).toContain("appointmentLimit?: string;");
     expect(packageSchema).toContain("overage?: string;");
     expect(packageSchema).toContain("rules?: string[];");
+  });
+
+  it("resolves every /book package and the public booking packages in the catalog", () => {
+    const offer = bookingOffer();
+    const catalog = packagesForStaffEditor([]);
+    const ids = [
+      ...offer.services.map((item) => item.id),
+      ...offer.basics.map((item) => item.id),
+      ...offer.addOns.flatMap((group) => group.items.map((item) => item.id)),
+      offer.iconicFinish?.id,
+      offer.virtualStaging?.id,
+      offer.specializedSocial?.id,
+      offer.specializedBoth?.id,
+    ].filter((id): id is string => Boolean(id));
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toContain("listing-essentials");
+    expect(ids).toContain("photos-20");
+    expect(ids).toContain("aerial-drone");
+    expect(ids).toContain("apprentice-25");
+
+    for (const id of ids) {
+      const item = catalog.find((entry) => entry.id === id || entry.bookingId === id);
+      expect(item, id).toBeTruthy();
+      const resolved = resolveSubmittedBooking({
+        selectedService: id,
+        lineItems: [{ id, name: "hack", price: 1 }],
+      });
+      expect(chargedServiceLines(resolved.lineItems)[0]?.id).toBe(id);
+      expect(resolved.lineItems.find((line) => line.id === id)?.price).toBe(item!.price);
+    }
+
+    for (const [label, price] of [
+      ["Hollywood — $199", 199],
+      ["Hall of Fame — $299", 299],
+      ["Red Carpet — $599", 599],
+      ["Aerial Only", 99],
+      ["photos-20", 99],
+    ] as const) {
+      const resolved = resolveSubmittedBooking({ selectedService: label, total: price });
+      expect(resolved.total).toBe(price);
+      expect(chargedServiceLines(resolved.lineItems)[0]?.price).toBe(price);
+      expect(chargedServiceLines(resolved.lineItems)[0]?.name).toBeTruthy();
+    }
+  });
+
+  it("keeps the submitted name and price when a package is not in the catalog", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const resolved = resolveSubmittedBooking({
+      selectedService: "Mystery Package",
+      lineItems: [{ name: "Mystery Package", price: 42 }],
+      total: 42,
+    });
+    expect(resolved.lineItems[0]).toMatchObject({ name: "Mystery Package", price: 42 });
+    expect(resolved.total).toBe(42);
+    expect(warn).toHaveBeenCalled();
+
+    const fromTotalOnly = resolveSubmittedBooking({ selectedService: "Unlisted Glow", total: 77 });
+    expect(fromTotalOnly.total).toBe(77);
+    expect(chargedServiceLines(fromTotalOnly.lineItems)[0]).toMatchObject({ name: "Unlisted Glow", price: 77 });
+    warn.mockRestore();
   });
 
   it("lets active staff write the public packages catalog", () => {

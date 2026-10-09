@@ -8,7 +8,7 @@ import {
   Camera, AlertCircle, Plus, Minus, Save, Printer, ExternalLink,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { doc, onSnapshot, updateDoc, serverTimestamp, collection, getDocs, query, where } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc, serverTimestamp, collection, getDoc, getDocs, query, where } from "firebase/firestore";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -16,6 +16,7 @@ import {
   LIFE_OF_THE_LISTING_CARE_SUMMARY_LABEL,
 } from "@shared/lifeOfTheListingCare";
 import { staffInvoicePath } from "@shared/staffInvoice";
+import { orderChargeSummary, orderServiceLines } from "@shared/orderPackageLines";
 import type { GalleryReleaseReport } from "@shared/galleryRelease";
 
 // ─── Status system ────────────────────────────────────────────────────────────
@@ -73,6 +74,7 @@ export default function AdminOrderDetail() {
   const [showCancel, setShowCancel] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<"details"|"invoice"|"gallery"|"history">("details");
   const [release, setRelease] = React.useState<GalleryReleaseReport | null>(null);
+  const [linkedRequest, setLinkedRequest] = React.useState<Record<string, unknown> | null>(null);
 
   // Staff for assignment
   const [staff, setStaff] = React.useState<any[]>([]);
@@ -116,6 +118,19 @@ export default function AdminOrderDetail() {
     });
     return () => unsub();
   }, [id, navigate]);
+
+  React.useEffect(() => {
+    const requestId = typeof order?.orderRequestId === "string" ? order.orderRequestId.trim() : "";
+    if (!order || !requestId || orderServiceLines(order).length > 0) {
+      setLinkedRequest(null);
+      return;
+    }
+    let cancelled = false;
+    getDoc(doc(db, "orderRequests", requestId)).then((snap) => {
+      if (!cancelled && snap.exists()) setLinkedRequest({ id: snap.id, ...snap.data() });
+    }).catch((err) => console.error("[AdminOrderDetail] Linked booking read failed.", err));
+    return () => { cancelled = true; };
+  }, [order]);
 
   React.useEffect(() => {
     getDocs(collection(db, "staff")).then(snap => {
@@ -373,7 +388,8 @@ export default function AdminOrderDetail() {
 
   const statusBadge = getStatusBadge(order.status || "request");
   const addr = fmtAddress(order.address);
-  const svcList = order.services || [];
+  const svcList = orderServiceLines(order, linkedRequest);
+  const charges = orderChargeSummary(order, svcList);
   const invoice = order.invoice || {};
 
   return (
@@ -518,10 +534,10 @@ export default function AdminOrderDetail() {
                     </div>
                   ))}
                   <div className="border-t-2 border-gray-200 mt-2 pt-3 space-y-1">
-                    <div className="flex justify-between text-sm"><span className="text-gray-400">Subtotal</span><span className="font-bold">{fmtCurrency(order.subtotal || 0)}</span></div>
+                    <div className="flex justify-between text-sm"><span className="text-gray-400">Subtotal</span><span className="font-bold">{fmtCurrency(charges.subtotal || 0)}</span></div>
                     {order.tax > 0 && <div className="flex justify-between text-sm"><span className="text-gray-400">Tax</span><span>{fmtCurrency(order.tax)}</span></div>}
                     {order.discount > 0 && <div className="flex justify-between text-sm"><span className="text-gray-400">Discount</span><span className="text-green-600">-{fmtCurrency(order.discount)}</span></div>}
-                    <div className="flex justify-between text-lg mt-1"><span className="font-black">Total</span><span className="font-black text-[#0d9488]">{fmtCurrency(order.total || 0)}</span></div>
+                    <div className="flex justify-between text-lg mt-1"><span className="font-black">Total</span><span className="font-black text-[#0d9488]">{fmtCurrency(charges.total || 0)}</span></div>
                   </div>
                 </div>
               ) : (
@@ -669,12 +685,12 @@ export default function AdminOrderDetail() {
 
           <div className="flex justify-end">
             <div className="w-64 space-y-2">
-              <div className="flex justify-between"><span className="text-sm text-gray-400">Subtotal</span><span className="text-sm font-bold">{fmtCurrency(order.subtotal || 0)}</span></div>
+              <div className="flex justify-between"><span className="text-sm text-gray-400">Subtotal</span><span className="text-sm font-bold">{fmtCurrency(charges.subtotal || 0)}</span></div>
               {order.tax > 0 && <div className="flex justify-between"><span className="text-sm text-gray-400">Tax</span><span className="text-sm">{fmtCurrency(order.tax)}</span></div>}
               {order.discount > 0 && <div className="flex justify-between"><span className="text-sm text-gray-400">Discount</span><span className="text-sm text-green-600">-{fmtCurrency(order.discount)}</span></div>}
-              <div className="flex justify-between border-t-2 border-gray-200 pt-2"><span className="text-lg font-black">Total</span><span className="text-lg font-black">{fmtCurrency(order.total || 0)}</span></div>
+              <div className="flex justify-between border-t-2 border-gray-200 pt-2"><span className="text-lg font-black">Total</span><span className="text-lg font-black">{fmtCurrency(charges.total || 0)}</span></div>
               {invoice.amountPaid > 0 && <div className="flex justify-between"><span className="text-sm text-gray-400">Paid</span><span className="text-sm text-green-600">-{fmtCurrency(invoice.amountPaid)}</span></div>}
-              <div className="flex justify-between"><span className="text-sm font-bold">Amount Due</span><span className="text-sm font-black text-[#0d9488]">{fmtCurrency((order.total || 0) - (invoice.amountPaid || 0))}</span></div>
+              <div className="flex justify-between"><span className="text-sm font-bold">Amount Due</span><span className="text-sm font-black text-[#0d9488]">{fmtCurrency((charges.total || 0) - (invoice.amountPaid || 0))}</span></div>
             </div>
           </div>
 
