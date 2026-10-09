@@ -116,6 +116,7 @@ async function requirePhotographer(req, res, next) {
 const ORDER_RECEIVED_EMAIL_TEMPLATE = "booking_received";
 const ORDER_RECEIVED_SMS_KIND = "booking_confirmation";
 const STAFF_INBOUND_EMAIL_TEMPLATE = "live_chat";
+const OFFICE_NEW_ORDER_EMAIL_TEMPLATE$1 = "office_new_order";
 const STAFF_INBOUND_SMS_KIND = "staff_inbound";
 const STAFF_INBOUND_SMS_TO = "+12813560965";
 function clientNotifyLive(env = process.env) {
@@ -125,6 +126,7 @@ function clientNotifyLive(env = process.env) {
 function emailAllowed(template, env = process.env, audience) {
   if (template === ORDER_RECEIVED_EMAIL_TEMPLATE) return true;
   if (audience === "staff" && template === STAFF_INBOUND_EMAIL_TEMPLATE) return true;
+  if (audience === "staff" && template === OFFICE_NEW_ORDER_EMAIL_TEMPLATE$1) return true;
   return clientNotifyLive(env);
 }
 function smsAllowed(kind, env = process.env) {
@@ -133,8 +135,8 @@ function smsAllowed(kind, env = process.env) {
   return clientNotifyLive(env);
 }
 function isStaffInboundSmsDestination(to) {
-  const digits = to.replace(/\D/g, "");
-  return digits === "12813560965" || digits === "2813560965";
+  const digits2 = to.replace(/\D/g, "");
+  return digits2 === "12813560965" || digits2 === "2813560965";
 }
 function clientNotifyBlockReason(env = process.env) {
   if (env.CLIENT_COMMS_ZONE === "RED") return "CLIENT_COMMS_ZONE=RED";
@@ -162,7 +164,7 @@ function createTransport() {
   });
 }
 async function sendEmail(options) {
-  const { to, bcc, cc, template, audience, variables = {}, subject: subjectOverride, attachments } = options;
+  const { to, bcc, cc, template, audience, variables = {}, subject: subjectOverride, html, attachments } = options;
   if (!to) {
     console.warn("[Email] No recipient specified, skipping.");
     return { sent: false };
@@ -174,9 +176,9 @@ async function sendEmail(options) {
     return { sent: false };
   }
   let subject = subjectOverride || `Message from Iconic Images`;
-  let htmlBody = getFallbackTemplate(template, variables);
+  let htmlBody = html || getFallbackTemplate(template, variables);
   try {
-    if (admin.apps.length) {
+    if (!html && admin.apps.length) {
       const templateDoc = await db$q().collection("emailTemplates").where("category", "==", template).where("isActive", "==", true).limit(1).get();
       if (!templateDoc.empty) {
         const tmpl = templateDoc.docs[0].data();
@@ -367,10 +369,10 @@ function getClient() {
   return _client;
 }
 function normalisePhone(raw) {
-  const digits = raw.replace(/\D/g, "");
-  if (digits.length === 10) return `+1${digits}`;
-  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
-  return `+${digits}`;
+  const digits2 = raw.replace(/\D/g, "");
+  if (digits2.length === 10) return `+1${digits2}`;
+  if (digits2.length === 11 && digits2.startsWith("1")) return `+${digits2}`;
+  return `+${digits2}`;
 }
 async function sendSMS({ to, body, from, kind }) {
   if (kind === STAFF_INBOUND_SMS_KIND && !isStaffInboundSmsDestination(to)) {
@@ -1320,6 +1322,99 @@ const UPGRADES = [
     description: "MLS and social-optimized photo set."
   }
 ];
+const publicBookingPackages = [
+  {
+    id: "hollywood",
+    name: "Hollywood",
+    price: 199,
+    description: "A sharp, streamlined listing launch.",
+    features: ["30 daytime listing photos", "Branded listing website", "Grass replacement included"]
+  },
+  {
+    id: "hall-of-fame",
+    name: "Hall of Fame",
+    price: 299,
+    description: "More coverage for homes that need to stand out.",
+    features: ["35 listing photos", "5 aerial photos", "Branded listing website", "Grass replacement included"]
+  },
+  {
+    id: "red-carpet",
+    name: "Red Carpet",
+    price: 599,
+    description: "More story, more motion, more attention.",
+    features: ["45 listing photos", "5 aerials", "Social reel", "Amenity coverage", "Branded listing website", "Grass replacement included"]
+  },
+  {
+    id: "luxe-video",
+    name: "Luxe Video",
+    price: 785,
+    description: "Standout-home coverage with a listing video.",
+    features: ["50 listing photos", "5 aerials", "Listing video", "Premium editing package", "Grass replacement included"]
+  },
+  {
+    id: "luxe-3d",
+    name: "Luxe 3D Tour",
+    price: 785,
+    description: "Standout-home coverage with a 3D tour.",
+    features: ["50 listing photos", "5 aerials", "3D tour", "Premium editing package", "Grass replacement included"]
+  },
+  {
+    id: "photos-18",
+    name: "Photos Only — 18 photos",
+    price: 139,
+    description: "Photography only. Next-day delivery.",
+    features: ["18 photos", "Next-day delivery"]
+  },
+  {
+    id: "photos-25-only",
+    name: "Photos Only — 25 photos",
+    price: 169,
+    description: "Photography only. Next-day delivery.",
+    features: ["25 photos", "Next-day delivery"]
+  },
+  {
+    id: "photos-40",
+    name: "Photos Only — 40 photos",
+    price: 199,
+    description: "Photography only. Next-day delivery.",
+    features: ["40 photos", "Next-day delivery"]
+  },
+  {
+    id: "aerial-only",
+    name: "Aerial Only",
+    price: 99,
+    description: "Aerial photos without a photo package.",
+    features: ["5 aerial photos"]
+  },
+  {
+    id: "essentials-aerial",
+    name: "Essentials Aerial Upgrade",
+    price: 89,
+    description: "Aerial upgrade for The Essentials.",
+    features: ["Aerial photos"]
+  },
+  {
+    id: "grass-replacement",
+    name: "Grass replacement",
+    price: 25,
+    description: "Grass replacement for the appointment.",
+    features: ["Grass replacement"]
+  },
+  {
+    id: "iconic-polish",
+    name: "Iconic Polish",
+    price: 75,
+    description: "Premium digital finish.",
+    features: ["Premium digital finish"]
+  },
+  {
+    id: "agent-intro-video",
+    name: "Agent intro/outro",
+    price: 59,
+    description: "On-camera agent intro or outro, priced per video on the public booking page.",
+    features: ["Agent intro/outro"]
+  }
+];
 function serviceCategory(service) {
   if (service.category === "listings") return "photography";
   return "marketing";
@@ -1409,6 +1504,22 @@ function bookingPackageSeedDocs() {
       category: upgradeCategory(upgrade.id),
       bookingId: upgrade.id,
       bookingKind: "upgrade",
+      source: "booking-form-hardcoded"
+    });
+  }
+  for (const item of publicBookingPackages) {
+    docs.push({
+      id: item.id,
+      name: item.name,
+      tier: "standard",
+      price: item.price,
+      description: item.description,
+      includedServices: item.features || [],
+      isActive: true,
+      sortOrder: sortOrder++,
+      category: "photography",
+      bookingId: item.id,
+      bookingKind: "service",
       source: "booking-form-hardcoded"
     });
   }
@@ -1502,12 +1613,38 @@ function packagesForStaffEditor(liveDocs = [], options) {
 function chargeCatalog(input) {
   return input.catalog ?? packagesForStaffEditor([]);
 }
+function catalogMatchKey(raw) {
+  return raw.trim().toLowerCase().replace(/[—–]/g, " ").replace(/\$/g, " ").replace(/[_/]+/g, " ").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+function stripTrailingPrice(key) {
+  return key.replace(/\s+\d+\s+video$/, "").replace(/\s+\d[\d\s]*$/, "").trim();
+}
+function labeledPrice(raw) {
+  const match = raw.match(/\$\s*([0-9][0-9,]*)/);
+  if (!match) return void 0;
+  const amount = Number(match[1].replace(/,/g, ""));
+  return Number.isFinite(amount) ? amount : void 0;
+}
 function findCatalogItem(catalog, id) {
   const key = id.trim();
   if (!key) return void 0;
-  return catalog.find((item) => item.isActive !== false && (item.id === key || item.bookingId === key));
+  const active = catalog.filter((item) => item.isActive !== false);
+  const direct = active.find((item) => item.id === key || item.bookingId === key);
+  if (direct) return direct;
+  const wanted = catalogMatchKey(key);
+  const stripped = stripTrailingPrice(wanted);
+  const matches = active.filter((item) => {
+    const name = catalogMatchKey(item.name);
+    const title = item.cardTitle ? catalogMatchKey(item.cardTitle) : "";
+    return name === wanted || name === stripped || title !== "" && (title === wanted || title === stripped);
+  });
+  if (matches.length === 1) return matches[0];
+  const price = labeledPrice(key);
+  if (price == null) return void 0;
+  const priced = matches.filter((item) => item.price === price);
+  return priced.length === 1 ? priced[0] : void 0;
 }
-function roundMoney$1(value) {
+function roundMoney$3(value) {
   return Math.round(value * 100) / 100;
 }
 function catalogLineName(pkg, qty = 1) {
@@ -1519,21 +1656,27 @@ function catalogLineName(pkg, qty = 1) {
   }
   return pkg.name;
 }
-function pushCatalogLine(items, pkg, qty = 1) {
+function catalogLine(pkg, qty = 1) {
   const count = qty > 0 ? qty : 1;
-  const unitPrice = roundMoney$1(pkg.price);
+  const unitPrice = roundMoney$3(pkg.price);
   const line = {
     id: pkg.bookingId || pkg.id,
     name: catalogLineName(pkg, count),
     unitPrice,
     qty: count,
-    price: roundMoney$1(unitPrice * count)
+    price: roundMoney$3(unitPrice * count)
   };
   if (pkg.description) line.description = pkg.description;
   if (pkg.category) line.category = pkg.category;
   if (pkg.bookingKind) line.bookingKind = pkg.bookingKind;
   if (pkg.tier) line.tier = pkg.tier;
-  items.push(line);
+  return line;
+}
+function pushCatalogLine(items, pkg, qty = 1) {
+  items.push(catalogLine(pkg, qty));
+}
+function warnUncatalogedPackage(name, price) {
+  console.warn(`[Bookings] Package not in catalog; keeping submitted line "${name}" at ${price}.`);
 }
 function buildSubmittedLineItems(input) {
   const catalog = chargeCatalog(input);
@@ -1621,6 +1764,49 @@ function pricedPostedLines(items) {
     return rawPrice(raw.price) !== void 0;
   });
 }
+function nestedTotal$1(pricing) {
+  if (!pricing || typeof pricing !== "object") return void 0;
+  return rawPrice(pricing.total);
+}
+function postedLineForLabel(label, posted) {
+  const wanted = catalogMatchKey(label);
+  const stripped = stripTrailingPrice(wanted);
+  return posted.find((item) => {
+    const name = catalogMatchKey(item.name);
+    return name === wanted || name === stripped || stripTrailingPrice(name) === stripped;
+  });
+}
+function adoptPostedLine(catalog, item) {
+  const match = item.id && findCatalogItem(catalog, item.id) || findCatalogItem(catalog, item.name);
+  if (match) return catalogLine(match, item.qty);
+  warnUncatalogedPackage(item.name, item.price);
+  return item;
+}
+function fallbackSubmittedLine(label, posted, body) {
+  const match = postedLineForLabel(label, posted);
+  const price = match?.price ?? labeledPrice(label) ?? (chargedServiceLines(posted).length === 0 ? rawPrice(body.total) ?? nestedTotal$1(body.pricing) : void 0);
+  if (price == null) return null;
+  const name = match?.name?.trim() || label;
+  warnUncatalogedPackage(name, price);
+  return {
+    name,
+    unitPrice: match?.unitPrice ?? price,
+    qty: match?.qty || 1,
+    price
+  };
+}
+function insertServiceLine(items, line) {
+  const key = catalogMatchKey(line.name);
+  if (items.some((item) => catalogMatchKey(item.name) === key || catalogMatchKey(item.id || "") === key)) {
+    return items;
+  }
+  const promoAt = items.findIndex((item) => {
+    const id = String(item.id || "");
+    return id.startsWith("promo-") || item.name.startsWith("Promo Code:");
+  });
+  if (promoAt === -1) return [...items, line];
+  return [...items.slice(0, promoAt), line, ...items.slice(promoAt)];
+}
 function resolveSubmittedBooking(body, catalog) {
   const list = catalog ?? packagesForStaffEditor([]);
   const posted = normalizeBookingLineItems(body.lineItems);
@@ -1652,8 +1838,15 @@ function resolveSubmittedBooking(body, catalog) {
     lifeOfTheListingCare: Boolean(body.lifeOfTheListingCare),
     catalog: list
   });
+  const pricedPosted = pricedPostedLines(body.lineItems);
+  const unresolved = [selectedService, ...selectedBasics, ...selectedAddOns].filter((label) => label && !findCatalogItem(list, label));
+  for (const label of unresolved) {
+    const fallback = fallbackSubmittedLine(label, pricedPosted, body);
+    if (!fallback) continue;
+    lineItems = insertServiceLine(lineItems, fallback);
+  }
   if (chargedServiceLines(lineItems).length === 0) {
-    const temporary = pricedPostedLines(body.lineItems);
+    const temporary = pricedPosted.map((item) => adoptPostedLine(list, item));
     const alreadyDiscounted = temporary.some((item) => {
       const id = String(item.id || "");
       return id.startsWith("promo-") || item.name.startsWith("Promo Code:");
@@ -1671,9 +1864,22 @@ function resolveSubmittedBooking(body, catalog) {
       ] : temporary;
     }
   }
+  if (chargedServiceLines(lineItems).length === 0 && selectedService) {
+    const submitted = rawPrice(body.total) ?? nestedTotal$1(body.pricing) ?? labeledPrice(selectedService);
+    if (submitted != null) {
+      const name = selectedService;
+      warnUncatalogedPackage(name, submitted);
+      lineItems = insertServiceLine(lineItems, {
+        name,
+        unitPrice: submitted,
+        qty: 1,
+        price: submitted
+      });
+    }
+  }
   return {
     lineItems,
-    total: roundMoney$1(sumLineItemPrices(lineItems)),
+    total: roundMoney$3(sumLineItemPrices(lineItems)),
     promoCode: promo?.code ?? null,
     promoDiscount: promo?.discount ?? 0,
     selectedService: selectedService || null,
@@ -2206,10 +2412,10 @@ function listingCardAddress(data) {
   let state = "";
   let zip = "";
   for (const record of records) {
-    if (!street) street = firstText$2(record, ["street", "line1", "addressLine1", "streetAddress"]);
-    if (!city) city = firstText$2(record, ["city"]);
-    if (!state) state = firstText$2(record, ["state"]);
-    if (!zip) zip = firstText$2(record, ["zip", "postalCode"]);
+    if (!street) street = firstText$3(record, ["street", "line1", "addressLine1", "streetAddress"]);
+    if (!city) city = firstText$3(record, ["city"]);
+    if (!state) state = firstText$3(record, ["state"]);
+    if (!zip) zip = firstText$3(record, ["zip", "postalCode"]);
   }
   let locality = joinLocality(city, state, zip);
   if (!street || !locality) {
@@ -2238,8 +2444,8 @@ function formatShootDateLabel(isoDay, raw) {
 function addressRecords(data) {
   const records = [data];
   for (const key of ["address", "propertyAddress", "shootLocation"]) {
-    const nested = asRecord$3(data[key]);
-    if (nested) records.push(nested);
+    const nested2 = asRecord$3(data[key]);
+    if (nested2) records.push(nested2);
   }
   return records;
 }
@@ -2249,7 +2455,7 @@ function addressString$1(data) {
     if (typeof value === "string" && value.trim()) return value.trim();
     const record = asRecord$3(value);
     if (!record) continue;
-    const formatted = firstText$2(record, ["formatted", "label"]);
+    const formatted = firstText$3(record, ["formatted", "label"]);
     if (formatted) return formatted;
   }
   return "";
@@ -2301,8 +2507,8 @@ function readRaw(data, keys) {
 function factRecords(data) {
   const records = [data];
   for (const key of ["property", "details", "facts", "propertyFacts", "homeFacts"]) {
-    const nested = asRecord$3(data[key]);
-    if (nested) records.push(nested);
+    const nested2 = asRecord$3(data[key]);
+    if (nested2) records.push(nested2);
   }
   const portal = asRecord$3(data.portalData);
   if (portal) {
@@ -2333,7 +2539,7 @@ function poolLabel(value) {
   if (/^\d+(?:\.\d+)?$/.test(text2)) return text2 === "1" || text2 === "1.0" ? "Y" : text2;
   return "";
 }
-function firstText$2(record, keys) {
+function firstText$3(record, keys) {
   for (const key of keys) {
     const value = record[key];
     if (typeof value === "string" && value.trim()) return value.trim();
@@ -2356,7 +2562,7 @@ const ACCEPTED = /* @__PURE__ */ new Set([
   "consult_scheduled",
   "delivered"
 ]);
-function addressText(value) {
+function addressText$1(value) {
   if (!value) return "";
   if (typeof value === "string") return value.trim();
   if (typeof value === "object") {
@@ -2418,10 +2624,10 @@ function clockTime(value) {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 function storedAmount(value) {
-  if (typeof value === "number" && Number.isFinite(value)) return roundMoney(value);
+  if (typeof value === "number" && Number.isFinite(value)) return roundMoney$2(value);
   if (typeof value === "string" && value.trim()) {
     const parsed = Number(value.replace(/[$,\s]/g, ""));
-    if (Number.isFinite(parsed)) return roundMoney(parsed);
+    if (Number.isFinite(parsed)) return roundMoney$2(parsed);
   }
   return null;
 }
@@ -2459,7 +2665,7 @@ function buildClientListing(id, data) {
   const amenities = listingCardAmenities(data);
   return {
     id,
-    address: addressText(data.propertyAddress || data.address || data.shootLocation) || "Listing",
+    address: addressText$1(data.propertyAddress || data.address || data.shootLocation) || "Listing",
     status,
     projectType: projectType2,
     imageCount: Array.isArray(images) ? images.length : 0,
@@ -2484,8 +2690,8 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
     id,
     invoiceNumber: presentInvoiceNumber(data.invoiceNumber, id, Number.isNaN(issuedAt.getTime()) ? now : issuedAt),
     status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
-    clientName: text$8(data.clientName),
-    address: addressText(data.billToAddress || data.address || data.propertyAddress),
+    clientName: text$a(data.clientName),
+    address: addressText$1(data.billToAddress || data.address || data.propertyAddress),
     createdAt,
     issuedOn: formatPortalDate(data.createdAt) || formatPortalDate(data.sentAt) || formatPortalDate(data.paidAt),
     lineItems: storedLines(data.lineItems, data.services),
@@ -2494,7 +2700,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
     fees: storedAmount(data.fees),
     travel: storedAmount(data.travel),
     promoDiscount: storedAmount(data.promoDiscount),
-    promoCode: text$8(data.promoCode),
+    promoCode: text$a(data.promoCode),
     tax: storedAmount(data.tax),
     total: storedAmount(data.total),
     amountPaid: storedAmount(data.amountPaid),
@@ -2502,11 +2708,11 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
   };
 }
 function buildClientAppointment(id, data, orderRequest) {
-  const scheduledDate = firstDate(data.scheduledDate, data.appointmentDate);
+  const scheduledDate = firstDate$1(data.scheduledDate, data.appointmentDate);
   const scheduledTime = firstTime(data.scheduledTime, data.appointmentTime, data.apptTime);
-  let requestedDate = firstDate(data.requestedDate, data.originalScheduledDate, data.originalDate, orderRequest?.requestedDate, orderRequest?.originalScheduledDate);
+  let requestedDate = firstDate$1(data.requestedDate, data.originalScheduledDate, data.originalDate, orderRequest?.requestedDate, orderRequest?.originalScheduledDate);
   let requestedTime = firstTime(data.requestedTime, data.originalScheduledTime, data.originalTime, orderRequest?.requestedTime, orderRequest?.originalScheduledTime);
-  const requestScheduledDate = firstDate(orderRequest?.scheduledDate, orderRequest?.appointmentDate);
+  const requestScheduledDate = firstDate$1(orderRequest?.scheduledDate, orderRequest?.appointmentDate);
   const requestScheduledTime = firstTime(orderRequest?.scheduledTime, orderRequest?.appointmentTime);
   if (!requestedDate && requestScheduledDate && scheduledDate && requestScheduledDate !== scheduledDate) {
     requestedDate = requestScheduledDate;
@@ -2514,7 +2720,7 @@ function buildClientAppointment(id, data, orderRequest) {
   if (!requestedTime && requestScheduledTime && scheduledTime && clockTime(requestScheduledTime) !== clockTime(scheduledTime)) {
     requestedTime = requestScheduledTime;
   }
-  const proposedDate = firstDate(data.proposedDate, data.alternateDate, data.counterDate);
+  const proposedDate = firstDate$1(data.proposedDate, data.alternateDate, data.counterDate);
   const proposedTime = firstTime(data.proposedTime, data.alternateTime, data.counterTime);
   const status = typeof data.status === "string" ? data.status.trim() : "";
   const iconicAccepted = ACCEPTED.has(statusKey$1(status)) || statusKey$1(status) === "pending_confirmation" || statusKey$1(status) === "rescheduled";
@@ -2529,7 +2735,7 @@ function buildClientAppointment(id, data, orderRequest) {
   if (!time) time = requestedTime;
   return {
     id,
-    address: addressText(data.addressLabel || data.address) || "Appointment",
+    address: addressText$1(data.addressLabel || data.address) || "Appointment",
     status,
     date,
     time,
@@ -2545,15 +2751,15 @@ function storedLines(lineItems, services2) {
     if (typeof item === "string" && item.trim()) return [{ name: item.trim(), qty: null, amount: null }];
     if (!item || typeof item !== "object") return [];
     const record = item;
-    const named = text$8(record.name) || text$8(record.label);
-    const description = text$8(record.description);
+    const named = text$a(record.name) || text$a(record.label);
+    const description = text$a(record.description);
     const name = named || description;
     const qty = storedQty(record.qty ?? record.quantity);
     const amount = storedAmount(record.price ?? record.amount ?? record.total);
     if (!name && amount == null && qty == null) return [];
     const line = { name: name || "Line item", qty, amount };
-    const id = text$8(record.id);
-    const category = text$8(record.category);
+    const id = text$a(record.id);
+    const category = text$a(record.category);
     if (id) line.id = id;
     if (category) line.category = category;
     if (named && description) line.description = description;
@@ -2565,7 +2771,7 @@ function storedQty(value) {
   if (!Number.isFinite(qty) || qty <= 0) return null;
   return Math.round(qty);
 }
-function firstDate(...values) {
+function firstDate$1(...values) {
   for (const value of values) {
     const key = calendarDateKey(value);
     if (key) return key;
@@ -2589,10 +2795,10 @@ function isoStamp(value) {
   if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
   return null;
 }
-function text$8(value) {
+function text$a(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function roundMoney(value) {
+function roundMoney$2(value) {
   return Math.round(value * 100) / 100;
 }
 const MONTHS = {
@@ -2728,40 +2934,40 @@ function bookingListingGroups(input) {
   for (const doc of requests) {
     const node = nodeId("orderRequests", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("listings", text$7(doc.data.listingId)));
-    uf.link(node, nodeId("orders", text$7(doc.data.orderId) || text$7(doc.data.convertedToOrderId)));
-    uf.link(node, nodeId("invoices", text$7(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$7(doc.data.galleryId)));
+    uf.link(node, nodeId("listings", text$9(doc.data.listingId)));
+    uf.link(node, nodeId("orders", text$9(doc.data.orderId) || text$9(doc.data.convertedToOrderId)));
+    uf.link(node, nodeId("invoices", text$9(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$9(doc.data.galleryId)));
   }
   for (const doc of orders) {
     const node = nodeId("orders", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$7(doc.data.orderRequestId)));
-    uf.link(node, nodeId("listings", text$7(doc.data.listingId)));
-    uf.link(node, nodeId("invoices", text$7(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$7(doc.data.galleryId)));
+    uf.link(node, nodeId("orderRequests", text$9(doc.data.orderRequestId)));
+    uf.link(node, nodeId("listings", text$9(doc.data.listingId)));
+    uf.link(node, nodeId("invoices", text$9(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$9(doc.data.galleryId)));
   }
   for (const doc of invoices) {
     const node = nodeId("invoices", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$7(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$7(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$7(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$9(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$9(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$9(doc.data.listingId)));
   }
   for (const doc of appointments) {
     const node = nodeId("appointments", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$7(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$7(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$7(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$9(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$9(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$9(doc.data.listingId)));
   }
   for (const doc of galleries) {
     const node = nodeId("galleries", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$7(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$7(doc.data.orderId)));
-    uf.link(node, nodeId("invoices", text$7(doc.data.invoiceId)));
-    uf.link(node, nodeId("listings", text$7(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$9(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$9(doc.data.orderId)));
+    uf.link(node, nodeId("invoices", text$9(doc.data.invoiceId)));
+    uf.link(node, nodeId("listings", text$9(doc.data.listingId)));
   }
   const groups = [];
   for (const nodes of uf.components()) {
@@ -2820,7 +3026,7 @@ function fillEmptyListingFields(existing, desired) {
   return patch;
 }
 function clientOwnsListing(listing, clients) {
-  const clientId2 = text$7(listing.clientId);
+  const clientId2 = text$9(listing.clientId);
   const email = normalizeEmail(listing.clientEmail || listing.email);
   if (!clientId2 && !email) return true;
   if (clientId2 && clients.ids.includes(clientId2)) return true;
@@ -2842,11 +3048,11 @@ function desiredListingFields(group, identity) {
   assign(fields, "clientId", clientId(group, identity));
   assign(fields, "clientEmail", clientEmail(group, identity));
   assign(fields, "clientName", clientName(group));
-  assign(fields, "clientPhone", firstText$1(group, ["clientPhone", "phone"]));
+  assign(fields, "clientPhone", firstText$2(group, ["clientPhone", "phone"]));
   if (address) {
     fields.address = address;
     fields.propertyAddress = address;
-    const label = addressText(address);
+    const label = addressText$1(address);
     if (label) fields.addressLabel = label;
   }
   const pin = firstStoredServicePin(group);
@@ -2866,9 +3072,9 @@ function desiredListingFields(group, identity) {
   if (names.length) fields.services = names;
   if (total != null) fields.total = total;
   if (squareFootage != null) fields.squareFootage = squareFootage;
-  assign(fields, "propertyStatus", firstText$1(group, ["propertyStatus"]));
-  assign(fields, "furnishingStatus", firstText$1(group, ["furnishingStatus"]));
-  assign(fields, "accessMethod", firstText$1(group, ["accessMethod"]));
+  assign(fields, "propertyStatus", firstText$2(group, ["propertyStatus"]));
+  assign(fields, "furnishingStatus", firstText$2(group, ["furnishingStatus"]));
+  assign(fields, "accessMethod", firstText$2(group, ["accessMethod"]));
   assign(fields, "accessInfo", accessInfo(group));
   assign(fields, "createdAt", groupCreatedAt(group));
   return fields;
@@ -2885,10 +3091,10 @@ function chooseListing(group, listings, clients) {
 }
 function listingMatches(doc, group) {
   if (doc.id === group.stableId || group.preferredListingIds.includes(doc.id)) return true;
-  const requestId = text$7(doc.data.orderRequestId);
-  const orderId = text$7(doc.data.orderId);
-  const invoiceId = text$7(doc.data.invoiceId);
-  const appointmentId = text$7(doc.data.appointmentId);
+  const requestId = text$9(doc.data.orderRequestId);
+  const orderId = text$9(doc.data.orderId);
+  const invoiceId = text$9(doc.data.invoiceId);
+  const appointmentId = text$9(doc.data.appointmentId);
   return Boolean(
     requestId && group.orderRequestIds.includes(requestId) || orderId && group.orderIds.includes(orderId) || invoiceId && group.invoiceIds.includes(invoiceId) || appointmentId && group.appointmentIds.includes(appointmentId)
   );
@@ -2898,7 +3104,7 @@ function linksFor(group, listingId, listings, clients) {
   const links = [];
   const push = (collection, docs) => {
     for (const doc of docs) {
-      const current = text$7(doc.data.listingId);
+      const current = text$9(doc.data.listingId);
       if (current === listingId) continue;
       if (current && isPortalListingId(current) && ownedIds.has(current)) continue;
       links.push({ collection, id: doc.id });
@@ -2915,7 +3121,7 @@ function clientsFor(group, identity) {
   const ids = /* @__PURE__ */ new Set();
   const emails = /* @__PURE__ */ new Set();
   const addId = (value) => {
-    const id = text$7(value);
+    const id = text$9(value);
     if (id) ids.add(id);
   };
   const addEmail = (value) => {
@@ -2934,7 +3140,7 @@ function clientsFor(group, identity) {
 function preferredListingIds(group) {
   const ids = [];
   const push = (value) => {
-    const id = text$7(value);
+    const id = text$9(value);
     if (id && isPortalListingId(id) && !ids.includes(id)) ids.push(id);
   };
   for (const doc of [...group.orderRequests, ...group.orders, ...group.invoices, ...group.appointments, ...group.galleries]) {
@@ -2969,9 +3175,9 @@ function bestAddress(group) {
   }
   for (const doc of propertyDocs(group)) {
     for (const key of ["address", "propertyAddress", "shootLocation"]) {
-      if (typeof doc.data[key] === "string" && text$7(doc.data[key])) return text$7(doc.data[key]);
+      if (typeof doc.data[key] === "string" && text$9(doc.data[key])) return text$9(doc.data[key]);
     }
-    if (text$7(doc.data.addressLabel)) return text$7(doc.data.addressLabel);
+    if (text$9(doc.data.addressLabel)) return text$9(doc.data.addressLabel);
   }
   return null;
 }
@@ -2987,7 +3193,7 @@ function firstScheduleDate(group) {
 function firstScheduleTime(group) {
   for (const doc of [...group.appointments, ...group.orders, ...group.orderRequests]) {
     for (const key of ["scheduledTime", "appointmentTime", "apptTime", "requestedTime"]) {
-      const value = text$7(doc.data[key]);
+      const value = text$9(doc.data[key]);
       if (value && !/^tbd$/i.test(value)) return value;
     }
   }
@@ -3004,7 +3210,7 @@ function projectType(group) {
     if (doc.data.projectType === "real_estate") return "real_estate";
     const service = doc.data.selectedService;
     if (service && typeof service === "object") {
-      const category = text$7(service.category);
+      const category = text$9(service.category);
       if (category === "business" || category === "branding") return "business";
       if (category === "listings") return "real_estate";
     }
@@ -3030,7 +3236,7 @@ function namesFrom(value) {
   for (const item of value) {
     if (typeof item === "string" && item.trim()) names.push(item.trim());
     else if (item && typeof item === "object") {
-      const name = text$7(item.name);
+      const name = text$9(item.name);
       if (name) names.push(name);
     }
     if (names.length >= 40) break;
@@ -3040,23 +3246,23 @@ function namesFrom(value) {
 function firstTotal(group) {
   for (const doc of [...group.orders, ...group.invoices, ...group.orderRequests]) {
     if (doc.data.total != null && doc.data.total !== "") {
-      const parsed = money$3(doc.data.total);
+      const parsed = money$4(doc.data.total);
       if (parsed != null) return parsed;
     }
     const pricing = doc.data.pricing;
     if (pricing && typeof pricing === "object") {
-      const parsed = money$3(pricing.total);
+      const parsed = money$4(pricing.total);
       if (pricing.total != null && pricing.total !== "" && parsed != null) return parsed;
     }
   }
   return null;
 }
 function accessInfo(group) {
-  return [firstText$1(group, ["accessMethod"]), firstText$1(group, ["lockboxCode"])].filter(Boolean).join(" - ");
+  return [firstText$2(group, ["accessMethod"]), firstText$2(group, ["lockboxCode"])].filter(Boolean).join(" - ");
 }
 function clientId(group, identity) {
-  const bookingIds = propertyDocs(group).map((doc) => text$7(doc.data.clientId)).filter(Boolean);
-  const identityIds = (identity?.ids || []).map((id) => text$7(id)).filter(Boolean);
+  const bookingIds = propertyDocs(group).map((doc) => text$9(doc.data.clientId)).filter(Boolean);
+  const identityIds = (identity?.ids || []).map((id) => text$9(id)).filter(Boolean);
   return bookingIds.find((id) => identityIds.includes(id)) || bookingIds[0] || identityIds[0] || "";
 }
 function clientEmail(group, identity) {
@@ -3070,8 +3276,8 @@ function clientEmail(group, identity) {
 }
 function clientName(group) {
   for (const doc of propertyDocs(group)) {
-    if (text$7(doc.data.clientName)) return text$7(doc.data.clientName);
-    const joined = `${text$7(doc.data.firstName)} ${text$7(doc.data.lastName)}`.trim();
+    if (text$9(doc.data.clientName)) return text$9(doc.data.clientName);
+    const joined = `${text$9(doc.data.firstName)} ${text$9(doc.data.lastName)}`.trim();
     if (joined) return joined;
   }
   return "";
@@ -3079,7 +3285,7 @@ function clientName(group) {
 function chosenInvoiceId(group) {
   const known = new Set(group.invoiceIds);
   for (const doc of [...group.orderRequests, ...group.orders]) {
-    const id = text$7(doc.data.invoiceId);
+    const id = text$9(doc.data.invoiceId);
     if (id && known.has(id)) return id;
   }
   return newestDoc(group.invoices)?.id || group.invoiceIds[0] || "";
@@ -3088,7 +3294,7 @@ function chosenId(docs, ids, pointers = [], keys = []) {
   const known = new Set(ids);
   for (const doc of pointers) {
     for (const key of keys) {
-      const id = text$7(doc.data[key]);
+      const id = text$9(doc.data[key]);
       if (id && known.has(id)) return id;
     }
   }
@@ -3097,10 +3303,10 @@ function chosenId(docs, ids, pointers = [], keys = []) {
 function propertyDocs(group) {
   return [...group.orderRequests, ...group.orders, ...group.appointments, ...group.invoices, ...group.galleries];
 }
-function firstText$1(group, keys) {
+function firstText$2(group, keys) {
   for (const doc of propertyDocs(group)) {
     for (const key of keys) {
-      const value = text$7(doc.data[key]);
+      const value = text$9(doc.data[key]);
       if (value) return value;
     }
   }
@@ -3161,12 +3367,12 @@ function hasAddress(value) {
   if (typeof value === "string") return value.trim().length > 0;
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record = value;
-  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$7(record[key]).length > 0);
+  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$9(record[key]).length > 0);
 }
 function statusKey(value) {
   return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
 }
-function money$3(value) {
+function money$4(value) {
   const parsed = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value.replace(/[$,\s]/g, "")) : Number.NaN;
   if (!Number.isFinite(parsed)) return null;
   return Math.round(parsed * 100) / 100;
@@ -3193,14 +3399,14 @@ function isEmpty(value) {
 function isSentinel$1(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$7(value) {
+function text$9(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function cleanDocs(docs) {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
   for (const doc of docs || []) {
-    const id = text$7(doc?.id);
+    const id = text$9(doc?.id);
     if (!id || seen.has(id)) continue;
     seen.add(id);
     out.push({ id, data: doc.data && typeof doc.data === "object" ? doc.data : {} });
@@ -3280,7 +3486,7 @@ async function ensureBookingListingForRequest(orderRequestId) {
     galleries: []
   });
   const identity = {
-    ids: text$6(request.data.clientId) ? [text$6(request.data.clientId)] : [],
+    ids: text$8(request.data.clientId) ? [text$8(request.data.clientId)] : [],
     email: normalizeEmail(request.data.clientEmail || request.data.email)
   };
   const plans = await plansFor(bundle, identity);
@@ -3333,7 +3539,7 @@ async function applyBookingListingPlan(plan) {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
       created = true;
-      console.info(`[Listings] Created ${plan.listingId} for booking ${text$6(plan.createFields.orderRequestId) || text$6(plan.createFields.orderId) || text$6(plan.createFields.invoiceId)}`);
+      console.info(`[Listings] Created ${plan.listingId} for booking ${text$8(plan.createFields.orderRequestId) || text$8(plan.createFields.orderId) || text$8(plan.createFields.invoiceId)}`);
     } catch (err) {
       if (!alreadyExists(err)) throw err;
       await fillListing(ref, plan.createFields);
@@ -3362,7 +3568,7 @@ async function linkRecord(collectionName, id, listingId) {
   const ref = db$n().collection(collectionName).doc(id);
   const snap = await ref.get();
   if (!snap.exists) return;
-  if (text$6(snap.data()?.listingId) === listingId) return;
+  if (text$8(snap.data()?.listingId) === listingId) return;
   await ref.update({
     listingId,
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -3376,9 +3582,9 @@ async function loadVisibleSeeds(identity) {
   const keep = (map, docs) => {
     for (const doc of docs) {
       if (!visibleToPortalClient({
-        clientId: text$6(doc.data.clientId),
-        email: text$6(doc.data.email),
-        clientEmail: text$6(doc.data.clientEmail)
+        clientId: text$8(doc.data.clientId),
+        email: text$8(doc.data.email),
+        clientEmail: text$8(doc.data.clientEmail)
       }, identity)) continue;
       if (!map.has(doc.id)) map.set(doc.id, doc);
     }
@@ -3417,23 +3623,23 @@ async function hydrateBundle(seed) {
   const galleries = mapDocs(seed.galleries);
   const requestIds = new Set(requests.keys());
   for (const doc of [...orders.values(), ...invoices.values(), ...appointments.values()]) {
-    const id = text$6(doc.data.orderRequestId);
+    const id = text$8(doc.data.orderRequestId);
     if (id) requestIds.add(id);
   }
   await readMissing("orderRequests", requestIds, requests);
   const orderIds = new Set(orders.keys());
   for (const doc of requests.values()) {
-    const id = text$6(doc.data.convertedToOrderId) || text$6(doc.data.orderId);
+    const id = text$8(doc.data.convertedToOrderId) || text$8(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   for (const doc of [...invoices.values(), ...appointments.values()]) {
-    const id = text$6(doc.data.orderId);
+    const id = text$8(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   await readMissing("orders", orderIds, orders);
   const invoiceIds = new Set(invoices.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$6(doc.data.invoiceId);
+    const id = text$8(doc.data.invoiceId);
     if (id) invoiceIds.add(id);
   }
   await readMissing("invoices", invoiceIds, invoices);
@@ -3443,7 +3649,7 @@ async function hydrateBundle(seed) {
   mergeDocs(appointments, await queryIn("appointments", "orderId", [...orders.keys()]));
   const galleryIds = new Set(galleries.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$6(doc.data.galleryId);
+    const id = text$8(doc.data.galleryId);
     if (id) galleryIds.add(id);
   }
   await readMissing("galleries", galleryIds, galleries);
@@ -3531,12 +3737,12 @@ function plainValue(value) {
   if (isSentinel(value)) return null;
   if (Array.isArray(value)) return value.map((item) => plainValue(item));
   if (value && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype) {
-    const nested = {};
+    const nested2 = {};
     for (const [key, item] of Object.entries(value)) {
       if (item === void 0 || isSentinel(item)) continue;
-      nested[key] = plainValue(item);
+      nested2[key] = plainValue(item);
     }
-    return nested;
+    return nested2;
   }
   return value;
 }
@@ -3560,7 +3766,7 @@ function alreadyExists(err) {
 function isSentinel(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$6(value) {
+function text$8(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function chunk(items, size) {
@@ -3570,6 +3776,424 @@ function chunk(items, size) {
 }
 function lifeOfTheListingCareSelected(value) {
   return value === true;
+}
+function planOrderPackageRepair(record, catalog) {
+  if (hasPricedServices(record.lineItems) || hasPricedServices(record.services)) return null;
+  const resolved = resolveSubmittedBooking({
+    selectedService: record.selectedService,
+    selectedBasics: record.selectedBasics,
+    selectedAddOns: record.selectedAddOns,
+    premiumUpgrade: record.premiumUpgrade,
+    virtualStagingCredits: record.virtualStagingCredits,
+    specializedPhotography: record.specializedPhotography,
+    promoCode: record.promoCode,
+    lineItems: record.lineItems,
+    total: record.total ?? nestedTotal(record.pricing),
+    pricing: record.pricing,
+    lifeOfTheListingCare: record.lifeOfTheListingCare
+  }, catalog);
+  const lineItems = resolved.lineItems.filter((item) => item.name.trim());
+  if (chargedServiceLines(lineItems).length === 0) return null;
+  warnWhenStoredTotalDiffers(record, lineItems);
+  return {
+    lineItems,
+    services: lineItems
+  };
+}
+function hasPricedServices(value) {
+  return normalizeBookingLineItems(value).some((item) => {
+    if (!item.name.trim()) return false;
+    const id = String(item.id || "");
+    if (id.startsWith("promo-") || item.name.startsWith("Promo Code:")) return false;
+    return true;
+  });
+}
+function nestedTotal(pricing) {
+  if (!pricing || typeof pricing !== "object") return void 0;
+  return pricing.total;
+}
+function warnWhenStoredTotalDiffers(record, lineItems) {
+  const stored = [money$3(record.total), money$3(nestedTotal(record.pricing))].filter((amount) => amount != null);
+  if (stored.length === 0) return;
+  const rebuilt = roundMoney$1(sumLineItemPrices(chargedServiceLines(lineItems)));
+  const drifted = [...new Set(stored.filter((amount) => Math.abs(amount - rebuilt) > 9e-3))];
+  if (drifted.length === 0) return;
+  console.warn(
+    `[Bookings] Package repair kept stored total ${drifted.join(" / ")}; catalog lines total ${rebuilt}.`
+  );
+}
+function money$3(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return roundMoney$1(value);
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value.replace(/[$,\s]/g, ""));
+    if (Number.isFinite(parsed)) return roundMoney$1(parsed);
+  }
+  return void 0;
+}
+function roundMoney$1(value) {
+  return Math.round(value * 100) / 100;
+}
+const PACKAGE_LABEL_KEYS = [
+  "selectedService",
+  "package",
+  "packageName",
+  "packageId",
+  "selectedPackage"
+];
+function cleanPackageName(raw) {
+  return raw.replace(/\s+[—–-]\s+\$[\d,]+(?:\s*\/\s*\w+)?\s*$/i, "").replace(/\s+\$[\d,]+(?:\s*\/\s*\w+)?\s*$/i, "").trim();
+}
+function orderServiceLines(record, linked) {
+  const own = storedServiceLines(record);
+  if (own.length > 0) return own;
+  const fromLink = storedServiceLines(linked);
+  if (fromLink.length > 0) return fromLink;
+  const synthesized = synthesizePackageLine(record) || synthesizePackageLine(linked);
+  return synthesized ? [synthesized] : [];
+}
+function orderChargeSummary(record, lines) {
+  const lineSubtotal = roundMoney(lines.reduce((sum, line) => sum + line.price, 0));
+  const pricing = nested$1(record?.pricing);
+  const tax = moneyOrNull$1(record?.tax) ?? moneyOrNull$1(pricing.tax) ?? 0;
+  const storedTotal = moneyOrNull$1(record?.total) ?? moneyOrNull$1(pricing.total);
+  const total = storedTotal ?? roundMoney(lineSubtotal + tax);
+  const storedSubtotal = moneyOrNull$1(record?.subtotal) ?? moneyOrNull$1(pricing.subtotal);
+  const subtotal = lineSubtotal > 0 ? lineSubtotal : storedSubtotal && storedSubtotal > 0 ? storedSubtotal : total;
+  return { subtotal: roundMoney(subtotal), tax: roundMoney(tax), total: roundMoney(total) };
+}
+function storedServiceLines(record) {
+  if (!record) return [];
+  const raw = Array.isArray(record.lineItems) && record.lineItems.length > 0 ? record.lineItems : record.services;
+  return normalizeBookingLineItems(raw).filter((item) => item.name.trim() && !isPromo(item)).map(toOrderLine);
+}
+function synthesizePackageLine(record) {
+  if (!record) return null;
+  const label = packageLabel(record);
+  if (!label) return null;
+  const pricing = nested$1(record.pricing);
+  const price = moneyOrNull$1(record.total) ?? moneyOrNull$1(pricing.total) ?? moneyOrNull$1(pricing.subtotal) ?? moneyOrNull$1(record.amount) ?? labeledMoney(label);
+  if (price == null) return null;
+  return { name: cleanPackageName(label) || label, qty: 1, price };
+}
+function packageLabel(record) {
+  for (const key of PACKAGE_LABEL_KEYS) {
+    const value = text$7(record[key]);
+    if (value) return value;
+  }
+  return "";
+}
+function toOrderLine(item) {
+  const line = {
+    name: item.name,
+    qty: item.qty > 0 ? item.qty : 1,
+    price: item.price
+  };
+  if (item.id) line.id = item.id;
+  return line;
+}
+function isPromo(item) {
+  const id = String(item.id || "");
+  const name = String(item.name || "");
+  return id.startsWith("promo-") || name.startsWith("Promo Code:");
+}
+function labeledMoney(raw) {
+  const match = raw.match(/\$\s*([0-9][0-9,]*(?:\.\d+)?)/);
+  if (!match) return null;
+  const amount = Number(match[1].replace(/,/g, ""));
+  return Number.isFinite(amount) ? amount : null;
+}
+function moneyOrNull$1(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value.replace(/[$,\s]/g, ""));
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+function nested$1(value) {
+  return value && typeof value === "object" ? value : {};
+}
+function text$7(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function roundMoney(value) {
+  return Math.round(value * 100) / 100;
+}
+const NOT_PROVIDED = "Not provided";
+function officeNewOrderEmail(saved, options) {
+  const catalog = options?.catalog ?? packagesForStaffEditor([]);
+  const lines = orderServiceLines(saved);
+  const charges = orderChargeSummary(saved, lines);
+  const packageLine = lines.find((line) => !isAddOn(line, catalog)) || lines[0];
+  const addOns2 = packageLine ? lines.filter((line) => line !== packageLine) : lines;
+  const features = packageFeatures(packageLine, catalog);
+  const deliverables = describeDeliverables(features);
+  const packageName = packageLine ? cleanPackageName(packageLine.name) : NOT_PROVIDED;
+  const orderNumber = orderNumberOf(saved);
+  const address = firstText$1(saved, ["addressLabel", "address", "propertyAddress"]) || NOT_PROVIDED;
+  const requestedDate = firstDate(saved, ["scheduledDate", "requestedDate", "appointmentDate", "requestedDates"]);
+  const clientName2 = clientNameOf(saved);
+  const notes = notesOf(saved);
+  const fields = [
+    ["Order number", orderNumber],
+    ["Admin link", text$6(options?.adminUrl) || NOT_PROVIDED],
+    ["Client name", clientName2],
+    ["Client email", firstText$1(saved, ["clientEmail", "email"])],
+    ["Client phone", firstText$1(saved, ["clientPhone", "phone"])],
+    ["Agent", firstText$1(saved, ["agentName", "agent"])],
+    ["Agent email/phone", agentContactOf(saved)],
+    ["Brokerage", firstText$1(saved, ["brokerage", "brokerageName"])],
+    ["Property address", address === NOT_PROVIDED ? NOT_PROVIDED : addressText(saved.address) || address],
+    ["Unit", firstText$1(saved, ["unit", "unitNumber"]) || addressPart(saved.address, ["unit", "unitNumber"])],
+    ["Gate code", firstText$1(saved, ["gateCode", "gate"])],
+    ["Lockbox", lockboxOf(saved)],
+    ["Access notes", firstText$1(saved, ["accessNotes", "accessInstructions", "accessMethod"])],
+    ["MLS #", firstText$1(saved, ["mlsNumber", "mls", "mlsId"])],
+    ["Package", packageName],
+    ["Photo count", deliverables.photoCount],
+    ["Aerials", deliverables.aerials],
+    ["Reels", deliverables.reels],
+    ["Twilights", deliverables.twilights],
+    ["Walkthrough", deliverables.walkthrough],
+    ["Floor plan", deliverables.floorplan],
+    ["Turnaround", deliverables.turnaround],
+    ["Add-ons", addOnText(addOns2)],
+    ["Subtotal", moneyField(saved, "subtotal", lines.length ? charges.subtotal : null)],
+    ["Tax", moneyField(saved, "tax", lines.length ? charges.tax : null)],
+    ["Total", moneyField(saved, "total", lines.length ? charges.total : null)],
+    ["Payment", paymentOf(saved, lines.length ? charges.total : null)],
+    ["Requested date", requestedDate],
+    ["Requested time", firstText$1(saved, ["scheduledTime", "requestedTime", "appointmentTime", "timeWindow"])],
+    ["Square footage", firstText$1(saved, ["squareFootage", "sqft", "homeSize"])],
+    ["Occupancy", occupancyOf(saved)],
+    ["Notes", notes],
+    ["Booked via", bookedVia(saved)]
+  ];
+  const subjectCore = `New order ${orderNumber} — ${packageName} — ${address === NOT_PROVIDED ? NOT_PROVIDED : addressText(saved.address) || address} — ${requestedDate}`;
+  const subject = isTestOrder(clientName2, notes) ? `[TEST] ${subjectCore}` : subjectCore;
+  const plain = fields.map(([label, value]) => `${label}: ${value}`).join("\n");
+  const html = `<div style="font-family:Arial,sans-serif;max-width:640px;color:#111"><h1 style="font-size:18px">${escapeHtml$3(subject)}</h1><table style="width:100%;border-collapse:collapse">${fields.map(([label, value]) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:bold;vertical-align:top">${escapeHtml$3(label)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:pre-wrap">${escapeHtml$3(value)}</td></tr>`).join("")}</table></div>`;
+  return { subject, text: plain, html };
+}
+function isTestOrder(clientName2, notes) {
+  return `${clientName2}
+${notes}`.toUpperCase().includes("TEST ORDER");
+}
+function orderNumberOf(saved) {
+  const explicit = firstText$1(saved, ["orderNumber", "orderCode", "displayId"]);
+  if (explicit) return explicit;
+  const id = text$6(saved.id);
+  if (!id) return NOT_PROVIDED;
+  return `ORD-${id.slice(-5).toUpperCase()}`;
+}
+function clientNameOf(saved) {
+  const named = firstText$1(saved, ["clientName", "customerName"]);
+  if (named) return named;
+  const joined = [text$6(saved.firstName), text$6(saved.lastName)].filter(Boolean).join(" ");
+  return joined || NOT_PROVIDED;
+}
+function agentContactOf(saved) {
+  const clientEmail2 = firstText$1(saved, ["clientEmail", "email"]).toLowerCase();
+  const clientPhone = digits(firstText$1(saved, ["clientPhone", "phone"]));
+  const email = agentField(saved, ["agentEmail", "realtorEmail", "listingAgentEmail", "brokerEmail"], "email");
+  const phone = agentField(saved, ["agentPhone", "realtorPhone", "listingAgentPhone", "brokerPhone"], "phone");
+  const parts = [];
+  if (email && email.toLowerCase() !== clientEmail2) parts.push(email);
+  if (phone && digits(phone) !== clientPhone) parts.push(phone);
+  return parts.length ? parts.join(" / ") : NOT_PROVIDED;
+}
+function agentField(saved, keys, nestedKey) {
+  const direct = firstText$1(saved, keys);
+  if (direct !== NOT_PROVIDED) return direct;
+  for (const holder of [saved.agent, saved.listingAgent, saved.realtor]) {
+    const record = nested(holder);
+    const value = text$6(record[nestedKey]);
+    if (value) return value;
+  }
+  return "";
+}
+function digits(value) {
+  return value === NOT_PROVIDED ? "" : value.replace(/\D/g, "");
+}
+function notesOf(saved) {
+  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$6(saved[key])).filter(Boolean);
+  return parts.length ? parts.join("\n") : NOT_PROVIDED;
+}
+function lockboxOf(saved) {
+  const code = firstText$1(saved, ["lockboxCode", "supraCode"]);
+  return code || NOT_PROVIDED;
+}
+function occupancyOf(saved) {
+  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$6(saved[key])).filter(Boolean);
+  return parts.length ? parts.join(", ") : NOT_PROVIDED;
+}
+function bookedVia(saved) {
+  const lead = text$6(saved.leadSource);
+  const source = text$6(saved.source);
+  const blob = `${lead} ${source}`.toLowerCase();
+  if (!blob.trim()) return NOT_PROVIDED;
+  if (/admin/.test(blob)) return "Admin";
+  if (/portal/.test(blob)) return "Portal";
+  if (/site|booking form|booking_form|temporary booking|ordericonic|web/.test(blob)) return "Site";
+  return lead || source;
+}
+function paymentOf(saved, total) {
+  const invoice = nested(saved.invoice);
+  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$6(value).toLowerCase()).find(Boolean) || "";
+  if (/partial/.test(explicit)) return "Partial";
+  if (/\bpaid\b/.test(explicit) && !/unpaid/.test(explicit)) return "Paid";
+  if (/unpaid/.test(explicit)) return "Unpaid";
+  const paid = moneyOrNull(invoice.amountPaid) ?? moneyOrNull(saved.amountPaid) ?? moneyOrNull(saved.depositPaid);
+  if (paid != null && total != null && paid > 0 && paid + 9e-3 < total) return "Partial";
+  if (paid != null && paid > 0) return "Paid";
+  if (total != null || saved.total != null || invoice.status != null) return "Unpaid";
+  return NOT_PROVIDED;
+}
+function moneyField(saved, key, computed) {
+  const pricing = nested(saved.pricing);
+  const direct = moneyOrNull(saved[key]) ?? moneyOrNull(pricing[key]);
+  if (direct != null) return formatMoney(direct);
+  if (computed != null) return formatMoney(computed);
+  return NOT_PROVIDED;
+}
+function addOnText(lines) {
+  if (lines.length === 0) return NOT_PROVIDED;
+  return lines.map((line) => `${line.name} × ${line.qty || 1} — ${formatMoney(line.price)}`).join("\n");
+}
+function packageFeatures(line, catalog) {
+  if (!line) return [];
+  const match = catalog.find((item) => item.id === line.id || item.bookingId === line.id || item.name === line.name || item.name === cleanPackageName(line.name));
+  return match?.includedServices ?? [];
+}
+function describeDeliverables(features) {
+  return {
+    photoCount: featureMatch(features, /(\d+\s+(?:daytime\s+)?(?:listing\s+)?(?:photos|images)|full images)/i),
+    aerials: featureMatch(features, /(\d+\s+aerials?|aerial photos?|aerials?)/i),
+    reels: featureMatch(features, /([^\n]*reel[^\n]*)/i),
+    twilights: featureMatch(features, /([^\n]*twilight[^\n]*)/i),
+    walkthrough: featureMatch(features, /([^\n]*(?:walkthrough|listing video|3d tour|matterport)[^\n]*)/i),
+    floorplan: featureMatch(features, /([^\n]*floor\s*plan[^\n]*)/i),
+    turnaround: featureMatch(features, /([^\n]*(?:same[- ]day|next[- ]day|by 7\s*pm)[^\n]*)/i)
+  };
+}
+function featureMatch(features, pattern) {
+  const hit = features.find((feature) => pattern.test(feature));
+  return hit ? hit.trim() : NOT_PROVIDED;
+}
+function isAddOn(line, catalog) {
+  const match = catalog.find((item) => item.id === line.id || item.bookingId === line.id);
+  return match?.bookingKind === "addon" || match?.bookingKind === "upgrade";
+}
+function firstText$1(record, keys) {
+  for (const key of keys) {
+    const value = record[key];
+    if (Array.isArray(value)) {
+      const joined = value.map((entry) => displayScalar(entry)).filter((entry) => entry && entry !== NOT_PROVIDED).join(", ");
+      if (joined) return joined;
+      continue;
+    }
+    const shown = displayScalar(value);
+    if (shown !== NOT_PROVIDED) return shown;
+  }
+  return NOT_PROVIDED;
+}
+function firstDate(record, keys) {
+  return firstText$1(record, keys);
+}
+function addressText(value) {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (!value || typeof value !== "object") return "";
+  const record = value;
+  const formatted = text$6(record.formatted) || text$6(record.label);
+  if (formatted) return formatted;
+  return [record.street, record.city, record.state, record.zip].map((part) => text$6(part)).filter(Boolean).join(", ");
+}
+function addressPart(value, keys) {
+  if (!value || typeof value !== "object") return NOT_PROVIDED;
+  const record = value;
+  for (const key of keys) {
+    const shown = displayScalar(record[key]);
+    if (shown !== NOT_PROVIDED) return shown;
+  }
+  return NOT_PROVIDED;
+}
+function displayScalar(value) {
+  if (typeof value === "string") return value.trim() || NOT_PROVIDED;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
+  if (value && typeof value === "object") {
+    const record = value;
+    if (typeof record.toDate === "function") {
+      const date = record.toDate();
+      if (date instanceof Date && !Number.isNaN(date.getTime())) return date.toISOString().slice(0, 10);
+    }
+    const seconds = typeof record.seconds === "number" ? record.seconds : typeof record._seconds === "number" ? record._seconds : null;
+    if (seconds != null) return new Date(seconds * 1e3).toISOString().slice(0, 10);
+  }
+  return NOT_PROVIDED;
+}
+function formatMoney(value) {
+  return `$${value.toFixed(2)}`;
+}
+function moneyOrNull(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value.replace(/[$,\s]/g, ""));
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+function nested(value) {
+  return value && typeof value === "object" ? value : {};
+}
+function text$6(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function escapeHtml$3(value) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+const OFFICE_NEW_ORDER_EMAIL_TEMPLATE = "office_new_order";
+function officeStaffRecipients(env = process.env) {
+  const seen = /* @__PURE__ */ new Set();
+  const recipients = [];
+  for (const raw of [env.ADMIN_EMAIL, env.COORDINATOR_EMAIL]) {
+    for (const part of String(raw || "").split(/[,;]/)) {
+      const email = part.trim();
+      const key = email.toLowerCase();
+      if (!email || seen.has(key)) continue;
+      seen.add(key);
+      recipients.push(email);
+    }
+  }
+  return recipients;
+}
+async function notifyOfficeOfOrder(input) {
+  const env = input.env ?? process.env;
+  const saved = input.saved || {};
+  const clientEmails = new Set(
+    [saved.email, saved.clientEmail].map((value) => typeof value === "string" ? value.trim().toLowerCase() : "").filter(Boolean)
+  );
+  const recipients = officeStaffRecipients(env).filter((email) => !clientEmails.has(email.toLowerCase()));
+  if (recipients.length === 0) {
+    console.warn("[Bookings] Office new-order email skipped — ADMIN_EMAIL and COORDINATOR_EMAIL are not set.");
+    return { sent: false, reason: "no-recipients" };
+  }
+  if (!emailAllowed(OFFICE_NEW_ORDER_EMAIL_TEMPLATE, env, "staff")) {
+    return { sent: false, reason: "blocked" };
+  }
+  const message = officeNewOrderEmail(saved, { adminUrl: input.adminUrl });
+  const result = await sendEmail({
+    to: recipients.join(", "),
+    template: OFFICE_NEW_ORDER_EMAIL_TEMPLATE,
+    audience: "staff",
+    subject: message.subject,
+    html: message.html,
+    variables: {
+      subject: message.subject,
+      body: message.text
+    }
+  });
+  return { sent: result.sent };
 }
 const router$k = Router();
 const db$m = () => admin.firestore();
@@ -3888,9 +4512,24 @@ router$k.post("/", async (req, res) => {
         }
       }
     }
+    let officeAlertStatus = "skipped";
+    try {
+      const savedSnap = await docRef.get();
+      const savedOrder = { id: savedSnap.id, ...savedSnap.data() || {} };
+      const alert = await notifyOfficeOfOrder({
+        isNewOrder: true,
+        saved: savedOrder,
+        adminUrl: `${appUrl$2()}/admin/order-request/${savedSnap.id}`
+      });
+      officeAlertStatus = alert.sent ? "sent" : "skipped";
+    } catch (err) {
+      console.error("[Bookings] Office new-order email failed:", err);
+      officeAlertStatus = "failed";
+    }
     const notifications = {
       appointmentEmail: clientEmailStatus,
       officeEmail: officeEmailStatus,
+      officeAlert: officeAlertStatus,
       sms: smsStatus,
       passwordSetup: passwordSetupStatus,
       accountCreated: account.createdAccount,
@@ -3988,8 +4627,13 @@ router$k.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       longitude: locationFields.longitude,
       placeId: locationFields.placeId
     };
-    const requestLineItems = Array.isArray(request.lineItems) && request.lineItems.length > 0 ? request.lineItems : Array.isArray(request.services) ? request.services.map((service) => typeof service === "string" ? { name: service, price: 0 } : service) : [];
-    const requestTotal = Number(request.total ?? request.pricing?.total ?? 0) || 0;
+    const requestLineItems = linesForConfirmedOrder(request);
+    const lineSum = sumLineItemPrices(requestLineItems.filter((item) => {
+      const id = String(item.id || "");
+      return !id.startsWith("promo-") && !item.name.startsWith("Promo Code:");
+    }));
+    const requestTotal = Number(request.total ?? request.pricing?.total ?? lineSum) || lineSum;
+    const requestSubtotal = lineSum || Number(request.pricing?.subtotal) || requestTotal;
     const confirmDate = toDate$1(scheduledDate || request.scheduledDate || request.appointmentDate || request.requestedDate);
     const confirmTime = scheduledTime || request.scheduledTime || request.appointmentTime || request.requestedTime || null;
     if (!requestEmail) {
@@ -4048,8 +4692,11 @@ router$k.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       addressLabel: requestAddressLabel,
       ...storedPin,
       services: requestLineItems,
+      lineItems: requestLineItems,
+      selectedService: request.selectedService || null,
       addOns: [],
-      pricing: request.pricing || {},
+      subtotal: requestSubtotal,
+      pricing: { ...request.pricing || {}, subtotal: requestSubtotal, tax: Number(request.pricing?.tax) || 0, total: requestTotal },
       total: requestTotal,
       depositPaid: 0,
       balanceDue: requestTotal,
@@ -4180,7 +4827,7 @@ router$k.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       const draft = buildBookingInvoiceDraft({
         lineItems: requestLineItems,
         total: requestTotal,
-        pricing: request.pricing,
+        pricing: { subtotal: requestSubtotal, tax: Number(request.pricing?.tax) || 0 },
         clientEmail: requestEmail,
         clientId: clientId2,
         clientName: requestClientName,
@@ -4288,6 +4935,12 @@ async function stampDurableLinks(input) {
   if (input.listingId && plan.listingFields) {
     await db$m().collection("listings").doc(input.listingId).update({ ...plan.listingFields, updatedAt: now });
   }
+}
+function linesForConfirmedOrder(request) {
+  const raw = Array.isArray(request.lineItems) && request.lineItems.length > 0 ? request.lineItems : Array.isArray(request.services) ? request.services.map((service) => typeof service === "string" ? { name: service, price: 0 } : service) : [];
+  const stored = normalizeBookingLineItems(raw).filter((item) => item.name.trim());
+  if (chargedServiceLines(stored).length > 0) return stored;
+  return planOrderPackageRepair(request)?.lineItems ?? stored;
 }
 async function linkClientIdByEmail(email) {
   try {
@@ -4920,9 +5573,9 @@ function publicRevisions(listing) {
   });
 }
 function invoiceOf(listing) {
-  const nested = listing.invoice;
-  if (nested && typeof nested === "object" && typeof nested.status === "string") {
-    return { status: nested.status };
+  const nested2 = listing.invoice;
+  if (nested2 && typeof nested2 === "object" && typeof nested2.status === "string") {
+    return { status: nested2.status };
   }
   const status = text$5(listing.invoiceStatus);
   return status ? { status } : null;
@@ -5640,8 +6293,8 @@ function jsonSafe(value) {
   if (Array.isArray(value)) return value.map((item) => jsonSafe(item));
   if (typeof value === "object") {
     const out = {};
-    for (const [key, nested] of Object.entries(value)) {
-      out[key] = jsonSafe(nested);
+    for (const [key, nested2] of Object.entries(value)) {
+      out[key] = jsonSafe(nested2);
     }
     return out;
   }
@@ -10201,8 +10854,8 @@ router$e.get("/me/home", requireAuth, async (req, res) => {
         const data = doc.data();
         galleries.push({
           id: doc.id,
-          title: data.title || addressText(data.address) || "Gallery",
-          address: addressText(data.address),
+          title: data.title || addressText$1(data.address) || "Gallery",
+          address: addressText$1(data.address),
           status: data.status || "pending_upload",
           href: `/gallery/${doc.id}`
         });
@@ -10232,7 +10885,7 @@ router$e.get("/me/home", requireAuth, async (req, res) => {
       const listingId = typeof data.listingId === "string" ? data.listingId : "";
       orders.push({
         id: entry.id,
-        address: addressText(data.address || data.shootLocation) || "Order",
+        address: addressText$1(data.address || data.shootLocation) || "Order",
         status: data.status || "new",
         href: listingId ? `/studio/${listingId}` : ""
       });
@@ -12572,8 +13225,8 @@ function parseLiveChatBody(body) {
     return { ok: false, error: "Invalid email address." };
   }
   if (phone) {
-    const digits = phone.replace(/\D/g, "");
-    if (digits.length < 10 || digits.length > 15) {
+    const digits2 = phone.replace(/\D/g, "");
+    if (digits2.length < 10 || digits2.length > 15) {
       return { ok: false, error: "Invalid phone number." };
     }
   }
