@@ -13190,6 +13190,14 @@ function chicagoLocalToIso(localDateTime) {
   const utc = Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute)) - sign * hours * 36e5;
   return new Date(utc).toISOString();
 }
+function marketingSendLive(env = process.env) {
+  return env.MARKETING_SEND_LIVE === "true";
+}
+function marketingPublicUrl(env = process.env, requestOrigin = "") {
+  const configured = String(env.MARKETING_PUBLIC_URL || env.APP_URL || "").trim().replace(/\/$/, "");
+  if (configured) return configured;
+  return requestOrigin.replace(/\/$/, "");
+}
 class GmassSendBlocked extends Error {
   constructor() {
     super("GMass sending is off. Set GMASS_SEND_ENABLED=true after you mean to send.");
@@ -13265,9 +13273,7 @@ function requireMarketing(permission) {
   };
 }
 function originOf$1(req) {
-  const configured = process.env.APP_URL || process.env.FRONTEND_URL || "";
-  if (configured) return configured.replace(/\/$/, "");
-  return `${req.protocol}://${req.get("host")}`;
+  return marketingPublicUrl(process.env, `${req.protocol}://${req.get("host")}`);
 }
 function blankCampaign(now, settings) {
   return {
@@ -13383,9 +13389,9 @@ function knownFrom(settings, email, res) {
   return match;
 }
 function sendBlocked(res, gmass) {
-  if (!clientNotifyLive()) {
+  if (!marketingSendLive()) {
     res.status(503).json({
-      error: "Marketing email is off. Set CLIENT_NOTIFY_LIVE=true and leave CLIENT_COMMS_ZONE unset (not RED).",
+      error: "Marketing email is off. Set MARKETING_SEND_LIVE=true.",
       suppressed: true
     });
     return true;
@@ -13752,6 +13758,7 @@ router$b.get("/account", requireMarketing("view"), async (_req, res) => {
   const base = {
     configured: gmass.configured,
     writesEnabled: gmass.writesEnabled,
+    sendLive: marketingSendLive(),
     settings,
     links: GMASS_LINKS,
     inPortal: GMASS_IN_PORTAL,

@@ -9,8 +9,8 @@ import { applyMerge, mergeValues, withUnsubscribeFooter } from "../../shared/ema
 import { complaintLike, summarizeGmassReport } from "../../shared/emailMarketing/reports";
 import { chicagoLocalToIso, gmassSendTime } from "../../shared/emailMarketing/schedule";
 import { matchSendingAccount, normalizeSendingAccounts } from "../../shared/emailMarketing/sendingAccounts";
+import { marketingPublicUrl, marketingSendLive } from "../../shared/emailMarketing/sendGate";
 import { buildSuppression } from "../../shared/emailMarketing/suppression";
-import { clientNotifyLive } from "../../shared/clientNotify";
 import { isHostedDeployment, liveServerEnv } from "../../shared/tempAdmin";
 import {
   DEFAULT_MARKETING_SETTINGS,
@@ -38,9 +38,7 @@ function requireMarketing(permission: MarketingPermission) {
 }
 
 function originOf(req: AuthenticatedRequest): string {
-  const configured = process.env.APP_URL || process.env.FRONTEND_URL || "";
-  if (configured) return configured.replace(/\/$/, "");
-  return `${req.protocol}://${req.get("host")}`;
+  return marketingPublicUrl(process.env, `${req.protocol}://${req.get("host")}`);
 }
 
 function blankCampaign(now: string, settings: MarketingSettings): MarketingCampaign {
@@ -168,9 +166,9 @@ function knownFrom(settings: MarketingSettings, email: string, res: { status: (c
 }
 
 function sendBlocked(res: { status: (code: number) => { json: (body: unknown) => void } }, gmass: GmassClient): boolean {
-  if (!clientNotifyLive()) {
+  if (!marketingSendLive()) {
     res.status(503).json({
-      error: "Marketing email is off. Set CLIENT_NOTIFY_LIVE=true and leave CLIENT_COMMS_ZONE unset (not RED).",
+      error: "Marketing email is off. Set MARKETING_SEND_LIVE=true.",
       suppressed: true,
     });
     return true;
@@ -554,6 +552,7 @@ router.get("/account", requireMarketing("view"), async (_req, res) => {
   const base = {
     configured: gmass.configured,
     writesEnabled: gmass.writesEnabled,
+    sendLive: marketingSendLive(),
     settings,
     links: GMASS_LINKS,
     inPortal: GMASS_IN_PORTAL,
