@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { marketingApi } from "@/lib/marketingApi";
@@ -59,6 +59,8 @@ export default function CampaignBuilder() {
   const [accounts, setAccounts] = useState<SendingAccount[]>([]);
   const [newFromLabel, setNewFromLabel] = useState("News");
   const [newFromEmail, setNewFromEmail] = useState("");
+  const [tagsText, setTagsText] = useState("");
+  const loadedId = useRef("");
 
   useEffect(() => {
     let cancelled = false;
@@ -75,13 +77,19 @@ export default function CampaignBuilder() {
         if (!cancelled) navigate(`/admin/communications/email/campaigns/${created.campaign.id}`, { replace: true });
         return;
       }
+      if (loadedId.current === id) return;
       const data = await marketingApi<{ campaign: Campaign }>(token, `/api/marketing/campaigns/${id}`);
-      if (!cancelled) setCampaign(data.campaign);
+      if (!cancelled) {
+        loadedId.current = id;
+        setCampaign(data.campaign);
+        setTagsText(data.campaign.tags.join(", "));
+      }
     }
     load().catch((err: unknown) => setError(err instanceof Error ? err.message : "Could not open the campaign."));
     return () => { cancelled = true; };
+    // Load once per campaign id. Repeating this when the auth object changes wiped subject and from-address edits.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, user]);
+  }, [id, user?.uid]);
 
   const previewHtml = useMemo(() => {
     if (!campaign) return "";
@@ -203,7 +211,7 @@ export default function CampaignBuilder() {
       <ol className="mb-4 flex gap-2 overflow-x-auto">
         {STEPS.map((label, index) => (
           <li key={label}>
-            <button type="button" onClick={() => setStep(index)} className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${step === index ? "bg-[#0d9488] text-white" : "bg-white text-gray-500"}`}>
+            <button type="button" onClick={() => { if (index === step) return; save().then(() => setStep(index)).catch((err: unknown) => setError(err instanceof Error ? err.message : "Could not save.")); }} className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${step === index ? "bg-[#0d9488] text-white" : "bg-white text-gray-500"}`}>
               {index + 1} {label}
             </button>
           </li>
@@ -230,7 +238,7 @@ export default function CampaignBuilder() {
           ) : null}
           {campaign.audienceMode === "tags" ? (
             <label><span className={labelCls}>Tags, comma separated</span>
-              <input className={inputCls} value={campaign.tags.join(", ")} onChange={(event) => setCampaign({ ...campaign, tags: event.target.value.split(",").map((item) => item.trim()).filter(Boolean) })} />
+              <input className={inputCls} value={tagsText} placeholder="vip, austin" onChange={(event) => { setTagsText(event.target.value); setCampaign({ ...campaign, tags: event.target.value.split(",").map((item) => item.trim()).filter(Boolean) }); }} />
             </label>
           ) : null}
           <button type="button" className={buttonCls} onClick={() => save().then(() => setStep(1)).catch((err: unknown) => setError(err instanceof Error ? err.message : "Could not save."))}>Continue</button>

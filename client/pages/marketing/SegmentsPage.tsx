@@ -21,6 +21,7 @@ export default function SegmentsPage() {
   const [segments, setSegments] = useState<SegmentRow[]>([]);
   const [name, setName] = useState("");
   const [filter, setFilter] = useState<SegmentFilter>(EMPTY_SEGMENT_FILTER);
+  const [tagText, setTagText] = useState({ all: "", any: "", none: "" });
   const [editing, setEditing] = useState("");
   const [error, setError] = useState("");
 
@@ -44,6 +45,7 @@ export default function SegmentsPage() {
       });
       setName("");
       setFilter(EMPTY_SEGMENT_FILTER);
+      setTagText({ all: "", any: "", none: "" });
       setEditing("");
       await load();
     } catch (err) {
@@ -62,9 +64,9 @@ export default function SegmentsPage() {
       <form onSubmit={save} className={`${cardCls} mb-4 grid gap-3 p-5 md:grid-cols-2`}>
         <label className="md:col-span-2"><span className={labelCls}>Name</span><input className={inputCls} value={name} onChange={(event) => setName(event.target.value)} required placeholder="Austin agents" /></label>
         <label><span className={labelCls}>Search</span><input className={inputCls} value={filter.query} onChange={(event) => setFilter({ ...filter, query: event.target.value })} /></label>
-        <label><span className={labelCls}>Has all tags</span><input className={inputCls} value={filter.tagsAll.join(", ")} placeholder="vip, austin" onChange={(event) => setFilter({ ...filter, tagsAll: tagsFrom(event.target.value) })} /></label>
-        <label><span className={labelCls}>Has any tag</span><input className={inputCls} value={filter.tagsAny.join(", ")} onChange={(event) => setFilter({ ...filter, tagsAny: tagsFrom(event.target.value) })} /></label>
-        <label><span className={labelCls}>Excludes tags</span><input className={inputCls} value={filter.tagsNone.join(", ")} onChange={(event) => setFilter({ ...filter, tagsNone: tagsFrom(event.target.value) })} /></label>
+        <label><span className={labelCls}>Has all tags</span><input className={inputCls} value={tagText.all} placeholder="vip, austin" onChange={(event) => { setTagText({ ...tagText, all: event.target.value }); setFilter({ ...filter, tagsAll: tagsFrom(event.target.value) }); }} /></label>
+        <label><span className={labelCls}>Has any tag</span><input className={inputCls} value={tagText.any} placeholder="vip, austin" onChange={(event) => { setTagText({ ...tagText, any: event.target.value }); setFilter({ ...filter, tagsAny: tagsFrom(event.target.value) }); }} /></label>
+        <label><span className={labelCls}>Excludes tags</span><input className={inputCls} value={tagText.none} onChange={(event) => { setTagText({ ...tagText, none: event.target.value }); setFilter({ ...filter, tagsNone: tagsFrom(event.target.value) }); }} /></label>
         <label>
           <span className={labelCls}>Source</span>
           <select className={inputCls} value={filter.source} onChange={(event) => setFilter({ ...filter, source: event.target.value as SegmentFilter["source"] })}>
@@ -92,7 +94,7 @@ export default function SegmentsPage() {
         </label>
         <div className="md:col-span-2 flex gap-2">
           <button className={buttonCls} type="submit">{editing ? "Update segment" : "Save segment"}</button>
-          {editing ? <button className={ghostCls} type="button" onClick={() => { setEditing(""); setName(""); setFilter(EMPTY_SEGMENT_FILTER); }}>Cancel</button> : null}
+          {editing ? <button className={ghostCls} type="button" onClick={() => { setEditing(""); setName(""); setFilter(EMPTY_SEGMENT_FILTER); setTagText({ all: "", any: "", none: "" }); }}>Cancel</button> : null}
         </div>
       </form>
       <div className="grid gap-3">
@@ -103,7 +105,7 @@ export default function SegmentsPage() {
               <p className="text-sm text-gray-500">{segment.count} contacts · {[...segment.filter.tagsAll, ...segment.filter.tagsAny].join(", ") || "No tag filter"}</p>
             </div>
             <div className="flex gap-2">
-              <button type="button" className={ghostCls} onClick={() => { setEditing(segment.id); setName(segment.name); setFilter(segment.filter); }}>Edit</button>
+              <button type="button" className={ghostCls} onClick={() => { setEditing(segment.id); setName(segment.name); setFilter(segment.filter); setTagText({ all: segment.filter.tagsAll.join(", "), any: segment.filter.tagsAny.join(", "), none: segment.filter.tagsNone.join(", ") }); }}>Edit</button>
               <button type="button" className={ghostCls} onClick={() => remove(segment.id).catch((err: unknown) => setError(err instanceof Error ? err.message : "Could not delete."))}>Delete</button>
             </div>
           </article>
