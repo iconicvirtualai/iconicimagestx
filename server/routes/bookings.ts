@@ -17,6 +17,7 @@ import { lifeOfTheListingCareSelected } from "../../shared/lifeOfTheListingCare"
 import { buildBookingInvoiceDraft, existingInvoiceId } from "../../shared/bookingInvoice";
 import { nextSequentialInvoiceNumber, planInvoiceLink } from "../../shared/orderProjectInvoice";
 import { chargedServiceLines, normalizeBookingLineItems, orderTotalLabel, resolveSubmittedBooking, sumLineItemPrices } from "../../shared/bookingPricing";
+import { applyServerTravel, isTravelFeeLine, travelSummaryText, type TravelAssessment } from "../../shared/travelZones";
 import { planOrderPackageRepair } from "../../shared/orderPackageRepair";
 import { notifyOfficeOfOrder } from "../services/officeOrderNotify";
 import { packagesForStaffEditor } from "../../shared/bookingCatalog";
@@ -99,10 +100,25 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: "Missing required fields." });
     }
 
+    const clientName = `${firstName} ${lastName}`.trim();
+    const locationFields = storedServiceLocationFields(address);
+    const savedAddress = locationFields.address;
+    if (!savedAddress) {
+      return res.status(400).json({ error: "Missing required fields." });
+    }
+    const displayAddress = addressLabel(savedAddress);
+
     const catalog = await loadBookingCatalog();
     const resolved = resolveSubmittedBooking(req.body, catalog);
-    const lineItems = resolved.lineItems;
-    const total = resolved.total;
+    // A posted travel fee is not a service and is not the price. Quote the pin or ZIP.
+    const keptLines = resolved.lineItems.filter((item) => !isTravelFeeLine(item));
+    if (chargedServiceLines(keptLines).length === 0) {
+      return res.status(400).json({ error: "No services selected." });
+    }
+    const traveled = applyServerTravel(keptLines, savedAddress);
+    const lineItems = traveled.lineItems;
+    const total = traveled.total;
+    const travel = traveled.travel;
     const promoCode = resolved.promoCode;
     const promoDiscount = resolved.promoDiscount;
     const pricing = { subtotal: total, tax: 0, total };
@@ -111,18 +127,6 @@ router.post("/", async (req, res) => {
     const selectedAddOns = resolved.selectedAddOns;
     const specializedPhotography = resolved.specializedPhotography;
     const virtualStagingCredits = resolved.virtualStagingCredits;
-
-    if (chargedServiceLines(lineItems).length === 0) {
-      return res.status(400).json({ error: "No services selected." });
-    }
-
-    const clientName = `${firstName} ${lastName}`.trim();
-    const locationFields = storedServiceLocationFields(address);
-    const savedAddress = locationFields.address;
-    if (!savedAddress) {
-      return res.status(400).json({ error: "Missing required fields." });
-    }
-    const displayAddress = addressLabel(savedAddress);
     const { address: _savedAddress, ...storedPin } = locationFields;
 
     const orderRequest = {
@@ -139,6 +143,10 @@ router.post("/", async (req, res) => {
       vibeNote: vibeNote || "",
       promoCode: promoCode || null,
       promoDiscount: Number(promoDiscount) || 0,
+      travelZone: travel.travelZone,
+      travelMiles: travel.travelMiles,
+      travelFeeCents: travel.travelFeeCents,
+      travelQuoted: travel.travelQuoted,
       scheduledDate: scheduledDate || null,
       scheduledTime: scheduledTime || null,
       photographerPreference: photographerPreference || null,
@@ -226,6 +234,7 @@ router.post("/", async (req, res) => {
         total,
         promoCode,
         promoDiscount,
+        travel,
         clientId: account.clientId,
       });
       invoiceId = created.invoiceId;
@@ -279,6 +288,7 @@ router.post("/", async (req, res) => {
         furnishingStatus: furnishingStatus || "Not specified",
         accessMethod: accessLine,
         squareFootage: squareFootage ? `${squareFootage} sq ft` : "",
+        travelFee: travelSummaryText(travel),
         dashboardUrl: `${appUrl()}/admin/order-request/${docRef.id}`,
       },
     }).then((result) => (result.sent ? "sent" as const : "failed" as const)).catch((err) => {
@@ -302,6 +312,7 @@ router.post("/", async (req, res) => {
         furnishingStatus: furnishingStatus || "Not specified",
         accessMethod: accessLine,
         squareFootage: squareFootage ? `${squareFootage} sq ft` : "",
+        travelFee: travelSummaryText(travel),
         dashboardUrl: `${appUrl()}/admin/order-request/${docRef.id}`,
       },
     }).then((result) => (result.sent ? "sent" as const : "failed" as const)).catch((err) => {
@@ -521,13 +532,14 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       longitude: locationFields.longitude,
       placeId: locationFields.placeId,
     };
-    const requestLineItems = linesForConfirmedOrder(request);
-    const lineSum = sumLineItemPrices(requestLineItems.filter((item) => {
+    const traveledConfirm = applyServerTravel(linesForConfirmedOrder(request), requestAddress);
+    const requestLineItems = traveledConfirm.lineItems;
+    const travel = traveledConfirm.travel;
+    const requestTotal = traveledConfirm.total;
+    const requestSubtotal = sumLineItemPrices(requestLineItems.filter((item) => {
       const id = String(item.id || "");
       return !id.startsWith("promo-") && !item.name.startsWith("Promo Code:");
     }));
-    const requestTotal = Number(request.total ?? request.pricing?.total ?? lineSum) || lineSum;
-    const requestSubtotal = lineSum || Number(request.pricing?.subtotal) || requestTotal;
     const confirmSource = scheduledDate || request.scheduledDate || request.appointmentDate || request.requestedDate;
     const confirmDate = toDate(confirmSource);
     const confirmTime = scheduledTime || request.scheduledTime || request.appointmentTime || request.requestedTime || null;
@@ -609,6 +621,10 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       subtotal: requestSubtotal,
       pricing: { ...(request.pricing || {}), subtotal: requestSubtotal, tax: Number(request.pricing?.tax) || 0, total: requestTotal },
       total: requestTotal,
+      travelZone: travel.travelZone,
+      travelMiles: travel.travelMiles,
+      travelFeeCents: travel.travelFeeCents,
+      travelQuoted: travel.travelQuoted,
       depositPaid: 0,
       balanceDue: requestTotal,
       status: "confirmed",
@@ -687,7 +703,8 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       clientEmail: requestEmail,
       clientPhone: requestPhone,
       address: requestAddressLabel,
-      services: requestLineItems.map((item: any) => item.name || String(item)).filter(Boolean),
+      services: requestLineItems.filter((item) => !isTravelFeeLine(item)).map((item) => item.name || String(item)).filter(Boolean),
+      travelSummary: travelSummaryText(travel, { miles: true }),
       scheduledDate: confirmDate,
       scheduledTime: confirmTime,
       photographerEmail: photographer?.email || null,
@@ -758,6 +775,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
         orderRequestId: req.params.id,
         promoCode: request.promoCode,
         promoDiscount: request.promoDiscount,
+        travel,
       });
       await invoiceRef.set({
         ...draft,
@@ -815,6 +833,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
         scheduledDate: bookingDateLabel(confirmSource, "To be confirmed"),
         scheduledTime: confirmTime || "To be confirmed",
         photographerName: assignedPhotographerName || "Our team",
+        travelFee: travelSummaryText(travel),
         orderId: orderRef.id,
         portalUrl: `${appUrl()}/portal`,
       },
@@ -917,6 +936,7 @@ async function createBookingInvoiceDraft(input: {
   total: unknown;
   promoCode?: string | null;
   promoDiscount?: unknown;
+  travel?: TravelAssessment | null;
   clientId?: string | null;
 }): Promise<{ invoiceId: string; clientId: string | null }> {
   const clientId = input.clientId || await linkClientIdByEmail(input.email);
@@ -930,6 +950,7 @@ async function createBookingInvoiceDraft(input: {
     orderRequestId: input.orderRequestId,
     promoCode: input.promoCode,
     promoDiscount: input.promoDiscount,
+    travel: input.travel,
   });
   const invoiceRef = db().collection("invoices").doc();
   await invoiceRef.set({

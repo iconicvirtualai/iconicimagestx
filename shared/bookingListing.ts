@@ -7,6 +7,7 @@
 import { addressText, calendarDateKey } from "./clientHome.ts";
 import { normalizeEmail } from "./listingAccess.ts";
 import { storedRecordPin } from "./serviceLocation.ts";
+import { travelFromRecord } from "./travelZones.ts";
 
 export const PORTAL_LISTING_ID = /^[A-Za-z0-9_-]{4,128}$/;
 
@@ -264,6 +265,13 @@ function desiredListingFields(group: BookingListingGroup, identity?: BookingList
   assign(fields, "apptTime", scheduleTime);
   assign(fields, "scheduledTime", scheduleTime);
   if (names.length) fields.services = names;
+  const travel = firstStoredTravel(group);
+  if (travel) {
+    fields.travelZone = travel.travelZone;
+    fields.travelMiles = travel.travelMiles;
+    fields.travelFeeCents = travel.travelFeeCents;
+    fields.travelQuoted = travel.travelQuoted;
+  }
   if (total != null) fields.total = total;
   if (squareFootage != null) fields.squareFootage = squareFootage;
   assign(fields, "propertyStatus", firstText(group, ["propertyStatus"]));
@@ -542,6 +550,14 @@ function firstText(group: BookingListingGroup, keys: string[]): string {
     }
   }
   return "";
+}
+
+function firstStoredTravel(group: BookingListingGroup) {
+  for (const doc of propertyDocs(group)) {
+    const travel = travelFromRecord(doc.data);
+    if (travel) return travel;
+  }
+  return null;
 }
 
 function firstScalar(group: BookingListingGroup, keys: string[]): string | number | null {

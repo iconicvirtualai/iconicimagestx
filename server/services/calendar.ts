@@ -9,6 +9,8 @@ export interface CalendarBooking {
   clientPhone?: string;
   address: unknown;
   services: string[];
+  /** Already-formatted travel line, such as "Travel fee — Zone 2 — $50.00 (27.21 mi)". */
+  travelSummary?: string | null;
   scheduledDate?: Date | null;
   scheduledTime?: string | null;
   photographerEmail?: string | null;
@@ -89,6 +91,19 @@ function parseTime(time?: string | null) {
   return { hours, minutes };
 }
 
+export function bookingEventDescription(booking: CalendarBooking): string {
+  return [
+    `Order: ${booking.orderId}`,
+    `Client: ${booking.clientName}`,
+    booking.clientEmail ? `Email: ${booking.clientEmail}` : "",
+    booking.clientPhone ? `Phone: ${booking.clientPhone}` : "",
+    booking.photographerName ? `Photographer: ${booking.photographerName}` : "",
+    booking.services.length ? `Services: ${booking.services.join(", ")}` : "",
+    booking.travelSummary ? `Travel: ${booking.travelSummary}` : "",
+    booking.notes ? `Notes: ${booking.notes}` : "",
+  ].filter(Boolean).join("\n");
+}
+
 export function bookingEventTimes(date?: Date | null, time?: string | null) {
   if (!date) return null;
   const { hours, minutes } = parseTime(time);
@@ -122,15 +137,7 @@ export async function createCalendarBookingEvent(booking: CalendarBooking) {
 
   const calendar = google.calendar({ version: "v3", auth });
   const summary = `Iconic Images: ${booking.clientName}`;
-  const description = [
-    `Order: ${booking.orderId}`,
-    `Client: ${booking.clientName}`,
-    booking.clientEmail ? `Email: ${booking.clientEmail}` : "",
-    booking.clientPhone ? `Phone: ${booking.clientPhone}` : "",
-    booking.photographerName ? `Photographer: ${booking.photographerName}` : "",
-    booking.services.length ? `Services: ${booking.services.join(", ")}` : "",
-    booking.notes ? `Notes: ${booking.notes}` : "",
-  ].filter(Boolean).join("\n");
+  const description = bookingEventDescription(booking);
 
   const response = await calendar.events.insert({
     calendarId,

@@ -29,6 +29,12 @@ import {
   type BookingPriceInput,
 } from "@shared/bookingPricing";
 import {
+  assessTravel,
+  travelCustomerLine,
+  travelFeeDollars,
+  type TravelAssessment,
+} from "@shared/travelZones";
+import {
   LIFE_OF_THE_LISTING_CARE_BLURB,
   LIFE_OF_THE_LISTING_CARE_CHECKBOX_LABEL,
   LIFE_OF_THE_LISTING_CARE_PRICE_LABEL,
@@ -114,6 +120,18 @@ const consultQuestions = [
 interface BookingFormProps {
   initialServiceId?: string;
   initialCategoryId?: string;
+}
+
+function TravelFeeLine({ travel }: { travel: TravelAssessment }) {
+  const line = travelCustomerLine(travel);
+  return (
+    <div data-testid="travel-fee-line" className="flex justify-between items-start gap-3 text-[11px]">
+      <span className="text-gray-500">{line.label}</span>
+      {line.amount ? (
+        <span data-testid="travel-fee-amount" className="font-bold text-black shrink-0">{line.amount}</span>
+      ) : null}
+    </div>
+  );
 }
 
 export default function BookingForm({ initialServiceId, initialCategoryId }: BookingFormProps = {}) {
@@ -499,7 +517,9 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   const isConsultationPath = selectedServiceData && ["branding", "business", "growth"].includes(selectedServiceData.category);
   const isStudioPath = selectedServiceData?.category === "studio";
 
-  const calculateTotal = () => calculateSidebarTotal(bookingPriceInput());
+  const travel = assessTravel(formData.servicePlace ?? formData.address);
+  const showTravelLine = Boolean(formData.servicePlace) || formData.address.trim().length > 0;
+  const calculateTotal = () => Math.round((calculateSidebarTotal(bookingPriceInput()) + travelFeeDollars(travel)) * 100) / 100;
 
   const handleApplyPromo = () => {
     const promo = promoDiscountFor(promoInput);
@@ -515,7 +535,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   };
 
   const renderSummarySidebar = () => (
-    <div className="bg-white text-neutral-950 rounded-[2rem] border border-gray-100 p-6 shadow-xl sticky top-8">
+    <div data-testid="booking-estimator" className="bg-white text-neutral-950 rounded-[2rem] border border-gray-100 p-6 shadow-xl sticky top-8">
       <h3 className="text-lg font-black text-black uppercase tracking-tight mb-4 pb-3 border-b">Order Summary</h3>
       <div className="space-y-3 mb-6">
         {selectedServiceData && (
@@ -625,6 +645,11 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
       </div>
 
       <div className="pt-4 border-t border-dashed border-gray-200">
+        {showTravelLine && (
+          <div className="mb-4">
+            <TravelFeeLine travel={travel} />
+          </div>
+        )}
         <div className="flex justify-between items-center mb-4">
           <span className="text-[10px] font-black uppercase text-gray-400">Total Estimate</span>
           {hasBookingSelection(bookingPriceInput()) ? (
@@ -1327,6 +1352,18 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
             </div>
 
             <div className="space-y-8 max-w-lg mx-auto">
+               <div data-testid="order-summary-before-submit" className="rounded-2xl border border-gray-100 bg-gray-50 p-5 space-y-3">
+                 <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Order summary</p>
+                 <TravelFeeLine travel={travel} />
+                 <div className="flex justify-between items-center border-t border-gray-200 pt-3">
+                   <span className="text-[10px] font-black uppercase text-gray-400">Total estimate</span>
+                   {hasBookingSelection(bookingPriceInput()) ? (
+                     <span className="text-lg font-black text-black">${calculateTotal()}</span>
+                   ) : (
+                     <span className="text-sm font-bold uppercase tracking-widest text-gray-400">Select a package</span>
+                   )}
+                 </div>
+               </div>
                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">First Name</label>
