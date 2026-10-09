@@ -22,6 +22,7 @@ const FIELD_LABELS = [
   "Client email",
   "Client phone",
   "Agent",
+  "Agent email/phone",
   "Brokerage",
   "Property address",
   "Unit",
@@ -75,6 +76,7 @@ export function officeNewOrderEmail(
     ["Client email", firstText(saved, ["clientEmail", "email"])],
     ["Client phone", firstText(saved, ["clientPhone", "phone"])],
     ["Agent", firstText(saved, ["agentName", "agent"])],
+    ["Agent email/phone", agentContactOf(saved)],
     ["Brokerage", firstText(saved, ["brokerage", "brokerageName"])],
     ["Property address", address === NOT_PROVIDED ? NOT_PROVIDED : addressText(saved.address) || address],
     ["Unit", firstText(saved, ["unit", "unitNumber"]) || addressPart(saved.address, ["unit", "unitNumber"])],
@@ -131,6 +133,32 @@ function clientNameOf(saved: Record<string, unknown>): string {
   if (named) return named;
   const joined = [text(saved.firstName), text(saved.lastName)].filter(Boolean).join(" ");
   return joined || NOT_PROVIDED;
+}
+
+function agentContactOf(saved: Record<string, unknown>): string {
+  const clientEmail = firstText(saved, ["clientEmail", "email"]).toLowerCase();
+  const clientPhone = digits(firstText(saved, ["clientPhone", "phone"]));
+  const email = agentField(saved, ["agentEmail", "realtorEmail", "listingAgentEmail", "brokerEmail"], "email");
+  const phone = agentField(saved, ["agentPhone", "realtorPhone", "listingAgentPhone", "brokerPhone"], "phone");
+  const parts: string[] = [];
+  if (email && email.toLowerCase() !== clientEmail) parts.push(email);
+  if (phone && digits(phone) !== clientPhone) parts.push(phone);
+  return parts.length ? parts.join(" / ") : NOT_PROVIDED;
+}
+
+function agentField(saved: Record<string, unknown>, keys: string[], nestedKey: "email" | "phone"): string {
+  const direct = firstText(saved, keys);
+  if (direct !== NOT_PROVIDED) return direct;
+  for (const holder of [saved.agent, saved.listingAgent, saved.realtor]) {
+    const record = nested(holder);
+    const value = text(record[nestedKey]);
+    if (value) return value;
+  }
+  return "";
+}
+
+function digits(value: string): string {
+  return value === NOT_PROVIDED ? "" : value.replace(/\D/g, "");
 }
 
 function notesOf(saved: Record<string, unknown>): string {

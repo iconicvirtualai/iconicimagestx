@@ -79,19 +79,30 @@ describe("office new order delivery", () => {
 describe("order package backfill", () => {
   it("repairs empty lines and sends nothing", async () => {
     sendEmailMock.mockClear();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const write = vi.fn(async (_patch: OrderPackageRepair) => undefined);
     const result = await runOrderPackageBackfill({
       id: "6y4F0RVWBQw5z5IJxbWe",
       clientName: "TEST ORDER Sytoya",
       selectedService: "Hollywood — $199",
-      total: 199,
+      total: 175,
       lineItems: [],
       services: [],
       vibeNote: "TEST ORDER",
     }, write);
     expect(result.updated).toBe(true);
     expect(write).toHaveBeenCalledTimes(1);
-    expect(write.mock.calls[0]?.[0]?.lineItems[0]).toMatchObject({ name: "Hollywood", price: 199 });
+    const patch = write.mock.calls[0]?.[0];
+    expect(patch && Object.keys(patch).sort()).toEqual(["lineItems", "services"]);
+    expect(patch).not.toHaveProperty("total");
+    expect(patch).not.toHaveProperty("subtotal");
+    expect(patch).not.toHaveProperty("pricing");
+    expect(patch).not.toHaveProperty("paymentStatus");
+    expect(patch).not.toHaveProperty("invoice");
+    expect(patch).not.toHaveProperty("amountPaid");
+    expect(patch?.lineItems[0]?.name).toBe("Hollywood");
+    expect(warn.mock.calls.flat().join(" ")).toContain("kept stored total 175");
+    warn.mockRestore();
     expect(sendEmailMock).not.toHaveBeenCalled();
 
     const repairSource = readFileSync(new URL("./orderPackageRepair.ts", import.meta.url), "utf8");

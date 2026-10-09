@@ -50,6 +50,8 @@ const saved = {
   email: "sytoya@example.com",
   phone: "281-555-0100",
   agentName: "Ada Agent",
+  agentEmail: "ada@harbor.com",
+  agentPhone: "713-555-0199",
   brokerage: "Harbor Realty",
   address: "123 Main St, Conroe, TX",
   unit: "12",
@@ -91,6 +93,7 @@ describe("office new order email", () => {
     expect(email.text).toContain("Client email: sytoya@example.com");
     expect(email.text).toContain("Client phone: 281-555-0100");
     expect(email.text).toContain("Agent: Ada Agent");
+    expect(email.text).toContain("Agent email/phone: ada@harbor.com / 713-555-0199");
     expect(email.text).toContain("Brokerage: Harbor Realty");
     expect(email.text).toContain("Property address: 123 Main St, Conroe, TX");
     expect(email.text).toContain("Unit: 12");
@@ -125,6 +128,21 @@ describe("office new order email", () => {
     for (const label of officeOrderEmailFieldLabels()) {
       expect(email.text).toContain(`${label}: ${NOT_PROVIDED}`);
     }
+  });
+
+  it("shows agent email and phone only when they differ from the client", () => {
+    const same = officeNewOrderEmail({
+      ...saved,
+      agentEmail: "sytoya@example.com",
+      agentPhone: "(281) 555-0100",
+    }, { catalog });
+    expect(same.text).toContain(`Agent email/phone: ${NOT_PROVIDED}`);
+    const namedOnly = officeNewOrderEmail({
+      ...saved,
+      agentEmail: "ada@harbor.com",
+      agentPhone: "281-555-0100",
+    }, { catalog });
+    expect(namedOnly.text.split("\n").find((row) => row.startsWith("Agent email/phone:"))).toBe("Agent email/phone: ada@harbor.com");
   });
 
   it("prefixes [TEST] when the client name or notes contain TEST ORDER", () => {
