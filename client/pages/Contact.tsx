@@ -4,6 +4,7 @@ import ChatWidget from "@/components/ChatWidget";
 import { Button } from "@/components/ui/button";
 import { MessageCircle, ArrowRight, Phone } from "lucide-react";
 import { toast } from "sonner";
+import { trackContactSubmit } from "@/lib/tracking";
 
 interface FormData {
   name: string;
@@ -57,6 +58,10 @@ export default function Contact() {
         throw new Error(data.error || "Failed to send message");
       }
 
+      trackContactSubmit({
+        email: formData.email,
+        phone: formData.phone,
+      });
       toast.success("Message sent successfully! We'll get back to you soon.");
       setFormData({
         name: "",

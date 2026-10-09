@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { createOrder } from "@/lib/createOrder";
+import { trackBookingSuccess } from "@/lib/tracking";
 import { bookingFollowUp } from "@/lib/bookingFollowUp";
 import { Link, useSearchParams } from "react-router-dom";
 import ChatWidget from "@/components/ChatWidget";
@@ -486,6 +487,13 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     setSubmitNote(bookingFollowUp(result));
 
     setStep("success");
+    trackBookingSuccess({
+      packageId: formData.selectedService,
+      value: total,
+      email: formData.email,
+      phone: formData.phone,
+      transactionId: result?.requestId,
+    });
 
   } catch (error: any) {
     console.error("ORDER ERROR:", error);
