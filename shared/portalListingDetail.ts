@@ -6,6 +6,7 @@
  * Those edits do not geocode, look up public records, or publish payment.
  */
 
+import { addressText } from "./addressText.ts";
 import { readPhotoEditRequests, type PhotoEditRequest } from "./photoEditRequest";
 
 export const PORTAL_LISTING_TABS = [
@@ -672,8 +673,7 @@ function addressFromRecord(record: Record<string, unknown>): PortalAddress {
 }
 
 function addressString(value: unknown): string {
-  if (typeof value === "string") return value.trim();
-  return "";
+  return addressText(value);
 }
 
 function firstText(record: Record<string, unknown>, keys: string[]): string {

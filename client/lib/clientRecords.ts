@@ -1,5 +1,7 @@
 /** Shared helpers for the admin client list and client account. */
 
+import { recordAddressText } from "@shared/addressText";
+
 export interface ClientSocial {
   instagram?: string;
   facebook?: string;
@@ -89,9 +91,5 @@ export function formatWhen(value: any): string {
 }
 
 export function recordAddress(record: any): string {
-  const address = record?.address || record?.shootLocation;
-  if (!address) return "—";
-  if (typeof address === "string") return address;
-  if (address.formatted) return address.formatted;
-  return [address.street, address.city, address.state, address.zip].filter(Boolean).join(", ") || "—";
+  return recordAddressText(record) || "—";
 }

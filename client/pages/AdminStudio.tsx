@@ -1,4 +1,5 @@
 import * as React from "react";
+import { recordAddressText } from "@shared/addressText";
 import AdminLayout from "@/components/AdminLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { db, storage } from "@/lib/firebase";
@@ -219,7 +220,7 @@ function UploadPortal({ listings, user, isAdmin, isEditor }: any) {
 
     // Folder structure: Uploads > Year > Month > Day > Order# - Agent - Address
     const datePath = `${format(now, "yyyy")}/${format(now, "MM")}/${format(now, "dd")}`;
-    const orderLabel = `${listing.id.substring(0,6)} - ${clientName} - ${listing.propertyAddress || 'Address'}`;
+    const orderLabel = `${listing.id.substring(0,6)} - ${clientName} - ${recordAddressText(listing) || "Address"}`;
     const basePath = `Uploads/${datePath}/${orderLabel}`;
 
     const uploadPromises = files.map(file => {
@@ -284,7 +285,7 @@ function UploadPortal({ listings, user, isAdmin, isEditor }: any) {
               onClick={() => setSelectedListing(l.id)}
               className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedListing === l.id ? 'border-[#0d9488] bg-[#0d9488]/5' : 'border-gray-100 bg-white'}`}
             >
-              <p className="text-xs font-black truncate">{l.propertyAddress || 'Unnamed'}</p>
+              <p className="text-xs font-black truncate">{recordAddressText(l) || "Unnamed"}</p>
               <p className="text-[10px] text-gray-400 font-bold">{l.clientName || 'Agent'}</p>
               <div className="flex items-center gap-2 mt-2">
                 <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 bg-gray-100 rounded-full">
@@ -512,7 +513,7 @@ function EditingStudio({ listings, apiKey, user }: { listings: any[], apiKey: st
               updatedAt: serverTimestamp()
             });
 
-            toast.success(`Enhancement complete for ${listing.propertyAddress}`);
+            toast.success(`Enhancement complete for ${recordAddressText(listing) || "this listing"}`);
             setProcessingId(null);
           }
         } catch (e) {
@@ -628,7 +629,7 @@ function EditingStudio({ listings, apiKey, user }: { listings: any[], apiKey: st
               <div className="flex items-start justify-between gap-6">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-2">
-                    <h4 className="text-sm font-black text-black truncate">{l.propertyAddress || 'Unnamed Listing'}</h4>
+                    <h4 className="text-sm font-black text-black truncate">{recordAddressText(l) || "Unnamed Listing"}</h4>
                     <StatusBadge status={status} />
                     {isIncomplete && (
                       <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-red-50 text-red-500 border border-red-100">
@@ -754,7 +755,7 @@ function TemplatesFloorplans({ listings, user }: { listings: any[]; user: any })
     setUploading(true);
 
     const clientName = selected.clientName || selected.customerName || "Agent";
-    const address = selected.propertyAddress || selected.address || selected.shootLocation || "Address";
+    const address = recordAddressText(selected) || "Address";
     const basePath = `Floorplans/${selectedListing}/${clientName} - ${address}`;
 
     try {
@@ -872,7 +873,7 @@ function TemplatesFloorplans({ listings, user }: { listings: any[]; user: any })
                 onClick={() => setSelectedListing(listing.id)}
                 className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedListing === listing.id ? "border-[#0d9488] bg-[#0d9488]/5" : "border-gray-100 bg-white hover:border-gray-200"}`}
               >
-                <p className="text-xs font-black truncate">{listing.propertyAddress || listing.address || "Unnamed listing"}</p>
+                <p className="text-xs font-black truncate">{recordAddressText(listing) || "Unnamed listing"}</p>
                 <p className="text-[10px] text-gray-400 font-bold mt-0.5">{listing.clientName || listing.customerName || "Agent"}</p>
                 <div className="flex flex-wrap gap-2 mt-3">
                   <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 bg-gray-100 rounded-full">
@@ -900,7 +901,7 @@ function TemplatesFloorplans({ listings, user }: { listings: any[]; user: any })
               <div className="flex items-start justify-between gap-4 mb-6">
                 <div>
                   <p className={labelCls}>Selected Listing</p>
-                  <h3 className="text-lg font-black text-black mt-1">{selected.propertyAddress || selected.address || "Unnamed listing"}</h3>
+                  <h3 className="text-lg font-black text-black mt-1">{recordAddressText(selected) || "Unnamed listing"}</h3>
                   <p className="text-xs text-gray-400 font-bold mt-1">{selected.clientName || selected.customerName || "Agent"}</p>
                 </div>
                 <StatusBadge status={(selected.floorplanWorkflowStatus === "canva_template_queued" ? "Processing" : "Pending") as WorkflowStatus} />

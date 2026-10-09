@@ -71,6 +71,10 @@ describe("Iconic Studio queue and files", () => {
 
   it("reads a listing address and a photo frame", () => {
     expect(listingAddressLabel({ address: { street: "10 Oak", city: "Austin", state: "TX" } })).toBe("10 Oak, Austin, TX");
+    expect(listingAddressLabel({
+      address: { formatted: "100 Congress Ave, Austin, TX 78701", lat: 30.26, lng: -97.74, placeId: "place_congress" },
+    })).toBe("100 Congress Ave, Austin, TX 78701");
+    expect(listingAddressLabel({})).toBe("Untitled listing");
     const frame = frameFromListingImage({
       path: "listings/job123456/finals/1_a.jpg",
       url: "https://example.com/a.jpg",

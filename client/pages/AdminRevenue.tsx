@@ -4,13 +4,12 @@ import { DollarSign, TrendingUp, Clock, AlertTriangle, CheckCircle, FileText, Do
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 import { toast } from "sonner";
+import { addressText } from "@shared/addressText";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 
 function fmtCurrency(n: number): string { return "$" + (n || 0).toLocaleString("en-US", { minimumFractionDigits: 2 }); }
-function fmtAddr(a: any): string {
-  if (!a) return "—";
-  if (typeof a === "string") return a;
-  return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "—";
+function fmtAddr(a: unknown): string {
+  return addressText(a) || "—";
 }
 function fmtDate(ts: any): string {
   if (!ts) return "—";

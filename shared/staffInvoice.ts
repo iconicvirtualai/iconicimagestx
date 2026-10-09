@@ -3,6 +3,7 @@
  * Firestore only. This module does not call Square, email, or SMS.
  */
 
+import { addressText } from "./addressText.ts";
 import { normalizeBookingLineItems, type BookingLineItem } from "./bookingPricing.ts";
 import { cleanPersonName, normalizeEmail } from "./listingAccess.ts";
 import { draftInvoiceNumber } from "./orderProjectInvoice.ts";
@@ -196,20 +197,8 @@ export function staffServiceUnitPrice(line: StaffServiceLine, unitPrice: number)
 }
 
 export function billToAddressText(address: unknown): string {
-  if (!address) return "";
-  if (typeof address === "string") {
-    const text = address.trim();
-    return text === "—" ? "" : text;
-  }
-  if (typeof address === "object") {
-    const record = address as Record<string, unknown>;
-    if (typeof record.formatted === "string" && record.formatted.trim()) return record.formatted.trim();
-    return [record.street, record.city, record.state, record.zip]
-      .map((part) => (typeof part === "string" ? part.trim() : ""))
-      .filter(Boolean)
-      .join(", ");
-  }
-  return "";
+  const text = addressText(address);
+  return text === "—" ? "" : text;
 }
 
 export function isPromoLine(item: { id?: string; name?: string }): boolean {

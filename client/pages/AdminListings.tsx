@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 import StaffActionQueue from "@/components/StaffActionQueue";
+import { recordAddressText } from "@shared/addressText";
 import { choosePortalClient, listingAppointmentDate } from "@shared/listingWrite";
 import {
   LISTING_QUEUE,
@@ -504,7 +505,7 @@ export default function AdminListings() {
   const queueNow = React.useMemo(() => new Date(), [projects]);
   const narrowed = React.useMemo(() => {
     return projects.filter(p => {
-      const loc = p.address || p.shootLocation || "";
+      const loc = recordAddressText(p);
       const tile = buildAdminOrderTile(p as unknown as Record<string, unknown>);
       const matchSearch = !search.trim() ||
         [loc, p.clientName, p.id, tile.packageName, tile.skinLabel, tile.orderCode, tile.clientName, tile.channel]

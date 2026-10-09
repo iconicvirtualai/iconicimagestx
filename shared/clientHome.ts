@@ -8,6 +8,7 @@ import { brandedInvoicePdf, brandedInvoicePdfFilename, type BrandedInvoicePdfInp
 import { iconicBusinessFooterLines } from "./iconicBusiness.ts";
 import { invoiceFaceFromStored } from "./invoiceFace.ts";
 import { presentInvoiceNumber } from "./orderProjectInvoice.ts";
+import { addressText } from "./addressText.ts";
 import {
   formatShootDateLabel,
   listingCardAddress,
@@ -15,6 +16,8 @@ import {
   resolveListingCardLook,
   type ListingCardLook,
 } from "./listingCard.ts";
+
+export { addressText };
 
 const CHICAGO = "America/Chicago";
 
@@ -120,20 +123,6 @@ export interface ClientAppointment {
   requestedTime: string;
   approved: boolean;
   createdAt: string | null;
-}
-
-export function addressText(value: unknown): string {
-  if (!value) return "";
-  if (typeof value === "string") return value.trim();
-  if (typeof value === "object") {
-    const address = value as Record<string, unknown>;
-    if (typeof address.formatted === "string" && address.formatted.trim()) return address.formatted.trim();
-    if (typeof address.label === "string" && address.label.trim()) return address.label.trim();
-    return [address.street, address.city, address.state, address.zip]
-      .filter((part) => typeof part === "string" && part.trim())
-      .join(", ");
-  }
-  return "";
 }
 
 export function statusKey(value: unknown): string {

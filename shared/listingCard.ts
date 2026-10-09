@@ -4,6 +4,7 @@
  * Foundation, Evolution, and Bundle stay on the plain project tile.
  */
 
+import { addressText } from "./addressText.ts";
 import {
   resolvePackageSkin,
   resolvePackageSkinFromOrder,
@@ -84,12 +85,8 @@ function addressRecords(data: Record<string, unknown>): Record<string, unknown>[
 
 function addressString(data: Record<string, unknown>): string {
   for (const key of ["address", "propertyAddress", "shootLocation", "addressLabel"]) {
-    const value = data[key];
-    if (typeof value === "string" && value.trim()) return value.trim();
-    const record = asRecord(value);
-    if (!record) continue;
-    const formatted = firstText(record, ["formatted", "label"]);
-    if (formatted) return formatted;
+    const label = addressText(data[key]);
+    if (label) return label;
   }
   return "";
 }

@@ -31,17 +31,15 @@ import {
   markScheduledAppointmentConfirmed,
   upsertScheduledAppointment,
 } from "@/lib/scheduleRecords";
+import { addressText } from "@shared/addressText";
 import {
   LIFE_OF_THE_LISTING_CARE_PRICE_LABEL,
   LIFE_OF_THE_LISTING_CARE_SUMMARY_LABEL,
 } from "@shared/lifeOfTheListingCare";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function fmtAddr(a: any): string {
-  if (!a) return "—";
-  if (typeof a === "string") return a;
-  if (a.formatted) return a.formatted;
-  return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "—";
+function fmtAddr(a: unknown): string {
+  return addressText(a) || "—";
 }
 function fmtDate(ts: any): string {
   if (!ts) return "—";

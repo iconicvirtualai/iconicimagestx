@@ -18,6 +18,7 @@ import {
   projectInvoiceButtonLabel,
 } from "@shared/orderProjectInvoice";
 import { ensureLinkedInvoice, resolveLinkedInvoice } from "@/lib/orderProjectInvoice";
+import { addressText, recordAddressText } from "@shared/addressText";
 import { staffInvoicePath } from "@shared/staffInvoice";
 import { PresentationShareButton, PresentationSharePanel } from "@/components/PresentationSharePanel";
 import { PhotoEditRequestStaff } from "@/components/PhotoEditRequestStaff";
@@ -47,16 +48,22 @@ const BIZ_TABS = ["Photos", "Videography", "Branding", "Social Content", "Files"
 const inputCls = "w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30";
 const labelCls = "block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1";
 
+function fieldText(value: unknown): string {
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+  return addressText(value);
+}
+
 function InfoField({ label, value, editing, onChange, type = "text" }: {
   label: string; value: any; editing: boolean; onChange: (v: string) => void; type?: string;
 }) {
+  const shown = fieldText(value);
   return (
     <div>
       <p className={labelCls}>{label}</p>
       {editing ? (
-        <input type={type} value={value || ""} onChange={e => onChange(e.target.value)} className={inputCls} />
+        <input type={type} value={shown} onChange={e => onChange(e.target.value)} className={inputCls} />
       ) : (
-        <p className="text-sm font-bold text-gray-800">{value || "—"}</p>
+        <p className="text-sm font-bold text-gray-800">{shown || "—"}</p>
       )}
     </div>
   );
@@ -245,20 +252,26 @@ function PhotoUploader({ projectId, onUpload }: { projectId: string; onUpload: (
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function AdminListingFile() {
+export default function AdminListingFile({
+  initialProject = null,
+  initialTab = 0,
+}: {
+  initialProject?: Record<string, unknown> | null;
+  initialTab?: number;
+} = {}) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const getPresentationToken = () => user?.getIdToken();
-  const [project, setProject] = React.useState<any>(null);
-  const [loading, setLoading] = React.useState(true);
-  const [activeTab, setActiveTab] = React.useState(0);
+  const [project, setProject] = React.useState<any>(initialProject);
+  const [loading, setLoading] = React.useState(!initialProject);
+  const [activeTab, setActiveTab] = React.useState(initialTab);
   const [updating, setUpdating] = React.useState(false);
   const [statusLocked, setStatusLocked] = React.useState(true);
 
   // Info editing
   const [editingInfo, setEditingInfo] = React.useState(false);
-  const [infoForm, setInfoForm] = React.useState<any>({});
+  const [infoForm, setInfoForm] = React.useState<any>(initialProject ?? {});
   const [tourInput, setTourInput] = React.useState("");
   const editingInfoRef = React.useRef(false);
   editingInfoRef.current = editingInfo;
@@ -448,7 +461,7 @@ export default function AdminListingFile() {
   const isRE = (editingInfo ? formType : savedType) !== "business";
   const tabs = isRE ? RE_TABS : BIZ_TABS;
   const statuses = isRE ? RE_STATUSES : BIZ_STATUSES;
-  const location = project.address || project.shootLocation || "—";
+  const location = recordAddressText(project) || "—";
   const badge = STATUS_BADGE[project.status] ?? "bg-gray-100 text-gray-500";
   const badgeLabel = STATUS_LABELS[project.status] ?? project.status ?? "—";
   const images: any[] = project.images || [];

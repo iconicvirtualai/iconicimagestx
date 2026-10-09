@@ -11,16 +11,11 @@ import { listingLinkFields } from "@shared/orderProjectInvoice";
 import { Button } from "@/components/ui/button";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 import { upsertScheduledAppointment } from "@/lib/scheduleRecords";
+import { recordAddressText } from "@shared/addressText";
 import { buildAdminOrderTile, type AdminStudioId } from "@shared/adminOrderTile";
 import { exclusiveOrderBuckets } from "@shared/orderPackageLines";
 import { AdminOrderTile } from "@/components/admin/AdminOrderTile";
 
-function fmtAddr(a: any): string {
-  if (!a) return "—";
-  if (typeof a === "string") return a;
-  if (a.formatted) return a.formatted;
-  return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "—";
-}
 function safe(v: any): string {
   if (v === null || v === undefined) return "—";
   if (typeof v === "string") return v || "—";
@@ -47,7 +42,7 @@ function getUnifiedStatus(o: any): string {
 }
 
 const getName = (o: any) => safe(o.clientName || o.customerName || o.name || ((o.firstName || "") + " " + (o.lastName || "")).trim());
-const getAddr = (o: any) => fmtAddr(o.address || o.shootLocation || o.location);
+const getAddr = (o: any) => recordAddressText(o) || "—";
 const getTotal = (o: any) => Number(o.total) || Number(o.amount) || Number(o.pricing?.total) || 0;
 
 export default function AdminOrders() {

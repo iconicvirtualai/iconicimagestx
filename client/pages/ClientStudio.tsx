@@ -10,14 +10,9 @@ import {
   ChevronLeft, ChevronRight, X, Edit3, Share2, ExternalLink,
   Star, Check, Layers, Zap,
 } from "lucide-react";
+import { addressText } from "@shared/addressText";
 import { clientGalleryDownloadsUnlocked, studioOffersDownloads } from "@shared/paymentAccess";
 import { GalleryDownloadLockNotice } from "@/components/GalleryDownloadLock";
-
-function fmtAddr(a: any): string {
-  if (!a) return "";
-  if (typeof a === "string") return a;
-  return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "";
-}
 
 function failureCopy(status: number, data: { code?: string; message?: string; error?: string }, id: string) {
   const message = data.message || data.error || "";
@@ -220,7 +215,7 @@ export default function ClientStudio() {
     });
   const canDownloadFiles = studioOffersDownloads(project.view, downloadsUnlocked);
   const locked = !downloadsUnlocked;
-  const address = fmtAddr(project.address || project.shootLocation);
+  const address = addressText(project.address) || addressText(project.shootLocation);
   const revisions: any[] = project.revisions || [];
 
   return (

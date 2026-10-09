@@ -6,6 +6,7 @@
  */
 
 import admin from "firebase-admin";
+import { recordAddressText } from "../../shared/addressText";
 import { clientGalleryDownloadsUnlocked, type GalleryDownloadGate } from "../../shared/paymentAccess";
 import { loadGalleryReleaseForGallery } from "./galleryReleaseGate";
 import { sendEmail } from "./email";
@@ -19,17 +20,6 @@ function httpError(status: number, message: string, extra?: Record<string, unkno
 
 function appUrl() {
   return process.env.APP_URL || "https://iconicimagestx.com";
-}
-
-function addressLabel(address: unknown): string {
-  if (!address) return "the property";
-  if (typeof address === "string") return address;
-  if (typeof address === "object") {
-    const row = address as Record<string, unknown>;
-    if (typeof row.formatted === "string" && row.formatted) return row.formatted;
-    return [row.street, row.city, row.state, row.zip].filter(Boolean).join(", ") || "the property";
-  }
-  return String(address);
 }
 
 async function invoiceForGallery(gallery: Record<string, unknown>) {
@@ -117,7 +107,7 @@ export async function deliverGalleryToClient(galleryId: string, options?: { expi
       template: "gallery_delivery",
       variables: {
         clientName: gallery.clientName,
-        address: gallery.addressLabel || addressLabel(gallery.address),
+        address: recordAddressText(gallery) || "the property",
         galleryUrl: deliveryUrl,
         invoiceAmount: invoice ? `$${invoice.total.toFixed(2)}` : "",
         paymentUrl: invoice && invoiceSnap ? `${appUrl()}/invoice/${invoiceSnap.docs[0].id}` : "",

@@ -4,6 +4,7 @@
  * This module does not send mail and does not address the client.
  */
 
+import { addressText } from "./addressText.ts";
 import { packagesForStaffEditor, type StaffCatalogPackage } from "./bookingCatalog.ts";
 import { orderChargeSummary, orderServiceLines, cleanPackageName, type OrderServiceLine } from "./orderPackageLines.ts";
 
@@ -64,7 +65,11 @@ export function officeNewOrderEmail(
   const deliverables = describeDeliverables(features);
   const packageName = packageLine ? cleanPackageName(packageLine.name) : NOT_PROVIDED;
   const orderNumber = orderNumberOf(saved);
-  const address = firstText(saved, ["addressLabel", "address", "propertyAddress"]) || NOT_PROVIDED;
+  const address = addressText(saved.addressLabel)
+    || addressText(saved.address)
+    || addressText(saved.propertyAddress)
+    || addressText(saved.shootLocation)
+    || NOT_PROVIDED;
   const requestedDate = firstDate(saved, ["scheduledDate", "requestedDate", "appointmentDate", "requestedDates"]);
   const clientName = clientNameOf(saved);
   const notes = notesOf(saved);
@@ -78,7 +83,7 @@ export function officeNewOrderEmail(
     ["Agent", firstText(saved, ["agentName", "agent"])],
     ["Agent email/phone", agentContactOf(saved)],
     ["Brokerage", firstText(saved, ["brokerage", "brokerageName"])],
-    ["Property address", address === NOT_PROVIDED ? NOT_PROVIDED : addressText(saved.address) || address],
+    ["Property address", address],
     ["Unit", firstText(saved, ["unit", "unitNumber"]) || addressPart(saved.address, ["unit", "unitNumber"])],
     ["Gate code", firstText(saved, ["gateCode", "gate"])],
     ["Lockbox", lockboxOf(saved)],
@@ -105,7 +110,7 @@ export function officeNewOrderEmail(
     ["Booked via", bookedVia(saved)],
   ];
 
-  const subjectCore = `New order ${orderNumber} — ${packageName} — ${address === NOT_PROVIDED ? NOT_PROVIDED : addressText(saved.address) || address} — ${requestedDate}`;
+  const subjectCore = `New order ${orderNumber} — ${packageName} — ${address} — ${requestedDate}`;
   const subject = isTestOrder(clientName, notes) ? `[TEST] ${subjectCore}` : subjectCore;
   const plain = fields.map(([label, value]) => `${label}: ${value}`).join("\n");
   const html = `<div style="font-family:Arial,sans-serif;max-width:640px;color:#111"><h1 style="font-size:18px">${escapeHtml(subject)}</h1><table style="width:100%;border-collapse:collapse">${fields.map(([label, value]) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:bold;vertical-align:top">${escapeHtml(label)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:pre-wrap">${escapeHtml(value)}</td></tr>`).join("")}</table></div>`;
@@ -273,15 +278,6 @@ function firstText(record: Record<string, unknown>, keys: string[]): string {
 
 function firstDate(record: Record<string, unknown>, keys: string[]): string {
   return firstText(record, keys);
-}
-
-function addressText(value: unknown): string {
-  if (typeof value === "string" && value.trim()) return value.trim();
-  if (!value || typeof value !== "object") return "";
-  const record = value as Record<string, unknown>;
-  const formatted = text(record.formatted) || text(record.label);
-  if (formatted) return formatted;
-  return [record.street, record.city, record.state, record.zip].map((part) => text(part)).filter(Boolean).join(", ");
 }
 
 function addressPart(value: unknown, keys: string[]): string {

@@ -108,6 +108,27 @@ describe("portal listing detail", () => {
     expect(JSON.stringify(detail)).not.toContain("Lockbox");
   });
 
+  it("reads a Google Places address object without rendering the pin fields as text", () => {
+    const detail = buildPortalListingDetail({
+      listing: {
+        id: listingId,
+        address: {
+          formatted: "100 Congress Ave, Austin, TX 78701",
+          lat: 30.2648,
+          lng: -97.7431,
+          placeId: "place_congress",
+        },
+      },
+    });
+    expect(detail.address.line1).toBe("100 Congress Ave");
+    expect(detail.address.city).toBe("Austin");
+    expect(detail.address.state).toBe("TX");
+    expect(detail.address.zip).toBe("78701");
+    expect(detail.address.lat).toBe(30.2648);
+    expect(detail.address.lng).toBe(-97.7431);
+    expect(detail.address.formatted).not.toContain("place_congress");
+  });
+
   it("pins the map from stored coordinates and not from a typed address", () => {
     const typed = buildPortalListingDetail({
       listing: {

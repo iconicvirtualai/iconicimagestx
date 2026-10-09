@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
+import { recordAddressText } from "@shared/addressText";
 import { useAuth } from "@/contexts/AuthContext";
 import IconicStudioWorkspace, { type StudioDeliveryView, type StudioJobView } from "@/components/iconic-studio/IconicStudioWorkspace";
 import {
@@ -101,7 +102,7 @@ export default function AdminIconicStudio() {
       setListings(data.listings || []);
       setJobs((data.jobs || []) as unknown as StudioJobView[]);
       setFrames(nextFrames);
-      setAddress(data.listing?.address || "Choose a listing");
+      setAddress(recordAddressText(data.listing) || "Choose a listing");
       setEditPlan(data.listing?.editPlan || null);
       setRelease(data.listing?.release || null);
       setDelivery(data.listing?.delivery || null);

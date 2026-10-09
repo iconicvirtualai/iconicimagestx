@@ -8,6 +8,7 @@
 import { Router } from "express";
 import admin from "firebase-admin";
 import { requireStaff, requireCoordinator, type AuthenticatedRequest } from "../middleware/auth";
+import { recordAddressText } from "../../shared/addressText";
 import { sendSMS, SMS_TEMPLATES, normalisePhone } from "../services/sms";
 
 const router = Router();
@@ -30,17 +31,6 @@ function toDate(value: unknown): Date | null {
   }
   const parsed = new Date(value as string | number | Date);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
-function addressLabel(address: unknown): string {
-  if (!address) return "the property";
-  if (typeof address === "string") return address;
-  if (typeof address === "object") {
-    const a = address as Record<string, unknown>;
-    if (typeof a.formatted === "string" && a.formatted) return a.formatted;
-    return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "the property";
-  }
-  return String(address);
 }
 
 function combineDateAndTime(date: Date | null, time: unknown) {
@@ -255,7 +245,7 @@ async function runReminderSweep(req: any, res: any) {
       const phone = merged.clientPhone || merged.phone;
       const name = merged.firstName || merged.clientName?.split(" ")?.[0] || "there";
       const time = merged.scheduledTime || merged.appointmentTime || "your appointment time";
-      const address = merged.addressLabel || addressLabel(merged.address || merged.propertyAddress);
+      const address = recordAddressText(merged) || "the property";
 
       const dueTypes: Array<"24h" | "1h"> = [];
       if (!sent["24h"] && sameCalendarDay(scheduledDate, tomorrow)) {
@@ -277,7 +267,7 @@ async function runReminderSweep(req: any, res: any) {
 
         const body = type === "1h"
           ? SMS_TEMPLATES.appointmentReminder1h(name, String(time))
-          : SMS_TEMPLATES.appointmentReminder24h(name, scheduledDate.toLocaleDateString("en-US"), String(time), String(address));
+          : SMS_TEMPLATES.appointmentReminder24h(name, scheduledDate.toLocaleDateString("en-US"), String(time), address);
 
         try {
           const result = await sendSMS({ to: String(phone), body });

@@ -7,13 +7,9 @@ import {
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, updateDoc, doc, serverTimestamp } from "firebase/firestore";
+import { recordAddressText } from "@shared/addressText";
 import { toast } from "sonner";
 
-function fmtAddr(a: any): string {
-  if (!a) return "—";
-  if (typeof a === "string") return a;
-  return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "—";
-}
 function fmtDate(ts: any): string {
   if (!ts) return "—";
   if (ts.toDate) return ts.toDate().toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -180,7 +176,7 @@ export default function AdminEditingPipeline() {
               <div key={p.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <p className="text-sm font-black text-black">{fmtAddr(p.address || p.shootLocation)}</p>
+                    <p className="text-sm font-black text-black">{recordAddressText(p) || "—"}</p>
                     <p className="text-xs text-gray-500">{p.clientName || "—"} • {photoCount} photos</p>
                   </div>
                   <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${stageInfo.color}`}>

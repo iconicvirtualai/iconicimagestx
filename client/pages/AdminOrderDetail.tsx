@@ -15,6 +15,7 @@ import {
   LIFE_OF_THE_LISTING_CARE_PRICE_LABEL,
   LIFE_OF_THE_LISTING_CARE_SUMMARY_LABEL,
 } from "@shared/lifeOfTheListingCare";
+import { addressText } from "@shared/addressText";
 import { staffInvoicePath } from "@shared/staffInvoice";
 import { orderChargeSummary, orderServiceLines } from "@shared/orderPackageLines";
 import type { GalleryReleaseReport } from "@shared/galleryRelease";
@@ -36,12 +37,8 @@ function getStatusBadge(status: string) {
   return ORDER_STATUSES.find(s => s.value === status) || { value: status, label: status, color: "bg-gray-100 text-gray-500" };
 }
 
-function fmtAddress(addr: any): string {
-  if (!addr) return "—";
-  if (typeof addr === "string") return addr;
-  if (addr.formatted) return addr.formatted;
-  const parts = [addr.street, addr.city, addr.state, addr.zip].filter(Boolean);
-  return parts.length > 0 ? parts.join(", ") : "—";
+function fmtAddress(addr: unknown): string {
+  return addressText(addr) || "—";
 }
 
 function fmtDate(ts: any): string {
