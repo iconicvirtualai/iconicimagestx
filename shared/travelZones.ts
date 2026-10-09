@@ -4,9 +4,9 @@
  * Concentric circles centered on the studio. Distance is straight-line
  * haversine miles. Tolls are not considered. Driving distance is not used.
  *
- * PROVISIONAL outer radii, measured off the old Wix zone map. Cadi will
- * confirm the mileage bands. Fees are the published zone prices. To change
- * a band or a fee, edit TRAVEL_ZONES below — this is the only zone config.
+ * Outer radii are confirmed: 17, 30, 42, 55, 69, and 84 straight-line miles
+ * from the studio. Fees are the published zone prices. To change a band or
+ * a fee, edit TRAVEL_ZONES below — this is the only zone config.
  *
  *   Zone 1  ≤ 17 mi   FREE
  *   Zone 2  ≤ 30 mi   $50
@@ -39,14 +39,14 @@ export const TRAVEL_ORIGIN = {
 
 export interface TravelZone {
   zone: number;
-  /** PROVISIONAL. Inclusive outer radius in straight-line miles. Cadi will confirm. */
+  /** Inclusive outer radius in straight-line miles from the studio. */
   outerMiles: number;
   feeCents: number;
 }
 
 /**
- * PROVISIONAL mileage bands. outerMiles is the inclusive outer edge.
- * Cadi will confirm these radii; fees are the published prices.
+ * Confirmed mileage bands. outerMiles is the inclusive outer edge.
+ * Fees are the published prices. Past zone 6 is "Travel quoted".
  */
 export const TRAVEL_ZONES: readonly TravelZone[] = [
   { zone: 1, outerMiles: 17, feeCents: 0 },

@@ -67,7 +67,7 @@ const SAMPLES: Array<{
 ];
 
 describe("travel zone config", () => {
-  it("keeps the published fees and the provisional radii in one table", () => {
+  it("keeps the published fees and the confirmed radii in one table", () => {
     expect(TRAVEL_ZONES.map((zone) => [zone.zone, zone.outerMiles, zone.feeCents])).toEqual([
       [1, 17, 0],
       [2, 30, 5_000],
@@ -148,7 +148,7 @@ describe("unresolved locations", () => {
 });
 
 describe("sample addresses", () => {
-  it("matches the provisional zone table", () => {
+  it("matches the confirmed zone table", () => {
     for (const sample of SAMPLES) {
       const travel = assessTravel(sample.address);
       expect(travel.travelZone, sample.label).toBe(sample.zone);

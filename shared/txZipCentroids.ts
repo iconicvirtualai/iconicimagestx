@@ -30,6 +30,6 @@ export const TX_ZIP_CENTROIDS: Readonly<Record<string, ZipCentroid>> = {
   "77550": { lat: 29.2983, lng: -94.793 },
   // Beaumont
   "77701": { lat: 30.0688, lng: -94.1039 },
-  // Austin — outside zone 6 with the provisional radii
+  // Austin — past zone 6, so the quote is "Travel quoted"
   "78701": { lat: 30.2713, lng: -97.7426 },
 };
