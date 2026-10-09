@@ -4,7 +4,12 @@
  */
 
 import { normalizeEmail } from "./listingAccess.ts";
-import { normalizeBookingLineItems, type BookingLineItem } from "./bookingPricing.ts";
+import { normalizeBookingLineItems, sumLineItemPrices, type BookingLineItem } from "./bookingPricing.ts";
+import {
+  isTravelFeeLine,
+  travelInvoiceLine,
+  type TravelAssessment,
+} from "./travelZones.ts";
 
 export interface BookingInvoiceDraftInput {
   lineItems: unknown;
@@ -16,6 +21,8 @@ export interface BookingInvoiceDraftInput {
   orderRequestId?: string | null;
   promoCode?: string | null;
   promoDiscount?: unknown;
+  /** Server quote. When set, the draft line and total are rebuilt from it. */
+  travel?: TravelAssessment | null;
 }
 
 export interface BookingInvoiceDraft {
@@ -34,11 +41,24 @@ export interface BookingInvoiceDraft {
   paymentProvider: "square";
   promoCode: string | null;
   promoDiscount: number;
+  travelZone?: number | null;
+  travelMiles?: number | null;
+  travelFeeCents?: number | null;
+  travelQuoted?: boolean;
 }
 
 export function buildBookingInvoiceDraft(input: BookingInvoiceDraftInput): BookingInvoiceDraft {
-  const total = Number(input.total) || 0;
-  const lineItems = normalizeBookingLineItems(input.lineItems);
+  let lineItems = normalizeBookingLineItems(input.lineItems);
+  let total = Number(input.total) || 0;
+  const travelFields: Pick<BookingInvoiceDraft, "travelZone" | "travelMiles" | "travelFeeCents" | "travelQuoted"> = {};
+  if (input.travel) {
+    lineItems = [...lineItems.filter((item) => !isTravelFeeLine(item)), travelInvoiceLine(input.travel)];
+    total = Math.round(sumLineItemPrices(lineItems) * 100) / 100;
+    travelFields.travelZone = input.travel.travelZone;
+    travelFields.travelMiles = input.travel.travelMiles;
+    travelFields.travelFeeCents = input.travel.travelFeeCents;
+    travelFields.travelQuoted = input.travel.travelQuoted;
+  }
   return {
     orderRequestId: input.orderRequestId || null,
     orderId: null,
@@ -46,7 +66,7 @@ export function buildBookingInvoiceDraft(input: BookingInvoiceDraftInput): Booki
     clientEmail: normalizeEmail(input.clientEmail),
     clientName: input.clientName,
     lineItems,
-    subtotal: Number(input.pricing?.subtotal ?? total) || 0,
+    subtotal: input.travel ? total : (Number(input.pricing?.subtotal ?? total) || 0),
     tax: Number(input.pricing?.tax) || 0,
     total,
     amountPaid: 0,
@@ -55,6 +75,7 @@ export function buildBookingInvoiceDraft(input: BookingInvoiceDraftInput): Booki
     paymentProvider: "square",
     promoCode: input.promoCode || null,
     promoDiscount: Number(input.promoDiscount) || 0,
+    ...travelFields,
   };
 }
 

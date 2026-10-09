@@ -95,6 +95,36 @@ function quinnBooking() {
 }
 
 describe("booking listing docs", () => {
+  it("copies a travel quote onto the project, including a quoted trip", () => {
+    const zoned = quinnBooking();
+    Object.assign(zoned.orderRequests[0].data, {
+      travelZone: 2,
+      travelMiles: 27.21,
+      travelFeeCents: 5000,
+      travelQuoted: false,
+    });
+    const zonePlan = planBookingListings(zoned).find((plan) => plan.listingId === "bklist_req_reqOct3");
+    expect(zonePlan?.createFields).toMatchObject({
+      travelZone: 2,
+      travelMiles: 27.21,
+      travelFeeCents: 5000,
+      travelQuoted: false,
+    });
+
+    const quoted = quinnBooking();
+    Object.assign(quoted.orderRequests[0].data, {
+      travelZone: null,
+      travelMiles: 137.23,
+      travelFeeCents: null,
+      travelQuoted: true,
+    });
+    const quotedPlan = planBookingListings(quoted).find((plan) => plan.listingId === "bklist_req_reqOct3");
+    expect(quotedPlan?.createFields.travelQuoted).toBe(true);
+    expect(quotedPlan?.createFields.travelZone).toBeNull();
+    expect(quotedPlan?.createFields.travelFeeCents).toBeNull();
+    expect(quotedPlan?.createFields.travelMiles).toBe(137.23);
+  });
+
   it("gives each existing order one stable listing the home tile can open", () => {
     const plans = planBookingListings(quinnBooking());
     expect(plans.map((plan) => plan.listingId)).toEqual(["bklist_req_reqOct2", "bklist_req_reqOct3"]);
@@ -126,6 +156,7 @@ describe("booking listing docs", () => {
       createdAt: "2026-10-03T15:00:00.000Z",
     });
     expect(qa?.createFields.lockboxCode).toBeUndefined();
+    expect(qa?.createFields.travelQuoted).toBeUndefined();
     expect(qa?.links.map((link) => `${link.collection}/${link.id}`)).toEqual([
       "appointments/appt-qa",
       "invoices/inv0006",

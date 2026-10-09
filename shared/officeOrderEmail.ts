@@ -8,6 +8,7 @@ import { addressText } from "./addressText.ts";
 import { formatChicagoDate } from "./clientHome.ts";
 import { packagesForStaffEditor, type StaffCatalogPackage } from "./bookingCatalog.ts";
 import { orderChargeSummary, orderServiceLines, cleanPackageName, type OrderServiceLine } from "./orderPackageLines.ts";
+import { isTravelFeeLine, travelTextForRecord } from "./travelZones.ts";
 
 export const NOT_PROVIDED = "Not provided";
 
@@ -41,6 +42,7 @@ const FIELD_LABELS = [
   "Floor plan",
   "Turnaround",
   "Add-ons",
+  "Travel",
   "Subtotal",
   "Tax",
   "Total",
@@ -58,7 +60,7 @@ export function officeNewOrderEmail(
   options?: { adminUrl?: string; catalog?: StaffCatalogPackage[] },
 ): OfficeOrderEmail {
   const catalog = options?.catalog ?? packagesForStaffEditor([]);
-  const lines = orderServiceLines(saved);
+  const lines = orderServiceLines(saved).filter((line) => !isTravelFeeLine(line));
   const charges = orderChargeSummary(saved, lines);
   const packageLine = lines.find((line) => !isAddOn(line, catalog)) || lines[0];
   const addOns = packageLine ? lines.filter((line) => line !== packageLine) : lines;
@@ -99,6 +101,7 @@ export function officeNewOrderEmail(
     ["Floor plan", deliverables.floorplan],
     ["Turnaround", deliverables.turnaround],
     ["Add-ons", addOnText(addOns)],
+    ["Travel", travelTextForRecord(saved, { miles: true }) ?? NOT_PROVIDED],
     ["Subtotal", moneyField(saved, "subtotal", lines.length ? charges.subtotal : null)],
     ["Tax", moneyField(saved, "tax", lines.length ? charges.tax : null)],
     ["Total", moneyField(saved, "total", lines.length ? charges.total : null)],

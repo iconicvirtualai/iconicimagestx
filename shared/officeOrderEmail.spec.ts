@@ -122,6 +122,29 @@ describe("office new order email", () => {
     expect(email.text).toContain("Booked via: Site");
   });
 
+  it("prints the stored travel quote and miles on their own line", () => {
+    const zoned = officeNewOrderEmail({
+      ...saved,
+      travelZone: 2,
+      travelMiles: 27.21,
+      travelFeeCents: 5000,
+      travelQuoted: false,
+    }, { catalog });
+    expect(zoned.text).toContain("Travel: Travel fee — Zone 2 — $50.00 (27.21 mi)");
+    expect(zoned.text).not.toMatch(/Travel:.*\$0/);
+
+    const quoted = officeNewOrderEmail({
+      ...saved,
+      address: "100 Congress Ave, Austin, TX 78701",
+      travelZone: null,
+      travelMiles: 137.23,
+      travelFeeCents: null,
+      travelQuoted: true,
+    }, { catalog });
+    expect(quoted.text).toContain("Travel: Travel quoted (137.23 mi)");
+    expect(quoted.text).not.toMatch(/\$0/);
+  });
+
   it("keeps a UTC-midnight requested date on that calendar day", () => {
     const email = officeNewOrderEmail({
       ...saved,

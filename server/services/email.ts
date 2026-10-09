@@ -169,6 +169,7 @@ function getFallbackTemplate(
         <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Furnishing</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.furnishingStatus || "—"}</td></tr>
         <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Access Method</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><strong>${vars.accessMethod || "—"}</strong></td></tr>
         ${vars.squareFootage ? `<tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Square Footage</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.squareFootage}</td></tr>` : ""}
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Travel</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.travelFee || "Travel quoted"}</td></tr>
         <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;">Order Total</td><td style="padding:10px 14px;font-weight:bold;color:#0d9488;">${vars.total}</td></tr>
       </table>
 
@@ -189,7 +190,8 @@ function getFallbackTemplate(
       <p>Great news — your shoot at <strong>${vars.address}</strong> is confirmed!</p>
       <p><strong>Date:</strong> ${vars.scheduledDate}<br>
       <strong>Time:</strong> ${vars.scheduledTime}<br>
-      <strong>Photographer:</strong> ${vars.photographerName}</p>
+      <strong>Photographer:</strong> ${vars.photographerName}<br>
+      <strong>Travel:</strong> ${vars.travelFee || "Travel quoted"}</p>
       <p><a href="${vars.portalUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">View Your Portal</a></p>
     `),
     gallery_delivery: base(`
