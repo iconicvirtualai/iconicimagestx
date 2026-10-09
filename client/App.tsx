@@ -68,6 +68,10 @@ import ImportPage from "./pages/marketing/ImportPage";
 import ContactDetailPage from "./pages/marketing/ContactDetailPage";
 import SegmentsPage from "./pages/marketing/SegmentsPage";
 import SuppressionPage from "./pages/marketing/SuppressionPage";
+import CampaignsPage from "./pages/marketing/CampaignsPage";
+import CampaignBuilder from "./pages/marketing/CampaignBuilder";
+import CampaignReport from "./pages/marketing/CampaignReport";
+import AccountPage from "./pages/marketing/AccountPage";
 import Unsubscribe from "./pages/Unsubscribe";
 import AdminPhotographer from "./pages/AdminPhotographer";
 import AdminUpload from "./pages/AdminUpload";
@@ -174,6 +178,11 @@ const App = () => (
             <Route path="/admin/communications/email/import" element={<ProtectedRoute requiredRole="admin"><ImportPage /></ProtectedRoute>} />
             <Route path="/admin/communications/email/segments" element={<ProtectedRoute requiredRole="admin"><SegmentsPage /></ProtectedRoute>} />
             <Route path="/admin/communications/email/suppression" element={<ProtectedRoute requiredRole="admin"><SuppressionPage /></ProtectedRoute>} />
+            <Route path="/admin/communications/email/campaigns/new" element={<ProtectedRoute requiredRole="admin"><CampaignBuilder /></ProtectedRoute>} />
+            <Route path="/admin/communications/email/campaigns/:id/report" element={<ProtectedRoute requiredRole="admin"><CampaignReport /></ProtectedRoute>} />
+            <Route path="/admin/communications/email/campaigns/:id" element={<ProtectedRoute requiredRole="admin"><CampaignBuilder /></ProtectedRoute>} />
+            <Route path="/admin/communications/email/campaigns" element={<ProtectedRoute requiredRole="admin"><CampaignsPage /></ProtectedRoute>} />
+            <Route path="/admin/communications/email/account" element={<ProtectedRoute requiredRole="admin"><AccountPage /></ProtectedRoute>} />
             <Route path="/admin/photographer" element={<ProtectedRoute requiredRole="photographer"><AdminPhotographer /></ProtectedRoute>} />
             <Route path="/admin/upload" element={<ProtectedRoute requiredRole="photographer"><AdminUpload /></ProtectedRoute>} />
             <Route path="/admin/editor" element={<ProtectedRoute requiredRole="editor"><AdminEditor /></ProtectedRoute>} />

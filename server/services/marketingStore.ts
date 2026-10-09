@@ -1,6 +1,7 @@
 import admin from "firebase-admin";
 import { syncClientsIntoContacts } from "../../shared/emailMarketing/contacts";
 import { seedSuppression } from "../../shared/emailMarketing/suppression";
+import { normalizeSendingAccounts, matchSendingAccount, PHOTOS_SENDING_ACCOUNT } from "../../shared/emailMarketing/sendingAccounts";
 import {
   DEFAULT_MARKETING_SETTINGS,
   type ActivityEvent,
@@ -9,7 +10,19 @@ import {
   type MarketingSettings,
   type Segment,
   type SuppressionEntry,
+  type MarketingCampaign,
+  type MarketingTemplate,
 } from "../../shared/emailMarketing/types";
+import type { ReportDerived } from "../../shared/emailMarketing/reports";
+
+export interface CachedReport {
+  campaignId: string;
+  gmassCampaignId: string;
+  fetchedAt: string;
+  sample: boolean;
+  derived: ReportDerived;
+  raw: Record<string, unknown>;
+}
 
 export interface MarketingStore {
   ensureSeed(): Promise<void>;
@@ -29,10 +42,27 @@ export interface MarketingStore {
   listClients(): Promise<ClientSource[]>;
   /** Memory store only. Firestore reads the live clients collection. */
   replaceClients?(clients: ClientSource[]): void;
+  listCampaigns(): Promise<MarketingCampaign[]>;
+  getCampaign(id: string): Promise<MarketingCampaign | null>;
+  saveCampaign(campaign: MarketingCampaign): Promise<void>;
+  deleteCampaign(id: string): Promise<void>;
+  listTemplates(): Promise<MarketingTemplate[]>;
+  saveTemplate(template: MarketingTemplate): Promise<void>;
+  deleteTemplate(id: string): Promise<void>;
+  listSends(): Promise<{ email: string; campaignId: string; sentAt: string }[]>;
+  addSends(sends: { email: string; campaignId: string; sentAt: string }[]): Promise<void>;
+  getReport(campaignId: string): Promise<CachedReport | null>;
+  saveReport(report: CachedReport): Promise<void>;
+  listReports(): Promise<CachedReport[]>;
 }
 
 function settingsFrom(raw: Partial<MarketingSettings> | undefined): MarketingSettings {
-  return { ...DEFAULT_MARKETING_SETTINGS, ...(raw || {}) };
+  const merged = { ...DEFAULT_MARKETING_SETTINGS, ...(raw || {}) };
+  const sendingAccounts = normalizeSendingAccounts(
+    raw && Array.isArray(raw.sendingAccounts) ? raw.sendingAccounts : DEFAULT_MARKETING_SETTINGS.sendingAccounts,
+  );
+  const fromEmail = matchSendingAccount(merged.fromEmail, sendingAccounts) || sendingAccounts[0]?.email || PHOTOS_SENDING_ACCOUNT;
+  return { ...merged, sendingAccounts, fromEmail };
 }
 
 export function createMemoryMarketingStore(): MarketingStore {
@@ -40,6 +70,10 @@ export function createMemoryMarketingStore(): MarketingStore {
   const segments = new Map<string, Segment>();
   const suppression = new Map<string, SuppressionEntry>();
   const events: ActivityEvent[] = [];
+  const campaigns = new Map<string, MarketingCampaign>();
+  const templates = new Map<string, MarketingTemplate>();
+  const sends: { email: string; campaignId: string; sentAt: string }[] = [];
+  const reports = new Map<string, CachedReport>();
   let settings: MarketingSettings = { ...DEFAULT_MARKETING_SETTINGS };
   let clients: ClientSource[] = [];
 
@@ -84,6 +118,7 @@ export function createMemoryMarketingStore(): MarketingStore {
       events.push(...next);
     },
     async getSettings() {
+      settings = settingsFrom(settings);
       return settings;
     },
     async saveSettings(next) {
@@ -94,6 +129,42 @@ export function createMemoryMarketingStore(): MarketingStore {
     },
     replaceClients(next) {
       clients = next;
+    },
+    async listCampaigns() {
+      return [...campaigns.values()];
+    },
+    async getCampaign(id) {
+      return campaigns.get(id) || null;
+    },
+    async saveCampaign(campaign) {
+      campaigns.set(campaign.id, campaign);
+    },
+    async deleteCampaign(id) {
+      campaigns.delete(id);
+    },
+    async listTemplates() {
+      return [...templates.values()];
+    },
+    async saveTemplate(template) {
+      templates.set(template.id, template);
+    },
+    async deleteTemplate(id) {
+      templates.delete(id);
+    },
+    async listSends() {
+      return sends;
+    },
+    async addSends(next) {
+      sends.push(...next);
+    },
+    async getReport(campaignId) {
+      return reports.get(campaignId) || null;
+    },
+    async saveReport(report) {
+      reports.set(report.campaignId, report);
+    },
+    async listReports() {
+      return [...reports.values()];
     },
   };
 }
@@ -200,6 +271,51 @@ const firestoreStore: MarketingStore = {
         company: String(data.company || ""),
       };
     });
+  },
+  async listCampaigns() {
+    const snap = await db().collection("marketingCampaigns").get();
+    return snap.docs.map((doc) => doc.data() as MarketingCampaign);
+  },
+  async getCampaign(id) {
+    const doc = await db().collection("marketingCampaigns").doc(id).get();
+    return doc.exists ? doc.data() as MarketingCampaign : null;
+  },
+  async saveCampaign(campaign) {
+    await db().collection("marketingCampaigns").doc(campaign.id).set(campaign);
+  },
+  async deleteCampaign(id) {
+    await db().collection("marketingCampaigns").doc(id).delete();
+  },
+  async listTemplates() {
+    const snap = await db().collection("marketingTemplates").get();
+    return snap.docs.map((doc) => doc.data() as MarketingTemplate);
+  },
+  async saveTemplate(template) {
+    await db().collection("marketingTemplates").doc(template.id).set(template);
+  },
+  async deleteTemplate(id) {
+    await db().collection("marketingTemplates").doc(id).delete();
+  },
+  async listSends() {
+    const snap = await db().collection("marketingSends").get();
+    return snap.docs.map((doc) => doc.data() as { email: string; campaignId: string; sentAt: string });
+  },
+  async addSends(sends) {
+    await writeAll("marketingSends", sends.map((send) => ({
+      id: `${send.campaignId}_${send.email}`.replace(/[^\w@.-]+/g, "_"),
+      data: send,
+    })));
+  },
+  async getReport(campaignId) {
+    const doc = await db().collection("marketingReports").doc(campaignId).get();
+    return doc.exists ? doc.data() as CachedReport : null;
+  },
+  async saveReport(report) {
+    await db().collection("marketingReports").doc(report.campaignId).set(report);
+  },
+  async listReports() {
+    const snap = await db().collection("marketingReports").get();
+    return snap.docs.map((doc) => doc.data() as CachedReport);
   },
 };
 

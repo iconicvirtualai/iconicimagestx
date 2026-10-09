@@ -64,6 +64,12 @@ export interface Segment {
   updatedAt: string;
 }
 
+/** A From address on the Gmail account connected to GMass. photos@ today; news@ can be added later. */
+export interface SendingAccount {
+  email: string;
+  label: string;
+}
+
 export interface MarketingSettings {
   frequencyMax: number;
   frequencyDays: number;
@@ -72,8 +78,10 @@ export interface MarketingSettings {
   bounceWarnRate: number;
   bouncePauseRate: number;
   fromName: string;
+  /** Default From for a new campaign. Must be one of sendingAccounts. */
   fromEmail: string;
   replyTo: string;
+  sendingAccounts: SendingAccount[];
   suppressionSeededAt: string;
 }
 
@@ -85,6 +93,60 @@ export interface ActivityEvent {
   type: "sent" | "delivered" | "open" | "click" | "bounce" | "block" | "unsubscribe" | "reply" | "complained";
   at: string;
   detail: string;
+}
+
+export type CampaignStatus = "draft" | "scheduled" | "sending" | "sent" | "cancelled" | "pause-recommended";
+
+export interface AudienceConfirmation {
+  token: string;
+  sendAt: string;
+  overlapOverride: boolean;
+  recipientCount: number;
+  recipientEmails: string[];
+  suppressed: number;
+  frequencyCapped: number;
+  overlapHeld: number;
+  duplicatesRemoved: number;
+  unverified: number;
+  warnings: string[];
+  removedPreview: { email: string; reason: string; detail: string }[];
+  /** From address locked into this confirm. */
+  fromEmail: string;
+  at: string;
+}
+
+export interface MarketingCampaign {
+  id: string;
+  name: string;
+  status: CampaignStatus;
+  audienceMode: "all" | "segment" | "tags";
+  segmentId: string;
+  tags: string[];
+  subject: string;
+  preheader: string;
+  fromName: string;
+  fromEmail: string;
+  replyTo: string;
+  html: string;
+  templateId: string;
+  scheduledAt: string;
+  overlapOverride: boolean;
+  confirmation: AudienceConfirmation | null;
+  gmassDraftId: string;
+  gmassCampaignId: string;
+  recipientEmails: string[];
+  sentAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MarketingTemplate {
+  id: string;
+  name: string;
+  subject: string;
+  preheader: string;
+  html: string;
+  updatedAt: string;
 }
 
 export const EMPTY_SEGMENT_FILTER: SegmentFilter = {
@@ -107,5 +169,6 @@ export const DEFAULT_MARKETING_SETTINGS: MarketingSettings = {
   fromName: "Iconic Images",
   fromEmail: "photos@iconicimagestx.com",
   replyTo: "photos@iconicimagestx.com",
+  sendingAccounts: [{ email: "photos@iconicimagestx.com", label: "Photos" }],
   suppressionSeededAt: "",
 };

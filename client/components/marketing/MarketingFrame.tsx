@@ -7,7 +7,9 @@ const LINKS = [
   { href: "/admin/communications/email/contacts", label: "Contacts" },
   { href: "/admin/communications/email/import", label: "Import" },
   { href: "/admin/communications/email/segments", label: "Segments" },
+  { href: "/admin/communications/email/campaigns", label: "Campaigns" },
   { href: "/admin/communications/email/suppression", label: "Do not email" },
+  { href: "/admin/communications/email/account", label: "GMass" },
 ];
 
 export default function MarketingFrame({
