@@ -9,6 +9,8 @@ describe("admin nav highlight", () => {
     expect(mostSpecificNavHref("/admin/customers/abc", hrefs)).toBe("/admin/customers");
     expect(mostSpecificNavHref("/admin/studio", hrefs)).toBe("/admin/studio");
     expect(mostSpecificNavHref("/admin/delivery", hrefs)).toBe("/admin/delivery");
+    expect(mostSpecificNavHref("/admin/communications", hrefs)).toBe("/admin/communications");
+    expect(mostSpecificNavHref("/admin/communications/email/contacts", hrefs)).toBe("/admin/communications/email");
   });
 });
 

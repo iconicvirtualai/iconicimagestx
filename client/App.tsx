@@ -62,6 +62,17 @@ import AdminBookingCatalog from "./pages/AdminBookingCatalog";
 import AdminInvoicePresets from "./pages/AdminInvoicePresets";
 import AdminListings from "./pages/AdminListings";
 import AdminMessages from "./pages/AdminMessages";
+import EmailHome from "./pages/marketing/EmailHome";
+import ContactsPage from "./pages/marketing/ContactsPage";
+import ImportPage from "./pages/marketing/ImportPage";
+import ContactDetailPage from "./pages/marketing/ContactDetailPage";
+import SegmentsPage from "./pages/marketing/SegmentsPage";
+import SuppressionPage from "./pages/marketing/SuppressionPage";
+import CampaignsPage from "./pages/marketing/CampaignsPage";
+import CampaignBuilder from "./pages/marketing/CampaignBuilder";
+import CampaignReport from "./pages/marketing/CampaignReport";
+import AccountPage from "./pages/marketing/AccountPage";
+import Unsubscribe from "./pages/Unsubscribe";
 import AdminPhotographer from "./pages/AdminPhotographer";
 import AdminUpload from "./pages/AdminUpload";
 import AdminEditor from "./pages/AdminEditor";
@@ -112,6 +123,7 @@ const App = () => (
             <Route path="/insights/prep" element={<Navigate to="/" replace />} />
             <Route path="/stock-footage" element={<StockFootage />} />
             <Route path="/privacy" element={<Privacy />} />
+            <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="/terms" element={<Terms />} />
             {/* Shirt QR destination. /go/ matches here too (trailing slash is ignored). */}
             <Route path="/go" element={<Go />} />
@@ -160,6 +172,17 @@ const App = () => (
             <Route path="/admin/invoice-presets" element={<ProtectedRoute requiredRole="coordinator"><AdminInvoicePresets /></ProtectedRoute>} />
             <Route path="/admin/messages" element={<ProtectedRoute requiredRole="coordinator"><AdminMessages /></ProtectedRoute>} />
             <Route path="/admin/communications" element={<ProtectedRoute requiredRole="coordinator"><AdminMessages /></ProtectedRoute>} />
+            <Route path="/admin/communications/email" element={<ProtectedRoute requiredRole="admin"><EmailHome /></ProtectedRoute>} />
+            <Route path="/admin/communications/email/contacts" element={<ProtectedRoute requiredRole="admin"><ContactsPage /></ProtectedRoute>} />
+            <Route path="/admin/communications/email/contacts/view" element={<ProtectedRoute requiredRole="admin"><ContactDetailPage /></ProtectedRoute>} />
+            <Route path="/admin/communications/email/import" element={<ProtectedRoute requiredRole="admin"><ImportPage /></ProtectedRoute>} />
+            <Route path="/admin/communications/email/segments" element={<ProtectedRoute requiredRole="admin"><SegmentsPage /></ProtectedRoute>} />
+            <Route path="/admin/communications/email/suppression" element={<ProtectedRoute requiredRole="admin"><SuppressionPage /></ProtectedRoute>} />
+            <Route path="/admin/communications/email/campaigns/new" element={<ProtectedRoute requiredRole="admin"><CampaignBuilder /></ProtectedRoute>} />
+            <Route path="/admin/communications/email/campaigns/:id/report" element={<ProtectedRoute requiredRole="admin"><CampaignReport /></ProtectedRoute>} />
+            <Route path="/admin/communications/email/campaigns/:id" element={<ProtectedRoute requiredRole="admin"><CampaignBuilder /></ProtectedRoute>} />
+            <Route path="/admin/communications/email/campaigns" element={<ProtectedRoute requiredRole="admin"><CampaignsPage /></ProtectedRoute>} />
+            <Route path="/admin/communications/email/account" element={<ProtectedRoute requiredRole="admin"><AccountPage /></ProtectedRoute>} />
             <Route path="/admin/photographer" element={<ProtectedRoute requiredRole="photographer"><AdminPhotographer /></ProtectedRoute>} />
             <Route path="/admin/upload" element={<ProtectedRoute requiredRole="photographer"><AdminUpload /></ProtectedRoute>} />
             <Route path="/admin/editor" element={<ProtectedRoute requiredRole="editor"><AdminEditor /></ProtectedRoute>} />
