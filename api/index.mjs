@@ -244,6 +244,7 @@ function getFallbackTemplate(type, vars) {
         <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Furnishing</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.furnishingStatus || "—"}</td></tr>
         <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Access Method</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><strong>${vars.accessMethod || "—"}</strong></td></tr>
         ${vars.squareFootage ? `<tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Square Footage</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.squareFootage}</td></tr>` : ""}
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Travel</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.travelFee || "Travel quoted"}</td></tr>
         <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;">Order Total</td><td style="padding:10px 14px;font-weight:bold;color:#0d9488;">${vars.total}</td></tr>
       </table>
 
@@ -264,7 +265,8 @@ function getFallbackTemplate(type, vars) {
       <p>Great news — your shoot at <strong>${vars.address}</strong> is confirmed!</p>
       <p><strong>Date:</strong> ${vars.scheduledDate}<br>
       <strong>Time:</strong> ${vars.scheduledTime}<br>
-      <strong>Photographer:</strong> ${vars.photographerName}</p>
+      <strong>Photographer:</strong> ${vars.photographerName}<br>
+      <strong>Travel:</strong> ${vars.travelFee || "Travel quoted"}</p>
       <p><a href="${vars.portalUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">View Your Portal</a></p>
     `),
     gallery_delivery: base(`
@@ -1231,7 +1233,7 @@ function findCatalogItem(catalog, id) {
   const priced = matches.filter((item) => item.price === price);
   return priced.length === 1 ? priced[0] : void 0;
 }
-function roundMoney$3(value) {
+function roundMoney$4(value) {
   return Math.round(value * 100) / 100;
 }
 function catalogLineName(pkg, qty = 1) {
@@ -1245,13 +1247,13 @@ function catalogLineName(pkg, qty = 1) {
 }
 function catalogLine(pkg, qty = 1) {
   const count = qty > 0 ? qty : 1;
-  const unitPrice = roundMoney$3(pkg.price);
+  const unitPrice = roundMoney$4(pkg.price);
   const line = {
     id: pkg.bookingId || pkg.id,
     name: catalogLineName(pkg, count),
     unitPrice,
     qty: count,
-    price: roundMoney$3(unitPrice * count)
+    price: roundMoney$4(unitPrice * count)
   };
   if (pkg.description) line.description = pkg.description;
   if (pkg.category) line.category = pkg.category;
@@ -1426,8 +1428,8 @@ function resolveSubmittedBooking(body, catalog) {
     catalog: list2
   });
   const pricedPosted = pricedPostedLines(body.lineItems);
-  const unresolved = [selectedService, ...selectedBasics, ...selectedAddOns].filter((label) => label && !findCatalogItem(list2, label));
-  for (const label of unresolved) {
+  const unresolved2 = [selectedService, ...selectedBasics, ...selectedAddOns].filter((label) => label && !findCatalogItem(list2, label));
+  for (const label of unresolved2) {
     const fallback = fallbackSubmittedLine(label, pricedPosted, body);
     if (!fallback) continue;
     lineItems = insertServiceLine(lineItems, fallback);
@@ -1466,7 +1468,7 @@ function resolveSubmittedBooking(body, catalog) {
   }
   return {
     lineItems,
-    total: roundMoney$3(sumLineItemPrices(lineItems)),
+    total: roundMoney$4(sumLineItemPrices(lineItems)),
     promoCode: promo?.code ?? null,
     promoDiscount: promo?.discount ?? 0,
     selectedService: selectedService || null,
@@ -1544,9 +1546,267 @@ function clientCanViewListing(listing, identity) {
   const listingEmail = normalizeEmail$1(listing.clientEmail);
   return Boolean(email && listingEmail && email === listingEmail);
 }
+const ADDRESS_LIMIT = 300;
+const PLACE_ID_LIMIT = 300;
+function serviceLocationFromInput(value) {
+  if (typeof value === "string") {
+    const formatted2 = clip(value, ADDRESS_LIMIT);
+    return formatted2 ? { kind: "text", formatted: formatted2 } : null;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const row = value;
+  const formatted = clip(firstString(row, ["formatted", "description", "label"]), ADDRESS_LIMIT);
+  const placeId = clip(firstString(row, ["placeId", "place_id"]), PLACE_ID_LIMIT);
+  const lat = readCoord$1(row.lat ?? row.latitude, "lat");
+  const lng = readCoord$1(row.lng ?? row.longitude, "lng");
+  if (formatted && placeId && lat != null && lng != null) {
+    return { kind: "picked", place: { placeId, formatted, lat, lng } };
+  }
+  if (formatted) return { kind: "text", formatted };
+  return null;
+}
+function storedServiceLocationFields(value) {
+  const location = serviceLocationFromInput(value);
+  if (!location) return { address: "" };
+  if (location.kind === "text") return { address: location.formatted };
+  const { place } = location;
+  return {
+    address: place,
+    lat: place.lat,
+    lng: place.lng,
+    latitude: place.lat,
+    longitude: place.lng,
+    placeId: place.placeId
+  };
+}
+function storedRecordPin(record) {
+  if (!record) return null;
+  for (const key of ["address", "propertyAddress", "shootLocation"]) {
+    const location = serviceLocationFromInput(record[key]);
+    if (location?.kind === "picked") return { lat: location.place.lat, lng: location.place.lng };
+  }
+  const lat = readCoord$1(record.lat ?? record.latitude, "lat");
+  const lng = readCoord$1(record.lng ?? record.longitude, "lng");
+  if (lat != null && lng != null) return { lat, lng };
+  return null;
+}
+function firstString(row, keys) {
+  for (const key of keys) {
+    const value = row[key];
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  return "";
+}
+function clip(value, limit) {
+  if (typeof value !== "string") return "";
+  return value.trim().slice(0, limit);
+}
+function readCoord$1(value, axis) {
+  const number = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
+  if (!Number.isFinite(number)) return null;
+  if (axis === "lat" && (number < -90 || number > 90)) return null;
+  if (axis === "lng" && (number < -180 || number > 180)) return null;
+  return number;
+}
+const TX_ZIP_CENTROIDS = {
+  // Spring / The Woodlands — studio ZIP
+  "77380": { lat: 30.1441, lng: -95.4703 },
+  // Spring
+  "77373": { lat: 30.0532, lng: -95.3773 },
+  // Downtown Houston
+  "77002": { lat: 29.7594, lng: -95.3594 },
+  // Katy
+  "77494": { lat: 29.7404, lng: -95.8304 },
+  // Huntsville
+  "77340": { lat: 30.6448, lng: -95.5798 },
+  // Galveston
+  "77550": { lat: 29.2983, lng: -94.793 },
+  // Beaumont
+  "77701": { lat: 30.0688, lng: -94.1039 },
+  // Austin — past zone 6, so the quote is "Travel quoted"
+  "78701": { lat: 30.2713, lng: -97.7426 }
+};
+const EARTH_RADIUS_MILES = 3958.7613;
+const TRAVEL_ORIGIN = {
+  lat: 30.145492547135,
+  lng: -95.448893600358
+};
+const TRAVEL_ZONES = [
+  { zone: 1, outerMiles: 17, feeCents: 0 },
+  { zone: 2, outerMiles: 30, feeCents: 5e3 },
+  { zone: 3, outerMiles: 42, feeCents: 7500 },
+  { zone: 4, outerMiles: 55, feeCents: 1e4 },
+  { zone: 5, outerMiles: 69, feeCents: 12500 },
+  { zone: 6, outerMiles: 84, feeCents: 15e3 }
+];
+const TRAVEL_LINE_ID = "travel-fee";
+const TRAVEL_QUOTED_NOTE = "Staff must price travel before publishing.";
+const TX_ZIP = /\b(7[5-9]\d{3})(?:-\d{4})?\b/g;
+const BOUNDARY_EPSILON_MILES = 1e-6;
+function haversineMiles(from, to) {
+  const dLat = toRad(to.lat - from.lat);
+  const dLng = toRad(to.lng - from.lng);
+  const lat1 = toRad(from.lat);
+  const lat2 = toRad(to.lat);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * EARTH_RADIUS_MILES * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+function assessTravel(value) {
+  const pin = pinFrom(value);
+  if (pin) return quoteFromMiles(haversineMiles(TRAVEL_ORIGIN, pin));
+  const zip = zipFrom(value);
+  if (zip) {
+    const centroid = TX_ZIP_CENTROIDS[zip];
+    if (centroid) return quoteFromMiles(haversineMiles(TRAVEL_ORIGIN, centroid));
+  }
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const row = value;
+    if (row.address != null && row.address !== value) return assessTravel(row.address);
+  }
+  return unresolved();
+}
+function travelCustomerLine(travel) {
+  if (travel.travelQuoted || travel.travelZone == null) {
+    return { label: "Travel quoted", amount: null };
+  }
+  if (travel.travelZone === 1) {
+    return { label: "Travel fee — Zone 1", amount: "FREE (Zone 1)" };
+  }
+  return {
+    label: `Travel fee — Zone ${travel.travelZone}`,
+    amount: sidebarMoney(travel.travelFeeCents ?? 0)
+  };
+}
+function travelSummaryText(travel, options) {
+  const line = travelCustomerLine(travel);
+  const miles = options?.miles && travel.travelMiles != null ? ` (${travel.travelMiles.toFixed(2)} mi)` : "";
+  if (travel.travelQuoted || travel.travelZone == null) return `${line.label}${miles}`;
+  if (travel.travelZone === 1) return `FREE (Zone 1)${miles}`;
+  return `${line.label} — ${emailMoney(travel.travelFeeCents ?? 0)}${miles}`;
+}
+function isTravelFeeLine(item) {
+  if (!item) return false;
+  if (String(item.id || "") === TRAVEL_LINE_ID) return true;
+  const name = String(item.name || "").trim();
+  return name === "Travel quoted" || name === "FREE (Zone 1)" || /^Travel fee\b/i.test(name);
+}
+function travelInvoiceLine(travel) {
+  if (travel.travelQuoted || travel.travelZone == null) {
+    return {
+      id: TRAVEL_LINE_ID,
+      name: "Travel quoted",
+      description: TRAVEL_QUOTED_NOTE,
+      unitPrice: 0,
+      qty: 1,
+      price: 0
+    };
+  }
+  const price = travel.travelFeeCents == null ? 0 : travel.travelFeeCents / 100;
+  return {
+    id: TRAVEL_LINE_ID,
+    name: `Travel fee — Zone ${travel.travelZone}`,
+    unitPrice: price,
+    qty: 1,
+    price
+  };
+}
+function applyServerTravel(lineItems, address, clientTravelFeeCents) {
+  const travel = assessTravel(address);
+  const kept = normalizeBookingLineItems(lineItems).filter((item) => !isTravelFeeLine(item));
+  const next = [...kept, travelInvoiceLine(travel)];
+  return {
+    lineItems: next,
+    total: roundMoney$3(sumLineItemPrices(next)),
+    travel
+  };
+}
+function travelFromRecord(record) {
+  if (!record || typeof record.travelQuoted !== "boolean") return null;
+  return {
+    travelZone: finiteOrNull(record.travelZone),
+    travelMiles: finiteOrNull(record.travelMiles),
+    travelFeeCents: finiteOrNull(record.travelFeeCents),
+    travelQuoted: record.travelQuoted
+  };
+}
+function travelTextForRecord(record, options) {
+  if (!record) return null;
+  const stored = travelFromRecord(record);
+  if (stored) return travelSummaryText(stored, options);
+  const address = record.address ?? record.propertyAddress ?? record.shootLocation ?? record.addressLabel;
+  if (address == null || address === "") return null;
+  return travelSummaryText(assessTravel(address), options);
+}
+function quoteFromMiles(miles) {
+  const travelMiles = roundMiles(miles);
+  for (const zone of TRAVEL_ZONES) {
+    if (miles <= zone.outerMiles + BOUNDARY_EPSILON_MILES) {
+      return {
+        travelZone: zone.zone,
+        travelMiles,
+        travelFeeCents: zone.feeCents,
+        travelQuoted: false
+      };
+    }
+  }
+  return {
+    travelZone: null,
+    travelMiles,
+    travelFeeCents: null,
+    travelQuoted: true
+  };
+}
+function unresolved() {
+  return {
+    travelZone: null,
+    travelMiles: null,
+    travelFeeCents: null,
+    travelQuoted: true
+  };
+}
+function pinFrom(value) {
+  const location = serviceLocationFromInput(value);
+  if (location?.kind === "picked") return { lat: location.place.lat, lng: location.place.lng };
+  return null;
+}
+function zipFrom(value) {
+  const text2 = addressText(value) || (typeof value === "string" ? value : "");
+  if (!text2) return null;
+  const matches = text2.match(TX_ZIP);
+  if (!matches || matches.length === 0) return null;
+  return matches[matches.length - 1].slice(0, 5);
+}
+function finiteOrNull(value) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+function sidebarMoney(cents) {
+  const dollars = cents / 100;
+  return Number.isInteger(dollars) ? `$${dollars}` : `$${dollars.toFixed(2)}`;
+}
+function emailMoney(cents) {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+function roundMiles(miles) {
+  return Math.round(miles * 100) / 100;
+}
+function roundMoney$3(value) {
+  return Math.round(value * 100) / 100;
+}
+function toRad(degrees) {
+  return degrees * Math.PI / 180;
+}
 function buildBookingInvoiceDraft(input) {
-  const total = Number(input.total) || 0;
-  const lineItems = normalizeBookingLineItems(input.lineItems);
+  let lineItems = normalizeBookingLineItems(input.lineItems);
+  let total = Number(input.total) || 0;
+  const travelFields = {};
+  if (input.travel) {
+    lineItems = [...lineItems.filter((item) => !isTravelFeeLine(item)), travelInvoiceLine(input.travel)];
+    total = Math.round(sumLineItemPrices(lineItems) * 100) / 100;
+    travelFields.travelZone = input.travel.travelZone;
+    travelFields.travelMiles = input.travel.travelMiles;
+    travelFields.travelFeeCents = input.travel.travelFeeCents;
+    travelFields.travelQuoted = input.travel.travelQuoted;
+  }
   return {
     orderRequestId: input.orderRequestId || null,
     orderId: null,
@@ -1554,7 +1814,7 @@ function buildBookingInvoiceDraft(input) {
     clientEmail: normalizeEmail$1(input.clientEmail),
     clientName: input.clientName,
     lineItems,
-    subtotal: Number(input.pricing?.subtotal ?? total) || 0,
+    subtotal: input.travel ? total : Number(input.pricing?.subtotal ?? total) || 0,
     tax: Number(input.pricing?.tax) || 0,
     total,
     amountPaid: 0,
@@ -1562,7 +1822,8 @@ function buildBookingInvoiceDraft(input) {
     status: "draft",
     paymentProvider: "square",
     promoCode: input.promoCode || null,
-    promoDiscount: Number(input.promoDiscount) || 0
+    promoDiscount: Number(input.promoDiscount) || 0,
+    ...travelFields
   };
 }
 function existingInvoiceId(value) {
@@ -2522,6 +2783,18 @@ function parseTime(time) {
   if (meridian === "AM" && hours === 12) hours = 0;
   return { hours, minutes };
 }
+function bookingEventDescription(booking) {
+  return [
+    `Order: ${booking.orderId}`,
+    `Client: ${booking.clientName}`,
+    booking.clientEmail ? `Email: ${booking.clientEmail}` : "",
+    booking.clientPhone ? `Phone: ${booking.clientPhone}` : "",
+    booking.photographerName ? `Photographer: ${booking.photographerName}` : "",
+    booking.services.length ? `Services: ${booking.services.join(", ")}` : "",
+    booking.travelSummary ? `Travel: ${booking.travelSummary}` : "",
+    booking.notes ? `Notes: ${booking.notes}` : ""
+  ].filter(Boolean).join("\n");
+}
 function bookingEventTimes(date, time) {
   if (!date) return null;
   const { hours, minutes } = parseTime(time);
@@ -2547,15 +2820,7 @@ async function createCalendarBookingEvent(booking) {
   const calendarId = booking.photographerCalendarId || booking.photographerEmail || process.env.GOOGLE_CALENDAR_ID || "primary";
   const calendar = google.calendar({ version: "v3", auth });
   const summary = `Iconic Images: ${booking.clientName}`;
-  const description = [
-    `Order: ${booking.orderId}`,
-    `Client: ${booking.clientName}`,
-    booking.clientEmail ? `Email: ${booking.clientEmail}` : "",
-    booking.clientPhone ? `Phone: ${booking.clientPhone}` : "",
-    booking.photographerName ? `Photographer: ${booking.photographerName}` : "",
-    booking.services.length ? `Services: ${booking.services.join(", ")}` : "",
-    booking.notes ? `Notes: ${booking.notes}` : ""
-  ].filter(Boolean).join("\n");
+  const description = bookingEventDescription(booking);
   const response = await calendar.events.insert({
     calendarId,
     sendUpdates: "none",
@@ -2875,68 +3140,6 @@ function visibleToPortalClient(record, identity) {
   if (!email) return false;
   return [record.email, record.clientEmail].some((value) => normalizeEmail$1(value) === email);
 }
-const ADDRESS_LIMIT = 300;
-const PLACE_ID_LIMIT = 300;
-function serviceLocationFromInput(value) {
-  if (typeof value === "string") {
-    const formatted2 = clip(value, ADDRESS_LIMIT);
-    return formatted2 ? { kind: "text", formatted: formatted2 } : null;
-  }
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const row = value;
-  const formatted = clip(firstString(row, ["formatted", "description", "label"]), ADDRESS_LIMIT);
-  const placeId = clip(firstString(row, ["placeId", "place_id"]), PLACE_ID_LIMIT);
-  const lat = readCoord$1(row.lat ?? row.latitude, "lat");
-  const lng = readCoord$1(row.lng ?? row.longitude, "lng");
-  if (formatted && placeId && lat != null && lng != null) {
-    return { kind: "picked", place: { placeId, formatted, lat, lng } };
-  }
-  if (formatted) return { kind: "text", formatted };
-  return null;
-}
-function storedServiceLocationFields(value) {
-  const location = serviceLocationFromInput(value);
-  if (!location) return { address: "" };
-  if (location.kind === "text") return { address: location.formatted };
-  const { place } = location;
-  return {
-    address: place,
-    lat: place.lat,
-    lng: place.lng,
-    latitude: place.lat,
-    longitude: place.lng,
-    placeId: place.placeId
-  };
-}
-function storedRecordPin(record) {
-  if (!record) return null;
-  for (const key of ["address", "propertyAddress", "shootLocation"]) {
-    const location = serviceLocationFromInput(record[key]);
-    if (location?.kind === "picked") return { lat: location.place.lat, lng: location.place.lng };
-  }
-  const lat = readCoord$1(record.lat ?? record.latitude, "lat");
-  const lng = readCoord$1(record.lng ?? record.longitude, "lng");
-  if (lat != null && lng != null) return { lat, lng };
-  return null;
-}
-function firstString(row, keys) {
-  for (const key of keys) {
-    const value = row[key];
-    if (typeof value === "string" && value.trim()) return value;
-  }
-  return "";
-}
-function clip(value, limit) {
-  if (typeof value !== "string") return "";
-  return value.trim().slice(0, limit);
-}
-function readCoord$1(value, axis) {
-  const number = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
-  if (!Number.isFinite(number)) return null;
-  if (axis === "lat" && (number < -90 || number > 90)) return null;
-  if (axis === "lng" && (number < -180 || number > 180)) return null;
-  return number;
-}
 const PORTAL_LISTING_ID$1 = /^[A-Za-z0-9_-]{4,128}$/;
 const NEVER_FILL = /* @__PURE__ */ new Set([
   "images",
@@ -3109,6 +3312,13 @@ function desiredListingFields(group, identity) {
   assign(fields, "apptTime", scheduleTime);
   assign(fields, "scheduledTime", scheduleTime);
   if (names.length) fields.services = names;
+  const travel = firstStoredTravel(group);
+  if (travel) {
+    fields.travelZone = travel.travelZone;
+    fields.travelMiles = travel.travelMiles;
+    fields.travelFeeCents = travel.travelFeeCents;
+    fields.travelQuoted = travel.travelQuoted;
+  }
   if (total != null) fields.total = total;
   if (squareFootage != null) fields.squareFootage = squareFootage;
   assign(fields, "propertyStatus", firstText$2(group, ["propertyStatus"]));
@@ -3350,6 +3560,13 @@ function firstText$2(group, keys) {
     }
   }
   return "";
+}
+function firstStoredTravel(group) {
+  for (const doc of propertyDocs(group)) {
+    const travel = travelFromRecord(doc.data);
+    if (travel) return travel;
+  }
+  return null;
 }
 function firstScalar(group, keys) {
   for (const doc of propertyDocs(group)) {
@@ -3961,7 +4178,7 @@ function roundMoney(value) {
 const NOT_PROVIDED = "Not provided";
 function officeNewOrderEmail(saved, options) {
   const catalog = options?.catalog ?? packagesForStaffEditor([]);
-  const lines = orderServiceLines(saved);
+  const lines = orderServiceLines(saved).filter((line) => !isTravelFeeLine(line));
   const charges = orderChargeSummary(saved, lines);
   const packageLine = lines.find((line) => !isAddOn(line, catalog)) || lines[0];
   const addOns2 = packageLine ? lines.filter((line) => line !== packageLine) : lines;
@@ -3997,6 +4214,7 @@ function officeNewOrderEmail(saved, options) {
     ["Floor plan", deliverables.floorplan],
     ["Turnaround", deliverables.turnaround],
     ["Add-ons", addOnText(addOns2)],
+    ["Travel", travelTextForRecord(saved, { miles: true }) ?? NOT_PROVIDED],
     ["Subtotal", moneyField(saved, "subtotal", lines.length ? charges.subtotal : null)],
     ["Tax", moneyField(saved, "tax", lines.length ? charges.tax : null)],
     ["Total", moneyField(saved, "total", lines.length ? charges.total : null)],
@@ -4296,10 +4514,23 @@ router$m.post("/", async (req, res) => {
     if (!firstName || !lastName || !email || !phone || !address) {
       return res.status(400).json({ error: "Missing required fields." });
     }
+    const clientName2 = `${firstName} ${lastName}`.trim();
+    const locationFields = storedServiceLocationFields(address);
+    const savedAddress = locationFields.address;
+    if (!savedAddress) {
+      return res.status(400).json({ error: "Missing required fields." });
+    }
+    const displayAddress = addressLabel(savedAddress);
     const catalog = await loadBookingCatalog();
     const resolved = resolveSubmittedBooking(req.body, catalog);
-    const lineItems = resolved.lineItems;
-    const total = resolved.total;
+    const keptLines = resolved.lineItems.filter((item) => !isTravelFeeLine(item));
+    if (chargedServiceLines(keptLines).length === 0) {
+      return res.status(400).json({ error: "No services selected." });
+    }
+    const traveled = applyServerTravel(keptLines, savedAddress);
+    const lineItems = traveled.lineItems;
+    const total = traveled.total;
+    const travel = traveled.travel;
     const promoCode = resolved.promoCode;
     const promoDiscount = resolved.promoDiscount;
     const pricing = { subtotal: total, tax: 0, total };
@@ -4308,16 +4539,6 @@ router$m.post("/", async (req, res) => {
     const selectedAddOns = resolved.selectedAddOns;
     const specializedPhotography = resolved.specializedPhotography;
     const virtualStagingCredits = resolved.virtualStagingCredits;
-    if (chargedServiceLines(lineItems).length === 0) {
-      return res.status(400).json({ error: "No services selected." });
-    }
-    const clientName2 = `${firstName} ${lastName}`.trim();
-    const locationFields = storedServiceLocationFields(address);
-    const savedAddress = locationFields.address;
-    if (!savedAddress) {
-      return res.status(400).json({ error: "Missing required fields." });
-    }
-    const displayAddress = addressLabel(savedAddress);
     const { address: _savedAddress, ...storedPin } = locationFields;
     const orderRequest = {
       firstName,
@@ -4333,6 +4554,10 @@ router$m.post("/", async (req, res) => {
       vibeNote: vibeNote || "",
       promoCode: promoCode || null,
       promoDiscount: Number(promoDiscount) || 0,
+      travelZone: travel.travelZone,
+      travelMiles: travel.travelMiles,
+      travelFeeCents: travel.travelFeeCents,
+      travelQuoted: travel.travelQuoted,
       scheduledDate: scheduledDate || null,
       scheduledTime: scheduledTime || null,
       photographerPreference: photographerPreference || null,
@@ -4416,6 +4641,7 @@ router$m.post("/", async (req, res) => {
         total,
         promoCode,
         promoDiscount,
+        travel,
         clientId: account.clientId
       });
       invoiceId = created.invoiceId;
@@ -4455,6 +4681,7 @@ router$m.post("/", async (req, res) => {
         furnishingStatus: furnishingStatus || "Not specified",
         accessMethod: accessLine,
         squareFootage: squareFootage ? `${squareFootage} sq ft` : "",
+        travelFee: travelSummaryText(travel),
         dashboardUrl: `${appUrl$2()}/admin/order-request/${docRef.id}`
       }
     }).then((result) => result.sent ? "sent" : "failed").catch((err) => {
@@ -4475,6 +4702,7 @@ router$m.post("/", async (req, res) => {
         furnishingStatus: furnishingStatus || "Not specified",
         accessMethod: accessLine,
         squareFootage: squareFootage ? `${squareFootage} sq ft` : "",
+        travelFee: travelSummaryText(travel),
         dashboardUrl: `${appUrl$2()}/admin/order-request/${docRef.id}`
       }
     }).then((result) => result.sent ? "sent" : "failed").catch((err) => {
@@ -4659,13 +4887,14 @@ router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       longitude: locationFields.longitude,
       placeId: locationFields.placeId
     };
-    const requestLineItems = linesForConfirmedOrder(request);
-    const lineSum = sumLineItemPrices(requestLineItems.filter((item) => {
+    const traveledConfirm = applyServerTravel(linesForConfirmedOrder(request), requestAddress);
+    const requestLineItems = traveledConfirm.lineItems;
+    const travel = traveledConfirm.travel;
+    const requestTotal = traveledConfirm.total;
+    const requestSubtotal = sumLineItemPrices(requestLineItems.filter((item) => {
       const id = String(item.id || "");
       return !id.startsWith("promo-") && !item.name.startsWith("Promo Code:");
     }));
-    const requestTotal = Number(request.total ?? request.pricing?.total ?? lineSum) || lineSum;
-    const requestSubtotal = lineSum || Number(request.pricing?.subtotal) || requestTotal;
     const confirmSource = scheduledDate || request.scheduledDate || request.appointmentDate || request.requestedDate;
     const confirmDate = toDate$1(confirmSource);
     const confirmTime = scheduledTime || request.scheduledTime || request.appointmentTime || request.requestedTime || null;
@@ -4731,6 +4960,10 @@ router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       subtotal: requestSubtotal,
       pricing: { ...request.pricing || {}, subtotal: requestSubtotal, tax: Number(request.pricing?.tax) || 0, total: requestTotal },
       total: requestTotal,
+      travelZone: travel.travelZone,
+      travelMiles: travel.travelMiles,
+      travelFeeCents: travel.travelFeeCents,
+      travelQuoted: travel.travelQuoted,
       depositPaid: 0,
       balanceDue: requestTotal,
       status: "confirmed",
@@ -4798,7 +5031,8 @@ router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       clientEmail: requestEmail,
       clientPhone: requestPhone,
       address: requestAddressLabel,
-      services: requestLineItems.map((item) => item.name || String(item)).filter(Boolean),
+      services: requestLineItems.filter((item) => !isTravelFeeLine(item)).map((item) => item.name || String(item)).filter(Boolean),
+      travelSummary: travelSummaryText(travel, { miles: true }),
       scheduledDate: confirmDate,
       scheduledTime: confirmTime,
       photographerEmail: photographer?.email || null,
@@ -4866,7 +5100,8 @@ router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         clientName: requestClientName,
         orderRequestId: req.params.id,
         promoCode: request.promoCode,
-        promoDiscount: request.promoDiscount
+        promoDiscount: request.promoDiscount,
+        travel
       });
       await invoiceRef.set({
         ...draft,
@@ -4917,6 +5152,7 @@ router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         scheduledDate: bookingDateLabel(confirmSource, "To be confirmed"),
         scheduledTime: confirmTime || "To be confirmed",
         photographerName: assignedPhotographerName || "Our team",
+        travelFee: travelSummaryText(travel),
         orderId: orderRef.id,
         portalUrl: `${appUrl$2()}/portal`
       }
@@ -4997,7 +5233,8 @@ async function createBookingInvoiceDraft(input) {
     clientName: input.clientName,
     orderRequestId: input.orderRequestId,
     promoCode: input.promoCode,
-    promoDiscount: input.promoDiscount
+    promoDiscount: input.promoDiscount,
+    travel: input.travel
   });
   const invoiceRef = db$n().collection("invoices").doc();
   await invoiceRef.set({
