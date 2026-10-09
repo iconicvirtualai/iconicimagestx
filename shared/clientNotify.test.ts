@@ -34,7 +34,7 @@ describe("booking_received stays on under RED", () => {
   });
 
   it("keeps marketing, portal, and other non-order templates off", () => {
-    for (const template of ["marketing", "manual_message", "contact_confirmation", "contact_form", "order_confirmed", "gallery_delivery", "invoice", "live_chat"]) {
+    for (const template of ["marketing", "manual_message", "contact_confirmation", "contact_form", "order_confirmed", "gallery_delivery", "invoice", "live_chat", "office_new_order"]) {
       expect(emailAllowed(template, {})).toBe(false);
       expect(emailAllowed(template, { CLIENT_NOTIFY_LIVE: "true", CLIENT_COMMS_ZONE: "RED" })).toBe(false);
     }
@@ -47,6 +47,9 @@ describe("booking_received stays on under RED", () => {
     expect(emailAllowed("live_chat", { CLIENT_COMMS_ZONE: "RED" })).toBe(false);
     expect(emailAllowed("live_chat", { CLIENT_COMMS_ZONE: "RED" }, "client")).toBe(false);
     expect(emailAllowed("contact_confirmation", { CLIENT_COMMS_ZONE: "RED" }, "staff")).toBe(false);
+    expect(emailAllowed("office_new_order", { CLIENT_COMMS_ZONE: "RED" }, "staff")).toBe(true);
+    expect(emailAllowed("office_new_order", { CLIENT_COMMS_ZONE: "RED" })).toBe(false);
+    expect(emailAllowed("office_new_order", { CLIENT_COMMS_ZONE: "RED" }, "client")).toBe(false);
   });
 
   it("sends the client bookingConfirmation SMS with no flags set and while the zone is RED", () => {

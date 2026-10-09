@@ -285,6 +285,106 @@ const UPGRADES: CatalogItem[] = [
   },
 ];
 
+/**
+ * Packages the public booking pages sell that are not cards on /book.
+ * Hollywood, Hall of Fame, Red Carpet, and the photo-count classics live
+ * on the temporary order page. Aerial Only is the aerial-only choice.
+ * Seed only — do not write these into production from this module.
+ */
+export const publicBookingPackages: CatalogItem[] = [
+  {
+    id: "hollywood",
+    name: "Hollywood",
+    price: 199,
+    description: "A sharp, streamlined listing launch.",
+    features: ["30 daytime listing photos", "Branded listing website", "Grass replacement included"],
+  },
+  {
+    id: "hall-of-fame",
+    name: "Hall of Fame",
+    price: 299,
+    description: "More coverage for homes that need to stand out.",
+    features: ["35 listing photos", "5 aerial photos", "Branded listing website", "Grass replacement included"],
+  },
+  {
+    id: "red-carpet",
+    name: "Red Carpet",
+    price: 599,
+    description: "More story, more motion, more attention.",
+    features: ["45 listing photos", "5 aerials", "Social reel", "Amenity coverage", "Branded listing website", "Grass replacement included"],
+  },
+  {
+    id: "luxe-video",
+    name: "Luxe Video",
+    price: 785,
+    description: "Standout-home coverage with a listing video.",
+    features: ["50 listing photos", "5 aerials", "Listing video", "Premium editing package", "Grass replacement included"],
+  },
+  {
+    id: "luxe-3d",
+    name: "Luxe 3D Tour",
+    price: 785,
+    description: "Standout-home coverage with a 3D tour.",
+    features: ["50 listing photos", "5 aerials", "3D tour", "Premium editing package", "Grass replacement included"],
+  },
+  {
+    id: "photos-18",
+    name: "Photos Only — 18 photos",
+    price: 139,
+    description: "Photography only. Next-day delivery.",
+    features: ["18 photos", "Next-day delivery"],
+  },
+  {
+    id: "photos-25-only",
+    name: "Photos Only — 25 photos",
+    price: 169,
+    description: "Photography only. Next-day delivery.",
+    features: ["25 photos", "Next-day delivery"],
+  },
+  {
+    id: "photos-40",
+    name: "Photos Only — 40 photos",
+    price: 199,
+    description: "Photography only. Next-day delivery.",
+    features: ["40 photos", "Next-day delivery"],
+  },
+  {
+    id: "aerial-only",
+    name: "Aerial Only",
+    price: 99,
+    description: "Aerial photos without a photo package.",
+    features: ["5 aerial photos"],
+  },
+  {
+    id: "essentials-aerial",
+    name: "Essentials Aerial Upgrade",
+    price: 89,
+    description: "Aerial upgrade for The Essentials.",
+    features: ["Aerial photos"],
+  },
+  {
+    id: "grass-replacement",
+    name: "Grass replacement",
+    price: 25,
+    description: "Grass replacement for the appointment.",
+    features: ["Grass replacement"],
+  },
+  {
+    id: "iconic-polish",
+    name: "Iconic Polish",
+    price: 75,
+    description: "Premium digital finish.",
+    features: ["Premium digital finish"],
+  },
+  {
+    id: "agent-intro-video",
+    name: "Agent intro/outro",
+    price: 59,
+    description: "On-camera agent intro or outro, priced per video on the public booking page.",
+    features: ["Agent intro/outro"],
+  },
+];
+
 export function hardcodedChargePrice(id: string): number | undefined {
   const service = services.find((entry) => entry.id === id);
   if (service) return service.price;
@@ -294,6 +394,8 @@ export function hardcodedChargePrice(id: string): number | undefined {
   if (addon) return addon.price;
   const upgrade = UPGRADES.find((entry) => entry.id === id);
   if (upgrade) return upgrade.price;
+  const publicPackage = publicBookingPackages.find((entry) => entry.id === id);
+  if (publicPackage) return publicPackage.price;
   return undefined;
 }
 
@@ -458,6 +560,23 @@ export function bookingPackageSeedDocs(): BookingPackageSeed[] {
       category: upgradeCategory(upgrade.id),
       bookingId: upgrade.id,
       bookingKind: "upgrade",
+      source: "booking-form-hardcoded",
+    });
+  }
+
+  for (const item of publicBookingPackages) {
+    docs.push({
+      id: item.id,
+      name: item.name,
+      tier: "standard",
+      price: item.price,
+      description: item.description,
+      includedServices: item.features || [],
+      isActive: true,
+      sortOrder: sortOrder++,
+      category: "photography",
+      bookingId: item.id,
+      bookingKind: "service",
       source: "booking-form-hardcoded",
     });
   }

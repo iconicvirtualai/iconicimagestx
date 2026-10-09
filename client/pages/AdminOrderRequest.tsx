@@ -23,6 +23,7 @@ import { staffInvoicePath } from "@shared/staffInvoice";
 import { ensureLinkedInvoice, resolveLinkedInvoice } from "@/lib/orderProjectInvoice";
 import { syncOrderBillingToInvoice } from "@/lib/staffInvoice";
 import { separatePromoDiscount } from "@shared/bookingPricing";
+import { orderChargeSummary, orderServiceLines } from "@shared/orderPackageLines";
 import { linkOrderToListing, resolvePortalClientId } from "@/lib/listingClient";
 import { deliverInvoiceEmail } from "@/lib/deliverInvoice";
 import { useAuth } from "@/contexts/AuthContext";
@@ -414,9 +415,9 @@ export default function AdminOrderRequest() {
 
   const statusKey = (typeof order.status === "string" ? order.status : "new").toLowerCase().replace(/\s+/g, "_");
   const statusInfo = STATUS_MAP[statusKey] || STATUS_MAP.new;
-  const lineItems: any[] = order.lineItems || [];
-  const orderTotal = Number(order.total) || Number(order.pricing?.total) || 0;
-  const subtotal = Number(order.pricing?.subtotal) || orderTotal;
+  const lineItems = orderServiceLines(order);
+  const charges = orderChargeSummary(order, lineItems);
+  const orderTotal = charges.total;
   const promoDiscount = Number(order.promoDiscount) || 0;
   const extraPromo = separatePromoDiscount(lineItems, promoDiscount);
   const clientName = order.clientName || `${order.firstName || ""} ${order.lastName || ""}`.trim() || "—";

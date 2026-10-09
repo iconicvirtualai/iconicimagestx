@@ -21,6 +21,8 @@ export const ORDER_RECEIVED_SMS_KIND = "booking_confirmation";
 
 /** Visitor live chat → office inbox. Not a client send. */
 export const STAFF_INBOUND_EMAIL_TEMPLATE = "live_chat";
+/** Saved new-order alert → ADMIN_EMAIL and COORDINATOR_EMAIL. Not a client send. */
+export const OFFICE_NEW_ORDER_EMAIL_TEMPLATE = "office_new_order";
 /** Visitor live chat → office Google Voice. Not a client send. */
 export const STAFF_INBOUND_SMS_KIND = "staff_inbound";
 /** Iconic Images Google Voice, E.164. */
@@ -43,6 +45,7 @@ export function emailAllowed(
 ): boolean {
   if (template === ORDER_RECEIVED_EMAIL_TEMPLATE) return true;
   if (audience === "staff" && template === STAFF_INBOUND_EMAIL_TEMPLATE) return true;
+  if (audience === "staff" && template === OFFICE_NEW_ORDER_EMAIL_TEMPLATE) return true;
   return clientNotifyLive(env);
 }
 

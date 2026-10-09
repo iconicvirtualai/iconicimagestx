@@ -48,19 +48,22 @@ interface SendEmailOptions {
   cc?: string;
   template: string;
   /**
-   * "staff" is required for the live_chat office alert. Omit for client mail.
+   * "staff" is required for the live_chat office alert and the new-order
+   * office alert. Omit for client mail.
    * Visitor addresses must not be paired with audience "staff".
    */
   audience?: "client" | "staff";
   variables?: Record<string, string>;
   subject?: string; // override template subject
+  /** When set, this HTML is the message. A stored template cannot replace it. */
+  html?: string;
   attachments?: Array<{ filename: string; path: string }>;
 }
 
 // ─── Main Send Function ───────────────────────────────────────────────────────
 
 export async function sendEmail(options: SendEmailOptions): Promise<{ sent: boolean }> {
-  const { to, bcc, cc, template, audience, variables = {}, subject: subjectOverride, attachments } = options;
+  const { to, bcc, cc, template, audience, variables = {}, subject: subjectOverride, html, attachments } = options;
 
   if (!to) {
     console.warn("[Email] No recipient specified, skipping.");
@@ -78,11 +81,12 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ sent: bool
   }
 
   let subject = subjectOverride || `Message from Iconic Images`;
-  let htmlBody = getFallbackTemplate(template, variables);
+  let htmlBody = html || getFallbackTemplate(template, variables);
 
   // A missing or broken Firestore template must not block the built-in copy.
+  // A caller-supplied HTML body is the message; do not swap in a stored template.
   try {
-    if (admin.apps.length) {
+    if (!html && admin.apps.length) {
       const templateDoc = await db()
         .collection("emailTemplates")
         .where("category", "==", template)

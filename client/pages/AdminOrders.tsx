@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 import { upsertScheduledAppointment } from "@/lib/scheduleRecords";
 import { buildAdminOrderTile, type AdminStudioId } from "@shared/adminOrderTile";
+import { exclusiveOrderBuckets } from "@shared/orderPackageLines";
 import { AdminOrderTile } from "@/components/admin/AdminOrderTile";
 
 function fmtAddr(a: any): string {
@@ -185,20 +186,15 @@ export default function AdminOrders() {
     });
   };
 
-  const actionRequired = orders.filter(o => {
-    const s = getUnifiedStatus(o);
-    return s === "unscheduled";
+  const buckets = exclusiveOrderBuckets(orders, (order) => {
+    const status = getUnifiedStatus(order);
+    if (status === "archived" || status === "cancelled") return "archived";
+    if (status === "unscheduled") return "action";
+    return "active";
   });
-
-  const allActive = orders.filter(o => {
-    const s = getUnifiedStatus(o);
-    return s !== "archived" && s !== "cancelled";
-  });
-
-  const archived = orders.filter(o => {
-    const s = getUnifiedStatus(o);
-    return s === "archived" || s === "cancelled";
-  });
+  const actionRequired = buckets.action;
+  const allActive = buckets.active;
+  const archived = buckets.archived;
 
   // ─── SORTING ───────────────────────────────────────────────────────────────
 
