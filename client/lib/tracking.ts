@@ -140,6 +140,14 @@ function cleanToken(value: unknown): string {
   return trimmed;
 }
 
+/** A conversion label, or the full AW-XXXX/label value copied from Google. */
+function cleanAdsLabel(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (/^AW-[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+$/.test(trimmed)) return trimmed;
+  return cleanToken(trimmed);
+}
+
 export function readTrackingConfig(env: Partial<TrackingEnv> | null | undefined): TrackingConfig {
   const source = env ?? {};
   return {
@@ -147,10 +155,10 @@ export function readTrackingConfig(env: Partial<TrackingEnv> | null | undefined)
     googleAdsId: cleanToken(source.VITE_GOOGLE_ADS_ID),
     uetTagId: cleanToken(source.VITE_UET_TAG_ID),
     adsLabels: {
-      book_submit: cleanToken(source.VITE_GOOGLE_ADS_LABEL_BOOK_SUBMIT),
-      studio_request: cleanToken(source.VITE_GOOGLE_ADS_LABEL_STUDIO_REQUEST),
-      contact_submit: cleanToken(source.VITE_GOOGLE_ADS_LABEL_CONTACT_SUBMIT),
-      call_click: cleanToken(source.VITE_GOOGLE_ADS_LABEL_CALL_CLICK),
+      book_submit: cleanAdsLabel(source.VITE_GOOGLE_ADS_LABEL_BOOK_SUBMIT),
+      studio_request: cleanAdsLabel(source.VITE_GOOGLE_ADS_LABEL_STUDIO_REQUEST),
+      contact_submit: cleanAdsLabel(source.VITE_GOOGLE_ADS_LABEL_CONTACT_SUBMIT),
+      call_click: cleanAdsLabel(source.VITE_GOOGLE_ADS_LABEL_CALL_CLICK),
     },
   };
 }

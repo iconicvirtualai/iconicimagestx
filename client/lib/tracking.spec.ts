@@ -74,6 +74,12 @@ describe("tracking config", () => {
       VITE_UET_TAG_ID: "12 34",
     }).ga4MeasurementId).toBe("");
     expect(readTrackingConfig({ VITE_GOOGLE_ADS_ID: "AW 1" }).googleAdsId).toBe("");
+    expect(readTrackingConfig({
+      VITE_GOOGLE_ADS_LABEL_BOOK_SUBMIT: " AW-999/bookLabel ",
+    }).adsLabels.book_submit).toBe("AW-999/bookLabel");
+    expect(readTrackingConfig({
+      VITE_GOOGLE_ADS_LABEL_BOOK_SUBMIT: "not a label",
+    }).adsLabels.book_submit).toBe("");
   });
 });
 
