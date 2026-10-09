@@ -58,6 +58,7 @@ export const navGroups: { label: string; items: AdminNavItem[] }[] = [
       { label: "Projects", href: "/admin/listings", icon: Home, roles: COORD_UP },
       { label: "Clients", href: "/admin/customers", icon: Users, roles: COORD_UP },
       { label: "Communications", href: "/admin/communications", icon: MessageSquare, roles: COORD_UP },
+      { label: "Email", href: "/admin/communications/email", icon: Mail, roles: ADMIN_ONLY },
     ],
   },
   {

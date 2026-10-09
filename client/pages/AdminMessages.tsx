@@ -31,6 +31,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Link } from "react-router-dom";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 import ContactLiveChat from "@/components/ContactLiveChat";
 import { useAuth } from "@/contexts/AuthContext";
@@ -139,7 +140,7 @@ function timeAgo(ts: { seconds: number } | null) {
 
 export default function AdminMessages() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [tab, setTab] = useState<Tab>("sweep");
   const [threads, setThreads] = useState<OrderThread[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -622,6 +623,14 @@ export default function AdminMessages() {
                   <p className="text-gray-400 text-sm mt-2 max-w-3xl">
                     This center is the required home for team, client, email, text, portal, and social communications. AICON should sweep it automatically and flag anything unanswered, failed, urgent, or financially connected.
                   </p>
+                  {isAdmin ? (
+                    <Link
+                      to="/admin/communications/email"
+                      className="mt-4 inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-xs font-bold uppercase tracking-widest text-white hover:bg-teal-500"
+                    >
+                      <Mail className="h-4 w-4" /> Email marketing
+                    </Link>
+                  ) : null}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -174,6 +174,55 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ─── Email marketing ─────────────────────────────────────────────────────
+    // Admin SDK writes these. The browser may read them for an admin session.
+    // Publish this file in the Firebase console. Vercel does not deploy rules.
+
+    match /marketingContacts/{contactId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /marketingSegments/{segmentId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /marketingSuppression/{entryId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /marketingSettings/{settingId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /marketingEvents/{eventId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /marketingCampaigns/{campaignId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /marketingTemplates/{templateId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /marketingSends/{sendId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /marketingReports/{reportId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // ─── Campaigns ───────────────────────────────────────────────────────────
 
     match /campaigns/{campaignId} {

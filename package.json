@@ -30,9 +30,10 @@
     "firebase-functions": "^7.1.1",
     "googleapis": "^171.4.0",
     "nodemailer": "^8.0.2",
+    "stripe": "^16.0.0",
     "twilio": "^5.13.0",
-    "zod": "^3.25.76",
-    "stripe": "^16.0.0"
+    "xlsx": "^0.18.5",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@hookform/resolvers": "^5.2.1",
