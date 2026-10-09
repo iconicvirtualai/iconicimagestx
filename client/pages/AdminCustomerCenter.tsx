@@ -9,6 +9,7 @@ import {
 } from "firebase/firestore";
 import { toast } from "sonner";
 import StaffActionQueue from "@/components/StaffActionQueue";
+import { addressText } from "@shared/addressText";
 import {
   asTags, clientInitials, clientName, normEmail, type ClientRecord,
 } from "@/lib/clientRecords";
@@ -95,6 +96,7 @@ export default function AdminCustomerCenter() {
       client.email,
       client.phone,
       client.company,
+      addressText(client.address),
       client.group,
       client.status,
       ...asTags(client.tags),
@@ -150,7 +152,7 @@ export default function AdminCustomerCenter() {
       email: client.email || "",
       phone: client.phone || "",
       company: client.company || "",
-      address: client.address || "",
+      address: addressText(client.address),
       group: client.group || "",
       status: client.status || "active",
       tags: asTags(client.tags).join(", "),

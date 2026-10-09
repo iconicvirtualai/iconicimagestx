@@ -22,21 +22,11 @@ import {
   normalisePhone,
 } from "../services/sms";
 import { requireStaff, requireCoordinator, type AuthenticatedRequest } from "../middleware/auth";
+import { recordAddressText } from "../../shared/addressText";
 import { clientNotifyBlockReason, clientNotifyLive } from "../../shared/clientNotify";
 
 const router = Router();
 const db = () => admin.firestore();
-
-function addressLabel(address: unknown): string {
-  if (!address) return "the property";
-  if (typeof address === "string") return address;
-  if (typeof address === "object") {
-    const a = address as Record<string, unknown>;
-    if (typeof a.formatted === "string" && a.formatted) return a.formatted;
-    return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "the property";
-  }
-  return String(address);
-}
 
 async function findOrderLikeDocument(id: string) {
   const orderRequestDoc = await db().collection("orderRequests").doc(id).get();
@@ -111,7 +101,7 @@ router.post("/remind/:orderId", requireStaff, async (req: AuthenticatedRequest, 
     const name = order.firstName || order.clientName?.split(" ")[0] || "there";
     const date = order.scheduledDate || "your scheduled date";
     const time = order.scheduledTime || "your appointment time";
-    const address = order.addressLabel || addressLabel(order.address || order.propertyAddress);
+    const address = recordAddressText(order) || "the property";
 
     let body: string;
     if (type === "1h") {

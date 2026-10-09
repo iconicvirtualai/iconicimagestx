@@ -4,6 +4,7 @@ import { Copy, Download, ExternalLink, Image, Link2, Lock, AlertCircle, CreditCa
 import { Button } from "@/components/ui/button";
 import Footer from "@/components/Footer";
 import { toast } from "sonner";
+import { addressText } from "@shared/addressText";
 import { ICONIC_DOWNLOAD_LOCK } from "@shared/paymentAccess";
 import { GalleryDownloadLockNotice } from "@/components/GalleryDownloadLock";
 
@@ -94,7 +95,7 @@ export default function PublicGallery() {
       <header className="bg-black text-white">
         <div className="max-w-6xl mx-auto px-4 py-10">
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Iconic Images</p>
-          <h1 className="text-3xl font-black mt-2">{gallery.address || gallery.title || "Your Gallery"}</h1>
+          <h1 className="text-3xl font-black mt-2">{addressText(gallery.address) || gallery.title || "Your Gallery"}</h1>
           {gallery.clientName && <p className="text-gray-400 mt-1">{gallery.clientName}</p>}
         </div>
       </header>

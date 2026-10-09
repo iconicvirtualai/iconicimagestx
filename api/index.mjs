@@ -508,6 +508,28 @@ Questions or edits? Just reply here. — Iconic Images`,
 
 Check dashboard for details.`
 };
+const RECORD_ADDRESS_KEYS = ["addressLabel", "address", "propertyAddress", "shootLocation", "location"];
+function addressText(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value !== "object" || Array.isArray(value)) return "";
+  const address = value;
+  const formatted = text$c(address.formatted) || text$c(address.label);
+  if (formatted) return formatted;
+  return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
+}
+function recordAddressText(record) {
+  if (!record || typeof record !== "object") return addressText(record);
+  const row = record;
+  for (const key of RECORD_ADDRESS_KEYS) {
+    const label = addressText(row[key]);
+    if (label) return label;
+  }
+  return "";
+}
+function text$c(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
 function getPrivateKey() {
   return (process.env.GOOGLE_CALENDAR_PRIVATE_KEY || "").replace(/\\n/g, "\n");
 }
@@ -570,7 +592,7 @@ async function createCalendarBookingEvent(booking) {
     sendUpdates: "none",
     requestBody: {
       summary,
-      location: booking.address,
+      location: addressText(booking.address),
       description,
       start: { dateTime: times.start, timeZone: "America/Chicago" },
       end: { dateTime: times.end, timeZone: "America/Chicago" },
@@ -2452,12 +2474,8 @@ function addressRecords(data) {
 }
 function addressString$1(data) {
   for (const key of ["address", "propertyAddress", "shootLocation", "addressLabel"]) {
-    const value = data[key];
-    if (typeof value === "string" && value.trim()) return value.trim();
-    const record = asRecord$3(value);
-    if (!record) continue;
-    const formatted = firstText$3(record, ["formatted", "label"]);
-    if (formatted) return formatted;
+    const label = addressText(data[key]);
+    if (label) return label;
   }
   return "";
 }
@@ -2563,17 +2581,6 @@ const ACCEPTED = /* @__PURE__ */ new Set([
   "consult_scheduled",
   "delivered"
 ]);
-function addressText$1(value) {
-  if (!value) return "";
-  if (typeof value === "string") return value.trim();
-  if (typeof value === "object") {
-    const address = value;
-    if (typeof address.formatted === "string" && address.formatted.trim()) return address.formatted.trim();
-    if (typeof address.label === "string" && address.label.trim()) return address.label.trim();
-    return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
-  }
-  return "";
-}
 function statusKey$1(value) {
   return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
 }
@@ -2666,7 +2673,7 @@ function buildClientListing(id, data) {
   const amenities = listingCardAmenities(data);
   return {
     id,
-    address: addressText$1(data.propertyAddress || data.address || data.shootLocation) || "Listing",
+    address: addressText(data.propertyAddress || data.address || data.shootLocation) || "Listing",
     status,
     projectType: projectType2,
     imageCount: Array.isArray(images) ? images.length : 0,
@@ -2692,7 +2699,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
     invoiceNumber: presentInvoiceNumber(data.invoiceNumber, id, Number.isNaN(issuedAt.getTime()) ? now : issuedAt),
     status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
     clientName: text$b(data.clientName),
-    address: addressText$1(data.billToAddress || data.address || data.propertyAddress),
+    address: addressText(data.billToAddress || data.address || data.propertyAddress),
     createdAt,
     issuedOn: formatPortalDate(data.createdAt) || formatPortalDate(data.sentAt) || formatPortalDate(data.paidAt),
     lineItems: storedLines(data.lineItems, data.services),
@@ -2736,7 +2743,7 @@ function buildClientAppointment(id, data, orderRequest) {
   if (!time) time = requestedTime;
   return {
     id,
-    address: addressText$1(data.addressLabel || data.address) || "Appointment",
+    address: addressText(data.addressLabel || data.address) || "Appointment",
     status,
     date,
     time,
@@ -3053,7 +3060,7 @@ function desiredListingFields(group, identity) {
   if (address) {
     fields.address = address;
     fields.propertyAddress = address;
-    const label = addressText$1(address);
+    const label = addressText(address);
     if (label) fields.addressLabel = label;
   }
   const pin = firstStoredServicePin(group);
@@ -3931,7 +3938,7 @@ function officeNewOrderEmail(saved, options) {
   const deliverables = describeDeliverables(features);
   const packageName = packageLine ? cleanPackageName(packageLine.name) : NOT_PROVIDED;
   const orderNumber = orderNumberOf(saved);
-  const address = firstText$1(saved, ["addressLabel", "address", "propertyAddress"]) || NOT_PROVIDED;
+  const address = addressText(saved.addressLabel) || addressText(saved.address) || addressText(saved.propertyAddress) || addressText(saved.shootLocation) || NOT_PROVIDED;
   const requestedDate = firstDate(saved, ["scheduledDate", "requestedDate", "appointmentDate", "requestedDates"]);
   const clientName2 = clientNameOf(saved);
   const notes = notesOf(saved);
@@ -3944,7 +3951,7 @@ function officeNewOrderEmail(saved, options) {
     ["Agent", firstText$1(saved, ["agentName", "agent"])],
     ["Agent email/phone", agentContactOf(saved)],
     ["Brokerage", firstText$1(saved, ["brokerage", "brokerageName"])],
-    ["Property address", address === NOT_PROVIDED ? NOT_PROVIDED : addressText(saved.address) || address],
+    ["Property address", address],
     ["Unit", firstText$1(saved, ["unit", "unitNumber"]) || addressPart(saved.address, ["unit", "unitNumber"])],
     ["Gate code", firstText$1(saved, ["gateCode", "gate"])],
     ["Lockbox", lockboxOf(saved)],
@@ -3970,7 +3977,7 @@ function officeNewOrderEmail(saved, options) {
     ["Notes", notes],
     ["Booked via", bookedVia(saved)]
   ];
-  const subjectCore = `New order ${orderNumber} — ${packageName} — ${address === NOT_PROVIDED ? NOT_PROVIDED : addressText(saved.address) || address} — ${requestedDate}`;
+  const subjectCore = `New order ${orderNumber} — ${packageName} — ${address} — ${requestedDate}`;
   const subject = isTestOrder(clientName2, notes) ? `[TEST] ${subjectCore}` : subjectCore;
   const plain = fields.map(([label, value]) => `${label}: ${value}`).join("\n");
   const html = `<div style="font-family:Arial,sans-serif;max-width:640px;color:#111"><h1 style="font-size:18px">${escapeHtml$4(subject)}</h1><table style="width:100%;border-collapse:collapse">${fields.map(([label, value]) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:bold;vertical-align:top">${escapeHtml$4(label)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:pre-wrap">${escapeHtml$4(value)}</td></tr>`).join("")}</table></div>`;
@@ -4101,14 +4108,6 @@ function firstText$1(record, keys) {
 function firstDate(record, keys) {
   return firstText$1(record, keys);
 }
-function addressText(value) {
-  if (typeof value === "string" && value.trim()) return value.trim();
-  if (!value || typeof value !== "object") return "";
-  const record = value;
-  const formatted = text$7(record.formatted) || text$7(record.label);
-  if (formatted) return formatted;
-  return [record.street, record.city, record.state, record.zip].map((part) => text$7(part)).filter(Boolean).join(", ");
-}
 function addressPart(value, keys) {
   if (!value || typeof value !== "object") return NOT_PROVIDED;
   const record = value;
@@ -4201,15 +4200,8 @@ const db$n = () => admin.firestore();
 function appUrl$2() {
   return process.env.APP_URL || "https://iconicimagestx.com";
 }
-function addressLabel$3(address) {
-  if (!address) return "Address not provided";
-  if (typeof address === "string") return address;
-  if (typeof address === "object") {
-    const a = address;
-    if (typeof a.formatted === "string" && a.formatted) return a.formatted;
-    return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "Address not provided";
-  }
-  return String(address);
+function addressLabel(address) {
+  return addressText(address) || "Address not provided";
 }
 function toDate$1(value) {
   if (!value) return null;
@@ -4286,7 +4278,7 @@ router$m.post("/", async (req, res) => {
     if (!savedAddress) {
       return res.status(400).json({ error: "Missing required fields." });
     }
-    const displayAddress = addressLabel$3(savedAddress);
+    const displayAddress = addressLabel(savedAddress);
     const { address: _savedAddress, ...storedPin } = locationFields;
     const orderRequest = {
       firstName,
@@ -4620,7 +4612,7 @@ router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     const requestClientName = request.clientName || `${requestFirstName} ${requestLastName}`.trim() || "Client";
     const locationFields = storedServiceLocationFields(request.address || request.propertyAddress || "");
     const requestAddress = locationFields.address || "";
-    const requestAddressLabel = addressLabel$3(requestAddress);
+    const requestAddressLabel = addressLabel(requestAddress);
     const storedPin = locationFields.lat == null ? {} : {
       lat: locationFields.lat,
       lng: locationFields.lng,
@@ -5350,15 +5342,7 @@ function finalsObjectPath(listingId, fileName2, now = Date.now()) {
   return `listings/${listingId}/finals/${now}_${safeStorageFileName(fileName2)}`;
 }
 function listingAddressLabel(listing) {
-  const source = listing?.address ?? listing?.shootLocation;
-  if (!source) return "Untitled listing";
-  if (typeof source === "string" && source.trim()) return source.trim();
-  if (typeof source === "object") {
-    const row = source;
-    const parts = [row.street, row.city, row.state, row.zip].map((part) => String(part || "").trim()).filter(Boolean);
-    if (parts.length) return parts.join(", ");
-  }
-  return "Untitled listing";
+  return recordAddressText(listing) || "Untitled listing";
 }
 function clamp(value, min, max) {
   if (!Number.isFinite(value)) return 0;
@@ -5516,13 +5500,7 @@ function galleryResult(doc, via) {
   };
 }
 function addressOf(listing) {
-  const property = text$6(listing.propertyAddress);
-  if (property) return property;
-  const labeled = listingAddressLabel({
-    address: listing.address,
-    shootLocation: listing.shootLocation
-  });
-  return labeled === "Untitled listing" ? "" : labeled;
+  return addressText(listing.addressLabel) || addressText(listing.propertyAddress) || addressText(listing.address) || addressText(listing.shootLocation);
 }
 function servicesOf(listing) {
   if (!Array.isArray(listing.services)) return [];
@@ -6172,13 +6150,8 @@ function tallyStudioJobs(jobs) {
   return studio;
 }
 function rowAddress(input) {
-  if (typeof input.addressLabel === "string" && input.addressLabel.trim()) return input.addressLabel.trim();
-  const fromAddress = listingAddressLabel({ address: input.address });
-  if (fromAddress !== "Untitled listing") return fromAddress;
-  if (input.listing) {
-    const fromListing = listingAddressLabel(input.listing);
-    if (fromListing !== "Untitled listing") return fromListing;
-  }
+  const labeled = addressText(input.addressLabel) || addressText(input.address) || (input.listing ? recordAddressText(input.listing) : "");
+  if (labeled) return labeled;
   if (typeof input.title === "string" && input.title.trim()) return input.title.trim();
   return "Untitled listing";
 }
@@ -7543,16 +7516,6 @@ function httpError$2(status, message, extra) {
 function appUrl$1() {
   return process.env.APP_URL || "https://iconicimagestx.com";
 }
-function addressLabel$2(address) {
-  if (!address) return "the property";
-  if (typeof address === "string") return address;
-  if (typeof address === "object") {
-    const row = address;
-    if (typeof row.formatted === "string" && row.formatted) return row.formatted;
-    return [row.street, row.city, row.state, row.zip].filter(Boolean).join(", ") || "the property";
-  }
-  return String(address);
-}
 async function invoiceForGallery$1(gallery) {
   if (typeof gallery.invoiceId === "string" && gallery.invoiceId) {
     const doc = await db$i().collection("invoices").doc(gallery.invoiceId).get();
@@ -7625,7 +7588,7 @@ async function deliverGalleryToClient(galleryId, options) {
       template: "gallery_delivery",
       variables: {
         clientName: gallery.clientName,
-        address: gallery.addressLabel || addressLabel$2(gallery.address),
+        address: recordAddressText(gallery) || "the property",
         galleryUrl: deliveryUrl,
         invoiceAmount: invoice ? `$${invoice.total.toFixed(2)}` : "",
         paymentUrl: invoice && invoiceSnap ? `${appUrl$1()}/invoice/${invoiceSnap.docs[0].id}` : "",
@@ -7865,7 +7828,7 @@ function clientGalleryPayload(id, gallery, gate) {
   return {
     id,
     title: gallery.title,
-    address: gallery.address,
+    address: recordAddressText(gallery),
     clientName: gallery.clientName,
     status: gallery.status,
     deliveredAt: gallery.deliveredAt || null,
@@ -8588,7 +8551,7 @@ router$j.post("/invoice/:id/checkout", async (req, res) => {
           unit_amount: Math.round(amountDue * 100),
           product_data: {
             name: `Studio Noir Invoice ${invoice.invoiceNumber || invoiceDoc.id}`,
-            description: invoice.address || invoice.clientName || void 0
+            description: addressText(invoice.address) || addressText(invoice.billToAddress) || (typeof invoice.clientName === "string" ? invoice.clientName : "") || void 0
           }
         },
         quantity: 1
@@ -9979,8 +9942,7 @@ function addressFromRecord(record) {
   };
 }
 function addressString(value) {
-  if (typeof value === "string") return value.trim();
-  return "";
+  return addressText(value);
 }
 function firstText(record, keys) {
   for (const key of keys) {
@@ -10855,8 +10817,8 @@ router$g.get("/me/home", requireAuth, async (req, res) => {
         const data = doc.data();
         galleries.push({
           id: doc.id,
-          title: data.title || addressText$1(data.address) || "Gallery",
-          address: addressText$1(data.address),
+          title: data.title || addressText(data.address) || "Gallery",
+          address: addressText(data.address),
           status: data.status || "pending_upload",
           href: `/gallery/${doc.id}`
         });
@@ -10886,7 +10848,7 @@ router$g.get("/me/home", requireAuth, async (req, res) => {
       const listingId = typeof data.listingId === "string" ? data.listingId : "";
       orders.push({
         id: entry2.id,
-        address: addressText$1(data.address || data.shootLocation) || "Order",
+        address: addressText(data.address || data.shootLocation) || "Order",
         status: data.status || "new",
         href: listingId ? `/studio/${listingId}` : ""
       });
@@ -13874,16 +13836,6 @@ function toDate(value) {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
-function addressLabel$1(address) {
-  if (!address) return "the property";
-  if (typeof address === "string") return address;
-  if (typeof address === "object") {
-    const a = address;
-    if (typeof a.formatted === "string" && a.formatted) return a.formatted;
-    return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "the property";
-  }
-  return String(address);
-}
 function combineDateAndTime(date, time) {
   if (!date) return null;
   const combined = new Date(date);
@@ -14031,7 +13983,7 @@ async function runReminderSweep(req, res) {
       const phone = merged.clientPhone || merged.phone;
       const name = merged.firstName || merged.clientName?.split(" ")?.[0] || "there";
       const time = merged.scheduledTime || merged.appointmentTime || "your appointment time";
-      const address = merged.addressLabel || addressLabel$1(merged.address || merged.propertyAddress);
+      const address = recordAddressText(merged) || "the property";
       const dueTypes = [];
       if (!sent["24h"] && sameCalendarDay(scheduledDate, tomorrow)) {
         dueTypes.push("24h");
@@ -14047,7 +13999,7 @@ async function runReminderSweep(req, res) {
           results.push({ appointmentId: appointmentDoc.id, orderId, type, skipped: "missing_phone" });
           continue;
         }
-        const body = type === "1h" ? SMS_TEMPLATES.appointmentReminder1h(name, String(time)) : SMS_TEMPLATES.appointmentReminder24h(name, scheduledDate.toLocaleDateString("en-US"), String(time), String(address));
+        const body = type === "1h" ? SMS_TEMPLATES.appointmentReminder1h(name, String(time)) : SMS_TEMPLATES.appointmentReminder24h(name, scheduledDate.toLocaleDateString("en-US"), String(time), address);
         try {
           const result = await sendSMS({ to: String(phone), body });
           if (result.suppressed) {
@@ -14843,16 +14795,6 @@ router$6.get("/distance", async (req, res) => {
 });
 const router$5 = Router();
 const db$1 = () => admin.firestore();
-function addressLabel(address) {
-  if (!address) return "the property";
-  if (typeof address === "string") return address;
-  if (typeof address === "object") {
-    const a = address;
-    if (typeof a.formatted === "string" && a.formatted) return a.formatted;
-    return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "the property";
-  }
-  return String(address);
-}
 async function findOrderLikeDocument(id) {
   const orderRequestDoc = await db$1().collection("orderRequests").doc(id).get();
   if (orderRequestDoc.exists) return orderRequestDoc;
@@ -14911,7 +14853,7 @@ router$5.post("/remind/:orderId", requireStaff, async (req, res) => {
     const name = order.firstName || order.clientName?.split(" ")[0] || "there";
     const date = order.scheduledDate || "your scheduled date";
     const time = order.scheduledTime || "your appointment time";
-    const address = order.addressLabel || addressLabel(order.address || order.propertyAddress);
+    const address = recordAddressText(order) || "the property";
     let body;
     if (type === "1h") {
       body = SMS_TEMPLATES.appointmentReminder1h(name, time);
@@ -15880,7 +15822,7 @@ function addressParts(listing) {
     address: listing?.address,
     shootLocation: listing?.shootLocation
   });
-  if (labeled && labeled !== "Untitled listing") return { address: labeled, street: labeled, locality: "" };
+  if (labeled !== "Untitled listing") return { address: labeled, street: labeled, locality: "" };
   return { address: "", street: "", locality: "" };
 }
 function agentNameOf(listing) {

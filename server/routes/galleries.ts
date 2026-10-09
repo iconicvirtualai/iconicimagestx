@@ -13,6 +13,7 @@ import {
   publicMediaItem,
   type GalleryDownloadGate,
 } from "../../shared/paymentAccess";
+import { recordAddressText } from "../../shared/addressText";
 import { galleryStatusNeedsReleaseGate } from "../../shared/galleryRelease";
 import { deliverGalleryToClient } from "../services/galleryDeliver";
 import { loadGalleryReleaseForGallery } from "../services/galleryReleaseGate";
@@ -93,7 +94,7 @@ function clientGalleryPayload(id: string, gallery: Record<string, unknown>, gate
   return {
     id,
     title: gallery.title,
-    address: gallery.address,
+    address: recordAddressText(gallery),
     clientName: gallery.clientName,
     status: gallery.status,
     deliveredAt: gallery.deliveredAt || null,

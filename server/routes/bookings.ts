@@ -21,6 +21,7 @@ import { planOrderPackageRepair } from "../../shared/orderPackageRepair";
 import { notifyOfficeOfOrder } from "../services/officeOrderNotify";
 import { packagesForStaffEditor } from "../../shared/bookingCatalog";
 import { normalizeEmail } from "../../shared/listingAccess";
+import { addressText } from "../../shared/addressText";
 import { storedServiceLocationFields } from "../../shared/serviceLocation";
 
 const router = Router();
@@ -31,14 +32,7 @@ function appUrl() {
 }
 
 function addressLabel(address: unknown): string {
-  if (!address) return "Address not provided";
-  if (typeof address === "string") return address;
-  if (typeof address === "object") {
-    const a = address as Record<string, unknown>;
-    if (typeof a.formatted === "string" && a.formatted) return a.formatted;
-    return [a.street, a.city, a.state, a.zip].filter(Boolean).join(", ") || "Address not provided";
-  }
-  return String(address);
+  return addressText(address) || "Address not provided";
 }
 
 function toDate(value: unknown): Date | null {

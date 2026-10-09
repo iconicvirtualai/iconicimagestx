@@ -122,6 +122,23 @@ describe("office new order email", () => {
     expect(email.text).toContain("Booked via: Site");
   });
 
+  it("prints a Google Places address in the subject and body", () => {
+    const email = officeNewOrderEmail({
+      ...saved,
+      addressLabel: "",
+      address: {
+        formatted: "100 Congress Ave, Austin, TX 78701",
+        lat: 30.2648,
+        lng: -97.7431,
+        placeId: "place_congress",
+      },
+    }, { catalog });
+    expect(email.subject).toContain("100 Congress Ave, Austin, TX 78701");
+    expect(email.text).toContain("Property address: 100 Congress Ave, Austin, TX 78701");
+    expect(email.text).not.toContain("place_congress");
+    expect(email.text).not.toContain("[object Object]");
+  });
+
   it("shows Not provided for every missing field and does not throw", () => {
     const email = officeNewOrderEmail({});
     expect(email.subject).toBe(`New order ${NOT_PROVIDED} — ${NOT_PROVIDED} — ${NOT_PROVIDED} — ${NOT_PROVIDED}`);

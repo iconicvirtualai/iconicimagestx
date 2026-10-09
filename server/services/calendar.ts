@@ -1,11 +1,12 @@
 import { google } from "googleapis";
+import { addressText } from "../../shared/addressText";
 
 export interface CalendarBooking {
   orderId: string;
   clientName: string;
   clientEmail?: string;
   clientPhone?: string;
-  address: string;
+  address: unknown;
   services: string[];
   scheduledDate?: Date | null;
   scheduledTime?: string | null;
@@ -134,7 +135,7 @@ export async function createCalendarBookingEvent(booking: CalendarBooking) {
     sendUpdates: "none",
     requestBody: {
       summary,
-      location: booking.address,
+      location: addressText(booking.address),
       description,
       start: { dateTime: times.start, timeZone: "America/Chicago" },
       end: { dateTime: times.end, timeZone: "America/Chicago" },

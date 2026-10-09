@@ -100,6 +100,24 @@ describe("listing presentation", () => {
     expect(photos.map((photo) => photo.id)).toEqual(["yard"]);
   });
 
+  it("reads a Google Places address on the presentation", () => {
+    const presentation = buildPresentation({
+      token: "abcdefghijklmnopqrstuv",
+      listing: {
+        id: "listing1234",
+        address: {
+          formatted: "100 Congress Ave, Austin, TX 78701",
+          lat: 30.2648,
+          lng: -97.7431,
+          placeId: "place_congress",
+        },
+        images: [],
+      },
+    });
+    expect(presentation?.address).toBe("100 Congress Ave, Austin, TX 78701");
+    expect(JSON.stringify(presentation)).not.toContain("place_congress");
+  });
+
   it("hides a presentation the staff turned off", () => {
     expect(buildPresentation({
       token: "abcdefghijklmnopqrstuv",

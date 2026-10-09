@@ -4,7 +4,8 @@
  * This does not send email or SMS.
  */
 
-import { frameFromListingImage, listingAddressLabel } from "./iconicStudio";
+import { addressText } from "./addressText.ts";
+import { frameFromListingImage } from "./iconicStudio";
 import { clientGalleryDownloadsUnlocked } from "./paymentAccess";
 
 export const RELEASED_GALLERY_STATUSES = ["delivered", "approved"] as const;
@@ -121,13 +122,10 @@ function galleryResult(doc: GalleryLinkDoc, via?: string): ClientGalleryLinkResu
 }
 
 function addressOf(listing: GalleryLinkDoc): string {
-  const property = text(listing.propertyAddress);
-  if (property) return property;
-  const labeled = listingAddressLabel({
-    address: listing.address,
-    shootLocation: listing.shootLocation,
-  });
-  return labeled === "Untitled listing" ? "" : labeled;
+  return addressText(listing.addressLabel)
+    || addressText(listing.propertyAddress)
+    || addressText(listing.address)
+    || addressText(listing.shootLocation);
 }
 
 function servicesOf(listing: GalleryLinkDoc): string[] {

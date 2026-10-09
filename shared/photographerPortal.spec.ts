@@ -80,6 +80,22 @@ describe("photographer portal jobs", () => {
     expect(jobNeedsPhotographer(job)).toBe(false);
   });
 
+  it("reads a Google Places address on the job card", () => {
+    const [job] = buildPhotographerPortal({
+      today: TODAY,
+      listings: [listing({
+        address: {
+          formatted: "100 Congress Ave, Austin, TX 78701",
+          lat: 30.2648,
+          lng: -97.7431,
+          placeId: "place_congress",
+        },
+      })],
+    });
+    expect(job.address).toBe("100 Congress Ave, Austin, TX 78701");
+    expect(job.mapsHref).toContain("100%20Congress");
+  });
+
   it("shows Iconic Studio editing status after photos are in", () => {
     const [job] = buildPhotographerPortal({
       today: TODAY,

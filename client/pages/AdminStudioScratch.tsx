@@ -8,6 +8,7 @@ import StudioScratchPad, {
   type StagingRequest,
 } from "@/components/studio-scratch/StudioScratchPad";
 import { stagingApi, stagingGuidance } from "@/components/studio-scratch/scratchDesk";
+import { recordAddressText } from "@shared/addressText";
 import { useAuth } from "@/contexts/AuthContext";
 import { auth, storage } from "@/lib/firebase";
 import { fetchScratchStatus, postScratchEdit } from "@/lib/scratchApi";
@@ -208,7 +209,7 @@ export default function AdminStudioScratch() {
       .then(async (data) => {
         if (cancel) return;
         setOrderJobs(studioOrderTrayJobs(data.jobs, listingId));
-        const address = data.listing?.address || listingId;
+        const address = recordAddressText(data.listing) || listingId;
         const frames = framesFromListingImages(data.listing?.images);
         const slice = frames.slice(0, SCRATCH_MAX_FILES);
         setListingLabel(address);

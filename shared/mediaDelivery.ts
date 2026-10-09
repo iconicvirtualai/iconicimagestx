@@ -7,7 +7,7 @@
  * This module does not send email or SMS and does not run image edits.
  */
 
-import { listingAddressLabel } from "./iconicStudio";
+import { addressText, recordAddressText } from "./addressText.ts";
 
 export const MEDIA_DELIVERY_STATUSES = ["pending", "undelivered", "delivered"] as const;
 export type MediaDeliveryStatus = (typeof MEDIA_DELIVERY_STATUSES)[number];
@@ -156,13 +156,10 @@ function rowAddress(input: {
   title?: unknown;
   listing?: DeliveryListingSource | null;
 }): string {
-  if (typeof input.addressLabel === "string" && input.addressLabel.trim()) return input.addressLabel.trim();
-  const fromAddress = listingAddressLabel({ address: input.address });
-  if (fromAddress !== "Untitled listing") return fromAddress;
-  if (input.listing) {
-    const fromListing = listingAddressLabel(input.listing);
-    if (fromListing !== "Untitled listing") return fromListing;
-  }
+  const labeled = addressText(input.addressLabel)
+    || addressText(input.address)
+    || (input.listing ? recordAddressText(input.listing) : "");
+  if (labeled) return labeled;
   if (typeof input.title === "string" && input.title.trim()) return input.title.trim();
   return "Untitled listing";
 }

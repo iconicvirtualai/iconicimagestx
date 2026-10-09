@@ -5,7 +5,8 @@
  * Does not queue edits or call OpenAI.
  */
 
-import { iconicStudioHref, isRawStudioFile, listingAddressLabel } from "./iconicStudio";
+import { recordAddressText } from "./addressText.ts";
+import { iconicStudioHref, isRawStudioFile } from "./iconicStudio";
 
 const CHICAGO = "America/Chicago";
 
@@ -393,14 +394,7 @@ function sortPhotographerJobs(jobs: PhotographerJobCard[]): PhotographerJobCard[
 }
 
 function photographerAddress(listing: PhotographerListingInput): string {
-  for (const value of [listing.address, listing.propertyAddress, listing.shootLocation]) {
-    if (typeof value === "string" && value.trim()) return value.trim();
-    if (value && typeof value === "object") {
-      const label = listingAddressLabel({ address: value });
-      if (label !== "Untitled listing") return label;
-    }
-  }
-  return "Untitled listing";
+  return recordAddressText(listing) || "Untitled listing";
 }
 
 export function readAppointmentDate(value: unknown): Date | null {

@@ -8,6 +8,7 @@ import {
   Clock,
   Eye,
 } from "lucide-react";
+import { recordAddressText } from "@shared/addressText";
 import { toast } from "sonner";
 
 const STATUS_OPTIONS = ["needs_editing", "in_progress", "ready_for_review", "delivered"];
@@ -121,7 +122,7 @@ export default function AdminEditor() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-4 mb-2">
                       <p className="font-black text-sm text-black truncate">
-                        {listing.propertyAddress || "Unnamed Listing"}
+                        {recordAddressText(listing) || "Unnamed Listing"}
                       </p>
                       <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full flex-shrink-0 ${statusColor[editStatus]}`}>
                         {statusLabel[editStatus]}

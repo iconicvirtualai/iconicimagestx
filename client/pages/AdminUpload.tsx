@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { PhotographerJobBanner } from "@/components/photographer/PhotographerPortal";
 import { fetchAssignedListings, uploadListingFile } from "@/lib/listingUpload";
 import { drainOrderEditQueue, fetchStudioWorkspace, postIconicPolish } from "@/lib/studioApi";
+import { addressText } from "@shared/addressText";
 import {
   PHOTOGRAPHER_UPLOAD_ACCEPT,
   buildPhotographerPortal,
@@ -178,7 +179,7 @@ export default function AdminUpload() {
             >
               {jobs.map((job) => (
                 <option key={job.id} value={job.id}>
-                  {job.address} — {job.action.statusLabel}
+                  {addressText(job.address) || "No address"} — {job.action.statusLabel}
                 </option>
               ))}
             </select>
@@ -213,7 +214,7 @@ export default function AdminUpload() {
           />
           <Upload className="mx-auto mb-4 h-10 w-10 text-gray-300" />
           <p className="mb-1 text-sm font-black uppercase tracking-widest text-gray-500">
-            {selected ? `Drop the shoot for ${selected.address}` : "Drop photos here or click to browse"}
+            {selected ? `Drop the shoot for ${addressText(selected.address) || "this shoot"}` : "Drop photos here or click to browse"}
           </p>
           <p className="text-xs text-gray-400">JPEG, PNG, WebP, and RAW. RAW stays in the raw folder until a preview exists.</p>
         </div>

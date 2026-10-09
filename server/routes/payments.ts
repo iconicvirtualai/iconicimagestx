@@ -11,6 +11,7 @@ import crypto from "crypto";
 import { requireCoordinator, requireAuth, type AuthenticatedRequest } from "../middleware/auth";
 import { sendEmail } from "../services/email";
 import { clientNotifyLive } from "../../shared/clientNotify";
+import { addressText } from "../../shared/addressText";
 import { amountStillDue, invoiceAllowsDownload, invoiceIdFromSquareNote, squarePaymentNote } from "../../shared/paymentAccess";
 import { presentInvoiceNumber } from "../../shared/orderProjectInvoice";
 import { fetchPublishedSquareInvoiceUrl, resolveSquareCheckoutUrl, squareApiBaseUrl } from "../../shared/squareInvoice";
@@ -477,7 +478,7 @@ router.post("/invoice/:id/checkout", async (req: Request, res: Response) => {
           unit_amount: Math.round(amountDue * 100),
           product_data: {
             name: `Studio Noir Invoice ${invoice.invoiceNumber || invoiceDoc.id}`,
-            description: invoice.address || invoice.clientName || undefined,
+            description: addressText(invoice.address) || addressText(invoice.billToAddress) || (typeof invoice.clientName === "string" ? invoice.clientName : "") || undefined,
           },
         },
         quantity: 1,

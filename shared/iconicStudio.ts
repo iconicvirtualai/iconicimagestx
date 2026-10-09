@@ -7,6 +7,7 @@
  * Presets here are staff overrides for one frame, not a photographer picker.
  */
 
+import { recordAddressText } from "./addressText.ts";
 import { isListingStoragePath, safeStorageFileName } from "./listingAccess";
 import { studioEditorHref } from "./studioEditorHref";
 
@@ -182,16 +183,8 @@ export function finalsObjectPath(listingId: string, fileName: string, now = Date
   return `listings/${listingId}/finals/${now}_${safeStorageFileName(fileName)}`;
 }
 
-export function listingAddressLabel(listing: { address?: unknown; shootLocation?: unknown } | null | undefined): string {
-  const source = listing?.address ?? listing?.shootLocation;
-  if (!source) return "Untitled listing";
-  if (typeof source === "string" && source.trim()) return source.trim();
-  if (typeof source === "object") {
-    const row = source as Record<string, unknown>;
-    const parts = [row.street, row.city, row.state, row.zip].map((part) => String(part || "").trim()).filter(Boolean);
-    if (parts.length) return parts.join(", ");
-  }
-  return "Untitled listing";
+export function listingAddressLabel(listing: { address?: unknown; shootLocation?: unknown; propertyAddress?: unknown; addressLabel?: unknown } | null | undefined): string {
+  return recordAddressText(listing) || "Untitled listing";
 }
 
 function clamp(value: number, min: number, max: number): number {

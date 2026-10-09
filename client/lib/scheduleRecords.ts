@@ -8,6 +8,7 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
+import { recordAddressText } from "@shared/addressText";
 import { db } from "./firebase";
 
 const GENERIC_ASSIGNEES = new Set([
@@ -215,7 +216,7 @@ export async function upsertScheduledAppointment({
   const firstProvider = assignedProviders[0] || null;
   const total = appointmentRevenue(order);
   const clientName = order?.clientName || `${order?.firstName || ""} ${order?.lastName || ""}`.trim() || "Unknown Client";
-  const address = order?.addressLabel || order?.address || order?.propertyAddress || order?.shootLocation || "";
+  const address = recordAddressText(order);
   const services = orderLineItems(order);
 
   const sharedScheduleFields = {
@@ -260,7 +261,7 @@ export async function upsertScheduledAppointment({
     clientEmail: order?.email || order?.clientEmail || "",
     clientPhone: order?.phone || order?.clientPhone || "",
     address,
-    addressLabel: typeof address === "string" ? address : "",
+    addressLabel: address,
     services,
     lineItems: services,
     total,

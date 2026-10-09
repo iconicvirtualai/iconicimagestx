@@ -1,4 +1,5 @@
 import * as React from "react";
+import { recordAddressText } from "@shared/addressText";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 import {
@@ -364,9 +365,9 @@ function matchesCalendarMetricEvent(local: any, event: any) {
   if (normalizeMetricTime(local.scheduledTime || local.appointmentTime || local.apptTime) !== normalizeMetricTime(event.appointmentTime)) return false;
 
   const localClient = String(local.clientName || local.customerName || "").toLowerCase();
-  const localAddress = String(local.addressLabel || local.address || local.shootLocation || "").toLowerCase();
+  const localAddress = recordAddressText(local).toLowerCase();
   const eventClient = String(event.clientName || "").toLowerCase();
-  const eventAddress = String(event.address || "").toLowerCase();
+  const eventAddress = recordAddressText(event).toLowerCase();
   return tokenMetricOverlap(localClient, eventClient) || tokenMetricOverlap(localAddress, eventAddress);
 }
 

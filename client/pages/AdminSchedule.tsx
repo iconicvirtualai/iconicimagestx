@@ -13,6 +13,7 @@ import {
   staffDisplayName,
   toDate,
 } from "@/lib/scheduleRecords";
+import { addressText, recordAddressText } from "@shared/addressText";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Calendar as CalendarIcon,
@@ -604,7 +605,7 @@ export default function AdminSchedule() {
 
 function normalizeAppointment(record: any, staff: any[]): Appointment {
   const apptDate = scheduleRecordDate(record);
-  const address = record.addressLabel || record.address || record.propertyAddress || record.shootLocation || "No address";
+  const address = recordAddressText(record) || "No address";
   const city = extractCity(address);
   const services = Array.isArray(record.services) && record.services.length > 0
     ? record.services.map((item: any) => typeof item === "string" ? item : item.name || String(item))
@@ -686,7 +687,7 @@ function normalizeCalendarAppointment(event: any): Appointment | null {
   if (!apptDate) return null;
   const parts = String(event.summary || "").split(/\s+[—-]\s+/).map((part: string) => part.trim()).filter(Boolean);
   const clientName = parts[0]?.replace(/^Iconic Images:\s*/i, "") || "Calendar appointment";
-  const address = event.location || parts[1] || "No address";
+  const address = addressText(event.location) || parts[1] || "No address";
   const services = parts.slice(2);
 
   return {
