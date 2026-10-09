@@ -1,6 +1,8 @@
 import type { Server } from "node:http";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createServer } from "../index";
+import { sendEmail } from "../services/email";
+import { sendSMS, sendSMSCampaign } from "../services/sms";
 import { resetMarketingStoreForTests } from "../services/marketingStore";
 import { setGmassClientForTests, type GmassClient } from "../services/gmassClient";
 
@@ -12,6 +14,9 @@ const saved = {
   CLIENT_NOTIFY_LIVE: process.env.CLIENT_NOTIFY_LIVE,
   CLIENT_COMMS_ZONE: process.env.CLIENT_COMMS_ZONE,
   MARKETING_DEMO: process.env.MARKETING_DEMO,
+  MARKETING_SEND_LIVE: process.env.MARKETING_SEND_LIVE,
+  MARKETING_PUBLIC_URL: process.env.MARKETING_PUBLIC_URL,
+  APP_URL: process.env.APP_URL,
 };
 
 let server: Server;
@@ -46,6 +51,9 @@ beforeEach(() => {
   setGmassClientForTests(null);
   delete process.env.CLIENT_NOTIFY_LIVE;
   delete process.env.MARKETING_DEMO;
+  delete process.env.MARKETING_SEND_LIVE;
+  delete process.env.MARKETING_PUBLIC_URL;
+  delete process.env.APP_URL;
 });
 
 async function api(path: string, init: RequestInit = {}) {
@@ -110,8 +118,9 @@ describe("campaign send guard", () => {
     expect(preview.data.confirmation.warnings[0]).toMatch(/never verified/);
     expect(preview.data.confirmation.removedPreview.some((item: { email: string }) => item.email === "bruce@anywhere.com")).toBe(true);
 
-    const calls: { draft?: { emailAddresses?: string; fromEmail?: string } }[] = [];
-    process.env.CLIENT_NOTIFY_LIVE = "true";
+    const calls: { draft?: { emailAddresses?: string; fromEmail?: string; message?: string } }[] = [];
+    delete process.env.CLIENT_NOTIFY_LIVE;
+    process.env.MARKETING_SEND_LIVE = "true";
     setGmassClientForTests(gmassMock(false, calls));
     const blocked = await api(`/api/marketing/campaigns/${id}/send`, {
       method: "POST",
@@ -189,7 +198,8 @@ describe("campaign send guard", () => {
     const preview = await api(`/api/marketing/campaigns/${created.data.campaign.id}/preview`, { method: "POST", body: "{}" });
     expect(preview.data.confirmation.fromEmail).toBe("news@iconicimagestx.com");
     const calls: { draft?: { fromEmail?: string } }[] = [];
-    process.env.CLIENT_NOTIFY_LIVE = "true";
+    delete process.env.CLIENT_NOTIFY_LIVE;
+    process.env.MARKETING_SEND_LIVE = "true";
     setGmassClientForTests(gmassMock(true, calls));
     const sent = await api(`/api/marketing/campaigns/${created.data.campaign.id}/send`, {
       method: "POST",
@@ -197,6 +207,87 @@ describe("campaign send guard", () => {
     });
     expect(sent.response.status).toBe(200);
     expect(calls[0].draft?.fromEmail).toBe("news@iconicimagestx.com");
+  });
+
+  it("sends when MARKETING_SEND_LIVE is set and CLIENT_NOTIFY_LIVE is not", async () => {
+    await api("/api/marketing/imports/commit", {
+      method: "POST",
+      body: JSON.stringify({
+        headers: ["email", "first"],
+        rows: [["ready@example.com", "Ready"]],
+        mapping: { email: "email", first: "firstName" },
+      }),
+    });
+    const created = await api("/api/marketing/campaigns", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "Portal switch",
+        subject: "Hi",
+        html: "<p>Hi {FirstName|there}</p>",
+        audienceMode: "all",
+      }),
+    });
+    const id = created.data.campaign.id;
+    const preview = await api(`/api/marketing/campaigns/${id}/preview`, { method: "POST", body: "{}" });
+    const calls: { draft?: { message?: string }; test?: { message?: string } }[] = [];
+    delete process.env.CLIENT_NOTIFY_LIVE;
+    delete process.env.MARKETING_SEND_LIVE;
+    process.env.APP_URL = "https://www.iconicimagestx.com";
+    process.env.MARKETING_PUBLIC_URL = "https://iconicimagestx.vercel.app";
+    setGmassClientForTests({
+      ...gmassMock(true, calls),
+      sendTransactional: async (message) => {
+        calls.push({ test: message });
+        return { ok: true };
+      },
+    });
+
+    const held = await api(`/api/marketing/campaigns/${id}/send`, {
+      method: "POST",
+      body: JSON.stringify({ token: preview.data.confirmation.token, overlapOverride: false }),
+    });
+    expect(held.response.status).toBe(503);
+    expect(held.data.error).toMatch(/MARKETING_SEND_LIVE/);
+    expect(calls).toHaveLength(0);
+
+    process.env.CLIENT_NOTIFY_LIVE = "true";
+    const stillHeld = await api(`/api/marketing/campaigns/${id}/send`, {
+      method: "POST",
+      body: JSON.stringify({ token: preview.data.confirmation.token, overlapOverride: false }),
+    });
+    expect(stillHeld.response.status).toBe(503);
+    expect(calls).toHaveLength(0);
+
+    delete process.env.CLIENT_NOTIFY_LIVE;
+    process.env.MARKETING_SEND_LIVE = "true";
+    const testSend = await api(`/api/marketing/campaigns/${id}/test`, {
+      method: "POST",
+      body: JSON.stringify({ to: "you@iconicimagestx.com" }),
+    });
+    expect(testSend.response.status).toBe(200);
+    expect(calls[0].test?.message).toContain("https://iconicimagestx.vercel.app/unsubscribe");
+    expect(calls[0].test?.message).not.toContain("iconicimagestx.com/unsubscribe");
+
+    const sent = await api(`/api/marketing/campaigns/${id}/send`, {
+      method: "POST",
+      body: JSON.stringify({ token: preview.data.confirmation.token, overlapOverride: false }),
+    });
+    expect(sent.response.status).toBe(200);
+    expect(calls[1].draft?.message).toContain("https://iconicimagestx.vercel.app/unsubscribe");
+    expect(calls[1].draft?.message).not.toContain("www.iconicimagestx.com");
+
+    const gallery = await sendEmail({ to: "ada@example.com", template: "gallery_delivery" });
+    const invoice = await sendEmail({ to: "ada@example.com", template: "invoice" });
+    const password = await sendEmail({ to: "ada@example.com", template: "account_password_setup" });
+    const order = await sendEmail({ to: "ada@example.com", template: "order_confirmed" });
+    expect(gallery.sent).toBe(false);
+    expect(invoice.sent).toBe(false);
+    expect(password.sent).toBe(false);
+    expect(order.sent).toBe(false);
+    const sms = await sendSMS({ to: "2815550100", body: "status" });
+    expect(sms).toMatchObject({ suppressed: true });
+    const bulk = await sendSMSCampaign([{ phone: "2815550100", name: "Ada" }], "Hi {{name}}");
+    expect(bulk[0]?.error).toBe("suppressed");
   });
 
   it("keeps the public sample route off unless the demo flag is set", async () => {

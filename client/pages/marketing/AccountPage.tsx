@@ -19,6 +19,7 @@ interface Settings {
 interface Account {
   configured: boolean;
   writesEnabled: boolean;
+  sendLive?: boolean;
   settings: Settings;
   links: LinkOut[];
   inPortal: string[];
@@ -95,7 +96,7 @@ export default function AccountPage() {
           <h2 className="text-sm font-black uppercase tracking-widest">Connection</h2>
           <p className="mt-2 text-sm text-gray-600">Default from <strong>{account?.sendingAccount || "photos@iconicimagestx.com"}</strong>. Each campaign picks its own from address.</p>
           <p className="mt-1 text-sm font-semibold">{account?.configured ? "API key is set." : "GMASS_API_KEY is not set on the server."}</p>
-          <p className="text-sm text-gray-600">{account?.writesEnabled ? "Live sends are enabled." : "Live sends stay off until GMASS_SEND_ENABLED=true."}</p>
+          <p className="text-sm text-gray-600">{account?.sendLive && account?.writesEnabled ? "Live marketing sends are enabled." : "Marketing sends stay off until MARKETING_SEND_LIVE=true and GMASS_SEND_ENABLED=true. Client booking and invoice mail still use CLIENT_NOTIFY_LIVE."}</p>
           {userFields.length ? (
             <dl className="mt-4 grid grid-cols-2 gap-2 text-sm">
               {userFields.map(([key, value]) => (

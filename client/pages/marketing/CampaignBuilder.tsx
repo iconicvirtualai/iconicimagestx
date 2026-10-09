@@ -313,7 +313,7 @@ export default function CampaignBuilder() {
       {step === 4 ? (
         <section className={`${cardCls} p-5`}>
           <label><span className={labelCls}>Send a test to</span><input className={inputCls} value={testTo} placeholder="you@iconicimagestx.com" onChange={(event) => setTestTo(event.target.value)} /></label>
-          <p className="mt-2 text-xs text-gray-500">A test uses GMass transactional email and still requires the send lock to be on. It does not count toward the frequency cap.</p>
+          <p className="mt-2 text-xs text-gray-500">A test uses GMass transactional email. It sends only when MARKETING_SEND_LIVE and GMASS_SEND_ENABLED are both true. It does not count toward the frequency cap.</p>
           <div className="mt-4 flex gap-2">
             <button type="button" className={buttonCls} onClick={() => sendTest().catch((err: unknown) => setError(err instanceof Error ? err.message : "Test failed."))}>Send test</button>
             <button type="button" className={ghostCls} onClick={() => setStep(5)}>Skip to confirm</button>
