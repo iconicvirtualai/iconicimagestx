@@ -150,6 +150,7 @@ const App = () => (
             <Route path="/admin/login" element={<AdminLogin />} />
 
             {/* ─── Admin / Staff ────────────────────────────────────────── */}
+            <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="/admin/dashboard" element={<ProtectedRoute requiredRole="coordinator"><AdminDashboard /></ProtectedRoute>} />
             <Route path="/admin/studio" element={<ProtectedRoute requiredRole="staff"><AdminStudioHome /></ProtectedRoute>} />
             <Route path="/admin/studio/editing" element={<ProtectedRoute requiredRole="staff"><AdminStudioScratch /></ProtectedRoute>} />

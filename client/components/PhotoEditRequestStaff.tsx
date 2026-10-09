@@ -12,7 +12,7 @@ const REPLACEMENT_TYPES = ["image/jpeg", "image/png", "image/webp"];
 function when(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
+  return date.toLocaleString("en-US", { timeZone: "America/Chicago" });
 }
 
 async function fileToBase64(file: File): Promise<string> {

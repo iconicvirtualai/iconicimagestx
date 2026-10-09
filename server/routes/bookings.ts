@@ -22,6 +22,7 @@ import { notifyOfficeOfOrder } from "../services/officeOrderNotify";
 import { packagesForStaffEditor } from "../../shared/bookingCatalog";
 import { normalizeEmail } from "../../shared/listingAccess";
 import { addressText } from "../../shared/addressText";
+import { bookingDateLabel } from "../../shared/clientHome";
 import { storedServiceLocationFields } from "../../shared/serviceLocation";
 
 const router = Router();
@@ -272,7 +273,7 @@ router.post("/", async (req, res) => {
         address: displayAddress,
         total: money(total),
         requestId: docRef.id,
-        scheduledDate: scheduledDate || "TBD — we'll confirm shortly",
+        scheduledDate: bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
         scheduledTime: scheduledTime || "",
         propertyStatus: propertyStatus || "Not specified",
         furnishingStatus: furnishingStatus || "Not specified",
@@ -295,7 +296,7 @@ router.post("/", async (req, res) => {
         address: displayAddress,
         total: money(total),
         requestId: docRef.id,
-        scheduledDate: scheduledDate || "TBD — we'll confirm shortly",
+        scheduledDate: bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
         scheduledTime: scheduledTime || "",
         propertyStatus: propertyStatus || "Not specified",
         furnishingStatus: furnishingStatus || "Not specified",
@@ -316,7 +317,7 @@ router.post("/", async (req, res) => {
         kind: "booking_confirmation",
         body: SMS_TEMPLATES.bookingConfirmation(
           firstName,
-          scheduledDate || "TBD — we'll confirm shortly",
+          bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
           displayAddress,
           money(total)
         ),
@@ -336,7 +337,7 @@ router.post("/", async (req, res) => {
         to: process.env.ADMIN_PHONE,
         body: SMS_TEMPLATES.newBookingAlert(
           displayAddress,
-          scheduledDate || "TBD",
+          bookingDateLabel(scheduledDate, "TBD"),
           serviceNames
         ),
       }).catch((err) => console.error("[Bookings] Admin SMS alert failed:", err));
@@ -527,7 +528,8 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
     }));
     const requestTotal = Number(request.total ?? request.pricing?.total ?? lineSum) || lineSum;
     const requestSubtotal = lineSum || Number(request.pricing?.subtotal) || requestTotal;
-    const confirmDate = toDate(scheduledDate || request.scheduledDate || request.appointmentDate || request.requestedDate);
+    const confirmSource = scheduledDate || request.scheduledDate || request.appointmentDate || request.requestedDate;
+    const confirmDate = toDate(confirmSource);
     const confirmTime = scheduledTime || request.scheduledTime || request.appointmentTime || request.requestedTime || null;
 
     if (!requestEmail) {
@@ -810,7 +812,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       variables: {
         clientName: requestClientName,
         address: requestAddressLabel,
-        scheduledDate: confirmDate ? confirmDate.toLocaleDateString("en-US") : "To be confirmed",
+        scheduledDate: bookingDateLabel(confirmSource, "To be confirmed"),
         scheduledTime: confirmTime || "To be confirmed",
         photographerName: assignedPhotographerName || "Our team",
         orderId: orderRef.id,

@@ -530,442 +530,6 @@ function recordAddressText(record) {
 function text$c(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function getPrivateKey() {
-  return (process.env.GOOGLE_CALENDAR_PRIVATE_KEY || "").replace(/\\n/g, "\n");
-}
-function getAuth() {
-  const clientEmail2 = process.env.GOOGLE_CALENDAR_CLIENT_EMAIL;
-  const privateKey = getPrivateKey();
-  if (!clientEmail2 || !privateKey) return null;
-  return new google.auth.JWT({
-    email: clientEmail2,
-    key: privateKey,
-    scopes: ["https://www.googleapis.com/auth/calendar"]
-  });
-}
-function parseTime(time) {
-  if (!time) return { hours: 9, minutes: 0 };
-  const match = time.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$/i);
-  if (!match) return { hours: 9, minutes: 0 };
-  let hours = Number(match[1]);
-  const minutes = Number(match[2] || 0);
-  const meridian = match[3]?.toUpperCase();
-  if (meridian === "PM" && hours < 12) hours += 12;
-  if (meridian === "AM" && hours === 12) hours = 0;
-  return { hours, minutes };
-}
-function eventTimes(date, time) {
-  if (!date) return null;
-  const { hours, minutes } = parseTime(time);
-  const datePart = date.toISOString().slice(0, 10);
-  const startMinutes = hours * 60 + minutes;
-  const endMinutes = startMinutes + Number(process.env.DEFAULT_APPOINTMENT_DURATION_MINUTES || 90);
-  const hhmm = (totalMinutes) => {
-    const dayMinutes = (totalMinutes % 1440 + 1440) % 1440;
-    const hh = Math.floor(dayMinutes / 60).toString().padStart(2, "0");
-    const mm = (dayMinutes % 60).toString().padStart(2, "0");
-    return `${hh}:${mm}:00`;
-  };
-  return {
-    start: `${datePart}T${hhmm(startMinutes)}`,
-    end: `${datePart}T${hhmm(endMinutes)}`
-  };
-}
-async function createCalendarBookingEvent(booking) {
-  const auth = getAuth();
-  const times = eventTimes(booking.scheduledDate, booking.scheduledTime);
-  if (!auth || !times) return null;
-  const calendarId = booking.photographerCalendarId || booking.photographerEmail || process.env.GOOGLE_CALENDAR_ID || "primary";
-  const calendar = google.calendar({ version: "v3", auth });
-  const summary = `Iconic Images: ${booking.clientName}`;
-  const description = [
-    `Order: ${booking.orderId}`,
-    `Client: ${booking.clientName}`,
-    booking.clientEmail ? `Email: ${booking.clientEmail}` : "",
-    booking.clientPhone ? `Phone: ${booking.clientPhone}` : "",
-    booking.photographerName ? `Photographer: ${booking.photographerName}` : "",
-    booking.services.length ? `Services: ${booking.services.join(", ")}` : "",
-    booking.notes ? `Notes: ${booking.notes}` : ""
-  ].filter(Boolean).join("\n");
-  const response = await calendar.events.insert({
-    calendarId,
-    sendUpdates: "none",
-    requestBody: {
-      summary,
-      location: addressText(booking.address),
-      description,
-      start: { dateTime: times.start, timeZone: "America/Chicago" },
-      end: { dateTime: times.end, timeZone: "America/Chicago" },
-      extendedProperties: {
-        private: {
-          orderId: booking.orderId,
-          source: "iconicimagestx"
-        }
-      }
-    }
-  });
-  return {
-    calendarId,
-    eventId: response.data.id || null,
-    htmlLink: response.data.htmlLink || null
-  };
-}
-async function verifyCalendarWriteAccess() {
-  const auth = getAuth();
-  if (!auth) {
-    throw new Error("Google Calendar service account is not configured.");
-  }
-  const calendarId = process.env.GOOGLE_CALENDAR_ID || "primary";
-  const calendar = google.calendar({ version: "v3", auth });
-  const start = new Date(Date.now() + 24 * 60 * 60 * 1e3);
-  start.setSeconds(0, 0);
-  const end = new Date(start);
-  end.setMinutes(end.getMinutes() + 5);
-  const response = await calendar.events.insert({
-    calendarId,
-    sendUpdates: "none",
-    requestBody: {
-      summary: "Iconic Calendar Health Check",
-      description: "Temporary event created by Iconic Images to verify booking calendar write access.",
-      start: { dateTime: start.toISOString(), timeZone: "America/Chicago" },
-      end: { dateTime: end.toISOString(), timeZone: "America/Chicago" },
-      extendedProperties: {
-        private: {
-          source: "iconicimagestx-health-check"
-        }
-      }
-    }
-  });
-  const eventId = response.data.id;
-  if (eventId) {
-    await calendar.events.delete({
-      calendarId,
-      eventId,
-      sendUpdates: "none"
-    });
-  }
-  return {
-    calendarId,
-    eventId: eventId || null
-  };
-}
-function toCalendarScheduleEvent(event, source) {
-  const allDay = Boolean(event.start?.date && !event.start?.dateTime);
-  return {
-    id: event.id || `${source.id}-${event.iCalUID || event.htmlLink || event.summary}`,
-    calendarId: source.id,
-    photographerName: source.name || source.id,
-    summary: event.summary || "Untitled appointment",
-    location: event.location || "",
-    description: event.description || "",
-    start: event.start?.dateTime || event.start?.date || null,
-    end: event.end?.dateTime || event.end?.date || null,
-    htmlLink: event.htmlLink || null,
-    allDay,
-    transparency: event.transparency || null,
-    eventType: event.eventType || null,
-    status: event.status || null
-  };
-}
-async function listCalendarScheduleEvents({
-  calendars,
-  timeMin,
-  timeMax
-}) {
-  const auth = getAuth();
-  if (!auth) return { configured: false, events: [], readFailures: 0 };
-  const calendar = google.calendar({ version: "v3", auth });
-  const uniqueCalendars = Array.from(
-    new Map(
-      calendars.filter((item) => item.id).map((item) => [item.id.toLowerCase(), item])
-    ).values()
-  );
-  const results = await Promise.allSettled(
-    uniqueCalendars.map(async (source) => {
-      const response = await calendar.events.list({
-        calendarId: source.id,
-        timeMin,
-        timeMax,
-        singleEvents: true,
-        orderBy: "startTime",
-        maxResults: 250
-      });
-      return (response.data.items || []).map((event) => toCalendarScheduleEvent(event, source));
-    })
-  );
-  const events = results.flatMap((result, index) => {
-    if (result.status === "fulfilled") return result.value;
-    console.error(`[Calendar] Failed to read ${uniqueCalendars[index]?.id}:`, result.reason);
-    return [];
-  });
-  const readFailures = results.filter((result) => result.status === "rejected").length;
-  return { configured: true, events, readFailures };
-}
-const PLAYTEST_ADDRESS = "100 Playtest Lane, Austin, TX 78701";
-const STAFF_ROLES = ["admin", "coordinator", "photographer", "editor"];
-function normalizeEmail$1(value) {
-  return String(value || "").trim().toLowerCase();
-}
-function cleanPersonName(value) {
-  return String(value || "").trim().replace(/\s+/g, " ").slice(0, 80);
-}
-function isStaffRole(value) {
-  return STAFF_ROLES.includes(value);
-}
-function safeStorageFileName(fileName2) {
-  const base = String(fileName2 || "upload").split(/[/\\]/).pop() || "upload";
-  const cleaned = base.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/_+/g, "_");
-  return cleaned.slice(0, 180) || "upload";
-}
-function contentTypeForUpload(fileName2, provided) {
-  const raw = String(provided || "").trim().toLowerCase();
-  if (/^[\w.+-]+\/[\w.+-]+$/.test(raw) && raw.length <= 120 && raw !== "application/octet-stream") {
-    return raw;
-  }
-  const lower = fileName2.toLowerCase();
-  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
-  if (lower.endsWith(".png")) return "image/png";
-  if (lower.endsWith(".webp")) return "image/webp";
-  if (lower.endsWith(".gif")) return "image/gif";
-  if (lower.endsWith(".heic")) return "image/heic";
-  if (lower.endsWith(".heif")) return "image/heif";
-  if (lower.endsWith(".mp4")) return "video/mp4";
-  if (lower.endsWith(".mov")) return "video/quicktime";
-  return raw && /^[\w.+-]+\/[\w.+-]+$/.test(raw) ? raw : "application/octet-stream";
-}
-function isListingStoragePath(listingId, storagePath) {
-  if (!listingId || typeof storagePath !== "string") return false;
-  if (storagePath.includes("..") || storagePath.includes("\\") || storagePath.startsWith("/")) return false;
-  const prefix = `listings/${listingId}/`;
-  if (!storagePath.startsWith(prefix)) return false;
-  const rest = storagePath.slice(prefix.length);
-  return rest.startsWith("photos/") || rest.startsWith("raw/") || rest.startsWith("finals/");
-}
-function staffCanAccessListing(role, uid, listing) {
-  if (!listing || !uid) return false;
-  if (role === "admin" || role === "coordinator") return true;
-  if (listing.photographerUid === uid) return true;
-  if (Array.isArray(listing.photographerIds) && listing.photographerIds.includes(uid)) return true;
-  if (Array.isArray(listing.assignedProviders)) {
-    return listing.assignedProviders.some(
-      (provider) => provider?.providerId === uid || provider?.uid === uid || provider?.id === uid
-    );
-  }
-  return false;
-}
-function clientCanViewListing(listing, identity) {
-  if (!listing || !identity?.uid) return false;
-  const ids = /* @__PURE__ */ new Set([identity.uid, ...identity.ids || []]);
-  if (listing.clientId && ids.has(String(listing.clientId))) return true;
-  const email = normalizeEmail$1(identity.email);
-  const listingEmail = normalizeEmail$1(listing.clientEmail);
-  return Boolean(email && listingEmail && email === listingEmail);
-}
-const db$q = () => admin.firestore();
-async function upsertPortalClient(input) {
-  const email = normalizeEmail$1(input.email);
-  const firstName = cleanPersonName(input.firstName);
-  const lastName = cleanPersonName(input.lastName);
-  const phone = String(input.phone || "").trim().slice(0, 40);
-  const now = admin.firestore.FieldValue.serverTimestamp();
-  const existing = email ? await db$q().collection("clients").where("email", "==", email).limit(5).get() : null;
-  const linked = existing?.docs.find((doc) => doc.id !== input.uid);
-  const linkedData = linked?.data() || {};
-  const uidRef = db$q().collection("clients").doc(input.uid);
-  const uidSnap = await uidRef.get();
-  const previous = uidSnap.exists ? uidSnap.data() || {} : {};
-  await uidRef.set({
-    firebaseUid: input.uid,
-    firstName: firstName || previous.firstName || "Client",
-    lastName: lastName || previous.lastName || "",
-    email: email || previous.email || "",
-    phone: phone || previous.phone || linkedData.phone || "",
-    company: previous.company || linkedData.company || "",
-    address: previous.address || linkedData.address || "",
-    status: "active",
-    portalAccess: true,
-    totalOrders: previous.totalOrders ?? linkedData.totalOrders ?? 0,
-    totalSpend: previous.totalSpend ?? linkedData.totalSpend ?? 0,
-    tags: previous.tags || linkedData.tags || [],
-    notes: previous.notes || linkedData.notes || "",
-    linkedClientId: linked?.id || previous.linkedClientId || null,
-    createdAt: previous.createdAt || now,
-    updatedAt: now
-  }, { merge: true });
-  if (linked) {
-    await linked.ref.set({
-      firebaseUid: input.uid,
-      portalAccess: true,
-      updatedAt: now
-    }, { merge: true });
-  }
-  return { id: input.uid, linkedClientId: linked?.id || null, email };
-}
-async function resolveClientIdentity(uid, email) {
-  const ids = /* @__PURE__ */ new Set([uid]);
-  const direct = await db$q().collection("clients").doc(uid).get();
-  let profile = direct.exists ? { id: direct.id, ...direct.data() } : null;
-  const redirectId = typeof profile?._redirect === "string" ? profile._redirect : "";
-  if (redirectId) ids.add(redirectId);
-  const linkedId = typeof profile?.linkedClientId === "string" ? profile.linkedClientId : "";
-  if (linkedId) ids.add(linkedId);
-  const normalized = normalizeEmail$1(email || profile?.email);
-  if (normalized) {
-    const matches = await db$q().collection("clients").where("email", "==", normalized).limit(10).get();
-    for (const doc of matches.docs) {
-      ids.add(doc.id);
-      if (!profile) profile = { id: doc.id, ...doc.data() };
-    }
-  }
-  if (redirectId && profile && !profile.email) {
-    const real = await db$q().collection("clients").doc(redirectId).get();
-    if (real.exists) profile = { id: real.id, ...real.data(), portalDocId: uid };
-  }
-  return { ids: [...ids], profile, email: normalized };
-}
-function planBookingAccount(input) {
-  if (input.staffMatch) {
-    return {
-      createAuthUser: false,
-      sendPasswordSetup: false,
-      attachToUid: null,
-      skipReason: "staff_email"
-    };
-  }
-  if (input.authUid) {
-    return {
-      createAuthUser: false,
-      sendPasswordSetup: false,
-      attachToUid: input.authUid,
-      skipReason: null
-    };
-  }
-  return {
-    createAuthUser: true,
-    sendPasswordSetup: true,
-    attachToUid: null,
-    skipReason: null
-  };
-}
-const db$p = () => admin.firestore();
-function appUrl$3() {
-  return process.env.APP_URL || process.env.FRONTEND_URL || "https://iconicimagestx.com";
-}
-async function attachBookingClient(input) {
-  const email = normalizeEmail$1(input.email);
-  if (!email || !email.includes("@")) {
-    return { clientId: null, createdAccount: false, passwordSetupLink: null, skipReason: "invalid_email" };
-  }
-  const firstName = cleanPersonName(input.firstName) || "Client";
-  const lastName = cleanPersonName(input.lastName);
-  const phone = String(input.phone || "").trim().slice(0, 40);
-  const staffHit = await db$p().collection("staff").where("email", "==", email).limit(1).get();
-  let authUid = null;
-  if (staffHit.empty) {
-    try {
-      authUid = (await admin.auth().getUserByEmail(email)).uid;
-    } catch (err) {
-      const code = err.code;
-      if (code !== "auth/user-not-found") throw err;
-    }
-  }
-  const plan = planBookingAccount({ staffMatch: !staffHit.empty, authUid });
-  if (plan.skipReason === "staff_email") {
-    console.warn(`[Bookings] Skipped portal account for staff email ${email}`);
-    return { clientId: null, createdAccount: false, passwordSetupLink: null, skipReason: "staff_email" };
-  }
-  let uid = plan.attachToUid;
-  let createdAccount = false;
-  if (plan.createAuthUser) {
-    try {
-      const user = await admin.auth().createUser({
-        email,
-        password: randomBytes(24).toString("base64url"),
-        displayName: `${firstName} ${lastName}`.trim(),
-        emailVerified: false
-      });
-      uid = user.uid;
-      createdAccount = true;
-    } catch (err) {
-      const code = err.code;
-      if (code !== "auth/email-already-exists") throw err;
-      uid = (await admin.auth().getUserByEmail(email)).uid;
-      createdAccount = false;
-    }
-  }
-  if (!uid) {
-    return { clientId: null, createdAccount: false, passwordSetupLink: null, skipReason: null };
-  }
-  try {
-    await upsertPortalClient({ uid, email, firstName, lastName, phone });
-  } catch (err) {
-    if (createdAccount) await admin.auth().deleteUser(uid).catch(() => void 0);
-    throw err;
-  }
-  let passwordSetupLink = null;
-  if (createdAccount && plan.sendPasswordSetup && input.preparePasswordLink) {
-    passwordSetupLink = await createPasswordSetupLink(email);
-  }
-  return { clientId: uid, createdAccount, passwordSetupLink, skipReason: null };
-}
-async function createPasswordSetupLink(email) {
-  const continueUrl = `${appUrl$3().replace(/\/$/, "")}/portal`;
-  try {
-    return await admin.auth().generatePasswordResetLink(email, {
-      url: continueUrl,
-      handleCodeInApp: false
-    });
-  } catch (err) {
-    console.warn("[Bookings] Password setup link with continue URL failed. Using the default Firebase link.", err);
-  }
-  try {
-    return await admin.auth().generatePasswordResetLink(email);
-  } catch (err) {
-    console.error("[Bookings] Password setup link was not created:", err);
-    return null;
-  }
-}
-async function sendFirebasePasswordEmail(email) {
-  const key = process.env.FIREBASE_WEB_API_KEY || process.env.VITE_FIREBASE_API_KEY;
-  if (!key) {
-    throw new Error("Set FIREBASE_WEB_API_KEY or VITE_FIREBASE_API_KEY to send the Firebase password email.");
-  }
-  const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${encodeURIComponent(key)}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ requestType: "PASSWORD_RESET", email })
-  });
-  if (!res.ok) {
-    throw new Error(`Firebase password email failed (${res.status}).`);
-  }
-}
-async function createRequestedAppointment(input) {
-  const now = admin.firestore.FieldValue.serverTimestamp();
-  await db$p().collection("appointments").add({
-    orderRequestId: input.orderRequestId,
-    clientId: input.clientId,
-    clientName: input.clientName,
-    clientEmail: input.clientEmail,
-    clientPhone: input.clientPhone,
-    address: input.address,
-    addressLabel: input.addressLabel,
-    scheduledDate: input.scheduledDate,
-    scheduledTime: input.scheduledTime,
-    services: input.services,
-    status: "requested",
-    source: "booking_form",
-    notes: input.notes,
-    createdAt: now,
-    updatedAt: now
-  });
-}
-function visibleToPortalClient(record, identity) {
-  if (!record) return false;
-  if (record.clientId && identity.ids.includes(String(record.clientId))) return true;
-  const email = normalizeEmail$1(identity.email);
-  if (!email) return false;
-  return [record.email, record.clientEmail].some((value) => normalizeEmail$1(value) === email);
-}
 const services = [
   // Listings
   {
@@ -1920,6 +1484,66 @@ function chargedServiceLines(items) {
     return !id.startsWith("promo-") && !name.startsWith("Promo Code:");
   });
 }
+const PLAYTEST_ADDRESS = "100 Playtest Lane, Austin, TX 78701";
+const STAFF_ROLES = ["admin", "coordinator", "photographer", "editor"];
+function normalizeEmail$1(value) {
+  return String(value || "").trim().toLowerCase();
+}
+function cleanPersonName(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").slice(0, 80);
+}
+function isStaffRole(value) {
+  return STAFF_ROLES.includes(value);
+}
+function safeStorageFileName(fileName2) {
+  const base = String(fileName2 || "upload").split(/[/\\]/).pop() || "upload";
+  const cleaned = base.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/_+/g, "_");
+  return cleaned.slice(0, 180) || "upload";
+}
+function contentTypeForUpload(fileName2, provided) {
+  const raw = String(provided || "").trim().toLowerCase();
+  if (/^[\w.+-]+\/[\w.+-]+$/.test(raw) && raw.length <= 120 && raw !== "application/octet-stream") {
+    return raw;
+  }
+  const lower = fileName2.toLowerCase();
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".gif")) return "image/gif";
+  if (lower.endsWith(".heic")) return "image/heic";
+  if (lower.endsWith(".heif")) return "image/heif";
+  if (lower.endsWith(".mp4")) return "video/mp4";
+  if (lower.endsWith(".mov")) return "video/quicktime";
+  return raw && /^[\w.+-]+\/[\w.+-]+$/.test(raw) ? raw : "application/octet-stream";
+}
+function isListingStoragePath(listingId, storagePath) {
+  if (!listingId || typeof storagePath !== "string") return false;
+  if (storagePath.includes("..") || storagePath.includes("\\") || storagePath.startsWith("/")) return false;
+  const prefix = `listings/${listingId}/`;
+  if (!storagePath.startsWith(prefix)) return false;
+  const rest = storagePath.slice(prefix.length);
+  return rest.startsWith("photos/") || rest.startsWith("raw/") || rest.startsWith("finals/");
+}
+function staffCanAccessListing(role, uid, listing) {
+  if (!listing || !uid) return false;
+  if (role === "admin" || role === "coordinator") return true;
+  if (listing.photographerUid === uid) return true;
+  if (Array.isArray(listing.photographerIds) && listing.photographerIds.includes(uid)) return true;
+  if (Array.isArray(listing.assignedProviders)) {
+    return listing.assignedProviders.some(
+      (provider) => provider?.providerId === uid || provider?.uid === uid || provider?.id === uid
+    );
+  }
+  return false;
+}
+function clientCanViewListing(listing, identity) {
+  if (!listing || !identity?.uid) return false;
+  const ids = /* @__PURE__ */ new Set([identity.uid, ...identity.ids || []]);
+  if (listing.clientId && ids.has(String(listing.clientId))) return true;
+  const email = normalizeEmail$1(identity.email);
+  const listingEmail = normalizeEmail$1(listing.clientEmail);
+  return Boolean(email && listingEmail && email === listingEmail);
+}
 function buildBookingInvoiceDraft(input) {
   const total = Number(input.total) || 0;
   const lineItems = normalizeBookingLineItems(input.lineItems);
@@ -2590,6 +2214,10 @@ function calendarDateKey(value, timeZone = CHICAGO) {
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : instantDateKey(value, timeZone);
   if (typeof value === "object") {
     const record = value;
+    if (typeof record.toDate === "function") {
+      const date = record.toDate();
+      if (date instanceof Date && !Number.isNaN(date.getTime())) return instantDateKey(date, timeZone);
+    }
     const seconds = typeof record.seconds === "number" ? record.seconds : typeof record._seconds === "number" ? record._seconds : null;
     if (seconds == null) return null;
     return instantDateKey(new Date(seconds * 1e3), timeZone);
@@ -2604,16 +2232,28 @@ function calendarDateKey(value, timeZone = CHICAGO) {
   if (Number.isNaN(parsed.getTime())) return null;
   return instantDateKey(parsed, timeZone);
 }
-function formatPortalDate(value) {
+function formatChicagoDate(value, style = "short") {
   const key = calendarDateKey(value);
   if (!key) return null;
   const [year, month, day] = key.split("-").map(Number);
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC"
-  }).format(new Date(Date.UTC(year, month - 1, day)));
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const options = style === "long" ? { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "UTC" } : style === "weekday" ? { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" } : style === "compact" ? { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" } : { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" };
+  return new Intl.DateTimeFormat("en-US", options).format(date);
+}
+function formatPortalDate(value) {
+  return formatChicagoDate(value, "short");
+}
+function bookingDateLabel(value, fallback = "") {
+  const formatted = formatChicagoDate(value);
+  if (formatted) return formatted;
+  if (typeof value === "string" && value.trim()) return value.trim();
+  return fallback;
+}
+function chicagoNoonDate(value) {
+  const key = calendarDateKey(value);
+  if (!key) return null;
+  const date = /* @__PURE__ */ new Date(`${key}T12:00:00-06:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 function clockTime(value) {
   if (typeof value !== "string") return null;
@@ -2858,6 +2498,383 @@ function formatZoned(date, timeZone) {
     day: "2-digit"
   }).format(date);
 }
+function getPrivateKey() {
+  return (process.env.GOOGLE_CALENDAR_PRIVATE_KEY || "").replace(/\\n/g, "\n");
+}
+function getAuth() {
+  const clientEmail2 = process.env.GOOGLE_CALENDAR_CLIENT_EMAIL;
+  const privateKey = getPrivateKey();
+  if (!clientEmail2 || !privateKey) return null;
+  return new google.auth.JWT({
+    email: clientEmail2,
+    key: privateKey,
+    scopes: ["https://www.googleapis.com/auth/calendar"]
+  });
+}
+function parseTime(time) {
+  if (!time) return { hours: 9, minutes: 0 };
+  const match = time.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+  if (!match) return { hours: 9, minutes: 0 };
+  let hours = Number(match[1]);
+  const minutes = Number(match[2] || 0);
+  const meridian = match[3]?.toUpperCase();
+  if (meridian === "PM" && hours < 12) hours += 12;
+  if (meridian === "AM" && hours === 12) hours = 0;
+  return { hours, minutes };
+}
+function bookingEventTimes(date, time) {
+  if (!date) return null;
+  const { hours, minutes } = parseTime(time);
+  const datePart = calendarDateKey(date);
+  if (!datePart) return null;
+  const startMinutes = hours * 60 + minutes;
+  const endMinutes = startMinutes + Number(process.env.DEFAULT_APPOINTMENT_DURATION_MINUTES || 90);
+  const hhmm = (totalMinutes) => {
+    const dayMinutes = (totalMinutes % 1440 + 1440) % 1440;
+    const hh = Math.floor(dayMinutes / 60).toString().padStart(2, "0");
+    const mm = (dayMinutes % 60).toString().padStart(2, "0");
+    return `${hh}:${mm}:00`;
+  };
+  return {
+    start: `${datePart}T${hhmm(startMinutes)}`,
+    end: `${datePart}T${hhmm(endMinutes)}`
+  };
+}
+async function createCalendarBookingEvent(booking) {
+  const auth = getAuth();
+  const times = bookingEventTimes(booking.scheduledDate, booking.scheduledTime);
+  if (!auth || !times) return null;
+  const calendarId = booking.photographerCalendarId || booking.photographerEmail || process.env.GOOGLE_CALENDAR_ID || "primary";
+  const calendar = google.calendar({ version: "v3", auth });
+  const summary = `Iconic Images: ${booking.clientName}`;
+  const description = [
+    `Order: ${booking.orderId}`,
+    `Client: ${booking.clientName}`,
+    booking.clientEmail ? `Email: ${booking.clientEmail}` : "",
+    booking.clientPhone ? `Phone: ${booking.clientPhone}` : "",
+    booking.photographerName ? `Photographer: ${booking.photographerName}` : "",
+    booking.services.length ? `Services: ${booking.services.join(", ")}` : "",
+    booking.notes ? `Notes: ${booking.notes}` : ""
+  ].filter(Boolean).join("\n");
+  const response = await calendar.events.insert({
+    calendarId,
+    sendUpdates: "none",
+    requestBody: {
+      summary,
+      location: addressText(booking.address),
+      description,
+      start: { dateTime: times.start, timeZone: "America/Chicago" },
+      end: { dateTime: times.end, timeZone: "America/Chicago" },
+      extendedProperties: {
+        private: {
+          orderId: booking.orderId,
+          source: "iconicimagestx"
+        }
+      }
+    }
+  });
+  return {
+    calendarId,
+    eventId: response.data.id || null,
+    htmlLink: response.data.htmlLink || null
+  };
+}
+async function verifyCalendarWriteAccess() {
+  const auth = getAuth();
+  if (!auth) {
+    throw new Error("Google Calendar service account is not configured.");
+  }
+  const calendarId = process.env.GOOGLE_CALENDAR_ID || "primary";
+  const calendar = google.calendar({ version: "v3", auth });
+  const start = new Date(Date.now() + 24 * 60 * 60 * 1e3);
+  start.setSeconds(0, 0);
+  const end = new Date(start);
+  end.setMinutes(end.getMinutes() + 5);
+  const response = await calendar.events.insert({
+    calendarId,
+    sendUpdates: "none",
+    requestBody: {
+      summary: "Iconic Calendar Health Check",
+      description: "Temporary event created by Iconic Images to verify booking calendar write access.",
+      start: { dateTime: start.toISOString(), timeZone: "America/Chicago" },
+      end: { dateTime: end.toISOString(), timeZone: "America/Chicago" },
+      extendedProperties: {
+        private: {
+          source: "iconicimagestx-health-check"
+        }
+      }
+    }
+  });
+  const eventId = response.data.id;
+  if (eventId) {
+    await calendar.events.delete({
+      calendarId,
+      eventId,
+      sendUpdates: "none"
+    });
+  }
+  return {
+    calendarId,
+    eventId: eventId || null
+  };
+}
+function toCalendarScheduleEvent(event, source) {
+  const allDay = Boolean(event.start?.date && !event.start?.dateTime);
+  return {
+    id: event.id || `${source.id}-${event.iCalUID || event.htmlLink || event.summary}`,
+    calendarId: source.id,
+    photographerName: source.name || source.id,
+    summary: event.summary || "Untitled appointment",
+    location: event.location || "",
+    description: event.description || "",
+    start: event.start?.dateTime || event.start?.date || null,
+    end: event.end?.dateTime || event.end?.date || null,
+    htmlLink: event.htmlLink || null,
+    allDay,
+    transparency: event.transparency || null,
+    eventType: event.eventType || null,
+    status: event.status || null
+  };
+}
+async function listCalendarScheduleEvents({
+  calendars,
+  timeMin,
+  timeMax
+}) {
+  const auth = getAuth();
+  if (!auth) return { configured: false, events: [], readFailures: 0 };
+  const calendar = google.calendar({ version: "v3", auth });
+  const uniqueCalendars = Array.from(
+    new Map(
+      calendars.filter((item) => item.id).map((item) => [item.id.toLowerCase(), item])
+    ).values()
+  );
+  const results = await Promise.allSettled(
+    uniqueCalendars.map(async (source) => {
+      const response = await calendar.events.list({
+        calendarId: source.id,
+        timeMin,
+        timeMax,
+        singleEvents: true,
+        orderBy: "startTime",
+        maxResults: 250
+      });
+      return (response.data.items || []).map((event) => toCalendarScheduleEvent(event, source));
+    })
+  );
+  const events = results.flatMap((result, index) => {
+    if (result.status === "fulfilled") return result.value;
+    console.error(`[Calendar] Failed to read ${uniqueCalendars[index]?.id}:`, result.reason);
+    return [];
+  });
+  const readFailures = results.filter((result) => result.status === "rejected").length;
+  return { configured: true, events, readFailures };
+}
+const db$q = () => admin.firestore();
+async function upsertPortalClient(input) {
+  const email = normalizeEmail$1(input.email);
+  const firstName = cleanPersonName(input.firstName);
+  const lastName = cleanPersonName(input.lastName);
+  const phone = String(input.phone || "").trim().slice(0, 40);
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const existing = email ? await db$q().collection("clients").where("email", "==", email).limit(5).get() : null;
+  const linked = existing?.docs.find((doc) => doc.id !== input.uid);
+  const linkedData = linked?.data() || {};
+  const uidRef = db$q().collection("clients").doc(input.uid);
+  const uidSnap = await uidRef.get();
+  const previous = uidSnap.exists ? uidSnap.data() || {} : {};
+  await uidRef.set({
+    firebaseUid: input.uid,
+    firstName: firstName || previous.firstName || "Client",
+    lastName: lastName || previous.lastName || "",
+    email: email || previous.email || "",
+    phone: phone || previous.phone || linkedData.phone || "",
+    company: previous.company || linkedData.company || "",
+    address: previous.address || linkedData.address || "",
+    status: "active",
+    portalAccess: true,
+    totalOrders: previous.totalOrders ?? linkedData.totalOrders ?? 0,
+    totalSpend: previous.totalSpend ?? linkedData.totalSpend ?? 0,
+    tags: previous.tags || linkedData.tags || [],
+    notes: previous.notes || linkedData.notes || "",
+    linkedClientId: linked?.id || previous.linkedClientId || null,
+    createdAt: previous.createdAt || now,
+    updatedAt: now
+  }, { merge: true });
+  if (linked) {
+    await linked.ref.set({
+      firebaseUid: input.uid,
+      portalAccess: true,
+      updatedAt: now
+    }, { merge: true });
+  }
+  return { id: input.uid, linkedClientId: linked?.id || null, email };
+}
+async function resolveClientIdentity(uid, email) {
+  const ids = /* @__PURE__ */ new Set([uid]);
+  const direct = await db$q().collection("clients").doc(uid).get();
+  let profile = direct.exists ? { id: direct.id, ...direct.data() } : null;
+  const redirectId = typeof profile?._redirect === "string" ? profile._redirect : "";
+  if (redirectId) ids.add(redirectId);
+  const linkedId = typeof profile?.linkedClientId === "string" ? profile.linkedClientId : "";
+  if (linkedId) ids.add(linkedId);
+  const normalized = normalizeEmail$1(email || profile?.email);
+  if (normalized) {
+    const matches = await db$q().collection("clients").where("email", "==", normalized).limit(10).get();
+    for (const doc of matches.docs) {
+      ids.add(doc.id);
+      if (!profile) profile = { id: doc.id, ...doc.data() };
+    }
+  }
+  if (redirectId && profile && !profile.email) {
+    const real = await db$q().collection("clients").doc(redirectId).get();
+    if (real.exists) profile = { id: real.id, ...real.data(), portalDocId: uid };
+  }
+  return { ids: [...ids], profile, email: normalized };
+}
+function planBookingAccount(input) {
+  if (input.staffMatch) {
+    return {
+      createAuthUser: false,
+      sendPasswordSetup: false,
+      attachToUid: null,
+      skipReason: "staff_email"
+    };
+  }
+  if (input.authUid) {
+    return {
+      createAuthUser: false,
+      sendPasswordSetup: false,
+      attachToUid: input.authUid,
+      skipReason: null
+    };
+  }
+  return {
+    createAuthUser: true,
+    sendPasswordSetup: true,
+    attachToUid: null,
+    skipReason: null
+  };
+}
+const db$p = () => admin.firestore();
+function appUrl$3() {
+  return process.env.APP_URL || process.env.FRONTEND_URL || "https://iconicimagestx.com";
+}
+async function attachBookingClient(input) {
+  const email = normalizeEmail$1(input.email);
+  if (!email || !email.includes("@")) {
+    return { clientId: null, createdAccount: false, passwordSetupLink: null, skipReason: "invalid_email" };
+  }
+  const firstName = cleanPersonName(input.firstName) || "Client";
+  const lastName = cleanPersonName(input.lastName);
+  const phone = String(input.phone || "").trim().slice(0, 40);
+  const staffHit = await db$p().collection("staff").where("email", "==", email).limit(1).get();
+  let authUid = null;
+  if (staffHit.empty) {
+    try {
+      authUid = (await admin.auth().getUserByEmail(email)).uid;
+    } catch (err) {
+      const code = err.code;
+      if (code !== "auth/user-not-found") throw err;
+    }
+  }
+  const plan = planBookingAccount({ staffMatch: !staffHit.empty, authUid });
+  if (plan.skipReason === "staff_email") {
+    console.warn(`[Bookings] Skipped portal account for staff email ${email}`);
+    return { clientId: null, createdAccount: false, passwordSetupLink: null, skipReason: "staff_email" };
+  }
+  let uid = plan.attachToUid;
+  let createdAccount = false;
+  if (plan.createAuthUser) {
+    try {
+      const user = await admin.auth().createUser({
+        email,
+        password: randomBytes(24).toString("base64url"),
+        displayName: `${firstName} ${lastName}`.trim(),
+        emailVerified: false
+      });
+      uid = user.uid;
+      createdAccount = true;
+    } catch (err) {
+      const code = err.code;
+      if (code !== "auth/email-already-exists") throw err;
+      uid = (await admin.auth().getUserByEmail(email)).uid;
+      createdAccount = false;
+    }
+  }
+  if (!uid) {
+    return { clientId: null, createdAccount: false, passwordSetupLink: null, skipReason: null };
+  }
+  try {
+    await upsertPortalClient({ uid, email, firstName, lastName, phone });
+  } catch (err) {
+    if (createdAccount) await admin.auth().deleteUser(uid).catch(() => void 0);
+    throw err;
+  }
+  let passwordSetupLink = null;
+  if (createdAccount && plan.sendPasswordSetup && input.preparePasswordLink) {
+    passwordSetupLink = await createPasswordSetupLink(email);
+  }
+  return { clientId: uid, createdAccount, passwordSetupLink, skipReason: null };
+}
+async function createPasswordSetupLink(email) {
+  const continueUrl = `${appUrl$3().replace(/\/$/, "")}/portal`;
+  try {
+    return await admin.auth().generatePasswordResetLink(email, {
+      url: continueUrl,
+      handleCodeInApp: false
+    });
+  } catch (err) {
+    console.warn("[Bookings] Password setup link with continue URL failed. Using the default Firebase link.", err);
+  }
+  try {
+    return await admin.auth().generatePasswordResetLink(email);
+  } catch (err) {
+    console.error("[Bookings] Password setup link was not created:", err);
+    return null;
+  }
+}
+async function sendFirebasePasswordEmail(email) {
+  const key = process.env.FIREBASE_WEB_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+  if (!key) {
+    throw new Error("Set FIREBASE_WEB_API_KEY or VITE_FIREBASE_API_KEY to send the Firebase password email.");
+  }
+  const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${encodeURIComponent(key)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ requestType: "PASSWORD_RESET", email })
+  });
+  if (!res.ok) {
+    throw new Error(`Firebase password email failed (${res.status}).`);
+  }
+}
+async function createRequestedAppointment(input) {
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  await db$p().collection("appointments").add({
+    orderRequestId: input.orderRequestId,
+    clientId: input.clientId,
+    clientName: input.clientName,
+    clientEmail: input.clientEmail,
+    clientPhone: input.clientPhone,
+    address: input.address,
+    addressLabel: input.addressLabel,
+    scheduledDate: input.scheduledDate,
+    scheduledTime: input.scheduledTime,
+    services: input.services,
+    status: "requested",
+    source: "booking_form",
+    notes: input.notes,
+    createdAt: now,
+    updatedAt: now
+  });
+}
+function visibleToPortalClient(record, identity) {
+  if (!record) return false;
+  if (record.clientId && identity.ids.includes(String(record.clientId))) return true;
+  const email = normalizeEmail$1(identity.email);
+  if (!email) return false;
+  return [record.email, record.clientEmail].some((value) => normalizeEmail$1(value) === email);
+}
 const ADDRESS_LIMIT = 300;
 const PLACE_ID_LIMIT = 300;
 function serviceLocationFromInput(value) {
@@ -2921,7 +2938,20 @@ function readCoord$1(value, axis) {
   return number;
 }
 const PORTAL_LISTING_ID$1 = /^[A-Za-z0-9_-]{4,128}$/;
-const NEVER_FILL = /* @__PURE__ */ new Set(["images", "createdAt", "source", "id"]);
+const NEVER_FILL = /* @__PURE__ */ new Set([
+  "images",
+  "createdAt",
+  "source",
+  "id",
+  "lockDownloads",
+  "requirePayment",
+  "lockStudio"
+]);
+const NEW_BOOKING_LOCKS = {
+  lockDownloads: true,
+  requirePayment: true,
+  lockStudio: false
+};
 function isPortalListingId(value) {
   return PORTAL_LISTING_ID$1.test(value);
 }
@@ -3017,10 +3047,11 @@ function planBookingListingGroup(group, existingListings, identity) {
   const listingId = existing?.id || group.stableId;
   if (!isPortalListingId(listingId)) return null;
   const desired = desiredListingFields(group, identity);
+  const createFields = existing ? desired : { ...desired, ...NEW_BOOKING_LOCKS };
   return {
     listingId,
     create: !existing,
-    createFields: desired,
+    createFields,
     fillFields: existing ? fillEmptyListingFields(existing.data, desired) : {},
     links: linksFor(group, listingId, cleanDocs(existingListings), clients)
   };
@@ -3472,14 +3503,13 @@ const LINK_COLLECTIONS = /* @__PURE__ */ new Set([
 const BLOCKED_FIELDS = /* @__PURE__ */ new Set([
   "id",
   "createdAt",
-  "requirePayment",
   "paymentUrl",
   "studioToken",
-  "lockDownloads",
   "lockboxCode",
   "notifications",
   "passwordSetupLink"
 ]);
+const LOCK_FIELDS = /* @__PURE__ */ new Set(["lockDownloads", "requirePayment", "lockStudio"]);
 async function ensureBookingListingForRequest(orderRequestId) {
   const id = orderRequestId.trim();
   if (!id) return null;
@@ -3755,6 +3785,7 @@ function plainValue(value) {
   return value;
 }
 function allowedField(key) {
+  if (LOCK_FIELDS.has(key)) return true;
   if (BLOCKED_FIELDS.has(key)) return false;
   if (/cubicasa/i.test(key) || /payment/i.test(key)) return false;
   if (/^square/i.test(key) && key !== "squareFootage") return false;
@@ -4106,7 +4137,15 @@ function firstText$1(record, keys) {
   return NOT_PROVIDED;
 }
 function firstDate(record, keys) {
-  return firstText$1(record, keys);
+  for (const key of keys) {
+    const value = record[key];
+    const values = Array.isArray(value) ? value : [value];
+    for (const entry2 of values) {
+      const formatted = formatChicagoDate(entry2);
+      if (formatted) return formatted;
+    }
+  }
+  return NOT_PROVIDED;
 }
 function addressPart(value, keys) {
   if (!value || typeof value !== "object") return NOT_PROVIDED;
@@ -4410,7 +4449,7 @@ router$m.post("/", async (req, res) => {
         address: displayAddress,
         total: money$2(total),
         requestId: docRef.id,
-        scheduledDate: scheduledDate || "TBD — we'll confirm shortly",
+        scheduledDate: bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
         scheduledTime: scheduledTime || "",
         propertyStatus: propertyStatus || "Not specified",
         furnishingStatus: furnishingStatus || "Not specified",
@@ -4430,7 +4469,7 @@ router$m.post("/", async (req, res) => {
         address: displayAddress,
         total: money$2(total),
         requestId: docRef.id,
-        scheduledDate: scheduledDate || "TBD — we'll confirm shortly",
+        scheduledDate: bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
         scheduledTime: scheduledTime || "",
         propertyStatus: propertyStatus || "Not specified",
         furnishingStatus: furnishingStatus || "Not specified",
@@ -4448,7 +4487,7 @@ router$m.post("/", async (req, res) => {
         kind: "booking_confirmation",
         body: SMS_TEMPLATES.bookingConfirmation(
           firstName,
-          scheduledDate || "TBD — we'll confirm shortly",
+          bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
           displayAddress,
           money$2(total)
         )
@@ -4464,7 +4503,7 @@ router$m.post("/", async (req, res) => {
         to: process.env.ADMIN_PHONE,
         body: SMS_TEMPLATES.newBookingAlert(
           displayAddress,
-          scheduledDate || "TBD",
+          bookingDateLabel(scheduledDate, "TBD"),
           serviceNames2
         )
       }).catch((err) => console.error("[Bookings] Admin SMS alert failed:", err));
@@ -4627,7 +4666,8 @@ router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     }));
     const requestTotal = Number(request.total ?? request.pricing?.total ?? lineSum) || lineSum;
     const requestSubtotal = lineSum || Number(request.pricing?.subtotal) || requestTotal;
-    const confirmDate = toDate$1(scheduledDate || request.scheduledDate || request.appointmentDate || request.requestedDate);
+    const confirmSource = scheduledDate || request.scheduledDate || request.appointmentDate || request.requestedDate;
+    const confirmDate = toDate$1(confirmSource);
     const confirmTime = scheduledTime || request.scheduledTime || request.appointmentTime || request.requestedTime || null;
     if (!requestEmail) {
       return res.status(400).json({ error: "Client email is missing on this booking request." });
@@ -4874,7 +4914,7 @@ router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       variables: {
         clientName: requestClientName,
         address: requestAddressLabel,
-        scheduledDate: confirmDate ? confirmDate.toLocaleDateString("en-US") : "To be confirmed",
+        scheduledDate: bookingDateLabel(confirmSource, "To be confirmed"),
         scheduledTime: confirmTime || "To be confirmed",
         photographerName: assignedPhotographerName || "Our team",
         orderId: orderRef.id,
@@ -5099,9 +5139,10 @@ router$l.patch("/:id", requireCoordinator, async (req, res) => {
       if (key in req.body) updates[key] = req.body[key];
     });
     if (updates.scheduledDate && typeof updates.scheduledDate === "string") {
-      updates.scheduledDate = admin.firestore.Timestamp.fromDate(
-        new Date(updates.scheduledDate)
-      );
+      const anchored = chicagoNoonDate(updates.scheduledDate) || new Date(updates.scheduledDate);
+      if (!Number.isNaN(anchored.getTime())) {
+        updates.scheduledDate = admin.firestore.Timestamp.fromDate(anchored);
+      }
     }
     await db$m().collection("orders").doc(req.params.id).update(updates);
     return res.json({ success: true });
@@ -5224,6 +5265,12 @@ const ICONIC_DOWNLOAD_LOCK = {
   title: "Your Iconic files are locked",
   message: "Iconic Images invoices after the shoot. Downloads open when that invoice is paid, or when our team releases the gallery."
 };
+function lockDownloadsOn(value) {
+  return value !== false;
+}
+function requirePaymentOn(value) {
+  return value !== false;
+}
 function clientGalleryDownloadsUnlocked(gate = {}) {
   if (gate.downloadsReleased === true) return true;
   if (gate.lockDownloads === false) return true;
@@ -5621,8 +5668,8 @@ function publicProject(listing, _related, notice) {
     videos: publicVideos(listing),
     tourUrl: httpUrl(listing.tourUrl),
     revisions: publicRevisions(listing),
-    lockDownloads: listing.lockDownloads === true,
-    requirePayment: listing.requirePayment === true,
+    lockDownloads: lockDownloadsOn(listing.lockDownloads),
+    requirePayment: requirePaymentOn(listing.requirePayment),
     downloadsUnlocked: clientGalleryDownloadsUnlocked({
       invoice,
       downloadEnabled: listing.downloadEnabled,
@@ -8376,7 +8423,7 @@ router$j.post("/send-invoice", requireCoordinator, async (req, res) => {
         invoiceNumber: invoice.invoiceNumber,
         amount: money$1(invoice.total),
         paymentUrl,
-        dueDate: invoice.dueDate ? invoice.dueDate.toDate().toLocaleDateString() : "Upon receipt"
+        dueDate: bookingDateLabel(invoice.dueDate, "Upon receipt")
       }
     });
     await invoiceDoc.ref.update({
@@ -13999,7 +14046,7 @@ async function runReminderSweep(req, res) {
           results.push({ appointmentId: appointmentDoc.id, orderId, type, skipped: "missing_phone" });
           continue;
         }
-        const body = type === "1h" ? SMS_TEMPLATES.appointmentReminder1h(name, String(time)) : SMS_TEMPLATES.appointmentReminder24h(name, scheduledDate.toLocaleDateString("en-US"), String(time), address);
+        const body = type === "1h" ? SMS_TEMPLATES.appointmentReminder1h(name, String(time)) : SMS_TEMPLATES.appointmentReminder24h(name, bookingDateLabel(scheduledDate, "your scheduled date"), String(time), address);
         try {
           const result = await sendSMS({ to: String(phone), body });
           if (result.suppressed) {
@@ -14851,7 +14898,7 @@ router$5.post("/remind/:orderId", requireStaff, async (req, res) => {
     const phone = order.phone || order.clientPhone;
     if (!phone) return res.status(400).json({ error: "No phone number on order." });
     const name = order.firstName || order.clientName?.split(" ")[0] || "there";
-    const date = order.scheduledDate || "your scheduled date";
+    const date = bookingDateLabel(order.scheduledDate, "your scheduled date");
     const time = order.scheduledTime || "your appointment time";
     const address = recordAddressText(order) || "the property";
     let body;

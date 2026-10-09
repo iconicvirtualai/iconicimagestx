@@ -141,7 +141,11 @@ export function calendarDateKey(value: unknown, timeZone = CHICAGO): string | nu
   if (typeof value === "number" && Number.isFinite(value)) return instantDateKey(new Date(value), timeZone);
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : instantDateKey(value, timeZone);
   if (typeof value === "object") {
-    const record = value as { seconds?: unknown; _seconds?: unknown };
+    const record = value as { seconds?: unknown; _seconds?: unknown; toDate?: () => Date };
+    if (typeof record.toDate === "function") {
+      const date = record.toDate();
+      if (date instanceof Date && !Number.isNaN(date.getTime())) return instantDateKey(date, timeZone);
+    }
     const seconds = typeof record.seconds === "number"
       ? record.seconds
       : typeof record._seconds === "number"
@@ -161,16 +165,46 @@ export function calendarDateKey(value: unknown, timeZone = CHICAGO): string | nu
   return instantDateKey(parsed, timeZone);
 }
 
-export function formatPortalDate(value: unknown): string | null {
+export type ChicagoDateStyle = "short" | "long" | "weekday" | "compact";
+
+/**
+ * Calendar day in America/Chicago, printed without a second timezone shift.
+ * A date-only string and a UTC-midnight timestamp stay on that calendar day.
+ * A timestamp with a time of day is the Chicago day.
+ */
+export function formatChicagoDate(value: unknown, style: ChicagoDateStyle = "short"): string | null {
   const key = calendarDateKey(value);
   if (!key) return null;
   const [year, month, day] = key.split("-").map(Number);
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(Date.UTC(year, month - 1, day)));
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const options: Intl.DateTimeFormatOptions = style === "long"
+    ? { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }
+    : style === "weekday"
+      ? { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }
+      : style === "compact"
+        ? { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }
+        : { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" };
+  return new Intl.DateTimeFormat("en-US", options).format(date);
+}
+
+export function formatPortalDate(value: unknown): string | null {
+  return formatChicagoDate(value, "short");
+}
+
+/** Printed Chicago day. Unparseable text is kept so a fallback phrase still shows. */
+export function bookingDateLabel(value: unknown, fallback = ""): string {
+  const formatted = formatChicagoDate(value);
+  if (formatted) return formatted;
+  if (typeof value === "string" && value.trim()) return value.trim();
+  return fallback;
+}
+
+/** Noon Central for a calendar day, so a date-only value is not stored as UTC midnight. */
+export function chicagoNoonDate(value: unknown): Date | null {
+  const key = calendarDateKey(value);
+  if (!key) return null;
+  const date = new Date(`${key}T12:00:00-06:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 export function clockTime(value: unknown): string | null {

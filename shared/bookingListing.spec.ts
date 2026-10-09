@@ -140,8 +140,12 @@ describe("booking listing docs", () => {
     ]);
     expect(cards[0].appointmentDate).toBe("2026-10-10");
 
+    expect(qa?.createFields.lockDownloads).toBe(true);
+    expect(qa?.createFields.requirePayment).toBe(true);
+    expect(qa?.createFields.lockStudio).toBe(false);
+
     const blob = JSON.stringify(plans);
-    expect(blob).not.toMatch(/requirePayment|paymentUrl|studioToken|lockDownloads|cubicasa/i);
+    expect(blob).not.toMatch(/paymentUrl|studioToken|cubicasa/i);
     expect(blob).not.toMatch(/"square(?!Footage)/);
   });
 
@@ -170,6 +174,23 @@ describe("booking listing docs", () => {
     expect(again.every((plan) => plan.create === false)).toBe(true);
     expect(again.every((plan) => Object.keys(plan.fillFields).length === 0)).toBe(true);
     expect(again.every((plan) => plan.links.length === 0)).toBe(true);
+  });
+
+  it("does not backfill lock flags onto a listing that already exists", () => {
+    const source = quinnBooking();
+    const first = planBookingListings(source);
+    const existingListings = first.map((plan) => {
+      const data = { ...plan.createFields };
+      delete data.lockDownloads;
+      delete data.requirePayment;
+      delete data.lockStudio;
+      return { id: plan.listingId, data };
+    });
+    const plans = planBookingListings({ ...source, existingListings });
+    expect(plans.every((plan) => plan.create === false)).toBe(true);
+    expect(plans.every((plan) => plan.fillFields.lockDownloads === undefined)).toBe(true);
+    expect(plans.every((plan) => plan.fillFields.requirePayment === undefined)).toBe(true);
+    expect(plans.every((plan) => plan.fillFields.lockStudio === undefined)).toBe(true);
   });
 
   it("keeps a staff listing and only fills a blank address", () => {

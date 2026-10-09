@@ -5,7 +5,6 @@ import { db } from "@/lib/firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 import {
   appointmentRevenue,
-  chicagoDateKey,
   getAssignedNames,
   isScheduledRecord,
   orderServices,
@@ -14,6 +13,7 @@ import {
   toDate,
 } from "@/lib/scheduleRecords";
 import { addressText, recordAddressText } from "@shared/addressText";
+import { calendarDateKey, formatChicagoDate } from "@shared/clientHome";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Calendar as CalendarIcon,
@@ -37,7 +37,6 @@ import {
   startOfWeek,
   endOfWeek,
   isSameMonth,
-  isSameDay,
   eachDayOfInterval,
   parseISO,
 } from "date-fns";
@@ -113,8 +112,16 @@ function shortPhotographerNames(names: string[]) {
   return names.map((name) => name.split(" ")[0]).join(", ");
 }
 
+function dayKey(day: Date): string {
+  return calendarDateKey(day) || format(day, "yyyy-MM-dd");
+}
+
 function isBlockOnDay(dateKey: string, day: Date) {
-  return isSameDay(new Date(`${dateKey}T12:00:00-06:00`), day);
+  return dateKey === dayKey(day);
+}
+
+function shootOnDay(appt: Appointment, day: Date) {
+  return Boolean(appt.apptDate && calendarDateKey(appt.apptDate) === dayKey(day));
 }
 
 function syncNote(sync: CalendarSync) {
@@ -261,7 +268,7 @@ export default function AdminSchedule() {
     return { appointments: data, blocks: googleBlocks };
   }, [rawAppointments, rawListings, rawOrderRequests, calendarEvents, staff]);
 
-  const todayKey = format(new Date(), "yyyy-MM-dd");
+  const todayKey = dayKey(new Date());
 
   const isDateCollapsed = React.useCallback((dateStr: string) => {
     if (dateStr in collapseOverrides) return collapseOverrides[dateStr];
@@ -279,12 +286,12 @@ export default function AdminSchedule() {
   };
 
   const cuesForDay = React.useCallback((day: Date): ShooterCue[] => {
-    const dayShoots = appointments.filter((appt) => appt.apptDate && isSameDay(appt.apptDate, day));
+    const dayShoots = appointments.filter((appt) => shootOnDay(appt, day));
     const dayBlocks = blocks.filter((block) => isBlockOnDay(block.dateKey, day));
     return shooterCuesForDay({ roster, shoots: dayShoots, blocks: dayBlocks });
   }, [appointments, blocks, roster]);
 
-  const selectedShoots = appointments.filter((appt) => appt.apptDate && isSameDay(appt.apptDate, selectedDay));
+  const selectedShoots = appointments.filter((appt) => shootOnDay(appt, selectedDay));
   const selectedCues = cuesForDay(selectedDay);
   const selectedSummary = dayOpsSummary({
     shootCount: selectedShoots.length,
@@ -293,12 +300,16 @@ export default function AdminSchedule() {
     unassignedCount: countUnassignedShoots(selectedShoots, roster),
   });
 
-  const monthAppointments = appointments.filter((appt) => appt.apptDate && isSameMonth(appt.apptDate, currentMonth));
+  const monthKey = format(currentMonth, "yyyy-MM");
+  const monthAppointments = appointments.filter((appt) => {
+    const key = appt.apptDate ? calendarDateKey(appt.apptDate) : null;
+    return Boolean(key && key.slice(0, 7) === monthKey);
+  });
   const groupedByDate = React.useMemo(() => {
     const groups: Record<string, Appointment[]> = {};
     monthAppointments.forEach((appt) => {
       if (!appt.apptDate) return;
-      const key = format(appt.apptDate, "yyyy-MM-dd");
+      const key = calendarDateKey(appt.apptDate) || format(appt.apptDate, "yyyy-MM-dd");
       if (!groups[key]) groups[key] = [];
       groups[key].push(appt);
     });
@@ -400,7 +411,7 @@ export default function AdminSchedule() {
                         </div>
                         <div>
                           <h3 className="text-sm font-black uppercase tracking-widest text-black">
-                            {format(day, "EEEE, MMMM do, yyyy")}
+                            {formatChicagoDate(dateStr, "long") || format(day, "EEEE, MMMM do, yyyy")}
                           </h3>
                           <p className="text-[11px] font-bold text-gray-500">
                             {summary}
@@ -538,7 +549,7 @@ export default function AdminSchedule() {
                     <CalendarIcon className="w-3.5 h-3.5" />
                     <span className="text-[10px] font-black uppercase tracking-widest">Date</span>
                   </div>
-                  <p className="text-sm font-bold text-black">{selectedAppt.apptDate ? format(selectedAppt.apptDate, "MMM do, yyyy") : "TBD"}</p>
+                  <p className="text-sm font-bold text-black">{formatChicagoDate(selectedAppt.apptDate) || "TBD"}</p>
                 </div>
                 <div>
                   <div className="flex items-center gap-2 text-gray-400 mb-1">
@@ -716,7 +727,7 @@ function normalizeCalendarAppointment(event: any): Appointment | null {
 
 function matchesCalendarEvent(local: Appointment, googleEvent: Appointment) {
   if (!local.apptDate || !googleEvent.apptDate) return false;
-  if (chicagoDateKey(local.apptDate) !== chicagoDateKey(googleEvent.apptDate)) return false;
+  if (calendarDateKey(local.apptDate) !== calendarDateKey(googleEvent.apptDate)) return false;
 
   const localTime = normalizeTime(local.apptTime);
   const googleTime = normalizeTime(googleEvent.apptTime);
@@ -796,7 +807,7 @@ function CalendarView({
 
         <div className="grid grid-cols-7 auto-rows-[minmax(148px,auto)]">
           {days.map((day) => {
-            const appts = appointments.filter((appt) => appt.apptDate && isSameDay(appt.apptDate, day));
+            const appts = appointments.filter((appt) => shootOnDay(appt, day));
             const dayBlocks = blocks.filter((block) => isBlockOnDay(block.dateKey, day));
             const cues = shooterCuesForDay({ roster, shoots: appts, blocks: dayBlocks });
             const cue = dayLoadCue({
@@ -804,8 +815,8 @@ function CalendarView({
               twilightShootCount: appts.filter((appt) => appt.twilight).length,
             });
             const isCurrentMonth = isSameMonth(day, monthStart);
-            const isTodayDate = isSameDay(day, new Date());
-            const isSelected = isSameDay(day, selectedDay);
+            const isTodayDate = dayKey(day) === dayKey(new Date());
+            const isSelected = dayKey(day) === dayKey(selectedDay);
             const twilightCue = cue === "Twilight" || Boolean(cue && cue.includes("twilight"));
 
             return (

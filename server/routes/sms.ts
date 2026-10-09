@@ -23,6 +23,7 @@ import {
 } from "../services/sms";
 import { requireStaff, requireCoordinator, type AuthenticatedRequest } from "../middleware/auth";
 import { recordAddressText } from "../../shared/addressText";
+import { bookingDateLabel } from "../../shared/clientHome";
 import { clientNotifyBlockReason, clientNotifyLive } from "../../shared/clientNotify";
 
 const router = Router();
@@ -99,7 +100,7 @@ router.post("/remind/:orderId", requireStaff, async (req: AuthenticatedRequest, 
     if (!phone) return res.status(400).json({ error: "No phone number on order." });
 
     const name = order.firstName || order.clientName?.split(" ")[0] || "there";
-    const date = order.scheduledDate || "your scheduled date";
+    const date = bookingDateLabel(order.scheduledDate, "your scheduled date");
     const time = order.scheduledTime || "your appointment time";
     const address = recordAddressText(order) || "the property";
 

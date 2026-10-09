@@ -1,5 +1,6 @@
 import { google } from "googleapis";
 import { addressText } from "../../shared/addressText";
+import { calendarDateKey } from "../../shared/clientHome";
 
 export interface CalendarBooking {
   orderId: string;
@@ -88,10 +89,11 @@ function parseTime(time?: string | null) {
   return { hours, minutes };
 }
 
-function eventTimes(date?: Date | null, time?: string | null) {
+export function bookingEventTimes(date?: Date | null, time?: string | null) {
   if (!date) return null;
   const { hours, minutes } = parseTime(time);
-  const datePart = date.toISOString().slice(0, 10);
+  const datePart = calendarDateKey(date);
+  if (!datePart) return null;
   const startMinutes = hours * 60 + minutes;
   const endMinutes = startMinutes + Number(process.env.DEFAULT_APPOINTMENT_DURATION_MINUTES || 90);
   const hhmm = (totalMinutes: number) => {
@@ -109,7 +111,7 @@ function eventTimes(date?: Date | null, time?: string | null) {
 
 export async function createCalendarBookingEvent(booking: CalendarBooking) {
   const auth = getAuth();
-  const times = eventTimes(booking.scheduledDate, booking.scheduledTime);
+  const times = bookingEventTimes(booking.scheduledDate, booking.scheduledTime);
   if (!auth || !times) return null;
 
   const calendarId =

@@ -5,17 +5,16 @@ import { db } from "@/lib/firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 import { toast } from "sonner";
 import { addressText } from "@shared/addressText";
+import { formatChicagoDate } from "@shared/clientHome";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 
 function fmtCurrency(n: number): string { return "$" + (n || 0).toLocaleString("en-US", { minimumFractionDigits: 2 }); }
 function fmtAddr(a: unknown): string {
   return addressText(a) || "—";
 }
-function fmtDate(ts: any): string {
+function fmtDate(ts: unknown): string {
   if (!ts) return "—";
-  if (typeof ts === "string" && ts.includes(",")) return ts;
-  if (ts.toDate) return ts.toDate().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  try { return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); } catch { return "—"; }
+  return formatChicagoDate(ts) || (typeof ts === "string" ? ts : "—");
 }
 function safe(v: any): string {
   if (v === null || v === undefined) return "—";

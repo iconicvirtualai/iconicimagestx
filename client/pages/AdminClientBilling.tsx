@@ -4,6 +4,7 @@ import AdminLayout from "@/components/AdminLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { deliverInvoiceEmail } from "@/lib/deliverInvoice";
 import { staffInvoicePath } from "@shared/staffInvoice";
+import { formatChicagoDate } from "@shared/clientHome";
 import { Search, DollarSign, Send, Eye, Plus, FileText, ChevronDown, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
@@ -12,11 +13,8 @@ import { toast } from "sonner";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 
 function fmtCurrency(n: number): string { return "$" + (n || 0).toLocaleString("en-US", { minimumFractionDigits: 2 }); }
-function fmtDate(ts: any): string {
-  if (!ts) return "—";
-  if (typeof ts === "string" && ts.includes(",")) return ts;
-  if (ts.toDate) return ts.toDate().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  try { return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); } catch { return "—"; }
+function fmtDate(ts: unknown): string {
+  return formatChicagoDate(ts) || "—";
 }
 function safe(v: any): string { if (!v) return "—"; if (typeof v === "string") return v; return String(v); }
 

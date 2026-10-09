@@ -12,8 +12,15 @@ import { toast } from "sonner";
 
 function fmtDate(ts: any): string {
   if (!ts) return "—";
-  if (ts.toDate) return ts.toDate().toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-  try { return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); } catch { return "—"; }
+  const date = typeof ts.toDate === "function" ? ts.toDate() : new Date(ts);
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/Chicago",
+  });
 }
 
 const STAGES = [

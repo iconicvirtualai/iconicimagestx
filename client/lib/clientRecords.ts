@@ -1,6 +1,7 @@
 /** Shared helpers for the admin client list and client account. */
 
 import { recordAddressText } from "@shared/addressText";
+import { formatChicagoDate } from "@shared/clientHome";
 
 export interface ClientSocial {
   instagram?: string;
@@ -79,15 +80,8 @@ export function formatMoney(value: unknown): string {
   return amount.toLocaleString("en-US", { style: "currency", currency: "USD" });
 }
 
-export function formatWhen(value: any): string {
-  if (!value) return "—";
-  try {
-    const date = value.toDate ? value.toDate() : new Date(value);
-    if (Number.isNaN(date.getTime())) return "—";
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  } catch {
-    return "—";
-  }
+export function formatWhen(value: unknown): string {
+  return formatChicagoDate(value) || "—";
 }
 
 export function recordAddress(record: any): string {

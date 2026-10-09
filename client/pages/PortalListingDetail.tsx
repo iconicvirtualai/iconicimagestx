@@ -871,7 +871,7 @@ function ActivityTab({ detail }: { detail: PortalListingDetailModel }) {
               <span className="w-2 h-2 rounded-full bg-[#0d9488] mt-1.5 shrink-0" />
               <div>
                 <p className="text-sm font-bold">{event.summary}</p>
-                <p className="text-[10px] uppercase tracking-widest text-gray-400 mt-1">{event.at ? new Date(event.at).toLocaleString() : "Time not recorded"}</p>
+                <p className="text-[10px] uppercase tracking-widest text-gray-400 mt-1">{event.at ? new Date(event.at).toLocaleString("en-US", { timeZone: "America/Chicago" }) : "Time not recorded"}</p>
               </div>
             </li>
           ))}

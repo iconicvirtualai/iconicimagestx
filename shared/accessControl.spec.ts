@@ -359,6 +359,8 @@ describe("invoice download gate", () => {
     expect(clientGalleryDownloadsUnlocked({ invoice: { status: "sent", total: 0, amountPaid: 0, amountDue: 0 } })).toBe(true);
     expect(clientGalleryDownloadsUnlocked({ invoice: unpaid, downloadsReleased: true, lockDownloads: true })).toBe(true);
     expect(clientGalleryDownloadsUnlocked({ invoice: unpaid, lockDownloads: false })).toBe(true);
+    expect(clientGalleryDownloadsUnlocked({ invoice: unpaid })).toBe(false);
+    expect(clientGalleryDownloadsUnlocked({ invoice: { status: "paid", total: 400, amountPaid: 400, amountDue: 0 } })).toBe(true);
     expect(clientGalleryDownloadsUnlocked({ invoice: unpaid, downloadEnabled: true })).toBe(true);
     expect(ICONIC_DOWNLOAD_LOCK.message).toMatch(/Iconic Images/);
     expect(ICONIC_DOWNLOAD_LOCK.message).toMatch(/after the shoot/);

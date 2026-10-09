@@ -5,6 +5,7 @@
  *  2. Confirmation emails are sent to the client and coordinator
  */
 
+import { bookingDateLabel } from "@shared/clientHome";
 import { lifeOfTheListingCareSelected } from "@shared/lifeOfTheListingCare";
 import { orderAddressFromBooking } from "@shared/serviceLocation";
 
@@ -27,11 +28,7 @@ export async function createOrder(formData: any) {
     pricing:                formData.pricing                || { subtotal: total, total },
     vibeNote:               formData.vibeNote               || formData.notes || "",
     squareFootage:          formData.sqft                   || formData.squareFootage || "",
-    scheduledDate:          formData.serviceDate
-                              ? new Date(formData.serviceDate).toLocaleDateString("en-US", {
-                                  weekday: "long", year: "numeric", month: "long", day: "numeric",
-                                })
-                              : null,
+    scheduledDate:          bookingDateLabel(formData.serviceDate) || null,
     scheduledTime:          formData.serviceTime            || null,
     photographerPreference: formData.preferredPhotographer  || null,
 

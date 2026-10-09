@@ -139,6 +139,34 @@ describe("decideClientGalleryLink", () => {
     if (locked.ok !== true || locked.kind !== "listing") throw new Error("expected the listing studio");
     expect(locked.project.downloadsUnlocked).toBe(false);
     expect(locked.project.images).toEqual([{ url: "https://cdn.example/final.jpg", name: "front.jpg" }]);
+
+    const unset = decideClientGalleryLink({
+      ...empty,
+      id: LISTING_ID,
+      listing: listing({ invoiceStatus: "sent" }),
+    });
+    if (unset.ok !== true || unset.kind !== "listing") throw new Error("expected the listing studio");
+    expect(unset.project.lockDownloads).toBe(true);
+    expect(unset.project.requirePayment).toBe(true);
+    expect(unset.project.downloadsUnlocked).toBe(false);
+
+    const paidUnset = decideClientGalleryLink({
+      ...empty,
+      id: LISTING_ID,
+      listing: listing({ invoiceStatus: "paid" }),
+    });
+    if (paidUnset.ok !== true || paidUnset.kind !== "listing") throw new Error("expected the listing studio");
+    expect(paidUnset.project.lockDownloads).toBe(true);
+    expect(paidUnset.project.downloadsUnlocked).toBe(true);
+
+    const releasedByStaff = decideClientGalleryLink({
+      ...empty,
+      id: LISTING_ID,
+      listing: listing({ invoiceStatus: "sent", lockDownloads: false }),
+    });
+    if (releasedByStaff.ok !== true || releasedByStaff.kind !== "listing") throw new Error("expected the listing studio");
+    expect(releasedByStaff.project.lockDownloads).toBe(false);
+    expect(releasedByStaff.project.downloadsUnlocked).toBe(true);
   });
 
   it("says when the project exists but Client Studio is off or locked", () => {

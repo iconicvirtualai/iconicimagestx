@@ -7,6 +7,7 @@
 import { Router } from "express";
 import admin from "firebase-admin";
 import { requireCoordinator, requireStaff, type AuthenticatedRequest } from "../middleware/auth";
+import { chicagoNoonDate } from "../../shared/clientHome";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -156,11 +157,12 @@ router.patch("/:id", requireCoordinator, async (req, res) => {
       if (key in req.body) updates[key] = req.body[key];
     });
 
-    // Convert scheduledDate string to Timestamp if provided
+    // Date-only strings are Central noon. UTC midnight would show as the previous Chicago day.
     if (updates.scheduledDate && typeof updates.scheduledDate === "string") {
-      updates.scheduledDate = admin.firestore.Timestamp.fromDate(
-        new Date(updates.scheduledDate)
-      );
+      const anchored = chicagoNoonDate(updates.scheduledDate) || new Date(updates.scheduledDate);
+      if (!Number.isNaN(anchored.getTime())) {
+        updates.scheduledDate = admin.firestore.Timestamp.fromDate(anchored);
+      }
     }
 
     await db().collection("orders").doc(req.params.id).update(updates);

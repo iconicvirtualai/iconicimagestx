@@ -9,6 +9,7 @@ import {
   Eye,
 } from "lucide-react";
 import { recordAddressText } from "@shared/addressText";
+import { formatChicagoDate } from "@shared/clientHome";
 import { toast } from "sonner";
 
 const STATUS_OPTIONS = ["needs_editing", "in_progress", "ready_for_review", "delivered"];
@@ -136,7 +137,7 @@ export default function AdminEditor() {
                       {listing.updatedAt && (
                         <span className="flex items-center gap-1 text-[10px] text-gray-400 font-bold uppercase tracking-widest">
                           <Clock className="w-3 h-3" />
-                          {new Date(listing.updatedAt.seconds * 1000).toLocaleDateString()}
+                          {formatChicagoDate(new Date(listing.updatedAt.seconds * 1000)) || ""}
                         </span>
                       )}
                     </div>
