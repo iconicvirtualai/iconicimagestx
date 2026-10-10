@@ -131,19 +131,51 @@ router.get("/", requireStaff, async (req, res) => {
   }
 });
 
+// Client-facing copy only. Staff detail stays in the server log.
+const PUBLIC_GALLERY_NOT_FOUND = "We couldn't find this gallery.";
+
+function publicGalleryNotFound(res: { status: (code: number) => { json: (body: unknown) => unknown } }) {
+  return res.status(404).json({ error: PUBLIC_GALLERY_NOT_FOUND });
+}
+
+/** Ids Firestore will not store. Real gallery ids still go through the lookup. */
+function malformedPublicGalleryId(id: string): boolean {
+  if (!id || id.length > 1500) return true;
+  if (id === "." || id === "..") return true;
+  if (id.includes("/") || id.includes("\\")) return true;
+  if (/^__.*__$/.test(id)) return true;
+  return /[\u0000-\u001F\u007F]/.test(id);
+}
+
 // ─── GET /api/galleries/public/:id — Public delivery link ───────────────────
 
 router.get("/public/:id", async (req, res) => {
+  const id = typeof req.params.id === "string" ? req.params.id : "";
+  if (malformedPublicGalleryId(id)) {
+    console.warn("[Galleries] Public gallery id rejected.");
+    return publicGalleryNotFound(res);
+  }
+  if (!admin.apps.length) {
+    console.error("[Galleries] Public gallery lookup skipped: Firebase Admin is not configured.");
+    return publicGalleryNotFound(res);
+  }
   try {
-    const doc = await db().collection("galleries").doc(req.params.id).get();
-    if (!doc.exists) return res.status(404).json({ error: "Gallery not found." });
+    const doc = await db().collection("galleries").doc(id).get();
+    if (!doc.exists) {
+      console.info("[Galleries] Public gallery not found.", id);
+      return publicGalleryNotFound(res);
+    }
 
     const gallery = doc.data()!;
     const gate = await downloadGateForGallery(gallery);
     return res.json(clientGalleryPayload(doc.id, gallery, gate));
   } catch (err) {
     console.error("[Galleries] Public fetch error:", err);
-    return res.status(500).json({ error: "Failed to fetch gallery." });
+    const code = (err as { code?: unknown }).code;
+    if (code === "not-found" || code === "invalid-argument" || code === 5 || code === 3) {
+      return publicGalleryNotFound(res);
+    }
+    return res.status(500).json({ error: "We couldn't open this gallery." });
   }
 });
 
