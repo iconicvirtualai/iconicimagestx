@@ -94,12 +94,77 @@ describe("invoice number surfaces", () => {
     expect(clientBillingInvoiceNumber({ id: "m6dpeaOrderRequestXXXX", invoice: {} }, [], when)).not.toBe("INV-M6DPEA");
   });
 
+  it("keeps TEST-DELIVERY-QA and still replaces the NaN bug", () => {
+    const qaId = "playtest-delivery-qa-invoice";
+    const qa = {
+      id: qaId,
+      invoiceNumber: "TEST-DELIVERY-QA",
+      createdAt: issuedAt,
+      orderRequestId: "playtest-delivery-qa-order",
+    };
+    const qaOrder = {
+      id: "playtest-delivery-qa-order",
+      invoiceId: qaId,
+      createdAt: issuedAt,
+      invoice: { invoiceNumber: "INV-M6DPEA" },
+    };
+    const expected = "TEST-DELIVERY-QA";
+    const numbers = [
+      presentInvoiceNumber(qa.invoiceNumber, qaId, when),
+      invoicePageInvoiceNumber(qa, when),
+      brandedInvoiceNumber(qa, when),
+      orderHistoryInvoiceNumber(qa, when),
+      clientBillingInvoiceNumber(qaOrder, [qa], when),
+      billingListInvoiceNumber(qa, when),
+      invoiceEmailNumber(qa, when),
+      receiptEmailNumber(qa, when),
+      buildClientInvoice(qaId, qa, when).invoiceNumber,
+    ];
+    expect(numbers).toEqual(Array(numbers.length).fill(expected));
+    expect(numbers).not.toContain("INV-2026-NVOICE");
+
+    const pdf = new TextDecoder().decode(brandedInvoicePdf({
+      invoiceNumber: qa.invoiceNumber,
+      invoiceId: qaId,
+      issuedAt,
+      clientName: "Ada",
+      billToAddress: "",
+      status: "sent",
+      face: invoiceFaceFromStored({ total: 10, amountDue: 10, lineItems: [{ name: "Photos", price: 10 }] }),
+    }));
+    expect(pdf).toContain(expected);
+    expect(pdf).not.toContain("INV-2026-NVOICE");
+
+    const portal = buildPortalListingDetail({
+      listing: { id: "listing1" },
+      invoices: [qa],
+    });
+    expect(portal.invoices[0].invoiceNumber).toBe(expected);
+
+    const issued = new Date(issuedAt);
+    const fallback = presentInvoiceNumber("INV-2026-0NaN", qaId, issued);
+    expect(fallback).toBe("INV-2026-NVOICE");
+    const broken = { id: qaId, invoiceNumber: "INV-2026-0NaN", createdAt: issuedAt };
+    const replaced = [
+      invoicePageInvoiceNumber(broken, when),
+      brandedInvoiceNumber(broken, when),
+      orderHistoryInvoiceNumber(broken, when),
+      clientBillingInvoiceNumber({ ...qaOrder, invoice: {} }, [broken], when),
+      billingListInvoiceNumber(broken, when),
+      invoiceEmailNumber(broken, when),
+      receiptEmailNumber(broken, when),
+      buildClientInvoice(qaId, { invoiceNumber: "INV-2026-0NaN", createdAt: issuedAt }, when).invoiceNumber,
+      presentInvoiceNumber("", qaId, issued),
+    ];
+    expect(new Set(replaced)).toEqual(new Set([fallback]));
+  });
+
   it("points each surface at the shared formatter", () => {
     const billing = read("../client/pages/AdminClientBilling.tsx");
     expect(billing).toContain("clientBillingInvoiceNumber");
     expect(billing).not.toContain("substring(0, 6)");
     expect(read("../client/pages/ClientInvoice.tsx")).toContain("invoicePageInvoiceNumber");
-    expect(read("../client/pages/AdminInvoiceEditor.tsx")).toContain("professionalInvoiceNumber");
+    expect(read("../client/pages/AdminInvoiceEditor.tsx")).toContain("invoicePageInvoiceNumber");
     expect(read("../shared/brandedInvoicePdf.ts")).toContain("brandedInvoiceNumber");
     expect(read("../client/lib/downloadBrandedInvoice.ts")).toContain("brandedInvoiceNumber");
     expect(read("../shared/clientHome.ts")).toContain("orderHistoryInvoiceNumber");

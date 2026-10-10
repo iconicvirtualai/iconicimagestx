@@ -131,10 +131,19 @@ export function draftInvoiceNumber(invoiceId: string, now = new Date()): string 
 }
 
 const HUMAN_INVOICE_NUMBER = /^INV-\d{4}-[A-Z0-9]+$/;
+/** String(NaN).padStart(4, "0") stored as INV-year-0NaN. Not a real invoice number. */
+const BROKEN_INVOICE_NUMBER = /^INV-\d{4}-0NaN$/i;
 
-/** A customer-facing number. Rejects the INV-2026-0NaN sequence bug. */
+/** A generated INV-year-#### number. Rejects the INV-2026-0NaN sequence bug. */
 export function isHumanInvoiceNumber(value: unknown): value is string {
-  return typeof value === "string" && HUMAN_INVOICE_NUMBER.test(value.trim()) && !/nan/i.test(value);
+  return typeof value === "string" && HUMAN_INVOICE_NUMBER.test(value.trim()) && !BROKEN_INVOICE_NUMBER.test(value.trim());
+}
+
+/** Any stored label except blank and the known INV-year-0NaN bug. */
+export function isStoredInvoiceNumber(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const trimmed = value.trim();
+  return trimmed.length > 0 && !BROKEN_INVOICE_NUMBER.test(trimmed);
 }
 
 /**
@@ -159,17 +168,13 @@ export function nextSequentialInvoiceNumber(existing: Iterable<unknown>, year: n
 }
 
 /**
- * Number to show a person. Keeps a valid stored invoiceNumber.
- * Falls back only when that field is missing or is not a real invoice number
- * (blank, the NaN sequence bug, or some other non-number). The fallback is
- * INV-year- plus the last six letters of the invoice id, and every surface
- * below uses this same function.
+ * Number to show a person. A stored invoiceNumber is shown as-is when it is
+ * a non-empty string and not the INV-year-0NaN bug. Falls back only when that
+ * field is missing or bad. The fallback is INV-year- plus the last six letters
+ * of the invoice id, and every surface below uses this same function.
  */
 export function presentInvoiceNumber(stored: unknown, invoiceId?: unknown, now = new Date()): string {
-  if (typeof stored === "string") {
-    const trimmed = stored.trim();
-    if (isHumanInvoiceNumber(trimmed)) return trimmed;
-  }
+  if (isStoredInvoiceNumber(stored)) return stored.trim();
   const id = typeof invoiceId === "string" ? invoiceId.trim() : "";
   if (id) return draftInvoiceNumber(id, now);
   return `INV-${now.getFullYear()}-0001`;
@@ -279,12 +284,12 @@ export function clientBillingInvoiceNumber(
     return false;
   });
   const preferred = (invoiceId ? matches.find((invoice) => nonEmptyId(invoice.id) === invoiceId) : undefined)
-    || matches.find((invoice) => isHumanInvoiceNumber(invoice.invoiceNumber))
+    || matches.find((invoice) => isStoredInvoiceNumber(invoice.invoiceNumber))
     || matches[0];
   const orderNumber = order.invoice?.invoiceNumber;
-  const stored = isHumanInvoiceNumber(preferred?.invoiceNumber)
+  const stored = isStoredInvoiceNumber(preferred?.invoiceNumber)
     ? preferred?.invoiceNumber
-    : isHumanInvoiceNumber(orderNumber)
+    : isStoredInvoiceNumber(orderNumber)
       ? orderNumber
       : preferred?.invoiceNumber ?? orderNumber;
 

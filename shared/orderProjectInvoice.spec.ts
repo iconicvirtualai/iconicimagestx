@@ -44,6 +44,9 @@ describe("human invoice numbers", () => {
     );
     expect(presentInvoiceNumber("INV-2026-0007", "OxD4TIjwc6X6GY57XFIn", when)).toBe("INV-2026-0007");
     expect(presentInvoiceNumber("INV-2026-0NaN", "OxD4TIjwc6X6GY57XFIn", when)).not.toMatch(/nan/i);
+    expect(presentInvoiceNumber("TEST-DELIVERY-QA", "playtest-delivery-qa-invoice", when)).toBe("TEST-DELIVERY-QA");
+    expect(presentInvoiceNumber("TEST-DELIVERY-QA", "playtest-delivery-qa-invoice", when)).not.toBe("INV-2026-NVOICE");
+    expect(presentInvoiceNumber("INV-2026-0019", "playtest-delivery-qa-invoice", when)).toBe("INV-2026-0019");
   });
 
   it("wires booking generation and the public invoice page off the NaN path", () => {
