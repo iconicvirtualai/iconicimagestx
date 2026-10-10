@@ -13,6 +13,7 @@ import {
   asTags, belongsToClient, clientName, formatMoney, formatWhen, money, recordAddress,
   type ClientRecord,
 } from "@/lib/clientRecords";
+import { MoneyAmount } from "@/components/MoneyAmount";
 import { staffInvoicePath } from "@shared/staffInvoice";
 
 const labelCls = "block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1";
@@ -354,10 +355,10 @@ function Row({ title, meta, value, extra, href, external }: { title: string; met
       <div className="min-w-0">
         <p className="truncate text-sm font-black text-black">{title}</p>
         {meta && <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{meta}</p>}
-        {extra && <p className="text-xs font-bold text-gray-500">{extra}</p>}
+        {extra && <p className="whitespace-nowrap text-xs font-bold text-gray-500">{extra}</p>}
       </div>
-      <div className="flex items-center gap-2">
-        {value && <span className="text-sm font-black text-black">{value}</span>}
+      <div className="flex shrink-0 items-center gap-2">
+        {value && <MoneyAmount className="text-sm font-black text-black">{value}</MoneyAmount>}
         {href && <ExternalLink className="h-3.5 w-3.5 text-[#0d9488]" />}
       </div>
     </div>

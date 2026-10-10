@@ -1,4 +1,5 @@
 import * as React from "react";
+import { MoneyAmount } from "@/components/MoneyAmount";
 import { iconicBusinessFooterLines } from "@shared/iconicBusiness";
 import type { InvoiceFace, InvoiceFaceLine } from "@shared/invoiceFace";
 import { invoiceFaceRows } from "@shared/invoiceFace";
@@ -45,11 +46,11 @@ export function BrandedInvoiceShell({
         <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-white/60">Amount paid</p>
-            <p className="mt-1 text-lg font-black">{money(amountPaid)}</p>
+            <MoneyAmount className="mt-1 text-lg font-black">{money(amountPaid)}</MoneyAmount>
           </div>
           <div className="text-left sm:text-right">
             <p className="text-[10px] font-black uppercase tracking-widest text-[#FFD700]">Amount due</p>
-            <p className="mt-1 text-2xl font-black">{money(amountDue)}</p>
+            <MoneyAmount className="mt-1 text-2xl font-black">{money(amountDue)}</MoneyAmount>
           </div>
         </div>
         <div className="mt-5 border-t border-white/15 pt-4 text-xs leading-relaxed text-white/75" data-testid="invoice-business-footer">
@@ -97,7 +98,7 @@ export function InvoiceLineTable({ lines }: { lines: InvoiceFaceLine[] }) {
                 {line.description ? <p className="mt-1 text-xs leading-relaxed text-gray-500">{line.description}</p> : null}
                 {line.qty > 1 ? <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-gray-400">Qty {line.qty}</p> : null}
               </div>
-              <p className="shrink-0 font-black text-black">{money(line.price)}</p>
+              <MoneyAmount className="font-black text-black">{money(line.price)}</MoneyAmount>
             </div>
           ))}
         </div>
@@ -113,16 +114,18 @@ export function InvoiceFaceSummary({ face }: { face: InvoiceFace }) {
       <dl className="space-y-2">
         {rows.map((row) => (
           <div key={row.id} data-invoice-row={row.id} className="flex items-baseline justify-between gap-4 text-sm">
-            <dt className="font-bold text-gray-500">{row.label}</dt>
-            <dd className="font-black text-black">
-              {row.signed === "subtract" ? `-${money(row.amount)}` : money(row.amount)}
+            <dt className="min-w-0 font-bold text-gray-500">{row.label}</dt>
+            <dd className="shrink-0">
+              <MoneyAmount className="font-black text-black">
+                {row.signed === "subtract" ? `-${money(row.amount)}` : money(row.amount)}
+              </MoneyAmount>
             </dd>
           </div>
         ))}
       </dl>
       <div className="mt-4 rounded-xl bg-[#1d4ed8] px-5 py-4 text-white" data-testid="invoice-total-box">
         <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#FFD700]">Total</p>
-        <p className="mt-1 text-3xl font-black tracking-tight">{money(face.total)}</p>
+        <MoneyAmount className="mt-1 text-3xl font-black tracking-tight">{money(face.total)}</MoneyAmount>
       </div>
     </div>
   );

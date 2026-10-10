@@ -10,6 +10,7 @@ import {
   InvoiceFaceSummary,
   money,
 } from "@/components/invoice/BrandedInvoice";
+import { MoneyAmount } from "@/components/MoneyAmount";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
@@ -502,13 +503,13 @@ export default function AdminInvoiceEditor() {
                       </div>
                       {catalogPrice != null && (
                         <span className="mt-1 block text-xs font-medium text-gray-500">
-                          Catalog price {money(catalogPrice)}
+                          Catalog price <MoneyAmount className="min-w-0 text-xs font-medium text-gray-500">{money(catalogPrice)}</MoneyAmount>
                         </span>
                       )}
                     </label>
                     <div>
                       <span className={labelCls}>Line total</span>
-                      <p className="mt-1 px-1 py-2.5 text-sm font-black text-black">{money(service.price)}</p>
+                      <MoneyAmount className="mt-1 px-1 py-2.5 text-sm font-black text-black">{money(service.price)}</MoneyAmount>
                       {categoryLabel && (
                         <span className="block text-xs font-medium text-gray-500">{categoryLabel} · {kindLabel}</span>
                       )}

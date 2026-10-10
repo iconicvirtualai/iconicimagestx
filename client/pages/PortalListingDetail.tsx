@@ -26,6 +26,7 @@ import {
   photoEditStatusLabel,
   type PhotoEditRequest,
 } from "@shared/photoEditRequest";
+import { MoneyAmount } from "@/components/MoneyAmount";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Eye, EyeOff, MapPin } from "lucide-react";
 import { toast } from "sonner";
@@ -849,7 +850,10 @@ function OrdersTab({ detail }: { detail: PortalListingDetailModel }) {
                 <p className="font-black">{invoice.invoiceNumber}</p>
                 <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">{invoice.status.replace(/_/g, " ")}</p>
               </div>
-              <p className="text-sm text-gray-600 mt-2">Total {money(invoice.total)}</p>
+              <p className="mt-2 flex items-baseline justify-between gap-3 text-sm text-gray-600">
+                <span className="min-w-0">Total</span>
+                <MoneyAmount className="font-black text-black">{money(invoice.total)}</MoneyAmount>
+              </p>
             </article>
           ))}
         </div>

@@ -196,6 +196,8 @@ describe("invoice summary markup", () => {
     expect(hidden).toContain("Promotions");
     expect(hidden).toContain("Fees");
     expect(hidden).toContain('data-testid="invoice-total-box"');
+    expect(hidden).toContain('data-slot="money"');
+    expect(hidden).toContain("whitespace-nowrap");
     expect(hidden).not.toContain('data-invoice-row="processing"');
 
     const shown = renderToStaticMarkup(

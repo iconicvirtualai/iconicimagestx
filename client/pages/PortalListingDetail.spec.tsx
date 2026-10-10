@@ -192,6 +192,9 @@ describe("portal listing detail page", () => {
     expect(orders).toContain("INV-2026-100");
     expect(orders).toContain("draft");
     expect(orders).toContain("Total");
+    expect(orders).toContain("$100.00");
+    expect(orders).toContain('data-slot="money"');
+    expect(orders).toContain("whitespace-nowrap");
     expect(orders).not.toContain("View invoice");
     expect(orders).not.toContain("/invoice/");
     expect(orders).not.toContain("Pay now");

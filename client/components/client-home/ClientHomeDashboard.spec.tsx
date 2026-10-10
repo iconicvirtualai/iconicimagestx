@@ -202,6 +202,8 @@ describe("client home dashboard", () => {
     expect(open).toContain("Download PDF");
     expect(open).toContain("Photos");
     expect(open).toContain("$250.00");
+    expect(open).toContain('data-slot="money"');
+    expect(open).toContain("whitespace-nowrap");
     expect(open).not.toContain("Pay");
     expect(open).not.toContain("/invoice/");
     expect(open).not.toContain("checkout");

@@ -6,6 +6,7 @@ import { createOrder } from "@/lib/createOrder";
 import { bookingFollowUp } from "@/lib/bookingFollowUp";
 import { Link, useSearchParams } from "react-router-dom";
 import ChatWidget from "@/components/ChatWidget";
+import { MoneyAmount } from "@/components/MoneyAmount";
 import { SmsConsentField } from "@/components/SmsConsentField";
 import { BUSINESS_CONTACT } from "@shared/businessContact";
 import { db } from "@/lib/firebase";
@@ -126,10 +127,10 @@ interface BookingFormProps {
 function TravelFeeLine({ travel }: { travel: TravelAssessment }) {
   const line = travelCustomerLine(travel);
   return (
-    <div data-testid="travel-fee-line" className="flex justify-between items-start gap-3 text-[11px]">
-      <span className="text-gray-500">{line.label}</span>
+    <div data-testid="travel-fee-line" className="flex items-baseline justify-between gap-3 text-[11px]">
+      <span className="min-w-0 text-gray-500">{line.label}</span>
       {line.amount ? (
-        <span data-testid="travel-fee-amount" className="font-bold text-black shrink-0">{line.amount}</span>
+        <MoneyAmount data-testid="travel-fee-amount" className="font-bold text-black">{line.amount}</MoneyAmount>
       ) : null}
     </div>
   );
@@ -540,9 +541,9 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
       <h3 className="text-lg font-black text-black uppercase tracking-tight mb-4 pb-3 border-b">Order Summary</h3>
       <div className="space-y-3 mb-6">
         {selectedServiceData && (
-          <div className="flex justify-between items-start gap-3">
-            <span className="text-xs font-bold text-gray-700">{selectedServiceData.name}</span>
-            <span className="text-sm font-black text-black">${selectedServiceData.price}</span>
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="min-w-0 text-xs font-bold text-gray-700">{selectedServiceData.name}</span>
+            <MoneyAmount className="text-sm font-black text-black">${selectedServiceData.price}</MoneyAmount>
           </div>
         )}
         {formData.selectedBasics.length > 0 && (
@@ -550,8 +551,8 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
             {formData.selectedBasics.map(id => {
               const b = basicsList.find(x => x.id === id);
               return b ? (
-                <div key={id} className="flex justify-between items-start gap-3 text-[11px]">
-                  <span className="text-gray-500">
+                <div key={id} className="flex items-baseline justify-between gap-3 text-[11px]">
+                  <span className="min-w-0 text-gray-500">
                     {b.name}
                     {b.appointmentLimit && (
                       <span className="mt-0.5 block text-[10px] font-medium leading-snug text-gray-400">
@@ -559,7 +560,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                       </span>
                     )}
                   </span>
-                  <span className="font-bold text-black shrink-0">${b.price}</span>
+                  <MoneyAmount className="font-bold text-black">${b.price}</MoneyAmount>
                 </div>
               ) : null;
             })}
@@ -571,21 +572,21 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
           </div>
         )}
         {formData.premiumUpgrade && (
-          <div className="flex justify-between items-center text-[11px]">
-            <span className="text-gray-500 italic">✨ Iconic Finish (Premium) (Next Day Delivery)</span>
-            <span className="font-bold text-black">${iconicFinishPrice}</span>
+          <div className="flex items-baseline justify-between gap-3 text-[11px]">
+            <span className="min-w-0 text-gray-500 italic">✨ Iconic Finish (Premium) (Next Day Delivery)</span>
+            <MoneyAmount className="font-bold text-black">${iconicFinishPrice}</MoneyAmount>
           </div>
         )}
         {formData.specializedPhotography !== "mls" && (
-          <div className="flex justify-between items-center text-[11px]">
-            <span className="text-gray-500 italic">📸 Specialized: {formData.specializedPhotography === "social" ? (offer.specializedSocial?.name || "Social Media Optimized") : (offer.specializedBoth?.name || "MLS + Social Media Optimized")}</span>
-            <span className="font-bold text-black">${formData.specializedPhotography === "social" ? specializedSocialPrice : specializedBothPrice}</span>
+          <div className="flex items-baseline justify-between gap-3 text-[11px]">
+            <span className="min-w-0 text-gray-500 italic">📸 Specialized: {formData.specializedPhotography === "social" ? (offer.specializedSocial?.name || "Social Media Optimized") : (offer.specializedBoth?.name || "MLS + Social Media Optimized")}</span>
+            <MoneyAmount className="font-bold text-black">${formData.specializedPhotography === "social" ? specializedSocialPrice : specializedBothPrice}</MoneyAmount>
           </div>
         )}
         {formData.virtualStagingCredits > 0 && (
-          <div className="flex justify-between items-center text-[11px]">
-            <span className="text-gray-500 italic">🏠 {offer.virtualStaging?.name || "Virtual Staging"} ({formData.virtualStagingCredits} credits)</span>
-            <span className="font-bold text-black">${formData.virtualStagingCredits * virtualStagingUnitPrice}</span>
+          <div className="flex items-baseline justify-between gap-3 text-[11px]">
+            <span className="min-w-0 text-gray-500 italic">🏠 {offer.virtualStaging?.name || "Virtual Staging"} ({formData.virtualStagingCredits} credits)</span>
+            <MoneyAmount className="font-bold text-black">${formData.virtualStagingCredits * virtualStagingUnitPrice}</MoneyAmount>
           </div>
         )}
         {formData.selectedAddOns.length > 0 && (
@@ -597,9 +598,9 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                  if (a) found = a;
                });
                return found ? (
-                 <div key={id} className="flex justify-between items-center text-[11px]">
-                   <span className="text-gray-500">{found.name}</span>
-                   <span className="font-bold text-black">${found.price}</span>
+                 <div key={id} className="flex items-baseline justify-between gap-3 text-[11px]">
+                   <span className="min-w-0 text-gray-500">{found.name}</span>
+                   <MoneyAmount className="font-bold text-black">${found.price}</MoneyAmount>
                  </div>
                ) : null;
              })}
@@ -620,9 +621,9 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
 
         {/* Applied Promo Display */}
         {appliedPromo && (
-          <div className="pt-2 mt-2 border-t border-dashed border-teal-100 flex justify-between items-center text-[11px]">
-             <span className="text-teal-600 font-bold flex items-center gap-1.5"><Sparkles className="w-3 h-3" /> PROMO: {appliedPromo.code}</span>
-             <span className="font-black text-teal-600">-${appliedPromo.discount}</span>
+          <div className="pt-2 mt-2 border-t border-dashed border-teal-100 flex items-baseline justify-between gap-3 text-[11px]">
+             <span className="min-w-0 text-teal-600 font-bold flex items-center gap-1.5"><Sparkles className="w-3 h-3" /> PROMO: {appliedPromo.code}</span>
+             <MoneyAmount className="font-black text-teal-600">-${appliedPromo.discount}</MoneyAmount>
           </div>
         )}
       </div>
@@ -654,9 +655,9 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
         <div className="flex justify-between items-center mb-4">
           <span className="text-[10px] font-black uppercase text-gray-400">Total Estimate</span>
           {hasBookingSelection(bookingPriceInput()) ? (
-            <span data-testid="booking-total" className="text-2xl font-black text-black" style={{ color: settings.global.primaryColor }}>
+            <MoneyAmount data-testid="booking-total" className="text-2xl font-black text-black" style={{ color: settings.global.primaryColor }}>
               ${calculateTotal()}
-            </span>
+            </MoneyAmount>
           ) : (
             <span data-testid="booking-total" className="text-sm font-bold uppercase tracking-widest text-gray-400">
               Select a package
@@ -1356,10 +1357,10 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                <div data-testid="order-summary-before-submit" className="rounded-2xl border border-gray-100 bg-gray-50 p-5 space-y-3">
                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Order summary</p>
                  <TravelFeeLine travel={travel} />
-                 <div className="flex justify-between items-center border-t border-gray-200 pt-3">
-                   <span className="text-[10px] font-black uppercase text-gray-400">Total estimate</span>
+                 <div className="flex items-baseline justify-between gap-3 border-t border-gray-200 pt-3">
+                   <span className="min-w-0 text-[10px] font-black uppercase text-gray-400">Total estimate</span>
                    {hasBookingSelection(bookingPriceInput()) ? (
-                     <span className="text-lg font-black text-black">${calculateTotal()}</span>
+                     <MoneyAmount className="text-lg font-black text-black">${calculateTotal()}</MoneyAmount>
                    ) : (
                      <span className="text-sm font-bold uppercase tracking-widest text-gray-400">Select a package</span>
                    )}

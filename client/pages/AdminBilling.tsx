@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import AdminLayout from "@/components/AdminLayout";
+import { MoneyAmount } from "@/components/MoneyAmount";
 import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, limit, getDocs } from "firebase/firestore";
 import { AlertCircle, CreditCard, FileText } from "lucide-react";
@@ -153,7 +154,7 @@ export default function AdminBilling() {
                         {invoice.description}
                       </td>
                       <td className="py-3 px-4 text-gray-900 font-semibold">
-                        ${invoice.amount.toFixed(2)}
+                        <MoneyAmount className="font-semibold text-gray-900">${invoice.amount.toFixed(2)}</MoneyAmount>
                       </td>
                       <td className="py-3 px-4">
                         <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold border">
