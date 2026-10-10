@@ -24,7 +24,9 @@ import {
   listingStatusChips,
   type ListingQueueId,
 } from "@/lib/staffListQueue";
+import { loadAdminListingPrices } from "@/lib/listingPriceLookup";
 import { buildAdminOrderTile, type AdminStudioId } from "@shared/adminOrderTile";
+import { listingPriceLabel, listingPriceLookupKey, type ListingPriceIndex } from "@shared/listingPrice";
 import { AdminOrderTile } from "@/components/admin/AdminOrderTile";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -160,6 +162,7 @@ function useGooglePlaces(inputRef: React.RefObject<HTMLInputElement>, onSelect: 
 export default function AdminListings() {
   const navigate = useNavigate();
   const [projects, setProjects] = React.useState<Project[]>([]);
+  const [priceIndex, setPriceIndex] = React.useState<ListingPriceIndex | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<string[]>(["in_progress"]);
@@ -225,6 +228,32 @@ export default function AdminListings() {
     });
     return () => unsub();
   }, []);
+
+  const listingsRef = React.useRef(projects);
+  listingsRef.current = projects;
+  const priceKey = React.useMemo(
+    () => listingPriceLookupKey(projects as unknown as Record<string, unknown>[]),
+    [projects],
+  );
+
+  React.useEffect(() => {
+    const listings = listingsRef.current as unknown as Record<string, unknown>[];
+    if (!priceKey) {
+      setPriceIndex(null);
+      return;
+    }
+    let cancelled = false;
+    loadAdminListingPrices(listings)
+      .then((index) => {
+        if (!cancelled) setPriceIndex(index);
+      })
+      .catch((err) => {
+        console.error("[Listings] Price lookup failed.", err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [priceKey]);
 
   // Load clients + staff + services when modal opens
   React.useEffect(() => {
@@ -792,7 +821,11 @@ export default function AdminListings() {
         <div className="grid grid-cols-1 items-start gap-6 pb-24 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map(p => {
             const nextAction = LISTING_QUEUE.find((item) => item.id === listingNextAction(p, queueNow));
-            const order = buildAdminOrderTile(p as unknown as Record<string, unknown>);
+            const record = p as unknown as Record<string, unknown>;
+            const order = {
+              ...buildAdminOrderTile(record),
+              priceLabel: listingPriceLabel(record, priceIndex),
+            };
             const setStudio = async (studio: AdminStudioId) => {
               try {
                 await updateDoc(doc(db, "listings", p.id), { studio, updatedAt: serverTimestamp() });
