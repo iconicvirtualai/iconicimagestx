@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { X, Send, User } from "lucide-react";
 import type { ContactThreadMessage, ContactThreadView } from "@shared/contactThread";
+import { BUSINESS_CONTACT } from "@shared/businessContact";
 
 interface Message {
   id: string;
@@ -271,7 +272,7 @@ export default function ChatWidget({ isOpen, onClose }: { isOpen: boolean; onClo
       setInputValue("");
     } catch (err) {
       const message = err instanceof Error ? err.message : "We couldn't save your message.";
-      setError(`${message} Your message is still here — try again, or call 281-356-0965.`);
+      setError(`${message} Your message is still here — try again, or call ${BUSINESS_CONTACT.phoneDisplay}.`);
     } finally {
       setSending(false);
     }

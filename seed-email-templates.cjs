@@ -9,7 +9,7 @@ async function seedEmailTemplates() {
   console.log("Seeding email templates...");
   await db.collection("emailTemplates").doc("clientConfirmation").set({
     subject: "Booking Confirmed – {propertyAddress}",
-    body: `Hi {clientName},\n\nThank you for booking with Iconic Images TX!\n\nProperty: {propertyAddress}\nServices: {services}\nNotes: {notes}\nOrder ID: {orderId}\n\nWe'll be in touch shortly to confirm your shoot time.\n\nWarm regards,\nThe Iconic Images TX Team\norders@iconicimagestx.com`,
+    body: `Hi {clientName},\n\nThank you for booking with Iconic Images TX!\n\nProperty: {propertyAddress}\nServices: {services}\nNotes: {notes}\nOrder ID: {orderId}\n\nWe'll be in touch shortly to confirm your shoot time.\n\nWarm regards,\nThe Iconic Images TX Team\n26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380 | 281.356.0965 | photos@iconicimagestx.com`,
   });
   console.log("✅ clientConfirmation saved.");
 

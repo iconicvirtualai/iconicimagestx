@@ -6,6 +6,7 @@
 
 import nodemailer from "nodemailer";
 import admin from "firebase-admin";
+import { BUSINESS_CONTACT } from "../../shared/businessContact";
 import { clientNotifyBlockReason, emailAllowed } from "../../shared/clientNotify";
 
 const db = () => admin.firestore();
@@ -150,6 +151,7 @@ function getFallbackTemplate(
       </div>
       ${content}
       <div style="border-top: 1px solid #eee; margin-top: 30px; padding-top: 20px; text-align: center; color: #999; font-size: 12px;">
+        <p>${BUSINESS_CONTACT.line}</p>
         <p>Iconic Images TX | iconicimagestx.com</p>
         <p>Questions? Reply to this email or message us through your client portal.</p>
       </div>
@@ -277,7 +279,7 @@ function getFallbackTemplate(
       <h2 style="color:#0d9488;">We received your message!</h2>
       <p>Hi ${vars.name},</p>
       <p>Thank you for reaching out to Iconic Images. We've received your message and our team will review it shortly.</p>
-      <p>We typically respond to inquiries within 24 business hours. If your question is urgent, feel free to call us at <strong>281-356-0965</strong>.</p>
+      <p>We typically respond to inquiries within 24 business hours. If your question is urgent, feel free to call us at <strong>${BUSINESS_CONTACT.phoneDisplay}</strong> or email <strong>${BUSINESS_CONTACT.email}</strong>.</p>
       <p style="margin-top:30px;color:#888;font-size:12px;">
         If you have any additional information to add, simply reply to this email or visit <strong>iconicimagestx.com</strong>.
       </p>

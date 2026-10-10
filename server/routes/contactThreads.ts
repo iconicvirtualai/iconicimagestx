@@ -3,6 +3,7 @@ import { clientIp } from "../lib/clientIp";
 import { createRateLimiter } from "../lib/rateLimit";
 import { requireCoordinator, type AuthenticatedRequest } from "../middleware/auth";
 import { LIVE_CHAT_MAX_PER_WINDOW, LIVE_CHAT_WINDOW_MS, parseLiveChatBody } from "../services/liveChat";
+import { BUSINESS_CONTACT } from "../../shared/businessContact";
 import {
   appendStaffReply,
   continueClientThread,
@@ -97,7 +98,7 @@ router.post("/threads", async (req, res) => {
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
     return res.status(429).json({
-      error: "Too many messages. Please wait a few minutes or call us at 281-356-0965.",
+      error: `Too many messages. Please wait a few minutes or call us at ${BUSINESS_CONTACT.phoneDisplay}.`,
     });
   }
 
@@ -122,7 +123,7 @@ router.post("/threads", async (req, res) => {
   } catch (error) {
     console.error("[ContactThread] Client message failed.", error);
     return res.status(500).json({
-      error: "We couldn't save your message. Please try again, or call 281-356-0965.",
+      error: `We couldn't save your message. Please try again, or call ${BUSINESS_CONTACT.phoneDisplay}.`,
     });
   }
 });

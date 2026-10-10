@@ -22,6 +22,7 @@ import {
   isStaffInboundSmsDestination,
   smsAllowed,
 } from "../../shared/clientNotify";
+import { BUSINESS_CONTACT } from "../../shared/businessContact";
 
 // ─── Client ──────────────────────────────────────────────────────────────────
 
@@ -246,7 +247,7 @@ export const SMS_TEMPLATES = {
   ) =>
     `Hi ${name}! We've received your booking request for ${address}.\n\n` +
     `⚠️ THIS IS NOT A CONFIRMATION. Our team will review your request and reach out shortly to confirm your appointment.\n\n` +
-    `Requested date: ${date}\nEstimated total: ${total}\n\nQuestions? Reply to this text! — Iconic Images 📸`,
+    `Requested date: ${date}\nEstimated total: ${total}\n\nQuestions? Reply to this text, or reach us at ${BUSINESS_CONTACT.line}. — Iconic Images 📸`,
 
   appointmentReminder24h: (name: string, date: string, time: string, address: string) =>
     `Hey ${name}, reminder! Your Iconic Images shoot is tomorrow 📸\n\n` +

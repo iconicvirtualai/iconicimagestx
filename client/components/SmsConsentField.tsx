@@ -1,5 +1,6 @@
 import type { MouseEvent } from "react";
 import { Link } from "react-router-dom";
+import { BUSINESS_CONTACT } from "@shared/businessContact";
 
 function keepCheckbox(event: MouseEvent) {
   event.stopPropagation();
@@ -28,7 +29,15 @@ export function SmsConsentField({
         I agree to receive transactional booking and appointment text messages from{" "}
         <strong>Iconic Images</strong>, including order-received notices, appointment reminders, and photo
         delivery updates. Message frequency varies. Message and data rates may apply. Reply STOP to opt out.
-        Reply HELP for help. Consent is not a condition of purchase.{" "}
+        Reply HELP for help, or contact{" "}
+        <a href={BUSINESS_CONTACT.phoneHref} className="font-semibold text-black underline">
+          {BUSINESS_CONTACT.phoneDisplay}
+        </a>
+        {" or "}
+        <a href={BUSINESS_CONTACT.emailHref} className="font-semibold text-black underline">
+          {BUSINESS_CONTACT.email}
+        </a>
+        . Consent is not a condition of purchase.{" "}
         <Link to="/privacy" className="font-semibold text-black underline" onClick={keepCheckbox} onMouseDown={(event) => event.preventDefault()}>
           Privacy Policy
         </Link>

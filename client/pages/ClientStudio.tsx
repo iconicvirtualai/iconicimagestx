@@ -14,6 +14,7 @@ import { addressText } from "@shared/addressText";
 import { formatChicagoDate } from "@shared/clientHome";
 import { clientGalleryDownloadsUnlocked, studioOffersDownloads } from "@shared/paymentAccess";
 import { GalleryDownloadLockNotice } from "@/components/GalleryDownloadLock";
+import { PublicContactLine } from "@/components/PublicContactLine";
 
 function failureCopy(status: number, data: { code?: string; message?: string; error?: string }, id: string) {
   const message = data.message || data.error || "";
@@ -455,7 +456,7 @@ export default function ClientStudio() {
       <footer className="border-t border-gray-100 py-8 mt-12">
         <div className="max-w-6xl mx-auto px-4 text-center">
           <p className="text-[10px] text-gray-400 uppercase tracking-widest">Powered by Iconic Images Photography</p>
-          <p className="text-[10px] text-gray-300 mt-1">iconicimagestx.com</p>
+          <PublicContactLine className="mt-2 text-[11px] text-gray-500" linkClassName="underline" />
           <div className="mt-3 flex justify-center gap-4 text-xs">
             <Link to="/privacy" className="underline text-gray-500">Privacy Policy</Link>
             <Link to="/terms" className="underline text-gray-500">Terms and Conditions</Link>

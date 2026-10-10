@@ -116,10 +116,10 @@ describe("branded invoice pdf", () => {
     expect(pdf).toContain("PAYMENT");
     expect(pdf).toContain("AMOUNT DUE");
     expect(pdf).toContain("Iconic Images Photography, LLC");
-    expect(pdf).toContain("2219 Sawdust Rd. #1304");
+    expect(pdf).toContain("26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380");
     expect(pdf).toContain("photos@iconicimagestx.com");
-    expect(pdf).toContain("cadi@iconicimagestx.com");
-    expect(pdf).toContain("281-356-0965");
+    expect(pdf).not.toContain("cadi" + "@");
+    expect(pdf).toContain("281.356.0965");
     expect(pdf).toContain("iconicimagestx.com");
     expect(pdf).not.toContain("Processing");
     expect(pdf).not.toContain("checkout");
@@ -179,11 +179,10 @@ describe("invoice business footer", () => {
     );
     expect(html).toContain('data-testid="invoice-business-footer"');
     expect(html).toContain("Iconic Images Photography, LLC");
-    expect(html).toContain("2219 Sawdust Rd. #1304");
-    expect(html).toContain("Spring, TX 77380");
-    expect(html).toContain("281-356-0965");
+    expect(html).toContain("26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380");
+    expect(html).toContain("281.356.0965");
     expect(html).toContain("photos@iconicimagestx.com");
-    expect(html).toContain("cadi@iconicimagestx.com");
+    expect(html).not.toContain("cadi" + "@");
     expect(html).toContain("iconicimagestx.com");
   });
 });

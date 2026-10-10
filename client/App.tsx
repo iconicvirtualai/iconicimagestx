@@ -17,6 +17,7 @@ import { BrowserRouter, Navigate, Routes, Route, useLocation } from "react-route
 import { useEffect } from "react";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
+import { LocalBusinessJsonLd } from "./components/LocalBusinessJsonLd";
 
 // Public pages
 import Index from "./pages/Index";
@@ -104,6 +105,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <LocalBusinessJsonLd />
         <ScrollToTop />
         <AuthProvider>
           <Routes>

@@ -4,6 +4,8 @@ import ChatWidget from "@/components/ChatWidget";
 import { Button } from "@/components/ui/button";
 import { MessageCircle, ArrowRight, Phone } from "lucide-react";
 import { toast } from "sonner";
+import { BUSINESS_CONTACT } from "@shared/businessContact";
+import { PublicContactLine } from "@/components/PublicContactLine";
 
 interface FormData {
   name: string;
@@ -113,7 +115,7 @@ export default function Contact() {
                     </button>
 
                     <a
-                      href="tel:281-356-0965"
+                      href={BUSINESS_CONTACT.phoneHref}
                       className="flex items-center gap-4 p-4 bg-gray-100/50 border border-black rounded-2xl group hover:bg-gray-200/50 transition-all duration-300 shadow-xl hover:shadow-2xl text-left relative overflow-hidden"
                     >
                       <div className="bg-black p-2.5 rounded-xl text-white group-hover:scale-110 transition-transform flex-shrink-0 shadow-sm">
@@ -122,12 +124,16 @@ export default function Contact() {
                       <div className="flex-1 min-w-[120px] relative z-10">
                         <div className="text-[9px] font-bold tracking-widest text-black/60 uppercase mb-0.5">CALL US</div>
                         <div className="text-base font-bold text-black group-hover:text-black transition-colors flex items-center gap-2">
-                          281-356-0965
+                          {BUSINESS_CONTACT.phoneDisplay}
                           <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0" />
                         </div>
                       </div>
                     </a>
                   </div>
+                  <PublicContactLine
+                    className="pt-6 text-sm leading-relaxed text-gray-700"
+                    linkClassName="font-semibold text-teal-700 underline"
+                  />
                 </div>
 
               </div>

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Facebook, Instagram } from "lucide-react";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { LegalLinks } from "@/components/LegalLinks";
+import { PublicContactLine } from "@/components/PublicContactLine";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -40,8 +41,12 @@ export default function Footer() {
           </div>
         </div>
 
+        <PublicContactLine
+          className="mt-8 text-center text-sm leading-relaxed opacity-90"
+          linkClassName="underline underline-offset-4 hover:text-white/80"
+        />
         <LegalLinks
-          className="mt-8 justify-center border-t border-white/20 pt-6"
+          className="mt-6 justify-center border-t border-white/20 pt-6"
           linkClassName="text-sm font-semibold underline underline-offset-4 hover:text-white/80 transition-colors"
         />
       </div>
