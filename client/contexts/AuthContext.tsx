@@ -31,6 +31,7 @@ import {
   type AuthSessionState,
 } from "@shared/staffAccess";
 import { isTempAdminClientEnabled } from "@shared/tempAdmin";
+import { passwordResetFailureMessage, requestPasswordReset } from "../lib/passwordReset";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -259,10 +260,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Password reset
+  // Password reset. Firebase Auth emails the link. This does not use our mailer
+  // and does not read CLIENT_NOTIFY_LIVE.
   const resetPassword = async (email: string) => {
     setError(null);
-    await sendPasswordResetEmail(auth, email);
+    try {
+      await requestPasswordReset(email, (address) => sendPasswordResetEmail(auth, address));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : passwordResetFailureMessage(err);
+      setError(message);
+      throw err instanceof Error ? err : new Error(message);
+    }
   };
 
   const refreshProfile = async () => {

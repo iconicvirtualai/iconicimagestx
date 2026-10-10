@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { clientLoginAction, clientReturnPath, staffHomePath } from "@shared/staffAccess";
+import { passwordResetFailureMessage } from "@/lib/passwordReset";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -89,19 +90,16 @@ export default function Login() {
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resetEmail) return;
+    if (!resetEmail || submitting) return;
+    setSubmitting(true);
     try {
-      const gate = await fetch("/api/client-notify");
-      const gateData = await gate.json().catch(() => ({ live: false }));
-      if (!gate.ok || gateData?.live !== true) {
-        toast.error("Failed to send reset email.");
-        return;
-      }
       await resetPassword(resetEmail);
       toast.success("Reset email sent. Check your inbox.");
       setMode("signin");
-    } catch {
-      toast.error("Failed to send reset email.");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : passwordResetFailureMessage(err));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -150,8 +148,8 @@ export default function Login() {
               className={inputClass}
               required
             />
-            <Button type="submit" className="w-full bg-white text-black hover:bg-gray-100">
-              Send Reset Link
+            <Button type="submit" disabled={submitting} className="w-full bg-white text-black hover:bg-gray-100">
+              {submitting ? "Sending..." : "Send Reset Link"}
             </Button>
             <div className="text-center">
               <button type="button" onClick={() => setMode("signin")} className="text-zinc-500 hover:text-zinc-300 text-sm">

@@ -197,8 +197,9 @@ export function createServer() {
     }
   });
 
-  // Portal password-reset and other non-order client mail check this.
-  // booking_received does not. live is false unless CLIENT_NOTIFY_LIVE is exactly "true"
+  // Non-order client mail (booking password-setup, campaigns, and similar)
+  // can read this. Client login password reset does not: Firebase Auth sends
+  // that email. live is false unless CLIENT_NOTIFY_LIVE is exactly "true"
   // and CLIENT_COMMS_ZONE is not RED.
   app.get("/api/client-notify", (_req, res) => {
     res.json({ live: clientNotifyLive() });
