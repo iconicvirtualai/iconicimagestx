@@ -5829,6 +5829,18 @@ function servicesOf(listing) {
     return "";
   }).filter(Boolean).slice(0, 24);
 }
+const PRIVATE_FILE = /\.(zip|pdf|dng|cr2|cr3|nef|nrw|arw|srf|sr2|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic)(\?|$)/i;
+const PRIVATE_FOLDER = /\/(raw|downloads?|mls|full|print|zips?)\//i;
+function rowOf(item) {
+  return item && typeof item === "object" ? item : null;
+}
+function isPrivateMedia(path2, name, url) {
+  if (PRIVATE_FOLDER.test(path2) || path2.includes("/raw/")) return true;
+  return PRIVATE_FILE.test(name) || PRIVATE_FILE.test(url);
+}
+function mediaName(row, fallback) {
+  return text$6(row.name) || text$6(row.fileName) || text$6(row.title) || fallback;
+}
 function publicImages(listing) {
   if (!Array.isArray(listing.images)) return [];
   const images = [];
@@ -5836,7 +5848,7 @@ function publicImages(listing) {
     const frame = frameFromListingImage(item, index);
     const url = httpUrl(frame?.url);
     if (!frame || frame.raw || !url) return;
-    if (frame.path.includes("/raw/")) return;
+    if (isPrivateMedia(frame.path, frame.name, url)) return;
     images.push({ url, name: frame.name });
   });
   return images.slice(0, 200);
@@ -5845,18 +5857,99 @@ function publicVideos(listing) {
   if (!Array.isArray(listing.videos)) return [];
   const videos = [];
   for (const item of listing.videos) {
-    if (!item || typeof item !== "object") continue;
-    const row = item;
+    const row = rowOf(item);
+    if (!row) continue;
     const url = httpUrl(row.url);
-    if (!url || url.includes("/raw/")) continue;
-    videos.push({ url, name: text$6(row.name) || "Video" });
+    const name = mediaName(row, "Video");
+    if (!url || isPrivateMedia(text$6(row.path) || text$6(row.storagePath), name, url)) continue;
+    videos.push({ url, name });
   }
   return videos.slice(0, 40);
 }
-function publicRevisions(listing) {
+function publicTour(listing) {
+  for (const key of ["tourUrl", "matterportUrl", "virtualTourUrl", "virtualTour", "threeDTourUrl", "tourLink"]) {
+    const url = httpUrl(listing[key]);
+    if (url && !isPrivateMedia("", key, url)) return url;
+  }
+  return "";
+}
+function agentNameOf$1(listing) {
+  const direct = text$6(listing.agentName) || text$6(listing.listingAgent);
+  if (direct) return direct;
+  const agent = listing.agent;
+  if (agent && typeof agent === "object") return text$6(agent.name);
+  if (typeof agent === "string") return agent.trim();
+  return "";
+}
+function publicFloorPlans(listing) {
+  const groups = [listing.floorplans, listing.floorPlans];
+  const plans = [];
+  for (const group of groups) {
+    if (!Array.isArray(group)) continue;
+    for (const item of group) {
+      const row = rowOf(item);
+      if (!row) continue;
+      const url = httpUrl(row.url) || httpUrl(row.shareUrl);
+      const name = mediaName(row, "Floor plan");
+      const path2 = text$6(row.path) || text$6(row.storagePath);
+      if (!url || isPrivateMedia(path2, name, url)) continue;
+      plans.push({ url, name });
+    }
+  }
+  return plans.slice(0, 40);
+}
+function downloadUrlOf(row) {
+  for (const key of ["downloadUrl", "fullResUrl", "mlsUrl", "originalUrl", "zipUrl", "printUrl"]) {
+    const url = httpUrl(row[key]);
+    if (url) return url;
+  }
+  return "";
+}
+function ownerFiles(listing) {
+  const files = [];
+  const push = (url, name) => {
+    if (!url || files.some((file) => file.url === url)) return;
+    files.push({ url, name });
+  };
+  for (const key of ["zipUrl", "downloadUrl", "mlsUrl", "mlsPackageUrl", "fullResUrl"]) {
+    push(httpUrl(listing[key]), key);
+  }
+  const groups = [listing.images, listing.files, listing.downloads, listing.mlsFiles, listing.floorplans, listing.floorPlans];
+  for (const group of groups) {
+    if (!Array.isArray(group)) continue;
+    group.forEach((item, index) => {
+      const row = rowOf(item);
+      if (!row) return;
+      const name = mediaName(row, `File ${index + 1}`);
+      const path2 = text$6(row.path) || text$6(row.storagePath);
+      const display = httpUrl(row.url);
+      const download = downloadUrlOf(row);
+      if (download) push(download, name);
+      if (display && isPrivateMedia(path2, name, display)) push(display, name);
+    });
+  }
+  return files.slice(0, 200);
+}
+function ownerImageDownloads(listing, images) {
+  const byUrl = /* @__PURE__ */ new Map();
+  if (Array.isArray(listing.images)) {
+    for (const item of listing.images) {
+      const row = rowOf(item);
+      if (!row) continue;
+      const display = httpUrl(row.url);
+      const download = downloadUrlOf(row);
+      if (display && download && download !== display) byUrl.set(display, download);
+    }
+  }
+  return images.map((image) => {
+    const downloadUrl = byUrl.get(image.url);
+    return downloadUrl ? { ...image, downloadUrl } : image;
+  });
+}
+function ownerRevisions(listing) {
   if (!Array.isArray(listing.revisions)) return [];
   return listing.revisions.slice(0, 40).map((item, index) => {
-    const row = item && typeof item === "object" ? item : {};
+    const row = rowOf(item) || {};
     const photoIndex = typeof row.photoIndex === "number" ? row.photoIndex : null;
     return {
       id: text$6(row.id) || `revision-${index + 1}`,
@@ -5928,27 +6021,41 @@ function listingResult(listing, related) {
   };
 }
 function publicProject(listing, _related, notice) {
-  const invoice = invoiceOf(listing);
   return {
     id: listing.id,
     address: addressOf(listing),
-    clientName: text$6(listing.clientName),
+    agentName: agentNameOf$1(listing),
     services: servicesOf(listing),
     images: publicImages(listing),
     videos: publicVideos(listing),
-    tourUrl: httpUrl(listing.tourUrl),
-    revisions: publicRevisions(listing),
-    lockDownloads: lockDownloadsOn(listing.lockDownloads),
-    requirePayment: requirePaymentOn(listing.requirePayment),
-    downloadsUnlocked: clientGalleryDownloadsUnlocked({
-      invoice,
-      downloadEnabled: listing.downloadEnabled,
-      downloadsReleased: listing.downloadsReleased,
-      lockDownloads: listing.lockDownloads
-    }),
-    invoice,
+    tourUrl: publicTour(listing),
+    floorPlans: publicFloorPlans(listing),
     notice,
     view: "public"
+  };
+}
+function ownerStudioProject(listing, pub, gate = {}) {
+  const invoiceStatus = text$6(gate.invoice?.status) || text$6(invoiceOf(listing)?.status);
+  const invoice = invoiceStatus ? { status: invoiceStatus } : null;
+  const downloadsUnlocked = clientGalleryDownloadsUnlocked({
+    invoice,
+    downloadEnabled: gate.downloadEnabled ?? listing.downloadEnabled,
+    downloadsReleased: gate.downloadsReleased ?? listing.downloadsReleased,
+    lockDownloads: listing.lockDownloads
+  });
+  return {
+    ...pub,
+    view: "owner",
+    clientName: text$6(listing.clientName),
+    clientEmail: text$6(listing.clientEmail),
+    clientPhone: text$6(listing.clientPhone),
+    revisions: ownerRevisions(listing),
+    lockDownloads: lockDownloadsOn(listing.lockDownloads),
+    requirePayment: requirePaymentOn(listing.requirePayment),
+    downloadsUnlocked,
+    invoice,
+    images: downloadsUnlocked ? ownerImageDownloads(listing, pub.images) : pub.images,
+    files: downloadsUnlocked ? ownerFiles(listing) : []
   };
 }
 function pointerMessage(id, via, galleryId, listingId) {
@@ -7960,7 +8067,7 @@ async function resolveClientGalleryLink(id) {
   const gallery = docRecord(gallerySnap);
   const listing = docRecord(listingSnap);
   if (gallery) {
-    return finishGalleryLink(decideClientGalleryLink({
+    return decideClientGalleryLink({
       id,
       gallery,
       listing: null,
@@ -7970,10 +8077,10 @@ async function resolveClientGalleryLink(id) {
       pointedGallery: null,
       pointedListing: null,
       galleriesByOrderId: []
-    }));
+    });
   }
   if (listing) {
-    return finishGalleryLink(decideClientGalleryLink({
+    return decideClientGalleryLink({
       id,
       gallery: null,
       listing,
@@ -7983,7 +8090,7 @@ async function resolveClientGalleryLink(id) {
       pointedGallery: null,
       pointedListing: null,
       galleriesByOrderId: []
-    }));
+    });
   }
   const relatedGalleries = await galleriesWhere("listingId", id);
   const [orderSnap, requestSnap] = await Promise.all([
@@ -8002,7 +8109,7 @@ async function resolveClientGalleryLink(id) {
     pointedListing = docRecord(await db$h().collection("listings").doc(pointedListingId).get());
     if (pointedListing) pointedRelated = await relatedForListing(pointedListing);
   }
-  return finishGalleryLink(decideClientGalleryLink({
+  return decideClientGalleryLink({
     id,
     gallery: null,
     listing: null,
@@ -8012,7 +8119,7 @@ async function resolveClientGalleryLink(id) {
     pointedGallery,
     pointedListing,
     galleriesByOrderId
-  }));
+  });
 }
 async function invoiceForListing(listing) {
   const invoiceId = text$5(listing.invoiceId);
@@ -8031,26 +8138,56 @@ async function invoiceForListing(listing) {
     return null;
   }
 }
-async function finishGalleryLink(result) {
+function callerCanOpenPrivateStudio(listing, caller) {
+  if (!caller) return false;
+  if (caller.staffRole && staffCanAccessListing(caller.staffRole, caller.uid, listing)) return true;
+  return clientCanViewListing(listing, { uid: caller.uid, email: caller.email, ids: caller.ids });
+}
+async function readStudioCaller(req) {
+  const header = req.headers.authorization || "";
+  if (!header.startsWith("Bearer ")) return null;
+  const token = header.slice("Bearer ".length).trim();
+  if (!token) return null;
+  try {
+    if (isTempAdminEnabled(liveServerEnv()) && token === "temp-admin-token") {
+      return {
+        uid: "temp-admin-uid",
+        email: "temp-admin@iconicimagestx.com",
+        ids: ["temp-admin-uid"],
+        staffRole: "admin"
+      };
+    }
+    const decoded = await admin.auth().verifyIdToken(token);
+    const staffSnap = await db$h().collection("staff").doc(decoded.uid).get();
+    const staff = staffSnap.exists ? staffSnap.data() : null;
+    const staffRole = isActiveStaffRecord(staff) ? String(staff?.role || "") : void 0;
+    const identity = await resolveClientIdentity(decoded.uid, decoded.email);
+    return {
+      uid: decoded.uid,
+      email: identity.email || decoded.email,
+      ids: identity.ids,
+      staffRole
+    };
+  } catch (err) {
+    console.warn("[Galleries] Studio link session was not applied.", err);
+    return null;
+  }
+}
+async function finishGalleryLink(result, caller) {
   if (!result.ok || result.kind !== "listing") return result;
   const listing = docRecord(await db$h().collection("listings").doc(result.project.id).get());
-  if (!listing) return result;
+  if (!listing || !callerCanOpenPrivateStudio(listing, caller)) return result;
   const [invoice, related] = await Promise.all([
     invoiceForListing(listing),
     relatedForListing(listing)
   ]);
+  if (result.project.view !== "public") return result;
   const status = typeof invoice?.status === "string" ? invoice.status : "";
-  const invoiceForGate = invoice || (result.project.invoice ? { status: result.project.invoice.status } : null);
-  const project = {
-    ...result.project,
-    invoice: status ? { status } : result.project.invoice,
-    downloadsUnlocked: clientGalleryDownloadsUnlocked({
-      invoice: invoiceForGate,
-      downloadEnabled: listing.downloadEnabled === true || related.some((doc) => doc.downloadEnabled === true),
-      downloadsReleased: listing.downloadsReleased === true || related.some((doc) => doc.downloadsReleased === true),
-      lockDownloads: listing.lockDownloads
-    })
-  };
+  const project = ownerStudioProject(listing, result.project, {
+    invoice: status ? { status } : null,
+    downloadEnabled: listing.downloadEnabled === true || related.some((doc) => doc.downloadEnabled === true),
+    downloadsReleased: listing.downloadsReleased === true || related.some((doc) => doc.downloadsReleased === true)
+  });
   return { ...result, project };
 }
 const handlePublicGalleryLink = async (req, res) => {
@@ -8064,7 +8201,7 @@ const handlePublicGalleryLink = async (req, res) => {
     return res.status(503).json({ code: "lookup_unavailable", error: message, message });
   }
   try {
-    const result = await resolveClientGalleryLink(id);
+    const result = await finishGalleryLink(await resolveClientGalleryLink(id), await readStudioCaller(req));
     if (result.ok === false) {
       return res.status(result.httpStatus).json({
         code: result.code,
@@ -8146,7 +8283,6 @@ function clientGalleryPayload(id, gallery, gate) {
     id,
     title: gallery.title,
     address: recordAddressText(gallery),
-    clientName: gallery.clientName,
     status: gallery.status,
     deliveredAt: gallery.deliveredAt || null,
     expiresAt: gallery.expiresAt || null,
@@ -8201,7 +8337,10 @@ router$k.get("/:id", requireAuth, async (req, res) => {
         return res.status(403).json({ error: "Gallery not yet available." });
       }
       const gate = await downloadGateForGallery(gallery);
-      return res.json(clientGalleryPayload(doc.id, gallery, gate));
+      return res.json({
+        ...clientGalleryPayload(doc.id, gallery, gate),
+        clientName: gallery.clientName || null
+      });
     }
     return res.json({ id: doc.id, ...gallery });
   } catch (err) {
@@ -16181,7 +16320,7 @@ function buildPresentation(source) {
   const photos = collectPresentationPhotos(source);
   const { address, street, locality } = addressParts(listing);
   const agentName = agentNameOf(listing);
-  const clientName2 = text(listing?.clientName);
+  const clientName2 = "";
   const origin = source.origin || "";
   const path2 = presentationPath(source.token);
   const pageUrl = origin ? `${origin.replace(/\/$/, "")}${path2}` : path2;
