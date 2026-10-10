@@ -175,6 +175,74 @@ function clientNotifyBlockReason(env = process.env) {
   if (env.CLIENT_COMMS_ZONE === "RED") return "CLIENT_COMMS_ZONE=RED";
   return "CLIENT_NOTIFY_LIVE is not exactly true";
 }
+const MAILBOX = /^[^\s@,;<>"]+@[^\s@,;<>"]+$/;
+function mailboxAddress(input) {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  const wrapped = trimmed.match(/^(?:"[^"]*"|[^<"]*?)\s*<([^<>]+)>\s*$/);
+  const candidate = (wrapped ? wrapped[1] : trimmed).trim().toLowerCase();
+  if (!MAILBOX.test(candidate)) return null;
+  return candidate;
+}
+function notifyTestAllowlist(env = process.env) {
+  const raw = env.NOTIFY_TEST_ALLOWLIST;
+  const allow = /* @__PURE__ */ new Set();
+  if (!raw) return allow;
+  for (const part of raw.split(",")) {
+    const address = mailboxAddress(part);
+    if (address) allow.add(address);
+  }
+  return allow;
+}
+function isNotifyTestAllowlisted(address, env = process.env) {
+  const mailbox = mailboxAddress(address);
+  if (!mailbox) return false;
+  return notifyTestAllowlist(env).has(mailbox);
+}
+function recipientTokens(value) {
+  if (!value) return [];
+  return value.split(/[,;\n]/).map((part) => part.trim()).filter(Boolean);
+}
+function keepExact(value, allow, held) {
+  const kept = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const token of recipientTokens(value)) {
+    const mailbox = mailboxAddress(token);
+    if (mailbox && allow.has(mailbox)) {
+      if (!seen.has(mailbox)) {
+        seen.add(mailbox);
+        kept.push(mailbox);
+      }
+    } else {
+      held.push(token);
+    }
+  }
+  return kept;
+}
+function narrowGatedClientRecipients(input, env = process.env) {
+  const allow = notifyTestAllowlist(env);
+  if (allow.size === 0) return null;
+  const held = [];
+  let to = keepExact(input.to, allow, held);
+  let cc = keepExact(input.cc, allow, held);
+  let bcc = keepExact(input.bcc, allow, held);
+  const replyTo = keepExact(input.replyTo, allow, held);
+  if (to.length === 0 && cc.length > 0) {
+    to = cc;
+    cc = [];
+  } else if (to.length === 0 && bcc.length > 0) {
+    to = bcc;
+    bcc = [];
+  }
+  if (to.length === 0) return null;
+  return {
+    to: to.join(", "),
+    cc: cc.length > 0 ? cc.join(", ") : void 0,
+    bcc: bcc.length > 0 ? bcc.join(", ") : void 0,
+    replyTo: replyTo.length > 0 ? replyTo.join(", ") : void 0,
+    held
+  };
+}
 const db$r = () => admin.firestore();
 class EmailNotConfiguredError extends Error {
   code = "email_not_configured";
@@ -197,16 +265,33 @@ function createTransport() {
   });
 }
 async function sendEmail(options) {
-  const { to, bcc, cc, template, audience, variables = {}, subject: subjectOverride, html, attachments } = options;
+  const { template, audience, variables = {}, subject: subjectOverride, html, attachments } = options;
+  let to = options.to;
+  let bcc = options.bcc;
+  let cc = options.cc;
+  let replyTo = options.replyTo;
   if (!to) {
     console.warn("[Email] No recipient specified, skipping.");
     return { sent: false };
   }
   if (!emailAllowed(template, process.env, audience)) {
-    console.warn(
-      `[Email] Suppressed '${template}' to ${to} — ${clientNotifyBlockReason()}. No message sent.`
-    );
-    return { sent: false };
+    const narrowed = narrowGatedClientRecipients({ to, cc, bcc, replyTo }, process.env);
+    if (!narrowed) {
+      const why = notifyTestAllowlist().size > 0 ? `${clientNotifyBlockReason()}. Recipient is not an exact NOTIFY_TEST_ALLOWLIST match.` : `${clientNotifyBlockReason()}.`;
+      console.warn(
+        `[Email] Suppressed '${template}' to ${to} — ${why} No message sent.`
+      );
+      return { sent: false };
+    }
+    to = narrowed.to;
+    cc = narrowed.cc;
+    bcc = narrowed.bcc;
+    replyTo = narrowed.replyTo;
+    if (narrowed.held.length > 0) {
+      console.warn(
+        `[Email] '${template}' sent only to NOTIFY_TEST_ALLOWLIST. Held: ${narrowed.held.join(", ")}.`
+      );
+    }
   }
   let subject = subjectOverride || `Message from Iconic Images`;
   let htmlBody = html || getFallbackTemplate(template, variables);
@@ -233,6 +318,7 @@ async function sendEmail(options) {
       to,
       bcc,
       cc,
+      ...replyTo ? { replyTo } : {},
       subject,
       html: htmlBody,
       attachments
@@ -4621,6 +4707,7 @@ router$m.post("/", async (req, res) => {
     };
     const docRef = await db$n().collection("orderRequests").add(orderRequest);
     const normalizedEmail = orderRequest.email;
+    const passwordSetupAllowed = clientNotifyLive() || isNotifyTestAllowlisted(normalizedEmail);
     let account = {
       clientId: null,
       createdAccount: false,
@@ -4633,7 +4720,7 @@ router$m.post("/", async (req, res) => {
         firstName,
         lastName,
         phone,
-        preparePasswordLink: clientNotifyLive()
+        preparePasswordLink: passwordSetupAllowed
       });
     } catch (err) {
       console.error("[Bookings] Account attach failed:", err);
@@ -4770,7 +4857,7 @@ router$m.post("/", async (req, res) => {
       }).catch((err) => console.error("[Bookings] Admin SMS alert failed:", err));
     }
     if (account.createdAccount) {
-      if (!clientNotifyLive()) {
+      if (!passwordSetupAllowed) {
         passwordSetupStatus = "gated";
         console.info(
           `[Bookings] Password-setup email not sent for request ${docRef.id}. ${clientNotifyBlockReason()}.`
