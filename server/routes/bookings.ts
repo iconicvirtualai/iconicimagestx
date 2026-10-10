@@ -16,7 +16,7 @@ import { clientNotifyBlockReason, clientNotifyLive, isNotifyTestAllowlisted } fr
 import { lifeOfTheListingCareSelected } from "../../shared/lifeOfTheListingCare";
 import { buildBookingInvoiceDraft, existingInvoiceId } from "../../shared/bookingInvoice";
 import { nextSequentialInvoiceNumber, planInvoiceLink } from "../../shared/orderProjectInvoice";
-import { chargedServiceLines, normalizeBookingLineItems, orderTotalLabel, resolveSubmittedBooking, sumLineItemPrices } from "../../shared/bookingPricing";
+import { chargedServiceLines, normalizeBookingLineItems, orderTotalLabel, resolveSubmittedBooking, sumLineItemPrices, unpricedCatalogBookingError } from "../../shared/bookingPricing";
 import { applyServerTravel, isTravelFeeLine, travelSummaryText, type TravelAssessment } from "../../shared/travelZones";
 import { planOrderPackageRepair } from "../../shared/orderPackageRepair";
 import { notifyOfficeOfOrder } from "../services/officeOrderNotify";
@@ -109,6 +109,8 @@ router.post("/", async (req, res) => {
     const displayAddress = addressLabel(savedAddress);
 
     const catalog = await loadBookingCatalog();
+    const unpriced = unpricedCatalogBookingError(req.body, catalog);
+    if (unpriced) return res.status(400).json({ error: unpriced });
     const resolved = resolveSubmittedBooking(req.body, catalog);
     // A posted travel fee is not a service and is not the price. Quote the pin or ZIP.
     const keptLines = resolved.lineItems.filter((item) => !isTravelFeeLine(item));

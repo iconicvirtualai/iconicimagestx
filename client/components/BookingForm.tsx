@@ -17,6 +17,8 @@ import {
   APPRENTICESHIP_PROGRAM_NAME,
   APPRENTICESHIP_RULES,
   bookingOffer,
+  bookingPriceHolds,
+  CALL_FOR_PRICING_LABEL,
   isApprenticeshipPackage,
   isExclusivePhotoPackage,
   packagesForStaffEditor,
@@ -136,6 +138,46 @@ function TravelFeeLine({ travel }: { travel: TravelAssessment }) {
   );
 }
 
+function PriceHoldCard({
+  id,
+  title,
+  description,
+  compact = false,
+}: {
+  id: string;
+  title: string;
+  description?: string;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      data-testid={`price-hold-${id}`}
+      aria-disabled="true"
+      className={compact
+        ? "w-full p-3 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 text-left flex justify-between items-center gap-3"
+        : "relative p-4 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 text-left flex flex-col justify-between h-full"}
+    >
+      <div className={compact ? "flex flex-col min-w-0" : "flex-1 space-y-1"}>
+        <h4 className={compact
+          ? "text-[10px] font-black uppercase text-black"
+          : "font-black text-black uppercase text-[11px] leading-tight"}
+        >
+          {title}
+        </h4>
+        {description ? (
+          <p className="text-[10px] text-gray-500 leading-relaxed line-clamp-2">{description}</p>
+        ) : null}
+      </div>
+      <a
+        href={BUSINESS_CONTACT.phoneHref}
+        className="text-[10px] font-black uppercase tracking-widest text-gray-500 underline decoration-gray-300 underline-offset-2 shrink-0"
+      >
+        {CALL_FOR_PRICING_LABEL}
+      </a>
+    </div>
+  );
+}
+
 export default function BookingForm({ initialServiceId, initialCategoryId }: BookingFormProps = {}) {
   const settings = useSiteSettings();
   const isMobile = useIsMobile();
@@ -192,11 +234,25 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
 
   const [catalog, setCatalog] = useState<StaffCatalogPackage[]>(() => packagesForStaffEditor([]));
   const offer = useMemo(() => bookingOffer(catalog), [catalog]);
+  const priceHolds = useMemo(() => bookingPriceHolds(catalog), [catalog]);
   const services = offer.services;
   const addOns = offer.addOns;
   const photoOnlyPackages = offer.photoOnlyPackages;
   const apprenticeshipPackages = offer.apprenticeshipPackages;
   const basicsList = offer.basics;
+  const addOnColumns = useMemo(() => {
+    const categories = [
+      ...addOns.map((group) => group.category),
+      ...priceHolds.addOns
+        .map((group) => group.category)
+        .filter((category) => !addOns.some((group) => group.category === category)),
+    ];
+    return categories.map((category) => ({
+      category,
+      items: addOns.find((group) => group.category === category)?.items ?? [],
+      holds: priceHolds.addOns.find((group) => group.category === category)?.items ?? [],
+    }));
+  }, [addOns, priceHolds]);
   const iconicFinishPrice = offer.iconicFinish?.price ?? 0;
   const virtualStagingUnitPrice = offer.virtualStaging?.price ?? 0;
   const specializedSocialPrice = offer.specializedSocial?.price ?? 0;
@@ -230,23 +286,42 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
       setFormData(prev => ({ ...prev, leadSource: utmSource }));
     }
 
+    const heldIds = new Set([
+      ...priceHolds.services.map((item) => item.id),
+      ...priceHolds.basics.map((item) => item.id),
+      ...priceHolds.addOns.flatMap((group) => group.items.map((item) => item.id)),
+      priceHolds.iconicFinish?.id,
+      priceHolds.virtualStaging?.id,
+      priceHolds.specializedSocial?.id,
+      priceHolds.specializedBoth?.id,
+    ].filter((id): id is string => Boolean(id)));
+
     if (serviceParam) {
-      setFormData(prev => ({
-        ...prev,
-        selectedService: serviceParam,
-        premiumUpgrade: premiumParam
-      }));
-      // Expand only the category of the selected service
-      const service = services.find(s => s.id === serviceParam);
-      if (service) {
-        setExpandedCategories([service.category]);
+      const held = priceHolds.services.find((item) => item.id === serviceParam);
+      if (held) {
+        setFormData(prev => ({
+          ...prev,
+          selectedService: prev.selectedService === serviceParam ? "" : prev.selectedService,
+        }));
+        setExpandedCategories([held.category]);
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          selectedService: serviceParam,
+          premiumUpgrade: premiumParam
+        }));
+        // Expand only the category of the selected service
+        const service = services.find(s => s.id === serviceParam);
+        if (service) {
+          setExpandedCategories([service.category]);
+        }
       }
     }
 
     if (itemsParam) {
-      const items = itemsParam.split(",");
-      const specializedSocial = items.includes("specialized-social");
-      const specializedBoth = items.includes("specialized-both");
+      const items = itemsParam.split(",").map((id) => id.trim()).filter((id) => id && !heldIds.has(id));
+      const specializedSocial = items.includes("specialized-social") && !heldIds.has("specialized-social");
+      const specializedBoth = items.includes("specialized-both") && !heldIds.has("specialized-both");
       const apprenticePick = items.find((id) => isApprenticeshipPackage(id));
 
       setFormData(prev => ({
@@ -263,7 +338,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
       }));
       setShowBasics(true);
     }
-  }, [searchParams, initialServiceId, services]);
+  }, [searchParams, initialServiceId, services, priceHolds]);
 
   const updateFormData = (data: Partial<typeof formData>) => {
     setFormData(prev => ({ ...prev, ...data }));
@@ -370,7 +445,13 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   const apprenticeshipOnly = apprenticeshipSelected && !formData.selectedService;
 
   const nextStep = () => {
-    if (step === 1 && !formData.selectedService && formData.selectedBasics.length === 0) {
+    const priceHeld = (id: string) =>
+      priceHolds.services.some((item) => item.id === id)
+      || priceHolds.basics.some((item) => item.id === id)
+      || priceHolds.addOns.some((group) => group.items.some((item) => item.id === id));
+    const bookableService = Boolean(formData.selectedService) && !priceHeld(formData.selectedService);
+    const bookableBasic = formData.selectedBasics.some((id) => !priceHeld(id));
+    if (step === 1 && !bookableService && !bookableBasic) {
       toast.error("Please select a Campaign Tier or Basics package");
       return;
     }
@@ -798,6 +879,14 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                                 )}
                               </React.Fragment>
                             ))}
+                            {priceHolds.services.filter((item) => item.category === cat).map((item) => (
+                              <PriceHoldCard
+                                key={item.id}
+                                id={item.id}
+                                title={item.name}
+                                description={item.description}
+                              />
+                            ))}
                           </div>
                         </motion.div>
                       )}
@@ -830,6 +919,9 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                             </div>
                           )}
                         </button>
+                      ))}
+                      {priceHolds.photoOnlyPackages.map((item) => (
+                        <PriceHoldCard key={item.id} id={item.id} title={item.name} description={item.description} />
                       ))}
                     </div>
                   </div>
@@ -875,6 +967,14 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                           </button>
                         );
                       })}
+                      {priceHolds.apprenticeshipPackages.map((item) => (
+                        <PriceHoldCard
+                          key={item.id}
+                          id={item.id}
+                          title={item.cardTitle || item.name}
+                          description={item.description}
+                        />
+                      ))}
                     </div>
                     <p className="text-[11px] font-bold leading-relaxed text-gray-600">
                       Overages: {APPRENTICESHIP_OVERAGE_LABEL}.
@@ -988,7 +1088,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {addOns.map((cat) => (
+                {addOnColumns.map((cat) => (
                   <div key={cat.category} className="space-y-4">
                     <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 border-b pb-1.5">{cat.category}</h4>
                     <div className="space-y-2">
@@ -1010,6 +1110,15 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                             </div>
                           )}
                         </button>
+                      ))}
+                      {cat.holds.map((item) => (
+                        <PriceHoldCard
+                          key={item.id}
+                          id={item.id}
+                          title={item.name}
+                          description={item.description}
+                          compact
+                        />
                       ))}
                     </div>
                   </div>

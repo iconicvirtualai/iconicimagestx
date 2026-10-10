@@ -4,7 +4,10 @@ import { SMS_TEMPLATES } from "../server/services/sms";
 import {
   bookingOffer,
   bookingPackageSeedDocs,
+  bookingPriceHolds,
+  CALL_FOR_PRICING_LABEL,
   catalogPackageSaveData,
+  catalogPriceIsBookable,
   hardcodedChargePrice,
   newCatalogPackageData,
   packagesForStaffEditor,
@@ -22,6 +25,7 @@ import {
   resolveSubmittedBooking,
   separatePromoDiscount,
   sumLineItemPrices,
+  unpricedCatalogBookingError,
   type BookingPriceInput,
 } from "./bookingPricing";
 
@@ -479,6 +483,96 @@ describe("booking catalog parity", () => {
       expect(chargedServiceLines(resolved.lineItems)[0]?.price).toBe(price);
       expect(chargedServiceLines(resolved.lineItems)[0]?.name).toBeTruthy();
     }
+
+    const offerIds = [
+      ...offer.services.map((item) => item.id),
+      ...offer.basics.map((item) => item.id),
+      ...offer.addOns.flatMap((group) => group.items.map((item) => item.id)),
+    ];
+    expect(offerIds).not.toContain("studio-noir");
+    expect(offerIds).not.toContain("studio-blanc");
+    expect(bookingPriceHolds().services.map((item) => item.id).sort()).toEqual(["studio-blanc", "studio-noir"]);
+  });
+
+  it("rejects a booking that includes a $0 or unpriced catalog item", () => {
+    const catalog = packagesForStaffEditor([]);
+    const unpriced = catalog.filter((item) => !catalogPriceIsBookable(item.price));
+    expect(unpriced.map((item) => [item.id, item.name, item.price])).toEqual([
+      ["studio-noir", "Studio Noir", 0],
+      ["studio-blanc", "Studio Blanc", 0],
+    ]);
+    expect(packagesForStaffEditor([], { includeInactive: true }).some((item) => item.id === "studio-noir")).toBe(true);
+
+    const noir = unpricedCatalogBookingError({
+      selectedService: "studio-noir",
+      lineItems: [{ id: "studio-noir", name: "Studio Noir", price: 400 }],
+    });
+    expect(noir).toBe(`Studio Noir is not available to book until a price is set. ${CALL_FOR_PRICING_LABEL}.`);
+
+    const both = unpricedCatalogBookingError({
+      selectedService: "studio-noir",
+      selectedAddOns: ["studio-blanc"],
+    });
+    expect(both).toBe(`Studio Noir and Studio Blanc are not available to book until a price is set. ${CALL_FOR_PRICING_LABEL}.`);
+
+    const missing = packagesForStaffEditor([
+      {
+        id: "twilight-hold",
+        name: "Twilight Hold",
+        bookingKind: "addon",
+        category: "addon",
+        addonGroup: "The Space",
+        isActive: true,
+      },
+    ]);
+    expect(missing.find((item) => item.id === "twilight-hold")?.price).toBe(0);
+    expect(bookingOffer(missing).addOns.some((group) => group.items.some((item) => item.id === "twilight-hold"))).toBe(false);
+    expect(bookingPriceHolds(missing).addOns.some((group) => group.items.some((item) => item.id === "twilight-hold" && item.price === 0))).toBe(true);
+    expect(unpricedCatalogBookingError({ selectedAddOns: ["twilight-hold"] }, missing))
+      .toBe(`Twilight Hold is not available to book until a price is set. ${CALL_FOR_PRICING_LABEL}.`);
+
+    const zeroed = packagesForStaffEditor([{ id: "aerial-drone", price: 0 }]);
+    expect(bookingOffer(zeroed).addOns.some((group) => group.items.some((item) => item.id === "aerial-drone"))).toBe(false);
+    expect(bookingPriceHolds(zeroed).addOns.some((group) => group.items.some((item) => item.id === "aerial-drone"))).toBe(true);
+    expect(unpricedCatalogBookingError({
+      selectedService: "listing-essentials",
+      selectedAddOns: ["aerial-drone"],
+    }, zeroed)).toBe(`Aerial Drone Stills is not available to book until a price is set. ${CALL_FOR_PRICING_LABEL}.`);
+    expect(unpricedCatalogBookingError({ selectedService: "listing-essentials" }, zeroed)).toBeNull();
+    expect(resolveSubmittedBooking({ selectedService: "listing-essentials" }, zeroed).total).toBe(249);
+    expect(calculateSidebarTotal({ selectedService: "listing-showcase", catalog: zeroed })).toBe(549);
+
+    expect(unpricedCatalogBookingError({
+      selectedService: "listing-showcase",
+      selectedAddOns: ["same-day"],
+      premiumUpgrade: true,
+      lineItems: [{ id: "listing-showcase", name: "hack", price: 1 }],
+    })).toBeNull();
+    expect(hasBookingSelection({ selectedService: "studio-noir" })).toBe(false);
+    expect(hasBookingSelection({ selectedService: "listing-essentials" })).toBe(true);
+    expect(hasBookingSelection({ selectedBasics: ["photos-35"] })).toBe(true);
+
+    expect(unpricedCatalogBookingError({
+      selectedService: "Studio booking / pre-sale",
+      lineItems: [
+        { name: "Studio booking / pre-sale", price: 0 },
+        { name: "Same-Day Delivery $50", price: 50 },
+      ],
+      selectedAddOns: ["Same-Day Delivery $50"],
+    })).toBeNull();
+
+    const postStart = bookingsRoute.indexOf('router.post("/",');
+    const writeAt = bookingsRoute.indexOf('collection("orderRequests").add', postStart);
+    const guard = bookingsRoute.slice(postStart, writeAt);
+    expect(guard).toContain("unpricedCatalogBookingError(req.body, catalog)");
+    expect(guard).toContain("return res.status(400).json({ error: unpriced })");
+    expect(writeAt).toBeGreaterThan(postStart);
+
+    expect(bookingForm).toContain("bookingPriceHolds(catalog)");
+    expect(bookingForm).toContain("CALL_FOR_PRICING_LABEL");
+    expect(bookingForm).toContain("data-testid={`price-hold-${id}`}");
+    expect(bookingForm).toContain('aria-disabled="true"');
+    expect(catalogSource).toContain('CALL_FOR_PRICING_LABEL = "Call for pricing"');
   });
 
   it("keeps the submitted name and price when a package is not in the catalog", () => {
