@@ -27,7 +27,6 @@ import Studio105 from "./pages/Studio105";
 import Contact from "./pages/Contact";
 import Book from "./pages/Book";
 import Pricing from "./pages/Pricing";
-import PricingV1 from "./pages/PricingV1";
 import AIPricingAssistant from "./pages/AIPricingAssistant";
 import Socials from "./pages/Socials";
 import AgentLandingPage from "./pages/AgentLandingPage";
@@ -118,7 +117,6 @@ const App = () => (
             <Route path="/book" element={<Book />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/pricing/ai-assistant" element={<AIPricingAssistant />} />
-            <Route path="/pricing-v1" element={<PricingV1 />} />
             <Route path="/socials" element={<Socials />} />
             <Route path="/agents" element={<AgentLandingPage />} />
             {/* Resources stays off the public site. Stock Footage library is public again. */}

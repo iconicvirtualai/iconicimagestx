@@ -20,6 +20,11 @@ app.get(["/podcast-guest-prep", "/podcast-guest-prep/"], (_req, res) => {
   res.sendFile(podcastGuestPrep);
 });
 
+// Retired pricing page. Must stay ahead of the SPA catch-all so crawlers get a real 301.
+app.get(["/pricing-v1", "/pricing-v1/"], (_req, res) => {
+  res.redirect(301, "/pricing");
+});
+
 // Bare /studio and /gallery have no project id. ID routes stay on the SPA.
 app.get(["/studio", "/studio/", "/gallery", "/gallery/"], (_req, res) => {
   res.redirect(302, "/studio-105");
