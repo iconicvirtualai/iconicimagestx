@@ -24,10 +24,10 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/present/:token", "destination": "/api/presentations/shell/:token" },
-    { "source": "/admin/owners", "destination": "/api/owners/page" },
-    { "source": "/admin/owners/", "destination": "/api/owners/page" },
-    { "source": "/owners", "destination": "/api/owners/page" },
-    { "source": "/owners/", "destination": "/api/owners/page" },
+    { "source": "/admin/owners", "destination": "/api/index" },
+    { "source": "/admin/owners/", "destination": "/api/index" },
+    { "source": "/owners", "destination": "/api/index" },
+    { "source": "/owners/", "destination": "/api/index" },
     { "source": "/podcast-guest-prep", "destination": "/podcast-guest-prep.html" },
     { "source": "/podcast-guest-prep/", "destination": "/podcast-guest-prep.html" },
     { "source": "/(.*)", "destination": "/index.html" }
