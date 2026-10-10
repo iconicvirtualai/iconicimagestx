@@ -7,7 +7,7 @@ import admin from "firebase-admin";
 import nodemailer from "nodemailer";
 import twilio from "twilio";
 import { google } from "googleapis";
-import crypto, { randomBytes, randomUUID } from "crypto";
+import crypto, { randomBytes, randomUUID, createHmac, timingSafeEqual as timingSafeEqual$1 } from "crypto";
 import Stripe from "stripe";
 import * as XLSX from "xlsx";
 import { randomBytes as randomBytes$1, timingSafeEqual } from "node:crypto";
@@ -1233,7 +1233,7 @@ function findCatalogItem(catalog, id) {
   const priced = matches.filter((item) => item.price === price);
   return priced.length === 1 ? priced[0] : void 0;
 }
-function roundMoney$4(value) {
+function roundMoney$5(value) {
   return Math.round(value * 100) / 100;
 }
 function catalogLineName(pkg, qty = 1) {
@@ -1247,13 +1247,13 @@ function catalogLineName(pkg, qty = 1) {
 }
 function catalogLine(pkg, qty = 1) {
   const count = qty > 0 ? qty : 1;
-  const unitPrice = roundMoney$4(pkg.price);
+  const unitPrice = roundMoney$5(pkg.price);
   const line = {
     id: pkg.bookingId || pkg.id,
     name: catalogLineName(pkg, count),
     unitPrice,
     qty: count,
-    price: roundMoney$4(unitPrice * count)
+    price: roundMoney$5(unitPrice * count)
   };
   if (pkg.description) line.description = pkg.description;
   if (pkg.category) line.category = pkg.category;
@@ -1468,7 +1468,7 @@ function resolveSubmittedBooking(body, catalog) {
   }
   return {
     lineItems,
-    total: roundMoney$4(sumLineItemPrices(lineItems)),
+    total: roundMoney$5(sumLineItemPrices(lineItems)),
     promoCode: promo?.code ?? null,
     promoDiscount: promo?.discount ?? 0,
     selectedService: selectedService || null,
@@ -1716,7 +1716,7 @@ function applyServerTravel(lineItems, address, clientTravelFeeCents) {
   const next = [...kept, travelInvoiceLine(travel)];
   return {
     lineItems: next,
-    total: roundMoney$3(sumLineItemPrices(next)),
+    total: roundMoney$4(sumLineItemPrices(next)),
     travel
   };
 }
@@ -1789,7 +1789,7 @@ function emailMoney(cents) {
 function roundMiles(miles) {
   return Math.round(miles * 100) / 100;
 }
-function roundMoney$3(value) {
+function roundMoney$4(value) {
   return Math.round(value * 100) / 100;
 }
 function toRad(degrees) {
@@ -2533,10 +2533,10 @@ function clockTime(value) {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 function storedAmount(value) {
-  if (typeof value === "number" && Number.isFinite(value)) return roundMoney$2(value);
+  if (typeof value === "number" && Number.isFinite(value)) return roundMoney$3(value);
   if (typeof value === "string" && value.trim()) {
     const parsed = Number(value.replace(/[$,\s]/g, ""));
-    if (Number.isFinite(parsed)) return roundMoney$2(parsed);
+    if (Number.isFinite(parsed)) return roundMoney$3(parsed);
   }
   return null;
 }
@@ -2707,7 +2707,7 @@ function isoStamp(value) {
 function text$b(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function roundMoney$2(value) {
+function roundMoney$3(value) {
   return Math.round(value * 100) / 100;
 }
 const MONTHS = {
@@ -2731,24 +2731,24 @@ function textualDateKey(value) {
     const month = MONTHS[long[1].toLowerCase()];
     const day = Number(long[2]);
     const year = Number(long[3]);
-    if (month && day >= 1 && day <= 31) return dateKey(year, month, day);
+    if (month && day >= 1 && day <= 31) return dateKey$1(year, month, day);
   }
   const slash = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (slash) {
     const month = Number(slash[1]);
     const day = Number(slash[2]);
     const year = Number(slash[3]);
-    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) return dateKey(year, month, day);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) return dateKey$1(year, month, day);
   }
   return null;
 }
 function instantDateKey(date, timeZone) {
   if (date.getUTCHours() === 0 && date.getUTCMinutes() === 0 && date.getUTCSeconds() === 0 && date.getUTCMilliseconds() === 0) {
-    return dateKey(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+    return dateKey$1(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
   }
   return formatZoned(date, timeZone);
 }
-function dateKey(year, month, day) {
+function dateKey$1(year, month, day) {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 function formatZoned(date, timeZone) {
@@ -4071,7 +4071,7 @@ function nestedTotal(pricing) {
 function warnWhenStoredTotalDiffers(record, lineItems) {
   const stored = [money$3(record.total), money$3(nestedTotal(record.pricing))].filter((amount) => amount != null);
   if (stored.length === 0) return;
-  const rebuilt = roundMoney$1(sumLineItemPrices(chargedServiceLines(lineItems)));
+  const rebuilt = roundMoney$2(sumLineItemPrices(chargedServiceLines(lineItems)));
   const drifted = [...new Set(stored.filter((amount) => Math.abs(amount - rebuilt) > 9e-3))];
   if (drifted.length === 0) return;
   console.warn(
@@ -4079,14 +4079,14 @@ function warnWhenStoredTotalDiffers(record, lineItems) {
   );
 }
 function money$3(value) {
-  if (typeof value === "number" && Number.isFinite(value)) return roundMoney$1(value);
+  if (typeof value === "number" && Number.isFinite(value)) return roundMoney$2(value);
   if (typeof value === "string" && value.trim()) {
     const parsed = Number(value.replace(/[$,\s]/g, ""));
-    if (Number.isFinite(parsed)) return roundMoney$1(parsed);
+    if (Number.isFinite(parsed)) return roundMoney$2(parsed);
   }
   return void 0;
 }
-function roundMoney$1(value) {
+function roundMoney$2(value) {
   return Math.round(value * 100) / 100;
 }
 const PACKAGE_LABEL_KEYS = [
@@ -4108,14 +4108,14 @@ function orderServiceLines(record, linked) {
   return synthesized ? [synthesized] : [];
 }
 function orderChargeSummary(record, lines) {
-  const lineSubtotal = roundMoney(lines.reduce((sum, line) => sum + line.price, 0));
+  const lineSubtotal = roundMoney$1(lines.reduce((sum, line) => sum + line.price, 0));
   const pricing = nested$1(record?.pricing);
   const tax = moneyOrNull$1(record?.tax) ?? moneyOrNull$1(pricing.tax) ?? 0;
   const storedTotal = moneyOrNull$1(record?.total) ?? moneyOrNull$1(pricing.total);
-  const total = storedTotal ?? roundMoney(lineSubtotal + tax);
+  const total = storedTotal ?? roundMoney$1(lineSubtotal + tax);
   const storedSubtotal = moneyOrNull$1(record?.subtotal) ?? moneyOrNull$1(pricing.subtotal);
   const subtotal = lineSubtotal > 0 ? lineSubtotal : storedSubtotal && storedSubtotal > 0 ? storedSubtotal : total;
-  return { subtotal: roundMoney(subtotal), tax: roundMoney(tax), total: roundMoney(total) };
+  return { subtotal: roundMoney$1(subtotal), tax: roundMoney$1(tax), total: roundMoney$1(total) };
 }
 function storedServiceLines(record) {
   if (!record) return [];
@@ -4172,7 +4172,7 @@ function nested$1(value) {
 function text$8(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function roundMoney(value) {
+function roundMoney$1(value) {
   return Math.round(value * 100) / 100;
 }
 const NOT_PROVIDED = "Not provided";
@@ -12243,39 +12243,39 @@ function parseCsv(text2) {
   const input = text2.replace(/^\uFEFF/, "");
   const matrix = [];
   let row = [];
-  let cell = "";
+  let cell2 = "";
   let quoted = false;
   for (let i = 0; i < input.length; i += 1) {
     const char = input[i];
     if (quoted) {
       if (char === '"') {
         if (input[i + 1] === '"') {
-          cell += '"';
+          cell2 += '"';
           i += 1;
         } else {
           quoted = false;
         }
       } else {
-        cell += char;
+        cell2 += char;
       }
       continue;
     }
     if (char === '"') {
       quoted = true;
     } else if (char === ",") {
-      row.push(cell.trim());
-      cell = "";
+      row.push(cell2.trim());
+      cell2 = "";
     } else if (char === "\n") {
-      row.push(cell.trim());
+      row.push(cell2.trim());
       matrix.push(row);
       row = [];
-      cell = "";
+      cell2 = "";
     } else if (char !== "\r") {
-      cell += char;
+      cell2 += char;
     }
   }
-  if (cell.length || row.length) {
-    row.push(cell.trim());
+  if (cell2.length || row.length) {
+    row.push(cell2.trim());
     matrix.push(row);
   }
   const filled = matrix.filter((line) => line.some((value) => value.length > 0));
@@ -12787,8 +12787,8 @@ function parseTabularUpload(input) {
       defval: "",
       blankrows: false
     });
-    const lines = matrix.map((row) => row.map((cell) => String(cell ?? "").trim()));
-    const filled = lines.filter((row) => row.some((cell) => cell.length > 0));
+    const lines = matrix.map((row) => row.map((cell2) => String(cell2 ?? "").trim()));
+    const filled = lines.filter((row) => row.some((cell2) => cell2.length > 0));
     if (!filled.length) return { headers: [], rows: [] };
     const width = filled.reduce((max, row) => Math.max(max, row.length), 0);
     const headers = filled[0].concat(Array(Math.max(0, width - filled[0].length)).fill("")).map((header, index) => header || `Column ${index + 1}`);
@@ -16326,7 +16326,7 @@ async function renderPresentationShell(token, origin) {
     if (!presentation) {
       return { status: 404, html: "<!doctype html><title>Presentation</title><p>This presentation link is not active.</p>" };
     }
-    const shell = await readSpaShell();
+    const shell = await readSpaShell$1();
     const html = shell ? injectPresentationMeta(shell, presentation.meta) : standalonePresentation(presentation);
     return { status: 200, html };
   } catch (err) {
@@ -16383,7 +16383,7 @@ router$1.post("/listings/:id/presentation", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "The presentation link could not be saved." });
   }
 });
-async function readSpaShell() {
+async function readSpaShell$1() {
   const candidates = [
     path.join(process.cwd(), "dist/spa/index.html")
   ];
@@ -16490,6 +16490,1178 @@ router.post("/listings/:id/photo-edit-requests/:requestId/replacement", requireS
     return sendKnownError(res, err, "Could not attach that replacement.");
   }
 });
+function ownerAllowlist(raw) {
+  if (raw == null) return [];
+  const emails = raw.split(/[,;\s]+/).map((email) => email.trim().toLowerCase()).filter((email) => email.includes("@"));
+  return [...new Set(emails)];
+}
+function isOwnerEmail(email, allowlist) {
+  if (!email) return false;
+  if (allowlist.length === 0) return false;
+  return allowlist.includes(email.trim().toLowerCase());
+}
+const OWNER_FIXTURE_BEARER = "owner-fixture";
+const OWNER_SESSION_COOKIE = "owners_session";
+const SESSION_MS = 12 * 60 * 60 * 1e3;
+const BLOCKED_BEARERS = /* @__PURE__ */ new Set(["temp-admin-token", OWNER_FIXTURE_BEARER]);
+let tokenVerifier = defaultVerifyIdToken;
+function ownerRuntimeEnv(env = process.env) {
+  return {
+    OWNER_EMAILS: env.OWNER_EMAILS,
+    OWNER_SUITE_FIXTURES: env.OWNER_SUITE_FIXTURES,
+    OWNER_SESSION_SECRET: env.OWNER_SESSION_SECRET,
+    OWNER_SHEETS_SA_EMAIL: env.OWNER_SHEETS_SA_EMAIL,
+    OWNER_SHEETS_SA_KEY: env.OWNER_SHEETS_SA_KEY,
+    FIREBASE_SERVICE_ACCOUNT: env.FIREBASE_SERVICE_ACCOUNT,
+    VERCEL: env.VERCEL,
+    VERCEL_ENV: env.VERCEL_ENV,
+    NODE_ENV: env["NODE_ENV"]
+  };
+}
+function ownerFixturesEnabled(env = ownerRuntimeEnv()) {
+  if (env.OWNER_SUITE_FIXTURES !== "true") return false;
+  return !isHostedDeployment(env);
+}
+function ownerSessionSecret(env = ownerRuntimeEnv()) {
+  const explicit = env.OWNER_SESSION_SECRET?.trim();
+  if (explicit && explicit.length >= 16) return explicit;
+  const serviceAccount = env.FIREBASE_SERVICE_ACCOUNT;
+  if (serviceAccount && serviceAccount.length >= 32) {
+    return createHmac("sha256", "iconic-owners-suite-v1").update(serviceAccount).digest("hex");
+  }
+  const sheetsKey = env.OWNER_SHEETS_SA_KEY;
+  if (sheetsKey && sheetsKey.length >= 32) {
+    return createHmac("sha256", "iconic-owners-suite-v1").update(sheetsKey).digest("hex");
+  }
+  return null;
+}
+function signOwnerSession(identity, secret, now = Date.now()) {
+  const body = Buffer.from(JSON.stringify({
+    email: identity.email.trim().toLowerCase(),
+    uid: identity.uid,
+    exp: now + SESSION_MS
+  })).toString("base64url");
+  const sig = createHmac("sha256", secret).update(body).digest("base64url");
+  return `${body}.${sig}`;
+}
+function readOwnerSession(token, secret, now = Date.now()) {
+  const [body, sig] = token.split(".");
+  if (!body || !sig) return null;
+  const expected = createHmac("sha256", secret).update(body).digest("base64url");
+  const actualBuf = Buffer.from(sig);
+  const expectedBuf = Buffer.from(expected);
+  if (actualBuf.length !== expectedBuf.length || !timingSafeEqual$1(actualBuf, expectedBuf)) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+    if (!parsed.email || !parsed.uid || typeof parsed.exp !== "number" || parsed.exp < now) return null;
+    return { email: parsed.email.trim().toLowerCase(), uid: parsed.uid };
+  } catch {
+    return null;
+  }
+}
+function sessionCookieHeader(token, env = ownerRuntimeEnv(), maxAge = SESSION_MS / 1e3) {
+  const secure = isHostedDeployment(env);
+  const parts = [
+    `${OWNER_SESSION_COOKIE}=${token}`,
+    "HttpOnly",
+    "SameSite=Lax",
+    "Path=/",
+    `Max-Age=${maxAge}`
+  ];
+  if (secure) parts.push("Secure");
+  return parts.join("; ");
+}
+async function resolveOwnerIdentity(headers, env = ownerRuntimeEnv()) {
+  const allow = ownerAllowlist(env.OWNER_EMAILS);
+  if (allow.length === 0) return null;
+  const authorization = headerString(headers.authorization);
+  if (ownerFixturesEnabled(env) && authorization === `Bearer ${OWNER_FIXTURE_BEARER}`) {
+    return { email: allow[0], uid: "owner-fixture" };
+  }
+  const secret = ownerSessionSecret(env);
+  const cookie = readCookie(headerString(headers.cookie), OWNER_SESSION_COOKIE);
+  if (cookie && secret) {
+    const session = readOwnerSession(cookie, secret);
+    if (session && isOwnerEmail(session.email, allow)) return session;
+  }
+  if (!authorization.startsWith("Bearer ")) return null;
+  const token = authorization.slice("Bearer ".length).trim();
+  if (!token || BLOCKED_BEARERS.has(token)) return null;
+  const verified = await tokenVerifier(token);
+  const email = verified?.email?.trim().toLowerCase();
+  if (!email || !verified?.uid || !isOwnerEmail(email, allow)) return null;
+  return { email, uid: verified.uid };
+}
+async function defaultVerifyIdToken(token) {
+  if (!admin.apps.length) return null;
+  try {
+    const decoded = await admin.auth().verifyIdToken(token);
+    return { email: decoded.email, uid: decoded.uid };
+  } catch {
+    return null;
+  }
+}
+function headerString(value) {
+  if (Array.isArray(value)) return value[0] || "";
+  return value || "";
+}
+function readCookie(header, name) {
+  for (const part of header.split(";")) {
+    const [rawName, ...rest] = part.trim().split("=");
+    if (rawName === name) return rest.join("=") || null;
+  }
+  return null;
+}
+const PLAN_BUSINESSES = [
+  "Iconic Images M&M",
+  "Iconic Studios",
+  "aICON",
+  "Iconic Virtual",
+  "DOT",
+  "KDP"
+];
+const HEADER_KEYS = ["business", "section", "item", "date", "amount", "status", "notes"];
+const BUSINESS_ALIASES = {
+  "iconic images m m": "Iconic Images M&M",
+  "iconic images mm": "Iconic Images M&M",
+  "iconic images m and m": "Iconic Images M&M",
+  "iconic studios": "Iconic Studios",
+  "iconic studio": "Iconic Studios",
+  aicon: "aICON",
+  "a icon": "aICON",
+  "iconic virtual": "Iconic Virtual",
+  dot: "DOT",
+  kdp: "KDP"
+};
+function emptyPlanBoard() {
+  return {
+    columns: PLAN_BUSINESSES.map((business2) => ({
+      business: business2,
+      revenue: null,
+      expenses: null,
+      calendar: [],
+      social: [],
+      events: [],
+      email: [],
+      todos: []
+    }))
+  };
+}
+function parsePlanBoard(sheets) {
+  const board = emptyPlanBoard();
+  try {
+    const sheet = findPlanSheet(sheets);
+    if (!sheet) return board;
+    const rows = cleanRows(sheet.rows);
+    const headerAt = rows.findIndex((row) => headerMap(row) != null);
+    if (headerAt < 0) return board;
+    const headers = headerMap(rows[headerAt]);
+    if (!headers) return board;
+    const lists = /* @__PURE__ */ new Map();
+    for (const business2 of PLAN_BUSINESSES) {
+      lists.set(business2, { calendar: [], social: [], events: [], email: [], todos: [] });
+    }
+    const money2 = /* @__PURE__ */ new Map();
+    for (const business2 of PLAN_BUSINESSES) {
+      money2.set(business2, { revenue: null, expenses: null, sawRevenue: false, sawExpense: false });
+    }
+    rows.slice(headerAt + 1).forEach((row, index) => {
+      const business2 = businessOf(cellAt(row, headers.business));
+      const kind = sectionOf(cellAt(row, headers.section));
+      if (!business2 || !kind) return;
+      const purse = money2.get(business2);
+      const buckets = lists.get(business2);
+      if (!purse || !buckets) return;
+      if (kind === "revenue" || kind === "expense") {
+        const amount = parseMoney(cellAt(row, headers.amount));
+        if (kind === "revenue") {
+          purse.sawRevenue = true;
+          if (amount != null) purse.revenue = roundMoney((purse.revenue ?? 0) + amount);
+        } else {
+          purse.sawExpense = true;
+          if (amount != null) purse.expenses = roundMoney((purse.expenses ?? 0) + amount);
+        }
+        return;
+      }
+      const item = cellAt(row, headers.item);
+      if (!item) return;
+      const status = cellAt(row, headers.status);
+      buckets[kind].push({
+        item,
+        date: dateKey(cellAt(row, headers.date)),
+        amount: parseMoney(cellAt(row, headers.amount)),
+        status: status || null,
+        notes: cellAt(row, headers.notes) || null,
+        done: kind === "todos" && isDone(status),
+        index
+      });
+    });
+    for (const column of board.columns) {
+      const purse = money2.get(column.business);
+      const buckets = lists.get(column.business);
+      if (!purse || !buckets) continue;
+      column.revenue = purse.sawRevenue ? purse.revenue ?? 0 : null;
+      column.expenses = purse.sawExpense ? purse.expenses ?? 0 : null;
+      column.calendar = sortLines(buckets.calendar);
+      column.social = sortLines(buckets.social);
+      column.events = sortLines(buckets.events);
+      column.email = sortLines(buckets.email);
+      column.todos = sortLines(buckets.todos);
+    }
+    return board;
+  } catch {
+    return emptyPlanBoard();
+  }
+}
+function findPlanSheet(sheets) {
+  if (!Array.isArray(sheets)) return void 0;
+  return sheets.find((sheet) => {
+    if (!sheet || typeof sheet !== "object") return false;
+    const title = normalizeTabTitle(String(sheet.title || ""));
+    return title === "plan board" || title.includes("plan board");
+  });
+}
+function cleanRows(rows) {
+  if (!Array.isArray(rows)) return [];
+  return rows.map((row) => Array.isArray(row) ? row.map((item) => item == null ? "" : String(item).trim()) : []);
+}
+function headerMap(row) {
+  const map = {};
+  row.forEach((value, index) => {
+    const key = value.toLowerCase().replace(/[^a-z]+/g, " ").trim();
+    if (HEADER_KEYS.includes(key) && map[key] == null) {
+      map[key] = index;
+    }
+  });
+  if (map.business == null || map.section == null) return null;
+  return map;
+}
+function cellAt(row, index) {
+  if (index == null) return "";
+  return row[index] || "";
+}
+function businessOf(value) {
+  const key = value.toLowerCase().replace(/&/g, " ").replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+  return BUSINESS_ALIASES[key] || null;
+}
+function sectionOf(value) {
+  const key = value.toLowerCase().replace(/[^a-z]+/g, "");
+  if (key === "revenue") return "revenue";
+  if (key === "expense" || key === "expenses") return "expense";
+  if (key === "calendar") return "calendar";
+  if (key === "social" || key === "socials") return "social";
+  if (key === "event" || key === "events" || key === "promo" || key === "promos" || key === "promotion" || key === "promotions") return "events";
+  if (key === "email" || key === "emails") return "email";
+  if (key === "todo" || key === "todos") return "todos";
+  return null;
+}
+function isDone(status) {
+  const key = status.toLowerCase().replace(/[^a-z]+/g, " ").trim();
+  return key === "done" || key === "complete" || key === "completed";
+}
+function dateKey(value) {
+  const text2 = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text2)) return text2;
+  const slash = text2.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (!slash) return null;
+  const year = slash[3].length === 2 ? `20${slash[3]}` : slash[3];
+  const month = slash[1].padStart(2, "0");
+  const day = slash[2].padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+function roundMoney(value) {
+  return Math.round(value * 100) / 100;
+}
+function sortLines(lines) {
+  return [...lines].sort((a, b) => {
+    if (a.date && b.date && a.date !== b.date) return a.date < b.date ? -1 : 1;
+    if (a.date && !b.date) return -1;
+    if (!a.date && b.date) return 1;
+    return a.index - b.index;
+  }).map(({ index: _index, ...line }) => line);
+}
+const WEEK_AMOUNT = ["cash this week", "this week cash", "collected this week", "week collected", "revenue this week"];
+const WEEK_GOAL = ["week goal", "this week goal", "weekly goal", "goal this week"];
+const MONTH_AMOUNT = ["cash this month", "this month cash", "collected this month", "month collected", "revenue this month", "mtd cash", "month to date"];
+const MONTH_GOAL = ["month goal", "this month goal", "monthly goal", "goal this month"];
+const SAVINGS_AMOUNT = ["savings", "savings balance", "saved", "reserve balance"];
+const SAVINGS_GOAL = ["savings goal", "reserve goal", "savings target"];
+const MONEY_SECTIONS = ["money in", "money in by payment", "payments", "by payment", "payment method"];
+const AR_SECTIONS = ["accounts receivable", "receivables", "money owed to us", "outstanding invoices", "ar"];
+const OWE_SECTIONS = ["owes", "we owe", "accounts payable", "bills"];
+const CLOSED_DECISIONS = /* @__PURE__ */ new Set(["done", "closed", "decided", "yes", "no", "approved", "declined", "complete", "completed", "settled"]);
+function normalizeTabTitle(title) {
+  return title.toLowerCase().replace(/\$/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+}
+function emptyOwnerSuiteData(now = /* @__PURE__ */ new Date()) {
+  return {
+    generatedAt: now.toISOString(),
+    cashWeek: { amount: null, goal: null },
+    cashMonth: { amount: null, goal: null },
+    savings: { amount: null, goal: null, note: null },
+    moneyIn: [],
+    receivables: [],
+    owes: [],
+    businesses: [],
+    today: [],
+    calendar: [],
+    decisions: [],
+    tracker: { goal: null, current: null, rows: [] },
+    horizons: [],
+    bots: { state: "unknown", entries: [] },
+    planBoard: emptyPlanBoard()
+  };
+}
+function parseOwnerSuite(sheets, now = /* @__PURE__ */ new Date()) {
+  const data = emptyOwnerSuiteData(now);
+  const safeSheets = Array.isArray(sheets) ? sheets : [];
+  data.cashWeek = {
+    amount: labeledNumber(safeSheets, WEEK_AMOUNT, WEEK_GOAL),
+    goal: labeledNumber(safeSheets, WEEK_GOAL)
+  };
+  data.cashMonth = {
+    amount: labeledNumber(safeSheets, MONTH_AMOUNT, MONTH_GOAL),
+    goal: labeledNumber(safeSheets, MONTH_GOAL)
+  };
+  data.savings = {
+    amount: labeledNumber(safeSheets, SAVINGS_AMOUNT, SAVINGS_GOAL),
+    goal: labeledNumber(safeSheets, SAVINGS_GOAL),
+    note: labeledNote(findSheet(safeSheets, ["friday scorecard", "scorecard"])?.rows || [], SAVINGS_AMOUNT, SAVINGS_GOAL)
+  };
+  data.moneyIn = moneyIn(safeSheets);
+  data.receivables = parties(safeSheets, AR_SECTIONS, ["receivable", "ar", "outstanding"]);
+  data.owes = owes(safeSheets);
+  data.businesses = businesses(findSheet(safeSheets, ["businesses", "business"]));
+  const plan = weekPlan(findSheet(safeSheets, ["this week"]), now);
+  data.today = plan.today;
+  data.calendar = plan.calendar;
+  data.decisions = decisions(findSheet(safeSheets, ["decisions", "needs your yes"]));
+  data.tracker = tracker(findSheet(safeSheets, ["100k tracker", "100k"]));
+  data.horizons = horizons(findSheet(safeSheets, ["30 60 90"]));
+  data.bots = bots(findSheet(safeSheets, ["action log", "bot log"]));
+  try {
+    data.planBoard = parsePlanBoard(safeSheets);
+  } catch {
+    data.planBoard = emptyPlanBoard();
+  }
+  return data;
+}
+function findSheet(sheets, aliases) {
+  return sheets.find((sheet) => {
+    const title = normalizeTabTitle(sheet?.title || "");
+    return aliases.some((alias) => title === alias || title.includes(alias));
+  });
+}
+function cell(value) {
+  if (value == null) return "";
+  return String(value).trim();
+}
+function rowsOf(sheet) {
+  if (!sheet || !Array.isArray(sheet.rows)) return [];
+  return sheet.rows.map((row) => Array.isArray(row) ? row.map((item) => cell(item)) : []);
+}
+function parseMoney(raw) {
+  const text2 = cell(raw);
+  if (!text2 || /^(-|—|n\/a|na|tbd)$/i.test(text2)) return null;
+  if (/[a-z]/i.test(text2.replace(/[$%,\s().-]/g, "")) && !/^\$/.test(text2)) return null;
+  const negative = /^\(.*\)$/.test(text2) || text2.startsWith("-");
+  const numeric2 = text2.replace(/[$,%\s]/g, "").replace(/[()]/g, "");
+  if (!numeric2 || numeric2 === "-" || numeric2 === ".") return null;
+  const value = Number(numeric2);
+  if (!Number.isFinite(value)) return null;
+  return negative ? -Math.abs(value) : value;
+}
+function parsePercent(raw) {
+  const text2 = cell(raw);
+  if (!text2) return null;
+  const value = parseMoney(text2.replace(/%/g, ""));
+  if (value == null) return null;
+  if (text2.includes("%") || value > 1) return Math.round(value * 10) / 10;
+  return Math.round(value * 1e3) / 10;
+}
+function norm(value) {
+  return value.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9%]+/g, " ").replace(/\s+/g, " ").trim();
+}
+function matchesAlias(value, aliases, avoid = []) {
+  const name = norm(value);
+  if (!name) return false;
+  if (avoid.some((alias) => name === alias || name.startsWith(`${alias} `))) return false;
+  return aliases.some((alias) => name === alias || name.startsWith(`${alias} `) || name.startsWith(`${alias}:`));
+}
+function inlineNumber(value, aliases) {
+  const name = norm(value);
+  const alias = aliases.find((item) => name.startsWith(item));
+  if (!alias) return null;
+  value.slice(value.toLowerCase().indexOf(alias.slice(0, 4)) >= 0 ? 0 : 0);
+  const money2 = value.match(/-?\$?\s*\d[\d,]*(?:\.\d+)?%?/);
+  if (!money2) return null;
+  const before = value.slice(0, money2.index).toLowerCase();
+  if (!aliases.some((item) => norm(before).includes(item) || norm(value).startsWith(item))) return null;
+  if (norm(before) === "" && !aliases.some((item) => name.startsWith(item))) return null;
+  const parsed = parseMoney(money2[0]);
+  if (parsed == null) return null;
+  if (norm(value) === money2[0].toLowerCase()) return null;
+  return parsed;
+}
+function labeledNumber(sheets, aliases, avoid = []) {
+  for (const sheet of sheets) {
+    const found = labeledNumberInRows(rowsOf(sheet), aliases, avoid);
+    if (found != null) return found;
+  }
+  return null;
+}
+function labeledNumberInRows(rows, aliases, avoid = []) {
+  for (let r = 0; r < rows.length; r += 1) {
+    for (let c = 0; c < rows[r].length; c += 1) {
+      const current = rows[r][c] || "";
+      if (!matchesAlias(current, aliases, avoid)) continue;
+      const inline = inlineNumber(current, aliases);
+      if (inline != null) return inline;
+      const right = parseMoney(rows[r][c + 1] || "");
+      if (right != null) return right;
+      const below = rows[r + 1]?.[c] || "";
+      if (!matchesAlias(below, aliases, avoid)) {
+        const down = parseMoney(below);
+        if (down != null) return down;
+      }
+    }
+  }
+  return null;
+}
+function labeledNote(rows, aliases, avoid) {
+  for (let r = 0; r < rows.length; r += 1) {
+    for (let c = 0; c < rows[r].length; c += 1) {
+      if (!matchesAlias(rows[r][c] || "", aliases, avoid)) continue;
+      const notes = rows[r].slice(c + 1).filter((item) => item && parseMoney(item) == null && !matchesAlias(item, [...aliases, ...avoid]));
+      return notes[0] || null;
+    }
+  }
+  return null;
+}
+function sectionBlock(rows, aliases) {
+  for (let r = 0; r < rows.length; r += 1) {
+    const filled = rows[r].filter(Boolean);
+    if (filled.length !== 1 || !matchesAlias(filled[0], aliases)) continue;
+    const block = [];
+    for (let i = r + 1; i < rows.length; i += 1) {
+      const next = rows[i].filter(Boolean);
+      if (next.length === 0) {
+        if (block.length) break;
+        continue;
+      }
+      if (next.length === 1 && isSectionTitle(next[0])) break;
+      block.push(rows[i]);
+    }
+    return block;
+  }
+  return null;
+}
+function isSectionTitle(value) {
+  return matchesAlias(value, [...MONEY_SECTIONS, ...AR_SECTIONS, ...OWE_SECTIONS, "businesses", "decisions", "this week"]);
+}
+function isHeaderRow(row) {
+  const filled = row.filter(Boolean);
+  if (filled.length < 2) return false;
+  const words = filled.filter((item) => /[a-z]/i.test(item) && parseMoney(item) == null);
+  const amounts = filled.filter((item) => parseMoney(item) != null);
+  if (amounts.length > 0) return false;
+  return words.length >= 2;
+}
+function pairs(rows) {
+  const items = [];
+  for (const row of rows) {
+    if (isHeaderRow(row)) continue;
+    const texts = [];
+    let amount = null;
+    for (const item of row) {
+      if (!item) continue;
+      const money2 = parseMoney(item);
+      if (money2 != null && amount == null && !/[a-z]/i.test(item.replace(/[$%,\s().-]/g, ""))) {
+        amount = money2;
+        continue;
+      }
+      texts.push(item);
+    }
+    if (!texts.length) continue;
+    items.push({ name: texts[0], amount, detail: texts[1] || null });
+  }
+  return items.filter((item) => item.name && !matchesAlias(item.name, MONEY_SECTIONS));
+}
+function moneyIn(sheets) {
+  const collected = [];
+  for (const sheet of sheets) {
+    const block = sectionBlock(rowsOf(sheet), MONEY_SECTIONS);
+    if (block) collected.push(...pairs(block).map((item) => ({ method: item.name, amount: item.amount })));
+  }
+  if (collected.length) return collected;
+  for (const sheet of sheets) {
+    const records = tableRecords(rowsOf(sheet));
+    const rows = records.map((record) => ({
+      method: pick(record, ["method", "source", "payment", "tender"]),
+      amount: parseMoney(pick(record, ["amount", "total", "in", "collected"]))
+    })).filter((row) => row.method && !pickMatchesOnly(row.method));
+    if (rows.length && records.some((record) => pick(record, ["method", "source", "payment", "tender"]))) {
+      return rows;
+    }
+  }
+  return [];
+}
+function pickMatchesOnly(value) {
+  return matchesAlias(value, ["method", "source", "amount", "total"]);
+}
+function parties(sheets, sections, kinds) {
+  const fromSections = [];
+  for (const sheet of sheets) {
+    const block = sectionBlock(rowsOf(sheet), sections);
+    if (block) fromSections.push(...pairs(block));
+  }
+  if (fromSections.length) return fromSections;
+  return recordsByKind(sheets, kinds);
+}
+function owes(sheets) {
+  const sheet = findSheet(sheets, ["owes"]);
+  const records = tableRecords(rowsOf(sheet));
+  const typed = splitKind(records);
+  if (typed.owes.length || typed.receivables.length) return typed.owes;
+  const fromSheet = records.map(recordToParty).filter((item) => item.name);
+  if (fromSheet.length) return fromSheet;
+  return parties(sheets, OWE_SECTIONS, ["owe", "owes", "payable", "bill"]);
+}
+function recordsByKind(sheets, kinds) {
+  const sheet = findSheet(sheets, ["owes"]);
+  const typed = splitKind(tableRecords(rowsOf(sheet)));
+  if (kinds.some((kind) => kind === "ar" || kind === "receivable" || kind === "outstanding")) return typed.receivables;
+  return [];
+}
+function splitKind(records) {
+  const owesRows = [];
+  const receivables = [];
+  let sawKind = false;
+  for (const record of records) {
+    const kind = norm(pick(record, ["type", "kind", "category"]));
+    const party = recordToParty(record);
+    if (!party.name) continue;
+    if (!kind) continue;
+    sawKind = true;
+    if (["ar", "receivable", "receivables", "outstanding", "incoming"].includes(kind)) receivables.push(party);
+    else owesRows.push(party);
+  }
+  if (!sawKind) return { owes: [], receivables: [] };
+  return { owes: owesRows, receivables };
+}
+function recordToParty(record) {
+  return {
+    name: pick(record, ["name", "who", "client", "customer", "account", "vendor", "business"]),
+    amount: parseMoney(pick(record, ["amount", "balance", "due", "total", "owes"])),
+    detail: pick(record, ["detail", "note", "notes", "due date", "status", "when"]) || null
+  };
+}
+function businesses(sheet) {
+  const records = tableRecords(rowsOf(sheet));
+  const fromTable = records.map((record) => {
+    const name = pick(record, ["business", "name", "company"]);
+    const status = pick(record, ["status", "health", "ryg", "color", "state"]);
+    const note = pick(record, ["note", "notes", "detail", "comment"]) || null;
+    return business(name, status, note);
+  }).filter((item) => item.name);
+  if (fromTable.length) return fromTable;
+  return pairs(rowsOf(sheet)).map((item) => business(item.name, item.detail || "", null)).filter((item) => item.name && !isHeaderRow([item.name]));
+}
+function business(name, status, note) {
+  const tone = toneOf(status);
+  return { name, tone, label: toneLabel(tone), note };
+}
+function toneOf(raw) {
+  const name = norm(raw);
+  if (!name) return "unknown";
+  if (name === "g" || name === "green" || name === "good" || name === "ok" || name === "okay" || name.includes("green") || name.includes("on track") || name.includes("healthy")) {
+    return "green";
+  }
+  if (name === "y" || name === "yellow" || name.includes("yellow") || name.includes("watch") || name.includes("caution") || name.includes("attention")) {
+    return "yellow";
+  }
+  if (name === "r" || name === "red" || name.includes("red") || name.includes("behind") || name.includes("off track") || name.includes("risk") || name.includes("late")) {
+    return "red";
+  }
+  return "unknown";
+}
+function toneLabel(tone) {
+  if (tone === "green") return "On track";
+  if (tone === "yellow") return "Watch";
+  if (tone === "red") return "Behind";
+  return "No status";
+}
+function weekPlan(sheet, now) {
+  const todayKey = chicagoDateKey(now);
+  const weekday = chicagoWeekday(now);
+  const records = tableRecords(rowsOf(sheet));
+  const items = (records.length ? records.map((record) => planFromRecord(record)) : pairs(rowsOf(sheet)).map((item) => ({
+    when: null,
+    title: item.name,
+    detail: item.detail,
+    dateKey: null,
+    weekday: null,
+    flagged: false
+  }))).filter((item) => item.title);
+  const today = items.filter((item) => item.flagged || item.dateKey === todayKey || item.weekday === weekday);
+  return {
+    today: today.map(stripFlag),
+    calendar: items.map(stripFlag)
+  };
+}
+function planFromRecord(record) {
+  const whenCell = pick(record, ["when", "today", "flag"]);
+  const day = pick(record, ["day", "weekday"]);
+  const date = pick(record, ["date"]);
+  const calendar = pick(record, ["calendar", "event", "appointment"]);
+  const plan = pick(record, ["plan", "focus", "item", "task", "title"]);
+  const where = pick(record, ["where", "location", "place"]);
+  const time = pick(record, ["time"]);
+  const weekday = weekdayName(day) || weekdayName(date);
+  return {
+    when: time || null,
+    title: plan || calendar || day,
+    detail: [calendar && plan ? calendar : "", where].filter(Boolean).join(" · ") || null,
+    dateKey: dateKeyFromCell(date),
+    weekday,
+    flagged: /^(today|yes|y)$/i.test(whenCell)
+  };
+}
+function stripFlag(item) {
+  return {
+    when: item.when,
+    title: item.title,
+    detail: item.detail,
+    dateKey: item.dateKey,
+    weekday: item.weekday
+  };
+}
+function decisions(sheet) {
+  const records = tableRecords(rowsOf(sheet));
+  const items = records.length ? records.map((record) => ({
+    title: pick(record, ["decision", "title", "question", "item", "need"]),
+    detail: pick(record, ["detail", "note", "notes", "context"]) || null,
+    by: pick(record, ["by", "due", "needed", "when", "date"]) || null,
+    status: pick(record, ["status", "state"])
+  })) : pairs(rowsOf(sheet)).map((item) => ({ title: item.name, detail: item.detail, by: null, status: "" }));
+  return items.filter((item) => item.title && !CLOSED_DECISIONS.has(norm(item.status || ""))).map(({ title, detail, by }) => ({ title, detail, by }));
+}
+function tracker(sheet) {
+  const rows = rowsOf(sheet);
+  const goal = labeledNumberInRows(rows, ["goal", "target", "tracker goal"], ["savings goal"]);
+  const current = labeledNumberInRows(rows, ["current", "collected", "actual", "progress", "to date"]);
+  const records = tableRecords(rows);
+  const breakdown = records.map((record) => ({
+    label: pick(record, ["source", "business", "name", "label", "stream"]),
+    amount: parseMoney(pick(record, ["amount", "total", "current", "collected"]))
+  })).filter((row) => row.label && !matchesAlias(row.label, ["goal", "current", "target", "source", "amount"]));
+  return { goal, current, rows: breakdown };
+}
+function horizons(sheet) {
+  const rows = rowsOf(sheet);
+  const header = rows.find((row) => row.filter(Boolean).length >= 2);
+  if (header) {
+    const columns = header.map((value, index) => ({ horizon: horizonKey(value), index })).filter((column) => column.horizon != null);
+    if (columns.length >= 2) {
+      const headerAt = rows.indexOf(header);
+      return columns.map((column) => ({
+        horizon: column.horizon,
+        items: rows.slice(headerAt + 1).map((row) => cell(row[column.index])).filter(Boolean)
+      })).filter((column) => column.items.length);
+    }
+  }
+  const records = tableRecords(rows);
+  const grouped = /* @__PURE__ */ new Map();
+  for (const record of records) {
+    const horizon = horizonKey(pick(record, ["horizon", "window", "days", "phase"]));
+    const item = pick(record, ["item", "plan", "focus", "goal", "task"]);
+    if (!horizon || !item) continue;
+    grouped.set(horizon, [...grouped.get(horizon) || [], item]);
+  }
+  return ["30", "60", "90"].flatMap((horizon) => {
+    const items = grouped.get(horizon) || [];
+    return items.length ? [{ horizon, items }] : [];
+  });
+}
+function horizonKey(value) {
+  const name = norm(value);
+  if (name === "30" || name === "30 days" || name === "30 day" || name.startsWith("30 ")) return "30";
+  if (name === "60" || name === "60 days" || name === "60 day" || name.startsWith("60 ")) return "60";
+  if (name === "90" || name === "90 days" || name === "90 day" || name.startsWith("90 ")) return "90";
+  return null;
+}
+function bots(sheet) {
+  if (!sheet) return { state: "missing", entries: [] };
+  const records = tableRecords(rowsOf(sheet));
+  if (!records.length) return { state: "empty", entries: [] };
+  const groups = /* @__PURE__ */ new Map();
+  for (const record of records) {
+    const bot = pick(record, ["bot", "agent", "name"]) || "Bot";
+    const loop = pick(record, ["loop", "workflow", "lane"]) || "All loops";
+    const key = `${norm(bot)}::${norm(loop)}`;
+    const current = groups.get(key) || { bot, loop, actionsDone: 0, salesClosed: 0, accuracy: null, accuracySamples: [] };
+    const actions = parseMoney(pick(record, ["actions", "actions done", "done", "count"]));
+    const sales = parseMoney(pick(record, ["sales closed", "sales", "closed", "sold"]));
+    const accuracy = parsePercent(pick(record, ["accuracy", "score"]));
+    current.actionsDone = (current.actionsDone || 0) + (actions != null ? actions : 1);
+    if (sales != null) current.salesClosed = (current.salesClosed || 0) + sales;
+    else if (/\b(closed|sold|won|paid)\b/i.test(pick(record, ["result", "status", "outcome"]))) {
+      current.salesClosed = (current.salesClosed || 0) + 1;
+    }
+    if (accuracy != null) current.accuracySamples.push(accuracy);
+    current.bot = bot;
+    current.loop = loop;
+    groups.set(key, current);
+  }
+  const entries = [...groups.values()].map((entry2) => ({
+    bot: entry2.bot,
+    loop: entry2.loop,
+    actionsDone: entry2.actionsDone,
+    salesClosed: entry2.salesClosed,
+    accuracy: entry2.accuracySamples.length ? Math.round(entry2.accuracySamples.reduce((sum, value) => sum + value, 0) / entry2.accuracySamples.length * 10) / 10 : null
+  }));
+  return { state: entries.length ? "ready" : "empty", entries };
+}
+function tableRecords(rows) {
+  let headerAt = -1;
+  for (let i = 0; i < rows.length; i += 1) {
+    if (!isHeaderRow(rows[i])) continue;
+    headerAt = i;
+    break;
+  }
+  if (headerAt < 0) return [];
+  const headers = rows[headerAt].map((header) => norm(header));
+  const records = [];
+  for (const row of rows.slice(headerAt + 1)) {
+    if (row.every((item) => !item)) continue;
+    if (isSectionTitle(row.filter(Boolean)[0] || "") && row.filter(Boolean).length === 1) break;
+    const record = {};
+    headers.forEach((header, index) => {
+      if (!header) return;
+      record[header] = cell(row[index]);
+    });
+    if (Object.values(record).some(Boolean)) records.push(record);
+  }
+  return records;
+}
+function pick(record, aliases) {
+  const entries = Object.entries(record);
+  for (const alias of aliases) {
+    const exact = entries.find(([key]) => key === alias);
+    if (exact?.[1]) return exact[1];
+  }
+  for (const alias of aliases) {
+    const partial = entries.find(([key]) => key.startsWith(`${alias} `) || key.endsWith(` ${alias}`));
+    if (partial?.[1]) return partial[1];
+  }
+  return "";
+}
+function weekdayName(value) {
+  const name = norm(value);
+  const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  return days.find((day) => name === day || name.startsWith(`${day} `)) || null;
+}
+function dateKeyFromCell(value) {
+  const text2 = cell(value);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text2)) return text2;
+  const slash = text2.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (!slash) return null;
+  const year = slash[3].length === 2 ? `20${slash[3]}` : slash[3];
+  return `${year}-${slash[1].padStart(2, "0")}-${slash[2].padStart(2, "0")}`;
+}
+function chicagoDateKey(now) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(now);
+  const year = parts.find((part) => part.type === "year")?.value || "0000";
+  const month = parts.find((part) => part.type === "month")?.value || "01";
+  const day = parts.find((part) => part.type === "day")?.value || "01";
+  return `${year}-${month}-${day}`;
+}
+function chicagoWeekday(now) {
+  return new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", weekday: "long" }).format(now).toLowerCase();
+}
+function ownerSuiteFixtureGrids(options = {}) {
+  const sheets = [
+    {
+      title: "Friday Scorecard",
+      rows: [
+        ["Cash this week", "$4,280", "Week goal", "$5,000"],
+        ["Cash this month", "$18,640", "Month goal", "$22,000"],
+        ["Savings", "$12,400", "Savings goal", "$15,000", "Reserve"],
+        [],
+        ["Money in"],
+        ["Method", "Amount"],
+        ["Card", "$2,140"],
+        ["Zelle", "$980"],
+        ["Check", "$760"],
+        ["Invoice", "$400"],
+        [],
+        ["Accounts receivable"],
+        ["Name", "Amount", "Detail"],
+        ["Northwind Realty", "$1,800", "Due Friday"],
+        ["Harper and Co", "$640", "Net 15"]
+      ]
+    },
+    {
+      title: "This Week",
+      rows: [
+        ["Day", "Date", "Plan", "Time", "Calendar", "Where", "When"],
+        ["Friday", "2026-10-09", "Review the scorecard", "9:00 AM", "Broker breakfast", "Downtown", ""],
+        ["Saturday", "2026-10-10", "Edit the lake house", "10:30 AM", "Lake house delivery", "Lakeway", "Today"],
+        ["Monday", "2026-10-12", "Send commercial proposals", "1:00 PM", "Proposal block", "Studio", ""]
+      ]
+    },
+    {
+      title: "$100k Tracker",
+      rows: [
+        ["Goal", "$100,000"],
+        ["Current", "$63,400"],
+        ["Source", "Amount"],
+        ["Iconic Images", "$48,000"],
+        ["Education", "$9,400"],
+        ["Commercial", "$6,000"]
+      ]
+    },
+    {
+      title: "Businesses",
+      rows: [
+        ["Business", "Status", "Note"],
+        ["Iconic Images", "Green", "Shoots on pace"],
+        ["Studio 105", "G", "Rentals booked"],
+        ["Education", "Yellow", "Course outline waiting"],
+        ["Prints", "On track", "Lab on time"],
+        ["Commercial", "Red", "Proposal needs a yes"],
+        ["Workshops", "Watch", "Fall dates open"]
+      ]
+    },
+    {
+      title: "30-60-90",
+      rows: [
+        ["30", "60", "90"],
+        ["Close two commercial proposals", "Launch the education waitlist", "Check the 100k pace"],
+        ["Book November workshops", "Bring savings to the reserve goal", "Hire a weekend editor"]
+      ]
+    },
+    {
+      title: "Owes",
+      rows: [
+        ["Who", "Amount", "Detail"],
+        ["Lab prints", "$220", "Due Monday"],
+        ["Software", "$49", "Monthly"]
+      ]
+    },
+    {
+      title: "Decisions",
+      rows: [
+        ["Decision", "Detail", "By", "Status"],
+        ["Raise the weekend retainer", "Weekend shoots are full", "Friday", "Waiting"],
+        ["Buy a second lighting kit", "One kit is booked out", "This month", "Needs your yes"],
+        ["Sponsor the broker breakfast", "The host asked this week", "Wednesday", "Open"],
+        ["Archive last spring's prices", "Already settled in the sheet", "", "Done"]
+      ]
+    }
+  ];
+  if (options.planBoard !== false) {
+    sheets.push(planBoardFixture());
+  }
+  if (options.actionLog !== false) {
+    sheets.push({
+      title: "Action Log",
+      rows: [
+        ["Bot", "Loop", "Actions", "Sales closed", "Accuracy"],
+        ["Booking bot", "Follow-up", "14", "3", "98%"],
+        ["Inbox bot", "Reply", "22", "1", "97%"],
+        ["Billing bot", "Invoice", "9", "4", "99%"]
+      ]
+    });
+  }
+  return sheets;
+}
+function planBoardFixture() {
+  return {
+    title: "Plan Board",
+    rows: [
+      ["Business", "Section", "Item", "Date", "Amount", "Status", "Notes", "Lane"],
+      ["iconic images m&m", "Revenue", "October retainers", "2026-10-01", "$8,400", "", "Retainer", "ignore-me"],
+      ["Iconic Images M&M", "revenue", "Print add-on", "2026-10-08", "$640", "", "", ""],
+      ["Iconic Images M&M", "Expense", "Lab", "2026-10-03", "$1,200", "", "Prints", ""],
+      ["ICONIC IMAGES M&M", "EXPENSE", "Ads", "10/12/2026", "$350", "", "", ""],
+      ["Iconic Images M&M", "Calendar", "Broker breakfast", "2026-10-16", "", "Set", "Downtown", ""],
+      ["Iconic Images M&M", "calendar", "Gallery night", "2026-10-14", "", "", "Studio", ""],
+      ["Iconic Images M&M", "Social", "Lake house reel", "2026-10-18", "", "Scheduled", "", ""],
+      ["Iconic Images M&M", "Social", "Before and after", "2026-10-11", "", "", "", ""],
+      ["Iconic Images M&M", "Event", "Fall mini sessions", "2026-10-24", "", "", "Outdoor", ""],
+      ["Iconic Images M&M", "Promo", "Referral card", "2026-10-20", "", "", "", ""],
+      ["Iconic Images M&M", "Email", "Newsletter", "2026-10-27", "", "", "", ""],
+      ["Iconic Images M&M", "Email", "Past client note", "2026-10-13", "", "Draft", "", ""],
+      ["Iconic Images M&M", "To-do", "File the lens receipt", "2026-10-09", "", "Done", "", ""],
+      ["Iconic Images M&M", "To-do", "Confirm weekend crew", "2026-10-10", "", "Open", "", ""],
+      ["Iconic Studios", "Revenue", "Booth rentals", "2026-10-02", "$3,200", "", "", ""],
+      ["Iconic Studios", "Expense", "Utilities", "2026-10-04", "$800", "", "", ""],
+      ["Iconic Studios", "Calendar", "Studio tour", "2026-10-15", "", "", "", ""],
+      ["Iconic Studios", "Social", "Cyclorama reel", "2026-10-12", "", "", "", ""],
+      ["Iconic Studios", "Event", "Open studio", "2026-10-22", "", "", "", ""],
+      ["Iconic Studios", "Email", "Member reminder", "2026-10-17", "", "", "", ""],
+      ["Iconic Studios", "To-do", "Order backdrops", "", "", "Open", "Seamless paper", ""],
+      ["aICON", "Revenue", "Suite build", "2026-10-06", "$1,500", "", "", ""],
+      ["aICON", "Expense", "Software", "2026-10-05", "$90", "", "", ""],
+      ["aICON", "Calendar", "Ship the scorecard", "2026-10-10", "", "", "", ""],
+      ["aicon", "Social", "Feature the board", "2026-10-19", "", "", "", ""],
+      ["aICON", "Email", "Weekly ops note", "2026-10-14", "", "", "", ""],
+      ["aICON", "To-do", "Review the owner gate", "2026-10-08", "", "Completed", "", ""],
+      ["Iconic Virtual", "Revenue", "Tour packages", "2026-10-03", "$2,100", "", "", ""],
+      ["Iconic Virtual", "Expense", "Hosting", "2026-10-07", "$400", "", "", ""],
+      ["Iconic Virtual", "Calendar", "Listing refresh", "2026-10-13", "", "", "", ""],
+      ["Iconic Virtual", "Social", "Virtual tour clip", "2026-10-16", "", "", "", ""],
+      ["Iconic Virtual", "Promo", "October highlight", "2026-10-19", "", "", "", ""],
+      ["Iconic Virtual", "Email", "Agent blast", "2026-10-15", "", "", "", ""],
+      ["Iconic Virtual", "To-do", "Update floor plans", "", "", "Open", "", ""],
+      ["KDP", "Revenue", "Paperback", "2026-10-09", "$720", "", "", ""],
+      ["KDP", "Expense", "Proof copy", "2026-10-02", "$40", "", "", ""],
+      ["KDP", "Calendar", "Upload week", "2026-10-18", "", "", "", ""],
+      ["KDP", "Social", "Cover refresh", "2026-10-21", "", "", "", ""],
+      ["KDP", "Email", "Reader note", "2026-10-11", "", "", "", ""],
+      ["KDP", "To-do", "Proof chapter four", "", "", "Open", "", ""],
+      ["Mystery Co", "Revenue", "Should not appear", "2026-10-01", "$9,999", "", "", ""],
+      ["Iconic Images M&M", "Other", "Ignore this lane", "2026-10-01", "$50", "", "", ""]
+    ]
+  };
+}
+const OWNER_SHEET_ID = "1vHkdHRhAWKcnsv8-d1ZZSWRr-OZyy0xCaqK1Bi3VB3Q";
+const READONLY_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
+const CACHE_MS = 6e4;
+const ERROR_CACHE_MS = 15e3;
+const TAB_ALIASES = [
+  { aliases: ["friday scorecard"] },
+  { aliases: ["this week"] },
+  { aliases: ["100k tracker"] },
+  { aliases: ["businesses"] },
+  { aliases: ["30 60 90"] },
+  { aliases: ["owes"] },
+  { aliases: ["decisions"] },
+  { aliases: ["action log"] },
+  { aliases: ["plan board"] }
+];
+let cache = null;
+function resolveSheetsCredentials(env = ownerRuntimeEnv()) {
+  const fromFirebase = credentialsFromJson(env.FIREBASE_SERVICE_ACCOUNT);
+  if (fromFirebase) return fromFirebase;
+  const email = env.OWNER_SHEETS_SA_EMAIL?.trim();
+  const key = env.OWNER_SHEETS_SA_KEY?.replace(/\\n/g, "\n").trim();
+  if (email && key) return { client_email: email, private_key: key };
+  return null;
+}
+async function loadOwnerSuite(options = {}) {
+  const env = ownerRuntimeEnv();
+  const now = options.now ?? /* @__PURE__ */ new Date();
+  if (ownerFixturesEnabled(env)) {
+    return {
+      data: parseOwnerSuite(ownerSuiteFixtureGrids(), now),
+      source: "fixture",
+      configured: true,
+      notice: null,
+      readerEmail: null
+    };
+  }
+  if (!options.fresh && cache && cache.expires > Date.now()) return cache.payload;
+  const credentials = resolveSheetsCredentials(env);
+  if (!credentials) {
+    const payload = {
+      data: unknownData(now),
+      source: "empty",
+      configured: false,
+      notice: "Scorecard is not connected.",
+      readerEmail: null
+    };
+    cache = { expires: Date.now() + ERROR_CACHE_MS, payload };
+    return payload;
+  }
+  try {
+    const grids = await fetchScorecard(credentials);
+    const payload = {
+      data: parseOwnerSuite(grids, now),
+      source: "sheet",
+      configured: true,
+      notice: null,
+      readerEmail: credentials.client_email
+    };
+    cache = { expires: Date.now() + CACHE_MS, payload };
+    return payload;
+  } catch (error) {
+    const status = error && typeof error === "object" && "code" in error ? String(error.code) : "error";
+    console.error(`[Owners] Scorecard read failed (${status})`);
+    const payload = {
+      data: unknownData(now),
+      source: "empty",
+      configured: true,
+      notice: "The scorecard could not be read.",
+      readerEmail: credentials.client_email
+    };
+    cache = { expires: Date.now() + ERROR_CACHE_MS, payload };
+    return payload;
+  }
+}
+function unknownData(now) {
+  const data = emptyOwnerSuiteData(now);
+  data.bots.state = "unknown";
+  return data;
+}
+function credentialsFromJson(raw) {
+  if (!raw || !raw.trim().startsWith("{")) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed.client_email || !parsed.private_key) return null;
+    return {
+      client_email: parsed.client_email,
+      private_key: parsed.private_key.replace(/\\n/g, "\n")
+    };
+  } catch {
+    return null;
+  }
+}
+async function fetchScorecard(credentials) {
+  const auth = new google.auth.JWT({
+    email: credentials.client_email,
+    key: credentials.private_key,
+    scopes: [READONLY_SCOPE]
+  });
+  const sheets = google.sheets({ version: "v4", auth });
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId: OWNER_SHEET_ID,
+    fields: "sheets.properties.title"
+  });
+  const titles = (meta.data.sheets || []).map((sheet) => sheet.properties?.title || "").filter(Boolean);
+  const matched = TAB_ALIASES.map((wanted) => titles.find((title) => {
+    const name = title.toLowerCase().replace(/\$/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+    return wanted.aliases.some((alias) => name === alias || name.includes(alias));
+  })).filter((title) => Boolean(title));
+  if (!matched.length) return [];
+  const values = await sheets.spreadsheets.values.batchGet({
+    spreadsheetId: OWNER_SHEET_ID,
+    ranges: matched.map((title) => `'${title.replace(/'/g, "''")}'`),
+    valueRenderOption: "FORMATTED_VALUE"
+  });
+  return (values.data.valueRanges || []).map((range, index) => ({
+    title: matched[index] || "",
+    rows: (range.values || []).map((row) => row.map((cell2) => cell2 == null ? "" : String(cell2)))
+  }));
+}
+const OWNER_WHY = "Freedom to be outside with my dogs, kids, nieces, pig and garden, and to fly to Puerto Rico whenever I want. More traveling, more giving.";
+const NOT_FOUND = { error: "Not found" };
+function mountOwners(app) {
+  const page = ["/admin/owners", "/admin/owners/", "/owners", "/owners/", "/api/owners/page"];
+  app.get(page, (req, res) => {
+    void handleOwnersPage(req, res);
+  });
+  app.get("/api/owners/suite", (req, res) => {
+    void handleSuite(req, res);
+  });
+  app.post("/api/owners/session", (req, res) => {
+    void handleSession(req, res);
+  });
+  app.post("/api/owners/logout", (_req, res) => {
+    setPrivate(res);
+    res.setHeader("Set-Cookie", sessionCookieHeader("", ownerRuntimeEnv(), 0));
+    res.status(204).end();
+  });
+}
+async function handleSuite(req, res) {
+  setPrivate(res);
+  const owner = await resolveOwnerIdentity(req.headers);
+  if (!owner) return res.status(404).json(NOT_FOUND);
+  const fresh = req.query.fresh === "1";
+  const payload = await loadOwnerSuite({ fresh });
+  return res.status(200).json({ ...payload, why: OWNER_WHY });
+}
+async function handleSession(req, res) {
+  setPrivate(res);
+  const owner = await resolveOwnerIdentity(req.headers);
+  const secret = ownerSessionSecret();
+  if (!owner || !secret) return res.status(404).json(NOT_FOUND);
+  const token = signOwnerSession(owner, secret);
+  res.setHeader("Set-Cookie", sessionCookieHeader(token));
+  return res.status(200).json({ ok: true });
+}
+async function handleOwnersPage(req, res) {
+  setPrivate(res);
+  const owner = await resolveOwnerIdentity(req.headers);
+  if (!owner) return res.status(404).type("html").send(NOT_FOUND_HTML);
+  const html = injectDevPreamble(injectRobots(await readSpaShell() || FALLBACK_SHELL));
+  return res.status(200).type("html").send(html);
+}
+function setPrivate(res) {
+  res.setHeader("Cache-Control", "private, no-store, max-age=0");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("CDN-Cache-Control", "no-store");
+  res.setHeader("X-Robots-Tag", "noindex, nofollow");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("Vary", "Cookie, Authorization");
+}
+function injectDevPreamble(html) {
+  if (process.env.ICONIC_VITE_DEV !== "1" || html.includes("/@react-refresh")) return html;
+  const preamble = `<script type="module">
+import { injectIntoGlobalHook } from "/@react-refresh";
+injectIntoGlobalHook(window);
+window.$RefreshReg$ = () => {};
+window.$RefreshSig$ = () => (type) => type;
+<\/script>`;
+  return html.includes("</head>") ? html.replace("</head>", `${preamble}
+  </head>`) : `${preamble}${html}`;
+}
+function injectRobots(html) {
+  if (html.includes('name="robots"')) return html;
+  if (html.includes("</head>")) {
+    return html.replace("</head>", '    <meta name="robots" content="noindex, nofollow" />\n  </head>');
+  }
+  return `<!doctype html><meta name="robots" content="noindex, nofollow" />${html}`;
+}
+async function readSpaShell() {
+  const source = path.join(process.cwd(), "index.html");
+  const dist = path.join(process.cwd(), "dist/spa/index.html");
+  const preferred = process.env.ICONIC_VITE_DEV === "1" ? [source, dist] : [dist, source];
+  for (const file of preferred) {
+    try {
+      return await fs.readFile(file, "utf8");
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+const NOT_FOUND_HTML = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Page not found</title>
+  </head>
+  <body style="margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f3f4f6;font-family:Inter,system-ui,sans-serif;color:#111827">
+    <div style="text-align:center">
+      <h1 style="font-size:2.25rem;margin:0 0 .75rem">404</h1>
+      <p style="margin:0 0 1rem;color:#4b5563">Page not found</p>
+      <a href="/" style="color:#3b82f6">Return to Home</a>
+    </div>
+  </body>
+</html>`;
+const FALLBACK_SHELL = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Iconic Images</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/client/main.tsx"><\/script>
+  </body>
+</html>`;
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
 const API_BUILD_MARKER = "auth-square-2026-09-28";
 if (!admin.apps.length) {
@@ -16607,6 +17779,7 @@ function createServer() {
   app.get("/api/client-notify", (_req, res) => {
     res.json({ live: clientNotifyLive() });
   });
+  mountOwners(app);
   app.use("/api/bookings", router$m);
   app.use("/api/orders", router$l);
   app.use("/api/galleries", router$k);
