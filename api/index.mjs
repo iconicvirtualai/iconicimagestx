@@ -1318,6 +1318,11 @@ function packagesForStaffEditor(liveDocs = [], options) {
   const items = [...byId.values()].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
   return options?.includeInactive ? items : items.filter((item) => item.isActive);
 }
+const CALL_FOR_PRICING_LABEL = "Call for pricing";
+function catalogPriceIsBookable(price) {
+  const amount = typeof price === "number" ? price : typeof price === "string" && price.trim() ? Number(price) : Number.NaN;
+  return Number.isFinite(amount) && amount > 0;
+}
 function chargeCatalog(input) {
   return input.catalog ?? packagesForStaffEditor([]);
 }
@@ -1604,6 +1609,45 @@ function chargedServiceLines(items) {
     const name = String(item.name || "");
     return !id.startsWith("promo-") && !name.startsWith("Promo Code:");
   });
+}
+function joinCatalogNames(names) {
+  if (names.length <= 1) return names[0] || "";
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+}
+function unpricedCatalogBookingError(body, catalog) {
+  const list2 = catalog ?? packagesForStaffEditor([]);
+  const names = /* @__PURE__ */ new Set();
+  const consider = (raw) => {
+    if (typeof raw !== "string") return;
+    const item = findCatalogItem(list2, raw);
+    if (item && !catalogPriceIsBookable(item.price)) names.add(item.name);
+  };
+  consider(body.selectedService);
+  for (const id of textList(body.selectedBasics)) consider(id);
+  for (const id of textList(body.selectedAddOns)) consider(id);
+  if (body.premiumUpgrade === true) consider("iconic-finish");
+  const credits = Number(body.virtualStagingCredits);
+  if (Number.isFinite(credits) && credits > 0) consider("virtual-staging");
+  const specialized = optionalLineText(body.specializedPhotography);
+  if (specialized === "social") consider("specialized-social");
+  if (specialized === "both") consider("specialized-both");
+  if (Array.isArray(body.lineItems)) {
+    for (const raw of body.lineItems) {
+      if (!raw || typeof raw !== "object") continue;
+      const item = raw;
+      consider(item.id);
+      consider(item.name);
+    }
+  }
+  for (const line of chargedServiceLines(resolveSubmittedBooking(body, list2).lineItems)) {
+    consider(line.id);
+    consider(line.name);
+  }
+  if (names.size === 0) return null;
+  const listNames = [...names];
+  const verb = listNames.length === 1 ? "is" : "are";
+  return `${joinCatalogNames(listNames)} ${verb} not available to book until a price is set. ${CALL_FOR_PRICING_LABEL}.`;
 }
 const PLAYTEST_ADDRESS = "100 Playtest Lane, Austin, TX 78701";
 const STAFF_ROLES = ["admin", "coordinator", "photographer", "editor"];
@@ -4680,6 +4724,8 @@ router$m.post("/", async (req, res) => {
     }
     const displayAddress = addressLabel(savedAddress);
     const catalog = await loadBookingCatalog();
+    const unpriced = unpricedCatalogBookingError(req.body, catalog);
+    if (unpriced) return res.status(400).json({ error: unpriced });
     const resolved = resolveSubmittedBooking(req.body, catalog);
     const keptLines = resolved.lineItems.filter((item) => !isTravelFeeLine(item));
     if (chargedServiceLines(keptLines).length === 0) {
