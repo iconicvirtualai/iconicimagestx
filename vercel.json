@@ -25,7 +25,7 @@
   ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" },
-    { "source": "/present/:token", "destination": "/api/presentations/shell/:token" },
+    { "source": "/present/:token", "destination": "/api/index" },
     { "source": "/admin/owners", "destination": "/api/index" },
     { "source": "/admin/owners/", "destination": "/api/index" },
     { "source": "/owners", "destination": "/api/index" },

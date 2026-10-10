@@ -4,7 +4,7 @@
  * POST only stores the token on the listing. It does not email or text the client.
  */
 
-import { Router } from "express";
+import { Router, type RequestHandler } from "express";
 import { randomBytes } from "crypto";
 import fs from "fs/promises";
 import path from "path";
@@ -88,11 +88,6 @@ router.get("/presentations/:token", async (req, res) => {
   }
 });
 
-router.get("/presentations/shell/:token", async (req, res) => {
-  const rendered = await renderPresentationShell(String(req.params.token || ""), originOf(req));
-  res.status(rendered.status).type("html").send(rendered.html);
-});
-
 export async function renderPresentationShell(token: string, origin: string): Promise<{ status: number; html: string }> {
   if (!isPresentationToken(token)) {
     return { status: 400, html: "<!doctype html><title>Presentation</title><p>That presentation link is not valid.</p>" };
@@ -110,6 +105,13 @@ export async function renderPresentationShell(token: string, origin: string): Pr
     return { status: 500, html: "<!doctype html><title>Presentation</title><p>This presentation could not be opened.</p>" };
   }
 }
+
+export const handlePresentationShell: RequestHandler = async (req, res) => {
+  const rendered = await renderPresentationShell(String(req.params.token || ""), originOf(req));
+  res.status(rendered.status).type("html").send(rendered.html);
+};
+
+router.get("/presentations/shell/:token", handlePresentationShell);
 
 router.post("/listings/:id/presentation", requireStaff, async (req, res) => {
   const listingId = String(req.params.id || "");
