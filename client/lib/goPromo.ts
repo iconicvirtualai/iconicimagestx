@@ -1,9 +1,10 @@
 /**
  * Shirt QR destination (/go).
  *
- * Sam / Cody: this is the only file you need to change when the promo updates.
- * The printed shirts stay pointed at /go. Edit the fields below and ship.
+ * Sam / Cody: the printed shirts stay pointed at /go.
+ * Edit the fields below when this landing page should say something new.
  *
+ * - documentTitle: the browser tab title
  * - title, description: the headline and short blurb on the page
  * - ctaLabel, ctaHref: the button. Use a site path ("/book") or a full URL
  *   ("https://..."). Leave either one blank to hide the button.
@@ -17,11 +18,13 @@ export interface GoPromo {
   ctaHref: string;
 }
 
+export const goDocumentTitle = "Iconic Images | Book your shoot";
+
 export const goPromo: GoPromo = {
   eyebrow: "Iconic Studio",
-  title: "Current promo coming",
+  title: "Real estate media that sells",
   description:
-    "You’re in the right place. This page is the permanent home for our shirt QR — the latest offer, event, or announcement will land here, so the shirts never go out of date.",
+    "Listing photos, film, and brand media from Iconic Images. Book a shoot when you are ready.",
   ctaLabel: "Book a shoot",
   ctaHref: "/book",
 };

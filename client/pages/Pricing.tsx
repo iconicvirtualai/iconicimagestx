@@ -1002,10 +1002,10 @@ export default function Pricing() {
 
               {/* Phase 1: The 7-Tier Lifecycle Management */}
               <div id="phase1" className="mb-24">
-                <div className="flex items-center gap-4 mb-10">
-                  <div className="h-[2px] flex-1 bg-gradient-to-r from-transparent to-gray-200"></div>
-                  <h3 className="text-lg font-black text-gray-400 uppercase tracking-[0.3em] whitespace-nowrap">THE 7-TIER LIFECYCLE MANAGEMENT</h3>
-                  <div className="h-[2px] flex-1 bg-gradient-to-l from-transparent to-gray-200"></div>
+                <div className="mb-10 flex items-center gap-3 sm:gap-4">
+                  <div className="h-[2px] min-w-4 flex-1 bg-gradient-to-r from-transparent to-gray-200"></div>
+                  <h3 className="min-w-0 max-w-full text-balance text-center text-sm font-black uppercase leading-snug tracking-[0.12em] text-gray-400 [overflow-wrap:anywhere] sm:tracking-[0.16em] md:text-base md:tracking-[0.2em] lg:text-lg lg:tracking-[0.28em]">THE 7-TIER LIFECYCLE MANAGEMENT</h3>
+                  <div className="h-[2px] min-w-4 flex-1 bg-gradient-to-l from-transparent to-gray-200"></div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
@@ -1042,10 +1042,10 @@ export default function Pricing() {
               {/* Phase 2: Money Over Time */}
               {settings.pricing.showPhase2 && (
                 <div id="phase2">
-                  <div className="flex items-center gap-4 mb-10">
-                    <div className="h-[2px] flex-1" style={{ backgroundImage: `linear-gradient(to right, transparent, ${settings.global.primaryColor}33)` }}></div>
-                    <h3 className="text-lg font-black uppercase tracking-[0.3em] whitespace-nowrap" style={{ color: settings.global.primaryColor }}>PHASE 2: THE "MONEY OVER TIME" TRACK</h3>
-                    <div className="h-[2px] flex-1" style={{ backgroundImage: `linear-gradient(to left, transparent, ${settings.global.primaryColor}33)` }}></div>
+                  <div className="mb-10 flex items-center gap-3 sm:gap-4">
+                    <div className="h-[2px] min-w-4 flex-1" style={{ backgroundImage: `linear-gradient(to right, transparent, ${settings.global.primaryColor}33)` }}></div>
+                    <h3 className="min-w-0 max-w-full text-balance text-center text-sm font-black uppercase leading-snug tracking-[0.12em] [overflow-wrap:anywhere] sm:tracking-[0.16em] md:text-base md:tracking-[0.2em] lg:text-lg lg:tracking-[0.28em]" style={{ color: settings.global.primaryColor }}>PHASE 2: THE "MONEY OVER TIME" TRACK</h3>
+                    <div className="h-[2px] min-w-4 flex-1" style={{ backgroundImage: `linear-gradient(to left, transparent, ${settings.global.primaryColor}33)` }}></div>
                   </div>
 
                   <div className="flex flex-wrap justify-center gap-8">
