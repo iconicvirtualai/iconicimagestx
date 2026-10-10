@@ -410,7 +410,7 @@ describe("booking listing docs", () => {
     expect(service).not.toContain("sendSMS");
     expect(service).not.toContain("cubicasa.com");
     expect(bookings).not.toContain("geocode");
-    expect(bookings.match(/template: "booking_received"/g)).toHaveLength(2);
+    expect(bookings.match(/template: "booking_received"/g)).toHaveLength(1);
     expect(bookings.match(/template: "order_confirmed"/g)).toHaveLength(1);
     expect(bookings).toContain("SMS_TEMPLATES.bookingConfirmation");
     expect(home).toContain("clientListingPath(listing.id)");

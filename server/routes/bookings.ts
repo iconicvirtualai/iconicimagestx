@@ -268,7 +268,6 @@ router.post("/", async (req, res) => {
       : "Not specified";
 
     let clientEmailStatus: "sent" | "failed" = "failed";
-    let officeEmailStatus: "sent" | "failed" = "failed";
     let passwordSetupStatus: "sent" | "failed" | "not_needed" | "gated" = account.createdAccount ? "gated" : "not_needed";
     let smsStatus: "sent" | "failed" | "skipped" | "not_configured" = phone ? "failed" : "skipped";
 
@@ -293,30 +292,6 @@ router.post("/", async (req, res) => {
       },
     }).then((result) => (result.sent ? "sent" as const : "failed" as const)).catch((err) => {
       console.error("[Bookings] Confirmation email failed:", err);
-      return "failed" as const;
-    });
-
-
-    // Send the same complete order notification to the office
-    officeEmailStatus = await sendEmail({
-      to: "photos@iconicimagestx.com",
-      template: "booking_received",
-      variables: {
-        clientName,
-        address: displayAddress,
-        total: money(total),
-        requestId: docRef.id,
-        scheduledDate: bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
-        scheduledTime: scheduledTime || "",
-        propertyStatus: propertyStatus || "Not specified",
-        furnishingStatus: furnishingStatus || "Not specified",
-        accessMethod: accessLine,
-        squareFootage: squareFootage ? `${squareFootage} sq ft` : "",
-        travelFee: travelSummaryText(travel),
-        dashboardUrl: `${appUrl()}/admin/order-request/${docRef.id}`,
-      },
-    }).then((result) => (result.sent ? "sent" as const : "failed" as const)).catch((err) => {
-      console.error("[Bookings] Office notification email failed:", err);
       return "failed" as const;
     });
 
@@ -411,7 +386,6 @@ router.post("/", async (req, res) => {
 
     const notifications = {
       appointmentEmail: clientEmailStatus,
-      officeEmail: officeEmailStatus,
       officeAlert: officeAlertStatus,
       sms: smsStatus,
       passwordSetup: passwordSetupStatus,
