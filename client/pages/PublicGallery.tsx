@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { Copy, Download, ExternalLink, Image, Link2, Lock, AlertCircle, CreditCard } from "lucide-react";
+import { Copy, Download, ExternalLink, Image, Link2, Lock, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Footer from "@/components/Footer";
 import { toast } from "sonner";
@@ -8,57 +8,83 @@ import { addressText } from "@shared/addressText";
 import { ICONIC_DOWNLOAD_LOCK } from "@shared/paymentAccess";
 import { GalleryDownloadLockNotice } from "@/components/GalleryDownloadLock";
 
+export const PUBLIC_GALLERY_MISSING_COPY = "We couldn't find this gallery. Check the link in your email or sign in to your portal.";
+
+export function PublicGalleryMissing() {
+  return (
+    <div className="min-h-screen bg-white flex flex-col" data-gallery-state="missing">
+      <header className="bg-black text-white">
+        <div className="max-w-6xl mx-auto px-4 py-10">
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Iconic Images</p>
+          <h1 className="text-3xl font-black mt-2">Gallery not found</h1>
+        </div>
+      </header>
+      <main className="flex flex-1 items-center justify-center px-4 py-16">
+        <div className="max-w-md text-center">
+          <p className="text-sm text-gray-600">{PUBLIC_GALLERY_MISSING_COPY}</p>
+          <Button asChild className="mt-6 bg-black hover:bg-gray-800 text-white rounded-xl">
+            <Link to="/portal">Sign in to your portal</Link>
+          </Button>
+          <p className="mt-6 text-sm text-gray-500">
+            <a href="mailto:photos@iconicimagestx.com" className="font-semibold text-black underline underline-offset-4">photos@iconicimagestx.com</a>
+            {" / "}
+            <a href="tel:2813560965" className="font-semibold text-black underline underline-offset-4">281.356.0965</a>
+          </p>
+        </div>
+      </main>
+      <Footer />
+    </div>
+  );
+}
+
 export default function PublicGallery() {
   const { galleryId } = useParams<{ galleryId: string }>();
   const navigate = useNavigate();
   const [gallery, setGallery] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState("");
-  const [errorTitle, setErrorTitle] = React.useState("Gallery Unavailable");
+  const [unavailable, setUnavailable] = React.useState(false);
 
   React.useEffect(() => {
-    if (!galleryId) return;
+    if (!galleryId) {
+      setUnavailable(true);
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     let redirecting = false;
     setLoading(true);
-    setError("");
-    setErrorTitle("Gallery Unavailable");
+    setUnavailable(false);
     setGallery(null);
     (async () => {
       try {
-        const res = await fetch(`/api/galleries/public/${galleryId}`);
-        const data = await res.json().catch(() => ({}));
+        const res = await fetch(`/api/galleries/public/${encodeURIComponent(galleryId)}`);
+        const data = await res.json().catch(() => null);
         if (cancelled) return;
+        if (res.ok && data && typeof data === "object") {
+          setGallery(data);
+          return;
+        }
+        // A project id shared on /gallery/:id can still open its studio or delivery gallery.
+        // Resolver text is for staff logs. This page never renders it.
         if (res.status === 404) {
           const linkRes = await fetch(`/api/galleries/link/${encodeURIComponent(galleryId)}`);
-          const link = await linkRes.json().catch(() => ({}));
+          const link = await linkRes.json().catch(() => null);
           if (cancelled) return;
-          if (linkRes.ok && link.kind === "listing" && link.openGalleryId && link.openGalleryId !== galleryId) {
+          const openGalleryId = link && typeof link.openGalleryId === "string" ? link.openGalleryId : "";
+          if (linkRes.ok && link?.kind === "listing" && openGalleryId && openGalleryId !== galleryId) {
             redirecting = true;
-            navigate(`/gallery/${link.openGalleryId}`, { replace: true });
+            navigate(`/gallery/${openGalleryId}`, { replace: true });
             return;
           }
-          if (linkRes.ok && link.kind === "listing") {
+          if (linkRes.ok && link?.kind === "listing") {
             redirecting = true;
             navigate(`/studio/${galleryId}`, { replace: true });
             return;
           }
-          const linkTitle = link.code === "studio_locked"
-            ? "Studio link is locked"
-            : link.code === "studio_disabled"
-              ? "Studio link is off"
-              : link.code === "lookup_unavailable" || link.code === "lookup_failed"
-                ? "Gallery link could not be checked"
-                : link.code === "unknown" || link.code === "dangling_pointer"
-                  ? "No gallery or project found"
-                  : "Gallery Unavailable";
-          setErrorTitle(linkTitle);
-          throw new Error(link.message || data.message || data.error || "Gallery link not found.");
         }
-        if (!res.ok) throw new Error(data.message || data.error || "We could not open this gallery.");
-        setGallery(data);
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "We could not open this gallery.");
+        setUnavailable(true);
+      } catch {
+        if (!cancelled) setUnavailable(true);
       } finally {
         if (!cancelled && !redirecting) setLoading(false);
       }
@@ -70,18 +96,7 @@ export default function PublicGallery() {
 
   if (loading) return <div className="min-h-screen bg-white flex items-center justify-center"><div className="w-8 h-8 border-4 border-[#0d9488] border-t-transparent rounded-full animate-spin" /></div>;
 
-  if (error || !gallery) return (
-    <div className="min-h-screen bg-white flex flex-col">
-      <div className="flex flex-1 items-center justify-center px-4">
-        <div className="max-w-md text-center">
-          <AlertCircle className="w-12 h-12 mx-auto mb-4 text-red-500" />
-          <h1 className="text-2xl font-black mb-2">{errorTitle}</h1>
-          <p className="text-sm text-gray-500">{error}</p>
-        </div>
-      </div>
-      <Footer />
-    </div>
-  );
+  if (unavailable || !gallery) return <PublicGalleryMissing />;
 
   const media: any[] = gallery.mediaItems || [];
   const needsPayment = Boolean(gallery.paymentRequired);
