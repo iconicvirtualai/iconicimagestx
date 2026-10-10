@@ -7,7 +7,7 @@
 import nodemailer from "nodemailer";
 import admin from "firebase-admin";
 import { BUSINESS_CONTACT } from "../../shared/businessContact";
-import { clientNotifyBlockReason, emailAllowed } from "../../shared/clientNotify";
+import { clientNotifyBlockReason, emailAllowed, narrowGatedClientRecipients, notifyTestAllowlist } from "../../shared/clientNotify";
 
 const db = () => admin.firestore();
 
@@ -47,6 +47,7 @@ interface SendEmailOptions {
   to: string;
   bcc?: string;
   cc?: string;
+  replyTo?: string;
   template: string;
   /**
    * "staff" is required for the live_chat office alert and the new-order
@@ -64,7 +65,11 @@ interface SendEmailOptions {
 // ─── Main Send Function ───────────────────────────────────────────────────────
 
 export async function sendEmail(options: SendEmailOptions): Promise<{ sent: boolean }> {
-  const { to, bcc, cc, template, audience, variables = {}, subject: subjectOverride, html, attachments } = options;
+  const { template, audience, variables = {}, subject: subjectOverride, html, attachments } = options;
+  let to = options.to;
+  let bcc = options.bcc;
+  let cc = options.cc;
+  let replyTo = options.replyTo;
 
   if (!to) {
     console.warn("[Email] No recipient specified, skipping.");
@@ -72,13 +77,30 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ sent: bool
   }
 
   // booking_received (order-received confirmation) always sends.
-  // live_chat sends only with audience "staff" (visitor → office).
-  // Marketing, portal, contact auto-acks, and other non-order client mail stay off under RED.
+  // live_chat and office_new_order send only with audience "staff".
+  // Other client mail stays off unless CLIENT_NOTIFY_LIVE is exactly "true"
+  // and the zone is not RED. NOTIFY_TEST_ALLOWLIST can still deliver those
+  // gated messages, and only to exact addresses on that list, including in RED.
   if (!emailAllowed(template, process.env, audience)) {
-    console.warn(
-      `[Email] Suppressed '${template}' to ${to} — ${clientNotifyBlockReason()}. No message sent.`,
-    );
-    return { sent: false };
+    const narrowed = narrowGatedClientRecipients({ to, cc, bcc, replyTo }, process.env);
+    if (!narrowed) {
+      const why = notifyTestAllowlist().size > 0
+        ? `${clientNotifyBlockReason()}. Recipient is not an exact NOTIFY_TEST_ALLOWLIST match.`
+        : `${clientNotifyBlockReason()}.`;
+      console.warn(
+        `[Email] Suppressed '${template}' to ${to} — ${why} No message sent.`,
+      );
+      return { sent: false };
+    }
+    to = narrowed.to;
+    cc = narrowed.cc;
+    bcc = narrowed.bcc;
+    replyTo = narrowed.replyTo;
+    if (narrowed.held.length > 0) {
+      console.warn(
+        `[Email] '${template}' sent only to NOTIFY_TEST_ALLOWLIST. Held: ${narrowed.held.join(", ")}.`,
+      );
+    }
   }
 
   let subject = subjectOverride || `Message from Iconic Images`;
@@ -116,6 +138,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ sent: bool
       to,
       bcc,
       cc,
+      ...(replyTo ? { replyTo } : {}),
       subject,
       html: htmlBody,
       attachments,

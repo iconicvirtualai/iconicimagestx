@@ -47,6 +47,7 @@ describe("live order confirmation emails", () => {
     const received = sendBlocks(bookings, "booking_received").join("\n");
     expect(received).not.toContain("account_password_setup");
     expect(received).not.toContain("setupUrl");
+    expect(bookings).toContain("clientNotifyLive() || isNotifyTestAllowlisted(normalizedEmail)");
     expect(bookings).not.toContain("BOOKING_NOTIFY_LIVE");
     expect(bookings).not.toContain("bookingNotificationsLive");
     expect(bookings).not.toContain("appointmentReminder");
@@ -56,7 +57,7 @@ describe("live order confirmation emails", () => {
   it("sends booking confirms before the password-setup gate", () => {
     const receivedAt = bookings.indexOf('template: "booking_received"');
     const smsAt = bookings.indexOf('kind: "booking_confirmation"');
-    const gateAt = bookings.indexOf("if (!clientNotifyLive())");
+    const gateAt = bookings.indexOf("if (!passwordSetupAllowed)");
     const passwordAt = bookings.indexOf('template: "account_password_setup"');
     expect(receivedAt).toBeGreaterThan(-1);
     expect(smsAt).toBeGreaterThan(receivedAt);
