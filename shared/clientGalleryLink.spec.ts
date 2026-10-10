@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decideClientGalleryLink, type GalleryLinkDoc } from "./clientGalleryLink";
+import { decideClientGalleryLink, ownerStudioProject, type GalleryLinkDoc } from "./clientGalleryLink";
 
 const LISTING_ID = "V92oe4gWihszc95tEcVQ";
 
@@ -8,21 +8,39 @@ function listing(overrides: Record<string, unknown> = {}): GalleryLinkDoc {
     id: LISTING_ID,
     studioEnabled: true,
     address: "100 Main St, Austin, TX",
-    clientName: "Ada Agent",
+    agentName: "Ada Agent",
+    clientName: "Private Client",
     clientEmail: "ada@example.com",
     clientPhone: "512-555-0100",
     notes: "lockbox 1234",
     studioToken: "secret-token",
+    invoiceId: "inv_private_1",
+    orderId: "order_private_1",
+    zipUrl: "https://cdn.example/delivery.zip",
+    mlsUrl: "https://cdn.example/mls-full.jpg",
     images: [
-      { url: "https://cdn.example/final.jpg", name: "front.jpg", path: `listings/${LISTING_ID}/finals/1_front.jpg` },
+      {
+        url: "https://cdn.example/final.jpg",
+        name: "front.jpg",
+        path: `listings/${LISTING_ID}/finals/1_front.jpg`,
+        downloadUrl: "https://cdn.example/front-full.jpg",
+      },
       { url: "https://cdn.example/raw.dng", name: "front.dng", path: `listings/${LISTING_ID}/raw/1_front.dng`, contentType: "image/x-adobe-dng" },
+      { url: "https://cdn.example/mls.jpg", name: "mls.jpg", path: `listings/${LISTING_ID}/mls/mls.jpg` },
       { url: "javascript:alert(1)", name: "bad.jpg", path: `listings/${LISTING_ID}/photos/bad.jpg` },
     ],
     videos: [
       { url: "javascript:alert(1)", name: "bad" },
       { url: "https://cdn.example/walkthrough.mp4", name: "Walkthrough" },
     ],
+    floorplans: [
+      { url: "https://cdn.example/level1.jpg", name: "Level 1.jpg" },
+      { url: "https://cdn.example/plans.zip", name: "plans.zip" },
+    ],
     tourUrl: "javascript:alert(1)",
+    matterportUrl: "https://my.matterport.com/show/?m=abc",
+    revisions: [{ id: "rev-1", type: "single", photoIndex: 0, description: "Warm the kitchen", status: "pending", createdAt: "2026-04-01" }],
+    paymentNote: "private-balance-8841",
     ...overrides,
   };
 }
@@ -47,16 +65,31 @@ describe("decideClientGalleryLink", () => {
     expect(result.project.id).toBe(LISTING_ID);
     expect(result.project.images).toEqual([{ url: "https://cdn.example/final.jpg", name: "front.jpg" }]);
     expect(result.project.videos).toEqual([{ url: "https://cdn.example/walkthrough.mp4", name: "Walkthrough" }]);
-    expect(result.project.tourUrl).toBe("");
+    expect(result.project.tourUrl).toBe("https://my.matterport.com/show/?m=abc");
+    expect(result.project.floorPlans).toEqual([{ url: "https://cdn.example/level1.jpg", name: "Level 1.jpg" }]);
     expect(result.project.view).toBe("public");
-    expect(result.project.downloadsUnlocked).toBe(false);
-    expect(result.project.clientName).toBe("Ada Agent");
-    expect(JSON.stringify(result.project)).not.toContain("ada@example.com");
-    expect(JSON.stringify(result.project)).not.toContain("javascript:");
-    expect(JSON.stringify(result.project)).not.toContain("512-555-0100");
-    expect(JSON.stringify(result.project)).not.toContain("lockbox");
-    expect(JSON.stringify(result.project)).not.toContain("secret-token");
-    expect(JSON.stringify(result.project)).not.toContain("/raw/");
+    expect(result.project.agentName).toBe("Ada Agent");
+    expect(result.project).not.toHaveProperty("clientName");
+    expect(result.project).not.toHaveProperty("downloadsUnlocked");
+    expect(result.project).not.toHaveProperty("invoice");
+    expect(result.project).not.toHaveProperty("revisions");
+    expect(result.project).not.toHaveProperty("files");
+    const body = JSON.stringify(result.project);
+    expect(body).not.toContain("ada@example.com");
+    expect(body).not.toContain("Private Client");
+    expect(body).not.toContain("javascript:");
+    expect(body).not.toContain("512-555-0100");
+    expect(body).not.toContain("lockbox");
+    expect(body).not.toContain("secret-token");
+    expect(body).not.toContain("/raw/");
+    expect(body).not.toContain("front-full.jpg");
+    expect(body).not.toContain("delivery.zip");
+    expect(body).not.toContain("mls-full.jpg");
+    expect(body).not.toContain("plans.zip");
+    expect(body).not.toContain("Warm the kitchen");
+    expect(body).not.toContain("inv_private_1");
+    expect(body).not.toContain("order_private_1");
+    expect(body).not.toContain("private-balance-8841");
   });
 
   it("sends a released linked gallery when the shared id is the project", () => {
@@ -112,7 +145,7 @@ describe("decideClientGalleryLink", () => {
     expect(result.galleryId).toBe("galleryDelivered1");
   });
 
-  it("unlocks the owning client only after payment or a staff release", () => {
+  it("keeps download files off the public share even after the invoice is paid", () => {
     const paid = decideClientGalleryLink({
       ...empty,
       id: LISTING_ID,
@@ -120,53 +153,68 @@ describe("decideClientGalleryLink", () => {
     });
     expect(paid.ok).toBe(true);
     if (paid.ok !== true || paid.kind !== "listing") throw new Error("expected the listing studio");
-    expect(paid.project.downloadsUnlocked).toBe(true);
     expect(paid.project.view).toBe("public");
+    expect(paid.project.images).toEqual([{ url: "https://cdn.example/final.jpg", name: "front.jpg" }]);
+    expect(JSON.stringify(paid.project)).not.toContain("front-full.jpg");
+    expect(JSON.stringify(paid.project)).not.toContain("delivery.zip");
+  });
 
-    const released = decideClientGalleryLink({
-      ...empty,
-      id: LISTING_ID,
-      listing: listing({ lockDownloads: true, invoiceStatus: "sent", downloadsReleased: true }),
-    });
-    if (released.ok !== true || released.kind !== "listing") throw new Error("expected the listing studio");
-    expect(released.project.downloadsUnlocked).toBe(true);
+  it("gives the owner delivery files only after the existing payment lock opens", () => {
+    const source = listing({ invoiceStatus: "paid", lockDownloads: true });
+    const opened = decideClientGalleryLink({ ...empty, id: LISTING_ID, listing: source });
+    if (opened.ok !== true || opened.kind !== "listing") throw new Error("expected the listing studio");
+    const paid = ownerStudioProject(source, opened.project.view === "public" ? opened.project : { ...opened.project, view: "public" });
+    expect(paid.view).toBe("owner");
+    expect(paid.downloadsUnlocked).toBe(true);
+    expect(paid.clientName).toBe("Private Client");
+    expect(paid.clientEmail).toBe("ada@example.com");
+    expect(paid.revisions[0]?.description).toBe("Warm the kitchen");
+    expect(paid.invoice).toEqual({ status: "paid" });
+    expect(paid.images[0]?.downloadUrl).toBe("https://cdn.example/front-full.jpg");
+    expect(paid.files.map((file) => file.url)).toEqual(expect.arrayContaining([
+      "https://cdn.example/delivery.zip",
+      "https://cdn.example/mls-full.jpg",
+      "https://cdn.example/front-full.jpg",
+    ]));
 
-    const locked = decideClientGalleryLink({
-      ...empty,
-      id: LISTING_ID,
-      listing: listing({ lockDownloads: true, requirePayment: false, invoiceStatus: "sent" }),
-    });
-    if (locked.ok !== true || locked.kind !== "listing") throw new Error("expected the listing studio");
-    expect(locked.project.downloadsUnlocked).toBe(false);
-    expect(locked.project.images).toEqual([{ url: "https://cdn.example/final.jpg", name: "front.jpg" }]);
+    const lockedSource = listing({ lockDownloads: true, requirePayment: false, invoiceStatus: "sent" });
+    const lockedOpen = decideClientGalleryLink({ ...empty, id: LISTING_ID, listing: lockedSource });
+    if (lockedOpen.ok !== true || lockedOpen.kind !== "listing" || lockedOpen.project.view !== "public") {
+      throw new Error("expected the listing studio");
+    }
+    const locked = ownerStudioProject(lockedSource, lockedOpen.project);
+    expect(locked.downloadsUnlocked).toBe(false);
+    expect(locked.lockDownloads).toBe(true);
+    expect(locked.files).toEqual([]);
+    expect(locked.images).toEqual([{ url: "https://cdn.example/final.jpg", name: "front.jpg" }]);
+    expect(JSON.stringify(locked.images)).not.toContain("front-full.jpg");
+    expect(locked.clientEmail).toBe("ada@example.com");
 
-    const unset = decideClientGalleryLink({
-      ...empty,
-      id: LISTING_ID,
-      listing: listing({ invoiceStatus: "sent" }),
-    });
-    if (unset.ok !== true || unset.kind !== "listing") throw new Error("expected the listing studio");
-    expect(unset.project.lockDownloads).toBe(true);
-    expect(unset.project.requirePayment).toBe(true);
-    expect(unset.project.downloadsUnlocked).toBe(false);
+    const releasedSource = listing({ lockDownloads: true, invoiceStatus: "sent", downloadsReleased: true });
+    const releasedOpen = decideClientGalleryLink({ ...empty, id: LISTING_ID, listing: releasedSource });
+    if (releasedOpen.ok !== true || releasedOpen.kind !== "listing" || releasedOpen.project.view !== "public") {
+      throw new Error("expected the listing studio");
+    }
+    expect(ownerStudioProject(releasedSource, releasedOpen.project).downloadsUnlocked).toBe(true);
 
-    const paidUnset = decideClientGalleryLink({
-      ...empty,
-      id: LISTING_ID,
-      listing: listing({ invoiceStatus: "paid" }),
-    });
-    if (paidUnset.ok !== true || paidUnset.kind !== "listing") throw new Error("expected the listing studio");
-    expect(paidUnset.project.lockDownloads).toBe(true);
-    expect(paidUnset.project.downloadsUnlocked).toBe(true);
+    const unsetSource = listing({ invoiceStatus: "sent" });
+    const unsetOpen = decideClientGalleryLink({ ...empty, id: LISTING_ID, listing: unsetSource });
+    if (unsetOpen.ok !== true || unsetOpen.kind !== "listing" || unsetOpen.project.view !== "public") {
+      throw new Error("expected the listing studio");
+    }
+    const unset = ownerStudioProject(unsetSource, unsetOpen.project);
+    expect(unset.lockDownloads).toBe(true);
+    expect(unset.requirePayment).toBe(true);
+    expect(unset.downloadsUnlocked).toBe(false);
 
-    const releasedByStaff = decideClientGalleryLink({
-      ...empty,
-      id: LISTING_ID,
-      listing: listing({ invoiceStatus: "sent", lockDownloads: false }),
-    });
-    if (releasedByStaff.ok !== true || releasedByStaff.kind !== "listing") throw new Error("expected the listing studio");
-    expect(releasedByStaff.project.lockDownloads).toBe(false);
-    expect(releasedByStaff.project.downloadsUnlocked).toBe(true);
+    const staffRelease = listing({ invoiceStatus: "sent", lockDownloads: false });
+    const staffOpen = decideClientGalleryLink({ ...empty, id: LISTING_ID, listing: staffRelease });
+    if (staffOpen.ok !== true || staffOpen.kind !== "listing" || staffOpen.project.view !== "public") {
+      throw new Error("expected the listing studio");
+    }
+    const releasedByStaff = ownerStudioProject(staffRelease, staffOpen.project);
+    expect(releasedByStaff.lockDownloads).toBe(false);
+    expect(releasedByStaff.downloadsUnlocked).toBe(true);
   });
 
   it("says when the project exists but Client Studio is off or locked", () => {

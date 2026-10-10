@@ -55,7 +55,8 @@ describe("listing presentation", () => {
     expect(presentation?.address).toBe("18 Oak Hollow, Spring, TX 77389");
     expect(presentation?.street).toBe("18 Oak Hollow");
     expect(presentation?.agentName).toBe("Riley Chen");
-    expect(presentation?.clientName).toBe("Northgate Group");
+    expect(presentation?.clientName).toBe("");
+    expect(JSON.stringify(presentation)).not.toContain("Northgate Group");
     expect(presentation?.price).toBe("$1,250,000");
     expect(presentation?.beds).toBe("4");
     const urls = presentation?.photos.map((photo) => photo.url);

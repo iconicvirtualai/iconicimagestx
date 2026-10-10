@@ -331,7 +331,8 @@ export function buildPresentation(source: PresentationSource): PublicPresentatio
   const photos = collectPresentationPhotos(source);
   const { address, street, locality } = addressParts(listing);
   const agentName = agentNameOf(listing);
-  const clientName = text(listing?.clientName);
+  // Share links are advertising pages. The client name stays off this payload.
+  const clientName = "";
   const origin = source.origin || "";
   const path = presentationPath(source.token);
   const pageUrl = origin ? `${origin.replace(/\/$/, "")}${path}` : path;

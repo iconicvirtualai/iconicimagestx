@@ -2,7 +2,7 @@ import * as React from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { doc, getDoc, serverTimestamp } from "firebase/firestore";
+import { doc, serverTimestamp } from "firebase/firestore";
 import { fetchListing } from "@/lib/listingUpload";
 import { toast } from "sonner";
 import {
@@ -57,7 +57,16 @@ export default function ClientStudio() {
     setLeaving(false);
     (async () => {
       try {
-        const res = await fetch(`/api/galleries/link/${encodeURIComponent(listingId)}`);
+        const headers: Record<string, string> = {};
+        if (user) {
+          try {
+            const token = await user.getIdToken();
+            if (token) headers.Authorization = `Bearer ${token}`;
+          } catch (err) {
+            console.warn("[ClientStudio] Could not attach the session.", err);
+          }
+        }
+        const res = await fetch(`/api/galleries/link/${encodeURIComponent(listingId)}`, { headers });
         const data = await res.json().catch(() => ({}));
         if (cancelled) return;
 
@@ -75,33 +84,10 @@ export default function ClientStudio() {
           });
           return;
         }
-        if (res.ok && data.kind === "listing" && data.openGalleryId) {
-          setLeaving(true);
-          navigate(`/gallery/${data.openGalleryId}`, { replace: true });
-          return;
-        }
         if (res.ok && data.kind === "listing" && data.project) {
-          let next = data.project;
-          if (user) {
-            try {
-              const snap = await getDoc(doc(db, "listings", listingId));
-              if (snap.exists()) {
-                const raw = { id: snap.id, ...snap.data() } as Record<string, unknown>;
-                next = {
-                  ...data.project,
-                  ...raw,
-                  view: "owner",
-                  downloadsUnlocked: data.project.downloadsUnlocked,
-                  notice: raw.notice || data.project.notice || null,
-                };
-              }
-            } catch (err) {
-              console.warn("[ClientStudio] Signed-in listing read failed.", err);
-            }
-          }
           if (!cancelled) {
             setFailure(null);
-            setProject(next);
+            setProject(data.project);
           }
           return;
         }
@@ -111,7 +97,7 @@ export default function ClientStudio() {
             const signedInProject = await fetchListing(listingId);
             if (!cancelled) {
               setFailure(null);
-              setProject(signedInProject);
+              setProject({ ...signedInProject, view: signedInProject.view || "owner" });
             }
             return;
           } catch (err) {
@@ -139,7 +125,7 @@ export default function ClientStudio() {
     };
   }, [listingId, navigate, user, authLoading]);
 
-  const canRevise = Boolean(user) && project?.view !== "public";
+  const canRevise = Boolean(user) && project?.view === "owner";
 
   const handleRevisionSubmit = async () => {
     if (!revisionNote.trim() || !listingId) return;
@@ -204,8 +190,10 @@ export default function ClientStudio() {
     </div>
   );
 
+  const owner = project.view === "owner";
   const images: any[] = project.images || [];
   const videos: any[] = project.videos || [];
+  const floorPlans: any[] = project.floorPlans || [];
   const tours: any[] = project.tourUrl ? [{ url: project.tourUrl }] : [];
   const downloadsUnlocked = typeof project.downloadsUnlocked === "boolean"
     ? project.downloadsUnlocked
@@ -216,9 +204,18 @@ export default function ClientStudio() {
       lockDownloads: project.lockDownloads,
     });
   const canDownloadFiles = studioOffersDownloads(project.view, downloadsUnlocked);
-  const locked = !downloadsUnlocked;
+  const locked = owner && !downloadsUnlocked;
   const address = addressText(project.address) || addressText(project.shootLocation);
-  const revisions: any[] = project.revisions || [];
+  const revisions: any[] = owner ? (project.revisions || []) : [];
+  const tabs = [
+    { id: "photos", label: "Photos", count: images.length },
+    { id: "videos", label: "Videos", count: videos.length },
+    { id: "tours", label: "Tours", count: tours.length + floorPlans.length },
+    ...(owner ? [
+      { id: "revisions", label: "Revisions", count: revisions.filter((r) => r.status === "pending").length },
+      { id: "ai_studio", label: "AI Tools", count: 0 },
+    ] : []),
+  ];
 
   return (
     <div className="min-h-screen bg-white">
@@ -232,12 +229,17 @@ export default function ClientStudio() {
             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Iconic Images</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tight">{address || "Your Gallery"}</h1>
-          {listingId && (
+          {owner && listingId && (
             <Link to={`/portal/listings/${listingId}`} className="inline-block mt-3 text-[10px] font-black uppercase tracking-widest text-[#0d9488]">
               Listing file
             </Link>
           )}
-          {project.clientName && <p className="text-gray-400 mt-1">{project.clientName}</p>}
+          {project.agentName && <p className="text-gray-400 mt-1">{project.agentName}</p>}
+          {owner && project.clientName && project.clientName !== project.agentName && (
+            <p className="text-gray-500 mt-1">{project.clientName}</p>
+          )}
+          {owner && project.clientEmail && <p className="text-gray-500 text-sm mt-1">{project.clientEmail}</p>}
+          {owner && project.clientPhone && <p className="text-gray-500 text-sm">{project.clientPhone}</p>}
           {project.services && Array.isArray(project.services) && (
             <div className="flex flex-wrap gap-2 mt-3">
               {project.services.map((s: string, i: number) => (
@@ -251,13 +253,7 @@ export default function ClientStudio() {
       {/* Tabs */}
       <div className="border-b border-gray-100 sticky top-0 bg-white z-10">
         <div className="max-w-6xl mx-auto px-4 flex gap-6">
-          {[
-            { id: "photos", label: "Photos", count: images.length },
-            { id: "videos", label: "Videos", count: videos.length },
-            { id: "tours", label: "3D Tours", count: tours.length },
-            { id: "revisions", label: "Revisions", count: revisions.filter(r => r.status === "pending").length },
-            { id: "ai_studio", label: "AI Tools", count: 0 },
-          ].map(t => (
+          {tabs.map(t => (
             <button key={t.id} onClick={() => setActiveTab(t.id as any)}
               className={`py-4 text-xs font-black uppercase tracking-widest border-b-2 transition-colors ${activeTab === t.id ? "border-[#0d9488] text-[#0d9488]" : "border-transparent text-gray-400 hover:text-gray-700"}`}>
               {t.label} {t.count > 0 && <span className="ml-1 text-gray-300">({t.count})</span>}
@@ -319,7 +315,7 @@ export default function ClientStudio() {
 
         {/* TOURS */}
         {activeTab === "tours" && (
-          tours.length === 0 ? (
+          tours.length === 0 && floorPlans.length === 0 ? (
             <div className="text-center py-20"><Layers className="w-16 h-16 text-gray-200 mx-auto mb-4" /><p className="text-gray-400 font-bold">No 3D tours</p></div>
           ) : (
             <div className="space-y-4">
@@ -331,12 +327,24 @@ export default function ClientStudio() {
                   </a>
                 </div>
               ))}
+              {floorPlans.map((plan: any, i: number) => (
+                <div key={plan.url || i} className="bg-gray-50 rounded-2xl p-6">
+                  <p className="font-bold mb-2">{plan.name || "Floor plan"}</p>
+                  {/\.(jpe?g|png|webp|gif)(\?|$)/i.test(String(plan.url || "")) ? (
+                    <img src={plan.url} alt={plan.name || "Floor plan"} className="mt-3 max-h-[480px] w-full rounded-xl object-contain bg-white" />
+                  ) : (
+                    <a href={plan.url} target="_blank" rel="noopener noreferrer" className="text-[#0d9488] font-bold flex items-center gap-2">
+                      View floor plan <ExternalLink className="w-4 h-4" />
+                    </a>
+                  )}
+                </div>
+              ))}
             </div>
           )
         )}
 
         {/* REVISIONS */}
-        {activeTab === "revisions" && (
+        {owner && activeTab === "revisions" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-black uppercase tracking-widest">Revision Requests</h3>
@@ -376,7 +384,7 @@ export default function ClientStudio() {
         )}
 
         {/* AI STUDIO (Placeholder) */}
-        {activeTab === "ai_studio" && (
+        {owner && activeTab === "ai_studio" && (
           <div className="bg-black rounded-3xl p-12 text-center text-white">
             <Zap className="w-12 h-12 text-[#0d9488] mx-auto mb-4" />
             <h3 className="text-xl font-black uppercase tracking-tight mb-2">AI Creative Studio</h3>
@@ -418,7 +426,7 @@ export default function ClientStudio() {
           <img src={images[selectedPhoto]?.url} alt="" className="max-w-[90vw] max-h-[90vh] object-contain" />
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3">
             <span className="text-white text-xs font-bold">{selectedPhoto + 1} / {images.length}</span>
-            {canDownloadFiles && <a href={images[selectedPhoto]?.url} download className="px-3 py-1.5 bg-white text-black rounded-lg text-[10px] font-bold">Download</a>}
+            {canDownloadFiles && <a href={images[selectedPhoto]?.downloadUrl || images[selectedPhoto]?.url} download className="px-3 py-1.5 bg-white text-black rounded-lg text-[10px] font-bold">Download</a>}
             {canRevise && (
               <button onClick={() => { setRevisionType("single"); setShowRevision(true); }} className="px-3 py-1.5 bg-white/20 text-white rounded-lg text-[10px] font-bold">Request Edit</button>
             )}

@@ -8,11 +8,16 @@ import admin from "firebase-admin";
 import {
   decideClientGalleryLink,
   invalidGalleryLinkMessage,
+  ownerStudioProject,
   type ClientGalleryLinkResult,
   type GalleryLinkDoc,
-  type PublicStudioProject,
+  type OwnerStudioProject,
 } from "../../shared/clientGalleryLink";
-import { clientGalleryDownloadsUnlocked } from "../../shared/paymentAccess";
+import { clientCanViewListing, staffCanAccessListing } from "../../shared/listingAccess";
+import { isActiveStaffRecord } from "../../shared/staffAccess";
+import { isTempAdminEnabled, liveServerEnv } from "../../shared/tempAdmin";
+import { resolveClientIdentity } from "../services/clientAccounts";
+import type { AuthenticatedRequest } from "../middleware/auth";
 
 const db = () => admin.firestore();
 
@@ -60,7 +65,7 @@ export async function resolveClientGalleryLink(id: string): Promise<ClientGaller
   const listing = docRecord(listingSnap);
 
   if (gallery) {
-    return finishGalleryLink(decideClientGalleryLink({
+    return decideClientGalleryLink({
       id,
       gallery,
       listing: null,
@@ -70,11 +75,11 @@ export async function resolveClientGalleryLink(id: string): Promise<ClientGaller
       pointedGallery: null,
       pointedListing: null,
       galleriesByOrderId: [],
-    }));
+    });
   }
 
   if (listing) {
-    return finishGalleryLink(decideClientGalleryLink({
+    return decideClientGalleryLink({
       id,
       gallery: null,
       listing,
@@ -84,7 +89,7 @@ export async function resolveClientGalleryLink(id: string): Promise<ClientGaller
       pointedGallery: null,
       pointedListing: null,
       galleriesByOrderId: [],
-    }));
+    });
   }
 
   const relatedGalleries = await galleriesWhere("listingId", id);
@@ -105,7 +110,7 @@ export async function resolveClientGalleryLink(id: string): Promise<ClientGaller
     if (pointedListing) pointedRelated = await relatedForListing(pointedListing);
   }
 
-  return finishGalleryLink(decideClientGalleryLink({
+  return decideClientGalleryLink({
     id,
     gallery: null,
     listing: null,
@@ -115,7 +120,7 @@ export async function resolveClientGalleryLink(id: string): Promise<ClientGaller
     pointedGallery,
     pointedListing,
     galleriesByOrderId,
-  }));
+  });
 }
 
 async function invoiceForListing(listing: GalleryLinkDoc): Promise<Record<string, unknown> | null> {
@@ -136,31 +141,78 @@ async function invoiceForListing(listing: GalleryLinkDoc): Promise<Record<string
   }
 }
 
-/** Replace the listing-only download flag with the post-shoot invoice and gallery release. */
-async function finishGalleryLink(result: ClientGalleryLinkResult): Promise<ClientGalleryLinkResult> {
+interface StudioCaller {
+  uid: string;
+  email?: string;
+  ids: string[];
+  staffRole?: string;
+}
+
+function callerCanOpenPrivateStudio(listing: GalleryLinkDoc, caller: StudioCaller | null): boolean {
+  if (!caller) return false;
+  if (caller.staffRole && staffCanAccessListing(caller.staffRole, caller.uid, listing)) return true;
+  return clientCanViewListing(listing, { uid: caller.uid, email: caller.email, ids: caller.ids });
+}
+
+/** A bad or missing session stays on the public share. It does not block the page. */
+async function readStudioCaller(req: { headers: { authorization?: string } }): Promise<StudioCaller | null> {
+  const header = req.headers.authorization || "";
+  if (!header.startsWith("Bearer ")) return null;
+  const token = header.slice("Bearer ".length).trim();
+  if (!token) return null;
+  try {
+    if (isTempAdminEnabled(liveServerEnv()) && token === "temp-admin-token") {
+      return {
+        uid: "temp-admin-uid",
+        email: "temp-admin@iconicimagestx.com",
+        ids: ["temp-admin-uid"],
+        staffRole: "admin",
+      };
+    }
+    const decoded = await admin.auth().verifyIdToken(token);
+    const staffSnap = await db().collection("staff").doc(decoded.uid).get();
+    const staff = staffSnap.exists ? staffSnap.data() : null;
+    const staffRole = isActiveStaffRecord(staff) ? String(staff?.role || "") : undefined;
+    const identity = await resolveClientIdentity(decoded.uid, decoded.email);
+    return {
+      uid: decoded.uid,
+      email: identity.email || decoded.email,
+      ids: identity.ids,
+      staffRole,
+    };
+  } catch (err) {
+    console.warn("[Galleries] Studio link session was not applied.", err);
+    return null;
+  }
+}
+
+/**
+ * Public callers keep the download-free share.
+ * The owning client and staff with listing access get delivery files.
+ * Download URLs still follow the existing payment lock.
+ */
+async function finishGalleryLink(
+  result: ClientGalleryLinkResult,
+  caller: StudioCaller | null,
+): Promise<ClientGalleryLinkResult> {
   if (!result.ok || result.kind !== "listing") return result;
   const listing = docRecord(await db().collection("listings").doc(result.project.id).get());
-  if (!listing) return result;
+  if (!listing || !callerCanOpenPrivateStudio(listing, caller)) return result;
   const [invoice, related] = await Promise.all([
     invoiceForListing(listing),
     relatedForListing(listing),
   ]);
+  if (result.project.view !== "public") return result;
   const status = typeof invoice?.status === "string" ? invoice.status : "";
-  const invoiceForGate = invoice || (result.project.invoice ? { status: result.project.invoice.status } : null);
-  const project: PublicStudioProject = {
-    ...result.project,
-    invoice: status ? { status } : result.project.invoice,
-    downloadsUnlocked: clientGalleryDownloadsUnlocked({
-      invoice: invoiceForGate,
-      downloadEnabled: listing.downloadEnabled === true || related.some((doc) => doc.downloadEnabled === true),
-      downloadsReleased: listing.downloadsReleased === true || related.some((doc) => doc.downloadsReleased === true),
-      lockDownloads: listing.lockDownloads,
-    }),
-  };
+  const project: OwnerStudioProject = ownerStudioProject(listing, result.project, {
+    invoice: status ? { status } : null,
+    downloadEnabled: listing.downloadEnabled === true || related.some((doc) => doc.downloadEnabled === true),
+    downloadsReleased: listing.downloadsReleased === true || related.some((doc) => doc.downloadsReleased === true),
+  });
   return { ...result, project };
 }
 
-export const handlePublicGalleryLink: RequestHandler = async (req, res) => {
+export const handlePublicGalleryLink: RequestHandler = async (req: AuthenticatedRequest, res) => {
   const id = String(req.params.id || "");
   const invalid = invalidGalleryLinkMessage(id);
   if (invalid) {
@@ -172,7 +224,7 @@ export const handlePublicGalleryLink: RequestHandler = async (req, res) => {
   }
 
   try {
-    const result = await resolveClientGalleryLink(id);
+    const result = await finishGalleryLink(await resolveClientGalleryLink(id), await readStudioCaller(req));
     if (result.ok === false) {
       return res.status(result.httpStatus).json({
         code: result.code,
