@@ -10,15 +10,6 @@ export interface CalendarRosterPerson {
   name: string;
 }
 
-export const ICONIC_CALENDAR_ROSTER: CalendarRosterPerson[] = [
-  { id: "mike@iconicimagestx.com", name: "Mike Luna" },
-  { id: "armando@iconicimagestx.com", name: "Armando" },
-  { id: "pedro@iconicimagestx.com", name: "Pedro" },
-  { id: "steven@iconicimagestx.com", name: "Steven" },
-  { id: "cadi@iconicimagestx.com", name: "Cadi" },
-  { id: "daniel@iconicimagestx.com", name: "Daniel" },
-];
-
 export type CalendarBlockKind = "shoot" | "hold" | "unavailable" | "free";
 
 export type ShooterDayStatus = "open" | "booked" | "twilight" | "hold" | "unavailable";

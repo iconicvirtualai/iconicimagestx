@@ -12,6 +12,7 @@ import {
   setHours,
   addDays,
 } from "date-fns";
+import { fetchPhotographerRoster, mergeCalendarRoster } from "@/lib/photographerRoster";
 import {
   appointmentRevenue,
   centralNoonDate,
@@ -19,7 +20,6 @@ import {
   getAssignedNames,
   isScheduledRecord,
   scheduleRecordDate,
-  staffDisplayName,
   toDate,
 } from "@/lib/scheduleRecords";
 import { useAuth } from "@/contexts/AuthContext";
@@ -107,26 +107,16 @@ export function useOperationsMetrics() {
       const todayKey = chicagoDateKey(new Date());
       const weekStart = startOfWeek(centralNoonDate(todayKey), { weekStartsOn: 1 });
       const weekEnd = addDays(weekStart, 7);
-      const defaultCalendars = [
-        { id: "mike@iconicimagestx.com", name: "Mike Luna" },
-        { id: "armando@iconicimagestx.com", name: "Armando" },
-        { id: "pedro@iconicimagestx.com", name: "Pedro" },
-        { id: "steven@iconicimagestx.com", name: "Steven" },
-        { id: "cadi@iconicimagestx.com", name: "Cadi" },
-        { id: "daniel@iconicimagestx.com", name: "Daniel" },
-      ];
-      const staffCalendars = staff
-        .map((person) => ({
-          id: person.googleCalendarId || person.calendarId || person.calendarEmail || person.email,
-          name: staffDisplayName(person) || person.email,
-        }))
-        .filter((item) => item.id);
-      const calendars = Array.from(
-        new Map(defaultCalendars.concat(staffCalendars).map((item) => [item.id.toLowerCase(), item])).values()
-      );
 
       try {
         const token = await user.getIdToken();
+        let rosterPeople: { id: string; name: string }[] = [];
+        try {
+          rosterPeople = await fetchPhotographerRoster(token);
+        } catch (error) {
+          console.warn("[useOperationsMetrics] Photographer roster unavailable:", error);
+        }
+        const calendars = mergeCalendarRoster(rosterPeople, staff);
         const response = await fetch("/api/calendar/schedule", {
           method: "POST",
           headers: {

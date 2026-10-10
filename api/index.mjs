@@ -15887,6 +15887,17 @@ router$2.post("/threads", async (req, res) => {
     });
   }
 });
+const PHOTOGRAPHER_CALENDAR_ROSTER = [
+  { id: "mike@iconicimagestx.com", name: "Mike Luna" },
+  { id: "armando@iconicimagestx.com", name: "Armando" },
+  { id: "pedro@iconicimagestx.com", name: "Pedro" },
+  { id: "steven@iconicimagestx.com", name: "Steven" },
+  { id: "cadi@iconicimagestx.com", name: "Cadi" },
+  { id: "daniel@iconicimagestx.com", name: "Daniel" }
+];
+function photographerCalendarRoster() {
+  return PHOTOGRAPHER_CALENDAR_ROSTER.map((person) => ({ ...person }));
+}
 const BUCKET = process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET || "iconic-images-aicon.firebasestorage.app";
 const CONFIG_ERROR = "Gallery upload is not configured on this server. In the Vercel project, set FIREBASE_SERVICE_ACCOUNT to the iconic-images-aicon service account JSON (Preview environment is enough) and FIREBASE_STORAGE_BUCKET to iconic-images-aicon.firebasestorage.app. Redeploy the preview. Do not change Storage rules to public write.";
 function safeFileName(raw) {
@@ -17775,6 +17786,9 @@ function createServer() {
         error: error instanceof Error ? error.message : "Calendar write check failed"
       });
     }
+  });
+  app.get("/api/calendar/roster", requireStaff, (_req, res) => {
+    return res.json({ photographers: photographerCalendarRoster() });
   });
   app.post("/api/calendar/schedule", requireStaff, async (req, res) => {
     try {

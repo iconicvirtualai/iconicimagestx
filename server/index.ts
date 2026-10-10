@@ -34,6 +34,7 @@ import contactRouter from "./routes/contact";
 import liveChatRouter from "./routes/liveChat";
 import contactThreadsRouter from "./routes/contactThreads";
 import { listCalendarScheduleEvents, verifyCalendarWriteAccess } from "./services/calendar";
+import { photographerCalendarRoster } from "./services/photographerRoster";
 import { clientNotifyLive } from "../shared/clientNotify";
 import { requireAdmin, requireStaff } from "./middleware/auth";
 import { handleListingPhotoUpload } from "./routes/listingPhotos";
@@ -156,6 +157,10 @@ export function createServer() {
         error: error instanceof Error ? error.message : "Calendar write check failed",
       });
     }
+  });
+
+  app.get("/api/calendar/roster", requireStaff, (_req, res) => {
+    return res.json({ photographers: photographerCalendarRoster() });
   });
 
   app.post("/api/calendar/schedule", requireStaff, async (req, res) => {

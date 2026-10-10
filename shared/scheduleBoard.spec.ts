@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  ICONIC_CALENDAR_ROSTER,
   calendarRoster,
   classifyCalendarEvent,
   countUnassignedShoots,
@@ -13,7 +12,14 @@ import {
   shooterStatusLabel,
 } from "./scheduleBoard";
 
-const roster = ICONIC_CALENDAR_ROSTER;
+const roster = [
+  { id: "mike@example.com", name: "Mike Luna" },
+  { id: "armando@example.com", name: "Armando" },
+  { id: "pedro@example.com", name: "Pedro" },
+  { id: "steven@example.com", name: "Steven" },
+  { id: "owner-calendar@example.com", name: "Cadi" },
+  { id: "daniel@example.com", name: "Daniel" },
+];
 
 describe("twilight labels", () => {
   it("reads twilight and dusk services as twilight", () => {
@@ -108,12 +114,12 @@ describe("shooter availability", () => {
 
   it("does not fuzzy-match a shared first name", () => {
     const people = calendarRoster([
-      { id: "mike@iconicimagestx.com", name: "Mike Luna" },
-      { id: "mike.s@iconicimagestx.com", name: "Mike Smith" },
-      { id: "armando@iconicimagestx.com", name: "Armando" },
+      { id: "mike@example.com", name: "Mike Luna" },
+      { id: "mike.s@example.com", name: "Mike Smith" },
+      { id: "armando@example.com", name: "Armando" },
     ]);
     expect(matchShooter("Mike", people)).toBeNull();
-    expect(matchShooter("Mike Luna", people)?.id).toBe("mike@iconicimagestx.com");
+    expect(matchShooter("Mike Luna", people)?.id).toBe("mike@example.com");
     expect(matchShooter("Armando Reyes", people)?.name).toBe("Armando");
   });
 
