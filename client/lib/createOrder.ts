@@ -72,6 +72,7 @@ export async function createOrder(formData: any) {
   return {
     success: true,
     requestId: data.requestId as string,
+    orderNumber: typeof data.orderNumber === "string" ? data.orderNumber : "",
     accountCreated: Boolean(data.accountCreated),
     notifications: (data.notifications || null) as {
       appointmentEmail?: string;

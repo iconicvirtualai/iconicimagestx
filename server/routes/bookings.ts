@@ -25,6 +25,7 @@ import { normalizeEmail } from "../../shared/listingAccess";
 import { addressText } from "../../shared/addressText";
 import { bookingDateLabel } from "../../shared/clientHome";
 import { storedServiceLocationFields } from "../../shared/serviceLocation";
+import { buildAdminOrderTile } from "../../shared/adminOrderTile";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -407,9 +408,23 @@ router.post("/", async (req, res) => {
 
     // Firestore draft stays for staff. Square billing waits until after the shoot.
 
+    // Same short code /admin/orders prints for this saved request. Display only.
+    let orderNumber = docRef.id;
+    try {
+      orderNumber = buildAdminOrderTile({
+        id: docRef.id,
+        selectedService: selectedService || null,
+        lineItems,
+        services: lineItems,
+      }).orderCode;
+    } catch (err) {
+      console.error("[Bookings] Order number format failed:", err);
+    }
+
     return res.status(201).json({
       success: true,
       requestId: docRef.id,
+      orderNumber,
       invoiceId,
       accountCreated: account.createdAccount,
       notifications,
