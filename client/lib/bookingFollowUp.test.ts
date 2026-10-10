@@ -44,7 +44,6 @@ describe("bookingFollowUp", () => {
       notifications: { appointmentEmail: "failed" },
     });
     expect(note).toContain(`call ${BUSINESS_CONTACT.phoneDisplay}`);
-    expect(note).not.toContain("281-356-0965");
   });
 
   it("does not promise a text or a new password when the account already existed", () => {

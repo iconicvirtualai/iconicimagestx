@@ -20,6 +20,10 @@ const bookingForm = readFileSync(
   new URL("./BookingForm.tsx", import.meta.url),
   "utf8",
 );
+const bookingConfirmation = readFileSync(
+  new URL("./BookingConfirmation.tsx", import.meta.url),
+  "utf8",
+);
 
 describe("money amount layout", () => {
   it("keeps $75.00 on one line with nowrap, no shrink, tabular figures, and a minimum width", () => {
@@ -81,10 +85,8 @@ describe("money amount layout", () => {
     expect(estimator).toContain('data-testid="booking-total"');
     expect(estimator).not.toContain("YOU'RE IN");
 
-    const confirmation = bookingForm.slice(
-      bookingForm.indexOf('case "success"'),
-    );
-    expect(confirmation).toContain("YOU'RE IN");
-    expect(confirmation).not.toContain("MoneyAmount");
+    expect(bookingForm).toContain("<BookingConfirmation");
+    expect(bookingConfirmation).toContain("YOU'RE IN");
+    expect(bookingConfirmation).not.toContain("MoneyAmount");
   });
 });
