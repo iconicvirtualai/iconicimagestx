@@ -34,8 +34,8 @@ export default function FAQSection() {
               FAQ
             </span>
           </div>
-          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold mb-6 leading-[1.2] tracking-tight text-black max-w-5xl mx-auto whitespace-nowrap">
-            Got questions? We've got <span className="accent-text-bordered">answers</span>.
+          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold mb-6 leading-[1.2] tracking-tight text-black max-w-5xl mx-auto text-balance [overflow-wrap:normal] [word-break:normal]">
+            Got questions? We've got <span className="whitespace-nowrap"><span className="accent-text-bordered">answers</span>.</span>
           </h2>
           <p className="text-lg md:text-xl text-gray-500 max-w-2xl mx-auto leading-relaxed">
             Everything you need to know about Iconic in a nutshell.

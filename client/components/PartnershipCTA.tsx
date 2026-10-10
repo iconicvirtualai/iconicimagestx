@@ -8,7 +8,7 @@ export default function PartnershipCTA() {
       <div className="container mx-auto px-4">
         <div className="max-w-4xl mx-auto text-center">
           {/* Headline */}
-          <h2 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-8 leading-[1.1] tracking-tight uppercase">
+          <h2 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-8 leading-[1.1] tracking-tight uppercase [overflow-wrap:normal] [word-break:normal]">
             Let's Create Something
             <br className="hidden md:block" />
             ICONIC Together.
@@ -24,7 +24,7 @@ export default function PartnershipCTA() {
           {/* CTA Button */}
           <div className="flex justify-center">
             <Link to="/book">
-              <Button className="bg-white text-black hover:bg-gray-100 font-bold text-xl px-12 py-8 rounded-2xl transition-all hover:scale-105 flex items-center gap-2">
+              <Button className="max-w-full whitespace-normal bg-white text-black hover:bg-gray-100 font-bold text-base sm:text-xl px-6 sm:px-12 py-6 sm:py-8 rounded-2xl transition-all hover:scale-105 flex items-center gap-2 [overflow-wrap:normal] [word-break:normal]">
                 Get your free Iconic Video
                 <ArrowRight className="w-6 h-6" />
               </Button>

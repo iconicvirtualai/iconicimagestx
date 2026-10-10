@@ -104,6 +104,18 @@ export default function Header() {
                 {item.label}
               </Link>
             ))}
+            <Link
+              to="/login"
+              className="text-xs font-bold text-white/70 hover:text-white transition-colors"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Log in
+            </Link>
+            <Link to="/book" onClick={() => setIsMenuOpen(false)}>
+              <Button className="w-full rounded-xl px-5 py-1.5 h-10 text-[10px] font-black uppercase tracking-widest bg-white text-black hover:bg-gray-200">
+                Book Now
+              </Button>
+            </Link>
           </nav>
         </div>
       )}
