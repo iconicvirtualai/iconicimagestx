@@ -4,6 +4,7 @@ import { goDocumentTitle, goPromo, hasGoPromoCta } from "./goPromo";
 describe("shirt QR landing copy", () => {
   it("uses an evergreen title, heading, and book action", () => {
     expect(goDocumentTitle).toBe("Iconic Images | Book your shoot");
+    expect(goPromo.eyebrow).toBe("Iconic Images");
     expect(goPromo.title).toBe("Real estate media that sells");
     expect(goPromo.ctaLabel).toBe("Book a shoot");
     expect(goPromo.ctaHref).toBe("/book");

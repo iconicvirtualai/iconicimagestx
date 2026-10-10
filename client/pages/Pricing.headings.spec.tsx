@@ -27,7 +27,8 @@ describe("pricing section headings", () => {
     ]) {
       const tag = headingTag(html, text);
       expect(tag).not.toContain("whitespace-nowrap");
-      expect(tag).toContain("overflow-wrap:anywhere");
+      expect(tag).not.toContain("anywhere");
+      expect(tag).toContain("break-words");
       expect(tag).toContain("tracking-[0.12em]");
       expect(tag).toContain("min-w-0");
     }

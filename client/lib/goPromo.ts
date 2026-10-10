@@ -21,7 +21,7 @@ export interface GoPromo {
 export const goDocumentTitle = "Iconic Images | Book your shoot";
 
 export const goPromo: GoPromo = {
-  eyebrow: "Iconic Studio",
+  eyebrow: "Iconic Images",
   title: "Real estate media that sells",
   description:
     "Listing photos, film, and brand media from Iconic Images. Book a shoot when you are ready.",

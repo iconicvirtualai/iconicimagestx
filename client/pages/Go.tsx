@@ -57,7 +57,7 @@ export default function Go() {
           <p className="text-xs font-black uppercase tracking-[0.28em] text-teal-300">
             {goPromo.eyebrow}
           </p>
-          <h1 className="mt-4 text-balance text-4xl font-black leading-[1.05] tracking-tight text-white [overflow-wrap:anywhere] sm:text-5xl">
+          <h1 className="mt-4 text-balance break-words text-4xl font-black leading-[1.05] tracking-tight text-white sm:text-5xl">
             {goPromo.title}
           </h1>
           <p className="mx-auto mt-5 max-w-md text-lg leading-relaxed text-white">
