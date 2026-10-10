@@ -46,7 +46,7 @@ describe("staff invoice routes", () => {
     expect(editorPage).toContain("PackageCatalogPicker");
     expect(pickerPage).toContain("Choose a package");
     expect(pickerPage).toContain("Search packages");
-    expect(editorPage).toContain("professionalInvoiceNumber");
+    expect(editorPage).toContain("invoicePageInvoiceNumber");
     expect(editorPage).toContain(">Description<");
     expect(editorPage).toContain(">Quantity<");
     expect(editorPage).toContain("Discount amount");

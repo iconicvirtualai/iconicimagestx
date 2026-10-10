@@ -33,11 +33,11 @@ import {
   type InvoicePreset,
   type InvoicePresetKind,
 } from "@shared/invoicePresets";
+import { invoicePageInvoiceNumber } from "@shared/orderProjectInvoice";
 import {
   billToAddressText,
   clientPaymentPath,
   findStaffCatalogPackage,
-  professionalInvoiceNumber,
   repriceInvoiceAdjustments,
   splitStaffInvoiceLines,
   staffInvoiceSavePatch,
@@ -362,7 +362,11 @@ export default function AdminInvoiceEditor() {
     );
   }
 
-  const invoiceNumber = professionalInvoiceNumber(invoice.invoiceNumber, invoiceId);
+  const invoiceNumber = invoicePageInvoiceNumber({
+    invoiceNumber: invoice.invoiceNumber,
+    id: invoiceId,
+    createdAt: invoice.createdAt,
+  });
 
   return (
     <AdminLayout title="Invoice">
