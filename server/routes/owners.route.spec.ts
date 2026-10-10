@@ -163,6 +163,11 @@ describe("owners suite access", () => {
     expect(page).not.toContain("1vHkdHRhAWKcnsv8");
     expect(page).not.toContain("4280");
     expect(page).not.toContain(OWNER_WHY);
+    expect(page).not.toContain("Cormorant");
+    expect(page).not.toContain("font-serif");
+    expect(page).not.toContain("italic");
+    expect(page).toContain("Montserrat");
+    expect(page).toContain("Inter, system-ui, sans-serif");
     const vercel = JSON.parse(fs.readFileSync("vercel.json", "utf8")) as {
       rewrites: Array<{ source: string; destination: string }>;
     };

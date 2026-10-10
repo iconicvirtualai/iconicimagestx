@@ -98,7 +98,7 @@ export default function OwnersSuite() {
   }
   if (state.status === "error") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#071422] px-6 text-center">
+      <div className="owners-suite flex min-h-screen items-center justify-center bg-[#071422] px-6 text-center" style={suiteFont}>
         <div>
           <p className="text-sm text-[#d5deea]">This page could not be opened.</p>
           <button type="button" onClick={() => void refresh()} className="mt-4 text-xs font-black uppercase tracking-[0.18em] text-[#e8c872]">
@@ -117,6 +117,38 @@ export default function OwnersSuite() {
       onRefresh={() => void refresh()}
       onSignOut={() => void signOut()}
     />
+  );
+}
+
+/** Inter is already on the site. Montserrat is requested only while this suite is open. */
+const SUITE_SANS = 'Inter, system-ui, sans-serif';
+const SUITE_HEADING = '"Montserrat", Inter, system-ui, sans-serif';
+const suiteFont = {
+  fontFamily: SUITE_SANS,
+  fontStyle: "normal" as const,
+  ["--owners-heading" as string]: SUITE_HEADING,
+};
+
+function OwnersFonts() {
+  useEffect(() => {
+    const id = "owners-suite-fonts";
+    if (document.getElementById(id)) return;
+    const link = document.createElement("link");
+    link.id = id;
+    link.rel = "stylesheet";
+    link.href = "https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&display=swap";
+    document.head.appendChild(link);
+  }, []);
+
+  return (
+    <style>{`
+      .owners-suite, .owners-suite * { font-style: normal; }
+      .owners-suite .owners-heading {
+        font-family: var(--owners-heading);
+        font-weight: 700;
+        font-style: normal;
+      }
+    `}</style>
   );
 }
 
@@ -146,7 +178,8 @@ function OwnersSuiteView({
   const stamp = suiteStamp(data.generatedAt);
 
   return (
-    <div className="min-h-screen bg-[#071422] text-[#f7f1e4]">
+    <div className="owners-suite min-h-screen bg-[#071422] text-[#f7f1e4]" style={suiteFont}>
+      <OwnersFonts />
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <img src="/media/decor/arc.svg" alt="" className="absolute -right-24 -top-16 w-[420px] opacity-30" />
         <div className="absolute left-1/2 top-0 h-64 w-[36rem] -translate-x-1/2 rounded-full bg-[#e8c872]/10 blur-3xl" />
@@ -156,7 +189,7 @@ function OwnersSuiteView({
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-8">
           <div className="min-w-0">
             <p className="text-[10px] font-black uppercase tracking-[0.28em] text-white">Iconic</p>
-            <h1 className="font-['Cormorant_Garamond'] text-[1.7rem] leading-none text-[#f4e2b0]">Owners Suite</h1>
+            <h1 className="owners-heading text-[1.7rem] leading-none text-[#f4e2b0]">Owners Suite</h1>
           </div>
           <div className="flex shrink-0 items-center gap-4">
             {showOps ? (
@@ -239,7 +272,7 @@ function OwnersSuiteView({
                   <span className={`mb-3 inline-flex rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-[#071422] ${toneClass(business.tone)}`}>
                     {business.label}
                   </span>
-                  <h3 className="font-['Cormorant_Garamond'] text-[1.35rem] leading-none text-[#f7f1e4]">{business.name}</h3>
+                  <h3 className="owners-heading text-[1.35rem] leading-none text-[#f7f1e4]">{business.name}</h3>
                   <p className="mt-2 text-[11px] leading-snug text-[#9fb0c7]">{business.note || "No note"}</p>
                 </article>
               ))}
@@ -312,7 +345,7 @@ function OwnersSuiteView({
               <div className="grid gap-2">
                 {data.horizons.map((horizon) => (
                   <article key={horizon.horizon} className="rounded-2xl bg-[#071422] px-3 py-3">
-                    <p className="font-['Cormorant_Garamond'] text-3xl leading-none text-[#e8c872]">{horizon.horizon}</p>
+                    <p className="owners-heading text-3xl leading-none text-[#e8c872]">{horizon.horizon}</p>
                     <ul className="mt-2 space-y-1">
                       {horizon.items.map((item) => (
                         <li key={item} className="text-xs leading-snug text-[#d5deea]">{item}</li>
@@ -337,7 +370,7 @@ function WhyHero({ quote }: { quote: string }) {
       <div className="pointer-events-none absolute -left-10 -top-12 h-40 w-40 rounded-full bg-[#f0d48a]/35 blur-3xl" />
       <div className="pointer-events-none absolute -right-8 bottom-0 h-28 w-48 rounded-full bg-[#e8c872]/25 blur-2xl" />
       <p className="relative text-[10px] font-black uppercase tracking-[0.28em] text-[#f0d48a]">Why</p>
-      <blockquote className="relative mt-3 max-w-4xl font-['Cormorant_Garamond'] text-[1.65rem] font-medium leading-snug text-[#fff8ea] md:text-[2.35rem] md:leading-tight">
+      <blockquote className="relative mt-3 max-w-4xl owners-heading text-[1.65rem] leading-snug text-[#fff8ea] md:text-[2.15rem] md:leading-snug">
         <span aria-hidden="true" className="mr-1 text-[#f0d48a]">“</span>
         {quote}
         <span aria-hidden="true" className="text-[#f0d48a]">”</span>
@@ -350,7 +383,7 @@ function Card({ kicker, title, children }: { kicker: string; title: string; chil
   return (
     <section className="min-w-0 rounded-[28px] border border-[#e8c872]/30 bg-[#102844] p-5 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
       <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#e8c872]">{kicker}</p>
-      <h2 className="mt-1 font-['Cormorant_Garamond'] text-[1.85rem] leading-none text-[#f7f1e4]">{title}</h2>
+      <h2 className="mt-1 owners-heading text-[1.85rem] leading-none text-[#f7f1e4]">{title}</h2>
       <div className="mt-4">{children}</div>
     </section>
   );
@@ -367,7 +400,7 @@ function Meter({ label, amount, goal }: { label: string; amount: number | null; 
     <div>
       <div className="flex items-end justify-between gap-3">
         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#c5d0df]">{label}</p>
-        <p className="font-['Cormorant_Garamond'] text-4xl leading-none text-[#f7f1e4]">{money(amount)}</p>
+        <p className="owners-heading text-4xl leading-none text-[#f7f1e4]">{money(amount)}</p>
       </div>
       <div
         className="mt-3 h-2 overflow-hidden rounded-full bg-white/10"
@@ -440,7 +473,7 @@ function WeekStrip({ generatedAt, items }: { generatedAt: string; items: OwnerSu
           return (
             <div key={day.key} className={`rounded-xl px-1 py-2 text-center ${active ? "bg-[#e8c872] text-[#071422]" : "bg-[#071422] text-[#d5deea]"}`}>
               <p className="text-[9px] font-black uppercase tracking-wide">{day.label}</p>
-              <p className="mt-1 font-['Cormorant_Garamond'] text-xl leading-none">{day.date}</p>
+              <p className="mt-1 owners-heading text-xl leading-none">{day.date}</p>
               <p className="mt-1 text-[9px] font-bold">{count || "·"}</p>
             </div>
           );
@@ -474,7 +507,7 @@ function BotCard({ state, entries }: { state: OwnerSuiteData["bots"]["state"]; e
                   <p className="text-sm font-semibold text-[#f7f1e4]">{entry.bot}</p>
                   <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#e8c872]">{entry.loop}</p>
                 </div>
-                <p className="shrink-0 font-['Cormorant_Garamond'] text-3xl leading-none text-[#f4e2b0]">
+                <p className="shrink-0 owners-heading text-3xl leading-none text-[#f4e2b0]">
                   {entry.accuracy == null ? "—" : `${entry.accuracy}%`}
                 </p>
               </div>
