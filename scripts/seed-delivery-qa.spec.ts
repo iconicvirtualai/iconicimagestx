@@ -1,17 +1,26 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { inflateRawSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
+import { createElement } from "react";
+import { renderToString } from "react-dom/server";
+import { ClientGalleryMediaCard } from "../client/components/gallery/ClientGalleryMedia.tsx";
+import { classifyClientGalleryItem } from "../client/components/gallery/clientGalleryMedia.ts";
 import { buildPortalListingDetail } from "../shared/portalListingDetail.ts";
+import { publicMediaItem } from "../shared/paymentAccess.ts";
 import {
   DELIVERY_QA_CLIENT_EMAIL,
   DELIVERY_QA_CLIENT_NAME,
   DELIVERY_QA_IDS,
+  DELIVERY_QA_LOCK_FIELDS,
   DELIVERY_QA_MATTERPORT_URL,
   DELIVERY_QA_ROLES,
+  DELIVERY_QA_UNLOCK_FIELDS,
   buildDeliveryQaSeed,
   deliveryQaPublicPreview,
   deliveryQaRefusals,
+  deliveryQaUnlockRefusals,
   formatDeliveryQaDryRun,
   parseDeliveryQaArgs,
 } from "../shared/deliveryQaSeed.ts";
@@ -70,11 +79,10 @@ describe("delivery QA seed plan", () => {
     expect(doc("invoices").data).not.toHaveProperty("squarePaymentId");
     expect(doc("galleries").data).toMatchObject({
       status: "delivered",
-      downloadEnabled: false,
-      downloadsReleased: false,
-      lockDownloads: true,
+      ...DELIVERY_QA_LOCK_FIELDS,
       invoiceId: DELIVERY_QA_IDS.invoice,
     });
+    expect(doc("listings").data).toMatchObject(DELIVERY_QA_LOCK_FIELDS);
 
     const preview = deliveryQaPublicPreview(plan);
     expect(preview.paymentRequired).toBe(true);
@@ -85,14 +93,21 @@ describe("delivery QA seed plan", () => {
       expect(item.url).toBeNull();
       expect(item.shareUrl).toBeNull();
       expect(item.embedUrl).toBeNull();
+      expect(item.poster).toBeNull();
       expect(item.locked).toBe(true);
     }
     expect(plan.emailsSent).toBe(0);
   });
 
-  it("points the gallery and listing at sample media or a labeled placeholder", () => {
-    const placeholders = plan.media.filter((item) => item.placeholder).map((item) => item.role);
-    expect(placeholders).toEqual(["floorplan-png", "floorplan-pdf", "other"]);
+  it("points the gallery and listing at real sample media", () => {
+    expect(plan.media.filter((item) => item.placeholder)).toEqual([]);
+    expect(plan.media.find((item) => item.role === "floorplan-png")).toMatchObject({
+      contentType: "image/png",
+      width: 1800,
+      height: 1270,
+      coverage: "converted",
+    });
+    expect(plan.media.find((item) => item.role === "other")?.contentType).toBe("application/zip");
     expect(plan.media.find((item) => item.role === "matterport")).toMatchObject({
       type: "matterport",
       url: DELIVERY_QA_MATTERPORT_URL,
@@ -162,10 +177,11 @@ describe("delivery QA seed plan", () => {
   });
 
   it("treats a dry run as the default and keeps mail out of the script", () => {
-    expect(parseDeliveryQaArgs([])).toEqual({ write: false, unknown: [] });
-    expect(parseDeliveryQaArgs(["--"])).toEqual({ write: false, unknown: [] });
-    expect(parseDeliveryQaArgs(["--write"])).toEqual({ write: true, unknown: [] });
-    expect(parseDeliveryQaArgs(["--send"])).toEqual({ write: false, unknown: ["--send"] });
+    expect(parseDeliveryQaArgs([])).toEqual({ write: false, unlock: false, unknown: [] });
+    expect(parseDeliveryQaArgs(["--"])).toEqual({ write: false, unlock: false, unknown: [] });
+    expect(parseDeliveryQaArgs(["--write"])).toEqual({ write: true, unlock: false, unknown: [] });
+    expect(parseDeliveryQaArgs(["--unlock"])).toEqual({ write: false, unlock: true, unknown: [] });
+    expect(parseDeliveryQaArgs(["--send"])).toEqual({ write: false, unlock: false, unknown: ["--send"] });
 
     const source = readFileSync(new URL("./seed-delivery-qa.ts", import.meta.url), "utf8");
     expect(source).not.toMatch(/from ["'][^"']*(email|sms|square|twilio|nodemailer)/);
@@ -187,12 +203,19 @@ describe("delivery QA seed plan", () => {
     const png = readFileSync("public/media/playtest/TEST-delivery-qa-floorplan.png");
     const pdf = readFileSync("public/media/playtest/TEST-delivery-qa-floorplan.pdf");
     const zip = readFileSync("public/media/playtest/TEST-delivery-qa-other.zip");
+    const jpeg = readFileSync("public/media/launch/floorplan_sample_cropped.jpg");
     expect(png.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
-    expect(png.length).toBeLessThan(200);
+    expect(png.readUInt32BE(16)).toBe(1800);
+    expect(png.readUInt32BE(20)).toBe(1270);
+    expect(png.length).toBeGreaterThan(10_000);
     expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
-    expect(pdf.toString("latin1")).toContain("TEST - Delivery QA floor plan placeholder");
+    expect(pdf.includes(jpeg)).toBe(true);
+    expect(pdf.toString("latin1")).not.toContain("floor plan placeholder");
     expect(zip.subarray(0, 2).toString()).toBe("PK");
-    expect(zip.length).toBeLessThan(500);
+    expect(zip.length).toBe(plan.media.find((item) => item.role === "other")?.fileSize);
+    const entry = zipEntry(zip, "floorplan_sample_cropped.jpg");
+    expect(entry.subarray(0, 3).toString("hex")).toBe("ffd8ff");
+    expect(entry.equals(jpeg)).toBe(true);
 
     const stdout = execFileSync(
       fileURLToPath(new URL("../node_modules/.bin/tsx", import.meta.url)),
@@ -205,4 +228,87 @@ describe("delivery QA seed plan", () => {
     );
     expect(stdout).toBe(formatDeliveryQaDryRun(plan));
   });
+
+  it("renders each unlocked public item as the gallery kind that file is", () => {
+    const kinds = [
+      "mls-photo",
+      "fullres-photo",
+      "branded-video",
+      "unbranded-video",
+      "reel",
+      "tour",
+      "floorplan-image",
+      "floorplan-pdf",
+      "aerial-photo",
+      "file",
+    ];
+    const rendered = plan.media.map((item) => {
+      const publicItem = publicMediaItem(item as unknown as Record<string, unknown>, true);
+      return {
+        kind: classifyClientGalleryItem(publicItem),
+        html: renderToString(createElement(ClientGalleryMediaCard, { item: publicItem })),
+        item: publicItem,
+      };
+    });
+    expect(rendered.map((row) => row.kind)).toEqual(kinds);
+    expect(rendered[5].html).toContain(`src="${DELIVERY_QA_MATTERPORT_URL}"`);
+    expect(rendered[5].html).toContain("gallery-tour-");
+    expect(rendered[6].html).toContain("TEST-delivery-qa-floorplan.png");
+    expect(rendered[7].html).toContain("gallery-open-floorplan-");
+    expect(rendered[7].html).toContain("TEST-delivery-qa-floorplan.png");
+    expect(rendered[7].item.url).toContain("TEST-delivery-qa-floorplan.pdf");
+    expect(rendered[9].html).toContain("ZIP");
+    expect(rendered[9].html).not.toContain("Size not on file");
+    for (const row of rendered) {
+      if (row.kind === "tour") continue;
+      expect(String(row.item.url)).toMatch(/^https:\/\/iconicimagestx\.com\//);
+    }
+  });
+
+  it("refuses unlock unless both playtest docs exist", () => {
+    expect(deliveryQaUnlockRefusals({
+      gallery: { exists: true, playtest: true },
+      listing: { exists: true, playtest: true },
+    })).toEqual([]);
+    expect(deliveryQaUnlockRefusals({
+      gallery: { exists: false, playtest: undefined },
+      listing: { exists: true, playtest: false },
+    })).toEqual([
+      `galleries/${DELIVERY_QA_IDS.gallery} does not exist.`,
+      `listings/${DELIVERY_QA_IDS.listing} is not marked playtest.`,
+    ]);
+    expect(DELIVERY_QA_UNLOCK_FIELDS).toEqual({
+      lockDownloads: false,
+      requirePayment: false,
+      downloadEnabled: true,
+      downloadsReleased: true,
+    });
+    expect(DELIVERY_QA_UNLOCK_FIELDS).not.toHaveProperty("status");
+    expect(DELIVERY_QA_UNLOCK_FIELDS).not.toHaveProperty("amountPaid");
+    const source = readFileSync(new URL("./seed-delivery-qa.ts", import.meta.url), "utf8");
+    const unlock = source.slice(source.indexOf("async function unlockDeliveryQa"));
+    expect(unlock).toContain("deliveryQaUnlockRefusals");
+    expect(unlock).not.toContain('collection("invoices")');
+    expect(unlock.indexOf("deliveryQaUnlockRefusals")).toBeLessThan(unlock.indexOf("batch.commit"));
+  });
 });
+
+function zipEntry(zip: Buffer, name: string): Buffer {
+  let offset = 0;
+  while (offset + 30 < zip.length && zip.readUInt32LE(offset) === 0x04034b50) {
+    const method = zip.readUInt16LE(offset + 8);
+    const compressedSize = zip.readUInt32LE(offset + 18);
+    const nameLength = zip.readUInt16LE(offset + 26);
+    const extraLength = zip.readUInt16LE(offset + 28);
+    const entryName = zip.subarray(offset + 30, offset + 30 + nameLength).toString();
+    const dataStart = offset + 30 + nameLength + extraLength;
+    const data = zip.subarray(dataStart, dataStart + compressedSize);
+    if (entryName === name) {
+      if (method === 0) return Buffer.from(data);
+      if (method === 8) return inflateRawSync(data);
+      throw new Error(`unsupported zip method ${method}`);
+    }
+    offset = dataStart + compressedSize;
+  }
+  throw new Error(`missing zip entry ${name}`);
+}
