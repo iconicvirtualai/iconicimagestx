@@ -16,6 +16,8 @@
     }
   },
   "redirects": [
+    { "source": "/pricing-v1", "destination": "/pricing", "statusCode": 301 },
+    { "source": "/pricing-v1/", "destination": "/pricing", "statusCode": 301 },
     { "source": "/studio", "destination": "/studio-105", "permanent": false },
     { "source": "/studio/", "destination": "/studio-105", "permanent": false },
     { "source": "/gallery", "destination": "/studio-105", "permanent": false },

@@ -38,10 +38,16 @@ function expressPlugin(): Plugin {
     apply: "serve", // Only apply during development (serve mode)
     configureServer(server) {
       // Serve the standalone guest-prep sheet at a clean path before the SPA fallback.
-      server.middlewares.use((req, _res, next) => {
+      server.middlewares.use((req, res, next) => {
         const raw = req.url || "";
         const queryAt = raw.indexOf("?");
         const pathOnly = queryAt === -1 ? raw : raw.slice(0, queryAt);
+        if (pathOnly === "/pricing-v1" || pathOnly === "/pricing-v1/") {
+          res.statusCode = 301;
+          res.setHeader("Location", "/pricing");
+          res.end();
+          return;
+        }
         if (pathOnly === "/podcast-guest-prep" || pathOnly === "/podcast-guest-prep/") {
           const search = queryAt === -1 ? "" : raw.slice(queryAt);
           req.url = `/podcast-guest-prep.html${search}`;
