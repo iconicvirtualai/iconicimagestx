@@ -775,13 +775,29 @@ function offerItem(pkg: StaffCatalogPackage, presentation?: CatalogItem): Catalo
   };
 }
 
-/** Selectable booking lists. Prices, names, and active flags come from the catalog. */
-export function bookingOffer(catalog: StaffCatalogPackage[] = packagesForStaffEditor([])): BookingOffer {
+/** Public booking copy when a catalog price is $0 or missing. */
+export const CALL_FOR_PRICING_LABEL = "Call for pricing";
+
+/** True when a catalog price can be charged on the public booking form. */
+export function catalogPriceIsBookable(price: unknown): boolean {
+  const amount = typeof price === "number"
+    ? price
+    : typeof price === "string" && price.trim()
+      ? Number(price)
+      : Number.NaN;
+  return Number.isFinite(amount) && amount > 0;
+}
+
+function collectBookingOffer(
+  catalog: StaffCatalogPackage[],
+  include: (pkg: StaffCatalogPackage) => boolean,
+): BookingOffer {
   const servicesOut: BookingOfferService[] = [];
   const basics: CatalogItem[] = [];
   const addOnBuckets = new Map<string, CatalogItem[]>();
 
   for (const pkg of catalog) {
+    if (!include(pkg)) continue;
     if (pkg.bookingKind === "service") {
       const known = services.find((entry) => entry.id === pkg.id || entry.id === pkg.bookingId);
       const category = pkg.serviceCategory || known?.category;
@@ -820,7 +836,7 @@ export function bookingOffer(catalog: StaffCatalogPackage[] = packagesForStaffEd
     ...[...addOnBuckets.keys()].filter((group) => !addOns.some((entry) => entry.category === group)),
   ];
   const upgrade = (id: string) => {
-    const pkg = catalog.find((entry) => entry.id === id || entry.bookingId === id);
+    const pkg = catalog.find((entry) => (entry.id === id || entry.bookingId === id) && include(entry));
     return pkg ? offerItem(pkg, UPGRADES.find((entry) => entry.id === id)) : undefined;
   };
 
@@ -837,6 +853,16 @@ export function bookingOffer(catalog: StaffCatalogPackage[] = packagesForStaffEd
     specializedSocial: upgrade("specialized-social"),
     specializedBoth: upgrade("specialized-both"),
   };
+}
+
+/** Selectable booking lists. A $0 or missing price is left out so it cannot be booked. */
+export function bookingOffer(catalog: StaffCatalogPackage[] = packagesForStaffEditor([])): BookingOffer {
+  return collectBookingOffer(catalog, (pkg) => catalogPriceIsBookable(pkg.price));
+}
+
+/** Active catalog rows waiting on a real price. /book can show them, but they are not selectable. */
+export function bookingPriceHolds(catalog: StaffCatalogPackage[] = packagesForStaffEditor([])): BookingOffer {
+  return collectBookingOffer(catalog, (pkg) => !catalogPriceIsBookable(pkg.price));
 }
 
 export interface CatalogPackageEdits {

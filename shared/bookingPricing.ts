@@ -10,6 +10,8 @@
  */
 
 import {
+  CALL_FOR_PRICING_LABEL,
+  catalogPriceIsBookable,
   packagesForStaffEditor,
   promoDiscountFor,
   type StaffCatalogPackage,
@@ -130,19 +132,26 @@ function warnUncatalogedPackage(name: string, price: number): void {
 
 /** True once the customer has picked something the catalog can price. */
 export function hasBookingSelection(input: BookingPriceInput): boolean {
-  const catalog = input.catalog;
+  const explicitCatalog = input.catalog;
+  const catalog = explicitCatalog ?? packagesForStaffEditor([]);
   const known = (id?: string) => {
     const key = String(id || "").trim();
     if (!key) return false;
-    return catalog ? Boolean(findCatalogItem(catalog, key)) : true;
+    const item = findCatalogItem(catalog, key);
+    if (item) return catalogPriceIsBookable(item.price);
+    return explicitCatalog ? false : true;
+  };
+  const pricedUpgrade = (id: string) => {
+    const item = findCatalogItem(catalog, id);
+    return item ? catalogPriceIsBookable(item.price) : !explicitCatalog;
   };
   if (known(input.selectedService)) return true;
   if ((input.selectedBasics || []).some((id) => known(id))) return true;
   if ((input.selectedAddOns || []).some((id) => known(id))) return true;
-  if (input.premiumUpgrade && (!catalog || findCatalogItem(catalog, "iconic-finish"))) return true;
-  if ((input.virtualStagingCredits || 0) > 0 && (!catalog || findCatalogItem(catalog, "virtual-staging"))) return true;
-  if (input.specializedPhotography === "social") return !catalog || Boolean(findCatalogItem(catalog, "specialized-social"));
-  if (input.specializedPhotography === "both") return !catalog || Boolean(findCatalogItem(catalog, "specialized-both"));
+  if (input.premiumUpgrade && pricedUpgrade("iconic-finish")) return true;
+  if ((input.virtualStagingCredits || 0) > 0 && pricedUpgrade("virtual-staging")) return true;
+  if (input.specializedPhotography === "social") return pricedUpgrade("specialized-social");
+  if (input.specializedPhotography === "both") return pricedUpgrade("specialized-both");
   return false;
 }
 
@@ -471,4 +480,57 @@ export function chargedServiceLines<T extends { id?: string; name?: string }>(it
     const name = String(item.name || "");
     return !id.startsWith("promo-") && !name.startsWith("Promo Code:");
   });
+}
+
+function joinCatalogNames(names: string[]): string {
+  if (names.length <= 1) return names[0] || "";
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+}
+
+/**
+ * Names a catalog package or add-on on this booking whose price is $0 or missing.
+ * Returns null when every matched catalog item has a price the form can charge.
+ * Uncataloged lines, including the temporary order page, are left alone.
+ */
+export function unpricedCatalogBookingError(
+  body: Record<string, unknown>,
+  catalog?: StaffCatalogPackage[],
+): string | null {
+  const list = catalog ?? packagesForStaffEditor([]);
+  const names = new Set<string>();
+  const consider = (raw: unknown) => {
+    if (typeof raw !== "string") return;
+    const item = findCatalogItem(list, raw);
+    if (item && !catalogPriceIsBookable(item.price)) names.add(item.name);
+  };
+
+  consider(body.selectedService);
+  for (const id of textList(body.selectedBasics)) consider(id);
+  for (const id of textList(body.selectedAddOns)) consider(id);
+  if (body.premiumUpgrade === true) consider("iconic-finish");
+  const credits = Number(body.virtualStagingCredits);
+  if (Number.isFinite(credits) && credits > 0) consider("virtual-staging");
+  const specialized = optionalLineText(body.specializedPhotography);
+  if (specialized === "social") consider("specialized-social");
+  if (specialized === "both") consider("specialized-both");
+
+  if (Array.isArray(body.lineItems)) {
+    for (const raw of body.lineItems) {
+      if (!raw || typeof raw !== "object") continue;
+      const item = raw as Record<string, unknown>;
+      consider(item.id);
+      consider(item.name);
+    }
+  }
+
+  for (const line of chargedServiceLines(resolveSubmittedBooking(body, list).lineItems)) {
+    consider(line.id);
+    consider(line.name);
+  }
+
+  if (names.size === 0) return null;
+  const listNames = [...names];
+  const verb = listNames.length === 1 ? "is" : "are";
+  return `${joinCatalogNames(listNames)} ${verb} not available to book until a price is set. ${CALL_FOR_PRICING_LABEL}.`;
 }
