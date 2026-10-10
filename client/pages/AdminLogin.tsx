@@ -8,6 +8,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { staffLoginAction } from "@shared/staffAccess";
+import { openOwnerSession } from "@/lib/openOwnerSession";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -24,21 +25,35 @@ export default function AdminLogin() {
 
   // Wait until profile loading finishes. A signed-in user with isStaff still
   // false is only "not staff" after staff/{uid} has been read.
+  // Owner access is a separate server check and does not follow staff role.
   useEffect(() => {
-    const action = staffLoginAction({
-      loading,
-      hasUser: Boolean(user),
-      isStaff,
-      role: staffProfile?.role,
-    });
-    if (action.type === "redirect") {
-      navigate(action.path);
-      return;
-    }
-    if (action.type === "not-staff") {
-      toast.error("This login is not an active staff account.");
-      void signOutUser();
-    }
+    if (loading || !user) return;
+    let cancelled = false;
+    void (async () => {
+      const owner = await openOwnerSession(user);
+      if (cancelled) return;
+      if (owner) {
+        navigate("/admin/owners", { replace: true });
+        return;
+      }
+      const action = staffLoginAction({
+        loading,
+        hasUser: Boolean(user),
+        isStaff,
+        role: staffProfile?.role,
+      });
+      if (action.type === "redirect") {
+        navigate(action.path);
+        return;
+      }
+      if (action.type === "not-staff") {
+        toast.error("This login is not an active staff account.");
+        void signOutUser();
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
     // signOutUser identity changes each render; only the auth state should retrigger this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isStaff, staffProfile, loading, navigate]);
