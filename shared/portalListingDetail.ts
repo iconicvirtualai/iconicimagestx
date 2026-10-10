@@ -7,6 +7,7 @@
  */
 
 import { addressText } from "./addressText.ts";
+import { orderHistoryInvoiceNumber } from "./orderProjectInvoice.ts";
 import { readPhotoEditRequests, type PhotoEditRequest } from "./photoEditRequest";
 
 export const PORTAL_LISTING_TABS = [
@@ -943,7 +944,11 @@ function readInvoices(invoices: Array<Record<string, unknown>>): PortalInvoiceSu
     const total = money(invoice.total);
     summaries.push({
       id,
-      invoiceNumber: text(invoice.invoiceNumber) || id,
+      invoiceNumber: orderHistoryInvoiceNumber({
+        invoiceNumber: invoice.invoiceNumber,
+        id,
+        createdAt: invoice.createdAt,
+      }),
       status: text(invoice.status) || "draft",
       total,
       amountDue: invoice.amountDue == null ? total : money(invoice.amountDue),
@@ -1035,7 +1040,11 @@ function buildActivity(
 
   for (const invoice of sources.invoices || []) {
     const id = text(invoice.id);
-    const number = text(invoice.invoiceNumber) || invoices.find((item) => item.id === id)?.invoiceNumber || "Invoice";
+    const number = orderHistoryInvoiceNumber({
+      invoiceNumber: invoice.invoiceNumber,
+      id,
+      createdAt: invoice.createdAt,
+    });
     const status = text(invoice.status) || "draft";
     const summary = status === "paid"
       ? `Payment recorded on ${number}`

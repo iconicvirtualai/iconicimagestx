@@ -6,6 +6,7 @@ import { collection, onSnapshot } from "firebase/firestore";
 import { toast } from "sonner";
 import { addressText } from "@shared/addressText";
 import { formatChicagoDate } from "@shared/clientHome";
+import { billingListInvoiceNumber } from "@shared/orderProjectInvoice";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 
 function fmtCurrency(n: number): string { return "$" + (n || 0).toLocaleString("en-US", { minimumFractionDigits: 2 }); }
@@ -288,7 +289,7 @@ export default function AdminRevenue() {
                   const due = Number(o.amountDue) || Math.max(total - paid, 0);
                   return (
                     <tr key={o.id} className="border-t border-gray-100 hover:bg-gray-50">
-                      <td className="py-2.5 px-4 text-xs font-bold text-[#0d9488]">{o.invoiceNumber || `#${(o.id || "").substring(0, 6)}`}</td>
+                      <td className="py-2.5 px-4 text-xs font-bold text-[#0d9488]">{billingListInvoiceNumber({ invoiceNumber: o.invoiceNumber, id: o.id, createdAt: o.createdAt })}</td>
                       <td className="py-2.5 px-4 text-xs text-gray-500">{fmtDate(o.createdAt || o.updatedAt || o.sentAt || o.paidAt)}</td>
                       <td className="py-2.5 px-4 text-xs font-bold">{safe(o.clientName || o.customerName || o.name)}</td>
                       <td className="py-2.5 px-4 text-xs text-gray-500">{fmtAddr(o.address)}</td>
