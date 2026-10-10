@@ -40,6 +40,23 @@ describe("client gallery media classification", () => {
     ).toBe("photo");
   });
 
+  it("keeps a portrait branded file branded and an unlabeled portrait video a reel", () => {
+    expect(classifyClientGalleryItem({
+      type: "video",
+      fileName: "branded.mp4",
+      url: "https://cdn.example/branded.mp4",
+      width: 1080,
+      height: 1920,
+    })).toBe("branded-video");
+    expect(classifyClientGalleryItem({
+      type: "video",
+      fileName: "clip.mp4",
+      url: "https://cdn.example/clip.mp4",
+      width: 1080,
+      height: 1920,
+    })).toBe("reel");
+  });
+
   it("does not treat unbranded as branded", () => {
     expect(
       classifyClientGalleryItem({

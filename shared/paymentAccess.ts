@@ -119,30 +119,81 @@ export function invoiceIdFromSquareNote(note: unknown): string | null {
 
 const LINK_MEDIA_TYPES = new Set(["video", "reel", "tour", "matterport"]);
 
-/** Public gallery payload. File and share URLs stay off the response until the invoice is paid. */
-export function publicMediaItem(item: Record<string, unknown>, canDownload: boolean) {
-  const type = String(item.type || "photo");
-  const title = item.title || item.fileName || "Media";
+function publicText(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function publicSize(value: unknown): number | string | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) return value;
+  return null;
+}
+
+function publicFileSize(value: unknown): number | null {
+  const parsed = typeof value === "number"
+    ? value
+    : typeof value === "string" && value.trim()
+      ? Number(value)
+      : NaN;
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return parsed;
+}
+
+export interface PublicGalleryMedia {
+  id?: string;
+  fileName: string;
+  title: string;
+  name: string;
+  type: string;
+  category: string | null;
+  contentType: string | null;
+  width: number | string | null;
+  height: number | string | null;
+  fileSize: number | null;
+  canDownload: boolean;
+  locked: boolean;
+  url: string | null;
+  shareUrl: string | null;
+  embedUrl: string | null;
+  poster: string | null;
+  thumbnailUrl: string | null;
+}
+
+/**
+ * Public gallery payload. File, share, embed, and poster URLs stay off the
+ * response until the invoice is paid. The fields the client gallery uses to
+ * choose a player (type, category, contentType, file name, pixel size) stay.
+ */
+export function publicMediaItem(item: Record<string, unknown>, canDownload: boolean): PublicGalleryMedia {
+  const type = publicText(item.type) || "photo";
+  const title = publicText(item.title) || publicText(item.fileName) || "Media";
+  const fileName = publicText(item.fileName) || title;
   const base = {
-    id: item.id,
-    fileName: item.fileName || title,
+    id: publicText(item.id) || undefined,
+    fileName,
     title,
+    name: publicText(item.name) || fileName,
     type,
-    width: item.width || null,
-    height: item.height || null,
+    category: publicText(item.category),
+    contentType: publicText(item.contentType),
+    width: publicSize(item.width),
+    height: publicSize(item.height),
+    fileSize: publicFileSize(item.fileSize),
     canDownload: Boolean(canDownload && item.downloadable !== false && !LINK_MEDIA_TYPES.has(type)),
     locked: !canDownload,
   };
 
   if (!canDownload) {
-    return { ...base, url: null, shareUrl: null, embedUrl: null };
+    return { ...base, url: null, shareUrl: null, embedUrl: null, poster: null, thumbnailUrl: null };
   }
 
-  const url = (item.shareUrl || item.embedUrl || item.url || null) as string | null;
+  const url = publicText(item.shareUrl) || publicText(item.embedUrl) || publicText(item.url);
   return {
     ...base,
     url,
-    shareUrl: (item.shareUrl || item.url || item.embedUrl || null) as string | null,
-    embedUrl: (item.embedUrl || item.url || null) as string | null,
+    shareUrl: publicText(item.shareUrl) || publicText(item.url) || publicText(item.embedUrl),
+    embedUrl: publicText(item.embedUrl) || publicText(item.url),
+    poster: publicText(item.poster) || publicText(item.thumbnailUrl),
+    thumbnailUrl: publicText(item.thumbnailUrl) || publicText(item.poster),
   };
 }

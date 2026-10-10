@@ -4,6 +4,7 @@
  * scripts/seed-delivery-qa.ts prints it on a dry run and writes it only with --write.
  */
 
+import { classifyClientGalleryItem } from "../client/components/gallery/clientGalleryMedia.ts";
 import { PLAYTEST_ADDRESS } from "./listingAccess.ts";
 import {
   ICONIC_DOWNLOAD_LOCK,
@@ -43,24 +44,47 @@ export const DELIVERY_QA_ROLES = [
 ] as const;
 
 export type DeliveryQaRole = (typeof DELIVERY_QA_ROLES)[number];
-export type DeliveryQaCoverage = "sample" | "stand-in" | "placeholder" | "public-demo";
+export type DeliveryQaCoverage = "sample" | "stand-in" | "converted" | "public-demo";
+
+/** Fields the public gallery and the listing both read for the download lock. */
+export const DELIVERY_QA_LOCK_FIELDS = {
+  lockDownloads: true,
+  requirePayment: true,
+  downloadEnabled: false,
+  downloadsReleased: false,
+} as const;
+
+/**
+ * --unlock writes only these fields. requirePayment false does not open files
+ * by itself; lockDownloads false, downloadEnabled true, and downloadsReleased
+ * true do. The invoice is left unpaid.
+ */
+export const DELIVERY_QA_UNLOCK_FIELDS = {
+  lockDownloads: false,
+  requirePayment: false,
+  downloadEnabled: true,
+  downloadsReleased: true,
+} as const;
 
 export interface DeliveryQaMedia {
   id: string;
   role: DeliveryQaRole;
   type: string;
+  category: string | null;
   title: string;
   fileName: string;
   name: string;
   url: string;
   shareUrl: string;
   embedUrl: string | null;
+  poster: string | null;
   contentType: string;
   width: number | null;
   height: number | null;
+  fileSize: number | null;
   downloadable: boolean;
   coverage: DeliveryQaCoverage;
-  /** True when the repo has no file of this deliverable and the bytes below are a generated stand-in. */
+  /** True only for a generated blank stand-in. Seed v2 has none. */
   placeholder: boolean;
   sourcePath: string | null;
   note: string;
@@ -94,11 +118,12 @@ const LINE = {
   category: "service" as const,
 };
 
-export function parseDeliveryQaArgs(argv: string[]): { write: boolean; unknown: string[] } {
+export function parseDeliveryQaArgs(argv: string[]): { write: boolean; unlock: boolean; unknown: string[] } {
   const args = argv.filter((arg) => arg !== "--");
   return {
     write: args.includes("--write"),
-    unknown: args.filter((arg) => arg.startsWith("-") && arg !== "--write"),
+    unlock: args.includes("--unlock"),
+    unknown: args.filter((arg) => arg.startsWith("-") && arg !== "--write" && arg !== "--unlock"),
   };
 }
 
@@ -124,6 +149,23 @@ export function deliveryQaRefusals(input: {
   for (const match of input.emailMatches) {
     if (match.path === clientPath) continue;
     reasons.push(`${match.path} already uses ${DELIVERY_QA_CLIENT_EMAIL}.`);
+  }
+  return reasons;
+}
+
+/** --unlock reads these two docs and writes nothing unless both are playtest. */
+export function deliveryQaUnlockRefusals(input: {
+  gallery: { exists: boolean; playtest: unknown };
+  listing: { exists: boolean; playtest: unknown };
+}): string[] {
+  const reasons: string[] = [];
+  const targets = [
+    { label: `galleries/${DELIVERY_QA_IDS.gallery}`, doc: input.gallery },
+    { label: `listings/${DELIVERY_QA_IDS.listing}`, doc: input.listing },
+  ];
+  for (const target of targets) {
+    if (!target.doc.exists) reasons.push(`${target.label} does not exist.`);
+    else if (target.doc.playtest !== true) reasons.push(`${target.label} is not marked playtest.`);
   }
   return reasons;
 }
@@ -234,10 +276,7 @@ export function buildDeliveryQaSeed(options?: { origin?: string }): DeliveryQaPl
         status: "delivered",
         services: ["TEST - Delivery QA"],
         notes: "TEST ORDER. Playtest delivery QA project. Safe to ignore in scheduling and revenue.",
-        lockDownloads: true,
-        downloadsReleased: false,
-        requirePayment: true,
-        downloadEnabled: false,
+        ...DELIVERY_QA_LOCK_FIELDS,
         images: listingFiles("mls-photo", "full-res-photo", "aerial"),
         videos: listingFiles("branded-mp4", "unbranded-mp4", "vertical-reel"),
         tours: listingFiles("matterport"),
@@ -260,9 +299,7 @@ export function buildDeliveryQaSeed(options?: { origin?: string }): DeliveryQaPl
         clientName: DELIVERY_QA_CLIENT_NAME,
         clientEmail: DELIVERY_QA_CLIENT_EMAIL,
         status: "delivered",
-        downloadEnabled: false,
-        downloadsReleased: false,
-        lockDownloads: true,
+        ...DELIVERY_QA_LOCK_FIELDS,
         mediaItems: media,
         videoLinks: [],
         tourLinks: [],
@@ -327,7 +364,12 @@ export function formatDeliveryQaDryRun(plan: DeliveryQaPlan): string {
     "On write, createdAt is kept when the document already exists.",
     "updatedAt is set to the server time.",
     "Running --write again restores the unpaid $1.00 invoice and re-locks downloads.",
+    "Re-lock sets lockDownloads true, requirePayment true, downloadEnabled false, and downloadsReleased false.",
     "It does not append a second copy of any media item.",
+    "--unlock sets lockDownloads false, requirePayment false, downloadEnabled true, and downloadsReleased true",
+    "on galleries/playtest-delivery-qa-gallery and listings/playtest-delivery-qa-listing only.",
+    "It reads both documents first and writes nothing unless each one has playtest true.",
+    "It does not mark the invoice paid.",
     "",
     "Client",
     `  name: ${plan.clientName}`,
@@ -381,9 +423,14 @@ export function formatDeliveryQaDryRun(plan: DeliveryQaPlan): string {
       `   coverage: ${item.coverage}`,
       `   placeholder: ${item.placeholder}`,
       `   contentType: ${item.contentType}`,
+      `   category: ${item.category || "n/a"}`,
       `   size: ${item.width && item.height ? `${item.width}x${item.height}` : "n/a"}`,
+      `   fileSize: ${item.fileSize ?? "n/a"}`,
       `   source: ${item.sourcePath || item.url}`,
       `   url: ${item.url}`,
+      `   embedUrl: ${item.embedUrl || "n/a"}`,
+      `   poster: ${item.poster || "n/a"}`,
+      `   unlocked gallery kind: ${classifyClientGalleryItem(publicMediaItem(item as unknown as Record<string, unknown>, true))}`,
       `   locked public url: ${String(locked.url)}`,
       `   locked public shareUrl: ${String(locked.shareUrl)}`,
       `   locked public embedUrl: ${String(locked.embedUrl)}`,
@@ -410,10 +457,11 @@ export function formatDeliveryQaDryRun(plan: DeliveryQaPlan): string {
     "- FIREBASE_SERVICE_ACCOUNT (service account JSON) or GOOGLE_APPLICATION_CREDENTIALS.",
     "- Same credential the booking catalog seed uses. This repo's upload errors name Firebase project iconic-images-aicon.",
     "- The script prints that credential's project id and then writes. It does not take a separate project id flag.",
-    "- APP_URL is optional. It only changes the absolute links stored for the gallery, the invoice, and sample media. Default: https://iconicimagestx.com.",
+    "- APP_URL is optional. It sets the absolute links stored for the gallery, the invoice, and sample media. Default: https://iconicimagestx.com.",
     "- Square, SMTP, Stripe, and Twilio are not read.",
-    "- The three placeholder files under public/media/playtest/ have to be deployed with the site before those URLs resolve. The other samples are already in public/.",
-    "- Command: pnpm seed:delivery-qa -- --write",
+    "- public/media/playtest/TEST-delivery-qa-floorplan.png, TEST-delivery-qa-floorplan.pdf, and TEST-delivery-qa-other.zip have to be deployed before those URLs resolve. They are a PNG, a one-page PDF, and a zip of public/media/launch/floorplan_sample_cropped.jpg. The other samples are already in public/.",
+    "- Command: APP_URL=https://iconicimagestx.vercel.app pnpm seed:delivery-qa -- --write",
+    "- After that write, unlock only the playtest gallery and listing with: APP_URL=https://iconicimagestx.vercel.app pnpm seed:delivery-qa -- --unlock",
     "",
     "Document bodies (createdAt and updatedAt are added only on write):",
     JSON.stringify(plan.documents, null, 2),
@@ -432,146 +480,174 @@ function abs(origin: string, publicPath: string): string {
 }
 
 function deliveryQaMedia(origin: string): DeliveryQaMedia[] {
+  const floorPng = abs(origin, "/media/playtest/TEST-delivery-qa-floorplan.png");
   const specs: Array<Omit<DeliveryQaMedia, "id" | "playtest" | "uploadedBy" | "uploadedAt" | "shareUrl" | "embedUrl"> & { embed?: boolean }> = [
     {
       role: "mls-photo",
       type: "photo",
+      category: "mls",
       title: "TEST - Delivery QA MLS-size photo",
       fileName: "TEST-delivery-qa-mls-photo.jpg",
       name: "TEST-delivery-qa-mls-photo.jpg",
       url: abs(origin, "/media/photos/listing-living-01.jpg"),
+      poster: null,
       contentType: "image/jpeg",
       width: 1600,
       height: 1066,
+      fileSize: null,
       downloadable: true,
       coverage: "stand-in",
       placeholder: false,
       sourcePath: "public/media/photos/listing-living-01.jpg",
-      note: "No MLS export is stored in the repo. This is an existing 1600x1066 sample still, labeled as the MLS-size role.",
+      note: "Existing 1600x1066 sample still, labeled MLS. The repo has no separate MLS export.",
     },
     {
       role: "full-res-photo",
       type: "photo",
+      category: "full-res",
       title: "TEST - Delivery QA full-res photo",
       fileName: "TEST-delivery-qa-full-res-photo.jpg",
       name: "TEST-delivery-qa-full-res-photo.jpg",
       url: abs(origin, "/media/photos/luxury-exterior.jpg"),
+      poster: null,
       contentType: "image/jpeg",
       width: 1920,
       height: 1280,
+      fileSize: null,
       downloadable: true,
       coverage: "stand-in",
       placeholder: false,
       sourcePath: "public/media/photos/luxury-exterior.jpg",
-      note: "No camera-original full-res file is in the repo. This is the existing 1920x1280 sample used by the seeded presentation, labeled as the full-res role.",
+      note: "Existing 1920x1280 sample used by the seeded presentation, labeled full-res. The repo has no camera original.",
     },
     {
       role: "branded-mp4",
       type: "video",
+      category: "branded",
       title: "TEST - Delivery QA branded MP4",
       fileName: "TEST-delivery-qa-branded.mp4",
       name: "TEST-delivery-qa-branded.mp4",
       url: abs(origin, "/media/blaze/01_BUILT_v2.mp4"),
+      poster: null,
       contentType: "video/mp4",
-      width: null,
-      height: null,
+      width: 1080,
+      height: 1920,
+      fileSize: null,
       downloadable: false,
       coverage: "stand-in",
       placeholder: false,
       sourcePath: "public/media/blaze/01_BUILT_v2.mp4",
-      note: "No branded listing master is in the repo. This existing Iconic brand film is labeled as the branded MP4 role. It is not client property video.",
+      note: "Existing Iconic brand film, 1080x1920. Labeled branded so the gallery plays it as branded video. It is not client property video.",
     },
     {
       role: "unbranded-mp4",
       type: "video",
+      category: "unbranded",
       title: "TEST - Delivery QA unbranded MP4",
       fileName: "TEST-delivery-qa-unbranded.mp4",
       name: "TEST-delivery-qa-unbranded.mp4",
       url: abs(origin, "/media/video/product-photography.mp4"),
+      poster: null,
       contentType: "video/mp4",
-      width: null,
-      height: null,
+      width: 1280,
+      height: 720,
+      fileSize: null,
       downloadable: false,
       coverage: "stand-in",
       placeholder: false,
       sourcePath: "public/media/video/product-photography.mp4",
-      note: "No unbranded listing master is in the repo. This existing product clip is labeled as the unbranded MP4 role. It is not client property video.",
+      note: "Existing 1280x720 product clip, labeled unbranded. It is not client property video.",
     },
     {
       role: "vertical-reel",
       type: "reel",
+      category: "reel",
       title: "TEST - Delivery QA vertical snap reel",
       fileName: "TEST-delivery-qa-snap-reel.mp4",
       name: "TEST-delivery-qa-snap-reel.mp4",
       url: abs(origin, "/media/videos/snap-reels/snap-reel-01.mp4"),
+      poster: null,
       contentType: "video/mp4",
-      width: null,
-      height: null,
+      width: 1080,
+      height: 1920,
+      fileSize: null,
       downloadable: false,
       coverage: "sample",
       placeholder: false,
       sourcePath: "public/media/videos/snap-reels/snap-reel-01.mp4",
-      note: "Existing snap reel sample. The site already describes Essential Snap Reels as 9:16 vertical.",
+      note: "Existing snap reel sample. The file is 1080x1920.",
     },
     {
       role: "matterport",
       type: "matterport",
+      category: "matterport",
       title: "TEST - Delivery QA Matterport public demo",
       fileName: "TEST-delivery-qa-matterport",
       name: "TEST-delivery-qa-matterport",
       url: DELIVERY_QA_MATTERPORT_URL,
+      poster: null,
       contentType: "text/html",
       width: null,
       height: null,
+      fileSize: null,
       downloadable: false,
       coverage: "public-demo",
       placeholder: false,
       sourcePath: null,
       embed: true,
-      note: "Matterport's public Showcase sample model SxQL3iGyoDo. Not an Iconic client model and not a file in this repo.",
+      note: "Matterport's public Showcase sample model SxQL3iGyoDo. The gallery iframe uses this embed URL. Not an Iconic client model.",
     },
     {
       role: "floorplan-png",
       type: "floorplan",
+      category: "floorplan",
       title: "TEST - Delivery QA floor plan PNG",
       fileName: "TEST-delivery-qa-floorplan.png",
       name: "TEST-delivery-qa-floorplan.png",
-      url: abs(origin, "/media/playtest/TEST-delivery-qa-floorplan.png"),
+      url: floorPng,
+      poster: null,
       contentType: "image/png",
-      width: 1,
-      height: 1,
+      width: 1800,
+      height: 1270,
+      fileSize: null,
       downloadable: true,
-      coverage: "placeholder",
-      placeholder: true,
+      coverage: "converted",
+      placeholder: false,
       sourcePath: "public/media/playtest/TEST-delivery-qa-floorplan.png",
-      note: "No PNG floor plan sample is in the repo. public/media/launch/floorplan_sample_cropped.jpg is a JPEG, so it was not used. This 1x1 PNG is a test placeholder.",
+      note: "PNG converted from public/media/launch/floorplan_sample_cropped.jpg (1800x1270). Not a 1x1 placeholder.",
     },
     {
       role: "floorplan-pdf",
       type: "floorplan",
+      category: "floorplan",
       title: "TEST - Delivery QA floor plan PDF",
       fileName: "TEST-delivery-qa-floorplan.pdf",
       name: "TEST-delivery-qa-floorplan.pdf",
       url: abs(origin, "/media/playtest/TEST-delivery-qa-floorplan.pdf"),
+      poster: floorPng,
       contentType: "application/pdf",
       width: null,
       height: null,
+      fileSize: null,
       downloadable: true,
-      coverage: "placeholder",
-      placeholder: true,
+      coverage: "converted",
+      placeholder: false,
       sourcePath: "public/media/playtest/TEST-delivery-qa-floorplan.pdf",
-      note: "No PDF floor plan sample is in the repo. This one-page placeholder says TEST - Delivery QA. The portal floor plan tab only lists JPEG and PNG, so this PDF stays on the gallery and the listing record and does not appear as a portal floor plan.",
+      note: "One-page PDF that embeds public/media/launch/floorplan_sample_cropped.jpg. The gallery card previews the PNG and opens this PDF. The portal floor plan tab still lists JPEG and PNG only.",
     },
     {
       role: "aerial",
       type: "aerial",
+      category: "aerial",
       title: "TEST - Delivery QA aerial",
       fileName: "TEST-delivery-qa-aerial.jpg",
       name: "TEST-delivery-qa-aerial.jpg",
       url: abs(origin, "/media/photos/drone-hero.jpg"),
+      poster: null,
       contentType: "image/jpeg",
       width: 1920,
       height: 1280,
+      fileSize: null,
       downloadable: true,
       coverage: "sample",
       placeholder: false,
@@ -581,18 +657,21 @@ function deliveryQaMedia(origin: string): DeliveryQaMedia[] {
     {
       role: "other",
       type: "file",
+      category: "other",
       title: "TEST - Delivery QA other zip",
       fileName: "TEST-delivery-qa-other.zip",
       name: "TEST-delivery-qa-other.zip",
       url: abs(origin, "/media/playtest/TEST-delivery-qa-other.zip"),
+      poster: null,
       contentType: "application/zip",
       width: null,
       height: null,
+      fileSize: 55060,
       downloadable: true,
-      coverage: "placeholder",
-      placeholder: true,
+      coverage: "converted",
+      placeholder: false,
       sourcePath: "public/media/playtest/TEST-delivery-qa-other.zip",
-      note: "No sample zip or extra PDF is in the repo. This stored zip contains TEST-delivery-qa.txt and is the other-file role.",
+      note: "Zip of public/media/launch/floorplan_sample_cropped.jpg. The entry inside the archive is that JPEG.",
     },
   ];
 
@@ -621,8 +700,11 @@ function listingFile(item: DeliveryQaMedia) {
     shareUrl: item.shareUrl,
     embedUrl: item.embedUrl,
     contentType: item.contentType,
+    category: item.category,
+    poster: item.poster,
     width: item.width,
     height: item.height,
+    fileSize: item.fileSize,
     downloadable: item.downloadable,
     playtest: true,
     sourcePath: item.sourcePath,

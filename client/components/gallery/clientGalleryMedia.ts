@@ -208,11 +208,14 @@ export function classifyClientGalleryItem(
   }
   if (aerialSignal && videoFile) return "aerial-video";
   if (aerialSignal && imageFile) return "aerial-photo";
-  if (videoFile && (reelSignal || isPortrait(item))) return "reel";
+  // A named reel, branded file, or unbranded file keeps that label.
+  // Portrait size is only the fallback that turns an unlabeled video into a reel.
+  if (videoFile && reelSignal) return "reel";
   if (videoFile && UNBRANDED.test(`${type} ${category} ${name}`))
     return "unbranded-video";
   if (videoFile && BRANDED.test(`${type} ${category} ${name}`))
     return "branded-video";
+  if (videoFile && isPortrait(item)) return "reel";
   if (videoFile) return "video";
   if (
     zipFile ||

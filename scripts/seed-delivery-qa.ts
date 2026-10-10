@@ -2,7 +2,8 @@
  * Idempotent client delivery QA seed.
  *
  *   pnpm seed:delivery-qa
- *   pnpm seed:delivery-qa -- --write
+ *   APP_URL=https://iconicimagestx.vercel.app pnpm seed:delivery-qa -- --write
+ *   APP_URL=https://iconicimagestx.vercel.app pnpm seed:delivery-qa -- --unlock
  *
  * Dry run is the default. It prints the documents and does not
  * contact Firebase, send email, or upload media.
@@ -10,11 +11,17 @@
  * --write needs FIREBASE_SERVICE_ACCOUNT (JSON) or
  * GOOGLE_APPLICATION_CREDENTIALS, same as pnpm seed:booking-catalog.
  * It does not send email, SMS, or a Square invoice, and it does not
- * create a Firebase Auth user.
+ * create a Firebase Auth user. A later --write puts the download lock back.
+ *
+ * --unlock changes lock fields on the playtest gallery and listing only.
+ * It does not mark the invoice paid and does not send email.
  */
 import {
+  DELIVERY_QA_IDS,
+  DELIVERY_QA_UNLOCK_FIELDS,
   buildDeliveryQaSeed,
   deliveryQaRefusals,
+  deliveryQaUnlockRefusals,
   formatDeliveryQaDryRun,
   parseDeliveryQaArgs,
   type DeliveryQaDocument,
@@ -24,31 +31,66 @@ const parsed = parseDeliveryQaArgs(process.argv.slice(2));
 
 if (parsed.unknown.length > 0) {
   console.error(
-    `Unknown argument: ${parsed.unknown.join(" ")}. Dry run is the default. The only write flag is --write.`,
+    `Unknown argument: ${parsed.unknown.join(" ")}. Dry run is the default. Flags are --write and --unlock.`,
   );
+  process.exit(2);
+}
+
+if (parsed.write && parsed.unlock) {
+  console.error("Pass either --write or --unlock, not both. --write re-locks. --unlock only clears the lock.");
   process.exit(2);
 }
 
 const origin = String(process.env.APP_URL || "").trim();
 const plan = buildDeliveryQaSeed(origin ? { origin } : undefined);
 
-if (!parsed.write) {
+if (!parsed.write && !parsed.unlock) {
   process.stdout.write(formatDeliveryQaDryRun(plan));
   process.exit(0);
 }
 
 try {
-  await writeDeliveryQa(plan.documents);
+  if (parsed.unlock) await unlockDeliveryQa();
+  else await writeDeliveryQa(plan.documents);
 } catch (err) {
   console.error(err instanceof Error ? err.message : err);
   process.exit(1);
 }
 
-async function writeDeliveryQa(documents: DeliveryQaDocument[]) {
+async function unlockDeliveryQa() {
+  const admin = await loadAdmin();
+  const projectId = await credentialProjectId();
+  const resolvedProject = projectId || admin.app().options.projectId || "(unknown project)";
+  console.log(`UNLOCK MODE. Firebase project: ${resolvedProject}`);
+  console.log("Reading the playtest gallery and listing before any write.");
+
+  const db = admin.firestore();
+  const galleryRef = db.collection("galleries").doc(DELIVERY_QA_IDS.gallery);
+  const listingRef = db.collection("listings").doc(DELIVERY_QA_IDS.listing);
+  const [gallerySnap, listingSnap] = await Promise.all([galleryRef.get(), listingRef.get()]);
+  const refusals = deliveryQaUnlockRefusals({
+    gallery: { exists: gallerySnap.exists, playtest: gallerySnap.data()?.playtest },
+    listing: { exists: listingSnap.exists, playtest: listingSnap.data()?.playtest },
+  });
+  if (refusals.length > 0) {
+    console.error("Refusing to unlock. No documents were changed.");
+    for (const reason of refusals) console.error(`- ${reason}`);
+    process.exit(1);
+  }
+
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const patch = { ...DELIVERY_QA_UNLOCK_FIELDS, updatedAt: now };
+  const batch = db.batch();
+  batch.set(galleryRef, patch, { merge: true });
+  batch.set(listingRef, patch, { merge: true });
+  await batch.commit();
+  console.log(`Unlocked downloads on galleries/${DELIVERY_QA_IDS.gallery} and listings/${DELIVERY_QA_IDS.listing}.`);
+  console.log("Invoice was not changed and is still unpaid. No email was sent.");
+}
+
+async function loadAdmin() {
   await import("dotenv/config");
   const admin = (await import("firebase-admin")).default;
-  const projectId = await credentialProjectId();
-
   if (!admin.apps.length) {
     if (process.env.FIREBASE_SERVICE_ACCOUNT) {
       admin.initializeApp({
@@ -62,6 +104,12 @@ async function writeDeliveryQa(documents: DeliveryQaDocument[]) {
       );
     }
   }
+  return admin;
+}
+
+async function writeDeliveryQa(documents: DeliveryQaDocument[]) {
+  const admin = await loadAdmin();
+  const projectId = await credentialProjectId();
 
   const resolvedProject = projectId || admin.app().options.projectId || "(unknown project)";
   console.log(`WRITE MODE. Firebase project: ${resolvedProject}`);
