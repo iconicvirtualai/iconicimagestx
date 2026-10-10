@@ -11,7 +11,7 @@ import {
 } from "@/components/invoice/BrandedInvoice";
 import { downloadBrandedInvoice } from "@/lib/downloadBrandedInvoice";
 import { invoiceFaceFromStored } from "@shared/invoiceFace";
-import { presentInvoiceNumber } from "@shared/orderProjectInvoice";
+import { invoicePageInvoiceNumber } from "@shared/orderProjectInvoice";
 import { ICONIC_DOWNLOAD_LOCK } from "@shared/paymentAccess";
 
 export default function ClientInvoice() {
@@ -52,7 +52,11 @@ export default function ClientInvoice() {
   const paid = Boolean(invoice.paid) || invoice.status === "paid";
   const awaitingSquare = searchParams.get("paid") === "1" && !paid;
   const providerLabel = invoice.paymentProvider === "stripe" ? "Stripe" : "Square";
-  const invoiceNumber = presentInvoiceNumber(invoice.invoiceNumber, invoiceId);
+  const invoiceNumber = invoicePageInvoiceNumber({
+    invoiceNumber: invoice.invoiceNumber,
+    id: invoiceId,
+    createdAt: invoice.createdAt,
+  });
   const face = invoiceFaceFromStored(invoice);
   const address = typeof invoice.billToAddress === "string" ? invoice.billToAddress : "";
 
@@ -81,6 +85,8 @@ export default function ClientInvoice() {
   const downloadPdf = () => {
     downloadBrandedInvoice({
       invoiceNumber,
+      invoiceId,
+      issuedAt: invoice.createdAt,
       clientName: String(invoice.clientName || ""),
       billToAddress: address,
       status: paid ? "Paid" : "Payment due",

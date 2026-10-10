@@ -153,7 +153,9 @@ describe("client invoice page", () => {
     expect(clientInvoice).toContain("BrandedInvoiceShell");
     expect(brandedInvoice).toContain("logo-white-large.png");
     expect(brandedInvoice).toContain("data-testid=\"invoice-total-box\"");
-    expect(clientInvoice).toContain("presentInvoiceNumber(invoice.invoiceNumber, invoiceId)");
+    expect(clientInvoice).toContain("invoicePageInvoiceNumber");
+    expect(clientInvoice).toContain("invoice.invoiceNumber");
+    expect(clientInvoice).toContain("id: invoiceId");
     expect(clientInvoice).toContain('fetch(`/api/payments/invoice/${invoiceId}/checkout`');
     expect(clientInvoice).toContain("Pay Securely");
     expect(clientInvoice).toContain("ICONIC_DOWNLOAD_LOCK.message");

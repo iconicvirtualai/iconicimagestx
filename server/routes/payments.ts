@@ -14,7 +14,7 @@ import { clientNotifyLive } from "../../shared/clientNotify";
 import { addressText } from "../../shared/addressText";
 import { bookingDateLabel } from "../../shared/clientHome";
 import { amountStillDue, invoiceAllowsDownload, invoiceIdFromSquareNote, squarePaymentNote } from "../../shared/paymentAccess";
-import { presentInvoiceNumber } from "../../shared/orderProjectInvoice";
+import { invoiceEmailNumber, invoicePageInvoiceNumber, receiptEmailNumber } from "../../shared/orderProjectInvoice";
 import { fetchPublishedSquareInvoiceUrl, resolveSquareCheckoutUrl, squareApiBaseUrl } from "../../shared/squareInvoice";
 
 const router = Router();
@@ -202,7 +202,11 @@ async function applySuccessfulPayment({
       variables: {
         clientName: invoice.clientName,
         amount: money(amount),
-        invoiceNumber: invoice.invoiceNumber,
+        invoiceNumber: receiptEmailNumber({
+          invoiceNumber: invoice.invoiceNumber,
+          id: invoiceId,
+          createdAt: invoice.createdAt,
+        }),
         balance: money(newAmountDue),
       },
     }).catch(console.error);
@@ -272,7 +276,11 @@ router.post("/send-invoice", requireCoordinator, async (req, res) => {
       template: "invoice",
       variables: {
         clientName: invoice.clientName,
-        invoiceNumber: invoice.invoiceNumber,
+        invoiceNumber: invoiceEmailNumber({
+          invoiceNumber: invoice.invoiceNumber,
+          id: invoiceDoc.id,
+          createdAt: invoice.createdAt,
+        }),
         amount: money(invoice.total),
         paymentUrl,
         dueDate: bookingDateLabel(invoice.dueDate, "Upon receipt"),
@@ -313,7 +321,11 @@ router.post("/send-receipt", requireCoordinator, async (req, res) => {
       variables: {
         clientName: invoice.clientName,
         amount: money(invoice.amountPaid || invoice.total),
-        invoiceNumber: invoice.invoiceNumber,
+        invoiceNumber: receiptEmailNumber({
+          invoiceNumber: invoice.invoiceNumber,
+          id: invoiceDoc.id,
+          createdAt: invoice.createdAt,
+        }),
         balance: money(amountStillDue(invoice)),
       },
     });
@@ -336,7 +348,11 @@ router.get("/invoice/:id", async (req: Request, res: Response) => {
     return res.json({
       id: invoiceDoc.id,
       paid: invoiceAllowsDownload(invoice),
-      invoiceNumber: presentInvoiceNumber(invoice.invoiceNumber, invoiceDoc.id),
+      invoiceNumber: invoicePageInvoiceNumber({
+        invoiceNumber: invoice.invoiceNumber,
+        id: invoiceDoc.id,
+        createdAt: invoice.createdAt,
+      }),
       clientName: invoice.clientName,
       lineItems: invoice.lineItems,
       subtotal: invoice.subtotal,

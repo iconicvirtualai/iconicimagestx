@@ -5,9 +5,14 @@
 
 import { iconicBusinessFooterLines } from "./iconicBusiness.ts";
 import { invoiceFaceRows, type InvoiceFace } from "./invoiceFace.ts";
+import { brandedInvoiceNumber } from "./orderProjectInvoice.ts";
 
 export interface BrandedInvoicePdfInput {
   invoiceNumber: string;
+  /** Document id. Used only when invoiceNumber is missing. */
+  invoiceId?: string;
+  /** Issued date. Used only for the missing-number fallback year. */
+  issuedAt?: unknown;
   clientName: string;
   billToAddress: string;
   status: string;
@@ -37,13 +42,18 @@ const BLUE = [0.114, 0.306, 0.847] as const;
 const MUTED = [0.35, 0.35, 0.35] as const;
 
 function layout(input: BrandedInvoicePdfInput): Op[] {
+  const invoiceNumber = brandedInvoiceNumber({
+    invoiceNumber: input.invoiceNumber,
+    id: input.invoiceId,
+    createdAt: input.issuedAt,
+  });
   const ops: Op[] = [
     rect(0, 720, PAGE_W, 72, ...BLACK),
     rect(0, 714, PAGE_W, 6, ...YELLOW),
     rect(0, 710, PAGE_W, 4, ...BLUE),
     text(36, 748, 16, "F2", ...WHITE, "ICONIC IMAGES"),
     text(400, 758, 8, "F2", ...YELLOW, "INVOICE"),
-    text(400, 740, 12, "F2", ...WHITE, clip(input.invoiceNumber || "Invoice", 24)),
+    text(400, 740, 12, "F2", ...WHITE, clip(invoiceNumber, 24)),
   ];
   const status = input.status.trim();
   if (status) ops.push(text(400, 726, 8, "F1", ...YELLOW, clip(status.toUpperCase(), 28)));

@@ -49,8 +49,12 @@ describe("human invoice numbers", () => {
   it("wires booking generation and the public invoice page off the NaN path", () => {
     expect(bookings).toContain("nextSequentialInvoiceNumber");
     expect(bookings).not.toContain("parseInt(last");
-    expect(paymentsRoute).toContain("presentInvoiceNumber(invoice.invoiceNumber, invoiceDoc.id)");
-    expect(clientInvoice).toContain("presentInvoiceNumber(invoice.invoiceNumber, invoiceId)");
+    expect(paymentsRoute).toContain("invoicePageInvoiceNumber");
+    expect(paymentsRoute).toContain("invoice.invoiceNumber");
+    expect(paymentsRoute).toContain("invoiceDoc.id");
+    expect(clientInvoice).toContain("invoicePageInvoiceNumber");
+    expect(clientInvoice).toContain("invoice.invoiceNumber");
+    expect(clientInvoice).toContain("id: invoiceId");
     expect(clientInvoice).toContain('href="/"');
     expect(clientInvoice).toContain("Back to Home");
     expect(clientInvoice).not.toContain('<Link to="/">');

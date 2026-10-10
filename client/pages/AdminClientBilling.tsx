@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { deliverInvoiceEmail } from "@/lib/deliverInvoice";
 import { staffInvoicePath } from "@shared/staffInvoice";
 import { formatChicagoDate } from "@shared/clientHome";
+import { clientBillingInvoiceNumber, type ClientBillingInvoiceDoc } from "@shared/orderProjectInvoice";
 import { Search, DollarSign, Send, Eye, Plus, FileText, ChevronDown, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
@@ -34,6 +35,7 @@ export default function AdminClientBilling() {
   const { user } = useAuth();
   const [sendingId, setSendingId] = React.useState<string | null>(null);
   const [orders, setOrders] = React.useState<any[]>([]);
+  const [invoiceDocs, setInvoiceDocs] = React.useState<ClientBillingInvoiceDoc[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
@@ -43,11 +45,23 @@ export default function AdminClientBilling() {
   const [newInv, setNewInv] = React.useState({ clientName: "", clientEmail: "", items: [{ name: "", price: 0 }], notes: "" });
 
   React.useEffect(() => {
-    const unsub = onSnapshot(collection(db, "orderRequests"), snap => {
+    const ready = { orders: false, invoices: false };
+    const finish = (key: "orders" | "invoices") => {
+      ready[key] = true;
+      if (ready.orders && ready.invoices) setLoading(false);
+    };
+    const unsubOrders = onSnapshot(collection(db, "orderRequests"), snap => {
       setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setLoading(false);
-    }, () => setLoading(false));
-    return () => unsub();
+      finish("orders");
+    }, () => finish("orders"));
+    const unsubInvoices = onSnapshot(collection(db, "invoices"), snap => {
+      setInvoiceDocs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      finish("invoices");
+    }, () => finish("invoices"));
+    return () => {
+      unsubOrders();
+      unsubInvoices();
+    };
   }, []);
 
   // Build invoice list from orders
@@ -60,7 +74,7 @@ export default function AdminClientBilling() {
       return {
         orderId: o.id,
         invoiceId: typeof o.invoiceId === "string" ? o.invoiceId : "",
-        invoiceNumber: inv.invoiceNumber || `INV-${(o.id || "").substring(0, 6).toUpperCase()}`,
+        invoiceNumber: clientBillingInvoiceNumber(o, invoiceDocs),
         clientName: safe(o.clientName || o.customerName || `${o.firstName || ""} ${o.lastName || ""}`.trim()),
         clientEmail: o.email || o.clientEmail || "",
         date: o.createdAt || o.submittedAt,
@@ -71,7 +85,7 @@ export default function AdminClientBilling() {
         lineItems: o.lineItems || [],
       };
     }).filter(inv => inv.total > 0);
-  }, [orders]);
+  }, [orders, invoiceDocs]);
 
   const filtered = React.useMemo(() => {
     let result = invoices;

@@ -7,7 +7,7 @@
 import { brandedInvoicePdf, brandedInvoicePdfFilename, type BrandedInvoicePdfInput } from "./brandedInvoicePdf.ts";
 import { iconicBusinessFooterLines } from "./iconicBusiness.ts";
 import { invoiceFaceFromStored } from "./invoiceFace.ts";
-import { presentInvoiceNumber } from "./orderProjectInvoice.ts";
+import { orderHistoryInvoiceNumber } from "./orderProjectInvoice.ts";
 import { addressText } from "./addressText.ts";
 import {
   formatShootDateLabel,
@@ -296,10 +296,13 @@ export function buildClientListing(id: string, data: Record<string, unknown>): C
 
 export function buildClientInvoice(id: string, data: Record<string, unknown>, now = new Date()): ClientInvoiceStatement {
   const createdAt = isoStamp(data.createdAt);
-  const issuedAt = createdAt ? new Date(createdAt) : now;
   return {
     id,
-    invoiceNumber: presentInvoiceNumber(data.invoiceNumber, id, Number.isNaN(issuedAt.getTime()) ? now : issuedAt),
+    invoiceNumber: orderHistoryInvoiceNumber({
+      invoiceNumber: data.invoiceNumber,
+      id,
+      createdAt: data.createdAt,
+    }, now),
     status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
     clientName: text(data.clientName),
     address: addressText(data.billToAddress || data.address || data.propertyAddress),
@@ -449,6 +452,8 @@ export function clientInvoicePdfInput(statement: ClientInvoiceStatement): Brande
   });
   return {
     invoiceNumber: statement.invoiceNumber,
+    invoiceId: statement.id,
+    issuedAt: statement.createdAt,
     clientName: statement.clientName,
     billToAddress: statement.address,
     status: humanStatus(statement.status),

@@ -159,8 +159,11 @@ export function nextSequentialInvoiceNumber(existing: Iterable<unknown>, year: n
 }
 
 /**
- * Number to show a person. Keeps a valid stored number.
- * Replaces NaN and other garbage with a stable number from the invoice id.
+ * Number to show a person. Keeps a valid stored invoiceNumber.
+ * Falls back only when that field is missing or is not a real invoice number
+ * (blank, the NaN sequence bug, or some other non-number). The fallback is
+ * INV-year- plus the last six letters of the invoice id, and every surface
+ * below uses this same function.
  */
 export function presentInvoiceNumber(stored: unknown, invoiceId?: unknown, now = new Date()): string {
   if (typeof stored === "string") {
@@ -170,6 +173,126 @@ export function presentInvoiceNumber(stored: unknown, invoiceId?: unknown, now =
   const id = typeof invoiceId === "string" ? invoiceId.trim() : "";
   if (id) return draftInvoiceNumber(id, now);
   return `INV-${now.getFullYear()}-0001`;
+}
+
+export interface InvoiceNumberSource {
+  id?: unknown;
+  invoiceNumber?: unknown;
+  createdAt?: unknown;
+}
+
+/** Year for the missing-number fallback. A stored number does not use this date. */
+export function invoiceNumberAsOf(value: unknown, now = new Date()): Date {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+  if (value && typeof value === "object" && "toDate" in value && typeof (value as { toDate?: unknown }).toDate === "function") {
+    try {
+      const date = (value as { toDate: () => Date }).toDate();
+      if (date instanceof Date && !Number.isNaN(date.getTime())) return date;
+    } catch {
+      return now;
+    }
+  }
+  if (typeof value === "string" && value.trim()) {
+    const date = new Date(value.trim());
+    if (!Number.isNaN(date.getTime())) return date;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) return date;
+  }
+  return now;
+}
+
+function shownInvoiceNumber(source: InvoiceNumberSource, now = new Date()): string {
+  const id = typeof source.id === "string" ? source.id : "";
+  return presentInvoiceNumber(source.invoiceNumber, id, invoiceNumberAsOf(source.createdAt, now));
+}
+
+/** /invoice/:id and the public invoice payload. */
+export function invoicePageInvoiceNumber(source: InvoiceNumberSource, now = new Date()): string {
+  return shownInvoiceNumber(source, now);
+}
+
+/** brandedInvoicePdf and downloadBrandedInvoice. */
+export function brandedInvoiceNumber(source: InvoiceNumberSource, now = new Date()): string {
+  return shownInvoiceNumber(source, now);
+}
+
+/** Portal Order History and the listing Orders tab. */
+export function orderHistoryInvoiceNumber(source: InvoiceNumberSource, now = new Date()): string {
+  return shownInvoiceNumber(source, now);
+}
+
+/** AR and billing lists (revenue detail, client account invoices). */
+export function billingListInvoiceNumber(source: InvoiceNumberSource, now = new Date()): string {
+  return shownInvoiceNumber(source, now);
+}
+
+/** Invoice email. */
+export function invoiceEmailNumber(source: InvoiceNumberSource, now = new Date()): string {
+  return shownInvoiceNumber(source, now);
+}
+
+/** Payment receipt email. */
+export function receiptEmailNumber(source: InvoiceNumberSource, now = new Date()): string {
+  return shownInvoiceNumber(source, now);
+}
+
+export interface ClientBillingOrder {
+  id?: unknown;
+  invoiceId?: unknown;
+  orderId?: unknown;
+  createdAt?: unknown;
+  submittedAt?: unknown;
+  invoice?: { invoiceNumber?: unknown } | null;
+}
+
+export interface ClientBillingInvoiceDoc {
+  id?: unknown;
+  invoiceNumber?: unknown;
+  createdAt?: unknown;
+  orderRequestId?: unknown;
+  orderId?: unknown;
+}
+
+/**
+ * Number on /admin/client-billing.
+ * The invoice document's stored invoiceNumber wins. The copy nested on the
+ * order is used only when the invoice document has no real number. The old
+ * INV- plus the first six characters of the order id is not a number.
+ */
+export function clientBillingInvoiceNumber(
+  order: ClientBillingOrder,
+  invoices: ClientBillingInvoiceDoc[] = [],
+  now = new Date(),
+): string {
+  const invoiceId = nonEmptyId(order.invoiceId);
+  const orderId = nonEmptyId(order.id);
+  const linkedOrderId = nonEmptyId(order.orderId);
+  const matches = invoices.filter((invoice) => {
+    const id = nonEmptyId(invoice.id);
+    if (invoiceId && id === invoiceId) return true;
+    const requestId = nonEmptyId(invoice.orderRequestId);
+    const invoiceOrderId = nonEmptyId(invoice.orderId);
+    if (orderId && (requestId === orderId || invoiceOrderId === orderId)) return true;
+    if (linkedOrderId && (requestId === linkedOrderId || invoiceOrderId === linkedOrderId)) return true;
+    return false;
+  });
+  const preferred = (invoiceId ? matches.find((invoice) => nonEmptyId(invoice.id) === invoiceId) : undefined)
+    || matches.find((invoice) => isHumanInvoiceNumber(invoice.invoiceNumber))
+    || matches[0];
+  const orderNumber = order.invoice?.invoiceNumber;
+  const stored = isHumanInvoiceNumber(preferred?.invoiceNumber)
+    ? preferred?.invoiceNumber
+    : isHumanInvoiceNumber(orderNumber)
+      ? orderNumber
+      : preferred?.invoiceNumber ?? orderNumber;
+
+  return shownInvoiceNumber({
+    invoiceNumber: stored,
+    id: nonEmptyId(preferred?.id) || invoiceId || orderId || "",
+    createdAt: preferred?.createdAt ?? order.createdAt ?? order.submittedAt,
+  }, now);
 }
 
 /** Copy the order's stored total and lines. Does not reprice from the catalog. */

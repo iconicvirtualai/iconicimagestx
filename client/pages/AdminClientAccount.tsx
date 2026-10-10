@@ -14,6 +14,7 @@ import {
   type ClientRecord,
 } from "@/lib/clientRecords";
 import { staffInvoicePath } from "@shared/staffInvoice";
+import { billingListInvoiceNumber, clientBillingInvoiceNumber } from "@shared/orderProjectInvoice";
 
 const labelCls = "block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1";
 const inputCls = "w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30";
@@ -119,7 +120,12 @@ export default function AdminClientAccount() {
   const orderInvoices = history.filter((order) => order.invoice?.invoiceNumber || money(order.invoice?.total) !== null);
   const taxLines = [
     ...history.map((order) => ({ id: order.id, source: "Order", label: recordAddress(order), tax: money(order.pricing?.tax) })),
-    ...storedInvoices.map((invoice) => ({ id: invoice.id, source: "Invoice", label: invoice.invoiceNumber || invoice.id, tax: money(invoice.tax) })),
+    ...storedInvoices.map((invoice) => ({
+      id: invoice.id,
+      source: "Invoice",
+      label: billingListInvoiceNumber({ invoiceNumber: invoice.invoiceNumber, id: invoice.id, createdAt: invoice.createdAt }),
+      tax: money(invoice.tax),
+    })),
   ].filter((line) => line.tax !== null);
   const billed = [
     ...history.filter((order) => money(order.total) !== null || money(order.pricing?.total) !== null),
@@ -202,14 +208,14 @@ export default function AdminClientAccount() {
         )}
 
         {section === "invoices" && (
-          <Section title="Past invoices" hint="Invoice numbers are shown only when one is already stored.">
+          <Section title="Past invoices" hint="The number stored on the invoice. The same fallback is used only when that field is empty.">
             {storedInvoices.length === 0 && orderInvoices.length === 0 ? <Empty text="No invoices are stored for this client yet." /> : (
               <div className="space-y-2">
                 {storedInvoices.map((invoice) => (
-                  <Row key={invoice.id} title={invoice.invoiceNumber || "Invoice"} meta={invoice.status || "stored"} value={formatMoney(invoice.total)} href={invoice.id ? staffInvoicePath(invoice.id) : undefined} />
+                  <Row key={invoice.id} title={billingListInvoiceNumber({ invoiceNumber: invoice.invoiceNumber, id: invoice.id, createdAt: invoice.createdAt })} meta={invoice.status || "stored"} value={formatMoney(invoice.total)} href={invoice.id ? staffInvoicePath(invoice.id) : undefined} />
                 ))}
                 {orderInvoices.map((order) => (
-                  <Row key={order.id} title={order.invoice.invoiceNumber} meta={order.invoice.status || "on order"} value={formatMoney(order.invoice.total ?? order.total)} href={`/admin/order-request/${order.id}`} />
+                  <Row key={order.id} title={clientBillingInvoiceNumber(order, invoices)} meta={order.invoice.status || "on order"} value={formatMoney(order.invoice.total ?? order.total)} href={`/admin/order-request/${order.id}`} />
                 ))}
               </div>
             )}
