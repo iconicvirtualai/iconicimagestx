@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { renderToString } from "react-dom/server";
 import { AdminOrderTile } from "./AdminOrderTile";
 import { sampleAdminOrderTiles } from "@shared/adminOrderTile";
+import { projectSurfaceStatus } from "@shared/projectSurfaceStatus";
 
 const [listing, business] = sampleAdminOrderTiles();
 
@@ -43,5 +44,24 @@ describe("admin order tile chrome", () => {
     expect(html).toContain("aria-pressed=\"true\"");
     expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);
     expect(html).toContain("Business");
+  });
+
+  it("shows Cancelled and Paid together and does not call a cancelled project Delivered", () => {
+    const surface = projectSurfaceStatus({
+      listing: {
+        id: "5PBP8HYUaADAOJRGwoeU",
+        status: "cancelled",
+        invoiceStatus: "paid",
+        galleryStatus: "delivered",
+        deliveredAt: "2026-02-02",
+      },
+      invoices: [{ id: "inv_paid", status: "paid", total: 549, amountPaid: 549, listingId: "5PBP8HYUaADAOJRGwoeU" }],
+    });
+    const html = renderToString(<AdminOrderTile order={listing} surface={surface} />);
+    expect(html).toContain("Cancelled");
+    expect(html).toContain("Paid");
+    expect(html).toContain('data-status="cancelled"');
+    expect(html).toContain('data-paid="paid"');
+    expect(html).not.toContain(">Delivered<");
   });
 });

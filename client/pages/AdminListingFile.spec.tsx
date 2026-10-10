@@ -94,6 +94,22 @@ describe("admin listing page address", () => {
     expect(pressed(html, "Lock Studio")).toBe("true");
   });
 
+  it("shows Cancelled from the shared helper while billing is still loading", () => {
+    const html = renderListing("1906 Pagemill", {
+      status: "cancelled",
+      invoiceStatus: "paid",
+      paymentStatus: "paid",
+      paidAt: "2026-02-01",
+      galleryStatus: "delivered",
+      deliveredAt: "2026-02-02",
+      amountPaid: 549,
+      total: 549,
+    });
+    expect(html).toMatch(/bg-red-100 text-red-700[^"]*">Cancelled/);
+    expect(html).toContain("Checking");
+    expect(html).toContain("Checking invoice");
+  });
+
   it("renders a placeholder when the address is missing", () => {
     const html = renderListing(undefined);
     expect(heading(html)).toBe("—");

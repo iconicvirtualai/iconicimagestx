@@ -6,6 +6,7 @@ import {
   type AdminPaidState,
   type AdminStudioId,
 } from "@shared/adminOrderTile";
+import type { ProjectPayment, ProjectSurface } from "@shared/projectSurfaceStatus";
 import { cn } from "@/lib/utils";
 
 const PAID_CLASS: Record<AdminPaidState, string> = {
@@ -34,12 +35,15 @@ const DELIVERY_DOT: Record<AdminDeliveryState, string> = {
 
 export function AdminOrderTile({
   order,
+  surface,
   selected = false,
   onOpen,
   onToggleSelect,
   onStudioChange,
 }: {
   order: AdminOrderTileModel;
+  /** Project card status and payment. Orders omit this and keep their own chips. */
+  surface?: ProjectSurface;
   selected?: boolean;
   onOpen?: () => void;
   onToggleSelect?: () => void;
@@ -49,8 +53,9 @@ export function AdminOrderTile({
     <article
       data-admin-order-tile=""
       data-kind={order.kind}
-      data-paid={order.paid}
-      data-delivery={order.delivery}
+      data-paid={surface?.payment || order.paid}
+      data-delivery={surface ? (surface.delivered ? "delivered" : "not_delivered") : order.delivery}
+      data-status={surface?.projectStatus || ""}
       data-studio={order.studio || ""}
       onClick={onOpen}
       style={{ fontFamily: "Inter, system-ui, sans-serif" }}
@@ -59,7 +64,9 @@ export function AdminOrderTile({
         onOpen && "cursor-pointer",
         selected && "ring-2 ring-[#0d9488] ring-offset-2",
       )}
-      aria-label={`${order.typeLabel} order ${order.packageName}, ${order.paidLabel}, ${order.deliveryLabel}`}
+      aria-label={surface
+        ? `${order.typeLabel} order ${order.packageName}, ${surface.projectStatusLabel}, ${surface.paymentLabel}`
+        : `${order.typeLabel} order ${order.packageName}, ${order.paidLabel}, ${order.deliveryLabel}`}
     >
       <div className="relative h-[148px] shrink-0 overflow-hidden bg-[#1e293b]">
         <img src={order.heroUrl} alt="" className="h-full w-full object-cover" data-slot="hero" />
@@ -113,8 +120,17 @@ export function AdminOrderTile({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Status className={PAID_CLASS[order.paid]} dot={PAID_DOT[order.paid]} slot="paid" label={order.paidLabel} />
-          <Status className={DELIVERY_CLASS[order.delivery]} dot={DELIVERY_DOT[order.delivery]} slot="delivery" label={order.deliveryLabel} />
+          {surface ? (
+            <>
+              <Status className={statusClass(surface.projectStatus).box} dot={statusClass(surface.projectStatus).dot} slot="status" label={surface.projectStatusLabel} />
+              <Status className={paymentClass(surface.payment).box} dot={paymentClass(surface.payment).dot} slot="payment" label={surface.paymentLabel} />
+            </>
+          ) : (
+            <>
+              <Status className={PAID_CLASS[order.paid]} dot={PAID_DOT[order.paid]} slot="paid" label={order.paidLabel} />
+              <Status className={DELIVERY_CLASS[order.delivery]} dot={DELIVERY_DOT[order.delivery]} slot="delivery" label={order.deliveryLabel} />
+            </>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-x-3.5 gap-y-2.5 rounded-[10px] border border-[#e2e8f0] bg-[#f8fafc] p-3">
@@ -164,6 +180,25 @@ export function AdminOrderTile({
       </div>
     </article>
   );
+}
+
+function statusClass(status: string): { box: string; dot: string } {
+  if (status === "cancelled" || status === "canceled") {
+    return { box: "border-red-200 bg-red-50 text-red-700", dot: "bg-red-600" };
+  }
+  if (status.includes("delivered")) return { box: DELIVERY_CLASS.delivered, dot: DELIVERY_DOT.delivered };
+  if (status === "paid") return { box: PAID_CLASS.paid, dot: PAID_DOT.paid };
+  if (status === "in_progress" || status === "pending" || status.includes("scheduled") || status === "confirmed") {
+    return { box: DELIVERY_CLASS.in_progress, dot: DELIVERY_DOT.in_progress };
+  }
+  return { box: DELIVERY_CLASS.not_delivered, dot: DELIVERY_DOT.not_delivered };
+}
+
+function paymentClass(payment: ProjectPayment): { box: string; dot: string } {
+  if (payment === "paid") return { box: PAID_CLASS.paid, dot: PAID_DOT.paid };
+  if (payment === "partial") return { box: PAID_CLASS.partial, dot: PAID_DOT.partial };
+  if (payment === "unpaid") return { box: PAID_CLASS.unpaid, dot: PAID_DOT.unpaid };
+  return { box: DELIVERY_CLASS.not_delivered, dot: DELIVERY_DOT.not_delivered };
 }
 
 function Status({ className, dot, slot, label }: { className: string; dot: string; slot: string; label: string }) {
