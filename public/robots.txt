@@ -6,5 +6,6 @@ Disallow: /owners
 Disallow: /studio/
 Disallow: /gallery/
 Disallow: /api
+Disallow: /invoice
 
 Sitemap: https://iconicimagestx.vercel.app/sitemap.xml

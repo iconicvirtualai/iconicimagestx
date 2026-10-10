@@ -120,6 +120,10 @@ describe("spa rewrite coverage", () => {
       "/studio/(.*)",
       "/gallery/(.*)",
       "/seo/(.*)",
+      "/invoice",
+      "/invoice/(.*)",
+      "/podcast-guest-prep",
+      "/podcast-guest-prep/",
     ]);
     for (const rule of vercel.headers) {
       expect(rule.headers).toEqual([{ key: "X-Robots-Tag", value: "noindex, nofollow" }]);
@@ -134,6 +138,32 @@ describe("spa rewrite coverage", () => {
     expect(headerMatches("/studio-105")).toBe(false);
     expect(headerMatches("/login")).toBe(false);
     expect(headerMatches("/pricing")).toBe(false);
+    expect(headerMatches("/present/preview")).toBe(false);
+  });
+
+  it("noindexes invoice urls and the podcast guest prep sheet", () => {
+    const headerMatches = (path: string) =>
+      vercel.headers.some((rule) => compileVercelSource(rule.source).test(path));
+    expect(headerMatches("/invoice")).toBe(true);
+    expect(headerMatches("/invoice/inv-1")).toBe(true);
+    expect(headerMatches("/invoice/inv-1/")).toBe(true);
+    expect(headerMatches("/podcast-guest-prep")).toBe(true);
+    expect(headerMatches("/podcast-guest-prep/")).toBe(true);
+    expect(headerMatches("/login")).toBe(false);
+    expect(headerMatches("/pricing")).toBe(false);
+    expect(headerMatches("/pricing-v1")).toBe(false);
+    expect(headerMatches("/studio-105")).toBe(false);
+    expect(headerMatches("/present/preview")).toBe(false);
+    for (const source of ["/invoice", "/invoice/(.*)", "/podcast-guest-prep", "/podcast-guest-prep/"]) {
+      const rule = vercel.headers.find((item) => item.source === source);
+      expect(rule?.headers).toEqual([{ key: "X-Robots-Tag", value: "noindex, nofollow" }]);
+    }
+    expect(firstMatchingRewrite("/invoice/inv-1", vercel.rewrites)?.destination).toBe("/seo/private.html");
+    expect(firstMatchingRewrite("/invoice/inv-1/", vercel.rewrites)?.destination).toBe("/seo/private.html");
+    expect(firstMatchingRewrite("/podcast-guest-prep", vercel.rewrites)?.destination).toBe("/podcast-guest-prep.html");
+    expect(firstMatchingRewrite("/podcast-guest-prep/", vercel.rewrites)?.destination).toBe("/podcast-guest-prep.html");
+    expect(firstMatchingRewrite("/login", vercel.rewrites)?.destination).toBe("/seo/login.html");
+    expect(firstMatchingRewrite("/present/preview", vercel.rewrites)?.destination).toBe("/api/index");
   });
 
   it("removes the public admin login link and serves a real not-found page", () => {

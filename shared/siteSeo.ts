@@ -138,6 +138,7 @@ export function isNoIndexPath(pathname: string): boolean {
   if (path === "/owners" || path.startsWith("/owners/")) return true;
   if (path.startsWith("/studio/")) return true;
   if (path.startsWith("/gallery/")) return true;
+  if (path === "/invoice" || path.startsWith("/invoice/")) return true;
   return false;
 }
 
@@ -237,6 +238,7 @@ Disallow: /owners
 Disallow: /studio/
 Disallow: /gallery/
 Disallow: /api
+Disallow: /invoice
 
 Sitemap: ${origin}/sitemap.xml
 `;

@@ -36,6 +36,9 @@ const APP_SHELL_SOURCES = [
   "/services/virtual-staging/checkout",
 ];
 
+/** Stays in APP_SHELL_SOURCES so rewrite order does not move. Served noindex. */
+const PRIVATE_EXACT_SOURCES = new Set(["/invoice/:invoiceId"]);
+
 const RESERVED: Rewrite[] = [
   { source: "/api", destination: "/api/index" },
   { source: "/api/(.*)", destination: "/api/index" },
@@ -63,7 +66,10 @@ export function buildVercelRewrites(): Rewrite[] {
     destination: `/${page.file}`,
   }));
   for (const source of APP_SHELL_SOURCES) {
-    spa.push({ source, destination: APP_SHELL });
+    spa.push({
+      source,
+      destination: PRIVATE_EXACT_SOURCES.has(source) ? PRIVATE_SHELL : APP_SHELL,
+    });
   }
   spa.push(
     { source: "/studio/:listingId", destination: PRIVATE_SHELL },
@@ -97,6 +103,10 @@ export const NOINDEX_HEADER_SOURCES = [
   "/studio/(.*)",
   "/gallery/(.*)",
   "/seo/(.*)",
+  "/invoice",
+  "/invoice/(.*)",
+  "/podcast-guest-prep",
+  "/podcast-guest-prep/",
 ];
 
 export function buildVercelHeaders(): HeaderRule[] {

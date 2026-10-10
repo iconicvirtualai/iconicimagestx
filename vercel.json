@@ -242,11 +242,11 @@
     },
     {
       "source": "/invoice/:invoiceId",
-      "destination": "/seo/app.html"
+      "destination": "/seo/private.html"
     },
     {
       "source": "/invoice/:invoiceId/",
-      "destination": "/seo/app.html"
+      "destination": "/seo/private.html"
     },
     {
       "source": "/services/virtual-staging",
@@ -404,6 +404,42 @@
     },
     {
       "source": "/seo/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/invoice",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/invoice/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/podcast-guest-prep",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/podcast-guest-prep/",
       "headers": [
         {
           "key": "X-Robots-Tag",
