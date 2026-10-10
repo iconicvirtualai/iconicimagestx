@@ -91,6 +91,7 @@ export default function AdminDeliveryQueue() {
       <p className="mb-6 max-w-2xl text-xs text-gray-500">
         Pending, Undelivered, and Delivered follow the gallery on each Studio job.
         Mark Delivered uses the same hold as sending the gallery to the client.
+        Project missing means the Studio project was deleted. That row stays in the queue for cleanup.
       </p>
       {demo && (
         <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">

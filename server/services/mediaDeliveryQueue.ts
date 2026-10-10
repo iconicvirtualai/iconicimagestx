@@ -4,18 +4,24 @@
  * collection. Pending and Undelivered write the existing gallery status.
  * Delivered calls deliverGalleryToClient so the release hold and client
  * notice stay on that path.
+ * Listing the queue also checks, in batches, that each linked listing
+ * (project) and gallery still exists. Missing records are flagged. Nothing
+ * is deleted or rewritten.
  */
 
 import admin from "firebase-admin";
 import { galleryStatusNeedsReleaseGate } from "../../shared/galleryRelease";
 import {
+  applyLinkedRecordPresence,
   buildMediaDeliveryQueue,
+  collectLinkedRecordPresence,
   galleryStatusForDeliveryMove,
   isMediaDeliveryStatus,
   MEDIA_DELIVERY_LABELS,
   type DeliveryGallerySource,
   type DeliveryJobSource,
   type DeliveryListingSource,
+  type LinkedRecordSnap,
   type MediaDeliveryRow,
   type MediaDeliveryStatus,
 } from "../../shared/mediaDelivery";
@@ -73,11 +79,44 @@ export async function listMediaDeliveryQueue(input: { uid: string; role: string 
     galleryId: asString(item.data.galleryId) || asString(item.data.playtestGalleryId),
   }));
 
-  return buildMediaDeliveryQueue({
+  const rows = buildMediaDeliveryQueue({
     galleries,
     listings: listingSources,
     jobs,
   });
+  const galleryIdByListing = new Map<string, string>();
+  for (const listing of listingSources) {
+    if (listing.galleryId) galleryIdByListing.set(listing.id, listing.galleryId);
+  }
+  const loadedListingIds = new Set(listingSources.map((listing) => listing.id));
+  const loadedGalleryIds = new Set(galleries.map((gallery) => gallery.id));
+  const [listingPresence, galleryPresence] = await Promise.all([
+    collectLinkedRecordPresence(
+      rows.map((row) => row.listingId),
+      loadedListingIds,
+      (ids) => readExistingDocuments("listings", ids),
+    ),
+    collectLinkedRecordPresence(
+      [...rows.map((row) => row.galleryId), ...galleryIdByListing.values()],
+      loadedGalleryIds,
+      (ids) => readExistingDocuments("galleries", ids),
+    ),
+  ]);
+  return applyLinkedRecordPresence(
+    rows,
+    { listings: listingPresence, galleries: galleryPresence },
+    galleryIdByListing,
+  );
+}
+
+/** One batched read for a chunk of document ids. Missing docs come back exists: false. */
+async function readExistingDocuments(
+  collectionName: "listings" | "galleries",
+  ids: string[],
+): Promise<LinkedRecordSnap[]> {
+  if (ids.length === 0) return [];
+  const snaps = await db().getAll(...ids.map((id) => db().collection(collectionName).doc(id)));
+  return snaps.map((snap) => ({ id: snap.id, exists: snap.exists }));
 }
 
 export async function moveMediaDelivery(input: {

@@ -41,6 +41,10 @@ export interface MediaDeliveryRow {
   mediaCount: number;
   studio: MediaDeliveryStudio;
   moves: MediaDeliveryStatus[];
+  /** Listing/project document is gone. The row stays; the Studio link does not. */
+  projectMissing: boolean;
+  /** Linked gallery document is gone. The row stays; nothing links at that gallery. */
+  galleryMissing: boolean;
 }
 
 export interface DeliveryGallerySource {
@@ -138,6 +142,104 @@ function emptyStudio(): MediaDeliveryStudio {
   return { active: 0, review: 0, approved: 0, failed: 0 };
 }
 
+/** Firestore document ids this queue is willing to look up. */
+const LINKED_DOCUMENT_ID = /^[A-Za-z0-9_-]{1,128}$/;
+
+/** One getAll covers a chunk. Callers must not read one document per row. */
+export const LINKED_RECORD_BATCH = 30;
+
+export interface LinkedRecordPresence {
+  existing: ReadonlySet<string>;
+  /** A failed batch. These ids are not treated as deleted. */
+  unverified: ReadonlySet<string>;
+}
+
+export interface LinkedRecordSnap {
+  id: string;
+  exists: boolean;
+}
+
+function chunkIds(ids: string[], size: number): string[][] {
+  const parts: string[][] = [];
+  for (let index = 0; index < ids.length; index += size) parts.push(ids.slice(index, index + size));
+  return parts;
+}
+
+/**
+ * Classify linked listing/project and gallery ids.
+ * Ids already loaded by the queue count as existing and are not read again.
+ * The rest are handed to readBatch in chunks. A thrown batch is unverified,
+ * so a lookup failure does not flag live rows or take the page down.
+ * This does not delete or write anything.
+ */
+export async function collectLinkedRecordPresence(
+  ids: Array<string | null | undefined>,
+  alreadyExisting: ReadonlySet<string>,
+  readBatch: (ids: string[]) => Promise<LinkedRecordSnap[]>,
+): Promise<LinkedRecordPresence> {
+  const existing = new Set<string>();
+  const unverified = new Set<string>();
+  const pending: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of ids) {
+    const id = typeof raw === "string" ? raw.trim() : "";
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    if (alreadyExisting.has(id)) {
+      existing.add(id);
+      continue;
+    }
+    if (!LINKED_DOCUMENT_ID.test(id)) continue;
+    pending.push(id);
+  }
+  for (const part of chunkIds(pending, LINKED_RECORD_BATCH)) {
+    try {
+      const snaps = await readBatch(part);
+      const returned = new Set<string>();
+      for (const snap of snaps) {
+        const id = String(snap.id || "").trim();
+        if (!id) continue;
+        returned.add(id);
+        if (snap.exists) existing.add(id);
+      }
+      for (const id of part) {
+        if (!returned.has(id)) unverified.add(id);
+      }
+    } catch (err) {
+      console.error("[Delivery] Linked record check failed:", err instanceof Error ? err.message : err);
+      for (const id of part) unverified.add(id);
+    }
+  }
+  return { existing, unverified };
+}
+
+function recordMissing(id: string | null | undefined, presence: LinkedRecordPresence): boolean {
+  const value = typeof id === "string" ? id.trim() : "";
+  if (!value) return false;
+  if (presence.unverified.has(value)) return false;
+  return !presence.existing.has(value);
+}
+
+/**
+ * Mark rows whose listing/project or gallery document is gone.
+ * Does not drop the row and does not change delivery status.
+ */
+export function applyLinkedRecordPresence(
+  rows: MediaDeliveryRow[],
+  presence: { listings: LinkedRecordPresence; galleries: LinkedRecordPresence },
+  galleryIdByListing: ReadonlyMap<string, string> = new Map(),
+): MediaDeliveryRow[] {
+  return rows.map((row) => {
+    const linkedGalleryId = row.galleryId
+      || (row.listingId ? galleryIdByListing.get(row.listingId) || null : null);
+    return {
+      ...row,
+      projectMissing: recordMissing(row.listingId, presence.listings),
+      galleryMissing: recordMissing(linkedGalleryId, presence.galleries),
+    };
+  });
+}
+
 export function tallyStudioJobs(jobs: DeliveryJobSource[]): MediaDeliveryStudio {
   const studio = emptyStudio();
   for (const job of jobs) {
@@ -175,12 +277,19 @@ const STATUS_RANK: Record<MediaDeliveryStatus, number> = {
   delivered: 2,
 };
 
-function finalize(row: Omit<MediaDeliveryRow, "moves" | "label" | "deliveryStatus">): MediaDeliveryRow {
+type DeliveryRowDraft = Omit<MediaDeliveryRow, "moves" | "label" | "deliveryStatus" | "projectMissing" | "galleryMissing"> & {
+  projectMissing?: boolean;
+  galleryMissing?: boolean;
+};
+
+function finalize(row: DeliveryRowDraft): MediaDeliveryRow {
   const deliveryStatus = mediaDeliveryFromGalleryStatus(row.galleryStatus);
   const next: MediaDeliveryRow = {
     ...row,
     deliveryStatus,
     label: MEDIA_DELIVERY_LABELS[deliveryStatus],
+    projectMissing: row.projectMissing === true,
+    galleryMissing: row.galleryMissing === true,
     moves: [],
   };
   next.moves = deliveryMoveTargets(next);
