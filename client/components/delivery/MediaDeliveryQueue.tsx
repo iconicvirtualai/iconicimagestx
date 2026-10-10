@@ -90,6 +90,22 @@ export default function MediaDeliveryQueue({
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-widest ${PILL[row.deliveryStatus]}`}>
                         {row.label}
                       </span>
+                      {row.projectMissing && (
+                        <span
+                          data-testid={`delivery-project-missing-${row.id}`}
+                          className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-rose-800"
+                        >
+                          Project missing
+                        </span>
+                      )}
+                      {row.galleryMissing && (
+                        <span
+                          data-testid={`delivery-gallery-missing-${row.id}`}
+                          className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-rose-800"
+                        >
+                          Gallery missing
+                        </span>
+                      )}
                     </div>
                     <p className="mt-1 text-xs text-gray-500">
                       {row.clientName || "No client name"}
@@ -100,7 +116,7 @@ export default function MediaDeliveryQueue({
                     {held && <p className="mt-2 text-[11px] font-bold text-amber-800">{held}</p>}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    {row.listingId && (
+                    {row.listingId && !row.projectMissing && (
                       <a
                         href={iconicStudioHref(row.listingId)}
                         className="rounded-lg border border-gray-200 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-gray-600"

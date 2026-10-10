@@ -1,9 +1,12 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  applyLinkedRecordPresence,
   applyMediaDeliveryMove,
   buildMediaDeliveryQueue,
+  collectLinkedRecordPresence,
   galleryStatusForDeliveryMove,
+  LINKED_RECORD_BATCH,
   mediaDeliveryFromGalleryStatus,
   sampleMediaDeliveryRows,
 } from "./mediaDelivery";
@@ -63,6 +66,114 @@ describe("Iconic media delivery labels", () => {
     });
     expect(row.label).toBe("Delivered");
     expect(row.moves).toContain("delivered");
+  });
+
+  it("flags a deleted listing or gallery and leaves live rows unchanged", async () => {
+    const rows = buildMediaDeliveryQueue({
+      galleries: [
+        {
+          id: "galleryDelivered1",
+          status: "delivered",
+          listingId: "zT9VnzBHtPjzEY3LFKGJ",
+          addressLabel: "123 Iconic Test Lane",
+          clientName: "Iconic Test",
+          mediaCount: 3,
+        },
+        {
+          id: "galleryLive00001",
+          status: "delivered",
+          listingId: "listingLive0001",
+          addressLabel: "8 Cedar Lane, Austin, TX",
+          clientName: "Sample Client",
+          mediaCount: 30,
+        },
+      ],
+      listings: [
+        { id: "listingLive0001", address: "8 Cedar Lane, Austin, TX" },
+        { id: "listingNoGallery", address: "4 Bare Studio, Austin, TX", galleryId: "galleryGone00001" },
+      ],
+      jobs: [{ listingId: "listingNoGallery", status: "processing" }],
+    });
+    const listingCalls: string[][] = [];
+    const galleryCalls: string[][] = [];
+    const missing = async (calls: string[][], part: string[]) => {
+      calls.push(part);
+      return part.map((id) => ({ id, exists: false }));
+    };
+    const [listings, galleries] = await Promise.all([
+      collectLinkedRecordPresence(
+        rows.map((row) => row.listingId),
+        new Set(["listingLive0001", "listingNoGallery"]),
+        (part) => missing(listingCalls, part),
+      ),
+      collectLinkedRecordPresence(
+        ["galleryDelivered1", "galleryLive00001", "galleryGone00001"],
+        new Set(["galleryDelivered1", "galleryLive00001"]),
+        (part) => missing(galleryCalls, part),
+      ),
+    ]);
+    expect(listingCalls).toEqual([["zT9VnzBHtPjzEY3LFKGJ"]]);
+    expect(galleryCalls).toEqual([["galleryGone00001"]]);
+    const flagged = applyLinkedRecordPresence(rows, { listings, galleries }, new Map([
+      ["listingNoGallery", "galleryGone00001"],
+    ]));
+    const orphan = flagged.find((row) => row.address === "123 Iconic Test Lane");
+    const live = flagged.find((row) => row.id === "galleryLive00001");
+    const bare = flagged.find((row) => row.id === "listing:listingNoGallery");
+    expect(orphan?.projectMissing).toBe(true);
+    expect(orphan?.galleryMissing).toBe(false);
+    expect(orphan?.label).toBe("Delivered");
+    expect(orphan?.listingId).toBe("zT9VnzBHtPjzEY3LFKGJ");
+    expect(live?.projectMissing).toBe(false);
+    expect(live?.galleryMissing).toBe(false);
+    expect(live?.moves).toEqual(["pending", "undelivered"]);
+    expect(bare?.projectMissing).toBe(false);
+    expect(bare?.galleryMissing).toBe(true);
+    expect(bare?.label).toBe("Pending");
+  });
+
+  it("checks linked records in batches and does not treat a failed lookup as deleted", async () => {
+    const ids = Array.from({ length: LINKED_RECORD_BATCH + 2 }, (_item, index) => `listingBatch${String(index).padStart(4, "0")}`);
+    const calls: string[][] = [];
+    const presence = await collectLinkedRecordPresence(ids, new Set([ids[0]]), async (part) => {
+      calls.push(part);
+      return part.map((id) => ({ id, exists: false }));
+    });
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toHaveLength(LINKED_RECORD_BATCH);
+    expect(calls[1]).toHaveLength(1);
+    expect(presence.existing.has(ids[0])).toBe(true);
+    expect(presence.existing.has(ids[1])).toBe(false);
+    expect(calls.flat()).not.toContain(ids[0]);
+
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const failedCalls: string[][] = [];
+      const failed = await collectLinkedRecordPresence(
+        ["zT9VnzBHtPjzEY3LFKGJ", "bad id"],
+        new Set(),
+        async (part) => {
+          failedCalls.push(part);
+          throw new Error("firestore unavailable");
+        },
+      );
+      expect(failedCalls).toEqual([["zT9VnzBHtPjzEY3LFKGJ"]]);
+      expect(failed.unverified.has("zT9VnzBHtPjzEY3LFKGJ")).toBe(true);
+      expect(failed.existing.size).toBe(0);
+      const [row] = buildMediaDeliveryQueue({
+        galleries: [{ id: "galleryDelivered1", status: "delivered", listingId: "zT9VnzBHtPjzEY3LFKGJ", addressLabel: "123 Iconic Test Lane" }],
+      });
+      const unverified = applyLinkedRecordPresence([row], {
+        listings: failed,
+        galleries: { existing: new Set(["galleryDelivered1"]), unverified: new Set() },
+      });
+      expect(unverified[0].projectMissing).toBe(false);
+      const kept = applyMediaDeliveryMove({ ...unverified[0], projectMissing: true }, "pending");
+      expect(kept.projectMissing).toBe(true);
+      expect(kept.label).toBe("Pending");
+    } finally {
+      error.mockRestore();
+    }
   });
 
   it("stays on the Iconic wording", () => {
