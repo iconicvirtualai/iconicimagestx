@@ -2044,9 +2044,11 @@ function draftInvoiceNumber(invoiceId, now = /* @__PURE__ */ new Date()) {
   const suffix = invoiceId.replace(/[^A-Za-z0-9]/g, "").slice(-6).toUpperCase() || "000001";
   return `INV-${year}-${suffix}`;
 }
-const HUMAN_INVOICE_NUMBER = /^INV-\d{4}-[A-Z0-9]+$/;
-function isHumanInvoiceNumber(value) {
-  return typeof value === "string" && HUMAN_INVOICE_NUMBER.test(value.trim()) && !/nan/i.test(value);
+const BROKEN_INVOICE_NUMBER = /^INV-\d{4}-0NaN$/i;
+function isStoredInvoiceNumber(value) {
+  if (typeof value !== "string") return false;
+  const trimmed = value.trim();
+  return trimmed.length > 0 && !BROKEN_INVOICE_NUMBER.test(trimmed);
 }
 function nextSequentialInvoiceNumber(existing, year) {
   const prefix = `INV-${year}-`;
@@ -2064,10 +2066,7 @@ function nextSequentialInvoiceNumber(existing, year) {
   return `${prefix}${String(safe).padStart(4, "0")}`;
 }
 function presentInvoiceNumber(stored, invoiceId, now = /* @__PURE__ */ new Date()) {
-  if (typeof stored === "string") {
-    const trimmed = stored.trim();
-    if (isHumanInvoiceNumber(trimmed)) return trimmed;
-  }
+  if (isStoredInvoiceNumber(stored)) return stored.trim();
   const id = typeof invoiceId === "string" ? invoiceId.trim() : "";
   if (id) return draftInvoiceNumber(id, now);
   return `INV-${now.getFullYear()}-0001`;
