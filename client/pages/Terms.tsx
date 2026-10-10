@@ -1,17 +1,12 @@
 import { Link } from "react-router-dom";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
+import LegalDocument, { legalScrollMarginClassName } from "@/components/LegalDocument";
 import LegalContact from "@/components/LegalContact";
 import { LEGAL } from "@/lib/legal";
 
 export default function Terms() {
   return (
-    <div className="flex flex-col min-h-screen bg-white">
-      <Header />
-
-      <main className="flex-1">
-        <div className="container mx-auto px-4 py-16 max-w-4xl">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Terms and Conditions</h1>
+    <LegalDocument>
+          <h1 id="terms-and-conditions" className={`${legalScrollMarginClassName} text-4xl font-bold text-gray-900 mb-2`}>Terms and Conditions</h1>
           <p className="text-sm text-gray-500 mb-4">Last updated: {LEGAL.lastUpdated}</p>
           <p className="text-sm text-gray-600 mb-10">
             These Terms and Conditions are the terms of service for {LEGAL.brand} / {LEGAL.brandSite}. They are a
@@ -23,7 +18,7 @@ export default function Terms() {
           </p>
 
           <div className="prose prose-gray max-w-none space-y-8 text-gray-700 leading-relaxed">
-            <section>
+            <section id="agreement" className={legalScrollMarginClassName}>
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">1. Agreement</h2>
               <p>
                 These Terms and Conditions (&quot;Terms&quot;) govern your use of the websites and services of{" "}
@@ -37,7 +32,7 @@ export default function Terms() {
               </p>
             </section>
 
-            <section>
+            <section id="services" className={legalScrollMarginClassName}>
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">2. Services</h2>
               <p>
                 We provide real estate and property photography, video, aerial imagery, virtual staging, and related
@@ -47,7 +42,7 @@ export default function Terms() {
               </p>
             </section>
 
-            <section>
+            <section id="booking-requests" className={legalScrollMarginClassName}>
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">3. Booking Requests</h2>
               <p>
                 Submitting the booking form is a request, not a confirmed appointment. An order-received email or text
@@ -61,7 +56,7 @@ export default function Terms() {
               </p>
             </section>
 
-            <section>
+            <section id="fees-and-payment" className={legalScrollMarginClassName}>
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">4. Fees and Payment</h2>
               <p>
                 Fees are those quoted on the booking flow, an invoice, or a written proposal. Estimates shown before
@@ -71,7 +66,7 @@ export default function Terms() {
               </p>
             </section>
 
-            <section>
+            <section id="changes-rescheduling-cancellation" className={legalScrollMarginClassName}>
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">5. Changes, Rescheduling, and Cancellation</h2>
               <p>
                 Contact us as soon as you need to reschedule or cancel a shoot so we can adjust the calendar. Monthly
@@ -82,7 +77,7 @@ export default function Terms() {
               </p>
             </section>
 
-            <section>
+            <section id="deliverables-and-license" className={legalScrollMarginClassName}>
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">6. Deliverables and License</h2>
               <p>
                 Unless a written agreement says otherwise, {LEGAL.entity} retains copyright in the photographs, video,
@@ -98,7 +93,7 @@ export default function Terms() {
               </p>
             </section>
 
-            <section>
+            <section id="sms-and-email" className={legalScrollMarginClassName}>
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">7. SMS and Email Program</h2>
               <p>
                 Text messages are sent only if you check the consent box on the booking or order form. That box is how
@@ -139,7 +134,7 @@ export default function Terms() {
               </p>
             </section>
 
-            <section>
+            <section id="acceptable-use" className={legalScrollMarginClassName}>
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">8. Acceptable Use</h2>
               <p>You agree not to:</p>
               <ul className="list-disc list-inside mt-3 space-y-2">
@@ -149,7 +144,7 @@ export default function Terms() {
               </ul>
             </section>
 
-            <section>
+            <section id="disclaimers" className={legalScrollMarginClassName}>
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">9. Disclaimers</h2>
               <p>
                 Our media is produced for marketing. It is not an appraisal, inspection, survey, or legal, tax, or
@@ -158,7 +153,7 @@ export default function Terms() {
               </p>
             </section>
 
-            <section>
+            <section id="limitation-of-liability" className={legalScrollMarginClassName}>
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">10. Limitation of Liability</h2>
               <p>
                 To the fullest extent permitted by Texas law, {LEGAL.entity} and its owners, employees, and
@@ -169,7 +164,7 @@ export default function Terms() {
               </p>
             </section>
 
-            <section>
+            <section id="governing-law" className={legalScrollMarginClassName}>
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">11. Governing Law</h2>
               <p>
                 These Terms are governed by the laws of the State of Texas, without regard to conflict-of-law rules.
@@ -178,7 +173,7 @@ export default function Terms() {
               </p>
             </section>
 
-            <section>
+            <section id="changes" className={legalScrollMarginClassName}>
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">12. Changes</h2>
               <p>
                 We may update these Terms from time to time. The &quot;Last updated&quot; date at the top of this page
@@ -188,16 +183,12 @@ export default function Terms() {
               </p>
             </section>
 
-            <section>
+            <section id="contact" className={legalScrollMarginClassName}>
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">13. Contact</h2>
               <p>Questions about these Terms, a booking, or the SMS program:</p>
               <LegalContact />
             </section>
           </div>
-        </div>
-      </main>
-
-      <Footer />
-    </div>
+    </LegalDocument>
   );
 }
