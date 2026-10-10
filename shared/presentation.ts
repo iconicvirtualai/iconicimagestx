@@ -7,6 +7,7 @@
 
 import { frameFromListingImage, listingAddressLabel } from "./iconicStudio";
 import { hiddenPresentationKeys, rowHiddenFromPresentation } from "./portalListingDetail";
+import { stripPublicMeta } from "./siteSeo";
 
 export const PRESENTATION_PREVIEW_TOKEN = "preview";
 export const PRESENTATION_PATH = "/present";
@@ -431,7 +432,7 @@ export function injectPresentationMeta(html: string, meta: PresentationMeta): st
     meta.image ? `<meta name="twitter:image" content="${escapeHtml(meta.image)}" />` : "",
   ].filter(Boolean).join("\n    ");
 
-  let next = html.replace(/<title>[\s\S]*?<\/title>/i, "");
+  let next = stripPublicMeta(html).replace(/<title>[\s\S]*?<\/title>/gi, "");
   if (next.includes("</head>")) {
     next = next.replace("</head>", `    ${tags}\n  </head>`);
   } else {

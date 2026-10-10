@@ -16574,6 +16574,19 @@ const handleListingPhotoUpload = async (req, res) => {
     });
   }
 };
+const DEFAULT_SITE_ORIGIN = "https://iconicimagestx.vercel.app";
+const GENERIC_TITLE = "Iconic Images - Creative Media Partners";
+function readConfiguredOrigin() {
+  const nodeOrigin = typeof process !== "undefined" ? process.env?.VITE_SITE_ORIGIN : "";
+  return String(nodeOrigin || "").trim().replace(/\/$/, "");
+}
+readConfiguredOrigin() || DEFAULT_SITE_ORIGIN;
+function isPublicMetaTag(tag) {
+  return /(?:\bname|\bproperty)\s*=\s*["'](?:description|robots|og:[^"']*|twitter:[^"']*)["']/i.test(tag);
+}
+function stripPublicMeta(html) {
+  return html.replace(/<link\b[^>]*rel=["']canonical["'][^>]*\/?>\s*/gi, "").replace(/<meta\b[^>]*\/?>\s*/gi, (tag) => isPublicMetaTag(tag) ? "" : tag);
+}
 const PRESENTATION_PREVIEW_TOKEN = "preview";
 const PRESENTATION_PATH = "/present";
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{22,80}$/;
@@ -16896,7 +16909,7 @@ function injectPresentationMeta(html, meta) {
     `<meta name="twitter:description" content="${escapeHtml$1(meta.description)}" />`,
     meta.image ? `<meta name="twitter:image" content="${escapeHtml$1(meta.image)}" />` : ""
   ].filter(Boolean).join("\n    ");
-  let next = html.replace(/<title>[\s\S]*?<\/title>/i, "");
+  let next = stripPublicMeta(html).replace(/<title>[\s\S]*?<\/title>/gi, "");
   if (next.includes("</head>")) {
     next = next.replace("</head>", `    ${tags}
   </head>`);
@@ -18271,11 +18284,17 @@ window.$RefreshSig$ = () => (type) => type;
   </head>`) : `${preamble}${html}`;
 }
 function injectRobots(html) {
-  if (html.includes('name="robots"')) return html;
-  if (html.includes("</head>")) {
-    return html.replace("</head>", '    <meta name="robots" content="noindex, nofollow" />\n  </head>');
+  let next = stripPublicMeta(html).replace(/<title>[\s\S]*?<\/title>/i, `<title>${GENERIC_TITLE}</title>`);
+  const robots = '<meta name="robots" content="noindex, nofollow" />';
+  if (!next.includes("<title>")) {
+    next = next.includes("</head>") ? next.replace("</head>", `    <title>${GENERIC_TITLE}</title>
+  </head>`) : `<title>${GENERIC_TITLE}</title>${next}`;
   }
-  return `<!doctype html><meta name="robots" content="noindex, nofollow" />${html}`;
+  if (next.includes("</head>")) {
+    return next.replace("</head>", `    ${robots}
+  </head>`);
+  }
+  return `<!doctype html>${robots}${next}`;
 }
 async function readSpaShell() {
   const source = path.join(process.cwd(), "index.html");

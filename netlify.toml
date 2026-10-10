@@ -50,9 +50,9 @@
 [[redirects]]
   from = "/gallery"
   status = 302
-  to = "/studio-105"
+  to = "/portal"
 
 [[redirects]]
   from = "/gallery/"
   status = 302
-  to = "/studio-105"
+  to = "/portal"

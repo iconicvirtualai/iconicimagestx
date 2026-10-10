@@ -16,22 +16,400 @@
     }
   },
   "redirects": [
-    { "source": "/pricing-v1", "destination": "/pricing", "statusCode": 301 },
-    { "source": "/pricing-v1/", "destination": "/pricing", "statusCode": 301 },
-    { "source": "/studio", "destination": "/studio-105", "permanent": false },
-    { "source": "/studio/", "destination": "/studio-105", "permanent": false },
-    { "source": "/gallery", "destination": "/studio-105", "permanent": false },
-    { "source": "/gallery/", "destination": "/studio-105", "permanent": false }
+    {
+      "source": "/pricing-v1",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/pricing-v1/",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/studio",
+      "destination": "/studio-105",
+      "permanent": false
+    },
+    {
+      "source": "/studio/",
+      "destination": "/studio-105",
+      "permanent": false
+    },
+    {
+      "source": "/gallery",
+      "destination": "/portal",
+      "permanent": false
+    },
+    {
+      "source": "/gallery/",
+      "destination": "/portal",
+      "permanent": false
+    }
   ],
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" },
-    { "source": "/present/:token", "destination": "/api/index" },
-    { "source": "/admin/owners", "destination": "/api/index" },
-    { "source": "/admin/owners/", "destination": "/api/index" },
-    { "source": "/owners", "destination": "/api/index" },
-    { "source": "/owners/", "destination": "/api/index" },
-    { "source": "/podcast-guest-prep", "destination": "/podcast-guest-prep.html" },
-    { "source": "/podcast-guest-prep/", "destination": "/podcast-guest-prep.html" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/api",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/api/",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/present/:token",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/present/:token/",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/admin/owners",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/admin/owners/",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/owners",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/owners/",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/podcast-guest-prep",
+      "destination": "/podcast-guest-prep.html"
+    },
+    {
+      "source": "/podcast-guest-prep/",
+      "destination": "/podcast-guest-prep.html"
+    },
+    {
+      "source": "/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/about",
+      "destination": "/seo/about.html"
+    },
+    {
+      "source": "/about/",
+      "destination": "/seo/about.html"
+    },
+    {
+      "source": "/pricing",
+      "destination": "/seo/pricing.html"
+    },
+    {
+      "source": "/pricing/",
+      "destination": "/seo/pricing.html"
+    },
+    {
+      "source": "/studio-105",
+      "destination": "/seo/studio-105.html"
+    },
+    {
+      "source": "/studio-105/",
+      "destination": "/seo/studio-105.html"
+    },
+    {
+      "source": "/portfolio",
+      "destination": "/seo/portfolio.html"
+    },
+    {
+      "source": "/portfolio/",
+      "destination": "/seo/portfolio.html"
+    },
+    {
+      "source": "/stock-footage",
+      "destination": "/seo/stock-footage.html"
+    },
+    {
+      "source": "/stock-footage/",
+      "destination": "/seo/stock-footage.html"
+    },
+    {
+      "source": "/contact",
+      "destination": "/seo/contact.html"
+    },
+    {
+      "source": "/contact/",
+      "destination": "/seo/contact.html"
+    },
+    {
+      "source": "/socials",
+      "destination": "/seo/socials.html"
+    },
+    {
+      "source": "/socials/",
+      "destination": "/seo/socials.html"
+    },
+    {
+      "source": "/book",
+      "destination": "/seo/book.html"
+    },
+    {
+      "source": "/book/",
+      "destination": "/seo/book.html"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/seo/privacy.html"
+    },
+    {
+      "source": "/privacy/",
+      "destination": "/seo/privacy.html"
+    },
+    {
+      "source": "/terms",
+      "destination": "/seo/terms.html"
+    },
+    {
+      "source": "/terms/",
+      "destination": "/seo/terms.html"
+    },
+    {
+      "source": "/login",
+      "destination": "/seo/login.html"
+    },
+    {
+      "source": "/login/",
+      "destination": "/seo/login.html"
+    },
+    {
+      "source": "/pricing/ai-assistant",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/pricing/ai-assistant/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/agents",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/agents/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/insights",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/insights/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/insights/prep",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/insights/prep/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/unsubscribe",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/unsubscribe/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/go",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/go/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/listing-cards",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/listing-cards/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/invoice/:invoiceId",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/invoice/:invoiceId/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/services/virtual-staging",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/services/virtual-staging/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/services/virtual-staging/select",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/services/virtual-staging/select/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/services/virtual-staging/ai-tool",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/services/virtual-staging/ai-tool/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/services/virtual-staging/pro-order",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/services/virtual-staging/pro-order/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/services/virtual-staging/checkout",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/services/virtual-staging/checkout/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/studio/:listingId",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/studio/:listingId/",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/gallery/:galleryId",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/gallery/:galleryId/",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/admin",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/admin/",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/admin/(.*)",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/portal",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/portal/",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/portal/(.*)",
+      "destination": "/seo/private.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/admin",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/admin/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/portal",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/portal/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/owners",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/owners/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/studio/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/gallery/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/seo/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    }
   ]
 }

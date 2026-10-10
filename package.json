@@ -13,7 +13,7 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run build:client && npm run build:server && npm run build:vercel",
-    "build:client": "vite build",
+    "build:client": "vite build && tsx scripts/generate-seo-html.ts",
     "build:server": "vite build --config vite.config.server.ts",
     "build:vercel": "vite build --config vite.config.vercel.ts",
     "start": "node dist/server/node-build.mjs",

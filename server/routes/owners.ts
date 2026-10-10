@@ -16,6 +16,7 @@ import {
 } from "../services/ownerGate";
 import { loadOwnerSuite } from "../services/ownerSheets";
 import { OWNER_WHY } from "../services/ownerWhy";
+import { GENERIC_TITLE, stripPublicMeta } from "../../shared/siteSeo";
 
 const NOT_FOUND = { error: "Not found" };
 
@@ -86,11 +87,17 @@ window.$RefreshSig$ = () => (type) => type;
 }
 
 function injectRobots(html: string): string {
-  if (html.includes('name="robots"')) return html;
-  if (html.includes("</head>")) {
-    return html.replace("</head>", '    <meta name="robots" content="noindex, nofollow" />\n  </head>');
+  let next = stripPublicMeta(html).replace(/<title>[\s\S]*?<\/title>/i, `<title>${GENERIC_TITLE}</title>`);
+  const robots = '<meta name="robots" content="noindex, nofollow" />';
+  if (!next.includes("<title>")) {
+    next = next.includes("</head>")
+      ? next.replace("</head>", `    <title>${GENERIC_TITLE}</title>\n  </head>`)
+      : `<title>${GENERIC_TITLE}</title>${next}`;
   }
-  return `<!doctype html><meta name="robots" content="noindex, nofollow" />${html}`;
+  if (next.includes("</head>")) {
+    return next.replace("</head>", `    ${robots}\n  </head>`);
+  }
+  return `<!doctype html>${robots}${next}`;
 }
 
 async function readSpaShell(): Promise<string | null> {

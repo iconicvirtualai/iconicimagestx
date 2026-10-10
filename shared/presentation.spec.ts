@@ -152,4 +152,19 @@ describe("listing presentation", () => {
     expect(html).toContain("twitter:image");
     expect(html).toContain("noindex");
   });
+
+  it("replaces an earlier public description instead of keeping both", () => {
+    const html = injectPresentationMeta(
+      `<html><head><title>Home</title><meta name="description" content="Public home" /><meta property="og:title" content="Home" /></head><body></body></html>`,
+      {
+        title: "Private presentation",
+        description: "12 photographs",
+        image: "https://cdn.example/hero.jpg",
+        url: "https://iconicimagestx.vercel.app/present/abcdefghijklmnopqrstuv",
+      },
+    );
+    expect(html).not.toContain("Public home");
+    expect(html.match(/og:title/g)).toHaveLength(1);
+    expect(html).toContain("Private presentation");
+  });
 });

@@ -1,6 +1,8 @@
+import fs from "fs";
 import path from "path";
 import { createServer } from "./index";
 import * as express from "express";
+import { htmlFileForRequestPath } from "@shared/spaRouting";
 import { renderPresentationShell } from "./routes/presentations";
 
 const app = createServer();
@@ -25,14 +27,18 @@ app.get(["/pricing-v1", "/pricing-v1/"], (_req, res) => {
   res.redirect(301, "/pricing");
 });
 
-// Bare /studio and /gallery have no project id. ID routes stay on the SPA.
-app.get(["/studio", "/studio/", "/gallery", "/gallery/"], (_req, res) => {
+// Bare /studio has no project id. Studio 105 is the public studio page.
+app.get(["/studio", "/studio/"], (_req, res) => {
   res.redirect(302, "/studio-105");
 });
 
-// Handle React Router - serve index.html for all non-API routes
+// Bare /gallery has no project id. The client portal is the door.
+app.get(["/gallery", "/gallery/"], (_req, res) => {
+  res.redirect(302, "/portal");
+});
+
+// Known SPA routes serve their shell. Anything else is a real 404.
 app.get("/{*splat}", async (req, res) => {
-  // Don't serve index.html for API routes
   if (req.path.startsWith("/api/") || req.path.startsWith("/health")) {
     return res.status(404).json({ error: "API endpoint not found" });
   }
@@ -41,13 +47,22 @@ app.get("/{*splat}", async (req, res) => {
   if (presentation) {
     const origin = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
     const rendered = await renderPresentationShell(decodeURIComponent(presentation[1]), origin);
-    if (rendered.status === 200) {
-      res.setHeader("Cache-Control", "no-store");
-      return res.status(200).type("html").send(rendered.html);
-    }
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(rendered.status).type("html").send(rendered.html);
   }
 
-  res.sendFile(path.join(distPath, "index.html"));
+  const rel = htmlFileForRequestPath(req.path);
+  if (rel) {
+    const file = path.join(distPath, rel);
+    if (fs.existsSync(file)) return res.sendFile(file);
+    return res.sendFile(path.join(distPath, "index.html"));
+  }
+
+  const missing = path.join(distPath, "404.html");
+  if (fs.existsSync(missing)) {
+    return res.status(404).type("html").send(fs.readFileSync(missing));
+  }
+  return res.status(404).type("html").send("Page not found");
 });
 
 app.listen(port, () => {
