@@ -1,17 +1,12 @@
 import { Link } from "react-router-dom";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
+import LegalDocument, { legalScrollMarginClassName } from "@/components/LegalDocument";
 import LegalContact from "@/components/LegalContact";
 import { LEGAL } from "@/lib/legal";
 
 export default function Privacy() {
   return (
-    <div className="flex flex-col min-h-screen bg-white">
-      <Header />
-
-      <main className="flex-1">
-        <div className="container mx-auto px-4 py-16 max-w-4xl">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Privacy Policy</h1>
+    <LegalDocument>
+          <h1 id="privacy-policy" className={`${legalScrollMarginClassName} text-4xl font-bold text-gray-900 mb-2`}>Privacy Policy</h1>
           <p className="text-sm text-gray-500 mb-4">Last updated: {LEGAL.lastUpdated}</p>
           <p className="text-sm text-gray-600 mb-10">
             This policy works together with our{" "}
@@ -22,7 +17,7 @@ export default function Privacy() {
           </p>
 
           <div className="prose prose-gray max-w-none space-y-8 text-gray-700 leading-relaxed">
-            <section>
+            <section id="introduction" className={legalScrollMarginClassName}>
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">1. Introduction</h2>
               <p>
                 {LEGAL.entity} (&quot;{LEGAL.brand},&quot; &quot;{LEGAL.brandSite},&quot; &quot;we,&quot; &quot;us,&quot; or
@@ -34,7 +29,7 @@ export default function Privacy() {
               </p>
             </section>
 
-            <section>
+            <section id="information-we-collect" className={legalScrollMarginClassName}>
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">2. Information We Collect</h2>
               <p>We may collect the following categories of personal information:</p>
               <ul className="list-disc list-inside mt-3 space-y-2">
@@ -64,7 +59,7 @@ export default function Privacy() {
               </ul>
             </section>
 
-            <section>
+            <section id="how-we-use-your-information" className={legalScrollMarginClassName}>
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">3. How We Use Your Information</h2>
               <p>We use the information we collect to:</p>
               <ul className="list-disc list-inside mt-3 space-y-2">
@@ -81,7 +76,7 @@ export default function Privacy() {
               </ul>
             </section>
 
-            <section>
+            <section id="sms-and-email" className={legalScrollMarginClassName}>
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">4. SMS and Email Communications</h2>
               <p>
                 {LEGAL.brand} sends transactional text messages and email related to real estate photography bookings
@@ -137,7 +132,7 @@ export default function Privacy() {
               <p className="mt-3">Carriers are not liable for delayed or undelivered messages.</p>
             </section>
 
-            <section>
+            <section id="sharing-your-information" className={legalScrollMarginClassName}>
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">5. Sharing Your Information</h2>
               <p>
                 We do not sell, trade, or rent your personal information. Mobile numbers and messaging consent are not
@@ -166,7 +161,7 @@ export default function Privacy() {
               </ul>
             </section>
 
-            <section>
+            <section id="data-retention" className={legalScrollMarginClassName}>
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">6. Data Retention</h2>
               <p>
                 We retain your personal information for as long as necessary to fulfill the purposes described in this
@@ -176,7 +171,7 @@ export default function Privacy() {
               </p>
             </section>
 
-            <section>
+            <section id="cookies-and-tracking" className={legalScrollMarginClassName}>
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">7. Cookies and Tracking</h2>
               <p>
                 Our website may use cookies and similar tracking technologies to enhance your browsing experience,
@@ -185,7 +180,7 @@ export default function Privacy() {
               </p>
             </section>
 
-            <section>
+            <section id="security" className={legalScrollMarginClassName}>
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">8. Security</h2>
               <p>
                 We implement industry-standard security measures to protect your personal information from unauthorized
@@ -194,7 +189,7 @@ export default function Privacy() {
               </p>
             </section>
 
-            <section>
+            <section id="your-rights" className={legalScrollMarginClassName}>
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">9. Your Rights</h2>
               <p>Depending on your location, you may have the right to:</p>
               <ul className="list-disc list-inside mt-3 space-y-2">
@@ -207,7 +202,7 @@ export default function Privacy() {
               <p className="mt-3">To exercise any of these rights, please contact us using the information below.</p>
             </section>
 
-            <section>
+            <section id="childrens-privacy" className={legalScrollMarginClassName}>
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">10. Children&apos;s Privacy</h2>
               <p>
                 Our services are not directed to individuals under the age of 18. We do not knowingly collect personal
@@ -216,7 +211,7 @@ export default function Privacy() {
               </p>
             </section>
 
-            <section>
+            <section id="changes" className={legalScrollMarginClassName}>
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">11. Changes to This Policy</h2>
               <p>
                 We may update this Privacy Policy from time to time. When we do, we will revise the &quot;Last
@@ -225,7 +220,7 @@ export default function Privacy() {
               </p>
             </section>
 
-            <section>
+            <section id="contact" className={legalScrollMarginClassName}>
               <h2 className="text-2xl font-semibold text-gray-900 mb-3">12. Contact Us</h2>
               <p>
                 If you have any questions, concerns, or requests regarding this Privacy Policy, our SMS program, or our
@@ -234,10 +229,6 @@ export default function Privacy() {
               <LegalContact />
             </section>
           </div>
-        </div>
-      </main>
-
-      <Footer />
-    </div>
+    </LegalDocument>
   );
 }
