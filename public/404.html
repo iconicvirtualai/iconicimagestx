@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Page not found | Iconic Images</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <style>
+      html, body { margin: 0; height: 100%; }
+      body {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: #f3f4f6;
+        color: #111827;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      }
+      main {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 2rem 1rem;
+      }
+      h1 { font-size: 2.25rem; line-height: 2.5rem; font-weight: 700; margin: 0 0 1rem; }
+      main p { font-size: 1.25rem; line-height: 1.75rem; color: #4b5563; margin: 0 0 1rem; }
+      main a { color: #3b82f6; }
+      main a:hover { color: #1d4ed8; }
+      footer { background: #0d9488; color: #fff; padding: 3rem 1rem; }
+      .wrap { max-width: 1100px; margin: 0 auto; text-align: center; }
+      .nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.5rem; margin-top: 1rem; }
+      .nav a, footer a { color: #fff; text-decoration: none; font-size: 0.875rem; font-weight: 500; }
+      .nav a:hover, footer a:hover { color: rgba(255, 255, 255, 0.8); }
+      .legal { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid rgba(255, 255, 255, 0.2); display: flex; justify-content: center; gap: 1.5rem; }
+      .legal a { font-weight: 600; text-decoration: underline; text-underline-offset: 4px; }
+      .contact { margin-top: 2rem; font-size: 0.875rem; line-height: 1.6; }
+      .contact a { text-decoration: underline; text-underline-offset: 4px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div>
+        <h1>404</h1>
+        <p>Oops! Page not found</p>
+        <a href="/">Return to Home</a>
+      </div>
+    </main>
+    <footer>
+      <div class="wrap">
+        <div>© <span id="year"></span> Iconic Images Inc.</div>
+        <nav class="nav" aria-label="Footer">
+          <a href="/">Home</a>
+          <a href="/pricing">Pricing</a>
+          <a href="/socials">Socials</a>
+          <a href="/portfolio">Portfolio</a>
+          <a href="/studio-105">Studio 105</a>
+          <a href="/contact">Contact Us</a>
+          <a href="/login">Client Login</a>
+        </nav>
+        <p class="contact">26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380 | <a href="tel:+12813560965">281.356.0965</a> | <a href="mailto:photos@iconicimagestx.com">photos@iconicimagestx.com</a></p>
+        <nav class="legal" aria-label="Legal">
+          <a href="/privacy">Privacy Policy</a>
+          <a href="/terms">Terms and Conditions</a>
+        </nav>
+      </div>
+    </footer>
+    <script>document.getElementById("year").textContent = String(new Date().getFullYear());</script>
+  </body>
+</html>

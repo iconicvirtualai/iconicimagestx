@@ -18,6 +18,7 @@ import { useEffect } from "react";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { LocalBusinessJsonLd } from "./components/LocalBusinessJsonLd";
+import SiteMeta from "./components/SiteMeta";
 
 // Public pages
 import Index from "./pages/Index";
@@ -106,6 +107,7 @@ const App = () => (
       <BrowserRouter>
         <LocalBusinessJsonLd />
         <ScrollToTop />
+        <SiteMeta />
         <AuthProvider>
           <Routes>
             {/* ─── Public Routes ─────────────────────────────────────────── */}
@@ -130,9 +132,10 @@ const App = () => (
             <Route path="/go" element={<Go />} />
             <Route path="/listing-cards" element={<ProtectedRoute requiredRole="coordinator"><ListingCardPreview /></ProtectedRoute>} />
             <Route path="/admin/order-tiles" element={<AdminOrderTiles />} />
-            {/* Bare paths have no project id. Studio 105 is the public studio page. */}
+            {/* Bare /studio has no project id. Studio 105 is the public studio page. */}
             <Route path="/studio" element={<Navigate to="/studio-105" replace />} />
-            <Route path="/gallery" element={<Navigate to="/studio-105" replace />} />
+            {/* Bare /gallery has no project id. The client portal is the door. */}
+            <Route path="/gallery" element={<Navigate to="/portal" replace />} />
             <Route path="/studio/:listingId" element={<ClientStudio />} />
             <Route path="/gallery/:galleryId" element={<PublicGallery />} />
             <Route path="/present/:token" element={<ListingPresentation />} />
