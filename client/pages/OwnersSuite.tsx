@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import type { OwnerSuiteData } from "@shared/ownerSuite";
+import PlanBoard from "@/components/owners/PlanBoard";
 import NotFound from "@/pages/NotFound";
 import { useAuth } from "@/contexts/AuthContext";
 import { auth } from "@/lib/firebase";
@@ -176,6 +177,7 @@ function OwnersSuiteView({
 }) {
   const data = payload.data;
   const stamp = suiteStamp(data.generatedAt);
+  const [tab, setTab] = useState<"scorecard" | "plan">("scorecard");
 
   return (
     <div className="owners-suite min-h-screen bg-[#071422] text-[#f7f1e4]" style={suiteFont}>
@@ -205,9 +207,16 @@ function OwnersSuiteView({
             </button>
           </div>
         </div>
+        <div role="tablist" aria-label="Owners Suite" className="mx-auto flex max-w-6xl gap-1 px-4 md:px-8">
+          <SuiteTab active={tab === "scorecard"} onSelect={() => setTab("scorecard")}>Scorecard</SuiteTab>
+          <SuiteTab active={tab === "plan"} onSelect={() => setTab("plan")}>Plan Board</SuiteTab>
+        </div>
         <div className="h-px bg-gradient-to-r from-transparent via-[#e8c872] to-transparent" />
       </header>
 
+      {tab === "plan" ? (
+        <PlanBoard columns={data.planBoard?.columns} stamp={stamp} preview={payload.source === "fixture"} />
+      ) : (
       <main className="relative mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 md:px-8 md:py-8">
         {payload.why ? <WhyHero quote={payload.why} /> : null}
         <div className="flex flex-wrap items-center justify-between gap-2 px-1">
@@ -360,7 +369,22 @@ function OwnersSuiteView({
 
         <BotCard state={data.bots.state} entries={data.bots.entries} />
       </main>
+      )}
     </div>
+  );
+}
+
+function SuiteTab({ active, onSelect, children }: { active: boolean; onSelect: () => void; children: string }) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onSelect}
+      className={`border-b-2 px-3 py-2 text-[11px] font-black uppercase tracking-[0.16em] ${active ? "border-[#e8c872] text-[#f4e2b0]" : "border-transparent text-[#9fb0c7]"}`}
+    >
+      {children}
+    </button>
   );
 }
 

@@ -4,6 +4,8 @@
  * sheet degrades to "no data" instead of throwing.
  */
 
+import { emptyPlanBoard, parsePlanBoard, type PlanBoard } from "./ownerPlan";
+
 export interface SheetGrid {
   title: string;
   rows: string[][];
@@ -87,6 +89,7 @@ export interface OwnerSuiteData {
     state: BotFeedState;
     entries: BotStat[];
   };
+  planBoard: PlanBoard;
 }
 
 const WEEK_AMOUNT = ["cash this week", "this week cash", "collected this week", "week collected", "revenue this week"];
@@ -120,6 +123,7 @@ export function emptyOwnerSuiteData(now = new Date()): OwnerSuiteData {
     tracker: { goal: null, current: null, rows: [] },
     horizons: [],
     bots: { state: "unknown", entries: [] },
+    planBoard: emptyPlanBoard(),
   };
 }
 
@@ -150,6 +154,11 @@ export function parseOwnerSuite(sheets: SheetGrid[], now = new Date()): OwnerSui
   data.tracker = tracker(findSheet(safeSheets, ["100k tracker", "100k"]));
   data.horizons = horizons(findSheet(safeSheets, ["30 60 90"]));
   data.bots = bots(findSheet(safeSheets, ["action log", "bot log"]));
+  try {
+    data.planBoard = parsePlanBoard(safeSheets);
+  } catch {
+    data.planBoard = emptyPlanBoard();
+  }
   return data;
 }
 

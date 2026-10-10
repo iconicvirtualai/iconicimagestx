@@ -22,6 +22,7 @@ const TAB_ALIASES: Array<{ aliases: string[] }> = [
   { aliases: ["owes"] },
   { aliases: ["decisions"] },
   { aliases: ["action log"] },
+  { aliases: ["plan board"] },
 ];
 
 export interface SheetsCredentials {

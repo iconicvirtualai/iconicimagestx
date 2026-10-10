@@ -77,6 +77,7 @@ describe("owners suite access", () => {
       expect(hit.text).not.toContain("4280");
       expect(hit.text).not.toContain("1vHkdHRhAWKcnsv8");
       expect(hit.text).not.toContain(OWNER_WHY);
+      expect(hit.text).not.toContain("Fall mini sessions");
       expect(hit.text.toLowerCase()).not.toContain("forbidden");
     }
     expect(page.text).toContain("Page not found");
@@ -112,6 +113,10 @@ describe("owners suite access", () => {
     const body = JSON.parse(api.text);
     expect(body.data.cashWeek.amount).toBe(4280);
     expect(body.data.businesses).toHaveLength(6);
+    expect(body.data.planBoard.columns).toHaveLength(6);
+    expect(body.data.planBoard.columns[0]).toMatchObject({ business: "Iconic Images M&M", revenue: 9040, expenses: 1550 });
+    expect(body.data.planBoard.columns[4].business).toBe("DOT");
+    expect(body.data.planBoard.columns[4].revenue).toBeNull();
     expect(body.source).toBe("fixture");
     expect(body.why).toBe(OWNER_WHY);
     expect(api.text).not.toContain("BEGIN PRIVATE KEY");
@@ -168,6 +173,12 @@ describe("owners suite access", () => {
     expect(page).not.toContain("italic");
     expect(page).toContain("Montserrat");
     expect(page).toContain("Inter, system-ui, sans-serif");
+    const plan = fs.readFileSync("client/components/owners/PlanBoard.tsx", "utf8");
+    expect(plan).not.toContain("Cormorant");
+    expect(plan).not.toContain("font-serif");
+    expect(plan).not.toContain("italic");
+    expect(plan).toContain("No plan yet");
+    expect(plan).toContain("snap-x");
     const vercel = JSON.parse(fs.readFileSync("vercel.json", "utf8")) as {
       rewrites: Array<{ source: string; destination: string }>;
     };

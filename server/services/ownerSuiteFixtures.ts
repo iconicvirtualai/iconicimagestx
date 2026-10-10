@@ -4,7 +4,7 @@ import type { SheetGrid } from "../../shared/ownerSuite";
  * Invented preview numbers for tests and local screenshots.
  * This is not the live scorecard and must never be replaced with a sheet export.
  */
-export function ownerSuiteFixtureGrids(options: { actionLog?: boolean } = {}): SheetGrid[] {
+export function ownerSuiteFixtureGrids(options: { actionLog?: boolean; planBoard?: boolean } = {}): SheetGrid[] {
   const sheets: SheetGrid[] = [
     {
       title: "Friday Scorecard",
@@ -85,6 +85,9 @@ export function ownerSuiteFixtureGrids(options: { actionLog?: boolean } = {}): S
       ],
     },
   ];
+  if (options.planBoard !== false) {
+    sheets.push(planBoardFixture());
+  }
   if (options.actionLog !== false) {
     sheets.push({
       title: "Action Log",
@@ -97,4 +100,55 @@ export function ownerSuiteFixtureGrids(options: { actionLog?: boolean } = {}): S
     });
   }
   return sheets;
+}
+
+function planBoardFixture(): SheetGrid {
+  return {
+    title: "Plan Board",
+    rows: [
+      ["Business", "Section", "Item", "Date", "Amount", "Status", "Notes", "Lane"],
+      ["iconic images m&m", "Revenue", "October retainers", "2026-10-01", "$8,400", "", "Retainer", "ignore-me"],
+      ["Iconic Images M&M", "revenue", "Print add-on", "2026-10-08", "$640", "", "", ""],
+      ["Iconic Images M&M", "Expense", "Lab", "2026-10-03", "$1,200", "", "Prints", ""],
+      ["ICONIC IMAGES M&M", "EXPENSE", "Ads", "10/12/2026", "$350", "", "", ""],
+      ["Iconic Images M&M", "Calendar", "Broker breakfast", "2026-10-16", "", "Set", "Downtown", ""],
+      ["Iconic Images M&M", "calendar", "Gallery night", "2026-10-14", "", "", "Studio", ""],
+      ["Iconic Images M&M", "Social", "Lake house reel", "2026-10-18", "", "Scheduled", "", ""],
+      ["Iconic Images M&M", "Social", "Before and after", "2026-10-11", "", "", "", ""],
+      ["Iconic Images M&M", "Event", "Fall mini sessions", "2026-10-24", "", "", "Outdoor", ""],
+      ["Iconic Images M&M", "Promo", "Referral card", "2026-10-20", "", "", "", ""],
+      ["Iconic Images M&M", "Email", "Newsletter", "2026-10-27", "", "", "", ""],
+      ["Iconic Images M&M", "Email", "Past client note", "2026-10-13", "", "Draft", "", ""],
+      ["Iconic Images M&M", "To-do", "File the lens receipt", "2026-10-09", "", "Done", "", ""],
+      ["Iconic Images M&M", "To-do", "Confirm weekend crew", "2026-10-10", "", "Open", "", ""],
+      ["Iconic Studios", "Revenue", "Booth rentals", "2026-10-02", "$3,200", "", "", ""],
+      ["Iconic Studios", "Expense", "Utilities", "2026-10-04", "$800", "", "", ""],
+      ["Iconic Studios", "Calendar", "Studio tour", "2026-10-15", "", "", "", ""],
+      ["Iconic Studios", "Social", "Cyclorama reel", "2026-10-12", "", "", "", ""],
+      ["Iconic Studios", "Event", "Open studio", "2026-10-22", "", "", "", ""],
+      ["Iconic Studios", "Email", "Member reminder", "2026-10-17", "", "", "", ""],
+      ["Iconic Studios", "To-do", "Order backdrops", "", "", "Open", "Seamless paper", ""],
+      ["aICON", "Revenue", "Suite build", "2026-10-06", "$1,500", "", "", ""],
+      ["aICON", "Expense", "Software", "2026-10-05", "$90", "", "", ""],
+      ["aICON", "Calendar", "Ship the scorecard", "2026-10-10", "", "", "", ""],
+      ["aicon", "Social", "Feature the board", "2026-10-19", "", "", "", ""],
+      ["aICON", "Email", "Weekly ops note", "2026-10-14", "", "", "", ""],
+      ["aICON", "To-do", "Review the owner gate", "2026-10-08", "", "Completed", "", ""],
+      ["Iconic Virtual", "Revenue", "Tour packages", "2026-10-03", "$2,100", "", "", ""],
+      ["Iconic Virtual", "Expense", "Hosting", "2026-10-07", "$400", "", "", ""],
+      ["Iconic Virtual", "Calendar", "Listing refresh", "2026-10-13", "", "", "", ""],
+      ["Iconic Virtual", "Social", "Virtual tour clip", "2026-10-16", "", "", "", ""],
+      ["Iconic Virtual", "Promo", "October highlight", "2026-10-19", "", "", "", ""],
+      ["Iconic Virtual", "Email", "Agent blast", "2026-10-15", "", "", "", ""],
+      ["Iconic Virtual", "To-do", "Update floor plans", "", "", "Open", "", ""],
+      ["KDP", "Revenue", "Paperback", "2026-10-09", "$720", "", "", ""],
+      ["KDP", "Expense", "Proof copy", "2026-10-02", "$40", "", "", ""],
+      ["KDP", "Calendar", "Upload week", "2026-10-18", "", "", "", ""],
+      ["KDP", "Social", "Cover refresh", "2026-10-21", "", "", "", ""],
+      ["KDP", "Email", "Reader note", "2026-10-11", "", "", "", ""],
+      ["KDP", "To-do", "Proof chapter four", "", "", "Open", "", ""],
+      ["Mystery Co", "Revenue", "Should not appear", "2026-10-01", "$9,999", "", "", ""],
+      ["Iconic Images M&M", "Other", "Ignore this lane", "2026-10-01", "$50", "", "", ""],
+    ],
+  };
 }
