@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { clientLoginAction, clientReturnPath, staffHomePath } from "@shared/staffAccess";
-import { passwordResetFailureMessage } from "@/lib/passwordReset";
+import { PASSWORD_RESET_NOTICE, passwordResetFailureMessage } from "@/lib/passwordReset";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -94,7 +94,7 @@ export default function Login() {
     setSubmitting(true);
     try {
       await resetPassword(resetEmail);
-      toast.success("Reset email sent. Check your inbox.");
+      toast.success(PASSWORD_RESET_NOTICE);
       setMode("signin");
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : passwordResetFailureMessage(err));

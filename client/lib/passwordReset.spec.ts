@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import {
+  PASSWORD_RESET_FORMAT_MESSAGE,
+  PASSWORD_RESET_NOTICE,
   passwordResetFailureMessage,
   passwordResetLogLine,
   requestPasswordReset,
@@ -39,25 +41,44 @@ describe("requestPasswordReset", () => {
     );
   });
 
-  it("maps the other Firebase failures to friendly copy", () => {
-    expect(passwordResetFailureMessage({ code: "auth/invalid-email" })).toBe("Enter a valid email address.");
-    expect(passwordResetFailureMessage({ code: "auth/user-not-found" })).toMatch(/No portal account/);
+  it("uses one notice for success, an unknown address, and Firebase invalid-email", async () => {
+    const log = vi.fn();
+    const sent = vi.fn().mockResolvedValue(undefined);
+    await expect(requestPasswordReset("ada@example.com", sent, log)).resolves.toBeUndefined();
+    expect(sent).toHaveBeenCalledWith("ada@example.com");
+    expect(log).not.toHaveBeenCalled();
+
+    for (const code of ["auth/user-not-found", "auth/invalid-email", "auth/user-disabled"]) {
+      const send = vi.fn().mockRejectedValue({ code, message: `Firebase: Error (${code}).` });
+      await expect(requestPasswordReset("ada@example.com", send, log)).resolves.toBeUndefined();
+      expect(passwordResetFailureMessage({ code })).toBe(PASSWORD_RESET_NOTICE);
+      expect(passwordResetLogLine({ code })).toBe(`[Auth] Password reset failed: ${code}`);
+    }
+    expect(log.mock.calls.map((call) => String(call[0]))).toEqual([
+      "[Auth] Password reset failed: auth/user-not-found",
+      "[Auth] Password reset failed: auth/invalid-email",
+      "[Auth] Password reset failed: auth/user-disabled",
+    ]);
+    expect(PASSWORD_RESET_NOTICE).not.toMatch(/no portal account|no account|not found|disabled|invalid email/i);
+  });
+
+  it("maps delivery failures to friendly copy and keeps the code in the log", () => {
     expect(passwordResetFailureMessage({ code: "auth/too-many-requests" })).toMatch(/Wait a few minutes/);
     expect(passwordResetFailureMessage({ code: "auth/network-request-failed" })).toMatch(/connection/);
     expect(passwordResetFailureMessage({ code: "auth/invalid-continue-uri" })).toMatch(/not authorized yet/);
     expect(passwordResetFailureMessage({ code: "auth/missing-continue-uri" })).toMatch(/not authorized yet/);
     expect(passwordResetFailureMessage({ code: "auth/internal-error" })).toMatch(/Try again in a few minutes/);
     expect(passwordResetFailureMessage(new Error("smtp down"))).not.toMatch(/smtp|auth\//);
-    expect(passwordResetLogLine({ code: "auth/user-not-found" })).toBe(
-      "[Auth] Password reset failed: auth/user-not-found",
-    );
     expect(passwordResetLogLine(new Error("nope"))).toBe("[Auth] Password reset failed: unknown");
   });
 
-  it("does not send when the email is blank", async () => {
+  it("rejects a malformed address before calling Firebase", async () => {
     const send = vi.fn();
-    await expect(requestPasswordReset("   ", send)).rejects.toThrow(/Enter the email/);
+    const log = vi.fn();
+    await expect(requestPasswordReset("   ", send, log)).rejects.toThrow(PASSWORD_RESET_FORMAT_MESSAGE);
+    await expect(requestPasswordReset("not-an-email", send, log)).rejects.toThrow(PASSWORD_RESET_FORMAT_MESSAGE);
     expect(send).not.toHaveBeenCalled();
+    expect(log).not.toHaveBeenCalled();
   });
 });
 
@@ -68,10 +89,19 @@ describe("login password reset wiring", () => {
     expect(loginSource).not.toContain("sendEmail");
     expect(loginSource).not.toContain("generatePasswordResetLink");
     expect(loginSource).toContain("await resetPassword(resetEmail)");
+    expect(loginSource).toContain("toast.success(PASSWORD_RESET_NOTICE)");
     expect(loginSource).not.toContain("Failed to send reset email.");
+    expect(loginSource).not.toContain("Reset email sent. Check your inbox.");
+    expect(loginSource).not.toContain("No portal account");
+    expect(loginSource).not.toContain("No account found");
 
     expect(adminLoginSource).not.toContain("/api/client-notify");
     expect(adminLoginSource).not.toContain("Failed to send reset email.");
+    expect(adminLoginSource).toContain("toast.success(PASSWORD_RESET_NOTICE)");
+    expect(adminLoginSource).not.toContain("Reset email sent. Check your inbox.");
+    expect(adminLoginSource).not.toContain("No portal account");
+    expect(adminLoginSource).not.toContain("No account found");
+    expect(authSource).not.toContain("No portal account uses that email");
 
     expect(authSource).toContain("sendPasswordResetEmail(auth, address)");
     expect(authSource).not.toMatch(/sendPasswordResetEmail\([\s\S]*actionCodeSettings/);

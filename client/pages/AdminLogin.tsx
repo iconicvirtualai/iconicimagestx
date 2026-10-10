@@ -8,7 +8,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { staffLoginAction } from "@shared/staffAccess";
-import { passwordResetFailureMessage } from "@/lib/passwordReset";
+import { PASSWORD_RESET_NOTICE, passwordResetFailureMessage } from "@/lib/passwordReset";
 import { openOwnerSession } from "@/lib/openOwnerSession";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,7 +83,7 @@ export default function AdminLogin() {
     setSubmitting(true);
     try {
       await resetPassword(resetEmail);
-      toast.success("Reset email sent. Check your inbox.");
+      toast.success(PASSWORD_RESET_NOTICE);
       setShowReset(false);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : passwordResetFailureMessage(err));

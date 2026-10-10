@@ -9,11 +9,38 @@
  * so tests can mock the send and never touch mail.
  */
 
+/** Shown for a sent link, an unknown address, and a Firebase invalid-email. */
+export const PASSWORD_RESET_NOTICE =
+  "If an account exists for that email, we'll send a reset link. Check your inbox.";
+
+/** Client-side format check only. Does not say whether an account exists. */
+export const PASSWORD_RESET_FORMAT_MESSAGE = "Enter a valid email address.";
+
 const CONTINUE_URI_CODES = new Set([
   "auth/unauthorized-continue-uri",
   "auth/invalid-continue-uri",
   "auth/missing-continue-uri",
 ]);
+
+/**
+ * These Firebase results must not get their own toast. A distinct message
+ * would tell the person whether that address has an account.
+ * auth/user-disabled is included because "this account is disabled" confirms one exists.
+ */
+const NEUTRAL_RESULT_CODES = new Set([
+  "auth/invalid-email",
+  "auth/user-not-found",
+  "auth/user-disabled",
+]);
+
+/** Blank or not shaped like an email. Firebase is not called. */
+export function passwordResetFormatError(email: string): string | null {
+  const address = email.trim();
+  if (!address || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) {
+    return PASSWORD_RESET_FORMAT_MESSAGE;
+  }
+  return null;
+}
 
 export function passwordResetErrorCode(err: unknown): string | null {
   if (typeof err !== "object" || err === null || !("code" in err)) return null;
@@ -30,15 +57,11 @@ export function passwordResetLogLine(err: unknown): string {
   return `[Auth] Password reset failed: ${code}`;
 }
 
-/** Client-facing copy. Does not include Firebase error codes. */
+/** Client-facing copy. Does not include Firebase error codes or account existence. */
 export function passwordResetFailureMessage(err: unknown): string {
-  switch (passwordResetErrorCode(err)) {
-    case "auth/invalid-email":
-      return "Enter a valid email address.";
-    case "auth/user-not-found":
-      return "No portal account uses that email. Check the spelling, or create an account.";
-    case "auth/user-disabled":
-      return "This account is disabled. Contact the office and we'll help you sign in.";
+  const code = passwordResetErrorCode(err);
+  if (code && NEUTRAL_RESULT_CODES.has(code)) return PASSWORD_RESET_NOTICE;
+  switch (code) {
     case "auth/too-many-requests":
       return "Too many reset attempts. Wait a few minutes and try again.";
     case "auth/network-request-failed":
@@ -59,14 +82,17 @@ export async function requestPasswordReset(
     console.error(line);
   },
 ): Promise<void> {
-  const address = email.trim();
-  if (!address) {
-    throw new Error("Enter the email on the account.");
+  const formatError = passwordResetFormatError(email);
+  if (formatError) {
+    throw new Error(formatError);
   }
+  const address = email.trim();
   try {
     await send(address);
   } catch (err) {
     log(passwordResetLogLine(err));
+    const code = passwordResetErrorCode(err);
+    if (code && NEUTRAL_RESULT_CODES.has(code)) return;
     throw new Error(passwordResetFailureMessage(err));
   }
 }
