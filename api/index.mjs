@@ -635,7 +635,7 @@ function addressText(value) {
   if (typeof value === "string") return value.trim();
   if (typeof value !== "object" || Array.isArray(value)) return "";
   const address = value;
-  const formatted = text$c(address.formatted) || text$c(address.label);
+  const formatted = text$d(address.formatted) || text$d(address.label);
   if (formatted) return formatted;
   return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
 }
@@ -648,7 +648,7 @@ function recordAddressText(record) {
   }
   return "";
 }
-function text$c(value) {
+function text$d(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const services = [
@@ -2450,6 +2450,14 @@ function packageSkin(look) {
   if (!found) throw new Error(`Missing package skin: ${look}`);
   return found;
 }
+function clientSkinLabel(lookOrSkin) {
+  const item = typeof lookOrSkin === "string" ? packageSkin(lookOrSkin) : lookOrSkin;
+  return `Client skin: ${item.skinLabel}`;
+}
+function packagePriceDisplay(lookOrSkin) {
+  const item = typeof lookOrSkin === "string" ? packageSkin(lookOrSkin) : lookOrSkin;
+  return item.priceDisplay;
+}
 function resolvePackageSkin(value) {
   const look = lookFromUnknown(value);
   return look ? packageSkin(look) : null;
@@ -2801,7 +2809,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
       createdAt: data.createdAt
     }, now),
     status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
-    clientName: text$b(data.clientName),
+    clientName: text$c(data.clientName),
     address: addressText(data.billToAddress || data.address || data.propertyAddress),
     createdAt,
     issuedOn: formatPortalDate(data.createdAt) || formatPortalDate(data.sentAt) || formatPortalDate(data.paidAt),
@@ -2811,7 +2819,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
     fees: storedAmount(data.fees),
     travel: storedAmount(data.travel),
     promoDiscount: storedAmount(data.promoDiscount),
-    promoCode: text$b(data.promoCode),
+    promoCode: text$c(data.promoCode),
     tax: storedAmount(data.tax),
     total: storedAmount(data.total),
     amountPaid: storedAmount(data.amountPaid),
@@ -2862,15 +2870,15 @@ function storedLines(lineItems, services2) {
     if (typeof item === "string" && item.trim()) return [{ name: item.trim(), qty: null, amount: null }];
     if (!item || typeof item !== "object") return [];
     const record = item;
-    const named = text$b(record.name) || text$b(record.label);
-    const description = text$b(record.description);
+    const named = text$c(record.name) || text$c(record.label);
+    const description = text$c(record.description);
     const name = named || description;
     const qty = storedQty(record.qty ?? record.quantity);
     const amount = storedAmount(record.price ?? record.amount ?? record.total);
     if (!name && amount == null && qty == null) return [];
     const line = { name: name || "Line item", qty, amount };
-    const id = text$b(record.id);
-    const category = text$b(record.category);
+    const id = text$c(record.id);
+    const category = text$c(record.category);
     if (id) line.id = id;
     if (category) line.category = category;
     if (named && description) line.description = description;
@@ -2906,7 +2914,7 @@ function isoStamp(value) {
   if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
   return null;
 }
-function text$b(value) {
+function text$c(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function roundMoney$3(value) {
@@ -3377,40 +3385,40 @@ function bookingListingGroups(input) {
   for (const doc of requests) {
     const node = nodeId("orderRequests", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("listings", text$a(doc.data.listingId)));
-    uf.link(node, nodeId("orders", text$a(doc.data.orderId) || text$a(doc.data.convertedToOrderId)));
-    uf.link(node, nodeId("invoices", text$a(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$a(doc.data.galleryId)));
+    uf.link(node, nodeId("listings", text$b(doc.data.listingId)));
+    uf.link(node, nodeId("orders", text$b(doc.data.orderId) || text$b(doc.data.convertedToOrderId)));
+    uf.link(node, nodeId("invoices", text$b(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$b(doc.data.galleryId)));
   }
   for (const doc of orders) {
     const node = nodeId("orders", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$a(doc.data.orderRequestId)));
-    uf.link(node, nodeId("listings", text$a(doc.data.listingId)));
-    uf.link(node, nodeId("invoices", text$a(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$a(doc.data.galleryId)));
+    uf.link(node, nodeId("orderRequests", text$b(doc.data.orderRequestId)));
+    uf.link(node, nodeId("listings", text$b(doc.data.listingId)));
+    uf.link(node, nodeId("invoices", text$b(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$b(doc.data.galleryId)));
   }
   for (const doc of invoices) {
     const node = nodeId("invoices", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$a(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$a(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$a(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$b(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$b(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$b(doc.data.listingId)));
   }
   for (const doc of appointments) {
     const node = nodeId("appointments", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$a(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$a(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$a(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$b(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$b(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$b(doc.data.listingId)));
   }
   for (const doc of galleries) {
     const node = nodeId("galleries", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$a(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$a(doc.data.orderId)));
-    uf.link(node, nodeId("invoices", text$a(doc.data.invoiceId)));
-    uf.link(node, nodeId("listings", text$a(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$b(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$b(doc.data.orderId)));
+    uf.link(node, nodeId("invoices", text$b(doc.data.invoiceId)));
+    uf.link(node, nodeId("listings", text$b(doc.data.listingId)));
   }
   const groups = [];
   for (const nodes of uf.components()) {
@@ -3470,7 +3478,7 @@ function fillEmptyListingFields(existing, desired) {
   return patch;
 }
 function clientOwnsListing(listing, clients) {
-  const clientId2 = text$a(listing.clientId);
+  const clientId2 = text$b(listing.clientId);
   const email = normalizeEmail$1(listing.clientEmail || listing.email);
   if (!clientId2 && !email) return true;
   if (clientId2 && clients.ids.includes(clientId2)) return true;
@@ -3491,7 +3499,7 @@ function desiredListingFields(group, identity) {
   assign(fields, "galleryId", chosenId(group.galleries, group.galleryIds, [...group.orderRequests, ...group.orders], ["galleryId"]));
   assign(fields, "clientId", clientId(group, identity));
   assign(fields, "clientEmail", clientEmail(group, identity));
-  assign(fields, "clientName", clientName(group));
+  assign(fields, "clientName", clientName$1(group));
   assign(fields, "clientPhone", firstText$2(group, ["clientPhone", "phone"]));
   if (address) {
     fields.address = address;
@@ -3542,10 +3550,10 @@ function chooseListing(group, listings, clients) {
 }
 function listingMatches(doc, group) {
   if (doc.id === group.stableId || group.preferredListingIds.includes(doc.id)) return true;
-  const requestId = text$a(doc.data.orderRequestId);
-  const orderId = text$a(doc.data.orderId);
-  const invoiceId = text$a(doc.data.invoiceId);
-  const appointmentId = text$a(doc.data.appointmentId);
+  const requestId = text$b(doc.data.orderRequestId);
+  const orderId = text$b(doc.data.orderId);
+  const invoiceId = text$b(doc.data.invoiceId);
+  const appointmentId = text$b(doc.data.appointmentId);
   return Boolean(
     requestId && group.orderRequestIds.includes(requestId) || orderId && group.orderIds.includes(orderId) || invoiceId && group.invoiceIds.includes(invoiceId) || appointmentId && group.appointmentIds.includes(appointmentId)
   );
@@ -3555,7 +3563,7 @@ function linksFor(group, listingId, listings, clients) {
   const links = [];
   const push = (collection, docs) => {
     for (const doc of docs) {
-      const current = text$a(doc.data.listingId);
+      const current = text$b(doc.data.listingId);
       if (current === listingId) continue;
       if (current && isPortalListingId(current) && ownedIds.has(current)) continue;
       links.push({ collection, id: doc.id });
@@ -3572,7 +3580,7 @@ function clientsFor(group, identity) {
   const ids = /* @__PURE__ */ new Set();
   const emails = /* @__PURE__ */ new Set();
   const addId = (value) => {
-    const id = text$a(value);
+    const id = text$b(value);
     if (id) ids.add(id);
   };
   const addEmail = (value) => {
@@ -3591,7 +3599,7 @@ function clientsFor(group, identity) {
 function preferredListingIds(group) {
   const ids = [];
   const push = (value) => {
-    const id = text$a(value);
+    const id = text$b(value);
     if (id && isPortalListingId(id) && !ids.includes(id)) ids.push(id);
   };
   for (const doc of [...group.orderRequests, ...group.orders, ...group.invoices, ...group.appointments, ...group.galleries]) {
@@ -3626,9 +3634,9 @@ function bestAddress(group) {
   }
   for (const doc of propertyDocs(group)) {
     for (const key of ["address", "propertyAddress", "shootLocation"]) {
-      if (typeof doc.data[key] === "string" && text$a(doc.data[key])) return text$a(doc.data[key]);
+      if (typeof doc.data[key] === "string" && text$b(doc.data[key])) return text$b(doc.data[key]);
     }
-    if (text$a(doc.data.addressLabel)) return text$a(doc.data.addressLabel);
+    if (text$b(doc.data.addressLabel)) return text$b(doc.data.addressLabel);
   }
   return null;
 }
@@ -3644,7 +3652,7 @@ function firstScheduleDate(group) {
 function firstScheduleTime(group) {
   for (const doc of [...group.appointments, ...group.orders, ...group.orderRequests]) {
     for (const key of ["scheduledTime", "appointmentTime", "apptTime", "requestedTime"]) {
-      const value = text$a(doc.data[key]);
+      const value = text$b(doc.data[key]);
       if (value && !/^tbd$/i.test(value)) return value;
     }
   }
@@ -3661,7 +3669,7 @@ function projectType(group) {
     if (doc.data.projectType === "real_estate") return "real_estate";
     const service = doc.data.selectedService;
     if (service && typeof service === "object") {
-      const category = text$a(service.category);
+      const category = text$b(service.category);
       if (category === "business" || category === "branding") return "business";
       if (category === "listings") return "real_estate";
     }
@@ -3687,7 +3695,7 @@ function namesFrom(value) {
   for (const item of value) {
     if (typeof item === "string" && item.trim()) names.push(item.trim());
     else if (item && typeof item === "object") {
-      const name = text$a(item.name);
+      const name = text$b(item.name);
       if (name) names.push(name);
     }
     if (names.length >= 40) break;
@@ -3697,12 +3705,12 @@ function namesFrom(value) {
 function firstTotal(group) {
   for (const doc of [...group.orders, ...group.invoices, ...group.orderRequests]) {
     if (doc.data.total != null && doc.data.total !== "") {
-      const parsed = money$4(doc.data.total);
+      const parsed = money$5(doc.data.total);
       if (parsed != null) return parsed;
     }
     const pricing = doc.data.pricing;
     if (pricing && typeof pricing === "object") {
-      const parsed = money$4(pricing.total);
+      const parsed = money$5(pricing.total);
       if (pricing.total != null && pricing.total !== "" && parsed != null) return parsed;
     }
   }
@@ -3712,8 +3720,8 @@ function accessInfo(group) {
   return [firstText$2(group, ["accessMethod"]), firstText$2(group, ["lockboxCode"])].filter(Boolean).join(" - ");
 }
 function clientId(group, identity) {
-  const bookingIds = propertyDocs(group).map((doc) => text$a(doc.data.clientId)).filter(Boolean);
-  const identityIds = (identity?.ids || []).map((id) => text$a(id)).filter(Boolean);
+  const bookingIds = propertyDocs(group).map((doc) => text$b(doc.data.clientId)).filter(Boolean);
+  const identityIds = (identity?.ids || []).map((id) => text$b(id)).filter(Boolean);
   return bookingIds.find((id) => identityIds.includes(id)) || bookingIds[0] || identityIds[0] || "";
 }
 function clientEmail(group, identity) {
@@ -3725,10 +3733,10 @@ function clientEmail(group, identity) {
   }
   return "";
 }
-function clientName(group) {
+function clientName$1(group) {
   for (const doc of propertyDocs(group)) {
-    if (text$a(doc.data.clientName)) return text$a(doc.data.clientName);
-    const joined = `${text$a(doc.data.firstName)} ${text$a(doc.data.lastName)}`.trim();
+    if (text$b(doc.data.clientName)) return text$b(doc.data.clientName);
+    const joined = `${text$b(doc.data.firstName)} ${text$b(doc.data.lastName)}`.trim();
     if (joined) return joined;
   }
   return "";
@@ -3736,7 +3744,7 @@ function clientName(group) {
 function chosenInvoiceId(group) {
   const known = new Set(group.invoiceIds);
   for (const doc of [...group.orderRequests, ...group.orders]) {
-    const id = text$a(doc.data.invoiceId);
+    const id = text$b(doc.data.invoiceId);
     if (id && known.has(id)) return id;
   }
   return newestDoc(group.invoices)?.id || group.invoiceIds[0] || "";
@@ -3745,7 +3753,7 @@ function chosenId(docs, ids, pointers = [], keys = []) {
   const known = new Set(ids);
   for (const doc of pointers) {
     for (const key of keys) {
-      const id = text$a(doc.data[key]);
+      const id = text$b(doc.data[key]);
       if (id && known.has(id)) return id;
     }
   }
@@ -3757,7 +3765,7 @@ function propertyDocs(group) {
 function firstText$2(group, keys) {
   for (const doc of propertyDocs(group)) {
     for (const key of keys) {
-      const value = text$a(doc.data[key]);
+      const value = text$b(doc.data[key]);
       if (value) return value;
     }
   }
@@ -3825,12 +3833,12 @@ function hasAddress(value) {
   if (typeof value === "string") return value.trim().length > 0;
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record = value;
-  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$a(record[key]).length > 0);
+  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$b(record[key]).length > 0);
 }
 function statusKey(value) {
   return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
 }
-function money$4(value) {
+function money$5(value) {
   const parsed = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value.replace(/[$,\s]/g, "")) : Number.NaN;
   if (!Number.isFinite(parsed)) return null;
   return Math.round(parsed * 100) / 100;
@@ -3857,14 +3865,14 @@ function isEmpty(value) {
 function isSentinel$1(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$a(value) {
+function text$b(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function cleanDocs(docs) {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
   for (const doc of docs || []) {
-    const id = text$a(doc?.id);
+    const id = text$b(doc?.id);
     if (!id || seen.has(id)) continue;
     seen.add(id);
     out.push({ id, data: doc.data && typeof doc.data === "object" ? doc.data : {} });
@@ -3943,7 +3951,7 @@ async function ensureBookingListingForRequest(orderRequestId) {
     galleries: []
   });
   const identity = {
-    ids: text$9(request.data.clientId) ? [text$9(request.data.clientId)] : [],
+    ids: text$a(request.data.clientId) ? [text$a(request.data.clientId)] : [],
     email: normalizeEmail$1(request.data.clientEmail || request.data.email)
   };
   const plans = await plansFor(bundle, identity);
@@ -3996,7 +4004,7 @@ async function applyBookingListingPlan(plan) {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
       created = true;
-      console.info(`[Listings] Created ${plan.listingId} for booking ${text$9(plan.createFields.orderRequestId) || text$9(plan.createFields.orderId) || text$9(plan.createFields.invoiceId)}`);
+      console.info(`[Listings] Created ${plan.listingId} for booking ${text$a(plan.createFields.orderRequestId) || text$a(plan.createFields.orderId) || text$a(plan.createFields.invoiceId)}`);
     } catch (err) {
       if (!alreadyExists(err)) throw err;
       await fillListing(ref, plan.createFields);
@@ -4025,7 +4033,7 @@ async function linkRecord(collectionName, id, listingId) {
   const ref = db$o().collection(collectionName).doc(id);
   const snap = await ref.get();
   if (!snap.exists) return;
-  if (text$9(snap.data()?.listingId) === listingId) return;
+  if (text$a(snap.data()?.listingId) === listingId) return;
   await ref.update({
     listingId,
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -4039,9 +4047,9 @@ async function loadVisibleSeeds(identity) {
   const keep = (map, docs) => {
     for (const doc of docs) {
       if (!visibleToPortalClient({
-        clientId: text$9(doc.data.clientId),
-        email: text$9(doc.data.email),
-        clientEmail: text$9(doc.data.clientEmail)
+        clientId: text$a(doc.data.clientId),
+        email: text$a(doc.data.email),
+        clientEmail: text$a(doc.data.clientEmail)
       }, identity)) continue;
       if (!map.has(doc.id)) map.set(doc.id, doc);
     }
@@ -4080,23 +4088,23 @@ async function hydrateBundle(seed) {
   const galleries = mapDocs(seed.galleries);
   const requestIds = new Set(requests.keys());
   for (const doc of [...orders.values(), ...invoices.values(), ...appointments.values()]) {
-    const id = text$9(doc.data.orderRequestId);
+    const id = text$a(doc.data.orderRequestId);
     if (id) requestIds.add(id);
   }
   await readMissing("orderRequests", requestIds, requests);
   const orderIds = new Set(orders.keys());
   for (const doc of requests.values()) {
-    const id = text$9(doc.data.convertedToOrderId) || text$9(doc.data.orderId);
+    const id = text$a(doc.data.convertedToOrderId) || text$a(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   for (const doc of [...invoices.values(), ...appointments.values()]) {
-    const id = text$9(doc.data.orderId);
+    const id = text$a(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   await readMissing("orders", orderIds, orders);
   const invoiceIds = new Set(invoices.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$9(doc.data.invoiceId);
+    const id = text$a(doc.data.invoiceId);
     if (id) invoiceIds.add(id);
   }
   await readMissing("invoices", invoiceIds, invoices);
@@ -4106,7 +4114,7 @@ async function hydrateBundle(seed) {
   mergeDocs(appointments, await queryIn("appointments", "orderId", [...orders.keys()]));
   const galleryIds = new Set(galleries.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$9(doc.data.galleryId);
+    const id = text$a(doc.data.galleryId);
     if (id) galleryIds.add(id);
   }
   await readMissing("galleries", galleryIds, galleries);
@@ -4224,7 +4232,7 @@ function alreadyExists(err) {
 function isSentinel(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$9(value) {
+function text$a(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function chunk(items, size) {
@@ -4271,7 +4279,7 @@ function nestedTotal(pricing) {
   return pricing.total;
 }
 function warnWhenStoredTotalDiffers(record, lineItems) {
-  const stored = [money$3(record.total), money$3(nestedTotal(record.pricing))].filter((amount) => amount != null);
+  const stored = [money$4(record.total), money$4(nestedTotal(record.pricing))].filter((amount) => amount != null);
   if (stored.length === 0) return;
   const rebuilt = roundMoney$2(sumLineItemPrices(chargedServiceLines(lineItems)));
   const drifted = [...new Set(stored.filter((amount) => Math.abs(amount - rebuilt) > 9e-3))];
@@ -4280,7 +4288,7 @@ function warnWhenStoredTotalDiffers(record, lineItems) {
     `[Bookings] Package repair kept stored total ${drifted.join(" / ")}; catalog lines total ${rebuilt}.`
   );
 }
-function money$3(value) {
+function money$4(value) {
   if (typeof value === "number" && Number.isFinite(value)) return roundMoney$2(value);
   if (typeof value === "string" && value.trim()) {
     const parsed = Number(value.replace(/[$,\s]/g, ""));
@@ -4311,7 +4319,7 @@ function orderServiceLines(record, linked) {
 }
 function orderChargeSummary(record, lines) {
   const lineSubtotal = roundMoney$1(lines.reduce((sum, line) => sum + line.price, 0));
-  const pricing = nested$1(record?.pricing);
+  const pricing = nested$2(record?.pricing);
   const tax = moneyOrNull$1(record?.tax) ?? moneyOrNull$1(pricing.tax) ?? 0;
   const storedTotal = moneyOrNull$1(record?.total) ?? moneyOrNull$1(pricing.total);
   const total = storedTotal ?? roundMoney$1(lineSubtotal + tax);
@@ -4328,14 +4336,14 @@ function synthesizePackageLine(record) {
   if (!record) return null;
   const label = packageLabel(record);
   if (!label) return null;
-  const pricing = nested$1(record.pricing);
+  const pricing = nested$2(record.pricing);
   const price = moneyOrNull$1(record.total) ?? moneyOrNull$1(pricing.total) ?? moneyOrNull$1(pricing.subtotal) ?? moneyOrNull$1(record.amount) ?? labeledMoney(label);
   if (price == null) return null;
   return { name: cleanPackageName(label) || label, qty: 1, price };
 }
 function packageLabel(record) {
   for (const key of PACKAGE_LABEL_KEYS) {
-    const value = text$8(record[key]);
+    const value = text$9(record[key]);
     if (value) return value;
   }
   return "";
@@ -4368,10 +4376,10 @@ function moneyOrNull$1(value) {
   }
   return null;
 }
-function nested$1(value) {
+function nested$2(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$8(value) {
+function text$9(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function roundMoney$1(value) {
@@ -4394,7 +4402,7 @@ function officeNewOrderEmail(saved, options) {
   const notes = notesOf(saved);
   const fields = [
     ["Order number", orderNumber],
-    ["Admin link", text$7(options?.adminUrl) || NOT_PROVIDED],
+    ["Admin link", text$8(options?.adminUrl) || NOT_PROVIDED],
     ["Client name", clientName2],
     ["Client email", firstText$1(saved, ["clientEmail", "email"])],
     ["Client phone", firstText$1(saved, ["clientPhone", "phone"])],
@@ -4441,14 +4449,14 @@ ${notes}`.toUpperCase().includes("TEST ORDER");
 function orderNumberOf(saved) {
   const explicit = firstText$1(saved, ["orderNumber", "orderCode", "displayId"]);
   if (explicit) return explicit;
-  const id = text$7(saved.id);
+  const id = text$8(saved.id);
   if (!id) return NOT_PROVIDED;
   return `ORD-${id.slice(-5).toUpperCase()}`;
 }
 function clientNameOf(saved) {
   const named = firstText$1(saved, ["clientName", "customerName"]);
   if (named) return named;
-  const joined = [text$7(saved.firstName), text$7(saved.lastName)].filter(Boolean).join(" ");
+  const joined = [text$8(saved.firstName), text$8(saved.lastName)].filter(Boolean).join(" ");
   return joined || NOT_PROVIDED;
 }
 function agentContactOf(saved) {
@@ -4465,8 +4473,8 @@ function agentField(saved, keys, nestedKey) {
   const direct = firstText$1(saved, keys);
   if (direct !== NOT_PROVIDED) return direct;
   for (const holder of [saved.agent, saved.listingAgent, saved.realtor]) {
-    const record = nested(holder);
-    const value = text$7(record[nestedKey]);
+    const record = nested$1(holder);
+    const value = text$8(record[nestedKey]);
     if (value) return value;
   }
   return "";
@@ -4475,7 +4483,7 @@ function digits(value) {
   return value === NOT_PROVIDED ? "" : value.replace(/\D/g, "");
 }
 function notesOf(saved) {
-  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$7(saved[key])).filter(Boolean);
+  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$8(saved[key])).filter(Boolean);
   return parts.length ? parts.join("\n") : NOT_PROVIDED;
 }
 function lockboxOf(saved) {
@@ -4483,12 +4491,12 @@ function lockboxOf(saved) {
   return code || NOT_PROVIDED;
 }
 function occupancyOf(saved) {
-  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$7(saved[key])).filter(Boolean);
+  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$8(saved[key])).filter(Boolean);
   return parts.length ? parts.join(", ") : NOT_PROVIDED;
 }
 function bookedVia(saved) {
-  const lead = text$7(saved.leadSource);
-  const source = text$7(saved.source);
+  const lead = text$8(saved.leadSource);
+  const source = text$8(saved.source);
   const blob = `${lead} ${source}`.toLowerCase();
   if (!blob.trim()) return NOT_PROVIDED;
   if (/admin/.test(blob)) return "Admin";
@@ -4497,8 +4505,8 @@ function bookedVia(saved) {
   return lead || source;
 }
 function paymentOf(saved, total) {
-  const invoice = nested(saved.invoice);
-  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$7(value).toLowerCase()).find(Boolean) || "";
+  const invoice = nested$1(saved.invoice);
+  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$8(value).toLowerCase()).find(Boolean) || "";
   if (/partial/.test(explicit)) return "Partial";
   if (/\bpaid\b/.test(explicit) && !/unpaid/.test(explicit)) return "Paid";
   if (/unpaid/.test(explicit)) return "Unpaid";
@@ -4509,7 +4517,7 @@ function paymentOf(saved, total) {
   return NOT_PROVIDED;
 }
 function moneyField(saved, key, computed) {
-  const pricing = nested(saved.pricing);
+  const pricing = nested$1(saved.pricing);
   const direct = moneyOrNull(saved[key]) ?? moneyOrNull(pricing[key]);
   if (direct != null) return formatMoney(direct);
   if (computed != null) return formatMoney(computed);
@@ -4602,10 +4610,10 @@ function moneyOrNull(value) {
   }
   return null;
 }
-function nested(value) {
+function nested$1(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$7(value) {
+function text$8(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function escapeHtml$4(value) {
@@ -4653,6 +4661,170 @@ async function notifyOfficeOfOrder(input) {
     }
   });
   return { sent: result.sent };
+}
+const LISTING_HERO = "/media/launch/hero_day_exterior_front.jpg";
+const BUSINESS_HERO = "/media/photos/lifestyle-mtz04327.jpg";
+const BRAND_SESSION_LOCATION = "N/A — brand session";
+const PAID_LABEL = {
+  paid: "Paid",
+  unpaid: "Unpaid",
+  partial: "Partial"
+};
+const DELIVERY_LABEL = {
+  delivered: "Delivered",
+  in_progress: "In progress",
+  not_delivered: "Not delivered"
+};
+function buildAdminOrderTile(record) {
+  const lines = orderServiceLines(record);
+  const priced = lines.length > 0 ? { ...record, lineItems: lines, services: lines } : record;
+  const skin2 = resolvePackageSkinFromOrder(priced);
+  const kind = orderKind(priced, skin2);
+  const studio = kind === "business" ? studioFromRecord(priced) : null;
+  const heroUrl = heroFromRecord(record) || (kind === "business" ? BUSINESS_HERO : LISTING_HERO);
+  const paid = paidState(record);
+  const delivery = deliveryState(record);
+  const named = lines[0] ? cleanPackageName(lines[0].name) : "";
+  const packageName = skin2?.title || named || "Custom order";
+  const charges = orderChargeSummary(record, lines);
+  return {
+    id: text$7(record.id) || packageName,
+    orderCode: orderCode(kind, record),
+    kind,
+    typeLabel: kind === "business" ? "Business" : "Listing",
+    heroUrl,
+    heroAlt: `${packageName} order`,
+    packageName,
+    skinLabel: skin2 ? clientSkinLabel(skin2) : "Client skin: Custom",
+    priceLabel: skin2 ? packagePriceDisplay(skin2) : lines.length > 0 || charges.total > 0 ? tilePrice(charges.total) : "—",
+    priceNote: skin2?.priceNote || "",
+    paid,
+    paidLabel: PAID_LABEL[paid],
+    delivery,
+    deliveryLabel: DELIVERY_LABEL[delivery],
+    clientName: clientName(record),
+    appointmentDate: appointmentLabel(record),
+    location: locationLabel(kind, record),
+    studio,
+    channel: channelFor(skin2, kind)
+  };
+}
+function orderKind(record, skin2) {
+  const raw = text$7(record.projectType || record.orderType || record.type).toLowerCase();
+  if (raw === "business" || raw === "brand" || raw === "social") return "business";
+  if (raw === "real_estate" || raw === "listing" || raw === "property") return "listing";
+  if (skin2?.category === "listing") return "listing";
+  if (skin2) return "business";
+  return "listing";
+}
+function channelFor(skin2, kind) {
+  if (skin2?.category === "social") return "Social";
+  if (skin2?.category === "human-brand") return "Human Brand";
+  if (skin2?.category === "listing") return "Listings & Spaces";
+  return kind === "business" ? "Human Brand" : "Listings & Spaces";
+}
+function orderCode(kind, record) {
+  const explicit = text$7(record.orderCode || record.orderNumber || record.displayId);
+  if (explicit) return explicit.toUpperCase();
+  const id = text$7(record.id);
+  const prefix = kind === "listing" ? "L" : "B";
+  const digits2 = id.replace(/\D/g, "");
+  const tail = (digits2 || id.replace(/[^a-zA-Z0-9]/g, "")).slice(-5).toUpperCase().padStart(5, "0");
+  return `ORD - ${prefix} - ${tail}`;
+}
+function heroFromRecord(record) {
+  const explicit = text$7(record.heroUrl) || text$7(record.coverUrl) || text$7(record.coverImage);
+  if (explicit) return explicit;
+  const images = record.images;
+  if (!Array.isArray(images)) return "";
+  for (const image of images) {
+    if (typeof image === "string" && image.trim()) return image.trim();
+    if (image && typeof image === "object") {
+      const url = text$7(image.url) || text$7(image.thumbnailUrl);
+      if (url) return url;
+    }
+  }
+  return "";
+}
+function clientName(record) {
+  const named = text$7(record.clientName) || text$7(record.customerName) || text$7(record.agentName) || [text$7(record.firstName), text$7(record.lastName)].filter(Boolean).join(" ");
+  return named || "—";
+}
+function appointmentLabel(record) {
+  const raw = record.appointmentDate ?? record.apptDate ?? record.scheduledDate ?? record.requestedDate;
+  const key = calendarDateKey(raw);
+  const date = formatShootDateLabel(key, typeof raw === "string" ? raw : void 0);
+  const time = text$7(record.scheduledTime || record.appointmentTime || record.requestedTime);
+  const photographer = text$7(record.assignedPhotographerName || record.photographerName || record.photographerPreference);
+  return [date, time, photographer].filter(Boolean).join(" · ") || "—";
+}
+function tilePrice(amount) {
+  const rounded = Math.round(amount * 100) / 100;
+  if (Number.isInteger(rounded)) return `$${rounded.toLocaleString("en-US")}`;
+  return `$${rounded.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+function locationLabel(kind, record) {
+  const raw = addressText(record.address || record.propertyAddress || record.shootLocation || record.location);
+  if (kind === "business" && isBrandSession(raw)) return BRAND_SESSION_LOCATION;
+  return raw || "—";
+}
+function isBrandSession(value) {
+  const key = value.trim().toLowerCase();
+  if (!key || key === "—" || key === "-" || key === "n/a" || key === "na") return true;
+  return /brand session/.test(key);
+}
+function studioFromRecord(record) {
+  const explicit = record.studio ?? record.studioId ?? record.room ?? record.shootStudio;
+  if (explicit != null && String(explicit).trim()) return resolveAdminStudio(explicit);
+  const blob = `${JSON.stringify(record.serviceIds || "")} ${JSON.stringify(record.services || "")}`.toLowerCase();
+  if (/studio-blanc|studio blanc/.test(blob)) return "studio-blanc";
+  if (/studio-noir|studio noir/.test(blob)) return "studio-noir";
+  if (/podcast/.test(blob)) return "podcast-studio";
+  return "offsite";
+}
+function resolveAdminStudio(value) {
+  const textValue = String(value ?? "").trim().toLowerCase().replace(/[_-]+/g, " ");
+  if (/noir/.test(textValue)) return "studio-noir";
+  if (/blanc/.test(textValue)) return "studio-blanc";
+  if (/podcast/.test(textValue)) return "podcast-studio";
+  if (/off\s*site|on location/.test(textValue)) return "offsite";
+  return "offsite";
+}
+function paidState(record) {
+  const invoice = nested(record.invoice);
+  const explicit = [record.paymentStatus, record.invoiceStatus, invoice.status].map((value) => normalize(value)).join(" ");
+  if (/\bpartial\b/.test(explicit) || normalize(record.status) === "partial") return "partial";
+  const total = money$3(invoice.total ?? record.total ?? record.amount);
+  const paid = money$3(invoice.amountPaid ?? record.amountPaid);
+  if (paid > 0 && total > 0 && paid + 9e-3 < total) return "partial";
+  if (/\bpaid\b/.test(explicit) || record.paidAt || paid > 0 && (total === 0 || paid >= total)) return "paid";
+  const status = normalize(record.status);
+  if (status === "paid" || status === "delivered_paid") return "paid";
+  return "unpaid";
+}
+function deliveryState(record) {
+  const status = normalize(record.status);
+  const delivery = normalize(record.deliveryStatus || record.galleryStatus);
+  if (record.deliveredAt || status.includes("delivered") || delivery === "delivered") return "delivered";
+  if (status === "in_progress" || status === "pending" || status === "pending_edit" || status === "in_review" || status === "editing" || status === "scheduled" || status === "confirmed" || status === "appt_scheduled" || status === "consult_scheduled" || delivery === "pending" || delivery === "undelivered" || delivery === "in_progress" || delivery === "ready_for_review") return "in_progress";
+  return "not_delivered";
+}
+function nested(value) {
+  return value && typeof value === "object" ? value : {};
+}
+function normalize(value) {
+  return String(value ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+function money$3(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value.replace(/[$,\s]/g, ""));
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return 0;
+}
+function text$7(value) {
+  return typeof value === "string" ? value.trim() : "";
 }
 const router$m = Router();
 const db$n = () => admin.firestore();
@@ -4982,9 +5154,21 @@ router$m.post("/", async (req, res) => {
       notifications,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     }).catch((err) => console.error("[Bookings] Notification status was not saved:", err));
+    let orderNumber = docRef.id;
+    try {
+      orderNumber = buildAdminOrderTile({
+        id: docRef.id,
+        selectedService: selectedService || null,
+        lineItems,
+        services: lineItems
+      }).orderCode;
+    } catch (err) {
+      console.error("[Bookings] Order number format failed:", err);
+    }
     return res.status(201).json({
       success: true,
       requestId: docRef.id,
+      orderNumber,
       invoiceId,
       accountCreated: account.createdAccount,
       notifications,
