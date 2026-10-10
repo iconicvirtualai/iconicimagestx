@@ -19,13 +19,15 @@ const SOURCE_EXTENSIONS = new Set([
 
 /**
  * Internal-only files that still name the owner login or a staff calendar id.
- * They are not public contact copy.
+ * They are not public contact copy. The shooter calendar ids live on the
+ * server roster, loaded by signed-in staff, not in the client bundle.
  */
 const CADI_ALLOWLIST = new Set([
   "shared/ownerAccess.ts",
   ".env.example",
-  "shared/scheduleBoard.ts",
-  "client/hooks/useOperationsMetrics.ts",
+  "server/services/photographerRoster.ts",
+  "server/services/photographerRoster.spec.ts",
+  "server/routes/calendarRoster.route.spec.ts",
 ]);
 
 /** Staff-inbound routing test feeds the hyphenated Google Voice form. Not a public display. */

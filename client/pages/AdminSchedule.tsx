@@ -9,7 +9,6 @@ import {
   isScheduledRecord,
   orderServices,
   scheduleRecordDate,
-  staffDisplayName,
   toDate,
 } from "@/lib/scheduleRecords";
 import { addressText, recordAddressText } from "@shared/addressText";
@@ -41,9 +40,8 @@ import {
   parseISO,
 } from "date-fns";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
+import { fetchPhotographerRoster, mergeCalendarRoster } from "@/lib/photographerRoster";
 import {
-  ICONIC_CALENDAR_ROSTER,
-  calendarRoster,
   classifyCalendarEvent,
   countUnassignedShoots,
   dayLoadCue,
@@ -140,19 +138,39 @@ export default function AdminSchedule() {
   const [calendarEvents, setCalendarEvents] = React.useState<any[]>([]);
   const [calendarSync, setCalendarSync] = React.useState<CalendarSync>("checking");
   const [staff, setStaff] = React.useState<any[]>([]);
+  const [rosterPeople, setRosterPeople] = React.useState<CalendarRosterPerson[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [currentMonth, setCurrentMonth] = React.useState(new Date());
   const [selectedDay, setSelectedDay] = React.useState(new Date());
   const [collapseOverrides, setCollapseOverrides] = React.useState<Record<string, boolean>>({});
   const [selectedAppt, setSelectedAppt] = React.useState<Appointment | null>(null);
 
-  const roster = React.useMemo(() => {
-    const staffCalendars = staff.map((person) => ({
-      id: person.googleCalendarId || person.calendarId || person.calendarEmail || person.email,
-      name: staffDisplayName(person) || person.email,
-    }));
-    return calendarRoster(ICONIC_CALENDAR_ROSTER.concat(staffCalendars));
-  }, [staff]);
+  const roster = React.useMemo(
+    () => mergeCalendarRoster(rosterPeople, staff),
+    [rosterPeople, staff],
+  );
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function loadRoster() {
+      if (!user?.getIdToken) {
+        if (!cancelled) setRosterPeople([]);
+        return;
+      }
+      try {
+        const token = await user.getIdToken();
+        const people = await fetchPhotographerRoster(token);
+        if (!cancelled) setRosterPeople(people);
+      } catch (error) {
+        console.warn("[AdminSchedule] Photographer roster unavailable:", error);
+        if (!cancelled) setRosterPeople([]);
+      }
+    }
+
+    loadRoster();
+    return () => { cancelled = true; };
+  }, [user]);
 
   React.useEffect(() => {
     const ready = () => setLoading(false);
