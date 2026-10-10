@@ -5899,28 +5899,48 @@ function invoiceIdFromSquareNote(note) {
   return match?.[1] || null;
 }
 const LINK_MEDIA_TYPES = /* @__PURE__ */ new Set(["video", "reel", "tour", "matterport"]);
+function publicText(value) {
+  return typeof value === "string" && value.trim() ? value : null;
+}
+function publicSize(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) return value;
+  return null;
+}
+function publicFileSize(value) {
+  const parsed = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return parsed;
+}
 function publicMediaItem(item, canDownload) {
-  const type = String(item.type || "photo");
-  const title = item.title || item.fileName || "Media";
+  const type = publicText(item.type) || "photo";
+  const title = publicText(item.title) || publicText(item.fileName) || "Media";
+  const fileName2 = publicText(item.fileName) || title;
   const base = {
-    id: item.id,
-    fileName: item.fileName || title,
+    id: publicText(item.id) || void 0,
+    fileName: fileName2,
     title,
+    name: publicText(item.name) || fileName2,
     type,
-    width: item.width || null,
-    height: item.height || null,
+    category: publicText(item.category),
+    contentType: publicText(item.contentType),
+    width: publicSize(item.width),
+    height: publicSize(item.height),
+    fileSize: publicFileSize(item.fileSize),
     canDownload: Boolean(canDownload && item.downloadable !== false && !LINK_MEDIA_TYPES.has(type)),
     locked: !canDownload
   };
   if (!canDownload) {
-    return { ...base, url: null, shareUrl: null, embedUrl: null };
+    return { ...base, url: null, shareUrl: null, embedUrl: null, poster: null, thumbnailUrl: null };
   }
-  const url = item.shareUrl || item.embedUrl || item.url || null;
+  const url = publicText(item.shareUrl) || publicText(item.embedUrl) || publicText(item.url);
   return {
     ...base,
     url,
-    shareUrl: item.shareUrl || item.url || item.embedUrl || null,
-    embedUrl: item.embedUrl || item.url || null
+    shareUrl: publicText(item.shareUrl) || publicText(item.url) || publicText(item.embedUrl),
+    embedUrl: publicText(item.embedUrl) || publicText(item.url),
+    poster: publicText(item.poster) || publicText(item.thumbnailUrl),
+    thumbnailUrl: publicText(item.thumbnailUrl) || publicText(item.poster)
   };
 }
 const AI_EDIT_PRESETS = [
