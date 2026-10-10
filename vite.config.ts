@@ -49,6 +49,7 @@ function expressPlugin(): Plugin {
         next();
       });
 
+      process.env.ICONIC_VITE_DEV = "1";
       const app = createServer();
 
       // Add Express app as middleware to Vite dev server

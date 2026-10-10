@@ -40,6 +40,7 @@ import { handleListingPhotoUpload } from "./routes/listingPhotos";
 import { handleGetPublicPortalListing } from "./routes/portalListing";
 import presentationsRouter from "./routes/presentations";
 import photoEditRequestsRouter from "./routes/photoEditRequests";
+import { mountOwners } from "./routes/owners";
 
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
 const API_BUILD_MARKER = "auth-square-2026-09-28";
@@ -202,6 +203,9 @@ export function createServer() {
   app.get("/api/client-notify", (_req, res) => {
     res.json({ live: clientNotifyLive() });
   });
+
+  // Owners Suite is mounted before other APIs. Staff roles do not open it.
+  mountOwners(app);
 
   // ─── API Routes ────────────────────────────────────────────────────
   app.use("/api/bookings", bookingsRouter);
