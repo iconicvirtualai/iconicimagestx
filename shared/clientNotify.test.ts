@@ -132,7 +132,7 @@ describe("NOTIFY_TEST_ALLOWLIST exact addresses", () => {
     for (const address of [
       "ops@iconicimagestx.com",
       "photos@iconicimagestx.com",
-      "cadi@iconicimagestx.com",
+      "studio@iconicimagestx.com",
       "ops+other@iconicimagestx.com",
       "someone@example.com",
       "*@iconicimagestx.com.evil.test",

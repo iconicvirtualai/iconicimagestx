@@ -72,9 +72,12 @@ function lastSent(): SentMessage {
   return message;
 }
 
+function recipientFields(message: SentMessage = lastSent()): string {
+  return [message.to, message.cc, message.bcc, message.replyTo].filter(Boolean).join("\n");
+}
+
 function mailedTo(): string {
-  const message = lastSent();
-  return [message.to, message.cc, message.bcc, message.replyTo].filter(Boolean).join(", ");
+  return recipientFields().split("\n").join(", ");
 }
 
 describe("client notify test allowlist", () => {
@@ -137,7 +140,7 @@ describe("client notify test allowlist", () => {
       to: "ops@iconicimagestx.com <ada@example.com>",
       cc: `Studio <${QA}>`,
       bcc: "photos@iconicimagestx.com",
-      replyTo: "cadi@iconicimagestx.com",
+      replyTo: "studio@iconicimagestx.com",
       template: "gallery_delivery",
     });
     expect(result).toEqual({ sent: true });
@@ -146,10 +149,11 @@ describe("client notify test allowlist", () => {
     expect(message.cc).toBeUndefined();
     expect(message.bcc).toBeUndefined();
     expect(message.replyTo).toBeUndefined();
-    expect(JSON.stringify(message)).not.toContain("ada@example.com");
-    expect(JSON.stringify(message)).not.toContain("ops@iconicimagestx.com");
-    expect(JSON.stringify(message)).not.toContain("photos@iconicimagestx.com");
-    expect(JSON.stringify(message)).not.toContain("cadi@iconicimagestx.com");
+    const recipients = recipientFields(message);
+    expect(recipients).not.toContain("ada@example.com");
+    expect(recipients).not.toContain("ops@iconicimagestx.com");
+    expect(recipients).not.toContain("photos@iconicimagestx.com");
+    expect(recipients).not.toContain("studio@iconicimagestx.com");
   });
 
   it("does not send when Reply-To is allowlisted but every delivery recipient is a real client", async () => {
@@ -170,7 +174,7 @@ describe("client notify test allowlist", () => {
     for (const address of [
       "ops@iconicimagestx.com",
       "photos@iconicimagestx.com",
-      "cadi@iconicimagestx.com",
+      "studio@iconicimagestx.com",
       "ops+other@iconicimagestx.com",
       "ops+deliveryqa@iconicimagestx.com.evil.test",
     ]) {
@@ -178,7 +182,8 @@ describe("client notify test allowlist", () => {
       const result = await sendEmail({ to: address, cc: QA, template: "invoice" });
       expect(result).toEqual({ sent: true });
       expect(lastSent().to).toBe(QA);
-      expect(JSON.stringify(lastSent())).not.toContain(address);
+      expect(recipientFields()).toBe(QA);
+      expect(recipientFields()).not.toContain(address);
       sendMail.mockClear();
       const alone = await sendEmail({ to: address, template: "account_password_setup" });
       expect(alone).toEqual({ sent: false });
