@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { createOrder } from "@/lib/createOrder";
-import { bookingFollowUp } from "@/lib/bookingFollowUp";
+import { readClientNotificationsLive, type BookingSubmitResult } from "@/lib/bookingFollowUp";
+import { BookingConfirmation } from "@/components/BookingConfirmation";
 import { Link, useSearchParams } from "react-router-dom";
 import ChatWidget from "@/components/ChatWidget";
 import { MoneyAmount } from "@/components/MoneyAmount";
@@ -184,7 +185,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   const [searchParams] = useSearchParams();
   const [step, setStep] = useState<Step>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitNote, setSubmitNote] = useState("");
+  const [submitResult, setSubmitResult] = useState<BookingSubmitResult | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [selectedDetailItem, setSelectedDetailItem] = useState<any>(null);
   const [showIconicPopup, setShowIconicPopup] = useState(false);
@@ -577,14 +578,21 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   const total = sumLineItemPrices(lineItems);
 
   try {
-    const result = await createOrder({
-      ...formData,
-      lineItems,
-      total,
-      promoCode: appliedPromo?.code || null,
-      promoDiscount: appliedPromo?.discount || 0,
+    const [result, clientNotificationsLive] = await Promise.all([
+      createOrder({
+        ...formData,
+        lineItems,
+        total,
+        promoCode: appliedPromo?.code || null,
+        promoDiscount: appliedPromo?.discount || 0,
+      }),
+      readClientNotificationsLive(),
+    ]);
+    setSubmitResult({
+      ...result,
+      selectedService: typeof formData.selectedService === "string" ? formData.selectedService : null,
+      clientNotificationsLive,
     });
-    setSubmitNote(bookingFollowUp(result));
 
     setStep("success");
 
@@ -1615,73 +1623,31 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
           </motion.div>
         );
 
-      case "success":
-        return (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }} 
-            animate={{ opacity: 1, scale: 1 }} 
-            className="text-center space-y-8 py-16"
-          >
-            <div className="relative mx-auto w-28 h-28">
-               <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", damping: 12, stiffness: 200 }}
-                className="w-full h-full rounded-[2rem] bg-black flex items-center justify-center relative z-10 shadow-xl"
-               >
-                 <Check className="w-12 h-12 stroke-[3] text-white" />
-               </motion.div>
-               <motion.div
-                animate={{
-                  scale: [1, 1.3, 1],
-                  opacity: [0.4, 0, 0.4]
-                }}
-                transition={{ repeat: Infinity, duration: 3 }}
-                className="absolute inset-0 rounded-full blur-2xl bg-black/5"
-               ></motion.div>
-            </div>
-            <div className="space-y-3">
-              <h2 className="text-4xl font-black tracking-tight uppercase text-black">YOU'RE IN</h2>
-              <p className="text-gray-500 font-medium max-w-md mx-auto leading-relaxed text-sm">
-                {submitNote || "We're sharpening the lenses and checking the weather. Expect a confirmation text shortly."}
-              </p>
-            </div>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Button asChild className="bg-black hover:bg-gray-800 text-white font-black px-10 py-6 text-sm rounded-2xl transition-all shadow-xl hover:scale-105 active:scale-95 w-full sm:w-auto">
-                <a href="/">Back to Home</a>
-              </Button>
-              <Button
-                onClick={() => {
-                  setStep(1);
-                  setExpandedCategories(["listings"]);
-                  setFormData(prev => ({
-                    ...prev,
-                    address: "",
-                    servicePlace: null,
-                    selectedService: "",
-                    selectedBasics: [],
-                    selectedAddOns: [],
-                    lifeOfTheListingCare: false,
-                    premiumUpgrade: false,
-                    virtualStagingCredits: 0,
-                    smsConsent: false
-                  }));
-                }}
-                variant="outline"
-                className="border-2 border-black text-black font-black px-10 py-6 text-sm rounded-2xl transition-all shadow-md hover:scale-105 active:scale-95 w-full sm:w-auto"
-              >
-                Book Another Service
-              </Button>
-            </div>
-          </motion.div>
-        );
     }
   };
 
   if (step === "success") {
     return (
-      <div className="max-w-2xl mx-auto px-4 text-neutral-950">
-        {renderStep()}
+      <div className="min-w-0 text-neutral-950">
+        <BookingConfirmation
+          result={submitResult ?? {}}
+          onBookAnother={() => {
+            setStep(1);
+            setExpandedCategories(["listings"]);
+            setFormData(prev => ({
+              ...prev,
+              address: "",
+              servicePlace: null,
+              selectedService: "",
+              selectedBasics: [],
+              selectedAddOns: [],
+              lifeOfTheListingCare: false,
+              premiumUpgrade: false,
+              virtualStagingCredits: 0,
+              smsConsent: false
+            }));
+          }}
+        />
       </div>
     );
   }
