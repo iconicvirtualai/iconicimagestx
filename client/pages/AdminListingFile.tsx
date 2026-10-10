@@ -23,6 +23,7 @@ import { calendarDateKey, formatChicagoDate } from "@shared/clientHome";
 import { lockDownloadsOn, requirePaymentOn } from "@shared/paymentAccess";
 import { staffInvoicePath } from "@shared/staffInvoice";
 import { PresentationShareButton, PresentationSharePanel } from "@/components/PresentationSharePanel";
+import { PlaytestBadge } from "@/components/PlaytestBadge";
 import { PhotoEditRequestStaff } from "@/components/PhotoEditRequestStaff";
 
 // ─── Status systems ───────────────────────────────────────────────────────────
@@ -875,7 +876,7 @@ export default function AdminListingFile({
                 <p className="text-sm font-black text-black">{linkedOrder.clientName || project.clientName || "Client"}</p>
                 <p className="text-[10px] font-mono text-gray-400">#{String(linkedOrder.id).slice(0, 8)}</p>
                 <p className="text-xs font-bold text-gray-600">{String(linkedOrder.status || "new").replace(/_/g, " ")}</p>
-                <p className="text-sm font-black text-[#0d9488]">${Number(linkedOrder.total || linkedOrder.pricing?.total || 0).toLocaleString()}</p>
+                <p className="text-sm font-black text-[#0d9488]">${Number(linkedOrder.total || linkedOrder.pricing?.total || 0).toLocaleString()}<PlaytestBadge record={linkedOrder} links={{ client: project }} /></p>
               </div>
             ) : project.orderRequestId ? (
               <p className="text-xs text-gray-400 mb-3">Order link saved.</p>
@@ -891,7 +892,7 @@ export default function AdminListingFile({
 
           {/* Invoice — same document as the order when this project came from one */}
           <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-5">
-            <h3 className={`${labelCls} mb-4 flex items-center gap-2`}><CreditCard className="w-3.5 h-3.5" /> Invoice</h3>
+            <h3 className={`${labelCls} mb-4 flex items-center gap-2`}><CreditCard className="w-3.5 h-3.5" /> Invoice<PlaytestBadge record={linkedInvoice || project} links={{ order: linkedOrder, client: project }} /></h3>
             {linkedInvoice ? (
               <div className="mb-3">
                 <p className="text-xl font-black text-black">${Number(linkedInvoice.total ?? linkedInvoice.amountDue ?? project.total ?? 0).toLocaleString()}</p>

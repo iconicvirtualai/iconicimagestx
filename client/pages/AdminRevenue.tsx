@@ -6,7 +6,9 @@ import { collection, onSnapshot } from "firebase/firestore";
 import { toast } from "sonner";
 import { addressText } from "@shared/addressText";
 import { formatChicagoDate } from "@shared/clientHome";
+import { summarizeInvoiceRevenue } from "@shared/playtestRecord";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
+import { PlaytestBadge } from "@/components/PlaytestBadge";
 
 function fmtCurrency(n: number): string { return "$" + (n || 0).toLocaleString("en-US", { minimumFractionDigits: 2 }); }
 function fmtAddr(a: unknown): string {
@@ -102,48 +104,10 @@ export default function AdminRevenue() {
     });
   }, [invoices, datePreset, customFrom, customTo]);
 
-  // Revenue stages
+  // Revenue stages. Playtest invoices stay in the detail table and out of these totals.
   const stats = React.useMemo(() => {
-    let projected = 0, earned = 0, invoiced = 0, overdue = 0, collected = 0;
-    let photographerPayout = 0, editingCost = 0, platformFees = 0;
-
-    filtered.forEach(o => {
-      const total = Number(o.total) || (Number(o.amountDue) || 0) + (Number(o.amountPaid) || 0);
-      const status = (typeof o.status === "string" ? o.status : "").toLowerCase();
-      const paid = Number(o.amountPaid) || 0;
-
-      // Categorize
-      if (["cancelled", "void", "voided", "archived"].includes(status) && paid === 0) return;
-
-      projected += total;
-
-      if (["sent", "draft", "overdue", "paid", "completed"].includes(status)) {
-        earned += total;
-      }
-
-      if (status === "sent" || status === "draft" || total > 0) {
-        invoiced += total;
-      }
-
-      if (status === "overdue" || (o.dueDate && getTs(o.dueDate) && getTs(o.dueDate)! < new Date() && paid < total)) {
-        overdue += (total - paid);
-      }
-
-      if (paid > 0) {
-        collected += paid;
-      }
-
-      // Costs
-      photographerPayout += total * settings.photographerPayRate;
-      editingCost += settings.editingCostPerPhoto * settings.avgPhotosPerOrder;
-      if (total > 0) platformFees += (total * settings.platformFeePercent) + settings.platformFeeFlat;
-    });
-
-    const totalCosts = photographerPayout + editingCost + platformFees;
-    const grossMargin = collected - totalCosts;
-    const marginPercent = collected > 0 ? (grossMargin / collected * 100) : 0;
-
-    return { projected, earned, invoiced, overdue, collected, photographerPayout, editingCost, platformFees, totalCosts, grossMargin, marginPercent, count: filtered.length };
+    const money = summarizeInvoiceRevenue(filtered, settings);
+    return { ...money, count: filtered.length };
   }, [filtered, settings]);
 
   const inputCls = "h-9 px-3 rounded-xl border border-gray-200 text-xs font-bold bg-white focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30";
@@ -288,7 +252,7 @@ export default function AdminRevenue() {
                   const due = Number(o.amountDue) || Math.max(total - paid, 0);
                   return (
                     <tr key={o.id} className="border-t border-gray-100 hover:bg-gray-50">
-                      <td className="py-2.5 px-4 text-xs font-bold text-[#0d9488]">{o.invoiceNumber || `#${(o.id || "").substring(0, 6)}`}</td>
+                      <td className="py-2.5 px-4 text-xs font-bold text-[#0d9488]">{o.invoiceNumber || `#${(o.id || "").substring(0, 6)}`}<PlaytestBadge record={o} /></td>
                       <td className="py-2.5 px-4 text-xs text-gray-500">{fmtDate(o.createdAt || o.updatedAt || o.sentAt || o.paidAt)}</td>
                       <td className="py-2.5 px-4 text-xs font-bold">{safe(o.clientName || o.customerName || o.name)}</td>
                       <td className="py-2.5 px-4 text-xs text-gray-500">{fmtAddr(o.address)}</td>

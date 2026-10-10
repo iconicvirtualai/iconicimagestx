@@ -23,6 +23,12 @@ import {
   toDate,
 } from "@/lib/scheduleRecords";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  countedAppointmentRevenue,
+  linksForPlaytestIds,
+  playtestOrderAndClientIds,
+  sumOperationsPaidRevenue,
+} from "@shared/playtestRecord";
 
 export interface OperationMetrics {
   orderRequestsCount: number;
@@ -197,13 +203,14 @@ export function useOperationsMetrics() {
       .map(normalizeCalendarMetricEvent)
       .filter((event): event is any => Boolean(event) && isThisWeek(getApptDate(event)));
 
-    const revToday = scheduledToday.reduce((s, i) => s + appointmentRevenue(i), 0);
-    const revWeek = scheduledWeek.reduce((s, i) => s + appointmentRevenue(i), 0);
-    const revMonth = scheduledMonth.reduce((s, i) => s + appointmentRevenue(i), 0);
+    const revenueOf = (item: any) => countedAppointmentRevenue(item, appointmentRevenue(item));
+    const revToday = scheduledToday.reduce((s, i) => s + revenueOf(i), 0);
+    const revWeek = scheduledWeek.reduce((s, i) => s + revenueOf(i), 0);
+    const revMonth = scheduledMonth.reduce((s, i) => s + revenueOf(i), 0);
     const revProjected = appointmentItems.filter(i => {
       const d = getApptDate(i);
       return d && chicagoDateKey(d) >= todayKey && !["paid", "delivered_paid"].includes((i.status || "").toLowerCase());
-    }).reduce((s, i) => s + appointmentRevenue(i), 0);
+    }).reduce((s, i) => s + revenueOf(i), 0);
 
     const shooters: Record<string, number> = {};
     let unassignedAppointmentsThisWeek = 0;
@@ -258,7 +265,7 @@ export function useOperationsMetrics() {
     const cancellationsCount = stabilityItems.filter(i => (i.status || "").toLowerCase() === "cancelled").length;
     const noShowsCount = stabilityItems.filter(i => (i.status || "").toLowerCase() === "no_show").length;
 
-    const revenueAppointments = appointmentItems.filter((item) => appointmentRevenue(item) > 0);
+    const revenueAppointments = appointmentItems.filter((item) => revenueOf(item) > 0);
 
     const clientData: Record<string, { rev: number; vol: number; last: Date }> = {};
     revenueAppointments.forEach(i => {
@@ -302,9 +309,8 @@ export function useOperationsMetrics() {
 
     const listingsInProgressCount = listings.filter(l => ["in_progress", "delivered"].includes((l.status || "").toLowerCase())).length;
     
-    const paidRevenue = invoices.reduce((sum, invoice: any) => (
-      sum + (Number(invoice.total) || Number(invoice.amountDue) + Number(invoice.amountPaid) || 0)
-    ), 0);
+    const playtestIds = playtestOrderAndClientIds(listings.concat(orderRequests, appointments));
+    const paidRevenue = sumOperationsPaidRevenue(invoices, (invoice) => linksForPlaytestIds(invoice, playtestIds));
 
     return {
       orderRequestsCount: orderRequestsFiltered.length,

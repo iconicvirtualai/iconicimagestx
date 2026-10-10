@@ -8,6 +8,7 @@ import { Router } from "express";
 import admin from "firebase-admin";
 import { requireCoordinator, requireStaff, type AuthenticatedRequest } from "../middleware/auth";
 import { chicagoNoonDate } from "../../shared/clientHome";
+import { sumTransactionAmounts } from "../../shared/playtestRecord";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -77,10 +78,7 @@ router.get("/dashboard", requireStaff, async (_req, res) => {
       statusCounts[s] = (statusCounts[s] || 0) + 1;
     });
 
-    const monthRevenue = monthTransactions.docs.reduce(
-      (sum, d) => sum + (d.data().amount || 0),
-      0
-    );
+    const monthRevenue = sumTransactionAmounts(monthTransactions.docs.map((d) => d.data()));
 
     return res.json({
       totalOrders: allOrders.size,

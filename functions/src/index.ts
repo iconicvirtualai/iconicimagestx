@@ -1,6 +1,7 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { google } from "googleapis";
+import { shouldRunOrderCreated } from "../../shared/orderCreatedNotify";
 
 admin.initializeApp();
 
@@ -57,6 +58,11 @@ export const onOrderCreated = functions.firestore
   .onCreate(async (snap, context) => {
     const order = snap.data();
     const orderId = context.params.orderId;
+
+    if (!shouldRunOrderCreated(order)) {
+      console.info(`[onOrderCreated] Skipped playtest order ${orderId}.`);
+      return;
+    }
 
     // Not the booking_received order-ack. This Gmail path is a non-order-form
     // client/owner blast and stays off unless CLIENT_NOTIFY_LIVE is exactly

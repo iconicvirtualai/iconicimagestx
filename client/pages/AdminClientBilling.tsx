@@ -5,6 +5,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { deliverInvoiceEmail } from "@/lib/deliverInvoice";
 import { staffInvoicePath } from "@shared/staffInvoice";
 import { formatChicagoDate } from "@shared/clientHome";
+import { summarizeBillingTotals } from "@shared/playtestRecord";
+import { PlaytestBadge } from "@/components/PlaytestBadge";
 import { Search, DollarSign, Send, Eye, Plus, FileText, ChevronDown, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
@@ -69,6 +71,7 @@ export default function AdminClientBilling() {
         due: total - paid,
         status,
         lineItems: o.lineItems || [],
+        source: o,
       };
     }).filter(inv => inv.total > 0);
   }, [orders]);
@@ -84,10 +87,7 @@ export default function AdminClientBilling() {
   }, [invoices, search, statusFilter]);
 
   const stats = React.useMemo(() => ({
-    total: invoices.reduce((s, i) => s + i.total, 0),
-    collected: invoices.reduce((s, i) => s + i.paid, 0),
-    outstanding: invoices.reduce((s, i) => s + i.due, 0),
-    overdue: invoices.filter(i => i.status === "overdue").reduce((s, i) => s + i.due, 0),
+    ...summarizeBillingTotals(invoices),
     count: invoices.length,
   }), [invoices]);
 
@@ -218,7 +218,7 @@ export default function AdminClientBilling() {
                 return (
                   <tr key={inv.orderId} className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer"
                     onClick={() => navigate(`/admin/order-request/${inv.orderId}`)}>
-                    <td className="py-3 px-4 text-xs font-bold text-[#0d9488]">{inv.invoiceNumber}</td>
+                    <td className="py-3 px-4 text-xs font-bold text-[#0d9488]">{inv.invoiceNumber}<PlaytestBadge record={inv.source} /></td>
                     <td className="py-3 px-4 text-xs text-gray-500">{fmtDate(inv.date)}</td>
                     <td className="py-3 px-4">
                       <p className="text-xs font-bold">{inv.clientName}</p>

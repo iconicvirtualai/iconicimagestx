@@ -16,6 +16,8 @@ import { toast } from "sonner";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 import StaffActionQueue from "@/components/StaffActionQueue";
 import { recordAddressText } from "@shared/addressText";
+import { isPlaytestRecord, sumListingRevenue } from "@shared/playtestRecord";
+import { PlaytestBadge } from "@/components/PlaytestBadge";
 import { choosePortalClient, listingAppointmentDate } from "@shared/listingWrite";
 import {
   LISTING_QUEUE,
@@ -582,7 +584,7 @@ export default function AdminListings() {
   // ─── Stats summary ─────────────────────────────────────────────────────────
   const stats = React.useMemo(() => {
     const total = filtered.length;
-    const totalRevenue = filtered.reduce((sum, p) => sum + (p.total || 0), 0);
+    const totalRevenue = sumListingRevenue(filtered);
     const paid = filtered.filter(p => p.status === "paid").length;
     const scheduled = filtered.filter(p => p.status === "scheduled" || p.status === "appt_scheduled" || p.status === "consult_scheduled").length;
     return { total, totalRevenue, paid, scheduled };
@@ -811,6 +813,7 @@ export default function AdminListings() {
                   onToggleSelect={() => toggleSelect(p.id)}
                   onStudioChange={order.studio ? setStudio : undefined}
                 />
+                {isPlaytestRecord(p) ? <p className="mt-2 px-1"><PlaytestBadge record={p} className="ml-0" /></p> : null}
                 {nextAction ? (
                   <p className="mt-2 px-1 text-[10px] font-black uppercase tracking-widest text-[#0d9488]">{nextAction.label}</p>
                 ) : null}

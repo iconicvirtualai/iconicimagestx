@@ -14,6 +14,7 @@ import {
   type ClientRecord,
 } from "@/lib/clientRecords";
 import { staffInvoicePath } from "@shared/staffInvoice";
+import { PlaytestBadge } from "@/components/PlaytestBadge";
 
 const labelCls = "block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1";
 const inputCls = "w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30";
@@ -134,7 +135,7 @@ export default function AdminClientAccount() {
 
       <div className="mb-6 rounded-[1.5rem] bg-black p-6 text-white">
         <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">{client.company || client.group || "Client"}</p>
-        <h2 className="mt-1 text-2xl font-black uppercase tracking-tight">{clientName(client)}</h2>
+        <h2 className="mt-1 text-2xl font-black uppercase tracking-tight">{clientName(client)}<PlaytestBadge record={client} /></h2>
         <p className="mt-2 text-sm text-gray-400">{client.email || "No email"}{client.phone ? ` · ${client.phone}` : ""}</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <span className="rounded-full bg-white/10 px-3 py-1 text-[9px] font-black uppercase tracking-widest">{client.status || "active"}</span>
@@ -172,11 +173,11 @@ export default function AdminClientAccount() {
                   if (total === null) return null;
                   const paid = money(order.invoice?.amountPaid);
                   return (
-                    <Row key={order.id} title={recordAddress(order)} meta={`${formatWhen(order.createdAt)} · ${order.invoice?.status || order.status || "order"}`} value={formatMoney(total)} extra={paid === null ? undefined : `Paid ${formatMoney(paid)}`} href={`/admin/order-request/${order.id}`} />
+                    <Row key={order.id} title={recordAddress(order)} meta={`${formatWhen(order.createdAt)} · ${order.invoice?.status || order.status || "order"}`} value={formatMoney(total)} extra={paid === null ? undefined : `Paid ${formatMoney(paid)}`} href={`/admin/order-request/${order.id}`} badge={<PlaytestBadge record={order} links={{ client }} />} />
                   );
                 })}
                 {projects.filter((project) => money(project.total) !== null).map((project) => (
-                  <Row key={project.id} title={recordAddress(project)} meta={project.invoiceStatus || project.status || "project"} value={formatMoney(project.total)} href={`/admin/listing/${project.id}`} />
+                  <Row key={project.id} title={recordAddress(project)} meta={project.invoiceStatus || project.status || "project"} value={formatMoney(project.total)} href={`/admin/listing/${project.id}`} badge={<PlaytestBadge record={project} links={{ client }} />} />
                 ))}
               </div>
             )}
@@ -206,10 +207,10 @@ export default function AdminClientAccount() {
             {storedInvoices.length === 0 && orderInvoices.length === 0 ? <Empty text="No invoices are stored for this client yet." /> : (
               <div className="space-y-2">
                 {storedInvoices.map((invoice) => (
-                  <Row key={invoice.id} title={invoice.invoiceNumber || "Invoice"} meta={invoice.status || "stored"} value={formatMoney(invoice.total)} href={invoice.id ? staffInvoicePath(invoice.id) : undefined} />
+                  <Row key={invoice.id} title={invoice.invoiceNumber || "Invoice"} meta={invoice.status || "stored"} value={formatMoney(invoice.total)} href={invoice.id ? staffInvoicePath(invoice.id) : undefined} badge={<PlaytestBadge record={invoice} links={{ client }} />} />
                 ))}
                 {orderInvoices.map((order) => (
-                  <Row key={order.id} title={order.invoice.invoiceNumber} meta={order.invoice.status || "on order"} value={formatMoney(order.invoice.total ?? order.total)} href={`/admin/order-request/${order.id}`} />
+                  <Row key={order.id} title={order.invoice.invoiceNumber} meta={order.invoice.status || "on order"} value={formatMoney(order.invoice.total ?? order.total)} href={`/admin/order-request/${order.id}`} badge={<PlaytestBadge record={order} links={{ client }} />} />
                 ))}
               </div>
             )}
@@ -245,6 +246,7 @@ export default function AdminClientAccount() {
                     meta={`${formatWhen(order.createdAt || order.submittedAt)} · ${order.status || "new"}`}
                     value={money(order.total) === null && money(order.pricing?.total) === null ? undefined : formatMoney(order.total ?? order.pricing?.total)}
                     href={`/admin/order-request/${order.id}`}
+                    badge={<PlaytestBadge record={order} links={{ client }} />}
                   />
                 ))}
               </div>
@@ -348,11 +350,14 @@ function Empty({ text }: { text: string }) {
   return <p className="rounded-2xl bg-gray-50 px-4 py-8 text-center text-xs font-black uppercase tracking-widest text-gray-400">{text}</p>;
 }
 
-function Row({ title, meta, value, extra, href, external }: { title: string; meta?: string; value?: string; extra?: string; href?: string; external?: boolean }) {
+function Row({ title, meta, value, extra, href, external, badge }: { title: string; meta?: string; value?: string; extra?: string; href?: string; external?: boolean; badge?: React.ReactNode }) {
   const body = (
     <div className="flex items-center justify-between gap-4 rounded-xl bg-gray-50 px-4 py-3">
       <div className="min-w-0">
-        <p className="truncate text-sm font-black text-black">{title}</p>
+        <div className="flex min-w-0 items-center">
+          <p className="truncate text-sm font-black text-black">{title}</p>
+          {badge}
+        </div>
         {meta && <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{meta}</p>}
         {extra && <p className="text-xs font-bold text-gray-500">{extra}</p>}
       </div>

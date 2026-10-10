@@ -21,6 +21,7 @@ import { formatChicagoDate } from "@shared/clientHome";
 import { staffInvoicePath } from "@shared/staffInvoice";
 import { orderChargeSummary, orderServiceLines } from "@shared/orderPackageLines";
 import type { GalleryReleaseReport } from "@shared/galleryRelease";
+import { PlaytestBadge } from "@/components/PlaytestBadge";
 
 // ─── Status system ────────────────────────────────────────────────────────────
 const ORDER_STATUSES = [
@@ -619,7 +620,7 @@ export default function AdminOrderDetail() {
 
             {/* Quick invoice summary */}
             <div className="bg-black text-white rounded-2xl p-5">
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-3">Invoice</h3>
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-3">Invoice<PlaytestBadge record={invoice} links={{ order }} /></h3>
               <p className="text-2xl font-black">{fmtCurrency(order.total || 0)}</p>
               <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-1">
                 {invoice.status === "paid" ? "Paid" : invoice.amountPaid > 0 ? `$${invoice.amountPaid} paid` : "Unpaid"}
@@ -635,7 +636,7 @@ export default function AdminOrderDetail() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 max-w-2xl">
           <div className="flex justify-between mb-8">
             <div>
-              <h2 className="text-xl font-black">INVOICE</h2>
+              <h2 className="text-xl font-black">INVOICE<PlaytestBadge record={invoice} links={{ order }} /></h2>
               <p className="text-sm text-gray-400">{invoice.invoiceNumber || order.orderNumber}</p>
             </div>
             <div className="text-right">

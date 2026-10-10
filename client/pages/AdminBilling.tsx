@@ -5,6 +5,7 @@ import { collection, query, where, orderBy, limit, getDocs } from "firebase/fire
 import { AlertCircle, CreditCard, FileText } from "lucide-react";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 import { formatChicagoDate } from "@shared/clientHome";
+import { PlaytestBadge } from "@/components/PlaytestBadge";
 
 interface Invoice {
   id: string;
@@ -151,6 +152,7 @@ export default function AdminBilling() {
                       </td>
                       <td className="py-3 px-4 text-gray-700">
                         {invoice.description}
+                        <PlaytestBadge record={invoice} />
                       </td>
                       <td className="py-3 px-4 text-gray-900 font-semibold">
                         ${invoice.amount.toFixed(2)}

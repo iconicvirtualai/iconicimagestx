@@ -2385,7 +2385,7 @@ function formatShootDateLabel(isoDay, raw) {
 function addressRecords(data) {
   const records = [data];
   for (const key of ["address", "propertyAddress", "shootLocation"]) {
-    const nested2 = asRecord$3(data[key]);
+    const nested2 = asRecord$4(data[key]);
     if (nested2) records.push(nested2);
   }
   return records;
@@ -2444,13 +2444,13 @@ function readRaw(data, keys) {
 function factRecords(data) {
   const records = [data];
   for (const key of ["property", "details", "facts", "propertyFacts", "homeFacts"]) {
-    const nested2 = asRecord$3(data[key]);
+    const nested2 = asRecord$4(data[key]);
     if (nested2) records.push(nested2);
   }
-  const portal = asRecord$3(data.portalData);
+  const portal = asRecord$4(data.portalData);
   if (portal) {
     records.push(portal);
-    const facts = asRecord$3(portal.facts);
+    const facts = asRecord$4(portal.facts);
     if (facts) records.push(facts);
   }
   return records;
@@ -2483,7 +2483,7 @@ function firstText$3(record, keys) {
   }
   return "";
 }
-function asRecord$3(value) {
+function asRecord$4(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   return value;
 }
@@ -5293,6 +5293,25 @@ async function generateInvoiceNumber() {
     year
   );
 }
+function isPlaytestRecord(record, links) {
+  if (playtestFlag(record)) return true;
+  if (playtestFlag(links?.order) || playtestFlag(links?.client)) return true;
+  const data = asRecord$3(record);
+  return playtestFlag(data.order) || playtestFlag(data.client) || playtestFlag(data.invoice);
+}
+function sumTransactionAmounts(records) {
+  return records.reduce((sum, record) => {
+    if (isPlaytestRecord(record)) return sum;
+    return sum + (Number(asRecord$3(record).amount) || 0);
+  }, 0);
+}
+function playtestFlag(record) {
+  return asRecord$3(record).playtest === true;
+}
+function asRecord$3(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value;
+}
 const router$l = Router();
 const db$m = () => admin.firestore();
 router$l.get("/", requireStaff, async (req, res) => {
@@ -5339,10 +5358,7 @@ router$l.get("/dashboard", requireStaff, async (_req, res) => {
       const s = d.data().status;
       statusCounts[s] = (statusCounts[s] || 0) + 1;
     });
-    const monthRevenue = monthTransactions.docs.reduce(
-      (sum, d) => sum + (d.data().amount || 0),
-      0
-    );
+    const monthRevenue = sumTransactionAmounts(monthTransactions.docs.map((d) => d.data()));
     return res.json({
       totalOrders: allOrders.size,
       todayOrders: todayOrders.size,
@@ -8597,7 +8613,8 @@ async function applySuccessfulPayment({
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     }).catch((err) => console.error("[Payments] Order balance update failed:", err));
   }
-  if (resolvedClientId) {
+  const playtestPayment = isPlaytestRecord(invoice);
+  if (resolvedClientId && !playtestPayment) {
     await db$f().collection("clients").doc(resolvedClientId).update({
       totalSpend: admin.firestore.FieldValue.increment(amount),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -8619,6 +8636,7 @@ async function applySuccessfulPayment({
     amount,
     paymentMethod: method,
     status: "completed",
+    ...playtestPayment ? { playtest: true } : {},
     ...squarePaymentId ? { squarePaymentId } : {},
     ...stripePaymentIntentId ? { stripePaymentIntentId } : {},
     processedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -9059,7 +9077,9 @@ router$j.get("/transactions", requireCoordinator, async (req, res) => {
     }
     const snapshot = await query.limit(Number(limit)).get();
     const transactions = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-    const totalRevenue = transactions.filter((t) => t.status === "completed" && t.type === "payment").reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+    const totalRevenue = sumTransactionAmounts(
+      transactions.filter((t) => t.status === "completed" && t.type === "payment")
+    );
     return res.json({ transactions, totalRevenue });
   } catch (err) {
     console.error("[Payments] Transactions error:", err);
@@ -9113,6 +9133,7 @@ async function handleStripeRefund(charge) {
     invoiceId: invoiceDoc.id,
     clientId: invoiceDoc.data().clientId,
     clientName: invoiceDoc.data().clientName,
+    ...isPlaytestRecord(invoiceDoc.data()) ? { playtest: true } : {},
     amount: -refundAmount,
     paymentMethod: "stripe",
     status: "completed",
