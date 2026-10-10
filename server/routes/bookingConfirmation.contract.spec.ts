@@ -12,19 +12,57 @@ function sendBlocks(source: string, template: string): string[] {
   return source.match(pattern) ?? [];
 }
 
+function handlerSlice(source: string, startMarker: string, endMarker: string): string {
+  const start = source.indexOf(startMarker);
+  const end = source.indexOf(endMarker, start + startMarker.length);
+  return source.slice(start, end === -1 ? undefined : end);
+}
+
 describe("live order confirmation emails", () => {
-  it("still sends booking_received to the client and the office", () => {
+  it("sends booking_received only to the client", () => {
     const blocks = sendBlocks(bookings, "booking_received");
-    expect(blocks).toHaveLength(2);
+    expect(blocks).toHaveLength(1);
     expect(blocks[0]).toContain("to: email");
-    expect(blocks[1]).toContain('to: "photos@iconicimagestx.com"');
-    for (const block of blocks) {
-      expect(block).toContain("clientName");
-      expect(block).toContain("address: displayAddress");
-      expect(block).toContain("total: money(total)");
-      expect(block).toContain("requestId: docRef.id");
-      expect(block).toContain("dashboardUrl:");
-    }
+    expect(blocks[0]).not.toContain("photos@iconicimagestx.com");
+    expect(blocks[0]).toContain("clientName");
+    expect(blocks[0]).toContain("address: displayAddress");
+    expect(blocks[0]).toContain("total: money(total)");
+    expect(blocks[0]).toContain("requestId: docRef.id");
+    expect(blocks[0]).toContain("dashboardUrl:");
+    expect(bookings).not.toContain('to: "photos@iconicimagestx.com"');
+    expect(bookings).not.toContain("officeEmailStatus");
+  });
+
+  it("sends exactly one office email on a new booking, the saved-order alert", () => {
+    const post = handlerSlice(bookings, 'router.post("/",', 'router.get("/",');
+    const clientReceived = sendBlocks(post, "booking_received");
+    expect(clientReceived).toHaveLength(1);
+    expect(clientReceived[0]).toContain("to: email");
+
+    const directSends = post.match(/await sendEmail\(\{/g) ?? [];
+    expect(directSends.length).toBeGreaterThan(0);
+    expect(post).not.toContain('template: "office_new_order"');
+    expect(post).not.toContain('audience: "staff"');
+    expect(post).not.toContain("photos@iconicimagestx.com");
+    expect(post.match(/notifyOfficeOfOrder\(/g)).toHaveLength(1);
+    expect(post).toContain("isNewOrder: true");
+    expect(post).toContain("saved: savedOrder");
+    expect(post.indexOf("const savedSnap = await docRef.get()")).toBeLessThan(
+      post.indexOf("notifyOfficeOfOrder"),
+    );
+
+    const confirm = handlerSlice(bookings, 'router.patch("/:id/confirm"', 'router.patch("/:id/decline"');
+    expect(confirm).not.toContain("notifyOfficeOfOrder");
+    expect(confirm).not.toContain('template: "booking_received"');
+    expect(sendBlocks(confirm, "order_confirmed")).toHaveLength(1);
+    expect(sendBlocks(confirm, "order_confirmed")[0]).toContain("to: requestEmail");
+
+    const officeNotify = readFileSync(new URL("../services/officeOrderNotify.ts", import.meta.url), "utf8");
+    expect(officeNotify).toContain('export const OFFICE_NEW_ORDER_EMAIL_TEMPLATE = "office_new_order"');
+    expect(officeNotify.match(/await sendEmail\(\{/g)).toHaveLength(1);
+    expect(officeNotify).toContain("template: OFFICE_NEW_ORDER_EMAIL_TEMPLATE");
+    expect(officeNotify).toContain('audience: "staff"');
+    expect(officeNotify).not.toContain("booking_received");
   });
 
   it("still sends order_confirmed to the client on booking confirm", () => {
