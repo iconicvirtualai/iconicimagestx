@@ -11,6 +11,8 @@ interface OwnerSuitePayload {
   configured: boolean;
   notice: string | null;
   readerEmail: string | null;
+  /** Static owner line from the authenticated suite response. Not a sheet cell. */
+  why?: string;
 }
 
 type LoadState =
@@ -174,6 +176,7 @@ function OwnersSuiteView({
       </header>
 
       <main className="relative mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 md:px-8 md:py-8">
+        {payload.why ? <WhyHero quote={payload.why} /> : null}
         <div className="flex flex-wrap items-center justify-between gap-2 px-1">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9fb0c7]">{stamp}</p>
           {payload.source === "fixture" ? (
@@ -325,6 +328,21 @@ function OwnersSuiteView({
         <BotCard state={data.bots.state} entries={data.bots.entries} />
       </main>
     </div>
+  );
+}
+
+function WhyHero({ quote }: { quote: string }) {
+  return (
+    <section className="relative overflow-hidden rounded-[28px] border border-[#e8c872]/55 bg-gradient-to-br from-[#5a4318] via-[#1c3d66] to-[#102844] px-5 py-6 shadow-[0_0_48px_rgba(232,200,114,0.22)] md:px-8 md:py-8">
+      <div className="pointer-events-none absolute -left-10 -top-12 h-40 w-40 rounded-full bg-[#f0d48a]/35 blur-3xl" />
+      <div className="pointer-events-none absolute -right-8 bottom-0 h-28 w-48 rounded-full bg-[#e8c872]/25 blur-2xl" />
+      <p className="relative text-[10px] font-black uppercase tracking-[0.28em] text-[#f0d48a]">Why</p>
+      <blockquote className="relative mt-3 max-w-4xl font-['Cormorant_Garamond'] text-[1.65rem] font-medium leading-snug text-[#fff8ea] md:text-[2.35rem] md:leading-tight">
+        <span aria-hidden="true" className="mr-1 text-[#f0d48a]">“</span>
+        {quote}
+        <span aria-hidden="true" className="text-[#f0d48a]">”</span>
+      </blockquote>
+    </section>
   );
 }
 

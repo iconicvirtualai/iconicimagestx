@@ -10,6 +10,7 @@ import {
   signOwnerSession,
 } from "../services/ownerGate";
 import { clearOwnerSuiteCacheForTests } from "../services/ownerSheets";
+import { OWNER_WHY } from "../services/ownerWhy";
 
 const KEYS = ["OWNER_EMAILS", "OWNER_SUITE_FIXTURES", "OWNER_SESSION_SECRET", "VERCEL", "VERCEL_ENV", "NODE_ENV"] as const;
 const saved = Object.fromEntries(KEYS.map((key) => [key, process.env[key]]));
@@ -75,6 +76,7 @@ describe("owners suite access", () => {
       expect(hit.response.headers.get("x-robots-tag")).toContain("noindex");
       expect(hit.text).not.toContain("4280");
       expect(hit.text).not.toContain("1vHkdHRhAWKcnsv8");
+      expect(hit.text).not.toContain(OWNER_WHY);
       expect(hit.text.toLowerCase()).not.toContain("forbidden");
     }
     expect(page.text).toContain("Page not found");
@@ -94,6 +96,7 @@ describe("owners suite access", () => {
     expect(page.response.status).toBe(404);
     expect(admin.text).not.toContain("4280");
     expect(admin.text).not.toContain("Northwind");
+    expect(admin.text).not.toContain(OWNER_WHY);
   });
 
   it("allows the owner and keeps the response private", async () => {
@@ -110,6 +113,7 @@ describe("owners suite access", () => {
     expect(body.data.cashWeek.amount).toBe(4280);
     expect(body.data.businesses).toHaveLength(6);
     expect(body.source).toBe("fixture");
+    expect(body.why).toBe(OWNER_WHY);
     expect(api.text).not.toContain("BEGIN PRIVATE KEY");
 
     const session = await fetch(`${baseUrl}/api/owners/session`, {
@@ -124,6 +128,7 @@ describe("owners suite access", () => {
     expect(page.response.status).toBe(200);
     expect(page.text).toContain('name="robots" content="noindex, nofollow"');
     expect(page.text).not.toContain("4280");
+    expect(page.text).not.toContain(OWNER_WHY);
   });
 
   it("denies the owner when OWNER_EMAILS is missing", async () => {
@@ -137,6 +142,7 @@ describe("owners suite access", () => {
     const fixture = await read("/api/owners/suite", { Authorization: `Bearer ${OWNER_FIXTURE_BEARER}` });
     expect(api.response.status).toBe(404);
     expect(fixture.response.status).toBe(404);
+    expect(api.text).not.toContain(OWNER_WHY);
   });
 
   it("does not honor a session cookie for someone off the allowlist", async () => {
@@ -156,6 +162,7 @@ describe("owners suite access", () => {
     const page = fs.readFileSync("client/pages/OwnersSuite.tsx", "utf8");
     expect(page).not.toContain("1vHkdHRhAWKcnsv8");
     expect(page).not.toContain("4280");
+    expect(page).not.toContain(OWNER_WHY);
     const vercel = JSON.parse(fs.readFileSync("vercel.json", "utf8")) as {
       rewrites: Array<{ source: string; destination: string }>;
     };

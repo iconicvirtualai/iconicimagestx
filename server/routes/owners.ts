@@ -15,6 +15,7 @@ import {
   ownerSessionSecret,
 } from "../services/ownerGate";
 import { loadOwnerSuite } from "../services/ownerSheets";
+import { OWNER_WHY } from "../services/ownerWhy";
 
 const NOT_FOUND = { error: "Not found" };
 
@@ -42,7 +43,7 @@ async function handleSuite(req: Request, res: Response) {
   if (!owner) return res.status(404).json(NOT_FOUND);
   const fresh = req.query.fresh === "1";
   const payload = await loadOwnerSuite({ fresh });
-  return res.status(200).json(payload);
+  return res.status(200).json({ ...payload, why: OWNER_WHY });
 }
 
 async function handleSession(req: Request, res: Response) {
