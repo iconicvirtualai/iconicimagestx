@@ -16785,10 +16785,6 @@ router$1.get("/presentations/:token", async (req, res) => {
     return res.status(500).json({ error: "This presentation could not be opened." });
   }
 });
-router$1.get("/presentations/shell/:token", async (req, res) => {
-  const rendered = await renderPresentationShell(String(req.params.token || ""), originOf(req));
-  res.status(rendered.status).type("html").send(rendered.html);
-});
 async function renderPresentationShell(token, origin) {
   if (!isPresentationToken(token)) {
     return { status: 400, html: "<!doctype html><title>Presentation</title><p>That presentation link is not valid.</p>" };
@@ -16806,6 +16802,11 @@ async function renderPresentationShell(token, origin) {
     return { status: 500, html: "<!doctype html><title>Presentation</title><p>This presentation could not be opened.</p>" };
   }
 }
+const handlePresentationShell = async (req, res) => {
+  const rendered = await renderPresentationShell(String(req.params.token || ""), originOf(req));
+  res.status(rendered.status).type("html").send(rendered.html);
+};
+router$1.get("/presentations/shell/:token", handlePresentationShell);
 router$1.post("/listings/:id/presentation", requireStaff, async (req, res) => {
   const listingId = String(req.params.id || "");
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
@@ -18264,10 +18265,9 @@ function createServer() {
   app.use("/api/clients", router$g);
   app.get("/api/portal/listings/:id", handleGetPublicPortalListing);
   app.use("/api/staff", router$f);
-  app.get("/present/:token", async (req, res, next) => {
+  app.get("/present/:token", (req, res, next) => {
     if (process.env.ICONIC_VITE_DEV === "1") return next();
-    const rendered = await renderPresentationShell(String(req.params.token || ""), originOf(req));
-    res.status(rendered.status).type("html").send(rendered.html);
+    return handlePresentationShell(req, res);
   });
   app.use("/api", router$1);
   app.use("/api/listings", router$e);
