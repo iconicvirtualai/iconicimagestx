@@ -17,29 +17,34 @@ import {
   invoiceDraftFromProject,
   projectInvoiceButtonLabel,
 } from "@shared/orderProjectInvoice";
-import { ensureLinkedInvoice, resolveLinkedInvoice } from "@/lib/orderProjectInvoice";
+import { ensureLinkedInvoice } from "@/lib/orderProjectInvoice";
+import { readProjectSurface } from "@/lib/projectSurfaceRead";
 import { addressText, recordAddressText } from "@shared/addressText";
 import { calendarDateKey, formatChicagoDate } from "@shared/clientHome";
 import { lockDownloadsOn, requirePaymentOn } from "@shared/paymentAccess";
 import { staffInvoicePath } from "@shared/staffInvoice";
+import { projectStatusLabel, projectSurfaceStatus, type ProjectSurface } from "@shared/projectSurfaceStatus";
 import { PresentationShareButton, PresentationSharePanel } from "@/components/PresentationSharePanel";
 import { PhotoEditRequestStaff } from "@/components/PhotoEditRequestStaff";
 
 // ─── Status systems ───────────────────────────────────────────────────────────
-const RE_STATUSES = ["unscheduled", "scheduled", "in_progress", "delivered", "paid", "archived"];
-const BIZ_STATUSES = ["unscheduled", "consult_scheduled", "appt_scheduled", "in_progress", "delivered", "paid", "archived"];
-
-const STATUS_LABELS: Record<string, string> = {
-  unscheduled: "Unscheduled", scheduled: "Scheduled", in_progress: "In Progress",
-  delivered: "Delivered", paid: "Paid", archived: "Archived",
-  consult_scheduled: "Consult Scheduled", appt_scheduled: "Appt Scheduled",
-};
+const RE_STATUSES = ["unscheduled", "scheduled", "in_progress", "delivered", "paid", "archived", "cancelled"];
+const BIZ_STATUSES = ["unscheduled", "consult_scheduled", "appt_scheduled", "in_progress", "delivered", "paid", "archived", "cancelled"];
 
 const STATUS_BADGE: Record<string, string> = {
   unscheduled: "bg-red-100 text-red-700", scheduled: "bg-green-100 text-green-700",
   in_progress: "bg-blue-100 text-blue-700", delivered: "bg-sky-100 text-sky-700",
   paid: "bg-teal-100 text-teal-700", archived: "bg-gray-100 text-gray-400",
   consult_scheduled: "bg-orange-100 text-orange-700", appt_scheduled: "bg-green-100 text-green-700",
+  cancelled: "bg-red-100 text-red-700",
+};
+
+const PAYMENT_BADGE: Record<string, string> = {
+  paid: "bg-teal-100 text-teal-700",
+  partial: "bg-amber-100 text-amber-800",
+  unpaid: "bg-orange-100 text-orange-700",
+  no_invoice: "bg-gray-100 text-gray-500",
+  pending: "bg-gray-100 text-gray-400",
 };
 
 // ─── Tab configs ──────────────────────────────────────────────────────────────
@@ -280,9 +285,8 @@ export default function AdminListingFile({
   const [tourInput, setTourInput] = React.useState("");
   const editingInfoRef = React.useRef(false);
   editingInfoRef.current = editingInfo;
-  const [linkedOrder, setLinkedOrder] = React.useState<any>(null);
-  const [linkedInvoice, setLinkedInvoice] = React.useState<any>(null);
-  const [invoicePhase, setInvoicePhase] = React.useState<"loading" | "missing" | "linked">("loading");
+  const [loadedSurface, setLoadedSurface] = React.useState<ProjectSurface | null>(null);
+  const [billingPhase, setBillingPhase] = React.useState<"loading" | "ready" | "error">("loading");
   const [invoiceBusy, setInvoiceBusy] = React.useState(false);
 
   // Live listener
@@ -308,56 +312,34 @@ export default function AdminListingFile({
   }, [id, navigate]);
 
   React.useEffect(() => {
-    setInvoicePhase("loading");
-    setLinkedInvoice(null);
-    setLinkedOrder(null);
+    setBillingPhase("loading");
+    setLoadedSurface(null);
   }, [id]);
 
   React.useEffect(() => {
     if (!project?.id || project.id !== id) return;
     let cancel = false;
-    (async () => {
-      let order: any = null;
-      const orderRequestId = typeof project.orderRequestId === "string" ? project.orderRequestId : "";
-      if (orderRequestId) {
-        try {
-          const snap = await getDoc(doc(db, "orderRequests", orderRequestId));
-          if (snap.exists()) order = { id: snap.id, ...snap.data() };
-        } catch (err) {
-          console.error("[AdminListingFile] Order lookup failed.", err);
-        }
-      }
-      if (cancel) return;
-      setLinkedOrder(order);
-      const anchor = {
-        orderRequestId: orderRequestId || null,
-        orderId: project.orderId || order?.convertedToOrderId || order?.orderId || null,
-        listingId: project.id,
-        orderInvoiceId: order?.invoiceId,
-        listingInvoiceId: project.invoiceId,
-      };
-      try {
-        const invoiceId = await resolveLinkedInvoice(anchor);
+    readProjectSurface(project)
+      .then((surface) => {
         if (cancel) return;
-        if (!invoiceId) {
-          setLinkedInvoice(null);
-          setInvoicePhase("missing");
-          return;
-        }
-        const invoiceSnap = await getDoc(doc(db, "invoices", invoiceId));
-        if (cancel) return;
-        setLinkedInvoice(invoiceSnap.exists() ? { id: invoiceSnap.id, ...invoiceSnap.data() } : { id: invoiceId });
-        setInvoicePhase("linked");
-      } catch (err) {
+        setLoadedSurface(surface);
+        setBillingPhase("ready");
+      })
+      .catch((err) => {
         console.error("[AdminListingFile] Invoice lookup failed.", err);
         if (cancel) return;
-        const stored = typeof project.invoiceId === "string" ? project.invoiceId.trim() : "";
-        setLinkedInvoice(stored ? { id: stored } : null);
-        setInvoicePhase(stored ? "linked" : "missing");
-      }
-    })();
+        setLoadedSurface(null);
+        setBillingPhase("error");
+      });
     return () => { cancel = true; };
-  }, [id, project?.id, project?.orderRequestId, project?.invoiceId, project?.orderId]);
+  }, [
+    id,
+    project?.id,
+    project?.orderRequestId,
+    project?.orderId,
+    project?.invoiceId,
+    project?.invoice && typeof project.invoice === "object" ? (project.invoice as { id?: string }).id : "",
+  ]);
 
   // Auto-status logic
   React.useEffect(() => {
@@ -375,7 +357,7 @@ export default function AdminListingFile({
 
     if (newStatus && newStatus !== currentStatus) {
       updateDoc(doc(db, "listings", id), { status: newStatus, updatedAt: serverTimestamp() })
-        .then(() => toast.info(`Status auto-updated to ${STATUS_LABELS[newStatus!]}`))
+        .then(() => toast.info(`Status auto-updated to ${projectStatusLabel(newStatus)}`))
         .catch(console.error);
     }
   }, [project, id]);
@@ -392,7 +374,7 @@ export default function AdminListingFile({
       if (val === "delivered") statusData.deliveredAt = serverTimestamp();
       if (val === "paid") statusData.paidAt = serverTimestamp();
       await patch(statusData);
-      toast.success(`Status → ${STATUS_LABELS[val] ?? val}`);
+      toast.success(`Status → ${projectStatusLabel(val)}`);
     } catch { toast.error("Failed to update status"); }
     finally { setUpdating(false); }
   };
@@ -419,22 +401,26 @@ export default function AdminListingFile({
   };
 
   const handleManageInvoice = async () => {
-    if (!project?.id || invoicePhase === "loading") return;
+    if (!project?.id || billingPhase === "loading") return;
     setInvoiceBusy(true);
     try {
-      let order = linkedOrder;
-      const orderRequestId = typeof project.orderRequestId === "string" ? project.orderRequestId : "";
+      const orderRequest = loadedSurface?.orderRequest || null;
+      const confirmedOrder = loadedSurface?.order || null;
+      let order = orderRequest;
+      const orderRequestId = typeof order?.id === "string"
+        ? order.id
+        : (typeof project.orderRequestId === "string" ? project.orderRequestId : "");
       if (!order && orderRequestId) {
         const snap = await getDoc(doc(db, "orderRequests", orderRequestId));
         if (snap.exists()) order = { id: snap.id, ...snap.data() };
       }
       const invoiceId = await ensureLinkedInvoice({
         orderRequestId: orderRequestId || null,
-        orderId: project.orderId || order?.convertedToOrderId || order?.orderId || null,
+        orderId: project.orderId || confirmedOrder?.id || order?.convertedToOrderId || order?.orderId || null,
         listingId: project.id,
-        orderInvoiceId: order?.invoiceId || linkedInvoice?.id,
-        listingInvoiceId: project.invoiceId || linkedInvoice?.id,
-      }, order ? invoiceDraftFromOrder(order) : invoiceDraftFromProject(project));
+        orderInvoiceId: loadedSurface?.invoiceId || confirmedOrder?.invoiceId || order?.invoiceId,
+        listingInvoiceId: project.invoiceId || loadedSurface?.invoiceId,
+      }, order ? invoiceDraftFromOrder(order as Parameters<typeof invoiceDraftFromOrder>[0]) : invoiceDraftFromProject(project));
       navigate(staffInvoicePath(invoiceId));
     } catch (err) {
       console.error(err);
@@ -467,8 +453,19 @@ export default function AdminListingFile({
   const tabs = isRE ? RE_TABS : BIZ_TABS;
   const statuses = isRE ? RE_STATUSES : BIZ_STATUSES;
   const location = recordAddressText(project) || "—";
-  const badge = STATUS_BADGE[project.status] ?? "bg-gray-100 text-gray-500";
-  const badgeLabel = STATUS_LABELS[project.status] ?? project.status ?? "—";
+  const surface = projectSurfaceStatus({
+    listing: project,
+    order: loadedSurface?.order,
+    orderRequest: loadedSurface?.orderRequest,
+    invoices: billingPhase === "ready" && loadedSurface?.invoice ? [loadedSurface.invoice] : [],
+    pending: billingPhase !== "ready",
+  });
+  const badge = STATUS_BADGE[surface.projectStatus] ?? "bg-gray-100 text-gray-500";
+  const badgeLabel = surface.projectStatusLabel;
+  const paymentBadge = PAYMENT_BADGE[surface.payment] ?? PAYMENT_BADGE.pending;
+  const linkedOrder = surface.orderRequest || surface.order;
+  const linkedInvoice = surface.invoice;
+  const invoiceAttached = Boolean(surface.invoiceId);
   const images: any[] = project.images || [];
   const coverPhoto = images.length > 0 ? images[0].url : null;
 
@@ -488,6 +485,7 @@ export default function AdminListingFile({
             {isRE ? <><Home className="w-3 h-3 inline mr-1" />Real Estate</> : <><Building2 className="w-3 h-3 inline mr-1" />Business</>}
           </span>
           <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full ${badge}`}>{badgeLabel}</span>
+          <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full ${paymentBadge}`}>{surface.paymentLabel}</span>
         </div>
       </div>
 
@@ -552,7 +550,7 @@ export default function AdminListingFile({
                   disabled={updating || statusLocked}
                   className={`w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs font-black text-white focus:outline-none disabled:opacity-50 ${statusLocked ? "cursor-not-allowed" : ""}`}
                 >
-                  {statuses.map(s => <option key={s} value={s} className="text-black bg-white">{STATUS_LABELS[s]}</option>)}
+                  {statuses.map(s => <option key={s} value={s} className="text-black bg-white">{projectStatusLabel(s)}</option>)}
                 </select>
                 {statusLocked && <p className="text-[9px] text-gray-600 mt-1">Click lock to change</p>}
               </div>
@@ -872,42 +870,52 @@ export default function AdminListingFile({
             <h3 className={`${labelCls} mb-4`}>Order</h3>
             {linkedOrder ? (
               <div className="space-y-2 mb-3">
-                <p className="text-sm font-black text-black">{linkedOrder.clientName || project.clientName || "Client"}</p>
+                <p className="text-sm font-black text-black">{String(linkedOrder.clientName || project.clientName || "Client")}</p>
                 <p className="text-[10px] font-mono text-gray-400">#{String(linkedOrder.id).slice(0, 8)}</p>
                 <p className="text-xs font-bold text-gray-600">{String(linkedOrder.status || "new").replace(/_/g, " ")}</p>
-                <p className="text-sm font-black text-[#0d9488]">${Number(linkedOrder.total || linkedOrder.pricing?.total || 0).toLocaleString()}</p>
+                <p className="text-sm font-black text-[#0d9488]">${Number(linkedOrder.total || (linkedOrder.pricing as { total?: unknown } | undefined)?.total || 0).toLocaleString()}</p>
               </div>
-            ) : project.orderRequestId ? (
+            ) : project.orderRequestId || project.orderId ? (
               <p className="text-xs text-gray-400 mb-3">Order link saved.</p>
             ) : (
               <p className="text-xs text-gray-400 mb-3">No order linked. Invoice for this project is created here.</p>
             )}
-            {linkedOrder && (
-              <button type="button" onClick={() => navigate(`/admin/order-request/${linkedOrder.id}`)}
+            {surface.orderRequest?.id ? (
+              <button type="button" onClick={() => navigate(`/admin/order-request/${surface.orderRequest?.id}`)}
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-600 hover:bg-gray-50 transition-colors"
               >View Order</button>
-            )}
+            ) : surface.order?.id ? (
+              <button type="button" onClick={() => navigate(`/admin/order/${surface.order?.id}`)}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-600 hover:bg-gray-50 transition-colors"
+              >View Order</button>
+            ) : null}
           </div>
 
           {/* Invoice — same document as the order when this project came from one */}
           <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-5">
             <h3 className={`${labelCls} mb-4 flex items-center gap-2`}><CreditCard className="w-3.5 h-3.5" /> Invoice</h3>
-            {linkedInvoice ? (
+            {billingPhase === "error" ? (
+              <p className="text-xs text-gray-400 mb-3">Could not check the invoice.</p>
+            ) : surface.payment === "pending" ? (
+              <p className="text-xs text-gray-400 mb-3">Checking invoice…</p>
+            ) : linkedInvoice ? (
               <div className="mb-3">
                 <p className="text-xl font-black text-black">${Number(linkedInvoice.total ?? linkedInvoice.amountDue ?? project.total ?? 0).toLocaleString()}</p>
-                <p className="text-[10px] text-gray-400 uppercase tracking-widest">{linkedInvoice.status || "Draft"}</p>
-                {linkedInvoice.invoiceNumber && <p className="text-[10px] font-mono text-gray-400 mt-1">{linkedInvoice.invoiceNumber}</p>}
+                <p className="text-[10px] text-gray-400 uppercase tracking-widest">{surface.paymentLabel}</p>
+                {linkedInvoice.invoiceNumber && <p className="text-[10px] font-mono text-gray-400 mt-1">{String(linkedInvoice.invoiceNumber)}</p>}
               </div>
+            ) : surface.invoiceId ? (
+              <p className="text-xs text-gray-400 mb-3">Linked invoice {surface.invoiceId} was not found. {surface.paymentLabel}.</p>
             ) : (
-              <p className="text-xs text-gray-400 mb-3">{invoicePhase === "loading" ? "Checking invoice…" : "No invoice yet."}</p>
+              <p className="text-xs text-gray-400 mb-3">No invoice yet.</p>
             )}
             <button
               type="button"
               onClick={handleManageInvoice}
-              disabled={invoiceBusy || invoicePhase === "loading"}
+              disabled={invoiceBusy || billingPhase === "loading"}
               className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
             >
-              {invoiceBusy ? "Opening..." : invoicePhase === "loading" ? "Invoice…" : projectInvoiceButtonLabel(invoicePhase === "linked")}
+              {invoiceBusy ? "Opening..." : billingPhase === "loading" ? "Invoice…" : projectInvoiceButtonLabel(invoiceAttached && billingPhase === "ready")}
             </button>
           </div>
         </div>

@@ -24,9 +24,10 @@ import {
   listingStatusChips,
   type ListingQueueId,
 } from "@/lib/staffListQueue";
-import { loadAdminListingPrices } from "@/lib/listingPriceLookup";
+import { loadAdminListingBilling } from "@/lib/listingPriceLookup";
 import { buildAdminOrderTile, type AdminStudioId } from "@shared/adminOrderTile";
-import { listingPriceLabel, listingPriceLookupKey, type ListingPriceIndex } from "@shared/listingPrice";
+import { emptyListingPriceIndex, listingBillingLookupKey, listingPriceLabel, type ListingPriceIndex } from "@shared/listingPrice";
+import { billingPoolFromPriceIndex, buildBillingIndex, projectSurfaceForListing } from "@shared/projectSurfaceStatus";
 import { AdminOrderTile } from "@/components/admin/AdminOrderTile";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -163,6 +164,8 @@ export default function AdminListings() {
   const navigate = useNavigate();
   const [projects, setProjects] = React.useState<Project[]>([]);
   const [priceIndex, setPriceIndex] = React.useState<ListingPriceIndex | null>(null);
+  const [billingReady, setBillingReady] = React.useState(false);
+  const [billingFailed, setBillingFailed] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<string[]>(["in_progress"]);
@@ -231,29 +234,37 @@ export default function AdminListings() {
 
   const listingsRef = React.useRef(projects);
   listingsRef.current = projects;
-  const priceKey = React.useMemo(
-    () => listingPriceLookupKey(projects as unknown as Record<string, unknown>[]),
+  const billingKey = React.useMemo(
+    () => listingBillingLookupKey(projects as unknown as Record<string, unknown>[]),
     [projects],
   );
 
   React.useEffect(() => {
     const listings = listingsRef.current as unknown as Record<string, unknown>[];
-    if (!priceKey) {
-      setPriceIndex(null);
+    if (!billingKey) {
+      setPriceIndex(emptyListingPriceIndex());
+      setBillingReady(true);
+      setBillingFailed(false);
       return;
     }
     let cancelled = false;
-    loadAdminListingPrices(listings)
+    loadAdminListingBilling(listings)
       .then((index) => {
-        if (!cancelled) setPriceIndex(index);
+        if (cancelled) return;
+        setPriceIndex(index);
+        setBillingReady(true);
+        setBillingFailed(false);
       })
       .catch((err) => {
-        console.error("[Listings] Price lookup failed.", err);
+        console.error("[Listings] Billing lookup failed.", err);
+        if (cancelled) return;
+        setBillingFailed(true);
+        setBillingReady(true);
       });
     return () => {
       cancelled = true;
     };
-  }, [priceKey]);
+  }, [billingKey]);
 
   // Load clients + staff + services when modal opens
   React.useEffect(() => {
@@ -303,6 +314,10 @@ export default function AdminListings() {
       .catch(console.error);
   }, []);
 
+  const billingIndex = React.useMemo(
+    () => buildBillingIndex(billingPoolFromPriceIndex(priceIndex)),
+    [priceIndex],
+  );
   const form = projectType === "real_estate" ? reForm : bizForm;
 
   const handleClientSearch = (val: string) => {
@@ -826,6 +841,9 @@ export default function AdminListings() {
               ...buildAdminOrderTile(record),
               priceLabel: listingPriceLabel(record, priceIndex),
             };
+            const surface = projectSurfaceForListing(record, billingIndex, {
+              pending: !billingReady || billingFailed,
+            });
             const setStudio = async (studio: AdminStudioId) => {
               try {
                 await updateDoc(doc(db, "listings", p.id), { studio, updatedAt: serverTimestamp() });
@@ -839,6 +857,7 @@ export default function AdminListings() {
               <div key={p.id} className="min-w-0">
                 <AdminOrderTile
                   order={order}
+                  surface={surface}
                   selected={selection.has(p.id)}
                   onOpen={() => navigate(`/admin/listing/${p.id}`)}
                   onToggleSelect={() => toggleSelect(p.id)}

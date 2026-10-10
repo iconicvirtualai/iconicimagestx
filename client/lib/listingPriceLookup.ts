@@ -6,6 +6,7 @@
 import { collection, documentId, getDocs, query, where, type QueryDocumentSnapshot } from "firebase/firestore";
 import {
   chunkIds,
+  loadListingBillingIndex,
   loadListingPriceIndex,
   type ListingPriceCollection,
   type ListingPriceDoc,
@@ -41,4 +42,9 @@ export const firestoreListingPriceReader: ListingPriceReader = {
 
 export function loadAdminListingPrices(listings: Record<string, unknown>[]) {
   return loadListingPriceIndex(listings, firestoreListingPriceReader);
+}
+
+/** Price fallback and project status share this one batched read. */
+export function loadAdminListingBilling(listings: Record<string, unknown>[]) {
+  return loadListingBillingIndex(listings, firestoreListingPriceReader);
 }

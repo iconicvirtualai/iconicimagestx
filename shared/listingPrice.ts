@@ -92,6 +92,20 @@ export function listingPriceLookupKey(listings: Record<string, unknown>[]): stri
     .join("|");
 }
 
+/** Changes when any listing's order or invoice link changes, priced or not. */
+export function listingBillingLookupKey(listings: Record<string, unknown>[]): string {
+  return listings
+    .map((listing) => [
+      docId(listing),
+      ...orderIdsOf(listing),
+      ...requestIdsOf(listing),
+      ...invoiceIdsOf(listing),
+      embeddedInvoiceId(listing),
+    ].join(":"))
+    .sort()
+    .join("|");
+}
+
 export function chunkIds<T>(values: T[], size = LISTING_PRICE_QUERY_CHUNK): T[][] {
   const chunks: T[][] = [];
   const step = size > 0 ? size : LISTING_PRICE_QUERY_CHUNK;
@@ -132,6 +146,25 @@ export async function loadListingPriceIndex(
   return index;
 }
 
+/**
+ * One batched read of orders, requests, and invoices for every listing.
+ * The grid uses this same index for the price fallback and for paid status.
+ * Rows that already show a catalog price are included, because paid status
+ * still comes from the linked invoice.
+ */
+export async function loadListingBillingIndex(
+  listings: Record<string, unknown>[],
+  reader: ListingPriceReader,
+): Promise<ListingPriceIndex> {
+  const index = emptyListingPriceIndex();
+  if (listings.length === 0) return index;
+  await readKnownIds(index, reader, listings);
+  await readInvoiceIdsFromOrders(index, reader, listings);
+  await readByLink(index, reader, listings);
+  await readEmbeddedInvoiceIds(index, reader, listings);
+  return index;
+}
+
 async function readKnownIds(
   index: ListingPriceIndex,
   reader: ListingPriceReader,
@@ -154,6 +187,15 @@ async function readInvoiceIdsFromOrders(
     const order = orderForListing(listing, index);
     return order ? invoiceIdsOf(order) : [];
   })).filter((id) => !index.invoices.has(id));
+  remember(index, [], [], await readIds(reader, "invoices", ids));
+}
+
+async function readEmbeddedInvoiceIds(
+  index: ListingPriceIndex,
+  reader: ListingPriceReader,
+  listings: Record<string, unknown>[],
+) {
+  const ids = unique(listings.map(embeddedInvoiceId)).filter((id) => !index.invoices.has(id));
   remember(index, [], [], await readIds(reader, "invoices", ids));
 }
 
@@ -318,6 +360,10 @@ function requestIdsOf(record: Record<string, unknown>): string[] {
 
 function invoiceIdsOf(record: Record<string, unknown>): string[] {
   return unique([text(record.invoiceId)]);
+}
+
+function embeddedInvoiceId(record: Record<string, unknown>): string {
+  return text(nestedRecord(record.invoice)?.id);
 }
 
 function docId(record: Record<string, unknown>): string {

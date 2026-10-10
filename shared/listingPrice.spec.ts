@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { packagePriceDisplay, resolvePackageSkin } from "./packageSkins.ts";
+import { billingPoolFromPriceIndex, buildBillingIndex, projectSurfaceForListing } from "./projectSurfaceStatus.ts";
 import {
   chunkIds,
   formatAdminMoney,
   listingPriceLabel,
+  listingBillingLookupKey,
   listingPriceLookupKey,
+  loadListingBillingIndex,
   loadListingPriceIndex,
   resolveListingPriceLabel,
   type ListingPriceDoc,
@@ -176,5 +179,37 @@ describe("listing price lookup", () => {
     expect(byField).not.toHaveBeenCalled();
     expect(listingPriceLabel({ id: "priced", serviceIds: ["listing-showcase"], total: 549 }, index))
       .toBe(packagePriceDisplay(resolvePackageSkin("listing-showcase")!));
+  });
+});
+
+describe("one billing load for price and paid status", () => {
+  it("reads orders and invoices once and feeds both the price and the status helper", async () => {
+    const priced = {
+      id: "priced",
+      serviceIds: ["listing-showcase"],
+      status: "cancelled",
+      invoice: { id: "inv_paid", status: "draft" },
+    };
+    const custom = { id: "14793", services: ["Custom"], status: "delivered", orderId: "order9" };
+    const { reader, calls } = memoryReader({
+      orders: [{ id: "order9", listingId: "14793", total: 0, invoiceId: "inv_draft" }],
+      invoices: [
+        { id: "inv_paid", status: "paid", total: 549, amountPaid: 549, listingId: "priced" },
+        { id: "inv_draft", status: "draft", total: 320, amountPaid: 0, orderId: "order9" },
+      ],
+    });
+
+    const index = await loadListingBillingIndex([priced, custom], reader);
+    expect(listingPriceLabel(priced, index)).toBe(packagePriceDisplay(resolvePackageSkin("listing-showcase")!));
+    expect(listingPriceLabel(custom, index)).toBe(formatAdminMoney(320));
+
+    const surface = projectSurfaceForListing(priced, buildBillingIndex(billingPoolFromPriceIndex(index)));
+    expect(surface.invoiceId).toBe("inv_paid");
+    expect(surface.payment).toBe("paid");
+    expect(surface.chips.map((chip) => chip.label)).toEqual(["Cancelled", "Paid"]);
+    expect(index.invoices.has("inv_paid")).toBe(true);
+    expect(calls.filter((call) => call.startsWith("field:invoices:listingId:"))).toHaveLength(1);
+    expect(calls.filter((call) => call.includes("inv_paid"))).toHaveLength(0);
+    expect(listingBillingLookupKey([priced])).toContain("inv_paid");
   });
 });
