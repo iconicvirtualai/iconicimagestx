@@ -159,6 +159,55 @@ describe("owners suite access", () => {
     expect(api.response.status).toBe(404);
   });
 
+  it("rewrites owner pages to the API function before the SPA fallback and 404s when signed out", async () => {
+    const vercel = JSON.parse(fs.readFileSync("vercel.json", "utf8")) as {
+      functions: Record<string, unknown>;
+      rewrites: Array<{ source: string; destination: string }>;
+    };
+    // api/index.mjs is the only API function. /api/(.*) is what invokes it.
+    // /api/owners/page is not a function file, so a rewrite there never runs
+    // and the SPA catch-all serves index.html.
+    expect(vercel.functions["api/index.mjs"]).toBeTruthy();
+    expect(fs.existsSync("api/owners/page.mjs")).toBe(false);
+    expect(fs.existsSync("api/owners/page.js")).toBe(false);
+    const apiEntry = vercel.rewrites.find((rule) => rule.source === "/api/(.*)");
+    expect(apiEntry?.destination).toBe("/api/index");
+    const spa = vercel.rewrites.findIndex((rule) => rule.destination === "/index.html");
+    expect(spa).toBeGreaterThanOrEqual(0);
+    const ownerRewrites = ["/owners", "/owners/", "/admin/owners", "/admin/owners/"].map((source) => {
+      const index = vercel.rewrites.findIndex((rule) => rule.source === source);
+      return {
+        source,
+        destination: vercel.rewrites[index]?.destination ?? null,
+        beforeSpa: index >= 0 && index < spa,
+      };
+    });
+    expect(ownerRewrites).toEqual([
+      { source: "/owners", destination: "/api/index", beforeSpa: true },
+      { source: "/owners/", destination: "/api/index", beforeSpa: true },
+      { source: "/admin/owners", destination: "/api/index", beforeSpa: true },
+      { source: "/admin/owners/", destination: "/api/index", beforeSpa: true },
+    ]);
+    expect(vercel.rewrites.some((rule) => rule.destination === "/api/owners/page")).toBe(false);
+
+    allowOwnerFixtures();
+    const signedOut = [];
+    for (const path of ["/owners", "/admin/owners"]) {
+      const hit = await read(path);
+      signedOut.push({
+        path,
+        status: hit.response.status,
+        notFound: hit.text.includes("Page not found"),
+        noindex: hit.response.headers.get("x-robots-tag")?.includes("noindex") ?? false,
+        leaksWhy: hit.text.includes(OWNER_WHY),
+      });
+    }
+    expect(signedOut).toEqual([
+      { path: "/owners", status: 404, notFound: true, noindex: true, leaksWhy: false },
+      { path: "/admin/owners", status: 404, notFound: true, noindex: true, leaksWhy: false },
+    ]);
+  });
+
   it("keeps the route out of the staff shell and ahead of the public SPA rewrite", () => {
     const app = fs.readFileSync("client/App.tsx", "utf8");
     const ownersLine = app.split("\n").find((line) => line.includes('path="/admin/owners"'));
