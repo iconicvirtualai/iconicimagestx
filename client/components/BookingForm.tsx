@@ -686,22 +686,22 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
             className="space-y-8"
           >
             <div className="text-center space-y-3">
-              <h2 className="text-2xl font-black text-black tracking-tight uppercase">Select your Campaign Tier</h2>
-              <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">Choose the level of impact for your presence</p>
+              <h2 className="text-2xl font-black text-black tracking-tight uppercase [overflow-wrap:normal] [word-break:normal]">Select your Campaign Tier</h2>
+              <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wide sm:tracking-widest [overflow-wrap:normal] [word-break:normal]">Choose the level of impact for your presence</p>
             </div>
 
             {/* Basics Toggle */}
             <div className="flex flex-col items-center gap-3">
-              <div className="flex items-center gap-3 bg-gray-50 p-1.5 rounded-full border border-gray-100">
+              <div className="flex max-w-full flex-wrap items-center justify-center gap-2 rounded-3xl bg-gray-50 p-1.5 border border-gray-100 sm:flex-nowrap sm:rounded-full sm:gap-3">
                  <button 
                   onClick={() => setShowBasics(false)}
-                  className={`px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${!showBasics ? 'bg-black text-white' : 'text-gray-400 hover:text-black'}`}
+                  className={`shrink-0 whitespace-nowrap px-4 sm:px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-wide sm:tracking-widest transition-all [overflow-wrap:normal] [word-break:normal] ${!showBasics ? 'bg-black text-white' : 'text-gray-400 hover:text-black'}`}
                  >
                    Campaign Tiers
                  </button>
                  <button 
                   onClick={() => setShowBasics(true)}
-                  className={`px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${showBasics ? 'bg-black text-white' : 'text-gray-400 hover:text-black'}`}
+                  className={`shrink-0 whitespace-nowrap px-4 sm:px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-wide sm:tracking-widest transition-all [overflow-wrap:normal] [word-break:normal] ${showBasics ? 'bg-black text-white' : 'text-gray-400 hover:text-black'}`}
                  >
                    The Basics (Photos-Only)
                  </button>
@@ -718,17 +718,17 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                   <div key={cat} className="space-y-3">
                     <button 
                       onClick={() => toggleCategory(cat)}
-                      className="w-full flex items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl hover:bg-gray-50 transition-all shadow-sm"
+                      className="w-full flex items-center justify-between gap-3 p-4 bg-white border border-gray-100 rounded-2xl hover:bg-gray-50 transition-all shadow-sm"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600">
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <div className="w-8 h-8 shrink-0 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600">
                            {cat === "listings" && <Camera className="w-4 h-4" />}
                            {cat === "branding" && <Users className="w-4 h-4" />}
                            {cat === "business" && <Zap className="w-4 h-4" />}
                            {cat === "growth" && <Star className="w-4 h-4" />}
                            {cat === "studio" && <Boxes className="w-4 h-4" />}
                         </div>
-                        <h3 className="text-sm font-black uppercase tracking-widest text-black">
+                        <h3 className="min-w-0 text-left text-sm font-black uppercase tracking-wide text-black sm:tracking-widest [overflow-wrap:normal] [word-break:normal]">
                           {cat === "listings" && "Listings & Spaces"}
                           {cat === "branding" && "The Human Brand"}
                           {cat === "business" && "Social Monopoly"}
@@ -736,7 +736,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                           {cat === "studio" && "Studio 105"}
                         </h3>
                       </div>
-                      {expandedCategories.includes(cat) ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                      {expandedCategories.includes(cat) ? <ChevronUp className="w-4 h-4 shrink-0 text-gray-400" /> : <ChevronDown className="w-4 h-4 shrink-0 text-gray-400" />}
                     </button>
 
                     <AnimatePresence>
