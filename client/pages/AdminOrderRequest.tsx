@@ -1,6 +1,7 @@
 import * as React from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
+import { MoneyAmount } from "@/components/MoneyAmount";
 import { Button } from "@/components/ui/button";
 import {
   ChevronLeft, Edit3, Save, Calendar, Archive,
@@ -481,17 +482,17 @@ export default function AdminOrderRequest() {
                   </div>
                 ))}
                 <button onClick={() => setForm(function(f){ return {...f, lineItems: [...(f.lineItems||[]), {name:"",price:0}]}; })} className="text-[#0d9488] text-xs font-bold mt-2">+ Add Service</button>
-                <div className="border-t border-white/20 pt-3 mt-3 flex justify-between">
-                  <span className="text-lg font-black text-white">Total</span>
-                  <span className="text-lg font-black text-[#0d9488]">{fmtCurrency((form.lineItems||[]).reduce(function(s,x){return s+(Number(x.price)||0)},0))}</span>
+                <div className="border-t border-white/20 pt-3 mt-3 flex items-baseline justify-between gap-3">
+                  <span className="min-w-0 text-lg font-black text-white">Total</span>
+                  <MoneyAmount className="text-lg font-black text-[#0d9488]">{fmtCurrency((form.lineItems||[]).reduce(function(s,x){return s+(Number(x.price)||0)},0))}</MoneyAmount>
                 </div>
               </div>
             ) : lineItems.length > 0 ? (
               <div className="mt-1 bg-gray-50 border border-gray-100 rounded-2xl overflow-hidden">
                 {lineItems.map((li: any, i: number) => (
-                  <div key={i} className={`flex justify-between items-center px-4 py-3 ${i > 0 ? "border-t border-gray-200/50" : ""}`}>
-                    <span className="text-sm font-bold text-gray-900">{li.name || safe(li)}</span>
-                    {li.price != null && <span className="text-sm font-black text-[#0d9488]">{fmtCurrency(li.price)}</span>}
+                  <div key={i} className={`flex items-baseline justify-between gap-3 px-4 py-3 ${i > 0 ? "border-t border-gray-200/50" : ""}`}>
+                    <span className="min-w-0 text-sm font-bold text-gray-900">{li.name || safe(li)}</span>
+                    {li.price != null && <MoneyAmount className="text-sm font-black text-[#0d9488]">{fmtCurrency(li.price)}</MoneyAmount>}
                   </div>
                 ))}
                 {order.lifeOfTheListingCare === true && (
@@ -501,14 +502,14 @@ export default function AdminOrderRequest() {
                   </div>
                 )}
                 {extraPromo > 0 && (
-                  <div className="flex justify-between items-center px-4 py-3 border-t border-gray-200/50 bg-green-50/50">
-                    <span className="text-sm font-bold text-gray-500 italic">Promo ({order.promoCode})</span>
-                    <span className="text-sm font-bold text-green-600">-{fmtCurrency(extraPromo)}</span>
+                  <div className="flex items-baseline justify-between gap-3 px-4 py-3 border-t border-gray-200/50 bg-green-50/50">
+                    <span className="min-w-0 text-sm font-bold text-gray-500 italic">Promo ({order.promoCode})</span>
+                    <MoneyAmount className="text-sm font-bold text-green-600">-{fmtCurrency(extraPromo)}</MoneyAmount>
                   </div>
                 )}
-                <div className="bg-white border-t border-gray-200 px-4 py-4 flex justify-between items-center">
-                  <span className="text-base font-black uppercase tracking-tight">Total Amount</span>
-                  <span className="text-xl font-black text-black">{fmtCurrency(orderTotal)}</span>
+                <div className="bg-white border-t border-gray-200 px-4 py-4 flex items-baseline justify-between gap-3">
+                  <span className="min-w-0 text-base font-black uppercase tracking-tight">Total Amount</span>
+                  <MoneyAmount className="text-xl font-black text-black">{fmtCurrency(orderTotal)}</MoneyAmount>
                 </div>
               </div>
             ) : (
@@ -542,9 +543,9 @@ export default function AdminOrderRequest() {
             {lineItems.length > 0 && (
               <div className="space-y-2 mb-4">
                 {lineItems.map((li: any, i: number) => (
-                  <div key={i} className="flex justify-between text-sm">
-                    <span className="text-gray-300 font-medium">{li.name || safe(li)}</span>
-                    {li.price != null && <span className="font-bold">{fmtCurrency(li.price)}</span>}
+                  <div key={i} className="flex items-baseline justify-between gap-3 text-sm">
+                    <span className="min-w-0 text-gray-300 font-medium">{li.name || safe(li)}</span>
+                    {li.price != null && <MoneyAmount className="font-bold">{fmtCurrency(li.price)}</MoneyAmount>}
                   </div>
                 ))}
                 {order.lifeOfTheListingCare === true && (
@@ -556,15 +557,15 @@ export default function AdminOrderRequest() {
               </div>
             )}
             {extraPromo > 0 && (
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-gray-400">Promo</span>
-                <span className="text-green-600 font-bold">-{fmtCurrency(extraPromo)}</span>
+              <div className="flex items-baseline justify-between gap-3 text-sm mb-2">
+                <span className="min-w-0 text-gray-400">Promo</span>
+                <MoneyAmount className="text-green-600 font-bold">-{fmtCurrency(extraPromo)}</MoneyAmount>
               </div>
             )}
             <div className="border-t border-gray-100 pt-3 mt-2">
-              <div className="flex justify-between text-lg">
-                <span className="font-black text-white">Total</span>
-                <span className="font-black text-[#0d9488]">{fmtCurrency(orderTotal)}</span>
+              <div className="flex items-baseline justify-between gap-3 text-lg">
+                <span className="min-w-0 font-black text-white">Total</span>
+                <MoneyAmount className="font-black text-[#0d9488]">{fmtCurrency(orderTotal)}</MoneyAmount>
               </div>
             </div>
             <div className="mt-4 pt-4 border-t border-gray-100 space-y-2 text-xs">

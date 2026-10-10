@@ -6,6 +6,7 @@ import { deliverInvoiceEmail } from "@/lib/deliverInvoice";
 import { staffInvoicePath } from "@shared/staffInvoice";
 import { formatChicagoDate } from "@shared/clientHome";
 import { Search, DollarSign, Send, Eye, Plus, FileText, ChevronDown, Download } from "lucide-react";
+import { MoneyAmount } from "@/components/MoneyAmount";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, addDoc, serverTimestamp, updateDoc, doc } from "firebase/firestore";
@@ -156,20 +157,20 @@ export default function AdminClientBilling() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <p className={labelCls}>Total Invoiced</p>
-          <p className="text-xl font-black">{fmtCurrency(stats.total)}</p>
+          <MoneyAmount className="text-xl font-black">{fmtCurrency(stats.total)}</MoneyAmount>
           <p className="text-[10px] text-gray-400">{stats.count} invoices</p>
         </div>
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <p className={labelCls}>Collected</p>
-          <p className="text-xl font-black text-green-600">{fmtCurrency(stats.collected)}</p>
+          <MoneyAmount className="text-xl font-black text-green-600">{fmtCurrency(stats.collected)}</MoneyAmount>
         </div>
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <p className={labelCls}>Outstanding</p>
-          <p className="text-xl font-black text-orange-600">{fmtCurrency(stats.outstanding)}</p>
+          <MoneyAmount className="text-xl font-black text-orange-600">{fmtCurrency(stats.outstanding)}</MoneyAmount>
         </div>
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <p className={labelCls}>Overdue</p>
-          <p className="text-xl font-black text-red-600">{fmtCurrency(stats.overdue)}</p>
+          <MoneyAmount className="text-xl font-black text-red-600">{fmtCurrency(stats.overdue)}</MoneyAmount>
         </div>
       </div>
 
@@ -224,9 +225,9 @@ export default function AdminClientBilling() {
                       <p className="text-xs font-bold">{inv.clientName}</p>
                       <p className="text-[10px] text-gray-400">{inv.clientEmail}</p>
                     </td>
-                    <td className="py-3 px-4 text-xs font-bold text-right">{fmtCurrency(inv.total)}</td>
-                    <td className="py-3 px-4 text-xs text-right text-green-600">{inv.paid > 0 ? fmtCurrency(inv.paid) : "—"}</td>
-                    <td className="py-3 px-4 text-xs font-bold text-right">{inv.due > 0 ? fmtCurrency(inv.due) : "—"}</td>
+                    <td className="py-3 px-4 text-right text-xs font-bold"><MoneyAmount className="text-xs font-bold">{fmtCurrency(inv.total)}</MoneyAmount></td>
+                    <td className="py-3 px-4 text-right text-xs text-green-600">{inv.paid > 0 ? <MoneyAmount className="text-xs text-green-600">{fmtCurrency(inv.paid)}</MoneyAmount> : "—"}</td>
+                    <td className="py-3 px-4 text-right text-xs font-bold">{inv.due > 0 ? <MoneyAmount className="text-xs font-bold">{fmtCurrency(inv.due)}</MoneyAmount> : "—"}</td>
                     <td className="py-3 px-4"><span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${st.color}`}>{st.label}</span></td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
@@ -264,9 +265,9 @@ export default function AdminClientBilling() {
                 <button onClick={handleAddItem} className="text-xs font-bold text-[#0d9488] mt-1">+ Add Line Item</button>
               </div>
               <div><p className={`${labelCls} mb-1`}>Notes</p><textarea value={newInv.notes} onChange={e => setNewInv(f => ({...f, notes: e.target.value}))} rows={2} className={`${inputCls} resize-none`} /></div>
-              <div className="flex justify-between text-lg border-t pt-3">
-                <span className="font-black">Total</span>
-                <span className="font-black text-[#0d9488]">{fmtCurrency(newInv.items.reduce((s, i) => s + (Number(i.price) || 0), 0))}</span>
+              <div className="flex items-baseline justify-between gap-3 border-t pt-3 text-lg">
+                <span className="min-w-0 font-black">Total</span>
+                <MoneyAmount className="font-black text-[#0d9488]">{fmtCurrency(newInv.items.reduce((s, i) => s + (Number(i.price) || 0), 0))}</MoneyAmount>
               </div>
             </div>
             <div className="flex gap-3">

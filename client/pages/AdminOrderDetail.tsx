@@ -1,6 +1,7 @@
 import * as React from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
+import { MoneyAmount } from "@/components/MoneyAmount";
 import { Button } from "@/components/ui/button";
 import {
   ChevronLeft, Edit3, Check, X, Calendar, Clock, MapPin, User,
@@ -522,19 +523,19 @@ export default function AdminOrderDetail() {
               {svcList.length > 0 ? (
                 <div>
                   {svcList.map((s: any, i: number) => (
-                    <div key={i} className={`flex justify-between py-3 ${i > 0 ? "border-t border-gray-100" : ""}`}>
-                      <div>
+                    <div key={i} className={`flex items-baseline justify-between gap-3 py-3 ${i > 0 ? "border-t border-gray-100" : ""}`}>
+                      <div className="min-w-0">
                         <p className="text-sm font-bold">{typeof s === "string" ? s : s.name}</p>
                         {s.duration > 0 && <p className="text-[10px] text-gray-400">{s.duration} min</p>}
                       </div>
-                      <p className="text-sm font-black">{s.price ? fmtCurrency(s.price * (s.qty || 1)) : ""}</p>
+                      {s.price ? <MoneyAmount className="text-sm font-black">{fmtCurrency(s.price * (s.qty || 1))}</MoneyAmount> : null}
                     </div>
                   ))}
                   <div className="border-t-2 border-gray-200 mt-2 pt-3 space-y-1">
-                    <div className="flex justify-between text-sm"><span className="text-gray-400">Subtotal</span><span className="font-bold">{fmtCurrency(charges.subtotal || 0)}</span></div>
-                    {order.tax > 0 && <div className="flex justify-between text-sm"><span className="text-gray-400">Tax</span><span>{fmtCurrency(order.tax)}</span></div>}
-                    {order.discount > 0 && <div className="flex justify-between text-sm"><span className="text-gray-400">Discount</span><span className="text-green-600">-{fmtCurrency(order.discount)}</span></div>}
-                    <div className="flex justify-between text-lg mt-1"><span className="font-black">Total</span><span className="font-black text-[#0d9488]">{fmtCurrency(charges.total || 0)}</span></div>
+                    <div className="flex items-baseline justify-between gap-3 text-sm"><span className="min-w-0 text-gray-400">Subtotal</span><MoneyAmount className="font-bold">{fmtCurrency(charges.subtotal || 0)}</MoneyAmount></div>
+                    {order.tax > 0 && <div className="flex items-baseline justify-between gap-3 text-sm"><span className="min-w-0 text-gray-400">Tax</span><MoneyAmount>{fmtCurrency(order.tax)}</MoneyAmount></div>}
+                    {order.discount > 0 && <div className="flex items-baseline justify-between gap-3 text-sm"><span className="min-w-0 text-gray-400">Discount</span><MoneyAmount className="text-green-600">-{fmtCurrency(order.discount)}</MoneyAmount></div>}
+                    <div className="mt-1 flex items-baseline justify-between gap-3 text-lg"><span className="min-w-0 font-black">Total</span><MoneyAmount className="font-black text-[#0d9488]">{fmtCurrency(charges.total || 0)}</MoneyAmount></div>
                   </div>
                 </div>
               ) : (
@@ -620,7 +621,7 @@ export default function AdminOrderDetail() {
             {/* Quick invoice summary */}
             <div className="bg-black text-white rounded-2xl p-5">
               <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-3">Invoice</h3>
-              <p className="text-2xl font-black">{fmtCurrency(order.total || 0)}</p>
+              <MoneyAmount className="text-2xl font-black">{fmtCurrency(order.total || 0)}</MoneyAmount>
               <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-1">
                 {invoice.status === "paid" ? "Paid" : invoice.amountPaid > 0 ? `$${invoice.amountPaid} paid` : "Unpaid"}
               </p>
@@ -673,8 +674,8 @@ export default function AdminOrderDetail() {
                 <tr key={i} className="border-b border-gray-100">
                   <td className="py-3 text-sm font-bold">{typeof s === "string" ? s : s.name}</td>
                   <td className="py-3 text-sm text-right">{s.qty || 1}</td>
-                  <td className="py-3 text-sm text-right">{s.price ? fmtCurrency(s.price) : "—"}</td>
-                  <td className="py-3 text-sm text-right font-bold">{s.price ? fmtCurrency(s.price * (s.qty || 1)) : "—"}</td>
+                  <td className="py-3 text-sm text-right">{s.price ? <MoneyAmount className="text-sm">{fmtCurrency(s.price)}</MoneyAmount> : "—"}</td>
+                  <td className="py-3 text-sm text-right font-bold">{s.price ? <MoneyAmount className="text-sm font-bold">{fmtCurrency(s.price * (s.qty || 1))}</MoneyAmount> : "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -682,12 +683,12 @@ export default function AdminOrderDetail() {
 
           <div className="flex justify-end">
             <div className="w-64 space-y-2">
-              <div className="flex justify-between"><span className="text-sm text-gray-400">Subtotal</span><span className="text-sm font-bold">{fmtCurrency(charges.subtotal || 0)}</span></div>
-              {order.tax > 0 && <div className="flex justify-between"><span className="text-sm text-gray-400">Tax</span><span className="text-sm">{fmtCurrency(order.tax)}</span></div>}
-              {order.discount > 0 && <div className="flex justify-between"><span className="text-sm text-gray-400">Discount</span><span className="text-sm text-green-600">-{fmtCurrency(order.discount)}</span></div>}
-              <div className="flex justify-between border-t-2 border-gray-200 pt-2"><span className="text-lg font-black">Total</span><span className="text-lg font-black">{fmtCurrency(charges.total || 0)}</span></div>
-              {invoice.amountPaid > 0 && <div className="flex justify-between"><span className="text-sm text-gray-400">Paid</span><span className="text-sm text-green-600">-{fmtCurrency(invoice.amountPaid)}</span></div>}
-              <div className="flex justify-between"><span className="text-sm font-bold">Amount Due</span><span className="text-sm font-black text-[#0d9488]">{fmtCurrency((charges.total || 0) - (invoice.amountPaid || 0))}</span></div>
+              <div className="flex items-baseline justify-between gap-3"><span className="min-w-0 text-sm text-gray-400">Subtotal</span><MoneyAmount className="text-sm font-bold">{fmtCurrency(charges.subtotal || 0)}</MoneyAmount></div>
+              {order.tax > 0 && <div className="flex items-baseline justify-between gap-3"><span className="min-w-0 text-sm text-gray-400">Tax</span><MoneyAmount className="text-sm">{fmtCurrency(order.tax)}</MoneyAmount></div>}
+              {order.discount > 0 && <div className="flex items-baseline justify-between gap-3"><span className="min-w-0 text-sm text-gray-400">Discount</span><MoneyAmount className="text-sm text-green-600">-{fmtCurrency(order.discount)}</MoneyAmount></div>}
+              <div className="flex items-baseline justify-between gap-3 border-t-2 border-gray-200 pt-2"><span className="min-w-0 text-lg font-black">Total</span><MoneyAmount className="text-lg font-black">{fmtCurrency(charges.total || 0)}</MoneyAmount></div>
+              {invoice.amountPaid > 0 && <div className="flex items-baseline justify-between gap-3"><span className="min-w-0 text-sm text-gray-400">Paid</span><MoneyAmount className="text-sm text-green-600">-{fmtCurrency(invoice.amountPaid)}</MoneyAmount></div>}
+              <div className="flex items-baseline justify-between gap-3"><span className="min-w-0 text-sm font-bold">Amount Due</span><MoneyAmount className="text-sm font-black text-[#0d9488]">{fmtCurrency((charges.total || 0) - (invoice.amountPaid || 0))}</MoneyAmount></div>
             </div>
           </div>
 

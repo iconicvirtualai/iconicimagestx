@@ -13,6 +13,7 @@ import {
   Receipt,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MoneyAmount } from "@/components/MoneyAmount";
 import { downloadBrandedInvoice } from "@/lib/downloadBrandedInvoice";
 import {
   appointmentSummary,
@@ -276,7 +277,11 @@ export function OrderHistory({
                   </p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                  <p className="font-black">{invoice.total == null ? "Total not stored" : usd(invoice.total)}</p>
+                  {invoice.total == null ? (
+                    <p className="font-black">Total not stored</p>
+                  ) : (
+                    <MoneyAmount className="font-black">{usd(invoice.total)}</MoneyAmount>
+                  )}
                   <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`} />
                 </div>
               </button>
@@ -299,12 +304,16 @@ function InvoiceDetail({ invoice }: { invoice: ClientInvoiceStatement }) {
           <p className="text-sm text-gray-500">No line items are stored on this invoice.</p>
         ) : (
           invoice.lineItems.map((item, index) => (
-            <div key={`${item.name}-${index}`} className="flex items-start justify-between gap-4 text-sm">
-              <span className="font-bold">
+            <div key={`${item.name}-${index}`} className="flex items-baseline justify-between gap-4 text-sm">
+              <span className="min-w-0 font-bold">
                 {item.name}
                 {item.qty != null ? <span className="font-medium text-gray-500"> × {item.qty}</span> : null}
               </span>
-              <span>{item.amount == null ? "Amount not stored" : usd(item.amount)}</span>
+              {item.amount == null ? (
+                <span className="shrink-0">Amount not stored</span>
+              ) : (
+                <MoneyAmount>{usd(item.amount)}</MoneyAmount>
+              )}
             </div>
           ))
         )}
@@ -328,9 +337,9 @@ function InvoiceDetail({ invoice }: { invoice: ClientInvoiceStatement }) {
 function MoneyRow({ label, value }: { label: string; value: number | null }) {
   if (value == null) return null;
   return (
-    <div className="flex items-center justify-between gap-4 text-sm">
-      <span className="text-gray-500">{label}</span>
-      <span className="font-bold">{usd(value)}</span>
+    <div className="flex items-baseline justify-between gap-4 text-sm">
+      <span className="min-w-0 text-gray-500">{label}</span>
+      <MoneyAmount className="font-bold">{usd(value)}</MoneyAmount>
     </div>
   );
 }
