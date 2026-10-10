@@ -38,7 +38,7 @@ import { clientNotifyLive } from "../shared/clientNotify";
 import { requireAdmin, requireStaff } from "./middleware/auth";
 import { handleListingPhotoUpload } from "./routes/listingPhotos";
 import { handleGetPublicPortalListing } from "./routes/portalListing";
-import presentationsRouter from "./routes/presentations";
+import presentationsRouter, { handlePresentationShell } from "./routes/presentations";
 import photoEditRequestsRouter from "./routes/photoEditRequests";
 import { mountOwners } from "./routes/owners";
 
@@ -217,6 +217,13 @@ export function createServer() {
   app.use("/api/clients", clientsRouter);
   app.get("/api/portal/listings/:id", handleGetPublicPortalListing);
   app.use("/api/staff", staffRouter);
+  // Vercel does not chain rewrites. /present/:token is rewritten to this
+  // function and the original path is what arrives here. Vite dev leaves the
+  // request to the SPA so ListingPresentation still boots from the client.
+  app.get("/present/:token", (req, res, next) => {
+    if (process.env.ICONIC_VITE_DEV === "1") return next();
+    return handlePresentationShell(req, res, next);
+  });
   app.use("/api", presentationsRouter);
   app.use("/api/listings", listingsRouter);
   app.use("/api", photoEditRequestsRouter);

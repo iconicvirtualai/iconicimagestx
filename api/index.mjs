@@ -17822,6 +17822,11 @@ function createServer() {
   app.use("/api/clients", router$g);
   app.get("/api/portal/listings/:id", handleGetPublicPortalListing);
   app.use("/api/staff", router$f);
+  app.get("/present/:token", async (req, res, next) => {
+    if (process.env.ICONIC_VITE_DEV === "1") return next();
+    const rendered = await renderPresentationShell(String(req.params.token || ""), originOf(req));
+    res.status(rendered.status).type("html").send(rendered.html);
+  });
   app.use("/api", router$1);
   app.use("/api/listings", router$e);
   app.use("/api", router);
