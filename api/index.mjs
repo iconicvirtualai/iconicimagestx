@@ -2028,6 +2028,42 @@ function presentInvoiceNumber(stored, invoiceId, now = /* @__PURE__ */ new Date(
   if (id) return draftInvoiceNumber(id, now);
   return `INV-${now.getFullYear()}-0001`;
 }
+function invoiceNumberAsOf(value, now = /* @__PURE__ */ new Date()) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+  if (value && typeof value === "object" && "toDate" in value && typeof value.toDate === "function") {
+    try {
+      const date = value.toDate();
+      if (date instanceof Date && !Number.isNaN(date.getTime())) return date;
+    } catch {
+      return now;
+    }
+  }
+  if (typeof value === "string" && value.trim()) {
+    const date = new Date(value.trim());
+    if (!Number.isNaN(date.getTime())) return date;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) return date;
+  }
+  return now;
+}
+function shownInvoiceNumber(source, now = /* @__PURE__ */ new Date()) {
+  const id = typeof source.id === "string" ? source.id : "";
+  return presentInvoiceNumber(source.invoiceNumber, id, invoiceNumberAsOf(source.createdAt, now));
+}
+function invoicePageInvoiceNumber(source, now = /* @__PURE__ */ new Date()) {
+  return shownInvoiceNumber(source, now);
+}
+function orderHistoryInvoiceNumber(source, now = /* @__PURE__ */ new Date()) {
+  return shownInvoiceNumber(source, now);
+}
+function invoiceEmailNumber(source, now = /* @__PURE__ */ new Date()) {
+  return shownInvoiceNumber(source, now);
+}
+function receiptEmailNumber(source, now = /* @__PURE__ */ new Date()) {
+  return shownInvoiceNumber(source, now);
+}
 const DIRECT_PACKAGE_KEYS = ["package", "packageName", "packageId", "selectedPackage", "selectedService", "serviceId"];
 const PACKAGE_SKINS = [
   skin({
@@ -2713,10 +2749,13 @@ function buildClientListing(id, data) {
 }
 function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
   const createdAt = isoStamp(data.createdAt);
-  const issuedAt = createdAt ? new Date(createdAt) : now;
   return {
     id,
-    invoiceNumber: presentInvoiceNumber(data.invoiceNumber, id, Number.isNaN(issuedAt.getTime()) ? now : issuedAt),
+    invoiceNumber: orderHistoryInvoiceNumber({
+      invoiceNumber: data.invoiceNumber,
+      id,
+      createdAt: data.createdAt
+    }, now),
     status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
     clientName: text$b(data.clientName),
     address: addressText(data.billToAddress || data.address || data.propertyAddress),
@@ -8885,7 +8924,11 @@ async function applySuccessfulPayment({
       variables: {
         clientName: invoice.clientName,
         amount: money$1(amount),
-        invoiceNumber: invoice.invoiceNumber,
+        invoiceNumber: receiptEmailNumber({
+          invoiceNumber: invoice.invoiceNumber,
+          id: invoiceId,
+          createdAt: invoice.createdAt
+        }),
         balance: money$1(newAmountDue)
       }
     }).catch(console.error);
@@ -8943,7 +8986,11 @@ router$j.post("/send-invoice", requireCoordinator, async (req, res) => {
       template: "invoice",
       variables: {
         clientName: invoice.clientName,
-        invoiceNumber: invoice.invoiceNumber,
+        invoiceNumber: invoiceEmailNumber({
+          invoiceNumber: invoice.invoiceNumber,
+          id: invoiceDoc.id,
+          createdAt: invoice.createdAt
+        }),
         amount: money$1(invoice.total),
         paymentUrl,
         dueDate: bookingDateLabel(invoice.dueDate, "Upon receipt")
@@ -8978,7 +9025,11 @@ router$j.post("/send-receipt", requireCoordinator, async (req, res) => {
       variables: {
         clientName: invoice.clientName,
         amount: money$1(invoice.amountPaid || invoice.total),
-        invoiceNumber: invoice.invoiceNumber,
+        invoiceNumber: receiptEmailNumber({
+          invoiceNumber: invoice.invoiceNumber,
+          id: invoiceDoc.id,
+          createdAt: invoice.createdAt
+        }),
         balance: money$1(amountStillDue(invoice))
       }
     });
@@ -8997,7 +9048,11 @@ router$j.get("/invoice/:id", async (req, res) => {
     return res.json({
       id: invoiceDoc.id,
       paid: invoiceAllowsDownload(invoice),
-      invoiceNumber: presentInvoiceNumber(invoice.invoiceNumber, invoiceDoc.id),
+      invoiceNumber: invoicePageInvoiceNumber({
+        invoiceNumber: invoice.invoiceNumber,
+        id: invoiceDoc.id,
+        createdAt: invoice.createdAt
+      }),
       clientName: invoice.clientName,
       lineItems: invoice.lineItems,
       subtotal: invoice.subtotal,
@@ -10220,7 +10275,7 @@ function buildPortalListingDetail(sources) {
   const floorplans = collectFloorplans(listing, galleries, store);
   const website = readWebsite(listing.portalWebsite);
   const invoices = readInvoices(sources.invoices || []);
-  const activity = buildActivity(sources, photos, videos, floorplans, tours, invoices);
+  const activity = buildActivity(sources, photos, videos, floorplans, tours);
   const status = text$3(listing.status) || text$3(sources.order?.status) || text$3(sources.orderRequest?.status) || "open";
   return applyStoredPortalData({
     id,
@@ -10749,7 +10804,11 @@ function readInvoices(invoices) {
     const total = money(invoice.total);
     summaries.push({
       id,
-      invoiceNumber: text$3(invoice.invoiceNumber) || id,
+      invoiceNumber: orderHistoryInvoiceNumber({
+        invoiceNumber: invoice.invoiceNumber,
+        id,
+        createdAt: invoice.createdAt
+      }),
       status: text$3(invoice.status) || "draft",
       total,
       amountDue: invoice.amountDue == null ? total : money(invoice.amountDue)
@@ -10825,7 +10884,11 @@ function buildActivity(sources, photos, videos, floorplans, tours, invoices) {
   }
   for (const invoice of sources.invoices || []) {
     const id = text$3(invoice.id);
-    const number = text$3(invoice.invoiceNumber) || invoices.find((item) => item.id === id)?.invoiceNumber || "Invoice";
+    const number = orderHistoryInvoiceNumber({
+      invoiceNumber: invoice.invoiceNumber,
+      id,
+      createdAt: invoice.createdAt
+    });
     const status = text$3(invoice.status) || "draft";
     const summary = status === "paid" ? `Payment recorded on ${number}` : `Invoice ${number} is ${status.replace(/_/g, " ")}`;
     push(eventOf(`invoice-${id || number}`, invoice.paidAt || invoice.updatedAt || invoice.createdAt, "invoice", summary));
