@@ -1,3 +1,5 @@
+import { BUSINESS_CONTACT } from "@shared/businessContact";
+
 export interface BookingSubmitResult {
   accountCreated?: boolean;
   notifications?: {
@@ -13,7 +15,7 @@ export function bookingFollowUp(result: BookingSubmitResult) {
   const notes = ["We saved your appointment request."];
   const emailStatus = result.notifications?.appointmentEmail;
   if (emailStatus === "sent") notes.push("A confirmation email is on its way.");
-  else notes.push("If the confirmation email does not arrive in a few minutes, call 281-356-0965.");
+  else notes.push(`If the confirmation email does not arrive in a few minutes, call ${BUSINESS_CONTACT.phoneDisplay}.`);
   if (result.notifications?.sms === "sent") {
     notes.push("A text confirmation was sent to the phone number on this form.");
   }

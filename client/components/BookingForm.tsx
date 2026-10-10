@@ -7,6 +7,7 @@ import { bookingFollowUp } from "@/lib/bookingFollowUp";
 import { Link, useSearchParams } from "react-router-dom";
 import ChatWidget from "@/components/ChatWidget";
 import { SmsConsentField } from "@/components/SmsConsentField";
+import { BUSINESS_CONTACT } from "@shared/businessContact";
 import { db } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
 import {
@@ -1681,13 +1682,13 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                  </button>
 
                  <a
-                  href="tel:281-356-0965"
+                  href={BUSINESS_CONTACT.phoneHref}
                   className="flex items-center gap-2.5 group transition-colors"
                  >
                     <div className="w-8 h-8 rounded-lg bg-teal-400/10 flex items-center justify-center text-teal-400 group-hover:bg-teal-400 group-hover:text-black transition-all shadow-sm">
                        <Phone className="w-4 h-4" />
                     </div>
-                    <span className="text-[9px] font-black uppercase tracking-widest group-hover:text-teal-400 transition-colors whitespace-nowrap">281.356.0965</span>
+                    <span className="text-[9px] font-black uppercase tracking-widest group-hover:text-teal-400 transition-colors whitespace-nowrap">{BUSINESS_CONTACT.phoneDisplay}</span>
                  </a>
               </div>
            </div>

@@ -180,9 +180,8 @@ describe("invoice statements", () => {
     expect(pdf).toContain("TOTAL");
     expect(pdf).toContain("PAYMENT");
     expect(pdf).toContain("Iconic Images Photography, LLC");
-    expect(pdf).toContain("2219 Sawdust Rd. #1304");
-    expect(pdf).toContain("Spring, TX 77380");
-    expect(pdf).toContain("281-356-0965");
+    expect(pdf).toContain("26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380");
+    expect(pdf).toContain("281.356.0965");
     expect(pdf).toContain("photos@iconicimagestx.com");
     expect(pdf).toContain("iconicimagestx.com");
     expect(pdf).not.toContain("Processing");

@@ -114,6 +114,38 @@ async function requirePhotographer(req, res, next) {
     next();
   });
 }
+const BUSINESS_CONTACT_LINE = "26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380 | 281.356.0965 | photos@iconicimagestx.com";
+function parseContactLine(line) {
+  const parts = line.split(" | ");
+  if (parts.length !== 3) {
+    throw new Error("BUSINESS_CONTACT_LINE must be address | phone | email");
+  }
+  const [address, phoneDisplay, email] = parts;
+  const addressParts2 = address.split(", ");
+  if (addressParts2.length !== 3) {
+    throw new Error("Public address must be street, city, ST ZIP");
+  }
+  const [streetAddress, city, stateZip] = addressParts2;
+  const [state, postalCode] = stateZip.split(" ");
+  if (!streetAddress || !city || !state || !postalCode || !phoneDisplay || !email) {
+    throw new Error("BUSINESS_CONTACT_LINE is missing a public contact field");
+  }
+  const phoneDigits = phoneDisplay.replace(/\D/g, "");
+  return {
+    line,
+    address,
+    streetAddress,
+    addressLine2: `${city}, ${state} ${postalCode}`,
+    city,
+    state,
+    postalCode,
+    phoneDisplay,
+    phoneHref: `tel:+1${phoneDigits}`,
+    email,
+    emailHref: `mailto:${email}`
+  };
+}
+const BUSINESS_CONTACT = parseContactLine(BUSINESS_CONTACT_LINE);
 const ORDER_RECEIVED_EMAIL_TEMPLATE = "booking_received";
 const ORDER_RECEIVED_SMS_KIND = "booking_confirmation";
 const STAFF_INBOUND_EMAIL_TEMPLATE = "live_chat";
@@ -226,6 +258,7 @@ function getFallbackTemplate(type, vars) {
       </div>
       ${content}
       <div style="border-top: 1px solid #eee; margin-top: 30px; padding-top: 20px; text-align: center; color: #999; font-size: 12px;">
+        <p>${BUSINESS_CONTACT.line}</p>
         <p>Iconic Images TX | iconicimagestx.com</p>
         <p>Questions? Reply to this email or message us through your client portal.</p>
       </div>
@@ -352,7 +385,7 @@ function getFallbackTemplate(type, vars) {
       <h2 style="color:#0d9488;">We received your message!</h2>
       <p>Hi ${vars.name},</p>
       <p>Thank you for reaching out to Iconic Images. We've received your message and our team will review it shortly.</p>
-      <p>We typically respond to inquiries within 24 business hours. If your question is urgent, feel free to call us at <strong>281-356-0965</strong>.</p>
+      <p>We typically respond to inquiries within 24 business hours. If your question is urgent, feel free to call us at <strong>${BUSINESS_CONTACT.phoneDisplay}</strong> or email <strong>${BUSINESS_CONTACT.email}</strong>.</p>
       <p style="margin-top:30px;color:#888;font-size:12px;">
         If you have any additional information to add, simply reply to this email or visit <strong>iconicimagestx.com</strong>.
       </p>
@@ -487,7 +520,7 @@ const SMS_TEMPLATES = {
 Requested date: ${date}
 Estimated total: ${total}
 
-Questions? Reply to this text! — Iconic Images 📸`,
+Questions? Reply to this text, or reach us at ${BUSINESS_CONTACT.line}. — Iconic Images 📸`,
   appointmentReminder24h: (name, date, time, address) => `Hey ${name}, reminder! Your Iconic Images shoot is tomorrow 📸
 
 🕐 ${time}
@@ -15539,7 +15572,7 @@ router$3.post("/live-chat", async (req, res) => {
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
     return res.status(429).json({
-      error: "Too many messages. Please wait a few minutes or call us at 281-356-0965."
+      error: `Too many messages. Please wait a few minutes or call us at ${BUSINESS_CONTACT.phoneDisplay}.`
     });
   }
   try {
@@ -15554,11 +15587,11 @@ router$3.post("/live-chat", async (req, res) => {
     console.error("[LiveChat] Delivery failed:", error);
     if (error instanceof LiveChatDeliveryError && error.code === "not_configured") {
       return res.status(503).json({
-        error: "Chat delivery isn't set up on this server yet. Please call 281-356-0965."
+        error: `Chat delivery isn't set up on this server yet. Please call ${BUSINESS_CONTACT.phoneDisplay}.`
       });
     }
     return res.status(500).json({
-      error: "We couldn't deliver your message. Please try again, or call 281-356-0965."
+      error: `We couldn't deliver your message. Please try again, or call ${BUSINESS_CONTACT.phoneDisplay}.`
     });
   }
 });
@@ -15828,7 +15861,7 @@ router$2.post("/threads", async (req, res) => {
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
     return res.status(429).json({
-      error: "Too many messages. Please wait a few minutes or call us at 281-356-0965."
+      error: `Too many messages. Please wait a few minutes or call us at ${BUSINESS_CONTACT.phoneDisplay}.`
     });
   }
   const threadId = typeof req.body?.threadId === "string" ? req.body.threadId.trim() : "";
@@ -15850,7 +15883,7 @@ router$2.post("/threads", async (req, res) => {
   } catch (error) {
     console.error("[ContactThread] Client message failed.", error);
     return res.status(500).json({
-      error: "We couldn't save your message. Please try again, or call 281-356-0965."
+      error: `We couldn't save your message. Please try again, or call ${BUSINESS_CONTACT.phoneDisplay}.`
     });
   }
 });
