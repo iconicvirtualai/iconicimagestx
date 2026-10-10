@@ -28,6 +28,8 @@ import {
 } from "@shared/photoEditRequest";
 import { MoneyAmount } from "@/components/MoneyAmount";
 import { Button } from "@/components/ui/button";
+import { ClientGalleryMediaFrame } from "@/components/gallery/ClientGalleryMedia";
+import type { ClientGalleryItem } from "@/components/gallery/clientGalleryMedia";
 import { ArrowLeft, Eye, EyeOff, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import NotFound from "./NotFound";
@@ -583,6 +585,23 @@ function PhotoEditNote({
   );
 }
 
+function portalMediaToGalleryItem(item: PortalMediaItem): ClientGalleryItem {
+  const tour = item.kind === "tour" ? item as PortalTourItem : null;
+  return {
+    id: item.id,
+    fileName: item.name,
+    title: item.name,
+    type: item.kind,
+    url: item.url,
+    shareUrl: item.url,
+    embedUrl: tour?.embedUrl ?? null,
+    contentType: item.contentType,
+    provider: tour?.provider ?? null,
+    canDownload: false,
+    locked: false,
+  };
+}
+
 function MediaTab({
   title,
   empty,
@@ -631,12 +650,8 @@ function MediaTab({
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {visible.map((item, index) => (
-            <article key={item.id} className={`bg-white rounded-2xl border p-3 ${item.hidden ? "border-dashed border-gray-300" : "border-gray-100"}`} data-testid={`media-${item.kind}-${item.id}`}>
-              {item.kind === "video" ? (
-                <video src={item.url} className="w-full aspect-video rounded-xl bg-black" controls preload="metadata" />
-              ) : (
-                <img src={item.url} alt={item.name} className="w-full aspect-[4/3] object-cover rounded-xl bg-gray-100" />
-              )}
+            <article key={item.id} className={`min-w-0 bg-white rounded-2xl border p-3 ${item.hidden ? "border-dashed border-gray-300" : "border-gray-100"}`} data-testid={`media-${item.kind}-${item.id}`}>
+              <ClientGalleryMediaFrame item={portalMediaToGalleryItem(item)} />
               <div className="mt-3 flex items-start justify-between gap-2">
                 <div>
                   <p className="text-sm font-bold truncate">{item.name}</p>
@@ -706,10 +721,14 @@ function ToursTab({
               <p className="text-[10px] font-black uppercase tracking-widest text-[#0d9488]">{tour.provider}</p>
               <h3 className="font-black mt-1">{tour.name}</h3>
               {tour.hidden && <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mt-1">Hidden</p>}
-              {tour.embedUrl && !tour.hidden && (
-                <iframe title={tour.name} src={tour.embedUrl} className="w-full h-[360px] rounded-xl border border-gray-100 mt-4" loading="lazy" />
+              {!tour.hidden && (
+                <div className="mt-4">
+                  <ClientGalleryMediaFrame item={portalMediaToGalleryItem(tour)} />
+                </div>
               )}
-              <a href={tour.url} target="_blank" rel="noreferrer" className="inline-block mt-4 text-sm font-bold text-[#0d9488]">Open tour</a>
+              {tour.hidden && (
+                <a href={tour.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center mt-4 text-sm font-bold text-[#0d9488]">Open 3D tour</a>
+              )}
               {showEditor && (
                 <div className="mt-3">
                   <Button type="button" size="sm" variant="outline" disabled={saving} onClick={() => onMedia({ kind: "tour", id: tour.id, hidden: !tour.hidden })}>

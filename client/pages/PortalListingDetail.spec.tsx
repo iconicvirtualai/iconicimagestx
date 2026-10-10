@@ -31,7 +31,7 @@ const detail = buildPortalListingDetail({
 });
 
 function render(
-  tab: "data" | "photos" | "marketing" | "orders" | "activity" | "website",
+  tab: "data" | "photos" | "video" | "tours" | "floorplans" | "marketing" | "orders" | "activity" | "website",
   editing: "photo" | null = null,
   canEdit = true,
   dataEditing = false,
@@ -240,6 +240,91 @@ describe("portal listing detail page", () => {
     expect(data).not.toContain("Download");
     expect(data).not.toContain("INV-2026-100");
     expect(data).not.toContain("View invoice");
+  });
+
+  it("plays a listing video instead of turning a mov named tour into an iframe", () => {
+    const html = render("video");
+    expect(html).toContain("tour.mov");
+    expect(html).toContain("<video");
+    expect(html).toContain("playsinline");
+    expect(html).toContain('preload="metadata"');
+    expect(html).toContain("controls");
+    expect(html).not.toContain("<iframe");
+    expect(html).not.toContain("Download");
+  });
+
+  it("embeds Matterport, shows a PNG floor plan, and opens a PDF floor plan in a new tab", () => {
+    const media = {
+      ...detail,
+      videos: [{
+        id: "reel",
+        kind: "video" as const,
+        name: "snap-reel.mp4",
+        url: "https://cdn.example/snap-reel.mp4",
+        contentType: "video/mp4",
+        hidden: false,
+        order: 0,
+        uploadedAt: "",
+      }],
+      floorplans: [
+        { id: "png", kind: "floorplan" as const, name: "level1.png", url: "https://cdn.example/level1.png", contentType: "image/png", hidden: false, order: 0, uploadedAt: "" },
+        { id: "pdf", kind: "floorplan" as const, name: "level2.pdf", url: "https://cdn.example/level2.pdf", contentType: "application/pdf", hidden: false, order: 1, uploadedAt: "" },
+      ],
+      tours: [{
+        id: "mp",
+        kind: "tour" as const,
+        name: "Matterport",
+        url: "https://my.matterport.com/show/?m=abc123",
+        contentType: "",
+        hidden: false,
+        order: 0,
+        uploadedAt: "",
+        provider: "Matterport",
+        embedUrl: "https://my.matterport.com/show/?m=abc123",
+      }],
+    };
+    const view = (tab: "video" | "tours" | "floorplans") => renderToString(
+      <MemoryRouter>
+        <PortalListingDetailView
+          detail={media}
+          tab={tab}
+          editing={null}
+          saving={false}
+          canEdit={false}
+          dataEditing={false}
+          dataDraft={portalFactsDraftFromDetail(media)}
+          website={defaultPortalWebsite()}
+          onTab={() => undefined}
+          onToggleEditing={() => undefined}
+          onMedia={() => undefined}
+          onWebsite={() => undefined}
+          onWebsiteSave={() => undefined}
+          onDataEditing={() => undefined}
+          onDataDraft={() => undefined}
+          onDataSave={() => undefined}
+          onRequestPhotoEdit={async () => false}
+        />
+      </MemoryRouter>,
+    );
+    const reel = view("video");
+    expect(reel).toContain('data-gallery-kind="reel"');
+    expect(reel).toContain("78dvh");
+    expect(reel).not.toContain("aspect-video");
+    expect(reel).not.toContain("Download");
+
+    const tours = view("tours");
+    expect(tours).toContain('allow="fullscreen; xr-spatial-tracking"');
+    expect(tours).toContain("Open 3D tour");
+    expect(tours).not.toContain("Download");
+
+    const plans = view("floorplans");
+    expect(plans).toContain('data-gallery-kind="floorplan-image"');
+    expect(plans).toContain("level1.png");
+    expect(plans).toContain('data-gallery-kind="floorplan-pdf"');
+    expect(plans).toContain("Open floor plan");
+    expect(plans).toContain('target="_blank"');
+    expect(plans).not.toContain("<iframe");
+    expect(plans).not.toContain("Download");
   });
 
   it("keeps a logged-out visitor on the listing route and uses not-found for a bad id", () => {
