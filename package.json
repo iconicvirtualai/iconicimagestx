@@ -19,6 +19,7 @@
     "start": "node dist/server/node-build.mjs",
     "test": "vitest --run",
     "seed:booking-catalog": "tsx scripts/seed-booking-catalog.ts",
+    "seed:delivery-qa": "tsx scripts/seed-delivery-qa.ts",
     "format.fix": "prettier --write .",
     "typecheck": "tsc"
   },
