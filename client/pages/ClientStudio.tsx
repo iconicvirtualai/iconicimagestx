@@ -15,6 +15,7 @@ import { formatChicagoDate } from "@shared/clientHome";
 import { clientGalleryDownloadsUnlocked, studioOffersDownloads } from "@shared/paymentAccess";
 import { GalleryDownloadLockNotice } from "@/components/GalleryDownloadLock";
 import { PublicContactLine } from "@/components/PublicContactLine";
+import { StudioGalleryTabs, type StudioGalleryTab, type StudioGalleryTabId } from "@/components/gallery/StudioGalleryTabs";
 
 function failureCopy(status: number, data: { code?: string; message?: string; error?: string }, id: string) {
   const message = data.message || data.error || "";
@@ -48,7 +49,7 @@ export default function ClientStudio() {
   const [revisionNote, setRevisionNote] = React.useState("");
   const [revisionType, setRevisionType] = React.useState<"single" | "gallery">("single");
   const [submittingRevision, setSubmittingRevision] = React.useState(false);
-  const [activeTab, setActiveTab] = React.useState<"photos" | "videos" | "tours" | "revisions" | "ai_studio">("photos");
+  const [activeTab, setActiveTab] = React.useState<StudioGalleryTabId>("photos");
 
   React.useEffect(() => {
     if (!listingId || authLoading) return;
@@ -207,7 +208,7 @@ export default function ClientStudio() {
   const locked = owner && !downloadsUnlocked;
   const address = addressText(project.address) || addressText(project.shootLocation);
   const revisions: any[] = owner ? (project.revisions || []) : [];
-  const tabs = [
+  const tabs: StudioGalleryTab[] = [
     { id: "photos", label: "Photos", count: images.length },
     { id: "videos", label: "Videos", count: videos.length },
     { id: "tours", label: "Tours", count: tours.length + floorPlans.length },
@@ -218,7 +219,7 @@ export default function ClientStudio() {
   ];
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen overflow-x-hidden bg-white">
       {/* Header */}
       <header className="bg-black text-white">
         <div className="max-w-6xl mx-auto px-4 py-8 sm:py-12">
@@ -250,18 +251,11 @@ export default function ClientStudio() {
         </div>
       </header>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-100 sticky top-0 bg-white z-10">
-        <div className="max-w-6xl mx-auto px-4 flex gap-6">
-          {tabs.map(t => (
-            <button key={t.id} onClick={() => setActiveTab(t.id as any)}
-              className={`py-4 text-xs font-black uppercase tracking-widest border-b-2 transition-colors ${activeTab === t.id ? "border-[#0d9488] text-[#0d9488]" : "border-transparent text-gray-400 hover:text-gray-700"}`}>
-              {t.label} {t.count > 0 && <span className="ml-1 text-gray-300">({t.count})</span>}
-              {t.id === 'ai_studio' && <Zap className="w-2.5 h-2.5 ml-1 inline text-teal-500" />}
-            </button>
-          ))}
-        </div>
-      </div>
+      <StudioGalleryTabs
+        active={activeTab}
+        tabs={tabs}
+        onChange={setActiveTab}
+      />
 
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Locked notice */}
