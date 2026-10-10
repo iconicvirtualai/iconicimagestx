@@ -12,7 +12,7 @@ import { sendSMS, SMS_TEMPLATES } from "../services/sms";
 import { createCalendarBookingEvent } from "../services/calendar";
 import { attachBookingClient, createRequestedAppointment, sendFirebasePasswordEmail } from "../services/bookingClient";
 import { ensureBookingListingForRequest } from "../services/bookingListing";
-import { clientNotifyBlockReason, clientNotifyLive } from "../../shared/clientNotify";
+import { clientNotifyBlockReason, clientNotifyLive, isNotifyTestAllowlisted } from "../../shared/clientNotify";
 import { lifeOfTheListingCareSelected } from "../../shared/lifeOfTheListingCare";
 import { buildBookingInvoiceDraft, existingInvoiceId } from "../../shared/bookingInvoice";
 import { nextSequentialInvoiceNumber, planInvoiceLink } from "../../shared/orderProjectInvoice";
@@ -179,6 +179,9 @@ router.post("/", async (req, res) => {
     const docRef = await db().collection("orderRequests").add(orderRequest);
 
     const normalizedEmail = orderRequest.email;
+    // Password setup follows the client-mail gate. An exact allowlist address
+    // can still receive it while notifications are off, including in RED.
+    const passwordSetupAllowed = clientNotifyLive() || isNotifyTestAllowlisted(normalizedEmail);
     let account: Awaited<ReturnType<typeof attachBookingClient>> = {
       clientId: null,
       createdAccount: false,
@@ -191,7 +194,7 @@ router.post("/", async (req, res) => {
         firstName,
         lastName,
         phone,
-        preparePasswordLink: clientNotifyLive(),
+        preparePasswordLink: passwordSetupAllowed,
       });
     } catch (err) {
       console.error("[Bookings] Account attach failed:", err);
@@ -355,10 +358,11 @@ router.post("/", async (req, res) => {
     }
 
     // Password setup is not the order-received confirmation. It follows the
-    // same CLIENT_NOTIFY_LIVE / RED gate as other portal mail. The link is
-    // not stored on the order request.
+    // same CLIENT_NOTIFY_LIVE / RED gate as other portal mail, with the same
+    // exact NOTIFY_TEST_ALLOWLIST exception. The link is not stored on the
+    // order request.
     if (account.createdAccount) {
-      if (!clientNotifyLive()) {
+      if (!passwordSetupAllowed) {
         passwordSetupStatus = "gated";
         console.info(
           `[Bookings] Password-setup email not sent for request ${docRef.id}. ${clientNotifyBlockReason()}.`,

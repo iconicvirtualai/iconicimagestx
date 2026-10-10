@@ -4,7 +4,10 @@ import {
   clientNotifyBlockReason,
   clientNotifyLive,
   emailAllowed,
+  isNotifyTestAllowlisted,
   isStaffInboundSmsDestination,
+  narrowGatedClientRecipients,
+  notifyTestAllowlist,
   smsAllowed,
 } from "./clientNotify";
 
@@ -76,9 +79,11 @@ describe("outbound transports check the gate before sending", () => {
     const email = readFileSync(new URL("../server/services/email.ts", import.meta.url), "utf8");
     expect(policy).toContain("template === ORDER_RECEIVED_EMAIL_TEMPLATE");
     const gate = email.indexOf("if (!emailAllowed(template, process.env, audience))");
+    const narrow = email.indexOf("narrowGatedClientRecipients({");
     const send = email.indexOf("await transporter.sendMail");
     expect(gate).toBeGreaterThan(-1);
-    expect(send).toBeGreaterThan(gate);
+    expect(narrow).toBeGreaterThan(gate);
+    expect(send).toBeGreaterThan(narrow);
   });
 
   it("lets booking confirmation and destination-locked staff SMS through the twilio gate", () => {
@@ -106,5 +111,64 @@ describe("outbound transports check the gate before sending", () => {
     }
     const campaignSend = sms.lastIndexOf("client.messages.create");
     expect(sms.lastIndexOf("if (!clientNotifyLive())", campaignSend)).toBeGreaterThan(gate);
+  });
+});
+
+const QA = "ops+deliveryqa@iconicimagestx.com";
+
+describe("NOTIFY_TEST_ALLOWLIST exact addresses", () => {
+  const listed = { NOTIFY_TEST_ALLOWLIST: ` ${QA.toUpperCase()} , *@iconicimagestx.com ` };
+
+  it("does not turn the global switch on and does not fold plus-tags or domains", () => {
+    expect(clientNotifyLive({ NOTIFY_TEST_ALLOWLIST: QA })).toBe(false);
+    expect(clientNotifyLive({ CLIENT_NOTIFY_LIVE: "true", CLIENT_COMMS_ZONE: "RED", NOTIFY_TEST_ALLOWLIST: QA })).toBe(false);
+    expect(notifyTestAllowlist({})).toEqual(new Set());
+    expect(notifyTestAllowlist({ NOTIFY_TEST_ALLOWLIST: "" })).toEqual(new Set());
+    expect(notifyTestAllowlist({ NOTIFY_TEST_ALLOWLIST: " ,  " })).toEqual(new Set());
+    expect([...notifyTestAllowlist(listed)]).toEqual([QA, "*@iconicimagestx.com"]);
+
+    expect(isNotifyTestAllowlisted(`  ${QA.toUpperCase()}  `, listed)).toBe(true);
+    expect(isNotifyTestAllowlisted(`Ops QA <${QA}>`, listed)).toBe(true);
+    for (const address of [
+      "ops@iconicimagestx.com",
+      "photos@iconicimagestx.com",
+      "studio@iconicimagestx.com",
+      "ops+other@iconicimagestx.com",
+      "someone@example.com",
+      "*@iconicimagestx.com.evil.test",
+    ]) {
+      expect(isNotifyTestAllowlisted(address, listed)).toBe(false);
+    }
+    expect(isNotifyTestAllowlisted("*@iconicimagestx.com", listed)).toBe(true);
+    expect(isNotifyTestAllowlisted("ops@iconicimagestx.com", { NOTIFY_TEST_ALLOWLIST: "ops@iconicimagestx.com" })).toBe(true);
+    expect(isNotifyTestAllowlisted(QA, { NOTIFY_TEST_ALLOWLIST: "ops@iconicimagestx.com" })).toBe(false);
+  });
+
+  it("drops every non-exact To, Cc, Bcc, and Reply-To address", () => {
+    expect(narrowGatedClientRecipients({ to: "ada@example.com" }, {})).toBeNull();
+    expect(narrowGatedClientRecipients({ to: "ada@example.com", replyTo: QA }, listed)).toBeNull();
+
+    const narrowed = narrowGatedClientRecipients({
+      to: `ada@example.com, ${QA.toUpperCase()}`,
+      cc: "agent@broker.com",
+      bcc: `billing@broker.com; ${QA}`,
+      replyTo: "ada@example.com",
+    }, listed);
+    expect(narrowed).toMatchObject({
+      to: QA,
+      cc: undefined,
+      bcc: QA,
+      replyTo: undefined,
+    });
+    expect(narrowed?.held).toEqual(["ada@example.com", "agent@broker.com", "billing@broker.com", "ada@example.com"]);
+
+    const fromCc = narrowGatedClientRecipients({
+      to: "ops@iconicimagestx.com",
+      cc: `Name <${QA}>`,
+      replyTo: "photos@iconicimagestx.com",
+    }, listed);
+    expect(fromCc).toMatchObject({ to: QA, cc: undefined, bcc: undefined, replyTo: undefined });
+    expect(fromCc?.held).toContain("ops@iconicimagestx.com");
+    expect(fromCc?.held).toContain("photos@iconicimagestx.com");
   });
 });
