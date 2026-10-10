@@ -6688,6 +6688,65 @@ function deliveryMoveTargets(input) {
 function emptyStudio() {
   return { active: 0, review: 0, approved: 0, failed: 0 };
 }
+const LINKED_DOCUMENT_ID = /^[A-Za-z0-9_-]{1,128}$/;
+const LINKED_RECORD_BATCH = 30;
+function chunkIds(ids, size) {
+  const parts = [];
+  for (let index = 0; index < ids.length; index += size) parts.push(ids.slice(index, index + size));
+  return parts;
+}
+async function collectLinkedRecordPresence(ids, alreadyExisting, readBatch) {
+  const existing = /* @__PURE__ */ new Set();
+  const unverified = /* @__PURE__ */ new Set();
+  const pending = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const raw of ids) {
+    const id = typeof raw === "string" ? raw.trim() : "";
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    if (alreadyExisting.has(id)) {
+      existing.add(id);
+      continue;
+    }
+    if (!LINKED_DOCUMENT_ID.test(id)) continue;
+    pending.push(id);
+  }
+  for (const part of chunkIds(pending, LINKED_RECORD_BATCH)) {
+    try {
+      const snaps = await readBatch(part);
+      const returned = /* @__PURE__ */ new Set();
+      for (const snap of snaps) {
+        const id = String(snap.id || "").trim();
+        if (!id) continue;
+        returned.add(id);
+        if (snap.exists) existing.add(id);
+      }
+      for (const id of part) {
+        if (!returned.has(id)) unverified.add(id);
+      }
+    } catch (err) {
+      console.error("[Delivery] Linked record check failed:", err instanceof Error ? err.message : err);
+      for (const id of part) unverified.add(id);
+    }
+  }
+  return { existing, unverified };
+}
+function recordMissing(id, presence) {
+  const value = typeof id === "string" ? id.trim() : "";
+  if (!value) return false;
+  if (presence.unverified.has(value)) return false;
+  return !presence.existing.has(value);
+}
+function applyLinkedRecordPresence(rows, presence, galleryIdByListing = /* @__PURE__ */ new Map()) {
+  return rows.map((row) => {
+    const linkedGalleryId = row.galleryId || (row.listingId ? galleryIdByListing.get(row.listingId) || null : null);
+    return {
+      ...row,
+      projectMissing: recordMissing(row.listingId, presence.listings),
+      galleryMissing: recordMissing(linkedGalleryId, presence.galleries)
+    };
+  });
+}
 function tallyStudioJobs(jobs) {
   const studio = emptyStudio();
   for (const job of jobs) {
@@ -6720,6 +6779,8 @@ function finalize(row) {
     ...row,
     deliveryStatus,
     label: MEDIA_DELIVERY_LABELS[deliveryStatus],
+    projectMissing: row.projectMissing === true,
+    galleryMissing: row.galleryMissing === true,
     moves: []
   };
   next.moves = deliveryMoveTargets(next);
@@ -14899,11 +14960,39 @@ async function listMediaDeliveryQueue(input) {
     shootLocation: item.data.shootLocation,
     galleryId: asString(item.data.galleryId) || asString(item.data.playtestGalleryId)
   }));
-  return buildMediaDeliveryQueue({
+  const rows = buildMediaDeliveryQueue({
     galleries,
     listings: listingSources,
     jobs
   });
+  const galleryIdByListing = /* @__PURE__ */ new Map();
+  for (const listing of listingSources) {
+    if (listing.galleryId) galleryIdByListing.set(listing.id, listing.galleryId);
+  }
+  const loadedListingIds = new Set(listingSources.map((listing) => listing.id));
+  const loadedGalleryIds = new Set(galleries.map((gallery) => gallery.id));
+  const [listingPresence, galleryPresence] = await Promise.all([
+    collectLinkedRecordPresence(
+      rows.map((row) => row.listingId),
+      loadedListingIds,
+      (ids) => readExistingDocuments("listings", ids)
+    ),
+    collectLinkedRecordPresence(
+      [...rows.map((row) => row.galleryId), ...galleryIdByListing.values()],
+      loadedGalleryIds,
+      (ids) => readExistingDocuments("galleries", ids)
+    )
+  ]);
+  return applyLinkedRecordPresence(
+    rows,
+    { listings: listingPresence, galleries: galleryPresence },
+    galleryIdByListing
+  );
+}
+async function readExistingDocuments(collectionName, ids) {
+  if (ids.length === 0) return [];
+  const snaps = await db$2().getAll(...ids.map((id) => db$2().collection(collectionName).doc(id)));
+  return snaps.map((snap) => ({ id: snap.id, exists: snap.exists }));
 }
 async function moveMediaDelivery(input) {
   if (!isMediaDeliveryStatus(input.status)) {
