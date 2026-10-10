@@ -95,7 +95,6 @@ function clientGalleryPayload(id: string, gallery: Record<string, unknown>, gate
     id,
     title: gallery.title,
     address: recordAddressText(gallery),
-    clientName: gallery.clientName,
     status: gallery.status,
     deliveredAt: gallery.deliveredAt || null,
     expiresAt: gallery.expiresAt || null,
@@ -173,7 +172,10 @@ router.get("/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
         return res.status(403).json({ error: "Gallery not yet available." });
       }
       const gate = await downloadGateForGallery(gallery);
-      return res.json(clientGalleryPayload(doc.id, gallery, gate));
+      return res.json({
+        ...clientGalleryPayload(doc.id, gallery, gate),
+        clientName: gallery.clientName || null,
+      });
     }
 
     return res.json({ id: doc.id, ...gallery });

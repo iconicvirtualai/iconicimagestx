@@ -32,31 +32,57 @@ export interface ClientGalleryLinkInput {
   galleriesByOrderId: GalleryLinkDoc[];
 }
 
+export interface StudioMedia {
+  url: string;
+  name: string;
+  /** Full-res or MLS file. Present only on the owner view, and only when downloads are unlocked. */
+  downloadUrl?: string;
+}
+
+export interface StudioRevision {
+  id: string;
+  type: string;
+  photoIndex: number | null;
+  description: string;
+  status: string;
+  createdAt: string;
+}
+
+/**
+ * Advertising page for /studio/:id.
+ * Display photos, video, tour, floor plan, address, and agent name.
+ * No download URLs, invoice, order fields, revisions, or client contact info.
+ */
 export interface PublicStudioProject {
   id: string;
   address: string;
-  clientName: string;
+  agentName: string;
   services: string[];
-  images: Array<{ url: string; name: string }>;
-  videos: Array<{ url: string; name: string }>;
+  images: StudioMedia[];
+  videos: StudioMedia[];
   tourUrl: string;
-  revisions: Array<{
-    id: string;
-    type: string;
-    photoIndex: number | null;
-    description: string;
-    status: string;
-    createdAt: string;
-  }>;
+  floorPlans: StudioMedia[];
+  notice: string | null;
+  /** Marks the share payload so the page does not write it back over the listing. */
+  view: "public";
+}
+
+/** Owning client or staff. Adds delivery files and client contact on top of the share view. */
+export interface OwnerStudioProject extends Omit<PublicStudioProject, "view"> {
+  view: "owner";
+  clientName: string;
+  clientEmail: string;
+  clientPhone: string;
+  revisions: StudioRevision[];
   lockDownloads: boolean;
   requirePayment: boolean;
   /** True when the owning client may download. Shared links still do not offer downloads. */
   downloadsUnlocked: boolean;
   invoice: { status: string } | null;
-  notice: string | null;
-  /** Marks the share payload so the page does not write it back over the listing. */
-  view: "public";
+  files: StudioMedia[];
 }
+
+export type StudioProject = PublicStudioProject | OwnerStudioProject;
 
 export type ClientGalleryLinkResult =
   | {
@@ -71,7 +97,7 @@ export type ClientGalleryLinkResult =
       ok: true;
       kind: "listing";
       openGalleryId: string | null;
-      project: PublicStudioProject;
+      project: StudioProject;
     }
   | {
       ok: false;
@@ -142,36 +168,140 @@ function servicesOf(listing: GalleryLinkDoc): string[] {
     .slice(0, 24);
 }
 
-function publicImages(listing: GalleryLinkDoc): Array<{ url: string; name: string }> {
+const PRIVATE_FILE = /\.(zip|pdf|dng|cr2|cr3|nef|nrw|arw|srf|sr2|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic)(\?|$)/i;
+const PRIVATE_FOLDER = /\/(raw|downloads?|mls|full|print|zips?)\//i;
+
+function rowOf(item: unknown): Record<string, unknown> | null {
+  return item && typeof item === "object" ? item as Record<string, unknown> : null;
+}
+
+/** Delivery files: raw camera files, zips, and anything stored under a download or MLS folder. */
+function isPrivateMedia(path: string, name: string, url: string): boolean {
+  if (PRIVATE_FOLDER.test(path) || path.includes("/raw/")) return true;
+  return PRIVATE_FILE.test(name) || PRIVATE_FILE.test(url);
+}
+
+function mediaName(row: Record<string, unknown>, fallback: string): string {
+  return text(row.name) || text(row.fileName) || text(row.title) || fallback;
+}
+
+function publicImages(listing: GalleryLinkDoc): StudioMedia[] {
   if (!Array.isArray(listing.images)) return [];
-  const images: Array<{ url: string; name: string }> = [];
+  const images: StudioMedia[] = [];
   listing.images.forEach((item, index) => {
     const frame = frameFromListingImage(item, index);
     const url = httpUrl(frame?.url);
     if (!frame || frame.raw || !url) return;
-    if (frame.path.includes("/raw/")) return;
+    if (isPrivateMedia(frame.path, frame.name, url)) return;
     images.push({ url, name: frame.name });
   });
   return images.slice(0, 200);
 }
 
-function publicVideos(listing: GalleryLinkDoc): Array<{ url: string; name: string }> {
+function publicVideos(listing: GalleryLinkDoc): StudioMedia[] {
   if (!Array.isArray(listing.videos)) return [];
-  const videos: Array<{ url: string; name: string }> = [];
+  const videos: StudioMedia[] = [];
   for (const item of listing.videos) {
-    if (!item || typeof item !== "object") continue;
-    const row = item as Record<string, unknown>;
+    const row = rowOf(item);
+    if (!row) continue;
     const url = httpUrl(row.url);
-    if (!url || url.includes("/raw/")) continue;
-    videos.push({ url, name: text(row.name) || "Video" });
+    const name = mediaName(row, "Video");
+    if (!url || isPrivateMedia(text(row.path) || text(row.storagePath), name, url)) continue;
+    videos.push({ url, name });
   }
   return videos.slice(0, 40);
 }
 
-function publicRevisions(listing: GalleryLinkDoc): PublicStudioProject["revisions"] {
+function publicTour(listing: GalleryLinkDoc): string {
+  for (const key of ["tourUrl", "matterportUrl", "virtualTourUrl", "virtualTour", "threeDTourUrl", "tourLink"]) {
+    const url = httpUrl(listing[key]);
+    if (url && !isPrivateMedia("", key, url)) return url;
+  }
+  return "";
+}
+
+function agentNameOf(listing: GalleryLinkDoc): string {
+  const direct = text(listing.agentName) || text(listing.listingAgent);
+  if (direct) return direct;
+  const agent = listing.agent;
+  if (agent && typeof agent === "object") return text((agent as Record<string, unknown>).name);
+  if (typeof agent === "string") return agent.trim();
+  return "";
+}
+
+function publicFloorPlans(listing: GalleryLinkDoc): StudioMedia[] {
+  const groups = [listing.floorplans, listing.floorPlans];
+  const plans: StudioMedia[] = [];
+  for (const group of groups) {
+    if (!Array.isArray(group)) continue;
+    for (const item of group) {
+      const row = rowOf(item);
+      if (!row) continue;
+      const url = httpUrl(row.url) || httpUrl(row.shareUrl);
+      const name = mediaName(row, "Floor plan");
+      const path = text(row.path) || text(row.storagePath);
+      if (!url || isPrivateMedia(path, name, url)) continue;
+      plans.push({ url, name });
+    }
+  }
+  return plans.slice(0, 40);
+}
+
+function downloadUrlOf(row: Record<string, unknown>): string {
+  for (const key of ["downloadUrl", "fullResUrl", "mlsUrl", "originalUrl", "zipUrl", "printUrl"]) {
+    const url = httpUrl(row[key]);
+    if (url) return url;
+  }
+  return "";
+}
+
+function ownerFiles(listing: GalleryLinkDoc): StudioMedia[] {
+  const files: StudioMedia[] = [];
+  const push = (url: string, name: string) => {
+    if (!url || files.some((file) => file.url === url)) return;
+    files.push({ url, name });
+  };
+  for (const key of ["zipUrl", "downloadUrl", "mlsUrl", "mlsPackageUrl", "fullResUrl"]) {
+    push(httpUrl(listing[key]), key);
+  }
+  const groups = [listing.images, listing.files, listing.downloads, listing.mlsFiles, listing.floorplans, listing.floorPlans];
+  for (const group of groups) {
+    if (!Array.isArray(group)) continue;
+    group.forEach((item, index) => {
+      const row = rowOf(item);
+      if (!row) return;
+      const name = mediaName(row, `File ${index + 1}`);
+      const path = text(row.path) || text(row.storagePath);
+      const display = httpUrl(row.url);
+      const download = downloadUrlOf(row);
+      if (download) push(download, name);
+      if (display && isPrivateMedia(path, name, display)) push(display, name);
+    });
+  }
+  return files.slice(0, 200);
+}
+
+function ownerImageDownloads(listing: GalleryLinkDoc, images: StudioMedia[]): StudioMedia[] {
+  const byUrl = new Map<string, string>();
+  if (Array.isArray(listing.images)) {
+    for (const item of listing.images) {
+      const row = rowOf(item);
+      if (!row) continue;
+      const display = httpUrl(row.url);
+      const download = downloadUrlOf(row);
+      if (display && download && download !== display) byUrl.set(display, download);
+    }
+  }
+  return images.map((image) => {
+    const downloadUrl = byUrl.get(image.url);
+    return downloadUrl ? { ...image, downloadUrl } : image;
+  });
+}
+
+function ownerRevisions(listing: GalleryLinkDoc): StudioRevision[] {
   if (!Array.isArray(listing.revisions)) return [];
   return listing.revisions.slice(0, 40).map((item, index) => {
-    const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+    const row = rowOf(item) || {};
     const photoIndex = typeof row.photoIndex === "number" ? row.photoIndex : null;
     return {
       id: text(row.id) || `revision-${index + 1}`,
@@ -258,27 +388,53 @@ function listingResult(listing: GalleryLinkDoc, related: GalleryLinkDoc[]): Clie
 }
 
 function publicProject(listing: GalleryLinkDoc, _related: GalleryLinkDoc[], notice: string | null): PublicStudioProject {
-  const invoice = invoiceOf(listing);
   return {
     id: listing.id,
     address: addressOf(listing),
-    clientName: text(listing.clientName),
+    agentName: agentNameOf(listing),
     services: servicesOf(listing),
     images: publicImages(listing),
     videos: publicVideos(listing),
-    tourUrl: httpUrl(listing.tourUrl),
-    revisions: publicRevisions(listing),
-    lockDownloads: lockDownloadsOn(listing.lockDownloads),
-    requirePayment: requirePaymentOn(listing.requirePayment),
-    downloadsUnlocked: clientGalleryDownloadsUnlocked({
-      invoice,
-      downloadEnabled: listing.downloadEnabled,
-      downloadsReleased: listing.downloadsReleased,
-      lockDownloads: listing.lockDownloads,
-    }),
-    invoice,
+    tourUrl: publicTour(listing),
+    floorPlans: publicFloorPlans(listing),
     notice,
     view: "public",
+  };
+}
+
+export interface OwnerStudioGate {
+  invoice?: { status?: string } | null;
+  downloadEnabled?: unknown;
+  downloadsReleased?: unknown;
+}
+
+/** Private delivery view. Download URLs stay off until the existing payment lock opens. */
+export function ownerStudioProject(
+  listing: GalleryLinkDoc,
+  pub: PublicStudioProject,
+  gate: OwnerStudioGate = {},
+): OwnerStudioProject {
+  const invoiceStatus = text(gate.invoice?.status) || text(invoiceOf(listing)?.status);
+  const invoice = invoiceStatus ? { status: invoiceStatus } : null;
+  const downloadsUnlocked = clientGalleryDownloadsUnlocked({
+    invoice,
+    downloadEnabled: gate.downloadEnabled ?? listing.downloadEnabled,
+    downloadsReleased: gate.downloadsReleased ?? listing.downloadsReleased,
+    lockDownloads: listing.lockDownloads,
+  });
+  return {
+    ...pub,
+    view: "owner",
+    clientName: text(listing.clientName),
+    clientEmail: text(listing.clientEmail),
+    clientPhone: text(listing.clientPhone),
+    revisions: ownerRevisions(listing),
+    lockDownloads: lockDownloadsOn(listing.lockDownloads),
+    requirePayment: requirePaymentOn(listing.requirePayment),
+    downloadsUnlocked,
+    invoice,
+    images: downloadsUnlocked ? ownerImageDownloads(listing, pub.images) : pub.images,
+    files: downloadsUnlocked ? ownerFiles(listing) : [],
   };
 }
 
