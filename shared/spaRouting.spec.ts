@@ -179,6 +179,12 @@ describe("spa rewrite coverage", () => {
     expect(emailHero.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
     expect(emailHero.readUInt32BE(16)).toBe(1200);
     expect(emailHero.readUInt32BE(20)).toBe(600);
+    expect(headerMatches("/email/senior-dollhouse.png")).toBe(false);
+    expect(firstMatchingRewrite("/email/senior-dollhouse.png", vercel.rewrites)).toBeUndefined();
+    const emailDollhouse = readFileSync(new URL("../public/email/senior-dollhouse.png", import.meta.url));
+    expect(emailDollhouse.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+    expect(emailDollhouse.readUInt32BE(16)).toBe(800);
+    expect(emailDollhouse.readUInt32BE(20)).toBe(560);
     expect(headerMatches("/present/preview")).toBe(false);
   });
 
