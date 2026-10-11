@@ -22,6 +22,12 @@ export const SENIOR_LIVING_REQUESTS = "seniorLivingRequests";
 /** Office inbox for this campaign. Added through the existing office notify helper. */
 export const SENIOR_LIVING_OPS_EMAIL = "ops@iconicimagestx.com";
 
+/** Senior living only. Other bookings still pay after the shoot. */
+export const SENIOR_LIVING_DEPOSIT_REQUIRED = true;
+export const SENIOR_LIVING_DEPOSIT_PERCENT = 50;
+export const SENIOR_LIVING_DEPOSIT_LINE =
+  "Reserve your date with a 50% deposit. The balance is due after the shoot.";
+
 export const SENIOR_LIVING_SERVICE_IDS = [
   "tour-3d",
   "rooms",
@@ -176,6 +182,9 @@ export function seniorLivingOfficeRecord(
   const serviceLabels = seniorLivingServiceLabels(value.services);
   const noteLines = [
     "Quote request. Not invoiced.",
+    `Deposit required: ${SENIOR_LIVING_DEPOSIT_REQUIRED ? "yes" : "no"}`,
+    `Deposit percent: ${SENIOR_LIVING_DEPOSIT_PERCENT}`,
+    SENIOR_LIVING_DEPOSIT_LINE,
     `Community: ${value.community}`,
     `Services: ${serviceLabels}`,
     `Preferred dates: ${value.preferredDates}`,
@@ -184,6 +193,8 @@ export function seniorLivingOfficeRecord(
   return {
     id,
     kind: "senior-living-request",
+    depositRequired: SENIOR_LIVING_DEPOSIT_REQUIRED,
+    depositPercent: SENIOR_LIVING_DEPOSIT_PERCENT,
     clientName: value.name,
     email: value.email,
     clientEmail: value.email,

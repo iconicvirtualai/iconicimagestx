@@ -18,6 +18,7 @@ import {
   parseSeniorLivingRequest,
   SENIOR_FACILITY_RATE_PER_SQFT,
   SENIOR_FACILITY_SQFT_CAP,
+  SENIOR_LIVING_DEPOSIT_LINE,
   SENIOR_LIVING_SERVICE_IDS,
   SENIOR_LIVING_SERVICE_LABELS,
   SENIOR_ROOM_RATES,
@@ -108,7 +109,7 @@ function TravelNote() {
 const STEPS = [
   {
     title: "Schedule",
-    body: "Tell us the community and a date that works.",
+    body: `Tell us the community and a date that works. ${SENIOR_LIVING_DEPOSIT_LINE}`,
   },
   {
     title: "Shoot",
@@ -251,6 +252,12 @@ export default function SeniorLiving() {
                   Call {BUSINESS_CONTACT.phoneDisplay}
                 </a>
               </div>
+              <p
+                data-testid="senior-deposit"
+                className="mt-4 max-w-xl text-lg leading-relaxed text-white sm:text-xl"
+              >
+                {SENIOR_LIVING_DEPOSIT_LINE}
+              </p>
             </div>
           </div>
         </section>
@@ -390,6 +397,7 @@ export default function SeniorLiving() {
                 <p className={`mt-3 ${bodyText}`}>
                   We have your request and will follow up with you.
                 </p>
+                <p className={`mt-3 ${bodyText}`}>{SENIOR_LIVING_DEPOSIT_LINE}</p>
               </div>
             ) : (
               <form
@@ -546,6 +554,22 @@ export default function SeniorLiving() {
                     className={fieldClass}
                   />
                 </label>
+                <div
+                  data-testid="senior-summary"
+                  className="rounded-2xl border border-neutral-300 bg-[#F6F3EE] p-4"
+                >
+                  <p className="text-lg font-semibold leading-snug">Summary</p>
+                  <p className={`mt-2 ${bodyText}`}>
+                    {services.length > 0
+                      ? services
+                          .map((id) => SENIOR_LIVING_SERVICE_LABELS[id])
+                          .join(", ")
+                      : "No services selected yet."}
+                  </p>
+                  <p className={`mt-2 ${bodyText}`}>
+                    {SENIOR_LIVING_DEPOSIT_LINE}
+                  </p>
+                </div>
                 {error ? (
                   <p
                     role="alert"
@@ -647,6 +671,9 @@ export default function SeniorLiving() {
                 </p>
               </article>
             </div>
+            <p className={`mt-8 max-w-3xl ${bodyText}`}>
+              {SENIOR_LIVING_DEPOSIT_LINE}
+            </p>
           </div>
         </section>
 

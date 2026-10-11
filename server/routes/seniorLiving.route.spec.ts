@@ -153,7 +153,11 @@ describe("senior living request route", () => {
   });
 
   it("writes the request and calls office notify without emailing the client", async () => {
-    const res = await post(valid);
+    const res = await post({
+      ...valid,
+      depositRequired: false,
+      depositPercent: 0,
+    });
     const body = await res.json();
     expect(res.status).toBe(201);
     expect(body.success).toBe(true);
@@ -161,12 +165,16 @@ describe("senior living request route", () => {
     expect(store.added[0].collection).toBe(SENIOR_LIVING_REQUESTS);
     expect(store.added[0].data.email).toBe(valid.email);
     expect(store.added[0].data.community).toBe(valid.community);
+    expect(store.added[0].data.depositRequired).toBe(true);
+    expect(store.added[0].data.depositPercent).toBe(50);
     expect(notify).toHaveBeenCalledTimes(1);
     const input = notify.mock.calls[0]?.[0];
     if (!input) throw new Error("office notify was not called");
     expect(input.isNewOrder).toBe(true);
     expect(input.saved.email).toBe(valid.email);
     expect(input.saved.clientEmail).toBe(valid.email);
+    expect(input.saved.depositRequired).toBe(true);
+    expect(input.saved.depositPercent).toBe(50);
     expect(input.saved.id).toBe(store.added[0].id);
     expect(input.env.ADMIN_EMAIL).toContain(SENIOR_LIVING_OPS_EMAIL);
     expect(sendEmail).not.toHaveBeenCalled();

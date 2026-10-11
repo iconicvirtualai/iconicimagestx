@@ -20,6 +20,7 @@ import {
 import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "@shared/businessContact";
 import {
   SENIOR_FACILITY_RATE_PER_SQFT,
+  SENIOR_LIVING_DEPOSIT_LINE,
   SENIOR_FACILITY_SQFT_CAP,
   SENIOR_ROOM_RATES,
   SENIOR_TOUR_PRICE,
@@ -106,6 +107,19 @@ describe("senior living page", () => {
     expect(html).toContain("Schedule");
     expect(html).toContain("Shoot");
     expect(html).toContain("Content Ready");
+    expect(html).toContain(SENIOR_LIVING_DEPOSIT_LINE);
+    expect(
+      container?.querySelector('[data-testid="senior-deposit"]')?.textContent,
+    ).toBe(SENIOR_LIVING_DEPOSIT_LINE);
+    expect(
+      container?.querySelector('[data-testid="senior-steps"]')?.textContent,
+    ).toContain(SENIOR_LIVING_DEPOSIT_LINE);
+    expect(
+      container?.querySelector('[data-testid="senior-pricing"]')?.textContent,
+    ).toContain(SENIOR_LIVING_DEPOSIT_LINE);
+    expect(
+      container?.querySelector('[data-testid="senior-summary"]')?.textContent,
+    ).toContain(SENIOR_LIVING_DEPOSIT_LINE);
     expect(
       container
         ?.querySelector('[data-testid="senior-cta"]')
@@ -330,6 +344,9 @@ describe("senior living page", () => {
     expect(
       container?.querySelector("[data-testid='senior-success']")?.textContent,
     ).toContain("Request received.");
+    expect(
+      container?.querySelector("[data-testid='senior-success']")?.textContent,
+    ).toContain(SENIOR_LIVING_DEPOSIT_LINE);
     expect(container?.textContent).not.toMatch(
       /check your email|emailed you|confirmation email/i,
     );

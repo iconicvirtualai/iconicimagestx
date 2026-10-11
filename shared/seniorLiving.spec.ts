@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   SENIOR_FACILITY_RATE_PER_SQFT,
+  SENIOR_LIVING_DEPOSIT_LINE,
+  SENIOR_LIVING_DEPOSIT_PERCENT,
+  SENIOR_LIVING_DEPOSIT_REQUIRED,
   SENIOR_LIVING_OPS_EMAIL,
   SENIOR_ROOM_RATES,
   SENIOR_TOUR_PRICE,
@@ -92,6 +95,13 @@ describe("senior living request validation", () => {
     );
     expect(String(saved.vibeNote)).toContain("Quote request. Not invoiced.");
     expect(String(saved.vibeNote)).not.toContain("confirmation email");
+    expect(saved.depositRequired).toBe(SENIOR_LIVING_DEPOSIT_REQUIRED);
+    expect(saved.depositPercent).toBe(SENIOR_LIVING_DEPOSIT_PERCENT);
+    expect(saved.depositRequired).toBe(true);
+    expect(saved.depositPercent).toBe(50);
+    expect(String(saved.vibeNote)).toContain("Deposit required: yes");
+    expect(String(saved.vibeNote)).toContain("Deposit percent: 50");
+    expect(String(saved.vibeNote)).toContain(SENIOR_LIVING_DEPOSIT_LINE);
   });
 
   it("adds ops to the existing office recipient list", () => {

@@ -7,6 +7,7 @@ vi.mock("../services/email", () => ({
 import { sendEmail } from "../services/email";
 import { notifyOfficeOfOrder } from "../services/officeOrderNotify";
 import {
+  SENIOR_LIVING_DEPOSIT_LINE,
   SENIOR_LIVING_OPS_EMAIL,
   seniorLivingOfficeEnv,
   seniorLivingOfficeRecord,
@@ -51,5 +52,10 @@ describe("senior living office notify", () => {
     expect(message.template).toBe("office_new_order");
     expect(message.subject).toContain("Senior Living");
     expect(message.html).toContain("A Woodlands-area senior living community");
+    expect(message.html).toContain("Deposit required: yes");
+    expect(message.html).toContain("Deposit percent: 50");
+    expect(message.html).toContain(SENIOR_LIVING_DEPOSIT_LINE);
+    expect(saved.depositRequired).toBe(true);
+    expect(saved.depositPercent).toBe(50);
   });
 });
