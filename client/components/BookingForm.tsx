@@ -582,7 +582,6 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     showTravelLine ? travelFeeDollars(travel) : 0,
     processingOn,
   );
-
   const handleApplyPromo = () => {
     const promo = promoDiscountFor(promoInput);
     if (promo?.code === "ICONICAI") {

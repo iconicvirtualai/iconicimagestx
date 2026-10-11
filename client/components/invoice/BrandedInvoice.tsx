@@ -5,9 +5,7 @@ import type { InvoiceFace, InvoiceFaceLine } from "@shared/invoiceFace";
 import {
   formatInvoiceDisplayDate,
   invoiceBlankRowCount,
-  invoiceProcessingMode,
   presentInvoiceMoney,
-  type InvoiceProcessingMode,
   type PresentedInvoiceMoney,
 } from "@shared/invoiceProcessing";
 
@@ -18,7 +16,6 @@ const GREEN = "#00A651";
 const FONT = '"Inter", Helvetica, Arial, sans-serif';
 
 const OnDarkContext = React.createContext(false);
-const ProcessingModeContext = React.createContext<InvoiceProcessingMode | undefined>(undefined);
 
 export function money(value: number): string {
   return (Number(value) || 0).toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -31,7 +28,6 @@ export function BrandedInvoiceShell({
   amountPaid,
   amountDue,
   notes,
-  processingMode,
   children,
   footer,
 }: {
@@ -43,20 +39,16 @@ export function BrandedInvoiceShell({
   amountDue: number;
   /** Pass "" to print the NOTES label with an empty body. Omit to leave notes to the page. */
   notes?: string;
-  /** Defaults to INVOICE_PROCESSING_MODE, which is display. */
-  processingMode?: InvoiceProcessingMode;
   children: React.ReactNode;
   footer?: React.ReactNode;
 }) {
   const date = formatInvoiceDisplayDate(issuedAt);
-  const mode = processingMode ?? invoiceProcessingMode();
   const { billTo, rest } = splitBillTo(children);
   return (
     <article
       className="flex min-h-[920px] flex-col overflow-hidden bg-white text-black sm:min-h-[1100px]"
       style={{ fontFamily: FONT }}
       data-testid="branded-invoice"
-      data-processing-mode={mode}
     >
       <header className="bg-black px-5 py-6 text-white sm:px-8">
         <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
@@ -87,12 +79,10 @@ export function BrandedInvoiceShell({
           </div>
         </div>
       </header>
-      <ProcessingModeContext.Provider value={mode}>
-        <div className="flex-1 space-y-5 px-4 py-5 sm:px-6 sm:py-6">
-          {rest}
-          <InvoiceNotes notes={notes} />
-        </div>
-      </ProcessingModeContext.Provider>
+      <div className="flex-1 space-y-5 px-4 py-5 sm:px-6 sm:py-6">
+        {rest}
+        <InvoiceNotes notes={notes} />
+      </div>
       {amountPaid > 0 ? (
         <div className="flex flex-wrap items-end justify-between gap-3 px-5 pb-2 text-sm sm:px-8" data-testid="invoice-balance">
           <p>
@@ -209,21 +199,13 @@ function LineRow({ line }: { line: InvoiceFaceLine }) {
 
 export function InvoiceFaceSummary({
   face,
-  processingMode,
 }: {
   face: InvoiceFace;
-  processingMode?: InvoiceProcessingMode;
 }) {
-  const contextMode = React.useContext(ProcessingModeContext);
-  const presented = presentInvoiceMoney(face, processingMode ?? contextMode ?? invoiceProcessingMode());
-  const cells: Array<{ id: string; label: string; amount: string; note?: string }> = [
+  const presented = presentInvoiceMoney(face);
+  const cells: Array<{ id: string; label: string; amount: string }> = [
     { id: "subtotal", label: "Sub total", amount: money(presented.subtotal) },
-    {
-      id: "processing",
-      label: "Processing",
-      amount: money(presented.processing),
-      note: presented.presentation === "included" ? "Included" : undefined,
-    },
+    { id: "processing", label: "Processing", amount: money(presented.processing) },
     { id: "promotions", label: "Promotions", amount: presented.promotions > 0 ? `-${money(presented.promotions)}` : money(0) },
     { id: "fees", label: "Fees", amount: money(presented.fees) },
   ];
@@ -234,10 +216,9 @@ export function InvoiceFaceSummary({
       <div className="rounded-2xl border-2 border-black px-4 py-4 sm:px-5" data-testid="invoice-total-box">
         <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:flex sm:items-end sm:justify-between sm:gap-3">
           {cells.map((cell) => (
-            <div key={cell.id} data-invoice-row={cell.id} data-processing-presentation={cell.id === "processing" ? presented.presentation : undefined}>
+            <div key={cell.id} data-invoice-row={cell.id}>
               <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-neutral-700 sm:text-[11px] sm:tracking-[0.16em]">{cell.label}</p>
               <MoneyAmount className="mt-1 text-sm font-bold text-black">{cell.amount}</MoneyAmount>
-              {cell.note ? <p className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: GREEN }}>{cell.note}</p> : null}
             </div>
           ))}
           <div className="col-span-2 border-t border-black/15 pt-3 sm:w-auto sm:border-0 sm:pt-0 sm:text-right" data-invoice-row="total">
@@ -246,11 +227,6 @@ export function InvoiceFaceSummary({
           </div>
         </div>
       </div>
-      {presented.presentation === "included" ? (
-        <p className="mt-2 text-[11px] leading-snug text-neutral-500" data-testid="processing-note">
-          Processing is 2.8% of the subtotal and is included in the total. It is not an extra charge.
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -284,7 +260,6 @@ export function BrandedInvoice({
   billToAddress,
   face,
   notes = "",
-  processingMode,
   footer,
 }: {
   invoiceNumber: string;
@@ -295,11 +270,9 @@ export function BrandedInvoice({
   billToAddress?: string;
   face: InvoiceFace;
   notes?: string;
-  processingMode?: InvoiceProcessingMode;
   footer?: React.ReactNode;
 }) {
-  const mode = processingMode ?? invoiceProcessingMode();
-  const presented: PresentedInvoiceMoney = presentInvoiceMoney(face, mode);
+  const presented: PresentedInvoiceMoney = presentInvoiceMoney(face);
   return (
     <BrandedInvoiceShell
       invoiceNumber={invoiceNumber}
@@ -308,12 +281,11 @@ export function BrandedInvoice({
       amountPaid={presented.amountPaid}
       amountDue={presented.amountDue}
       notes={notes}
-      processingMode={mode}
       footer={footer}
     >
       <InvoiceBillTo name={clientName} email={clientEmail} address={billToAddress} />
       <InvoiceLineTable lines={face.services} />
-      <InvoiceFaceSummary face={face} processingMode={mode} />
+      <InvoiceFaceSummary face={face} />
     </BrandedInvoiceShell>
   );
 }

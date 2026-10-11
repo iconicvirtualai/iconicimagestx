@@ -1,7 +1,7 @@
 /**
  * PDF of the branded Iconic invoice.
  * Layout follows the owner template: black header, pill table, totals box, notes, black footer.
- * Helvetica only. Display mode does not add the processing fee to the total.
+ * Helvetica only. Processing and the total are the stored invoice amounts.
  */
 
 import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "./businessContact.ts";
@@ -10,9 +10,7 @@ import type { InvoiceFace, InvoiceFaceLine } from "./invoiceFace.ts";
 import {
   formatInvoiceDisplayDate,
   invoiceBlankRowCount,
-  invoiceProcessingMode,
   presentInvoiceMoney,
-  type InvoiceProcessingMode,
 } from "./invoiceProcessing.ts";
 import { brandedInvoiceNumber } from "./orderProjectInvoice.ts";
 
@@ -27,8 +25,6 @@ export interface BrandedInvoicePdfInput {
   status: string;
   face: InvoiceFace;
   notes?: string;
-  /** Defaults to INVOICE_PROCESSING_MODE, which is display. */
-  processingMode?: InvoiceProcessingMode;
   /** Ignored. Contact details always come from businessContact.ts. */
   footerLines?: string[];
 }
@@ -67,7 +63,7 @@ function layout(input: BrandedInvoicePdfInput): string {
     id: input.invoiceId,
     createdAt: input.issuedAt,
   });
-  const presented = presentInvoiceMoney(input.face, input.processingMode ?? invoiceProcessingMode());
+  const presented = presentInvoiceMoney(input.face);
   const date = formatInvoiceDisplayDate(input.issuedAt);
   const ops: string[] = [];
 
@@ -122,18 +118,14 @@ function layout(input: BrandedInvoicePdfInput): string {
     ops.push(textRight(RIGHT - 12, baseline, 9, "F2", TEAL, row.total));
   });
 
-  const boxH = presented.presentation === "included" ? 78 : 64;
+  const boxH = 64;
   const boxTop = Math.min(bodyBottom - 16, 360);
   const boxY = boxTop - boxH;
   ops.push(strokeRoundedRect(LEFT, boxY, RIGHT - LEFT, boxH, 10, BLACK, 1.4));
 
-  const cells: Array<{ label: string; amount: string; note?: string }> = [
+  const cells: Array<{ label: string; amount: string }> = [
     { label: "SUB TOTAL", amount: money(presented.subtotal) },
-    {
-      label: "PROCESSING",
-      amount: money(presented.processing),
-      note: presented.presentation === "included" ? "INCLUDED" : undefined,
-    },
+    { label: "PROCESSING", amount: money(presented.processing) },
     { label: "PROMOTIONS", amount: promoAmount(presented.promotions) },
     { label: "FEES", amount: money(presented.fees) },
   ];
@@ -145,21 +137,12 @@ function layout(input: BrandedInvoicePdfInput): string {
     const x = LEFT + 16 + slotW * index;
     ops.push(text(x, boxY + boxH - 22, 7, "F1", BLACK, cell.label, 0.3));
     ops.push(text(x, boxY + boxH - 40, 11, "F2", BLACK, cell.amount));
-    if (cell.note) ops.push(text(x, boxY + 14, 7, "F2", GREEN, cell.note, 0.3));
   });
   const totalX = RIGHT - 16;
   ops.push(textRight(totalX, boxY + boxH - 22, 11, "F2", BLACK, totalCell.label, 0.4));
   ops.push(textRight(totalX, boxY + boxH - 44, 16, "F2", BLACK, totalCell.amount));
 
   let noteY = boxY - 28;
-  if (presented.presentation === "included") {
-    const note = "Processing is 2.8% of the subtotal and is included in the total.";
-    for (const line of wrap(note, 8, false, RIGHT - LEFT)) {
-      ops.push(text(LEFT, noteY, 8, "F1", MUTED, line));
-      noteY -= 11;
-    }
-    noteY -= 8;
-  }
   ops.push(text(LEFT, noteY, 11, "F2", PINK, "NOTES:", 1.3));
   noteY -= 16;
   const noteBody = (input.notes || "").trim();

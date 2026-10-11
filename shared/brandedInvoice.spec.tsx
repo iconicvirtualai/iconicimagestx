@@ -88,13 +88,14 @@ const retiredMarketing = ["Media", "& Marketing"].join(" ");
 const retiredSuite = ["Ste", "107"].join(" ");
 
 describe("branded invoice pdf", () => {
-  it("draws the template, embeds the logo, and keeps the charged total in display mode", () => {
+  it("draws the template, embeds the logo, and prints the stored processing total", () => {
     const face = invoiceFaceFromStored({
       lineItems: [{ name: "The Showcase", price: 549, qty: 1 }],
       subtotal: 549,
-      total: 549,
+      processing: 15.37,
+      total: 564.37,
       amountPaid: 0,
-      amountDue: 549,
+      amountDue: 564.37,
     });
     const bytes = brandedInvoicePdf({
       invoiceNumber: "12345",
@@ -104,7 +105,6 @@ describe("branded invoice pdf", () => {
       status: "",
       notes: "Gate code is 1234.",
       face,
-      processingMode: "display",
     });
     const pdf = new TextDecoder().decode(bytes);
     expect(pdf.startsWith("%PDF-1.4")).toBe(true);
@@ -124,10 +124,10 @@ describe("branded invoice pdf", () => {
     expect(pdf).toContain("PROCESSING");
     expect(pdf).toContain("PROMOTIONS");
     expect(pdf).toContain("FEES");
-    expect(pdf).toContain("INCLUDED");
+    expect(pdf).not.toContain("INCLUDED");
     expect(pdf).toContain("$15.37");
     expect(pdf).toContain("$549.00");
-    expect(pdf).not.toContain("$564.37");
+    expect(pdf).toContain("$564.37");
     expect(pdf).toContain("NOTES:");
     expect(pdf).toContain("Gate code is 1234.");
     expect(pdf).toContain("PAYMENT INFORMATION:");
@@ -143,7 +143,7 @@ describe("branded invoice pdf", () => {
     expect(pdf).not.toContain("Pay Securely");
   });
 
-  it("adds 2.8% to the printed total only in charge mode", () => {
+  it("prints a legacy invoice at its stored total and does not invent 2.8%", () => {
     const face = invoiceFaceFromStored({
       lineItems: [{ name: "The Showcase", price: 549, qty: 1 }],
       subtotal: 549,
@@ -156,11 +156,11 @@ describe("branded invoice pdf", () => {
       billToAddress: "",
       status: "",
       face,
-      processingMode: "charge",
     }));
     expect(pdf).toContain("PROCESSING");
-    expect(pdf).toContain("$15.37");
-    expect(pdf).toContain("$564.37");
+    expect(pdf).toContain("$0.00");
+    expect(pdf).toContain("$549.00");
+    expect(pdf).not.toContain("$564.37");
     expect(pdf).not.toContain("INCLUDED");
   });
 
@@ -178,7 +178,6 @@ describe("branded invoice pdf", () => {
       billToAddress: "",
       status: "sent",
       face,
-      processingMode: "charge",
     }));
     expect(pdf).toContain("PROCESSING");
     expect(pdf).toContain("$4.00");
@@ -243,36 +242,43 @@ describe("invoice summary markup", () => {
     lineItems: [{ name: "The Showcase", price: 549, qty: 1 }],
   });
 
-  it("prints 2.8% as included in display mode and adds it only in charge mode", () => {
-    const display = renderToStaticMarkup(<InvoiceFaceSummary face={showcase} processingMode="display" />);
-    expect(display).toContain("Sub total");
-    expect(display).toContain("Promotions");
-    expect(display).toContain("Fees");
-    expect(display).toContain('data-testid="invoice-total-box"');
-    expect(display).toContain('data-slot="money"');
-    expect(display).toContain("whitespace-nowrap");
-    expect(display).toContain('data-invoice-row="processing"');
-    expect(display).toContain('data-processing-presentation="included"');
-    expect(display).toContain("$15.37");
-    expect(display).toContain("$549.00");
-    expect(display).not.toContain("$564.37");
-    expect(display).toContain("not an extra charge");
+  it("prints the stored processing line and the stored total", () => {
+    const legacy = renderToStaticMarkup(<InvoiceFaceSummary face={showcase} />);
+    expect(legacy).toContain("Sub total");
+    expect(legacy).toContain("Promotions");
+    expect(legacy).toContain("Fees");
+    expect(legacy).toContain('data-testid="invoice-total-box"');
+    expect(legacy).toContain('data-slot="money"');
+    expect(legacy).toContain("whitespace-nowrap");
+    expect(legacy).toContain('data-invoice-row="processing"');
+    expect(legacy).toContain("$0.00");
+    expect(legacy).toContain("$549.00");
+    expect(legacy).not.toContain("$564.37");
+    expect(legacy).not.toContain("INCLUDED");
+    expect(legacy).not.toContain("not an extra charge");
 
-    const charge = renderToStaticMarkup(<InvoiceFaceSummary face={showcase} processingMode="charge" />);
-    expect(charge).toContain('data-processing-presentation="added"');
-    expect(charge).toContain("$15.37");
-    expect(charge).toContain("$564.37");
-    expect(charge).not.toContain("not an extra charge");
+    const charged = renderToStaticMarkup(
+      <InvoiceFaceSummary
+        face={invoiceFaceFromStored({
+          subtotal: 549,
+          processing: 15.37,
+          total: 564.37,
+          amountDue: 564.37,
+          lineItems: [{ name: "The Showcase", price: 549, qty: 1 }],
+        })}
+      />,
+    );
+    expect(charged).toContain("$15.37");
+    expect(charged).toContain("$564.37");
+    expect(charged).not.toContain("INCLUDED");
   });
 
   it("shows a stored processing amount instead of inventing another 2.8%", () => {
     const shown = renderToStaticMarkup(
       <InvoiceFaceSummary
         face={invoiceFaceFromStored({ subtotal: 80, processing: 5, total: 85, lineItems: [{ name: "Photos", price: 80 }] })}
-        processingMode="charge"
       />,
     );
-    expect(shown).toContain('data-processing-presentation="stored"');
     expect(shown).toContain("Processing");
     expect(shown).toContain("$5.00");
     expect(shown).toContain("$85.00");
@@ -288,7 +294,6 @@ describe("invoice summary markup", () => {
         billToAddress="123 Anywhere St., Any City"
         face={showcase}
         notes="Leave the lights on."
-        processingMode="display"
       />,
     );
     expect(html).toContain("JAN. 01, 2027");

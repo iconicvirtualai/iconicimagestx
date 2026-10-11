@@ -1,7 +1,35 @@
 import { useSearchParams } from "react-router-dom";
 import { BrandedInvoice } from "@/components/invoice/BrandedInvoice";
 import { invoiceFaceFromStored } from "@shared/invoiceFace";
-import type { InvoiceProcessingMode } from "@shared/invoiceProcessing";
+import { computeInvoiceTotals } from "@shared/invoiceProcessing";
+
+function chargedFace(input: {
+  lineItems: Array<Record<string, unknown>>;
+  subtotal: number;
+  promotions?: number;
+  fees?: number;
+  promoCode?: string;
+}) {
+  const totals = computeInvoiceTotals({
+    subtotal: input.subtotal,
+    promotions: input.promotions ?? 0,
+    fees: input.fees ?? 0,
+    travel: 0,
+    tax: 0,
+  });
+  return invoiceFaceFromStored({
+    lineItems: input.lineItems,
+    subtotal: totals.subtotal,
+    processing: totals.processing,
+    promoCode: input.promoCode,
+    promoDiscount: totals.promotions,
+    fees: totals.fees,
+    tax: 0,
+    total: totals.total,
+    amountPaid: 0,
+    amountDue: totals.amountDue,
+  });
+}
 
 const showcase = {
   invoiceNumber: "12345",
@@ -9,15 +37,9 @@ const showcase = {
   clientName: "Drew Feig",
   billToAddress: "123 Anywhere St., Any City",
   notes: "",
-  face: invoiceFaceFromStored({
+  face: chargedFace({
     lineItems: [{ name: "The Showcase", qty: 1, unitPrice: 549, price: 549 }],
     subtotal: 549,
-    promoDiscount: 0,
-    fees: 0,
-    tax: 0,
-    total: 549,
-    amountPaid: 0,
-    amountDue: 549,
   }),
 };
 
@@ -27,7 +49,7 @@ const lines = {
   clientName: "Jordan Hale",
   billToAddress: "88 Oak Lane\nSpring, TX 77380",
   notes: "Gate code is 1234. Please park in the driveway.",
-  face: invoiceFaceFromStored({
+  face: chargedFace({
     lineItems: [
       { name: "The Showcase", qty: 1, price: 549 },
       { name: "Twilight Photos", qty: 1, price: 199 },
@@ -35,13 +57,9 @@ const lines = {
       { name: "Floor Plan", qty: 2, unitPrice: 75, price: 150 },
     ],
     subtotal: 1048,
-    promoCode: "SPRING",
-    promoDiscount: 50,
+    promotions: 50,
     fees: 25,
-    tax: 0,
-    total: 1023,
-    amountPaid: 0,
-    amountDue: 1023,
+    promoCode: "SPRING",
   }),
 };
 
@@ -49,19 +67,22 @@ const lines = {
 export default function InvoiceTemplatePreview() {
   const [params] = useSearchParams();
   const sample = params.get("sample") === "lines" ? lines : showcase;
-  const mode: InvoiceProcessingMode = params.get("mode") === "charge" ? "charge" : "display";
   return (
     <main className="min-h-screen bg-white">
       <div className="mx-auto w-full max-w-[840px]">
-      <BrandedInvoice
-        invoiceNumber={sample.invoiceNumber}
-        issuedAt={sample.issuedAt}
-        clientName={sample.clientName}
-        billToAddress={sample.billToAddress}
-        face={sample.face}
-        notes={sample.notes}
-        processingMode={mode}
-      />
+        <BrandedInvoice
+          invoiceNumber={sample.invoiceNumber}
+          issuedAt={sample.issuedAt}
+          clientName={sample.clientName}
+          billToAddress={sample.billToAddress}
+          face={sample.face}
+          notes={sample.notes}
+          footer={(
+            <button type="button" className="h-12 w-full rounded-xl bg-[#0d9488] text-sm font-bold text-white">
+              Pay Securely
+            </button>
+          )}
+        />
       </div>
     </main>
   );

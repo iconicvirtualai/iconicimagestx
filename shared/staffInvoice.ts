@@ -6,6 +6,7 @@
 import { addressText } from "./addressText.ts";
 import { clientPayPath } from "./invoicePay.ts";
 import { normalizeBookingLineItems, type BookingLineItem } from "./bookingPricing.ts";
+import { computeInvoiceTotals } from "./invoiceProcessing.ts";
 import { cleanPersonName, normalizeEmail } from "./listingAccess.ts";
 import { draftInvoiceNumber } from "./orderProjectInvoice.ts";
 import type { StaffCatalogPackage } from "./bookingCatalog.ts";
@@ -287,9 +288,11 @@ export function staffInvoiceSavePatch(
     processing?: unknown;
     fees?: unknown;
     travel?: unknown;
+    processingPolicy?: unknown;
+    status?: unknown;
   } = {},
 ): InvoiceBillingPatch {
-  const totals = invoiceTotals(form, existing.amountPaid);
+  const totals = invoiceTotals(form, existing.amountPaid, existing);
   const patch: InvoiceBillingPatch = {
     clientName: cleanPersonName(form.clientName) || "Client",
     clientEmail: normalizeEmail(form.clientEmail),
@@ -367,27 +370,42 @@ export function repriceInvoiceAdjustments(form: StaffInvoiceForm, presets: Invoi
   return changed ? next : form;
 }
 
-function invoiceTotals(form: StaffInvoiceForm, amountPaid: unknown) {
+function invoiceTotals(
+  form: StaffInvoiceForm,
+  amountPaid: unknown,
+  existing: { processingPolicy?: unknown; status?: unknown } = {},
+) {
   const services = serviceRows(form.services);
   const promoCode = form.promoCode.trim();
   const promoDiscount = cents(Math.max(0, Number(form.promoDiscount) || 0));
   const tax = cents(Math.max(0, Number(form.tax) || 0));
-  const processing = cents(Math.max(0, Number(form.processing) || 0));
   const fees = cents(Math.max(0, Number(form.fees) || 0));
   const travel = cents(Math.max(0, Number(form.travel) || 0));
   const subtotal = cents(services.reduce((sum, item) => sum + item.price, 0));
-  const total = cents(Math.max(0, subtotal - promoDiscount) + tax + processing + fees + travel);
+  const comped = String(existing.status || "").toLowerCase() === "comped";
+  const automatic = existing.processingPolicy === "included" && !form.processingOverridden && !comped;
+  const totals = computeInvoiceTotals({
+    subtotal,
+    promotions: promoDiscount,
+    fees,
+    travel,
+    tax,
+    amountPaid,
+    processing: automatic ? null : cents(Math.max(0, Number(form.processing) || 0)),
+    applyProcessing: automatic,
+    comped,
+  });
   return {
     services,
     promoCode,
     promoDiscount,
     tax,
-    processing,
+    processing: totals.processing,
     fees,
     travel,
     subtotal,
-    total,
-    amountDue: cents(Math.max(0, total - cents(Math.max(0, Number(amountPaid) || 0)))),
+    total: totals.total,
+    amountDue: totals.amountDue,
   };
 }
 

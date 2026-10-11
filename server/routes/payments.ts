@@ -149,6 +149,7 @@ function invoiceMoney(invoice: Record<string, unknown>) {
     amountPaid: invoice.amountPaid,
     amountDue: invoice.amountDue,
     processing: invoice.processing ?? null,
+    processingPolicy: invoice.processingPolicy ?? null,
     fees: invoice.fees ?? null,
     travel: invoice.travel ?? null,
     promoDiscount: invoice.promoDiscount ?? null,
@@ -660,6 +661,8 @@ router.post("/invoice/:id/checkout", async (req: Request, res: Response) => {
     });
     if (view === "deny") return invoiceNotFound(res);
 
+    // Stored balance only. New invoices already include 2.8% in total.
+    // Legacy open invoices keep charging amountStillDue until a migration updates them.
     const amountDue = amountStillDue(invoice);
     const provider = invoiceProvider(invoice);
     const payToken = await payTokenForLink(invoiceDoc);
