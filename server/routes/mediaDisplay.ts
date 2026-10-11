@@ -35,7 +35,8 @@ const FETCH_TIMEOUT_MS = 8_000;
 const RATE_WINDOW_MS = 60_000;
 const RATE_MAX_DEFAULT = 180;
 const ALLOWED_HOSTS = new Set(["firebasestorage.googleapis.com", "storage.googleapis.com"]);
-const PROJECT_HOSTS = new Set(["iconicimagestx.vercel.app"]);
+const PRODUCTION_HOST = "iconicimagestx.vercel.app";
+const WIX_HOSTS = new Set(["iconicimagestx.com", "www.iconicimagestx.com"]);
 const VIDEO_EXT = /\.(mp4|m4v|mov|webm)$/i;
 const IMAGE_EXT = /\.(jpe?g|png|webp|gif)$/i;
 
@@ -139,25 +140,46 @@ function hostnameOf(value: string | undefined): string {
   }
 }
 
+function isWixHost(host: string): boolean {
+  return WIX_HOSTS.has(host);
+}
+
+/** Production project host. A Wix value in VERCEL_PROJECT_PRODUCTION_URL is ignored. */
+function configuredProductionHost(): string {
+  const configured = hostnameOf(process.env.VERCEL_PROJECT_PRODUCTION_URL);
+  if (configured && !isWixHost(configured)) return configured;
+  return PRODUCTION_HOST;
+}
+
 function deploymentHosts(): Set<string> {
-  const hosts = new Set(PROJECT_HOSTS);
-  const vercel = hostnameOf(process.env.VERCEL_URL);
-  if (vercel) hosts.add(vercel);
+  const hosts = new Set<string>([PRODUCTION_HOST]);
+  const production = hostnameOf(process.env.VERCEL_PROJECT_PRODUCTION_URL);
+  if (production && !isWixHost(production)) hosts.add(production);
+  if (process.env.VERCEL_ENV === "preview") {
+    const preview = hostnameOf(process.env.VERCEL_URL);
+    if (preview && !isWixHost(preview)) hosts.add(preview);
+  }
   return hosts;
 }
 
 /**
- * This deployment's host. APP_URL is the Wix site and must not be used:
- * it 301s, and the fetch refuses redirects. VERCEL_URL wins. The request
- * host is used only when it is this Vercel project.
+ * Host for a same-origin /media fetch.
+ * Production uses VERCEL_PROJECT_PRODUCTION_URL, then iconicimagestx.vercel.app.
+ * The deployment host (VERCEL_URL) is behind Vercel SSO, so it is only used
+ * on previews. Those preview fetches may still hit SSO.
+ * APP_URL and the Wix hosts are never used.
  */
 function chooseOwnHost(req: { headers?: { host?: string | string[] } }): string {
-  const vercel = hostnameOf(process.env.VERCEL_URL);
-  if (vercel) return vercel;
+  if (process.env.VERCEL_ENV === "production") return configuredProductionHost();
+  if (process.env.VERCEL_ENV === "preview") {
+    const preview = hostnameOf(process.env.VERCEL_URL);
+    if (preview && !isWixHost(preview)) return preview;
+    return "";
+  }
   const header = req.headers?.host;
   const raw = Array.isArray(header) ? header[0] : header;
   const requestHost = hostnameOf(typeof raw === "string" ? raw.split(",")[0] : "");
-  if (requestHost && deploymentHosts().has(requestHost)) return requestHost;
+  if (requestHost && !isWixHost(requestHost) && deploymentHosts().has(requestHost)) return requestHost;
   return "";
 }
 
