@@ -6144,6 +6144,23 @@ function rasterPoster(row, legacyDropTagged = false) {
   }
   return "";
 }
+const VIDEO_PLACEHOLDER_PREFIX = "video-placeholder:";
+function videoFileUrl(row) {
+  const url = shareableUrl$1(row.url) || shareableUrl$1(row.shareUrl);
+  if (!url || !VIDEO_FILE.test(url.split("#")[0])) return "";
+  return url;
+}
+function videoPlaceholderSource(row) {
+  if (rasterPoster(row)) return "";
+  const file = videoFileUrl(row);
+  const type = text$8(row.type).toLowerCase();
+  const content = text$8(row.contentType).toLowerCase();
+  const named = type === "video" || type === "reel" || content.startsWith("video/");
+  if (!file && !named) return "";
+  const id = text$8(row.id) || file || text$8(row.path) || text$8(row.storagePath) || text$8(row.name) || text$8(row.fileName);
+  if (!id) return "";
+  return `${VIDEO_PLACEHOLDER_PREFIX}${encodeURIComponent(id)}`;
+}
 function floorSource(row, legacyDropTagged = false) {
   if (legacyDropTagged && (isMls(row) || isFullRes(row))) return separateDisplay(row);
   return rasterShareSource(row, legacyDropTagged) || rasterPoster(row, legacyDropTagged);
@@ -6179,18 +6196,14 @@ function shareDisplayItems(listing, options = {}) {
     listing.videos.forEach((item) => {
       const row = rowOf$2(item);
       if (!row) return;
-      pushDisplay(items, seen, mediaName$1(row, "Video"), rasterPoster(row, legacy), "poster");
+      const poster = rasterPoster(row, legacy) || videoPlaceholderSource(row);
+      pushDisplay(items, seen, mediaName$1(row, "Video"), poster, "poster");
     });
   }
   return items;
 }
-function videoFileUrl(row) {
-  const url = shareableUrl$1(row.url) || shareableUrl$1(row.shareUrl);
-  if (!url || !VIDEO_FILE.test(url.split("#")[0])) return "";
-  return url;
-}
 function ownerPosterSource(row) {
-  return rasterPoster(row) || videoFileUrl(row);
+  return rasterPoster(row) || videoPlaceholderSource(row);
 }
 function listingOwnerDisplayItems(listing) {
   const items = [...shareDisplayItems(listing)];
@@ -6199,7 +6212,7 @@ function listingOwnerDisplayItems(listing) {
   listing.videos.forEach((item) => {
     const row = rowOf$2(item);
     if (!row || rasterPoster(row)) return;
-    pushDisplay(items, seen, mediaName$1(row, "Video"), videoFileUrl(row), "poster");
+    pushDisplay(items, seen, mediaName$1(row, "Video"), videoPlaceholderSource(row), "poster");
   });
   return items;
 }
@@ -6223,12 +6236,8 @@ function galleryOwnerDisplayItems(media) {
   for (const row of rows) {
     const type = text$8(row.type).toLowerCase();
     if (type !== "video" && type !== "reel") continue;
-    const poster = rasterPoster(row);
-    if (poster) {
-      pushDisplay(items, seen, mediaName$1(row, "Video"), poster, "poster");
-      continue;
-    }
-    pushDisplay(items, seen, mediaName$1(row, "Video"), videoFileUrl(row), "poster");
+    const poster = rasterPoster(row) || videoPlaceholderSource(row);
+    pushDisplay(items, seen, mediaName$1(row, "Video"), poster, "poster");
   }
   return items;
 }
@@ -6237,7 +6246,7 @@ function displayMedia(listingId, index, name) {
   return { url, displayUrl: url, name };
 }
 function posterIndex(row, items) {
-  const poster = rasterPoster(row);
+  const poster = rasterPoster(row) || videoPlaceholderSource(row);
   if (!poster) return -1;
   return items.findIndex((item) => item.sourceUrl === poster);
 }
@@ -6282,6 +6291,7 @@ function publicShareVideos(listing, playback) {
     if (!row) continue;
     const name = mediaName$1(row, "Video");
     const posterAt = posterIndex(row, items);
+    if (playback && (isUnbranded(row) || isMls(row))) continue;
     if (playback && (isBrandedPlayback(row) || isReelPlayback(row))) {
       const url = deliveredVideoUrl(row);
       if (!url) continue;
@@ -9431,6 +9441,14 @@ const handlePublicGalleryLink = async (req, res) => {
 const router$k = Router();
 const db$g = () => admin.firestore();
 const storage = () => admin.storage().bucket();
+function cleanPosterUrl(value) {
+  if (typeof value !== "string") return null;
+  const url = value.trim();
+  if (!url || url.length > 2e3 || url.includes("\\") || url.includes("..")) return null;
+  if (!/^https?:\/\//i.test(url) && !url.startsWith("/")) return null;
+  if (!/\.(jpe?g|png|webp|gif)(\?|#|$)/i.test(url)) return null;
+  return url;
+}
 function adminReady$5(res) {
   if (admin.apps.length) return true;
   res.status(503).json({
@@ -9617,7 +9635,9 @@ router$k.post("/:id/media", requirePhotographer, async (req, res) => {
       width,
       height,
       fileSize,
-      isRaw: isRaw2 = false
+      isRaw: isRaw2 = false,
+      poster,
+      posterUrl
     } = req.body;
     if (!storagePath || !fileName2) {
       return res.status(400).json({ error: "storagePath and fileName required." });
@@ -9644,6 +9664,11 @@ router$k.post("/:id/media", requirePhotographer, async (req, res) => {
       uploadedBy: req.user.uid,
       uploadedAt: admin.firestore.Timestamp.now()
     };
+    const storedPoster = cleanPosterUrl(posterUrl) || cleanPosterUrl(poster);
+    if (storedPoster) {
+      mediaItem.poster = storedPoster;
+      mediaItem.posterUrl = storedPoster;
+    }
     await galleryDoc.ref.update({
       mediaItems: admin.firestore.FieldValue.arrayUnion(mediaItem),
       status: isRaw2 ? "raw_uploaded" : "editing",
@@ -9657,7 +9682,7 @@ router$k.post("/:id/media", requirePhotographer, async (req, res) => {
 });
 router$k.post("/:id/media-link", requireCoordinator, async (req, res) => {
   try {
-    const { url, title, type = "video", embedUrl, thumbnailUrl, downloadable = false } = req.body;
+    const { url, title, type = "video", embedUrl, thumbnailUrl, downloadable = false, poster, posterUrl } = req.body;
     if (!url) return res.status(400).json({ error: "url required." });
     const galleryDoc = await db$g().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
@@ -9674,6 +9699,12 @@ router$k.post("/:id/media-link", requireCoordinator, async (req, res) => {
       uploadedBy: req.user.uid,
       uploadedAt: admin.firestore.Timestamp.now()
     };
+    const storedPoster = cleanPosterUrl(posterUrl) || cleanPosterUrl(poster) || cleanPosterUrl(thumbnailUrl);
+    if (storedPoster) {
+      item.poster = storedPoster;
+      item.posterUrl = storedPoster;
+      if (!item.thumbnailUrl) item.thumbnailUrl = storedPoster;
+    }
     await galleryDoc.ref.update({
       mediaItems: admin.firestore.FieldValue.arrayUnion(item),
       status: "ready_for_review",
