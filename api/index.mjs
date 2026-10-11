@@ -6199,6 +6199,12 @@ function httpUrl(value) {
   const url = text$6(value);
   return url.startsWith("https://") || url.startsWith("http://") ? url : "";
 }
+function shareableUrl(value) {
+  const url = text$6(value);
+  if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
+  if (url.startsWith("/")) return url;
+  return httpUrl(url);
+}
 function galleryResult(doc, via) {
   const status2 = statusOf(doc) || "unknown";
   const released = isReleased(doc);
@@ -6418,17 +6424,27 @@ function listingResult(listing, related) {
   };
 }
 function publicProject(listing, _related, notice) {
+  const safe = displaySafeShareMedia(listing);
   return {
     id: listing.id,
     address: addressOf(listing),
     agentName: agentNameOf$1(listing),
     services: servicesOf(listing),
-    images: publicImages(listing),
-    videos: publicVideos(listing),
-    tourUrl: publicTour(listing),
-    floorPlans: publicFloorPlans(listing),
+    images: safe.images,
+    videos: safe.videos,
+    tourUrl: safe.tourUrl,
+    floorPlans: safe.floorPlans,
     notice,
     view: "public"
+  };
+}
+function ownerMediaSource(listing, pub) {
+  return {
+    ...pub,
+    images: publicImages(listing),
+    videos: publicVideos(listing),
+    floorPlans: publicFloorPlans(listing),
+    tourUrl: publicTour(listing)
   };
 }
 const ORIGINAL_FILE = /\.(mp4|m4v|mov|webm|avi|mkv|zip|pdf|dng|cr2|cr3|nef|nrw|arw|srf|sr2|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic|heif)(\?|#|$)/i;
@@ -6478,11 +6494,11 @@ function walkOriginalNeedles(value, needles, inheritedOriginal = false) {
   for (const key of FILE_URL_KEYS) pushNeedle(needles, row[key]);
   const original = inheritedOriginal || rowIsDeliveryOriginal(row);
   if (original) {
-    const fileUrls = new Set(FILE_URL_KEYS.map((key) => httpUrl(row[key])).filter(Boolean));
+    const fileUrls = new Set(FILE_URL_KEYS.map((key) => shareableUrl(row[key])).filter(Boolean));
     for (const key of ["url", "shareUrl", "embedUrl", "sourcePath", "storagePath", "path"]) {
       const raw = text$6(row[key]);
       if (!raw) continue;
-      const asUrl = httpUrl(raw);
+      const asUrl = shareableUrl(raw);
       if (asUrl && isStreamUrl(asUrl)) continue;
       if (!inheritedOriginal && (key === "url" || key === "shareUrl") && asUrl && isDisplayImageUrl(asUrl) && !fileUrls.has(asUrl) && !isFullResOrMls(row) && row.downloadable !== true) continue;
       pushNeedle(needles, raw);
@@ -6528,7 +6544,7 @@ function scrubOriginals(value, needles) {
 }
 function displayImageCandidate(row, needles) {
   for (const key of DISPLAY_IMAGE_KEYS) {
-    const url = httpUrl(row[key]);
+    const url = shareableUrl(row[key]);
     if (!url || !isDisplayImageUrl(url) || containsOriginal(url, needles)) continue;
     return url;
   }
@@ -6539,9 +6555,10 @@ function lockedPhoto(row, index, needles) {
   if (!frame || frame.raw) return null;
   const display = displayImageCandidate(row, needles);
   if (display) return { url: display, name: frame.name };
-  const url = httpUrl(row.url);
-  if (!url || !isDisplayImageUrl(url) || isOriginalFileUrl(url) || containsOriginal(url, needles)) return null;
-  if (isPrivateMedia(frame.path, frame.name, url) || isFullResOrMls(row) || row.downloadable === true) return null;
+  const url = [shareableUrl(row.url), shareableUrl(row.shareUrl)].find(
+    (candidate) => Boolean(candidate) && isDisplayImageUrl(candidate) && !isOriginalFileUrl(candidate) && !containsOriginal(candidate, needles)
+  ) || "";
+  if (!url || isPrivateMedia(frame.path, frame.name, url) || isFullResOrMls(row) || row.downloadable === true) return null;
   return { url, name: frame.name };
 }
 function lockedVideo(row, needles) {
@@ -6549,7 +6566,7 @@ function lockedVideo(row, needles) {
   let stream = "";
   let streamKey = "";
   for (const key of STREAM_KEYS) {
-    const url = httpUrl(row[key]);
+    const url = shareableUrl(row[key]);
     if (!url || !isStreamUrl(url) || containsOriginal(url, needles)) continue;
     stream = url;
     streamKey = key;
@@ -6603,6 +6620,50 @@ function lockedOwnerMedia(listing, pub) {
     tourUrl
   }, needles);
 }
+function playableShareVideo(video) {
+  return Boolean(
+    video.url || video.poster || video.thumbnailUrl || video.streamUrl || video.previewUrl || video.playbackUrl || video.embedUrl
+  );
+}
+function embedTour(listing, needles) {
+  const groups = [listing.tours, listing.tourLinks];
+  for (const group of groups) {
+    if (!Array.isArray(group)) continue;
+    for (const item of group) {
+      const row = rowOf(item);
+      if (!row) continue;
+      for (const key of ["embedUrl", "url", "shareUrl"]) {
+        const url = shareableUrl(row[key]);
+        if (!url || isOriginalFileUrl(url) || containsOriginal(url, needles)) continue;
+        const type = text$6(row.type).toLowerCase();
+        if (type === "matterport" || type === "tour" || /matterport\.com/i.test(url)) return url;
+      }
+    }
+  }
+  return "";
+}
+function displaySafeShareMedia(listing) {
+  const safe = lockedOwnerMedia(listing, {
+    id: listing.id,
+    tourUrl: publicTour(listing)
+  });
+  const needles = listingOriginalNeedles(listing);
+  return {
+    ...safe,
+    videos: safe.videos.filter(playableShareVideo),
+    tourUrl: safe.tourUrl || embedTour(listing, needles)
+  };
+}
+function displaySafeImageUrl(row, needles) {
+  const url = text$6(row.url) || text$6(row.shareUrl);
+  const photo = lockedPhoto(url ? { ...row, url } : row, 0, needles);
+  return typeof photo?.url === "string" ? photo.url : "";
+}
+function originalNeedlesFor(rows) {
+  const needles = [];
+  for (const row of rows) walkOriginalNeedles(row, needles);
+  return [...new Set(needles)];
+}
 function ownerStudioProject(listing, pub, gate = {}) {
   const authoritativeInvoice = Object.prototype.hasOwnProperty.call(gate, "invoice");
   const invoiceDoc = authoritativeInvoice && gate.invoice && typeof gate.invoice === "object" ? gate.invoice : null;
@@ -6621,8 +6682,9 @@ function ownerStudioProject(listing, pub, gate = {}) {
     galleries: [],
     invoice: authoritativeInvoice ? invoiceDoc : null
   });
+  const source = ownerMediaSource(listing, pub);
   const project = {
-    ...pub,
+    ...source,
     view: "owner",
     clientName: text$6(listing.clientName),
     clientEmail: text$6(listing.clientEmail),
@@ -6632,13 +6694,13 @@ function ownerStudioProject(listing, pub, gate = {}) {
     requirePayment: requirePaymentOn(listing.requirePayment),
     downloadsUnlocked,
     invoice,
-    images: downloadsUnlocked ? ownerImageDownloads(listing, pub.images) : pub.images,
+    images: downloadsUnlocked ? ownerImageDownloads(listing, source.images) : source.images,
     files: downloadsUnlocked ? ownerFiles(listing) : []
   };
   if (downloadsUnlocked || gate.staffAccess === true) return project;
   return {
     ...project,
-    ...lockedOwnerMedia(listing, pub),
+    ...lockedOwnerMedia(listing, source),
     files: []
   };
 }
@@ -16866,22 +16928,6 @@ function isPresentationToken(value) {
 function createPresentationToken(randomBytes2) {
   return randomBytes2(18).toString("base64url");
 }
-function safePresentationUrl(value) {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.startsWith("//") || trimmed.startsWith("/\\")) return null;
-  if (trimmed.startsWith("/")) {
-    if (trimmed.includes("..")) return null;
-    return trimmed;
-  }
-  try {
-    const url = new URL(trimmed);
-    if (url.protocol === "https:" || url.protocol === "http:") return url.toString();
-  } catch {
-    return null;
-  }
-  return null;
-}
 function text(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -16910,7 +16956,7 @@ function folderMap(listing) {
 function isRawPath(path2, name) {
   return RAW_EXT.test(name) || RAW_EXT.test(path2) || path2.includes("/raw/");
 }
-function pushDraft(drafts, row, index, folders, fallbackRoom = "") {
+function pushDraft(drafts, row, index, folders, needles, fallbackRoom = "") {
   const path2 = text(row.path) || text(row.storagePath);
   const name = text(row.name) || text(row.fileName) || text(row.title) || path2.split("/").pop() || "";
   const type = text(row.type).toLowerCase();
@@ -16920,7 +16966,7 @@ function pushDraft(drafts, row, index, folders, fallbackRoom = "") {
   const looksLikeImage = !contentType || contentType.startsWith("image/") || IMAGE_EXT.test(name) || IMAGE_EXT.test(path2);
   if (!looksLikeImage) return;
   if (contentType && !contentType.startsWith("image/") && !IMAGE_EXT.test(name)) return;
-  const url = safePresentationUrl(row.url) || safePresentationUrl(row.shareUrl);
+  const url = displaySafeImageUrl(row, needles);
   if (!url) return;
   const room = roomFromFields(row, folders) || fallbackRoom;
   const order = typeof row.order === "number" && Number.isFinite(row.order) ? row.order : index;
@@ -16937,7 +16983,7 @@ function pushDraft(drafts, row, index, folders, fallbackRoom = "") {
     final
   });
 }
-function listingDrafts(listing, hidden) {
+function listingDrafts(listing, hidden, needles) {
   if (!listing || !Array.isArray(listing.images)) return [];
   const folders = folderMap(listing);
   const drafts = [];
@@ -16951,11 +16997,11 @@ function listingDrafts(listing, hidden) {
     row.contentType = row.contentType || frame.contentType;
     row.id = row.id || frame.id;
     if (rowHiddenFromPresentation(row, hidden)) return;
-    pushDraft(drafts, row, index, folders);
+    pushDraft(drafts, row, index, folders, needles);
   });
   return drafts;
 }
-function galleryDrafts(galleries, start, hidden) {
+function galleryDrafts(galleries, start, hidden, needles) {
   const drafts = [];
   let index = start;
   for (const gallery of galleries || []) {
@@ -16966,7 +17012,7 @@ function galleryDrafts(galleries, start, hidden) {
         if (!item || typeof item !== "object") continue;
         const row = item;
         if (rowHiddenFromPresentation(row, hidden)) continue;
-        pushDraft(drafts, row, index, /* @__PURE__ */ new Map());
+        pushDraft(drafts, row, index, /* @__PURE__ */ new Map(), needles);
         index += 1;
       }
     }
@@ -17003,10 +17049,21 @@ function dedupe(drafts) {
   }
   return photos.slice(0, 200);
 }
+function presentationMediaRows(source) {
+  const rows = [];
+  const listingImages = source.listing?.images;
+  if (Array.isArray(listingImages)) rows.push(...listingImages);
+  for (const gallery of source.galleries || []) {
+    if (Array.isArray(gallery.mediaItems)) rows.push(...gallery.mediaItems);
+    if (Array.isArray(gallery.images)) rows.push(...gallery.images);
+  }
+  return rows;
+}
 function collectPresentationPhotos(source) {
   const hidden = hiddenPresentationKeys(source.listing);
-  const fromListing = listingDrafts(source.listing, hidden);
-  const fromGalleries = galleryDrafts(source.galleries, fromListing.length, hidden);
+  const needles = originalNeedlesFor(presentationMediaRows(source));
+  const fromListing = listingDrafts(source.listing, hidden, needles);
+  const fromGalleries = galleryDrafts(source.galleries, fromListing.length, hidden, needles);
   return dedupe(preferFinals([...fromListing, ...fromGalleries]));
 }
 function presentationRooms(photos) {

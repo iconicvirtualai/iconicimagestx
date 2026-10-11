@@ -73,7 +73,7 @@ describe("decideClientGalleryLink", () => {
     expect(result.openGalleryId).toBeNull();
     expect(result.project.id).toBe(LISTING_ID);
     expect(result.project.images).toEqual([{ url: "https://cdn.example/final.jpg", name: "front.jpg" }]);
-    expect(result.project.videos).toEqual([{ url: "https://cdn.example/walkthrough.mp4", name: "Walkthrough" }]);
+    expect(result.project.videos).toEqual([]);
     expect(result.project.tourUrl).toBe("https://my.matterport.com/show/?m=abc");
     expect(result.project.floorPlans).toEqual([{ url: "https://cdn.example/level1.jpg", name: "Level 1.jpg" }]);
     expect(result.project.view).toBe("public");
@@ -99,6 +99,65 @@ describe("decideClientGalleryLink", () => {
     expect(body).not.toContain("inv_private_1");
     expect(body).not.toContain("order_private_1");
     expect(body).not.toContain("private-balance-8841");
+    expect(body).not.toContain("walkthrough.mp4");
+  });
+
+  it("keeps a display image and a stream on the public share and leaves the original file off", () => {
+    const result = decideClientGalleryLink({
+      ...empty,
+      id: LISTING_ID,
+      listing: listing({
+        invoiceStatus: "paid",
+        downloadsReleased: true,
+        images: [
+          {
+            url: "https://cdn.example/luxury-exterior-full.jpg",
+            name: "exterior-full.jpg",
+            category: "full-res",
+            downloadable: true,
+            webUrl: "https://cdn.example/exterior-display.jpg",
+          },
+          {
+            url: "https://cdn.example/only-original.jpg",
+            name: "only-original.jpg",
+            category: "mls",
+            downloadable: true,
+          },
+        ],
+        videos: [
+          {
+            url: "https://cdn.example/walkthrough-raw.mp4",
+            name: "Walkthrough",
+            streamUrl: "https://cdn.example/walkthrough/stream.m3u8",
+            poster: "https://cdn.example/walkthrough-poster.jpg",
+          },
+        ],
+        tours: [{ type: "matterport", url: "https://my.matterport.com/show/?m=tour1", embedUrl: "https://my.matterport.com/show/?m=tour1" }],
+        floorplans: [
+          { url: "https://cdn.example/level1.jpg", name: "Level 1.jpg" },
+          { url: "https://cdn.example/plan.pdf", name: "plan.pdf", downloadable: true, poster: "https://cdn.example/plan.pdf" },
+        ],
+      }),
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok !== true || result.kind !== "listing") throw new Error("expected the listing studio");
+    expect(result.project.view).toBe("public");
+    expect(result.project.images.map((image) => image.url)).toEqual(["https://cdn.example/exterior-display.jpg"]);
+    expect(result.project.videos.map((video) => video.url)).toEqual(["https://cdn.example/walkthrough/stream.m3u8"]);
+    expect(result.project.tourUrl).toContain("matterport.com");
+    expect(result.project.floorPlans.map((plan) => plan.url)).toEqual(["https://cdn.example/level1.jpg"]);
+    expect(result.project.agentName).toBe("Ada Agent");
+    const body = JSON.stringify(result.project);
+    for (const hidden of [
+      "luxury-exterior-full.jpg",
+      "only-original.jpg",
+      "walkthrough-raw.mp4",
+      "plan.pdf",
+      "delivery.zip",
+      "front-full.jpg",
+    ]) {
+      expect(body).not.toContain(hidden);
+    }
   });
 
   it("sends a released linked gallery when the shared id is the project", () => {

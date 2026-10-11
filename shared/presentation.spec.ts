@@ -119,6 +119,49 @@ describe("listing presentation", () => {
     expect(JSON.stringify(presentation)).not.toContain("place_congress");
   });
 
+  it("uses a display image on the public presentation and leaves the original file off", () => {
+    const presentation = buildPresentation({
+      token: "abcdefghijklmnopqrstuv",
+      origin: "https://iconicimagestx.com",
+      listing: {
+        id: "listing1234",
+        address: "18 Oak Hollow",
+        agentName: "Riley Chen",
+        images: [
+          {
+            id: "exterior",
+            name: "exterior-full.jpg",
+            category: "full-res",
+            downloadable: true,
+            url: "https://cdn.example/luxury-exterior-full.jpg",
+            webUrl: "https://cdn.example/exterior-display.jpg",
+          },
+          {
+            id: "mls",
+            name: "mls.jpg",
+            category: "mls",
+            downloadable: true,
+            url: "https://cdn.example/listing-living-01.jpg",
+          },
+          {
+            id: "video",
+            name: "walkthrough.mp4",
+            type: "video",
+            url: "https://cdn.example/walkthrough-raw.mp4",
+            contentType: "video/mp4",
+          },
+        ],
+      },
+    });
+    expect(presentation?.photos.map((photo) => photo.url)).toEqual(["https://cdn.example/exterior-display.jpg"]);
+    expect(presentation?.agentName).toBe("Riley Chen");
+    expect(presentation?.address).toBe("18 Oak Hollow");
+    const body = JSON.stringify(presentation);
+    expect(body).not.toContain("luxury-exterior-full.jpg");
+    expect(body).not.toContain("listing-living-01.jpg");
+    expect(body).not.toContain("walkthrough-raw.mp4");
+  });
+
   it("hides a presentation the staff turned off", () => {
     expect(buildPresentation({
       token: "abcdefghijklmnopqrstuv",

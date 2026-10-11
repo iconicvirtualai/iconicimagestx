@@ -152,7 +152,7 @@ function expectMarketingView(body: Record<string, unknown>) {
   expect(project.address).toBe("100 Playtest Lane, Austin, TX 78701");
   expect(project.agentName).toBe("Ada Agent");
   expect(project.images).toEqual([{ url: "https://cdn.example/final.jpg", name: "front.jpg" }]);
-  expect(project.videos).toEqual([{ url: "https://cdn.example/walkthrough.mp4", name: "Walkthrough" }]);
+  expect(project.videos).toEqual([]);
   expect(project.tourUrl).toBe("https://my.matterport.com/show/?m=abc");
   expect(project.floorPlans).toEqual([{ url: "https://cdn.example/level1.jpg", name: "Level 1.jpg" }]);
   const json = JSON.stringify(body);
@@ -173,6 +173,7 @@ function expectMarketingView(body: Record<string, unknown>) {
     "order_private_1",
     "amountDue",
     "downloadsUnlocked",
+    "walkthrough.mp4",
   ]) {
     expect(json).not.toContain(secret);
   }
@@ -274,6 +275,8 @@ describe("GET /api/galleries/link/:id studio share", () => {
       "/media/videos/snap-reels/snap-reel-01.mp4",
       "/media/photos/luxury-exterior.jpg",
       "/media/photos/listing-living-01.jpg",
+      "/media/photos/drone-hero.jpg",
+      "/media/playtest/TEST-delivery-qa-floorplan.png",
       "/media/playtest/TEST-delivery-qa-floorplan.pdf",
       "/media/playtest/TEST-delivery-qa-other.zip",
       "public/media/blaze/01_BUILT_v2.mp4",
@@ -287,7 +290,10 @@ describe("GET /api/galleries/link/:id studio share", () => {
     const shared = await openStudio(undefined, DELIVERY_QA_IDS.listing);
     expect(shared.statusCode).toBe(200);
     expect((shared.body.project as { view?: string }).view).toBe("public");
-    expect(JSON.stringify(shared.body)).toContain("/media/blaze/01_BUILT_v2.mp4");
+    expect(leaked(shared.body)).toEqual([]);
+    expect(JSON.stringify(shared.body)).toContain("100 Playtest Lane, Austin, TX 78701");
+    expect(JSON.stringify(shared.body)).toContain("my.matterport.com/show");
+    expect(shared.body.project).not.toHaveProperty("files");
 
     const locked = await openStudio("Bearer qa-owner-token", DELIVERY_QA_IDS.listing);
     expect(locked.statusCode).toBe(200);
@@ -328,6 +334,12 @@ describe("GET /api/galleries/link/:id studio share", () => {
     expect(JSON.stringify(paid.body.project)).toContain("/media/blaze/01_BUILT_v2.mp4");
     expect(JSON.stringify(paid.body.project)).toContain("/media/photos/luxury-exterior.jpg");
     expect(JSON.stringify(paid.body)).not.toContain("amountDue");
+    const paidShare = await openStudio(undefined, DELIVERY_QA_IDS.listing);
+    expect((paidShare.body.project as { view?: string }).view).toBe("public");
+    expect(leaked(paidShare.body)).toEqual([]);
+    const paidOther = await openStudio("Bearer other-token", DELIVERY_QA_IDS.listing);
+    expect((paidOther.body.project as { view?: string }).view).toBe("public");
+    expect(leaked(paidOther.body)).toEqual([]);
 
     seed("invoices", DELIVERY_QA_IDS.invoice, invoice?.data || {});
     const listingDoc = plan.documents.find((doc) => doc.id === DELIVERY_QA_IDS.listing);
@@ -363,5 +375,8 @@ describe("GET /api/galleries/link/:id studio share", () => {
     const released = await openStudio("Bearer qa-owner-token", DELIVERY_QA_IDS.listing);
     expect((released.body.project as { downloadsUnlocked?: boolean }).downloadsUnlocked).toBe(true);
     expect(JSON.stringify(released.body.project)).toContain("/media/blaze/01_BUILT_v2.mp4");
+    const releasedShare = await openStudio(undefined, DELIVERY_QA_IDS.listing);
+    expect(leaked(releasedShare.body)).toEqual([]);
+    expect(JSON.stringify(releasedShare.body)).toContain("my.matterport.com/show");
   });
 });

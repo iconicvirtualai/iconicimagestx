@@ -5,6 +5,7 @@
  * This module does not send email or SMS.
  */
 
+import { displaySafeImageUrl, originalNeedlesFor } from "./clientGalleryLink";
 import { frameFromListingImage, listingAddressLabel } from "./iconicStudio";
 import { hiddenPresentationKeys, rowHiddenFromPresentation } from "./portalListingDetail";
 import { stripPublicMeta } from "./siteSeo";
@@ -145,6 +146,7 @@ function pushDraft(
   row: Record<string, unknown>,
   index: number,
   folders: Map<string, string>,
+  needles: string[],
   fallbackRoom = "",
 ) {
   const path = text(row.path) || text(row.storagePath);
@@ -159,7 +161,7 @@ function pushDraft(
     || IMAGE_EXT.test(path);
   if (!looksLikeImage) return;
   if (contentType && !contentType.startsWith("image/") && !IMAGE_EXT.test(name)) return;
-  const url = safePresentationUrl(row.url) || safePresentationUrl(row.shareUrl);
+  const url = displaySafeImageUrl(row, needles);
   if (!url) return;
   const room = roomFromFields(row, folders) || fallbackRoom;
   const order = typeof row.order === "number" && Number.isFinite(row.order) ? row.order : index;
@@ -177,7 +179,7 @@ function pushDraft(
   });
 }
 
-function listingDrafts(listing: Record<string, unknown> | null | undefined, hidden: Set<string>): DraftPhoto[] {
+function listingDrafts(listing: Record<string, unknown> | null | undefined, hidden: Set<string>, needles: string[]): DraftPhoto[] {
   if (!listing || !Array.isArray(listing.images)) return [];
   const folders = folderMap(listing);
   const drafts: DraftPhoto[] = [];
@@ -191,12 +193,12 @@ function listingDrafts(listing: Record<string, unknown> | null | undefined, hidd
     row.contentType = row.contentType || frame.contentType;
     row.id = row.id || frame.id;
     if (rowHiddenFromPresentation(row, hidden)) return;
-    pushDraft(drafts, row, index, folders);
+    pushDraft(drafts, row, index, folders, needles);
   });
   return drafts;
 }
 
-function galleryDrafts(galleries: Array<Record<string, unknown>> | undefined, start: number, hidden: Set<string>): DraftPhoto[] {
+function galleryDrafts(galleries: Array<Record<string, unknown>> | undefined, start: number, hidden: Set<string>, needles: string[]): DraftPhoto[] {
   const drafts: DraftPhoto[] = [];
   let index = start;
   for (const gallery of galleries || []) {
@@ -207,7 +209,7 @@ function galleryDrafts(galleries: Array<Record<string, unknown>> | undefined, st
         if (!item || typeof item !== "object") continue;
         const row = item as Record<string, unknown>;
         if (rowHiddenFromPresentation(row, hidden)) continue;
-        pushDraft(drafts, row, index, new Map());
+        pushDraft(drafts, row, index, new Map(), needles);
         index += 1;
       }
     }
@@ -247,10 +249,22 @@ function dedupe(drafts: DraftPhoto[]): PresentationPhoto[] {
   return photos.slice(0, 200);
 }
 
+function presentationMediaRows(source: PresentationSource): unknown[] {
+  const rows: unknown[] = [];
+  const listingImages = source.listing?.images;
+  if (Array.isArray(listingImages)) rows.push(...listingImages);
+  for (const gallery of source.galleries || []) {
+    if (Array.isArray(gallery.mediaItems)) rows.push(...gallery.mediaItems);
+    if (Array.isArray(gallery.images)) rows.push(...gallery.images);
+  }
+  return rows;
+}
+
 export function collectPresentationPhotos(source: PresentationSource): PresentationPhoto[] {
   const hidden = hiddenPresentationKeys(source.listing);
-  const fromListing = listingDrafts(source.listing, hidden);
-  const fromGalleries = galleryDrafts(source.galleries, fromListing.length, hidden);
+  const needles = originalNeedlesFor(presentationMediaRows(source));
+  const fromListing = listingDrafts(source.listing, hidden, needles);
+  const fromGalleries = galleryDrafts(source.galleries, fromListing.length, hidden, needles);
   return dedupe(preferFinals([...fromListing, ...fromGalleries]));
 }
 
