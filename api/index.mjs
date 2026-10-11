@@ -8,7 +8,7 @@ import nodemailer from "nodemailer";
 import twilio from "twilio";
 import { google } from "googleapis";
 import crypto, { randomBytes, randomUUID, createHmac as createHmac$1, timingSafeEqual as timingSafeEqual$1 } from "crypto";
-import { createHmac, randomBytes as randomBytes$1, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual, randomBytes as randomBytes$1 } from "node:crypto";
 import Stripe from "stripe";
 import * as XLSX from "xlsx";
 const STAFF_ROLES$1 = ["admin", "coordinator", "photographer", "editor"];
@@ -2006,16 +2006,79 @@ function existingInvoiceId(value) {
   const id = value.trim();
   return id ? id : null;
 }
+const FIRESTORE_AUTO_ID = /^[A-Za-z0-9]{20}$/;
+function isDerivedInvoiceId(id) {
+  return id.startsWith("listing_") || id.startsWith("ordreq_") || id.startsWith("playtest-");
+}
+function isLegacyOpenAutoId(id) {
+  return FIRESTORE_AUTO_ID.test(id) && !isDerivedInvoiceId(id);
+}
+function legacyInvoiceDocIds(anchor) {
+  const ids = [];
+  const orderRequestId = textId(anchor.orderRequestId);
+  const listingId = textId(anchor.listingId);
+  if (orderRequestId) ids.push(`ordreq_${orderRequestId}`);
+  if (listingId) ids.push(`listing_${listingId}`);
+  return ids;
+}
+function invoiceRedirectTarget(data) {
+  if (!data || typeof data !== "object") return null;
+  return textId(data.redirectInvoiceId) || textId(data._redirect);
+}
+function createPayToken() {
+  const bytes = new Uint8Array(32);
+  const cryptoApi = globalThis.crypto;
+  if (!cryptoApi?.getRandomValues) {
+    throw new Error("A crypto RNG is required to create a pay token.");
+  }
+  cryptoApi.getRandomValues(bytes);
+  return base64Url(bytes);
+}
+function decideInvoiceView(input) {
+  if (input.audience === "staff" || input.audience === "owner") return "full";
+  const stored = textId(input.payToken) || "";
+  const presented = textId(input.presentedToken) || "";
+  if (stored) return input.matches(stored, presented) ? "public" : "deny";
+  if (isLegacyOpenAutoId(input.invoiceId)) return "public";
+  return "deny";
+}
+function publicInvoiceClient(invoice) {
+  const name = typeof invoice.clientName === "string" ? invoice.clientName.trim() : "";
+  return { clientName: name };
+}
+function publicInvoiceLines(lineItems) {
+  if (!Array.isArray(lineItems)) return [];
+  const lines = [];
+  for (const item of lineItems) {
+    if (!item || typeof item !== "object") continue;
+    const row = item;
+    const name = typeof row.name === "string" ? row.name : "";
+    if (!name && row.price == null) continue;
+    const line = { name };
+    if (typeof row.description === "string" && row.description.trim()) line.description = row.description;
+    if (row.qty != null) line.qty = row.qty;
+    if (row.unitPrice != null) line.unitPrice = row.unitPrice;
+    if (row.price != null) line.price = row.price;
+    lines.push(line);
+  }
+  return lines;
+}
+function textId(value) {
+  if (typeof value !== "string") return null;
+  const id = value.trim();
+  return id || null;
+}
+function base64Url(bytes) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  const encode = globalThis.btoa;
+  if (!encode) throw new Error("base64 encoding is required to create a pay token.");
+  return encode(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
 function nonEmptyId(value) {
   if (typeof value !== "string") return null;
   const id = value.trim();
   return id ? id : null;
-}
-function orderInvoiceDocId(orderRequestId) {
-  return `ordreq_${orderRequestId}`;
-}
-function listingInvoiceDocId(listingId) {
-  return `listing_${listingId}`;
 }
 function compact(fields) {
   const out = {};
@@ -2031,9 +2094,11 @@ function planInvoiceLink(anchor) {
   const orderInvoiceId = nonEmptyId(anchor.orderInvoiceId);
   const listingInvoiceId = nonEmptyId(anchor.listingInvoiceId);
   const found = (anchor.foundInvoiceIds || []).map(nonEmptyId).filter((id) => Boolean(id));
+  const requested = nonEmptyId(anchor.createId);
+  const fresh = requested && !isDerivedInvoiceId(requested) ? requested : null;
   const invoiceId = orderInvoiceId || listingInvoiceId || found[0] || null;
-  const createId = invoiceId || (orderRequestId ? orderInvoiceDocId(orderRequestId) : null) || (listingId ? listingInvoiceDocId(listingId) : null);
-  if (!createId) {
+  const createId = invoiceId || fresh || "";
+  if (!createId && !orderRequestId && !listingId && !orderId) {
     throw new Error("An order or project is required to link an invoice.");
   }
   const invoiceFields = compact({
@@ -2041,14 +2106,15 @@ function planInvoiceLink(anchor) {
     orderId,
     listingId
   });
+  const linkId = createId || null;
   return {
     invoiceId,
     attached: Boolean(invoiceId),
     createId,
     invoiceFields,
-    orderRequestFields: orderRequestId ? compact({ invoiceId: createId, listingId, orderId }) : null,
-    listingFields: listingId ? compact({ invoiceId: createId, orderRequestId, orderId }) : null,
-    orderFields: orderId ? compact({ invoiceId: createId, orderRequestId, listingId }) : null
+    orderRequestFields: orderRequestId && linkId ? compact({ invoiceId: linkId, listingId, orderId }) : null,
+    listingFields: listingId && linkId ? compact({ invoiceId: linkId, orderRequestId, orderId }) : null,
+    orderFields: orderId && linkId ? compact({ invoiceId: linkId, orderRequestId, listingId }) : null
   };
 }
 function draftInvoiceNumber(invoiceId, now = /* @__PURE__ */ new Date()) {
@@ -2118,6 +2184,75 @@ function invoiceEmailNumber(source, now = /* @__PURE__ */ new Date()) {
 }
 function receiptEmailNumber(source, now = /* @__PURE__ */ new Date()) {
   return shownInvoiceNumber(source, now);
+}
+const __vite_import_meta_env__ = {};
+const DEFAULT_PUBLIC_SITE_URL = "https://iconicimagestx.vercel.app";
+function livePublicSiteEnv() {
+  const nodePublic = typeof process !== "undefined" ? process.env?.PUBLIC_SITE_URL : void 0;
+  const nodeVite = typeof process !== "undefined" ? process.env?.VITE_PUBLIC_SITE_URL : void 0;
+  const vitePublic = typeof import.meta !== "undefined" && __vite_import_meta_env__ ? void 0 : void 0;
+  return {
+    PUBLIC_SITE_URL: typeof nodePublic === "string" ? nodePublic : void 0,
+    VITE_PUBLIC_SITE_URL: typeof nodeVite === "string" && nodeVite.trim() ? nodeVite : typeof vitePublic === "string" ? vitePublic : void 0
+  };
+}
+function publicSiteUrl(env = livePublicSiteEnv()) {
+  const configured = String(env.PUBLIC_SITE_URL || env.VITE_PUBLIC_SITE_URL || "").trim();
+  const candidate = (configured || DEFAULT_PUBLIC_SITE_URL).replace(/\/+$/, "");
+  let parsed;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    throw new Error("PUBLIC_SITE_URL must be an https URL.");
+  }
+  if (parsed.protocol !== "https:") {
+    throw new Error("PUBLIC_SITE_URL must use https.");
+  }
+  if (!parsed.hostname) {
+    throw new Error("PUBLIC_SITE_URL must be an https URL.");
+  }
+  return candidate;
+}
+function publicClientUrl(path2, env) {
+  const suffix = path2.startsWith("/") ? path2 : `/${path2}`;
+  return `${publicSiteUrl(env)}${suffix}`;
+}
+const SETTLED$1 = /* @__PURE__ */ new Set(["paid", "comped"]);
+function isGuessableInvoiceId(id) {
+  return id.startsWith("listing_") || id.startsWith("ordreq_") || id.startsWith("playtest-");
+}
+function text$f(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function settled$1(invoice) {
+  return SETTLED$1.has(text$f(invoice?.status).toLowerCase());
+}
+function invoicePayLinkFor(invoice, env, extra) {
+  if (!invoice || settled$1(invoice)) return null;
+  const id = text$f(invoice.id);
+  const token = text$f(invoice.payToken);
+  if (!id || !token) return null;
+  const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
+  url.searchParams.set("t", token);
+  applyQuery(url, extra);
+  return url.toString();
+}
+function clientInvoiceUrl(invoice, env, extra) {
+  const tokenized = invoicePayLinkFor(invoice, env, extra);
+  if (tokenized) return tokenized;
+  if (!invoice || settled$1(invoice)) return null;
+  const id = text$f(invoice.id);
+  if (!id || isGuessableInvoiceId(id)) return null;
+  const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
+  applyQuery(url, extra);
+  return url.toString();
+}
+function applyQuery(url, extra) {
+  if (!extra) return;
+  for (const [key, value] of Object.entries(extra)) {
+    const textValue = text$f(value);
+    if (textValue && key !== "t") url.searchParams.set(key, textValue);
+  }
 }
 const DIRECT_PACKAGE_KEYS = ["package", "packageName", "packageId", "selectedPackage", "selectedService", "serviceId"];
 const PACKAGE_SKINS = [
@@ -2820,7 +2955,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
       createdAt: data.createdAt
     }, now),
     status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
-    clientName: text$f(data.clientName),
+    clientName: text$e(data.clientName),
     address: addressText(data.billToAddress || data.address || data.propertyAddress),
     createdAt,
     issuedOn: formatPortalDate(data.createdAt) || formatPortalDate(data.sentAt) || formatPortalDate(data.paidAt),
@@ -2830,11 +2965,12 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
     fees: storedAmount(data.fees),
     travel: storedAmount(data.travel),
     promoDiscount: storedAmount(data.promoDiscount),
-    promoCode: text$f(data.promoCode),
+    promoCode: text$e(data.promoCode),
     tax: storedAmount(data.tax),
     total: storedAmount(data.total),
     amountPaid: storedAmount(data.amountPaid),
-    amountDue: storedAmount(data.amountDue)
+    amountDue: storedAmount(data.amountDue),
+    payPath: invoicePayLinkFor({ id, payToken: data.payToken, status: data.status })
   };
 }
 function buildClientAppointment(id, data, orderRequest) {
@@ -2881,15 +3017,15 @@ function storedLines(lineItems, services2) {
     if (typeof item === "string" && item.trim()) return [{ name: item.trim(), qty: null, amount: null }];
     if (!item || typeof item !== "object") return [];
     const record = item;
-    const named = text$f(record.name) || text$f(record.label);
-    const description = text$f(record.description);
+    const named = text$e(record.name) || text$e(record.label);
+    const description = text$e(record.description);
     const name = named || description;
     const qty = storedQty(record.qty ?? record.quantity);
     const amount = storedAmount(record.price ?? record.amount ?? record.total);
     if (!name && amount == null && qty == null) return [];
     const line = { name: name || "Line item", qty, amount };
-    const id = text$f(record.id);
-    const category = text$f(record.category);
+    const id = text$e(record.id);
+    const category = text$e(record.category);
     if (id) line.id = id;
     if (category) line.category = category;
     if (named && description) line.description = description;
@@ -2925,7 +3061,7 @@ function isoStamp(value) {
   if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
   return null;
 }
-function text$f(value) {
+function text$e(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function roundMoney$3(value) {
@@ -3155,38 +3291,6 @@ async function listCalendarScheduleEvents({
   });
   const readFailures = results.filter((result) => result.status === "rejected").length;
   return { configured: true, events, readFailures };
-}
-const __vite_import_meta_env__ = {};
-const DEFAULT_PUBLIC_SITE_URL = "https://iconicimagestx.vercel.app";
-function livePublicSiteEnv() {
-  const nodePublic = typeof process !== "undefined" ? process.env?.PUBLIC_SITE_URL : void 0;
-  const nodeVite = typeof process !== "undefined" ? process.env?.VITE_PUBLIC_SITE_URL : void 0;
-  const vitePublic = typeof import.meta !== "undefined" && __vite_import_meta_env__ ? void 0 : void 0;
-  return {
-    PUBLIC_SITE_URL: typeof nodePublic === "string" ? nodePublic : void 0,
-    VITE_PUBLIC_SITE_URL: typeof nodeVite === "string" && nodeVite.trim() ? nodeVite : typeof vitePublic === "string" ? vitePublic : void 0
-  };
-}
-function publicSiteUrl(env = livePublicSiteEnv()) {
-  const configured = String(env.PUBLIC_SITE_URL || env.VITE_PUBLIC_SITE_URL || "").trim();
-  const candidate = (configured || DEFAULT_PUBLIC_SITE_URL).replace(/\/+$/, "");
-  let parsed;
-  try {
-    parsed = new URL(candidate);
-  } catch {
-    throw new Error("PUBLIC_SITE_URL must be an https URL.");
-  }
-  if (parsed.protocol !== "https:") {
-    throw new Error("PUBLIC_SITE_URL must use https.");
-  }
-  if (!parsed.hostname) {
-    throw new Error("PUBLIC_SITE_URL must be an https URL.");
-  }
-  return candidate;
-}
-function publicClientUrl(path2, env) {
-  const suffix = path2.startsWith("/") ? path2 : `/${path2}`;
-  return `${publicSiteUrl(env)}${suffix}`;
 }
 const db$q = () => admin.firestore();
 async function upsertPortalClient(input) {
@@ -3425,40 +3529,40 @@ function bookingListingGroups(input) {
   for (const doc of requests) {
     const node = nodeId("orderRequests", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("listings", text$e(doc.data.listingId)));
-    uf.link(node, nodeId("orders", text$e(doc.data.orderId) || text$e(doc.data.convertedToOrderId)));
-    uf.link(node, nodeId("invoices", text$e(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$e(doc.data.galleryId)));
+    uf.link(node, nodeId("listings", text$d(doc.data.listingId)));
+    uf.link(node, nodeId("orders", text$d(doc.data.orderId) || text$d(doc.data.convertedToOrderId)));
+    uf.link(node, nodeId("invoices", text$d(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$d(doc.data.galleryId)));
   }
   for (const doc of orders) {
     const node = nodeId("orders", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$e(doc.data.orderRequestId)));
-    uf.link(node, nodeId("listings", text$e(doc.data.listingId)));
-    uf.link(node, nodeId("invoices", text$e(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$e(doc.data.galleryId)));
+    uf.link(node, nodeId("orderRequests", text$d(doc.data.orderRequestId)));
+    uf.link(node, nodeId("listings", text$d(doc.data.listingId)));
+    uf.link(node, nodeId("invoices", text$d(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$d(doc.data.galleryId)));
   }
   for (const doc of invoices) {
     const node = nodeId("invoices", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$e(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$e(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$e(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$d(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$d(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$d(doc.data.listingId)));
   }
   for (const doc of appointments) {
     const node = nodeId("appointments", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$e(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$e(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$e(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$d(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$d(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$d(doc.data.listingId)));
   }
   for (const doc of galleries) {
     const node = nodeId("galleries", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$e(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$e(doc.data.orderId)));
-    uf.link(node, nodeId("invoices", text$e(doc.data.invoiceId)));
-    uf.link(node, nodeId("listings", text$e(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$d(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$d(doc.data.orderId)));
+    uf.link(node, nodeId("invoices", text$d(doc.data.invoiceId)));
+    uf.link(node, nodeId("listings", text$d(doc.data.listingId)));
   }
   const groups = [];
   for (const nodes of uf.components()) {
@@ -3518,7 +3622,7 @@ function fillEmptyListingFields(existing, desired) {
   return patch;
 }
 function clientOwnsListing(listing, clients) {
-  const clientId2 = text$e(listing.clientId);
+  const clientId2 = text$d(listing.clientId);
   const email = normalizeEmail$1(listing.clientEmail || listing.email);
   if (!clientId2 && !email) return true;
   if (clientId2 && clients.ids.includes(clientId2)) return true;
@@ -3590,10 +3694,10 @@ function chooseListing(group, listings, clients) {
 }
 function listingMatches(doc, group) {
   if (doc.id === group.stableId || group.preferredListingIds.includes(doc.id)) return true;
-  const requestId = text$e(doc.data.orderRequestId);
-  const orderId = text$e(doc.data.orderId);
-  const invoiceId = text$e(doc.data.invoiceId);
-  const appointmentId = text$e(doc.data.appointmentId);
+  const requestId = text$d(doc.data.orderRequestId);
+  const orderId = text$d(doc.data.orderId);
+  const invoiceId = text$d(doc.data.invoiceId);
+  const appointmentId = text$d(doc.data.appointmentId);
   return Boolean(
     requestId && group.orderRequestIds.includes(requestId) || orderId && group.orderIds.includes(orderId) || invoiceId && group.invoiceIds.includes(invoiceId) || appointmentId && group.appointmentIds.includes(appointmentId)
   );
@@ -3603,7 +3707,7 @@ function linksFor(group, listingId, listings, clients) {
   const links = [];
   const push = (collection, docs) => {
     for (const doc of docs) {
-      const current = text$e(doc.data.listingId);
+      const current = text$d(doc.data.listingId);
       if (current === listingId) continue;
       if (current && isPortalListingId(current) && ownedIds.has(current)) continue;
       links.push({ collection, id: doc.id });
@@ -3620,7 +3724,7 @@ function clientsFor(group, identity) {
   const ids = /* @__PURE__ */ new Set();
   const emails = /* @__PURE__ */ new Set();
   const addId = (value) => {
-    const id = text$e(value);
+    const id = text$d(value);
     if (id) ids.add(id);
   };
   const addEmail = (value) => {
@@ -3639,7 +3743,7 @@ function clientsFor(group, identity) {
 function preferredListingIds(group) {
   const ids = [];
   const push = (value) => {
-    const id = text$e(value);
+    const id = text$d(value);
     if (id && isPortalListingId(id) && !ids.includes(id)) ids.push(id);
   };
   for (const doc of [...group.orderRequests, ...group.orders, ...group.invoices, ...group.appointments, ...group.galleries]) {
@@ -3674,9 +3778,9 @@ function bestAddress(group) {
   }
   for (const doc of propertyDocs(group)) {
     for (const key of ["address", "propertyAddress", "shootLocation"]) {
-      if (typeof doc.data[key] === "string" && text$e(doc.data[key])) return text$e(doc.data[key]);
+      if (typeof doc.data[key] === "string" && text$d(doc.data[key])) return text$d(doc.data[key]);
     }
-    if (text$e(doc.data.addressLabel)) return text$e(doc.data.addressLabel);
+    if (text$d(doc.data.addressLabel)) return text$d(doc.data.addressLabel);
   }
   return null;
 }
@@ -3692,7 +3796,7 @@ function firstScheduleDate(group) {
 function firstScheduleTime(group) {
   for (const doc of [...group.appointments, ...group.orders, ...group.orderRequests]) {
     for (const key of ["scheduledTime", "appointmentTime", "apptTime", "requestedTime"]) {
-      const value = text$e(doc.data[key]);
+      const value = text$d(doc.data[key]);
       if (value && !/^tbd$/i.test(value)) return value;
     }
   }
@@ -3709,7 +3813,7 @@ function projectType(group) {
     if (doc.data.projectType === "real_estate") return "real_estate";
     const service = doc.data.selectedService;
     if (service && typeof service === "object") {
-      const category = text$e(service.category);
+      const category = text$d(service.category);
       if (category === "business" || category === "branding") return "business";
       if (category === "listings") return "real_estate";
     }
@@ -3735,7 +3839,7 @@ function namesFrom(value) {
   for (const item of value) {
     if (typeof item === "string" && item.trim()) names.push(item.trim());
     else if (item && typeof item === "object") {
-      const name = text$e(item.name);
+      const name = text$d(item.name);
       if (name) names.push(name);
     }
     if (names.length >= 40) break;
@@ -3760,8 +3864,8 @@ function accessInfo(group) {
   return [firstText$2(group, ["accessMethod"]), firstText$2(group, ["lockboxCode"])].filter(Boolean).join(" - ");
 }
 function clientId(group, identity) {
-  const bookingIds = propertyDocs(group).map((doc) => text$e(doc.data.clientId)).filter(Boolean);
-  const identityIds = (identity?.ids || []).map((id) => text$e(id)).filter(Boolean);
+  const bookingIds = propertyDocs(group).map((doc) => text$d(doc.data.clientId)).filter(Boolean);
+  const identityIds = (identity?.ids || []).map((id) => text$d(id)).filter(Boolean);
   return bookingIds.find((id) => identityIds.includes(id)) || bookingIds[0] || identityIds[0] || "";
 }
 function clientEmail(group, identity) {
@@ -3775,8 +3879,8 @@ function clientEmail(group, identity) {
 }
 function clientName$1(group) {
   for (const doc of propertyDocs(group)) {
-    if (text$e(doc.data.clientName)) return text$e(doc.data.clientName);
-    const joined = `${text$e(doc.data.firstName)} ${text$e(doc.data.lastName)}`.trim();
+    if (text$d(doc.data.clientName)) return text$d(doc.data.clientName);
+    const joined = `${text$d(doc.data.firstName)} ${text$d(doc.data.lastName)}`.trim();
     if (joined) return joined;
   }
   return "";
@@ -3784,7 +3888,7 @@ function clientName$1(group) {
 function chosenInvoiceId(group) {
   const known = new Set(group.invoiceIds);
   for (const doc of [...group.orderRequests, ...group.orders]) {
-    const id = text$e(doc.data.invoiceId);
+    const id = text$d(doc.data.invoiceId);
     if (id && known.has(id)) return id;
   }
   return newestDoc(group.invoices)?.id || group.invoiceIds[0] || "";
@@ -3793,7 +3897,7 @@ function chosenId(docs, ids, pointers = [], keys = []) {
   const known = new Set(ids);
   for (const doc of pointers) {
     for (const key of keys) {
-      const id = text$e(doc.data[key]);
+      const id = text$d(doc.data[key]);
       if (id && known.has(id)) return id;
     }
   }
@@ -3805,7 +3909,7 @@ function propertyDocs(group) {
 function firstText$2(group, keys) {
   for (const doc of propertyDocs(group)) {
     for (const key of keys) {
-      const value = text$e(doc.data[key]);
+      const value = text$d(doc.data[key]);
       if (value) return value;
     }
   }
@@ -3873,7 +3977,7 @@ function hasAddress(value) {
   if (typeof value === "string") return value.trim().length > 0;
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record = value;
-  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$e(record[key]).length > 0);
+  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$d(record[key]).length > 0);
 }
 function statusKey(value) {
   return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
@@ -3905,14 +4009,14 @@ function isEmpty(value) {
 function isSentinel$1(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$e(value) {
+function text$d(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function cleanDocs(docs) {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
   for (const doc of docs || []) {
-    const id = text$e(doc?.id);
+    const id = text$d(doc?.id);
     if (!id || seen.has(id)) continue;
     seen.add(id);
     out.push({ id, data: doc.data && typeof doc.data === "object" ? doc.data : {} });
@@ -3991,7 +4095,7 @@ async function ensureBookingListingForRequest(orderRequestId) {
     galleries: []
   });
   const identity = {
-    ids: text$d(request.data.clientId) ? [text$d(request.data.clientId)] : [],
+    ids: text$c(request.data.clientId) ? [text$c(request.data.clientId)] : [],
     email: normalizeEmail$1(request.data.clientEmail || request.data.email)
   };
   const plans = await plansFor(bundle, identity);
@@ -4044,7 +4148,7 @@ async function applyBookingListingPlan(plan) {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
       created = true;
-      console.info(`[Listings] Created ${plan.listingId} for booking ${text$d(plan.createFields.orderRequestId) || text$d(plan.createFields.orderId) || text$d(plan.createFields.invoiceId)}`);
+      console.info(`[Listings] Created ${plan.listingId} for booking ${text$c(plan.createFields.orderRequestId) || text$c(plan.createFields.orderId) || text$c(plan.createFields.invoiceId)}`);
     } catch (err) {
       if (!alreadyExists(err)) throw err;
       await fillListing(ref, plan.createFields);
@@ -4073,7 +4177,7 @@ async function linkRecord(collectionName, id, listingId) {
   const ref = db$o().collection(collectionName).doc(id);
   const snap = await ref.get();
   if (!snap.exists) return;
-  if (text$d(snap.data()?.listingId) === listingId) return;
+  if (text$c(snap.data()?.listingId) === listingId) return;
   await ref.update({
     listingId,
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -4087,9 +4191,9 @@ async function loadVisibleSeeds(identity) {
   const keep = (map, docs) => {
     for (const doc of docs) {
       if (!visibleToPortalClient({
-        clientId: text$d(doc.data.clientId),
-        email: text$d(doc.data.email),
-        clientEmail: text$d(doc.data.clientEmail)
+        clientId: text$c(doc.data.clientId),
+        email: text$c(doc.data.email),
+        clientEmail: text$c(doc.data.clientEmail)
       }, identity)) continue;
       if (!map.has(doc.id)) map.set(doc.id, doc);
     }
@@ -4128,33 +4232,49 @@ async function hydrateBundle(seed) {
   const galleries = mapDocs(seed.galleries);
   const requestIds = new Set(requests.keys());
   for (const doc of [...orders.values(), ...invoices.values(), ...appointments.values()]) {
-    const id = text$d(doc.data.orderRequestId);
+    const id = text$c(doc.data.orderRequestId);
     if (id) requestIds.add(id);
   }
   await readMissing("orderRequests", requestIds, requests);
   const orderIds = new Set(orders.keys());
   for (const doc of requests.values()) {
-    const id = text$d(doc.data.convertedToOrderId) || text$d(doc.data.orderId);
+    const id = text$c(doc.data.convertedToOrderId) || text$c(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   for (const doc of [...invoices.values(), ...appointments.values()]) {
-    const id = text$d(doc.data.orderId);
+    const id = text$c(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   await readMissing("orders", orderIds, orders);
   const invoiceIds = new Set(invoices.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$d(doc.data.invoiceId);
+    const id = text$c(doc.data.invoiceId);
     if (id) invoiceIds.add(id);
   }
   await readMissing("invoices", invoiceIds, invoices);
+  const legacyIds = /* @__PURE__ */ new Set();
+  for (const doc of requests.values()) {
+    for (const id of legacyInvoiceDocIds({ orderRequestId: doc.id, listingId: text$c(doc.data.listingId) })) {
+      legacyIds.add(id);
+    }
+  }
+  for (const doc of orders.values()) {
+    for (const id of legacyInvoiceDocIds({
+      orderRequestId: text$c(doc.data.orderRequestId),
+      listingId: text$c(doc.data.listingId)
+    })) {
+      legacyIds.add(id);
+    }
+  }
+  await readMissing("invoices", legacyIds, invoices);
   mergeDocs(invoices, await queryIn("invoices", "orderRequestId", [...requests.keys()]));
   mergeDocs(invoices, await queryIn("invoices", "orderId", [...orders.keys()]));
+  await followInvoiceRedirects(invoices);
   mergeDocs(appointments, await queryIn("appointments", "orderRequestId", [...requests.keys()]));
   mergeDocs(appointments, await queryIn("appointments", "orderId", [...orders.keys()]));
   const galleryIds = new Set(galleries.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$d(doc.data.galleryId);
+    const id = text$c(doc.data.galleryId);
     if (id) galleryIds.add(id);
   }
   await readMissing("galleries", galleryIds, galleries);
@@ -4191,6 +4311,17 @@ async function loadListingsForGroups(identity, groups) {
   mergeDocs(found, await queryIn("listings", "orderId", [...orderIds]));
   mergeDocs(found, await queryIn("listings", "invoiceId", [...invoiceIds]));
   return [...found.values()];
+}
+async function followInvoiceRedirects(invoices) {
+  const targets = /* @__PURE__ */ new Set();
+  for (const doc of invoices.values()) {
+    const next = invoiceRedirectTarget(doc.data);
+    if (next && next !== doc.id) targets.add(next);
+  }
+  await readMissing("invoices", targets, invoices);
+  for (const [id, doc] of [...invoices.entries()]) {
+    if (invoiceRedirectTarget(doc.data)) invoices.delete(id);
+  }
 }
 async function readMissing(collectionName, ids, into) {
   const missing = [...ids].filter((id) => id && !into.has(id)).slice(0, 100);
@@ -4272,7 +4403,7 @@ function alreadyExists(err) {
 function isSentinel(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$d(value) {
+function text$c(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function chunk(items, size) {
@@ -4282,33 +4413,6 @@ function chunk(items, size) {
 }
 function lifeOfTheListingCareSelected(value) {
   return value === true;
-}
-const SETTLED$1 = /* @__PURE__ */ new Set(["paid", "comped"]);
-function isGuessableInvoiceId(id) {
-  return id.startsWith("listing_") || id.startsWith("ordreq_");
-}
-function text$c(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-function settled$1(invoice) {
-  return SETTLED$1.has(text$c(invoice?.status).toLowerCase());
-}
-function invoicePayLinkFor(invoice, env) {
-  if (!invoice || settled$1(invoice)) return null;
-  const id = text$c(invoice.id);
-  const token = text$c(invoice.payToken);
-  if (!id || !token) return null;
-  const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
-  url.searchParams.set("t", token);
-  return url.toString();
-}
-function clientInvoiceUrl(invoice, env) {
-  const tokenized = invoicePayLinkFor(invoice, env);
-  if (tokenized) return tokenized;
-  if (!invoice || settled$1(invoice)) return null;
-  const id = text$c(invoice.id);
-  if (!id || isGuessableInvoiceId(id)) return null;
-  return `${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`;
 }
 function planOrderPackageRepair(record, catalog) {
   if (hasPricedServices(record.lineItems) || hasPricedServices(record.services)) return null;
@@ -5528,6 +5632,8 @@ router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       }
     } else {
       const invoiceRef = db$n().collection("invoices").doc();
+      const payToken = createPayToken();
+      const paymentUrl = clientInvoiceUrl({ id: invoiceRef.id, status: "draft", payToken });
       const draft = buildBookingInvoiceDraft({
         lineItems: requestLineItems,
         total: requestTotal,
@@ -5546,7 +5652,8 @@ router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         galleryId: galleryRef.id,
         ...listingId ? { listingId } : {},
         invoiceNumber: await generateInvoiceNumber(),
-        ...clientInvoiceUrl({ id: invoiceRef.id, status: "draft" }) ? { paymentUrl: clientInvoiceUrl({ id: invoiceRef.id, status: "draft" }) } : {},
+        payToken,
+        ...paymentUrl ? { paymentUrl } : {},
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
@@ -5674,10 +5781,13 @@ async function createBookingInvoiceDraft(input) {
     travel: input.travel
   });
   const invoiceRef = db$n().collection("invoices").doc();
+  const payToken = createPayToken();
+  const paymentUrl = clientInvoiceUrl({ id: invoiceRef.id, status: "draft", payToken });
   await invoiceRef.set({
     ...draft,
     invoiceNumber: await generateInvoiceNumber(),
-    ...clientInvoiceUrl({ id: invoiceRef.id, status: "draft" }) ? { paymentUrl: clientInvoiceUrl({ id: invoiceRef.id, status: "draft" }) } : {},
+    payToken,
+    ...paymentUrl ? { paymentUrl } : {},
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   });
@@ -6346,6 +6456,21 @@ function lockedClientGalleryMedia(galleryId, items, canDownload) {
     if (!image) return base;
     return { ...base, url: image };
   });
+}
+async function readInvoiceDoc(get, startId) {
+  const seen = /* @__PURE__ */ new Set();
+  let current = startId.trim();
+  for (let hop = 0; hop < 4; hop += 1) {
+    if (!current || seen.has(current)) return null;
+    seen.add(current);
+    const snap = await get(current);
+    if (!snap.exists) return null;
+    const data = snap.data() || {};
+    const next = invoiceRedirectTarget(data);
+    if (!next || next === snap.id) return { id: snap.id, data };
+    current = next;
+  }
+  return null;
 }
 const AI_EDIT_PRESETS = [
   {
@@ -9054,21 +9179,25 @@ function httpError$2(status2, message, extra) {
   return Object.assign(new Error(message), { status: status2, ...extra });
 }
 async function invoiceForGallery$1(gallery) {
+  const load = (id) => db$i().collection("invoices").doc(id).get();
   if (typeof gallery.invoiceId === "string" && gallery.invoiceId) {
-    const doc = await db$i().collection("invoices").doc(gallery.invoiceId).get();
-    if (doc.exists) return { id: doc.id, ...doc.data() };
+    const doc = await readInvoiceDoc(load, gallery.invoiceId);
+    if (doc) return { id: doc.id, ...doc.data };
   }
   if (typeof gallery.orderId === "string" && gallery.orderId) {
     const snap = await db$i().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
-    if (!snap.empty) return { id: snap.docs[0].id, ...snap.docs[0].data() };
+    if (!snap.empty) {
+      const doc = await readInvoiceDoc(load, snap.docs[0].id);
+      if (doc) return { id: doc.id, ...doc.data };
+    }
   }
   const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
   if (listingId) {
     const listing = await db$i().collection("listings").doc(listingId).get();
     const invoiceId = listing.exists && typeof listing.data()?.invoiceId === "string" ? listing.data()?.invoiceId.trim() : "";
     if (invoiceId) {
-      const doc = await db$i().collection("invoices").doc(invoiceId).get();
-      if (doc.exists) return { id: doc.id, ...doc.data() };
+      const doc = await readInvoiceDoc(load, invoiceId);
+      if (doc) return { id: doc.id, ...doc.data };
     }
   }
   return null;
@@ -9309,17 +9438,27 @@ async function resolveClientGalleryLink(id) {
   });
 }
 async function invoiceForListing(listing) {
+  const load = (id) => db$h().collection("invoices").doc(id).get();
   const invoiceId = text$5(listing.invoiceId);
   if (invoiceId) {
-    const doc = await db$h().collection("invoices").doc(invoiceId).get();
-    if (doc.exists) return { id: doc.id, ...doc.data() || {} };
+    const doc = await readInvoiceDoc(load, invoiceId);
+    if (doc && !invoiceRedirectTarget(doc.data)) return { id: doc.id, ...doc.data };
+  }
+  for (const legacyId of legacyInvoiceDocIds({
+    orderRequestId: listing.orderRequestId,
+    listingId: listing.id
+  })) {
+    const doc = await readInvoiceDoc(load, legacyId);
+    if (doc && !invoiceRedirectTarget(doc.data)) return { id: doc.id, ...doc.data };
   }
   const orderId = text$5(listing.orderId);
   if (!orderId) return null;
   try {
     const snap = await db$h().collection("invoices").where("orderId", "==", orderId).limit(1).get();
     if (snap.empty) return null;
-    return { id: snap.docs[0].id, ...snap.docs[0].data() || {} };
+    const doc = await readInvoiceDoc(load, snap.docs[0].id);
+    if (!doc || invoiceRedirectTarget(doc.data)) return null;
+    return { id: doc.id, ...doc.data };
   } catch (err) {
     console.error("[Galleries] Invoice lookup failed:", err);
     return null;
@@ -9451,13 +9590,17 @@ async function holdIfOrderIncomplete(res, galleryId) {
   return true;
 }
 async function invoiceForGallery(gallery) {
+  const load = (id) => db$g().collection("invoices").doc(id).get();
   if (typeof gallery.invoiceId === "string" && gallery.invoiceId) {
-    const doc = await db$g().collection("invoices").doc(gallery.invoiceId).get();
-    if (doc.exists) return { id: doc.id, ...doc.data() };
+    const doc = await readInvoiceDoc(load, gallery.invoiceId);
+    if (doc) return { id: doc.id, ...doc.data };
   }
   if (typeof gallery.orderId === "string" && gallery.orderId) {
     const snap = await db$g().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
-    if (!snap.empty) return { id: snap.docs[0].id, ...snap.docs[0].data() };
+    if (!snap.empty) {
+      const doc = await readInvoiceDoc(load, snap.docs[0].id);
+      if (doc) return { id: doc.id, ...doc.data };
+    }
   }
   return null;
 }
@@ -9501,6 +9644,11 @@ function clientGalleryPayload(id, gallery, gate) {
     downloadEnabled: unlocked,
     paymentRequired: !unlocked,
     invoiceId: invoice?.id || null,
+    invoicePayPath: invoice?.id ? invoicePayLinkFor({
+      id: String(invoice.id),
+      payToken: invoice.payToken,
+      status: invoice.status
+    }) : null,
     invoiceStatus: invoice?.status || null,
     lockTitle: unlocked ? null : ICONIC_DOWNLOAD_LOCK.title,
     lockMessage: unlocked ? null : ICONIC_DOWNLOAD_LOCK.message,
@@ -9866,6 +10014,48 @@ async function fetchPublishedSquareInvoiceUrl(squareInvoiceId, deps) {
   if (!result.ok) return null;
   return publicUrlOf(result.body);
 }
+function payTokenMatches(stored, presented, equal = timingSafeEqual) {
+  const left = Buffer.from(typeof stored === "string" ? stored : "");
+  const right = Buffer.from(typeof presented === "string" ? presented : "");
+  if (left.length === 0) return false;
+  const candidate = Buffer.alloc(left.length);
+  if (right.length > 0) right.copy(candidate, 0, 0, Math.min(right.length, left.length));
+  const same = equal(left, candidate);
+  return same && right.length === left.length;
+}
+async function matchSquarePaymentInvoice(payment, lookup) {
+  const steps = [];
+  const noteId = invoiceIdFromSquareNote(payment.note || payment.payment_note);
+  if (noteId) steps.push(() => lookup.byId(noteId));
+  const referenceId = typeof payment.reference_id === "string" ? payment.reference_id.trim() : "";
+  if (referenceId) steps.push(() => lookup.byId(referenceId));
+  const orderId = typeof payment.order_id === "string" ? payment.order_id.trim() : "";
+  if (orderId) steps.push(() => lookup.byField("squareOrderId", orderId));
+  const linkRaw = payment.payment_link_id || payment.paymentLinkId;
+  const linkId = typeof linkRaw === "string" ? linkRaw.trim() : "";
+  if (linkId) steps.push(() => lookup.byField("squarePaymentLinkId", linkId));
+  const paymentId = typeof payment.id === "string" ? payment.id.trim() : "";
+  if (paymentId) steps.push(() => lookup.byField("squarePaymentId", paymentId));
+  for (const step of steps) {
+    const hit = await step();
+    if (hit) return followInvoiceRedirect(hit, lookup.byId);
+  }
+  return null;
+}
+async function followInvoiceRedirect(hit, byId) {
+  let current = hit;
+  const seen = /* @__PURE__ */ new Set();
+  for (let hop = 0; hop < 4; hop += 1) {
+    if (seen.has(current.id)) return current;
+    seen.add(current.id);
+    const next = invoiceRedirectTarget(current.data);
+    if (!next || next === current.id) return current;
+    const followed = await byId(next);
+    if (!followed) return current;
+    current = followed;
+  }
+  return current;
+}
 const router$j = Router();
 const db$f = () => admin.firestore();
 const stripe$1 = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
@@ -9873,15 +10063,6 @@ const stripe$1 = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
 });
 function appUrl() {
   return process.env.APP_URL || "https://iconicimagestx.com";
-}
-function emailedPayUrl(invoiceId, invoice) {
-  return clientInvoiceUrl({ id: invoiceId, payToken: invoice.payToken, status: invoice.status }) || "";
-}
-function storedPayUrl(invoiceId, invoice) {
-  const emailed = emailedPayUrl(invoiceId, invoice);
-  if (emailed) return emailed;
-  if (isGuessableInvoiceId(invoiceId)) return "";
-  return publicClientUrl(`/invoice/${encodeURIComponent(invoiceId)}`);
 }
 function stripeReady() {
   return Boolean(process.env.STRIPE_SECRET_KEY);
@@ -9900,6 +10081,92 @@ function invoiceProvider(invoice) {
 }
 function money$1(value) {
   return `$${(Number(value) || 0).toFixed(2)}`;
+}
+function invoiceNotFound(res) {
+  return res.status(404).json({ error: "Invoice not found." });
+}
+function presentedPayToken(req) {
+  const query = req.query.t;
+  if (typeof query === "string" && query.trim()) return query.trim();
+  const body = req.body && typeof req.body === "object" ? req.body.t : "";
+  return typeof body === "string" ? body.trim() : "";
+}
+async function loadInvoice(id) {
+  const seen = /* @__PURE__ */ new Set();
+  let current = id.trim();
+  for (let hop = 0; hop < 4; hop += 1) {
+    if (!current || seen.has(current)) return null;
+    seen.add(current);
+    const snap = await db$f().collection("invoices").doc(current).get();
+    if (!snap.exists) return null;
+    const next = invoiceRedirectTarget(snap.data() || {});
+    if (!next || next === snap.id) return snap;
+    current = next;
+  }
+  return null;
+}
+function ownsInvoice(ids, email, invoice) {
+  const clientId2 = typeof invoice.clientId === "string" ? invoice.clientId.trim() : "";
+  if (clientId2 && ids.includes(clientId2)) return true;
+  const invoiceEmail = normalizeEmail$1(invoice.clientEmail);
+  const viewerEmail = normalizeEmail$1(email);
+  return Boolean(invoiceEmail && viewerEmail && invoiceEmail === viewerEmail);
+}
+async function audienceFor(req, invoice) {
+  const header = req.headers.authorization || "";
+  if (!header.startsWith("Bearer ")) return "public";
+  const token = header.slice("Bearer ".length).trim();
+  if (!token) return "public";
+  try {
+    if (isTempAdminEnabled(liveServerEnv()) && token === "temp-admin-token") return "staff";
+    const decoded = await admin.auth().verifyIdToken(token);
+    const staffDoc = await db$f().collection("staff").doc(decoded.uid).get();
+    const staff = staffDoc.exists ? staffDoc.data() : null;
+    if (isActiveStaffRecord(staff) && (staff?.role === "admin" || staff?.role === "coordinator")) {
+      return "staff";
+    }
+    const identity = await resolveClientIdentity(decoded.uid, decoded.email);
+    if (ownsInvoice(identity.ids, identity.email || decoded.email || "", invoice)) return "owner";
+    return "public";
+  } catch (err) {
+    console.warn("[Payments] Invoice session was not applied.");
+    return "public";
+  }
+}
+async function payTokenForLink(invoiceDoc) {
+  const invoice = invoiceDoc.data() || {};
+  const existing = typeof invoice.payToken === "string" ? invoice.payToken.trim() : "";
+  if (existing) return existing;
+  if (isLegacyOpenAutoId(invoiceDoc.id)) return "";
+  const payToken = createPayToken();
+  const paymentUrl = clientInvoiceUrl({ id: invoiceDoc.id, payToken, status: invoice.status }) || "";
+  await invoiceDoc.ref.update({
+    payToken,
+    ...paymentUrl ? { paymentUrl } : {},
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  return payToken;
+}
+function invoiceMoney(invoice) {
+  return {
+    subtotal: invoice.subtotal,
+    tax: invoice.tax,
+    total: invoice.total,
+    amountPaid: invoice.amountPaid,
+    amountDue: invoice.amountDue,
+    processing: invoice.processing ?? null,
+    fees: invoice.fees ?? null,
+    travel: invoice.travel ?? null,
+    promoDiscount: invoice.promoDiscount ?? null,
+    promoCode: invoice.promoCode ?? null
+  };
+}
+function invoiceNumberFields(invoice, id) {
+  return invoicePageInvoiceNumber({
+    invoiceNumber: invoice.invoiceNumber,
+    id,
+    createdAt: invoice.createdAt
+  });
 }
 async function paymentAlreadyRecorded({
   squarePaymentId,
@@ -10073,11 +10340,16 @@ router$j.post("/send-invoice", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
-    const invoiceDoc = await db$f().collection("invoices").doc(invoiceId).get();
-    if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
-    const invoice = invoiceDoc.data();
+    const invoiceDoc = await loadInvoice(String(invoiceId));
+    if (!invoiceDoc) return invoiceNotFound(res);
+    const invoice = invoiceDoc.data() || {};
     const provider = invoiceProvider(invoice);
-    const paymentUrl = emailedPayUrl(invoiceId, invoice);
+    const payToken = await payTokenForLink(invoiceDoc);
+    const paymentUrl = clientInvoiceUrl({
+      id: invoiceDoc.id,
+      payToken: payToken || invoice.payToken,
+      status: invoice.status
+    }) || "";
     await sendEmail({
       to: invoice.clientEmail,
       template: "invoice",
@@ -10110,9 +10382,9 @@ router$j.post("/send-receipt", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
-    const invoiceDoc = await db$f().collection("invoices").doc(invoiceId).get();
-    if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
-    const invoice = invoiceDoc.data();
+    const invoiceDoc = await loadInvoice(String(invoiceId));
+    if (!invoiceDoc) return invoiceNotFound(res);
+    const invoice = invoiceDoc.data() || {};
     if (!invoiceAllowsDownload(invoice)) {
       return res.status(409).json({ error: "Invoice is not paid. Send the pay link instead." });
     }
@@ -10138,40 +10410,57 @@ router$j.post("/send-receipt", requireCoordinator, async (req, res) => {
 });
 router$j.get("/invoice/:id", async (req, res) => {
   try {
-    const invoiceDoc = await db$f().collection("invoices").doc(req.params.id).get();
-    if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
-    const invoice = invoiceDoc.data();
+    const invoiceDoc = await loadInvoice(req.params.id);
+    if (!invoiceDoc) return invoiceNotFound(res);
+    const invoice = invoiceDoc.data() || {};
     const provider = invoiceProvider(invoice);
-    return res.json({
+    const audience = await audienceFor(req, invoice);
+    const view = decideInvoiceView({
+      invoiceId: invoiceDoc.id,
+      payToken: invoice.payToken,
+      presentedToken: presentedPayToken(req),
+      audience,
+      matches: payTokenMatches
+    });
+    if (view === "deny") return invoiceNotFound(res);
+    const paid = invoiceAllowsDownload(invoice);
+    const shared = {
       id: invoiceDoc.id,
-      paid: invoiceAllowsDownload(invoice),
-      invoiceNumber: invoicePageInvoiceNumber({
-        invoiceNumber: invoice.invoiceNumber,
-        id: invoiceDoc.id,
-        createdAt: invoice.createdAt
-      }),
+      paid,
+      invoiceNumber: invoiceNumberFields(invoice, invoiceDoc.id),
       clientName: invoice.clientName,
+      ...invoiceMoney(invoice),
+      status: invoice.status,
+      paymentProvider: provider,
+      canPayOnline: provider === "stripe" ? stripeReady() : squareReady(),
+      createdAt: invoice.createdAt || null
+    };
+    if (view === "public") {
+      const body = {
+        ...shared,
+        ...publicInvoiceClient(invoice),
+        lineItems: publicInvoiceLines(invoice.lineItems)
+      };
+      if (paid && typeof invoice.galleryId === "string" && invoice.galleryId.trim()) {
+        body.galleryId = invoice.galleryId;
+      }
+      return res.json(body);
+    }
+    return res.json({
+      ...shared,
       lineItems: invoice.lineItems,
-      subtotal: invoice.subtotal,
-      tax: invoice.tax,
-      total: invoice.total,
-      amountPaid: invoice.amountPaid,
-      amountDue: invoice.amountDue,
-      processing: invoice.processing ?? null,
-      fees: invoice.fees ?? null,
-      travel: invoice.travel ?? null,
-      promoDiscount: invoice.promoDiscount ?? null,
-      promoCode: invoice.promoCode ?? null,
       billToAddress: typeof invoice.billToAddress === "string" ? invoice.billToAddress : null,
       notes: typeof invoice.notes === "string" ? invoice.notes : null,
       clientEmail: invoice.clientEmail || null,
-      status: invoice.status,
-      paymentProvider: provider,
       stripePaymentIntentId: invoice.stripePaymentIntentId || null,
       squarePaymentId: invoice.squarePaymentId || null,
       squarePaymentLinkId: invoice.squarePaymentLinkId || null,
       galleryId: invoice.galleryId || null,
-      paymentUrl: storedPayUrl(invoiceDoc.id, invoice),
+      paymentUrl: clientInvoiceUrl({
+        id: invoiceDoc.id,
+        payToken: invoice.payToken,
+        status: invoice.status
+      }) || "",
       canPayOnline: provider === "stripe" ? stripeReady() : squareReady()
     });
   } catch (err) {
@@ -10181,16 +10470,31 @@ router$j.get("/invoice/:id", async (req, res) => {
 });
 router$j.post("/invoice/:id/checkout", async (req, res) => {
   try {
-    const invoiceDoc = await db$f().collection("invoices").doc(req.params.id).get();
-    if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
-    const invoice = invoiceDoc.data();
+    const invoiceDoc = await loadInvoice(req.params.id);
+    if (!invoiceDoc) return invoiceNotFound(res);
+    const invoice = invoiceDoc.data() || {};
+    const audience = await audienceFor(req, invoice);
+    const view = decideInvoiceView({
+      invoiceId: invoiceDoc.id,
+      payToken: invoice.payToken,
+      presentedToken: presentedPayToken(req),
+      audience,
+      matches: payTokenMatches
+    });
+    if (view === "deny") return invoiceNotFound(res);
     const amountDue = amountStillDue(invoice);
     const provider = invoiceProvider(invoice);
+    const payToken = await payTokenForLink(invoiceDoc);
+    const invoiceUrl = clientInvoiceUrl({
+      id: invoiceDoc.id,
+      payToken: payToken || invoice.payToken,
+      status: invoice.status
+    }) || "";
     if (invoiceAllowsDownload(invoice)) {
       return res.json({
         paid: true,
         provider,
-        redirectUrl: invoice.galleryId ? publicClientUrl(`/gallery/${invoice.galleryId}`) : publicClientUrl(`/invoice/${invoiceDoc.id}`)
+        redirectUrl: view === "full" && invoice.galleryId ? publicClientUrl(`/gallery/${encodeURIComponent(String(invoice.galleryId))}`) : invoiceUrl
       });
     }
     if (amountDue <= 0) {
@@ -10234,7 +10538,11 @@ router$j.post("/invoice/:id/checkout", async (req, res) => {
             location_id: process.env.SQUARE_LOCATION_ID
           },
           checkout_options: {
-            redirect_url: publicClientUrl(`/invoice/${invoiceDoc.id}?paid=1`)
+            redirect_url: clientInvoiceUrl({
+              id: invoiceDoc.id,
+              payToken,
+              status: invoice.status
+            }, void 0, { paid: "1" }) || invoiceUrl
           },
           pre_populated_data: {
             buyer_email: invoice.clientEmail || void 0
@@ -10251,7 +10559,7 @@ router$j.post("/invoice/:id/checkout", async (req, res) => {
       await invoiceDoc.ref.update({
         status: "sent",
         paymentProvider: "square",
-        paymentUrl: link?.url || storedPayUrl(invoiceDoc.id, invoice),
+        paymentUrl: link?.url || invoiceUrl,
         squarePaymentLinkId: link?.id || null,
         squareOrderId: link?.order_id || null,
         sentAt: invoice.sentAt || admin.firestore.FieldValue.serverTimestamp(),
@@ -10292,14 +10600,21 @@ router$j.post("/invoice/:id/checkout", async (req, res) => {
         orderId: invoice.orderId || "",
         clientId: invoice.clientId || ""
       },
-      success_url: publicClientUrl(`/invoice/${invoiceDoc.id}?paid=1`),
-      cancel_url: publicClientUrl(`/invoice/${invoiceDoc.id}?cancelled=1`)
+      success_url: clientInvoiceUrl({
+        id: invoiceDoc.id,
+        payToken,
+        status: invoice.status
+      }, void 0, { paid: "1" }) || invoiceUrl,
+      cancel_url: clientInvoiceUrl({
+        id: invoiceDoc.id,
+        payToken,
+        status: invoice.status
+      }, void 0, { cancelled: "1" }) || invoiceUrl
     });
-    const stripePayUrl = storedPayUrl(invoiceDoc.id, invoice);
     await invoiceDoc.ref.update({
       status: "sent",
       paymentProvider: "stripe",
-      ...stripePayUrl ? { paymentUrl: stripePayUrl } : {},
+      ...invoiceUrl ? { paymentUrl: invoiceUrl } : {},
       stripeCheckoutSessionId: session.id,
       sentAt: invoice.sentAt || admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -10368,30 +10683,22 @@ function squareSignatureValid(rawBody, received, key) {
   });
 }
 async function findInvoiceForSquarePayment(payment) {
-  const noteId = invoiceIdFromSquareNote(payment.note || payment.payment_note);
-  if (noteId) {
-    const byNote = await db$f().collection("invoices").doc(noteId).get();
-    if (byNote.exists) return byNote;
-  }
-  const referenceId = typeof payment.reference_id === "string" ? payment.reference_id : "";
-  if (referenceId) {
-    const byReference = await db$f().collection("invoices").doc(referenceId).get();
-    if (byReference.exists) return byReference;
-  }
-  if (typeof payment.order_id === "string" && payment.order_id) {
-    const bySquareOrder = await db$f().collection("invoices").where("squareOrderId", "==", payment.order_id).limit(1).get();
-    if (!bySquareOrder.empty) return bySquareOrder.docs[0];
-  }
-  const linkId = payment.payment_link_id || payment.paymentLinkId;
-  if (typeof linkId === "string" && linkId) {
-    const byLink = await db$f().collection("invoices").where("squarePaymentLinkId", "==", linkId).limit(1).get();
-    if (!byLink.empty) return byLink.docs[0];
-  }
-  if (typeof payment.id === "string" && payment.id) {
-    const byPayment = await db$f().collection("invoices").where("squarePaymentId", "==", payment.id).limit(1).get();
-    if (!byPayment.empty) return byPayment.docs[0];
-  }
-  return null;
+  const hit = await matchSquarePaymentInvoice(payment, {
+    async byId(id) {
+      const snap2 = await db$f().collection("invoices").doc(id).get();
+      if (!snap2.exists) return null;
+      return { id: snap2.id, data: snap2.data() || {} };
+    },
+    async byField(field, value) {
+      const snap2 = await db$f().collection("invoices").where(field, "==", value).limit(1).get();
+      if (snap2.empty) return null;
+      const doc = snap2.docs[0];
+      return { id: doc.id, data: doc.data() || {} };
+    }
+  });
+  if (!hit) return null;
+  const snap = await db$f().collection("invoices").doc(hit.id).get();
+  return snap.exists ? snap : null;
 }
 router$j.post("/square-webhook", async (req, res) => {
   try {
@@ -10475,8 +10782,8 @@ router$j.get("/transactions", requireCoordinator, async (req, res) => {
 async function handleStripePaymentSucceeded(intent) {
   const { invoiceId, orderId, clientId: clientId2, clientName: clientName2 } = intent.metadata;
   if (!invoiceId) return;
-  const invoiceDoc = await db$f().collection("invoices").doc(invoiceId).get();
-  if (!invoiceDoc.exists) return;
+  const invoiceDoc = await loadInvoice(invoiceId);
+  if (!invoiceDoc) return;
   if (invoiceProvider(invoiceDoc.data() || {}) !== "stripe") {
     console.warn(`[Payments] Ignored Stripe payment ${intent.id} for non-Stripe invoice ${invoiceId}`);
     return;
@@ -12196,6 +12503,20 @@ async function readWhere(collectionName, field, value) {
     return [];
   }
 }
+async function readLiveInvoice(id) {
+  const seen = /* @__PURE__ */ new Set();
+  let current = id;
+  for (let hop = 0; hop < 4; hop += 1) {
+    if (!current || seen.has(current)) return null;
+    seen.add(current);
+    const doc = await readDoc("invoices", current);
+    if (!doc) return null;
+    const next = invoiceRedirectTarget(doc);
+    if (!next || next === current) return next ? null : doc;
+    current = next;
+  }
+  return null;
+}
 function unique(records) {
   const seen = /* @__PURE__ */ new Set();
   const out = [];
@@ -12222,9 +12543,14 @@ async function loadSources(listingId, listing) {
   ]);
   const order = orders.find((record) => record.id === orderId) || orders[0] || null;
   const invoiceIds = [text$2(listing.invoiceId), text$2(order?.invoiceId), text$2(orderRequest?.invoiceId)].filter(Boolean);
+  const legacyIds = [
+    ...legacyInvoiceDocIds({ orderRequestId: text$2(orderRequest?.id), listingId }),
+    ...legacyInvoiceDocIds({ orderRequestId: text$2(order?.orderRequestId), listingId: text$2(order?.listingId) || listingId })
+  ].filter((id) => !invoiceIds.includes(id));
   const galleryId = text$2(listing.galleryId) || text$2(orderRequest?.galleryId) || text$2(order?.galleryId);
-  const [invoiceDocs, invoicesByListing, invoicesByOrder, invoicesByRequest, galleryDoc, galleriesByListing, galleriesByOrder, appointmentsByRequest, appointmentsByOrder, appointmentsByListing] = await Promise.all([
-    Promise.all(invoiceIds.map((id) => readDoc("invoices", id))),
+  const [invoiceDocs, legacyDocs, invoicesByListing, invoicesByOrder, invoicesByRequest, galleryDoc, galleriesByListing, galleriesByOrder, appointmentsByRequest, appointmentsByOrder, appointmentsByListing] = await Promise.all([
+    Promise.all(invoiceIds.map((id) => readLiveInvoice(id))),
+    Promise.all(legacyIds.map((id) => readLiveInvoice(id))),
     readWhere("invoices", "listingId", listingId),
     readWhere("invoices", "orderId", text$2(order?.id)),
     readWhere("invoices", "orderRequestId", text$2(orderRequest?.id)),
@@ -12239,7 +12565,11 @@ async function loadSources(listingId, listing) {
     listing,
     orderRequest,
     order,
-    invoices: unique([...invoiceDocs, ...invoicesByListing, ...invoicesByOrder, ...invoicesByRequest]),
+    invoices: unique([
+      ...invoiceDocs,
+      ...legacyDocs,
+      ...[...invoicesByListing, ...invoicesByOrder, ...invoicesByRequest].filter((record) => !invoiceRedirectTarget(record))
+    ]),
     galleries: unique([galleryDoc, ...galleriesByListing, ...galleriesByOrder]),
     appointments: unique([...appointmentsByRequest, ...appointmentsByOrder, ...appointmentsByListing])
   };
@@ -12814,8 +13144,8 @@ async function bootstrapPlaytest(input) {
     photographer,
     client: client ? { ...client, status: clientStatus } : { status: clientStatus, email: clientEmail2 || null },
     listing,
-    gallery: gallery ? { ...gallery, url: `${origin}${gallery.urlPath}` } : null,
-    invoice: invoice ? { ...invoice, url: `${origin}${invoice.urlPath}` } : null,
+    gallery: gallery ? { ...gallery, url: publicClientUrl(gallery.urlPath) } : null,
+    invoice: invoice ? { ...invoice, url: invoice.urlPath } : null,
     next: [
       `Sign in as the photographer at ${origin}/admin/login`,
       `Upload at ${origin}/admin/upload or ${origin}/admin/photographer`,
@@ -12911,9 +13241,15 @@ async function upsertPlaytestListing(photographerUid, client) {
 async function upsertPlaytestDelivery(photographerUid, client, listingId) {
   const orderId = `playtest-order-${client.id}`;
   const galleryId = `playtest-gallery-${client.id}`;
-  const invoiceId = `playtest-invoice-${client.id}`;
   const now = admin.firestore.FieldValue.serverTimestamp();
   const listingSnap = await db$9().collection("listings").doc(listingId).get();
+  const storedInvoiceId = typeof listingSnap.data()?.invoiceId === "string" ? listingSnap.data().invoiceId.trim() : "";
+  const legacyInvoiceId = `playtest-invoice-${client.id}`;
+  const foundInvoice = (storedInvoiceId ? await playtestInvoiceRecord(storedInvoiceId) : null) || (legacyInvoiceId !== storedInvoiceId ? await playtestInvoiceRecord(legacyInvoiceId) : null);
+  const invoiceId = foundInvoice?.id || db$9().collection("invoices").doc().id;
+  const existingToken = typeof foundInvoice?.data.payToken === "string" ? foundInvoice.data.payToken.trim() : "";
+  const payToken = existingToken || createPayToken();
+  const urlPath = clientInvoiceUrl({ id: invoiceId, status: "sent", payToken }) || "";
   const images = listingSnap.exists && Array.isArray(listingSnap.data()?.images) ? listingSnap.data().images : [];
   const mediaItems = images.filter((image) => image?.url).map((image, index) => ({
     id: `playtest-media-${index}-${image.path || image.name || "photo"}`,
@@ -12937,6 +13273,7 @@ async function upsertPlaytestDelivery(photographerUid, client, listingId) {
     clientName: client.name,
     clientEmail: client.email,
     status: "delivered",
+    invoiceId,
     downloadEnabled: true,
     mediaItems,
     deliveredAt: now,
@@ -12960,11 +13297,14 @@ async function upsertPlaytestDelivery(photographerUid, client, listingId) {
     amountPaid: 0,
     amountDue: 150,
     status: "sent",
+    payToken,
+    paymentUrl: urlPath,
     createdAt: now,
     updatedAt: now
   }, { merge: true });
   await db$9().collection("listings").doc(listingId).set({
     playtestGalleryId: galleryId,
+    invoiceId,
     clientId: client.id,
     clientEmail: client.email,
     clientName: client.name,
@@ -12972,8 +13312,23 @@ async function upsertPlaytestDelivery(photographerUid, client, listingId) {
   }, { merge: true });
   return {
     gallery: { id: galleryId, urlPath: `/gallery/${galleryId}` },
-    invoice: { id: invoiceId, urlPath: `/invoice/${invoiceId}`, status: "sent", amountDue: 150 }
+    invoice: { id: invoiceId, urlPath, status: "sent", amountDue: 150 }
   };
+}
+async function playtestInvoiceRecord(id) {
+  const seen = /* @__PURE__ */ new Set();
+  let current = id;
+  for (let hop = 0; hop < 4; hop += 1) {
+    if (!current || seen.has(current)) return null;
+    seen.add(current);
+    const snap = await db$9().collection("invoices").doc(current).get();
+    if (!snap.exists) return null;
+    const data = snap.data() || {};
+    const next = invoiceRedirectTarget(data);
+    if (!next || next === snap.id) return { id: snap.id, data };
+    current = next;
+  }
+  return null;
 }
 const router$f = Router();
 const db$8 = () => admin.firestore();
