@@ -209,6 +209,21 @@ describe("client home dashboard", () => {
     expect(open).not.toContain("checkout");
   });
 
+  it("links order history to the tokenized invoice when a pay token is stored", () => {
+    const html = renderToString(
+      <MemoryRouter>
+        <OrderHistory
+          invoices={[invoice({ payPath: "/invoice/AbCdEfGhIjKlMnOpQrSt?t=token" })]}
+          openId="inv-1"
+          onToggle={() => undefined}
+        />
+      </MemoryRouter>,
+    );
+    expect(html).toContain('href="/invoice/AbCdEfGhIjKlMnOpQrSt?t=token"');
+    expect(html).toContain("View invoice");
+    expect(html).not.toContain(">Pay<");
+  });
+
   it("says when no invoices are stored", () => {
     const html = view({ section: "orders" });
     expect(html).toContain("No invoices are stored on this account yet");

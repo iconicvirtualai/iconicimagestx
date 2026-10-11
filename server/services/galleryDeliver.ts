@@ -14,6 +14,7 @@ import {
   galleryDeliveryUrl,
   type GalleryEmailDelivery,
 } from "../../shared/galleryDelivery";
+import { readInvoiceDoc } from "../lib/invoiceDoc";
 import { clientGalleryDownloadsUnlocked, type GalleryDownloadGate } from "../../shared/paymentAccess";
 import { loadGalleryReleaseForGallery } from "./galleryReleaseGate";
 import { builtinEmailHtml, sendEmail } from "./email";
@@ -31,14 +32,18 @@ export interface GalleryDeliverActor {
   uid?: string | null;
 }
 
-async function invoiceForGallery(gallery: Record<string, unknown>) {
+async function invoiceForGallery(gallery: Record<string, unknown>): Promise<Record<string, unknown> | null> {
+  const load = (id: string) => db().collection("invoices").doc(id).get();
   if (typeof gallery.invoiceId === "string" && gallery.invoiceId) {
-    const doc = await db().collection("invoices").doc(gallery.invoiceId).get();
-    if (doc.exists) return { id: doc.id, ...doc.data() };
+    const doc = await readInvoiceDoc(load, gallery.invoiceId);
+    if (doc) return { id: doc.id, ...doc.data };
   }
   if (typeof gallery.orderId === "string" && gallery.orderId) {
     const snap = await db().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
-    if (!snap.empty) return { id: snap.docs[0].id, ...snap.docs[0].data() };
+    if (!snap.empty) {
+      const doc = await readInvoiceDoc(load, snap.docs[0].id);
+      if (doc) return { id: doc.id, ...doc.data };
+    }
   }
   const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
   if (listingId) {
@@ -47,8 +52,8 @@ async function invoiceForGallery(gallery: Record<string, unknown>) {
       ? listing.data()?.invoiceId.trim()
       : "";
     if (invoiceId) {
-      const doc = await db().collection("invoices").doc(invoiceId).get();
-      if (doc.exists) return { id: doc.id, ...doc.data() };
+      const doc = await readInvoiceDoc(load, invoiceId);
+      if (doc) return { id: doc.id, ...doc.data };
     }
   }
   return null;
