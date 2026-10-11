@@ -4997,6 +4997,235 @@ function money$3(value) {
 function text$9(value) {
   return typeof value === "string" ? value.trim() : "";
 }
+const DELIVERY_QA_CLIENT_EMAIL = "ops+deliveryqa@iconicimagestx.com";
+const DELIVERY_QA_CLIENT_ID = "playtest-delivery-qa-client";
+const DELIVERY_QA_GALLERY_ID = "playtest-delivery-qa-gallery";
+function isDeliveryQaClient(record) {
+  if (!record) return false;
+  if (record.playtest === true) return true;
+  return record.linkedClientId === DELIVERY_QA_CLIENT_ID && exactQaEmail(record.email);
+}
+function isPlaytestDeliveryQaGallery(record) {
+  return !!record && record.id === DELIVERY_QA_GALLERY_ID && record.playtest === true;
+}
+function exactQaEmail(value) {
+  return mailboxAddress(typeof value === "string" ? value : "") === DELIVERY_QA_CLIENT_EMAIL;
+}
+const CLOSED_STATUSES = /* @__PURE__ */ new Set(["void", "voided", "cancelled", "canceled"]);
+const SETTLED_STATUSES = /* @__PURE__ */ new Set(["paid", "comped"]);
+function statusOf$1(invoice) {
+  return String(invoice?.status || "").toLowerCase();
+}
+function numeric(value) {
+  if (value == null || value === "") return null;
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : null;
+}
+function invoiceBalance(invoice) {
+  const total = numeric(invoice?.total) ?? 0;
+  const amountPaid = numeric(invoice?.amountPaid) ?? 0;
+  const statedDue = numeric(invoice?.amountDue);
+  const computedDue = Math.max(0, total - amountPaid);
+  const amountDue = statedDue == null ? computedDue : Math.max(0, statedDue);
+  return { total, amountPaid, amountDue };
+}
+function invoiceAllowsDownload(invoice) {
+  if (!invoice) return false;
+  const status2 = statusOf$1(invoice);
+  if (CLOSED_STATUSES.has(status2)) return false;
+  if (SETTLED_STATUSES.has(status2)) return true;
+  const hasMoney = ["total", "amountDue", "amountPaid"].some((key) => numeric(invoice[key]) != null);
+  if (!hasMoney) return false;
+  const { total, amountPaid, amountDue } = invoiceBalance(invoice);
+  const statedDue = numeric(invoice.amountDue);
+  if (total <= 0 && (statedDue == null || statedDue <= 0)) return true;
+  if (statedDue != null && statedDue <= 0 && amountPaid <= 0 && total > 0) return false;
+  return amountDue <= 0 && amountPaid > 0;
+}
+const ICONIC_DOWNLOAD_LOCK = {
+  title: "Your Iconic files are locked",
+  message: "Iconic Images invoices after the shoot. Downloads open when that invoice is paid, or when our team releases the gallery."
+};
+function lockDownloadsOn(value) {
+  return value !== false;
+}
+function requirePaymentOn(value) {
+  return value !== false;
+}
+function clientGalleryDownloadsUnlocked(gate = {}) {
+  if (gate.downloadsReleased === true) return true;
+  if (gate.lockDownloads === false) return true;
+  if (gate.downloadEnabled === true) return true;
+  return invoiceAllowsDownload(gate.invoice);
+}
+function amountStillDue(invoice) {
+  if (!invoice) return 0;
+  const status2 = statusOf$1(invoice);
+  if (SETTLED_STATUSES.has(status2) || CLOSED_STATUSES.has(status2)) return 0;
+  const { total, amountPaid, amountDue } = invoiceBalance(invoice);
+  const computedDue = Math.max(0, total - amountPaid);
+  const statedDue = numeric(invoice.amountDue);
+  if (statedDue != null && statedDue <= 0 && computedDue > 0 && amountPaid <= 0) return computedDue;
+  return amountDue;
+}
+function squarePaymentNote(invoiceId, invoiceNumber) {
+  const label = invoiceNumber ? `Iconic Images invoice ${invoiceNumber}` : "Iconic Images invoice";
+  return `${label} invoiceId:${invoiceId}`;
+}
+function invoiceIdFromSquareNote(note) {
+  if (typeof note !== "string") return null;
+  const match = note.match(/invoiceId:([A-Za-z0-9_-]+)/);
+  return match?.[1] || null;
+}
+const LINK_MEDIA_TYPES = /* @__PURE__ */ new Set(["video", "reel", "tour", "matterport"]);
+function publicText(value) {
+  return typeof value === "string" && value.trim() ? value : null;
+}
+function publicSize(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) return value;
+  return null;
+}
+function publicFileSize(value) {
+  const parsed = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return parsed;
+}
+function publicMediaItem(item, canDownload) {
+  const type = publicText(item.type) || "photo";
+  const title = publicText(item.title) || publicText(item.fileName) || "Media";
+  const fileName2 = publicText(item.fileName) || title;
+  const base = {
+    id: publicText(item.id) || void 0,
+    fileName: fileName2,
+    title,
+    name: publicText(item.name) || fileName2,
+    type,
+    category: publicText(item.category),
+    contentType: publicText(item.contentType),
+    width: publicSize(item.width),
+    height: publicSize(item.height),
+    fileSize: publicFileSize(item.fileSize),
+    canDownload: Boolean(canDownload && item.downloadable !== false && !LINK_MEDIA_TYPES.has(type)),
+    locked: !canDownload
+  };
+  if (!canDownload) {
+    return { ...base, url: null, shareUrl: null, embedUrl: null, poster: null, thumbnailUrl: null };
+  }
+  const url = publicText(item.shareUrl) || publicText(item.embedUrl) || publicText(item.url);
+  return {
+    ...base,
+    url,
+    shareUrl: publicText(item.shareUrl) || publicText(item.url) || publicText(item.embedUrl),
+    embedUrl: publicText(item.embedUrl) || publicText(item.url),
+    poster: publicText(item.poster) || publicText(item.thumbnailUrl),
+    thumbnailUrl: publicText(item.thumbnailUrl) || publicText(item.poster)
+  };
+}
+const SETTLED = /* @__PURE__ */ new Set(["paid", "comped"]);
+function text$8(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function status(value) {
+  return text$8(value).toLowerCase();
+}
+function settled(value) {
+  return SETTLED.has(status(value));
+}
+function isPlaytestDoc(doc) {
+  if (!doc) return false;
+  if (doc.playtest === true) return true;
+  return text$8(doc.id).toLowerCase().startsWith("playtest-");
+}
+function nestedInvoiceStatus(listing) {
+  const nested2 = listing?.invoice;
+  if (!nested2 || typeof nested2 !== "object") return "";
+  return text$8(nested2.status);
+}
+function releaseFlags(subject) {
+  const listing = subject.listing;
+  return {
+    downloadEnabled: listing?.downloadEnabled === true || subject.galleries.some((gallery) => gallery.downloadEnabled === true),
+    downloadsReleased: listing?.downloadsReleased === true || subject.galleries.some((gallery) => gallery.downloadsReleased === true)
+  };
+}
+function copiedPaidFields(listing) {
+  if (!listing) return [];
+  const fields = [];
+  if (settled(listing.paymentStatus)) fields.push(`listing.paymentStatus=${status(listing.paymentStatus)}`);
+  if (settled(listing.invoiceStatus)) fields.push(`listing.invoiceStatus=${status(listing.invoiceStatus)}`);
+  const nested2 = nestedInvoiceStatus(listing);
+  if (settled(nested2)) fields.push(`listing.invoice.status=${status(nested2)}`);
+  return fields;
+}
+function strictStudioDownloadsUnlocked(subject) {
+  const flags = releaseFlags(subject);
+  const invoice = subject.invoice && typeof subject.invoice === "object" ? subject.invoice : null;
+  return clientGalleryDownloadsUnlocked({
+    invoice,
+    downloadEnabled: flags.downloadEnabled,
+    downloadsReleased: flags.downloadsReleased,
+    lockDownloads: subject.listing?.lockDownloads
+  });
+}
+function studioDownloadsUnlocked(subject) {
+  if (strictStudioDownloadsUnlocked(subject)) return true;
+  return copiedPaidFields(subject.listing).length > 0;
+}
+const QA_STAFF_ASSIGN_ERROR = "QA test accounts cannot be assigned to a real order.";
+function isQaStaff(staff) {
+  if (!staff) return false;
+  return staff.qaOnly === true || staff.playtest === true;
+}
+function recordAllowsQaStaff(record) {
+  if (!record) return false;
+  if (isPlaytestDoc(record)) return true;
+  if (isDeliveryQaClient(record)) return true;
+  if (isDeliveryQaClient({
+    playtest: record.playtest,
+    linkedClientId: record.linkedClientId ?? record.clientId,
+    email: record.email ?? record.clientEmail
+  })) return true;
+  if (record.client && isDeliveryQaClient(record.client)) return true;
+  return false;
+}
+function qaStaffAssignmentError(staff, record) {
+  if (recordAllowsQaStaff(record)) return null;
+  const people = Array.isArray(staff) ? staff : [];
+  return people.some((person) => isQaStaff(person)) ? QA_STAFF_ASSIGN_ERROR : null;
+}
+function phoneKey(value) {
+  const digits2 = String(value || "").replace(/\D/g, "");
+  if (digits2.length === 11 && digits2.startsWith("1")) return digits2.slice(1);
+  return digits2;
+}
+function qaStaffMatchingPhone(staff, phone) {
+  const key = phoneKey(phone);
+  if (!key) return null;
+  return (staff || []).find((person) => isQaStaff(person) && phoneKey(person.phone) === key) || null;
+}
+async function defaultStaffById(id) {
+  const snap = await admin.firestore().collection("staff").doc(id).get();
+  if (!snap.exists) return null;
+  return { id: snap.id, ...snap.data() };
+}
+function refusal(error) {
+  return error ? { status: 400, error } : null;
+}
+async function refuseQaStaffAssignment(input, loadStaff = defaultStaffById) {
+  if (recordAllowsQaStaff(input.record)) return null;
+  const provided = (input.staff || []).filter((person) => Boolean(person));
+  const ids = [...new Set(
+    (input.staffIds || []).map((id) => typeof id === "string" ? id.trim() : "").filter(Boolean)
+  )];
+  const loaded = ids.length > 0 ? (await Promise.all(ids.map((id) => loadStaff(id)))).filter((person) => Boolean(person)) : [];
+  return refusal(qaStaffAssignmentError([...provided, ...loaded], input.record));
+}
+function refuseQaStaffPhone(input) {
+  const match = qaStaffMatchingPhone(input.staff, input.photographerPhone);
+  if (!match) return null;
+  return refusal(qaStaffAssignmentError([match], input.record));
+}
 const router$m = Router();
 const db$n = () => admin.firestore();
 function appUrl$1() {
@@ -5445,7 +5674,12 @@ router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     let photographer = null;
     if (assignedPhotographerId) {
       const staffDoc = await db$n().collection("staff").doc(assignedPhotographerId).get();
-      photographer = staffDoc.exists ? staffDoc.data() : null;
+      photographer = staffDoc.exists ? { id: staffDoc.id, ...staffDoc.data() } : null;
+      const refusal2 = await refuseQaStaffAssignment({
+        staff: photographer ? [photographer] : [],
+        record: { id: requestDoc.id, ...request }
+      });
+      if (refusal2) return res.status(refusal2.status).json({ error: refusal2.error });
     }
     let clientId2;
     const attachedClientId = typeof request.clientId === "string" ? request.clientId.trim() : "";
@@ -5922,6 +6156,16 @@ router$l.patch("/:id", requireCoordinator, async (req, res) => {
     allowed.forEach((key) => {
       if (key in req.body) updates[key] = req.body[key];
     });
+    const photographerId = typeof updates.assignedPhotographerId === "string" ? updates.assignedPhotographerId.trim() : "";
+    if (photographerId) {
+      const orderDoc = await db$m().collection("orders").doc(req.params.id).get();
+      if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
+      const refusal2 = await refuseQaStaffAssignment({
+        staffIds: [photographerId],
+        record: { id: orderDoc.id, ...orderDoc.data() || {} }
+      });
+      if (refusal2) return res.status(refusal2.status).json({ error: refusal2.error });
+    }
     if (updates.scheduledDate && typeof updates.scheduledDate === "string") {
       const anchored = chicagoNoonDate(updates.scheduledDate) || new Date(updates.scheduledDate);
       if (!Number.isNaN(anchored.getTime())) {
@@ -6014,117 +6258,6 @@ router$l.get("/:id/timeline", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch timeline." });
   }
 });
-const CLOSED_STATUSES = /* @__PURE__ */ new Set(["void", "voided", "cancelled", "canceled"]);
-const SETTLED_STATUSES = /* @__PURE__ */ new Set(["paid", "comped"]);
-function statusOf$1(invoice) {
-  return String(invoice?.status || "").toLowerCase();
-}
-function numeric(value) {
-  if (value == null || value === "") return null;
-  const amount = Number(value);
-  return Number.isFinite(amount) ? amount : null;
-}
-function invoiceBalance(invoice) {
-  const total = numeric(invoice?.total) ?? 0;
-  const amountPaid = numeric(invoice?.amountPaid) ?? 0;
-  const statedDue = numeric(invoice?.amountDue);
-  const computedDue = Math.max(0, total - amountPaid);
-  const amountDue = statedDue == null ? computedDue : Math.max(0, statedDue);
-  return { total, amountPaid, amountDue };
-}
-function invoiceAllowsDownload(invoice) {
-  if (!invoice) return false;
-  const status2 = statusOf$1(invoice);
-  if (CLOSED_STATUSES.has(status2)) return false;
-  if (SETTLED_STATUSES.has(status2)) return true;
-  const hasMoney = ["total", "amountDue", "amountPaid"].some((key) => numeric(invoice[key]) != null);
-  if (!hasMoney) return false;
-  const { total, amountPaid, amountDue } = invoiceBalance(invoice);
-  const statedDue = numeric(invoice.amountDue);
-  if (total <= 0 && (statedDue == null || statedDue <= 0)) return true;
-  if (statedDue != null && statedDue <= 0 && amountPaid <= 0 && total > 0) return false;
-  return amountDue <= 0 && amountPaid > 0;
-}
-const ICONIC_DOWNLOAD_LOCK = {
-  title: "Your Iconic files are locked",
-  message: "Iconic Images invoices after the shoot. Downloads open when that invoice is paid, or when our team releases the gallery."
-};
-function lockDownloadsOn(value) {
-  return value !== false;
-}
-function requirePaymentOn(value) {
-  return value !== false;
-}
-function clientGalleryDownloadsUnlocked(gate = {}) {
-  if (gate.downloadsReleased === true) return true;
-  if (gate.lockDownloads === false) return true;
-  if (gate.downloadEnabled === true) return true;
-  return invoiceAllowsDownload(gate.invoice);
-}
-function amountStillDue(invoice) {
-  if (!invoice) return 0;
-  const status2 = statusOf$1(invoice);
-  if (SETTLED_STATUSES.has(status2) || CLOSED_STATUSES.has(status2)) return 0;
-  const { total, amountPaid, amountDue } = invoiceBalance(invoice);
-  const computedDue = Math.max(0, total - amountPaid);
-  const statedDue = numeric(invoice.amountDue);
-  if (statedDue != null && statedDue <= 0 && computedDue > 0 && amountPaid <= 0) return computedDue;
-  return amountDue;
-}
-function squarePaymentNote(invoiceId, invoiceNumber) {
-  const label = invoiceNumber ? `Iconic Images invoice ${invoiceNumber}` : "Iconic Images invoice";
-  return `${label} invoiceId:${invoiceId}`;
-}
-function invoiceIdFromSquareNote(note) {
-  if (typeof note !== "string") return null;
-  const match = note.match(/invoiceId:([A-Za-z0-9_-]+)/);
-  return match?.[1] || null;
-}
-const LINK_MEDIA_TYPES = /* @__PURE__ */ new Set(["video", "reel", "tour", "matterport"]);
-function publicText(value) {
-  return typeof value === "string" && value.trim() ? value : null;
-}
-function publicSize(value) {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string" && value.trim()) return value;
-  return null;
-}
-function publicFileSize(value) {
-  const parsed = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
-  if (!Number.isFinite(parsed) || parsed < 0) return null;
-  return parsed;
-}
-function publicMediaItem(item, canDownload) {
-  const type = publicText(item.type) || "photo";
-  const title = publicText(item.title) || publicText(item.fileName) || "Media";
-  const fileName2 = publicText(item.fileName) || title;
-  const base = {
-    id: publicText(item.id) || void 0,
-    fileName: fileName2,
-    title,
-    name: publicText(item.name) || fileName2,
-    type,
-    category: publicText(item.category),
-    contentType: publicText(item.contentType),
-    width: publicSize(item.width),
-    height: publicSize(item.height),
-    fileSize: publicFileSize(item.fileSize),
-    canDownload: Boolean(canDownload && item.downloadable !== false && !LINK_MEDIA_TYPES.has(type)),
-    locked: !canDownload
-  };
-  if (!canDownload) {
-    return { ...base, url: null, shareUrl: null, embedUrl: null, poster: null, thumbnailUrl: null };
-  }
-  const url = publicText(item.shareUrl) || publicText(item.embedUrl) || publicText(item.url);
-  return {
-    ...base,
-    url,
-    shareUrl: publicText(item.shareUrl) || publicText(item.url) || publicText(item.embedUrl),
-    embedUrl: publicText(item.embedUrl) || publicText(item.url),
-    poster: publicText(item.poster) || publicText(item.thumbnailUrl),
-    thumbnailUrl: publicText(item.thumbnailUrl) || publicText(item.poster)
-  };
-}
 const OWNER_DISPLAY_TTL_MS = 4 * 60 * 60 * 1e3;
 const DEV_SECRET = "iconic-owner-display-dev-v1";
 const ID_PATTERN$1 = /^[A-Za-z0-9_-]{8,128}$/;
@@ -6162,36 +6295,36 @@ const VIDEO_FILE = /\.(mp4|m4v|mov|webm)(\?|#|$)/i;
 const BLOCKED_EXT = /\.(zip|pdf|dng|cr2|cr3|nef|nrw|arw|srf|sr2|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic|heif|mp4|m4v|mov|webm)(\?|#|$)/i;
 const FILE_KEYS = ["downloadUrl", "fileUrl", "originalUrl", "fullResUrl", "mlsUrl", "zipUrl", "printUrl", "reelUrl", "mp4Url", "rawUrl", "src"];
 const DISPLAY_KEYS = ["previewUrl", "displayUrl", "webUrl", "thumbnailUrl"];
-function text$8(value) {
+function text$7(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function rowOf$2(item) {
   return item && typeof item === "object" ? item : null;
 }
 function shareableUrl$1(value) {
-  const url = text$8(value);
+  const url = text$7(value);
   if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
   if (url.startsWith("/")) return url;
   if (url.startsWith("https://") || url.startsWith("http://")) return url;
   return "";
 }
 function mediaName$1(row, fallback) {
-  return text$8(row.name) || text$8(row.fileName) || text$8(row.title) || fallback;
+  return text$7(row.name) || text$7(row.fileName) || text$7(row.title) || fallback;
 }
 function labelOf(row) {
-  return `${text$8(row.fileName)} ${text$8(row.name)} ${text$8(row.title)} ${text$8(row.path)} ${text$8(row.storagePath)}`.toLowerCase();
+  return `${text$7(row.fileName)} ${text$7(row.name)} ${text$7(row.title)} ${text$7(row.path)} ${text$7(row.storagePath)}`.toLowerCase();
 }
 function isMls(row) {
-  const category = text$8(row.category).toLowerCase();
-  const type = text$8(row.type).toLowerCase();
+  const category = text$7(row.category).toLowerCase();
+  const type = text$7(row.type).toLowerCase();
   if (category === "mls" || type === "mls") return true;
   const label = labelOf(row);
   if (/(^|[^a-z0-9])mls([^a-z0-9]|$)/.test(label)) return true;
   return /\/mls\//.test(label);
 }
 function isFullRes(row) {
-  const category = text$8(row.category).toLowerCase();
-  const type = text$8(row.type).toLowerCase();
+  const category = text$7(row.category).toLowerCase();
+  const type = text$7(row.type).toLowerCase();
   if (category === "full-res" || category === "fullres" || type === "full-res" || type === "fullres") return true;
   const label = labelOf(row);
   if (/(^|[^a-z0-9])full[\s_-]?res([^a-z0-9]|$)/.test(label)) return true;
@@ -6200,7 +6333,7 @@ function isFullRes(row) {
 function isRasterUrl(url, row) {
   if (!url || BLOCKED_EXT.test(url.split("#")[0]) || VIDEO_FILE.test(url.split("#")[0])) return false;
   if (RASTER.test(url.split("#")[0])) return true;
-  const content = text$8(row.contentType).toLowerCase();
+  const content = text$7(row.contentType).toLowerCase();
   return /^image\/(jpeg|jpg|png|webp|gif)/.test(content);
 }
 function blockedFileUrls(row, includeOwnUrl) {
@@ -6229,11 +6362,11 @@ function separateDisplay(row) {
 }
 function rasterShareSource(row, legacyDropTagged = false) {
   if (legacyDropTagged && isMls(row)) return "";
-  const type = text$8(row.type).toLowerCase();
+  const type = text$7(row.type).toLowerCase();
   if (type === "video" || type === "reel" || type === "file" || type === "matterport") return "";
-  const content = text$8(row.contentType).toLowerCase();
+  const content = text$7(row.contentType).toLowerCase();
   if (content.startsWith("video/") || content === "application/pdf" || content === "application/zip") return "";
-  const path2 = `${text$8(row.path)} ${text$8(row.storagePath)}`.toLowerCase();
+  const path2 = `${text$7(row.path)} ${text$7(row.storagePath)}`.toLowerCase();
   if (/\/(raw|downloads?|print|zips?)\//.test(path2)) return "";
   const display = separateDisplay(row);
   if (legacyDropTagged && isFullRes(row)) return display;
@@ -6263,11 +6396,11 @@ function videoFileUrl(row) {
 function videoPlaceholderSource(row) {
   if (rasterPoster(row)) return "";
   const file = videoFileUrl(row);
-  const type = text$8(row.type).toLowerCase();
-  const content = text$8(row.contentType).toLowerCase();
+  const type = text$7(row.type).toLowerCase();
+  const content = text$7(row.contentType).toLowerCase();
   const named = type === "video" || type === "reel" || content.startsWith("video/");
   if (!file && !named) return "";
-  const id = text$8(row.id) || file || text$8(row.path) || text$8(row.storagePath) || text$8(row.name) || text$8(row.fileName);
+  const id = text$7(row.id) || file || text$7(row.path) || text$7(row.storagePath) || text$7(row.name) || text$7(row.fileName);
   if (!id) return "";
   return `${VIDEO_PLACEHOLDER_PREFIX}${encodeURIComponent(id)}`;
 }
@@ -6327,8 +6460,8 @@ function listingOwnerDisplayItems(listing) {
   return items;
 }
 function isGalleryFloor(row) {
-  const type = text$8(row.type).toLowerCase();
-  const category = text$8(row.category).toLowerCase();
+  const type = text$7(row.type).toLowerCase();
+  const category = text$7(row.category).toLowerCase();
   return type === "floorplan" || type === "floor-plan" || category === "floorplan" || category === "floor-plan";
 }
 function galleryOwnerDisplayItems(media) {
@@ -6336,7 +6469,7 @@ function galleryOwnerDisplayItems(media) {
   const seen = /* @__PURE__ */ new Set();
   const rows = media.map(rowOf$2).filter((row) => Boolean(row));
   for (const row of rows) {
-    const type = text$8(row.type).toLowerCase();
+    const type = text$7(row.type).toLowerCase();
     if (type === "video" || type === "reel" || type === "matterport" || type === "tour" || type === "file" || type === "pdf") continue;
     const source = rasterShareSource(row);
     if (!source) continue;
@@ -6344,7 +6477,7 @@ function galleryOwnerDisplayItems(media) {
     pushDisplay(items, seen, mediaName$1(row, floor ? "Floor plan" : "Photo"), source, floor ? "floorPlan" : "image");
   }
   for (const row of rows) {
-    const type = text$8(row.type).toLowerCase();
+    const type = text$7(row.type).toLowerCase();
     if (type !== "video" && type !== "reel") continue;
     const poster = rasterPoster(row) || videoPlaceholderSource(row);
     pushDisplay(items, seen, mediaName$1(row, "Video"), poster, "poster");
@@ -6361,24 +6494,24 @@ function posterIndex(row, items) {
   return items.findIndex((item) => item.sourceUrl === poster);
 }
 function isUnbranded(row) {
-  const category = text$8(row.category).toLowerCase();
-  const type = text$8(row.type).toLowerCase();
+  const category = text$7(row.category).toLowerCase();
+  const type = text$7(row.type).toLowerCase();
   if (category === "unbranded" || type === "unbranded") return true;
-  const name = `${text$8(row.name)} ${text$8(row.fileName)} ${text$8(row.title)}`.toLowerCase();
+  const name = `${text$7(row.name)} ${text$7(row.fileName)} ${text$7(row.title)}`.toLowerCase();
   return name.includes("unbranded");
 }
 function isBrandedPlayback(row) {
   if (isMls(row) || isUnbranded(row)) return false;
-  const category = text$8(row.category).toLowerCase();
-  const type = text$8(row.type).toLowerCase();
+  const category = text$7(row.category).toLowerCase();
+  const type = text$7(row.type).toLowerCase();
   if (category === "branded" || type === "branded") return true;
-  const name = `${text$8(row.name)} ${text$8(row.fileName)} ${text$8(row.title)}`.toLowerCase();
+  const name = `${text$7(row.name)} ${text$7(row.fileName)} ${text$7(row.title)}`.toLowerCase();
   return /(^|[^a-z])branded([^a-z]|$)/.test(name);
 }
 function isReelPlayback(row) {
   if (isMls(row) || isUnbranded(row)) return false;
-  const category = text$8(row.category).toLowerCase();
-  const type = text$8(row.type).toLowerCase();
+  const category = text$7(row.category).toLowerCase();
+  const type = text$7(row.type).toLowerCase();
   return category === "reel" || type === "reel";
 }
 function deliveredVideoUrl(row) {
@@ -6673,51 +6806,6 @@ function frameFromListingImage(raw, index = 0) {
     studioApproved: item.studioApproved === true || path2.includes("/finals/"),
     studioRole: typeof item.studioRole === "string" ? item.studioRole : void 0
   };
-}
-const SETTLED = /* @__PURE__ */ new Set(["paid", "comped"]);
-function text$7(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-function status(value) {
-  return text$7(value).toLowerCase();
-}
-function settled(value) {
-  return SETTLED.has(status(value));
-}
-function nestedInvoiceStatus(listing) {
-  const nested2 = listing?.invoice;
-  if (!nested2 || typeof nested2 !== "object") return "";
-  return text$7(nested2.status);
-}
-function releaseFlags(subject) {
-  const listing = subject.listing;
-  return {
-    downloadEnabled: listing?.downloadEnabled === true || subject.galleries.some((gallery) => gallery.downloadEnabled === true),
-    downloadsReleased: listing?.downloadsReleased === true || subject.galleries.some((gallery) => gallery.downloadsReleased === true)
-  };
-}
-function copiedPaidFields(listing) {
-  if (!listing) return [];
-  const fields = [];
-  if (settled(listing.paymentStatus)) fields.push(`listing.paymentStatus=${status(listing.paymentStatus)}`);
-  if (settled(listing.invoiceStatus)) fields.push(`listing.invoiceStatus=${status(listing.invoiceStatus)}`);
-  const nested2 = nestedInvoiceStatus(listing);
-  if (settled(nested2)) fields.push(`listing.invoice.status=${status(nested2)}`);
-  return fields;
-}
-function strictStudioDownloadsUnlocked(subject) {
-  const flags = releaseFlags(subject);
-  const invoice = subject.invoice && typeof subject.invoice === "object" ? subject.invoice : null;
-  return clientGalleryDownloadsUnlocked({
-    invoice,
-    downloadEnabled: flags.downloadEnabled,
-    downloadsReleased: flags.downloadsReleased,
-    lockDownloads: subject.listing?.lockDownloads
-  });
-}
-function studioDownloadsUnlocked(subject) {
-  if (strictStudioDownloadsUnlocked(subject)) return true;
-  return copiedPaidFields(subject.listing).length > 0;
 }
 const RELEASED_GALLERY_STATUSES = ["delivered", "approved"];
 const ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
@@ -7272,10 +7360,6 @@ function decideClientGalleryLink(input) {
     code: "unknown",
     message: `No gallery and no project uses ${input.id}. Checked galleries/${input.id}, listings/${input.id}, galleries with listingId ${input.id}, orders/${input.id}, and orderRequests/${input.id}. /studio/${input.id} opens a project whose Client Studio link is on. /gallery/${input.id} opens a delivery gallery. This app does not resolve Fotello ids. Copy the link from the project file or the gallery delivery URL.`
   };
-}
-const DELIVERY_QA_GALLERY_ID = "playtest-delivery-qa-gallery";
-function isPlaytestDeliveryQaGallery(record) {
-  return !!record && record.id === DELIVERY_QA_GALLERY_ID && record.playtest === true;
 }
 const ORDER_GALLERY_RELEASE = "hold_until_order_complete";
 const SHOWCASE_PHOTO_COUNT = 30;
@@ -17042,6 +17126,16 @@ router$5.post("/conversation", requireStaff, async (req, res) => {
     if (!orderId || !photographerPhone || !clientPhone) {
       return res.status(400).json({ error: "orderId, photographerPhone, clientPhone required." });
     }
+    const [staffSnap, orderLike] = await Promise.all([
+      db$1().collection("staff").get(),
+      findOrderLikeDocument(String(orderId))
+    ]);
+    const refusal2 = refuseQaStaffPhone({
+      photographerPhone,
+      staff: staffSnap.docs.map((item) => ({ id: item.id, ...item.data() })),
+      record: orderLike ? { id: orderLike.id, ...orderLike.data() } : { id: String(orderId) }
+    });
+    if (refusal2) return res.status(refusal2.status).json({ error: refusal2.error });
     const existing = await db$1().collection("conversations").where("orderId", "==", orderId).where("status", "==", "active").limit(1).get();
     if (!existing.empty) {
       return res.json({ conversationSid: existing.docs[0].data().conversationSid, existing: true });
