@@ -115,6 +115,7 @@ async function requirePhotographer(req, res, next) {
   });
 }
 const BUSINESS_CONTACT_LINE = "26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380 | 281.356.0965 | photos@iconicimagestx.com";
+const LEGAL_BUSINESS_NAME = "Iconic Images Photography, LLC";
 function parseContactLine(line) {
   const parts = line.split(" | ");
   if (parts.length !== 3) {
@@ -345,6 +346,7 @@ function getFallbackTemplate(type, vars) {
       ${content}
       <div style="border-top: 1px solid #eee; margin-top: 30px; padding-top: 20px; text-align: center; color: #999; font-size: 12px;">
         <p>${BUSINESS_CONTACT.line}</p>
+        <p>${LEGAL_BUSINESS_NAME}</p>
         <p>Iconic Images TX | iconicimagestx.com</p>
         <p>Questions? Reply to this email or message us through your client portal.</p>
       </div>
