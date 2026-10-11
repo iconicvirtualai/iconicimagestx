@@ -36,7 +36,9 @@ describe("vercel function split", () => {
       functions: Record<string, { includeFiles?: string | string[]; excludeFiles?: string }>;
     };
     expect(vercel.functions["api/index.mjs"].excludeFiles).toContain("sharp");
-    expect(JSON.stringify(vercel.functions["api/index.mjs"].includeFiles)).not.toContain("sharp");
+    expect(typeof vercel.functions["api/index.mjs"].includeFiles).toBe("string");
+    expect(typeof vercel.functions["api/media-display.mjs"].includeFiles).toBe("string");
+    expect(vercel.functions["api/index.mjs"].includeFiles).not.toContain("sharp");
     expect(JSON.stringify(vercel.functions["api/media-display.mjs"].includeFiles)).toContain("sharp-libvips");
     expect(vercel.functions["api/media-display.mjs"].excludeFiles).toContain("public/media");
   });

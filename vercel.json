@@ -12,10 +12,7 @@
   "functions": {
     "api/index.mjs": {
       "maxDuration": 60,
-      "includeFiles": [
-        "dist/spa/index.html",
-        "public/studio/grass-reference.jpg"
-      ],
+      "includeFiles": "{dist/spa/index.html,public/studio/grass-reference.jpg}",
       "excludeFiles": "{node_modules/sharp/**,node_modules/@img/**,node_modules/.pnpm/sharp@*/**,node_modules/.pnpm/@img+sharp*/**}"
     },
     "api/media-display.mjs": {
