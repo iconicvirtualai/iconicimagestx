@@ -12,7 +12,11 @@
   "functions": {
     "api/index.mjs": {
       "maxDuration": 60,
-      "includeFiles": "{dist/spa/index.html,public/studio/grass-reference.jpg}"
+      "includeFiles": [
+        "dist/spa/index.html",
+        "public/studio/grass-reference.jpg",
+        "node_modules/.pnpm/@img+sharp-libvips-linux-x64@*/node_modules/@img/sharp-libvips-linux-x64/**"
+      ]
     }
   },
   "redirects": [
