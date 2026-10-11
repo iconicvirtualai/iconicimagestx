@@ -61,6 +61,12 @@ function mp4Anchors(html: string) {
     });
 }
 
+function anchorWith(html: string, hrefPart: string) {
+  return [...html.matchAll(/<a\b[^>]*>/gi)]
+    .map((match) => match[0])
+    .find((tag) => tag.includes(hrefPart));
+}
+
 describe("public studio share", () => {
   it("plays videos inline and does not offer a download or a raw mp4 link", () => {
     const videos = page("public", "videos");
@@ -95,8 +101,19 @@ describe("public studio share", () => {
     expect(photos).toContain("https://cdn.example/front.jpg");
     expect(photos).not.toContain("Download");
     expect(tours).toContain("https://cdn.example/level1.png");
-    expect(tours).toContain("View floor plan");
+    expect(tours).toContain("object-contain");
+    expect(tours).toContain("Open floor plan");
     expect(tours).toContain("https://cdn.example/level2.pdf");
+    expect(tours).toContain("studio-floorplan-tile");
+    expect(tours).toContain("Open 3D tour");
+    expect(tours).toContain("aspect-video");
+    const tourFrame = (tours.match(/<iframe\b[^>]*>/i) || [""])[0];
+    expect(tourFrame).toContain('src="https://my.matterport.com/show/?m=abc"');
+    expect(tourFrame).toContain('allow="fullscreen; xr-spatial-tracking"');
+    expect(tourFrame).toContain('loading="lazy"');
+    expect(tourFrame).toContain('title="3D tour"');
+    expect(anchorWith(tours, "level2.pdf")).toContain('target="_blank"');
+    expect(anchorWith(tours, "level2.pdf")).not.toMatch(/\sdownload/i);
     expect(videoTags(tours)).toHaveLength(1);
     expect(videoTags(tours)[0].toLowerCase()).toMatch(/controlslist="[^"]*nodownload/);
 
@@ -135,8 +152,65 @@ describe("owner studio view", () => {
     expect(photos).toContain("https://cdn.example/front-full.jpg");
 
     expect(videoTags(tours)).toEqual([]);
-    expect(tours).toContain("View floor plan");
+    expect(tours).toContain("Open floor plan");
+    expect(tours).toContain("Open 3D tour");
+    expect(tours).toContain('allow="fullscreen; xr-spatial-tracking"');
     expect(tours).toContain('href="https://cdn.example/level2.pdf"');
     expect(tours).toContain('href="https://cdn.example/walkthrough.mp4"');
+    expect(anchorWith(tours, "level2.pdf")).toMatch(/\sdownload/i);
+    expect(anchorWith(tours, "walkthrough.mp4")).not.toMatch(/\sdownload/i);
+  });
+});
+
+describe("studio tours, floor plans, and aerials", () => {
+  it("shows nothing when the payload has none of those fields", () => {
+    const html = renderToString(
+      <MemoryRouter>
+        <ClientStudioView
+          project={{ view: "public", images: [], videos: [] }}
+          listingId="listing1234"
+          signedIn={false}
+          initialTab="tours"
+        />
+      </MemoryRouter>,
+    );
+    expect(html).toContain("No 3D tours");
+    expect(html).not.toContain("<iframe");
+    expect(html).not.toContain("<video");
+    expect(html).not.toContain("Open floor plan");
+    expect(html).not.toContain("Open 3D tour");
+  });
+
+  it.each(["public", "owner"] as const)("renders aerial photos and videos on the %s tours tab", (view) => {
+    const html = renderToString(
+      <MemoryRouter>
+        <ClientStudioView
+          project={{
+            view,
+            images: [],
+            videos: [],
+            aerialPhotos: [{ url: "https://cdn.example/overhead.jpg", name: "Overhead", contentType: "image/jpeg" }],
+            aerialVideos: [{ url: "https://cdn.example/orbit.mp4", name: "Orbit", contentType: "video/mp4" }],
+          }}
+          listingId="listing1234"
+          signedIn={view === "owner"}
+          initialTab="tours"
+        />
+      </MemoryRouter>,
+    );
+    expect(html).toContain('data-studio-kind="aerial-photo"');
+    expect(html).toContain("https://cdn.example/overhead.jpg");
+    expect(html).toContain("object-contain");
+    const player = (html.match(/<video\b[^>]*>/i) || [""])[0];
+    expect(player).toContain("https://cdn.example/orbit.mp4");
+    expect(player.toLowerCase()).toContain("playsinline");
+    expect(player).toContain("controls");
+    if (view === "public") {
+      expect(player.toLowerCase()).toContain('controlslist="nodownload"');
+      expect(downloadAttributes(html)).toEqual([]);
+      expect(mp4Anchors(html)).toEqual([]);
+    } else {
+      expect(player.toLowerCase()).not.toContain("controlslist");
+    }
   });
 });
