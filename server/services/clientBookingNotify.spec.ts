@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const sendMail = vi.hoisted(() => vi.fn(async () => ({ messageId: "test-message" })));
+const sendMail = vi.hoisted(() => vi.fn(async (message: { to?: string; html?: string }) => {
+  void message;
+  return { messageId: "test-message" };
+}));
 
 vi.mock("nodemailer", () => ({
   default: {
@@ -125,8 +128,9 @@ describe("client booking mail and the notify switch", () => {
     });
     expect(received).toEqual({ sent: true, delivery: "sent" });
     expect(sendMail).toHaveBeenCalledTimes(1);
-    expect(sendMail.mock.calls[0][0].to).toBe(client);
-    expect(sendMail.mock.calls[0][0].html).toContain("Ada");
-    expect(sendMail.mock.calls[0][0].to).not.toContain("photos@iconicimagestx.com");
+    const message = sendMail.mock.calls[0]?.[0];
+    expect(message?.to).toBe(client);
+    expect(message?.html).toContain("Ada");
+    expect(message?.to).not.toContain("photos@iconicimagestx.com");
   });
 });

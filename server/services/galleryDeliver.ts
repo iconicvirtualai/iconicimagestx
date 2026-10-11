@@ -133,7 +133,7 @@ export async function deliverGalleryToClient(
         clientName: String(gallery.clientName || client?.name || ""),
         address,
         galleryUrl: deliveryUrl,
-        invoiceAmount: invoice ? `$${Number(invoice.total || 0).toFixed(2)}` : "",
+        invoiceAmount: invoice ? `$${Number((invoice as { total?: unknown }).total || 0).toFixed(2)}` : "",
         paymentUrl: payUrl || "",
         expiresAt: `${expiresInDays} days`,
       };

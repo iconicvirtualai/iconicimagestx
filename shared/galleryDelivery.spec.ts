@@ -42,13 +42,13 @@ describe("gallery delivery notice", () => {
   it("records who delivered, who was addressed, and whether the gate held the email", () => {
     const entry = galleryDeliveredHistoryEntry({
       at: "2026-10-11T02:00:00.000Z",
-      actor: { name: "Cadi", email: "cadi@iconicimagestx.com" },
+      actor: { name: "Cadi", email: "staff@example.com" },
       recipients: ["ada@example.com"],
       email: "suppressed",
     });
     expect(entry).toMatchObject({
       action: "Gallery delivered",
-      by: "Cadi (cadi@iconicimagestx.com)",
+      by: "Cadi (staff@example.com)",
       at: "2026-10-11T02:00:00.000Z",
       recipients: ["ada@example.com"],
       email: "suppressed",

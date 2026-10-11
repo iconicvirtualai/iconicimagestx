@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { store, sendMail } = vi.hoisted(() => ({
   store: new Map<string, Record<string, unknown>>(),
-  sendMail: vi.fn(async () => ({ messageId: "test-message" })),
+  sendMail: vi.fn(async (message: { subject?: string; html?: string; to?: string }) => {
+    void message;
+    return { messageId: "test-message" };
+  }),
 }));
 
 vi.mock("nodemailer", () => ({
@@ -168,7 +171,7 @@ describe("deliverGalleryToClient", () => {
   it("writes history when the notify gate suppresses the email, including playtest", async () => {
     seed({ status: "sent", payToken: "tok-1" });
     const result = await deliverGalleryToClient("gal-1", {
-      actor: { name: "Cadi", email: "cadi@iconicimagestx.com" },
+      actor: { name: "Cadi", email: "staff@example.com" },
       now: new Date("2026-10-11T02:00:00.000Z"),
     });
 
@@ -178,7 +181,7 @@ describe("deliverGalleryToClient", () => {
     expect(history()).toEqual([
       expect.objectContaining({
         action: "Gallery delivered",
-        by: "Cadi (cadi@iconicimagestx.com)",
+        by: "Cadi (staff@example.com)",
         at: "2026-10-11T02:00:00.000Z",
         recipients: ["ada@example.com"],
         email: "suppressed",
@@ -198,12 +201,13 @@ describe("deliverGalleryToClient", () => {
     });
     seed({ id: "inv-1", status: "sent", payToken: "tok-1" });
     await deliverGalleryToClient("gal-1", {
-      actor: { email: "cadi@iconicimagestx.com" },
+      actor: { email: "staff@example.com" },
       now: new Date("2026-10-11T03:00:00.000Z"),
     });
 
     expect(sendMail).toHaveBeenCalledTimes(1);
-    const message = sendMail.mock.calls[0][0] as { subject: string; html: string };
+    const message = sendMail.mock.calls[0]?.[0];
+    if (!message?.html || !message.subject) throw new Error("No delivery email was sent.");
     expect(message.subject).toBe("Your gallery is ready: 123 Main St");
     expect(message.html).toContain("https://links.example/gallery/gal-1");
     expect(message.html).toContain("https://links.example/invoice/inv-1?t=tok-1");
@@ -226,7 +230,7 @@ describe("deliverGalleryToClient", () => {
     });
     seed({ id: "inv-1", status: "paid", payToken: "tok-1" });
     await deliverGalleryToClient("gal-1", { actor: { uid: "staff-1" } });
-    const paidHtml = (sendMail.mock.calls[0][0] as { html: string }).html;
+    const paidHtml = sendMail.mock.calls[0]?.[0]?.html || "";
     expect(paidHtml).toContain("View Gallery");
     expect(paidHtml).not.toContain("Pay invoice");
     expect(paidHtml).not.toContain("tok-1");
@@ -235,7 +239,7 @@ describe("deliverGalleryToClient", () => {
     sendMail.mockClear();
     seed({ id: "listing_studio1", status: "sent" });
     await deliverGalleryToClient("gal-1", { actor: { uid: "staff-1" } });
-    const guessHtml = (sendMail.mock.calls[0][0] as { html: string }).html;
+    const guessHtml = sendMail.mock.calls[0]?.[0]?.html || "";
     expect(guessHtml).not.toContain("/invoice/listing_");
     expect(guessHtml).not.toContain("/invoice/ordreq_");
     expect(guessHtml).not.toContain("Pay invoice");

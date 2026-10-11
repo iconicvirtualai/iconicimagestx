@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./email", () => ({
-  sendEmail: vi.fn(async () => ({ sent: true })),
+  sendEmail: vi.fn(async () => ({ sent: true, delivery: "sent" as const })),
 }));
 
 import { sendEmail } from "./email";
@@ -29,7 +29,7 @@ const saved = {
 describe("office new order delivery", () => {
   beforeEach(() => {
     sendEmailMock.mockClear();
-    sendEmailMock.mockResolvedValue({ sent: true });
+    sendEmailMock.mockResolvedValue({ sent: true, delivery: "sent" });
   });
 
   it("emails staff from the saved order and never the client", async () => {
