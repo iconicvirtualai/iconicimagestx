@@ -138,6 +138,31 @@ function rasterPoster(row: Record<string, unknown>, legacyDropTagged = false): s
   return "";
 }
 
+/** Display-set key for a video with no stored poster. Not a file URL. */
+export const VIDEO_PLACEHOLDER_PREFIX = "video-placeholder:";
+
+function videoFileUrl(row: Record<string, unknown>): string {
+  const url = shareableUrl(row.url) || shareableUrl(row.shareUrl);
+  if (!url || !VIDEO_FILE.test(url.split("#")[0])) return "";
+  return url;
+}
+
+export function videoPlaceholderSource(row: Record<string, unknown>): string {
+  if (rasterPoster(row)) return "";
+  const file = videoFileUrl(row);
+  const type = text(row.type).toLowerCase();
+  const content = text(row.contentType).toLowerCase();
+  const named = type === "video" || type === "reel" || content.startsWith("video/");
+  if (!file && !named) return "";
+  const id = text(row.id) || file || text(row.path) || text(row.storagePath) || text(row.name) || text(row.fileName);
+  if (!id) return "";
+  return `${VIDEO_PLACEHOLDER_PREFIX}${encodeURIComponent(id)}`;
+}
+
+export function isVideoPlaceholderSource(sourceUrl: string): boolean {
+  return sourceUrl.startsWith(VIDEO_PLACEHOLDER_PREFIX);
+}
+
 function floorSource(row: Record<string, unknown>, legacyDropTagged = false): string {
   if (legacyDropTagged && (isMls(row) || isFullRes(row))) return separateDisplay(row);
   return rasterShareSource(row, legacyDropTagged) || rasterPoster(row, legacyDropTagged);
@@ -166,8 +191,11 @@ function pushDisplay(
 
 /**
  * Share-set order, shared by the public payload and /api/media/display/:listingId/:index.
- * Listing images, then floor-plan images, then stored video posters.
- * Indexes do not change with payment. Gallery documents are not part of this set.
+ * Listing images, then floor-plan images, then one slot per video.
+ * A stored poster image is fetched and resized. A video with no poster
+ * uses a placeholder key; the display route paints a card and does not
+ * read the MP4. Indexes do not change with payment.
+ * Gallery documents are not part of this set.
  */
 export function shareDisplayItems(listing: ShareListing, options: ShareDisplayOptions = {}): ShareDisplayItem[] {
   const legacy = options.legacyDropTagged === true;
@@ -193,27 +221,22 @@ export function shareDisplayItems(listing: ShareListing, options: ShareDisplayOp
     listing.videos.forEach((item) => {
       const row = rowOf(item);
       if (!row) return;
-      pushDisplay(items, seen, mediaName(row, "Video"), rasterPoster(row, legacy), "poster");
+      const poster = rasterPoster(row, legacy) || videoPlaceholderSource(row);
+      pushDisplay(items, seen, mediaName(row, "Video"), poster, "poster");
     });
   }
   return items;
 }
 
-function videoFileUrl(row: Record<string, unknown>): string {
-  const url = shareableUrl(row.url) || shareableUrl(row.shareUrl);
-  if (!url || !VIDEO_FILE.test(url.split("#")[0])) return "";
-  return url;
-}
-
-/** Stored poster image, or the video file when the display route must cut a frame. */
+/** Stored poster image, or the placeholder key when the video has none. */
 export function ownerPosterSource(row: Record<string, unknown>): string {
-  return rasterPoster(row) || videoFileUrl(row);
+  return rasterPoster(row) || videoPlaceholderSource(row);
 }
 
 /**
- * Locked owner studio set. Same rasters as the public share, plus a poster
- * frame for each video that has no stored poster image. The public listing
- * route does not serve those frames.
+ * Locked owner studio set. Same rasters and video slots as the public share.
+ * A video with no stored poster keeps a placeholder slot. The MP4 is not
+ * the fetch target.
  */
 export function listingOwnerDisplayItems(listing: ShareListing): ShareDisplayItem[] {
   const items = [...shareDisplayItems(listing)];
@@ -222,7 +245,7 @@ export function listingOwnerDisplayItems(listing: ShareListing): ShareDisplayIte
   listing.videos.forEach((item) => {
     const row = rowOf(item);
     if (!row || rasterPoster(row)) return;
-    pushDisplay(items, seen, mediaName(row, "Video"), videoFileUrl(row), "poster");
+    pushDisplay(items, seen, mediaName(row, "Video"), videoPlaceholderSource(row), "poster");
   });
   return items;
 }
@@ -252,12 +275,8 @@ export function galleryOwnerDisplayItems(media: unknown[]): ShareDisplayItem[] {
   for (const row of rows) {
     const type = text(row.type).toLowerCase();
     if (type !== "video" && type !== "reel") continue;
-    const poster = rasterPoster(row);
-    if (poster) {
-      pushDisplay(items, seen, mediaName(row, "Video"), poster, "poster");
-      continue;
-    }
-    pushDisplay(items, seen, mediaName(row, "Video"), videoFileUrl(row), "poster");
+    const poster = rasterPoster(row) || videoPlaceholderSource(row);
+    pushDisplay(items, seen, mediaName(row, "Video"), poster, "poster");
   }
   return items;
 }
@@ -273,7 +292,7 @@ function displayMedia(listingId: string, index: number, name: string): StudioMed
 }
 
 function posterIndex(row: Record<string, unknown>, items: ShareDisplayItem[]): number {
-  const poster = rasterPoster(row);
+  const poster = rasterPoster(row) || videoPlaceholderSource(row);
   if (!poster) return -1;
   return items.findIndex((item) => item.sourceUrl === poster);
 }
@@ -329,6 +348,7 @@ export function publicShareVideos(listing: ShareListing, playback: boolean): Stu
     if (!row) continue;
     const name = mediaName(row, "Video");
     const posterAt = posterIndex(row, items);
+    if (playback && (isUnbranded(row) || isMls(row))) continue;
     if (playback && (isBrandedPlayback(row) || isReelPlayback(row))) {
       const url = deliveredVideoUrl(row);
       if (!url) continue;

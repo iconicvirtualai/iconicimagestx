@@ -153,8 +153,15 @@ function expectMarketingView(body: Record<string, unknown>) {
   expect(project.agentName).toBe("Ada Agent");
   const photo = `/api/media/display/${LISTING_ID}/0`;
   const plan = `/api/media/display/${LISTING_ID}/1`;
+  const poster = `/api/media/display/${LISTING_ID}/2`;
   expect(project.images).toEqual([{ url: photo, displayUrl: photo, name: "front.jpg" }]);
-  expect(project.videos).toEqual([]);
+  expect(project.videos).toEqual([{
+    url: null,
+    name: "Walkthrough",
+    poster,
+    thumbnailUrl: poster,
+    displayUrl: poster,
+  }]);
   expect(project.tourUrl).toBe("https://my.matterport.com/show/?m=abc");
   expect(project.floorPlans).toEqual([{ url: plan, displayUrl: plan, name: "Level 1.jpg" }]);
   const json = JSON.stringify(body);
@@ -311,7 +318,12 @@ describe("GET /api/galleries/link/:id studio share", () => {
     ]);
     expect(sharedProject.images?.[0]?.displayUrl).toBe(`/api/media/display/${DELIVERY_QA_IDS.listing}/0`);
     expect(sharedProject.floorPlans?.[0]?.url).toBe(`/api/media/display/${DELIVERY_QA_IDS.listing}/3`);
-    expect(sharedProject.videos ?? []).toEqual([]);
+    expect(sharedProject.videos?.map((video) => video.url)).toEqual([null, null, null]);
+    expect(sharedProject.videos?.map((video) => (video as { poster?: string }).poster)).toEqual([
+      `/api/media/display/${DELIVERY_QA_IDS.listing}/4`,
+      `/api/media/display/${DELIVERY_QA_IDS.listing}/5`,
+      `/api/media/display/${DELIVERY_QA_IDS.listing}/6`,
+    ]);
     expect(JSON.stringify(shared.body)).toContain("100 Playtest Lane, Austin, TX 78701");
     expect(JSON.stringify(shared.body)).toContain("my.matterport.com/show");
     expect(shared.body.project).not.toHaveProperty("files");

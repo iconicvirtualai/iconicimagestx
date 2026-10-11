@@ -14,7 +14,7 @@ function qaListing() {
 describe("public share display set", () => {
   it("indexes MLS, full-res, aerials, and floor-plan images and skips PDF and zip", () => {
     const items = shareDisplayItems(qaListing());
-    expect(items.map((item) => item.kind)).toEqual(["image", "image", "image", "floorPlan"]);
+    expect(items.map((item) => item.kind)).toEqual(["image", "image", "image", "floorPlan", "poster", "poster", "poster"]);
     expect(items[0]?.sourceUrl).toContain("/media/photos/listing-living-01.jpg");
     expect(items[1]?.sourceUrl).toContain("/media/photos/luxury-exterior.jpg");
     expect(items[2]?.sourceUrl).toContain("/media/photos/drone-hero.jpg");
@@ -23,9 +23,11 @@ describe("public share display set", () => {
     expect(joined).not.toContain(".pdf");
     expect(joined).not.toContain(".zip");
     expect(joined).not.toContain(".mp4");
+    expect(items[4]?.sourceUrl.startsWith("video-placeholder:")).toBe(true);
     const media = publicShareMedia(qaListing());
     const urls = [...media.images, ...media.floorPlans].map((item) => item.url);
-    expect(urls).toEqual(items.map((_, index) => shareDisplayPath(LISTING_ID, index)));
+    const photoIndexes = items.flatMap((item, index) => item.kind === "poster" ? [] : [index]);
+    expect(urls).toEqual(photoIndexes.map((index) => shareDisplayPath(LISTING_ID, index)));
   });
 
   it("points payload photos at the display route and omits video URLs while locked", () => {
@@ -37,7 +39,14 @@ describe("public share display set", () => {
       { url: shareDisplayPath(LISTING_ID, 2), displayUrl: shareDisplayPath(LISTING_ID, 2), name: "TEST-delivery-qa-aerial.jpg" },
     ]);
     expect(media.floorPlans[0]?.url).toBe(shareDisplayPath(LISTING_ID, 3));
-    expect(publicShareVideos(listing, false)).toEqual([]);
+    const branded = shareDisplayPath(LISTING_ID, 4);
+    const unbranded = shareDisplayPath(LISTING_ID, 5);
+    const reel = shareDisplayPath(LISTING_ID, 6);
+    expect(publicShareVideos(listing, false)).toEqual([
+      { url: null, name: "TEST-delivery-qa-branded.mp4", poster: branded, thumbnailUrl: branded, displayUrl: branded },
+      { url: null, name: "TEST-delivery-qa-unbranded.mp4", poster: unbranded, thumbnailUrl: unbranded, displayUrl: unbranded },
+      { url: null, name: "TEST-delivery-qa-snap-reel.mp4", poster: reel, thumbnailUrl: reel, displayUrl: reel },
+    ]);
     const body = JSON.stringify({ ...media, videos: publicShareVideos(listing, false) });
     for (const hidden of [
       "/media/photos/drone-hero.jpg",
@@ -60,6 +69,8 @@ describe("public share display set", () => {
       "https://cdn.example/media/blaze/01_BUILT_v2.mp4",
       "https://cdn.example/media/videos/snap-reels/snap-reel-01.mp4",
     ]);
+    expect(videos[0]?.poster).toBe(shareDisplayPath(LISTING_ID, 4));
+    expect(videos[1]?.poster).toBe(shareDisplayPath(LISTING_ID, 6));
     const body = JSON.stringify(videos);
     expect(body).not.toContain("product-photography.mp4");
     expect(body).not.toContain("luxury-exterior");
