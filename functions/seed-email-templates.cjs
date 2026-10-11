@@ -33,6 +33,7 @@ ${total}
 {notes}
 
 — Iconic Images TX
+Iconic Images Photography, LLC
 26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380 | 281.356.0965 | photos@iconicimagestx.com`,
   });
 

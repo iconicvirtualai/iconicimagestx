@@ -6,6 +6,8 @@
  * the live app origin until VITE_SITE_ORIGIN points at the production domain.
  */
 
+import { LEGAL_BUSINESS_NAME } from "./businessContact.ts";
+
 export const DEFAULT_SITE_ORIGIN = "https://iconicimagestx.vercel.app";
 
 /** Drone still already used on the public marketing pages. */
@@ -87,7 +89,7 @@ export const PUBLIC_PAGES: readonly PublicPage[] = [
     path: "/privacy",
     file: "seo/privacy.html",
     title: "Privacy Policy | Iconic Images",
-    description: "Privacy Policy for Iconic Images Photography, LLC, a real estate media studio based in Spring, Texas.",
+    description: `Privacy Policy for ${LEGAL_BUSINESS_NAME}, a real estate media studio based in Spring, Texas.`,
   },
   {
     path: "/terms",

@@ -3,10 +3,10 @@
  * Address, phone, and contact email come from shared/businessContact.ts.
  */
 
-import { BUSINESS_CONTACT } from "./businessContact.ts";
+import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "./businessContact.ts";
 
 export const ICONIC_BUSINESS = {
-  entity: "Iconic Images Photography, LLC",
+  entity: LEGAL_BUSINESS_NAME,
   brand: "Iconic Images",
   brandSite: "Iconic Images TX",
   email: BUSINESS_CONTACT.email,
