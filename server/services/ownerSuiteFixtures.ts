@@ -102,6 +102,95 @@ export function ownerSuiteFixtureGrids(options: { actionLog?: boolean; planBoard
   return sheets;
 }
 
+/**
+ * Header and label text from the live command center, with placeholder values only.
+ * Action Log is omitted on purpose: that tab does not exist.
+ */
+export function ownerCommandCenterStructureGrids(): SheetGrid[] {
+  return [
+    {
+      title: "Plan Board",
+      rows: [
+        ["Business", "Section", "Item", "Date", "Amount", "Status", "Notes"],
+        ["Iconic Studios", "To-do", "Visual only placeholder", "2026-10-12", "0", "", "Visual tab"],
+      ],
+    },
+    {
+      title: "Plan Board Data",
+      rows: [
+        ["Business", "Section", "Item", "Date", "Amount", "Status", "Notes"],
+        ["KDP", "To-do", "Data tab placeholder", "2026-10-12", "0", "", "Placeholder note"],
+        ["Iconic Images M&M", "Calendar", "Placeholder calendar", "2026-10-16", "0", "", ""],
+      ],
+    },
+    {
+      title: "Friday Scorecard",
+      rows: [
+        ["FRIDAY SCORECARD · Week ending placeholder"],
+        ["Sources note placeholder"],
+        [],
+        ["METRIC", "VALUE"],
+        ["Cash collected this week", "$0"],
+        ["Toward $100k identified moves", "$0"],
+        ["Payroll reserve", "$0"],
+        ["Steven paid (Cash App)", "$0"],
+        ["Payroll HOLD unpaid", "~0+"],
+        ["AR > 7 days (client)", "Placeholder client"],
+        ["Past-due count", "0+"],
+        ["New bookings", "Active"],
+        ["DOT paid claims / upgrades", "0 / 0"],
+        ["Job apps / interviews", "0 / 0"],
+        ["Kids items done", "0"],
+        ["Square Loan remaining", "$0"],
+        [],
+        ["BUSINESS", "RAG"],
+        ["Iconic Images", "Red"],
+        ["Iconic Studios", "Yellow"],
+        ["KDP", "Green"],
+        ["Iconic Virtual.ai", "YELLOW"],
+        ["Doors Open Tour", "Amber"],
+        ["aICON", "G"],
+        [],
+        ["NEXT WEEK TARGET (suggestions for Cadi — NOT messaged)", "OWNER"],
+        ["Placeholder target", "Placeholder owner"],
+        [],
+        ["Week cash detail (Payment #)", "Date"],
+        ["P-0", "2026-10-12"],
+      ],
+    },
+    {
+      title: "Businesses",
+      rows: [
+        ["Businesses"],
+        ["Placeholder note"],
+        ["Business", "RAG", "Where it stands", "Next milestone", "Milestone due", "Next date on the calendar", "30-day target", "30-day $ (est.)", "Owner(s)", "15% profit check"],
+        ["Iconic Images", "YELLOW", "Placeholder standing", "Placeholder milestone", "2026-11-08", "2026-10-16", "Placeholder target", "$0", "Placeholder owner", "Placeholder"],
+        ["Iconic Studios", "Amber", "Placeholder standing", "Placeholder milestone", "TBD", "TBD", "Placeholder target", "$0", "Placeholder owner", "Placeholder"],
+        ["KDP", "R", "Placeholder standing", "Placeholder milestone", "TBD", "TBD", "Placeholder target", "$0", "Placeholder owner", "Placeholder"],
+        ["Iconic Virtual.ai", "g", "Placeholder standing", "Placeholder milestone", "TBD", "TBD", "Placeholder target", "$0", "Placeholder owner", "Placeholder"],
+        ["Doors Open Tour", "A", "Placeholder standing", "Placeholder milestone", "TBD", "TBD", "Placeholder target", "$0", "Placeholder owner", "Placeholder"],
+        ["aICON", "Green", "Placeholder standing", "Placeholder milestone", "TBD", "TBD", "Placeholder target", "$0", "Placeholder owner", "Placeholder"],
+      ],
+    },
+    {
+      title: "30-60-90",
+      rows: [
+        ["30-60-90 · Oct 9, 2026 → Jan 7, 2027"],
+        ["Gold = hard milestone. Day 30 = Nov 8 · Day 60 = Dec 8 · Day 90 = Jan 7, 2027. Placeholder note."],
+        ["OCTOBER 2026", "", "", "", "", "", "", "", "Date", "Milestone"],
+        ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT", "", "", ""],
+        ["", "", "", "", "", "16\n★ Placeholder hard milestone", "", "", "Fri Oct 16", "Placeholder early item"],
+        ["", "", "", "", "", "", "", "", "Sun Nov 8", "DAY 30: Placeholder checkpoint"],
+        ["", "", "", "", "", "", "", "", "Tue Dec 8", "DAY 60 checkpoint: Placeholder"],
+        ["", "", "", "", "", "", "", "", "Thu Jan 7, 2027", "DAY 90 checkpoint"],
+        ["", "", "", "", "", "", "", "", "TBD", "Placeholder undated"],
+        ["", "", "", "", "", "", "", "", "By Mar 2027 (est.)", "Placeholder later"],
+        ["", "", "", "", "", "", "", "", "Once stable", "Placeholder when stable"],
+      ],
+    },
+  ];
+}
+
 function planBoardFixture(): SheetGrid {
   return {
     title: "Plan Board",

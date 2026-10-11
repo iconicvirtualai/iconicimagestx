@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { INTENDED_OWNER_EMAIL } from "../../shared/ownerAccess";
-import { clearOwnerSuiteCacheForTests, loadOwnerSuite, resolveSheetsCredentials } from "./ownerSheets";
+import { clearOwnerSuiteCacheForTests, loadOwnerSuite, resolveSheetsCredentials, selectOwnerTabs } from "./ownerSheets";
 
 const KEYS = [
   "OWNER_EMAILS",
@@ -23,6 +23,33 @@ afterEach(() => {
     else process.env[key] = value;
   }
   clearOwnerSuiteCacheForTests();
+});
+
+describe("owner tab selection", () => {
+  it("prefers Plan Board Data and skips a missing Action Log", () => {
+    expect(selectOwnerTabs([
+      "Plan Board",
+      "Plan Board Data",
+      "Friday Scorecard",
+      "This Week",
+      "$100k Tracker",
+      "Businesses",
+      "30-60-90",
+      "Owes",
+      "Decisions",
+    ])).toEqual([
+      "Friday Scorecard",
+      "This Week",
+      "$100k Tracker",
+      "Businesses",
+      "30-60-90",
+      "Owes",
+      "Decisions",
+      "Plan Board Data",
+    ]);
+    expect(selectOwnerTabs(["Plan Board"])).toEqual(["Plan Board"]);
+    expect(selectOwnerTabs(["Action Log", "Plan Board Data"])).toEqual(["Action Log", "Plan Board Data"]);
+  });
 });
 
 describe("sheets credentials", () => {
