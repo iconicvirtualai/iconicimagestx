@@ -7,41 +7,40 @@
 import { Router, type Request, type Response } from "express";
 import Stripe from "stripe";
 import admin from "firebase-admin";
-import crypto from "crypto";
 import { requireCoordinator, requireAuth, type AuthenticatedRequest } from "../middleware/auth";
+import { appFirestore } from "../lib/appFirestore";
 import { sendEmail } from "../services/email";
+import { buildPaymentReceipt } from "../services/paymentReceiptEmail";
+import { receiveSquareWebhook } from "../services/squarePaidUnlock";
 import { clientNotifyLive } from "../../shared/clientNotify";
 import { addressText } from "../../shared/addressText";
 import { bookingDateLabel } from "../../shared/clientHome";
-import { amountStillDue, invoiceAllowsDownload, invoiceIdFromSquareNote, squarePaymentNote } from "../../shared/paymentAccess";
+import { amountStillDue, invoiceAllowsDownload, squarePaymentNote } from "../../shared/paymentAccess";
 import { invoiceEmailNumber, invoicePageInvoiceNumber, receiptEmailNumber } from "../../shared/orderProjectInvoice";
 import { fetchPublishedSquareInvoiceUrl, resolveSquareCheckoutUrl, squareApiBaseUrl } from "../../shared/squareInvoice";
-import { clientInvoiceUrl, isGuessableInvoiceId } from "../../shared/invoicePayLink";
+import { clientInvoiceUrl } from "../../shared/invoicePayLink";
 import { publicClientUrl } from "../../shared/publicSiteUrl";
+import {
+  createPayToken,
+  decideInvoiceView,
+  invoiceRedirectTarget,
+  isLegacyOpenAutoId,
+  publicInvoiceClient,
+  publicInvoiceLines,
+  type InvoiceAudience,
+} from "../../shared/invoicePay";
+import { normalizeEmail } from "../../shared/listingAccess";
+import { isActiveStaffRecord } from "../../shared/staffAccess";
+import { isTempAdminEnabled, liveServerEnv } from "../../shared/tempAdmin";
+import { payTokenMatches } from "../lib/payToken";
+import { resolveClientIdentity } from "../services/clientAccounts";
 
 const router = Router();
-const db = () => admin.firestore();
+const db = () => appFirestore();
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20",
 });
-
-function appUrl() {
-  return process.env.APP_URL || "https://iconicimagestx.com";
-}
-
-/** Pay link in client email. Empty when the invoice is paid, comped, or a guessable id with no token. */
-function emailedPayUrl(invoiceId: string, invoice: Record<string, unknown>): string {
-  return clientInvoiceUrl({ id: invoiceId, payToken: invoice.payToken, status: invoice.status }) || "";
-}
-
-/** Stored client invoice URL. Guessable ids are included only when a pay token is present. */
-function storedPayUrl(invoiceId: string, invoice: Record<string, unknown>): string {
-  const emailed = emailedPayUrl(invoiceId, invoice);
-  if (emailed) return emailed;
-  if (isGuessableInvoiceId(invoiceId)) return "";
-  return publicClientUrl(`/invoice/${encodeURIComponent(invoiceId)}`);
-}
 
 function stripeReady() {
   return Boolean(process.env.STRIPE_SECRET_KEY);
@@ -65,6 +64,100 @@ function invoiceProvider(invoice: Record<string, unknown>): "square" | "stripe" 
 
 function money(value: unknown) {
   return `$${(Number(value) || 0).toFixed(2)}`;
+}
+
+function invoiceNotFound(res: Response) {
+  return res.status(404).json({ error: "Invoice not found." });
+}
+
+function presentedPayToken(req: Request): string {
+  const query = req.query.t;
+  if (typeof query === "string" && query.trim()) return query.trim();
+  const body = req.body && typeof req.body === "object" ? (req.body as { t?: unknown }).t : "";
+  return typeof body === "string" ? body.trim() : "";
+}
+
+async function loadInvoice(id: string) {
+  const seen = new Set<string>();
+  let current = id.trim();
+  for (let hop = 0; hop < 4; hop += 1) {
+    if (!current || seen.has(current)) return null;
+    seen.add(current);
+    const snap = await db().collection("invoices").doc(current).get();
+    if (!snap.exists) return null;
+    const next = invoiceRedirectTarget(snap.data() || {});
+    if (!next || next === snap.id) return snap;
+    current = next;
+  }
+  return null;
+}
+
+function ownsInvoice(ids: string[], email: string, invoice: Record<string, unknown>): boolean {
+  const clientId = typeof invoice.clientId === "string" ? invoice.clientId.trim() : "";
+  if (clientId && ids.includes(clientId)) return true;
+  const invoiceEmail = normalizeEmail(invoice.clientEmail);
+  const viewerEmail = normalizeEmail(email);
+  return Boolean(invoiceEmail && viewerEmail && invoiceEmail === viewerEmail);
+}
+
+async function audienceFor(req: Request, invoice: Record<string, unknown>): Promise<InvoiceAudience> {
+  const header = req.headers.authorization || "";
+  if (!header.startsWith("Bearer ")) return "public";
+  const token = header.slice("Bearer ".length).trim();
+  if (!token) return "public";
+  try {
+    if (isTempAdminEnabled(liveServerEnv()) && token === "temp-admin-token") return "staff";
+    const decoded = await admin.auth().verifyIdToken(token);
+    const staffDoc = await db().collection("staff").doc(decoded.uid).get();
+    const staff = staffDoc.exists ? staffDoc.data() : null;
+    if (isActiveStaffRecord(staff) && (staff?.role === "admin" || staff?.role === "coordinator")) {
+      return "staff";
+    }
+    const identity = await resolveClientIdentity(decoded.uid, decoded.email);
+    if (ownsInvoice(identity.ids, identity.email || decoded.email || "", invoice)) return "owner";
+    return "public";
+  } catch (err) {
+    console.warn("[Payments] Invoice session was not applied.");
+    return "public";
+  }
+}
+
+async function payTokenForLink(invoiceDoc: FirebaseFirestore.DocumentSnapshot): Promise<string> {
+  const invoice = invoiceDoc.data() || {};
+  const existing = typeof invoice.payToken === "string" ? invoice.payToken.trim() : "";
+  if (existing) return existing;
+  if (isLegacyOpenAutoId(invoiceDoc.id)) return "";
+  const payToken = createPayToken();
+  const paymentUrl = clientInvoiceUrl({ id: invoiceDoc.id, payToken, status: invoice.status }) || "";
+  await invoiceDoc.ref.update({
+    payToken,
+    ...(paymentUrl ? { paymentUrl } : {}),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return payToken;
+}
+
+function invoiceMoney(invoice: Record<string, unknown>) {
+  return {
+    subtotal: invoice.subtotal,
+    tax: invoice.tax,
+    total: invoice.total,
+    amountPaid: invoice.amountPaid,
+    amountDue: invoice.amountDue,
+    processing: invoice.processing ?? null,
+    fees: invoice.fees ?? null,
+    travel: invoice.travel ?? null,
+    promoDiscount: invoice.promoDiscount ?? null,
+    promoCode: invoice.promoCode ?? null,
+  };
+}
+
+function invoiceNumberFields(invoice: Record<string, unknown>, id: string) {
+  return invoicePageInvoiceNumber({
+    invoiceNumber: invoice.invoiceNumber,
+    id,
+    createdAt: invoice.createdAt,
+  });
 }
 
 async function paymentAlreadyRecorded({
@@ -211,9 +304,21 @@ async function applySuccessfulPayment({
   });
 
   if (invoice.clientEmail) {
+    const rendered = buildPaymentReceipt({
+      invoice,
+      invoiceId,
+      unlocked: newAmountDue <= 0,
+      amountPaid: newAmountPaid,
+      balance: newAmountDue,
+      galleryId: invoice.galleryId,
+      listing: typeof invoice.listingId === "string" ? { id: invoice.listingId } : null,
+    });
     await sendEmail({
       to: invoice.clientEmail,
       template: "payment_receipt",
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
       variables: {
         clientName: invoice.clientName,
         amount: money(amount),
@@ -279,12 +384,17 @@ router.post("/send-invoice", requireCoordinator, async (req, res) => {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
 
-    const invoiceDoc = await db().collection("invoices").doc(invoiceId).get();
-    if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
+    const invoiceDoc = await loadInvoice(String(invoiceId));
+    if (!invoiceDoc) return invoiceNotFound(res);
 
-    const invoice = invoiceDoc.data()!;
+    const invoice = invoiceDoc.data() || {};
     const provider = invoiceProvider(invoice);
-    const paymentUrl = emailedPayUrl(invoiceId, invoice);
+    const payToken = await payTokenForLink(invoiceDoc);
+    const paymentUrl = clientInvoiceUrl({
+      id: invoiceDoc.id,
+      payToken: payToken || invoice.payToken,
+      status: invoice.status,
+    }) || "";
 
     await sendEmail({
       to: invoice.clientEmail,
@@ -322,17 +432,29 @@ router.post("/send-receipt", requireCoordinator, async (req, res) => {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
 
-    const invoiceDoc = await db().collection("invoices").doc(invoiceId).get();
-    if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
+    const invoiceDoc = await loadInvoice(String(invoiceId));
+    if (!invoiceDoc) return invoiceNotFound(res);
 
-    const invoice = invoiceDoc.data()!;
+    const invoice = invoiceDoc.data() || {};
     if (!invoiceAllowsDownload(invoice)) {
       return res.status(409).json({ error: "Invoice is not paid. Send the pay link instead." });
     }
 
+    const rendered = buildPaymentReceipt({
+      invoice,
+      invoiceId: invoiceDoc.id,
+      unlocked: true,
+      amountPaid: Number(invoice.amountPaid || invoice.total) || 0,
+      balance: amountStillDue(invoice),
+      galleryId: invoice.galleryId,
+      listing: typeof invoice.listingId === "string" ? { id: invoice.listingId } : null,
+    });
     await sendEmail({
       to: invoice.clientEmail,
       template: "payment_receipt",
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
       variables: {
         clientName: invoice.clientName,
         amount: money(invoice.amountPaid || invoice.total),
@@ -354,42 +476,60 @@ router.post("/send-receipt", requireCoordinator, async (req, res) => {
 
 router.get("/invoice/:id", async (req: Request, res: Response) => {
   try {
-    const invoiceDoc = await db().collection("invoices").doc(req.params.id).get();
-    if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
+    const invoiceDoc = await loadInvoice(req.params.id);
+    if (!invoiceDoc) return invoiceNotFound(res);
 
-    const invoice = invoiceDoc.data()!;
+    const invoice = invoiceDoc.data() || {};
     const provider = invoiceProvider(invoice);
+    const audience = await audienceFor(req, invoice);
+    const view = decideInvoiceView({
+      invoiceId: invoiceDoc.id,
+      payToken: invoice.payToken,
+      presentedToken: presentedPayToken(req),
+      audience,
+      matches: payTokenMatches,
+    });
+    if (view === "deny") return invoiceNotFound(res);
+
+    const paid = invoiceAllowsDownload(invoice);
+    const shared = {
+      id: invoiceDoc.id,
+      paid,
+      invoiceNumber: invoiceNumberFields(invoice, invoiceDoc.id),
+      clientName: invoice.clientName,
+      ...invoiceMoney(invoice),
+      status: invoice.status,
+      paymentProvider: provider,
+      canPayOnline: provider === "stripe" ? stripeReady() : squareReady(),
+      createdAt: invoice.createdAt || null,
+    };
+    if (view === "public") {
+      const body: Record<string, unknown> = {
+        ...shared,
+        ...publicInvoiceClient(invoice),
+        lineItems: publicInvoiceLines(invoice.lineItems),
+      };
+      if (paid && typeof invoice.galleryId === "string" && invoice.galleryId.trim()) {
+        body.galleryId = invoice.galleryId;
+      }
+      return res.json(body);
+    }
 
     return res.json({
-      id: invoiceDoc.id,
-      paid: invoiceAllowsDownload(invoice),
-      invoiceNumber: invoicePageInvoiceNumber({
-        invoiceNumber: invoice.invoiceNumber,
-        id: invoiceDoc.id,
-        createdAt: invoice.createdAt,
-      }),
-      clientName: invoice.clientName,
+      ...shared,
       lineItems: invoice.lineItems,
-      subtotal: invoice.subtotal,
-      tax: invoice.tax,
-      total: invoice.total,
-      amountPaid: invoice.amountPaid,
-      amountDue: invoice.amountDue,
-      processing: invoice.processing ?? null,
-      fees: invoice.fees ?? null,
-      travel: invoice.travel ?? null,
-      promoDiscount: invoice.promoDiscount ?? null,
-      promoCode: invoice.promoCode ?? null,
       billToAddress: typeof invoice.billToAddress === "string" ? invoice.billToAddress : null,
       notes: typeof invoice.notes === "string" ? invoice.notes : null,
       clientEmail: invoice.clientEmail || null,
-      status: invoice.status,
-      paymentProvider: provider,
       stripePaymentIntentId: invoice.stripePaymentIntentId || null,
       squarePaymentId: invoice.squarePaymentId || null,
       squarePaymentLinkId: invoice.squarePaymentLinkId || null,
       galleryId: invoice.galleryId || null,
-      paymentUrl: storedPayUrl(invoiceDoc.id, invoice),
+      paymentUrl: clientInvoiceUrl({
+        id: invoiceDoc.id,
+        payToken: invoice.payToken,
+        status: invoice.status,
+      }) || "",
       canPayOnline: provider === "stripe" ? stripeReady() : squareReady(),
     });
   } catch (err) {
@@ -400,20 +540,36 @@ router.get("/invoice/:id", async (req: Request, res: Response) => {
 
 router.post("/invoice/:id/checkout", async (req: Request, res: Response) => {
   try {
-    const invoiceDoc = await db().collection("invoices").doc(req.params.id).get();
-    if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
+    const invoiceDoc = await loadInvoice(req.params.id);
+    if (!invoiceDoc) return invoiceNotFound(res);
 
-    const invoice = invoiceDoc.data()!;
+    const invoice = invoiceDoc.data() || {};
+    const audience = await audienceFor(req, invoice);
+    const view = decideInvoiceView({
+      invoiceId: invoiceDoc.id,
+      payToken: invoice.payToken,
+      presentedToken: presentedPayToken(req),
+      audience,
+      matches: payTokenMatches,
+    });
+    if (view === "deny") return invoiceNotFound(res);
+
     const amountDue = amountStillDue(invoice);
     const provider = invoiceProvider(invoice);
+    const payToken = await payTokenForLink(invoiceDoc);
+    const invoiceUrl = clientInvoiceUrl({
+      id: invoiceDoc.id,
+      payToken: payToken || invoice.payToken,
+      status: invoice.status,
+    }) || "";
 
     if (invoiceAllowsDownload(invoice)) {
       return res.json({
         paid: true,
         provider,
-        redirectUrl: invoice.galleryId
-          ? publicClientUrl(`/gallery/${invoice.galleryId}`)
-          : publicClientUrl(`/invoice/${invoiceDoc.id}`),
+        redirectUrl: view === "full" && invoice.galleryId
+          ? publicClientUrl(`/gallery/${encodeURIComponent(String(invoice.galleryId))}`)
+          : invoiceUrl,
       });
     }
 
@@ -464,7 +620,11 @@ router.post("/invoice/:id/checkout", async (req: Request, res: Response) => {
             location_id: process.env.SQUARE_LOCATION_ID,
           },
           checkout_options: {
-            redirect_url: publicClientUrl(`/invoice/${invoiceDoc.id}?paid=1`),
+            redirect_url: clientInvoiceUrl({
+              id: invoiceDoc.id,
+              payToken,
+              status: invoice.status,
+            }, undefined, { paid: "1" }) || invoiceUrl,
           },
           pre_populated_data: {
             buyer_email: invoice.clientEmail || undefined,
@@ -483,7 +643,7 @@ router.post("/invoice/:id/checkout", async (req: Request, res: Response) => {
       await invoiceDoc.ref.update({
         status: "sent",
         paymentProvider: "square",
-        paymentUrl: link?.url || storedPayUrl(invoiceDoc.id, invoice),
+        paymentUrl: link?.url || invoiceUrl,
         squarePaymentLinkId: link?.id || null,
         squareOrderId: link?.order_id || null,
         sentAt: invoice.sentAt || admin.firestore.FieldValue.serverTimestamp(),
@@ -527,15 +687,22 @@ router.post("/invoice/:id/checkout", async (req: Request, res: Response) => {
         orderId: invoice.orderId || "",
         clientId: invoice.clientId || "",
       },
-      success_url: publicClientUrl(`/invoice/${invoiceDoc.id}?paid=1`),
-      cancel_url: publicClientUrl(`/invoice/${invoiceDoc.id}?cancelled=1`),
+      success_url: clientInvoiceUrl({
+        id: invoiceDoc.id,
+        payToken,
+        status: invoice.status,
+      }, undefined, { paid: "1" }) || invoiceUrl,
+      cancel_url: clientInvoiceUrl({
+        id: invoiceDoc.id,
+        payToken,
+        status: invoice.status,
+      }, undefined, { cancelled: "1" }) || invoiceUrl,
     });
 
-    const stripePayUrl = storedPayUrl(invoiceDoc.id, invoice);
     await invoiceDoc.ref.update({
       status: "sent",
       paymentProvider: "stripe",
-      ...(stripePayUrl ? { paymentUrl: stripePayUrl } : {}),
+      ...(invoiceUrl ? { paymentUrl: invoiceUrl } : {}),
       stripeCheckoutSessionId: session.id,
       sentAt: invoice.sentAt || admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -592,135 +759,14 @@ router.post("/webhook", async (req: Request, res: Response) => {
   }
 });
 
-function squareNotificationUrls(): string[] {
-  const explicit = process.env.SQUARE_WEBHOOK_NOTIFICATION_URL;
-  const urls = [
-    explicit,
-    `${appUrl()}/api/payments/square-webhook`,
-    process.env.FRONTEND_URL
-      ? `${process.env.FRONTEND_URL.replace(/\/$/, "")}/api/payments/square-webhook`
-      : "",
-  ].filter((url): url is string => Boolean(url));
-  return [...new Set(urls)];
-}
-
-function squareSignatureValid(rawBody: string, received: string | undefined, key: string): boolean {
-  if (!received) return false;
-  const receivedBuf = Buffer.from(received);
-  return squareNotificationUrls().some((url) => {
-    const expected = crypto.createHmac("sha256", key).update(url + rawBody).digest("base64");
-    const expectedBuf = Buffer.from(expected);
-    if (expectedBuf.length !== receivedBuf.length) return false;
-    return crypto.timingSafeEqual(expectedBuf, receivedBuf);
-  });
-}
-
-async function findInvoiceForSquarePayment(payment: Record<string, unknown>) {
-  const noteId = invoiceIdFromSquareNote(payment.note || payment.payment_note);
-  if (noteId) {
-    const byNote = await db().collection("invoices").doc(noteId).get();
-    if (byNote.exists) return byNote;
-  }
-
-  const referenceId = typeof payment.reference_id === "string" ? payment.reference_id : "";
-  if (referenceId) {
-    const byReference = await db().collection("invoices").doc(referenceId).get();
-    if (byReference.exists) return byReference;
-  }
-
-  if (typeof payment.order_id === "string" && payment.order_id) {
-    const bySquareOrder = await db()
-      .collection("invoices")
-      .where("squareOrderId", "==", payment.order_id)
-      .limit(1)
-      .get();
-    if (!bySquareOrder.empty) return bySquareOrder.docs[0];
-  }
-
-  const linkId = payment.payment_link_id || payment.paymentLinkId;
-  if (typeof linkId === "string" && linkId) {
-    const byLink = await db()
-      .collection("invoices")
-      .where("squarePaymentLinkId", "==", linkId)
-      .limit(1)
-      .get();
-    if (!byLink.empty) return byLink.docs[0];
-  }
-
-  if (typeof payment.id === "string" && payment.id) {
-    const byPayment = await db()
-      .collection("invoices")
-      .where("squarePaymentId", "==", payment.id)
-      .limit(1)
-      .get();
-    if (!byPayment.empty) return byPayment.docs[0];
-  }
-
-  return null;
-}
-
 router.post("/square-webhook", async (req: Request, res: Response) => {
-  try {
-    const rawBody = Buffer.isBuffer(req.body)
-      ? req.body.toString("utf8")
-      : JSON.stringify(req.body || {});
-    const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
-    if (!signatureKey) {
-      console.error("[Payments] Square webhook rejected: SQUARE_WEBHOOK_SIGNATURE_KEY is not set.");
-      return res.status(401).json({ error: "Square webhook signature key is not configured." });
-    }
-
-    const received = Array.isArray(req.headers["x-square-hmacsha256-signature"])
-      ? req.headers["x-square-hmacsha256-signature"][0]
-      : req.headers["x-square-hmacsha256-signature"];
-    if (!squareSignatureValid(rawBody, received, signatureKey)) {
-      return res.status(400).json({ error: "Invalid Square webhook signature." });
-    }
-
-    const event = JSON.parse(rawBody);
-    const payment = event?.data?.object?.payment || event?.data?.object;
-    if (!payment?.id || payment.status !== "COMPLETED") return res.json({ received: true });
-
-    const invoiceDoc = await findInvoiceForSquarePayment(payment);
-    if (!invoiceDoc) {
-      await db().collection("agentLogs").add({
-        agent: "travis",
-        action: "Unmatched Square payment",
-        summary: `Square payment ${payment.id} could not be matched to an invoice`,
-        status: "flagged",
-        relatedType: "invoice",
-        priority: "high",
-        requiresHumanReview: true,
-        details: payment.order_id || payment.note || "",
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-      return res.json({ received: true, unmatched: true });
-    }
-
-    const invoice = invoiceDoc.data() || {};
-    if (invoiceProvider(invoice) === "stripe") {
-      return res.json({ received: true, ignored: "stripe-invoice" });
-    }
-
-    const amountCents = Number(payment.amount_money?.amount ?? payment.total_money?.amount ?? 0);
-    const amount = amountCents / 100;
-    if (amount <= 0) return res.json({ received: true, ignored: "zero-amount" });
-
-    await applySuccessfulPayment({
-      invoiceId: invoiceDoc.id,
-      orderId: invoice.orderId,
-      clientId: invoice.clientId,
-      clientName: invoice.clientName,
-      amount,
-      method: "square",
-      squarePaymentId: payment.id,
-    });
-
-    return res.json({ received: true });
-  } catch (err) {
-    console.error("[Payments] Square webhook error:", err);
-    return res.status(500).json({ error: "Square webhook handler failed." });
-  }
+  const signatureHeader = req.headers["x-square-hmacsha256-signature"];
+  const signature = Array.isArray(signatureHeader) ? signatureHeader[0] : signatureHeader;
+  const result = await receiveSquareWebhook({
+    rawBody: req.body,
+    signature: typeof signature === "string" ? signature : undefined,
+  });
+  return res.status(result.status).json(result.body);
 });
 
 router.get("/transactions", requireCoordinator, async (req, res) => {
@@ -758,8 +804,8 @@ async function handleStripePaymentSucceeded(intent: Stripe.PaymentIntent) {
   const { invoiceId, orderId, clientId, clientName } = intent.metadata;
   if (!invoiceId) return;
 
-  const invoiceDoc = await db().collection("invoices").doc(invoiceId).get();
-  if (!invoiceDoc.exists) return;
+  const invoiceDoc = await loadInvoice(invoiceId);
+  if (!invoiceDoc) return;
   if (invoiceProvider(invoiceDoc.data() || {}) !== "stripe") {
     console.warn(`[Payments] Ignored Stripe payment ${intent.id} for non-Stripe invoice ${invoiceId}`);
     return;

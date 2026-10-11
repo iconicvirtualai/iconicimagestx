@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft, Copy, Plus, Save, Send } from "lucide-react";
-import { collection, doc, getDoc, getDocs, onSnapshot } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, onSnapshot, updateDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import AdminLayout from "@/components/AdminLayout";
 import { PackageCatalogPicker } from "@/components/PackageCatalogPicker";
@@ -33,6 +33,7 @@ import {
   type InvoicePreset,
   type InvoicePresetKind,
 } from "@shared/invoicePresets";
+import { createPayToken, isLegacyOpenAutoId } from "@shared/invoicePay";
 import { invoicePageInvoiceNumber } from "@shared/orderProjectInvoice";
 import { clientInvoiceUrl } from "@shared/invoicePayLink";
 import {
@@ -157,6 +158,27 @@ export default function AdminInvoiceEditor() {
     });
     return unsub;
   }, [invoiceId]);
+
+  const mintedFor = React.useRef("");
+  React.useEffect(() => {
+    if (!invoiceId || !invoice || mintedFor.current === invoiceId) return;
+    const existing = typeof invoice.payToken === "string" ? invoice.payToken.trim() : "";
+    if (existing || isLegacyOpenAutoId(invoiceId)) return;
+    mintedFor.current = invoiceId;
+    const payToken = createPayToken();
+    const paymentUrl = clientInvoiceUrl({
+      id: invoiceId,
+      status: invoice.status,
+      payToken,
+    });
+    if (!paymentUrl) {
+      mintedFor.current = "";
+      return;
+    }
+    updateDoc(doc(db, "invoices", invoiceId), { payToken, paymentUrl }).catch(() => {
+      mintedFor.current = "";
+    });
+  }, [invoice, invoiceId]);
 
   React.useEffect(() => watchInvoicePresets(setPresets), []);
 

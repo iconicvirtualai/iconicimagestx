@@ -23,6 +23,8 @@
     "report:lock-impact": "tsx scripts/report-lock-impact.ts",
     "report:share-photos": "tsx scripts/report-share-photos.ts",
     "qa:send-delivery": "tsx scripts/qa-send-delivery.ts",
+    "qa:square-webhook": "tsx scripts/qa-square-webhook.ts",
+    "migrate:invoice-ids": "tsx scripts/migrate-invoice-ids.ts",
     "format.fix": "prettier --write .",
     "typecheck": "tsc"
   },
