@@ -30,27 +30,27 @@ describe("optimize senior living photos", () => {
       },
     })
       .jpeg()
-      .toFile(path.join(inputDir, "sundale-lobby.jpg"));
+      .toFile(path.join(inputDir, "community-lobby.jpg"));
 
     const written = await optimizeSeniorLivingSources({ inputDir, outputDir });
     expect(written).toHaveLength(1);
-    expect(written[0].stem).toBe("sundale-lobby");
+    expect(written[0].stem).toBe("community-lobby");
     expect(written[0].warned).toBeNull();
 
     for (const width of SENIOR_LIVING_WIDTHS) {
       const meta = await sharp(
-        path.join(outputDir, `sundale-lobby-${width}.webp`),
+        path.join(outputDir, `community-lobby-${width}.webp`),
       ).metadata();
       expect(meta.width).toBe(width);
       expect(meta.format).toBe("webp");
     }
     const jpg = await sharp(
-      path.join(outputDir, "sundale-lobby.jpg"),
+      path.join(outputDir, "community-lobby.jpg"),
     ).metadata();
     expect(jpg.width).toBe(SENIOR_LIVING_WIDTHS[0]);
     expect(jpg.format).toBe("jpeg");
     const bytes = await readFile(
-      path.join(outputDir, "sundale-lobby-640.webp"),
+      path.join(outputDir, "community-lobby-640.webp"),
     );
     expect(bytes.length).toBeGreaterThan(20);
   });

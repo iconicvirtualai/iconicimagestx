@@ -1,11 +1,11 @@
 /**
- * Build responsive Sundale photos for /senior-living.
+ * Build responsive senior living photos for /senior-living.
  *
  *   pnpm optimize:senior-living
  *
  * Reads JPEG, PNG, or WebP originals from incoming/senior-living/.
  * Each file should be at least 1600 pixels wide. The stem is the filename
- * without its extension (sundale-lobby.jpg → sundale-lobby).
+ * without its extension (community-lobby.jpg → community-lobby).
  *
  * Writes into public/senior-living/:
  *   {stem}-1600.webp
@@ -57,7 +57,7 @@ export async function optimizeSeniorLivingSources(
     const stem = path.basename(name, path.extname(name)).toLowerCase();
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(stem)) {
       throw new Error(
-        `${name} needs a lowercase stem with letters, numbers, and hyphens, such as sundale-lobby.jpg.`,
+        `${name} needs a lowercase stem with letters, numbers, and hyphens, such as community-lobby.jpg.`,
       );
     }
     const source = path.join(options.inputDir, name);
@@ -91,7 +91,7 @@ export async function optimizeSeniorLivingSources(
 }
 
 function manifestSnippet(stem: string): string {
-  return `  { stem: "${stem}", alt: "Describe this Sundale Senior Living photo" },`;
+  return `  { stem: "${stem}", alt: "Photo at a Woodlands-area senior living community" },`;
 }
 
 async function main() {

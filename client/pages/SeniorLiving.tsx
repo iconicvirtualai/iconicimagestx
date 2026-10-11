@@ -5,9 +5,9 @@ import { PublicContactLine } from "@/components/PublicContactLine";
 import {
   publishedSeniorLivingPhotos,
   seniorLivingPhotoSrc,
-  SUNDALE_MATTERPORT_ALLOW,
-  SUNDALE_MATTERPORT_SRC,
-  SUNDALE_MATTERPORT_TITLE,
+  SENIOR_LIVING_MATTERPORT_ALLOW,
+  SENIOR_LIVING_MATTERPORT_SRC,
+  SENIOR_LIVING_MATTERPORT_TITLE,
   type SeniorLivingPhoto,
 } from "@/content/seniorLiving";
 import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "@shared/businessContact";
@@ -227,7 +227,7 @@ export default function SeniorLiving() {
                 For communities in Spring, The Woodlands, and Houston.
               </p>
               <p className="mt-3 max-w-xl text-base leading-relaxed text-white/70">
-                Sundale Senior Living is the sample tour on this page.
+                The sample tour is from a Woodlands-area senior living community.
               </p>
               <a
                 href="#schedule"
@@ -243,12 +243,12 @@ export default function SeniorLiving() {
         {photos.length > 0 ? (
           <section
             data-testid="senior-gallery"
-            aria-label="Sundale Senior Living photos"
+            aria-label="Photos of a Woodlands-area senior living community"
             className="bg-black"
           >
             <div className="mx-auto w-full max-w-6xl px-4 pb-14">
               <h2 className="text-2xl font-extrabold text-white">
-                Sundale Senior Living
+                A Woodlands-area senior living community
               </h2>
               <ul className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {photos.map((photo) => (
@@ -281,16 +281,16 @@ export default function SeniorLiving() {
               Sample tour
             </h2>
             <p className="mt-2 text-lg text-neutral-700">
-              Sundale Senior Living
+              A Woodlands-area senior living community
             </p>
             <div
               data-testid="matterport-tour"
               className="mt-6 aspect-video w-full max-w-full overflow-hidden rounded-2xl border-2 border-black bg-black"
             >
               <iframe
-                src={SUNDALE_MATTERPORT_SRC}
-                title={SUNDALE_MATTERPORT_TITLE}
-                allow={SUNDALE_MATTERPORT_ALLOW}
+                src={SENIOR_LIVING_MATTERPORT_SRC}
+                title={SENIOR_LIVING_MATTERPORT_TITLE}
+                allow={SENIOR_LIVING_MATTERPORT_ALLOW}
                 allowFullScreen
                 loading="lazy"
                 className="h-full w-full border-0"

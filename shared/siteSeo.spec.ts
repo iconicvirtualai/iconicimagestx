@@ -66,6 +66,9 @@ describe("public page meta", () => {
     expect(page?.description).toBe(
       "Virtual tours and photography for senior living communities in Spring, The Woodlands, and Houston.",
     );
+    expect(`${page?.title} ${page?.description}`.toLowerCase()).not.toContain(
+      ["sun", "dale"].join(""),
+    );
   });
 
   it("injects title, description, canonical, and social tags into the shell", () => {

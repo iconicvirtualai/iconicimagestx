@@ -77,8 +77,8 @@ import express from "express";
 
 const valid = {
   name: "Ada Lovelace",
-  community: "Sundale Senior Living",
-  email: "ada@sundale.example",
+  community: "A Woodlands-area senior living community",
+  email: "ada@community.example",
   phone: "281-555-0199",
   address: "100 Oak St, Spring, TX 77380",
   services: ["tour-3d", "rooms"],

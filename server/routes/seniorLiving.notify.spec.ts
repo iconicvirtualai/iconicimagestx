@@ -16,8 +16,8 @@ const sendEmailMock = vi.mocked(sendEmail);
 
 const value = {
   name: "Ada Lovelace",
-  community: "Sundale Senior Living",
-  email: "ada@sundale.example",
+  community: "A Woodlands-area senior living community",
+  email: "ada@community.example",
   phone: "281-555-0199",
   address: "100 Oak St, Spring, TX 77380",
   services: ["tour-3d" as const],
@@ -38,7 +38,7 @@ describe("senior living office notify", () => {
       adminUrl: "https://iconicimagestx.com/admin/orders",
       env: seniorLivingOfficeEnv({
         ADMIN_EMAIL: "photos@iconicimagestx.com",
-        COORDINATOR_EMAIL: "ada@sundale.example",
+        COORDINATOR_EMAIL: "ada@community.example",
       }),
     });
     expect(result.sent).toBe(true);
@@ -46,10 +46,10 @@ describe("senior living office notify", () => {
     const message = sendEmailMock.mock.calls[0][0];
     expect(message.to).toContain(SENIOR_LIVING_OPS_EMAIL);
     expect(message.to).toContain("photos@iconicimagestx.com");
-    expect(message.to).not.toContain("ada@sundale.example");
+    expect(message.to).not.toContain("ada@community.example");
     expect(message.audience).toBe("staff");
     expect(message.template).toBe("office_new_order");
     expect(message.subject).toContain("Senior Living");
-    expect(message.html).toContain("Sundale Senior Living");
+    expect(message.html).toContain("A Woodlands-area senior living community");
   });
 });

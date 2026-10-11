@@ -12,9 +12,9 @@ import {
   publishedSeniorLivingPhotos,
   SENIOR_LIVING_PHOTOS,
   SENIOR_LIVING_WIDTHS,
-  SUNDALE_MATTERPORT_ALLOW,
-  SUNDALE_MATTERPORT_SRC,
-  SUNDALE_MATTERPORT_TITLE,
+  SENIOR_LIVING_MATTERPORT_ALLOW,
+  SENIOR_LIVING_MATTERPORT_SRC,
+  SENIOR_LIVING_MATTERPORT_TITLE,
 } from "@/content/seniorLiving";
 import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "@shared/businessContact";
 import {
@@ -66,8 +66,8 @@ function setValue(id: string, value: string) {
 async function fillValid() {
   await act(async () => {
     setValue("senior-name", "Ada Lovelace");
-    setValue("senior-community", "Sundale Senior Living");
-    setValue("senior-email", "ada@sundale.example");
+    setValue("senior-community", "A Woodlands-area senior living community");
+    setValue("senior-email", "ada@community.example");
     setValue("senior-phone", "281-555-0199");
     setValue("senior-address", "100 Oak St, Spring, TX 77380");
     setValue("senior-dates", "April 14 or 15");
@@ -119,13 +119,16 @@ describe("senior living page", () => {
     expect(html).not.toContain("/book?package=");
 
     const frame = container?.querySelector("iframe");
-    expect(frame?.getAttribute("src")).toBe(SUNDALE_MATTERPORT_SRC);
-    expect(SUNDALE_MATTERPORT_SRC).toBe(
+    expect(frame?.getAttribute("src")).toBe(SENIOR_LIVING_MATTERPORT_SRC);
+    expect(SENIOR_LIVING_MATTERPORT_SRC).toBe(
       "https://my.matterport.com/show/?m=PNCyedKDjvi&play=1",
     );
-    expect(frame?.getAttribute("allow")).toBe(SUNDALE_MATTERPORT_ALLOW);
-    expect(SUNDALE_MATTERPORT_ALLOW).toBe("fullscreen; xr-spatial-tracking");
-    expect(frame?.getAttribute("title")).toBe(SUNDALE_MATTERPORT_TITLE);
+    expect(frame?.getAttribute("allow")).toBe(SENIOR_LIVING_MATTERPORT_ALLOW);
+    expect(SENIOR_LIVING_MATTERPORT_ALLOW).toBe(
+      "fullscreen; xr-spatial-tracking",
+    );
+    expect(frame?.getAttribute("title")).toBe(SENIOR_LIVING_MATTERPORT_TITLE);
+    expect(html.toLowerCase()).not.toContain(["sun", "dale"].join(""));
     expect(frame?.getAttribute("loading")).toBe("lazy");
     expect(frame?.hasAttribute("allowfullscreen")).toBe(true);
     expect(html).not.toMatch(/leave this site|you are leaving|opens in a new/i);
@@ -216,7 +219,14 @@ describe("senior living page", () => {
     expect(source).not.toMatch(/\b0\.05\b/);
     expect(source).not.toMatch(/\b17\b|\b84\b/);
     expect(source).not.toMatch(/\bfont-serif\b|Cormorant|Garamond|cursive/);
+    const communityName = ["sun", "dale"].join("");
+    expect(source.toLowerCase()).not.toContain(communityName);
     expect(source).not.toContain(["cadi", "@"].join(""));
+    const manifest = readFileSync(
+      path.join(process.cwd(), "client/content/seniorLiving.ts"),
+      "utf8",
+    );
+    expect(manifest.toLowerCase()).not.toContain(communityName);
   });
 
   it("validates the form before sending and shows success without a client email", async () => {
@@ -241,7 +251,7 @@ describe("senior living page", () => {
     expect(fetchMock).not.toHaveBeenCalled();
 
     await act(async () => {
-      setValue("senior-email", "ada@sundale.example");
+      setValue("senior-email", "ada@community.example");
     });
     fetchMock.mockResolvedValue({
       ok: true,
@@ -256,7 +266,7 @@ describe("senior living page", () => {
     expect(init.method).toBe("POST");
     const body = JSON.parse(init.body);
     expect(body.services).toEqual(["tour-3d"]);
-    expect(body.email).toBe("ada@sundale.example");
+    expect(body.email).toBe("ada@community.example");
     expect(body.companyWebsite).toBe("");
     expect(
       container?.querySelector("[data-testid='senior-success']")?.textContent,
