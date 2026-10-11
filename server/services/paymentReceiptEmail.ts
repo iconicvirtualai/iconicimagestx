@@ -1,10 +1,12 @@
 /**
  * Branded payment receipt. Table layout, inline styles, Arial/Helvetica.
- * Processing is 2.8% of the subtotal, shown as included. The total paid is
- * the amount collected, never subtotal plus the fee.
+ * Processing is 2.8% of the sale base, charged on top of the sale.
+ * TOTAL PAID is the amount collected. A legacy or comped invoice that was
+ * not charged the fee shows PROCESSING $0.00.
  *
- * TODO: dedupe processingFee with #132 INVOICE_PROCESSING_MODE when that
- * branch merges. This copy stays local so the receipt does not import #132.
+ * TODO: import processingFee from #132 shared/invoiceProcessing.ts once that
+ * branch merges. Pass base = subtotal - promotions + fees. The math below
+ * matches that helper: half-up cents of baseCents * 0.028.
  */
 
 import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "../../shared/businessContact";
@@ -18,11 +20,44 @@ const TEAL = "#14B8C4";
 const GREEN = "#16A34A";
 const ROW = "#F3F4F6";
 
-/** 2.8% of subtotal, rounded to the nearest cent. Included, not added on top. */
-export function processingFee(subtotal: number): number {
-  const cents = Math.round((Number(subtotal) || 0) * 100);
-  if (cents <= 0) return 0;
-  return Math.round(cents * 0.028) / 100;
+/**
+ * 2.8% of the sale base, half-up to the nearest cent.
+ * base = subtotal - promotions + fees. Zero when the base is blank or negative.
+ * Integer form of round(baseCents * 0.028), same as #132's processingFee.
+ */
+export function processingFee(base: number): number {
+  const amount = Number(base);
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  const baseCents = Math.round(amount * 100);
+  return Math.round((baseCents * 28) / 1000) / 100;
+}
+
+/**
+ * Processing printed on the receipt.
+ * Stored `processing` wins when the invoice has one. Otherwise this is 2.8%
+ * of the base. Either amount is shown only when the dollars paid include it.
+ * Comped invoices, and legacy invoices charged without the fee, show $0.00.
+ */
+export function receiptProcessing(input: {
+  invoice: Record<string, unknown>;
+  subtotal: number;
+  promotions: number;
+  fees: number;
+  totalPaid: number;
+}): number {
+  const status = text(input.invoice.status).toLowerCase();
+  const paymentStatus = text(input.invoice.paymentStatus).toLowerCase();
+  if (status === "comped" || paymentStatus === "comped") return 0;
+
+  const base = roundCents(input.subtotal - input.promotions + input.fees);
+  const stored = finite(input.invoice.processing);
+  const quoted = stored != null ? Math.max(0, stored) : processingFee(base);
+  const quotedCents = toCents(quoted);
+  if (quotedCents <= 0) return 0;
+  const paidCents = toCents(input.totalPaid);
+  const baseCents = toCents(base);
+  if (paidCents + 1 < baseCents + quotedCents) return 0;
+  return roundCents(quotedCents / 100);
 }
 
 export function receiptLogoUrl(env?: PublicSiteEnv): string {
@@ -104,6 +139,13 @@ export function buildPaymentReceipt(input: {
   const fees = finite(input.invoice.fees) ?? 0;
   const totalPaid = input.amountPaid ?? finite(input.invoice.amountPaid) ?? finite(input.invoice.total) ?? 0;
   const balance = input.balance ?? 0;
+  const processing = receiptProcessing({
+    invoice: input.invoice,
+    subtotal,
+    promotions,
+    fees,
+    totalPaid,
+  });
   const galleryId = text(input.galleryId) || text(input.invoice.galleryId);
   const galleryUrl = galleryId ? publicClientUrl(`/gallery/${encodeURIComponent(galleryId)}`, input.env) : "";
   const presentationUrl = input.presentationUrl === undefined
@@ -119,7 +161,7 @@ export function buildPaymentReceipt(input: {
     paidAtLabel: receiptPaidLabel(input.paidAt || new Date()),
     lines,
     subtotal,
-    processing: processingFee(subtotal),
+    processing,
     promotions,
     fees,
     totalPaid,
@@ -154,16 +196,23 @@ export function paymentReceiptFromVars(
     }
   }
   const subtotal = dollars(vars.subtotal) || lines.reduce((sum, line) => sum + line.total, 0);
+  const promotions = dollars(vars.promotions);
+  const fees = dollars(vars.fees);
   const totalPaid = dollars(vars.totalPaid) || dollars(vars.amount);
+  const invoice: Record<string, unknown> = {
+    status: vars.status,
+    paymentStatus: vars.paymentStatus,
+  };
+  if (vars.processing != null && vars.processing !== "") invoice.processing = dollars(vars.processing);
   return renderPaymentReceipt({
     clientName: vars.clientName || "there",
     invoiceNumber: vars.invoiceNumber || "",
     paidAtLabel: vars.paidAt || "",
     lines,
     subtotal,
-    processing: processingFee(subtotal),
-    promotions: dollars(vars.promotions),
-    fees: dollars(vars.fees),
+    processing: receiptProcessing({ invoice, subtotal, promotions, fees, totalPaid }),
+    promotions,
+    fees,
     totalPaid,
     balance: dollars(vars.balance),
     galleryUrl: vars.galleryUrl || "",
@@ -214,7 +263,7 @@ ${rows}
 <table class="totals-desktop" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:2px solid #000000;border-collapse:separate;font-family:${FONT};">
 <tr>
 ${totalCell("SUB TOTAL", money(content.subtotal), false)}
-${totalCell("PROCESSING", money(content.processing), false, "INCLUDED")}
+${totalCell("PROCESSING", money(content.processing), false)}
 ${totalCell("PROMOTIONS", money(content.promotions), false)}
 ${totalCell("FEES", money(content.fees), false)}
 ${totalCell("TOTAL PAID", money(content.totalPaid), true)}
@@ -222,14 +271,11 @@ ${totalCell("TOTAL PAID", money(content.totalPaid), true)}
 </table>
 <table class="totals-mobile" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="display:none;border:2px solid #000000;border-collapse:separate;font-family:${FONT};">
 ${totalRow("SUB TOTAL", money(content.subtotal), false)}
-${totalRow("PROCESSING", money(content.processing), false, "INCLUDED")}
+${totalRow("PROCESSING", money(content.processing), false)}
 ${totalRow("PROMOTIONS", money(content.promotions), false)}
 ${totalRow("FEES", money(content.fees), false)}
 ${totalRow("TOTAL PAID", money(content.totalPaid), true)}
 </table>
-</td></tr>
-<tr><td style="padding:8px 24px 4px;font-family:${FONT};font-size:12px;line-height:1.45;color:#6b7280;">
-Processing is 2.8% of the subtotal and is included in the total. It is not an extra charge.
 </td></tr>
 ${downloads}
 ${footerBlock()}
@@ -370,12 +416,10 @@ function receiptText(content: PaymentReceiptContent): string {
     ...itemLines,
     "",
     `SUB TOTAL ${money(content.subtotal)}`,
-    `PROCESSING ${money(content.processing)} INCLUDED`,
+    `PROCESSING ${money(content.processing)}`,
     `PROMOTIONS ${money(content.promotions)}`,
     `FEES ${money(content.fees)}`,
     `TOTAL PAID ${money(content.totalPaid)}`,
-    "",
-    "Processing is 2.8% of the subtotal and is included in the total. It is not an extra charge.",
     "",
     ...links,
     "",
@@ -395,6 +439,10 @@ function money(value: number): string {
 
 function roundCents(value: number): number {
   return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function toCents(value: number): number {
+  return Math.round((Number(value) || 0) * 100);
 }
 
 function finite(value: unknown): number | null {

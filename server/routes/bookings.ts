@@ -37,8 +37,8 @@ import { refuseQaStaffAssignment } from "../services/qaStaffAssign";
 const router = Router();
 const db = () => admin.firestore();
 
-function appUrl() {
-  return process.env.APP_URL || "https://iconicimagestx.com";
+function orderRequestAdminUrl(id: string): string {
+  return publicClientUrl(`/admin/order-request/${encodeURIComponent(id)}`);
 }
 
 function addressLabel(address: unknown): string {
@@ -350,7 +350,7 @@ router.post("/", async (req, res) => {
         accessMethod: accessLine,
         squareFootage: squareFootage ? `${squareFootage} sq ft` : "",
         travelFee: travelSummaryText(travel),
-        dashboardUrl: `${appUrl()}/admin/order-request/${docRef.id}`,
+        dashboardUrl: orderRequestAdminUrl(docRef.id),
       },
     }).then((result) => (result.sent ? "sent" as const : "failed" as const)).catch((err) => {
       console.error("[Bookings] Confirmation email failed:", err);
@@ -444,7 +444,7 @@ router.post("/", async (req, res) => {
       const alert = await notifyOfficeOfOrder({
         isNewOrder: true,
         saved: savedOrder,
-        adminUrl: `${appUrl()}/admin/order-request/${savedSnap.id}`,
+        adminUrl: orderRequestAdminUrl(savedSnap.id),
       });
       officeAlertStatus = alert.sent ? "sent" : "skipped";
     } catch (err) {

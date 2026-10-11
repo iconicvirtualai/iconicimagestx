@@ -12,7 +12,7 @@ Square invoice sync uses `delivery_method: SHARE_MANUALLY`, so Square does not e
 
 | Template or id | Channel | Trigger | Recipient | Gate | With `CLIENT_NOTIFY_LIVE` unset | Link base |
 | --- | --- | --- | --- | --- | --- | --- |
-| `booking_received` | Email | `POST` booking in `server/routes/bookings.ts`. Client submits a booking request. | Client email on the request | Ungated. `emailAllowed` always allows this template. Not narrowed to the allowlist. | **SENDS** | Built-in HTML has no link. The send still passes `dashboardUrl` from `APP_URL` (`/admin/order-request/:id`). A stored Firestore template that prints `{{dashboardUrl}}` would use the Wix host. |
+| `booking_received` | Email | `POST` booking in `server/routes/bookings.ts`. Client submits a booking request. | Client email on the request | **Intentional, keep live.** Ungated. `emailAllowed` always allows this template. Not narrowed to the allowlist. | **SENDS** (intentional, keep live) | Built-in HTML has no link. The send passes `dashboardUrl` from `publicSiteUrl()/admin/order-request/:id`. A stored Firestore template that prints `{{dashboardUrl}}` uses that host. |
 | `account_password_setup` | Email | Same booking handler, only when a new portal account was created. | Client email | `CLIENT_NOTIFY_LIVE` / `RED` / allowlist. Caller also skips the link when `passwordSetupAllowed` is false. | Allowlist-only. Otherwise suppressed and logged as gated. | `portalUrl` is `publicSiteUrl()/portal`. `setupUrl` is a Firebase password link whose continue URL is that same portal URL. |
 | Firebase password email (`accounts:sendOobCode`, `PASSWORD_RESET`) | Email, Firebase Auth | Fallback in the booking handler when SMTP fails, or when the setup link could not be built, and only if `passwordSetupAllowed`. Also `sendPasswordResetEmail` in `client/contexts/AuthContext.tsx` when someone uses Forgot password. | Client email | Booking fallback: same gate as password setup. The login-screen reset is **ungated**. Firebase sends it. | Booking fallback: allowlist-only. Forgot password: **SENDS** | Booking fallback has no continue URL, so the link is Firebase's default handler. Forgot password is the same. The host must be a Firebase authorized domain. |
 | `order_confirmed` | Email | Staff confirms the request in `server/routes/bookings.ts`. | Client email | Gated email. Allowlist can deliver it. | Allowlist-only. Otherwise suppressed. | `publicSiteUrl()/portal` |
@@ -22,7 +22,7 @@ Square invoice sync uses `delivery_method: SHARE_MANUALLY`, so Square does not e
 | `contact_confirmation` | Email | `POST /api/contact`. Visitor submits the contact form. | The address they typed | Gated email. The template is not marked staff. | Allowlist-only. A real visitor is suppressed. | No link. Phone and `photos@iconicimagestx.com` are the public contact block. |
 | `manual_message` | Email | Staff `POST /api/messages/email`. | The address staff typed. This can be a client. | Gated email. | Allowlist-only. | No link in the built-in template. The body is staff-written. |
 | `marketing` | Email | Staff sends a legacy campaign. `POST /api/campaigns/:id/send` in `server/routes/campaigns.ts`. | Active or VIP clients, or a custom id list | The route returns 503 unless `clientNotifyLive()`, and `sendEmail` gates the template too. No allowlist short-circuit on the route check. | **Suppressed** (route stops before send). | Whatever the campaign body contains. |
-| GMass campaign and GMass test send | Email, GMass | Marketing portal `POST /api/marketing/campaigns/:id/send` and `.../test`. | Campaign audience, or the test address | **Ungated by `CLIENT_NOTIFY_LIVE` and by RED.** Needs `MARKETING_SEND_LIVE=true`, `GMASS_API_KEY`, and `GMASS_SEND_ENABLED=true`. | Does not send unless those three are set. Setting `CLIENT_NOTIFY_LIVE` does not turn GMass on. Setting `MARKETING_SEND_LIVE` does not turn the other client emails on. | Unsubscribe and public links use `marketingPublicUrl`: `MARKETING_PUBLIC_URL`, else **`APP_URL` (Wix)**, else the request host. |
+| GMass campaign and GMass test send | Email, GMass | Marketing portal `POST /api/marketing/campaigns/:id/send` and `.../test`. | Campaign audience, or the test address | **Ungated by `CLIENT_NOTIFY_LIVE` and by RED.** Needs `MARKETING_SEND_LIVE=true`, `GMASS_API_KEY`, and `GMASS_SEND_ENABLED=true`. | Does not send unless those three are set. Setting `CLIENT_NOTIFY_LIVE` does not turn GMass on. Setting `MARKETING_SEND_LIVE` does not turn the other client emails on. | Unsubscribe and public links use `marketingPublicUrl`: `MARKETING_PUBLIC_URL`, else `publicSiteUrl()`. `APP_URL` is not a fallback. |
 | `clientConfirmation` (Gmail) | Email, Gmail API | `onOrderCreated` in `functions/src/index.ts` when an `orders/{id}` doc is created. | `order.clientEmail` | Direct check of `CLIENT_NOTIFY_LIVE === "true"` and not RED. No allowlist. | **Suppressed** | No URL in the seeded template. Live copy is the Firestore doc `emailTemplates/clientConfirmation`. |
 | Stripe `receipt_email` | Email, Stripe | `POST /api/payments/create-intent` and Stripe Checkout in `server/routes/payments.ts`. | Invoice client email | Passed to Stripe only when `clientNotifyLive()` is true. No allowlist. | **Suppressed** (field omitted). | Stripe's own receipt page. |
 | Square payment-link receipt | Email, Square | Checkout sets `pre_populated_data.buyer_email`. Square's own receipt email is a location setting, not this codebase. | Buyer email Square has | **Ungated.** Our flag does not turn it off. | **SENDS if the Square dashboard receipt setting is on.** | Square's receipt host. |
@@ -33,7 +33,7 @@ Square invoice sync uses `delivery_method: SHARE_MANUALLY`, so Square does not e
 
 | Template or id | Channel | Trigger | Recipient | Gate | With `CLIENT_NOTIFY_LIVE` unset | Link base |
 | --- | --- | --- | --- | --- | --- | --- |
-| `booking_confirmation` (`SMS_TEMPLATES.bookingConfirmation`) | SMS | Booking request handler. | Client phone | Ungated. `smsAllowed` always allows this kind. | **SENDS** | No URL. The public contact line is in the body. |
+| `booking_confirmation` (`SMS_TEMPLATES.bookingConfirmation`) | SMS | Booking request handler. | Client phone | **Intentional, keep live.** Ungated. `smsAllowed` always allows this kind. | **SENDS** (intentional, keep live) | No URL. The public contact line is in the body. |
 | `photosDelivered` | SMS | `deliverGalleryToClient`, after the gallery email. | Client phone | Gated SMS. No allowlist. | **Suppressed** | `publicSiteUrl()/gallery/:id` |
 | Appointment reminder, 24h and 1h | SMS | Staff `POST /api/sms/remind/:orderId`, and the reminder sweep `POST /api/agents/run-reminders`. | Client phone on the order | Gated SMS. No allowlist. | **Suppressed** | No URL. |
 | Staff one-off SMS | SMS | `POST /api/sms/send`. | The number staff typed. This can be a client. | Gated SMS. No allowlist. | **Suppressed** | Whatever staff typed. |
@@ -44,7 +44,7 @@ Square invoice sync uses `delivery_method: SHARE_MANUALLY`, so Square does not e
 
 | Template or id | Channel | Trigger | Recipient | Gate | With `CLIENT_NOTIFY_LIVE` unset | Link base |
 | --- | --- | --- | --- | --- | --- | --- |
-| `office_new_order` | Email | New booking, `notifyOfficeOfOrder`. Audience `staff`. | `ADMIN_EMAIL` and `COORDINATOR_EMAIL`, never the client address | Ungated for this template when audience is `staff`. | **SENDS** | Admin link is **`APP_URL`/admin/order-request/:id** (Wix host until that env changes). |
+| `office_new_order` | Email | New booking, `notifyOfficeOfOrder`. Audience `staff`. | `ADMIN_EMAIL` and `COORDINATOR_EMAIL`, never the client address | Ungated for this template when audience is `staff`. | **SENDS** | Admin link is `publicSiteUrl()/admin/order-request/:id`. |
 | `live_chat` | Email | Visitor chat, `server/services/liveChat.ts`. Audience `staff`. | Office inbox | Ungated for this template when audience is `staff`. Refused if audience is not staff. | **SENDS** | No client link. |
 | `staff_inbound` | SMS | Same live chat. | Office Google Voice `+12813560965` only | Ungated, and any other destination is refused. | **SENDS** to that number | No URL. |
 | `contact_form` | Email | Contact form, to the office. | `CONTACT_FORM_EMAIL` or `photos@iconicimagestx.com` | Treated as client mail because audience is not `staff`. | Allowlist-only. The office address is suppressed unless it is on the allowlist. | No site link. |
@@ -53,15 +53,19 @@ Square invoice sync uses `delivery_method: SHARE_MANUALLY`, so Square does not e
 
 ## Ungated, or still on `APP_URL` / Wix
 
-- **SENDS today with the flag unset:** `booking_received`, booking-confirmation SMS, Firebase Forgot password, `office_new_order`, live-chat staff email, live-chat staff SMS, and a Square seller receipt if that dashboard toggle is on.
-- **`APP_URL` (Wix) is still in a client payload:** `booking_received`'s `dashboardUrl` variable. It is not in the built-in HTML. It is in the variables a stored template can print.
-- **`APP_URL` is the link that is actually rendered:** `office_new_order` admin link, and GMass unsubscribe links whenever `MARKETING_PUBLIC_URL` is empty.
-- **Separate switch that ignores this flag:** GMass (`MARKETING_SEND_LIVE` + `GMASS_SEND_ENABLED`). Do not treat go-live of client notify as go-live of marketing.
+- **Intentional, keep live** with the flag unset: `booking_received` and the booking-confirmation SMS. The owner's lead confirmed both should keep reaching real clients.
+- **SENDS today with the flag unset, and is not that carve-out:** Firebase Forgot password, `office_new_order`, live-chat staff email, live-chat staff SMS, and a Square seller receipt if that dashboard toggle is on.
+- **Email and SMS links now on `publicSiteUrl()`:** `office_new_order` admin link, `booking_received`'s `dashboardUrl` variable, and GMass unsubscribe links when `MARKETING_PUBLIC_URL` is empty.
+- **Still built from `APP_URL`, and left alone because they are not a link inside an email or SMS body:**
+  - `server/routes/sms.ts` Twilio webhook URL (`/api/sms/webhook`). That string is the callback Twilio signs. It is not text in the message.
+  - `server/routes/presentations.ts` `originOf` for the presentation page and the URL returned when a token is created. Creating a token does not email or text the client. #134 owns the client presentation link.
+  - `server/services/studioQueueKick.ts` internal cron tick, `server/services/playtestBootstrap.ts` seed origin, and `server/node-build.ts` request origin. None of these are message copy.
+- **Separate switch that ignores this flag:** GMass (`MARKETING_SEND_LIVE` + `GMASS_SEND_ENABLED`). Do not treat go-live of client notify as go-live of marketing. Empty `MARKETING_PUBLIC_URL` now uses `publicSiteUrl()`, not `APP_URL`.
 
 ## Go-live order
 
 1. Set `PUBLIC_SITE_URL` to the https client origin (`https://iconicimagestx.vercel.app` until the custom domain is cut over). Do not point client links at `APP_URL`.
-2. Set `MARKETING_PUBLIC_URL` to that same origin before any GMass send, so unsubscribe links are not built from `APP_URL`.
+2. Set `MARKETING_PUBLIC_URL` to that same origin before any GMass send. If it is empty, unsubscribe links use `publicSiteUrl()`. They do not use `APP_URL`.
 3. Leave `CLIENT_COMMS_ZONE` unset, or anything other than `RED`.
 4. Set `NOTIFY_TEST_ALLOWLIST` to the exact QA mailboxes, including `ops+deliveryqa@iconicimagestx.com`. Do not add a domain pattern.
 5. Confirm SMTP (`SMTP_USER`, `SMTP_PASS`) and Twilio (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`) in the host that will send.

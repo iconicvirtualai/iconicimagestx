@@ -254,8 +254,9 @@ describe("Square webhook paid unlock", () => {
     expect(sent[0].html).toContain("Your downloads are ready");
     expect(sent[0].html).toContain("https://iconicimagestx.vercel.app/gallery/playtest-delivery-qa-gallery");
     expect(sent[0].html).not.toContain("View your listing presentation");
-    expect(sent[0].text).toContain("TOTAL PAID");
-    expect(sent[0].text).toContain("INCLUDED");
+    expect(sent[0].text).toContain("TOTAL PAID $1.00");
+    expect(sent[0].text).toContain("PROCESSING $0.00");
+    expect(sent[0].text).not.toContain("INCLUDED");
 
     const replay = await postEvent(event);
     expect(replay.status).toBe(200);
