@@ -1321,9 +1321,14 @@ function packagesForStaffEditor(liveDocs = [], options) {
   return options?.includeInactive ? items : items.filter((item) => item.isActive);
 }
 const CALL_FOR_PRICING_LABEL = "Call for pricing";
-function catalogPriceIsBookable(price) {
+function isPubliclyBookable(item) {
+  if (!item || typeof item !== "object") return false;
+  const price = item.price;
   const amount = typeof price === "number" ? price : typeof price === "string" && price.trim() ? Number(price) : Number.NaN;
   return Number.isFinite(amount) && amount > 0;
+}
+function publicBookingCatalogResponse(catalog = packagesForStaffEditor([])) {
+  return { packages: catalog.filter((item) => isPubliclyBookable(item)) };
 }
 function chargeCatalog(input) {
   return input.catalog ?? packagesForStaffEditor([]);
@@ -1623,7 +1628,7 @@ function unpricedCatalogBookingError(body, catalog) {
   const consider = (raw) => {
     if (typeof raw !== "string") return;
     const item = findCatalogItem(list2, raw);
-    if (item && !catalogPriceIsBookable(item.price)) names.add(item.name);
+    if (item && !isPubliclyBookable(item)) names.add(item.name);
   };
   consider(body.selectedService);
   for (const id of textList(body.selectedBasics)) consider(id);
@@ -5179,6 +5184,10 @@ router$m.post("/", async (req, res) => {
     console.error("[Bookings] Submission error:", err);
     return res.status(500).json({ error: "Failed to submit booking request." });
   }
+});
+router$m.get("/catalog", async (_req, res) => {
+  const catalog = await loadBookingCatalog();
+  return res.json(publicBookingCatalogResponse(catalog));
 });
 router$m.get("/", requireCoordinator, async (_req, res) => {
   try {
