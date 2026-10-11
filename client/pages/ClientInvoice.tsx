@@ -103,6 +103,8 @@ export default function ClientInvoice() {
     }
   };
 
+  const notes = typeof invoice.notes === "string" ? invoice.notes : "";
+
   const downloadPdf = () => {
     downloadBrandedInvoice({
       invoiceNumber,
@@ -111,6 +113,7 @@ export default function ClientInvoice() {
       clientName: String(invoice.clientName || ""),
       billToAddress: address,
       status: paid ? "Paid" : "Payment due",
+      notes,
       face,
     });
   };
@@ -120,9 +123,11 @@ export default function ClientInvoice() {
       <main className="max-w-3xl mx-auto px-4 py-8">
         <BrandedInvoiceShell
           invoiceNumber={invoiceNumber}
+          issuedAt={invoice.createdAt}
           status={paid ? "Paid" : "Payment due"}
           amountPaid={face.amountPaid}
           amountDue={face.amountDue}
+          notes={notes}
           footer={(
             <>
               <button
@@ -168,7 +173,6 @@ export default function ClientInvoice() {
           <InvoiceBillTo name={String(invoice.clientName || "")} email={typeof invoice.clientEmail === "string" ? invoice.clientEmail : ""} address={address} />
           <InvoiceLineTable lines={face.services} />
           <InvoiceFaceSummary face={face} />
-          {invoice.notes ? <p className="whitespace-pre-wrap text-sm text-gray-600">{String(invoice.notes)}</p> : null}
         </BrandedInvoiceShell>
 
         <a href="/" data-testid="invoice-back-home" className="mt-6 inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-gray-400 hover:text-black">
