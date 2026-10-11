@@ -11,7 +11,7 @@
 
 import {
   CALL_FOR_PRICING_LABEL,
-  catalogPriceIsBookable,
+  isPubliclyBookable,
   packagesForStaffEditor,
   promoDiscountFor,
   type StaffCatalogPackage,
@@ -138,12 +138,12 @@ export function hasBookingSelection(input: BookingPriceInput): boolean {
     const key = String(id || "").trim();
     if (!key) return false;
     const item = findCatalogItem(catalog, key);
-    if (item) return catalogPriceIsBookable(item.price);
+    if (item) return isPubliclyBookable(item);
     return explicitCatalog ? false : true;
   };
   const pricedUpgrade = (id: string) => {
     const item = findCatalogItem(catalog, id);
-    return item ? catalogPriceIsBookable(item.price) : !explicitCatalog;
+    return item ? isPubliclyBookable(item) : !explicitCatalog;
   };
   if (known(input.selectedService)) return true;
   if ((input.selectedBasics || []).some((id) => known(id))) return true;
@@ -502,7 +502,7 @@ export function unpricedCatalogBookingError(
   const consider = (raw: unknown) => {
     if (typeof raw !== "string") return;
     const item = findCatalogItem(list, raw);
-    if (item && !catalogPriceIsBookable(item.price)) names.add(item.name);
+    if (item && !isPubliclyBookable(item)) names.add(item.name);
   };
 
   consider(body.selectedService);
