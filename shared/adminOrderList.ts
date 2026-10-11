@@ -17,15 +17,19 @@ export type AdminOrdersViewMode = "tile" | "list";
 
 export type AdminOrderListSortField =
   | "orderCode"
+  | "placed"
   | "client"
   | "address"
   | "shoot"
   | "package"
+  | "items"
   | "photographer"
   | "status"
   | "payment"
   | "total"
-  | "delivery";
+  | "notes"
+  | "delivery"
+  | "docId";
 
 export type AdminOrderListSortOrder = "asc" | "desc";
 
@@ -48,15 +52,19 @@ export interface AdminOrderListColumn {
 
 export const ADMIN_ORDER_LIST_COLUMNS: readonly AdminOrderListColumn[] = [
   { id: "orderCode", label: "Order #", kind: "text" },
+  { id: "placed", label: "Placed", kind: "date" },
   { id: "client", label: "Client name", kind: "text" },
   { id: "address", label: "Property address", kind: "text" },
   { id: "shoot", label: "Shoot date & time", kind: "date" },
   { id: "package", label: "Package / services", kind: "text" },
+  { id: "items", label: "Items", kind: "number" },
   { id: "photographer", label: "Photographer", kind: "text" },
   { id: "status", label: "Order status", kind: "text" },
   { id: "payment", label: "Payment status", kind: "text" },
   { id: "total", label: "Total", kind: "number" },
+  { id: "notes", label: "Notes", kind: "text" },
   { id: "delivery", label: "Gallery / delivery status", kind: "text" },
+  { id: "docId", label: "#", kind: "text" },
 ];
 
 export interface AdminOrderListStaff {
@@ -66,21 +74,33 @@ export interface AdminOrderListStaff {
   lastName?: string;
 }
 
+export interface AdminOrderListItem {
+  name: string;
+  priceLabel: string | null;
+}
+
 export interface AdminOrderListRow {
   id: string;
   href: string;
   orderCode: string;
+  placedLabel: string;
+  placedSort: string | null;
   clientName: string;
+  clientEmail: string;
   address: string;
   shootLabel: string;
   shootSort: string | null;
   packageSummary: string;
+  items: AdminOrderListItem[];
+  itemsCount: number;
   photographer: string;
   statusLabel: string;
   paymentLabel: string;
   totalLabel: string;
   totalSort: number | null;
+  notes: string;
   deliveryLabel: string;
+  docIdLabel: string;
 }
 
 /**
@@ -269,6 +289,46 @@ export function adminOrderShoot(record: Record<string, unknown>): { label: strin
   return { label, sortKey: day ? `${day}T${hhmm || "00:00"}` : null };
 }
 
+/**
+ * Notes text from the pre-tiles orders table (commit bbb1e347):
+ * vibeNote, then notes, then internalNotes, joined with newlines.
+ */
+export function adminOrderNotes(record: Record<string, unknown>): string {
+  const vibe = rawString(record.vibeNote);
+  const notes = rawString(record.notes);
+  const internal = rawString(record.internalNotes);
+  return (vibe + (notes ? `\n${notes}` : "") + (internal ? `\n${internal}` : "")).trim();
+}
+
+/** lineItems, or services when lineItems is absent. Same source as the old Items count. */
+export function adminOrderItems(record: Record<string, unknown>): AdminOrderListItem[] {
+  const source = Array.isArray(record.lineItems)
+    ? record.lineItems
+    : Array.isArray(record.services)
+      ? record.services
+      : [];
+  return source.map((item) => {
+    if (typeof item === "string") return { name: item, priceLabel: null };
+    if (!item || typeof item !== "object") return { name: String(item ?? ""), priceLabel: null };
+    const row = item as Record<string, unknown>;
+    const name = text(row.name) || text(row.label) || JSON.stringify(item);
+    const price = row.price;
+    return { name, priceLabel: itemPriceLabel(price) };
+  });
+}
+
+/** Placed date: createdAt, then submittedAt, then date. Month and day in America/Chicago. */
+export function adminOrderPlaced(record: Record<string, unknown>): { label: string; sortKey: string | null } {
+  const raw = record.createdAt ?? record.submittedAt ?? record.date;
+  const date = placedDate(raw);
+  const label = formatPlaced(raw, date);
+  return { label: label || "—", sortKey: date ? date.toISOString() : null };
+}
+
+export function adminOrderDocIdLabel(id: string): string {
+  return `#${id.substring(0, 6)}`;
+}
+
 export function buildAdminOrderListRow(
   record: Record<string, unknown>,
   staff: AdminOrderListStaff[] = [],
@@ -276,23 +336,32 @@ export function buildAdminOrderListRow(
   const tile = buildAdminOrderTile(record);
   const id = text(record.id) || tile.id;
   const shoot = adminOrderShoot(record);
+  const placed = adminOrderPlaced(record);
+  const items = adminOrderItems(record);
   const totalLabel = adminOrderTotalLabel(record);
   const named = tile.clientName !== "—" ? tile.clientName : text(record.name);
   return {
     id,
     href: adminOrderDetailHref(id),
     orderCode: tile.orderCode,
+    placedLabel: placed.label,
+    placedSort: placed.sortKey,
     clientName: named || "—",
+    clientEmail: text(record.email),
     address: recordAddressText(record) || "—",
     shootLabel: shoot.label,
     shootSort: shoot.sortKey,
     packageSummary: adminOrderPackageSummary(record),
+    items,
+    itemsCount: items.length,
     photographer: adminOrderPhotographer(record, staff),
     statusLabel: adminOrderStatusLabel(record),
     paymentLabel: adminOrderPaymentLabel(record),
     totalLabel,
     totalSort: adminOrderTotalSortValue(totalLabel),
+    notes: adminOrderNotes(record),
     deliveryLabel: adminOrderGalleryLabel(record),
+    docIdLabel: adminOrderDocIdLabel(id),
   };
 }
 
@@ -358,6 +427,10 @@ export function sampleAdminOrderRecords(): Record<string, unknown>[] {
       status: "scheduled",
       invoice: { status: "paid", amountPaid: 624, total: 624 },
       clientName: "Sample Client Avery North",
+      email: "sample.avery.north@example.com",
+      vibeNote: "Sample vibe: bright and airy.",
+      notes: "Gate code is 0000. Park on the sample street.",
+      internalNotes: "Internal: confirm twilight add-on.",
       appointmentDate: "2026-04-12",
       appointmentTime: "10:30 AM",
       address: "100 Sample Maple Lane, Conroe, TX 77301",
@@ -372,6 +445,8 @@ export function sampleAdminOrderRecords(): Record<string, unknown>[] {
       projectType: "business",
       status: "consult_scheduled",
       clientName: "Sample Client Blair Quinn",
+      email: "sample.blair.quinn@example.com",
+      notes: "Sample consult notes for the oak office.",
       services: ["Consult"],
       lineItems: [{ name: "Consult", price: 0, amount: 350 }],
       total: 0,
@@ -403,6 +478,7 @@ export function sampleAdminOrderRecords(): Record<string, unknown>[] {
       serviceIds: ["listing-essentials"],
       status: "confirmed",
       clientName: "Sample Client Drew Ellis",
+      internalNotes: "Delivered sample set.",
       invoice: { status: "paid", amountPaid: 249, total: 249 },
       appointmentDate: "2026-05-01",
       appointmentTime: "1:15 PM",
@@ -418,6 +494,7 @@ export function sampleAdminOrderRecords(): Record<string, unknown>[] {
       projectType: "real_estate",
       status: "request",
       clientName: "Sample Client Quinn Blake",
+      notes: "Sample request notes.\nClient asked for a weekday morning.\nNo lockbox on the sample door.",
       selectedService: "Sample walkthrough",
       services: ["Sample walkthrough"],
       address: "500 Sample Birch Avenue, Katy, TX 77494",
@@ -430,6 +507,7 @@ export function sampleAdminOrderRecords(): Record<string, unknown>[] {
       serviceIds: ["listing-legacy"],
       status: "archived",
       clientName: "Sample Client Eden Frost",
+      vibeNote: "Sample archive note.",
       invoice: { status: "paid", amountPaid: 899, total: 899 },
       appointmentDate: "2026-01-08",
       appointmentTime: "11:00 AM",
@@ -449,7 +527,9 @@ function compareRows(
   direction: number,
 ): number {
   if (field === "shoot") return compareMissingLast(left.shootSort, right.shootSort, direction);
+  if (field === "placed") return compareMissingLast(left.placedSort, right.placedSort, direction);
   if (field === "total") return compareMissingLast(left.totalSort, right.totalSort, direction);
+  if (field === "items") return compareMissingLast(left.itemsCount, right.itemsCount, direction);
   const ranked = textValue(left, field).localeCompare(textValue(right, field), undefined, { sensitivity: "base" });
   return ranked * direction;
 }
@@ -467,6 +547,8 @@ function textValue(row: AdminOrderListRow, field: AdminOrderListSortField): stri
   switch (field) {
     case "orderCode":
       return row.orderCode;
+    case "placed":
+      return row.placedLabel;
     case "client":
       return row.clientName;
     case "address":
@@ -479,8 +561,12 @@ function textValue(row: AdminOrderListRow, field: AdminOrderListSortField): stri
       return row.statusLabel;
     case "payment":
       return row.paymentLabel;
+    case "notes":
+      return row.notes;
     case "delivery":
       return row.deliveryLabel;
+    case "docId":
+      return row.docIdLabel;
     default:
       return "";
   }
@@ -572,6 +658,51 @@ function coerceDate(value: unknown): Date | null {
       : null;
   if (seconds == null) return null;
   return new Date(seconds * 1000);
+}
+
+function formatPlaced(raw: unknown, date: Date | null): string {
+  if (raw == null || raw === "") return "";
+  if (typeof raw === "string" && raw.includes(",")) return raw;
+  if (!date) return "";
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: CHICAGO,
+  });
+}
+
+function placedDate(raw: unknown): Date | null {
+  if (raw && typeof raw === "object" && typeof (raw as { toDate?: () => Date }).toDate === "function") {
+    const date = (raw as { toDate: () => Date }).toDate();
+    if (date instanceof Date && !Number.isNaN(date.getTime())) return date;
+  }
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed.includes(",")) {
+      if (!trimmed) return null;
+      const parsed = new Date(trimmed);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+    const parsed = new Date(trimmed);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  if (typeof raw === "number") {
+    const parsed = new Date(raw);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  return coerceDate(raw);
+}
+
+/** Same "$1,234.00" shape the old Items popup used. Listing totals stay on resolveListingPriceLabel. */
+function itemPriceLabel(price: unknown): string | null {
+  if (price == null || price === "") return null;
+  const amount = typeof price === "number" ? price : Number(String(price).replace(/[$,\s]/g, ""));
+  if (!Number.isFinite(amount)) return null;
+  return `$${(amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+}
+
+function rawString(value: unknown): string {
+  return typeof value === "string" ? value : "";
 }
 
 function stringList(value: unknown): string[] {

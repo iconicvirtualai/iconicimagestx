@@ -77,6 +77,33 @@ describe("admin order list rows", () => {
     expect(maple.photographer).toBe("Sample Photographer Jordan Hale");
     expect(maple.statusLabel).toBe("Scheduled");
     expect(maple.deliveryLabel).toBe("Editing");
+    expect(maple.placedLabel).toBe("Apr 2");
+    expect(maple.clientEmail).toBe("sample.avery.north@example.com");
+    expect(maple.docIdLabel).toBe("#fixtur");
+    expect(maple.notes).toBe(
+      "Sample vibe: bright and airy.\nGate code is 0000. Park on the sample street.\nInternal: confirm twilight add-on.",
+    );
+    expect(maple.items.map((item) => item.name)).toEqual(["The Showcase", "Twilight photos"]);
+    expect(maple.items.map((item) => item.priceLabel)).toEqual(["$549.00", "$75.00"]);
+    expect(row("fixture-oak").notes).toBe("Sample consult notes for the oak office.");
+    expect(row("fixture-pine").notes).toBe("");
+    expect(row("fixture-cedar").notes).toBe("Delivered sample set.");
+    expect(row("fixture-elm").notes).toBe("Sample archive note.");
+    expect(buildAdminOrderListRow({
+      id: "note-trim",
+      vibeNote: "  ",
+      notes: "",
+      internalNotes: "  keep  ",
+    }).notes).toBe("keep");
+    expect(buildAdminOrderListRow({
+      id: "items-services",
+      services: ["Hollywood"],
+    }).items).toEqual([{ name: "Hollywood", priceLabel: null }]);
+    expect(buildAdminOrderListRow({
+      id: "items-empty-lines",
+      lineItems: [],
+      services: ["Ignored"],
+    }).itemsCount).toBe(0);
     expect(row("fixture-pine").photographer).toBe("Sample Photographer Riley Moss");
     expect(adminOrderPhotographer(byId("fixture-oak"), staff)).toBe("—");
     expect(row("fixture-cedar").photographer).toBe("Sample Photographer Alex Kim");
@@ -137,6 +164,28 @@ describe("admin order list sorting", () => {
       "fixture-maple",
       "fixture-birch",
     ]);
+    expect(sortAdminOrderRows(active, "placed", "desc").map((item) => item.id)).toEqual([
+      "fixture-cedar",
+      "fixture-maple",
+      "fixture-oak",
+      "fixture-pine",
+    ]);
+    expect(sortAdminOrderRows(active, "items", "desc").map((item) => item.id)).toEqual([
+      "fixture-maple",
+      "fixture-oak",
+      "fixture-pine",
+      "fixture-cedar",
+    ]);
+    expect(sortAdminOrderRows(active, "notes", "asc").map((item) => item.id)).toEqual([
+      "fixture-pine",
+      "fixture-cedar",
+      "fixture-oak",
+      "fixture-maple",
+    ]);
+    expect(sortAdminOrderRows([
+      row("fixture-maple"),
+      buildAdminOrderListRow({ id: "no-placed" }),
+    ], "placed", "asc").map((item) => item.id)).toEqual(["fixture-maple", "no-placed"]);
   });
 
   it("cycles column direction by type", () => {
@@ -145,6 +194,25 @@ describe("admin order list sorting", () => {
     expect(cycleAdminOrderListSort({ field: "client", order: "asc" }, "total")).toEqual({ field: "total", order: "desc" });
     expect(ADMIN_ORDER_LIST_COLUMNS.map((column) => column.kind)).toContain("date");
     expect(ADMIN_ORDER_LIST_COLUMNS.map((column) => column.kind)).toContain("number");
+    expect(ADMIN_ORDER_LIST_COLUMNS.map((column) => column.label)).toEqual([
+      "Order #",
+      "Placed",
+      "Client name",
+      "Property address",
+      "Shoot date & time",
+      "Package / services",
+      "Items",
+      "Photographer",
+      "Order status",
+      "Payment status",
+      "Total",
+      "Notes",
+      "Gallery / delivery status",
+      "#",
+    ]);
+    expect(cycleAdminOrderListSort(DEFAULT_ADMIN_ORDER_LIST_SORT, "notes")).toEqual({ field: "notes", order: "asc" });
+    expect(cycleAdminOrderListSort(DEFAULT_ADMIN_ORDER_LIST_SORT, "items")).toEqual({ field: "items", order: "desc" });
+    expect(cycleAdminOrderListSort(DEFAULT_ADMIN_ORDER_LIST_SORT, "placed")).toEqual({ field: "placed", order: "desc" });
   });
 });
 

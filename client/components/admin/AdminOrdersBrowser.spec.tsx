@@ -198,5 +198,70 @@ describe("admin orders list", () => {
     expect(section.textContent).toContain("Gallery / delivery status");
     const money = section.querySelector("[data-slot='money']");
     expect(money?.className).toContain("whitespace-nowrap");
+    expect(section.textContent).toContain("Notes");
+    expect(section.textContent).toContain("Placed");
+    expect(section.textContent).toContain("Items");
+  });
+
+  it("opens the notes and items popups and clamps notes on the phone row", async () => {
+    await renderAt("adminOrdersView:uid-notes");
+    await chooseList();
+    const section = activeSection();
+    const maple = section.querySelector("[data-order-id='fixture-maple']");
+    const pine = section.querySelector("[data-order-id='fixture-pine']");
+    if (!maple || !pine) throw new Error("Missing fixture rows");
+
+    expect(section.textContent).toContain("Apr 2");
+    expect(section.textContent).toContain("sample.avery.north@example.com");
+    expect(section.textContent).toContain("#fixtur");
+
+    const link = maple.querySelector("a[data-order-link='fixture-maple']");
+    expect(link?.querySelector("[data-notes-open]")).toBeNull();
+    expect(link?.querySelector("[data-items-button]")).toBeNull();
+    expect(link?.querySelector("[data-notes-expand]")).toBeNull();
+
+    const notesText = maple.querySelector("[data-notes-text]") as HTMLElement;
+    expect(notesText.className).toContain("line-clamp-3");
+    expect(notesText.className).toContain("whitespace-pre-wrap");
+    expect(notesText.textContent).toContain("Sample vibe: bright and airy.");
+    const expand = maple.querySelector("[data-notes-expand]") as HTMLButtonElement;
+    expect(expand.textContent).toBe("Expand");
+    await act(async () => {
+      expand.click();
+    });
+    expect(maple.querySelector("[data-notes-text]")?.className).not.toContain("line-clamp-3");
+    expect(expand.textContent).toBe("Show less");
+
+    expect(pine.querySelector("[data-notes-open]")).toBeNull();
+    expect(pine.querySelector("[data-field='Notes']")?.textContent).toContain("—");
+
+    await act(async () => {
+      (maple.querySelector("[data-notes-open]") as HTMLButtonElement).click();
+    });
+    const notesDialog = document.querySelector("[role='dialog']");
+    expect(notesDialog?.getAttribute("aria-label")).toBe("Order Notes");
+    expect(notesDialog?.textContent).toContain("Gate code is 0000. Park on the sample street.");
+    expect(notesDialog?.textContent).toContain("Internal: confirm twilight add-on.");
+    await act(async () => {
+      buttonByText(document, "Close")?.click();
+    });
+    expect(document.querySelector("[role='dialog']")).toBeNull();
+
+    await act(async () => {
+      (maple.querySelector("[data-items-button]") as HTMLButtonElement).click();
+    });
+    const itemsDialog = document.querySelector("[role='dialog']");
+    expect(itemsDialog?.getAttribute("aria-label")).toBe("Order Items");
+    expect(itemsDialog?.textContent).toContain("The Showcase");
+    expect(itemsDialog?.textContent).toContain("$549.00");
+    expect(itemsDialog?.textContent).toContain("Twilight photos");
+    expect(itemsDialog?.textContent).toContain("$75.00");
+    await act(async () => {
+      (document.querySelector("[aria-label='Close Order Items']") as HTMLButtonElement).click();
+    });
+    expect(document.querySelector("[role='dialog']")).toBeNull();
+
+    await clickButton(section, "Placed");
+    expect(activeIds()).toEqual(["fixture-cedar", "fixture-maple", "fixture-oak", "fixture-pine"]);
   });
 });
