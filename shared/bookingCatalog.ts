@@ -399,6 +399,23 @@ export function hardcodedChargePrice(id: string): number | undefined {
   return undefined;
 }
 
+/** Id match, then an exact package name. Listings often store the name only. */
+export function hardcodedChargePriceForText(raw: string): number | undefined {
+  const direct = hardcodedChargePrice(raw);
+  if (direct != null) return direct;
+  const key = raw.trim().toLowerCase();
+  if (!key) return undefined;
+  const pools: Array<{ id: string; name: string; price: number }> = [
+    ...services,
+    ...basicsList,
+    ...UPGRADES,
+    ...publicBookingPackages,
+    ...addOns.flatMap((category) => category.items),
+  ];
+  const hit = pools.find((entry) => entry.name.trim().toLowerCase() === key);
+  return hit && hit.price > 0 ? hit.price : undefined;
+}
+
 export interface CatalogPriceMismatch {
   id: string;
   hardcodedPrice: number;
@@ -778,14 +795,25 @@ function offerItem(pkg: StaffCatalogPackage, presentation?: CatalogItem): Catalo
 /** Public booking copy when a catalog price is $0 or missing. */
 export const CALL_FOR_PRICING_LABEL = "Call for pricing";
 
-/** True when a catalog price can be charged on the public booking form. */
-export function catalogPriceIsBookable(price: unknown): boolean {
+/**
+ * The only public-booking price rule.
+ * A package or add-on is on /book only when its price is a finite number above zero.
+ * Missing, null, blank, NaN, and anything <= 0 stay off the public flow.
+ */
+export function isPubliclyBookable(item: { price?: unknown } | null | undefined): boolean {
+  if (!item || typeof item !== "object") return false;
+  const price = item.price;
   const amount = typeof price === "number"
     ? price
     : typeof price === "string" && price.trim()
       ? Number(price)
       : Number.NaN;
   return Number.isFinite(amount) && amount > 0;
+}
+
+/** True when a catalog price can be charged on the public booking form. */
+export function catalogPriceIsBookable(price: unknown): boolean {
+  return isPubliclyBookable({ price });
 }
 
 function collectBookingOffer(
@@ -855,14 +883,42 @@ function collectBookingOffer(
   };
 }
 
-/** Selectable booking lists. A $0 or missing price is left out so it cannot be booked. */
+/** Selectable booking lists. A missing, blank, NaN, or non-positive price is left out. */
 export function bookingOffer(catalog: StaffCatalogPackage[] = packagesForStaffEditor([])): BookingOffer {
-  return collectBookingOffer(catalog, (pkg) => catalogPriceIsBookable(pkg.price));
+  return collectBookingOffer(catalog, (pkg) => isPubliclyBookable(pkg));
 }
 
-/** Active catalog rows waiting on a real price. /book can show them, but they are not selectable. */
+/** Active catalog rows waiting on a real price. They stay off /book until the price is above zero. */
 export function bookingPriceHolds(catalog: StaffCatalogPackage[] = packagesForStaffEditor([])): BookingOffer {
-  return collectBookingOffer(catalog, (pkg) => !catalogPriceIsBookable(pkg.price));
+  return collectBookingOffer(catalog, (pkg) => !isPubliclyBookable(pkg));
+}
+
+export interface PublicBookingCatalogResponse {
+  packages: StaffCatalogPackage[];
+}
+
+/** Catalog payload for the public booking page. Unpriced rows are already removed. */
+export function publicBookingCatalogResponse(
+  catalog: StaffCatalogPackage[] = packagesForStaffEditor([]),
+): PublicBookingCatalogResponse {
+  return { packages: catalog.filter((item) => isPubliclyBookable(item)) };
+}
+
+/**
+ * `?package=` / `?service=` selection for /book.
+ * A catalog row that is not publicly bookable clears the selection so the normal picker shows.
+ * An id that is not in the catalog is left as typed.
+ */
+export function resolvePublicPackageDeepLink(
+  requestedId: string,
+  catalog: StaffCatalogPackage[] = packagesForStaffEditor([]),
+): { selectedId: string; hidden: boolean } {
+  const key = requestedId.trim();
+  if (!key) return { selectedId: "", hidden: false };
+  const item = catalog.find((entry) => entry.id === key || entry.bookingId === key);
+  if (!item) return { selectedId: key, hidden: false };
+  if (!isPubliclyBookable(item)) return { selectedId: "", hidden: true };
+  return { selectedId: item.id, hidden: false };
 }
 
 export interface CatalogPackageEdits {

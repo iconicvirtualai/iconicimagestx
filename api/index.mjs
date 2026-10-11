@@ -7,10 +7,10 @@ import admin from "firebase-admin";
 import nodemailer from "nodemailer";
 import twilio from "twilio";
 import { google } from "googleapis";
-import crypto, { randomBytes, randomUUID, createHmac, timingSafeEqual as timingSafeEqual$1 } from "crypto";
+import crypto, { randomBytes, randomUUID, createHmac as createHmac$1, timingSafeEqual as timingSafeEqual$1 } from "crypto";
+import { createHmac, randomBytes as randomBytes$1, timingSafeEqual } from "node:crypto";
 import Stripe from "stripe";
 import * as XLSX from "xlsx";
-import { randomBytes as randomBytes$1, timingSafeEqual } from "node:crypto";
 const STAFF_ROLES$1 = ["admin", "coordinator", "photographer", "editor"];
 function isStaffRole$1(role) {
   return typeof role === "string" && STAFF_ROLES$1.includes(role);
@@ -273,7 +273,7 @@ async function sendEmail(options) {
   let replyTo = options.replyTo;
   if (!to) {
     console.warn("[Email] No recipient specified, skipping.");
-    return { sent: false };
+    return { sent: false, delivery: "suppressed" };
   }
   if (!emailAllowed(template, process.env, audience)) {
     const narrowed = narrowGatedClientRecipients({ to, cc, bcc, replyTo }, process.env);
@@ -282,7 +282,7 @@ async function sendEmail(options) {
       console.warn(
         `[Email] Suppressed '${template}' to ${to} — ${why} No message sent.`
       );
-      return { sent: false };
+      return { sent: false, delivery: "suppressed" };
     }
     to = narrowed.to;
     cc = narrowed.cc;
@@ -325,7 +325,8 @@ async function sendEmail(options) {
       attachments
     });
     console.log(`[Email] Sent '${template}' to ${to}`);
-    return { sent: true };
+    const delivery = emailAllowed(template, process.env, audience) ? "sent" : "allowlist";
+    return { sent: true, delivery };
   } catch (err) {
     console.error(`[Email] Failed to send '${template}' to ${to}:`, err);
     throw err;
@@ -335,6 +336,9 @@ async function sendEmail(options) {
 }
 function interpolate(template, variables) {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] ?? `{{${key}}}`);
+}
+function builtinEmailHtml(type, vars) {
+  return getFallbackTemplate(type, vars);
 }
 function getFallbackTemplate(type, vars) {
   const base = (content) => `
@@ -396,6 +400,7 @@ function getFallbackTemplate(type, vars) {
       <p>Your photos for <strong>${vars.address}</strong> are edited and waiting in your Iconic Images gallery.</p>
       ${vars.invoiceAmount ? `<p>Iconic Images invoices after the shoot. Downloads stay locked until the <strong>${vars.invoiceAmount}</strong> invoice is paid.</p>` : `<p>Downloads open from your gallery once that invoice is paid, or when our team releases the files.</p>`}
       <p><a href="${vars.galleryUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">View Gallery</a></p>
+      ${vars.paymentUrl ? `<p><a href="${vars.paymentUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Pay invoice</a></p>` : ""}
       <p style="color:#999;font-size:12px;">Gallery available for ${vars.expiresAt}.</p>
     `),
     invoice: base(`
@@ -403,7 +408,7 @@ function getFallbackTemplate(type, vars) {
       <p>Hi ${vars.clientName},</p>
       <p>Your invoice <strong>${vars.invoiceNumber}</strong> for <strong>${vars.amount}</strong> is ready.</p>
       ${vars.dueDate ? `<p>Due: <strong>${vars.dueDate}</strong></p>` : ""}
-      <p><a href="${vars.paymentUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Pay Invoice</a></p>
+      ${vars.paymentUrl ? `<p><a href="${vars.paymentUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Pay Invoice</a></p>` : ""}
     `),
     payment_receipt: base(`
       <h2>Payment received ✓</h2>
@@ -637,7 +642,7 @@ function addressText(value) {
   if (typeof value === "string") return value.trim();
   if (typeof value !== "object" || Array.isArray(value)) return "";
   const address = value;
-  const formatted = text$e(address.formatted) || text$e(address.label);
+  const formatted = text$g(address.formatted) || text$g(address.label);
   if (formatted) return formatted;
   return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
 }
@@ -650,7 +655,7 @@ function recordAddressText(record) {
   }
   return "";
 }
-function text$e(value) {
+function text$g(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const services = [
@@ -1321,9 +1326,14 @@ function packagesForStaffEditor(liveDocs = [], options) {
   return options?.includeInactive ? items : items.filter((item) => item.isActive);
 }
 const CALL_FOR_PRICING_LABEL = "Call for pricing";
-function catalogPriceIsBookable(price) {
+function isPubliclyBookable(item) {
+  if (!item || typeof item !== "object") return false;
+  const price = item.price;
   const amount = typeof price === "number" ? price : typeof price === "string" && price.trim() ? Number(price) : Number.NaN;
   return Number.isFinite(amount) && amount > 0;
+}
+function publicBookingCatalogResponse(catalog = packagesForStaffEditor([])) {
+  return { packages: catalog.filter((item) => isPubliclyBookable(item)) };
 }
 function chargeCatalog(input) {
   return input.catalog ?? packagesForStaffEditor([]);
@@ -1623,7 +1633,7 @@ function unpricedCatalogBookingError(body, catalog) {
   const consider = (raw) => {
     if (typeof raw !== "string") return;
     const item = findCatalogItem(list2, raw);
-    if (item && !catalogPriceIsBookable(item.price)) names.add(item.name);
+    if (item && !isPubliclyBookable(item)) names.add(item.name);
   };
   consider(body.selectedService);
   for (const id of textList(body.selectedBasics)) consider(id);
@@ -2810,7 +2820,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
       createdAt: data.createdAt
     }, now),
     status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
-    clientName: text$d(data.clientName),
+    clientName: text$f(data.clientName),
     address: addressText(data.billToAddress || data.address || data.propertyAddress),
     createdAt,
     issuedOn: formatPortalDate(data.createdAt) || formatPortalDate(data.sentAt) || formatPortalDate(data.paidAt),
@@ -2820,7 +2830,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
     fees: storedAmount(data.fees),
     travel: storedAmount(data.travel),
     promoDiscount: storedAmount(data.promoDiscount),
-    promoCode: text$d(data.promoCode),
+    promoCode: text$f(data.promoCode),
     tax: storedAmount(data.tax),
     total: storedAmount(data.total),
     amountPaid: storedAmount(data.amountPaid),
@@ -2871,15 +2881,15 @@ function storedLines(lineItems, services2) {
     if (typeof item === "string" && item.trim()) return [{ name: item.trim(), qty: null, amount: null }];
     if (!item || typeof item !== "object") return [];
     const record = item;
-    const named = text$d(record.name) || text$d(record.label);
-    const description = text$d(record.description);
+    const named = text$f(record.name) || text$f(record.label);
+    const description = text$f(record.description);
     const name = named || description;
     const qty = storedQty(record.qty ?? record.quantity);
     const amount = storedAmount(record.price ?? record.amount ?? record.total);
     if (!name && amount == null && qty == null) return [];
     const line = { name: name || "Line item", qty, amount };
-    const id = text$d(record.id);
-    const category = text$d(record.category);
+    const id = text$f(record.id);
+    const category = text$f(record.category);
     if (id) line.id = id;
     if (category) line.category = category;
     if (named && description) line.description = description;
@@ -2915,7 +2925,7 @@ function isoStamp(value) {
   if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
   return null;
 }
-function text$d(value) {
+function text$f(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function roundMoney$3(value) {
@@ -3146,6 +3156,38 @@ async function listCalendarScheduleEvents({
   const readFailures = results.filter((result) => result.status === "rejected").length;
   return { configured: true, events, readFailures };
 }
+const __vite_import_meta_env__ = {};
+const DEFAULT_PUBLIC_SITE_URL = "https://iconicimagestx.vercel.app";
+function livePublicSiteEnv() {
+  const nodePublic = typeof process !== "undefined" ? process.env?.PUBLIC_SITE_URL : void 0;
+  const nodeVite = typeof process !== "undefined" ? process.env?.VITE_PUBLIC_SITE_URL : void 0;
+  const vitePublic = typeof import.meta !== "undefined" && __vite_import_meta_env__ ? void 0 : void 0;
+  return {
+    PUBLIC_SITE_URL: typeof nodePublic === "string" ? nodePublic : void 0,
+    VITE_PUBLIC_SITE_URL: typeof nodeVite === "string" && nodeVite.trim() ? nodeVite : typeof vitePublic === "string" ? vitePublic : void 0
+  };
+}
+function publicSiteUrl(env = livePublicSiteEnv()) {
+  const configured = String(env.PUBLIC_SITE_URL || env.VITE_PUBLIC_SITE_URL || "").trim();
+  const candidate = (configured || DEFAULT_PUBLIC_SITE_URL).replace(/\/+$/, "");
+  let parsed;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    throw new Error("PUBLIC_SITE_URL must be an https URL.");
+  }
+  if (parsed.protocol !== "https:") {
+    throw new Error("PUBLIC_SITE_URL must use https.");
+  }
+  if (!parsed.hostname) {
+    throw new Error("PUBLIC_SITE_URL must be an https URL.");
+  }
+  return candidate;
+}
+function publicClientUrl(path2, env) {
+  const suffix = path2.startsWith("/") ? path2 : `/${path2}`;
+  return `${publicSiteUrl(env)}${suffix}`;
+}
 const db$q = () => admin.firestore();
 async function upsertPortalClient(input) {
   const email = normalizeEmail$1(input.email);
@@ -3233,9 +3275,6 @@ function planBookingAccount(input) {
   };
 }
 const db$p = () => admin.firestore();
-function appUrl$3() {
-  return process.env.APP_URL || process.env.FRONTEND_URL || "https://iconicimagestx.com";
-}
 async function attachBookingClient(input) {
   const email = normalizeEmail$1(input.email);
   if (!email || !email.includes("@")) {
@@ -3294,7 +3333,7 @@ async function attachBookingClient(input) {
   return { clientId: uid, createdAccount, passwordSetupLink, skipReason: null };
 }
 async function createPasswordSetupLink(email) {
-  const continueUrl = `${appUrl$3().replace(/\/$/, "")}/portal`;
+  const continueUrl = publicClientUrl("/portal");
   try {
     return await admin.auth().generatePasswordResetLink(email, {
       url: continueUrl,
@@ -3386,40 +3425,40 @@ function bookingListingGroups(input) {
   for (const doc of requests) {
     const node = nodeId("orderRequests", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("listings", text$c(doc.data.listingId)));
-    uf.link(node, nodeId("orders", text$c(doc.data.orderId) || text$c(doc.data.convertedToOrderId)));
-    uf.link(node, nodeId("invoices", text$c(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$c(doc.data.galleryId)));
+    uf.link(node, nodeId("listings", text$e(doc.data.listingId)));
+    uf.link(node, nodeId("orders", text$e(doc.data.orderId) || text$e(doc.data.convertedToOrderId)));
+    uf.link(node, nodeId("invoices", text$e(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$e(doc.data.galleryId)));
   }
   for (const doc of orders) {
     const node = nodeId("orders", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$c(doc.data.orderRequestId)));
-    uf.link(node, nodeId("listings", text$c(doc.data.listingId)));
-    uf.link(node, nodeId("invoices", text$c(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$c(doc.data.galleryId)));
+    uf.link(node, nodeId("orderRequests", text$e(doc.data.orderRequestId)));
+    uf.link(node, nodeId("listings", text$e(doc.data.listingId)));
+    uf.link(node, nodeId("invoices", text$e(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$e(doc.data.galleryId)));
   }
   for (const doc of invoices) {
     const node = nodeId("invoices", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$c(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$c(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$c(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$e(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$e(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$e(doc.data.listingId)));
   }
   for (const doc of appointments) {
     const node = nodeId("appointments", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$c(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$c(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$c(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$e(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$e(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$e(doc.data.listingId)));
   }
   for (const doc of galleries) {
     const node = nodeId("galleries", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$c(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$c(doc.data.orderId)));
-    uf.link(node, nodeId("invoices", text$c(doc.data.invoiceId)));
-    uf.link(node, nodeId("listings", text$c(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$e(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$e(doc.data.orderId)));
+    uf.link(node, nodeId("invoices", text$e(doc.data.invoiceId)));
+    uf.link(node, nodeId("listings", text$e(doc.data.listingId)));
   }
   const groups = [];
   for (const nodes of uf.components()) {
@@ -3479,7 +3518,7 @@ function fillEmptyListingFields(existing, desired) {
   return patch;
 }
 function clientOwnsListing(listing, clients) {
-  const clientId2 = text$c(listing.clientId);
+  const clientId2 = text$e(listing.clientId);
   const email = normalizeEmail$1(listing.clientEmail || listing.email);
   if (!clientId2 && !email) return true;
   if (clientId2 && clients.ids.includes(clientId2)) return true;
@@ -3551,10 +3590,10 @@ function chooseListing(group, listings, clients) {
 }
 function listingMatches(doc, group) {
   if (doc.id === group.stableId || group.preferredListingIds.includes(doc.id)) return true;
-  const requestId = text$c(doc.data.orderRequestId);
-  const orderId = text$c(doc.data.orderId);
-  const invoiceId = text$c(doc.data.invoiceId);
-  const appointmentId = text$c(doc.data.appointmentId);
+  const requestId = text$e(doc.data.orderRequestId);
+  const orderId = text$e(doc.data.orderId);
+  const invoiceId = text$e(doc.data.invoiceId);
+  const appointmentId = text$e(doc.data.appointmentId);
   return Boolean(
     requestId && group.orderRequestIds.includes(requestId) || orderId && group.orderIds.includes(orderId) || invoiceId && group.invoiceIds.includes(invoiceId) || appointmentId && group.appointmentIds.includes(appointmentId)
   );
@@ -3564,7 +3603,7 @@ function linksFor(group, listingId, listings, clients) {
   const links = [];
   const push = (collection, docs) => {
     for (const doc of docs) {
-      const current = text$c(doc.data.listingId);
+      const current = text$e(doc.data.listingId);
       if (current === listingId) continue;
       if (current && isPortalListingId(current) && ownedIds.has(current)) continue;
       links.push({ collection, id: doc.id });
@@ -3581,7 +3620,7 @@ function clientsFor(group, identity) {
   const ids = /* @__PURE__ */ new Set();
   const emails = /* @__PURE__ */ new Set();
   const addId = (value) => {
-    const id = text$c(value);
+    const id = text$e(value);
     if (id) ids.add(id);
   };
   const addEmail = (value) => {
@@ -3600,7 +3639,7 @@ function clientsFor(group, identity) {
 function preferredListingIds(group) {
   const ids = [];
   const push = (value) => {
-    const id = text$c(value);
+    const id = text$e(value);
     if (id && isPortalListingId(id) && !ids.includes(id)) ids.push(id);
   };
   for (const doc of [...group.orderRequests, ...group.orders, ...group.invoices, ...group.appointments, ...group.galleries]) {
@@ -3635,9 +3674,9 @@ function bestAddress(group) {
   }
   for (const doc of propertyDocs(group)) {
     for (const key of ["address", "propertyAddress", "shootLocation"]) {
-      if (typeof doc.data[key] === "string" && text$c(doc.data[key])) return text$c(doc.data[key]);
+      if (typeof doc.data[key] === "string" && text$e(doc.data[key])) return text$e(doc.data[key]);
     }
-    if (text$c(doc.data.addressLabel)) return text$c(doc.data.addressLabel);
+    if (text$e(doc.data.addressLabel)) return text$e(doc.data.addressLabel);
   }
   return null;
 }
@@ -3653,7 +3692,7 @@ function firstScheduleDate(group) {
 function firstScheduleTime(group) {
   for (const doc of [...group.appointments, ...group.orders, ...group.orderRequests]) {
     for (const key of ["scheduledTime", "appointmentTime", "apptTime", "requestedTime"]) {
-      const value = text$c(doc.data[key]);
+      const value = text$e(doc.data[key]);
       if (value && !/^tbd$/i.test(value)) return value;
     }
   }
@@ -3670,7 +3709,7 @@ function projectType(group) {
     if (doc.data.projectType === "real_estate") return "real_estate";
     const service = doc.data.selectedService;
     if (service && typeof service === "object") {
-      const category = text$c(service.category);
+      const category = text$e(service.category);
       if (category === "business" || category === "branding") return "business";
       if (category === "listings") return "real_estate";
     }
@@ -3696,7 +3735,7 @@ function namesFrom(value) {
   for (const item of value) {
     if (typeof item === "string" && item.trim()) names.push(item.trim());
     else if (item && typeof item === "object") {
-      const name = text$c(item.name);
+      const name = text$e(item.name);
       if (name) names.push(name);
     }
     if (names.length >= 40) break;
@@ -3721,8 +3760,8 @@ function accessInfo(group) {
   return [firstText$2(group, ["accessMethod"]), firstText$2(group, ["lockboxCode"])].filter(Boolean).join(" - ");
 }
 function clientId(group, identity) {
-  const bookingIds = propertyDocs(group).map((doc) => text$c(doc.data.clientId)).filter(Boolean);
-  const identityIds = (identity?.ids || []).map((id) => text$c(id)).filter(Boolean);
+  const bookingIds = propertyDocs(group).map((doc) => text$e(doc.data.clientId)).filter(Boolean);
+  const identityIds = (identity?.ids || []).map((id) => text$e(id)).filter(Boolean);
   return bookingIds.find((id) => identityIds.includes(id)) || bookingIds[0] || identityIds[0] || "";
 }
 function clientEmail(group, identity) {
@@ -3736,8 +3775,8 @@ function clientEmail(group, identity) {
 }
 function clientName$1(group) {
   for (const doc of propertyDocs(group)) {
-    if (text$c(doc.data.clientName)) return text$c(doc.data.clientName);
-    const joined = `${text$c(doc.data.firstName)} ${text$c(doc.data.lastName)}`.trim();
+    if (text$e(doc.data.clientName)) return text$e(doc.data.clientName);
+    const joined = `${text$e(doc.data.firstName)} ${text$e(doc.data.lastName)}`.trim();
     if (joined) return joined;
   }
   return "";
@@ -3745,7 +3784,7 @@ function clientName$1(group) {
 function chosenInvoiceId(group) {
   const known = new Set(group.invoiceIds);
   for (const doc of [...group.orderRequests, ...group.orders]) {
-    const id = text$c(doc.data.invoiceId);
+    const id = text$e(doc.data.invoiceId);
     if (id && known.has(id)) return id;
   }
   return newestDoc(group.invoices)?.id || group.invoiceIds[0] || "";
@@ -3754,7 +3793,7 @@ function chosenId(docs, ids, pointers = [], keys = []) {
   const known = new Set(ids);
   for (const doc of pointers) {
     for (const key of keys) {
-      const id = text$c(doc.data[key]);
+      const id = text$e(doc.data[key]);
       if (id && known.has(id)) return id;
     }
   }
@@ -3766,7 +3805,7 @@ function propertyDocs(group) {
 function firstText$2(group, keys) {
   for (const doc of propertyDocs(group)) {
     for (const key of keys) {
-      const value = text$c(doc.data[key]);
+      const value = text$e(doc.data[key]);
       if (value) return value;
     }
   }
@@ -3834,7 +3873,7 @@ function hasAddress(value) {
   if (typeof value === "string") return value.trim().length > 0;
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record = value;
-  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$c(record[key]).length > 0);
+  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$e(record[key]).length > 0);
 }
 function statusKey(value) {
   return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
@@ -3866,14 +3905,14 @@ function isEmpty(value) {
 function isSentinel$1(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$c(value) {
+function text$e(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function cleanDocs(docs) {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
   for (const doc of docs || []) {
-    const id = text$c(doc?.id);
+    const id = text$e(doc?.id);
     if (!id || seen.has(id)) continue;
     seen.add(id);
     out.push({ id, data: doc.data && typeof doc.data === "object" ? doc.data : {} });
@@ -3952,7 +3991,7 @@ async function ensureBookingListingForRequest(orderRequestId) {
     galleries: []
   });
   const identity = {
-    ids: text$b(request.data.clientId) ? [text$b(request.data.clientId)] : [],
+    ids: text$d(request.data.clientId) ? [text$d(request.data.clientId)] : [],
     email: normalizeEmail$1(request.data.clientEmail || request.data.email)
   };
   const plans = await plansFor(bundle, identity);
@@ -4005,7 +4044,7 @@ async function applyBookingListingPlan(plan) {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
       created = true;
-      console.info(`[Listings] Created ${plan.listingId} for booking ${text$b(plan.createFields.orderRequestId) || text$b(plan.createFields.orderId) || text$b(plan.createFields.invoiceId)}`);
+      console.info(`[Listings] Created ${plan.listingId} for booking ${text$d(plan.createFields.orderRequestId) || text$d(plan.createFields.orderId) || text$d(plan.createFields.invoiceId)}`);
     } catch (err) {
       if (!alreadyExists(err)) throw err;
       await fillListing(ref, plan.createFields);
@@ -4034,7 +4073,7 @@ async function linkRecord(collectionName, id, listingId) {
   const ref = db$o().collection(collectionName).doc(id);
   const snap = await ref.get();
   if (!snap.exists) return;
-  if (text$b(snap.data()?.listingId) === listingId) return;
+  if (text$d(snap.data()?.listingId) === listingId) return;
   await ref.update({
     listingId,
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -4048,9 +4087,9 @@ async function loadVisibleSeeds(identity) {
   const keep = (map, docs) => {
     for (const doc of docs) {
       if (!visibleToPortalClient({
-        clientId: text$b(doc.data.clientId),
-        email: text$b(doc.data.email),
-        clientEmail: text$b(doc.data.clientEmail)
+        clientId: text$d(doc.data.clientId),
+        email: text$d(doc.data.email),
+        clientEmail: text$d(doc.data.clientEmail)
       }, identity)) continue;
       if (!map.has(doc.id)) map.set(doc.id, doc);
     }
@@ -4089,23 +4128,23 @@ async function hydrateBundle(seed) {
   const galleries = mapDocs(seed.galleries);
   const requestIds = new Set(requests.keys());
   for (const doc of [...orders.values(), ...invoices.values(), ...appointments.values()]) {
-    const id = text$b(doc.data.orderRequestId);
+    const id = text$d(doc.data.orderRequestId);
     if (id) requestIds.add(id);
   }
   await readMissing("orderRequests", requestIds, requests);
   const orderIds = new Set(orders.keys());
   for (const doc of requests.values()) {
-    const id = text$b(doc.data.convertedToOrderId) || text$b(doc.data.orderId);
+    const id = text$d(doc.data.convertedToOrderId) || text$d(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   for (const doc of [...invoices.values(), ...appointments.values()]) {
-    const id = text$b(doc.data.orderId);
+    const id = text$d(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   await readMissing("orders", orderIds, orders);
   const invoiceIds = new Set(invoices.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$b(doc.data.invoiceId);
+    const id = text$d(doc.data.invoiceId);
     if (id) invoiceIds.add(id);
   }
   await readMissing("invoices", invoiceIds, invoices);
@@ -4115,7 +4154,7 @@ async function hydrateBundle(seed) {
   mergeDocs(appointments, await queryIn("appointments", "orderId", [...orders.keys()]));
   const galleryIds = new Set(galleries.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$b(doc.data.galleryId);
+    const id = text$d(doc.data.galleryId);
     if (id) galleryIds.add(id);
   }
   await readMissing("galleries", galleryIds, galleries);
@@ -4233,7 +4272,7 @@ function alreadyExists(err) {
 function isSentinel(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$b(value) {
+function text$d(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function chunk(items, size) {
@@ -4243,6 +4282,33 @@ function chunk(items, size) {
 }
 function lifeOfTheListingCareSelected(value) {
   return value === true;
+}
+const SETTLED$1 = /* @__PURE__ */ new Set(["paid", "comped"]);
+function isGuessableInvoiceId(id) {
+  return id.startsWith("listing_") || id.startsWith("ordreq_");
+}
+function text$c(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function settled$1(invoice) {
+  return SETTLED$1.has(text$c(invoice?.status).toLowerCase());
+}
+function invoicePayLinkFor(invoice, env) {
+  if (!invoice || settled$1(invoice)) return null;
+  const id = text$c(invoice.id);
+  const token = text$c(invoice.payToken);
+  if (!id || !token) return null;
+  const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
+  url.searchParams.set("t", token);
+  return url.toString();
+}
+function clientInvoiceUrl(invoice, env) {
+  const tokenized = invoicePayLinkFor(invoice, env);
+  if (tokenized) return tokenized;
+  if (!invoice || settled$1(invoice)) return null;
+  const id = text$c(invoice.id);
+  if (!id || isGuessableInvoiceId(id)) return null;
+  return `${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`;
 }
 function planOrderPackageRepair(record, catalog) {
   if (hasPricedServices(record.lineItems) || hasPricedServices(record.services)) return null;
@@ -4344,7 +4410,7 @@ function synthesizePackageLine(record) {
 }
 function packageLabel(record) {
   for (const key of PACKAGE_LABEL_KEYS) {
-    const value = text$a(record[key]);
+    const value = text$b(record[key]);
     if (value) return value;
   }
   return "";
@@ -4380,7 +4446,7 @@ function moneyOrNull$1(value) {
 function nested$2(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$a(value) {
+function text$b(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function roundMoney$1(value) {
@@ -4403,7 +4469,7 @@ function officeNewOrderEmail(saved, options) {
   const notes = notesOf(saved);
   const fields = [
     ["Order number", orderNumber],
-    ["Admin link", text$9(options?.adminUrl) || NOT_PROVIDED],
+    ["Admin link", text$a(options?.adminUrl) || NOT_PROVIDED],
     ["Client name", clientName2],
     ["Client email", firstText$1(saved, ["clientEmail", "email"])],
     ["Client phone", firstText$1(saved, ["clientPhone", "phone"])],
@@ -4450,14 +4516,14 @@ ${notes}`.toUpperCase().includes("TEST ORDER");
 function orderNumberOf(saved) {
   const explicit = firstText$1(saved, ["orderNumber", "orderCode", "displayId"]);
   if (explicit) return explicit;
-  const id = text$9(saved.id);
+  const id = text$a(saved.id);
   if (!id) return NOT_PROVIDED;
   return `ORD-${id.slice(-5).toUpperCase()}`;
 }
 function clientNameOf(saved) {
   const named = firstText$1(saved, ["clientName", "customerName"]);
   if (named) return named;
-  const joined = [text$9(saved.firstName), text$9(saved.lastName)].filter(Boolean).join(" ");
+  const joined = [text$a(saved.firstName), text$a(saved.lastName)].filter(Boolean).join(" ");
   return joined || NOT_PROVIDED;
 }
 function agentContactOf(saved) {
@@ -4475,7 +4541,7 @@ function agentField(saved, keys, nestedKey) {
   if (direct !== NOT_PROVIDED) return direct;
   for (const holder of [saved.agent, saved.listingAgent, saved.realtor]) {
     const record = nested$1(holder);
-    const value = text$9(record[nestedKey]);
+    const value = text$a(record[nestedKey]);
     if (value) return value;
   }
   return "";
@@ -4484,7 +4550,7 @@ function digits(value) {
   return value === NOT_PROVIDED ? "" : value.replace(/\D/g, "");
 }
 function notesOf(saved) {
-  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$9(saved[key])).filter(Boolean);
+  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$a(saved[key])).filter(Boolean);
   return parts.length ? parts.join("\n") : NOT_PROVIDED;
 }
 function lockboxOf(saved) {
@@ -4492,12 +4558,12 @@ function lockboxOf(saved) {
   return code || NOT_PROVIDED;
 }
 function occupancyOf(saved) {
-  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$9(saved[key])).filter(Boolean);
+  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$a(saved[key])).filter(Boolean);
   return parts.length ? parts.join(", ") : NOT_PROVIDED;
 }
 function bookedVia(saved) {
-  const lead = text$9(saved.leadSource);
-  const source = text$9(saved.source);
+  const lead = text$a(saved.leadSource);
+  const source = text$a(saved.source);
   const blob = `${lead} ${source}`.toLowerCase();
   if (!blob.trim()) return NOT_PROVIDED;
   if (/admin/.test(blob)) return "Admin";
@@ -4507,7 +4573,7 @@ function bookedVia(saved) {
 }
 function paymentOf(saved, total) {
   const invoice = nested$1(saved.invoice);
-  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$9(value).toLowerCase()).find(Boolean) || "";
+  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$a(value).toLowerCase()).find(Boolean) || "";
   if (/partial/.test(explicit)) return "Partial";
   if (/\bpaid\b/.test(explicit) && !/unpaid/.test(explicit)) return "Paid";
   if (/unpaid/.test(explicit)) return "Unpaid";
@@ -4614,7 +4680,7 @@ function moneyOrNull(value) {
 function nested$1(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$9(value) {
+function text$a(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function escapeHtml$4(value) {
@@ -4689,7 +4755,7 @@ function buildAdminOrderTile(record) {
   const packageName = skin2?.title || named || "Custom order";
   const charges = orderChargeSummary(record, lines);
   return {
-    id: text$8(record.id) || packageName,
+    id: text$9(record.id) || packageName,
     orderCode: orderCode(kind, record),
     kind,
     typeLabel: kind === "business" ? "Business" : "Listing",
@@ -4711,7 +4777,7 @@ function buildAdminOrderTile(record) {
   };
 }
 function orderKind(record, skin2) {
-  const raw = text$8(record.projectType || record.orderType || record.type).toLowerCase();
+  const raw = text$9(record.projectType || record.orderType || record.type).toLowerCase();
   if (raw === "business" || raw === "brand" || raw === "social") return "business";
   if (raw === "real_estate" || raw === "listing" || raw === "property") return "listing";
   if (skin2?.category === "listing") return "listing";
@@ -4725,38 +4791,38 @@ function channelFor(skin2, kind) {
   return kind === "business" ? "Human Brand" : "Listings & Spaces";
 }
 function orderCode(kind, record) {
-  const explicit = text$8(record.orderCode || record.orderNumber || record.displayId);
+  const explicit = text$9(record.orderCode || record.orderNumber || record.displayId);
   if (explicit) return explicit.toUpperCase();
-  const id = text$8(record.id);
+  const id = text$9(record.id);
   const prefix = kind === "listing" ? "L" : "B";
   const digits2 = id.replace(/\D/g, "");
   const tail = (digits2 || id.replace(/[^a-zA-Z0-9]/g, "")).slice(-5).toUpperCase().padStart(5, "0");
   return `ORD - ${prefix} - ${tail}`;
 }
 function heroFromRecord(record) {
-  const explicit = text$8(record.heroUrl) || text$8(record.coverUrl) || text$8(record.coverImage);
+  const explicit = text$9(record.heroUrl) || text$9(record.coverUrl) || text$9(record.coverImage);
   if (explicit) return explicit;
   const images = record.images;
   if (!Array.isArray(images)) return "";
   for (const image of images) {
     if (typeof image === "string" && image.trim()) return image.trim();
     if (image && typeof image === "object") {
-      const url = text$8(image.url) || text$8(image.thumbnailUrl);
+      const url = text$9(image.url) || text$9(image.thumbnailUrl);
       if (url) return url;
     }
   }
   return "";
 }
 function clientName(record) {
-  const named = text$8(record.clientName) || text$8(record.customerName) || text$8(record.agentName) || [text$8(record.firstName), text$8(record.lastName)].filter(Boolean).join(" ");
+  const named = text$9(record.clientName) || text$9(record.customerName) || text$9(record.agentName) || [text$9(record.firstName), text$9(record.lastName)].filter(Boolean).join(" ");
   return named || "—";
 }
 function appointmentLabel(record) {
   const raw = record.appointmentDate ?? record.apptDate ?? record.scheduledDate ?? record.requestedDate;
   const key = calendarDateKey(raw);
   const date = formatShootDateLabel(key, typeof raw === "string" ? raw : void 0);
-  const time = text$8(record.scheduledTime || record.appointmentTime || record.requestedTime);
-  const photographer = text$8(record.assignedPhotographerName || record.photographerName || record.photographerPreference);
+  const time = text$9(record.scheduledTime || record.appointmentTime || record.requestedTime);
+  const photographer = text$9(record.assignedPhotographerName || record.photographerName || record.photographerPreference);
   return [date, time, photographer].filter(Boolean).join(" · ") || "—";
 }
 function tilePrice(amount) {
@@ -4824,12 +4890,12 @@ function money$3(value) {
   }
   return 0;
 }
-function text$8(value) {
+function text$9(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const router$m = Router();
 const db$n = () => admin.firestore();
-function appUrl$2() {
+function appUrl$1() {
   return process.env.APP_URL || "https://iconicimagestx.com";
 }
 function addressLabel(address) {
@@ -5059,7 +5125,7 @@ router$m.post("/", async (req, res) => {
         accessMethod: accessLine,
         squareFootage: squareFootage ? `${squareFootage} sq ft` : "",
         travelFee: travelSummaryText(travel),
-        dashboardUrl: `${appUrl$2()}/admin/order-request/${docRef.id}`
+        dashboardUrl: `${appUrl$1()}/admin/order-request/${docRef.id}`
       }
     }).then((result) => result.sent ? "sent" : "failed").catch((err) => {
       console.error("[Bookings] Confirmation email failed:", err);
@@ -5106,7 +5172,7 @@ router$m.post("/", async (req, res) => {
             clientName: clientName2,
             clientEmail: normalizedEmail,
             setupUrl: account.passwordSetupLink,
-            portalUrl: `${appUrl$2()}/portal`
+            portalUrl: publicClientUrl("/portal")
           }
         }).then((result) => result.sent ? "sent" : "failed").catch(async (err) => {
           console.error("[Bookings] Password setup email failed:", err);
@@ -5135,7 +5201,7 @@ router$m.post("/", async (req, res) => {
       const alert = await notifyOfficeOfOrder({
         isNewOrder: true,
         saved: savedOrder,
-        adminUrl: `${appUrl$2()}/admin/order-request/${savedSnap.id}`
+        adminUrl: `${appUrl$1()}/admin/order-request/${savedSnap.id}`
       });
       officeAlertStatus = alert.sent ? "sent" : "skipped";
     } catch (err) {
@@ -5179,6 +5245,10 @@ router$m.post("/", async (req, res) => {
     console.error("[Bookings] Submission error:", err);
     return res.status(500).json({ error: "Failed to submit booking request." });
   }
+});
+router$m.get("/catalog", async (_req, res) => {
+  const catalog = await loadBookingCatalog();
+  return res.json(publicBookingCatalogResponse(catalog));
 });
 router$m.get("/", requireCoordinator, async (_req, res) => {
   try {
@@ -5476,7 +5546,7 @@ router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         galleryId: galleryRef.id,
         ...listingId ? { listingId } : {},
         invoiceNumber: await generateInvoiceNumber(),
-        paymentUrl: `${appUrl$2()}/invoice/${invoiceRef.id}`,
+        ...clientInvoiceUrl({ id: invoiceRef.id, status: "draft" }) ? { paymentUrl: clientInvoiceUrl({ id: invoiceRef.id, status: "draft" }) } : {},
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
@@ -5484,7 +5554,7 @@ router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     }
     await galleryRef.update({
       invoiceId,
-      deliveryUrl: `${appUrl$2()}/gallery/${galleryRef.id}`
+      deliveryUrl: publicClientUrl(`/gallery/${galleryRef.id}`)
     });
     await requestDoc.ref.update({
       status: "confirmed",
@@ -5521,7 +5591,7 @@ router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         photographerName: assignedPhotographerName || "Our team",
         travelFee: travelSummaryText(travel),
         orderId: orderRef.id,
-        portalUrl: `${appUrl$2()}/portal`
+        portalUrl: publicClientUrl("/portal")
       }
     }).catch((err) => console.error("[Bookings] Confirmation email failed:", err));
     return res.json({
@@ -5607,7 +5677,7 @@ async function createBookingInvoiceDraft(input) {
   await invoiceRef.set({
     ...draft,
     invoiceNumber: await generateInvoiceNumber(),
-    paymentUrl: `${appUrl$2()}/invoice/${invoiceRef.id}`,
+    ...clientInvoiceUrl({ id: invoiceRef.id, status: "draft" }) ? { paymentUrl: clientInvoiceUrl({ id: invoiceRef.id, status: "draft" }) } : {},
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   });
@@ -5945,6 +6015,338 @@ function publicMediaItem(item, canDownload) {
     thumbnailUrl: publicText(item.thumbnailUrl) || publicText(item.poster)
   };
 }
+const OWNER_DISPLAY_TTL_MS = 4 * 60 * 60 * 1e3;
+const DEV_SECRET = "iconic-owner-display-dev-v1";
+const ID_PATTERN$1 = /^[A-Za-z0-9_-]{8,128}$/;
+function ownerDisplaySecret(env = process.env) {
+  const explicit = env.OWNER_SESSION_SECRET?.trim();
+  if (explicit && explicit.length >= 16) return explicit;
+  const serviceAccount = env.FIREBASE_SERVICE_ACCOUNT;
+  if (serviceAccount && serviceAccount.length >= 32) {
+    return createHmac("sha256", "iconic-owner-display-v1").update(serviceAccount).digest("hex");
+  }
+  const sheetsKey = env.OWNER_SHEETS_SA_KEY;
+  if (sheetsKey && sheetsKey.length >= 32) {
+    return createHmac("sha256", "iconic-owner-display-v1").update(sheetsKey).digest("hex");
+  }
+  if (!isHostedDeployment(env)) return DEV_SECRET;
+  return null;
+}
+function signOwnerDisplayToken(claims, now = Date.now(), env = process.env) {
+  const secret = ownerDisplaySecret(env);
+  if (!secret || !ID_PATTERN$1.test(claims.id)) return null;
+  if (claims.scope !== "listing" && claims.scope !== "gallery") return null;
+  const body = Buffer.from(JSON.stringify({
+    s: claims.scope,
+    id: claims.id,
+    exp: now + OWNER_DISPLAY_TTL_MS
+  })).toString("base64url");
+  const sig = createHmac("sha256", secret).update(body).digest("base64url");
+  return `${body}.${sig}`;
+}
+function ownerDisplayPath(token, index) {
+  return `/api/media/display/o/${encodeURIComponent(token)}/${index}`;
+}
+const RASTER = /\.(jpe?g|png|webp|gif)(\?|#|$)/i;
+const VIDEO_FILE = /\.(mp4|m4v|mov|webm)(\?|#|$)/i;
+const BLOCKED_EXT = /\.(zip|pdf|dng|cr2|cr3|nef|nrw|arw|srf|sr2|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic|heif|mp4|m4v|mov|webm)(\?|#|$)/i;
+const FILE_KEYS = ["downloadUrl", "fileUrl", "originalUrl", "fullResUrl", "mlsUrl", "zipUrl", "printUrl", "reelUrl", "mp4Url", "rawUrl", "src"];
+const DISPLAY_KEYS = ["previewUrl", "displayUrl", "webUrl", "thumbnailUrl"];
+function text$8(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function rowOf$2(item) {
+  return item && typeof item === "object" ? item : null;
+}
+function shareableUrl$1(value) {
+  const url = text$8(value);
+  if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
+  if (url.startsWith("/")) return url;
+  if (url.startsWith("https://") || url.startsWith("http://")) return url;
+  return "";
+}
+function mediaName$1(row, fallback) {
+  return text$8(row.name) || text$8(row.fileName) || text$8(row.title) || fallback;
+}
+function labelOf(row) {
+  return `${text$8(row.fileName)} ${text$8(row.name)} ${text$8(row.title)} ${text$8(row.path)} ${text$8(row.storagePath)}`.toLowerCase();
+}
+function isMls(row) {
+  const category = text$8(row.category).toLowerCase();
+  const type = text$8(row.type).toLowerCase();
+  if (category === "mls" || type === "mls") return true;
+  const label = labelOf(row);
+  if (/(^|[^a-z0-9])mls([^a-z0-9]|$)/.test(label)) return true;
+  return /\/mls\//.test(label);
+}
+function isFullRes(row) {
+  const category = text$8(row.category).toLowerCase();
+  const type = text$8(row.type).toLowerCase();
+  if (category === "full-res" || category === "fullres" || type === "full-res" || type === "fullres") return true;
+  const label = labelOf(row);
+  if (/(^|[^a-z0-9])full[\s_-]?res([^a-z0-9]|$)/.test(label)) return true;
+  return /\/full\//.test(label);
+}
+function isRasterUrl(url, row) {
+  if (!url || BLOCKED_EXT.test(url.split("#")[0]) || VIDEO_FILE.test(url.split("#")[0])) return false;
+  if (RASTER.test(url.split("#")[0])) return true;
+  const content = text$8(row.contentType).toLowerCase();
+  return /^image\/(jpeg|jpg|png|webp|gif)/.test(content);
+}
+function blockedFileUrls(row, includeOwnUrl) {
+  const blocked = /* @__PURE__ */ new Set();
+  for (const key of FILE_KEYS) {
+    const url = shareableUrl$1(row[key]);
+    if (url) blocked.add(url);
+  }
+  if (includeOwnUrl) {
+    const own = shareableUrl$1(row.url);
+    const share = shareableUrl$1(row.shareUrl);
+    if (own) blocked.add(own);
+    if (share) blocked.add(share);
+  }
+  return blocked;
+}
+function separateDisplay(row) {
+  const blocked = blockedFileUrls(row, isFullRes(row));
+  for (const key of DISPLAY_KEYS) {
+    const url = shareableUrl$1(row[key]);
+    if (!url || !isRasterUrl(url, row) || blocked.has(url)) continue;
+    if (/\/mls\//i.test(url) || /\/full\//i.test(url)) continue;
+    return url;
+  }
+  return "";
+}
+function rasterShareSource(row, legacyDropTagged = false) {
+  if (legacyDropTagged && isMls(row)) return "";
+  const type = text$8(row.type).toLowerCase();
+  if (type === "video" || type === "reel" || type === "file" || type === "matterport") return "";
+  const content = text$8(row.contentType).toLowerCase();
+  if (content.startsWith("video/") || content === "application/pdf" || content === "application/zip") return "";
+  const path2 = `${text$8(row.path)} ${text$8(row.storagePath)}`.toLowerCase();
+  if (/\/(raw|downloads?|print|zips?)\//.test(path2)) return "";
+  const display = separateDisplay(row);
+  if (legacyDropTagged && isFullRes(row)) return display;
+  if (display) return display;
+  const url = shareableUrl$1(row.url) || shareableUrl$1(row.shareUrl);
+  if (!url || !isRasterUrl(url, row)) return "";
+  if (legacyDropTagged && /\/(mls|full)\//i.test(url)) return "";
+  if (/\/(raw|downloads?|print|zips?)\//i.test(url)) return "";
+  return url;
+}
+function rasterPoster(row, legacyDropTagged = false) {
+  if (legacyDropTagged && isMls(row)) return "";
+  for (const key of ["poster", "posterUrl", "thumbnailUrl"]) {
+    const url = shareableUrl$1(row[key]);
+    if (!url || !isRasterUrl(url, row)) continue;
+    if (legacyDropTagged && /\/(mls|full)\//i.test(url)) continue;
+    return url;
+  }
+  return "";
+}
+function floorSource(row, legacyDropTagged = false) {
+  if (legacyDropTagged && (isMls(row) || isFullRes(row))) return separateDisplay(row);
+  return rasterShareSource(row, legacyDropTagged) || rasterPoster(row, legacyDropTagged);
+}
+function shareDisplayPath(listingId, index) {
+  return `/api/media/display/${encodeURIComponent(listingId)}/${index}`;
+}
+function pushDisplay(items, seen, name, sourceUrl, kind) {
+  if (!sourceUrl || seen.has(sourceUrl) || items.length >= 240) return;
+  seen.add(sourceUrl);
+  items.push({ name, sourceUrl, kind });
+}
+function shareDisplayItems(listing, options = {}) {
+  const legacy = options.legacyDropTagged === true;
+  const items = [];
+  const seen = /* @__PURE__ */ new Set();
+  if (Array.isArray(listing.images)) {
+    listing.images.forEach((item, index) => {
+      const row = rowOf$2(item);
+      if (!row) return;
+      pushDisplay(items, seen, mediaName$1(row, `Photo ${index + 1}`), rasterShareSource(row, legacy), "image");
+    });
+  }
+  for (const group of [listing.floorplans, listing.floorPlans]) {
+    if (!Array.isArray(group)) continue;
+    group.forEach((item, index) => {
+      const row = rowOf$2(item);
+      if (!row) return;
+      pushDisplay(items, seen, mediaName$1(row, `Floor plan ${index + 1}`), floorSource(row, legacy), "floorPlan");
+    });
+  }
+  if (Array.isArray(listing.videos)) {
+    listing.videos.forEach((item) => {
+      const row = rowOf$2(item);
+      if (!row) return;
+      pushDisplay(items, seen, mediaName$1(row, "Video"), rasterPoster(row, legacy), "poster");
+    });
+  }
+  return items;
+}
+function videoFileUrl(row) {
+  const url = shareableUrl$1(row.url) || shareableUrl$1(row.shareUrl);
+  if (!url || !VIDEO_FILE.test(url.split("#")[0])) return "";
+  return url;
+}
+function ownerPosterSource(row) {
+  return rasterPoster(row) || videoFileUrl(row);
+}
+function listingOwnerDisplayItems(listing) {
+  const items = [...shareDisplayItems(listing)];
+  const seen = new Set(items.map((item) => item.sourceUrl));
+  if (!Array.isArray(listing.videos)) return items;
+  listing.videos.forEach((item) => {
+    const row = rowOf$2(item);
+    if (!row || rasterPoster(row)) return;
+    pushDisplay(items, seen, mediaName$1(row, "Video"), videoFileUrl(row), "poster");
+  });
+  return items;
+}
+function isGalleryFloor(row) {
+  const type = text$8(row.type).toLowerCase();
+  const category = text$8(row.category).toLowerCase();
+  return type === "floorplan" || type === "floor-plan" || category === "floorplan" || category === "floor-plan";
+}
+function galleryOwnerDisplayItems(media) {
+  const items = [];
+  const seen = /* @__PURE__ */ new Set();
+  const rows = media.map(rowOf$2).filter((row) => Boolean(row));
+  for (const row of rows) {
+    const type = text$8(row.type).toLowerCase();
+    if (type === "video" || type === "reel" || type === "matterport" || type === "tour" || type === "file" || type === "pdf") continue;
+    const source = rasterShareSource(row);
+    if (!source) continue;
+    const floor = isGalleryFloor(row);
+    pushDisplay(items, seen, mediaName$1(row, floor ? "Floor plan" : "Photo"), source, floor ? "floorPlan" : "image");
+  }
+  for (const row of rows) {
+    const type = text$8(row.type).toLowerCase();
+    if (type !== "video" && type !== "reel") continue;
+    const poster = rasterPoster(row);
+    if (poster) {
+      pushDisplay(items, seen, mediaName$1(row, "Video"), poster, "poster");
+      continue;
+    }
+    pushDisplay(items, seen, mediaName$1(row, "Video"), videoFileUrl(row), "poster");
+  }
+  return items;
+}
+function displayMedia(listingId, index, name) {
+  const url = shareDisplayPath(listingId, index);
+  return { url, displayUrl: url, name };
+}
+function posterIndex(row, items) {
+  const poster = rasterPoster(row);
+  if (!poster) return -1;
+  return items.findIndex((item) => item.sourceUrl === poster);
+}
+function isUnbranded(row) {
+  const category = text$8(row.category).toLowerCase();
+  const type = text$8(row.type).toLowerCase();
+  if (category === "unbranded" || type === "unbranded") return true;
+  const name = `${text$8(row.name)} ${text$8(row.fileName)} ${text$8(row.title)}`.toLowerCase();
+  return name.includes("unbranded");
+}
+function isBrandedPlayback(row) {
+  if (isMls(row) || isUnbranded(row)) return false;
+  const category = text$8(row.category).toLowerCase();
+  const type = text$8(row.type).toLowerCase();
+  if (category === "branded" || type === "branded") return true;
+  const name = `${text$8(row.name)} ${text$8(row.fileName)} ${text$8(row.title)}`.toLowerCase();
+  return /(^|[^a-z])branded([^a-z]|$)/.test(name);
+}
+function isReelPlayback(row) {
+  if (isMls(row) || isUnbranded(row)) return false;
+  const category = text$8(row.category).toLowerCase();
+  const type = text$8(row.type).toLowerCase();
+  return category === "reel" || type === "reel";
+}
+function deliveredVideoUrl(row) {
+  const url = shareableUrl$1(row.url) || shareableUrl$1(row.shareUrl);
+  if (!url || !VIDEO_FILE.test(url.split("#")[0])) return "";
+  if (/\/mls\//i.test(url)) return "";
+  return url;
+}
+function withPoster(media, listingId, index) {
+  if (index < 0) return media;
+  const poster = shareDisplayPath(listingId, index);
+  return { ...media, poster, thumbnailUrl: poster, displayUrl: poster };
+}
+function publicShareVideos(listing, playback) {
+  if (!Array.isArray(listing.videos)) return [];
+  const items = shareDisplayItems(listing);
+  const videos = [];
+  for (const item of listing.videos) {
+    const row = rowOf$2(item);
+    if (!row) continue;
+    const name = mediaName$1(row, "Video");
+    const posterAt = posterIndex(row, items);
+    if (playback && (isBrandedPlayback(row) || isReelPlayback(row))) {
+      const url = deliveredVideoUrl(row);
+      if (!url) continue;
+      videos.push(withPoster({ url, name, noDownload: true }, listing.id, posterAt));
+      continue;
+    }
+    if (posterAt < 0) continue;
+    videos.push(withPoster({ url: null, name }, listing.id, posterAt));
+  }
+  return videos.slice(0, 40);
+}
+function publicShareMedia(listing) {
+  const images = [];
+  const floorPlans = [];
+  shareDisplayItems(listing).forEach((item, index) => {
+    const media = displayMedia(listing.id, index, item.name);
+    if (item.kind === "image") images.push(media);
+    if (item.kind === "floorPlan") floorPlans.push(media);
+  });
+  return {
+    images: images.slice(0, 200),
+    floorPlans: floorPlans.slice(0, 40)
+  };
+}
+function rowOf$1(item) {
+  return item && typeof item === "object" ? item : {};
+}
+function matterportUrl(row) {
+  for (const key of ["embedUrl", "url", "shareUrl"]) {
+    const value = row[key];
+    if (typeof value !== "string") continue;
+    const url = value.trim();
+    if (!url) continue;
+    try {
+      if (new URL(url).hostname.toLowerCase().includes("matterport.com")) return url;
+    } catch {
+    }
+  }
+  return "";
+}
+function lockedClientGalleryMedia(galleryId, items, canDownload) {
+  const rows = items.map(rowOf$1);
+  if (canDownload) return rows.map((row) => publicMediaItem(row, true));
+  const display = galleryOwnerDisplayItems(rows);
+  const token = signOwnerDisplayToken({ scope: "gallery", id: galleryId });
+  const href = (source) => {
+    if (!token || !source) return null;
+    const index = display.findIndex((item) => item.sourceUrl === source);
+    if (index < 0) return null;
+    return ownerDisplayPath(token, index);
+  };
+  return rows.map((row) => {
+    const base = publicMediaItem(row, false);
+    const tour = matterportUrl(row);
+    if (tour) return { ...base, url: tour, shareUrl: tour, embedUrl: tour };
+    const type = typeof row.type === "string" ? row.type.toLowerCase() : "";
+    if (type === "video" || type === "reel") {
+      const poster = href(ownerPosterSource(row));
+      return { ...base, poster, thumbnailUrl: poster };
+    }
+    const image = href(rasterShareSource(row));
+    if (!image) return base;
+    return { ...base, url: image };
+  });
+}
 const AI_EDIT_PRESETS = [
   {
     id: "virtual_stage",
@@ -6201,6 +6603,12 @@ function httpUrl(value) {
   const url = text$6(value);
   return url.startsWith("https://") || url.startsWith("http://") ? url : "";
 }
+function shareableUrl(value) {
+  const url = text$6(value);
+  if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
+  if (url.startsWith("/")) return url;
+  return httpUrl(url);
+}
 function galleryResult(doc, via) {
   const status2 = statusOf(doc) || "unknown";
   const released = isReleased(doc);
@@ -6420,17 +6828,27 @@ function listingResult(listing, related) {
   };
 }
 function publicProject(listing, _related, notice) {
+  const safe = displaySafeShareMedia(listing);
   return {
     id: listing.id,
     address: addressOf(listing),
     agentName: agentNameOf$1(listing),
     services: servicesOf(listing),
-    images: publicImages(listing),
-    videos: publicVideos(listing),
-    tourUrl: publicTour(listing),
-    floorPlans: publicFloorPlans(listing),
+    images: safe.images,
+    videos: safe.videos,
+    tourUrl: safe.tourUrl,
+    floorPlans: safe.floorPlans,
     notice,
     view: "public"
+  };
+}
+function ownerMediaSource(listing, pub) {
+  return {
+    ...pub,
+    images: publicImages(listing),
+    videos: publicVideos(listing),
+    floorPlans: publicFloorPlans(listing),
+    tourUrl: publicTour(listing)
   };
 }
 const ORIGINAL_FILE = /\.(mp4|m4v|mov|webm|avi|mkv|zip|pdf|dng|cr2|cr3|nef|nrw|arw|srf|sr2|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic|heif)(\?|#|$)/i;
@@ -6480,11 +6898,11 @@ function walkOriginalNeedles(value, needles, inheritedOriginal = false) {
   for (const key of FILE_URL_KEYS) pushNeedle(needles, row[key]);
   const original = inheritedOriginal || rowIsDeliveryOriginal(row);
   if (original) {
-    const fileUrls = new Set(FILE_URL_KEYS.map((key) => httpUrl(row[key])).filter(Boolean));
+    const fileUrls = new Set(FILE_URL_KEYS.map((key) => shareableUrl(row[key])).filter(Boolean));
     for (const key of ["url", "shareUrl", "embedUrl", "sourcePath", "storagePath", "path"]) {
       const raw = text$6(row[key]);
       if (!raw) continue;
-      const asUrl = httpUrl(raw);
+      const asUrl = shareableUrl(raw);
       if (asUrl && isStreamUrl(asUrl)) continue;
       if (!inheritedOriginal && (key === "url" || key === "shareUrl") && asUrl && isDisplayImageUrl(asUrl) && !fileUrls.has(asUrl) && !isFullResOrMls(row) && row.downloadable !== true) continue;
       pushNeedle(needles, raw);
@@ -6528,82 +6946,85 @@ function scrubOriginals(value, needles) {
   };
   return walk(value);
 }
-function displayImageCandidate(row, needles) {
-  for (const key of DISPLAY_IMAGE_KEYS) {
-    const url = httpUrl(row[key]);
-    if (!url || !isDisplayImageUrl(url) || containsOriginal(url, needles)) continue;
-    return url;
-  }
-  return "";
-}
-function lockedPhoto(row, index, needles) {
-  const frame = frameFromListingImage(row, index);
-  if (!frame || frame.raw) return null;
-  const display = displayImageCandidate(row, needles);
-  if (display) return { url: display, name: frame.name };
-  const url = httpUrl(row.url);
-  if (!url || !isDisplayImageUrl(url) || isOriginalFileUrl(url) || containsOriginal(url, needles)) return null;
-  if (isPrivateMedia(frame.path, frame.name, url) || isFullResOrMls(row) || row.downloadable === true) return null;
-  return { url, name: frame.name };
-}
-function lockedVideo(row, needles) {
-  const name = mediaName(row, "Video");
-  let stream = "";
-  let streamKey = "";
-  for (const key of STREAM_KEYS) {
-    const url = httpUrl(row[key]);
-    if (!url || !isStreamUrl(url) || containsOriginal(url, needles)) continue;
-    stream = url;
-    streamKey = key;
-    break;
-  }
-  const poster = displayImageCandidate(row, needles);
-  if (!name && !stream && !poster) return null;
-  const media = { url: stream || null, name };
-  if (stream && streamKey) media[streamKey] = stream;
-  if (poster) {
-    media.poster = poster;
-    media.thumbnailUrl = poster;
-  }
-  return media;
-}
 function lockedOwnerMedia(listing, pub) {
   const needles = listingOriginalNeedles(listing);
+  const items = listingOwnerDisplayItems(listing);
+  const token = signOwnerDisplayToken({ scope: "listing", id: listing.id });
+  const href = (index) => token && index >= 0 ? ownerDisplayPath(token, index) : "";
   const images = [];
-  if (Array.isArray(listing.images)) {
-    listing.images.forEach((item, index) => {
-      const row = rowOf(item);
-      if (!row) return;
-      const photo = lockedPhoto(row, index, needles);
-      if (photo) images.push(photo);
-    });
-  }
+  const floorPlans = [];
+  items.forEach((item, index) => {
+    const url = href(index);
+    if (!url) return;
+    const media = { url, displayUrl: url, name: item.name };
+    if (item.kind === "image") images.push(media);
+    if (item.kind === "floorPlan") floorPlans.push(media);
+  });
   const videos = [];
   if (Array.isArray(listing.videos)) {
     for (const item of listing.videos) {
       const row = rowOf(item);
       if (!row) continue;
-      const video = lockedVideo(row, needles);
-      if (video) videos.push(video);
+      const name = mediaName(row, "Video");
+      let stream = "";
+      let streamKey = "";
+      for (const key of STREAM_KEYS) {
+        const url = shareableUrl(row[key]);
+        if (!url || !isStreamUrl(url) || containsOriginal(url, needles)) continue;
+        stream = url;
+        streamKey = key;
+        break;
+      }
+      const posterAt = items.findIndex((entry2) => entry2.sourceUrl === ownerPosterSource(row));
+      const poster = href(posterAt);
+      if (!name && !stream && !poster) continue;
+      const media = { url: stream || null, name };
+      if (stream && streamKey) media[streamKey] = stream;
+      if (poster) {
+        media.poster = poster;
+        media.thumbnailUrl = poster;
+        media.displayUrl = poster;
+      }
+      videos.push(media);
     }
   }
-  const floorPlans = [];
-  for (const group of [listing.floorplans, listing.floorPlans]) {
-    if (!Array.isArray(group)) continue;
-    group.forEach((item, index) => {
-      const row = rowOf(item);
-      if (!row) return;
-      const plan = lockedPhoto(row, index, needles);
-      if (plan) floorPlans.push(plan);
-    });
-  }
-  const tourUrl = pub.tourUrl && !isOriginalFileUrl(pub.tourUrl) && !containsOriginal(pub.tourUrl, needles) ? pub.tourUrl : "";
+  const embedded = embedTour(listing, needles);
+  const listed = pub.tourUrl && !isOriginalFileUrl(pub.tourUrl) && !containsOriginal(pub.tourUrl, needles) ? pub.tourUrl : "";
   return scrubOriginals({
     images: images.slice(0, 200),
     videos: videos.slice(0, 40),
     floorPlans: floorPlans.slice(0, 40),
-    tourUrl
+    tourUrl: embedded || listed
   }, needles);
+}
+function embedTour(listing, needles) {
+  const groups = [listing.tours, listing.tourLinks];
+  for (const group of groups) {
+    if (!Array.isArray(group)) continue;
+    for (const item of group) {
+      const row = rowOf(item);
+      if (!row) continue;
+      for (const key of ["embedUrl", "url", "shareUrl"]) {
+        const url = shareableUrl(row[key]);
+        if (!url || isOriginalFileUrl(url) || containsOriginal(url, needles)) continue;
+        const type = text$6(row.type).toLowerCase();
+        if (type === "matterport" || type === "tour" || /matterport\.com/i.test(url)) return url;
+      }
+    }
+  }
+  return "";
+}
+function displaySafeShareMedia(listing) {
+  const share = publicShareMedia(listing);
+  const needles = listingOriginalNeedles(listing);
+  const tour = publicTour(listing);
+  const safeTour = tour && !isOriginalFileUrl(tour) && !containsOriginal(tour, needles) ? tour : "";
+  return {
+    images: share.images,
+    floorPlans: share.floorPlans,
+    videos: publicShareVideos(listing, false),
+    tourUrl: safeTour || embedTour(listing, needles)
+  };
 }
 function ownerStudioProject(listing, pub, gate = {}) {
   const authoritativeInvoice = Object.prototype.hasOwnProperty.call(gate, "invoice");
@@ -6623,8 +7044,9 @@ function ownerStudioProject(listing, pub, gate = {}) {
     galleries: [],
     invoice: authoritativeInvoice ? invoiceDoc : null
   });
+  const source = ownerMediaSource(listing, pub);
   const project = {
-    ...pub,
+    ...source,
     view: "owner",
     clientName: text$6(listing.clientName),
     clientEmail: text$6(listing.clientEmail),
@@ -6634,13 +7056,13 @@ function ownerStudioProject(listing, pub, gate = {}) {
     requirePayment: requirePaymentOn(listing.requirePayment),
     downloadsUnlocked,
     invoice,
-    images: downloadsUnlocked ? ownerImageDownloads(listing, pub.images) : pub.images,
+    images: downloadsUnlocked ? ownerImageDownloads(listing, source.images) : source.images,
     files: downloadsUnlocked ? ownerFiles(listing) : []
   };
   if (downloadsUnlocked || gate.staffAccess === true) return project;
   return {
     ...project,
-    ...lockedOwnerMedia(listing, pub),
+    ...lockedOwnerMedia(listing, source),
     files: []
   };
 }
@@ -6953,8 +7375,8 @@ function photoSlot(storagePath) {
   return `photo_${(hash >>> 0).toString(16)}`;
 }
 function orderEditDocId(listingId, slot) {
-  const clean = `${listingId}_${slot}`.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 700);
-  return `order_${clean}`;
+  const clean2 = `${listingId}_${slot}`.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 700);
+  return `order_${clean2}`;
 }
 const AERIAL_NAME = /aerial|drone/i;
 function galleryStatusNeedsReleaseGate(status2) {
@@ -7125,6 +7547,40 @@ function assessGalleryRelease(plan, evidence) {
     gaps,
     message: releaseMessage(complete, percent, gaps, required)
   };
+}
+function galleryDeliverySubject(address) {
+  const place = typeof address === "string" ? address.trim() : "";
+  if (!place || place.toLowerCase() === "the property") return "Your gallery is ready";
+  return `Your gallery is ready: ${place}`;
+}
+function galleryDeliveryUrl(galleryId, env) {
+  return publicClientUrl(`/gallery/${encodeURIComponent(galleryId)}`, env);
+}
+function galleryDeliveryPayUrl(invoice, env) {
+  return invoicePayLinkFor(invoice, env);
+}
+function galleryDeliveredHistoryEntry(input) {
+  const recipients = input.recipients.map((item) => item.trim()).filter(Boolean);
+  const who = recipients.length > 0 ? recipients.join(", ") : "none";
+  const outcome = input.email === "sent" ? "Email sent." : input.email === "allowlist" ? "Email sent via the test allowlist." : "Email suppressed by the notify gate.";
+  return {
+    action: "Gallery delivered",
+    by: staffLabel(input.actor),
+    at: input.at,
+    details: `Recipients: ${who}. ${outcome}`,
+    recipients,
+    email: input.email
+  };
+}
+function staffLabel(actor) {
+  const email = clean(actor?.email);
+  const name = clean(actor?.name);
+  const uid = clean(actor?.uid);
+  if (name && email) return `${name} (${email})`;
+  return email || name || uid || "staff";
+}
+function clean(value) {
+  return typeof value === "string" ? value.trim() : "";
 }
 const MEDIA_DELIVERY_STATUSES = ["pending", "undelivered", "delivered"];
 const MEDIA_DELIVERY_LABELS = {
@@ -8597,9 +9053,6 @@ const db$i = () => admin.firestore();
 function httpError$2(status2, message, extra) {
   return Object.assign(new Error(message), { status: status2, ...extra });
 }
-function appUrl$1() {
-  return process.env.APP_URL || "https://iconicimagestx.com";
-}
 async function invoiceForGallery$1(gallery) {
   if (typeof gallery.invoiceId === "string" && gallery.invoiceId) {
     const doc = await db$i().collection("invoices").doc(gallery.invoiceId).get();
@@ -8608,6 +9061,15 @@ async function invoiceForGallery$1(gallery) {
   if (typeof gallery.orderId === "string" && gallery.orderId) {
     const snap = await db$i().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
     if (!snap.empty) return { id: snap.docs[0].id, ...snap.docs[0].data() };
+  }
+  const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
+  if (listingId) {
+    const listing = await db$i().collection("listings").doc(listingId).get();
+    const invoiceId = listing.exists && typeof listing.data()?.invoiceId === "string" ? listing.data()?.invoiceId.trim() : "";
+    if (invoiceId) {
+      const doc = await db$i().collection("invoices").doc(invoiceId).get();
+      if (doc.exists) return { id: doc.id, ...doc.data() };
+    }
   }
   return null;
 }
@@ -8646,7 +9108,7 @@ async function deliverGalleryToClient(galleryId, options) {
   const expiresAt = admin.firestore.Timestamp.fromDate(
     new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1e3)
   );
-  const deliveryUrl = `${appUrl$1()}/gallery/${galleryId}`;
+  const deliveryUrl = galleryDeliveryUrl(galleryId);
   await galleryDoc.ref.update({
     status: "delivered",
     deliveryUrl,
@@ -8664,22 +9126,46 @@ async function deliverGalleryToClient(galleryId, options) {
   const clientId2 = typeof gallery.clientId === "string" ? gallery.clientId : "";
   const clientDoc = clientId2 ? await db$i().collection("clients").doc(clientId2).get() : null;
   const client = clientDoc?.data();
-  if (client?.email) {
-    const invoiceSnap = gallery.orderId ? await db$i().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get() : null;
-    const invoice = invoiceSnap && !invoiceSnap.empty ? invoiceSnap.docs[0].data() : null;
-    await sendEmail({
-      to: client.email,
-      template: "gallery_delivery",
-      variables: {
-        clientName: gallery.clientName,
-        address: recordAddressText(gallery) || "the property",
+  const address = recordAddressText(gallery) || "the property";
+  const invoice = await invoiceForGallery$1(gallery);
+  const payUrl = galleryDeliveryPayUrl(invoice);
+  const recipients = typeof client?.email === "string" && client.email.trim() ? client.email.split(/[,;]/).map((item) => item.trim()).filter(Boolean) : [];
+  let emailDelivery = "suppressed";
+  try {
+    if (recipients.length > 0) {
+      const variables = {
+        clientName: String(gallery.clientName || client?.name || ""),
+        address,
         galleryUrl: deliveryUrl,
-        invoiceAmount: invoice ? `$${invoice.total.toFixed(2)}` : "",
-        paymentUrl: invoice && invoiceSnap ? `${appUrl$1()}/invoice/${invoiceSnap.docs[0].id}` : "",
+        invoiceAmount: invoice ? `$${Number(invoice.total || 0).toFixed(2)}` : "",
+        paymentUrl: payUrl || "",
         expiresAt: `${expiresInDays} days`
-      }
+      };
+      const result = await sendEmail({
+        to: recipients.join(", "),
+        template: "gallery_delivery",
+        subject: galleryDeliverySubject(address),
+        html: builtinEmailHtml("gallery_delivery", variables),
+        variables
+      });
+      emailDelivery = result.delivery;
+    }
+  } catch (err) {
+    await recordGalleryDelivered(gallery, {
+      at: (options?.now || /* @__PURE__ */ new Date()).toISOString(),
+      actor: options?.actor,
+      recipients,
+      email: "suppressed",
+      failed: true
     });
+    throw err;
   }
+  await recordGalleryDelivered(gallery, {
+    at: (options?.now || /* @__PURE__ */ new Date()).toISOString(),
+    actor: options?.actor,
+    recipients,
+    email: emailDelivery
+  });
   if (client?.phone) {
     await sendSMS({
       to: client.phone,
@@ -8687,6 +9173,47 @@ async function deliverGalleryToClient(galleryId, options) {
     }).catch((err) => console.error("[Galleries] Delivery SMS failed:", err));
   }
   return { deliveryUrl, galleryStatus: "delivered" };
+}
+async function recordGalleryDelivered(gallery, input) {
+  const entry2 = galleryDeliveredHistoryEntry({
+    at: input.at,
+    actor: input.actor,
+    recipients: input.recipients,
+    email: input.email
+  });
+  if (input.failed) {
+    entry2.details = `Recipients: ${input.recipients.join(", ") || "none"}. Email send failed.`;
+  } else if (input.recipients.length === 0) {
+    entry2.details = "Recipients: none. Email was not sent.";
+  }
+  const stamp2 = admin.firestore.FieldValue.serverTimestamp();
+  const orderId = await orderIdForGallery(gallery);
+  const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
+  if (!orderId && !listingId) {
+    console.warn("[Galleries] Gallery delivered with no order or listing to attach history to.");
+    return;
+  }
+  if (orderId) {
+    await db$i().collection("orders").doc(orderId).update({
+      history: admin.firestore.FieldValue.arrayUnion(entry2),
+      updatedAt: stamp2
+    });
+  } else {
+    console.warn("[Galleries] Gallery delivered with no order to attach history to.");
+  }
+  if (!listingId) return;
+  await db$i().collection("listings").doc(listingId).update({
+    auditLog: admin.firestore.FieldValue.arrayUnion(entry2),
+    updatedAt: stamp2
+  }).catch((err) => console.error("[Galleries] Project history was not saved:", err));
+}
+async function orderIdForGallery(gallery) {
+  if (typeof gallery.orderId === "string" && gallery.orderId.trim()) return gallery.orderId.trim();
+  const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
+  if (!listingId) return "";
+  const listing = await db$i().collection("listings").doc(listingId).get();
+  const orderId = listing.exists ? listing.data()?.orderId : "";
+  return typeof orderId === "string" ? orderId.trim() : "";
 }
 const db$h = () => admin.firestore();
 function text$5(value) {
@@ -8833,14 +9360,39 @@ async function readStudioCaller(req) {
     return null;
   }
 }
+function sharePlaybackOpen(listing, invoice, related) {
+  return studioDownloadsUnlocked({
+    listing: {
+      id: listing.id,
+      invoiceStatus: listing.invoiceStatus,
+      paymentStatus: listing.paymentStatus,
+      invoice: listing.invoice,
+      downloadEnabled: listing.downloadEnabled === true || related.some((doc) => doc.downloadEnabled === true),
+      downloadsReleased: listing.downloadsReleased === true || related.some((doc) => doc.downloadsReleased === true),
+      lockDownloads: listing.lockDownloads
+    },
+    galleries: [],
+    invoice
+  });
+}
 async function finishGalleryLink(result, caller) {
   if (!result.ok || result.kind !== "listing") return result;
   const listing = docRecord(await db$h().collection("listings").doc(result.project.id).get());
-  if (!listing || !callerCanOpenPrivateStudio(listing, caller)) return result;
+  if (!listing) return result;
   const [invoice, related] = await Promise.all([
     invoiceForListing(listing),
     relatedForListing(listing)
   ]);
+  if (!callerCanOpenPrivateStudio(listing, caller)) {
+    if (result.project.view !== "public") return result;
+    return {
+      ...result,
+      project: {
+        ...result.project,
+        videos: publicShareVideos(listing, sharePlaybackOpen(listing, invoice, related))
+      }
+    };
+  }
   if (result.project.view !== "public") return result;
   const project = ownerStudioProject(listing, result.project, {
     invoice: invoice ?? null,
@@ -8952,10 +9504,7 @@ function clientGalleryPayload(id, gallery, gate) {
     invoiceStatus: invoice?.status || null,
     lockTitle: unlocked ? null : ICONIC_DOWNLOAD_LOCK.title,
     lockMessage: unlocked ? null : ICONIC_DOWNLOAD_LOCK.message,
-    mediaItems: showMedia ? media.map((item) => publicMediaItem(
-      item && typeof item === "object" ? item : {},
-      unlocked
-    )) : []
+    mediaItems: showMedia ? lockedClientGalleryMedia(id, media, unlocked) : []
   };
 }
 router$k.get("/", requireStaff, async (req, res) => {
@@ -9174,7 +9723,12 @@ router$k.post("/:id/deliver", requireCoordinator, async (req, res) => {
   try {
     if (!adminReady$5(res)) return;
     const result = await deliverGalleryToClient(req.params.id, {
-      expiresInDays: Number(req.body?.expiresInDays)
+      expiresInDays: Number(req.body?.expiresInDays),
+      actor: {
+        email: req.user?.email || null,
+        name: typeof req.user?.name === "string" ? req.user.name : null,
+        uid: req.user?.uid || null
+      }
     });
     return res.json({ success: true, deliveryUrl: result.deliveryUrl });
   } catch (err) {
@@ -9319,6 +9873,15 @@ const stripe$1 = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
 });
 function appUrl() {
   return process.env.APP_URL || "https://iconicimagestx.com";
+}
+function emailedPayUrl(invoiceId, invoice) {
+  return clientInvoiceUrl({ id: invoiceId, payToken: invoice.payToken, status: invoice.status }) || "";
+}
+function storedPayUrl(invoiceId, invoice) {
+  const emailed = emailedPayUrl(invoiceId, invoice);
+  if (emailed) return emailed;
+  if (isGuessableInvoiceId(invoiceId)) return "";
+  return publicClientUrl(`/invoice/${encodeURIComponent(invoiceId)}`);
 }
 function stripeReady() {
   return Boolean(process.env.STRIPE_SECRET_KEY);
@@ -9514,7 +10077,7 @@ router$j.post("/send-invoice", requireCoordinator, async (req, res) => {
     if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
     const invoice = invoiceDoc.data();
     const provider = invoiceProvider(invoice);
-    const paymentUrl = `${appUrl()}/invoice/${invoiceId}`;
+    const paymentUrl = emailedPayUrl(invoiceId, invoice);
     await sendEmail({
       to: invoice.clientEmail,
       template: "invoice",
@@ -9533,7 +10096,7 @@ router$j.post("/send-invoice", requireCoordinator, async (req, res) => {
     await invoiceDoc.ref.update({
       status: "sent",
       paymentProvider: provider,
-      paymentUrl,
+      ...paymentUrl ? { paymentUrl } : {},
       sentAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -9608,7 +10171,7 @@ router$j.get("/invoice/:id", async (req, res) => {
       squarePaymentId: invoice.squarePaymentId || null,
       squarePaymentLinkId: invoice.squarePaymentLinkId || null,
       galleryId: invoice.galleryId || null,
-      paymentUrl: invoice.paymentUrl || `${appUrl()}/invoice/${invoiceDoc.id}`,
+      paymentUrl: storedPayUrl(invoiceDoc.id, invoice),
       canPayOnline: provider === "stripe" ? stripeReady() : squareReady()
     });
   } catch (err) {
@@ -9627,7 +10190,7 @@ router$j.post("/invoice/:id/checkout", async (req, res) => {
       return res.json({
         paid: true,
         provider,
-        redirectUrl: invoice.galleryId ? `${appUrl()}/gallery/${invoice.galleryId}` : `${appUrl()}/invoice/${invoiceDoc.id}`
+        redirectUrl: invoice.galleryId ? publicClientUrl(`/gallery/${invoice.galleryId}`) : publicClientUrl(`/invoice/${invoiceDoc.id}`)
       });
     }
     if (amountDue <= 0) {
@@ -9671,7 +10234,7 @@ router$j.post("/invoice/:id/checkout", async (req, res) => {
             location_id: process.env.SQUARE_LOCATION_ID
           },
           checkout_options: {
-            redirect_url: `${appUrl()}/invoice/${invoiceDoc.id}?paid=1`
+            redirect_url: publicClientUrl(`/invoice/${invoiceDoc.id}?paid=1`)
           },
           pre_populated_data: {
             buyer_email: invoice.clientEmail || void 0
@@ -9688,7 +10251,7 @@ router$j.post("/invoice/:id/checkout", async (req, res) => {
       await invoiceDoc.ref.update({
         status: "sent",
         paymentProvider: "square",
-        paymentUrl: link?.url || `${appUrl()}/invoice/${invoiceDoc.id}`,
+        paymentUrl: link?.url || storedPayUrl(invoiceDoc.id, invoice),
         squarePaymentLinkId: link?.id || null,
         squareOrderId: link?.order_id || null,
         sentAt: invoice.sentAt || admin.firestore.FieldValue.serverTimestamp(),
@@ -9729,13 +10292,14 @@ router$j.post("/invoice/:id/checkout", async (req, res) => {
         orderId: invoice.orderId || "",
         clientId: invoice.clientId || ""
       },
-      success_url: `${appUrl()}/invoice/${invoiceDoc.id}?paid=1`,
-      cancel_url: `${appUrl()}/invoice/${invoiceDoc.id}?cancelled=1`
+      success_url: publicClientUrl(`/invoice/${invoiceDoc.id}?paid=1`),
+      cancel_url: publicClientUrl(`/invoice/${invoiceDoc.id}?cancelled=1`)
     });
+    const stripePayUrl = storedPayUrl(invoiceDoc.id, invoice);
     await invoiceDoc.ref.update({
       status: "sent",
       paymentProvider: "stripe",
-      paymentUrl: `${appUrl()}/invoice/${invoiceDoc.id}`,
+      ...stripePayUrl ? { paymentUrl: stripePayUrl } : {},
       stripeCheckoutSessionId: session.id,
       sentAt: invoice.sentAt || admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -13000,12 +13564,12 @@ function uniqueTags(tags) {
   const seen = /* @__PURE__ */ new Set();
   const out = [];
   for (const tag of tags) {
-    const clean = normalizeTag(tag);
-    if (!clean) continue;
-    const key = clean.toLowerCase();
+    const clean2 = normalizeTag(tag);
+    if (!clean2) continue;
+    const key = clean2.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push(clean);
+    out.push(clean2);
   }
   return out;
 }
@@ -13699,7 +14263,8 @@ function createRateLimiter(options) {
       const now = options.now ? options.now() : Date.now();
       const windowStart = now - options.windowMs;
       const recent = (hits.get(key) ?? []).filter((stamp2) => stamp2 > windowStart);
-      if (recent.length >= options.max) {
+      const max = typeof options.max === "function" ? options.max() : options.max;
+      if (recent.length >= max) {
         const retryAfterSec = Math.max(1, Math.ceil((recent[0] + options.windowMs - now) / 1e3));
         hits.set(key, recent);
         return { allowed: false, retryAfterSec };
@@ -15473,7 +16038,10 @@ async function moveMediaDelivery(input) {
   }
   const galleryId = input.galleryId.trim();
   if (input.status === "delivered") {
-    const delivered = await deliverGalleryToClient(galleryId, { expiresInDays: input.expiresInDays });
+    const delivered = await deliverGalleryToClient(galleryId, {
+      expiresInDays: input.expiresInDays,
+      actor: input.actor
+    });
     return {
       galleryId,
       galleryStatus: delivered.galleryStatus,
@@ -15577,7 +16145,12 @@ router$8.post("/delivery-queue/move", requireCoordinator, async (req, res) => {
     const result = await moveMediaDelivery({
       galleryId,
       status: status2,
-      expiresInDays: Number(req.body?.expiresInDays)
+      expiresInDays: Number(req.body?.expiresInDays),
+      actor: {
+        email: req.user?.email || null,
+        name: typeof req.user?.name === "string" ? req.user.name : null,
+        uid: req.user?.uid || null
+      }
     });
     return res.json({ success: true, ...result });
   } catch (err) {
@@ -16868,22 +17441,6 @@ function isPresentationToken(value) {
 function createPresentationToken(randomBytes2) {
   return randomBytes2(18).toString("base64url");
 }
-function safePresentationUrl(value) {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.startsWith("//") || trimmed.startsWith("/\\")) return null;
-  if (trimmed.startsWith("/")) {
-    if (trimmed.includes("..")) return null;
-    return trimmed;
-  }
-  try {
-    const url = new URL(trimmed);
-    if (url.protocol === "https:" || url.protocol === "http:") return url.toString();
-  } catch {
-    return null;
-  }
-  return null;
-}
 function text(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -16922,20 +17479,21 @@ function pushDraft(drafts, row, index, folders, fallbackRoom = "") {
   const looksLikeImage = !contentType || contentType.startsWith("image/") || IMAGE_EXT.test(name) || IMAGE_EXT.test(path2);
   if (!looksLikeImage) return;
   if (contentType && !contentType.startsWith("image/") && !IMAGE_EXT.test(name)) return;
-  const url = safePresentationUrl(row.url) || safePresentationUrl(row.shareUrl);
-  if (!url) return;
+  const sourceUrl = rasterShareSource(row);
+  if (!sourceUrl) return;
   const room = roomFromFields(row, folders) || fallbackRoom;
   const order = typeof row.order === "number" && Number.isFinite(row.order) ? row.order : index;
   const final = row.studioApproved === true || text(row.studioRole) === "final" || path2.includes("/finals/");
   drafts.push({
-    id: text(row.id) || path2 || url,
-    url,
+    id: text(row.id) || path2 || sourceUrl,
+    url: sourceUrl,
     alt: room ? `${room} photograph` : "Listing photograph",
     room,
     order,
     index,
     path: path2,
     sourcePath: text(row.sourcePath),
+    sourceUrl,
     final
   });
 }
@@ -16987,29 +17545,34 @@ function preferFinals(drafts) {
     return true;
   });
 }
-function dedupe(drafts) {
-  const seen = /* @__PURE__ */ new Set();
-  const photos = [];
-  const sorted = [...drafts].sort((a, b) => a.order - b.order || a.index - b.index);
-  for (const item of sorted) {
-    const key = item.path || item.url;
-    if (seen.has(key) || seen.has(item.url)) continue;
-    seen.add(key);
-    seen.add(item.url);
-    photos.push({
-      id: item.id,
-      url: item.url,
-      alt: item.alt,
-      room: item.room
-    });
-  }
-  return photos.slice(0, 200);
-}
-function collectPresentationPhotos(source) {
+function presentationDrafts(source) {
   const hidden = hiddenPresentationKeys(source.listing);
   const fromListing = listingDrafts(source.listing, hidden);
   const fromGalleries = galleryDrafts(source.galleries, fromListing.length, hidden);
-  return dedupe(preferFinals([...fromListing, ...fromGalleries]));
+  const seen = /* @__PURE__ */ new Set();
+  const photos = [];
+  const sorted = [...preferFinals([...fromListing, ...fromGalleries])].sort((a, b) => a.order - b.order || a.index - b.index);
+  for (const item of sorted) {
+    const key = item.path || item.sourceUrl;
+    if (!item.sourceUrl || seen.has(key) || seen.has(item.sourceUrl)) continue;
+    seen.add(key);
+    seen.add(item.sourceUrl);
+    photos.push(item);
+  }
+  return photos.slice(0, 200);
+}
+function presentationDisplayPath(token, index) {
+  return `/api/media/display/p/${encodeURIComponent(token)}/${index}`;
+}
+function collectPresentationPhotos(source) {
+  const drafts = presentationDrafts(source);
+  const tokenRoute = TOKEN_PATTERN.test(source.token);
+  return drafts.map((item, index) => ({
+    id: item.id,
+    url: tokenRoute ? presentationDisplayPath(source.token, index) : item.sourceUrl,
+    alt: item.alt,
+    room: item.room
+  }));
 }
 function presentationRooms(photos) {
   const rooms = [];
@@ -17463,11 +18026,11 @@ function ownerSessionSecret(env = ownerRuntimeEnv()) {
   if (explicit && explicit.length >= 16) return explicit;
   const serviceAccount = env.FIREBASE_SERVICE_ACCOUNT;
   if (serviceAccount && serviceAccount.length >= 32) {
-    return createHmac("sha256", "iconic-owners-suite-v1").update(serviceAccount).digest("hex");
+    return createHmac$1("sha256", "iconic-owners-suite-v1").update(serviceAccount).digest("hex");
   }
   const sheetsKey = env.OWNER_SHEETS_SA_KEY;
   if (sheetsKey && sheetsKey.length >= 32) {
-    return createHmac("sha256", "iconic-owners-suite-v1").update(sheetsKey).digest("hex");
+    return createHmac$1("sha256", "iconic-owners-suite-v1").update(sheetsKey).digest("hex");
   }
   return null;
 }
@@ -17477,13 +18040,13 @@ function signOwnerSession(identity, secret, now = Date.now()) {
     uid: identity.uid,
     exp: now + SESSION_MS
   })).toString("base64url");
-  const sig = createHmac("sha256", secret).update(body).digest("base64url");
+  const sig = createHmac$1("sha256", secret).update(body).digest("base64url");
   return `${body}.${sig}`;
 }
 function readOwnerSession(token, secret, now = Date.now()) {
   const [body, sig] = token.split(".");
   if (!body || !sig) return null;
-  const expected = createHmac("sha256", secret).update(body).digest("base64url");
+  const expected = createHmac$1("sha256", secret).update(body).digest("base64url");
   const actualBuf = Buffer.from(sig);
   const expectedBuf = Buffer.from(expected);
   if (actualBuf.length !== expectedBuf.length || !timingSafeEqual$1(actualBuf, expectedBuf)) return null;
@@ -17602,14 +18165,14 @@ function parsePlanBoard(sheets) {
       money2.set(business2, { revenue: null, expenses: null, sawRevenue: false, sawExpense: false });
     }
     rows.slice(headerAt + 1).forEach((row, index) => {
-      const business2 = businessOf(cellAt(row, headers.business));
-      const kind = sectionOf(cellAt(row, headers.section));
+      const business2 = businessOf(cellAt$1(row, headers.business));
+      const kind = sectionOf(cellAt$1(row, headers.section));
       if (!business2 || !kind) return;
       const purse = money2.get(business2);
       const buckets = lists.get(business2);
       if (!purse || !buckets) return;
       if (kind === "revenue" || kind === "expense") {
-        const amount = parseMoney(cellAt(row, headers.amount));
+        const amount = parseMoney(cellAt$1(row, headers.amount));
         if (kind === "revenue") {
           purse.sawRevenue = true;
           if (amount != null) purse.revenue = roundMoney((purse.revenue ?? 0) + amount);
@@ -17619,15 +18182,15 @@ function parsePlanBoard(sheets) {
         }
         return;
       }
-      const item = cellAt(row, headers.item);
+      const item = cellAt$1(row, headers.item);
       if (!item) return;
-      const status2 = cellAt(row, headers.status);
+      const status2 = cellAt$1(row, headers.status);
       buckets[kind].push({
         item,
-        date: dateKey(cellAt(row, headers.date)),
-        amount: parseMoney(cellAt(row, headers.amount)),
+        date: dateKey(cellAt$1(row, headers.date)),
+        amount: parseMoney(cellAt$1(row, headers.amount)),
         status: status2 || null,
-        notes: cellAt(row, headers.notes) || null,
+        notes: cellAt$1(row, headers.notes) || null,
         done: kind === "todos" && isDone(status2),
         index
       });
@@ -17651,8 +18214,10 @@ function parsePlanBoard(sheets) {
 }
 function findPlanSheet(sheets) {
   if (!Array.isArray(sheets)) return void 0;
-  return sheets.find((sheet) => {
-    if (!sheet || typeof sheet !== "object") return false;
+  const grids = sheets.filter((sheet) => Boolean(sheet) && typeof sheet === "object");
+  const data = grids.find((sheet) => normalizeTabTitle(String(sheet.title || "")) === "plan board data");
+  if (data) return data;
+  return grids.find((sheet) => {
     const title = normalizeTabTitle(String(sheet.title || ""));
     return title === "plan board" || title.includes("plan board");
   });
@@ -17672,7 +18237,7 @@ function headerMap(row) {
   if (map.business == null || map.section == null) return null;
   return map;
 }
-function cellAt(row, index) {
+function cellAt$1(row, index) {
   if (index == null) return "";
   return row[index] || "";
 }
@@ -17716,11 +18281,11 @@ function sortLines(lines) {
     return a.index - b.index;
   }).map(({ index: _index, ...line }) => line);
 }
-const WEEK_AMOUNT = ["cash this week", "this week cash", "collected this week", "week collected", "revenue this week"];
+const WEEK_AMOUNT = ["cash collected this week", "cash this week", "this week cash", "collected this week", "week collected", "revenue this week"];
 const WEEK_GOAL = ["week goal", "this week goal", "weekly goal", "goal this week"];
 const MONTH_AMOUNT = ["cash this month", "this month cash", "collected this month", "month collected", "revenue this month", "mtd cash", "month to date"];
 const MONTH_GOAL = ["month goal", "this month goal", "monthly goal", "goal this month"];
-const SAVINGS_AMOUNT = ["savings", "savings balance", "saved", "reserve balance"];
+const SAVINGS_AMOUNT = ["payroll reserve", "savings", "savings balance", "saved", "reserve balance"];
 const SAVINGS_GOAL = ["savings goal", "reserve goal", "savings target"];
 const MONEY_SECTIONS = ["money in", "money in by payment", "payments", "by payment", "payment method"];
 const AR_SECTIONS = ["accounts receivable", "receivables", "money owed to us", "outstanding invoices", "ar"];
@@ -17744,9 +18309,13 @@ function emptyOwnerSuiteData(now = /* @__PURE__ */ new Date()) {
     decisions: [],
     tracker: { goal: null, current: null, rows: [] },
     horizons: [],
+    scorecard: emptyScorecard(),
     bots: { state: "unknown", entries: [] },
     planBoard: emptyPlanBoard()
   };
+}
+function emptyScorecard() {
+  return { metrics: [], rag: [], nextWeek: [], payments: [] };
 }
 function parseOwnerSuite(sheets, now = /* @__PURE__ */ new Date()) {
   const data = emptyOwnerSuiteData(now);
@@ -17767,7 +18336,19 @@ function parseOwnerSuite(sheets, now = /* @__PURE__ */ new Date()) {
   data.moneyIn = moneyIn(safeSheets);
   data.receivables = parties(safeSheets, AR_SECTIONS, ["receivable", "ar", "outstanding"]);
   data.owes = owes(safeSheets);
+  data.scorecard = fridayScorecard(findSheet(safeSheets, ["friday scorecard", "scorecard"]));
+  if (data.cashWeek.amount == null) {
+    const week = data.scorecard.metrics.find((metric) => matchesAlias(metric.label, WEEK_AMOUNT, WEEK_GOAL));
+    if (week?.amount != null) data.cashWeek.amount = week.amount;
+  }
+  if (data.savings.amount == null) {
+    const reserve = data.scorecard.metrics.find((metric) => matchesAlias(metric.label, SAVINGS_AMOUNT, SAVINGS_GOAL));
+    if (reserve?.amount != null) data.savings.amount = reserve.amount;
+  }
   data.businesses = businesses(findSheet(safeSheets, ["businesses", "business"]));
+  if (!data.businesses.length) {
+    data.businesses = data.scorecard.rag.map((row) => business(row.name, row.tone, null));
+  }
   const plan = weekPlan(findSheet(safeSheets, ["this week"]), now);
   data.today = plan.today;
   data.calendar = plan.calendar;
@@ -17797,9 +18378,13 @@ function rowsOf(sheet) {
   return sheet.rows.map((row) => Array.isArray(row) ? row.map((item) => cell(item)) : []);
 }
 function parseMoney(raw) {
-  const text2 = cell(raw);
-  if (!text2 || /^(-|—|n\/a|na|tbd)$/i.test(text2)) return null;
+  const original = cell(raw);
+  if (!original || /^(-|—|–|n\/a|na|tbd)$/i.test(original)) return null;
+  const text2 = original.replace(/^~\s*/, "").replace(/\s*\+\s*$/, "").trim();
+  if (!text2 || /^(-|—|–|n\/a|na|tbd)$/i.test(text2)) return null;
   if (/[a-z]/i.test(text2.replace(/[$%,\s().-]/g, "")) && !/^\$/.test(text2)) return null;
+  const figures = text2.replace(/,/g, "").match(/\d+(?:\.\d+)?/g) || [];
+  if (figures.length !== 1) return null;
   const negative = /^\(.*\)$/.test(text2) || text2.startsWith("-");
   const numeric2 = text2.replace(/[$,%\s]/g, "").replace(/[()]/g, "");
   if (!numeric2 || numeric2 === "-" || numeric2 === ".") return null;
@@ -17818,11 +18403,17 @@ function parsePercent(raw) {
 function norm(value) {
   return value.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9%]+/g, " ").replace(/\s+/g, " ").trim();
 }
+function phraseHas(name, alias) {
+  if (!name || !alias) return false;
+  if (name === alias) return true;
+  const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?:^|\\s)${escaped}(?:\\s|$)`).test(name);
+}
 function matchesAlias(value, aliases, avoid = []) {
   const name = norm(value);
   if (!name) return false;
-  if (avoid.some((alias) => name === alias || name.startsWith(`${alias} `))) return false;
-  return aliases.some((alias) => name === alias || name.startsWith(`${alias} `) || name.startsWith(`${alias}:`));
+  if (avoid.some((alias) => phraseHas(name, alias))) return false;
+  return aliases.some((alias) => phraseHas(name, alias));
 }
 function inlineNumber(value, aliases) {
   const name = norm(value);
@@ -17992,20 +18583,97 @@ function recordToParty(record) {
     detail: pick(record, ["detail", "note", "notes", "due date", "status", "when"]) || null
   };
 }
+const BUSINESS_FIELDS = [
+  { field: "name", phrases: ["business", "company"] },
+  { field: "status", phrases: ["rag", "status", "health", "ryg", "color"] },
+  { field: "note", phrases: ["where it stands", "notes", "note", "detail", "comment"] },
+  { field: "milestone", phrases: ["next milestone"] },
+  { field: "milestoneDue", phrases: ["milestone due"] },
+  { field: "nextDate", phrases: ["next date on the calendar", "next date"] },
+  { field: "target", phrases: ["30 day target"] },
+  { field: "targetAmount", phrases: ["30 day $"] },
+  { field: "owners", phrases: ["owner"] },
+  { field: "profitCheck", phrases: ["profit check", "15% profit"] }
+];
 function businesses(sheet) {
-  const records = tableRecords(rowsOf(sheet));
+  const rows = rowsOf(sheet);
+  const headerAt = rows.findIndex((row) => businessHeader(row) != null);
+  if (headerAt >= 0) {
+    const header = businessHeader(rows[headerAt]);
+    if (header) {
+      return rows.slice(headerAt + 1).flatMap((row) => {
+        const name = cellAt(row, header.name);
+        if (!name || phraseHas(norm(name), "business")) return [];
+        const status2 = cellAt(row, header.status);
+        const note = cellAt(row, header.note) || null;
+        const targetRaw = cellAt(row, header.targetAmount);
+        return [business(name, status2, note, {
+          milestone: cellAt(row, header.milestone) || null,
+          milestoneDue: cellAt(row, header.milestoneDue) || null,
+          nextDate: cellAt(row, header.nextDate) || null,
+          target: cellAt(row, header.target) || null,
+          targetAmount: parseMoney(targetRaw),
+          owners: cellAt(row, header.owners) || null,
+          profitCheck: cellAt(row, header.profitCheck) || null
+        })];
+      }).filter((item) => item.name);
+    }
+  }
+  const records = tableRecords(rows);
   const fromTable = records.map((record) => {
     const name = pick(record, ["business", "name", "company"]);
-    const status2 = pick(record, ["status", "health", "ryg", "color", "state"]);
-    const note = pick(record, ["note", "notes", "detail", "comment"]) || null;
+    const status2 = pick(record, ["status", "health", "ryg", "rag", "color", "state"]);
+    const note = pick(record, ["where it stands", "note", "notes", "detail", "comment"]) || null;
     return business(name, status2, note);
   }).filter((item) => item.name);
   if (fromTable.length) return fromTable;
-  return pairs(rowsOf(sheet)).map((item) => business(item.name, item.detail || "", null)).filter((item) => item.name && !isHeaderRow([item.name]));
+  return pairs(rows).map((item) => business(item.name, item.detail || "", null)).filter((item) => item.name && !isHeaderRow([item.name]));
 }
-function business(name, status2, note) {
+function businessHeader(row) {
+  const map = {};
+  const score = {};
+  row.forEach((value, index) => {
+    const key = looseHeader(value);
+    if (!key) return;
+    let best = null;
+    for (const field of BUSINESS_FIELDS) {
+      for (const phrase of field.phrases) {
+        if ((key === phrase || key.includes(phrase)) && (!best || phrase.length > best.score)) {
+          best = { field: field.field, score: phrase.length };
+        }
+      }
+    }
+    if (!best) return;
+    if (score[best.field] == null || best.score > (score[best.field] || 0)) {
+      map[best.field] = index;
+      score[best.field] = best.score;
+    }
+  });
+  if (map.name == null || map.status == null) return null;
+  return map;
+}
+function looseHeader(value) {
+  return value.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9$%]+/g, " ").replace(/\s+/g, " ").trim();
+}
+function cellAt(row, index) {
+  if (index == null) return "";
+  return row[index] || "";
+}
+function business(name, status2, note, extra = {}) {
   const tone = toneOf(status2);
-  return { name, tone, label: toneLabel(tone), note };
+  return {
+    name,
+    tone,
+    label: toneLabel(tone, status2),
+    note,
+    milestone: extra.milestone ?? null,
+    milestoneDue: extra.milestoneDue ?? null,
+    nextDate: extra.nextDate ?? null,
+    target: extra.target ?? null,
+    targetAmount: extra.targetAmount ?? null,
+    owners: extra.owners ?? null,
+    profitCheck: extra.profitCheck ?? null
+  };
 }
 function toneOf(raw) {
   const name = norm(raw);
@@ -18013,7 +18681,7 @@ function toneOf(raw) {
   if (name === "g" || name === "green" || name === "good" || name === "ok" || name === "okay" || name.includes("green") || name.includes("on track") || name.includes("healthy")) {
     return "green";
   }
-  if (name === "y" || name === "yellow" || name.includes("yellow") || name.includes("watch") || name.includes("caution") || name.includes("attention")) {
+  if (name === "y" || name === "a" || name === "yellow" || name === "amber" || name.includes("yellow") || name.includes("amber") || name.includes("watch") || name.includes("caution") || name.includes("attention")) {
     return "yellow";
   }
   if (name === "r" || name === "red" || name.includes("red") || name.includes("behind") || name.includes("off track") || name.includes("risk") || name.includes("late")) {
@@ -18021,7 +18689,12 @@ function toneOf(raw) {
   }
   return "unknown";
 }
-function toneLabel(tone) {
+function toneLabel(tone, raw) {
+  const name = norm(raw);
+  const colorWord = name === "r" || name === "y" || name === "g" || name === "a" || name === "red" || name === "yellow" || name === "green" || name === "amber" || name.includes("yellow") || name.includes("amber") || name.includes("green") || /(^|\s)red(\s|$)/.test(name);
+  if (colorWord && tone === "green") return "Green";
+  if (colorWord && tone === "yellow") return "Yellow";
+  if (colorWord && tone === "red") return "Red";
   if (tone === "green") return "On track";
   if (tone === "yellow") return "Watch";
   if (tone === "red") return "Behind";
@@ -18093,31 +18766,233 @@ function tracker(sheet) {
   })).filter((row) => row.label && !matchesAlias(row.label, ["goal", "current", "target", "source", "amount"]));
   return { goal, current, rows: breakdown };
 }
-function horizons(sheet) {
+function fridayScorecard(sheet) {
+  const card = emptyScorecard();
   const rows = rowsOf(sheet);
-  const header = rows.find((row) => row.filter(Boolean).length >= 2);
-  if (header) {
-    const columns = header.map((value, index) => ({ horizon: horizonKey(value), index })).filter((column) => column.horizon != null);
-    if (columns.length >= 2) {
-      const headerAt = rows.indexOf(header);
-      return columns.map((column) => ({
-        horizon: column.horizon,
-        items: rows.slice(headerAt + 1).map((row) => cell(row[column.index])).filter(Boolean)
-      })).filter((column) => column.items.length);
+  let section = null;
+  let columns = { label: 0, value: 1 };
+  for (const row of rows) {
+    if (row.every((value2) => !cell(value2))) {
+      section = null;
+      continue;
+    }
+    const next = scorecardSection(row);
+    if (next) {
+      section = next;
+      columns = scorecardColumns(row, next);
+      continue;
+    }
+    if (!section) continue;
+    const label = cell(row[columns.label]);
+    const value = cell(row[columns.value]);
+    if (!label || scorecardSection(row)) continue;
+    if (section === "metrics") {
+      if (norm(label) === "metric" || norm(label) === "value") continue;
+      card.metrics.push({ label, amount: parseMoney(value), text: value || null });
+    } else if (section === "rag") {
+      if (phraseHas(norm(label), "business")) continue;
+      card.rag.push({ name: label, tone: toneOf(value) });
+    } else if (section === "targets") {
+      card.nextWeek.push({ text: label, owner: value || null });
+    } else if (section === "payments") {
+      card.payments.push({ payment: label, date: value || null });
     }
   }
+  return card;
+}
+function scorecardSection(row) {
+  const cells = row.map((value) => norm(value)).filter(Boolean);
+  if (cells.length < 2) return null;
+  const blob = cells.join(" ");
+  if (cells.some((value) => value === "metric" || value === "metrics") && cells.some((value) => value === "value" || value === "values")) {
+    return "metrics";
+  }
+  if (cells.some((value) => value === "business" || value === "businesses") && cells.some((value) => value === "rag")) return "rag";
+  if (blob.includes("next week target")) return "targets";
+  if (blob.includes("week cash detail")) return "payments";
+  return null;
+}
+function scorecardColumns(row, section) {
+  const keys = row.map((value) => norm(value));
+  if (section === "metrics") {
+    return { label: Math.max(0, keys.findIndex((value) => value === "metric" || value === "metrics")), value: Math.max(1, keys.findIndex((value) => value === "value" || value === "values")) };
+  }
+  if (section === "rag") {
+    return { label: Math.max(0, keys.findIndex((value) => value === "business" || value === "businesses")), value: Math.max(1, keys.findIndex((value) => value === "rag")) };
+  }
+  if (section === "payments") {
+    const date = keys.findIndex((value) => value === "date");
+    return { label: 0, value: date >= 0 ? date : 1 };
+  }
+  const owner = keys.findIndex((value) => value === "owner" || value === "owners");
+  return { label: 0, value: owner >= 0 ? owner : 1 };
+}
+function horizons(sheet) {
+  const rows = rowsOf(sheet);
+  const columns = columnHorizons(rows);
+  if (columns.length) return columns;
+  const listed = milestoneListHorizons(rows);
+  if (listed.length) return listed;
+  const sections = sectionHorizons(rows);
+  if (sections.length) return sections;
+  return recordHorizons(rows);
+}
+function columnHorizons(rows) {
+  for (let i = 0; i < rows.length; i += 1) {
+    const columns = rows[i].map((value, index) => ({ horizon: horizonKey(value), index })).filter((column) => column.horizon != null);
+    if (columns.length < 2) continue;
+    const plans = columns.map((column) => ({
+      horizon: column.horizon,
+      items: rows.slice(i + 1).map((row) => cell(row[column.index])).filter((item) => Boolean(item) && horizonKey(item) == null)
+    })).filter((column) => column.items.length);
+    if (plans.length) return plans;
+  }
+  return [];
+}
+function milestoneListHorizons(rows) {
+  const headerAt = rows.findIndex((row) => row.some((value) => norm(value) === "date") && row.some((value) => norm(value) === "milestone"));
+  if (headerAt < 0) return [];
+  const header = rows[headerAt];
+  const dateCol = header.findIndex((value) => norm(value) === "date");
+  const milestoneCol = header.findIndex((value) => norm(value) === "milestone");
+  const anchors = horizonAnchors(rows);
+  const groups = /* @__PURE__ */ new Map();
+  for (const row of rows.slice(headerAt + 1)) {
+    const when = cell(row[dateCol]);
+    const milestone = cell(row[milestoneCol]);
+    if (!when && !milestone) continue;
+    if (norm(when) === "date" && norm(milestone) === "milestone") continue;
+    const marked = dayMark(milestone) || dayMark(when);
+    const iso = parseLooseDate(when, anchors.year, anchors.startMonth);
+    const horizon = marked || (iso ? bucketDate(iso, anchors) : "later");
+    const item = milestone && when ? `${when} · ${milestone}` : milestone || when;
+    pushHorizon(groups, horizon, item);
+  }
+  collectStarMilestones(rows, anchors, groups);
+  return packHorizons(groups);
+}
+function sectionHorizons(rows) {
+  const groups = /* @__PURE__ */ new Map();
+  let current = null;
+  for (const row of rows) {
+    const filled = row.map((value) => cell(value)).filter(Boolean);
+    if (!filled.length) continue;
+    const section = filled.length === 1 ? dayMark(filled[0]) || horizonKey(filled[0]) : null;
+    if (section) {
+      current = section;
+      continue;
+    }
+    if (!current) continue;
+    pushHorizon(groups, current, filled.join(" · "));
+  }
+  return packHorizons(groups);
+}
+function recordHorizons(rows) {
   const records = tableRecords(rows);
-  const grouped = /* @__PURE__ */ new Map();
+  const groups = /* @__PURE__ */ new Map();
   for (const record of records) {
     const horizon = horizonKey(pick(record, ["horizon", "window", "days", "phase"]));
-    const item = pick(record, ["item", "plan", "focus", "goal", "task"]);
+    const item = pick(record, ["item", "plan", "focus", "goal", "task", "milestone"]);
     if (!horizon || !item) continue;
-    grouped.set(horizon, [...grouped.get(horizon) || [], item]);
+    pushHorizon(groups, horizon, item);
   }
-  return ["30", "60", "90"].flatMap((horizon) => {
-    const items = grouped.get(horizon) || [];
+  return packHorizons(groups);
+}
+function pushHorizon(groups, horizon, item) {
+  const text2 = cell(item);
+  if (!text2) return;
+  const existing = [...groups.values()].flat();
+  if (existing.some((value) => sameHorizonItem(value, text2))) return;
+  groups.set(horizon, [...groups.get(horizon) || [], text2]);
+}
+function sameHorizonItem(left, right) {
+  const clean2 = (value) => norm(value.replace(/★/g, " "));
+  return clean2(left) === clean2(right);
+}
+function packHorizons(groups) {
+  return ["30", "60", "90", "later"].flatMap((horizon) => {
+    const items = groups.get(horizon) || [];
     return items.length ? [{ horizon, items }] : [];
   });
+}
+function horizonAnchors(rows) {
+  const note = rows.slice(0, 3).map((row) => row.join(" ")).join("\n");
+  const start = note.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2},?\s+(20\d{2})/i);
+  const year = start ? Number(start[2]) : Number(note.match(/\b(20\d{2})\b/)?.[1] || (/* @__PURE__ */ new Date()).getFullYear());
+  const startMonth = start ? monthIndex(start[1]) : null;
+  return {
+    year,
+    startMonth,
+    day30: anchorDate(note, "30", year, startMonth),
+    day60: anchorDate(note, "60", year, startMonth),
+    day90: anchorDate(note, "90", year, startMonth)
+  };
+}
+function anchorDate(text2, day, defaultYear, startMonth) {
+  const match = text2.match(new RegExp(`\\bday\\s*${day}\\s*=\\s*([a-z]+)\\s+(\\d{1,2})(?:\\s*,\\s*(20\\d{2}))?`, "i"));
+  if (!match) return null;
+  return toIso(match[1], Number(match[2]), match[3] ? Number(match[3]) : null, defaultYear, startMonth);
+}
+function bucketDate(iso, anchors) {
+  if (anchors.day30 && iso <= anchors.day30) return "30";
+  if (anchors.day60 && iso <= anchors.day60) return "60";
+  if (anchors.day90 && iso <= anchors.day90) return "90";
+  return "later";
+}
+function dayMark(text2) {
+  const match = text2.match(/\bDAY\s*(30|60|90)\b/i);
+  if (!match) return null;
+  return match[1];
+}
+function parseLooseDate(value, defaultYear, startMonth) {
+  const text2 = cell(value);
+  if (/^20\d{2}-\d{2}-\d{2}$/.test(text2)) return text2;
+  const named = text2.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:\s*,?\s*(20\d{2}))?\b/i);
+  if (named && Number(named[2]) <= 31) {
+    return toIso(named[1], Number(named[2]), named[3] ? Number(named[3]) : null, defaultYear, startMonth);
+  }
+  const monthYear = text2.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(20\d{2})\b/i);
+  if (monthYear) return toIso(monthYear[1], 1, Number(monthYear[2]), defaultYear, startMonth);
+  return null;
+}
+function toIso(monthName2, day, year, defaultYear, startMonth) {
+  const month = monthIndex(monthName2);
+  if (!month || day < 1 || day > 31) return null;
+  let resolved = year ?? defaultYear;
+  if (year == null && startMonth != null && month < startMonth) resolved += 1;
+  return `${resolved}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+function monthIndex(name) {
+  const key = name.toLowerCase().slice(0, 3);
+  const months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+  const index = months.indexOf(key);
+  return index < 0 ? null : index + 1;
+}
+function collectStarMilestones(rows, anchors, groups) {
+  let month = null;
+  let year = null;
+  for (const row of rows) {
+    for (const value of row) {
+      const header = value.trim().match(/^(january|february|march|april|may|june|july|august|september|october|november|december)\s+(20\d{2})$/i);
+      if (!header) continue;
+      month = monthIndex(header[1]);
+      year = Number(header[2]);
+    }
+    if (month == null || year == null) continue;
+    for (const value of row) {
+      if (!value.includes("★")) continue;
+      const text2 = value.split("★").slice(1).join("★").replace(/\s+/g, " ").trim();
+      if (!text2) continue;
+      const dayMatch = value.split("\n")[0].trim().match(/^(\d{1,2})$/);
+      const day = dayMatch ? Number(dayMatch[1]) : null;
+      const iso = day ? toIso(monthName(month), day, year, year, null) : null;
+      const horizon = iso ? bucketDate(iso, anchors) : "later";
+      pushHorizon(groups, horizon, `★ ${text2}`);
+    }
+  }
+}
+function monthName(month) {
+  return ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"][month - 1] || "jan";
 }
 function horizonKey(value) {
   const name = norm(value);
@@ -18127,7 +19002,7 @@ function horizonKey(value) {
   return null;
 }
 function bots(sheet) {
-  if (!sheet) return { state: "missing", entries: [] };
+  if (!sheet) return { state: "empty", entries: [] };
   const records = tableRecords(rowsOf(sheet));
   if (!records.length) return { state: "empty", entries: [] };
   const groups = /* @__PURE__ */ new Map();
@@ -18380,8 +19255,29 @@ const TAB_ALIASES = [
   { aliases: ["owes"] },
   { aliases: ["decisions"] },
   { aliases: ["action log"] },
-  { aliases: ["plan board"] }
+  { aliases: ["plan board data", "plan board"] }
 ];
+function selectOwnerTabs(titles) {
+  const cleaned = titles.filter(Boolean);
+  const picked = [];
+  for (const wanted of TAB_ALIASES) {
+    const match = matchOwnerTab(cleaned, wanted.aliases);
+    if (match && !picked.includes(match)) picked.push(match);
+  }
+  return picked;
+}
+function matchOwnerTab(titles, aliases) {
+  const named = titles.map((title) => ({ title, name: normalizeTabTitle(title) }));
+  for (const alias of aliases) {
+    const exact = named.find((item) => item.name === alias);
+    if (exact) return exact.title;
+  }
+  for (const alias of aliases) {
+    const partial = named.find((item) => item.name.includes(alias));
+    if (partial) return partial.title;
+  }
+  return void 0;
+}
 let cache = null;
 function resolveSheetsCredentials(env = ownerRuntimeEnv()) {
   const fromFirebase = credentialsFromJson(env.FIREBASE_SERVICE_ACCOUNT);
@@ -18471,10 +19367,7 @@ async function fetchScorecard(credentials) {
     fields: "sheets.properties.title"
   });
   const titles = (meta.data.sheets || []).map((sheet) => sheet.properties?.title || "").filter(Boolean);
-  const matched = TAB_ALIASES.map((wanted) => titles.find((title) => {
-    const name = title.toLowerCase().replace(/\$/g, "").replace(/[^a-z0-9]+/g, " ").trim();
-    return wanted.aliases.some((alias) => name === alias || name.includes(alias));
-  })).filter((title) => Boolean(title));
+  const matched = selectOwnerTabs(titles);
   if (!matched.length) return [];
   const values = await sheets.spreadsheets.values.batchGet({
     spreadsheetId: OWNER_SHEET_ID,

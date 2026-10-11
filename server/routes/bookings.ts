@@ -16,11 +16,13 @@ import { clientNotifyBlockReason, clientNotifyLive, isNotifyTestAllowlisted } fr
 import { lifeOfTheListingCareSelected } from "../../shared/lifeOfTheListingCare";
 import { buildBookingInvoiceDraft, existingInvoiceId } from "../../shared/bookingInvoice";
 import { nextSequentialInvoiceNumber, planInvoiceLink } from "../../shared/orderProjectInvoice";
+import { clientInvoiceUrl } from "../../shared/invoicePayLink";
+import { publicClientUrl } from "../../shared/publicSiteUrl";
 import { chargedServiceLines, normalizeBookingLineItems, orderTotalLabel, resolveSubmittedBooking, sumLineItemPrices, unpricedCatalogBookingError } from "../../shared/bookingPricing";
 import { applyServerTravel, isTravelFeeLine, travelSummaryText, type TravelAssessment } from "../../shared/travelZones";
 import { planOrderPackageRepair } from "../../shared/orderPackageRepair";
 import { notifyOfficeOfOrder } from "../services/officeOrderNotify";
-import { packagesForStaffEditor } from "../../shared/bookingCatalog";
+import { packagesForStaffEditor, publicBookingCatalogResponse } from "../../shared/bookingCatalog";
 import { normalizeEmail } from "../../shared/listingAccess";
 import { addressText } from "../../shared/addressText";
 import { bookingDateLabel } from "../../shared/clientHome";
@@ -353,7 +355,7 @@ router.post("/", async (req, res) => {
             clientName,
             clientEmail: normalizedEmail,
             setupUrl: account.passwordSetupLink,
-            portalUrl: `${appUrl()}/portal`,
+            portalUrl: publicClientUrl("/portal"),
           },
         }).then((result) => (result.sent ? "sent" as const : "failed" as const)).catch(async (err) => {
           console.error("[Bookings] Password setup email failed:", err);
@@ -434,6 +436,14 @@ router.post("/", async (req, res) => {
     console.error("[Bookings] Submission error:", err);
     return res.status(500).json({ error: "Failed to submit booking request." });
   }
+});
+
+// ─── GET /api/bookings/catalog — Public packages /book can sell ───────────────
+// Registered before /:id so "catalog" is not read as a booking request id.
+
+router.get("/catalog", async (_req, res) => {
+  const catalog = await loadBookingCatalog();
+  return res.json(publicBookingCatalogResponse(catalog));
 });
 
 // ─── GET /api/bookings — List all order requests (staff only) ─────────────────
@@ -778,7 +788,9 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
         galleryId: galleryRef.id,
         ...(listingId ? { listingId } : {}),
         invoiceNumber: await generateInvoiceNumber(),
-        paymentUrl: `${appUrl()}/invoice/${invoiceRef.id}`,
+        ...(clientInvoiceUrl({ id: invoiceRef.id, status: "draft" })
+          ? { paymentUrl: clientInvoiceUrl({ id: invoiceRef.id, status: "draft" }) }
+          : {}),
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -787,7 +799,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
 
     await galleryRef.update({
       invoiceId,
-      deliveryUrl: `${appUrl()}/gallery/${galleryRef.id}`,
+      deliveryUrl: publicClientUrl(`/gallery/${galleryRef.id}`),
     });
 
     // Mark request as confirmed
@@ -830,7 +842,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
         photographerName: assignedPhotographerName || "Our team",
         travelFee: travelSummaryText(travel),
         orderId: orderRef.id,
-        portalUrl: `${appUrl()}/portal`,
+        portalUrl: publicClientUrl("/portal"),
       },
     }).catch((err) => console.error("[Bookings] Confirmation email failed:", err));
 
@@ -951,7 +963,9 @@ async function createBookingInvoiceDraft(input: {
   await invoiceRef.set({
     ...draft,
     invoiceNumber: await generateInvoiceNumber(),
-    paymentUrl: `${appUrl()}/invoice/${invoiceRef.id}`,
+    ...(clientInvoiceUrl({ id: invoiceRef.id, status: "draft" })
+      ? { paymentUrl: clientInvoiceUrl({ id: invoiceRef.id, status: "draft" }) }
+      : {}),
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });

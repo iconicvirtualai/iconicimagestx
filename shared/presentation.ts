@@ -6,6 +6,7 @@
  */
 
 import { frameFromListingImage, listingAddressLabel } from "./iconicStudio";
+import { rasterShareSource } from "./publicShare";
 import { hiddenPresentationKeys, rowHiddenFromPresentation } from "./portalListingDetail";
 import { stripPublicMeta } from "./siteSeo";
 
@@ -137,6 +138,7 @@ interface DraftPhoto {
   index: number;
   path: string;
   sourcePath: string;
+  sourceUrl: string;
   final: boolean;
 }
 
@@ -159,20 +161,21 @@ function pushDraft(
     || IMAGE_EXT.test(path);
   if (!looksLikeImage) return;
   if (contentType && !contentType.startsWith("image/") && !IMAGE_EXT.test(name)) return;
-  const url = safePresentationUrl(row.url) || safePresentationUrl(row.shareUrl);
-  if (!url) return;
+  const sourceUrl = rasterShareSource(row);
+  if (!sourceUrl) return;
   const room = roomFromFields(row, folders) || fallbackRoom;
   const order = typeof row.order === "number" && Number.isFinite(row.order) ? row.order : index;
   const final = row.studioApproved === true || text(row.studioRole) === "final" || path.includes("/finals/");
   drafts.push({
-    id: text(row.id) || path || url,
-    url,
+    id: text(row.id) || path || sourceUrl,
+    url: sourceUrl,
     alt: room ? `${room} photograph` : "Listing photograph",
     room,
     order,
     index,
     path,
     sourcePath: text(row.sourcePath),
+    sourceUrl,
     final,
   });
 }
@@ -228,30 +231,42 @@ function preferFinals(drafts: DraftPhoto[]): DraftPhoto[] {
   });
 }
 
-function dedupe(drafts: DraftPhoto[]): PresentationPhoto[] {
+function presentationDrafts(source: PresentationSource): DraftPhoto[] {
+  const hidden = hiddenPresentationKeys(source.listing);
+  const fromListing = listingDrafts(source.listing, hidden);
+  const fromGalleries = galleryDrafts(source.galleries, fromListing.length, hidden);
   const seen = new Set<string>();
-  const photos: PresentationPhoto[] = [];
-  const sorted = [...drafts].sort((a, b) => a.order - b.order || a.index - b.index);
+  const photos: DraftPhoto[] = [];
+  const sorted = [...preferFinals([...fromListing, ...fromGalleries])].sort((a, b) => a.order - b.order || a.index - b.index);
   for (const item of sorted) {
-    const key = item.path || item.url;
-    if (seen.has(key) || seen.has(item.url)) continue;
+    const key = item.path || item.sourceUrl;
+    if (!item.sourceUrl || seen.has(key) || seen.has(item.sourceUrl)) continue;
     seen.add(key);
-    seen.add(item.url);
-    photos.push({
-      id: item.id,
-      url: item.url,
-      alt: item.alt,
-      room: item.room,
-    });
+    seen.add(item.sourceUrl);
+    photos.push(item);
   }
   return photos.slice(0, 200);
 }
 
+/** Source URLs in the same order as the presentation photos. Empty for the seeded preview token. */
+export function presentationPhotoSources(source: PresentationSource): string[] {
+  if (!TOKEN_PATTERN.test(source.token)) return [];
+  return presentationDrafts(source).map((item) => item.sourceUrl);
+}
+
+function presentationDisplayPath(token: string, index: number): string {
+  return `/api/media/display/p/${encodeURIComponent(token)}/${index}`;
+}
+
 export function collectPresentationPhotos(source: PresentationSource): PresentationPhoto[] {
-  const hidden = hiddenPresentationKeys(source.listing);
-  const fromListing = listingDrafts(source.listing, hidden);
-  const fromGalleries = galleryDrafts(source.galleries, fromListing.length, hidden);
-  return dedupe(preferFinals([...fromListing, ...fromGalleries]));
+  const drafts = presentationDrafts(source);
+  const tokenRoute = TOKEN_PATTERN.test(source.token);
+  return drafts.map((item, index) => ({
+    id: item.id,
+    url: tokenRoute ? presentationDisplayPath(source.token, index) : item.sourceUrl,
+    alt: item.alt,
+    room: item.room,
+  }));
 }
 
 export function presentationRooms(photos: PresentationPhoto[]): PresentationRoom[] {

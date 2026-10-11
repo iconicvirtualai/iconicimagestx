@@ -40,7 +40,7 @@ afterAll(async () => {
 beforeEach(() => {
   sendEmailMock.mockReset();
   sendSMSMock.mockReset();
-  sendEmailMock.mockResolvedValue({ sent: true });
+  sendEmailMock.mockResolvedValue({ sent: true, delivery: "sent" });
   sendSMSMock.mockResolvedValue({ sid: "SM123", status: "queued" });
 });
 
@@ -111,7 +111,7 @@ describe("POST /api/contact/live-chat", () => {
   });
 
   it("still delivers when email fails and the office text goes out", async () => {
-    sendEmailMock.mockResolvedValue({ sent: false });
+    sendEmailMock.mockResolvedValue({ sent: false, delivery: "suppressed" });
     const res = await postChat(validBody, "203.0.113.23");
     const data = await res.json();
     expect(res.status).toBe(200);
@@ -122,7 +122,7 @@ describe("POST /api/contact/live-chat", () => {
   });
 
   it("keeps the send as a failure when neither email nor SMS goes out", async () => {
-    sendEmailMock.mockResolvedValue({ sent: false });
+    sendEmailMock.mockResolvedValue({ sent: false, delivery: "suppressed" });
     sendSMSMock.mockResolvedValue({ sid: "", status: "suppressed", suppressed: true });
     const res = await postChat(validBody, "203.0.113.25");
     const data = await res.json();

@@ -355,6 +355,48 @@ describe("client gallery media render paths", () => {
     expect(html).toContain("ZIP · Size not on file");
   });
 
+  it("shows a locked display image, a video poster, and a Matterport embed without a download", () => {
+    const photo = render({
+      id: "locked-photo",
+      type: "photo",
+      fileName: "secret.jpg",
+      url: "/api/media/display/o/grant.sig/0",
+      locked: true,
+      canDownload: false,
+    });
+    expect(photo).toContain('data-gallery-kind="photo"');
+    expect(photo).toContain('src="/api/media/display/o/grant.sig/0"');
+    expect(photo).not.toContain('download=""');
+
+    const video = render({
+      id: "locked-video",
+      type: "video",
+      category: "branded",
+      fileName: "branded.mp4",
+      url: null,
+      poster: "/api/media/display/o/grant.sig/4",
+      contentType: "video/mp4",
+      locked: true,
+      canDownload: false,
+    });
+    expect(video).toContain('src="/api/media/display/o/grant.sig/4"');
+    expect(video).not.toContain("<video");
+    expect(video).not.toContain('download=""');
+
+    const tour = render({
+      id: "locked-tour",
+      type: "matterport",
+      fileName: "tour",
+      url: "https://my.matterport.com/show/?m=abc123",
+      embedUrl: "https://my.matterport.com/show/?m=abc123",
+      locked: true,
+      canDownload: false,
+    });
+    expect(tour).toContain('data-gallery-kind="tour"');
+    expect(tour).toContain('src="https://my.matterport.com/show/?m=abc123"');
+    expect(tour).not.toContain('download=""');
+  });
+
   it("keeps unpaid media locked and does not offer a download", () => {
     const html = render({
       id: "secret",

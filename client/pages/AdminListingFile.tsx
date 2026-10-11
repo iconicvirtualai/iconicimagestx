@@ -23,6 +23,7 @@ import { addressText, recordAddressText } from "@shared/addressText";
 import { calendarDateKey, formatChicagoDate } from "@shared/clientHome";
 import { lockDownloadsOn, requirePaymentOn } from "@shared/paymentAccess";
 import { staffInvoicePath } from "@shared/staffInvoice";
+import { publicClientUrl } from "@shared/publicSiteUrl";
 import { projectStatusLabel, projectSurfaceStatus, type ProjectSurface } from "@shared/projectSurfaceStatus";
 import { PresentationShareButton, PresentationSharePanel } from "@/components/PresentationSharePanel";
 import { PhotoEditRequestStaff } from "@/components/PhotoEditRequestStaff";
@@ -818,6 +819,7 @@ export default function AdminListingFile({
                         <div>
                           <p className="text-xs font-bold text-black">{entry.action}</p>
                           <p className="text-[10px] text-gray-400">{entry.by} · {entry.at}</p>
+                          {entry.details && <p className="text-[10px] text-gray-500 mt-0.5">{entry.details}</p>}
                         </div>
                       </div>
                     ))}
@@ -857,7 +859,7 @@ export default function AdminListingFile({
             <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-5">
               <h3 className={`${labelCls} mb-3`}>Client Studio</h3>
               <p className="text-[10px] text-gray-400 mb-3">Share this link with the client. It uses this project id and opens without a client login when Client Studio is on and Lock Studio is off.</p>
-              <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/studio/${id}`); toast.success("Studio link copied!"); }}
+              <button onClick={() => { navigator.clipboard.writeText(publicClientUrl(`/studio/${id}`)); toast.success("Studio link copied!"); }}
                 className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-800 transition-colors"
               >
                 <Copy className="w-3.5 h-3.5" /> Copy Studio Link

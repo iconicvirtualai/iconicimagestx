@@ -16,6 +16,7 @@ import {
 import { MoneyAmount } from "@/components/MoneyAmount";
 import { staffInvoicePath } from "@shared/staffInvoice";
 import { billingListInvoiceNumber, clientBillingInvoiceNumber } from "@shared/orderProjectInvoice";
+import { publicClientUrl } from "@shared/publicSiteUrl";
 
 const labelCls = "block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1";
 const inputCls = "w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30";
@@ -290,7 +291,7 @@ export default function AdminClientAccount() {
             {projects.filter((project) => project.studioEnabled).length === 0 ? <Empty text="No studio link is turned on for this client's projects." /> : (
               <div className="space-y-2">
                 {projects.filter((project) => project.studioEnabled).map((project) => (
-                  <Row key={project.id} title={recordAddress(project)} meta="Studio enabled" href={`/studio/${project.id}`} external />
+                  <Row key={project.id} title={recordAddress(project)} meta="Studio enabled" href={publicClientUrl(`/studio/${project.id}`)} external />
                 ))}
               </div>
             )}

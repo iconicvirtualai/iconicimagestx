@@ -10,9 +10,9 @@ import { requireCoordinator, requirePhotographer, requireStaff, requireAuth, typ
 import {
   ICONIC_DOWNLOAD_LOCK,
   clientGalleryDownloadsUnlocked,
-  publicMediaItem,
   type GalleryDownloadGate,
 } from "../../shared/paymentAccess";
+import { lockedClientGalleryMedia } from "../../shared/lockedClientMedia";
 import { recordAddressText } from "../../shared/addressText";
 import { galleryStatusNeedsReleaseGate } from "../../shared/galleryRelease";
 import { deliverGalleryToClient } from "../services/galleryDeliver";
@@ -104,12 +104,7 @@ function clientGalleryPayload(id: string, gallery: Record<string, unknown>, gate
     invoiceStatus: invoice?.status || null,
     lockTitle: unlocked ? null : ICONIC_DOWNLOAD_LOCK.title,
     lockMessage: unlocked ? null : ICONIC_DOWNLOAD_LOCK.message,
-    mediaItems: showMedia
-      ? media.map((item) => publicMediaItem(
-        item && typeof item === "object" ? item as Record<string, unknown> : {},
-        unlocked,
-      ))
-      : [],
+    mediaItems: showMedia ? lockedClientGalleryMedia(id, media, unlocked) : [],
   };
 }
 
@@ -380,7 +375,7 @@ router.patch("/:id/status", requireCoordinator, async (req, res) => {
 
 // ─── POST /api/galleries/:id/deliver — Deliver gallery to client ──────────────
 
-router.post("/:id/deliver", requireCoordinator, async (req, res) => {
+router.post("/:id/deliver", requireCoordinator, async (req: AuthenticatedRequest, res) => {
   try {
     if (!adminReady(res)) return;
     // Ignore body.downloadEnabled. The order screen always sends true, and
@@ -388,6 +383,11 @@ router.post("/:id/deliver", requireCoordinator, async (req, res) => {
     // or an existing staff release. Booking still does not collect up front.
     const result = await deliverGalleryToClient(req.params.id, {
       expiresInDays: Number(req.body?.expiresInDays),
+      actor: {
+        email: req.user?.email || null,
+        name: typeof req.user?.name === "string" ? req.user.name : null,
+        uid: req.user?.uid || null,
+      },
     });
     return res.json({ success: true, deliveryUrl: result.deliveryUrl });
   } catch (err) {

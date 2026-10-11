@@ -43,6 +43,8 @@ function createTransport() {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export type EmailDelivery = "sent" | "suppressed" | "allowlist";
+
 interface SendEmailOptions {
   to: string;
   bcc?: string;
@@ -64,7 +66,7 @@ interface SendEmailOptions {
 
 // ─── Main Send Function ───────────────────────────────────────────────────────
 
-export async function sendEmail(options: SendEmailOptions): Promise<{ sent: boolean }> {
+export async function sendEmail(options: SendEmailOptions): Promise<{ sent: boolean; delivery: EmailDelivery }> {
   const { template, audience, variables = {}, subject: subjectOverride, html, attachments } = options;
   let to = options.to;
   let bcc = options.bcc;
@@ -73,7 +75,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ sent: bool
 
   if (!to) {
     console.warn("[Email] No recipient specified, skipping.");
-    return { sent: false };
+    return { sent: false, delivery: "suppressed" };
   }
 
   // booking_received (order-received confirmation) always sends.
@@ -90,7 +92,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ sent: bool
       console.warn(
         `[Email] Suppressed '${template}' to ${to} — ${why} No message sent.`,
       );
-      return { sent: false };
+      return { sent: false, delivery: "suppressed" };
     }
     to = narrowed.to;
     cc = narrowed.cc;
@@ -145,7 +147,8 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ sent: bool
     });
 
     console.log(`[Email] Sent '${template}' to ${to}`);
-    return { sent: true };
+    const delivery: EmailDelivery = emailAllowed(template, process.env, audience) ? "sent" : "allowlist";
+    return { sent: true, delivery };
   } catch (err) {
     console.error(`[Email] Failed to send '${template}' to ${to}:`, err);
     throw err;
@@ -161,6 +164,13 @@ function interpolate(template: string, variables: Record<string, string>): strin
 }
 
 // ─── Fallback Templates (used if Firestore template missing) ──────────────────
+
+export function builtinEmailHtml(
+  type: string,
+  vars: Record<string, string>,
+): string {
+  return getFallbackTemplate(type, vars);
+}
 
 function getFallbackTemplate(
   type: string,
@@ -226,6 +236,7 @@ function getFallbackTemplate(
       <p>Your photos for <strong>${vars.address}</strong> are edited and waiting in your Iconic Images gallery.</p>
       ${vars.invoiceAmount ? `<p>Iconic Images invoices after the shoot. Downloads stay locked until the <strong>${vars.invoiceAmount}</strong> invoice is paid.</p>` : `<p>Downloads open from your gallery once that invoice is paid, or when our team releases the files.</p>`}
       <p><a href="${vars.galleryUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">View Gallery</a></p>
+      ${vars.paymentUrl ? `<p><a href="${vars.paymentUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Pay invoice</a></p>` : ""}
       <p style="color:#999;font-size:12px;">Gallery available for ${vars.expiresAt}.</p>
     `),
     invoice: base(`
@@ -233,7 +244,7 @@ function getFallbackTemplate(
       <p>Hi ${vars.clientName},</p>
       <p>Your invoice <strong>${vars.invoiceNumber}</strong> for <strong>${vars.amount}</strong> is ready.</p>
       ${vars.dueDate ? `<p>Due: <strong>${vars.dueDate}</strong></p>` : ""}
-      <p><a href="${vars.paymentUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Pay Invoice</a></p>
+      ${vars.paymentUrl ? `<p><a href="${vars.paymentUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Pay Invoice</a></p>` : ""}
     `),
     payment_receipt: base(`
       <h2>Payment received ✓</h2>

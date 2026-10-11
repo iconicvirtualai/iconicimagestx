@@ -151,10 +151,24 @@ export function galleryOffersDownload(item: ClientGalleryItem): boolean {
   return Boolean(galleryHttpUrl(item.url));
 }
 
+function isDisplayRouteUrl(value: unknown): boolean {
+  const url = galleryHttpUrl(value);
+  return Boolean(url && url.startsWith("/api/media/display/"));
+}
+
+/** A locked card can still show a resized image, a poster, or a Matterport embed. */
+function viewableWhileLocked(item: ClientGalleryItem): boolean {
+  if (isMatterportUrl(item)) return true;
+  if (isDisplayRouteUrl(item.url)) return true;
+  if (isDisplayRouteUrl(item.poster) || isDisplayRouteUrl(item.thumbnailUrl)) return true;
+  return false;
+}
+
 export function classifyClientGalleryItem(
   item: ClientGalleryItem,
 ): ClientGalleryKind {
-  if (item.locked === true || !hasAnyUrl(item)) return "locked";
+  if (item.locked === true && !viewableWhileLocked(item)) return "locked";
+  if (!hasAnyUrl(item) && !galleryPosterUrl(item)) return "locked";
 
   const type = text(item.type);
   const category =

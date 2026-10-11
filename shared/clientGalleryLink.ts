@@ -7,6 +7,8 @@
 import { addressText } from "./addressText.ts";
 import { frameFromListingImage } from "./iconicStudio";
 import { studioDownloadsUnlocked } from "./lockImpact.ts";
+import { ownerDisplayPath, signOwnerDisplayToken } from "./ownerDisplayGrant";
+import { listingOwnerDisplayItems, ownerPosterSource, publicShareMedia, publicShareVideos } from "./publicShare.ts";
 import {
   lockDownloadsOn,
   requirePaymentOn,
@@ -49,6 +51,10 @@ export interface StudioMedia {
   embedUrl?: string;
   poster?: string | null;
   thumbnailUrl?: string | null;
+  /** Public share display route. Same bytes as `url` for photos and floor plans. */
+  displayUrl?: string;
+  /** Share player hint. The UI sets controlsList=nodownload. */
+  noDownload?: true;
 }
 
 export interface StudioRevision {
@@ -140,6 +146,14 @@ function text(value: unknown): string {
 function httpUrl(value: unknown): string {
   const url = text(value);
   return url.startsWith("https://") || url.startsWith("http://") ? url : "";
+}
+
+/** http(s) or a same-site path. Used by the public sanitizer, not by owner file copies. */
+function shareableUrl(value: unknown): string {
+  const url = text(value);
+  if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
+  if (url.startsWith("/")) return url;
+  return httpUrl(url);
 }
 
 function galleryResult(doc: GalleryLinkDoc, via?: string): ClientGalleryLinkResult {
@@ -345,6 +359,11 @@ function pickReleasedGallery(listing: GalleryLinkDoc, related: GalleryLinkDoc[])
   return released[0] || null;
 }
 
+/** Same open/closed check as /studio. Related galleries only change the refusal copy. */
+export function publicStudioShareOpen(listing: GalleryLinkDoc): boolean {
+  return listingBlock(listing, []) === null;
+}
+
 function listingBlock(listing: GalleryLinkDoc, related: GalleryLinkDoc[]): ClientGalleryLinkResult | null {
   const linked = related
     .slice(0, 3)
@@ -400,17 +419,29 @@ function listingResult(listing: GalleryLinkDoc, related: GalleryLinkDoc[]): Clie
 }
 
 function publicProject(listing: GalleryLinkDoc, _related: GalleryLinkDoc[], notice: string | null): PublicStudioProject {
+  const safe = displaySafeShareMedia(listing);
   return {
     id: listing.id,
     address: addressOf(listing),
     agentName: agentNameOf(listing),
     services: servicesOf(listing),
-    images: publicImages(listing),
-    videos: publicVideos(listing),
-    tourUrl: publicTour(listing),
-    floorPlans: publicFloorPlans(listing),
+    images: safe.images,
+    videos: safe.videos,
+    tourUrl: safe.tourUrl,
+    floorPlans: safe.floorPlans,
     notice,
     view: "public",
+  };
+}
+
+/** Unsanitized media the owner and staff views already received. */
+function ownerMediaSource(listing: GalleryLinkDoc, pub: PublicStudioProject): PublicStudioProject {
+  return {
+    ...pub,
+    images: publicImages(listing),
+    videos: publicVideos(listing),
+    floorPlans: publicFloorPlans(listing),
+    tourUrl: publicTour(listing),
   };
 }
 
@@ -470,11 +501,11 @@ function walkOriginalNeedles(value: unknown, needles: string[], inheritedOrigina
   for (const key of FILE_URL_KEYS) pushNeedle(needles, row[key]);
   const original = inheritedOriginal || rowIsDeliveryOriginal(row);
   if (original) {
-    const fileUrls = new Set(FILE_URL_KEYS.map((key) => httpUrl(row[key])).filter(Boolean));
+    const fileUrls = new Set(FILE_URL_KEYS.map((key) => shareableUrl(row[key])).filter(Boolean));
     for (const key of ["url", "shareUrl", "embedUrl", "sourcePath", "storagePath", "path"] as const) {
       const raw = text(row[key]);
       if (!raw) continue;
-      const asUrl = httpUrl(raw);
+      const asUrl = shareableUrl(raw);
       if (asUrl && isStreamUrl(asUrl)) continue;
       // A separate web image can stay. The file fields and the original path cannot.
       if (
@@ -533,7 +564,7 @@ function scrubOriginals<T>(value: T, needles: string[]): T {
 
 function displayImageCandidate(row: Record<string, unknown>, needles: string[]): string {
   for (const key of DISPLAY_IMAGE_KEYS) {
-    const url = httpUrl(row[key]);
+    const url = shareableUrl(row[key]);
     if (!url || !isDisplayImageUrl(url) || containsOriginal(url, needles)) continue;
     return url;
   }
@@ -545,78 +576,122 @@ function lockedPhoto(row: Record<string, unknown>, index: number, needles: strin
   if (!frame || frame.raw) return null;
   const display = displayImageCandidate(row, needles);
   if (display) return { url: display, name: frame.name };
-  const url = httpUrl(row.url);
-  if (!url || !isDisplayImageUrl(url) || isOriginalFileUrl(url) || containsOriginal(url, needles)) return null;
-  if (isPrivateMedia(frame.path, frame.name, url) || isFullResOrMls(row) || row.downloadable === true) return null;
+  const url = [shareableUrl(row.url), shareableUrl(row.shareUrl)].find((candidate) =>
+    Boolean(candidate)
+    && isDisplayImageUrl(candidate)
+    && !isOriginalFileUrl(candidate)
+    && !containsOriginal(candidate, needles)
+  ) || "";
+  if (!url || isPrivateMedia(frame.path, frame.name, url) || isFullResOrMls(row) || row.downloadable === true) return null;
   return { url, name: frame.name };
-}
-
-function lockedVideo(row: Record<string, unknown>, needles: string[]): StudioMedia | null {
-  const name = mediaName(row, "Video");
-  let stream = "";
-  let streamKey: (typeof STREAM_KEYS)[number] | "" = "";
-  for (const key of STREAM_KEYS) {
-    const url = httpUrl(row[key]);
-    if (!url || !isStreamUrl(url) || containsOriginal(url, needles)) continue;
-    stream = url;
-    streamKey = key;
-    break;
-  }
-  const poster = displayImageCandidate(row, needles);
-  if (!name && !stream && !poster) return null;
-  const media: StudioMedia = { url: stream || null, name };
-  if (stream && streamKey) media[streamKey] = stream;
-  if (poster) {
-    media.poster = poster;
-    media.thumbnailUrl = poster;
-  }
-  return media;
 }
 
 /**
  * Owner view while downloads are locked.
- * `url` is a preview or stream, or null. Original files are not copied onto
- * any field, including posters, src, and nested variants.
+ * Photos, aerials, floor-plan images, and video posters use the owner display
+ * route. A stream may stay. MP4, zip, PDF, and raw file URLs do not.
  */
 function lockedOwnerMedia(listing: GalleryLinkDoc, pub: PublicStudioProject) {
   const needles = listingOriginalNeedles(listing);
+  const items = listingOwnerDisplayItems(listing);
+  const token = signOwnerDisplayToken({ scope: "listing", id: listing.id });
+  const href = (index: number) => (token && index >= 0 ? ownerDisplayPath(token, index) : "");
   const images: StudioMedia[] = [];
-  if (Array.isArray(listing.images)) {
-    listing.images.forEach((item, index) => {
-      const row = rowOf(item);
-      if (!row) return;
-      const photo = lockedPhoto(row, index, needles);
-      if (photo) images.push(photo);
-    });
-  }
+  const floorPlans: StudioMedia[] = [];
+  items.forEach((item, index) => {
+    const url = href(index);
+    if (!url) return;
+    const media = { url, displayUrl: url, name: item.name };
+    if (item.kind === "image") images.push(media);
+    if (item.kind === "floorPlan") floorPlans.push(media);
+  });
   const videos: StudioMedia[] = [];
   if (Array.isArray(listing.videos)) {
     for (const item of listing.videos) {
       const row = rowOf(item);
       if (!row) continue;
-      const video = lockedVideo(row, needles);
-      if (video) videos.push(video);
+      const name = mediaName(row, "Video");
+      let stream = "";
+      let streamKey: (typeof STREAM_KEYS)[number] | "" = "";
+      for (const key of STREAM_KEYS) {
+        const url = shareableUrl(row[key]);
+        if (!url || !isStreamUrl(url) || containsOriginal(url, needles)) continue;
+        stream = url;
+        streamKey = key;
+        break;
+      }
+      const posterAt = items.findIndex((entry) => entry.sourceUrl === ownerPosterSource(row));
+      const poster = href(posterAt);
+      if (!name && !stream && !poster) continue;
+      const media: StudioMedia = { url: stream || null, name };
+      if (stream && streamKey) media[streamKey] = stream;
+      if (poster) {
+        media.poster = poster;
+        media.thumbnailUrl = poster;
+        media.displayUrl = poster;
+      }
+      videos.push(media);
     }
   }
-  const floorPlans: StudioMedia[] = [];
-  for (const group of [listing.floorplans, listing.floorPlans]) {
-    if (!Array.isArray(group)) continue;
-    group.forEach((item, index) => {
-      const row = rowOf(item);
-      if (!row) return;
-      const plan = lockedPhoto(row, index, needles);
-      if (plan) floorPlans.push(plan);
-    });
-  }
-  const tourUrl = pub.tourUrl && !isOriginalFileUrl(pub.tourUrl) && !containsOriginal(pub.tourUrl, needles)
+  const embedded = embedTour(listing, needles);
+  const listed = pub.tourUrl && !isOriginalFileUrl(pub.tourUrl) && !containsOriginal(pub.tourUrl, needles)
     ? pub.tourUrl
     : "";
   return scrubOriginals({
     images: images.slice(0, 200),
     videos: videos.slice(0, 40),
     floorPlans: floorPlans.slice(0, 40),
-    tourUrl,
+    tourUrl: embedded || listed,
   }, needles);
+}
+
+/** Matterport and other non-file embeds stored on listing.tours. */
+function embedTour(listing: GalleryLinkDoc, needles: string[]): string {
+  const groups = [listing.tours, listing.tourLinks];
+  for (const group of groups) {
+    if (!Array.isArray(group)) continue;
+    for (const item of group) {
+      const row = rowOf(item);
+      if (!row) continue;
+      for (const key of ["embedUrl", "url", "shareUrl"] as const) {
+        const url = shareableUrl(row[key]);
+        if (!url || isOriginalFileUrl(url) || containsOriginal(url, needles)) continue;
+        const type = text(row.type).toLowerCase();
+        if (type === "matterport" || type === "tour" || /matterport\.com/i.test(url)) return url;
+      }
+    }
+  }
+  return "";
+}
+
+/**
+ * Public share media. Photos, aerials, and floor-plan images point at the
+ * display route. Video files stay off until the route applies playback.
+ */
+function displaySafeShareMedia(listing: GalleryLinkDoc) {
+  const share = publicShareMedia(listing);
+  const needles = listingOriginalNeedles(listing);
+  const tour = publicTour(listing);
+  const safeTour = tour && !isOriginalFileUrl(tour) && !containsOriginal(tour, needles) ? tour : "";
+  return {
+    images: share.images,
+    floorPlans: share.floorPlans,
+    videos: publicShareVideos(listing, false),
+    tourUrl: safeTour || embedTour(listing, needles),
+  };
+}
+
+/** Display image for a public presentation photo. Empty when the only file is an original. */
+export function displaySafeImageUrl(row: Record<string, unknown>, needles: string[]): string {
+  const url = text(row.url) || text(row.shareUrl);
+  const photo = lockedPhoto(url ? { ...row, url } : row, 0, needles);
+  return typeof photo?.url === "string" ? photo.url : "";
+}
+
+export function originalNeedlesFor(rows: unknown[]): string[] {
+  const needles: string[] = [];
+  for (const row of rows) walkOriginalNeedles(row, needles);
+  return [...new Set(needles)];
 }
 
 export interface OwnerStudioGate {
@@ -663,8 +738,9 @@ export function ownerStudioProject(
     galleries: [],
     invoice: authoritativeInvoice ? invoiceDoc : null,
   });
+  const source = ownerMediaSource(listing, pub);
   const project: OwnerStudioProject = {
-    ...pub,
+    ...source,
     view: "owner",
     clientName: text(listing.clientName),
     clientEmail: text(listing.clientEmail),
@@ -674,13 +750,13 @@ export function ownerStudioProject(
     requirePayment: requirePaymentOn(listing.requirePayment),
     downloadsUnlocked,
     invoice,
-    images: downloadsUnlocked ? ownerImageDownloads(listing, pub.images) : pub.images,
+    images: downloadsUnlocked ? ownerImageDownloads(listing, source.images) : source.images,
     files: downloadsUnlocked ? ownerFiles(listing) : [],
   };
   if (downloadsUnlocked || gate.staffAccess === true) return project;
   return {
     ...project,
-    ...lockedOwnerMedia(listing, pub),
+    ...lockedOwnerMedia(listing, source),
     files: [],
   };
 }

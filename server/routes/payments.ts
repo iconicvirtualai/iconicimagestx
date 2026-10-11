@@ -16,6 +16,8 @@ import { bookingDateLabel } from "../../shared/clientHome";
 import { amountStillDue, invoiceAllowsDownload, invoiceIdFromSquareNote, squarePaymentNote } from "../../shared/paymentAccess";
 import { invoiceEmailNumber, invoicePageInvoiceNumber, receiptEmailNumber } from "../../shared/orderProjectInvoice";
 import { fetchPublishedSquareInvoiceUrl, resolveSquareCheckoutUrl, squareApiBaseUrl } from "../../shared/squareInvoice";
+import { clientInvoiceUrl, isGuessableInvoiceId } from "../../shared/invoicePayLink";
+import { publicClientUrl } from "../../shared/publicSiteUrl";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -26,6 +28,19 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
 
 function appUrl() {
   return process.env.APP_URL || "https://iconicimagestx.com";
+}
+
+/** Pay link in client email. Empty when the invoice is paid, comped, or a guessable id with no token. */
+function emailedPayUrl(invoiceId: string, invoice: Record<string, unknown>): string {
+  return clientInvoiceUrl({ id: invoiceId, payToken: invoice.payToken, status: invoice.status }) || "";
+}
+
+/** Stored client invoice URL. Guessable ids are included only when a pay token is present. */
+function storedPayUrl(invoiceId: string, invoice: Record<string, unknown>): string {
+  const emailed = emailedPayUrl(invoiceId, invoice);
+  if (emailed) return emailed;
+  if (isGuessableInvoiceId(invoiceId)) return "";
+  return publicClientUrl(`/invoice/${encodeURIComponent(invoiceId)}`);
 }
 
 function stripeReady() {
@@ -269,7 +284,7 @@ router.post("/send-invoice", requireCoordinator, async (req, res) => {
 
     const invoice = invoiceDoc.data()!;
     const provider = invoiceProvider(invoice);
-    const paymentUrl = `${appUrl()}/invoice/${invoiceId}`;
+    const paymentUrl = emailedPayUrl(invoiceId, invoice);
 
     await sendEmail({
       to: invoice.clientEmail,
@@ -290,7 +305,7 @@ router.post("/send-invoice", requireCoordinator, async (req, res) => {
     await invoiceDoc.ref.update({
       status: "sent",
       paymentProvider: provider,
-      paymentUrl,
+      ...(paymentUrl ? { paymentUrl } : {}),
       sentAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -374,7 +389,7 @@ router.get("/invoice/:id", async (req: Request, res: Response) => {
       squarePaymentId: invoice.squarePaymentId || null,
       squarePaymentLinkId: invoice.squarePaymentLinkId || null,
       galleryId: invoice.galleryId || null,
-      paymentUrl: invoice.paymentUrl || `${appUrl()}/invoice/${invoiceDoc.id}`,
+      paymentUrl: storedPayUrl(invoiceDoc.id, invoice),
       canPayOnline: provider === "stripe" ? stripeReady() : squareReady(),
     });
   } catch (err) {
@@ -397,8 +412,8 @@ router.post("/invoice/:id/checkout", async (req: Request, res: Response) => {
         paid: true,
         provider,
         redirectUrl: invoice.galleryId
-          ? `${appUrl()}/gallery/${invoice.galleryId}`
-          : `${appUrl()}/invoice/${invoiceDoc.id}`,
+          ? publicClientUrl(`/gallery/${invoice.galleryId}`)
+          : publicClientUrl(`/invoice/${invoiceDoc.id}`),
       });
     }
 
@@ -449,7 +464,7 @@ router.post("/invoice/:id/checkout", async (req: Request, res: Response) => {
             location_id: process.env.SQUARE_LOCATION_ID,
           },
           checkout_options: {
-            redirect_url: `${appUrl()}/invoice/${invoiceDoc.id}?paid=1`,
+            redirect_url: publicClientUrl(`/invoice/${invoiceDoc.id}?paid=1`),
           },
           pre_populated_data: {
             buyer_email: invoice.clientEmail || undefined,
@@ -468,7 +483,7 @@ router.post("/invoice/:id/checkout", async (req: Request, res: Response) => {
       await invoiceDoc.ref.update({
         status: "sent",
         paymentProvider: "square",
-        paymentUrl: link?.url || `${appUrl()}/invoice/${invoiceDoc.id}`,
+        paymentUrl: link?.url || storedPayUrl(invoiceDoc.id, invoice),
         squarePaymentLinkId: link?.id || null,
         squareOrderId: link?.order_id || null,
         sentAt: invoice.sentAt || admin.firestore.FieldValue.serverTimestamp(),
@@ -512,14 +527,15 @@ router.post("/invoice/:id/checkout", async (req: Request, res: Response) => {
         orderId: invoice.orderId || "",
         clientId: invoice.clientId || "",
       },
-      success_url: `${appUrl()}/invoice/${invoiceDoc.id}?paid=1`,
-      cancel_url: `${appUrl()}/invoice/${invoiceDoc.id}?cancelled=1`,
+      success_url: publicClientUrl(`/invoice/${invoiceDoc.id}?paid=1`),
+      cancel_url: publicClientUrl(`/invoice/${invoiceDoc.id}?cancelled=1`),
     });
 
+    const stripePayUrl = storedPayUrl(invoiceDoc.id, invoice);
     await invoiceDoc.ref.update({
       status: "sent",
       paymentProvider: "stripe",
-      paymentUrl: `${appUrl()}/invoice/${invoiceDoc.id}`,
+      ...(stripePayUrl ? { paymentUrl: stripePayUrl } : {}),
       stripeCheckoutSessionId: session.id,
       sentAt: invoice.sentAt || admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
