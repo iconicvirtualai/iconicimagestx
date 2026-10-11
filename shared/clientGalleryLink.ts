@@ -6,7 +6,12 @@
 
 import { addressText } from "./addressText.ts";
 import { frameFromListingImage } from "./iconicStudio";
-import { clientGalleryDownloadsUnlocked, lockDownloadsOn, requirePaymentOn } from "./paymentAccess";
+import {
+  clientGalleryDownloadsUnlocked,
+  lockDownloadsOn,
+  requirePaymentOn,
+  type InvoiceLike,
+} from "./paymentAccess";
 
 export const RELEASED_GALLERY_STATUSES = ["delivered", "approved"] as const;
 
@@ -33,10 +38,17 @@ export interface ClientGalleryLinkInput {
 }
 
 export interface StudioMedia {
-  url: string;
+  /** Display or stream URL. Null when the only file on hand is an original the client cannot have yet. */
+  url: string | null;
   name: string;
   /** Full-res or MLS file. Present only on the owner view, and only when downloads are unlocked. */
   downloadUrl?: string;
+  streamUrl?: string;
+  previewUrl?: string;
+  playbackUrl?: string;
+  embedUrl?: string;
+  poster?: string | null;
+  thumbnailUrl?: string | null;
 }
 
 export interface StudioRevision {
@@ -402,10 +414,224 @@ function publicProject(listing: GalleryLinkDoc, _related: GalleryLinkDoc[], noti
   };
 }
 
+const ORIGINAL_FILE = /\.(mp4|m4v|mov|webm|avi|mkv|zip|pdf|dng|cr2|cr3|nef|nrw|arw|srf|sr2|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic|heif)(\?|#|$)/i;
+const DISPLAY_IMAGE = /\.(jpe?g|png|webp|gif)(\?|#|$)/i;
+const FILE_URL_KEYS = ["downloadUrl", "fileUrl", "originalUrl", "fullResUrl", "mlsUrl", "zipUrl", "printUrl", "reelUrl", "mp4Url", "rawUrl", "src"] as const;
+const STREAM_KEYS = ["streamUrl", "previewUrl", "playbackUrl", "embedUrl"] as const;
+const DISPLAY_IMAGE_KEYS = ["previewUrl", "displayUrl", "webUrl", "thumbnailUrl", "poster", "posterUrl"] as const;
+
+function isOriginalFileUrl(url: string): boolean {
+  return ORIGINAL_FILE.test(url.split("#")[0]);
+}
+
+function isDisplayImageUrl(url: string): boolean {
+  return DISPLAY_IMAGE.test(url.split("#")[0]);
+}
+
+/** A stream the player can show without handing over the original file. */
+function isStreamUrl(url: string): boolean {
+  if (!url || isOriginalFileUrl(url)) return false;
+  if (/\.m3u8(\?|#|$)/i.test(url)) return true;
+  return /(youtube\.com|youtu\.be|vimeo\.com|player\.vimeo\.com|mux\.com|stream\.mux|cloudflarestream\.com)/i.test(url);
+}
+
+function isFullResOrMls(row: Record<string, unknown>): boolean {
+  const category = text(row.category).toLowerCase();
+  const type = text(row.type).toLowerCase();
+  if (category === "mls" || category === "full-res" || category === "fullres" || type === "mls") return true;
+  const label = `${text(row.fileName)} ${text(row.name)} ${text(row.title)} ${text(row.path)} ${text(row.storagePath)}`.toLowerCase();
+  if (/(^|[^a-z0-9])(full[\s_-]?res|mls)([^a-z0-9]|$)/.test(label)) return true;
+  return /\/(mls|full)\//.test(label);
+}
+
+function rowIsDeliveryOriginal(row: Record<string, unknown>): boolean {
+  if (row.downloadable === true || isFullResOrMls(row)) return true;
+  const type = text(row.type).toLowerCase();
+  if (type === "video" || type === "reel" || type === "file") return true;
+  const content = text(row.contentType).toLowerCase();
+  if (content.startsWith("video/") || content === "application/zip" || content === "application/pdf") return true;
+  const candidates = [row.url, row.shareUrl, row.embedUrl, ...FILE_URL_KEYS.map((key) => row[key])];
+  return candidates.some((value) => isOriginalFileUrl(httpUrl(value) || text(value)));
+}
+
+function pushNeedle(needles: string[], value: unknown) {
+  const raw = text(value);
+  if (raw.length >= 12) needles.push(raw);
+}
+
+/** Paths and file URLs that must not survive on a locked owner payload. */
+function walkOriginalNeedles(value: unknown, needles: string[], inheritedOriginal = false) {
+  if (Array.isArray(value)) {
+    for (const item of value) walkOriginalNeedles(item, needles, inheritedOriginal);
+    return;
+  }
+  const row = rowOf(value);
+  if (!row) return;
+  for (const key of FILE_URL_KEYS) pushNeedle(needles, row[key]);
+  const original = inheritedOriginal || rowIsDeliveryOriginal(row);
+  if (original) {
+    const fileUrls = new Set(FILE_URL_KEYS.map((key) => httpUrl(row[key])).filter(Boolean));
+    for (const key of ["url", "shareUrl", "embedUrl", "sourcePath", "storagePath", "path"] as const) {
+      const raw = text(row[key]);
+      if (!raw) continue;
+      const asUrl = httpUrl(raw);
+      if (asUrl && isStreamUrl(asUrl)) continue;
+      // A separate web image can stay. The file fields and the original path cannot.
+      if (
+        !inheritedOriginal
+        && (key === "url" || key === "shareUrl")
+        && asUrl
+        && isDisplayImageUrl(asUrl)
+        && !fileUrls.has(asUrl)
+        && !isFullResOrMls(row)
+        && row.downloadable !== true
+      ) continue;
+      pushNeedle(needles, raw);
+    }
+    for (const key of DISPLAY_IMAGE_KEYS) {
+      const url = httpUrl(row[key]);
+      if (!url || isDisplayImageUrl(url) || isStreamUrl(url)) continue;
+      pushNeedle(needles, url);
+    }
+  }
+  for (const child of Object.values(row)) {
+    if (child && typeof child === "object") walkOriginalNeedles(child, needles, original);
+  }
+}
+
+function listingOriginalNeedles(listing: GalleryLinkDoc): string[] {
+  const needles: string[] = [];
+  for (const key of ["zipUrl", "downloadUrl", "mlsUrl", "mlsPackageUrl", "fullResUrl", "fileUrl", "originalUrl", "mp4Url"]) {
+    pushNeedle(needles, listing[key]);
+  }
+  for (const group of [listing.images, listing.videos, listing.files, listing.downloads, listing.mlsFiles, listing.floorplans, listing.floorPlans, listing.tours]) {
+    if (!Array.isArray(group)) continue;
+    for (const item of group) walkOriginalNeedles(item, needles);
+  }
+  return [...new Set(needles)];
+}
+
+function containsOriginal(value: string, needles: string[]): boolean {
+  return needles.some((needle) => value === needle || value.includes(needle));
+}
+
+function scrubOriginals<T>(value: T, needles: string[]): T {
+  const walk = (input: unknown): unknown => {
+    if (typeof input === "string") return containsOriginal(input, needles) ? null : input;
+    if (Array.isArray(input)) return input.map(walk);
+    if (input && typeof input === "object") {
+      const out: Record<string, unknown> = {};
+      for (const [key, child] of Object.entries(input as Record<string, unknown>)) {
+        out[key] = walk(child);
+      }
+      return out;
+    }
+    return input;
+  };
+  return walk(value) as T;
+}
+
+function displayImageCandidate(row: Record<string, unknown>, needles: string[]): string {
+  for (const key of DISPLAY_IMAGE_KEYS) {
+    const url = httpUrl(row[key]);
+    if (!url || !isDisplayImageUrl(url) || containsOriginal(url, needles)) continue;
+    return url;
+  }
+  return "";
+}
+
+function lockedPhoto(row: Record<string, unknown>, index: number, needles: string[]): StudioMedia | null {
+  const frame = frameFromListingImage(row, index);
+  if (!frame || frame.raw) return null;
+  const display = displayImageCandidate(row, needles);
+  if (display) return { url: display, name: frame.name };
+  const url = httpUrl(row.url);
+  if (!url || !isDisplayImageUrl(url) || isOriginalFileUrl(url) || containsOriginal(url, needles)) return null;
+  if (isPrivateMedia(frame.path, frame.name, url) || isFullResOrMls(row) || row.downloadable === true) return null;
+  return { url, name: frame.name };
+}
+
+function lockedVideo(row: Record<string, unknown>, needles: string[]): StudioMedia | null {
+  const name = mediaName(row, "Video");
+  let stream = "";
+  let streamKey: (typeof STREAM_KEYS)[number] | "" = "";
+  for (const key of STREAM_KEYS) {
+    const url = httpUrl(row[key]);
+    if (!url || !isStreamUrl(url) || containsOriginal(url, needles)) continue;
+    stream = url;
+    streamKey = key;
+    break;
+  }
+  const poster = displayImageCandidate(row, needles);
+  if (!name && !stream && !poster) return null;
+  const media: StudioMedia = { url: stream || null, name };
+  if (stream && streamKey) media[streamKey] = stream;
+  if (poster) {
+    media.poster = poster;
+    media.thumbnailUrl = poster;
+  }
+  return media;
+}
+
+/**
+ * Owner view while downloads are locked.
+ * `url` is a preview or stream, or null. Original files are not copied onto
+ * any field, including posters, src, and nested variants.
+ */
+function lockedOwnerMedia(listing: GalleryLinkDoc, pub: PublicStudioProject) {
+  const needles = listingOriginalNeedles(listing);
+  const images: StudioMedia[] = [];
+  if (Array.isArray(listing.images)) {
+    listing.images.forEach((item, index) => {
+      const row = rowOf(item);
+      if (!row) return;
+      const photo = lockedPhoto(row, index, needles);
+      if (photo) images.push(photo);
+    });
+  }
+  const videos: StudioMedia[] = [];
+  if (Array.isArray(listing.videos)) {
+    for (const item of listing.videos) {
+      const row = rowOf(item);
+      if (!row) continue;
+      const video = lockedVideo(row, needles);
+      if (video) videos.push(video);
+    }
+  }
+  const floorPlans: StudioMedia[] = [];
+  for (const group of [listing.floorplans, listing.floorPlans]) {
+    if (!Array.isArray(group)) continue;
+    group.forEach((item, index) => {
+      const row = rowOf(item);
+      if (!row) return;
+      const plan = lockedPhoto(row, index, needles);
+      if (plan) floorPlans.push(plan);
+    });
+  }
+  const tourUrl = pub.tourUrl && !isOriginalFileUrl(pub.tourUrl) && !containsOriginal(pub.tourUrl, needles)
+    ? pub.tourUrl
+    : "";
+  return scrubOriginals({
+    images: images.slice(0, 200),
+    videos: videos.slice(0, 40),
+    floorPlans: floorPlans.slice(0, 40),
+    tourUrl,
+  }, needles);
+}
+
 export interface OwnerStudioGate {
-  invoice?: { status?: string } | null;
+  /**
+   * Linked invoice document. When this key is present, including null,
+   * listing.invoiceStatus is not a payment signal.
+   */
+  invoice?: InvoiceLike;
   downloadEnabled?: unknown;
   downloadsReleased?: unknown;
+  /**
+   * Admin, coordinator, and assigned staff keep the owner payload they
+   * already receive. The owning client's locked view does not.
+   */
+  staffAccess?: boolean;
 }
 
 /** Private delivery view. Download URLs stay off until the existing payment lock opens. */
@@ -414,15 +640,21 @@ export function ownerStudioProject(
   pub: PublicStudioProject,
   gate: OwnerStudioGate = {},
 ): OwnerStudioProject {
-  const invoiceStatus = text(gate.invoice?.status) || text(invoiceOf(listing)?.status);
+  const authoritativeInvoice = Object.prototype.hasOwnProperty.call(gate, "invoice");
+  const invoiceDoc = authoritativeInvoice && gate.invoice && typeof gate.invoice === "object"
+    ? gate.invoice as Record<string, unknown>
+    : null;
+  const invoiceStatus = authoritativeInvoice
+    ? text(invoiceDoc?.status)
+    : text(invoiceOf(listing)?.status);
   const invoice = invoiceStatus ? { status: invoiceStatus } : null;
   const downloadsUnlocked = clientGalleryDownloadsUnlocked({
-    invoice,
+    invoice: authoritativeInvoice ? invoiceDoc : (invoiceStatus ? { status: invoiceStatus } : null),
     downloadEnabled: gate.downloadEnabled ?? listing.downloadEnabled,
     downloadsReleased: gate.downloadsReleased ?? listing.downloadsReleased,
     lockDownloads: listing.lockDownloads,
   });
-  return {
+  const project: OwnerStudioProject = {
     ...pub,
     view: "owner",
     clientName: text(listing.clientName),
@@ -435,6 +667,12 @@ export function ownerStudioProject(
     invoice,
     images: downloadsUnlocked ? ownerImageDownloads(listing, pub.images) : pub.images,
     files: downloadsUnlocked ? ownerFiles(listing) : [],
+  };
+  if (downloadsUnlocked || gate.staffAccess === true) return project;
+  return {
+    ...project,
+    ...lockedOwnerMedia(listing, pub),
+    files: [],
   };
 }
 

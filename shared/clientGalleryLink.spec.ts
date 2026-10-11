@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { decideClientGalleryLink, ownerStudioProject, type GalleryLinkDoc } from "./clientGalleryLink";
 
+function stringValues(value: unknown, found: string[] = []): string[] {
+  if (typeof value === "string") found.push(value);
+  else if (Array.isArray(value)) value.forEach((item) => stringValues(item, found));
+  else if (value && typeof value === "object") {
+    Object.values(value as Record<string, unknown>).forEach((item) => stringValues(item, found));
+  }
+  return found;
+}
+
 const LISTING_ID = "V92oe4gWihszc95tEcVQ";
 
 function listing(overrides: Record<string, unknown> = {}): GalleryLinkDoc {
@@ -215,6 +224,100 @@ describe("decideClientGalleryLink", () => {
     const releasedByStaff = ownerStudioProject(staffRelease, staffOpen.project);
     expect(releasedByStaff.lockDownloads).toBe(false);
     expect(releasedByStaff.downloadsUnlocked).toBe(true);
+  });
+
+  it("strips original files from the locked owner view and ignores a stale paid status", () => {
+    const rawMp4 = "https://cdn.example/walkthrough-raw.mp4";
+    const fullRes = "https://cdn.example/luxury-exterior-full.jpg";
+    const source = listing({
+      invoiceStatus: "paid",
+      lockDownloads: true,
+      images: [
+        {
+          url: "https://cdn.example/final.jpg",
+          name: "front.jpg",
+          path: `listings/${LISTING_ID}/finals/1_front.jpg`,
+          downloadUrl: "https://cdn.example/front-full.jpg",
+          fileUrl: "https://cdn.example/front-file.jpg",
+          originalUrl: "https://cdn.example/front-original.jpg",
+          fullResUrl: fullRes,
+          mlsUrl: "https://cdn.example/front-mls.jpg",
+          mp4Url: rawMp4,
+          src: "https://cdn.example/front-src.jpg",
+          variants: { original: { url: "https://cdn.example/nested-full-res.jpg", src: "https://cdn.example/nested-src.jpg" } },
+        },
+      ],
+      videos: [
+        {
+          url: rawMp4,
+          name: "Walkthrough",
+          fileUrl: "https://cdn.example/walkthrough-file.mp4",
+          originalUrl: "https://cdn.example/walkthrough-original.mp4",
+          downloadUrl: "https://cdn.example/walkthrough-download.mp4",
+          mp4Url: "https://cdn.example/walkthrough-mp4.mp4",
+          src: "https://cdn.example/walkthrough-src.mp4",
+          poster: rawMp4,
+          thumbnailUrl: "https://cdn.example/walkthrough-poster.jpg",
+          streamUrl: "https://cdn.example/walkthrough/stream.m3u8",
+          variants: [{ url: "https://cdn.example/walkthrough-variant.mp4" }],
+        },
+        {
+          url: "https://cdn.example/snap-reel.mp4",
+          name: "Snap reel",
+          type: "reel",
+          previewUrl: "https://cdn.example/reel/preview.m3u8",
+        },
+      ],
+    });
+    const opened = decideClientGalleryLink({ ...empty, id: LISTING_ID, listing: source });
+    if (opened.ok !== true || opened.kind !== "listing" || opened.project.view !== "public") {
+      throw new Error("expected the listing studio");
+    }
+    const locked = ownerStudioProject(source, opened.project, {
+      invoice: { status: "unpaid", total: 1, amountPaid: 0, amountDue: 1 },
+    });
+    expect(locked.downloadsUnlocked).toBe(false);
+    expect(locked.invoice).toEqual({ status: "unpaid" });
+    expect(locked.files).toEqual([]);
+    expect(locked.images.map((image) => image.url)).toEqual(["https://cdn.example/final.jpg"]);
+    expect(locked.videos.map((video) => video.url)).toEqual([
+      "https://cdn.example/walkthrough/stream.m3u8",
+      "https://cdn.example/reel/preview.m3u8",
+    ]);
+    expect(locked.videos[0]?.streamUrl).toBe("https://cdn.example/walkthrough/stream.m3u8");
+    expect(locked.videos[0]?.poster).toBe("https://cdn.example/walkthrough-poster.jpg");
+    expect(locked.videos[0]?.thumbnailUrl).toBe("https://cdn.example/walkthrough-poster.jpg");
+    const originals = [
+      rawMp4,
+      fullRes,
+      "https://cdn.example/front-full.jpg",
+      "https://cdn.example/front-file.jpg",
+      "https://cdn.example/front-original.jpg",
+      "https://cdn.example/front-mls.jpg",
+      "https://cdn.example/front-src.jpg",
+      "https://cdn.example/nested-full-res.jpg",
+      "https://cdn.example/nested-src.jpg",
+      "https://cdn.example/walkthrough-file.mp4",
+      "https://cdn.example/walkthrough-original.mp4",
+      "https://cdn.example/walkthrough-download.mp4",
+      "https://cdn.example/walkthrough-mp4.mp4",
+      "https://cdn.example/walkthrough-src.mp4",
+      "https://cdn.example/walkthrough-variant.mp4",
+      "https://cdn.example/snap-reel.mp4",
+      "https://cdn.example/delivery.zip",
+      "https://cdn.example/mls-full.jpg",
+    ];
+    const values = stringValues(locked);
+    for (const piece of originals) {
+      expect(values.some((value) => value === piece || value.includes(piece))).toBe(false);
+    }
+
+    const staff = ownerStudioProject(source, opened.project, {
+      invoice: { status: "unpaid", total: 1, amountPaid: 0, amountDue: 1 },
+      staffAccess: true,
+    });
+    expect(staff.downloadsUnlocked).toBe(false);
+    expect(JSON.stringify(staff.videos)).toContain(rawMp4);
   });
 
   it("says when the project exists but Client Studio is off or locked", () => {

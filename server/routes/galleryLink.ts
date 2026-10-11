@@ -203,11 +203,12 @@ async function finishGalleryLink(
     relatedForListing(listing),
   ]);
   if (result.project.view !== "public") return result;
-  const status = typeof invoice?.status === "string" ? invoice.status : "";
+  // The invoice document decides paid. A copied listing.invoiceStatus must not.
   const project: OwnerStudioProject = ownerStudioProject(listing, result.project, {
-    invoice: status ? { status } : null,
+    invoice: invoice ?? null,
     downloadEnabled: listing.downloadEnabled === true || related.some((doc) => doc.downloadEnabled === true),
     downloadsReleased: listing.downloadsReleased === true || related.some((doc) => doc.downloadsReleased === true),
+    staffAccess: Boolean(caller?.staffRole),
   });
   return { ...result, project };
 }

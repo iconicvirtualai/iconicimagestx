@@ -6386,16 +6386,190 @@ function publicProject(listing, _related, notice) {
     view: "public"
   };
 }
+const ORIGINAL_FILE = /\.(mp4|m4v|mov|webm|avi|mkv|zip|pdf|dng|cr2|cr3|nef|nrw|arw|srf|sr2|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic|heif)(\?|#|$)/i;
+const DISPLAY_IMAGE = /\.(jpe?g|png|webp|gif)(\?|#|$)/i;
+const FILE_URL_KEYS = ["downloadUrl", "fileUrl", "originalUrl", "fullResUrl", "mlsUrl", "zipUrl", "printUrl", "reelUrl", "mp4Url", "rawUrl", "src"];
+const STREAM_KEYS = ["streamUrl", "previewUrl", "playbackUrl", "embedUrl"];
+const DISPLAY_IMAGE_KEYS = ["previewUrl", "displayUrl", "webUrl", "thumbnailUrl", "poster", "posterUrl"];
+function isOriginalFileUrl(url) {
+  return ORIGINAL_FILE.test(url.split("#")[0]);
+}
+function isDisplayImageUrl(url) {
+  return DISPLAY_IMAGE.test(url.split("#")[0]);
+}
+function isStreamUrl(url) {
+  if (!url || isOriginalFileUrl(url)) return false;
+  if (/\.m3u8(\?|#|$)/i.test(url)) return true;
+  return /(youtube\.com|youtu\.be|vimeo\.com|player\.vimeo\.com|mux\.com|stream\.mux|cloudflarestream\.com)/i.test(url);
+}
+function isFullResOrMls(row) {
+  const category = text$6(row.category).toLowerCase();
+  const type = text$6(row.type).toLowerCase();
+  if (category === "mls" || category === "full-res" || category === "fullres" || type === "mls") return true;
+  const label = `${text$6(row.fileName)} ${text$6(row.name)} ${text$6(row.title)} ${text$6(row.path)} ${text$6(row.storagePath)}`.toLowerCase();
+  if (/(^|[^a-z0-9])(full[\s_-]?res|mls)([^a-z0-9]|$)/.test(label)) return true;
+  return /\/(mls|full)\//.test(label);
+}
+function rowIsDeliveryOriginal(row) {
+  if (row.downloadable === true || isFullResOrMls(row)) return true;
+  const type = text$6(row.type).toLowerCase();
+  if (type === "video" || type === "reel" || type === "file") return true;
+  const content = text$6(row.contentType).toLowerCase();
+  if (content.startsWith("video/") || content === "application/zip" || content === "application/pdf") return true;
+  const candidates = [row.url, row.shareUrl, row.embedUrl, ...FILE_URL_KEYS.map((key) => row[key])];
+  return candidates.some((value) => isOriginalFileUrl(httpUrl(value) || text$6(value)));
+}
+function pushNeedle(needles, value) {
+  const raw = text$6(value);
+  if (raw.length >= 12) needles.push(raw);
+}
+function walkOriginalNeedles(value, needles, inheritedOriginal = false) {
+  if (Array.isArray(value)) {
+    for (const item of value) walkOriginalNeedles(item, needles, inheritedOriginal);
+    return;
+  }
+  const row = rowOf(value);
+  if (!row) return;
+  for (const key of FILE_URL_KEYS) pushNeedle(needles, row[key]);
+  const original = inheritedOriginal || rowIsDeliveryOriginal(row);
+  if (original) {
+    const fileUrls = new Set(FILE_URL_KEYS.map((key) => httpUrl(row[key])).filter(Boolean));
+    for (const key of ["url", "shareUrl", "embedUrl", "sourcePath", "storagePath", "path"]) {
+      const raw = text$6(row[key]);
+      if (!raw) continue;
+      const asUrl = httpUrl(raw);
+      if (asUrl && isStreamUrl(asUrl)) continue;
+      if (!inheritedOriginal && (key === "url" || key === "shareUrl") && asUrl && isDisplayImageUrl(asUrl) && !fileUrls.has(asUrl) && !isFullResOrMls(row) && row.downloadable !== true) continue;
+      pushNeedle(needles, raw);
+    }
+    for (const key of DISPLAY_IMAGE_KEYS) {
+      const url = httpUrl(row[key]);
+      if (!url || isDisplayImageUrl(url) || isStreamUrl(url)) continue;
+      pushNeedle(needles, url);
+    }
+  }
+  for (const child of Object.values(row)) {
+    if (child && typeof child === "object") walkOriginalNeedles(child, needles, original);
+  }
+}
+function listingOriginalNeedles(listing) {
+  const needles = [];
+  for (const key of ["zipUrl", "downloadUrl", "mlsUrl", "mlsPackageUrl", "fullResUrl", "fileUrl", "originalUrl", "mp4Url"]) {
+    pushNeedle(needles, listing[key]);
+  }
+  for (const group of [listing.images, listing.videos, listing.files, listing.downloads, listing.mlsFiles, listing.floorplans, listing.floorPlans, listing.tours]) {
+    if (!Array.isArray(group)) continue;
+    for (const item of group) walkOriginalNeedles(item, needles);
+  }
+  return [...new Set(needles)];
+}
+function containsOriginal(value, needles) {
+  return needles.some((needle) => value === needle || value.includes(needle));
+}
+function scrubOriginals(value, needles) {
+  const walk = (input) => {
+    if (typeof input === "string") return containsOriginal(input, needles) ? null : input;
+    if (Array.isArray(input)) return input.map(walk);
+    if (input && typeof input === "object") {
+      const out = {};
+      for (const [key, child] of Object.entries(input)) {
+        out[key] = walk(child);
+      }
+      return out;
+    }
+    return input;
+  };
+  return walk(value);
+}
+function displayImageCandidate(row, needles) {
+  for (const key of DISPLAY_IMAGE_KEYS) {
+    const url = httpUrl(row[key]);
+    if (!url || !isDisplayImageUrl(url) || containsOriginal(url, needles)) continue;
+    return url;
+  }
+  return "";
+}
+function lockedPhoto(row, index, needles) {
+  const frame = frameFromListingImage(row, index);
+  if (!frame || frame.raw) return null;
+  const display = displayImageCandidate(row, needles);
+  if (display) return { url: display, name: frame.name };
+  const url = httpUrl(row.url);
+  if (!url || !isDisplayImageUrl(url) || isOriginalFileUrl(url) || containsOriginal(url, needles)) return null;
+  if (isPrivateMedia(frame.path, frame.name, url) || isFullResOrMls(row) || row.downloadable === true) return null;
+  return { url, name: frame.name };
+}
+function lockedVideo(row, needles) {
+  const name = mediaName(row, "Video");
+  let stream = "";
+  let streamKey = "";
+  for (const key of STREAM_KEYS) {
+    const url = httpUrl(row[key]);
+    if (!url || !isStreamUrl(url) || containsOriginal(url, needles)) continue;
+    stream = url;
+    streamKey = key;
+    break;
+  }
+  const poster = displayImageCandidate(row, needles);
+  if (!name && !stream && !poster) return null;
+  const media = { url: stream || null, name };
+  if (stream && streamKey) media[streamKey] = stream;
+  if (poster) {
+    media.poster = poster;
+    media.thumbnailUrl = poster;
+  }
+  return media;
+}
+function lockedOwnerMedia(listing, pub) {
+  const needles = listingOriginalNeedles(listing);
+  const images = [];
+  if (Array.isArray(listing.images)) {
+    listing.images.forEach((item, index) => {
+      const row = rowOf(item);
+      if (!row) return;
+      const photo = lockedPhoto(row, index, needles);
+      if (photo) images.push(photo);
+    });
+  }
+  const videos = [];
+  if (Array.isArray(listing.videos)) {
+    for (const item of listing.videos) {
+      const row = rowOf(item);
+      if (!row) continue;
+      const video = lockedVideo(row, needles);
+      if (video) videos.push(video);
+    }
+  }
+  const floorPlans = [];
+  for (const group of [listing.floorplans, listing.floorPlans]) {
+    if (!Array.isArray(group)) continue;
+    group.forEach((item, index) => {
+      const row = rowOf(item);
+      if (!row) return;
+      const plan = lockedPhoto(row, index, needles);
+      if (plan) floorPlans.push(plan);
+    });
+  }
+  const tourUrl = pub.tourUrl && !isOriginalFileUrl(pub.tourUrl) && !containsOriginal(pub.tourUrl, needles) ? pub.tourUrl : "";
+  return scrubOriginals({
+    images: images.slice(0, 200),
+    videos: videos.slice(0, 40),
+    floorPlans: floorPlans.slice(0, 40),
+    tourUrl
+  }, needles);
+}
 function ownerStudioProject(listing, pub, gate = {}) {
-  const invoiceStatus = text$6(gate.invoice?.status) || text$6(invoiceOf(listing)?.status);
+  const authoritativeInvoice = Object.prototype.hasOwnProperty.call(gate, "invoice");
+  const invoiceDoc = authoritativeInvoice && gate.invoice && typeof gate.invoice === "object" ? gate.invoice : null;
+  const invoiceStatus = authoritativeInvoice ? text$6(invoiceDoc?.status) : text$6(invoiceOf(listing)?.status);
   const invoice = invoiceStatus ? { status: invoiceStatus } : null;
   const downloadsUnlocked = clientGalleryDownloadsUnlocked({
-    invoice,
+    invoice: authoritativeInvoice ? invoiceDoc : invoiceStatus ? { status: invoiceStatus } : null,
     downloadEnabled: gate.downloadEnabled ?? listing.downloadEnabled,
     downloadsReleased: gate.downloadsReleased ?? listing.downloadsReleased,
     lockDownloads: listing.lockDownloads
   });
-  return {
+  const project = {
     ...pub,
     view: "owner",
     clientName: text$6(listing.clientName),
@@ -6408,6 +6582,12 @@ function ownerStudioProject(listing, pub, gate = {}) {
     invoice,
     images: downloadsUnlocked ? ownerImageDownloads(listing, pub.images) : pub.images,
     files: downloadsUnlocked ? ownerFiles(listing) : []
+  };
+  if (downloadsUnlocked || gate.staffAccess === true) return project;
+  return {
+    ...project,
+    ...lockedOwnerMedia(listing, pub),
+    files: []
   };
 }
 function pointerMessage(id, via, galleryId, listingId) {
@@ -8608,11 +8788,11 @@ async function finishGalleryLink(result, caller) {
     relatedForListing(listing)
   ]);
   if (result.project.view !== "public") return result;
-  const status = typeof invoice?.status === "string" ? invoice.status : "";
   const project = ownerStudioProject(listing, result.project, {
-    invoice: status ? { status } : null,
+    invoice: invoice ?? null,
     downloadEnabled: listing.downloadEnabled === true || related.some((doc) => doc.downloadEnabled === true),
-    downloadsReleased: listing.downloadsReleased === true || related.some((doc) => doc.downloadsReleased === true)
+    downloadsReleased: listing.downloadsReleased === true || related.some((doc) => doc.downloadsReleased === true),
+    staffAccess: Boolean(caller?.staffRole)
   });
   return { ...result, project };
 }
