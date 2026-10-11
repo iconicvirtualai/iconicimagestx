@@ -29,7 +29,19 @@ describe("studio gallery tabs", () => {
     for (const button of buttons) {
       expect(button).toContain("whitespace-nowrap");
       expect(button).toContain("shrink-0");
+      expect(button).toContain("min-w-max");
     }
+    const scroller = html.match(/<div\b[^>]*data-testid="studio-gallery-tabs"[^>]*>/)?.[0] || "";
+    expect(scroller).toContain("overflow-x-auto");
+    expect(scroller).toContain("min-w-0");
+    expect(scroller).toContain("scroll-pe-8");
+    expect(scroller).not.toContain("overflow-hidden");
+    expect(html).toContain("max-w-full");
+    expect(html).toContain("w-max");
+    expect(html).toContain("pe-8");
+    const beforeTabs = html.slice(0, html.indexOf('data-testid="studio-gallery-tabs"'));
+    expect(beforeTabs).not.toContain("overflow-hidden");
+    expect(beforeTabs).not.toContain("overflow-x-hidden");
   });
 
   it("renders only the tabs it is given", () => {
