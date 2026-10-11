@@ -43,7 +43,6 @@ const PAGE_W = 612;
 const PAGE_H = 792;
 const LEFT = 28;
 const RIGHT = 584;
-const FOOTER_H = 128;
 
 const BLACK: RGB = [0, 0, 0];
 const WHITE: RGB = [1, 1, 1];
@@ -67,76 +66,94 @@ function layout(input: BrandedInvoicePdfInput): string {
   const date = formatInvoiceDisplayDate(input.issuedAt);
   const ops: string[] = [];
 
+  const metaSize = PAGE_W * 0.018;
+  const toSize = PAGE_W * 0.02;
+  const addrSize = PAGE_W * 0.018;
+  const pillSize = PAGE_W * 0.024;
+  const lineSize = PAGE_W * 0.022;
+  const totalsSize = PAGE_W * 0.026;
+  const grandSize = PAGE_W * 0.04;
+  const notesSize = PAGE_W * 0.028;
+  const paySize = PAGE_W * 0.022;
+  const pillTrack = pillSize * 0.04;
+  const lineTrack = lineSize * 0.08;
+
   const logoW = 248;
   const logoH = logoW * (INVOICE_LOGO_IMAGE.height / INVOICE_LOGO_IMAGE.width);
   const logoX = RIGHT - logoW;
   const logoY = PAGE_H - 8 - logoH;
-  const addressLines = wrap(input.billToAddress, 10, false, 220).slice(0, 3);
-  let blockBottom = logoY - 22;
-  blockBottom -= 16;
-  blockBottom -= addressLines.length * 13;
-  const dateY = blockBottom;
+  const addressLines = wrap(input.billToAddress, addrSize, false, 230).slice(0, 3);
+  let infoY = logoY - 18;
+  const nameY = infoY - (toSize + 4);
+  let lastBaseline = nameY;
+  addressLines.forEach((_, index) => {
+    lastBaseline = nameY - (index + 1) * (addrSize + 3);
+  });
+  const dateY = lastBaseline;
   const status = input.status.trim();
-  const headerBottom = (status ? dateY - 16 : dateY) - 20;
+  const headerBottom = (status ? dateY - 16 : dateY) - 18;
 
   ops.push(fillRect(0, headerBottom, PAGE_W, PAGE_H - headerBottom, BLACK));
   ops.push(`q\n${num(logoW)} 0 0 ${num(logoH)} ${num(logoX)} ${num(logoY)} cm\n/Im1 Do\nQ`);
 
   ops.push(text(LEFT, PAGE_H - 46, 28, "F2", YELLOW, "INVOICE", 2.2));
-  ops.push(text(LEFT, PAGE_H - 72, 11, "F1", WHITE, `INVOICE NO : ${clip(invoiceNumber, 36)}`, 0.55));
-  if (date) ops.push(text(LEFT, dateY, 12, "F1", WHITE, date, 0.85));
-  if (status) ops.push(text(LEFT, dateY - 14, 8, "F1", WHITE, clip(status.toUpperCase(), 28), 0.5));
+  ops.push(text(LEFT, PAGE_H - 78, metaSize, "F2", WHITE, `INVOICE NO : ${clip(invoiceNumber, 36)}`, metaSize * 0.06));
+  if (date) ops.push(text(LEFT, dateY, metaSize, "F2", WHITE, date, metaSize * 0.06));
+  if (status) ops.push(text(LEFT, dateY - 14, 8, "F1", WHITE, clip(status.toUpperCase(), 28), 0.4));
 
-  let infoY = logoY - 22;
-  ops.push(textRight(RIGHT, infoY, 11, "F1", WHITE, "INVOICE TO :", 0.8));
-  infoY -= 16;
-  ops.push(textRight(RIGHT, infoY, 12, "F2", WHITE, clip((input.clientName || "Client").toUpperCase(), 32)));
-  for (const line of addressLines) {
-    infoY -= 13;
-    ops.push(textRight(RIGHT, infoY, 10, "F1", WHITE, line));
-  }
+  ops.push(textRight(RIGHT, infoY, toSize, "F2", WHITE, "INVOICE TO :", toSize * 0.04));
+  ops.push(textRight(RIGHT, nameY, toSize, "F2", WHITE, clip((input.clientName || "Client").toUpperCase(), 32), toSize * 0.04));
+  addressLines.forEach((line, index) => {
+    ops.push(textRight(RIGHT, nameY - (index + 1) * (addrSize + 3), addrSize, "F1", WHITE, line));
+  });
 
   const rows = tableRows(input.face.services);
-  const rowH = 26;
-  const pillH = 36;
+  const pillW = RIGHT - LEFT;
+  const pillH = Math.max(34, pillSize * 2.15);
   const tuck = 8;
-  const bodyInset = 18;
-  const boxInset = 8;
+  const bodyInset = pillW * 0.026;
+  const boxInset = pillW * 0.011;
   const bodyLeft = LEFT + bodyInset;
   const bodyRight = RIGHT - bodyInset;
   const boxLeft = LEFT + boxInset;
   const boxRight = RIGHT - boxInset;
-  const nameX = bodyLeft + 12;
-  const totalRight = bodyRight - 12;
-  const priceRight = totalRight - 78;
-  const qtyCenter = priceRight - 62;
-  const tableTop = headerBottom - 16;
+  const descX = LEFT + pillW * 0.06;
+  const qtyCenter = LEFT + pillW * 0.55;
+  const priceRight = LEFT + pillW * 0.72;
+  const totalRight = LEFT + pillW * 0.90;
+  const nameMax = qtyCenter - descX - 36;
+  const tableTop = headerBottom - 14;
   const pillY = tableTop - pillH;
+  const footerH = 168;
+  const boxH = Math.max(92, grandSize * 2.35);
+  const noteBody = (input.notes || "").trim();
+  const noteLines = noteBody ? wrap(noteBody, addrSize, false, RIGHT - LEFT).slice(0, 4) : [];
+  const notesBlock = 28 + noteLines.length * (addrSize + 3);
+  const room = pillY - (footerH + notesBlock + boxH + 16);
+  const rowH = Math.max(22, Math.min(34, room / Math.max(1, rows.length)));
   const visibleH = rows.length * rowH;
   const bodyH = visibleH + tuck;
-  const bodyTop = pillY + tuck;
-  const bodyBottom = bodyTop - bodyH;
+  const bodyBottom = pillY - visibleH;
   ops.push(fillBottomRoundedRect(bodyLeft, bodyBottom, bodyRight - bodyLeft, bodyH, 14, GRAY));
-  ops.push(fillRoundedRect(LEFT, pillY, RIGHT - LEFT, pillH, pillH / 2, BLACK));
-  const labelY = pillY + 13;
-  ops.push(text(nameX, labelY, 12, "F1", WHITE, "DESCRIPTION", 0.7));
-  ops.push(textCentered(qtyCenter, labelY, 12, "F1", WHITE, "QTY.", 0.6));
-  ops.push(textRight(priceRight, labelY, 12, "F1", WHITE, "PRICE", 0.6));
-  ops.push(textRight(totalRight, labelY, 12, "F1", WHITE, "TOTAL", 0.6));
+  ops.push(fillRoundedRect(LEFT, pillY, pillW, pillH, pillH / 2, BLACK));
+  const labelY = pillY + pillH / 2 - pillSize * 0.35;
+  ops.push(text(descX, labelY, pillSize, "F1", WHITE, "DESCRIPTION", pillTrack));
+  ops.push(textCentered(qtyCenter, labelY, pillSize, "F1", WHITE, "QTY.", pillTrack));
+  ops.push(textRight(priceRight, labelY, pillSize, "F1", WHITE, "PRICE", pillTrack));
+  ops.push(textRight(totalRight, labelY, pillSize, "F1", WHITE, "TOTAL", pillTrack));
 
   rows.forEach((row, index) => {
-    const baseline = pillY - rowH * index - 17;
+    const baseline = pillY - rowH * index - rowH * 0.62;
     const ruleY = pillY - rowH * (index + 1);
     ops.push(strokeLine(bodyLeft, ruleY, bodyRight, ruleY, RULE, 0.6));
     if (row.blank) return;
-    ops.push(text(nameX, baseline, 10, "F2", TEAL, clip(row.name.toUpperCase(), 34), 0.7));
-    ops.push(textCentered(qtyCenter, baseline, 10, "F2", TEAL, row.qty, 0.3));
-    ops.push(textRight(priceRight, baseline, 10, "F2", TEAL, row.price, 0.2));
-    ops.push(textRight(totalRight, baseline, 10, "F2", TEAL, row.total, 0.2));
+    ops.push(text(descX, baseline, lineSize, "F2", TEAL, clipToWidth(row.name.toUpperCase(), lineSize, true, lineTrack, nameMax), lineTrack));
+    ops.push(textCentered(qtyCenter, baseline, lineSize, "F2", TEAL, row.qty, lineTrack));
+    ops.push(textRight(priceRight, baseline, lineSize, "F2", TEAL, row.price, lineTrack * 0.4));
+    ops.push(textRight(totalRight, baseline, lineSize, "F2", TEAL, row.total, lineTrack * 0.4));
   });
 
-  const boxH = 74;
-  const boxTop = bodyBottom - 18;
+  const boxTop = bodyBottom - 16;
   const boxY = boxTop - boxH;
   ops.push(strokeRoundedRect(boxLeft, boxY, boxRight - boxLeft, boxH, 14, BLACK, 2));
 
@@ -147,44 +164,55 @@ function layout(input: BrandedInvoicePdfInput): string {
     { label: "FEES", amount: money(presented.fees) },
   ];
   if (presented.travel !== 0) cells.splice(3, 0, { label: "TRAVEL", amount: money(presented.travel) });
-  if (presented.tax !== 0) cells.splice(cells.length - 0, 0, { label: "TAX", amount: money(presented.tax) });
-  const totalCell = { label: "TOTAL", amount: money(presented.total) };
-  const totalCol = 118;
-  const slotW = (boxRight - boxLeft - 32 - totalCol) / cells.length;
+  if (presented.tax !== 0) cells.push({ label: "TAX", amount: money(presented.tax) });
+  const totalAmount = money(presented.total);
+  const totalCol = Math.max(textWidth("TOTAL", grandSize, false, grandSize * 0.04), textWidth(totalAmount, grandSize, true, 0));
+  const innerLeft = boxLeft + 14;
+  const innerRight = boxRight - 14;
+  const labelWidths = cells.map((cell) => textWidth(cell.label, totalsSize, false, totalsSize * 0.02));
+  const labelsSum = labelWidths.reduce((sum, width) => sum + width, 0);
+  const gap = cells.length > 1
+    ? Math.max(6, (innerRight - totalCol - 12 - innerLeft - labelsSum) / (cells.length - 1))
+    : 0;
+  let cellX = innerLeft;
+  const labelBaseline = boxY + boxH - Math.max(22, totalsSize + 8);
+  const amountBaseline = labelBaseline - (totalsSize + 8);
   cells.forEach((cell, index) => {
-    const x = boxLeft + 16 + slotW * index;
-    ops.push(text(x, boxY + boxH - 26, 11, "F1", BLACK, cell.label, 0.35));
-    ops.push(text(x, boxY + boxH - 48, 13, "F2", BLACK, cell.amount));
+    ops.push(text(cellX, labelBaseline, totalsSize, "F1", BLACK, cell.label, totalsSize * 0.02));
+    ops.push(text(cellX, amountBaseline, totalsSize, "F2", BLACK, cell.amount));
+    cellX += labelWidths[index] + gap;
   });
-  const totalX = boxRight - 16;
-  ops.push(textRight(totalX, boxY + boxH - 24, 16, "F1", BLACK, totalCell.label, 0.5));
-  ops.push(textRight(totalX, boxY + boxH - 50, 18, "F2", BLACK, totalCell.amount));
+  const totalX = innerRight;
+  ops.push(textRight(totalX, boxY + boxH - Math.max(24, grandSize * 0.85), grandSize, "F1", BLACK, "TOTAL", grandSize * 0.04));
+  ops.push(textRight(totalX, boxY + Math.max(16, grandSize * 0.72), grandSize, "F2", BLACK, totalAmount));
 
-  let noteY = boxY - 28;
-  ops.push(text(LEFT, noteY, 11, "F2", PINK, "NOTES:", 1.3));
-  noteY -= 16;
-  const noteBody = (input.notes || "").trim();
-  if (noteBody) {
-    for (const line of wrap(noteBody, 10, false, RIGHT - LEFT).slice(0, 5)) {
-      if (noteY < FOOTER_H + 8) break;
-      ops.push(text(LEFT, noteY, 10, "F1", BLACK, line));
-      noteY -= 13;
-    }
+  let noteY = boxY - 26;
+  ops.push(text(LEFT, noteY, notesSize, "F2", PINK, "NOTES:", notesSize * 0.08));
+  noteY -= notesSize + 4;
+  for (const line of noteLines) {
+    if (noteY < footerH + 8) break;
+    ops.push(text(LEFT, noteY, addrSize, "F1", BLACK, line));
+    noteY -= addrSize + 3;
   }
 
   if (presented.amountPaid > 0) {
-    ops.push(text(LEFT, FOOTER_H + 16, 8, "F1", MUTED, `Amount paid ${money(presented.amountPaid)}    Amount due ${money(presented.amountDue)}`));
+    ops.push(text(LEFT, footerH + 14, paySize * 0.8, "F1", MUTED, `Amount paid ${money(presented.amountPaid)}    Amount due ${money(presented.amountDue)}`));
   }
 
-  ops.push(fillRect(0, 0, PAGE_W, FOOTER_H, BLACK));
-  ops.push(text(LEFT, 104, 10, "F2", GREEN, "PAYMENT INFORMATION:", 1.15));
-  ops.push(text(LEFT, 84, 9, "F1", WHITE, LEGAL_BUSINESS_NAME));
-  ops.push(text(LEFT, 70, 9, "F1", WHITE, BUSINESS_CONTACT.phoneDisplay));
-  ops.push(text(LEFT, 56, 9, "F1", WHITE, BUSINESS_CONTACT.email));
-  ops.push(textRight(RIGHT, 84, 9, "F1", WHITE, BUSINESS_CONTACT.streetAddress));
-  ops.push(textRight(RIGHT, 70, 9, "F1", WHITE, BUSINESS_CONTACT.addressLine2));
-  ops.push(text(LEFT, 26, 9, "F2", TEAL, "THANK YOU FOR BEING ICONIC", 2.35));
-  ops.push(camera(RIGHT - 48, 14));
+  const contactLead = paySize + 4;
+  ops.push(fillRect(0, 0, PAGE_W, footerH, BLACK));
+  ops.push(text(LEFT, footerH - 28, paySize, "F2", GREEN, "PAYMENT INFORMATION:", paySize * 0.14));
+  ops.push(text(LEFT, footerH - 28 - contactLead, paySize, "F1", WHITE, LEGAL_BUSINESS_NAME));
+  ops.push(text(LEFT, footerH - 28 - contactLead * 2, paySize, "F1", WHITE, BUSINESS_CONTACT.phoneDisplay));
+  ops.push(text(LEFT, footerH - 28 - contactLead * 3, paySize, "F1", WHITE, BUSINESS_CONTACT.email));
+  ops.push(textRight(RIGHT, footerH - 28 - contactLead, paySize, "F1", WHITE, BUSINESS_CONTACT.streetAddress));
+  ops.push(textRight(RIGHT, footerH - 28 - contactLead * 2, paySize, "F1", WHITE, BUSINESS_CONTACT.addressLine2));
+  const thanks = "THANK YOU FOR BEING ICONIC";
+  const thanksMax = RIGHT - 56 - LEFT;
+  let thanksTrack = paySize * 0.5;
+  while (textWidth(thanks, paySize, true, thanksTrack) > thanksMax && thanksTrack > paySize * 0.2) thanksTrack -= 0.2;
+  ops.push(text(LEFT, 32, paySize, "F2", TEAL, thanks, thanksTrack));
+  ops.push(camera(RIGHT - 48, 18));
   return ops.filter(Boolean).join("\n");
 }
 
@@ -333,6 +361,14 @@ function clip(value: string, max: number): string {
   const clean = ascii(value);
   if (clean.length <= max) return clean;
   return `${clean.slice(0, Math.max(0, max - 3))}...`;
+}
+
+function clipToWidth(value: string, size: number, bold: boolean, tracking: number, maxWidth: number): string {
+  const clean = ascii(value);
+  if (!clean || textWidth(clean, size, bold, tracking) <= maxWidth) return clean;
+  let next = clean;
+  while (next.length > 1 && textWidth(`${next}...`, size, bold, tracking) > maxWidth) next = next.slice(0, -1);
+  return `${next}...`;
 }
 
 function wrap(value: string, size: number, bold: boolean, maxWidth: number): string[] {

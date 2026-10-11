@@ -225,6 +225,13 @@ describe("invoice business footer", () => {
     expect(html).toContain("Spring, TX 77380");
     expect(html).toContain("281.356.0965");
     expect(html).toContain("photos@iconicimagestx.com");
+    const withPay = renderToStaticMarkup(
+      <BrandedInvoiceShell invoiceNumber="INV-2026-1" amountPaid={0} amountDue={10} footer={<button type="button">Pay Securely</button>}>
+        <p>Body</p>
+      </BrandedInvoiceShell>,
+    );
+    expect(withPay.indexOf("Pay Securely")).toBeGreaterThan(-1);
+    expect(withPay.indexOf("Pay Securely")).toBeLessThan(withPay.indexOf("invoice-business-footer"));
     expect(html).not.toContain("cadi" + "@");
     expect(html).toContain("iconicimagestx.com");
     expect(html).not.toContain(retiredMarketing);

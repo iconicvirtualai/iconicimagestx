@@ -47,7 +47,7 @@ export function BrandedInvoiceShell({
   return (
     <article
       className="flex min-h-[920px] flex-col overflow-hidden bg-white text-black sm:min-h-[1100px]"
-      style={{ fontFamily: FONT }}
+      style={{ fontFamily: FONT, containerType: "inline-size" }}
       data-testid="branded-invoice"
     >
       <header className="bg-black px-5 py-6 text-white sm:px-8 sm:py-8">
@@ -57,10 +57,10 @@ export function BrandedInvoiceShell({
               <h1 className="whitespace-nowrap text-[1.35rem] font-extrabold leading-none tracking-[0.14em] sm:text-5xl sm:tracking-[0.18em]" style={{ color: YELLOW }}>
                 INVOICE
               </h1>
-              <p className="mt-2 text-[11px] font-medium tracking-[0.12em] sm:text-sm sm:tracking-[0.14em]">INVOICE NO : {invoiceNumber}</p>
+              <p className="mt-2 font-bold" style={type.meta}>INVOICE NO : {invoiceNumber}</p>
             </div>
             <div className="mt-auto pt-6 sm:pt-8">
-              {date ? <p className="text-xs font-medium tracking-[0.12em] sm:text-base sm:tracking-[0.16em]">{date}</p> : null}
+              {date ? <p className="font-bold" style={type.meta}>{date}</p> : null}
               {status ? <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/75">{status}</p> : null}
             </div>
           </div>
@@ -86,26 +86,27 @@ export function BrandedInvoiceShell({
         <InvoiceNotes notes={notes} />
       </div>
       {amountPaid > 0 ? (
-        <div className="flex flex-wrap items-end justify-between gap-3 px-5 pb-2 text-sm sm:px-8" data-testid="invoice-balance">
+        <div className="flex flex-wrap items-end justify-between gap-3 px-5 pb-2 sm:px-8" data-testid="invoice-balance">
           <p>
-            <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">Amount paid </span>
-            <MoneyAmount className="font-bold">{money(amountPaid)}</MoneyAmount>
+            <span className="font-semibold uppercase tracking-[0.08em] text-neutral-500" style={type.contact}>Amount paid </span>
+            <MoneyAmount className="min-w-0 font-bold" style={type.contact}>{money(amountPaid)}</MoneyAmount>
           </p>
           <p>
-            <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">Amount due </span>
-            <MoneyAmount className="font-black">{money(amountDue)}</MoneyAmount>
+            <span className="font-semibold uppercase tracking-[0.08em] text-neutral-500" style={type.contact}>Amount due </span>
+            <MoneyAmount className="min-w-0 font-black" style={type.contact}>{money(amountDue)}</MoneyAmount>
           </p>
         </div>
       ) : null}
+      {footer ? <div className="bg-white px-5 pb-6 pt-2 sm:px-8">{footer}</div> : null}
       <footer className="mt-auto bg-black px-5 py-6 text-white sm:px-8">
-        <p className="text-xs font-semibold tracking-[0.22em] sm:text-sm sm:tracking-[0.28em]" style={{ color: GREEN }}>PAYMENT INFORMATION:</p>
-        <div className="mt-3 flex flex-col gap-4 text-sm sm:flex-row sm:items-start sm:justify-between" data-testid="invoice-business-footer">
-          <div className="space-y-0.5">
-            <p className="font-semibold">{LEGAL_BUSINESS_NAME}</p>
+        <p className="font-bold" style={{ ...type.payment, color: GREEN }}>PAYMENT INFORMATION:</p>
+        <div className="mt-3 flex items-start justify-between gap-4" data-testid="invoice-business-footer">
+          <div className="min-w-0 space-y-0.5 font-normal" style={type.contact}>
+            <p>{LEGAL_BUSINESS_NAME}</p>
             <p><a className="text-white" href={BUSINESS_CONTACT.phoneHref}>{BUSINESS_CONTACT.phoneDisplay}</a></p>
             <p><a className="text-white" href={BUSINESS_CONTACT.emailHref}>{BUSINESS_CONTACT.email}</a></p>
           </div>
-          <div className="sm:text-right">
+          <div className="shrink-0 text-right font-normal" style={type.contact}>
             <p>{BUSINESS_CONTACT.streetAddress}</p>
             <p>{BUSINESS_CONTACT.addressLine2}</p>
           </div>
@@ -113,15 +114,14 @@ export function BrandedInvoiceShell({
         <div className="mt-6 flex items-center justify-between gap-3">
           <p
             data-testid="invoice-thank-you"
-            className="text-[11px] font-semibold uppercase leading-none tracking-[0.22em] sm:text-sm sm:tracking-[0.46em]"
-            style={{ color: TEAL }}
+            className="whitespace-nowrap font-semibold uppercase leading-none"
+            style={{ ...type.thanks, color: TEAL }}
           >
             THANK YOU FOR BEING ICONIC
           </p>
           <InvoiceCameraIcon />
         </div>
       </footer>
-      {footer ? <div className="space-y-3 bg-white px-5 py-5 sm:px-8">{footer}</div> : null}
     </article>
   );
 }
@@ -140,10 +140,10 @@ export function InvoiceBillTo({
   const muted = onDark ? "text-white/80" : "text-neutral-600";
   return (
     <div className={onDark ? "text-right" : undefined} data-testid="invoice-bill-to">
-      <p className={`text-[11px] font-semibold tracking-[0.16em] sm:text-xs ${label}`}>INVOICE TO :</p>
-      <p className={`mt-1 text-sm font-bold uppercase tracking-[0.08em] ${label}`}>{name || "Client"}</p>
-      {address ? <p className={`mt-1 whitespace-pre-wrap text-sm ${label}`}>{address}</p> : null}
-      {email ? <p className={`mt-1 text-xs ${muted}`}>{email}</p> : null}
+      <p className={`font-bold ${label}`} style={type.billTo}>INVOICE TO :</p>
+      <p className={`mt-1 font-bold uppercase ${label}`} style={type.billTo}>{name || "Client"}</p>
+      {address ? <p className={`mt-1 whitespace-pre-wrap font-normal ${label}`} style={type.address}>{address}</p> : null}
+      {email ? <p className={`mt-1 font-normal ${muted}`} style={type.address}>{email}</p> : null}
     </div>
   );
 }
@@ -154,23 +154,31 @@ export function InvoiceLineTable({ lines }: { lines: InvoiceFaceLine[] }) {
     <div data-testid="invoice-lines">
       <div
         data-testid="invoice-table-pill"
-        className="relative z-10 flex h-11 items-center rounded-full bg-black text-white sm:h-12"
+        className="relative z-10 rounded-full bg-black text-white"
+        style={{ height: "clamp(36px, 5.8cqw, 52px)" }}
       >
-        <div className={columnGrid("text-[13px] font-light uppercase tracking-[0.1em] sm:text-base sm:tracking-[0.14em]", "pill")}>
-          <span>Description</span>
-          <span className="text-center">Qty.</span>
-          <span className="text-right">Price</span>
-          <span className="text-right">Total</span>
-        </div>
+        <span className="absolute top-1/2 uppercase" style={{ ...type.pill, left: COL.desc, transform: "translateY(-50%)" }}>Description</span>
+        <span className="absolute top-1/2 uppercase" style={{ ...type.pill, left: COL.qty, transform: "translate(-50%, -50%)" }}>Qty.</span>
+        <span className="absolute top-1/2 uppercase" style={{ ...type.pill, left: COL.price, transform: "translate(-100%, -50%)" }}>Price</span>
+        <span className="absolute top-1/2 uppercase" style={{ ...type.pill, left: COL.total, transform: "translate(-100%, -50%)" }}>Total</span>
       </div>
-      <div data-testid="invoice-table-body" className="relative z-0 -mt-3 overflow-hidden rounded-b-[18px] bg-[#f3f4f6] pt-3 mx-3 sm:mx-5">
-        {lines.length === 0 ? <p className="px-3 py-3 text-sm text-neutral-500 sm:px-5">No line items yet.</p> : null}
-        {lines.map((line, index) => (
-          <LineRow key={`${line.name}-${index}`} line={line} />
-        ))}
-        {Array.from({ length: blanks }, (_, index) => (
-          <div key={`blank-${index}`} className={`${columnGrid("min-h-9 border-b border-[#6b7280]")}`} aria-hidden="true" />
-        ))}
+      <div className="relative z-0" style={{ marginTop: "calc(clamp(36px, 5.8cqw, 52px) * -0.28)" }}>
+        <div
+          data-testid="invoice-table-body"
+          className="absolute inset-x-[2.6%] bottom-0 rounded-b-[18px] bg-[#f3f4f6]"
+          style={{ top: "calc(clamp(36px, 5.8cqw, 52px) * 0.28)" }}
+        />
+        <div className="relative" style={{ paddingTop: "calc(clamp(36px, 5.8cqw, 52px) * 0.28)" }}>
+          {lines.length === 0 ? <p className="px-[6%] py-3 text-neutral-500" style={type.address}>No line items yet.</p> : null}
+          {lines.map((line, index) => (
+            <LineRow key={`${line.name}-${index}`} line={line} />
+          ))}
+          {Array.from({ length: blanks }, (_, index) => (
+            <div key={`blank-${index}`} className="relative" style={{ height: ROW_H }} aria-hidden="true">
+              <div className="absolute inset-x-[2.6%] bottom-0 border-b border-[#6b7280]" />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -181,23 +189,21 @@ function LineRow({ line }: { line: InvoiceFaceLine }) {
   const unit = Math.round((line.price / qty) * 100) / 100;
   const qtyLabel = Number.isInteger(qty) ? String(qty) : String(Math.round(qty * 100) / 100);
   return (
-    <div className={columnGrid("border-b border-[#6b7280] py-2.5")}>
-      <div className="min-w-0">
-        <p
-          className="text-[13px] font-bold uppercase leading-snug tracking-[0.04em] sm:text-base sm:tracking-[0.12em]"
-          style={{ color: TEAL, ...itemNameWrap }}
-        >
+    <div className="relative" style={{ minHeight: ROW_H }}>
+      <div className="absolute inset-x-[2.6%] bottom-0 border-b border-[#6b7280]" />
+      <div className="absolute top-1/2" style={{ left: COL.desc, width: "42%", transform: "translateY(-50%)" }}>
+        <p className="font-bold uppercase leading-snug" style={{ ...type.line, color: TEAL, ...itemNameWrap }}>
           {line.name || "Service"}
         </p>
         {line.description ? (
-          <p className="mt-1 text-xs leading-relaxed text-neutral-500" style={itemNameWrap}>
+          <p className="mt-1 leading-relaxed text-neutral-500" style={{ ...type.address, ...itemNameWrap }}>
             {line.description}
           </p>
         ) : null}
       </div>
-      <p className="text-center text-xs font-bold sm:text-sm" style={{ color: TEAL }}>{qtyLabel}</p>
-      <MoneyAmount className="min-w-0 text-xs font-bold sm:min-w-[5.5rem] sm:text-sm" style={{ color: TEAL }}>{money(unit)}</MoneyAmount>
-      <MoneyAmount className="min-w-0 text-xs font-bold sm:min-w-[5.5rem] sm:text-sm" style={{ color: TEAL }}>{money(line.price)}</MoneyAmount>
+      <p className="absolute top-1/2 font-bold" style={{ ...type.line, color: TEAL, left: COL.qty, transform: "translate(-50%, -50%)" }}>{qtyLabel}</p>
+      <MoneyAmount className="absolute top-1/2 min-w-0 font-bold" style={{ ...type.line, color: TEAL, left: COL.price, transform: "translate(-100%, -50%)" }}>{money(unit)}</MoneyAmount>
+      <MoneyAmount className="absolute top-1/2 min-w-0 font-bold" style={{ ...type.line, color: TEAL, left: COL.total, transform: "translate(-100%, -50%)" }}>{money(line.price)}</MoneyAmount>
     </div>
   );
 }
@@ -218,17 +224,17 @@ export function InvoiceFaceSummary({
   if (presented.tax !== 0) cells.push({ id: "tax", label: "Tax", amount: money(presented.tax) });
   return (
     <div>
-      <div className="mx-1.5 rounded-[14px] border-2 border-black px-4 py-4 sm:mx-2 sm:px-5" data-testid="invoice-total-box">
+      <div className="mx-[1.1%] rounded-[14px] border-2 border-black px-4 py-4 sm:px-5" data-testid="invoice-total-box">
         <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:flex sm:items-end sm:justify-between sm:gap-3">
           {cells.map((cell) => (
             <div key={cell.id} data-invoice-row={cell.id}>
-              <p className="text-sm font-light uppercase tracking-[0.08em] text-black sm:text-base">{cell.label}</p>
-              <MoneyAmount className="mt-1 text-base font-bold text-black">{cell.amount}</MoneyAmount>
+              <p className="font-light uppercase text-black" style={type.totals}>{cell.label}</p>
+              <MoneyAmount className="mt-1 min-w-0 font-bold text-black" style={type.totals}>{cell.amount}</MoneyAmount>
             </div>
           ))}
           <div className="col-span-2 border-t border-black/15 pt-3 sm:w-auto sm:border-0 sm:pt-0 sm:text-right" data-invoice-row="total">
-            <p className="text-xl font-light tracking-[0.12em] sm:text-2xl">TOTAL</p>
-            <MoneyAmount className="text-2xl font-bold text-black sm:text-3xl">{money(presented.total)}</MoneyAmount>
+            <p className="font-light" style={type.grand}>TOTAL</p>
+            <MoneyAmount className="min-w-0 font-bold text-black" style={type.grand}>{money(presented.total)}</MoneyAmount>
           </div>
         </div>
       </div>
@@ -240,7 +246,7 @@ export function InvoiceNotes({ notes }: { notes?: string | null }) {
   if (notes == null) return null;
   return (
     <section className="pt-2" data-testid="invoice-notes">
-      <h2 className="text-sm font-bold tracking-[0.22em]" style={{ color: PINK }}>NOTES:</h2>
+      <h2 className="font-bold" style={{ ...type.notes, color: PINK }}>NOTES:</h2>
       {notes.trim() ? <p className="mt-2 whitespace-pre-wrap text-sm text-black">{notes}</p> : null}
     </section>
   );
@@ -311,7 +317,21 @@ function splitBillTo(children: React.ReactNode): { billTo: React.ReactNode; rest
 
 const itemNameWrap = { wordBreak: "normal", overflowWrap: "normal", hyphens: "none" } as const;
 
-function columnGrid(extra: string, align: "row" | "pill" = "row"): string {
-  const pad = align === "pill" ? "px-[22px] sm:px-9" : "px-2.5 sm:px-4";
-  return `grid w-full grid-cols-[minmax(0,1fr)_2.5rem_4.7rem_4.7rem] items-center gap-x-1.5 ${pad} sm:grid-cols-[minmax(0,1fr)_4.5rem_6.5rem_6.5rem] sm:gap-x-3 ${extra}`;
-}
+/** Column anchors measured from the pill's left edge. */
+const COL = { desc: "6%", qty: "55%", price: "72%", total: "90%" } as const;
+const ROW_H = "clamp(42px, 6.2cqw, 56px)";
+
+/** Sizes are fractions of the invoice card width. Floors keep a 390px card readable. */
+const type = {
+  pill: { fontSize: "clamp(11px, 2.4cqw, 22px)", fontWeight: 300, letterSpacing: "0.04em" },
+  totals: { fontSize: "clamp(12px, 2.6cqw, 24px)", letterSpacing: "0.03em" },
+  grand: { fontSize: "clamp(18px, 4cqw, 36px)", letterSpacing: "0.04em" },
+  line: { fontSize: "clamp(13px, 2.2cqw, 20px)", letterSpacing: "0.08em" },
+  billTo: { fontSize: "clamp(12px, 2cqw, 18px)", letterSpacing: "0.04em" },
+  address: { fontSize: "clamp(11px, 1.8cqw, 16px)" },
+  meta: { fontSize: "clamp(12px, 1.8cqw, 16px)", letterSpacing: "0.06em" },
+  notes: { fontSize: "clamp(14px, 2.8cqw, 26px)", letterSpacing: "0.08em" },
+  payment: { fontSize: "clamp(11px, 2.2cqw, 20px)", letterSpacing: "0.16em" },
+  contact: { fontSize: "clamp(10px, 2.2cqw, 18.5px)" },
+  thanks: { fontSize: "clamp(8px, 2.2cqw, 18.5px)", letterSpacing: "0.5em" },
+} as const;
