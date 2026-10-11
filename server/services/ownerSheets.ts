@@ -9,7 +9,8 @@ import { ownerSuiteFixtureGrids } from "./ownerSuiteFixtures";
 import { ownerFixturesEnabled, ownerRuntimeEnv } from "./ownerGate";
 
 export const OWNER_SHEET_ID = "1vHkdHRhAWKcnsv8-d1ZZSWRr-OZyy0xCaqK1Bi3VB3Q";
-const READONLY_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
+/** Scorecard reads and the orders list. The orders write path uses a separate client. */
+export const SHEETS_READONLY_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
 const CACHE_MS = 60_000;
 const ERROR_CACHE_MS = 15_000;
 
@@ -152,13 +153,17 @@ function credentialsFromJson(raw: string | undefined): SheetsCredentials | null 
   }
 }
 
-async function fetchScorecard(credentials: SheetsCredentials): Promise<SheetGrid[]> {
+export function createReadonlySheetsClient(credentials: SheetsCredentials) {
   const auth = new google.auth.JWT({
     email: credentials.client_email,
     key: credentials.private_key,
-    scopes: [READONLY_SCOPE],
+    scopes: [SHEETS_READONLY_SCOPE],
   });
-  const sheets = google.sheets({ version: "v4", auth });
+  return google.sheets({ version: "v4", auth });
+}
+
+async function fetchScorecard(credentials: SheetsCredentials): Promise<SheetGrid[]> {
+  const sheets = createReadonlySheetsClient(credentials);
   const meta = await sheets.spreadsheets.get({
     spreadsheetId: OWNER_SHEET_ID,
     fields: "sheets.properties.title",

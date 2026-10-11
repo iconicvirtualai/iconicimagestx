@@ -15,6 +15,7 @@ import {
   ownerSessionSecret,
 } from "../services/ownerGate";
 import { loadOwnerSuite } from "../services/ownerSheets";
+import { listOwnerOrders, submitOwnerOrder } from "../services/ownerOrders";
 import { OWNER_WHY } from "../services/ownerWhy";
 import { GENERIC_TITLE, stripPublicMeta } from "../../shared/siteSeo";
 
@@ -27,6 +28,12 @@ export function mountOwners(app: Express) {
   });
   app.get("/api/owners/suite", (req, res) => {
     void handleSuite(req, res);
+  });
+  app.get("/api/owners/orders", (req, res) => {
+    void handleOrdersGet(req, res);
+  });
+  app.post("/api/owners/orders", (req, res) => {
+    void handleOrdersPost(req, res);
   });
   app.post("/api/owners/session", (req, res) => {
     void handleSession(req, res);
@@ -45,6 +52,38 @@ async function handleSuite(req: Request, res: Response) {
   const fresh = req.query.fresh === "1";
   const payload = await loadOwnerSuite({ fresh });
   return res.status(200).json({ ...payload, why: OWNER_WHY });
+}
+
+async function handleOrdersGet(req: Request, res: Response) {
+  setPrivate(res);
+  const owner = await resolveOwnerIdentity(req.headers);
+  if (!owner) return res.status(404).json(NOT_FOUND);
+  try {
+    const payload = await listOwnerOrders();
+    return res.status(200).json(payload);
+  } catch (error) {
+    console.error(`[Owners] Orders read failed (${errorStatus(error)})`);
+    return res.status(500).json({ error: "Orders could not be read." });
+  }
+}
+
+async function handleOrdersPost(req: Request, res: Response) {
+  setPrivate(res);
+  const owner = await resolveOwnerIdentity(req.headers);
+  if (!owner) return res.status(404).json(NOT_FOUND);
+  try {
+    const result = await submitOwnerOrder({ raw: req.body?.text, ownerEmail: owner.email });
+    if ("error" in result) return res.status(result.status).json({ error: result.error });
+    return res.status(201).json({ order: result.order });
+  } catch (error) {
+    console.error(`[Owners] Orders write failed (${errorStatus(error)})`);
+    return res.status(500).json({ error: "The order could not be saved." });
+  }
+}
+
+function errorStatus(error: unknown): string {
+  if (error && typeof error === "object" && "code" in error) return String((error as { code: unknown }).code);
+  return "error";
 }
 
 async function handleSession(req: Request, res: Response) {
