@@ -141,20 +141,52 @@ describe("senior living page", () => {
     expect(BUSINESS_CONTACT.email).toBe("photos@iconicimagestx.com");
   });
 
-  it("hides the gallery while the photo manifest is empty", () => {
-    expect(SENIOR_LIVING_PHOTOS).toEqual([]);
-    expect(publishedSeniorLivingPhotos()).toEqual([]);
-    expect(
-      container?.querySelector('[data-testid="senior-gallery"]'),
-    ).toBeNull();
-    expect(container?.innerHTML).not.toContain("/senior-living/");
+  it("shows the hero and the gallery from the manifest, without the hero duplicate", () => {
+    const photos = publishedSeniorLivingPhotos();
+    expect(SENIOR_LIVING_PHOTOS).toHaveLength(11);
+    expect(photos.map((photo) => photo.stem)).toEqual(
+      SENIOR_LIVING_PHOTOS.map((photo) => photo.stem),
+    );
+    expect(photos[0]?.stem).toBe("senior-living-01-hero");
+    expect(photos.map((photo) => photo.stem).join(" ")).not.toContain(
+      "entrance",
+    );
+    expect(SENIOR_LIVING_WIDTHS).toEqual([1600, 1024, 640]);
+    expect(publishedSeniorLivingPhotos([])).toEqual([]);
+
+    const hero = container?.querySelector(
+      '[data-testid="senior-hero"] img',
+    ) as HTMLImageElement | null;
+    expect(hero?.getAttribute("src")).toBe(
+      "/senior-living/senior-living-01-hero.jpg",
+    );
+    expect(hero?.getAttribute("alt")).toBe(photos[0]?.alt);
+    expect(hero?.className).toContain("object-top");
+    expect(hero?.className).toContain("sm:object-center");
+
+    const gallery = container?.querySelector('[data-testid="senior-gallery"]');
+    const images = [
+      ...((gallery?.querySelectorAll("img") || []) as unknown as HTMLImageElement[]),
+    ];
+    expect(images).toHaveLength(10);
+    expect(images.map((img) => img.getAttribute("alt"))).toEqual(
+      photos.slice(1).map((photo) => photo.alt),
+    );
+    expect(images.map((img) => img.getAttribute("src"))).toEqual(
+      photos.slice(1).map((photo) => `/senior-living/${photo.stem}.jpg`),
+    );
+    expect(gallery?.innerHTML).not.toContain("senior-living-01-hero");
     expect(container?.innerHTML).not.toMatch(
       /unsplash|picsum|coming soon|stock photo|via\.placeholder/i,
     );
+
+    const tour = container?.querySelector('[data-testid="matterport-tour"]');
     expect(
-      container?.querySelectorAll('img[src*="/senior-living/"]'),
-    ).toHaveLength(0);
-    expect(SENIOR_LIVING_WIDTHS).toEqual([1600, 1024, 640]);
+      gallery &&
+        tour &&
+        gallery.compareDocumentPosition(tour) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("renders pricing and travel from config, not from page literals", () => {
@@ -219,6 +251,8 @@ describe("senior living page", () => {
     expect(source).not.toMatch(/\b0\.05\b/);
     expect(source).not.toMatch(/\b17\b|\b84\b/);
     expect(source).not.toMatch(/\bfont-serif\b|Cormorant|Garamond|cursive/);
+    expect(source).toContain("object-top");
+    expect(source).toContain("photos.slice(1)");
     const communityName = ["sun", "dale"].join("");
     expect(source.toLowerCase()).not.toContain(communityName);
     expect(source).not.toContain(["cadi", "@"].join(""));

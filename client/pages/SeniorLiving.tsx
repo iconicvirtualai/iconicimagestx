@@ -43,12 +43,12 @@ function Photo({
   photo,
   sizes,
   eager = false,
-  decorative = false,
+  imgClassName = "object-center",
 }: {
   photo: SeniorLivingPhoto;
   sizes: string;
   eager?: boolean;
-  decorative?: boolean;
+  imgClassName?: string;
 }) {
   const src = seniorLivingPhotoSrc(photo);
   return (
@@ -56,12 +56,12 @@ function Photo({
       <source type="image/webp" srcSet={src.webpSrcSet} sizes={sizes} />
       <img
         src={src.jpg}
-        alt={decorative ? "" : photo.alt}
+        alt={photo.alt}
         width={1600}
         height={1067}
         loading={eager ? "eager" : "lazy"}
         decoding="async"
-        className="h-full w-full max-w-full object-cover"
+        className={`h-full w-full max-w-full object-cover ${imgClassName}`}
       />
     </picture>
   );
@@ -117,6 +117,7 @@ const STEPS = [
 export default function SeniorLiving() {
   const photos = publishedSeniorLivingPhotos();
   const heroPhoto = photos[0];
+  const gallery = photos.slice(1);
   const [name, setName] = useState("");
   const [community, setCommunity] = useState("");
   const [email, setEmail] = useState("");
@@ -212,7 +213,12 @@ export default function SeniorLiving() {
             {heroPhoto ? (
               <div className="mb-6 overflow-hidden rounded-3xl border-2 border-[#FFE14A]">
                 <div className="aspect-[16/9] w-full">
-                  <Photo photo={heroPhoto} sizes="100vw" eager decorative />
+                  <Photo
+                    photo={heroPhoto}
+                    sizes="100vw"
+                    eager
+                    imgClassName="object-top sm:object-center"
+                  />
                 </div>
               </div>
             ) : null}
@@ -240,7 +246,7 @@ export default function SeniorLiving() {
           </div>
         </section>
 
-        {photos.length > 0 ? (
+        {gallery.length > 0 ? (
           <section
             data-testid="senior-gallery"
             aria-label="Photos of a Woodlands-area senior living community"
@@ -251,7 +257,7 @@ export default function SeniorLiving() {
                 A Woodlands-area senior living community
               </h2>
               <ul className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {photos.map((photo) => (
+                {gallery.map((photo) => (
                   <li
                     key={photo.stem}
                     className="min-w-0 overflow-hidden rounded-2xl"
