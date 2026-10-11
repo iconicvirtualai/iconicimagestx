@@ -5,10 +5,10 @@
  */
 
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { staffLoginAction } from "@shared/staffAccess";
-import { openOwnerSession } from "@/lib/openOwnerSession";
+import { openOwnerSession, ownerLoginNext } from "@/lib/openOwnerSession";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -16,6 +16,8 @@ import { toast } from "sonner";
 export default function AdminLogin() {
   const { signIn, signOutUser, user, isStaff, staffProfile, loading, resetPassword } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const ownerNext = ownerLoginNext(location.search);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,6 +36,12 @@ export default function AdminLogin() {
       if (cancelled) return;
       if (owner) {
         navigate("/admin/owners", { replace: true });
+        return;
+      }
+      // Sent here from an owner page: a non-owner gets the same 404 as before,
+      // rendered client-side, instead of the staff dashboard.
+      if (ownerNext) {
+        navigate(ownerNext, { replace: true });
         return;
       }
       const action = staffLoginAction({
@@ -56,7 +64,7 @@ export default function AdminLogin() {
     };
     // signOutUser identity changes each render; only the auth state should retrigger this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isStaff, staffProfile, loading, navigate]);
+  }, [user, isStaff, staffProfile, loading, navigate, ownerNext]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

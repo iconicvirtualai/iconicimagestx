@@ -20,6 +20,9 @@ import { OWNER_WHY } from "../services/ownerWhy";
 import { GENERIC_TITLE, stripPublicMeta } from "../../shared/siteSeo";
 
 const NOT_FOUND = { error: "Not found" };
+/** Where a signed-out visit to an owner page is sent. The login page is the generic staff login. */
+export const OWNER_LOGIN_REDIRECT = "/admin/login?next=/admin/owners";
+const OWNER_PAGE_PATHS = new Set(["/admin/owners", "/admin/owners/", "/owners", "/owners/"]);
 
 export function mountOwners(app: Express) {
   const page = ["/admin/owners", "/admin/owners/", "/owners", "/owners/", "/api/owners/page"];
@@ -99,9 +102,23 @@ async function handleSession(req: Request, res: Response) {
 async function handleOwnersPage(req: Request, res: Response) {
   setPrivate(res);
   const owner = await resolveOwnerIdentity(req.headers);
-  if (!owner) return res.status(404).type("html").send(NOT_FOUND_HTML);
+  if (!owner) {
+    // A browser visit carries no bearer token, so with no owner session it is
+    // sent to the generic login. A failed bearer and /api/owners/page stay 404.
+    if (OWNER_PAGE_PATHS.has(req.path) && !hasBearer(req)) {
+      res.setHeader("Location", OWNER_LOGIN_REDIRECT);
+      return res.status(302).end();
+    }
+    return res.status(404).type("html").send(NOT_FOUND_HTML);
+  }
   const html = injectDevPreamble(injectRobots((await readSpaShell()) || FALLBACK_SHELL));
   return res.status(200).type("html").send(html);
+}
+
+function hasBearer(req: Request): boolean {
+  const value = req.headers.authorization;
+  const header = Array.isArray(value) ? value[0] : value;
+  return typeof header === "string" && header.trim().length > 0;
 }
 
 function setPrivate(res: Response) {
