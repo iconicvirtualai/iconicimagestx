@@ -63,6 +63,94 @@ describe("owners suite structure rendering", () => {
     expect(host.innerHTML.toLowerCase()).not.toContain("cormorant");
   });
 
+  it("shows orders for Cadi and submits the textarea", async () => {
+    const data = parseOwnerSuite(ownerCommandCenterStructureGrids(), new Date("2026-10-10T18:00:00Z"));
+    const submitted: string[] = [];
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    root = createRoot(host);
+    act(() => {
+      root?.render(
+        <OwnersSuiteView
+          payload={{ data, source: "fixture", configured: true, notice: null, readerEmail: null }}
+          refreshing={false}
+          showOps={false}
+          orders={[
+            {
+              timestamp: "2026-10-10 10:05 PM CT",
+              text: "Book the lake house",
+              status: "New",
+              ownerBot: "",
+              reply: "On it",
+            },
+          ]}
+          onSubmitOrder={async (text) => {
+            submitted.push(text);
+            return true;
+          }}
+          onRefresh={() => undefined}
+          onSignOut={() => undefined}
+        />,
+      );
+    });
+    const text = host.textContent || "";
+    expect(text).toContain("Orders for Cadi 2.0");
+    expect(text).toContain("Timestamp");
+    expect(text).toContain("Order text");
+    expect(text).toContain("Status");
+    expect(text).toContain("Owner bot");
+    expect(text).toContain("Cadi 2.0 reply");
+    expect(text).toContain("2026-10-10 10:05 PM CT");
+    expect(text).toContain("Book the lake house");
+    expect(text).toContain("New");
+    expect(text).toContain("On it");
+    const box = host.querySelector("[data-cadi-orders]");
+    expect(box?.innerHTML || "").not.toContain("font-serif");
+    expect((box?.innerHTML || "").toLowerCase()).not.toContain("cormorant");
+    const textarea = host.querySelector("textarea");
+    expect(textarea?.getAttribute("style") || "").toContain("Inter, system-ui, sans-serif");
+    expect(textarea?.getAttribute("style") || "").toContain("font-style: normal");
+    const empty = host.querySelector("form");
+    await act(async () => {
+      empty?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    expect(host.textContent || "").toContain("Enter an order.");
+    expect(submitted).toEqual([]);
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
+    await act(async () => {
+      setter?.call(textarea, "  Call the lab  ");
+      textarea?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      empty?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    expect(submitted).toEqual(["Call the lab"]);
+    expect((textarea as HTMLTextAreaElement).value).toBe("");
+  });
+
+  it("shows one not-connected line when the save error repeats the notice", () => {
+    const data = parseOwnerSuite(ownerCommandCenterStructureGrids(), new Date("2026-10-10T18:00:00Z"));
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    root = createRoot(host);
+    act(() => {
+      root?.render(
+        <OwnersSuiteView
+          payload={{ data, source: "fixture", configured: true, notice: null, readerEmail: null }}
+          refreshing={false}
+          showOps={false}
+          ordersNotice="Orders are not connected."
+          orderError="Orders are not connected."
+          onRefresh={() => undefined}
+          onSignOut={() => undefined}
+        />,
+      );
+    });
+    const text = host.textContent || "";
+    expect(text.split("Orders are not connected.").length - 1).toBe(1);
+    expect(host.querySelector("[role='alert']")?.textContent).toBe("Orders are not connected.");
+  });
+
   it("opens the plan board from the data tab", () => {
     const host = renderSuite();
     const plan = Array.from(host.querySelectorAll('[role="tab"]')).find((tab) => tab.textContent === "Plan Board");

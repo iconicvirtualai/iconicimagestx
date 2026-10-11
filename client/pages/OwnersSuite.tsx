@@ -1,5 +1,6 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import { OWNER_ORDER_TEXT_MAX, type OwnerOrder, type OwnerOrdersResponse } from "@shared/ownerOrders";
 import type { OwnerSuiteData } from "@shared/ownerSuite";
 import PlanBoard from "@/components/owners/PlanBoard";
 import NotFound from "@/pages/NotFound";
@@ -27,6 +28,10 @@ export default function OwnersSuite() {
   const { isStaff, signOutUser } = useAuth();
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [refreshing, setRefreshing] = useState(false);
+  const [orders, setOrders] = useState<OwnerOrder[]>([]);
+  const [ordersNotice, setOrdersNotice] = useState<string | null>(null);
+  const [orderError, setOrderError] = useState<string | null>(null);
+  const [ordersSubmitting, setOrdersSubmitting] = useState(false);
 
   useEffect(() => {
     const meta = document.querySelector('meta[name="robots"]') || document.createElement("meta");
@@ -35,7 +40,7 @@ export default function OwnersSuite() {
     if (!meta.parentElement) document.head.appendChild(meta);
   }, []);
 
-  async function load(fresh = false) {
+  async function ownerHeaders(): Promise<Record<string, string>> {
     const headers: Record<string, string> = {};
     if (auth.currentUser) {
       try {
@@ -44,11 +49,29 @@ export default function OwnersSuite() {
         // The httpOnly session cookie can still authorize this request.
       }
     }
-    const response = await fetch(fresh ? "/api/owners/suite?fresh=1" : "/api/owners/suite", {
-      headers,
+    return headers;
+  }
+
+  async function loadOrders(isCancelled = () => false) {
+    const response = await fetch("/api/owners/orders", {
+      headers: await ownerHeaders(),
       credentials: "include",
       cache: "no-store",
     });
+    if (!response.ok || isCancelled()) return;
+    const payload = (await response.json()) as OwnerOrdersResponse;
+    if (isCancelled()) return;
+    setOrders(payload.orders);
+    setOrdersNotice(payload.notice);
+  }
+
+  async function load(fresh = false, isCancelled = () => false) {
+    const response = await fetch(fresh ? "/api/owners/suite?fresh=1" : "/api/owners/suite", {
+      headers: await ownerHeaders(),
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (isCancelled()) return;
     if (response.status === 404) {
       setState({ status: "denied" });
       return;
@@ -58,13 +81,47 @@ export default function OwnersSuite() {
       return;
     }
     const payload = (await response.json()) as OwnerSuitePayload;
+    if (isCancelled()) return;
     setState({ status: "ready", payload });
     document.title = "Owners Suite · Iconic";
+    try {
+      await loadOrders(isCancelled);
+    } catch {
+      if (!isCancelled()) setOrdersNotice("Orders could not be read.");
+    }
+  }
+
+  async function submitOrder(text: string): Promise<boolean> {
+    setOrdersSubmitting(true);
+    setOrderError(null);
+    try {
+      const response = await fetch("/api/owners/orders", {
+        method: "POST",
+        headers: { ...(await ownerHeaders()), "Content-Type": "application/json" },
+        credentials: "include",
+        cache: "no-store",
+        body: JSON.stringify({ text }),
+      });
+      const body = (await response.json().catch(() => null)) as { error?: string; order?: OwnerOrder } | null;
+      if (!response.ok || !body?.order) {
+        setOrderError(body?.error || "The order could not be saved.");
+        return false;
+      }
+      setOrders((current) => [body.order as OwnerOrder, ...current].slice(0, 10));
+      setOrderError(null);
+      void loadOrders().catch(() => undefined);
+      return true;
+    } catch {
+      setOrderError("The order could not be saved.");
+      return false;
+    } finally {
+      setOrdersSubmitting(false);
+    }
   }
 
   useEffect(() => {
     let cancelled = false;
-    void load().catch(() => {
+    void load(false, () => cancelled).catch(() => {
       if (!cancelled) setState({ status: "error" });
     });
     return () => {
@@ -115,6 +172,11 @@ export default function OwnersSuite() {
       payload={state.payload}
       refreshing={refreshing}
       showOps={isStaff}
+      orders={orders}
+      ordersNotice={ordersNotice}
+      orderError={orderError}
+      ordersSubmitting={ordersSubmitting}
+      onSubmitOrder={submitOrder}
       onRefresh={() => void refresh()}
       onSignOut={() => void signOut()}
     />
@@ -166,12 +228,22 @@ export function OwnersSuiteView({
   payload,
   refreshing,
   showOps,
+  orders = [],
+  ordersNotice = null,
+  orderError = null,
+  ordersSubmitting = false,
+  onSubmitOrder,
   onRefresh,
   onSignOut,
 }: {
   payload: OwnerSuitePayload;
   refreshing: boolean;
   showOps: boolean;
+  orders?: OwnerOrder[];
+  ordersNotice?: string | null;
+  orderError?: string | null;
+  ordersSubmitting?: boolean;
+  onSubmitOrder?: (text: string) => Promise<boolean>;
   onRefresh: () => void;
   onSignOut: () => void;
 }) {
@@ -238,6 +310,14 @@ export function OwnersSuiteView({
             ) : null}
           </section>
         ) : null}
+
+        <OrdersForCadi
+          orders={orders}
+          notice={ordersNotice}
+          error={orderError}
+          submitting={ordersSubmitting}
+          onSubmit={onSubmitOrder}
+        />
 
         <section className="rounded-[28px] border border-[#e8c872]/35 bg-[#102844] p-5 shadow-[0_18px_50px_rgba(0,0,0,0.28)]">
           <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#e8c872]">Cash</p>
@@ -405,6 +485,113 @@ function WhyHero({ quote }: { quote: string }) {
         {quote}
         <span aria-hidden="true" className="text-[#f0d48a]">”</span>
       </blockquote>
+    </section>
+  );
+}
+
+function OrdersForCadi({
+  orders,
+  notice,
+  error,
+  submitting,
+  onSubmit,
+}: {
+  orders: OwnerOrder[];
+  notice: string | null;
+  error: string | null;
+  submitting: boolean;
+  onSubmit?: (text: string) => Promise<boolean>;
+}) {
+  const [draft, setDraft] = useState("");
+  const [localError, setLocalError] = useState<string | null>(null);
+  const shownError = localError || error;
+  const count = draft.trim().length;
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const text = draft.trim();
+    if (!text) {
+      setLocalError("Enter an order.");
+      return;
+    }
+    if (text.length > OWNER_ORDER_TEXT_MAX) {
+      setLocalError("Orders are limited to 2,000 characters.");
+      return;
+    }
+    setLocalError(null);
+    const saved = await onSubmit?.(text);
+    if (saved) setDraft("");
+  }
+
+  return (
+    <section data-cadi-orders style={suiteFont}>
+      <Card kicker="Owner" title="Orders for Cadi 2.0">
+        <form onSubmit={(event) => void submit(event)}>
+          <label htmlFor="cadi-order" className="text-[10px] font-black uppercase tracking-[0.16em] text-[#9fb0c7]">
+            Order text
+          </label>
+          <textarea
+            id="cadi-order"
+            name="order"
+            value={draft}
+            maxLength={OWNER_ORDER_TEXT_MAX}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              if (localError) setLocalError(null);
+            }}
+            placeholder="Write the order"
+            className="mt-2 min-h-28 w-full resize-y rounded-2xl border border-[#e8c872]/30 bg-[#071422] px-3 py-3 text-sm text-[#f7f1e4] outline-none"
+            style={suiteFont}
+          />
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9fb0c7]">
+              {count} / {OWNER_ORDER_TEXT_MAX}
+            </p>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="rounded-full bg-[#e8c872] px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] text-[#071422] disabled:opacity-60"
+              style={suiteFont}
+            >
+              {submitting ? "Sending" : "Submit"}
+            </button>
+          </div>
+        </form>
+        {shownError ? (
+          <p role="alert" className="mt-3 text-sm text-rose-200">
+            {shownError}
+          </p>
+        ) : null}
+        {notice && notice !== shownError ? <p className="mt-3 text-sm text-[#d5deea]">{notice}</p> : null}
+        {orders.length === 0 ? (
+          <p className="mt-4 text-sm text-[#9fb0c7]">No orders yet</p>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full border-collapse text-left text-sm" style={suiteFont}>
+              <thead>
+                <tr className="text-[10px] font-black uppercase tracking-[0.14em] text-[#9fb0c7]">
+                  <th className="px-2 py-2 font-black">Timestamp</th>
+                  <th className="px-2 py-2 font-black">Order text</th>
+                  <th className="px-2 py-2 font-black">Status</th>
+                  <th className="px-2 py-2 font-black">Owner bot</th>
+                  <th className="px-2 py-2 font-black">Cadi 2.0 reply</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((order, index) => (
+                  <tr key={`${order.timestamp}-${index}`} className="border-t border-[#e8c872]/15 align-top">
+                    <td className="px-2 py-3 text-xs text-[#e8c872]">{order.timestamp}</td>
+                    <td className="whitespace-pre-wrap px-2 py-3 text-[#f7f1e4]">{order.text}</td>
+                    <td className="px-2 py-3 text-[#d5deea]">{order.status || "—"}</td>
+                    <td className="px-2 py-3 text-[#d5deea]">{order.ownerBot || "—"}</td>
+                    <td className="whitespace-pre-wrap px-2 py-3 text-[#d5deea]">{order.reply || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
     </section>
   );
 }

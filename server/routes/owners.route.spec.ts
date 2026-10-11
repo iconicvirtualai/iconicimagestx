@@ -150,6 +150,43 @@ describe("owners suite access", () => {
     expect(api.text).not.toContain(OWNER_WHY);
   });
 
+  it("returns 404 for orders when the caller is not an owner", async () => {
+    allowOwnerFixtures();
+    const secret = "secret-order-text";
+    const anon = await read("/api/owners/orders");
+    const posted = await fetch(`${baseUrl}/api/owners/orders`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: secret }),
+    });
+    const postedText = await posted.text();
+    __setOwnerIdTokenVerifierForTests(async () => ({
+      email: "admin@iconicimagestx.com",
+      uid: "admin-uid",
+    }));
+    const admin = await read("/api/owners/orders", { Authorization: "Bearer admin-id-token" });
+    const temp = await fetch(`${baseUrl}/api/owners/orders`, {
+      method: "POST",
+      headers: { Authorization: "Bearer temp-admin-token", "Content-Type": "application/json" },
+      body: JSON.stringify({ text: secret }),
+    });
+    const tempText = await temp.text();
+    for (const hit of [
+      { status: anon.response.status, text: anon.text, cache: anon.response.headers.get("cache-control"), robots: anon.response.headers.get("x-robots-tag") },
+      { status: posted.status, text: postedText, cache: posted.headers.get("cache-control"), robots: posted.headers.get("x-robots-tag") },
+      { status: admin.response.status, text: admin.text, cache: admin.response.headers.get("cache-control"), robots: admin.response.headers.get("x-robots-tag") },
+      { status: temp.status, text: tempText, cache: temp.headers.get("cache-control"), robots: temp.headers.get("x-robots-tag") },
+    ]) {
+      expect(hit.status).toBe(404);
+      expect(hit.cache).toContain("private");
+      expect(hit.cache).toContain("no-store");
+      expect(hit.robots).toContain("noindex");
+      expect(hit.text).not.toContain(secret);
+      expect(hit.text).not.toContain("1vHkdHRhAWKcnsv8");
+      expect(hit.text.toLowerCase()).not.toContain("forbidden");
+    }
+  });
+
   it("does not honor a session cookie for someone off the allowlist", async () => {
     allowOwnerFixtures();
     const secret = ownerSessionSecret();
