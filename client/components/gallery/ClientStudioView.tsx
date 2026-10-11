@@ -11,10 +11,10 @@ import { clientGalleryDownloadsUnlocked, studioOffersDownloads } from "@shared/p
 import { GalleryDownloadLockNotice } from "@/components/GalleryDownloadLock";
 import { PublicContactLine } from "@/components/PublicContactLine";
 import { StudioGalleryTabs, type StudioGalleryTab, type StudioGalleryTabId } from "@/components/gallery/StudioGalleryTabs";
+import { StudioPropertyMedia } from "@/components/gallery/StudioPropertyMedia";
+import { blockPublicVideoMenu, readStudioPropertyMedia } from "@/components/gallery/studioPropertyMedia";
 
-export function blockPublicVideoMenu(event: { preventDefault: () => void }) {
-  event.preventDefault();
-}
+export { blockPublicVideoMenu };
 
 export function ClientStudioView({
   project,
@@ -73,8 +73,7 @@ export function ClientStudioView({
 
   const images: any[] = project.images || [];
   const videos: any[] = project.videos || [];
-  const floorPlans: any[] = project.floorPlans || [];
-  const tours: any[] = project.tourUrl ? [{ url: project.tourUrl }] : [];
+  const propertyMedia = readStudioPropertyMedia(project);
   const downloadsUnlocked = typeof project.downloadsUnlocked === "boolean"
     ? project.downloadsUnlocked
     : clientGalleryDownloadsUnlocked({
@@ -90,7 +89,7 @@ export function ClientStudioView({
   const tabs: StudioGalleryTab[] = [
     { id: "photos", label: "Photos", count: images.length },
     { id: "videos", label: "Videos", count: videos.length },
-    { id: "tours", label: "Tours", count: tours.length + floorPlans.length },
+    { id: "tours", label: "Tours", count: propertyMedia.tours.length + propertyMedia.floorPlans.length + propertyMedia.aerials.length },
     ...(owner ? [
       { id: "revisions" as const, label: "Revisions", count: revisions.filter((r) => r.status === "pending").length },
       { id: "ai_studio" as const, label: "AI Tools", count: 0 },
@@ -202,31 +201,12 @@ export function ClientStudioView({
           )
         )}
 
-        {/* TOURS */}
+        {/* TOURS, FLOOR PLANS, AERIALS */}
         {activeTab === "tours" && (
-          tours.length === 0 && floorPlans.length === 0 ? (
+          propertyMedia.tours.length === 0 && propertyMedia.floorPlans.length === 0 && propertyMedia.aerials.length === 0 ? (
             <div className="text-center py-20"><Layers className="w-16 h-16 text-gray-200 mx-auto mb-4" /><p className="text-gray-400 font-bold">No 3D tours</p></div>
           ) : (
-            <div className="space-y-4">
-              {tours.map((t: any, i: number) => (
-                <div key={i} className="bg-gray-50 rounded-2xl p-6">
-                  <p className="font-bold mb-2">3D Virtual Tour</p>
-                  <a href={t.url} target="_blank" rel="noopener noreferrer" className="text-[#0d9488] font-bold flex items-center gap-2">
-                    Open Tour <ExternalLink className="w-4 h-4" />
-                  </a>
-                </div>
-              ))}
-              {floorPlans.map((plan: any, i: number) => (
-                <div key={plan.url || i} className="bg-gray-50 rounded-2xl p-6">
-                  <p className="font-bold mb-2">{plan.name || "Floor plan"}</p>
-                  {owner ? (
-                    floorPlanBody(plan)
-                  ) : (
-                    publicFloorPlanBody(plan)
-                  )}
-                </div>
-              ))}
-            </div>
+            <StudioPropertyMedia media={propertyMedia} view={owner ? "owner" : "public"} />
           )
         )}
 
@@ -361,38 +341,4 @@ export function ClientStudioView({
       )}
     </div>
   );
-}
-
-function floorPlanBody(plan: { url?: string; name?: string }) {
-  return /\.(jpe?g|png|webp|gif)(\?|$)/i.test(String(plan.url || "")) ? (
-    <img src={plan.url} alt={plan.name || "Floor plan"} className="mt-3 max-h-[480px] w-full rounded-xl object-contain bg-white" />
-  ) : (
-    <a href={plan.url} target="_blank" rel="noopener noreferrer" className="text-[#0d9488] font-bold flex items-center gap-2">
-      View floor plan <ExternalLink className="w-4 h-4" />
-    </a>
-  );
-}
-
-function publicFloorPlanBody(plan: { url?: string; name?: string }) {
-  const url = String(plan.url || "");
-  if (isDirectVideoFile(url)) {
-    return (
-      <video
-        src={url}
-        controls
-        playsInline
-        preload="metadata"
-        controlsList="nodownload noplaybackrate"
-        disablePictureInPicture
-        onContextMenu={blockPublicVideoMenu}
-        className="mt-3 block h-auto w-full max-w-full rounded-xl bg-black"
-      />
-    );
-  }
-  return floorPlanBody(plan);
-}
-
-function isDirectVideoFile(url: string): boolean {
-  const path = url.split("?")[0]?.split("#")[0] || "";
-  return /\.(mp4|m4v|mov|webm|ogv)$/i.test(path);
 }
