@@ -256,7 +256,10 @@ describe("GET /api/galleries/link/:id studio share", () => {
       if (doc.collection === "listings") {
         data.studioEnabled = true;
         data.lockStudio = false;
-        data.invoiceStatus = "paid";
+        data.invoiceStatus = "sent";
+        data.paymentStatus = "unpaid";
+        data.downloadEnabled = false;
+        data.downloadsReleased = false;
       }
       seed(doc.collection, doc.id, data);
     }
@@ -328,12 +331,34 @@ describe("GET /api/galleries/link/:id studio share", () => {
 
     seed("invoices", DELIVERY_QA_IDS.invoice, invoice?.data || {});
     const listingDoc = plan.documents.find((doc) => doc.id === DELIVERY_QA_IDS.listing);
-    seed("listings", DELIVERY_QA_IDS.listing, {
+    const galleryDoc = plan.documents.find((doc) => doc.id === DELIVERY_QA_IDS.gallery);
+    const lockedListing = {
       ...(listingDoc?.data || {}),
       studioEnabled: true,
       lockStudio: false,
-      invoiceStatus: "paid",
+      invoiceStatus: "sent",
+      paymentStatus: "unpaid",
+      downloadEnabled: false,
+      downloadsReleased: false,
+    };
+    seed("listings", DELIVERY_QA_IDS.listing, { ...lockedListing, invoiceStatus: "paid" });
+    const stalePaid = await openStudio("Bearer qa-owner-token", DELIVERY_QA_IDS.listing);
+    const staleProject = stalePaid.body.project as { downloadsUnlocked?: boolean; invoice?: { status?: string } };
+    expect(staleProject.downloadsUnlocked).toBe(true);
+    expect(staleProject.invoice).toEqual({ status: "sent" });
+    expect(JSON.stringify(stalePaid.body.project)).toContain("/media/blaze/01_BUILT_v2.mp4");
+    expect(JSON.stringify(stalePaid.body.project)).toContain("/media/photos/luxury-exterior.jpg");
+
+    seed("listings", DELIVERY_QA_IDS.listing, { ...lockedListing, paymentStatus: "comped" });
+    const comped = await openStudio("Bearer qa-owner-token", DELIVERY_QA_IDS.listing);
+    expect((comped.body.project as { downloadsUnlocked?: boolean }).downloadsUnlocked).toBe(true);
+    expect(JSON.stringify(comped.body.project)).toContain("/media/blaze/01_BUILT_v2.mp4");
+
+    seed("listings", DELIVERY_QA_IDS.listing, lockedListing);
+    seed("galleries", DELIVERY_QA_IDS.gallery, {
+      ...(galleryDoc?.data || {}),
       downloadsReleased: true,
+      downloadEnabled: true,
     });
     const released = await openStudio("Bearer qa-owner-token", DELIVERY_QA_IDS.listing);
     expect((released.body.project as { downloadsUnlocked?: boolean }).downloadsUnlocked).toBe(true);

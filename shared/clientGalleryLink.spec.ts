@@ -226,11 +226,12 @@ describe("decideClientGalleryLink", () => {
     expect(releasedByStaff.downloadsUnlocked).toBe(true);
   });
 
-  it("strips original files from the locked owner view and ignores a stale paid status", () => {
+  it("strips original files from the truly locked owner view", () => {
     const rawMp4 = "https://cdn.example/walkthrough-raw.mp4";
     const fullRes = "https://cdn.example/luxury-exterior-full.jpg";
     const source = listing({
-      invoiceStatus: "paid",
+      invoiceStatus: "sent",
+      paymentStatus: "unpaid",
       lockDownloads: true,
       images: [
         {
@@ -318,6 +319,50 @@ describe("decideClientGalleryLink", () => {
     });
     expect(staff.downloadsUnlocked).toBe(false);
     expect(JSON.stringify(staff.videos)).toContain(rawMp4);
+  });
+
+  it("keeps full file URLs when staff marked paid or released, including a stale copied paid field", () => {
+    const rawMp4 = "https://cdn.example/walkthrough-raw.mp4";
+    const source = listing({
+      invoiceStatus: "paid",
+      paymentStatus: "unpaid",
+      lockDownloads: true,
+      downloadEnabled: false,
+      downloadsReleased: false,
+      videos: [{ url: rawMp4, name: "Walkthrough", streamUrl: "https://cdn.example/walkthrough/stream.m3u8" }],
+    });
+    const opened = decideClientGalleryLink({ ...empty, id: LISTING_ID, listing: source });
+    if (opened.ok !== true || opened.kind !== "listing" || opened.project.view !== "public") {
+      throw new Error("expected the listing studio");
+    }
+    const unpaidInvoice = { status: "unpaid", total: 450, amountPaid: 0, amountDue: 450 };
+    const stalePaid = ownerStudioProject(source, opened.project, { invoice: unpaidInvoice });
+    expect(stalePaid.downloadsUnlocked).toBe(true);
+    expect(stalePaid.invoice).toEqual({ status: "unpaid" });
+    expect(stalePaid.videos.map((video) => video.url)).toContain(rawMp4);
+    expect(stalePaid.images[0]?.downloadUrl).toBe("https://cdn.example/front-full.jpg");
+    expect(stalePaid.files.map((file) => file.url)).toEqual(expect.arrayContaining([
+      "https://cdn.example/delivery.zip",
+      "https://cdn.example/front-full.jpg",
+    ]));
+
+    const paymentStatus = ownerStudioProject(
+      listing({ invoiceStatus: "sent", paymentStatus: "comped", lockDownloads: true, videos: source.videos }),
+      opened.project,
+      { invoice: unpaidInvoice },
+    );
+    expect(paymentStatus.downloadsUnlocked).toBe(true);
+    expect(JSON.stringify(paymentStatus.videos)).toContain(rawMp4);
+    expect(paymentStatus.files.map((file) => file.url)).toContain("https://cdn.example/delivery.zip");
+
+    const released = ownerStudioProject(
+      listing({ invoiceStatus: "sent", paymentStatus: "unpaid", lockDownloads: true, videos: source.videos }),
+      opened.project,
+      { invoice: unpaidInvoice, downloadEnabled: true, downloadsReleased: true },
+    );
+    expect(released.downloadsUnlocked).toBe(true);
+    expect(JSON.stringify(released.files)).toContain("https://cdn.example/delivery.zip");
+    expect(JSON.stringify(released.videos)).toContain(rawMp4);
   });
 
   it("says when the project exists but Client Studio is off or locked", () => {

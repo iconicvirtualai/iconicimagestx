@@ -6,8 +6,8 @@
 
 import { addressText } from "./addressText.ts";
 import { frameFromListingImage } from "./iconicStudio";
+import { studioDownloadsUnlocked } from "./lockImpact.ts";
 import {
-  clientGalleryDownloadsUnlocked,
   lockDownloadsOn,
   requirePaymentOn,
   type InvoiceLike,
@@ -621,8 +621,10 @@ function lockedOwnerMedia(listing: GalleryLinkDoc, pub: PublicStudioProject) {
 
 export interface OwnerStudioGate {
   /**
-   * Linked invoice document. When this key is present, including null,
-   * listing.invoiceStatus is not a payment signal.
+   * Linked invoice document. Staff release flags and a listing
+   * paymentStatus or invoiceStatus of paid or comped also unlock, including
+   * a stale copied paid field on an invoice that is still explicitly unpaid.
+   * That narrow case stays open and is listed by the lock-impact report.
    */
   invoice?: InvoiceLike;
   downloadEnabled?: unknown;
@@ -648,11 +650,18 @@ export function ownerStudioProject(
     ? text(invoiceDoc?.status)
     : text(invoiceOf(listing)?.status);
   const invoice = invoiceStatus ? { status: invoiceStatus } : null;
-  const downloadsUnlocked = clientGalleryDownloadsUnlocked({
-    invoice: authoritativeInvoice ? invoiceDoc : (invoiceStatus ? { status: invoiceStatus } : null),
-    downloadEnabled: gate.downloadEnabled ?? listing.downloadEnabled,
-    downloadsReleased: gate.downloadsReleased ?? listing.downloadsReleased,
-    lockDownloads: listing.lockDownloads,
+  const downloadsUnlocked = studioDownloadsUnlocked({
+    listing: {
+      id: listing.id,
+      invoiceStatus: listing.invoiceStatus,
+      paymentStatus: listing.paymentStatus,
+      invoice: listing.invoice,
+      downloadEnabled: gate.downloadEnabled ?? listing.downloadEnabled,
+      downloadsReleased: gate.downloadsReleased ?? listing.downloadsReleased,
+      lockDownloads: listing.lockDownloads,
+    },
+    galleries: [],
+    invoice: authoritativeInvoice ? invoiceDoc : null,
   });
   const project: OwnerStudioProject = {
     ...pub,

@@ -203,7 +203,8 @@ async function finishGalleryLink(
     relatedForListing(listing),
   ]);
   if (result.project.view !== "public") return result;
-  // The invoice document decides paid. A copied listing.invoiceStatus must not.
+  // Staff release flags and staff-set paid/comped listing fields stay open.
+  // A stale copied paid field on an explicitly unpaid invoice stays open too.
   const project: OwnerStudioProject = ownerStudioProject(listing, result.project, {
     invoice: invoice ?? null,
     downloadEnabled: listing.downloadEnabled === true || related.some((doc) => doc.downloadEnabled === true),
