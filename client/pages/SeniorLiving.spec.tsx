@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import SeniorLiving, { SENIOR_LIVING_CTA } from "./SeniorLiving";
 import {
   publishedSeniorLivingPhotos,
+  SENIOR_LIVING_FAMILY_PHOTO,
   SENIOR_LIVING_PHOTOS,
   SENIOR_LIVING_WIDTHS,
   SENIOR_LIVING_MATTERPORT_ALLOW,
@@ -97,7 +98,8 @@ afterEach(() => {
 describe("senior living page", () => {
   it("renders the route sections, Matterport tour, and business footer", () => {
     const html = container?.innerHTML || "";
-    expect(html).toContain("Virtual tours and photography");
+    expect(html).toContain("Virtual tours for");
+    expect(html).toContain("senior living");
     expect(html).toContain("Spring");
     expect(html).toContain("The Woodlands");
     expect(html).toContain("Houston");
@@ -179,6 +181,23 @@ describe("senior living page", () => {
       photos.slice(1).map((photo) => `/senior-living/${photo.stem}.jpg`),
     );
     expect(gallery?.innerHTML).not.toContain("senior-living-01-hero");
+    expect(gallery?.innerHTML).not.toContain("senior-living-family");
+    expect(gallery?.innerHTML).not.toContain("residents");
+
+    const family = container?.querySelector(
+      '[data-testid="senior-family"] img',
+    ) as HTMLImageElement | null;
+    expect(family?.getAttribute("alt")).toBe(SENIOR_LIVING_FAMILY_PHOTO.alt);
+    expect(family?.getAttribute("src")).toBe(
+      `/senior-living/${SENIOR_LIVING_FAMILY_PHOTO.stem}.jpg`,
+    );
+    const steps = container?.querySelector('[data-testid="senior-steps"]');
+    expect(
+      family &&
+        steps &&
+        family.compareDocumentPosition(steps) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(container?.innerHTML).not.toMatch(
       /unsplash|picsum|coming soon|stock photo|via\.placeholder/i,
     );
@@ -256,7 +275,9 @@ describe("senior living page", () => {
     expect(source).not.toMatch(/\bfont-serif\b|Cormorant|Garamond|cursive/);
     expect(source).toContain("object-top");
     expect(source).toContain("photos.slice(1)");
-    expect(source.match(/#FFE14A/g)).toHaveLength(1);
+    expect(source).toContain("text-[#FFE14A]");
+    expect(source).toContain('className="bg-[#FFE14A] text-[#1A1A1A]"');
+    expect(source).not.toContain("residents");
     const communityName = ["sun", "dale"].join("");
     expect(source.toLowerCase()).not.toContain(communityName);
     expect(source).not.toContain(["cadi", "@"].join(""));

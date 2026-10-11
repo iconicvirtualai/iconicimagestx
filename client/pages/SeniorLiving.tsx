@@ -4,6 +4,7 @@ import { MoneyAmount } from "@/components/MoneyAmount";
 import { PublicContactLine } from "@/components/PublicContactLine";
 import {
   publishedSeniorLivingPhotos,
+  SENIOR_LIVING_FAMILY_PHOTO,
   seniorLivingPhotoSrc,
   SENIOR_LIVING_MATTERPORT_ALLOW,
   SENIOR_LIVING_MATTERPORT_SRC,
@@ -227,9 +228,10 @@ export default function SeniorLiving() {
                 </div>
               </div>
             ) : null}
-            <div className="relative z-10 -mt-20 max-w-3xl rounded-2xl bg-[#1C1917] p-6 text-white sm:-mt-32 sm:p-10">
-              <h1 className="text-[2rem] font-semibold leading-tight sm:text-4xl">
-                Virtual tours and photography
+            <div className="relative z-10 -mt-20 max-w-3xl rounded-2xl bg-[#1A1A1A] p-6 text-white sm:-mt-32 sm:p-10">
+              <h1 className="text-[2rem] font-bold leading-tight text-white sm:text-4xl">
+                Virtual tours for{" "}
+                <span className="text-[#FFE14A]">senior living</span>
               </h1>
               <p className="mt-4 max-w-xl text-lg leading-relaxed sm:text-xl">
                 For communities in Spring, The Woodlands, and Houston.
@@ -313,32 +315,55 @@ export default function SeniorLiving() {
         </section>
 
         <section
+          data-testid="senior-family"
+          aria-labelledby="family-heading"
           className="bg-[#F6F3EE] text-neutral-950"
+        >
+          <div className="mx-auto w-full max-w-6xl px-4 py-16 sm:py-20">
+            <h2
+              id="family-heading"
+              className="text-3xl font-bold leading-tight sm:text-4xl"
+            >
+              Life here
+            </h2>
+            <p className={`mt-4 max-w-2xl ${bodyText}`}>
+              Families are welcome. This is a quiet visit, made for the people
+              who live here and the people who love them.
+            </p>
+            <div className="mt-8 overflow-hidden rounded-2xl">
+              <div className="aspect-[3/2] w-full max-w-3xl bg-neutral-200">
+                <Photo
+                  photo={SENIOR_LIVING_FAMILY_PHOTO}
+                  sizes="(min-width: 768px) 768px, 100vw"
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section
+          className="bg-[#FFE14A] text-[#1A1A1A]"
           aria-labelledby="steps-heading"
         >
           <div className="mx-auto w-full max-w-6xl px-4 py-16 sm:py-20">
             <h2
               id="steps-heading"
-              className="text-3xl font-semibold leading-tight sm:text-4xl"
+              className="text-3xl font-bold leading-tight sm:text-4xl"
             >
               How it works
             </h2>
             <ol
               data-testid="senior-steps"
-              className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3"
+              className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-3"
             >
               {STEPS.map((step, index) => (
-                <li
-                  key={step.title}
-                  className="min-w-0 rounded-2xl border border-neutral-200 bg-white p-6"
-                >
-                  <p className="text-3xl font-semibold leading-none text-neutral-950">
-                    {index + 1}
-                  </p>
-                  <h3 className="mt-4 text-2xl font-semibold leading-tight">
-                    {step.title}
+                <li key={step.title} className="min-w-0">
+                  <h3 className="text-2xl font-bold leading-tight sm:text-3xl">
+                    {index + 1} {step.title}.
                   </h3>
-                  <p className={`mt-3 ${bodyText}`}>{step.body}</p>
+                  <p className="mt-3 text-lg leading-relaxed text-[#1A1A1A] sm:text-xl">
+                    {step.body}
+                  </p>
                 </li>
               ))}
             </ol>

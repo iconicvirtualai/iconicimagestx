@@ -84,6 +84,12 @@ export const SENIOR_LIVING_PHOTOS: readonly SeniorLivingPhoto[] = [
   },
 ];
 
+/** One fictional family photo for the "Life here" band. Not part of the building gallery. */
+export const SENIOR_LIVING_FAMILY_PHOTO: SeniorLivingPhoto = {
+  stem: "senior-living-family",
+  alt: "Smiling older woman holding hands with her adult daughter",
+};
+
 const STEM = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export function publishedSeniorLivingPhotos(
