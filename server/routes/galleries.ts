@@ -23,6 +23,15 @@ const router = Router();
 const db = () => admin.firestore();
 const storage = () => admin.storage().bucket();
 
+function cleanPosterUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const url = value.trim();
+  if (!url || url.length > 2000 || url.includes("\\") || url.includes("..")) return null;
+  if (!/^https?:\/\//i.test(url) && !url.startsWith("/")) return null;
+  if (!/\.(jpe?g|png|webp|gif)(\?|#|$)/i.test(url)) return null;
+  return url;
+}
+
 function adminReady(res: { status: (code: number) => { json: (body: unknown) => unknown } }) {
   if (admin.apps.length) return true;
   res.status(503).json({
@@ -250,7 +259,8 @@ router.post("/:id/media", requirePhotographer, async (req: AuthenticatedRequest,
   try {
     const {
       storagePath, fileName, type = "photo",
-      width, height, fileSize, isRaw = false
+      width, height, fileSize, isRaw = false,
+      poster, posterUrl,
     } = req.body;
 
     if (!storagePath || !fileName) {
@@ -268,7 +278,7 @@ router.post("/:id/media", requirePhotographer, async (req: AuthenticatedRequest,
       expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
     });
 
-    const mediaItem = {
+    const mediaItem: Record<string, unknown> = {
       id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       url,
       storagePath,
@@ -282,6 +292,11 @@ router.post("/:id/media", requirePhotographer, async (req: AuthenticatedRequest,
       uploadedBy: req.user!.uid,
       uploadedAt: admin.firestore.Timestamp.now(),
     };
+    const storedPoster = cleanPosterUrl(posterUrl) || cleanPosterUrl(poster);
+    if (storedPoster) {
+      mediaItem.poster = storedPoster;
+      mediaItem.posterUrl = storedPoster;
+    }
 
     await galleryDoc.ref.update({
       mediaItems: admin.firestore.FieldValue.arrayUnion(mediaItem),
@@ -300,13 +315,13 @@ router.post("/:id/media", requirePhotographer, async (req: AuthenticatedRequest,
 
 router.post("/:id/media-link", requireCoordinator, async (req: AuthenticatedRequest, res) => {
   try {
-    const { url, title, type = "video", embedUrl, thumbnailUrl, downloadable = false } = req.body;
+    const { url, title, type = "video", embedUrl, thumbnailUrl, downloadable = false, poster, posterUrl } = req.body;
     if (!url) return res.status(400).json({ error: "url required." });
 
     const galleryDoc = await db().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
 
-    const item = {
+    const item: Record<string, unknown> = {
       id: `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
       url,
       shareUrl: url,
@@ -319,6 +334,12 @@ router.post("/:id/media-link", requireCoordinator, async (req: AuthenticatedRequ
       uploadedBy: req.user!.uid,
       uploadedAt: admin.firestore.Timestamp.now(),
     };
+    const storedPoster = cleanPosterUrl(posterUrl) || cleanPosterUrl(poster) || cleanPosterUrl(thumbnailUrl);
+    if (storedPoster) {
+      item.poster = storedPoster;
+      item.posterUrl = storedPoster;
+      if (!item.thumbnailUrl) item.thumbnailUrl = storedPoster;
+    }
 
     await galleryDoc.ref.update({
       mediaItems: admin.firestore.FieldValue.arrayUnion(item),

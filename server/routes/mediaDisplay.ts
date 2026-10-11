@@ -3,14 +3,13 @@
  *   GET /api/media/display/:listingId/:index — public studio share, only while that share is open
  *   GET /api/media/display/p/:token/:index — one presentation's photos, while the token is active
  *   GET /api/media/display/o/:signedToken/:index — locked owner or gallery, HMAC scoped to that view
- * Source URLs stay on the server. A lock change is not cached for a day:
- * s-maxage is 5 minutes, with a short stale window.
+ * Source URLs stay on the server. A video with no stored poster returns a
+ * branded JPEG card. The MP4 is never the response. A lock change is not
+ * cached for a day: s-maxage is 5 minutes, with a short stale window.
  */
 
-import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import type { RequestHandler } from "express";
 import admin from "firebase-admin";
@@ -20,11 +19,13 @@ import { readOwnerDisplayToken } from "../../shared/ownerDisplayGrant";
 import { presentationPhotoSources } from "../../shared/presentation";
 import {
   galleryOwnerDisplayItems,
+  isVideoPlaceholderSource,
   listingOwnerDisplayItems,
   shareDisplayItems,
   type ShareDisplayItem,
   type ShareListing,
 } from "../../shared/publicShare";
+import { renderVideoPlaceholder, type VideoPlaceholderTone } from "../lib/videoPosterPlaceholder";
 import { clientIp } from "../lib/clientIp";
 import { createRateLimiter } from "../lib/rateLimit";
 
@@ -257,61 +258,6 @@ async function loadSource(sourceUrl: string, req: { headers?: { host?: string | 
   return null;
 }
 
-/** One JPEG frame from a video. The MP4 itself is never written to the response. */
-async function ffmpegPoster(source: Buffer): Promise<Buffer | null> {
-  const dir = await mkdtemp(path.join(tmpdir(), "display-poster-"));
-  const file = path.join(dir, "source.bin");
-  try {
-    await writeFile(file, source);
-    return await new Promise((resolve) => {
-      let settled = false;
-      const finish = (value: Buffer | null) => {
-        if (settled) return;
-        settled = true;
-        resolve(value);
-      };
-      const child = spawn("ffmpeg", [
-        "-hide_banner",
-        "-loglevel", "error",
-        "-ss", "0.2",
-        "-i", file,
-        "-frames:v", "1",
-        "-f", "image2pipe",
-        "-vcodec", "mjpeg",
-        "pipe:1",
-      ], { stdio: ["ignore", "pipe", "ignore"] });
-      const chunks: Buffer[] = [];
-      let total = 0;
-      const timer = setTimeout(() => {
-        child.kill("SIGKILL");
-        finish(null);
-      }, FETCH_TIMEOUT_MS);
-      child.stdout.on("data", (chunk: Buffer) => {
-        total += chunk.length;
-        if (total > 8 * 1024 * 1024) {
-          child.kill("SIGKILL");
-          finish(null);
-          return;
-        }
-        chunks.push(chunk);
-      });
-      child.on("error", () => {
-        clearTimeout(timer);
-        finish(null);
-      });
-      child.on("close", (code) => {
-        clearTimeout(timer);
-        const frame = chunks.length ? Buffer.concat(chunks) : null;
-        finish(code === 0 && frame && frame.length > 16 ? frame : null);
-      });
-    });
-  } catch {
-    return null;
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
-}
-
 async function galleriesForShare(listingId: string, listing: ShareListing): Promise<Array<Record<string, unknown>>> {
   const docs: Array<Record<string, unknown>> = [];
   const ids = new Set<string>();
@@ -466,6 +412,20 @@ function etagFor(bytes: Buffer): string {
   return `"${createHash("sha1").update(bytes).digest("hex")}"`;
 }
 
+/**
+ * A video slot with no stored poster image. The MP4 is not fetched.
+ * Owner and locked cards say the file waits on payment. Public shares,
+ * including a paid or released share whose payload already carries the
+ * MP4 with noDownload, use a neutral preview card.
+ */
+function placeholderTone(target: DisplayTarget): VideoPlaceholderTone {
+  return target.kind === "owner" ? "locked" : "preview";
+}
+
+function needsVideoPlaceholder(item: ShareDisplayItem): boolean {
+  return item.kind === "poster" && (isVideoPlaceholderSource(item.sourceUrl) || isVideoSource(item.sourceUrl));
+}
+
 function etagMatches(header: unknown, etag: string): boolean {
   const raw = Array.isArray(header) ? header.join(",") : typeof header === "string" ? header : "";
   if (!raw) return false;
@@ -496,10 +456,17 @@ export const handleMediaDisplay: RequestHandler = async (req, res) => {
   }
   if (!item) return notFound(res);
 
-  const video = item.kind === "poster" && isVideoSource(item.sourceUrl);
-  let source = await loadSource(item.sourceUrl, req, video);
-  if (source && video) source = await ffmpegPoster(source);
-  const jpeg = source ? await renderJpeg(source) : null;
+  let jpeg: Buffer | null = null;
+  if (needsVideoPlaceholder(item)) {
+    try {
+      jpeg = await renderVideoPlaceholder(placeholderTone(target));
+    } catch {
+      jpeg = null;
+    }
+  } else {
+    const source = await loadSource(item.sourceUrl, req);
+    jpeg = source ? await renderJpeg(source) : null;
+  }
   if (!jpeg) {
     console.error("[media-display] could not build a display image");
     return notFound(res);

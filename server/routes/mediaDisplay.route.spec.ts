@@ -54,6 +54,7 @@ vi.mock("firebase-admin", () => {
   return { default: admin };
 });
 
+import { renderVideoPlaceholder } from "../lib/videoPosterPlaceholder";
 import { handleMediaDisplay, resetMediaDisplayRateLimit } from "./mediaDisplay";
 
 const LISTING_ID = DELIVERY_QA_IDS.listing;
@@ -311,7 +312,7 @@ describe("GET /api/media/display/:listingId/:index", () => {
       listingId: LISTING_ID,
       mediaItems: [{ url: "https://cdn.example/media/photos/luxury-interior.jpg", name: "gallery-only.jpg", type: "photo" }],
     });
-    const outside = await openDisplay("4");
+    const outside = await openDisplay("7");
     expect(outside.statusCode).toBe(404);
     expect(JSON.stringify(outside)).not.toContain("luxury-interior");
     expect((await openDisplay("0")).statusCode).toBe(200);
@@ -502,4 +503,86 @@ describe("GET /api/media/display/:listingId/:index", () => {
     expect(JSON.stringify(paid.images)).toContain("/media/photos/luxury-exterior.jpg");
     expect(JSON.stringify(paid.images)).not.toContain("/api/media/display/o/");
   });
+
+  it("returns a locked placeholder JPEG for a video with no poster and never an MP4 URL", async () => {
+    const token = signOwnerDisplayToken({ scope: "listing", id: LISTING_ID });
+    const galleryToken = signOwnerDisplayToken({ scope: "gallery", id: DELIVERY_QA_IDS.gallery });
+    expect(token && galleryToken).toBeTruthy();
+    const plan = buildDeliveryQaSeed({ origin: "https://cdn.example" });
+    const galleryDoc = plan.documents.find((item) => item.id === DELIVERY_QA_IDS.gallery);
+    if (!galleryDoc) throw new Error("missing playtest gallery");
+    seed("galleries", DELIVERY_QA_IDS.gallery, galleryDoc.data);
+    const lockedCard = await renderVideoPlaceholder("locked");
+    const previewCard = await renderVideoPlaceholder("preview");
+
+    for (const index of ["4", "5", "6"]) {
+      const owner = await openDisplay(index, {}, LISTING_ID, `/api/media/display/o/${token}/${index}`);
+      expect(owner.statusCode).toBe(200);
+      expect(owner.headers["content-type"]).toBe("image/jpeg");
+      expect(owner.headers["cache-control"]).toBe("public, s-maxage=300, stale-while-revalidate=60");
+      expect(owner.body.equals(lockedCard)).toBe(true);
+      expect(owner.jsonBody).toBeUndefined();
+      expect(imageHasNoVideoUrl(owner.body)).toBe(true);
+
+      const gallery = await openDisplay(index, {}, LISTING_ID, `/api/media/display/o/${galleryToken}/${index}`);
+      expect(gallery.statusCode).toBe(200);
+      expect(gallery.body.equals(lockedCard)).toBe(true);
+      expect(imageHasNoVideoUrl(gallery.body)).toBe(true);
+    }
+
+    const unpaid = await openDisplay("4");
+    expect(unpaid.statusCode).toBe(200);
+    expect(unpaid.headers["content-type"]).toBe("image/jpeg");
+    expect(unpaid.body.equals(previewCard)).toBe(true);
+    expect(unpaid.body.equals(lockedCard)).toBe(false);
+    expect(imageHasNoVideoUrl(unpaid.body)).toBe(true);
+
+    const posterFile = path.join(process.cwd(), "public/media/playtest/display-stored-poster.jpg");
+    const red = await sharp({
+      create: { width: 32, height: 18, channels: 3, background: { r: 220, g: 20, b: 20 } },
+    }).jpeg().toBuffer();
+    await writeFile(posterFile, red);
+    const withPosterId = "poster-video-listing";
+    seed("listings", withPosterId, {
+      images: [],
+      videos: [{
+        id: "branded-with-poster",
+        name: "branded.mp4",
+        type: "video",
+        url: "https://cdn.example/media/blaze/01_BUILT_v2.mp4",
+        poster: "https://cdn.example/media/playtest/display-stored-poster.jpg",
+        posterUrl: "https://cdn.example/media/playtest/display-stored-poster.jpg",
+      }],
+    });
+    try {
+      const stored = await openDisplay("0", {}, withPosterId);
+      expect(stored.statusCode).toBe(200);
+      expect(stored.headers["content-type"]).toBe("image/jpeg");
+      expect(stored.body.equals(previewCard)).toBe(false);
+      expect(stored.body.equals(lockedCard)).toBe(false);
+      const pixel = await sharp(stored.body).raw().toBuffer({ resolveWithObject: true });
+      expect(pixel.data[0]).toBeGreaterThan(180);
+      expect(pixel.data[1]).toBeLessThan(80);
+      expect(imageHasNoVideoUrl(stored.body)).toBe(true);
+    } finally {
+      await rm(posterFile, { force: true });
+    }
+
+    const flipped = `${token?.slice(0, -1)}${token?.endsWith("a") ? "b" : "a"}`;
+    expect((await openDisplay("4", {}, LISTING_ID, `/api/media/display/o/${flipped}/4`)).statusCode).toBe(404);
+    expect((await openDisplay("4", {}, LISTING_ID, `/api/media/display/o/${token}/99`)).statusCode).toBe(404);
+    expect((await openDisplay("99")).statusCode).toBe(404);
+
+    const lockedStudio = "locked-video-studio1";
+    seed("listings", lockedStudio, { ...qaListingData(), id: lockedStudio, lockStudio: true });
+    const hidden = await openDisplay("4", {}, lockedStudio);
+    expect(hidden.statusCode).toBe(404);
+    expect(hidden.headers["cache-control"]).toBe("no-store");
+    expect(hidden.jsonBody).toEqual({ error: "Not found." });
+  });
 });
+
+function imageHasNoVideoUrl(body: Buffer): boolean {
+  const text = body.toString("latin1");
+  return !text.includes(".mp4") && !text.includes("http") && !text.includes("/media/");
+}
