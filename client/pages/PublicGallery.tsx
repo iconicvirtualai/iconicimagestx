@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import Footer from "@/components/Footer";
 import { toast } from "sonner";
 import { addressText } from "@shared/addressText";
+import { isGuessableInvoiceId } from "@shared/invoicePayLink";
 import { ICONIC_DOWNLOAD_LOCK } from "@shared/paymentAccess";
 import { GalleryDownloadLockNotice } from "@/components/GalleryDownloadLock";
 import { ClientGalleryBoard } from "@/components/gallery/ClientGalleryMedia";
@@ -19,7 +20,16 @@ export interface PublicGalleryModel {
   lockTitle?: string | null;
   lockMessage?: string | null;
   invoiceId?: string | null;
+  /** Absolute tokenized pay link from the public site. A legacy auto-id falls back to /invoice/{id}. */
+  invoicePayPath?: string | null;
   mediaItems?: ClientGalleryItem[];
+}
+
+function publicInvoiceHref(gallery: PublicGalleryModel): string {
+  if (gallery.invoicePayPath) return gallery.invoicePayPath;
+  const id = typeof gallery.invoiceId === "string" ? gallery.invoiceId.trim() : "";
+  if (!id || isGuessableInvoiceId(id)) return "";
+  return `/invoice/${id}`;
 }
 
 export function PublicGalleryView({
@@ -58,12 +68,12 @@ export function PublicGalleryView({
             title={gallery.lockTitle || ICONIC_DOWNLOAD_LOCK.title}
             message={gallery.lockMessage || ICONIC_DOWNLOAD_LOCK.message}
             action={
-              gallery.invoiceId ? (
+              publicInvoiceHref(gallery) ? (
                 <Button
                   asChild
                   className="rounded-xl bg-black text-white hover:bg-gray-800"
                 >
-                  <Link to={`/invoice/${gallery.invoiceId}`}>
+                  <Link to={publicInvoiceHref(gallery)}>
                     <CreditCard className="mr-2 h-4 w-4" /> View Invoice
                   </Link>
                 </Button>

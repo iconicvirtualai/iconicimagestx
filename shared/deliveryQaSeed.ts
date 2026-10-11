@@ -11,6 +11,7 @@ import {
   isDeliveryQaClient,
   type DeliveryQaClientRecord,
 } from "./deliveryQaClient.ts";
+import { clientInvoiceUrl } from "./invoicePayLink.ts";
 import { PLAYTEST_ADDRESS } from "./listingAccess.ts";
 import {
   ICONIC_DOWNLOAD_LOCK,
@@ -28,6 +29,9 @@ export const DELIVERY_QA_CLIENT_NAME = "TEST - Delivery QA";
 export const DELIVERY_QA_MARKED_AT = "2026-10-10T00:00:00.000Z";
 /** Matterport's public Showcase sample. Not an Iconic client space. */
 export const DELIVERY_QA_MATTERPORT_URL = "https://my.matterport.com/show/?m=SxQL3iGyoDo";
+
+/** Fixed fixture token so a second seed does not rotate the QA pay link. */
+export const DELIVERY_QA_PAY_TOKEN = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE";
 
 export const DELIVERY_QA_IDS = {
   client: DELIVERY_QA_CLIENT_ID,
@@ -225,7 +229,12 @@ export function buildDeliveryQaSeed(options?: { origin?: string }): DeliveryQaPl
     amountPaid: 0,
     amountDue: 1,
     status: "sent",
-    paymentUrl: `${origin}/invoice/${ids.invoice}`,
+    payToken: DELIVERY_QA_PAY_TOKEN,
+    paymentUrl: clientInvoiceUrl({
+      id: ids.invoice,
+      status: "sent",
+      payToken: DELIVERY_QA_PAY_TOKEN,
+    }) || "",
     notes: "TEST ORDER. Unpaid $1.00 playtest invoice. The delivery QA seed does not email this.",
   };
 
