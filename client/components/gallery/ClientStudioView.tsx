@@ -16,6 +16,43 @@ export function blockPublicVideoMenu(event: { preventDefault: () => void }) {
   event.preventDefault();
 }
 
+/**
+ * Inline playback for an owner video. First http(s) or site-relative value wins.
+ * Bean may omit the raw file (`url` / `downloadUrl` / `rawUrl`) while the gallery
+ * is locked and send a stream or preview instead.
+ */
+export const STUDIO_VIDEO_PLAYBACK_FIELDS = ["streamUrl", "previewUrl", "playbackUrl", "embedUrl", "url"] as const;
+
+/** Full file for a download action. Read only after the existing payment lock opens. */
+export const STUDIO_VIDEO_DOWNLOAD_FIELDS = ["downloadUrl", "rawUrl", "url"] as const;
+
+export function studioVideoPlaybackUrl(video: unknown): string {
+  return firstStudioMediaUrl(video, STUDIO_VIDEO_PLAYBACK_FIELDS);
+}
+
+export function studioVideoDownloadUrl(video: unknown): string {
+  return firstStudioMediaUrl(video, STUDIO_VIDEO_DOWNLOAD_FIELDS);
+}
+
+function firstStudioMediaUrl(video: unknown, fields: readonly string[]): string {
+  if (!video || typeof video !== "object") return "";
+  const record = video as Record<string, unknown>;
+  for (const field of fields) {
+    const url = studioHttpUrl(record[field]);
+    if (url) return url;
+  }
+  return "";
+}
+
+function studioHttpUrl(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const url = value.trim();
+  if (!url || url.startsWith("//") || url.includes("\\")) return "";
+  if (url.startsWith("/")) return url;
+  if (url.startsWith("https://") || url.startsWith("http://")) return url;
+  return "";
+}
+
 export function ClientStudioView({
   project,
   listingId,
@@ -181,7 +218,7 @@ export function ClientStudioView({
                 <div key={i} className={owner ? "bg-gray-50 rounded-2xl p-4" : "min-w-0 bg-gray-50 rounded-2xl p-4"}>
                   <p className="font-bold text-sm mb-2">{v.name || `Video ${i+1}`}</p>
                   {owner ? (
-                    v.url && <a href={v.url} target="_blank" rel="noopener noreferrer" className="text-[#0d9488] text-xs font-bold flex items-center gap-1">Watch <ExternalLink className="w-3 h-3" /></a>
+                    <OwnerStudioVideo video={v} canDownload={canDownloadFiles} />
                   ) : (
                     v.url && (
                       <video
@@ -201,6 +238,7 @@ export function ClientStudioView({
             </div>
           )
         )}
+        {activeTab === "videos" && owner && canDownloadFiles && <OwnerStudioFileDownloads files={project.files} />}
 
         {/* TOURS */}
         {activeTab === "tours" && (
@@ -359,6 +397,56 @@ export function ClientStudioView({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function OwnerStudioVideo({ video, canDownload }: { video: unknown; canDownload: boolean }) {
+  const src = studioVideoPlaybackUrl(video);
+  const downloadHref = canDownload ? studioVideoDownloadUrl(video) : "";
+  return (
+    <>
+      {src ? (
+        <video
+          src={src}
+          controls
+          playsInline
+          preload="metadata"
+          controlsList="nodownload"
+          onContextMenu={blockPublicVideoMenu}
+          className="block h-auto w-full max-w-full rounded-xl bg-black"
+        />
+      ) : (
+        <p className="text-sm font-semibold text-gray-500">Video available after payment</p>
+      )}
+      {downloadHref ? (
+        <a href={downloadHref} download className="mt-3 inline-flex items-center gap-1 text-xs font-black uppercase tracking-widest text-black">
+          <Download className="w-3.5 h-3.5" />
+          <span>Download</span>
+        </a>
+      ) : null}
+    </>
+  );
+}
+
+function OwnerStudioFileDownloads({ files }: { files: unknown }) {
+  if (!Array.isArray(files)) return null;
+  const downloads = files.flatMap((file) => {
+    if (!file || typeof file !== "object") return [];
+    const record = file as Record<string, unknown>;
+    const url = studioHttpUrl(record.url);
+    if (!url) return [];
+    const name = typeof record.name === "string" && record.name.trim() ? record.name.trim() : "Download";
+    return [{ url, name }];
+  });
+  if (downloads.length === 0) return null;
+  return (
+    <div className="mt-8 flex flex-wrap justify-center gap-3">
+      {downloads.map((file) => (
+        <a key={file.url} href={file.url} download className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-800">
+          <Download className="w-4 h-4" /> {file.name}
+        </a>
+      ))}
     </div>
   );
 }
