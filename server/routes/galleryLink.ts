@@ -13,9 +13,12 @@ import {
   type GalleryLinkDoc,
   type OwnerStudioProject,
 } from "../../shared/clientGalleryLink";
+import { invoicePayLinkFor } from "../../shared/invoicePayLink";
 import { studioDownloadsUnlocked } from "../../shared/lockImpact";
 import { publicShareVideos } from "../../shared/publicShare";
+import { invoiceRedirectTarget, legacyInvoiceDocIds } from "../../shared/invoicePay";
 import { clientCanViewListing, staffCanAccessListing } from "../../shared/listingAccess";
+import { readInvoiceDoc } from "../lib/invoiceDoc";
 import { isActiveStaffRecord } from "../../shared/staffAccess";
 import { isTempAdminEnabled, liveServerEnv } from "../../shared/tempAdmin";
 import { resolveClientIdentity } from "../services/clientAccounts";
@@ -126,17 +129,27 @@ export async function resolveClientGalleryLink(id: string): Promise<ClientGaller
 }
 
 async function invoiceForListing(listing: GalleryLinkDoc): Promise<Record<string, unknown> | null> {
+  const load = (id: string) => db().collection("invoices").doc(id).get();
   const invoiceId = text(listing.invoiceId);
   if (invoiceId) {
-    const doc = await db().collection("invoices").doc(invoiceId).get();
-    if (doc.exists) return { id: doc.id, ...(doc.data() || {}) };
+    const doc = await readInvoiceDoc(load, invoiceId);
+    if (doc && !invoiceRedirectTarget(doc.data)) return { id: doc.id, ...doc.data };
+  }
+  for (const legacyId of legacyInvoiceDocIds({
+    orderRequestId: listing.orderRequestId,
+    listingId: listing.id,
+  })) {
+    const doc = await readInvoiceDoc(load, legacyId);
+    if (doc && !invoiceRedirectTarget(doc.data)) return { id: doc.id, ...doc.data };
   }
   const orderId = text(listing.orderId);
   if (!orderId) return null;
   try {
     const snap = await db().collection("invoices").where("orderId", "==", orderId).limit(1).get();
     if (snap.empty) return null;
-    return { id: snap.docs[0].id, ...(snap.docs[0].data() || {}) };
+    const doc = await readInvoiceDoc(load, snap.docs[0].id);
+    if (!doc || invoiceRedirectTarget(doc.data)) return null;
+    return { id: doc.id, ...doc.data };
   } catch (err) {
     console.error("[Galleries] Invoice lookup failed:", err);
     return null;
@@ -243,7 +256,8 @@ async function finishGalleryLink(
     downloadsReleased: listing.downloadsReleased === true || related.some((doc) => doc.downloadsReleased === true),
     staffAccess: Boolean(caller?.staffRole),
   });
-  return { ...result, project };
+  const payUrl = invoicePayLinkFor(invoice);
+  return { ...result, project: payUrl ? { ...project, payUrl } : project };
 }
 
 export const handlePublicGalleryLink: RequestHandler = async (req: AuthenticatedRequest, res) => {

@@ -235,7 +235,8 @@ function getFallbackTemplate(
       <p>Hi ${vars.clientName},</p>
       <p>Your photos for <strong>${vars.address}</strong> are edited and waiting in your Iconic Images gallery.</p>
       ${vars.invoiceAmount ? `<p>Iconic Images invoices after the shoot. Downloads stay locked until the <strong>${vars.invoiceAmount}</strong> invoice is paid.</p>` : `<p>Downloads open from your gallery once that invoice is paid, or when our team releases the files.</p>`}
-      <p><a href="${vars.galleryUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">View Gallery</a></p>
+      ${vars.presentationUrl ? `<p><a href="${vars.presentationUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">View Gallery</a></p>` : ""}
+      <p><a href="${vars.galleryUrl}" style="color:#111;text-decoration:underline;">Your downloads & invoice</a></p>
       ${vars.paymentUrl ? `<p><a href="${vars.paymentUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Pay invoice</a></p>` : ""}
       <p style="color:#999;font-size:12px;">Gallery available for ${vars.expiresAt}.</p>
     `),

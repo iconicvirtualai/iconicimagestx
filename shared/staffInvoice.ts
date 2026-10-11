@@ -4,6 +4,7 @@
  */
 
 import { addressText } from "./addressText.ts";
+import { clientPayPath } from "./invoicePay.ts";
 import { normalizeBookingLineItems, type BookingLineItem } from "./bookingPricing.ts";
 import { cleanPersonName, normalizeEmail } from "./listingAccess.ts";
 import { draftInvoiceNumber } from "./orderProjectInvoice.ts";
@@ -91,8 +92,8 @@ export function staffInvoicePath(invoiceId: string): string {
 }
 
 /** Client checkout page. Staff create/view/manage must not navigate here. */
-export function clientPaymentPath(invoiceId: string): string {
-  return `/invoice/${requiredId(invoiceId)}`;
+export function clientPaymentPath(invoiceId: string, payToken?: unknown): string {
+  return clientPayPath(requiredId(invoiceId), payToken);
 }
 
 const PROFESSIONAL_INVOICE_NUMBER = /^(?:INV-\d{4}-[A-Z0-9]{3,12}|[A-Z]{2,12}-[A-Z0-9]{3,12})$/i;

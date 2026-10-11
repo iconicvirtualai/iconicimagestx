@@ -105,7 +105,7 @@ describe("delivery QA send", () => {
       to: "ops+deliveryqa@iconicimagestx.com",
       subject: "Your gallery is ready: 100 Playtest Lane, Austin, TX 78701",
       galleryUrl: "https://iconicimagestx.vercel.app/gallery/playtest-delivery-qa-gallery",
-      paymentUrl: null,
+      paymentUrl: "https://iconicimagestx.vercel.app/invoice/playtest-delivery-qa-invoice?t=AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE",
       invoiceAmount: "$1.00",
     });
 

@@ -78,6 +78,7 @@ export function buildVercelRewrites(): Rewrite[] {
     });
   }
   spa.push(
+    { source: "/studio/:listingId/site", destination: PRIVATE_SHELL },
     { source: "/studio/:listingId", destination: PRIVATE_SHELL },
     { source: "/gallery/:galleryId", destination: PRIVATE_SHELL },
     { source: "/admin", destination: PRIVATE_SHELL },

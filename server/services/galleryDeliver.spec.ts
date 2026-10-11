@@ -209,7 +209,13 @@ describe("deliverGalleryToClient", () => {
     const message = sendMail.mock.calls[0]?.[0];
     if (!message?.html || !message.subject) throw new Error("No delivery email was sent.");
     expect(message.subject).toBe("Your gallery is ready: 123 Main St");
+    expect(message.html).toContain("https://links.example/studio/listing-1/site");
+    expect(message.html).toContain(">View Gallery</a>");
+    expect(message.html).toContain("Your downloads & invoice");
     expect(message.html).toContain("https://links.example/gallery/gal-1");
+    expect(message.html.indexOf("https://links.example/studio/listing-1/site")).toBeLessThan(
+      message.html.indexOf("https://links.example/gallery/gal-1"),
+    );
     expect(message.html).toContain("https://links.example/invoice/inv-1?t=tok-1");
     expect(message.html).not.toContain("iconicimagestx.com/gallery");
     expect(message.html).not.toContain("/invoice/listing_");
@@ -232,6 +238,9 @@ describe("deliverGalleryToClient", () => {
     await deliverGalleryToClient("gal-1", { actor: { uid: "staff-1" } });
     const paidHtml = sendMail.mock.calls[0]?.[0]?.html || "";
     expect(paidHtml).toContain("View Gallery");
+    expect(paidHtml).toContain("https://iconicimagestx.vercel.app/studio/listing-1/site");
+    expect(paidHtml).toContain("Your downloads & invoice");
+    expect(paidHtml).toContain("https://iconicimagestx.vercel.app/gallery/gal-1");
     expect(paidHtml).not.toContain("Pay invoice");
     expect(paidHtml).not.toContain("tok-1");
     expect(history()[0].email).toBe("sent");

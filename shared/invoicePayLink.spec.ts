@@ -35,6 +35,16 @@ describe("invoicePayLinkFor", () => {
     );
     expect(clientInvoiceUrl({ id: "listing_studio1", status: "sent" }, ENV)).toBeNull();
     expect(clientInvoiceUrl({ id: "ordreq_req1", status: "draft" }, ENV)).toBeNull();
+    expect(clientInvoiceUrl({ id: "playtest-delivery-qa-invoice", status: "sent" }, ENV)).toBeNull();
+    expect(clientInvoiceUrl({ id: "playtest-invoice-client1", status: "sent" }, ENV)).toBeNull();
+    expect(clientInvoiceUrl({
+      id: "playtest-delivery-qa-invoice",
+      status: "sent",
+      payToken: TOKEN,
+    }, ENV)).toBe("https://links.example/invoice/playtest-delivery-qa-invoice?t=paytokenvalue");
     expect(clientInvoiceUrl({ id: "AbCdEfGhIjKlMnOpQrSt", status: "paid" }, ENV)).toBeNull();
+    expect(clientInvoiceUrl({ id: "AbCdEfGhIjKlMnOpQrSt", status: "sent", payToken: TOKEN }, ENV, { paid: "1" })).toBe(
+      "https://links.example/invoice/AbCdEfGhIjKlMnOpQrSt?t=paytokenvalue&paid=1",
+    );
   });
 });

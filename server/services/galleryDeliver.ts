@@ -14,6 +14,8 @@ import {
   galleryDeliveryUrl,
   type GalleryEmailDelivery,
 } from "../../shared/galleryDelivery";
+import { readInvoiceDoc } from "../lib/invoiceDoc";
+import { clientPresentationLinkFor } from "../../shared/clientPresentation";
 import { clientGalleryDownloadsUnlocked, type GalleryDownloadGate } from "../../shared/paymentAccess";
 import { loadGalleryReleaseForGallery } from "./galleryReleaseGate";
 import { builtinEmailHtml, sendEmail } from "./email";
@@ -31,14 +33,18 @@ export interface GalleryDeliverActor {
   uid?: string | null;
 }
 
-async function invoiceForGallery(gallery: Record<string, unknown>) {
+async function invoiceForGallery(gallery: Record<string, unknown>): Promise<Record<string, unknown> | null> {
+  const load = (id: string) => db().collection("invoices").doc(id).get();
   if (typeof gallery.invoiceId === "string" && gallery.invoiceId) {
-    const doc = await db().collection("invoices").doc(gallery.invoiceId).get();
-    if (doc.exists) return { id: doc.id, ...doc.data() };
+    const doc = await readInvoiceDoc(load, gallery.invoiceId);
+    if (doc) return { id: doc.id, ...doc.data };
   }
   if (typeof gallery.orderId === "string" && gallery.orderId) {
     const snap = await db().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
-    if (!snap.empty) return { id: snap.docs[0].id, ...snap.docs[0].data() };
+    if (!snap.empty) {
+      const doc = await readInvoiceDoc(load, snap.docs[0].id);
+      if (doc) return { id: doc.id, ...doc.data };
+    }
   }
   const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
   if (listingId) {
@@ -47,8 +53,8 @@ async function invoiceForGallery(gallery: Record<string, unknown>) {
       ? listing.data()?.invoiceId.trim()
       : "";
     if (invoiceId) {
-      const doc = await db().collection("invoices").doc(invoiceId).get();
-      if (doc.exists) return { id: doc.id, ...doc.data() };
+      const doc = await readInvoiceDoc(load, invoiceId);
+      if (doc) return { id: doc.id, ...doc.data };
     }
   }
   return null;
@@ -99,6 +105,8 @@ export async function deliverGalleryToClient(
     new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000),
   );
   const deliveryUrl = galleryDeliveryUrl(galleryId);
+  const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
+  const presentationUrl = clientPresentationLinkFor({ id: listingId, listingId }) || "";
 
   await galleryDoc.ref.update({
     status: "delivered",
@@ -132,6 +140,7 @@ export async function deliverGalleryToClient(
       const variables = {
         clientName: String(gallery.clientName || client?.name || ""),
         address,
+        presentationUrl,
         galleryUrl: deliveryUrl,
         invoiceAmount: invoice ? `$${Number((invoice as { total?: unknown }).total || 0).toFixed(2)}` : "",
         paymentUrl: payUrl || "",

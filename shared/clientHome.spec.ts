@@ -189,6 +189,22 @@ describe("invoice statements", () => {
     expect(pdf).not.toContain("checkout");
     expect(pdf).not.toContain("http");
     expect(statement.processing).toBeNull();
+    expect(statement.payPath).toBeNull();
+  });
+
+  it("adds a tokenized pay path only when the invoice stores a pay token", () => {
+    const saved = process.env.PUBLIC_SITE_URL;
+    process.env.PUBLIC_SITE_URL = "https://links.example";
+    try {
+      expect(buildClientInvoice("inv_9", { invoiceNumber: "INV-9", payToken: "abc" }).payPath).toBe(
+        "https://links.example/invoice/inv_9?t=abc",
+      );
+      expect(buildClientInvoice("inv_9", { invoiceNumber: "INV-9", status: "paid", payToken: "abc" }).payPath).toBeNull();
+      expect(buildClientInvoice("inv_9", { invoiceNumber: "INV-9", payToken: "  " }).payPath).toBeNull();
+    } finally {
+      if (saved === undefined) delete process.env.PUBLIC_SITE_URL;
+      else process.env.PUBLIC_SITE_URL = saved;
+    }
   });
 
   it("says when an invoice has no stored line items and does not invent processing", () => {
