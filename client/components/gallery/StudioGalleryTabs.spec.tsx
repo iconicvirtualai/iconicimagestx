@@ -17,10 +17,9 @@ function row(tabs: StudioGalleryTab[]) {
 }
 
 describe("studio gallery tabs", () => {
-  it("keeps each label on one line and scrolls the tab row", () => {
+  it("shows every owner label on one line at a narrow width", () => {
     const html = row(ownerTabs);
     expect(html).toContain('data-testid="studio-gallery-tabs"');
-    expect(html).toContain("overflow-x-auto");
     for (const label of ["Photos", "Videos", "Tours", "Revisions", "AI Tools"]) {
       expect(html).toContain(label);
     }
@@ -28,17 +27,14 @@ describe("studio gallery tabs", () => {
     expect(buttons).toHaveLength(5);
     for (const button of buttons) {
       expect(button).toContain("whitespace-nowrap");
-      expect(button).toContain("shrink-0");
-      expect(button).toContain("min-w-max");
     }
-    const scroller = html.match(/<div\b[^>]*data-testid="studio-gallery-tabs"[^>]*>/)?.[0] || "";
-    expect(scroller).toContain("overflow-x-auto");
-    expect(scroller).toContain("min-w-0");
-    expect(scroller).toContain("scroll-pe-8");
-    expect(scroller).not.toContain("overflow-hidden");
-    expect(html).toContain("max-w-full");
-    expect(html).toContain("w-max");
-    expect(html).toContain("pe-8");
+    const container = html.match(/<div\b[^>]*data-testid="studio-gallery-tabs"[^>]*>/)?.[0] || "";
+    expect(container).toContain("flex-wrap");
+    expect(container).toContain("gap-x-3");
+    expect(container).not.toContain("overflow-x-auto");
+    expect(container).not.toContain("overflow-x-scroll");
+    expect(html).toContain("sm:tracking-widest");
+    expect(html).toContain("sm:gap-6");
     const beforeTabs = html.slice(0, html.indexOf('data-testid="studio-gallery-tabs"'));
     expect(beforeTabs).not.toContain("overflow-hidden");
     expect(beforeTabs).not.toContain("overflow-x-hidden");
