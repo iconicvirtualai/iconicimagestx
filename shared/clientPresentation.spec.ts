@@ -110,13 +110,18 @@ describe("buildClientListingSite", () => {
 });
 
 describe("delivery email preview", () => {
-  it("substitutes the presentation URL into the existing template without editing it", () => {
+  it("renders the listing site as the primary button and the gallery as the secondary link", () => {
     const template = readFileSync(new URL("../server/services/email.ts", import.meta.url), "utf8");
+    expect(template).toContain('href="${vars.presentationUrl}"');
     expect(template).toContain('href="${vars.galleryUrl}"');
     expect(template).toContain("View Gallery");
+    expect(template).toContain("Your downloads & invoice");
+    expect(template).toContain("Pay invoice");
     const vars = deliveryEmailPreviewVars(ENV);
     const html = builtinEmailHtml("gallery_delivery", vars);
     expect(html).toContain("https://iconicimagestx.vercel.app/studio/sample-listing-site/site");
+    expect(html).toContain("https://iconicimagestx.vercel.app/gallery/sample-gallery-01");
+    expect(html.indexOf("/studio/sample-listing-site/site")).toBeLessThan(html.indexOf("/gallery/sample-gallery-01"));
     expect(html).toContain("Jordan Sample");
     expect(html).toContain("100 Playtest Lane, Austin, TX 78701");
     expect(html).toContain(PAY || "missing-pay-link");

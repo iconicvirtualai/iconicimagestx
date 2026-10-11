@@ -1,9 +1,8 @@
 /**
  * Client delivery presentation.
  *
- * Bean: the delivery email primary button should use `clientPresentationLinkFor`.
- * Leave `server/services/email.ts` as it is. The gallery URL stays the secondary
- * "Your downloads & invoice" link (`/gallery/:id` via `galleryDeliveryUrl`).
+ * The delivery email primary button uses `clientPresentationLinkFor`.
+ * `/gallery/:id` is the secondary "Your downloads & invoice" link.
  * This module does not send email.
  */
 
@@ -335,7 +334,7 @@ function asList(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
-/** Fixture vars for a local delivery-email preview. Does not edit the template. */
+/** Fixture vars for a local delivery-email preview. Does not send mail. */
 export function deliveryEmailPreviewVars(env?: PublicSiteEnv): Record<string, string> {
   const presentationUrl = clientPresentationLinkFor(
     { id: "sample-order-01", listingId: "sample-listing-site" },
@@ -348,7 +347,8 @@ export function deliveryEmailPreviewVars(env?: PublicSiteEnv): Record<string, st
   return {
     clientName: "Jordan Sample",
     address: "100 Playtest Lane, Austin, TX 78701",
-    galleryUrl: presentationUrl,
+    presentationUrl,
+    galleryUrl: publicClientUrl("/gallery/sample-gallery-01", env),
     paymentUrl,
     invoiceAmount: "$1.00",
     expiresAt: "30 days",

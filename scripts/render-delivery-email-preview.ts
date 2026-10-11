@@ -1,7 +1,6 @@
 /**
  * Local preview of the delivery email.
- * Uses the existing gallery_delivery template and substitutes the listing-site
- * URL into galleryUrl. Does not edit server/services/email.ts and does not send mail.
+ * Renders the gallery_delivery template with fixture data. Does not send mail.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
@@ -19,7 +18,7 @@ const html = `<!doctype html>
 </head>
 <body style="margin:0;background:#eceae6;">
   <p style="font-family:Inter,Arial,sans-serif;font-size:13px;color:#555;text-align:center;padding:18px 16px 0;">
-    Local preview only. Primary button uses the listing site. Bean will retitle it and add /gallery as “Your downloads &amp; invoice”.
+    Local preview only. Jordan Sample, 100 Playtest Lane. No email is sent.
   </p>
   ${builtinEmailHtml("gallery_delivery", vars)}
 </body>

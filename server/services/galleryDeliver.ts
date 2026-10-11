@@ -15,6 +15,7 @@ import {
   type GalleryEmailDelivery,
 } from "../../shared/galleryDelivery";
 import { readInvoiceDoc } from "../lib/invoiceDoc";
+import { clientPresentationLinkFor } from "../../shared/clientPresentation";
 import { clientGalleryDownloadsUnlocked, type GalleryDownloadGate } from "../../shared/paymentAccess";
 import { loadGalleryReleaseForGallery } from "./galleryReleaseGate";
 import { builtinEmailHtml, sendEmail } from "./email";
@@ -104,6 +105,8 @@ export async function deliverGalleryToClient(
     new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000),
   );
   const deliveryUrl = galleryDeliveryUrl(galleryId);
+  const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
+  const presentationUrl = clientPresentationLinkFor({ id: listingId, listingId }) || "";
 
   await galleryDoc.ref.update({
     status: "delivered",
@@ -137,6 +140,7 @@ export async function deliverGalleryToClient(
       const variables = {
         clientName: String(gallery.clientName || client?.name || ""),
         address,
+        presentationUrl,
         galleryUrl: deliveryUrl,
         invoiceAmount: invoice ? `$${Number((invoice as { total?: unknown }).total || 0).toFixed(2)}` : "",
         paymentUrl: payUrl || "",
