@@ -13,6 +13,7 @@ import {
   type GalleryLinkDoc,
   type OwnerStudioProject,
 } from "../../shared/clientGalleryLink";
+import { invoicePayLinkFor } from "../../shared/invoicePayLink";
 import { studioDownloadsUnlocked } from "../../shared/lockImpact";
 import { publicShareVideos } from "../../shared/publicShare";
 import { invoiceRedirectTarget, legacyInvoiceDocIds } from "../../shared/invoicePay";
@@ -255,7 +256,8 @@ async function finishGalleryLink(
     downloadsReleased: listing.downloadsReleased === true || related.some((doc) => doc.downloadsReleased === true),
     staffAccess: Boolean(caller?.staffRole),
   });
-  return { ...result, project };
+  const payUrl = invoicePayLinkFor(invoice);
+  return { ...result, project: payUrl ? { ...project, payUrl } : project };
 }
 
 export const handlePublicGalleryLink: RequestHandler = async (req: AuthenticatedRequest, res) => {
