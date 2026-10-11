@@ -9,6 +9,9 @@ import { ClientGalleryMediaCard } from "../client/components/gallery/ClientGalle
 import { classifyClientGalleryItem } from "../client/components/gallery/clientGalleryMedia.ts";
 import { buildPortalListingDetail } from "../shared/portalListingDetail.ts";
 import { publicMediaItem } from "../shared/paymentAccess.ts";
+import { isDeliveryQaClient } from "../shared/deliveryQaClient.ts";
+import { assessGalleryRelease, releaseForPlaytestDeliveryQaGallery } from "../shared/galleryRelease.ts";
+import { planOrderEdits } from "../shared/orderEditPlan.ts";
 import {
   DELIVERY_QA_CLIENT_EMAIL,
   DELIVERY_QA_CLIENT_NAME,
@@ -18,6 +21,7 @@ import {
   DELIVERY_QA_ROLES,
   DELIVERY_QA_UNLOCK_FIELDS,
   buildDeliveryQaSeed,
+  deliveryQaClientWriteId,
   deliveryQaPublicPreview,
   deliveryQaRefusals,
   deliveryQaUnlockRefusals,
@@ -176,6 +180,53 @@ describe("delivery QA seed plan", () => {
     ]);
   });
 
+  it("lets the linked portal login share the email and still blocks other clients", () => {
+    const login = {
+      path: "clients/QEdPnB7LGadwihiEsj9OMrUvzE93",
+      playtest: undefined,
+      linkedClientId: DELIVERY_QA_IDS.client,
+      email: DELIVERY_QA_CLIENT_EMAIL,
+    };
+    expect(isDeliveryQaClient(login)).toBe(true);
+    expect(deliveryQaRefusals({
+      documents: plan.documents.map((item) => ({ path: item.path, exists: true, playtest: true })),
+      emailMatches: [login],
+    })).toEqual([]);
+    expect(plan.documents.map((item) => item.id)).not.toContain("QEdPnB7LGadwihiEsj9OMrUvzE93");
+    expect(deliveryQaClientWriteId(plan.documents)).toBe(DELIVERY_QA_IDS.client);
+    expect(() => deliveryQaClientWriteId([
+      ...plan.documents,
+      { collection: "clients", id: "QEdPnB7LGadwihiEsj9OMrUvzE93", path: "clients/QEdPnB7LGadwihiEsj9OMrUvzE93", data: {} },
+    ])).toThrow(/refuses to write any client/);
+
+    expect(deliveryQaRefusals({
+      documents: plan.documents.map((item) => ({ path: item.path, exists: false, playtest: undefined })),
+      emailMatches: [{ path: "clients/unlinked-client", playtest: undefined, email: DELIVERY_QA_CLIENT_EMAIL }],
+    })).toEqual([
+      `clients/unlinked-client already uses ${DELIVERY_QA_CLIENT_EMAIL}.`,
+    ]);
+    expect(isDeliveryQaClient({
+      playtest: false,
+      linkedClientId: DELIVERY_QA_IDS.client,
+      email: "ops@iconicimagestx.com",
+    })).toBe(false);
+    expect(isDeliveryQaClient({ playtest: false, email: DELIVERY_QA_CLIENT_EMAIL })).toBe(false);
+
+    const order = plan.documents.find((item) => item.collection === "orders");
+    const listing = plan.documents.find((item) => item.collection === "listings");
+    const editPlan = planOrderEdits({
+      lineItems: order?.data.lineItems || order?.data.services,
+      services: listing?.data.services,
+    });
+    expect(editPlan.photoScope).toBe("none");
+    expect(editPlan.deliverables).toEqual([]);
+    expect(assessGalleryRelease(editPlan, { jobs: [], finals: [], uploads: [], media: [] }).complete).toBe(true);
+    expect(releaseForPlaytestDeliveryQaGallery({ id: DELIVERY_QA_IDS.gallery, playtest: true })?.complete).toBe(true);
+    expect(releaseForPlaytestDeliveryQaGallery({ id: DELIVERY_QA_IDS.gallery, playtest: false })).toBeNull();
+    const gate = readFileSync(new URL("../server/services/galleryReleaseGate.ts", import.meta.url), "utf8");
+    expect(gate.indexOf("releaseForPlaytestDeliveryQaGallery")).toBeLessThan(gate.indexOf("loadGalleryReleaseReport"));
+  });
+
   it("treats a dry run as the default and keeps mail out of the script", () => {
     expect(parseDeliveryQaArgs([])).toEqual({ write: false, unlock: false, unknown: [] });
     expect(parseDeliveryQaArgs(["--"])).toEqual({ write: false, unlock: false, unknown: [] });
@@ -266,16 +317,37 @@ describe("delivery QA seed plan", () => {
   });
 
   it("refuses unlock unless both playtest docs exist", () => {
+    const qaClient = { exists: true, playtest: true, email: DELIVERY_QA_CLIENT_EMAIL };
     expect(deliveryQaUnlockRefusals({
       gallery: { exists: true, playtest: true },
       listing: { exists: true, playtest: true },
+      client: qaClient,
     })).toEqual([]);
+    expect(deliveryQaUnlockRefusals({
+      gallery: { exists: true, playtest: true },
+      listing: { exists: true, playtest: true },
+      client: {
+        exists: true,
+        playtest: undefined,
+        linkedClientId: DELIVERY_QA_IDS.client,
+        email: DELIVERY_QA_CLIENT_EMAIL,
+      },
+    })).toEqual([]);
+    expect(deliveryQaUnlockRefusals({
+      gallery: { exists: true, playtest: true },
+      listing: { exists: true, playtest: true },
+      client: { exists: true, playtest: false, email: DELIVERY_QA_CLIENT_EMAIL },
+    })).toEqual([
+      `clients/${DELIVERY_QA_IDS.client} is not the delivery QA client.`,
+    ]);
     expect(deliveryQaUnlockRefusals({
       gallery: { exists: false, playtest: undefined },
       listing: { exists: true, playtest: false },
+      client: { exists: true, playtest: false },
     })).toEqual([
       `galleries/${DELIVERY_QA_IDS.gallery} does not exist.`,
       `listings/${DELIVERY_QA_IDS.listing} is not marked playtest.`,
+      `clients/${DELIVERY_QA_IDS.client} is not the delivery QA client.`,
     ]);
     expect(DELIVERY_QA_UNLOCK_FIELDS).toEqual({
       lockDownloads: false,
@@ -288,8 +360,15 @@ describe("delivery QA seed plan", () => {
     const source = readFileSync(new URL("./seed-delivery-qa.ts", import.meta.url), "utf8");
     const unlock = source.slice(source.indexOf("async function unlockDeliveryQa"));
     expect(unlock).toContain("deliveryQaUnlockRefusals");
+    expect(unlock).toContain("linkedClientId");
     expect(unlock).not.toContain('collection("invoices")');
     expect(unlock.indexOf("deliveryQaUnlockRefusals")).toBeLessThan(unlock.indexOf("batch.commit"));
+    const writes = unlock.slice(unlock.indexOf("const batch"));
+    expect(writes).not.toContain("clientRef");
+    const write = source.slice(source.indexOf("async function writeDeliveryQa"));
+    expect(write.indexOf("deliveryQaClientWriteId")).toBeLessThan(write.indexOf("batch.commit"));
+    expect(write).toContain("linkedClientId");
+    expect(write).not.toContain("QEdPnB7LGadwihiEsj9OMrUvzE93");
   });
 });
 

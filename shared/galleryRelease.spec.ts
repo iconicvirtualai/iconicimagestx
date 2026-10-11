@@ -3,6 +3,7 @@ import { ORDER_GALLERY_RELEASE, planOrderEdits } from "./orderEditPlan";
 import {
   assessGalleryRelease,
   galleryStatusNeedsReleaseGate,
+  releaseForPlaytestDeliveryQaGallery,
   unlinkedGalleryRelease,
 } from "./galleryRelease";
 
@@ -141,5 +142,22 @@ describe("gallery release gate", () => {
     expect(empty.complete).toBe(true);
     expect(empty.required).toBe(0);
     expect(unlinkedGalleryRelease().linked).toBe(false);
+  });
+
+  it("clears the release hold for the playtest delivery QA gallery only", () => {
+    const cleared = releaseForPlaytestDeliveryQaGallery({
+      id: "playtest-delivery-qa-gallery",
+      playtest: true,
+    });
+    expect(cleared?.complete).toBe(true);
+    expect(cleared?.gaps).toEqual([]);
+    expect(releaseForPlaytestDeliveryQaGallery({
+      id: "playtest-delivery-qa-gallery",
+      playtest: false,
+    })).toBeNull();
+    expect(releaseForPlaytestDeliveryQaGallery({
+      id: "real-gallery",
+      playtest: true,
+    })).toBeNull();
   });
 });

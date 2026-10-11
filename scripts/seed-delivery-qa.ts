@@ -15,11 +15,16 @@
  *
  * --unlock changes lock fields on the playtest gallery and listing only.
  * It does not mark the invoice paid and does not send email.
+ * It does not write the client, including QA's portal login.
+ *
+ * A portal login at the same email is not a conflict when linkedClientId is
+ * the playtest client. That login document is never written.
  */
 import {
   DELIVERY_QA_IDS,
   DELIVERY_QA_UNLOCK_FIELDS,
   buildDeliveryQaSeed,
+  deliveryQaClientWriteId,
   deliveryQaRefusals,
   deliveryQaUnlockRefusals,
   formatDeliveryQaDryRun,
@@ -67,10 +72,22 @@ async function unlockDeliveryQa() {
   const db = admin.firestore();
   const galleryRef = db.collection("galleries").doc(DELIVERY_QA_IDS.gallery);
   const listingRef = db.collection("listings").doc(DELIVERY_QA_IDS.listing);
-  const [gallerySnap, listingSnap] = await Promise.all([galleryRef.get(), listingRef.get()]);
+  const clientRef = db.collection("clients").doc(DELIVERY_QA_IDS.client);
+  const [gallerySnap, listingSnap, clientSnap] = await Promise.all([
+    galleryRef.get(),
+    listingRef.get(),
+    clientRef.get(),
+  ]);
+  const clientData = clientSnap.data();
   const refusals = deliveryQaUnlockRefusals({
     gallery: { exists: gallerySnap.exists, playtest: gallerySnap.data()?.playtest },
     listing: { exists: listingSnap.exists, playtest: listingSnap.data()?.playtest },
+    client: {
+      exists: clientSnap.exists,
+      playtest: clientData?.playtest,
+      linkedClientId: clientData?.linkedClientId,
+      email: clientData?.email,
+    },
   });
   if (refusals.length > 0) {
     console.error("Refusing to unlock. No documents were changed.");
@@ -136,6 +153,8 @@ async function writeDeliveryQa(documents: DeliveryQaDocument[]) {
     emailMatches: (emailSnap?.docs || []).map((match) => ({
       path: `clients/${match.id}`,
       playtest: match.data()?.playtest,
+      linkedClientId: match.data()?.linkedClientId,
+      email: match.data()?.email,
     })),
   });
 
@@ -145,6 +164,7 @@ async function writeDeliveryQa(documents: DeliveryQaDocument[]) {
     process.exit(1);
   }
 
+  deliveryQaClientWriteId(documents);
   const now = admin.firestore.FieldValue.serverTimestamp();
   const batch = db.batch();
   for (const { doc, snap } of snaps) {

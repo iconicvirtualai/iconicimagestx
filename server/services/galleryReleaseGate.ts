@@ -7,6 +7,7 @@
 import admin from "firebase-admin";
 import {
   assessGalleryRelease,
+  releaseForPlaytestDeliveryQaGallery,
   unlinkedGalleryRelease,
   type GalleryReleaseEvidence,
   type GalleryReleaseFile,
@@ -118,6 +119,8 @@ export async function loadGalleryReleaseForGallery(galleryId: string): Promise<G
     throw Object.assign(new Error("Gallery not found."), { status: 404 });
   }
   const gallery = { id: snap.id, ...(snap.data() || {}) } as FirebaseFirestore.DocumentData & { id: string };
+  const playtestRelease = releaseForPlaytestDeliveryQaGallery(gallery);
+  if (playtestRelease) return playtestRelease;
   const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
   if (listingId) {
     const listingSnap = await db().collection("listings").doc(listingId).get();

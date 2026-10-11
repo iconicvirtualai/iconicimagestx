@@ -5,6 +5,12 @@
  */
 
 import { classifyClientGalleryItem } from "../client/components/gallery/clientGalleryMedia.ts";
+import {
+  DELIVERY_QA_CLIENT_EMAIL,
+  DELIVERY_QA_CLIENT_ID,
+  isDeliveryQaClient,
+  type DeliveryQaClientRecord,
+} from "./deliveryQaClient.ts";
 import { PLAYTEST_ADDRESS } from "./listingAccess.ts";
 import {
   ICONIC_DOWNLOAD_LOCK,
@@ -14,16 +20,17 @@ import {
   type GalleryDownloadGate,
 } from "./paymentAccess.ts";
 
+export { DELIVERY_QA_CLIENT_EMAIL, isDeliveryQaClient };
+
 export const DELIVERY_QA_DEFAULT_ORIGIN = "https://iconicimagestx.com";
 export const DELIVERY_QA_CLIENT_NAME = "TEST - Delivery QA";
-export const DELIVERY_QA_CLIENT_EMAIL = "ops+deliveryqa@iconicimagestx.com";
 /** Fixed marker so a second run does not churn media timestamps. */
 export const DELIVERY_QA_MARKED_AT = "2026-10-10T00:00:00.000Z";
 /** Matterport's public Showcase sample. Not an Iconic client space. */
 export const DELIVERY_QA_MATTERPORT_URL = "https://my.matterport.com/show/?m=SxQL3iGyoDo";
 
 export const DELIVERY_QA_IDS = {
-  client: "playtest-delivery-qa-client",
+  client: DELIVERY_QA_CLIENT_ID,
   order: "playtest-delivery-qa-order",
   listing: "playtest-delivery-qa-listing",
   gallery: "playtest-delivery-qa-gallery",
@@ -131,13 +138,19 @@ export function deliveryQaClientPath(): string {
   return `clients/${DELIVERY_QA_IDS.client}`;
 }
 
+export interface DeliveryQaEmailMatch extends DeliveryQaClientRecord {
+  path: string;
+}
+
 /**
  * Refuse the write when a stable id already belongs to a real record,
  * or when another client document already owns the QA email.
+ * QA's portal login is linked to the playtest client and is not a conflict.
+ * The login document is not one of the five write targets.
  */
 export function deliveryQaRefusals(input: {
   documents: Array<{ path: string; exists: boolean; playtest: unknown }>;
-  emailMatches: Array<{ path: string; playtest: unknown }>;
+  emailMatches: DeliveryQaEmailMatch[];
 }): string[] {
   const reasons: string[] = [];
   const clientPath = deliveryQaClientPath();
@@ -148,15 +161,30 @@ export function deliveryQaRefusals(input: {
   }
   for (const match of input.emailMatches) {
     if (match.path === clientPath) continue;
+    if (isDeliveryQaClient(match)) continue;
     reasons.push(`${match.path} already uses ${DELIVERY_QA_CLIENT_EMAIL}.`);
   }
   return reasons;
 }
 
-/** --unlock reads these two docs and writes nothing unless both are playtest. */
+/** The batch may update the playtest client only. Never the portal login. */
+export function deliveryQaClientWriteId(documents: Array<{ collection: string; id: string }>): string {
+  const clients = documents.filter((doc) => doc.collection === "clients");
+  if (clients.length !== 1 || clients[0].id !== DELIVERY_QA_IDS.client) {
+    throw new Error(`Delivery QA seed refuses to write any client except clients/${DELIVERY_QA_IDS.client}.`);
+  }
+  return clients[0].id;
+}
+
+/**
+ * --unlock reads the playtest gallery, listing, and client.
+ * It writes nothing unless the gallery and listing are playtest and the
+ * client is in the delivery QA set. It does not write the client.
+ */
 export function deliveryQaUnlockRefusals(input: {
   gallery: { exists: boolean; playtest: unknown };
   listing: { exists: boolean; playtest: unknown };
+  client: { exists: boolean } & DeliveryQaClientRecord;
 }): string[] {
   const reasons: string[] = [];
   const targets = [
@@ -167,6 +195,9 @@ export function deliveryQaUnlockRefusals(input: {
     if (!target.doc.exists) reasons.push(`${target.label} does not exist.`);
     else if (target.doc.playtest !== true) reasons.push(`${target.label} is not marked playtest.`);
   }
+  const clientPath = deliveryQaClientPath();
+  if (!input.client.exists) reasons.push(`${clientPath} does not exist.`);
+  else if (!isDeliveryQaClient(input.client)) reasons.push(`${clientPath} is not the delivery QA client.`);
   return reasons;
 }
 

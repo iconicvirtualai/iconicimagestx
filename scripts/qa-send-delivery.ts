@@ -8,10 +8,16 @@
  * Firestore and it does not send.
  *
  * Without --dry-run, the script loads the playtest gallery, order, and client.
- * It exits non-zero and sends nothing unless all three are playtest and the
- * recipient is exactly ops+deliveryqa@iconicimagestx.com. The send goes through
+ * It exits non-zero and sends nothing unless the gallery and order are
+ * playtest, the client is the delivery QA client, and the recipient is
+ * exactly ops+deliveryqa@iconicimagestx.com. The send goes through
  * deliverGalleryToClient → sendEmail, so CLIENT_NOTIFY_LIVE and
  * NOTIFY_TEST_ALLOWLIST still apply.
+ *
+ * SMTP_PASS is a Vercel secret, so the live command cannot send from a laptop.
+ * Staff send the real delivery email by clicking Deliver Gallery on the
+ * playtest order in the app. That button calls the same deliverGalleryToClient
+ * path. The playtest gallery clears the release gate, so the button is not held.
  */
 import { DELIVERY_QA_IDS } from "../shared/deliveryQaSeed.ts";
 import {
@@ -95,6 +101,7 @@ function recordOf(exists: boolean, data: Record<string, unknown> | undefined): D
   return {
     exists,
     playtest: data?.playtest,
+    linkedClientId: data?.linkedClientId,
     clientId: data?.clientId,
     orderId: data?.orderId,
     email: data?.email,
