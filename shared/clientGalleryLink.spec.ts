@@ -77,10 +77,10 @@ describe("decideClientGalleryLink", () => {
     if (result.ok !== true || result.kind !== "listing") throw new Error("expected the listing studio");
     expect(result.openGalleryId).toBeNull();
     expect(result.project.id).toBe(LISTING_ID);
-    expect(result.project.images).toEqual([displayMedia(0, "front.jpg")]);
+    expect(result.project.images).toEqual([displayMedia(0, "front.jpg"), displayMedia(1, "mls.jpg")]);
     expect(result.project.videos).toEqual([]);
     expect(result.project.tourUrl).toBe("https://my.matterport.com/show/?m=abc");
-    expect(result.project.floorPlans).toEqual([displayMedia(1, "Level 1.jpg")]);
+    expect(result.project.floorPlans).toEqual([displayMedia(2, "Level 1.jpg")]);
     expect(result.project.view).toBe("public");
     expect(result.project.agentName).toBe("Ada Agent");
     expect(result.project).not.toHaveProperty("clientName");
@@ -149,8 +149,11 @@ describe("decideClientGalleryLink", () => {
     expect(result.ok).toBe(true);
     if (result.ok !== true || result.kind !== "listing") throw new Error("expected the listing studio");
     expect(result.project.view).toBe("public");
-    expect(result.project.images).toEqual([displayMedia(0, "exterior-full.jpg")]);
-    const poster = `/api/media/display/${LISTING_ID}/2`;
+    expect(result.project.images).toEqual([
+      displayMedia(0, "exterior-full.jpg"),
+      displayMedia(1, "only-original.jpg"),
+    ]);
+    const poster = `/api/media/display/${LISTING_ID}/3`;
     expect(result.project.videos).toEqual([{
       url: null,
       name: "Walkthrough",
@@ -159,12 +162,12 @@ describe("decideClientGalleryLink", () => {
       displayUrl: poster,
     }]);
     expect(result.project.tourUrl).toContain("matterport.com");
-    expect(result.project.floorPlans).toEqual([displayMedia(1, "Level 1.jpg")]);
+    expect(result.project.floorPlans).toEqual([displayMedia(2, "Level 1.jpg")]);
     expect(result.project.agentName).toBe("Ada Agent");
     const body = JSON.stringify(result.project);
     for (const hidden of [
       "luxury-exterior-full.jpg",
-      "only-original.jpg",
+      "https://cdn.example/only-original.jpg",
       "walkthrough-raw.mp4",
       "walkthrough/stream.m3u8",
       "walkthrough-poster.jpg",
@@ -240,7 +243,7 @@ describe("decideClientGalleryLink", () => {
     expect(paid.ok).toBe(true);
     if (paid.ok !== true || paid.kind !== "listing") throw new Error("expected the listing studio");
     expect(paid.project.view).toBe("public");
-    expect(paid.project.images).toEqual([displayMedia(0, "front.jpg")]);
+    expect(paid.project.images).toEqual([displayMedia(0, "front.jpg"), displayMedia(1, "mls.jpg")]);
     expect(paid.project.videos).toEqual([]);
     expect(JSON.stringify(paid.project)).not.toContain("final.jpg");
     expect(JSON.stringify(paid.project)).not.toContain("front-full.jpg");

@@ -301,9 +301,13 @@ describe("GET /api/galleries/link/:id studio share", () => {
     };
     expect(sharedProject.view).toBe("public");
     expect(leaked(shared.body)).toEqual([]);
-    expect(sharedProject.images?.[0]?.url).toBe(`/api/media/display/${DELIVERY_QA_IDS.listing}/0`);
+    expect(sharedProject.images?.map((image) => image.url)).toEqual([
+      `/api/media/display/${DELIVERY_QA_IDS.listing}/0`,
+      `/api/media/display/${DELIVERY_QA_IDS.listing}/1`,
+      `/api/media/display/${DELIVERY_QA_IDS.listing}/2`,
+    ]);
     expect(sharedProject.images?.[0]?.displayUrl).toBe(`/api/media/display/${DELIVERY_QA_IDS.listing}/0`);
-    expect(sharedProject.floorPlans?.[0]?.url).toBe(`/api/media/display/${DELIVERY_QA_IDS.listing}/1`);
+    expect(sharedProject.floorPlans?.[0]?.url).toBe(`/api/media/display/${DELIVERY_QA_IDS.listing}/3`);
     expect(sharedProject.videos ?? []).toEqual([]);
     expect(JSON.stringify(shared.body)).toContain("100 Playtest Lane, Austin, TX 78701");
     expect(JSON.stringify(shared.body)).toContain("my.matterport.com/show");

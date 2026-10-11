@@ -61,16 +61,22 @@ describe("listing presentation", () => {
     expect(presentation?.beds).toBe("4");
     const urls = presentation?.photos.map((photo) => photo.url);
     expect(urls).toEqual([
-      "https://cdn.example/kitchen-final.jpg",
-      "https://cdn.example/living.jpg",
-      "https://cdn.example/suite.jpg",
+      "/api/media/display/listing1234/1",
+      "/api/media/display/listing1234/2",
+      "/api/media/display/listing1234/3",
     ]);
     expect(presentation?.photos[0].room).toBe("Kitchen");
     expect(presentation?.rooms.map((room) => room.name)).toEqual(["Kitchen", "Living room", "Primary suite"]);
     expect(presentation?.meta.url).toBe("https://iconicimagestx.com/present/abcdefghijklmnopqrstuv");
-    expect(presentation?.meta.image).toBe("https://cdn.example/kitchen-final.jpg");
-    expect(JSON.stringify(presentation)).not.toContain("clientEmail");
-    expect(JSON.stringify(presentation)).not.toContain("/raw/");
+    expect(presentation?.meta.image).toBe("https://iconicimagestx.com/api/media/display/listing1234/1");
+    const body = JSON.stringify(presentation);
+    expect(body).not.toContain("clientEmail");
+    expect(body).not.toContain("/raw/");
+    expect(body).not.toContain("kitchen-final.jpg");
+    expect(body).not.toContain("kitchen.jpg");
+    expect(body).not.toContain("living.jpg");
+    expect(body).not.toContain("suite.jpg");
+    expect(body).not.toContain("cdn.example");
   });
 
   it("uses a media-library folder name when a photo has no room", () => {
@@ -153,13 +159,18 @@ describe("listing presentation", () => {
         ],
       },
     });
-    expect(presentation?.photos.map((photo) => photo.url)).toEqual(["https://cdn.example/exterior-display.jpg"]);
+    expect(presentation?.photos.map((photo) => photo.url)).toEqual([
+      "/api/media/display/listing1234/0",
+      "/api/media/display/listing1234/1",
+    ]);
     expect(presentation?.agentName).toBe("Riley Chen");
     expect(presentation?.address).toBe("18 Oak Hollow");
     const body = JSON.stringify(presentation);
     expect(body).not.toContain("luxury-exterior-full.jpg");
+    expect(body).not.toContain("exterior-display.jpg");
     expect(body).not.toContain("listing-living-01.jpg");
     expect(body).not.toContain("walkthrough-raw.mp4");
+    expect(body).not.toContain("cdn.example");
   });
 
   it("hides a presentation the staff turned off", () => {

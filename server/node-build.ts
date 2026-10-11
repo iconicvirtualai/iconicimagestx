@@ -1,11 +1,13 @@
 import fs from "fs";
 import path from "path";
 import { createServer } from "./index";
+import { handleMediaDisplay } from "./routes/mediaDisplay";
 import * as express from "express";
 import { htmlFileForRequestPath } from "@shared/spaRouting";
 import { renderPresentationShell } from "./routes/presentations";
 
 const app = createServer();
+app.get("/api/media/display/:listingId/:index", handleMediaDisplay);
 const port = process.env.PORT || 3000;
 
 // In production, serve the built SPA files

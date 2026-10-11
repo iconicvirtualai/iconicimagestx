@@ -1,7 +1,8 @@
 /**
  * GET /api/media/display/:listingId/:index
  * Resized JPEG for one public-share image. The index matches shareDisplayItems.
- * Source URLs stay on the server.
+ * Source URLs stay on the server. MLS and full-res rasters are resized here
+ * instead of being dropped from the share.
  */
 
 import { createHash } from "node:crypto";
@@ -21,6 +22,11 @@ const FETCH_TIMEOUT_MS = 8_000;
 const RATE_WINDOW_MS = 60_000;
 const RATE_MAX_DEFAULT = 180;
 const ALLOWED_HOSTS = new Set(["firebasestorage.googleapis.com", "storage.googleapis.com"]);
+const STATIC_OWN_HOSTS = new Set([
+  "iconicimagestx.com",
+  "www.iconicimagestx.com",
+  "iconicimagestx.vercel.app",
+]);
 
 const displayLimiter = createRateLimiter({
   windowMs: RATE_WINDOW_MS,
@@ -91,9 +97,80 @@ function remoteUrl(sourceUrl: string): string | null {
   return url.toString();
 }
 
-async function readRemote(sourceUrl: string): Promise<Buffer | null> {
-  const target = remoteUrl(sourceUrl);
-  if (!target) return null;
+function onVercel(): boolean {
+  return process.env.VERCEL === "1" || Boolean(process.env.VERCEL_ENV);
+}
+
+/**
+ * Local disk is a dev/test fallback. Production functions have no public/ tree.
+ * vercel.json excludeFiles keeps public/media out of the function package,
+ * because the file tracer would otherwise follow this directory.
+ */
+function allowDiskRead(): boolean {
+  if (onVercel()) return false;
+  return process.env.NODE_ENV !== "production";
+}
+
+function hostnameOf(value: string | undefined): string {
+  if (!value) return "";
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  try {
+    const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    return new URL(withScheme).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function trustedOwnHosts(): Set<string> {
+  const hosts = new Set(STATIC_OWN_HOSTS);
+  const app = hostnameOf(process.env.APP_URL);
+  const vercel = hostnameOf(process.env.VERCEL_URL);
+  if (app) hosts.add(app);
+  if (vercel) hosts.add(vercel);
+  return hosts;
+}
+
+function chooseOwnHost(req: { headers?: { host?: string | string[] } }): string {
+  const trusted = trustedOwnHosts();
+  const app = hostnameOf(process.env.APP_URL);
+  if (app && trusted.has(app)) return app;
+  const vercel = hostnameOf(process.env.VERCEL_URL);
+  if (vercel && trusted.has(vercel)) return vercel;
+  const header = req.headers?.host;
+  const raw = Array.isArray(header) ? header[0] : header;
+  const requestHost = hostnameOf(typeof raw === "string" ? raw.split(",")[0] : "");
+  if (requestHost && trusted.has(requestHost)) return requestHost;
+  return trusted.has("iconicimagestx.com") ? "iconicimagestx.com" : "";
+}
+
+function mediaPathname(sourceUrl: string): string | null {
+  let pathname = "";
+  if (sourceUrl.startsWith("/")) pathname = sourceUrl.split("?")[0].split("#")[0];
+  else {
+    try {
+      const url = new URL(sourceUrl);
+      if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+      pathname = url.pathname;
+    } catch {
+      return null;
+    }
+  }
+  if (!pathname.startsWith("/media/") || pathname.includes("..") || pathname.includes("\\") || pathname.includes("//")) return null;
+  if (!/\.(jpe?g|png|webp|gif)$/i.test(pathname)) return null;
+  return pathname;
+}
+
+/** Same-origin /media fetch. Never the foreign host the path was copied from. */
+function ownMediaUrl(sourceUrl: string, req: { headers?: { host?: string | string[] } }): string | null {
+  const pathname = mediaPathname(sourceUrl);
+  const host = chooseOwnHost(req);
+  if (!pathname || !host || !trustedOwnHosts().has(host)) return null;
+  return `https://${host}${pathname}`;
+}
+
+async function readRemote(target: string): Promise<Buffer | null> {
   let response: Response;
   try {
     response = await fetch(target, {
@@ -130,10 +207,59 @@ async function readRemote(sourceUrl: string): Promise<Buffer | null> {
   return chunks.length ? Buffer.concat(chunks) : null;
 }
 
-async function loadSource(sourceUrl: string): Promise<Buffer | null> {
-  const local = await readLocal(sourceUrl);
-  if (local) return local;
-  return readRemote(sourceUrl);
+async function loadSource(sourceUrl: string, req: { headers?: { host?: string | string[] } }): Promise<Buffer | null> {
+  if (allowDiskRead()) {
+    const local = await readLocal(sourceUrl);
+    if (local) return local;
+  }
+  const remote = remoteUrl(sourceUrl);
+  if (remote) return readRemote(remote);
+  const own = ownMediaUrl(sourceUrl, req);
+  if (own) return readRemote(own);
+  return null;
+}
+
+async function galleriesForShare(listingId: string, listing: ShareListing): Promise<Array<Record<string, unknown>>> {
+  const docs: Array<Record<string, unknown>> = [];
+  const ids = new Set<string>();
+  if (typeof listing.galleryId === "string" && listing.galleryId) ids.add(listing.galleryId);
+  if (typeof listing.playtestGalleryId === "string" && listing.playtestGalleryId) ids.add(listing.playtestGalleryId);
+  for (const id of ids) {
+    try {
+      const snap = await admin.firestore().collection("galleries").doc(id).get();
+      if (snap.exists) docs.push({ id: snap.id, ...(snap.data() || {}) });
+    } catch {
+      // A missing gallery must not hide the listing photos.
+    }
+  }
+  try {
+    const linked = await admin.firestore().collection("galleries").where("listingId", "==", listingId).limit(5).get();
+    linked.docs.forEach((doc) => {
+      if (!docs.some((item) => item.id === doc.id)) docs.push({ id: doc.id, ...(doc.data() || {}) });
+    });
+  } catch {
+    // Listing-photo indexes do not depend on this query.
+  }
+  return docs;
+}
+
+function displayParams(req: { params?: { listingId?: string; index?: string }; url?: string }): { listingId: string; index: string } {
+  const params = req.params || {};
+  let listingId = String(params.listingId || "");
+  let index = String(params.index || "");
+  if (listingId && index) return { listingId, index };
+  if (!req.url) return { listingId, index };
+  try {
+    const url = new URL(req.url, "https://iconicimagestx.com");
+    const match = url.pathname.match(/\/api\/media\/display\/([^/]+)\/([^/]+)\/?$/);
+    if (!listingId && match) listingId = decodeURIComponent(match[1]);
+    if (!index && match) index = decodeURIComponent(match[2]);
+    if (!listingId) listingId = url.searchParams.get("listingId") || "";
+    if (!index) index = url.searchParams.get("index") || "";
+  } catch {
+    // Fall through to the 404 below.
+  }
+  return { listingId, index };
 }
 
 async function renderJpeg(source: Buffer): Promise<Buffer | null> {
@@ -169,8 +295,7 @@ export const handleMediaDisplay: RequestHandler = async (req, res) => {
     return res.status(429).json({ error: "Too many requests." });
   }
 
-  const listingId = String(req.params.listingId || "");
-  const indexRaw = String(req.params.index || "");
+  const { listingId, index: indexRaw } = displayParams(req);
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId) || !/^\d{1,4}$/.test(indexRaw) || String(Number(indexRaw)) !== indexRaw) {
     return notFound(res);
   }
@@ -187,10 +312,11 @@ export const handleMediaDisplay: RequestHandler = async (req, res) => {
     return notFound(res);
   }
 
-  const item = shareDisplayItems(listing)[Number(indexRaw)];
+  const galleries = await galleriesForShare(listingId, listing);
+  const item = shareDisplayItems(listing, { galleries })[Number(indexRaw)];
   if (!item) return notFound(res);
 
-  const source = await loadSource(item.sourceUrl);
+  const source = await loadSource(item.sourceUrl, req);
   const jpeg = source ? await renderJpeg(source) : null;
   if (!jpeg) {
     console.error("[media-display] could not build a display image");

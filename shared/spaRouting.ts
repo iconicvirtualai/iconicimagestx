@@ -40,6 +40,9 @@ const APP_SHELL_SOURCES = [
 const PRIVATE_EXACT_SOURCES = new Set(["/invoice/:invoiceId"]);
 
 const RESERVED: Rewrite[] = [
+  // Ahead of /api/(.*) so sharp stays in api/media-display.mjs, not api/index.mjs.
+  // The original path still arrives at that function.
+  { source: "/api/media/display/(.*)", destination: "/api/media-display" },
   { source: "/api", destination: "/api/index" },
   { source: "/api/(.*)", destination: "/api/index" },
   // Vercel does not chain rewrites. /present/:token arrives at the API

@@ -10,10 +10,7 @@ import { google } from "googleapis";
 import crypto, { randomBytes, randomUUID, createHmac, timingSafeEqual as timingSafeEqual$1 } from "crypto";
 import Stripe from "stripe";
 import * as XLSX from "xlsx";
-import { randomBytes as randomBytes$1, timingSafeEqual, createHash } from "node:crypto";
-import { stat, realpath, readFile } from "node:fs/promises";
-import path$1 from "node:path";
-import sharp from "sharp";
+import { randomBytes as randomBytes$1, timingSafeEqual } from "node:crypto";
 const STAFF_ROLES$1 = ["admin", "coordinator", "photographer", "editor"];
 function isStaffRole$1(role) {
   return typeof role === "string" && STAFF_ROLES$1.includes(role);
@@ -6253,8 +6250,8 @@ function separateDisplay(row) {
   }
   return "";
 }
-function photoSource(row) {
-  if (isMls(row)) return "";
+function rasterShareSource(row, legacyDropTagged = false) {
+  if (legacyDropTagged && isMls(row)) return "";
   const type = text$7(row.type).toLowerCase();
   if (type === "video" || type === "reel" || type === "file" || type === "matterport") return "";
   const content = text$7(row.contentType).toLowerCase();
@@ -6262,31 +6259,33 @@ function photoSource(row) {
   const path2 = `${text$7(row.path)} ${text$7(row.storagePath)}`.toLowerCase();
   if (/\/(raw|downloads?|print|zips?)\//.test(path2)) return "";
   const display = separateDisplay(row);
-  if (isFullRes(row)) return display;
+  if (legacyDropTagged && isFullRes(row)) return display;
   if (display) return display;
   const url = shareableUrl$1(row.url) || shareableUrl$1(row.shareUrl);
   if (!url || !isRasterUrl(url, row)) return "";
-  if (/\/(mls|full|raw|downloads?|print|zips?)\//i.test(url)) return "";
+  if (legacyDropTagged && /\/(mls|full)\//i.test(url)) return "";
+  if (/\/(raw|downloads?|print|zips?)\//i.test(url)) return "";
   return url;
 }
-function rasterPoster(row) {
-  if (isMls(row)) return "";
+function rasterPoster(row, legacyDropTagged = false) {
+  if (legacyDropTagged && isMls(row)) return "";
   for (const key of ["poster", "posterUrl", "thumbnailUrl"]) {
     const url = shareableUrl$1(row[key]);
     if (!url || !isRasterUrl(url, row)) continue;
-    if (/\/(mls|full)\//i.test(url)) continue;
+    if (legacyDropTagged && /\/(mls|full)\//i.test(url)) continue;
     return url;
   }
   return "";
 }
-function floorSource(row) {
-  if (isMls(row) || isFullRes(row)) return separateDisplay(row);
-  return photoSource(row) || rasterPoster(row);
+function floorSource(row, legacyDropTagged = false) {
+  if (legacyDropTagged && (isMls(row) || isFullRes(row))) return separateDisplay(row);
+  return rasterShareSource(row, legacyDropTagged) || rasterPoster(row, legacyDropTagged);
 }
 function shareDisplayPath(listingId, index) {
   return `/api/media/display/${encodeURIComponent(listingId)}/${index}`;
 }
-function shareDisplayItems(listing) {
+function shareDisplayItems(listing, options = {}) {
+  const legacy = options.legacyDropTagged === true;
   const items = [];
   const seen = /* @__PURE__ */ new Set();
   const push = (name, sourceUrl, kind) => {
@@ -6298,7 +6297,7 @@ function shareDisplayItems(listing) {
     listing.images.forEach((item, index) => {
       const row = rowOf$1(item);
       if (!row) return;
-      push(mediaName$1(row, `Photo ${index + 1}`), photoSource(row), "image");
+      push(mediaName$1(row, `Photo ${index + 1}`), rasterShareSource(row, legacy), "image");
     });
   }
   for (const group of [listing.floorplans, listing.floorPlans]) {
@@ -6306,16 +6305,31 @@ function shareDisplayItems(listing) {
     group.forEach((item, index) => {
       const row = rowOf$1(item);
       if (!row) return;
-      push(mediaName$1(row, `Floor plan ${index + 1}`), floorSource(row), "floorPlan");
+      push(mediaName$1(row, `Floor plan ${index + 1}`), floorSource(row, legacy), "floorPlan");
     });
   }
   if (Array.isArray(listing.videos)) {
     listing.videos.forEach((item) => {
       const row = rowOf$1(item);
       if (!row) return;
-      push(mediaName$1(row, "Video"), rasterPoster(row), "poster");
+      push(mediaName$1(row, "Video"), rasterPoster(row, legacy), "poster");
     });
   }
+  const extras = [];
+  for (const gallery of options.galleries || []) {
+    for (const bucket2 of [gallery.mediaItems, gallery.images]) {
+      if (!Array.isArray(bucket2)) continue;
+      bucket2.forEach((item, index) => {
+        const row = rowOf$1(item);
+        if (!row) return;
+        const sourceUrl = rasterShareSource(row, legacy);
+        if (!sourceUrl) return;
+        extras.push({ name: mediaName$1(row, `Photo ${index + 1}`), sourceUrl });
+      });
+    }
+  }
+  extras.sort((a, b) => a.sourceUrl.localeCompare(b.sourceUrl) || a.name.localeCompare(b.name));
+  for (const extra of extras) push(extra.name, extra.sourceUrl, "image");
   return items;
 }
 function displayMedia(listingId, index, name) {
@@ -6860,16 +6874,6 @@ function displaySafeShareMedia(listing) {
     videos: publicShareVideos(listing, false),
     tourUrl: safeTour || embedTour(listing, needles)
   };
-}
-function displaySafeImageUrl(row, needles) {
-  const url = text$6(row.url) || text$6(row.shareUrl);
-  const photo = lockedPhoto(url ? { ...row, url } : row, 0, needles);
-  return typeof photo?.url === "string" ? photo.url : "";
-}
-function originalNeedlesFor(rows) {
-  const needles = [];
-  for (const row of rows) walkOriginalNeedles(row, needles);
-  return [...new Set(needles)];
 }
 function ownerStudioProject(listing, pub, gate = {}) {
   const authoritativeInvoice = Object.prototype.hasOwnProperty.call(gate, "invoice");
@@ -7798,7 +7802,7 @@ const INSPECTION_FAILED_NOTE = "Inspection did not finish. Review this photo.";
 function deliveryInspection(status2, notes) {
   return { status: status2, notes: [...notes] };
 }
-const MAX_SOURCE_BYTES$1 = 2e7;
+const MAX_SOURCE_BYTES = 2e7;
 class OpenAiEditError extends Error {
   status;
   constructor(message, status2) {
@@ -7886,14 +7890,14 @@ async function editListingPhotoWithOpenAI(input) {
   const apiKey = input.apiKey.trim();
   if (!apiKey) throw new OpenAiEditError("OPENAI_API_KEY is not configured on the server, so this photo was not edited.");
   if (!input.bytes.length) throw new OpenAiEditError("The source photo was empty.");
-  if (input.bytes.length > MAX_SOURCE_BYTES$1) {
+  if (input.bytes.length > MAX_SOURCE_BYTES) {
     throw new OpenAiEditError("That photo is over 20 MB. Export a smaller JPEG and queue the edit again.");
   }
   const prompt = input.prompt.trim();
   if (prompt.length < 3) throw new OpenAiEditError("Describe the AI edit.");
   const references = input.references || [];
   for (const reference of references) {
-    if (reference.bytes.length > MAX_SOURCE_BYTES$1) {
+    if (reference.bytes.length > MAX_SOURCE_BYTES) {
       throw new OpenAiEditError("A reference image is over 20 MB.");
     }
   }
@@ -17133,173 +17137,6 @@ const handleListingPhotoUpload = async (req, res) => {
     });
   }
 };
-const CACHE_CONTROL = "public, s-maxage=86400, stale-while-revalidate=604800";
-const MAX_EDGE = 1600;
-const MAX_SOURCE_BYTES = 25 * 1024 * 1024;
-const FETCH_TIMEOUT_MS = 8e3;
-const RATE_WINDOW_MS = 6e4;
-const RATE_MAX_DEFAULT = 180;
-const ALLOWED_HOSTS = /* @__PURE__ */ new Set(["firebasestorage.googleapis.com", "storage.googleapis.com"]);
-const displayLimiter = createRateLimiter({
-  windowMs: RATE_WINDOW_MS,
-  max: () => {
-    const raw = Number(process.env.MEDIA_DISPLAY_RATE_MAX);
-    if (Number.isFinite(raw) && raw >= 1 && raw <= 1e4) return Math.floor(raw);
-    return RATE_MAX_DEFAULT;
-  }
-});
-function notFound(res) {
-  res.setHeader("Cache-Control", "no-store");
-  return res.status(404).json({ error: "Not found." });
-}
-function mediaRoot() {
-  return path$1.resolve(process.cwd(), "public", "media");
-}
-function localCandidate(sourceUrl) {
-  let pathname = "";
-  if (sourceUrl.startsWith("/")) pathname = sourceUrl.split("?")[0].split("#")[0];
-  else {
-    try {
-      pathname = new URL(sourceUrl).pathname;
-    } catch {
-      return null;
-    }
-  }
-  if (!pathname.startsWith("/media/")) return null;
-  const relative = pathname.slice("/media/".length);
-  if (!relative || relative.includes("..") || relative.includes("\\")) return null;
-  if (!/\.(jpe?g|png|webp|gif)$/i.test(relative)) return null;
-  const root = mediaRoot();
-  const resolved = path$1.resolve(root, relative);
-  if (resolved !== root && !resolved.startsWith(root + path$1.sep)) return null;
-  return resolved;
-}
-async function readLocal(sourceUrl) {
-  const file = localCandidate(sourceUrl);
-  if (!file) return null;
-  try {
-    const info = await stat(file);
-    if (!info.isFile() || info.size <= 0 || info.size > MAX_SOURCE_BYTES) return null;
-    const root = await realpath(mediaRoot());
-    const real = await realpath(file);
-    if (real !== root && !real.startsWith(root + path$1.sep)) return null;
-    return await readFile(real);
-  } catch {
-    return null;
-  }
-}
-function remoteUrl(sourceUrl) {
-  let url;
-  try {
-    url = new URL(sourceUrl);
-  } catch {
-    return null;
-  }
-  if (url.protocol !== "https:" || url.username || url.password) return null;
-  if (!ALLOWED_HOSTS.has(url.hostname.toLowerCase())) return null;
-  return url.toString();
-}
-async function readRemote(sourceUrl) {
-  const target = remoteUrl(sourceUrl);
-  if (!target) return null;
-  let response;
-  try {
-    response = await fetch(target, {
-      redirect: "error",
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      headers: { Accept: "image/jpeg,image/png,image/webp,image/gif" }
-    });
-  } catch {
-    return null;
-  }
-  if (!response.ok) return null;
-  const advertised = Number(response.headers.get("content-length") || 0);
-  if (advertised > MAX_SOURCE_BYTES) return null;
-  const type = (response.headers.get("content-type") || "").toLowerCase();
-  if (type && !type.startsWith("image/")) return null;
-  const reader = response.body?.getReader();
-  if (!reader) return null;
-  const chunks = [];
-  let total = 0;
-  try {
-    for (; ; ) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > MAX_SOURCE_BYTES) {
-        await reader.cancel().catch(() => void 0);
-        return null;
-      }
-      chunks.push(Buffer.from(value));
-    }
-  } catch {
-    return null;
-  }
-  return chunks.length ? Buffer.concat(chunks) : null;
-}
-async function loadSource(sourceUrl) {
-  const local = await readLocal(sourceUrl);
-  if (local) return local;
-  return readRemote(sourceUrl);
-}
-async function renderJpeg(source) {
-  try {
-    return await sharp(source, { limitInputPixels: 8e7, failOn: "error" }).rotate().resize({ width: MAX_EDGE, height: MAX_EDGE, fit: "inside", withoutEnlargement: true }).jpeg({ quality: 80 }).toBuffer();
-  } catch {
-    return null;
-  }
-}
-function etagFor(bytes) {
-  return `"${createHash("sha1").update(bytes).digest("hex")}"`;
-}
-function etagMatches(header, etag) {
-  const raw = Array.isArray(header) ? header.join(",") : typeof header === "string" ? header : "";
-  if (!raw) return false;
-  return raw.split(",").some((part) => {
-    const token = part.trim();
-    return token === "*" || token === etag || token === `W/${etag}`;
-  });
-}
-const handleMediaDisplay = async (req, res) => {
-  const limit = displayLimiter.check(clientIp(req));
-  if (!limit.allowed) {
-    res.setHeader("Cache-Control", "no-store");
-    res.setHeader("Retry-After", String(limit.retryAfterSec));
-    return res.status(429).json({ error: "Too many requests." });
-  }
-  const listingId = String(req.params.listingId || "");
-  const indexRaw = String(req.params.index || "");
-  if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId) || !/^\d{1,4}$/.test(indexRaw) || String(Number(indexRaw)) !== indexRaw) {
-    return notFound(res);
-  }
-  if (!admin.apps.length) return notFound(res);
-  let listing = null;
-  try {
-    const snap = await admin.firestore().collection("listings").doc(listingId).get();
-    if (!snap.exists) return notFound(res);
-    listing = { id: snap.id, ...snap.data() || {} };
-  } catch {
-    console.error("[media-display] listing lookup failed");
-    return notFound(res);
-  }
-  const item = shareDisplayItems(listing)[Number(indexRaw)];
-  if (!item) return notFound(res);
-  const source = await loadSource(item.sourceUrl);
-  const jpeg = source ? await renderJpeg(source) : null;
-  if (!jpeg) {
-    console.error("[media-display] could not build a display image");
-    return notFound(res);
-  }
-  const etag = etagFor(jpeg);
-  res.setHeader("Cache-Control", CACHE_CONTROL);
-  res.setHeader("ETag", etag);
-  if (etagMatches(req.headers["if-none-match"], etag)) {
-    return res.status(304).end();
-  }
-  res.setHeader("Content-Type", "image/jpeg");
-  res.setHeader("Content-Length", String(jpeg.length));
-  return res.status(200).end(jpeg);
-};
 const DEFAULT_SITE_ORIGIN = "https://iconicimagestx.vercel.app";
 const GENERIC_TITLE = "Iconic Images - Creative Media Partners";
 function readConfiguredOrigin() {
@@ -17356,7 +17193,7 @@ function folderMap(listing) {
 function isRawPath(path2, name) {
   return RAW_EXT.test(name) || RAW_EXT.test(path2) || path2.includes("/raw/");
 }
-function pushDraft(drafts, row, index, folders, needles, fallbackRoom = "") {
+function pushDraft(drafts, row, index, folders, fallbackRoom = "") {
   const path2 = text(row.path) || text(row.storagePath);
   const name = text(row.name) || text(row.fileName) || text(row.title) || path2.split("/").pop() || "";
   const type = text(row.type).toLowerCase();
@@ -17366,24 +17203,25 @@ function pushDraft(drafts, row, index, folders, needles, fallbackRoom = "") {
   const looksLikeImage = !contentType || contentType.startsWith("image/") || IMAGE_EXT.test(name) || IMAGE_EXT.test(path2);
   if (!looksLikeImage) return;
   if (contentType && !contentType.startsWith("image/") && !IMAGE_EXT.test(name)) return;
-  const url = displaySafeImageUrl(row, needles);
-  if (!url) return;
+  const sourceUrl = rasterShareSource(row);
+  if (!sourceUrl) return;
   const room = roomFromFields(row, folders) || fallbackRoom;
   const order = typeof row.order === "number" && Number.isFinite(row.order) ? row.order : index;
   const final = row.studioApproved === true || text(row.studioRole) === "final" || path2.includes("/finals/");
   drafts.push({
-    id: text(row.id) || path2 || url,
-    url,
+    id: text(row.id) || path2 || sourceUrl,
+    url: sourceUrl,
     alt: room ? `${room} photograph` : "Listing photograph",
     room,
     order,
     index,
     path: path2,
     sourcePath: text(row.sourcePath),
+    sourceUrl,
     final
   });
 }
-function listingDrafts(listing, hidden, needles) {
+function listingDrafts(listing, hidden) {
   if (!listing || !Array.isArray(listing.images)) return [];
   const folders = folderMap(listing);
   const drafts = [];
@@ -17397,11 +17235,11 @@ function listingDrafts(listing, hidden, needles) {
     row.contentType = row.contentType || frame.contentType;
     row.id = row.id || frame.id;
     if (rowHiddenFromPresentation(row, hidden)) return;
-    pushDraft(drafts, row, index, folders, needles);
+    pushDraft(drafts, row, index, folders);
   });
   return drafts;
 }
-function galleryDrafts(galleries, start, hidden, needles) {
+function galleryDrafts(galleries, start, hidden) {
   const drafts = [];
   let index = start;
   for (const gallery of galleries || []) {
@@ -17412,7 +17250,7 @@ function galleryDrafts(galleries, start, hidden, needles) {
         if (!item || typeof item !== "object") continue;
         const row = item;
         if (rowHiddenFromPresentation(row, hidden)) continue;
-        pushDraft(drafts, row, index, /* @__PURE__ */ new Map(), needles);
+        pushDraft(drafts, row, index, /* @__PURE__ */ new Map());
         index += 1;
       }
     }
@@ -17449,22 +17287,25 @@ function dedupe(drafts) {
   }
   return photos.slice(0, 200);
 }
-function presentationMediaRows(source) {
-  const rows = [];
-  const listingImages = source.listing?.images;
-  if (Array.isArray(listingImages)) rows.push(...listingImages);
-  for (const gallery of source.galleries || []) {
-    if (Array.isArray(gallery.mediaItems)) rows.push(...gallery.mediaItems);
-    if (Array.isArray(gallery.images)) rows.push(...gallery.images);
+const LISTING_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
+function withDisplayRoutes(drafts, listing, galleries) {
+  const listingId = text(listing?.id);
+  if (!listing || !LISTING_ID_PATTERN.test(listingId)) return drafts;
+  const items = shareDisplayItems({ ...listing }, { galleries });
+  const routed = [];
+  for (const draft of drafts) {
+    const index = items.findIndex((item) => item.sourceUrl === draft.sourceUrl);
+    if (index < 0) continue;
+    routed.push({ ...draft, url: shareDisplayPath(listingId, index) });
   }
-  return rows;
+  return routed;
 }
 function collectPresentationPhotos(source) {
   const hidden = hiddenPresentationKeys(source.listing);
-  const needles = originalNeedlesFor(presentationMediaRows(source));
-  const fromListing = listingDrafts(source.listing, hidden, needles);
-  const fromGalleries = galleryDrafts(source.galleries, fromListing.length, hidden, needles);
-  return dedupe(preferFinals([...fromListing, ...fromGalleries]));
+  const fromListing = listingDrafts(source.listing, hidden);
+  const fromGalleries = galleryDrafts(source.galleries, fromListing.length, hidden);
+  const kept = withDisplayRoutes(preferFinals([...fromListing, ...fromGalleries]), source.listing, source.galleries);
+  return dedupe(kept);
 }
 function presentationRooms(photos) {
   const rooms = [];
@@ -19188,7 +19029,6 @@ function createServer() {
   app.use("/api/messages", router$h);
   app.use("/api/clients", router$g);
   app.get("/api/portal/listings/:id", handleGetPublicPortalListing);
-  app.get("/api/media/display/:listingId/:index", handleMediaDisplay);
   app.use("/api/staff", router$f);
   app.get("/present/:token", (req, res, next) => {
     if (process.env.ICONIC_VITE_DEV === "1") return next();

@@ -14,9 +14,14 @@
       "maxDuration": 60,
       "includeFiles": [
         "dist/spa/index.html",
-        "public/studio/grass-reference.jpg",
-        "node_modules/.pnpm/@img+sharp-libvips-linux-x64@*/node_modules/@img/sharp-libvips-linux-x64/**"
-      ]
+        "public/studio/grass-reference.jpg"
+      ],
+      "excludeFiles": "{node_modules/sharp/**,node_modules/@img/**,node_modules/.pnpm/sharp@*/**,node_modules/.pnpm/@img+sharp*/**}"
+    },
+    "api/media-display.mjs": {
+      "maxDuration": 60,
+      "includeFiles": "node_modules/.pnpm/@img+sharp-libvips-linux-x64@*/node_modules/@img/sharp-libvips-linux-x64/**",
+      "excludeFiles": "{public/media/**,node_modules/.pnpm/@img+sharp-linuxmusl-x64@*/**,node_modules/.pnpm/@img+sharp-libvips-linuxmusl-x64@*/**}"
     }
   },
   "redirects": [
@@ -52,6 +57,10 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/api/media/display/(.*)",
+      "destination": "/api/media-display"
+    },
     {
       "source": "/api",
       "destination": "/api/index"

@@ -52,10 +52,14 @@ beforeEach(() => {
   store.collections = {};
   resetMediaDisplayRateLimit();
   delete process.env.MEDIA_DISPLAY_RATE_MAX;
+  delete process.env.VERCEL;
+  delete process.env.VERCEL_ENV;
+  delete process.env.VERCEL_URL;
+  delete process.env.APP_URL;
   seed("listings", LISTING_ID, qaListingData());
 });
 
-async function openDisplay(index: string, headers: Record<string, string> = {}, listingId = LISTING_ID) {
+async function openDisplay(index: string, headers: Record<string, string> = {}, listingId: string = LISTING_ID) {
   let statusCode = 200;
   let jsonBody: unknown;
   const resHeaders: Record<string, string> = {};
@@ -148,7 +152,7 @@ describe("GET /api/media/display/:listingId/:index", () => {
     }
   });
 
-  it("404s an MLS-only listing, a bad index, and a non-share index", async () => {
+  it("serves an MLS-only photo through the display route and 404s a bad index", async () => {
     const mlsId = "mls-only-listing-id";
     seed("listings", mlsId, {
       images: [{
@@ -156,13 +160,33 @@ describe("GET /api/media/display/:listingId/:index", () => {
         name: "mls.jpg",
         category: "mls",
         downloadable: true,
+      }, {
+        url: "https://cdn.example/media/photos/luxury-exterior.jpg",
+        name: "full.jpg",
+        category: "full-res",
+        downloadable: true,
       }],
     });
     const mls = await openDisplay("0", {}, mlsId);
-    expect(mls.statusCode).toBe(404);
-    expect(mls.jsonBody).toEqual({ error: "Not found." });
-    expect(JSON.stringify(mls.jsonBody)).not.toContain("listing-living");
-    expect(JSON.stringify(mls.headers)).not.toContain("listing-living");
+    expect(mls.statusCode).toBe(200);
+    expect(mls.body[0]).toBe(0xff);
+    expect(mls.headers["content-type"]).toBe("image/jpeg");
+    expect(mls.headers["cache-control"]).toBe("public, s-maxage=86400, stale-while-revalidate=604800");
+    const full = await openDisplay("1", {}, mlsId);
+    expect(full.statusCode).toBe(200);
+    expect(full.body[0]).toBe(0xff);
+    const shown = JSON.stringify({ mls: mls.jsonBody, full: full.jsonBody, headers: mls.headers });
+    expect(shown).not.toContain("listing-living");
+    expect(shown).not.toContain("luxury-exterior");
+    expect(shown).not.toContain("cdn.example");
+
+    const pdfId = "pdf-only-listing1";
+    seed("listings", pdfId, {
+      images: [{ url: "https://cdn.example/notes.pdf", name: "notes.pdf", contentType: "application/pdf" }],
+    });
+    const pdf = await openDisplay("0", {}, pdfId);
+    expect(pdf.statusCode).toBe(404);
+    expect(pdf.jsonBody).toEqual({ error: "Not found." });
 
     const bad = await openDisplay("mls");
     expect(bad.statusCode).toBe(404);
@@ -185,5 +209,60 @@ describe("GET /api/media/display/:listingId/:index", () => {
     expect(blocked.jsonBody).toEqual({ error: "Too many requests." });
     expect(Number(blocked.headers["retry-after"])).toBeGreaterThan(0);
     expect(JSON.stringify(blocked.jsonBody)).not.toContain("/media/");
+  });
+
+  it("fetches /media from this deployment when public/ is not on disk", async () => {
+    process.env.VERCEL = "1";
+    process.env.APP_URL = "https://www.iconicimagestx.com";
+    const jpeg = await sharp({
+      create: { width: 4, height: 4, channels: 3, background: { r: 9, g: 9, b: 9 } },
+    }).jpeg().toBuffer();
+    const calls: Array<{ url: string; redirect?: RequestRedirect }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url: String(url), redirect: init?.redirect });
+      return new Response(jpeg, { status: 200, headers: { "content-type": "image/jpeg" } });
+    }));
+    try {
+      const result = await openDisplay("0", { host: "evil.example" });
+      expect(result.statusCode).toBe(200);
+      expect(result.body[0]).toBe(0xff);
+      expect(calls).toEqual([{
+        url: "https://www.iconicimagestx.com/media/photos/listing-living-01.jpg",
+        redirect: "error",
+      }]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("refuses a foreign image host and still allows Firebase Storage", async () => {
+    process.env.VERCEL = "1";
+    const calls: Array<{ url: string; redirect?: RequestRedirect }> = [];
+    const jpeg = await sharp({
+      create: { width: 4, height: 4, channels: 3, background: { r: 1, g: 1, b: 1 } },
+    }).jpeg().toBuffer();
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url: String(url), redirect: init?.redirect });
+      return new Response(jpeg, { status: 200, headers: { "content-type": "image/jpeg" } });
+    }));
+    const evilId = "evil-host-listing1";
+    seed("listings", evilId, {
+      images: [{ url: "https://evil.example/secret.jpg", name: "secret.jpg" }],
+    });
+    const storageId = "storage-listing1";
+    const storageUrl = "https://firebasestorage.googleapis.com/v0/b/iconic.appspot.com/o/photo.jpg?alt=media";
+    seed("listings", storageId, {
+      images: [{ url: storageUrl, name: "storage.jpg" }],
+    });
+    try {
+      const evil = await openDisplay("0", { host: "169.254.169.254" }, evilId);
+      expect(evil.statusCode).toBe(404);
+      expect(calls).toEqual([]);
+      const stored = await openDisplay("0", {}, storageId);
+      expect(stored.statusCode).toBe(200);
+      expect(calls).toEqual([{ url: storageUrl, redirect: "error" }]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

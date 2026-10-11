@@ -3,7 +3,9 @@
  * The index is the position in this share set, not a storage path.
  * Listing ids are already unguessable, and a stable index keeps the CDN cache
  * (s-maxage) from fragmenting the way a signed token would.
- * MLS, full-res-only, PDF, zip, and raw files have no index.
+ * MLS, full-res, and downloadable raster photos stay in the set. The payload
+ * carries the display route, never the original file URL. PDF, zip, raw, and
+ * non-image files have no index.
  */
 
 import type { StudioMedia } from "./clientGalleryLink.ts";
@@ -102,8 +104,14 @@ function separateDisplay(row: Record<string, unknown>): string {
   return "";
 }
 
-function photoSource(row: Record<string, unknown>): string {
-  if (isMls(row)) return "";
+/**
+ * Raster the display route may resize. A separate web image wins when one
+ * exists. MLS, full-res, and downloadable files are still rasters: the route
+ * resizes them and the public payload never receives this URL.
+ * legacyDropTagged is the first share cut, used only by the read-only report.
+ */
+export function rasterShareSource(row: Record<string, unknown>, legacyDropTagged = false): string {
+  if (legacyDropTagged && isMls(row)) return "";
   const type = text(row.type).toLowerCase();
   if (type === "video" || type === "reel" || type === "file" || type === "matterport") return "";
   const content = text(row.contentType).toLowerCase();
@@ -111,40 +119,53 @@ function photoSource(row: Record<string, unknown>): string {
   const path = `${text(row.path)} ${text(row.storagePath)}`.toLowerCase();
   if (/\/(raw|downloads?|print|zips?)\//.test(path)) return "";
   const display = separateDisplay(row);
-  if (isFullRes(row)) return display;
+  if (legacyDropTagged && isFullRes(row)) return display;
   if (display) return display;
   const url = shareableUrl(row.url) || shareableUrl(row.shareUrl);
   if (!url || !isRasterUrl(url, row)) return "";
-  if (/\/(mls|full|raw|downloads?|print|zips?)\//i.test(url)) return "";
+  if (legacyDropTagged && /\/(mls|full)\//i.test(url)) return "";
+  if (/\/(raw|downloads?|print|zips?)\//i.test(url)) return "";
   return url;
 }
 
-function rasterPoster(row: Record<string, unknown>): string {
-  if (isMls(row)) return "";
+function rasterPoster(row: Record<string, unknown>, legacyDropTagged = false): string {
+  if (legacyDropTagged && isMls(row)) return "";
   for (const key of ["poster", "posterUrl", "thumbnailUrl"] as const) {
     const url = shareableUrl(row[key]);
     if (!url || !isRasterUrl(url, row)) continue;
-    if (/\/(mls|full)\//i.test(url)) continue;
+    if (legacyDropTagged && /\/(mls|full)\//i.test(url)) continue;
     return url;
   }
   return "";
 }
 
-function floorSource(row: Record<string, unknown>): string {
-  if (isMls(row) || isFullRes(row)) return separateDisplay(row);
-  return photoSource(row) || rasterPoster(row);
+function floorSource(row: Record<string, unknown>, legacyDropTagged = false): string {
+  if (legacyDropTagged && (isMls(row) || isFullRes(row))) return separateDisplay(row);
+  return rasterShareSource(row, legacyDropTagged) || rasterPoster(row, legacyDropTagged);
 }
 
 export function shareDisplayPath(listingId: string, index: number): string {
   return `/api/media/display/${encodeURIComponent(listingId)}/${index}`;
 }
 
+export interface ShareDisplayOptions {
+  /**
+   * Gallery photos appended after listing images, floor plans, and posters.
+   * Listing indexes stay put so the share payload and the display route match
+   * even when a presentation also has gallery-only photos.
+   */
+  galleries?: Array<Record<string, unknown>>;
+  /** Report-only comparison with the cut that dropped MLS and full-res photos. */
+  legacyDropTagged?: boolean;
+}
+
 /**
  * Share-set order, shared by the payload and the display route:
- * eligible listing images, then floor-plan images, then video posters
- * that are not already in the set. Indexes do not change with payment.
+ * listing images, floor-plan images, video posters, then gallery-only rasters
+ * sorted by source URL. Indexes do not change with payment.
  */
-export function shareDisplayItems(listing: ShareListing): ShareDisplayItem[] {
+export function shareDisplayItems(listing: ShareListing, options: ShareDisplayOptions = {}): ShareDisplayItem[] {
+  const legacy = options.legacyDropTagged === true;
   const items: ShareDisplayItem[] = [];
   const seen = new Set<string>();
   const push = (name: string, sourceUrl: string, kind: ShareDisplayItem["kind"]) => {
@@ -157,7 +178,7 @@ export function shareDisplayItems(listing: ShareListing): ShareDisplayItem[] {
     listing.images.forEach((item, index) => {
       const row = rowOf(item);
       if (!row) return;
-      push(mediaName(row, `Photo ${index + 1}`), photoSource(row), "image");
+      push(mediaName(row, `Photo ${index + 1}`), rasterShareSource(row, legacy), "image");
     });
   }
   for (const group of [listing.floorplans, listing.floorPlans]) {
@@ -165,17 +186,37 @@ export function shareDisplayItems(listing: ShareListing): ShareDisplayItem[] {
     group.forEach((item, index) => {
       const row = rowOf(item);
       if (!row) return;
-      push(mediaName(row, `Floor plan ${index + 1}`), floorSource(row), "floorPlan");
+      push(mediaName(row, `Floor plan ${index + 1}`), floorSource(row, legacy), "floorPlan");
     });
   }
   if (Array.isArray(listing.videos)) {
     listing.videos.forEach((item) => {
       const row = rowOf(item);
       if (!row) return;
-      push(mediaName(row, "Video"), rasterPoster(row), "poster");
+      push(mediaName(row, "Video"), rasterPoster(row, legacy), "poster");
     });
   }
+  const extras: Array<{ name: string; sourceUrl: string }> = [];
+  for (const gallery of options.galleries || []) {
+    for (const bucket of [gallery.mediaItems, gallery.images]) {
+      if (!Array.isArray(bucket)) continue;
+      bucket.forEach((item, index) => {
+        const row = rowOf(item);
+        if (!row) return;
+        const sourceUrl = rasterShareSource(row, legacy);
+        if (!sourceUrl) return;
+        extras.push({ name: mediaName(row, `Photo ${index + 1}`), sourceUrl });
+      });
+    }
+  }
+  extras.sort((a, b) => a.sourceUrl.localeCompare(b.sourceUrl) || a.name.localeCompare(b.name));
+  for (const extra of extras) push(extra.name, extra.sourceUrl, "image");
   return items;
+}
+
+/** Images and floor plans a share page would show. Posters are not photos. */
+export function shareRasterCount(listing: ShareListing, legacyDropTagged = false): number {
+  return shareDisplayItems(listing, { legacyDropTagged }).filter((item) => item.kind === "image" || item.kind === "floorPlan").length;
 }
 
 function displayMedia(listingId: string, index: number, name: string): StudioMedia {

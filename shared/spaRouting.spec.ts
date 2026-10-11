@@ -20,6 +20,28 @@ const vercel = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url
 const footer = readFileSync(new URL("../client/components/Footer.tsx", import.meta.url), "utf8");
 const notFound = readFileSync(new URL("../public/404.html", import.meta.url), "utf8");
 
+describe("vercel function split", () => {
+  it("keeps sharp out of the main API function", () => {
+    const index = readFileSync(new URL("../api/index.mjs", import.meta.url), "utf8");
+    const media = readFileSync(new URL("../api/media-display.mjs", import.meta.url), "utf8");
+    expect(index).not.toMatch(/from ["']sharp["']/);
+    expect(index).not.toContain("handleMediaDisplay");
+    expect(index).not.toContain("@img/sharp");
+    expect(media).toMatch(/from ["']sharp["']/);
+    expect(media).toMatch(/from ["']firebase-admin["']/);
+    expect(media).not.toMatch(/from ["']googleapis["']/);
+    expect(media).not.toMatch(/from ["']express["']/);
+    expect(media).not.toMatch(/from ["']stripe["']/);
+    const vercel = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8")) as {
+      functions: Record<string, { includeFiles?: string | string[]; excludeFiles?: string }>;
+    };
+    expect(vercel.functions["api/index.mjs"].excludeFiles).toContain("sharp");
+    expect(JSON.stringify(vercel.functions["api/index.mjs"].includeFiles)).not.toContain("sharp");
+    expect(JSON.stringify(vercel.functions["api/media-display.mjs"].includeFiles)).toContain("sharp-libvips");
+    expect(vercel.functions["api/media-display.mjs"].excludeFiles).toContain("public/media");
+  });
+});
+
 describe("vercel source patterns", () => {
   it("matches exact paths, one segment, and prefixes without swallowing studio 105", () => {
     expect(compileVercelSource("/about").test("/about")).toBe(true);
@@ -103,7 +125,12 @@ describe("spa rewrite coverage", () => {
     expect(firstMatchingRewrite("/present/preview", vercel.rewrites)?.destination).toBe("/api/index");
     expect(firstMatchingRewrite("/podcast-guest-prep", vercel.rewrites)?.destination).toBe("/podcast-guest-prep.html");
     expect(firstMatchingRewrite("/book", vercel.rewrites)?.destination).toBe("/seo/book.html");
+    expect(firstMatchingRewrite("/api/media/display/listingid1/0", vercel.rewrites)?.destination).toBe("/api/media-display");
     expect(firstMatchingRewrite("/api/calendar/roster", vercel.rewrites)?.destination).toBe("/api/index");
+    const displayRule = vercel.rewrites.findIndex((rule) => rule.source === "/api/media/display/(.*)");
+    const apiCatchAll = vercel.rewrites.findIndex((rule) => rule.source === "/api/(.*)");
+    expect(displayRule).toBeGreaterThanOrEqual(0);
+    expect(apiCatchAll).toBeGreaterThan(displayRule);
     expect(firstMatchingRewrite("/this-page-does-not-exist", vercel.rewrites)).toBeUndefined();
     expect(vercel.redirects.some((rule) => rule.source === "/pricing-v1" && rule.destination === "/pricing" && rule.statusCode === 301)).toBe(true);
   });
