@@ -562,7 +562,7 @@ function OrdersForCadi({
             {shownError}
           </p>
         ) : null}
-        {notice ? <p className="mt-3 text-sm text-[#d5deea]">{notice}</p> : null}
+        {notice && notice !== shownError ? <p className="mt-3 text-sm text-[#d5deea]">{notice}</p> : null}
         {orders.length === 0 ? (
           <p className="mt-4 text-sm text-[#9fb0c7]">No orders yet</p>
         ) : (

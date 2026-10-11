@@ -128,6 +128,29 @@ describe("owners suite structure rendering", () => {
     expect((textarea as HTMLTextAreaElement).value).toBe("");
   });
 
+  it("shows one not-connected line when the save error repeats the notice", () => {
+    const data = parseOwnerSuite(ownerCommandCenterStructureGrids(), new Date("2026-10-10T18:00:00Z"));
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    root = createRoot(host);
+    act(() => {
+      root?.render(
+        <OwnersSuiteView
+          payload={{ data, source: "fixture", configured: true, notice: null, readerEmail: null }}
+          refreshing={false}
+          showOps={false}
+          ordersNotice="Orders are not connected."
+          orderError="Orders are not connected."
+          onRefresh={() => undefined}
+          onSignOut={() => undefined}
+        />,
+      );
+    });
+    const text = host.textContent || "";
+    expect(text.split("Orders are not connected.").length - 1).toBe(1);
+    expect(host.querySelector("[role='alert']")?.textContent).toBe("Orders are not connected.");
+  });
+
   it("opens the plan board from the data tab", () => {
     const host = renderSuite();
     const plan = Array.from(host.querySelectorAll('[role="tab"]')).find((tab) => tab.textContent === "Plan Board");
