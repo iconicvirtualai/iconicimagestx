@@ -154,7 +154,7 @@ describe("project card and project page share the helper", () => {
   it("reads billing on the card and the project page without writing", () => {
     expect(listingsPage).toContain("projectSurfaceForListing");
     expect(listingsPage).toContain("loadAdminListingBilling");
-    expect(listingsPage).toContain("listingPriceLabel");
+    expect(listingsPage).toContain("listingPriceForView");
     expect(listingsPage).not.toContain("useProjectBillingPool");
     expect(listingsPage).not.toContain("loadAdminListingPrices");
     expect(projectPage).toContain("readProjectSurface");

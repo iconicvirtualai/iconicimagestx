@@ -399,6 +399,23 @@ export function hardcodedChargePrice(id: string): number | undefined {
   return undefined;
 }
 
+/** Id match, then an exact package name. Listings often store the name only. */
+export function hardcodedChargePriceForText(raw: string): number | undefined {
+  const direct = hardcodedChargePrice(raw);
+  if (direct != null) return direct;
+  const key = raw.trim().toLowerCase();
+  if (!key) return undefined;
+  const pools: Array<{ id: string; name: string; price: number }> = [
+    ...services,
+    ...basicsList,
+    ...UPGRADES,
+    ...publicBookingPackages,
+    ...addOns.flatMap((category) => category.items),
+  ];
+  const hit = pools.find((entry) => entry.name.trim().toLowerCase() === key);
+  return hit && hit.price > 0 ? hit.price : undefined;
+}
+
 export interface CatalogPriceMismatch {
   id: string;
   hardcodedPrice: number;

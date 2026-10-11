@@ -1,10 +1,14 @@
 /**
  * Price for the admin listings grid.
- * Keeps the listing or order price the tile already shows, then the order
- * total, then a linked draft or sent invoice total. This module only reads.
+ * Keeps the listing or order price the tile already shows, then stored totals
+ * (including a consult line's amount, balance due, or amount due), then a
+ * linked invoice total or amount due, then a catalog package price.
+ * A dash is only for a record with no price anywhere. This module only reads.
  */
 
 import { buildAdminOrderTile } from "./adminOrderTile.ts";
+import { hardcodedChargePriceForText } from "./bookingCatalog.ts";
+import { listingInvoiceDocId, orderInvoiceDocId } from "./orderProjectInvoice.ts";
 
 export const LISTING_PRICE_MISSING = "—";
 export const LISTING_PRICE_QUERY_CHUNK = 30;
@@ -26,7 +30,7 @@ export interface ListingPriceIndex {
   invoices: Map<string, ListingPriceDoc>;
 }
 
-const USABLE_INVOICE_STATUS = new Set(["draft", "sent"]);
+const CLOSED_INVOICE_STATUS = new Set(["void", "voided", "cancelled", "canceled"]);
 
 /**
  * Currency string used across admin (client account, invoices, order detail).
@@ -42,30 +46,49 @@ export function resolveListingPriceLabel(input: {
   invoice?: Record<string, unknown> | null;
 }): string {
   const listing = input.listing;
-  const shown = priceShownToday(listing);
+  const order = input.order ?? nestedRecord(listing.order);
+  const shown = priceShownToday(listing) || (order ? priceShownToday(order) : null);
   if (shown) return shown;
 
-  const order = input.order ?? nestedRecord(listing.order);
-  const orderShown = order ? priceShownToday(order) : null;
-  if (orderShown) return orderShown;
+  const stored = (order ? storedMoney(order) : null) ?? storedMoney(listing);
+  if (stored != null) return formatAdminMoney(stored);
 
-  const orderTotal = firstPositive([
-    order?.total,
-    nestedRecord(order?.pricing)?.total,
-    order?.amount,
-    listing.total,
-    nestedRecord(listing.pricing)?.total,
-    listing.amount,
-  ]);
-  if (orderTotal != null) return formatAdminMoney(orderTotal);
-
-  const invoiceTotal = firstInvoiceTotal([
+  const invoiceTotal = firstInvoiceMoney([
     input.invoice,
     listing.invoice,
     order?.invoice,
   ]);
   if (invoiceTotal != null) return formatAdminMoney(invoiceTotal);
+
+  const catalog = (order ? catalogMoney(order) : null) ?? catalogMoney(listing);
+  if (catalog != null) return formatAdminMoney(catalog);
   return LISTING_PRICE_MISSING;
+}
+
+/**
+ * Price for one listings grid row. The status tab is not a price source:
+ * In progress and All resolve the same listing the same way.
+ */
+export function listingPriceForView(
+  listing: Record<string, unknown>,
+  index: ListingPriceIndex | null | undefined,
+  _view?: string,
+): string {
+  return listingPriceLabel(listing, index);
+}
+
+/**
+ * A dash painted before the order/invoice lookup finishes is not a result.
+ * A settled lookup replaces it. A settled dash is kept only when no price exists.
+ */
+export function replaceProvisionalListingPrice(
+  current: string | undefined,
+  next: string,
+  settled: boolean,
+): string {
+  if (settled) return next;
+  if (current && current !== LISTING_PRICE_MISSING) return current;
+  return next;
 }
 
 export function listingPriceLabel(
@@ -136,6 +159,8 @@ export async function loadListingPriceIndex(
   if (pending.length === 0) return index;
 
   await readKnownIds(index, reader, pending);
+  await readConvertedOrders(index, reader, pending);
+  await readStableInvoiceIds(index, reader, pending);
   if (unresolved(pending, index).length === 0) return index;
 
   await readInvoiceIdsFromOrders(index, reader, unresolved(pending, index));
@@ -143,6 +168,7 @@ export async function loadListingPriceIndex(
   if (still.length === 0) return index;
 
   await readByLink(index, reader, still);
+  await readStableInvoiceIds(index, reader, unresolved(pending, index));
   return index;
 }
 
@@ -159,9 +185,12 @@ export async function loadListingBillingIndex(
   const index = emptyListingPriceIndex();
   if (listings.length === 0) return index;
   await readKnownIds(index, reader, listings);
+  await readConvertedOrders(index, reader, listings);
+  await readStableInvoiceIds(index, reader, listings);
   await readInvoiceIdsFromOrders(index, reader, listings);
   await readByLink(index, reader, listings);
   await readEmbeddedInvoiceIds(index, reader, listings);
+  await readStableInvoiceIds(index, reader, listings);
   return index;
 }
 
@@ -176,6 +205,51 @@ async function readKnownIds(
     readIds(reader, "invoices", listings.flatMap(invoiceIdsOf)),
   ]);
   remember(index, orders, requests, invoices);
+}
+
+async function readConvertedOrders(
+  index: ListingPriceIndex,
+  reader: ListingPriceReader,
+  listings: Record<string, unknown>[],
+) {
+  const ids = unique(listings.flatMap((listing) => {
+    const requestIds = [...orderIdsOf(listing), ...requestIdsOf(listing)];
+    return requestIds.flatMap((id) => {
+      const request = index.orderRequests.get(id);
+      if (!request) return [];
+      return [text(request.convertedToOrderId), text(request.orderId)];
+    });
+  })).filter((id) => !index.orders.has(id));
+  remember(index, await readIds(reader, "orders", ids), [], []);
+}
+
+async function readStableInvoiceIds(
+  index: ListingPriceIndex,
+  reader: ListingPriceReader,
+  listings: Record<string, unknown>[],
+) {
+  const ids = unique(listings.flatMap((listing) => stableInvoiceIds(listing, index)))
+    .filter((id) => !index.invoices.has(id));
+  remember(index, [], [], await readIds(reader, "invoices", ids));
+}
+
+function stableInvoiceIds(listing: Record<string, unknown>, index: ListingPriceIndex): string[] {
+  const ids: string[] = [];
+  const pushRequest = (id: string) => {
+    if (id) ids.push(orderInvoiceDocId(id));
+  };
+  requestIdsOf(listing).forEach(pushRequest);
+  const listingId = docId(listing);
+  if (listingId) ids.push(listingInvoiceDocId(listingId));
+  for (const id of [...orderIdsOf(listing), ...requestIdsOf(listing)]) {
+    const request = index.orderRequests.get(id);
+    if (!request) continue;
+    pushRequest(docId(request));
+    pushRequest(text(request.orderRequestId));
+  }
+  const linked = orderForListing(listing, index);
+  if (linked) pushRequest(text(linked.orderRequestId));
+  return ids;
 }
 
 async function readInvoiceIdsFromOrders(
@@ -213,14 +287,15 @@ async function readByLink(
     const linked = orderForListing(listing, index);
     return [...requestIdsOf(listing), linked ? text(linked.orderRequestId) : ""];
   }));
-  const [orders, requests, byListing, byOrder, byRequest] = await Promise.all([
+  const [orders, requests, ordersByRequest, byListing, byOrder, byRequest] = await Promise.all([
     readField(reader, "orders", "listingId", listingIds),
     readField(reader, "orderRequests", "listingId", listingIds),
+    readField(reader, "orders", "orderRequestId", requestIds),
     readField(reader, "invoices", "listingId", listingIds),
     readField(reader, "invoices", "orderId", orderIds),
     readField(reader, "invoices", "orderRequestId", requestIds),
   ]);
-  remember(index, orders, requests, [...byListing, ...byOrder, ...byRequest]);
+  remember(index, [...orders, ...ordersByRequest], requests, [...byListing, ...byOrder, ...byRequest]);
 }
 
 function unresolved(listings: Record<string, unknown>[], index: ListingPriceIndex) {
@@ -260,19 +335,36 @@ function remember(
 }
 
 function orderForListing(listing: Record<string, unknown>, index: ListingPriceIndex): ListingPriceDoc | null {
-  for (const id of orderIdsOf(listing)) {
-    const order = index.orders.get(id);
-    if (order) return order;
-  }
-  for (const id of [...orderIdsOf(listing), ...requestIdsOf(listing)]) {
+  const candidates: ListingPriceDoc[] = [];
+  const seen = new Set<ListingPriceDoc>();
+  const add = (doc: ListingPriceDoc | null | undefined) => {
+    if (!doc || seen.has(doc)) return;
+    seen.add(doc);
+    candidates.push(doc);
+  };
+  for (const id of orderIdsOf(listing)) add(index.orders.get(id));
+  for (const id of requestIdsOf(listing)) {
     const request = index.orderRequests.get(id);
-    if (request) return request;
+    add(request);
+    if (request) {
+      add(index.orders.get(text(request.convertedToOrderId)));
+      add(index.orders.get(text(request.orderId)));
+    }
   }
   const listingId = docId(listing);
-  if (!listingId) return null;
-  return [...index.orders.values()].find((doc) => text(doc.listingId) === listingId)
-    || [...index.orderRequests.values()].find((doc) => text(doc.listingId) === listingId)
-    || null;
+  const requestIds = new Set([
+    ...requestIdsOf(listing),
+    ...candidates.map((doc) => docId(doc)),
+  ].filter(Boolean));
+  for (const doc of index.orders.values()) {
+    if ((listingId && text(doc.listingId) === listingId) || requestIds.has(text(doc.orderRequestId))) add(doc);
+  }
+  if (listingId) {
+    for (const doc of index.orderRequests.values()) {
+      if (text(doc.listingId) === listingId) add(doc);
+    }
+  }
+  return candidates.find((doc) => recordHasPrice(doc)) || candidates[0] || null;
 }
 
 function invoiceForListing(
@@ -282,6 +374,7 @@ function invoiceForListing(
 ): ListingPriceDoc | null {
   const preferredId = invoiceIdsOf(listing)[0] || (order ? invoiceIdsOf(order)[0] : "") || "";
   const listingId = docId(listing);
+  const stableIds = new Set(stableInvoiceIds(listing, index));
   const orderIds = new Set([
     ...orderIdsOf(listing),
     ...requestIdsOf(listing),
@@ -290,6 +383,7 @@ function invoiceForListing(
   ].filter(Boolean));
   const linked = [...index.invoices.values()].filter((doc) => {
     if (preferredId && doc.id === preferredId) return true;
+    if (stableIds.has(doc.id)) return true;
     if (listingId && text(doc.listingId) === listingId) return true;
     if (orderIds.size > 0 && (orderIds.has(text(doc.orderId)) || orderIds.has(text(doc.orderRequestId)))) return true;
     return false;
@@ -298,7 +392,7 @@ function invoiceForListing(
 }
 
 function chooseInvoice(docs: ListingPriceDoc[], preferredId: string): ListingPriceDoc | null {
-  const usable = docs.filter((doc) => invoiceTotal(doc) != null);
+  const usable = docs.filter((doc) => invoiceMoney(doc) != null);
   if (usable.length === 0) return null;
   const preferred = usable.find((doc) => doc.id === preferredId);
   if (preferred) return preferred;
@@ -308,23 +402,127 @@ function chooseInvoice(docs: ListingPriceDoc[], preferredId: string): ListingPri
 function priceShownToday(record: Record<string, unknown>): string | null {
   const label = buildAdminOrderTile(record).priceLabel;
   if (!label || label === LISTING_PRICE_MISSING) return null;
+  const amount = money(label);
+  if (amount != null && amount <= 0) return null;
   return label;
 }
 
-function invoiceTotal(value: unknown): number | null {
+function recordHasPrice(record: Record<string, unknown>): boolean {
+  return priceShownToday(record) != null
+    || storedMoney(record) != null
+    || invoiceMoney(record.invoice) != null
+    || catalogMoney(record) != null;
+}
+
+function storedMoney(record: Record<string, unknown>): number | null {
+  const pricing = nestedRecord(record.pricing);
+  return firstPositive([
+    record.total,
+    pricing?.total,
+    pricing?.subtotal,
+    record.amount,
+    record.subtotal,
+    record.balanceDue,
+    record.amountDue,
+    lineMoneySum(record),
+  ]);
+}
+
+function invoiceMoney(value: unknown): number | null {
   const record = nestedRecord(value);
   if (!record) return null;
   const status = text(record.status).toLowerCase();
-  if (!USABLE_INVOICE_STATUS.has(status)) return null;
-  return positiveMoney(record.total);
+  if (CLOSED_INVOICE_STATUS.has(status)) return null;
+  return firstPositive([
+    record.total,
+    record.amountDue,
+    record.subtotal,
+    lineMoneySum(record),
+  ]);
 }
 
-function firstInvoiceTotal(values: unknown[]): number | null {
+function firstInvoiceMoney(values: unknown[]): number | null {
   for (const value of values) {
-    const total = invoiceTotal(value);
+    const total = invoiceMoney(value);
     if (total != null) return total;
   }
   return null;
+}
+
+function lineMoneySum(record: Record<string, unknown>): number | null {
+  const raw = Array.isArray(record.lineItems) && record.lineItems.length > 0
+    ? record.lineItems
+    : Array.isArray(record.services) ? record.services : [];
+  let sum = 0;
+  let found = false;
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    const qtyRaw = money(row.qty);
+    const qty = qtyRaw != null && qtyRaw > 0 ? qtyRaw : 1;
+    const unit = money(row.unitPrice);
+    const extended = unit != null && unit > 0 ? Math.round(unit * qty * 100) / 100 : null;
+    const amount = firstPositive([row.price, row.amount, row.total, extended]);
+    if (amount == null) continue;
+    sum += amount;
+    found = true;
+  }
+  if (!found) return null;
+  const rounded = Math.round(sum * 100) / 100;
+  return rounded > 0 ? rounded : null;
+}
+
+function catalogMoney(record: Record<string, unknown>): number | null {
+  for (const value of catalogCandidates(record)) {
+    const catalog = hardcodedChargePriceForText(value);
+    if (catalog != null && catalog > 0) return Math.round(catalog * 100) / 100;
+    const labeled = labeledMoney(value);
+    if (labeled != null && labeled > 0) return labeled;
+  }
+  return null;
+}
+
+function catalogCandidates(record: Record<string, unknown>): string[] {
+  const values: string[] = [];
+  const push = (value: unknown) => {
+    const raw = text(value);
+    if (raw) values.push(raw);
+  };
+  push(record.selectedService);
+  push(record.serviceId);
+  push(record.packageId);
+  push(record.package);
+  push(record.packageName);
+  push(record.selectedPackage);
+  for (const id of asStrings(record.serviceIds)) push(id);
+  for (const id of asStrings(record.selectedBasics)) push(id);
+  for (const id of asStrings(record.selectedAddOns)) push(id);
+  const raw = Array.isArray(record.lineItems) && record.lineItems.length > 0
+    ? record.lineItems
+    : record.services;
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      if (typeof item === "string") push(item);
+      else if (item && typeof item === "object") {
+        const row = item as Record<string, unknown>;
+        push(row.id);
+        push(row.name);
+      }
+    }
+  }
+  return values;
+}
+
+function labeledMoney(raw: string): number | null {
+  const match = raw.match(/\$\s*([0-9][0-9,]*(?:\.\d+)?)/);
+  if (!match) return null;
+  const amount = Number(match[1].replace(/,/g, ""));
+  return Number.isFinite(amount) && amount > 0 ? amount : null;
+}
+
+function asStrings(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry) => text(entry)).filter(Boolean);
 }
 
 function firstPositive(values: unknown[]): number | null {

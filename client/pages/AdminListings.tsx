@@ -26,7 +26,14 @@ import {
 } from "@/lib/staffListQueue";
 import { loadAdminListingBilling } from "@/lib/listingPriceLookup";
 import { buildAdminOrderTile, type AdminStudioId } from "@shared/adminOrderTile";
-import { emptyListingPriceIndex, listingBillingLookupKey, listingPriceLabel, type ListingPriceIndex } from "@shared/listingPrice";
+import {
+  emptyListingPriceIndex,
+  LISTING_PRICE_MISSING,
+  listingBillingLookupKey,
+  listingPriceForView,
+  replaceProvisionalListingPrice,
+  type ListingPriceIndex,
+} from "@shared/listingPrice";
 import { billingPoolFromPriceIndex, buildBillingIndex, projectSurfaceForListing } from "@shared/projectSurfaceStatus";
 import { AdminOrderTile } from "@/components/admin/AdminOrderTile";
 
@@ -164,8 +171,10 @@ export default function AdminListings() {
   const navigate = useNavigate();
   const [projects, setProjects] = React.useState<Project[]>([]);
   const [priceIndex, setPriceIndex] = React.useState<ListingPriceIndex | null>(null);
+  const [pricedKey, setPricedKey] = React.useState<string | null>(null);
   const [billingReady, setBillingReady] = React.useState(false);
   const [billingFailed, setBillingFailed] = React.useState(false);
+  const priceCache = React.useRef(new Map<string, string>());
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<string[]>(["in_progress"]);
@@ -243,15 +252,19 @@ export default function AdminListings() {
     const listings = listingsRef.current as unknown as Record<string, unknown>[];
     if (!billingKey) {
       setPriceIndex(emptyListingPriceIndex());
+      setPricedKey("");
       setBillingReady(true);
       setBillingFailed(false);
       return;
     }
     let cancelled = false;
+    setBillingReady(false);
+    setBillingFailed(false);
     loadAdminListingBilling(listings)
       .then((index) => {
         if (cancelled) return;
         setPriceIndex(index);
+        setPricedKey(billingKey);
         setBillingReady(true);
         setBillingFailed(false);
       })
@@ -318,6 +331,19 @@ export default function AdminListings() {
     () => buildBillingIndex(billingPoolFromPriceIndex(priceIndex)),
     [priceIndex],
   );
+  const priceView = statusFilter.join("|");
+  const priceSettled = pricedKey === billingKey && priceIndex != null && billingReady && !billingFailed;
+  const priceById = React.useMemo(() => {
+    const map = new Map<string, string>();
+    for (const project of projects) {
+      const record = project as unknown as Record<string, unknown>;
+      const next = listingPriceForView(record, priceSettled ? priceIndex : null, priceView);
+      const price = replaceProvisionalListingPrice(priceCache.current.get(project.id), next, priceSettled);
+      if (priceSettled || price !== LISTING_PRICE_MISSING) priceCache.current.set(project.id, price);
+      map.set(project.id, price);
+    }
+    return map;
+  }, [projects, priceIndex, priceSettled, priceView]);
   const form = projectType === "real_estate" ? reForm : bizForm;
 
   const handleClientSearch = (val: string) => {
@@ -839,7 +865,7 @@ export default function AdminListings() {
             const record = p as unknown as Record<string, unknown>;
             const order = {
               ...buildAdminOrderTile(record),
-              priceLabel: listingPriceLabel(record, priceIndex),
+              priceLabel: priceById.get(p.id) || listingPriceForView(record, priceSettled ? priceIndex : null, priceView),
             };
             const surface = projectSurfaceForListing(record, billingIndex, {
               pending: !billingReady || billingFailed,

@@ -5,10 +5,12 @@ import {
   chunkIds,
   formatAdminMoney,
   listingPriceLabel,
+  listingPriceForView,
   listingBillingLookupKey,
   listingPriceLookupKey,
   loadListingBillingIndex,
   loadListingPriceIndex,
+  replaceProvisionalListingPrice,
   resolveListingPriceLabel,
   type ListingPriceDoc,
   type ListingPriceReader,
@@ -107,6 +109,70 @@ describe("listing price fallback", () => {
     })).toBe("$2,250.00");
   });
 
+  it("prices a consult B-order from the line amount the booking stores", () => {
+    expect(resolveListingPriceLabel({
+      listing: {
+        id: "533",
+        orderCode: "ORD-B-00533",
+        projectType: "business",
+        status: "consult_scheduled",
+        clientName: "Jessie Jones",
+        services: ["Consult"],
+        paymentStatus: "unpaid",
+        total: 0,
+      },
+      order: {
+        id: "req-533",
+        projectType: "business",
+        clientName: "Jessie Jones",
+        lineItems: [{ name: "Consult", price: 0, amount: 350 }],
+      },
+    })).toBe("$350.00");
+  });
+
+  it("uses a draft invoice amountDue when the consult lines have no price", () => {
+    expect(resolveListingPriceLabel({
+      listing: {
+        id: "533",
+        orderCode: "ORD-B-00533",
+        projectType: "business",
+        status: "consult_scheduled",
+        clientName: "Jessie Jones",
+        services: ["Consult"],
+        paymentStatus: "unpaid",
+      },
+      invoice: { id: "ordreq_req-533", status: "draft", amountDue: 350 },
+    })).toBe("$350.00");
+  });
+
+  it("uses the catalog package price when the B-order never stored a total", () => {
+    expect(resolveListingPriceLabel({
+      listing: {
+        id: "533",
+        orderCode: "ORD-B-00533",
+        projectType: "business",
+        status: "consult_scheduled",
+        clientName: "Jessie Jones",
+        services: ["Hollywood"],
+      },
+      order: { id: "req-533", selectedService: "hollywood" },
+    })).toBe("$199.00");
+  });
+
+  it("uses the catalog price from the service name a consult listing stores", () => {
+    expect(resolveListingPriceLabel({
+      listing: {
+        id: "533",
+        orderCode: "ORD-B-00533",
+        projectType: "business",
+        status: "consult_scheduled",
+        clientName: "Jessie Jones",
+        services: ["Hollywood"],
+        total: 0,
+      },
+    })).toBe("$199.00");
+  });
+
   it("shows a dash when the only invoice is void or nothing is priced", () => {
     expect(resolveListingPriceLabel({
       listing: customListing,
@@ -168,6 +234,45 @@ describe("listing price lookup", () => {
     expect(chunks[1]).toEqual(["id-30"]);
   });
 
+  it("reads a consult draft invoice stored at the ordreq_ id", async () => {
+    const listing = {
+      id: "533",
+      orderCode: "ORD-B-00533",
+      projectType: "business",
+      status: "consult_scheduled",
+      clientName: "Jessie Jones",
+      services: ["Consult"],
+      paymentStatus: "unpaid",
+      orderRequestId: "req-533",
+    };
+    const { reader, calls } = memoryReader({
+      orderRequests: [{ id: "req-533", listingId: "533", clientName: "Jessie Jones" }],
+      invoices: [{ id: "ordreq_req-533", status: "draft", amountDue: 350 }],
+    });
+    const index = await loadListingPriceIndex([listing], reader);
+    expect(calls.some((call) => call.startsWith("ids:invoices:") && call.includes("ordreq_req-533"))).toBe(true);
+    expect(listingPriceLabel(listing, index)).toBe("$350.00");
+  });
+
+  it("prices the confirmed B-order when the listing only has the request id", async () => {
+    const listing = {
+      id: "533",
+      orderCode: "ORD-B-00533",
+      projectType: "business",
+      status: "consult_scheduled",
+      clientName: "Jessie Jones",
+      services: ["Consult"],
+      orderRequestId: "req-533",
+    };
+    const { reader, calls } = memoryReader({
+      orderRequests: [{ id: "req-533", listingId: "533" }],
+      orders: [{ id: "order-533", orderRequestId: "req-533", balanceDue: 350 }],
+    });
+    const index = await loadListingBillingIndex([listing], reader);
+    expect(calls.some((call) => call.startsWith("field:orders:orderRequestId:"))).toBe(true);
+    expect(listingPriceLabel(listing, index)).toBe("$350.00");
+  });
+
   it("does not call the reader when every row already has a price", async () => {
     const byIds = vi.fn(async () => []);
     const byField = vi.fn(async () => []);
@@ -179,6 +284,30 @@ describe("listing price lookup", () => {
     expect(byField).not.toHaveBeenCalled();
     expect(listingPriceLabel({ id: "priced", serviceIds: ["listing-showcase"], total: 549 }, index))
       .toBe(packagePriceDisplay(resolvePackageSkin("listing-showcase")!));
+  });
+});
+
+describe("listing price is the same on every tab", () => {
+  it("replaces a provisional dash with the lookup price for in progress and all", async () => {
+    const listing = { ...customListing, status: "in_progress", orderId: "order-9" };
+    const { reader } = memoryReader({
+      orders: [{ id: "order-9", invoiceId: "inv-draft" }],
+      invoices: [{ id: "inv-draft", orderId: "order-9", status: "draft", total: 2250 }],
+    });
+    let shown = listingPriceForView(listing, null, "in_progress");
+    expect(shown).toBe("—");
+    expect(replaceProvisionalListingPrice(undefined, shown, false)).toBe("—");
+
+    const index = await loadListingBillingIndex([listing], reader);
+    const settled = ["in_progress", "all"].map((view) => {
+      const next = listingPriceForView(listing, index, view);
+      shown = replaceProvisionalListingPrice(shown, next, true);
+      return next;
+    });
+    expect(settled).toEqual(["$2,250.00", "$2,250.00"]);
+    expect(shown).toBe("$2,250.00");
+    expect(listingPriceForView(listing, index, "in_progress"))
+      .toBe(listingPriceForView(listing, index, "all"));
   });
 });
 
