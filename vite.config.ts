@@ -59,6 +59,8 @@ function expressPlugin(): Plugin {
       const app = createServer();
       // Dynamic import so the Vercel api/index build never traces sharp.
       const { handleMediaDisplay } = await import("./server/routes/mediaDisplay");
+      app.get("/api/media/display/p/:token/:index", handleMediaDisplay);
+      app.get("/api/media/display/o/:signedToken/:index", handleMediaDisplay);
       app.get("/api/media/display/:listingId/:index", handleMediaDisplay);
 
       // Add Express app as middleware to Vite dev server

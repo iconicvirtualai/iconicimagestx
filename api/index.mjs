@@ -7,10 +7,10 @@ import admin from "firebase-admin";
 import nodemailer from "nodemailer";
 import twilio from "twilio";
 import { google } from "googleapis";
-import crypto, { randomBytes, randomUUID, createHmac, timingSafeEqual as timingSafeEqual$1 } from "crypto";
+import crypto, { randomBytes, randomUUID, createHmac as createHmac$1, timingSafeEqual as timingSafeEqual$1 } from "crypto";
+import { createHmac, randomBytes as randomBytes$1, timingSafeEqual } from "node:crypto";
 import Stripe from "stripe";
 import * as XLSX from "xlsx";
-import { randomBytes as randomBytes$1, timingSafeEqual } from "node:crypto";
 const STAFF_ROLES$1 = ["admin", "coordinator", "photographer", "editor"];
 function isStaffRole$1(role) {
   return typeof role === "string" && STAFF_ROLES$1.includes(role);
@@ -5943,6 +5943,338 @@ function publicMediaItem(item, canDownload) {
     thumbnailUrl: publicText(item.thumbnailUrl) || publicText(item.poster)
   };
 }
+const OWNER_DISPLAY_TTL_MS = 4 * 60 * 60 * 1e3;
+const DEV_SECRET = "iconic-owner-display-dev-v1";
+const ID_PATTERN$1 = /^[A-Za-z0-9_-]{8,128}$/;
+function ownerDisplaySecret(env = process.env) {
+  const explicit = env.OWNER_SESSION_SECRET?.trim();
+  if (explicit && explicit.length >= 16) return explicit;
+  const serviceAccount = env.FIREBASE_SERVICE_ACCOUNT;
+  if (serviceAccount && serviceAccount.length >= 32) {
+    return createHmac("sha256", "iconic-owner-display-v1").update(serviceAccount).digest("hex");
+  }
+  const sheetsKey = env.OWNER_SHEETS_SA_KEY;
+  if (sheetsKey && sheetsKey.length >= 32) {
+    return createHmac("sha256", "iconic-owner-display-v1").update(sheetsKey).digest("hex");
+  }
+  if (!isHostedDeployment(env)) return DEV_SECRET;
+  return null;
+}
+function signOwnerDisplayToken(claims, now = Date.now(), env = process.env) {
+  const secret = ownerDisplaySecret(env);
+  if (!secret || !ID_PATTERN$1.test(claims.id)) return null;
+  if (claims.scope !== "listing" && claims.scope !== "gallery") return null;
+  const body = Buffer.from(JSON.stringify({
+    s: claims.scope,
+    id: claims.id,
+    exp: now + OWNER_DISPLAY_TTL_MS
+  })).toString("base64url");
+  const sig = createHmac("sha256", secret).update(body).digest("base64url");
+  return `${body}.${sig}`;
+}
+function ownerDisplayPath(token, index) {
+  return `/api/media/display/o/${encodeURIComponent(token)}/${index}`;
+}
+const RASTER = /\.(jpe?g|png|webp|gif)(\?|#|$)/i;
+const VIDEO_FILE = /\.(mp4|m4v|mov|webm)(\?|#|$)/i;
+const BLOCKED_EXT = /\.(zip|pdf|dng|cr2|cr3|nef|nrw|arw|srf|sr2|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic|heif|mp4|m4v|mov|webm)(\?|#|$)/i;
+const FILE_KEYS = ["downloadUrl", "fileUrl", "originalUrl", "fullResUrl", "mlsUrl", "zipUrl", "printUrl", "reelUrl", "mp4Url", "rawUrl", "src"];
+const DISPLAY_KEYS = ["previewUrl", "displayUrl", "webUrl", "thumbnailUrl"];
+function text$8(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function rowOf$2(item) {
+  return item && typeof item === "object" ? item : null;
+}
+function shareableUrl$1(value) {
+  const url = text$8(value);
+  if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
+  if (url.startsWith("/")) return url;
+  if (url.startsWith("https://") || url.startsWith("http://")) return url;
+  return "";
+}
+function mediaName$1(row, fallback) {
+  return text$8(row.name) || text$8(row.fileName) || text$8(row.title) || fallback;
+}
+function labelOf(row) {
+  return `${text$8(row.fileName)} ${text$8(row.name)} ${text$8(row.title)} ${text$8(row.path)} ${text$8(row.storagePath)}`.toLowerCase();
+}
+function isMls(row) {
+  const category = text$8(row.category).toLowerCase();
+  const type = text$8(row.type).toLowerCase();
+  if (category === "mls" || type === "mls") return true;
+  const label = labelOf(row);
+  if (/(^|[^a-z0-9])mls([^a-z0-9]|$)/.test(label)) return true;
+  return /\/mls\//.test(label);
+}
+function isFullRes(row) {
+  const category = text$8(row.category).toLowerCase();
+  const type = text$8(row.type).toLowerCase();
+  if (category === "full-res" || category === "fullres" || type === "full-res" || type === "fullres") return true;
+  const label = labelOf(row);
+  if (/(^|[^a-z0-9])full[\s_-]?res([^a-z0-9]|$)/.test(label)) return true;
+  return /\/full\//.test(label);
+}
+function isRasterUrl(url, row) {
+  if (!url || BLOCKED_EXT.test(url.split("#")[0]) || VIDEO_FILE.test(url.split("#")[0])) return false;
+  if (RASTER.test(url.split("#")[0])) return true;
+  const content = text$8(row.contentType).toLowerCase();
+  return /^image\/(jpeg|jpg|png|webp|gif)/.test(content);
+}
+function blockedFileUrls(row, includeOwnUrl) {
+  const blocked = /* @__PURE__ */ new Set();
+  for (const key of FILE_KEYS) {
+    const url = shareableUrl$1(row[key]);
+    if (url) blocked.add(url);
+  }
+  if (includeOwnUrl) {
+    const own = shareableUrl$1(row.url);
+    const share = shareableUrl$1(row.shareUrl);
+    if (own) blocked.add(own);
+    if (share) blocked.add(share);
+  }
+  return blocked;
+}
+function separateDisplay(row) {
+  const blocked = blockedFileUrls(row, isFullRes(row));
+  for (const key of DISPLAY_KEYS) {
+    const url = shareableUrl$1(row[key]);
+    if (!url || !isRasterUrl(url, row) || blocked.has(url)) continue;
+    if (/\/mls\//i.test(url) || /\/full\//i.test(url)) continue;
+    return url;
+  }
+  return "";
+}
+function rasterShareSource(row, legacyDropTagged = false) {
+  if (legacyDropTagged && isMls(row)) return "";
+  const type = text$8(row.type).toLowerCase();
+  if (type === "video" || type === "reel" || type === "file" || type === "matterport") return "";
+  const content = text$8(row.contentType).toLowerCase();
+  if (content.startsWith("video/") || content === "application/pdf" || content === "application/zip") return "";
+  const path2 = `${text$8(row.path)} ${text$8(row.storagePath)}`.toLowerCase();
+  if (/\/(raw|downloads?|print|zips?)\//.test(path2)) return "";
+  const display = separateDisplay(row);
+  if (legacyDropTagged && isFullRes(row)) return display;
+  if (display) return display;
+  const url = shareableUrl$1(row.url) || shareableUrl$1(row.shareUrl);
+  if (!url || !isRasterUrl(url, row)) return "";
+  if (legacyDropTagged && /\/(mls|full)\//i.test(url)) return "";
+  if (/\/(raw|downloads?|print|zips?)\//i.test(url)) return "";
+  return url;
+}
+function rasterPoster(row, legacyDropTagged = false) {
+  if (legacyDropTagged && isMls(row)) return "";
+  for (const key of ["poster", "posterUrl", "thumbnailUrl"]) {
+    const url = shareableUrl$1(row[key]);
+    if (!url || !isRasterUrl(url, row)) continue;
+    if (legacyDropTagged && /\/(mls|full)\//i.test(url)) continue;
+    return url;
+  }
+  return "";
+}
+function floorSource(row, legacyDropTagged = false) {
+  if (legacyDropTagged && (isMls(row) || isFullRes(row))) return separateDisplay(row);
+  return rasterShareSource(row, legacyDropTagged) || rasterPoster(row, legacyDropTagged);
+}
+function shareDisplayPath(listingId, index) {
+  return `/api/media/display/${encodeURIComponent(listingId)}/${index}`;
+}
+function pushDisplay(items, seen, name, sourceUrl, kind) {
+  if (!sourceUrl || seen.has(sourceUrl) || items.length >= 240) return;
+  seen.add(sourceUrl);
+  items.push({ name, sourceUrl, kind });
+}
+function shareDisplayItems(listing, options = {}) {
+  const legacy = options.legacyDropTagged === true;
+  const items = [];
+  const seen = /* @__PURE__ */ new Set();
+  if (Array.isArray(listing.images)) {
+    listing.images.forEach((item, index) => {
+      const row = rowOf$2(item);
+      if (!row) return;
+      pushDisplay(items, seen, mediaName$1(row, `Photo ${index + 1}`), rasterShareSource(row, legacy), "image");
+    });
+  }
+  for (const group of [listing.floorplans, listing.floorPlans]) {
+    if (!Array.isArray(group)) continue;
+    group.forEach((item, index) => {
+      const row = rowOf$2(item);
+      if (!row) return;
+      pushDisplay(items, seen, mediaName$1(row, `Floor plan ${index + 1}`), floorSource(row, legacy), "floorPlan");
+    });
+  }
+  if (Array.isArray(listing.videos)) {
+    listing.videos.forEach((item) => {
+      const row = rowOf$2(item);
+      if (!row) return;
+      pushDisplay(items, seen, mediaName$1(row, "Video"), rasterPoster(row, legacy), "poster");
+    });
+  }
+  return items;
+}
+function videoFileUrl(row) {
+  const url = shareableUrl$1(row.url) || shareableUrl$1(row.shareUrl);
+  if (!url || !VIDEO_FILE.test(url.split("#")[0])) return "";
+  return url;
+}
+function ownerPosterSource(row) {
+  return rasterPoster(row) || videoFileUrl(row);
+}
+function listingOwnerDisplayItems(listing) {
+  const items = [...shareDisplayItems(listing)];
+  const seen = new Set(items.map((item) => item.sourceUrl));
+  if (!Array.isArray(listing.videos)) return items;
+  listing.videos.forEach((item) => {
+    const row = rowOf$2(item);
+    if (!row || rasterPoster(row)) return;
+    pushDisplay(items, seen, mediaName$1(row, "Video"), videoFileUrl(row), "poster");
+  });
+  return items;
+}
+function isGalleryFloor(row) {
+  const type = text$8(row.type).toLowerCase();
+  const category = text$8(row.category).toLowerCase();
+  return type === "floorplan" || type === "floor-plan" || category === "floorplan" || category === "floor-plan";
+}
+function galleryOwnerDisplayItems(media) {
+  const items = [];
+  const seen = /* @__PURE__ */ new Set();
+  const rows = media.map(rowOf$2).filter((row) => Boolean(row));
+  for (const row of rows) {
+    const type = text$8(row.type).toLowerCase();
+    if (type === "video" || type === "reel" || type === "matterport" || type === "tour" || type === "file" || type === "pdf") continue;
+    const source = rasterShareSource(row);
+    if (!source) continue;
+    const floor = isGalleryFloor(row);
+    pushDisplay(items, seen, mediaName$1(row, floor ? "Floor plan" : "Photo"), source, floor ? "floorPlan" : "image");
+  }
+  for (const row of rows) {
+    const type = text$8(row.type).toLowerCase();
+    if (type !== "video" && type !== "reel") continue;
+    const poster = rasterPoster(row);
+    if (poster) {
+      pushDisplay(items, seen, mediaName$1(row, "Video"), poster, "poster");
+      continue;
+    }
+    pushDisplay(items, seen, mediaName$1(row, "Video"), videoFileUrl(row), "poster");
+  }
+  return items;
+}
+function displayMedia(listingId, index, name) {
+  const url = shareDisplayPath(listingId, index);
+  return { url, displayUrl: url, name };
+}
+function posterIndex(row, items) {
+  const poster = rasterPoster(row);
+  if (!poster) return -1;
+  return items.findIndex((item) => item.sourceUrl === poster);
+}
+function isUnbranded(row) {
+  const category = text$8(row.category).toLowerCase();
+  const type = text$8(row.type).toLowerCase();
+  if (category === "unbranded" || type === "unbranded") return true;
+  const name = `${text$8(row.name)} ${text$8(row.fileName)} ${text$8(row.title)}`.toLowerCase();
+  return name.includes("unbranded");
+}
+function isBrandedPlayback(row) {
+  if (isMls(row) || isUnbranded(row)) return false;
+  const category = text$8(row.category).toLowerCase();
+  const type = text$8(row.type).toLowerCase();
+  if (category === "branded" || type === "branded") return true;
+  const name = `${text$8(row.name)} ${text$8(row.fileName)} ${text$8(row.title)}`.toLowerCase();
+  return /(^|[^a-z])branded([^a-z]|$)/.test(name);
+}
+function isReelPlayback(row) {
+  if (isMls(row) || isUnbranded(row)) return false;
+  const category = text$8(row.category).toLowerCase();
+  const type = text$8(row.type).toLowerCase();
+  return category === "reel" || type === "reel";
+}
+function deliveredVideoUrl(row) {
+  const url = shareableUrl$1(row.url) || shareableUrl$1(row.shareUrl);
+  if (!url || !VIDEO_FILE.test(url.split("#")[0])) return "";
+  if (/\/mls\//i.test(url)) return "";
+  return url;
+}
+function withPoster(media, listingId, index) {
+  if (index < 0) return media;
+  const poster = shareDisplayPath(listingId, index);
+  return { ...media, poster, thumbnailUrl: poster, displayUrl: poster };
+}
+function publicShareVideos(listing, playback) {
+  if (!Array.isArray(listing.videos)) return [];
+  const items = shareDisplayItems(listing);
+  const videos = [];
+  for (const item of listing.videos) {
+    const row = rowOf$2(item);
+    if (!row) continue;
+    const name = mediaName$1(row, "Video");
+    const posterAt = posterIndex(row, items);
+    if (playback && (isBrandedPlayback(row) || isReelPlayback(row))) {
+      const url = deliveredVideoUrl(row);
+      if (!url) continue;
+      videos.push(withPoster({ url, name, noDownload: true }, listing.id, posterAt));
+      continue;
+    }
+    if (posterAt < 0) continue;
+    videos.push(withPoster({ url: null, name }, listing.id, posterAt));
+  }
+  return videos.slice(0, 40);
+}
+function publicShareMedia(listing) {
+  const images = [];
+  const floorPlans = [];
+  shareDisplayItems(listing).forEach((item, index) => {
+    const media = displayMedia(listing.id, index, item.name);
+    if (item.kind === "image") images.push(media);
+    if (item.kind === "floorPlan") floorPlans.push(media);
+  });
+  return {
+    images: images.slice(0, 200),
+    floorPlans: floorPlans.slice(0, 40)
+  };
+}
+function rowOf$1(item) {
+  return item && typeof item === "object" ? item : {};
+}
+function matterportUrl(row) {
+  for (const key of ["embedUrl", "url", "shareUrl"]) {
+    const value = row[key];
+    if (typeof value !== "string") continue;
+    const url = value.trim();
+    if (!url) continue;
+    try {
+      if (new URL(url).hostname.toLowerCase().includes("matterport.com")) return url;
+    } catch {
+    }
+  }
+  return "";
+}
+function lockedClientGalleryMedia(galleryId, items, canDownload) {
+  const rows = items.map(rowOf$1);
+  if (canDownload) return rows.map((row) => publicMediaItem(row, true));
+  const display = galleryOwnerDisplayItems(rows);
+  const token = signOwnerDisplayToken({ scope: "gallery", id: galleryId });
+  const href = (source) => {
+    if (!token || !source) return null;
+    const index = display.findIndex((item) => item.sourceUrl === source);
+    if (index < 0) return null;
+    return ownerDisplayPath(token, index);
+  };
+  return rows.map((row) => {
+    const base = publicMediaItem(row, false);
+    const tour = matterportUrl(row);
+    if (tour) return { ...base, url: tour, shareUrl: tour, embedUrl: tour };
+    const type = typeof row.type === "string" ? row.type.toLowerCase() : "";
+    if (type === "video" || type === "reel") {
+      const poster = href(ownerPosterSource(row));
+      return { ...base, poster, thumbnailUrl: poster };
+    }
+    const image = href(rasterShareSource(row));
+    if (!image) return base;
+    return { ...base, url: image };
+  });
+}
 const AI_EDIT_PRESETS = [
   {
     id: "virtual_stage",
@@ -6136,11 +6468,11 @@ function frameFromListingImage(raw, index = 0) {
   };
 }
 const SETTLED = /* @__PURE__ */ new Set(["paid", "comped"]);
-function text$8(value) {
+function text$7(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function status(value) {
-  return text$8(value).toLowerCase();
+  return text$7(value).toLowerCase();
 }
 function settled(value) {
   return SETTLED.has(status(value));
@@ -6148,7 +6480,7 @@ function settled(value) {
 function nestedInvoiceStatus(listing) {
   const nested2 = listing?.invoice;
   if (!nested2 || typeof nested2 !== "object") return "";
-  return text$8(nested2.status);
+  return text$7(nested2.status);
 }
 function releaseFlags(subject) {
   const listing = subject.listing;
@@ -6179,232 +6511,6 @@ function strictStudioDownloadsUnlocked(subject) {
 function studioDownloadsUnlocked(subject) {
   if (strictStudioDownloadsUnlocked(subject)) return true;
   return copiedPaidFields(subject.listing).length > 0;
-}
-const RASTER = /\.(jpe?g|png|webp|gif)(\?|#|$)/i;
-const VIDEO_FILE = /\.(mp4|m4v|mov|webm)(\?|#|$)/i;
-const BLOCKED_EXT = /\.(zip|pdf|dng|cr2|cr3|nef|nrw|arw|srf|sr2|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic|heif|mp4|m4v|mov|webm)(\?|#|$)/i;
-const FILE_KEYS = ["downloadUrl", "fileUrl", "originalUrl", "fullResUrl", "mlsUrl", "zipUrl", "printUrl", "reelUrl", "mp4Url", "rawUrl", "src"];
-const DISPLAY_KEYS = ["previewUrl", "displayUrl", "webUrl", "thumbnailUrl"];
-function text$7(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-function rowOf$1(item) {
-  return item && typeof item === "object" ? item : null;
-}
-function shareableUrl$1(value) {
-  const url = text$7(value);
-  if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
-  if (url.startsWith("/")) return url;
-  if (url.startsWith("https://") || url.startsWith("http://")) return url;
-  return "";
-}
-function mediaName$1(row, fallback) {
-  return text$7(row.name) || text$7(row.fileName) || text$7(row.title) || fallback;
-}
-function labelOf(row) {
-  return `${text$7(row.fileName)} ${text$7(row.name)} ${text$7(row.title)} ${text$7(row.path)} ${text$7(row.storagePath)}`.toLowerCase();
-}
-function isMls(row) {
-  const category = text$7(row.category).toLowerCase();
-  const type = text$7(row.type).toLowerCase();
-  if (category === "mls" || type === "mls") return true;
-  const label = labelOf(row);
-  if (/(^|[^a-z0-9])mls([^a-z0-9]|$)/.test(label)) return true;
-  return /\/mls\//.test(label);
-}
-function isFullRes(row) {
-  const category = text$7(row.category).toLowerCase();
-  const type = text$7(row.type).toLowerCase();
-  if (category === "full-res" || category === "fullres" || type === "full-res" || type === "fullres") return true;
-  const label = labelOf(row);
-  if (/(^|[^a-z0-9])full[\s_-]?res([^a-z0-9]|$)/.test(label)) return true;
-  return /\/full\//.test(label);
-}
-function isRasterUrl(url, row) {
-  if (!url || BLOCKED_EXT.test(url.split("#")[0]) || VIDEO_FILE.test(url.split("#")[0])) return false;
-  if (RASTER.test(url.split("#")[0])) return true;
-  const content = text$7(row.contentType).toLowerCase();
-  return /^image\/(jpeg|jpg|png|webp|gif)/.test(content);
-}
-function blockedFileUrls(row, includeOwnUrl) {
-  const blocked = /* @__PURE__ */ new Set();
-  for (const key of FILE_KEYS) {
-    const url = shareableUrl$1(row[key]);
-    if (url) blocked.add(url);
-  }
-  if (includeOwnUrl) {
-    const own = shareableUrl$1(row.url);
-    const share = shareableUrl$1(row.shareUrl);
-    if (own) blocked.add(own);
-    if (share) blocked.add(share);
-  }
-  return blocked;
-}
-function separateDisplay(row) {
-  const blocked = blockedFileUrls(row, isFullRes(row));
-  for (const key of DISPLAY_KEYS) {
-    const url = shareableUrl$1(row[key]);
-    if (!url || !isRasterUrl(url, row) || blocked.has(url)) continue;
-    if (/\/mls\//i.test(url) || /\/full\//i.test(url)) continue;
-    return url;
-  }
-  return "";
-}
-function rasterShareSource(row, legacyDropTagged = false) {
-  if (legacyDropTagged && isMls(row)) return "";
-  const type = text$7(row.type).toLowerCase();
-  if (type === "video" || type === "reel" || type === "file" || type === "matterport") return "";
-  const content = text$7(row.contentType).toLowerCase();
-  if (content.startsWith("video/") || content === "application/pdf" || content === "application/zip") return "";
-  const path2 = `${text$7(row.path)} ${text$7(row.storagePath)}`.toLowerCase();
-  if (/\/(raw|downloads?|print|zips?)\//.test(path2)) return "";
-  const display = separateDisplay(row);
-  if (legacyDropTagged && isFullRes(row)) return display;
-  if (display) return display;
-  const url = shareableUrl$1(row.url) || shareableUrl$1(row.shareUrl);
-  if (!url || !isRasterUrl(url, row)) return "";
-  if (legacyDropTagged && /\/(mls|full)\//i.test(url)) return "";
-  if (/\/(raw|downloads?|print|zips?)\//i.test(url)) return "";
-  return url;
-}
-function rasterPoster(row, legacyDropTagged = false) {
-  if (legacyDropTagged && isMls(row)) return "";
-  for (const key of ["poster", "posterUrl", "thumbnailUrl"]) {
-    const url = shareableUrl$1(row[key]);
-    if (!url || !isRasterUrl(url, row)) continue;
-    if (legacyDropTagged && /\/(mls|full)\//i.test(url)) continue;
-    return url;
-  }
-  return "";
-}
-function floorSource(row, legacyDropTagged = false) {
-  if (legacyDropTagged && (isMls(row) || isFullRes(row))) return separateDisplay(row);
-  return rasterShareSource(row, legacyDropTagged) || rasterPoster(row, legacyDropTagged);
-}
-function shareDisplayPath(listingId, index) {
-  return `/api/media/display/${encodeURIComponent(listingId)}/${index}`;
-}
-function shareDisplayItems(listing, options = {}) {
-  const legacy = options.legacyDropTagged === true;
-  const items = [];
-  const seen = /* @__PURE__ */ new Set();
-  const push = (name, sourceUrl, kind) => {
-    if (!sourceUrl || seen.has(sourceUrl) || items.length >= 240) return;
-    seen.add(sourceUrl);
-    items.push({ name, sourceUrl, kind });
-  };
-  if (Array.isArray(listing.images)) {
-    listing.images.forEach((item, index) => {
-      const row = rowOf$1(item);
-      if (!row) return;
-      push(mediaName$1(row, `Photo ${index + 1}`), rasterShareSource(row, legacy), "image");
-    });
-  }
-  for (const group of [listing.floorplans, listing.floorPlans]) {
-    if (!Array.isArray(group)) continue;
-    group.forEach((item, index) => {
-      const row = rowOf$1(item);
-      if (!row) return;
-      push(mediaName$1(row, `Floor plan ${index + 1}`), floorSource(row, legacy), "floorPlan");
-    });
-  }
-  if (Array.isArray(listing.videos)) {
-    listing.videos.forEach((item) => {
-      const row = rowOf$1(item);
-      if (!row) return;
-      push(mediaName$1(row, "Video"), rasterPoster(row, legacy), "poster");
-    });
-  }
-  const extras = [];
-  for (const gallery of options.galleries || []) {
-    for (const bucket2 of [gallery.mediaItems, gallery.images]) {
-      if (!Array.isArray(bucket2)) continue;
-      bucket2.forEach((item, index) => {
-        const row = rowOf$1(item);
-        if (!row) return;
-        const sourceUrl = rasterShareSource(row, legacy);
-        if (!sourceUrl) return;
-        extras.push({ name: mediaName$1(row, `Photo ${index + 1}`), sourceUrl });
-      });
-    }
-  }
-  extras.sort((a, b) => a.sourceUrl.localeCompare(b.sourceUrl) || a.name.localeCompare(b.name));
-  for (const extra of extras) push(extra.name, extra.sourceUrl, "image");
-  return items;
-}
-function displayMedia(listingId, index, name) {
-  const url = shareDisplayPath(listingId, index);
-  return { url, displayUrl: url, name };
-}
-function posterIndex(row, items) {
-  const poster = rasterPoster(row);
-  if (!poster) return -1;
-  return items.findIndex((item) => item.sourceUrl === poster);
-}
-function isUnbranded(row) {
-  const category = text$7(row.category).toLowerCase();
-  const type = text$7(row.type).toLowerCase();
-  if (category === "unbranded" || type === "unbranded") return true;
-  const name = `${text$7(row.name)} ${text$7(row.fileName)} ${text$7(row.title)}`.toLowerCase();
-  return name.includes("unbranded");
-}
-function isBrandedPlayback(row) {
-  if (isMls(row) || isUnbranded(row)) return false;
-  const category = text$7(row.category).toLowerCase();
-  const type = text$7(row.type).toLowerCase();
-  if (category === "branded" || type === "branded") return true;
-  const name = `${text$7(row.name)} ${text$7(row.fileName)} ${text$7(row.title)}`.toLowerCase();
-  return /(^|[^a-z])branded([^a-z]|$)/.test(name);
-}
-function isReelPlayback(row) {
-  if (isMls(row) || isUnbranded(row)) return false;
-  const category = text$7(row.category).toLowerCase();
-  const type = text$7(row.type).toLowerCase();
-  return category === "reel" || type === "reel";
-}
-function deliveredVideoUrl(row) {
-  const url = shareableUrl$1(row.url) || shareableUrl$1(row.shareUrl);
-  if (!url || !VIDEO_FILE.test(url.split("#")[0])) return "";
-  if (/\/mls\//i.test(url)) return "";
-  return url;
-}
-function withPoster(media, listingId, index) {
-  if (index < 0) return media;
-  const poster = shareDisplayPath(listingId, index);
-  return { ...media, poster, thumbnailUrl: poster, displayUrl: poster };
-}
-function publicShareVideos(listing, playback) {
-  if (!Array.isArray(listing.videos)) return [];
-  const items = shareDisplayItems(listing);
-  const videos = [];
-  for (const item of listing.videos) {
-    const row = rowOf$1(item);
-    if (!row) continue;
-    const name = mediaName$1(row, "Video");
-    const posterAt = posterIndex(row, items);
-    if (playback && (isBrandedPlayback(row) || isReelPlayback(row))) {
-      const url = deliveredVideoUrl(row);
-      if (!url) continue;
-      videos.push(withPoster({ url, name, noDownload: true }, listing.id, posterAt));
-      continue;
-    }
-    if (posterAt < 0) continue;
-    videos.push(withPoster({ url: null, name }, listing.id, posterAt));
-  }
-  return videos.slice(0, 40);
-}
-function publicShareMedia(listing) {
-  const images = [];
-  const floorPlans = [];
-  shareDisplayItems(listing).forEach((item, index) => {
-    const media = displayMedia(listing.id, index, item.name);
-    if (item.kind === "image") images.push(media);
-    if (item.kind === "floorPlan") floorPlans.push(media);
-  });
-  return {
-    images: images.slice(0, 200),
-    floorPlans: floorPlans.slice(0, 40)
-  };
 }
 const RELEASED_GALLERY_STATUSES = ["delivered", "approved"];
 const ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
@@ -6768,82 +6874,55 @@ function scrubOriginals(value, needles) {
   };
   return walk(value);
 }
-function displayImageCandidate(row, needles) {
-  for (const key of DISPLAY_IMAGE_KEYS) {
-    const url = shareableUrl(row[key]);
-    if (!url || !isDisplayImageUrl(url) || containsOriginal(url, needles)) continue;
-    return url;
-  }
-  return "";
-}
-function lockedPhoto(row, index, needles) {
-  const frame = frameFromListingImage(row, index);
-  if (!frame || frame.raw) return null;
-  const display = displayImageCandidate(row, needles);
-  if (display) return { url: display, name: frame.name };
-  const url = [shareableUrl(row.url), shareableUrl(row.shareUrl)].find(
-    (candidate) => Boolean(candidate) && isDisplayImageUrl(candidate) && !isOriginalFileUrl(candidate) && !containsOriginal(candidate, needles)
-  ) || "";
-  if (!url || isPrivateMedia(frame.path, frame.name, url) || isFullResOrMls(row) || row.downloadable === true) return null;
-  return { url, name: frame.name };
-}
-function lockedVideo(row, needles) {
-  const name = mediaName(row, "Video");
-  let stream = "";
-  let streamKey = "";
-  for (const key of STREAM_KEYS) {
-    const url = shareableUrl(row[key]);
-    if (!url || !isStreamUrl(url) || containsOriginal(url, needles)) continue;
-    stream = url;
-    streamKey = key;
-    break;
-  }
-  const poster = displayImageCandidate(row, needles);
-  if (!name && !stream && !poster) return null;
-  const media = { url: stream || null, name };
-  if (stream && streamKey) media[streamKey] = stream;
-  if (poster) {
-    media.poster = poster;
-    media.thumbnailUrl = poster;
-  }
-  return media;
-}
 function lockedOwnerMedia(listing, pub) {
   const needles = listingOriginalNeedles(listing);
+  const items = listingOwnerDisplayItems(listing);
+  const token = signOwnerDisplayToken({ scope: "listing", id: listing.id });
+  const href = (index) => token && index >= 0 ? ownerDisplayPath(token, index) : "";
   const images = [];
-  if (Array.isArray(listing.images)) {
-    listing.images.forEach((item, index) => {
-      const row = rowOf(item);
-      if (!row) return;
-      const photo = lockedPhoto(row, index, needles);
-      if (photo) images.push(photo);
-    });
-  }
+  const floorPlans = [];
+  items.forEach((item, index) => {
+    const url = href(index);
+    if (!url) return;
+    const media = { url, displayUrl: url, name: item.name };
+    if (item.kind === "image") images.push(media);
+    if (item.kind === "floorPlan") floorPlans.push(media);
+  });
   const videos = [];
   if (Array.isArray(listing.videos)) {
     for (const item of listing.videos) {
       const row = rowOf(item);
       if (!row) continue;
-      const video = lockedVideo(row, needles);
-      if (video) videos.push(video);
+      const name = mediaName(row, "Video");
+      let stream = "";
+      let streamKey = "";
+      for (const key of STREAM_KEYS) {
+        const url = shareableUrl(row[key]);
+        if (!url || !isStreamUrl(url) || containsOriginal(url, needles)) continue;
+        stream = url;
+        streamKey = key;
+        break;
+      }
+      const posterAt = items.findIndex((entry2) => entry2.sourceUrl === ownerPosterSource(row));
+      const poster = href(posterAt);
+      if (!name && !stream && !poster) continue;
+      const media = { url: stream || null, name };
+      if (stream && streamKey) media[streamKey] = stream;
+      if (poster) {
+        media.poster = poster;
+        media.thumbnailUrl = poster;
+        media.displayUrl = poster;
+      }
+      videos.push(media);
     }
   }
-  const floorPlans = [];
-  for (const group of [listing.floorplans, listing.floorPlans]) {
-    if (!Array.isArray(group)) continue;
-    group.forEach((item, index) => {
-      const row = rowOf(item);
-      if (!row) return;
-      const plan = lockedPhoto(row, index, needles);
-      if (plan) floorPlans.push(plan);
-    });
-  }
-  const tourUrl = pub.tourUrl && !isOriginalFileUrl(pub.tourUrl) && !containsOriginal(pub.tourUrl, needles) ? pub.tourUrl : "";
+  const embedded = embedTour(listing, needles);
+  const listed = pub.tourUrl && !isOriginalFileUrl(pub.tourUrl) && !containsOriginal(pub.tourUrl, needles) ? pub.tourUrl : "";
   return scrubOriginals({
     images: images.slice(0, 200),
     videos: videos.slice(0, 40),
     floorPlans: floorPlans.slice(0, 40),
-    tourUrl
+    tourUrl: embedded || listed
   }, needles);
 }
 function embedTour(listing, needles) {
@@ -9248,10 +9327,7 @@ function clientGalleryPayload(id, gallery, gate) {
     invoiceStatus: invoice?.status || null,
     lockTitle: unlocked ? null : ICONIC_DOWNLOAD_LOCK.title,
     lockMessage: unlocked ? null : ICONIC_DOWNLOAD_LOCK.message,
-    mediaItems: showMedia ? media.map((item) => publicMediaItem(
-      item && typeof item === "object" ? item : {},
-      unlocked
-    )) : []
+    mediaItems: showMedia ? lockedClientGalleryMedia(id, media, unlocked) : []
   };
 }
 router$k.get("/", requireStaff, async (req, res) => {
@@ -17269,43 +17345,34 @@ function preferFinals(drafts) {
     return true;
   });
 }
-function dedupe(drafts) {
-  const seen = /* @__PURE__ */ new Set();
-  const photos = [];
-  const sorted = [...drafts].sort((a, b) => a.order - b.order || a.index - b.index);
-  for (const item of sorted) {
-    const key = item.path || item.url;
-    if (seen.has(key) || seen.has(item.url)) continue;
-    seen.add(key);
-    seen.add(item.url);
-    photos.push({
-      id: item.id,
-      url: item.url,
-      alt: item.alt,
-      room: item.room
-    });
-  }
-  return photos.slice(0, 200);
-}
-const LISTING_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
-function withDisplayRoutes(drafts, listing, galleries) {
-  const listingId = text(listing?.id);
-  if (!listing || !LISTING_ID_PATTERN.test(listingId)) return drafts;
-  const items = shareDisplayItems({ ...listing }, { galleries });
-  const routed = [];
-  for (const draft of drafts) {
-    const index = items.findIndex((item) => item.sourceUrl === draft.sourceUrl);
-    if (index < 0) continue;
-    routed.push({ ...draft, url: shareDisplayPath(listingId, index) });
-  }
-  return routed;
-}
-function collectPresentationPhotos(source) {
+function presentationDrafts(source) {
   const hidden = hiddenPresentationKeys(source.listing);
   const fromListing = listingDrafts(source.listing, hidden);
   const fromGalleries = galleryDrafts(source.galleries, fromListing.length, hidden);
-  const kept = withDisplayRoutes(preferFinals([...fromListing, ...fromGalleries]), source.listing, source.galleries);
-  return dedupe(kept);
+  const seen = /* @__PURE__ */ new Set();
+  const photos = [];
+  const sorted = [...preferFinals([...fromListing, ...fromGalleries])].sort((a, b) => a.order - b.order || a.index - b.index);
+  for (const item of sorted) {
+    const key = item.path || item.sourceUrl;
+    if (!item.sourceUrl || seen.has(key) || seen.has(item.sourceUrl)) continue;
+    seen.add(key);
+    seen.add(item.sourceUrl);
+    photos.push(item);
+  }
+  return photos.slice(0, 200);
+}
+function presentationDisplayPath(token, index) {
+  return `/api/media/display/p/${encodeURIComponent(token)}/${index}`;
+}
+function collectPresentationPhotos(source) {
+  const drafts = presentationDrafts(source);
+  const tokenRoute = TOKEN_PATTERN.test(source.token);
+  return drafts.map((item, index) => ({
+    id: item.id,
+    url: tokenRoute ? presentationDisplayPath(source.token, index) : item.sourceUrl,
+    alt: item.alt,
+    room: item.room
+  }));
 }
 function presentationRooms(photos) {
   const rooms = [];
@@ -17759,11 +17826,11 @@ function ownerSessionSecret(env = ownerRuntimeEnv()) {
   if (explicit && explicit.length >= 16) return explicit;
   const serviceAccount = env.FIREBASE_SERVICE_ACCOUNT;
   if (serviceAccount && serviceAccount.length >= 32) {
-    return createHmac("sha256", "iconic-owners-suite-v1").update(serviceAccount).digest("hex");
+    return createHmac$1("sha256", "iconic-owners-suite-v1").update(serviceAccount).digest("hex");
   }
   const sheetsKey = env.OWNER_SHEETS_SA_KEY;
   if (sheetsKey && sheetsKey.length >= 32) {
-    return createHmac("sha256", "iconic-owners-suite-v1").update(sheetsKey).digest("hex");
+    return createHmac$1("sha256", "iconic-owners-suite-v1").update(sheetsKey).digest("hex");
   }
   return null;
 }
@@ -17773,13 +17840,13 @@ function signOwnerSession(identity, secret, now = Date.now()) {
     uid: identity.uid,
     exp: now + SESSION_MS
   })).toString("base64url");
-  const sig = createHmac("sha256", secret).update(body).digest("base64url");
+  const sig = createHmac$1("sha256", secret).update(body).digest("base64url");
   return `${body}.${sig}`;
 }
 function readOwnerSession(token, secret, now = Date.now()) {
   const [body, sig] = token.split(".");
   if (!body || !sig) return null;
-  const expected = createHmac("sha256", secret).update(body).digest("base64url");
+  const expected = createHmac$1("sha256", secret).update(body).digest("base64url");
   const actualBuf = Buffer.from(sig);
   const expectedBuf = Buffer.from(expected);
   if (actualBuf.length !== expectedBuf.length || !timingSafeEqual$1(actualBuf, expectedBuf)) return null;

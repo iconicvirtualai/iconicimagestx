@@ -6,7 +6,7 @@
  */
 
 import { frameFromListingImage, listingAddressLabel } from "./iconicStudio";
-import { rasterShareSource, shareDisplayItems, shareDisplayPath } from "./publicShare";
+import { rasterShareSource } from "./publicShare";
 import { hiddenPresentationKeys, rowHiddenFromPresentation } from "./portalListingDetail";
 import { stripPublicMeta } from "./siteSeo";
 
@@ -231,50 +231,42 @@ function preferFinals(drafts: DraftPhoto[]): DraftPhoto[] {
   });
 }
 
-function dedupe(drafts: DraftPhoto[]): PresentationPhoto[] {
+function presentationDrafts(source: PresentationSource): DraftPhoto[] {
+  const hidden = hiddenPresentationKeys(source.listing);
+  const fromListing = listingDrafts(source.listing, hidden);
+  const fromGalleries = galleryDrafts(source.galleries, fromListing.length, hidden);
   const seen = new Set<string>();
-  const photos: PresentationPhoto[] = [];
-  const sorted = [...drafts].sort((a, b) => a.order - b.order || a.index - b.index);
+  const photos: DraftPhoto[] = [];
+  const sorted = [...preferFinals([...fromListing, ...fromGalleries])].sort((a, b) => a.order - b.order || a.index - b.index);
   for (const item of sorted) {
-    const key = item.path || item.url;
-    if (seen.has(key) || seen.has(item.url)) continue;
+    const key = item.path || item.sourceUrl;
+    if (!item.sourceUrl || seen.has(key) || seen.has(item.sourceUrl)) continue;
     seen.add(key);
-    seen.add(item.url);
-    photos.push({
-      id: item.id,
-      url: item.url,
-      alt: item.alt,
-      room: item.room,
-    });
+    seen.add(item.sourceUrl);
+    photos.push(item);
   }
   return photos.slice(0, 200);
 }
 
-const LISTING_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
+/** Source URLs in the same order as the presentation photos. Empty for the seeded preview token. */
+export function presentationPhotoSources(source: PresentationSource): string[] {
+  if (!TOKEN_PATTERN.test(source.token)) return [];
+  return presentationDrafts(source).map((item) => item.sourceUrl);
+}
 
-function withDisplayRoutes(
-  drafts: DraftPhoto[],
-  listing: Record<string, unknown> | null | undefined,
-  galleries: Array<Record<string, unknown>> | undefined,
-): DraftPhoto[] {
-  const listingId = text(listing?.id);
-  if (!listing || !LISTING_ID_PATTERN.test(listingId)) return drafts;
-  const items = shareDisplayItems({ id: listingId, ...listing }, { galleries });
-  const routed: DraftPhoto[] = [];
-  for (const draft of drafts) {
-    const index = items.findIndex((item) => item.sourceUrl === draft.sourceUrl);
-    if (index < 0) continue;
-    routed.push({ ...draft, url: shareDisplayPath(listingId, index) });
-  }
-  return routed;
+function presentationDisplayPath(token: string, index: number): string {
+  return `/api/media/display/p/${encodeURIComponent(token)}/${index}`;
 }
 
 export function collectPresentationPhotos(source: PresentationSource): PresentationPhoto[] {
-  const hidden = hiddenPresentationKeys(source.listing);
-  const fromListing = listingDrafts(source.listing, hidden);
-  const fromGalleries = galleryDrafts(source.galleries, fromListing.length, hidden);
-  const kept = withDisplayRoutes(preferFinals([...fromListing, ...fromGalleries]), source.listing, source.galleries);
-  return dedupe(kept);
+  const drafts = presentationDrafts(source);
+  const tokenRoute = TOKEN_PATTERN.test(source.token);
+  return drafts.map((item, index) => ({
+    id: item.id,
+    url: tokenRoute ? presentationDisplayPath(source.token, index) : item.sourceUrl,
+    alt: item.alt,
+    room: item.room,
+  }));
 }
 
 export function presentationRooms(photos: PresentationPhoto[]): PresentationRoom[] {

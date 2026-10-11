@@ -1,32 +1,43 @@
 /**
- * GET /api/media/display/:listingId/:index
- * Resized JPEG for one public-share image. The index matches shareDisplayItems.
- * Source URLs stay on the server. MLS and full-res rasters are resized here
- * instead of being dropped from the share.
+ * Resized JPEG for one display image.
+ *   GET /api/media/display/:listingId/:index — public studio share, only while that share is open
+ *   GET /api/media/display/p/:token/:index — one presentation's photos, while the token is active
+ *   GET /api/media/display/o/:signedToken/:index — locked owner or gallery, HMAC scoped to that view
+ * Source URLs stay on the server. A lock change is not cached for a day:
+ * s-maxage is 5 minutes, with a short stale window.
  */
 
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFile, realpath, stat } from "node:fs/promises";
+import { mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import type { RequestHandler } from "express";
 import admin from "firebase-admin";
 import sharp from "sharp";
-import { shareDisplayItems, type ShareListing } from "../../shared/publicShare";
+import { publicStudioShareOpen } from "../../shared/clientGalleryLink";
+import { readOwnerDisplayToken } from "../../shared/ownerDisplayGrant";
+import { presentationPhotoSources } from "../../shared/presentation";
+import {
+  galleryOwnerDisplayItems,
+  listingOwnerDisplayItems,
+  shareDisplayItems,
+  type ShareDisplayItem,
+  type ShareListing,
+} from "../../shared/publicShare";
 import { clientIp } from "../lib/clientIp";
 import { createRateLimiter } from "../lib/rateLimit";
 
-const CACHE_CONTROL = "public, s-maxage=86400, stale-while-revalidate=604800";
+const CACHE_CONTROL = "public, s-maxage=300, stale-while-revalidate=60";
 const MAX_EDGE = 1600;
 const MAX_SOURCE_BYTES = 25 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 8_000;
 const RATE_WINDOW_MS = 60_000;
 const RATE_MAX_DEFAULT = 180;
 const ALLOWED_HOSTS = new Set(["firebasestorage.googleapis.com", "storage.googleapis.com"]);
-const STATIC_OWN_HOSTS = new Set([
-  "iconicimagestx.com",
-  "www.iconicimagestx.com",
-  "iconicimagestx.vercel.app",
-]);
+const PROJECT_HOSTS = new Set(["iconicimagestx.vercel.app"]);
+const VIDEO_EXT = /\.(mp4|m4v|mov|webm)$/i;
+const IMAGE_EXT = /\.(jpe?g|png|webp|gif)$/i;
 
 const displayLimiter = createRateLimiter({
   windowMs: RATE_WINDOW_MS,
@@ -50,7 +61,12 @@ function mediaRoot(): string {
   return path.resolve(process.cwd(), "public", "media");
 }
 
-function localCandidate(sourceUrl: string): string | null {
+function isVideoSource(sourceUrl: string): boolean {
+  const pathOnly = sourceUrl.split("?")[0].split("#")[0];
+  return VIDEO_EXT.test(pathOnly);
+}
+
+function localCandidate(sourceUrl: string, allowVideo = false): string | null {
   let pathname = "";
   if (sourceUrl.startsWith("/")) pathname = sourceUrl.split("?")[0].split("#")[0];
   else {
@@ -63,15 +79,15 @@ function localCandidate(sourceUrl: string): string | null {
   if (!pathname.startsWith("/media/")) return null;
   const relative = pathname.slice("/media/".length);
   if (!relative || relative.includes("..") || relative.includes("\\")) return null;
-  if (!/\.(jpe?g|png|webp|gif)$/i.test(relative)) return null;
+  if (!IMAGE_EXT.test(relative) && !(allowVideo && VIDEO_EXT.test(relative))) return null;
   const root = mediaRoot();
   const resolved = path.resolve(root, relative);
   if (resolved !== root && !resolved.startsWith(root + path.sep)) return null;
   return resolved;
 }
 
-async function readLocal(sourceUrl: string): Promise<Buffer | null> {
-  const file = localCandidate(sourceUrl);
+async function readLocal(sourceUrl: string, allowVideo = false): Promise<Buffer | null> {
+  const file = localCandidate(sourceUrl, allowVideo);
   if (!file) return null;
   try {
     const info = await stat(file);
@@ -123,29 +139,29 @@ function hostnameOf(value: string | undefined): string {
   }
 }
 
-function trustedOwnHosts(): Set<string> {
-  const hosts = new Set(STATIC_OWN_HOSTS);
-  const app = hostnameOf(process.env.APP_URL);
+function deploymentHosts(): Set<string> {
+  const hosts = new Set(PROJECT_HOSTS);
   const vercel = hostnameOf(process.env.VERCEL_URL);
-  if (app) hosts.add(app);
   if (vercel) hosts.add(vercel);
   return hosts;
 }
 
+/**
+ * This deployment's host. APP_URL is the Wix site and must not be used:
+ * it 301s, and the fetch refuses redirects. VERCEL_URL wins. The request
+ * host is used only when it is this Vercel project.
+ */
 function chooseOwnHost(req: { headers?: { host?: string | string[] } }): string {
-  const trusted = trustedOwnHosts();
-  const app = hostnameOf(process.env.APP_URL);
-  if (app && trusted.has(app)) return app;
   const vercel = hostnameOf(process.env.VERCEL_URL);
-  if (vercel && trusted.has(vercel)) return vercel;
+  if (vercel) return vercel;
   const header = req.headers?.host;
   const raw = Array.isArray(header) ? header[0] : header;
   const requestHost = hostnameOf(typeof raw === "string" ? raw.split(",")[0] : "");
-  if (requestHost && trusted.has(requestHost)) return requestHost;
-  return trusted.has("iconicimagestx.com") ? "iconicimagestx.com" : "";
+  if (requestHost && deploymentHosts().has(requestHost)) return requestHost;
+  return "";
 }
 
-function mediaPathname(sourceUrl: string): string | null {
+function mediaPathname(sourceUrl: string, allowVideo = false): string | null {
   let pathname = "";
   if (sourceUrl.startsWith("/")) pathname = sourceUrl.split("?")[0].split("#")[0];
   else {
@@ -158,15 +174,15 @@ function mediaPathname(sourceUrl: string): string | null {
     }
   }
   if (!pathname.startsWith("/media/") || pathname.includes("..") || pathname.includes("\\") || pathname.includes("//")) return null;
-  if (!/\.(jpe?g|png|webp|gif)$/i.test(pathname)) return null;
+  if (!IMAGE_EXT.test(pathname) && !(allowVideo && VIDEO_EXT.test(pathname))) return null;
   return pathname;
 }
 
 /** Same-origin /media fetch. Never the foreign host the path was copied from. */
-function ownMediaUrl(sourceUrl: string, req: { headers?: { host?: string | string[] } }): string | null {
-  const pathname = mediaPathname(sourceUrl);
+function ownMediaUrl(sourceUrl: string, req: { headers?: { host?: string | string[] } }, allowVideo = false): string | null {
+  const pathname = mediaPathname(sourceUrl, allowVideo);
   const host = chooseOwnHost(req);
-  if (!pathname || !host || !trustedOwnHosts().has(host)) return null;
+  if (!pathname || !host || !deploymentHosts().has(host)) return null;
   return `https://${host}${pathname}`;
 }
 
@@ -207,16 +223,71 @@ async function readRemote(target: string): Promise<Buffer | null> {
   return chunks.length ? Buffer.concat(chunks) : null;
 }
 
-async function loadSource(sourceUrl: string, req: { headers?: { host?: string | string[] } }): Promise<Buffer | null> {
+async function loadSource(sourceUrl: string, req: { headers?: { host?: string | string[] } }, allowVideo = false): Promise<Buffer | null> {
   if (allowDiskRead()) {
-    const local = await readLocal(sourceUrl);
+    const local = await readLocal(sourceUrl, allowVideo);
     if (local) return local;
   }
   const remote = remoteUrl(sourceUrl);
   if (remote) return readRemote(remote);
-  const own = ownMediaUrl(sourceUrl, req);
+  const own = ownMediaUrl(sourceUrl, req, allowVideo);
   if (own) return readRemote(own);
   return null;
+}
+
+/** One JPEG frame from a video. The MP4 itself is never written to the response. */
+async function ffmpegPoster(source: Buffer): Promise<Buffer | null> {
+  const dir = await mkdtemp(path.join(tmpdir(), "display-poster-"));
+  const file = path.join(dir, "source.bin");
+  try {
+    await writeFile(file, source);
+    return await new Promise((resolve) => {
+      let settled = false;
+      const finish = (value: Buffer | null) => {
+        if (settled) return;
+        settled = true;
+        resolve(value);
+      };
+      const child = spawn("ffmpeg", [
+        "-hide_banner",
+        "-loglevel", "error",
+        "-ss", "0.2",
+        "-i", file,
+        "-frames:v", "1",
+        "-f", "image2pipe",
+        "-vcodec", "mjpeg",
+        "pipe:1",
+      ], { stdio: ["ignore", "pipe", "ignore"] });
+      const chunks: Buffer[] = [];
+      let total = 0;
+      const timer = setTimeout(() => {
+        child.kill("SIGKILL");
+        finish(null);
+      }, FETCH_TIMEOUT_MS);
+      child.stdout.on("data", (chunk: Buffer) => {
+        total += chunk.length;
+        if (total > 8 * 1024 * 1024) {
+          child.kill("SIGKILL");
+          finish(null);
+          return;
+        }
+        chunks.push(chunk);
+      });
+      child.on("error", () => {
+        clearTimeout(timer);
+        finish(null);
+      });
+      child.on("close", (code) => {
+        clearTimeout(timer);
+        const frame = chunks.length ? Buffer.concat(chunks) : null;
+        finish(code === 0 && frame && frame.length > 16 ? frame : null);
+      });
+    });
+  } catch {
+    return null;
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 }
 
 async function galleriesForShare(listingId: string, listing: ShareListing): Promise<Array<Record<string, unknown>>> {
@@ -243,23 +314,118 @@ async function galleriesForShare(listingId: string, listing: ShareListing): Prom
   return docs;
 }
 
-function displayParams(req: { params?: { listingId?: string; index?: string }; url?: string }): { listingId: string; index: string } {
-  const params = req.params || {};
-  let listingId = String(params.listingId || "");
-  let index = String(params.index || "");
-  if (listingId && index) return { listingId, index };
-  if (!req.url) return { listingId, index };
+type DisplayTarget =
+  | { kind: "share"; listingId: string; index: number }
+  | { kind: "presentation"; token: string; index: number }
+  | { kind: "owner"; token: string; index: number };
+
+function parseIndex(value: string): number | null {
+  if (!/^\d{1,4}$/.test(value) || String(Number(value)) !== value) return null;
+  return Number(value);
+}
+
+function decodePart(value: string): string {
   try {
-    const url = new URL(req.url, "https://iconicimagestx.com");
-    const match = url.pathname.match(/\/api\/media\/display\/([^/]+)\/([^/]+)\/?$/);
-    if (!listingId && match) listingId = decodeURIComponent(match[1]);
-    if (!index && match) index = decodeURIComponent(match[2]);
-    if (!listingId) listingId = url.searchParams.get("listingId") || "";
-    if (!index) index = url.searchParams.get("index") || "";
+    return decodeURIComponent(value);
   } catch {
-    // Fall through to the 404 below.
+    return value;
   }
-  return { listingId, index };
+}
+
+function requestPath(req: { url?: string }): string {
+  if (!req.url) return "";
+  try {
+    return new URL(req.url, "https://display.local").pathname;
+  } catch {
+    return req.url.split("?")[0] || "";
+  }
+}
+
+function displayTarget(req: {
+  params?: { listingId?: string; index?: string; token?: string; signedToken?: string };
+  url?: string;
+}): DisplayTarget | null {
+  const path = requestPath(req);
+  const presentation = path.match(/\/api\/media\/display\/p\/([^/]+)\/([^/]+)\/?$/);
+  if (presentation) {
+    const index = parseIndex(decodePart(presentation[2]));
+    if (index === null) return null;
+    return { kind: "presentation", token: decodePart(presentation[1]), index };
+  }
+  const owner = path.match(/\/api\/media\/display\/o\/([^/]+)\/([^/]+)\/?$/);
+  if (owner) {
+    const index = parseIndex(decodePart(owner[2]));
+    if (index === null) return null;
+    return { kind: "owner", token: decodePart(owner[1]), index };
+  }
+  const share = path.match(/\/api\/media\/display\/([^/]+)\/([^/]+)\/?$/);
+  if (share) {
+    const listingId = decodePart(share[1]);
+    const index = parseIndex(decodePart(share[2]));
+    if (!listingId || listingId === "p" || listingId === "o" || index === null) return null;
+    return { kind: "share", listingId, index };
+  }
+  const params = req.params || {};
+  const index = parseIndex(String(params.index || ""));
+  if (index === null) return null;
+  if (params.token) return { kind: "presentation", token: String(params.token), index };
+  if (params.signedToken) return { kind: "owner", token: String(params.signedToken), index };
+  if (params.listingId && params.listingId !== "p" && params.listingId !== "o") {
+    return { kind: "share", listingId: String(params.listingId), index };
+  }
+  return null;
+}
+
+async function loadListing(listingId: string): Promise<ShareListing | null> {
+  const snap = await admin.firestore().collection("listings").doc(listingId).get();
+  if (!snap.exists) return null;
+  return { id: snap.id, ...(snap.data() || {}) };
+}
+
+async function listingByPresentationToken(token: string): Promise<ShareListing | null> {
+  const snap = await admin.firestore().collection("listings").where("presentationToken", "==", token).limit(1).get();
+  const doc = snap.docs[0];
+  if (!doc) return null;
+  return { id: doc.id, ...(doc.data() || {}) };
+}
+
+async function galleryMedia(galleryId: string): Promise<unknown[] | null> {
+  const snap = await admin.firestore().collection("galleries").doc(galleryId).get();
+  if (!snap.exists) return null;
+  const data = snap.data() || {};
+  return [
+    ...(Array.isArray(data.mediaItems) ? data.mediaItems : []),
+    ...(Array.isArray(data.videoLinks) ? data.videoLinks : []),
+    ...(Array.isArray(data.tourLinks) ? data.tourLinks : []),
+  ];
+}
+
+async function resolveItem(target: DisplayTarget): Promise<ShareDisplayItem | null> {
+  if (target.kind === "share") {
+    if (!/^[A-Za-z0-9_-]{8,128}$/.test(target.listingId)) return null;
+    const listing = await loadListing(target.listingId);
+    if (!listing || !publicStudioShareOpen(listing)) return null;
+    return shareDisplayItems(listing)[target.index] || null;
+  }
+  if (target.kind === "presentation") {
+    if (!/^[A-Za-z0-9_-]{22,80}$/.test(target.token)) return null;
+    const listing = await listingByPresentationToken(target.token);
+    if (!listing || listing.presentationEnabled === false) return null;
+    const galleries = await galleriesForShare(listing.id, listing);
+    const sourceUrl = presentationPhotoSources({ token: target.token, listing, galleries })[target.index];
+    if (!sourceUrl) return null;
+    return { name: "Photo", sourceUrl, kind: "image" };
+  }
+  const claims = readOwnerDisplayToken(target.token);
+  if (!claims) return null;
+  if (claims.scope === "listing") {
+    const listing = await loadListing(claims.id);
+    if (!listing) return null;
+    return listingOwnerDisplayItems(listing)[target.index] || null;
+  }
+  const media = await galleryMedia(claims.id);
+  if (!media) return null;
+  return galleryOwnerDisplayItems(media)[target.index] || null;
 }
 
 async function renderJpeg(source: Buffer): Promise<Buffer | null> {
@@ -295,28 +461,22 @@ export const handleMediaDisplay: RequestHandler = async (req, res) => {
     return res.status(429).json({ error: "Too many requests." });
   }
 
-  const { listingId, index: indexRaw } = displayParams(req);
-  if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId) || !/^\d{1,4}$/.test(indexRaw) || String(Number(indexRaw)) !== indexRaw) {
-    return notFound(res);
-  }
-
+  const target = displayTarget(req);
+  if (!target) return notFound(res);
   if (!admin.apps.length) return notFound(res);
 
-  let listing: ShareListing | null = null;
+  let item: ShareDisplayItem | null = null;
   try {
-    const snap = await admin.firestore().collection("listings").doc(listingId).get();
-    if (!snap.exists) return notFound(res);
-    listing = { id: snap.id, ...(snap.data() || {}) };
+    item = await resolveItem(target);
   } catch {
-    console.error("[media-display] listing lookup failed");
+    console.error("[media-display] lookup failed");
     return notFound(res);
   }
-
-  const galleries = await galleriesForShare(listingId, listing);
-  const item = shareDisplayItems(listing, { galleries })[Number(indexRaw)];
   if (!item) return notFound(res);
 
-  const source = await loadSource(item.sourceUrl, req);
+  const video = item.kind === "poster" && isVideoSource(item.sourceUrl);
+  let source = await loadSource(item.sourceUrl, req, video);
+  if (source && video) source = await ffmpegPoster(source);
   const jpeg = source ? await renderJpeg(source) : null;
   if (!jpeg) {
     console.error("[media-display] could not build a display image");

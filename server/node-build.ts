@@ -7,6 +7,8 @@ import { htmlFileForRequestPath } from "@shared/spaRouting";
 import { renderPresentationShell } from "./routes/presentations";
 
 const app = createServer();
+app.get("/api/media/display/p/:token/:index", handleMediaDisplay);
+app.get("/api/media/display/o/:signedToken/:index", handleMediaDisplay);
 app.get("/api/media/display/:listingId/:index", handleMediaDisplay);
 const port = process.env.PORT || 3000;
 

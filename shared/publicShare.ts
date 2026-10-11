@@ -1,8 +1,7 @@
 /**
  * Public share photos are served from GET /api/media/display/:listingId/:index.
- * The index is the position in this share set, not a storage path.
- * Listing ids are already unguessable, and a stable index keeps the CDN cache
- * (s-maxage) from fragmenting the way a signed token would.
+ * The index is this share set only. Gallery-only photos are not appended,
+ * so a closed studio cannot be reached by guessing a later index.
  * MLS, full-res, and downloadable raster photos stay in the set. The payload
  * carries the display route, never the original file URL. PDF, zip, raw, and
  * non-image files have no index.
@@ -149,36 +148,37 @@ export function shareDisplayPath(listingId: string, index: number): string {
 }
 
 export interface ShareDisplayOptions {
-  /**
-   * Gallery photos appended after listing images, floor plans, and posters.
-   * Listing indexes stay put so the share payload and the display route match
-   * even when a presentation also has gallery-only photos.
-   */
-  galleries?: Array<Record<string, unknown>>;
   /** Report-only comparison with the cut that dropped MLS and full-res photos. */
   legacyDropTagged?: boolean;
 }
 
+function pushDisplay(
+  items: ShareDisplayItem[],
+  seen: Set<string>,
+  name: string,
+  sourceUrl: string,
+  kind: ShareDisplayItem["kind"],
+) {
+  if (!sourceUrl || seen.has(sourceUrl) || items.length >= 240) return;
+  seen.add(sourceUrl);
+  items.push({ name, sourceUrl, kind });
+}
+
 /**
- * Share-set order, shared by the payload and the display route:
- * listing images, floor-plan images, video posters, then gallery-only rasters
- * sorted by source URL. Indexes do not change with payment.
+ * Share-set order, shared by the public payload and /api/media/display/:listingId/:index.
+ * Listing images, then floor-plan images, then stored video posters.
+ * Indexes do not change with payment. Gallery documents are not part of this set.
  */
 export function shareDisplayItems(listing: ShareListing, options: ShareDisplayOptions = {}): ShareDisplayItem[] {
   const legacy = options.legacyDropTagged === true;
   const items: ShareDisplayItem[] = [];
   const seen = new Set<string>();
-  const push = (name: string, sourceUrl: string, kind: ShareDisplayItem["kind"]) => {
-    if (!sourceUrl || seen.has(sourceUrl) || items.length >= 240) return;
-    seen.add(sourceUrl);
-    items.push({ name, sourceUrl, kind });
-  };
 
   if (Array.isArray(listing.images)) {
     listing.images.forEach((item, index) => {
       const row = rowOf(item);
       if (!row) return;
-      push(mediaName(row, `Photo ${index + 1}`), rasterShareSource(row, legacy), "image");
+      pushDisplay(items, seen, mediaName(row, `Photo ${index + 1}`), rasterShareSource(row, legacy), "image");
     });
   }
   for (const group of [listing.floorplans, listing.floorPlans]) {
@@ -186,31 +186,79 @@ export function shareDisplayItems(listing: ShareListing, options: ShareDisplayOp
     group.forEach((item, index) => {
       const row = rowOf(item);
       if (!row) return;
-      push(mediaName(row, `Floor plan ${index + 1}`), floorSource(row, legacy), "floorPlan");
+      pushDisplay(items, seen, mediaName(row, `Floor plan ${index + 1}`), floorSource(row, legacy), "floorPlan");
     });
   }
   if (Array.isArray(listing.videos)) {
     listing.videos.forEach((item) => {
       const row = rowOf(item);
       if (!row) return;
-      push(mediaName(row, "Video"), rasterPoster(row, legacy), "poster");
+      pushDisplay(items, seen, mediaName(row, "Video"), rasterPoster(row, legacy), "poster");
     });
   }
-  const extras: Array<{ name: string; sourceUrl: string }> = [];
-  for (const gallery of options.galleries || []) {
-    for (const bucket of [gallery.mediaItems, gallery.images]) {
-      if (!Array.isArray(bucket)) continue;
-      bucket.forEach((item, index) => {
-        const row = rowOf(item);
-        if (!row) return;
-        const sourceUrl = rasterShareSource(row, legacy);
-        if (!sourceUrl) return;
-        extras.push({ name: mediaName(row, `Photo ${index + 1}`), sourceUrl });
-      });
-    }
+  return items;
+}
+
+function videoFileUrl(row: Record<string, unknown>): string {
+  const url = shareableUrl(row.url) || shareableUrl(row.shareUrl);
+  if (!url || !VIDEO_FILE.test(url.split("#")[0])) return "";
+  return url;
+}
+
+/** Stored poster image, or the video file when the display route must cut a frame. */
+export function ownerPosterSource(row: Record<string, unknown>): string {
+  return rasterPoster(row) || videoFileUrl(row);
+}
+
+/**
+ * Locked owner studio set. Same rasters as the public share, plus a poster
+ * frame for each video that has no stored poster image. The public listing
+ * route does not serve those frames.
+ */
+export function listingOwnerDisplayItems(listing: ShareListing): ShareDisplayItem[] {
+  const items = [...shareDisplayItems(listing)];
+  const seen = new Set(items.map((item) => item.sourceUrl));
+  if (!Array.isArray(listing.videos)) return items;
+  listing.videos.forEach((item) => {
+    const row = rowOf(item);
+    if (!row || rasterPoster(row)) return;
+    pushDisplay(items, seen, mediaName(row, "Video"), videoFileUrl(row), "poster");
+  });
+  return items;
+}
+
+function isGalleryFloor(row: Record<string, unknown>): boolean {
+  const type = text(row.type).toLowerCase();
+  const category = text(row.category).toLowerCase();
+  return type === "floorplan" || type === "floor-plan" || category === "floorplan" || category === "floor-plan";
+}
+
+/**
+ * Locked gallery set, in media-item order: raster photos and floor-plan
+ * images, then one poster per video. PDF, zip, and raw files are omitted.
+ */
+export function galleryOwnerDisplayItems(media: unknown[]): ShareDisplayItem[] {
+  const items: ShareDisplayItem[] = [];
+  const seen = new Set<string>();
+  const rows = media.map(rowOf).filter((row): row is Record<string, unknown> => Boolean(row));
+  for (const row of rows) {
+    const type = text(row.type).toLowerCase();
+    if (type === "video" || type === "reel" || type === "matterport" || type === "tour" || type === "file" || type === "pdf") continue;
+    const source = rasterShareSource(row);
+    if (!source) continue;
+    const floor = isGalleryFloor(row);
+    pushDisplay(items, seen, mediaName(row, floor ? "Floor plan" : "Photo"), source, floor ? "floorPlan" : "image");
   }
-  extras.sort((a, b) => a.sourceUrl.localeCompare(b.sourceUrl) || a.name.localeCompare(b.name));
-  for (const extra of extras) push(extra.name, extra.sourceUrl, "image");
+  for (const row of rows) {
+    const type = text(row.type).toLowerCase();
+    if (type !== "video" && type !== "reel") continue;
+    const poster = rasterPoster(row);
+    if (poster) {
+      pushDisplay(items, seen, mediaName(row, "Video"), poster, "poster");
+      continue;
+    }
+    pushDisplay(items, seen, mediaName(row, "Video"), videoFileUrl(row), "poster");
+  }
   return items;
 }
 

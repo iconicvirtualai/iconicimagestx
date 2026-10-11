@@ -177,6 +177,22 @@ function VideoFrame({
   const poster = galleryPosterUrl(item);
   const style = galleryFrameStyle(kind, item);
   if (!src) {
+    if (poster) {
+      return (
+        <div
+          data-gallery-kind={kind}
+          className="overflow-hidden rounded-xl bg-gray-100"
+        >
+          <img
+            src={poster}
+            alt={name}
+            loading="lazy"
+            data-testid={`gallery-poster-${item.id || kind}`}
+            className="mx-auto block h-auto w-full max-w-full object-contain"
+          />
+        </div>
+      );
+    }
     const open = galleryShareUrl(item);
     return (
       <div

@@ -128,10 +128,16 @@ describe("spa rewrite coverage", () => {
     expect(firstMatchingRewrite("/podcast-guest-prep", vercel.rewrites)?.destination).toBe("/podcast-guest-prep.html");
     expect(firstMatchingRewrite("/book", vercel.rewrites)?.destination).toBe("/seo/book.html");
     expect(firstMatchingRewrite("/api/media/display/listingid1/0", vercel.rewrites)?.destination).toBe("/api/media-display");
+    expect(firstMatchingRewrite("/api/media/display/p/abcdefghijklmnopqrstuv/0", vercel.rewrites)?.destination).toBe("/api/media-display");
+    expect(firstMatchingRewrite("/api/media/display/o/token.sig/0", vercel.rewrites)?.destination).toBe("/api/media-display");
+    const presentationRule = vercel.rewrites.findIndex((rule) => rule.source === "/api/media/display/p/(.*)");
+    const ownerRule = vercel.rewrites.findIndex((rule) => rule.source === "/api/media/display/o/(.*)");
     expect(firstMatchingRewrite("/api/calendar/roster", vercel.rewrites)?.destination).toBe("/api/index");
     const displayRule = vercel.rewrites.findIndex((rule) => rule.source === "/api/media/display/(.*)");
     const apiCatchAll = vercel.rewrites.findIndex((rule) => rule.source === "/api/(.*)");
-    expect(displayRule).toBeGreaterThanOrEqual(0);
+    expect(presentationRule).toBeGreaterThanOrEqual(0);
+    expect(ownerRule).toBeGreaterThan(presentationRule);
+    expect(displayRule).toBeGreaterThan(ownerRule);
     expect(apiCatchAll).toBeGreaterThan(displayRule);
     expect(firstMatchingRewrite("/this-page-does-not-exist", vercel.rewrites)).toBeUndefined();
     expect(vercel.redirects.some((rule) => rule.source === "/pricing-v1" && rule.destination === "/pricing" && rule.statusCode === 301)).toBe(true);

@@ -55,6 +55,14 @@
   ],
   "rewrites": [
     {
+      "source": "/api/media/display/p/(.*)",
+      "destination": "/api/media-display"
+    },
+    {
+      "source": "/api/media/display/o/(.*)",
+      "destination": "/api/media-display"
+    },
+    {
       "source": "/api/media/display/(.*)",
       "destination": "/api/media-display"
     },

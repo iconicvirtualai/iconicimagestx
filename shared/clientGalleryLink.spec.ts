@@ -278,8 +278,16 @@ describe("decideClientGalleryLink", () => {
     expect(locked.downloadsUnlocked).toBe(false);
     expect(locked.lockDownloads).toBe(true);
     expect(locked.files).toEqual([]);
-    expect(locked.images).toEqual([{ url: "https://cdn.example/final.jpg", name: "front.jpg" }]);
-    expect(JSON.stringify(locked.images)).not.toContain("front-full.jpg");
+    expect(locked.images.map((image) => image.name)).toEqual(["front.jpg", "mls.jpg"]);
+    expect(locked.images.every((image) => /^\/api\/media\/display\/o\/[^/]+\/\d+$/.test(String(image.url)))).toBe(true);
+    expect(locked.floorPlans[0]?.url).toMatch(/^\/api\/media\/display\/o\/[^/]+\/\d+$/);
+    expect(locked.tourUrl).toContain("matterport.com");
+    const lockedBody = JSON.stringify(locked);
+    expect(lockedBody).not.toContain("final.jpg");
+    expect(lockedBody).not.toContain("front-full.jpg");
+    expect(lockedBody).not.toContain("https://cdn.example/mls.jpg");
+    expect(lockedBody).not.toContain("level1.jpg");
+    expect(lockedBody).not.toContain("walkthrough.mp4");
     expect(locked.clientEmail).toBe("ada@example.com");
 
     const releasedSource = listing({ lockDownloads: true, invoiceStatus: "sent", downloadsReleased: true });
@@ -363,14 +371,15 @@ describe("decideClientGalleryLink", () => {
     expect(locked.downloadsUnlocked).toBe(false);
     expect(locked.invoice).toEqual({ status: "unpaid" });
     expect(locked.files).toEqual([]);
-    expect(locked.images.map((image) => image.url)).toEqual(["https://cdn.example/final.jpg"]);
+    expect(locked.images.every((image) => /^\/api\/media\/display\/o\/[^/]+\/\d+$/.test(String(image.url)))).toBe(true);
     expect(locked.videos.map((video) => video.url)).toEqual([
       "https://cdn.example/walkthrough/stream.m3u8",
       "https://cdn.example/reel/preview.m3u8",
     ]);
     expect(locked.videos[0]?.streamUrl).toBe("https://cdn.example/walkthrough/stream.m3u8");
-    expect(locked.videos[0]?.poster).toBe("https://cdn.example/walkthrough-poster.jpg");
-    expect(locked.videos[0]?.thumbnailUrl).toBe("https://cdn.example/walkthrough-poster.jpg");
+    expect(locked.videos[0]?.poster).toMatch(/^\/api\/media\/display\/o\/[^/]+\/\d+$/);
+    expect(locked.videos[0]?.thumbnailUrl).toBe(locked.videos[0]?.poster);
+    expect(JSON.stringify(locked.videos)).not.toContain("walkthrough-poster.jpg");
     const originals = [
       rawMp4,
       fullRes,

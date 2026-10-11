@@ -183,7 +183,7 @@ function expectMarketingView(body: Record<string, unknown>) {
   }
 }
 
-function expectOwnerView(body: Record<string, unknown>, downloadsOpen: boolean) {
+function expectOwnerView(body: Record<string, unknown>, downloadsOpen: boolean, media: "full" | "display" = downloadsOpen ? "full" : "display") {
   expect(body.kind).toBe("listing");
   const project = body.project as Record<string, unknown>;
   expect(project.view).toBe("owner");
@@ -191,7 +191,9 @@ function expectOwnerView(body: Record<string, unknown>, downloadsOpen: boolean) 
   expect(project.clientName).toBe("Private Client");
   expect(project.clientEmail).toBe("ada@example.com");
   expect(project.clientPhone).toBe("512-555-0100");
-  expect((project.images as Array<{ url: string }>)[0].url).toBe("https://cdn.example/final.jpg");
+  const firstImage = (project.images as Array<{ url: string }>)[0]?.url || "";
+  if (media === "full") expect(firstImage).toBe("https://cdn.example/final.jpg");
+  else expect(firstImage).toMatch(/^\/api\/media\/display\/o\/[^/]+\/0$/);
   expect((project.revisions as Array<{ description: string }>)[0].description).toBe("Warm the kitchen");
   expect(project.invoice).toEqual({ status: downloadsOpen ? "paid" : "sent" });
   expect(project.downloadsUnlocked).toBe(downloadsOpen);
@@ -204,6 +206,7 @@ function expectOwnerView(body: Record<string, unknown>, downloadsOpen: boolean) 
     expect(json).not.toContain("delivery.zip");
     expect(json).not.toContain("front-full.jpg");
     expect(json).not.toContain("mls-full.jpg");
+    if (media === "display") expect(json).not.toContain("final.jpg");
     expect(json).not.toContain("invoice-pii@example.com");
   }
 }
@@ -251,7 +254,7 @@ describe("GET /api/galleries/link/:id studio share", () => {
   it("gives staff the same private view", async () => {
     const { statusCode, body } = await openStudio("Bearer staff-token");
     expect(statusCode).toBe(200);
-    expectOwnerView(body, false);
+    expectOwnerView(body, false, "full");
   });
 
   it("keeps original files off the locked delivery QA owner view", async () => {
@@ -328,12 +331,32 @@ describe("GET /api/galleries/link/:id studio share", () => {
     expect(leaked(lockedProject)).toEqual([]);
     const lockedPublic = plan.media.map((item) => publicMediaItem(item as unknown as Record<string, unknown>, false));
     const publicBlob = JSON.stringify(lockedPublic);
+    const lockedBlob = JSON.stringify(lockedProject);
     for (const item of plan.media) {
       for (const value of [item.url, item.shareUrl, item.embedUrl, item.poster, item.sourcePath]) {
         if (typeof value !== "string" || !value || publicBlob.includes(value)) continue;
-        expect(JSON.stringify(lockedProject)).not.toContain(value);
+        if (value.includes("matterport.com")) continue;
+        expect(lockedBlob).not.toContain(value);
       }
     }
+    const lockedView = lockedProject as {
+      images?: Array<{ url?: string }>;
+      floorPlans?: Array<{ url?: string }>;
+      videos?: Array<{ url?: string | null; poster?: string | null }>;
+      tourUrl?: string;
+    };
+    expect(lockedView.images?.map((image) => image.url)).toEqual([
+      expect.stringMatching(/^\/api\/media\/display\/o\/[^/]+\/0$/),
+      expect.stringMatching(/^\/api\/media\/display\/o\/[^/]+\/1$/),
+      expect.stringMatching(/^\/api\/media\/display\/o\/[^/]+\/2$/),
+    ]);
+    expect(lockedView.floorPlans?.[0]?.url).toMatch(/^\/api\/media\/display\/o\/[^/]+\/3$/);
+    expect(lockedView.videos?.length).toBe(3);
+    for (const video of lockedView.videos || []) {
+      expect(video.url ?? null).toBeNull();
+      expect(video.poster).toMatch(/^\/api\/media\/display\/o\/[^/]+\/\d+$/);
+    }
+    expect(lockedView.tourUrl).toContain("my.matterport.com/show");
 
     const staff = await openStudio("Bearer staff-token", DELIVERY_QA_IDS.listing);
     expect(staff.statusCode).toBe(200);

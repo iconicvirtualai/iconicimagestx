@@ -23,6 +23,9 @@ describe("public share display set", () => {
     expect(joined).not.toContain(".pdf");
     expect(joined).not.toContain(".zip");
     expect(joined).not.toContain(".mp4");
+    const media = publicShareMedia(qaListing());
+    const urls = [...media.images, ...media.floorPlans].map((item) => item.url);
+    expect(urls).toEqual(items.map((_, index) => shareDisplayPath(LISTING_ID, index)));
   });
 
   it("points payload photos at the display route and omits video URLs while locked", () => {

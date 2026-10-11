@@ -41,7 +41,10 @@ const PRIVATE_EXACT_SOURCES = new Set(["/invoice/:invoiceId"]);
 
 const RESERVED: Rewrite[] = [
   // Ahead of /api/(.*) so sharp stays in api/media-display.mjs, not api/index.mjs.
-  // The original path still arrives at that function.
+  // The original path still arrives at that function. p/ and o/ are listed
+  // first so a later rule cannot send them to the main API.
+  { source: "/api/media/display/p/(.*)", destination: "/api/media-display" },
+  { source: "/api/media/display/o/(.*)", destination: "/api/media-display" },
   { source: "/api/media/display/(.*)", destination: "/api/media-display" },
   { source: "/api", destination: "/api/index" },
   { source: "/api/(.*)", destination: "/api/index" },

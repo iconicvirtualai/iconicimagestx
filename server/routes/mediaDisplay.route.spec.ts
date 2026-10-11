@@ -2,7 +2,10 @@ import { rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import sharp from "sharp";
+import { ownerStudioProject } from "../../shared/clientGalleryLink";
 import { buildDeliveryQaSeed, DELIVERY_QA_IDS } from "../../shared/deliveryQaSeed";
+import { lockedClientGalleryMedia } from "../../shared/lockedClientMedia";
+import { signOwnerDisplayToken } from "../../shared/ownerDisplayGrant";
 
 const store = vi.hoisted(() => ({
   collections: {} as Record<string, Map<string, Record<string, unknown>>>,
@@ -29,6 +32,20 @@ vi.mock("firebase-admin", () => {
                 return { id, exists: data !== undefined, data: () => data };
               },
             };
+          },
+          where(field: string, op: string, value: unknown) {
+            const query = {
+              limit() {
+                return query;
+              },
+              async get() {
+                const matched = [...docs(name).entries()].filter(([, data]) => op === "==" && data[field] === value);
+                return {
+                  docs: matched.map(([id, data]) => ({ id, data: () => data })),
+                };
+              },
+            };
+            return query;
           },
         };
       },
@@ -59,13 +76,14 @@ beforeEach(() => {
   seed("listings", LISTING_ID, qaListingData());
 });
 
-async function openDisplay(index: string, headers: Record<string, string> = {}, listingId: string = LISTING_ID) {
+async function openDisplay(index: string, headers: Record<string, string> = {}, listingId: string = LISTING_ID, url?: string) {
   let statusCode = 200;
   let jsonBody: unknown;
   const resHeaders: Record<string, string> = {};
   const chunks: Buffer[] = [];
   const req = {
     params: { listingId, index },
+    url: url || `/api/media/display/${listingId}/${index}`,
     headers,
     ip: "203.0.113.10",
     socket: { remoteAddress: "203.0.113.10" },
@@ -99,7 +117,7 @@ describe("GET /api/media/display/:listingId/:index", () => {
     expect(first.body[0]).toBe(0xff);
     expect(first.body[1]).toBe(0xd8);
     expect(first.headers["content-type"]).toBe("image/jpeg");
-    expect(first.headers["cache-control"]).toBe("public, s-maxage=86400, stale-while-revalidate=604800");
+    expect(first.headers["cache-control"]).toBe("public, s-maxage=300, stale-while-revalidate=60");
     expect(first.headers.etag).toMatch(/^"[a-f0-9]{40}"$/);
     const meta = await sharp(first.body).metadata();
     expect(meta.width).toBeLessThanOrEqual(1600);
@@ -171,7 +189,7 @@ describe("GET /api/media/display/:listingId/:index", () => {
     expect(mls.statusCode).toBe(200);
     expect(mls.body[0]).toBe(0xff);
     expect(mls.headers["content-type"]).toBe("image/jpeg");
-    expect(mls.headers["cache-control"]).toBe("public, s-maxage=86400, stale-while-revalidate=604800");
+    expect(mls.headers["cache-control"]).toBe("public, s-maxage=300, stale-while-revalidate=60");
     const full = await openDisplay("1", {}, mlsId);
     expect(full.statusCode).toBe(200);
     expect(full.body[0]).toBe(0xff);
@@ -213,6 +231,7 @@ describe("GET /api/media/display/:listingId/:index", () => {
 
   it("fetches /media from this deployment when public/ is not on disk", async () => {
     process.env.VERCEL = "1";
+    process.env.VERCEL_URL = "iconicimagestx-abc.vercel.app";
     process.env.APP_URL = "https://www.iconicimagestx.com";
     const jpeg = await sharp({
       create: { width: 4, height: 4, channels: 3, background: { r: 9, g: 9, b: 9 } },
@@ -227,9 +246,10 @@ describe("GET /api/media/display/:listingId/:index", () => {
       expect(result.statusCode).toBe(200);
       expect(result.body[0]).toBe(0xff);
       expect(calls).toEqual([{
-        url: "https://www.iconicimagestx.com/media/photos/listing-living-01.jpg",
+        url: "https://iconicimagestx-abc.vercel.app/media/photos/listing-living-01.jpg",
         redirect: "error",
       }]);
+      expect(calls[0]?.url).not.toContain("iconicimagestx.com");
     } finally {
       vi.unstubAllGlobals();
     }
@@ -264,5 +284,182 @@ describe("GET /api/media/display/:listingId/:index", () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  it("404s when the studio share is closed and when the index is outside the share set", async () => {
+    const lockedId = "locked-studio-listing";
+    seed("listings", lockedId, {
+      ...qaListingData(),
+      id: lockedId,
+      lockStudio: true,
+    });
+    const locked = await openDisplay("0", {}, lockedId);
+    expect(locked.statusCode).toBe(404);
+    expect(locked.headers["cache-control"]).toBe("no-store");
+    expect(locked.jsonBody).toEqual({ error: "Not found." });
+
+    const disabledId = "disabled-studio-list";
+    seed("listings", disabledId, {
+      ...qaListingData(),
+      studioEnabled: false,
+    });
+    expect((await openDisplay("0", {}, disabledId)).statusCode).toBe(404);
+
+    seed("galleries", "gallery-only-extra", {
+      listingId: LISTING_ID,
+      mediaItems: [{ url: "https://cdn.example/media/photos/luxury-interior.jpg", name: "gallery-only.jpg", type: "photo" }],
+    });
+    const outside = await openDisplay("4");
+    expect(outside.statusCode).toBe(404);
+    expect(JSON.stringify(outside)).not.toContain("luxury-interior");
+    expect((await openDisplay("0")).statusCode).toBe(200);
+  });
+
+  it("serves a presentation photo on a locked studio and 404s an unknown token", async () => {
+    const token = "abcdefghijklmnopqrstuv";
+    const lockedId = "present-locked-list1";
+    seed("listings", lockedId, {
+      id: lockedId,
+      lockStudio: true,
+      presentationToken: token,
+      presentationEnabled: true,
+      images: [{
+        url: "https://cdn.example/media/photos/listing-living-01.jpg",
+        name: "living.jpg",
+        contentType: "image/jpeg",
+      }],
+    });
+    expect((await openDisplay("0", {}, lockedId)).statusCode).toBe(404);
+    const photo = await openDisplay("0", {}, lockedId, `/api/media/display/p/${token}/0`);
+    expect(photo.statusCode).toBe(200);
+    expect(photo.body[0]).toBe(0xff);
+    expect(photo.headers["content-type"]).toBe("image/jpeg");
+    expect(JSON.stringify(photo.headers)).not.toContain("listing-living");
+
+    seed("listings", lockedId, {
+      id: lockedId,
+      lockStudio: true,
+      presentationToken: token,
+      presentationEnabled: false,
+      images: [{ url: "https://cdn.example/media/photos/listing-living-01.jpg", name: "living.jpg" }],
+    });
+    expect((await openDisplay("0", {}, lockedId, `/api/media/display/p/${token}/0`)).statusCode).toBe(404);
+    expect((await openDisplay("0", {}, lockedId, "/api/media/display/p/not-a-real-token-value/0")).statusCode).toBe(404);
+    expect((await openDisplay("0", {}, lockedId, "/api/media/display/p/zzzzzzzzzzzzzzzzzzzzzz/0")).statusCode).toBe(404);
+  });
+
+  it("never fetches APP_URL, including the Wix host", async () => {
+    process.env.VERCEL = "1";
+    process.env.APP_URL = "https://www.iconicimagestx.com";
+    delete process.env.VERCEL_URL;
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      calls.push(String(url));
+      return new Response(null, { status: 500 });
+    }));
+    try {
+      const wix = await openDisplay("0", { host: "www.iconicimagestx.com" });
+      expect(wix.statusCode).toBe(404);
+      expect(calls).toEqual([]);
+      await openDisplay("0", { host: "iconicimagestx.vercel.app" });
+      expect(calls).toEqual(["https://iconicimagestx.vercel.app/media/photos/listing-living-01.jpg"]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("returns JPEGs for a locked owner studio and a locked gallery without original paths", async () => {
+    const plan = buildDeliveryQaSeed({ origin: "https://cdn.example" });
+    const listingDoc = plan.documents.find((item) => item.id === DELIVERY_QA_IDS.listing);
+    const galleryDoc = plan.documents.find((item) => item.id === DELIVERY_QA_IDS.gallery);
+    if (!listingDoc || !galleryDoc) throw new Error("missing playtest docs");
+    const listing = { id: DELIVERY_QA_IDS.listing, ...listingDoc.data, lockStudio: true };
+    seed("listings", DELIVERY_QA_IDS.listing, listing);
+    seed("galleries", DELIVERY_QA_IDS.gallery, galleryDoc.data);
+
+    const owner = ownerStudioProject(listing, {
+      id: listing.id,
+      address: "100 Playtest Lane",
+      agentName: "",
+      services: [],
+      images: [],
+      videos: [],
+      tourUrl: "",
+      floorPlans: [],
+      notice: null,
+      view: "public",
+    }, { invoice: { status: "sent", total: 1, amountPaid: 0, amountDue: 1 } });
+    expect(owner.downloadsUnlocked).toBe(false);
+    expect(owner.tourUrl).toContain("my.matterport.com/show");
+    const ownerUrls = [
+      ...(owner.images || []).map((image) => image.url),
+      ...(owner.floorPlans || []).map((planImage) => planImage.url),
+      ...(owner.videos || []).map((video) => video.poster),
+    ].filter((url): url is string => typeof url === "string");
+    expect(ownerUrls.length).toBeGreaterThanOrEqual(7);
+    for (const url of ownerUrls) {
+      expect(url).toMatch(/^\/api\/media\/display\/o\/[^/]+\/\d+$/);
+      const result = await openDisplay("0", {}, LISTING_ID, url);
+      expect(result.statusCode).toBe(200);
+      expect(result.body[0]).toBe(0xff);
+      expect(result.headers["content-type"]).toBe("image/jpeg");
+    }
+    const ownerBlob = JSON.stringify(owner);
+    expect(ownerBlob).not.toContain("/media/photos/");
+    expect(ownerBlob).not.toContain("/media/blaze/");
+    expect(ownerBlob).not.toContain("/media/video/");
+    expect(ownerBlob).not.toContain("/media/videos/");
+    expect(ownerBlob).not.toContain(".pdf");
+    expect(ownerBlob).not.toContain(".zip");
+
+    const galleryMedia = lockedClientGalleryMedia(DELIVERY_QA_IDS.gallery, [
+      ...(Array.isArray(galleryDoc.data.mediaItems) ? galleryDoc.data.mediaItems : []),
+    ], false);
+    const photos = galleryMedia.filter((item) => item.type === "photo" || item.type === "aerial" || item.type === "floorplan" && item.contentType === "image/png");
+    expect(photos.every((item) => typeof item.url === "string" && item.url.startsWith("/api/media/display/o/"))).toBe(true);
+    const videos = galleryMedia.filter((item) => item.type === "video" || item.type === "reel");
+    expect(videos.every((item) => item.url === null && typeof item.poster === "string" && item.poster.startsWith("/api/media/display/o/"))).toBe(true);
+    const tour = galleryMedia.find((item) => item.type === "matterport");
+    expect(tour?.embedUrl).toContain("my.matterport.com/show");
+    const pdf = galleryMedia.find((item) => item.fileName?.endsWith(".pdf"));
+    const zip = galleryMedia.find((item) => item.fileName?.endsWith(".zip"));
+    expect(pdf?.url).toBeNull();
+    expect(zip?.url).toBeNull();
+    const galleryBlob = JSON.stringify(galleryMedia);
+    expect(galleryBlob).not.toContain("/media/photos/");
+    expect(galleryBlob).not.toContain("/media/blaze/");
+    expect(galleryBlob).not.toContain("/media/video/");
+    expect(galleryBlob).not.toContain("/media/playtest/");
+    for (const item of galleryMedia) {
+      for (const candidate of [item.url, item.poster]) {
+        if (typeof candidate !== "string" || !candidate.startsWith("/api/media/display/")) continue;
+        const result = await openDisplay("0", {}, LISTING_ID, candidate);
+        expect(result.statusCode).toBe(200);
+        expect(result.body[0]).toBe(0xff);
+      }
+    }
+
+    const forged = signOwnerDisplayToken({ scope: "listing", id: DELIVERY_QA_IDS.listing });
+    expect(forged).toBeTruthy();
+    const flipped = `${forged?.slice(0, -1)}${forged?.endsWith("a") ? "b" : "a"}`;
+    expect((await openDisplay("0", {}, LISTING_ID, `/api/media/display/o/${flipped}/0`)).statusCode).toBe(404);
+    const other = signOwnerDisplayToken({ scope: "listing", id: "other-listing-id" });
+    expect((await openDisplay("0", {}, LISTING_ID, `/api/media/display/o/${other}/0`)).statusCode).toBe(404);
+
+    const paid = ownerStudioProject(listing, {
+      id: listing.id,
+      address: "100 Playtest Lane",
+      agentName: "",
+      services: [],
+      images: [],
+      videos: [],
+      tourUrl: "",
+      floorPlans: [],
+      notice: null,
+      view: "public",
+    }, { invoice: { status: "paid", total: 1, amountPaid: 1, amountDue: 0 } });
+    expect(JSON.stringify(paid)).toContain("/media/blaze/01_BUILT_v2.mp4");
+    expect(JSON.stringify(paid.images)).toContain("/media/photos/luxury-exterior.jpg");
+    expect(JSON.stringify(paid.images)).not.toContain("/api/media/display/o/");
   });
 });

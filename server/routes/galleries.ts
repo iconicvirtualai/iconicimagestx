@@ -10,9 +10,9 @@ import { requireCoordinator, requirePhotographer, requireStaff, requireAuth, typ
 import {
   ICONIC_DOWNLOAD_LOCK,
   clientGalleryDownloadsUnlocked,
-  publicMediaItem,
   type GalleryDownloadGate,
 } from "../../shared/paymentAccess";
+import { lockedClientGalleryMedia } from "../../shared/lockedClientMedia";
 import { recordAddressText } from "../../shared/addressText";
 import { galleryStatusNeedsReleaseGate } from "../../shared/galleryRelease";
 import { deliverGalleryToClient } from "../services/galleryDeliver";
@@ -104,12 +104,7 @@ function clientGalleryPayload(id: string, gallery: Record<string, unknown>, gate
     invoiceStatus: invoice?.status || null,
     lockTitle: unlocked ? null : ICONIC_DOWNLOAD_LOCK.title,
     lockMessage: unlocked ? null : ICONIC_DOWNLOAD_LOCK.message,
-    mediaItems: showMedia
-      ? media.map((item) => publicMediaItem(
-        item && typeof item === "object" ? item as Record<string, unknown> : {},
-        unlocked,
-      ))
-      : [],
+    mediaItems: showMedia ? lockedClientGalleryMedia(id, media, unlocked) : [],
   };
 }
 
