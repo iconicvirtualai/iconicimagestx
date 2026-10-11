@@ -14643,28 +14643,28 @@ function clientIp(req) {
   return req.ip || req.socket?.remoteAddress || "unknown";
 }
 function createRateLimiter(options) {
-  const hits = /* @__PURE__ */ new Map();
+  const hits2 = /* @__PURE__ */ new Map();
   return {
     check(key) {
       const now = options.now ? options.now() : Date.now();
       const windowStart = now - options.windowMs;
-      const recent = (hits.get(key) ?? []).filter((stamp2) => stamp2 > windowStart);
+      const recent = (hits2.get(key) ?? []).filter((stamp2) => stamp2 > windowStart);
       const max = typeof options.max === "function" ? options.max() : options.max;
       if (recent.length >= max) {
         const retryAfterSec = Math.max(1, Math.ceil((recent[0] + options.windowMs - now) / 1e3));
-        hits.set(key, recent);
+        hits2.set(key, recent);
         return { allowed: false, retryAfterSec };
       }
       recent.push(now);
-      hits.set(key, recent);
-      if (hits.size > 5e3) {
-        const oldest = hits.keys().next().value;
-        if (oldest) hits.delete(oldest);
+      hits2.set(key, recent);
+      if (hits2.size > 5e3) {
+        const oldest = hits2.keys().next().value;
+        if (oldest) hits2.delete(oldest);
       }
       return { allowed: true, retryAfterSec: 0 };
     },
     reset() {
-      hits.clear();
+      hits2.clear();
     }
   };
 }
@@ -18551,14 +18551,14 @@ function parsePlanBoard(sheets) {
       money2.set(business2, { revenue: null, expenses: null, sawRevenue: false, sawExpense: false });
     }
     rows.slice(headerAt + 1).forEach((row, index) => {
-      const business2 = businessOf(cellAt$1(row, headers.business));
-      const kind = sectionOf(cellAt$1(row, headers.section));
+      const business2 = businessOf(cellAt$2(row, headers.business));
+      const kind = sectionOf(cellAt$2(row, headers.section));
       if (!business2 || !kind) return;
       const purse = money2.get(business2);
       const buckets = lists.get(business2);
       if (!purse || !buckets) return;
       if (kind === "revenue" || kind === "expense") {
-        const amount = parseMoney(cellAt$1(row, headers.amount));
+        const amount = parseMoney(cellAt$2(row, headers.amount));
         if (kind === "revenue") {
           purse.sawRevenue = true;
           if (amount != null) purse.revenue = roundMoney((purse.revenue ?? 0) + amount);
@@ -18568,15 +18568,15 @@ function parsePlanBoard(sheets) {
         }
         return;
       }
-      const item = cellAt$1(row, headers.item);
+      const item = cellAt$2(row, headers.item);
       if (!item) return;
-      const status2 = cellAt$1(row, headers.status);
+      const status2 = cellAt$2(row, headers.status);
       buckets[kind].push({
         item,
-        date: dateKey(cellAt$1(row, headers.date)),
-        amount: parseMoney(cellAt$1(row, headers.amount)),
+        date: dateKey(cellAt$2(row, headers.date)),
+        amount: parseMoney(cellAt$2(row, headers.amount)),
         status: status2 || null,
-        notes: cellAt$1(row, headers.notes) || null,
+        notes: cellAt$2(row, headers.notes) || null,
         done: kind === "todos" && isDone(status2),
         index
       });
@@ -18623,7 +18623,7 @@ function headerMap(row) {
   if (map.business == null || map.section == null) return null;
   return map;
 }
-function cellAt$1(row, index) {
+function cellAt$2(row, index) {
   if (index == null) return "";
   return row[index] || "";
 }
@@ -18988,19 +18988,19 @@ function businesses(sheet) {
     const header = businessHeader(rows[headerAt]);
     if (header) {
       return rows.slice(headerAt + 1).flatMap((row) => {
-        const name = cellAt(row, header.name);
+        const name = cellAt$1(row, header.name);
         if (!name || phraseHas(norm(name), "business")) return [];
-        const status2 = cellAt(row, header.status);
-        const note = cellAt(row, header.note) || null;
-        const targetRaw = cellAt(row, header.targetAmount);
+        const status2 = cellAt$1(row, header.status);
+        const note = cellAt$1(row, header.note) || null;
+        const targetRaw = cellAt$1(row, header.targetAmount);
         return [business(name, status2, note, {
-          milestone: cellAt(row, header.milestone) || null,
-          milestoneDue: cellAt(row, header.milestoneDue) || null,
-          nextDate: cellAt(row, header.nextDate) || null,
-          target: cellAt(row, header.target) || null,
+          milestone: cellAt$1(row, header.milestone) || null,
+          milestoneDue: cellAt$1(row, header.milestoneDue) || null,
+          nextDate: cellAt$1(row, header.nextDate) || null,
+          target: cellAt$1(row, header.target) || null,
           targetAmount: parseMoney(targetRaw),
-          owners: cellAt(row, header.owners) || null,
-          profitCheck: cellAt(row, header.profitCheck) || null
+          owners: cellAt$1(row, header.owners) || null,
+          profitCheck: cellAt$1(row, header.profitCheck) || null
         })];
       }).filter((item) => item.name);
     }
@@ -19041,7 +19041,7 @@ function businessHeader(row) {
 function looseHeader(value) {
   return value.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9$%]+/g, " ").replace(/\s+/g, " ").trim();
 }
-function cellAt(row, index) {
+function cellAt$1(row, index) {
   if (index == null) return "";
   return row[index] || "";
 }
@@ -19629,7 +19629,7 @@ function planBoardFixture() {
   };
 }
 const OWNER_SHEET_ID = "1vHkdHRhAWKcnsv8-d1ZZSWRr-OZyy0xCaqK1Bi3VB3Q";
-const READONLY_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
+const SHEETS_READONLY_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
 const CACHE_MS = 6e4;
 const ERROR_CACHE_MS = 15e3;
 const TAB_ALIASES = [
@@ -19741,13 +19741,16 @@ function credentialsFromJson(raw) {
     return null;
   }
 }
-async function fetchScorecard(credentials) {
+function createReadonlySheetsClient(credentials) {
   const auth = new google.auth.JWT({
     email: credentials.client_email,
     key: credentials.private_key,
-    scopes: [READONLY_SCOPE]
+    scopes: [SHEETS_READONLY_SCOPE]
   });
-  const sheets = google.sheets({ version: "v4", auth });
+  return google.sheets({ version: "v4", auth });
+}
+async function fetchScorecard(credentials) {
+  const sheets = createReadonlySheetsClient(credentials);
   const meta = await sheets.spreadsheets.get({
     spreadsheetId: OWNER_SHEET_ID,
     fields: "sheets.properties.title"
@@ -19765,6 +19768,201 @@ async function fetchScorecard(credentials) {
     rows: (range.values || []).map((row) => row.map((cell2) => cell2 == null ? "" : String(cell2)))
   }));
 }
+const OWNER_ORDERS_TAB = "Orders";
+const OWNER_ORDERS_HEADERS = [
+  "Timestamp CT",
+  "Order text",
+  "Status",
+  "Owner bot",
+  "Cadi 2.0 reply"
+];
+const OWNER_ORDER_TEXT_MAX = 2e3;
+const OWNER_ORDER_STATUS_NEW = "New";
+const ORDERS_WRITE_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
+const MINUTE_MS = 6e4;
+const DAY_MS = 24 * 60 * 60 * 1e3;
+const OWNER_ORDER_MINUTE_LIMIT = 5;
+const OWNER_ORDER_DAY_LIMIT = 50;
+const FORMULA_LEAD = /^[=+\-@]/;
+const NOT_CONNECTED = "Orders are not connected.";
+const hits = /* @__PURE__ */ new Map();
+function formatOrderTimestampCt(now) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true
+  }).formatToParts(now);
+  const read = (type) => parts.find((part) => part.type === type)?.value || "";
+  const period = read("dayPeriod").toUpperCase().startsWith("P") ? "PM" : "AM";
+  return `${read("year")}-${read("month")}-${read("day")} ${read("hour")}:${read("minute")} ${period} CT`;
+}
+function neutralizeSheetFormula(text2) {
+  return FORMULA_LEAD.test(text2) ? `'${text2}` : text2;
+}
+function prepareOwnerOrderText(raw) {
+  if (typeof raw !== "string") return { ok: false, error: "Enter an order." };
+  const trimmed = raw.trim();
+  if (!trimmed) return { ok: false, error: "Enter an order." };
+  if (trimmed.length > OWNER_ORDER_TEXT_MAX) {
+    return { ok: false, error: "Orders are limited to 2,000 characters." };
+  }
+  return { ok: true, text: neutralizeSheetFormula(trimmed) };
+}
+function consumeOwnerOrderRateLimit(email, now) {
+  const key = email.trim().toLowerCase();
+  const recent = (hits.get(key) || []).filter((stamp2) => now - stamp2 < DAY_MS);
+  const inMinute = recent.filter((stamp2) => now - stamp2 < MINUTE_MS);
+  if (inMinute.length >= OWNER_ORDER_MINUTE_LIMIT) {
+    hits.set(key, recent);
+    return { ok: false, error: "Too many orders. You can submit 5 per minute." };
+  }
+  if (recent.length >= OWNER_ORDER_DAY_LIMIT) {
+    hits.set(key, recent);
+    return { ok: false, error: "Too many orders. You can submit 50 per day." };
+  }
+  recent.push(now);
+  hits.set(key, recent);
+  return { ok: true };
+}
+function releaseOwnerOrderRateLimit(email, now) {
+  const key = email.trim().toLowerCase();
+  const recent = hits.get(key);
+  if (!recent) return;
+  const index = recent.lastIndexOf(now);
+  if (index >= 0) recent.splice(index, 1);
+}
+async function listOwnerOrders() {
+  const credentials = resolveSheetsCredentials();
+  if (!credentials) {
+    return { orders: [], configured: false, notice: NOT_CONNECTED, readerEmail: null };
+  }
+  const sheets = createReadonlySheetsClient(credentials);
+  const orders = await readOrders(sheets);
+  return { orders, configured: true, notice: null, readerEmail: credentials.client_email };
+}
+async function submitOwnerOrder(input) {
+  const prepared = prepareOwnerOrderText(input.raw);
+  if ("error" in prepared) return { ok: false, status: 400, error: prepared.error };
+  const credentials = resolveSheetsCredentials();
+  if (!credentials) return { ok: false, status: 503, error: NOT_CONNECTED };
+  const now = input.now ?? /* @__PURE__ */ new Date();
+  const nowMs = now.getTime();
+  const limit = consumeOwnerOrderRateLimit(input.ownerEmail, nowMs);
+  if ("error" in limit) return { ok: false, status: 429, error: limit.error };
+  try {
+    const sheets = createOrdersWriteClient(credentials);
+    const order = await appendOrder(sheets, prepared.text, now);
+    return { ok: true, order };
+  } catch (error) {
+    releaseOwnerOrderRateLimit(input.ownerEmail, nowMs);
+    throw error;
+  }
+}
+function createOrdersWriteClient(credentials) {
+  const auth = new google.auth.JWT({
+    email: credentials.client_email,
+    key: credentials.private_key,
+    scopes: [ORDERS_WRITE_SCOPE]
+  });
+  return google.sheets({ version: "v4", auth });
+}
+async function readTitles(sheets) {
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId: OWNER_SHEET_ID,
+    fields: "sheets.properties.title"
+  });
+  return (meta.data.sheets || []).map((sheet) => sheet.properties?.title || "").filter(Boolean);
+}
+async function readOrders(sheets) {
+  const titles = await readTitles(sheets);
+  if (!titles.includes(OWNER_ORDERS_TAB)) return [];
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId: OWNER_SHEET_ID,
+    range: sheetRange("A:E"),
+    valueRenderOption: "FORMATTED_VALUE"
+  });
+  return parseOrderRows(response.data.values || []);
+}
+async function appendOrder(sheets, text2, now) {
+  const titles = await readTitles(sheets);
+  if (!titles.includes(OWNER_ORDERS_TAB)) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: OWNER_SHEET_ID,
+      requestBody: {
+        requests: [
+          {
+            addSheet: {
+              properties: {
+                title: OWNER_ORDERS_TAB,
+                gridProperties: { frozenRowCount: 1 }
+              }
+            }
+          }
+        ]
+      }
+    });
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: OWNER_SHEET_ID,
+      range: sheetRange("A1:E1"),
+      valueInputOption: "RAW",
+      requestBody: { values: [Array.from(OWNER_ORDERS_HEADERS)] }
+    });
+  }
+  const order = {
+    timestamp: formatOrderTimestampCt(now),
+    text: text2,
+    status: OWNER_ORDER_STATUS_NEW,
+    ownerBot: "",
+    reply: ""
+  };
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: OWNER_SHEET_ID,
+    range: sheetRange("A:E"),
+    valueInputOption: "RAW",
+    insertDataOption: "INSERT_ROWS",
+    requestBody: {
+      values: [[order.timestamp, order.text, order.status, order.ownerBot, order.reply]]
+    }
+  });
+  return order;
+}
+function parseOrderRows(values) {
+  const rows = values.map((row) => row.map((cell2) => cell2 == null ? "" : String(cell2)));
+  if (!rows.length) return [];
+  const header = looksLikeHeader(rows[0]) ? rows[0] : [];
+  const data = header.length ? rows.slice(1) : rows;
+  const timestampAt = columnIndex(header, "Timestamp CT", 0);
+  const textAt = columnIndex(header, "Order text", 1);
+  const statusAt = columnIndex(header, "Status", 2);
+  const ownerBotAt = columnIndex(header, "Owner bot", 3);
+  const replyAt = columnIndex(header, "Cadi 2.0 reply", 4);
+  const orders = data.map((row) => ({
+    timestamp: cellAt(row, timestampAt),
+    text: cellAt(row, textAt),
+    status: cellAt(row, statusAt),
+    ownerBot: cellAt(row, ownerBotAt),
+    reply: cellAt(row, replyAt)
+  })).filter((order) => order.timestamp || order.text || order.status || order.ownerBot || order.reply);
+  return orders.slice(-10).reverse();
+}
+function looksLikeHeader(row) {
+  const cells = row.map((cell2) => cell2.trim());
+  return cells.includes("Timestamp CT") || cells.includes("Order text");
+}
+function columnIndex(header, name, fallback) {
+  const index = header.findIndex((cell2) => cell2.trim() === name);
+  return index >= 0 ? index : fallback;
+}
+function cellAt(row, index) {
+  return (row[index] || "").trim();
+}
+function sheetRange(a1) {
+  return `'${OWNER_ORDERS_TAB.replace(/'/g, "''")}'!${a1}`;
+}
 const OWNER_WHY = "Freedom to be outside with my dogs, kids, nieces, pig and garden, and to fly to Puerto Rico whenever I want. More traveling, more giving.";
 const NOT_FOUND = { error: "Not found" };
 function mountOwners(app) {
@@ -19774,6 +19972,12 @@ function mountOwners(app) {
   });
   app.get("/api/owners/suite", (req, res) => {
     void handleSuite(req, res);
+  });
+  app.get("/api/owners/orders", (req, res) => {
+    void handleOrdersGet(req, res);
+  });
+  app.post("/api/owners/orders", (req, res) => {
+    void handleOrdersPost(req, res);
   });
   app.post("/api/owners/session", (req, res) => {
     void handleSession(req, res);
@@ -19791,6 +19995,35 @@ async function handleSuite(req, res) {
   const fresh = req.query.fresh === "1";
   const payload = await loadOwnerSuite({ fresh });
   return res.status(200).json({ ...payload, why: OWNER_WHY });
+}
+async function handleOrdersGet(req, res) {
+  setPrivate(res);
+  const owner = await resolveOwnerIdentity(req.headers);
+  if (!owner) return res.status(404).json(NOT_FOUND);
+  try {
+    const payload = await listOwnerOrders();
+    return res.status(200).json(payload);
+  } catch (error) {
+    console.error(`[Owners] Orders read failed (${errorStatus(error)})`);
+    return res.status(500).json({ error: "Orders could not be read." });
+  }
+}
+async function handleOrdersPost(req, res) {
+  setPrivate(res);
+  const owner = await resolveOwnerIdentity(req.headers);
+  if (!owner) return res.status(404).json(NOT_FOUND);
+  try {
+    const result = await submitOwnerOrder({ raw: req.body?.text, ownerEmail: owner.email });
+    if ("error" in result) return res.status(result.status).json({ error: result.error });
+    return res.status(201).json({ order: result.order });
+  } catch (error) {
+    console.error(`[Owners] Orders write failed (${errorStatus(error)})`);
+    return res.status(500).json({ error: "The order could not be saved." });
+  }
+}
+function errorStatus(error) {
+  if (error && typeof error === "object" && "code" in error) return String(error.code);
+  return "error";
 }
 async function handleSession(req, res) {
   setPrivate(res);
