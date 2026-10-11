@@ -1,7 +1,6 @@
 import * as React from "react";
-import { useNavigate } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
-import { Search, ChevronDown, X, Archive, Calendar, Layers, ChevronUp, RefreshCw } from "lucide-react";
+import { X, Archive, Calendar, Layers, RefreshCw } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, writeBatch, doc, serverTimestamp, addDoc, getDocs, updateDoc } from "firebase/firestore";
 import { toast } from "sonner";
@@ -12,9 +11,10 @@ import { Button } from "@/components/ui/button";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 import { upsertScheduledAppointment } from "@/lib/scheduleRecords";
 import { recordAddressText } from "@shared/addressText";
-import { buildAdminOrderTile, type AdminStudioId } from "@shared/adminOrderTile";
-import { exclusiveOrderBuckets } from "@shared/orderPackageLines";
-import { AdminOrderTile } from "@/components/admin/AdminOrderTile";
+import { type AdminStudioId } from "@shared/adminOrderTile";
+import { adminOrdersViewStorageKey } from "@shared/adminOrderList";
+import { AdminOrdersBrowser } from "@/components/admin/AdminOrdersBrowser";
+import { useAuth } from "@/contexts/AuthContext";
 
 function safe(v: any): string {
   if (v === null || v === undefined) return "—";
@@ -23,30 +23,12 @@ function safe(v: any): string {
   return String(v);
 }
 
-// Unified status flow
-function getUnifiedStatus(o: any): string {
-  var s = (typeof o.status === "string" ? o.status : "").toLowerCase().replace(/\s+/g, "_");
-  if (s === "archived") return "archived";
-  if (s === "cancelled") return "cancelled";
-
-  var inv = o.invoice || {};
-  var paid = inv.amountPaid > 0 || inv.status === "paid" || s === "paid" || s === "delivered_paid";
-
-  if (paid && (s.includes("delivered") || s === "paid")) return "delivered_paid";
-  if (s.includes("delivered")) return "delivered_unpaid";
-  if (s === "in_review") return "in_review";
-  if (s === "pending" || s === "pending_edit" || s === "in_progress") return "pending";
-  if (s === "confirmed") return "confirmed";
-  if (s === "scheduled" || s === "appt_scheduled" || s === "consult_scheduled") return "scheduled";
-  return "unscheduled";
-}
-
 const getName = (o: any) => safe(o.clientName || o.customerName || o.name || ((o.firstName || "") + " " + (o.lastName || "")).trim());
 const getAddr = (o: any) => recordAddressText(o) || "—";
 const getTotal = (o: any) => Number(o.total) || Number(o.amount) || Number(o.pricing?.total) || 0;
 
 export default function AdminOrders() {
-  const navigate = useNavigate();
+  const { user } = useAuth();
   const [orders, setOrders] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [now, setNow] = React.useState(Date.now());
@@ -55,11 +37,6 @@ export default function AdminOrders() {
   const [isBulkScheduling, setIsBulkScheduling] = React.useState(false);
   const [isBulkProjecting, setIsBulkProjecting] = React.useState(false);
   const [bulkProjectType, setBulkProjectType] = React.useState<"real_estate" | "business">("real_estate");
-
-  // Section States
-  const [sect1, setSect1] = React.useState({ perPage: 20, sort: "newest", search: "", collapsed: false });
-  const [sect2, setSect2] = React.useState({ perPage: 20, sortField: "createdAt", sortOrder: "desc" as "asc"|"desc", search: "", collapsed: false });
-  const [sect3, setSect3] = React.useState({ perPage: 20, sort: "newest", search: "", collapsed: true });
 
   React.useEffect(() => {
     const unsub = onSnapshot(collection(db, "orderRequests"), snap => {
@@ -167,96 +144,14 @@ export default function AdminOrders() {
     finally { setIsBulkProjecting(false); setSelection(new Set()); }
   };
 
-  // ─── FILTERING ─────────────────────────────────────────────────────────────
-
-  const searchFilter = (list: any[], q: string) => {
-    if (!q.trim()) return list;
-    const low = q.toLowerCase();
-    return list.filter(o => {
-      const tile = buildAdminOrderTile(o);
-      return [getName(o), getAddr(o), o.id, tile.packageName, tile.skinLabel, tile.orderCode, tile.clientName, tile.channel]
-        .join(" ")
-        .toLowerCase()
-        .includes(low);
-    });
-  };
-
-  const buckets = exclusiveOrderBuckets(orders, (order) => {
-    const status = getUnifiedStatus(order);
-    if (status === "archived" || status === "cancelled") return "archived";
-    if (status === "unscheduled") return "action";
-    return "active";
-  });
-  const actionRequired = buckets.action;
-  const allActive = buckets.active;
-  const archived = buckets.archived;
-
-  // ─── SORTING ───────────────────────────────────────────────────────────────
-
-  const sortOrders = (list: any[], field: string, order: "asc" | "desc") => {
-    return [...list].sort((a, b) => {
-      let va: any, vb: any;
-      if (field === "createdAt") {
-        va = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
-        vb = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
-      } else if (field === "id") {
-        va = a.id || ""; vb = b.id || "";
-      } else if (field === "customer") {
-        va = getName(a).toLowerCase(); vb = getName(b).toLowerCase();
-      } else if (field === "total") {
-        va = getTotal(a); vb = getTotal(b);
-      } else if (field === "appointment") {
-        va = (a.appointmentDate?.toDate ? a.appointmentDate.toDate().getTime() : (a.appointmentDate ? new Date(a.appointmentDate).getTime() : 0));
-        vb = (b.appointmentDate?.toDate ? b.appointmentDate.toDate().getTime() : (b.appointmentDate ? new Date(b.appointmentDate).getTime() : 0));
-      } else if (field === "status") {
-        va = getUnifiedStatus(a); vb = getUnifiedStatus(b);
-      }
-      if (va < vb) return order === "asc" ? -1 : 1;
-      if (va > vb) return order === "asc" ? 1 : -1;
-      return 0;
-    });
-  };
-
-  const sect1Filtered = sortOrders(searchFilter(actionRequired, sect1.search), "createdAt", sect1.sort === "newest" ? "desc" : "asc");
-  const sect2Filtered = sortOrders(searchFilter(allActive, sect2.search), sect2.sortField, sect2.sortOrder);
-  const sect3Filtered = sortOrders(searchFilter(archived, sect3.search), "createdAt", sect3.sort === "newest" ? "desc" : "asc");
-
-  const visibleIds = (list: any[], perPage: number) => list.slice(0, perPage).map((order) => order.id);
-
-  function renderTiles(list: any[]) {
-    if (list.length === 0) {
-      return (
-        <div className="rounded-2xl border border-dashed border-[#cbd5e1] bg-white px-6 py-10 text-center">
-          <p className="text-[10px] font-black uppercase tracking-widest text-[#64748b]">No orders in this list</p>
-        </div>
-      );
+  const setStudio = async (orderId: string, studio: AdminStudioId) => {
+    try {
+      await updateDoc(doc(db, "orderRequests", orderId), { studio, updatedAt: serverTimestamp() });
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not update the studio.");
     }
-    return (
-      <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {list.map((order) => {
-          const tile = buildAdminOrderTile(order);
-          const setStudio = async (studio: AdminStudioId) => {
-            try {
-              await updateDoc(doc(db, "orderRequests", order.id), { studio, updatedAt: serverTimestamp() });
-            } catch (err) {
-              console.error(err);
-              toast.error("Could not update the studio.");
-            }
-          };
-          return (
-            <AdminOrderTile
-              key={order.id}
-              order={tile}
-              selected={selection.has(order.id)}
-              onOpen={() => navigate("/admin/order-request/" + order.id)}
-              onToggleSelect={() => toggleSelect(order.id)}
-              onStudioChange={tile.studio ? setStudio : undefined}
-            />
-          );
-        })}
-      </div>
-    );
-  }
+  };
 
   return (
     <AdminLayout title="Orders">
@@ -266,113 +161,15 @@ export default function AdminOrders() {
       {loading ? (
         <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 border-[#0d9488] border-t-transparent rounded-full animate-spin" /></div>
       ) : (
-        <div className="space-y-12 pb-24">
-
-          {/* ── SECTION 1: REQUIRING ACTION ── */}
-          <section>
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
-              <h2
-                className="text-sm font-black uppercase tracking-widest flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity select-none"
-                onClick={() => setSect1({...sect1, collapsed: !sect1.collapsed})}
-              >
-                {sect1.collapsed ? <ChevronDown className="w-4 h-4 text-[#0d9488]" /> : <ChevronUp className="w-4 h-4 text-[#0d9488]" />}
-                Orders Requiring Action <span className="bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px]">{actionRequired.length}</span>
-              </h2>
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <Search className="w-3 h-3 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input type="text" placeholder="Search..." value={sect1.search} onChange={e => setSect1({...sect1, search: e.target.value})}
-                    className="h-8 pl-8 pr-3 rounded-lg border border-gray-200 text-xs focus:ring-1 focus:ring-[#0d9488] outline-none" />
-                </div>
-                <select value={sect1.sort} onChange={e => setSect1({...sect1, sort: e.target.value})} className="h-8 px-2 rounded-lg border border-gray-200 text-[10px] font-bold">
-                  <option value="newest">Newest</option>
-                  <option value="oldest">Oldest</option>
-                </select>
-                <select value={sect1.perPage} onChange={e => setSect1({...sect1, perPage: Number(e.target.value)})} className="h-8 px-2 rounded-lg border border-gray-200 text-[10px] font-bold">
-                  <option value={10}>10</option><option value={20}>20</option><option value={50}>50</option>
-                </select>
-                <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500">
-                  <input type="checkbox" onChange={() => selectAll(visibleIds(sect1Filtered, sect1.perPage))}
-                    checked={visibleIds(sect1Filtered, sect1.perPage).length > 0 && visibleIds(sect1Filtered, sect1.perPage).every(id => selection.has(id))}
-                    className="w-4 h-4 rounded border-gray-300 text-[#0d9488] focus:ring-[#0d9488]" />
-                  Select
-                </label>
-              </div>
-            </div>
-            {!sect1.collapsed && renderTiles(sect1Filtered.slice(0, sect1.perPage))}
-          </section>
-
-          {/* ── SECTION 2: ALL ORDERS ── */}
-          <section>
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
-              <h2
-                className="text-sm font-black uppercase tracking-widest flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity select-none"
-                onClick={() => setSect2({...sect2, collapsed: !sect2.collapsed})}
-              >
-                {sect2.collapsed ? <ChevronDown className="w-4 h-4 text-black" /> : <ChevronUp className="w-4 h-4 text-black" />}
-                All Orders <span className="bg-black text-white px-2 py-0.5 rounded-full text-[10px]">{allActive.length}</span>
-              </h2>
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <Search className="w-3 h-3 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input type="text" placeholder="Search..." value={sect2.search} onChange={e => setSect2({...sect2, search: e.target.value})}
-                    className="h-8 pl-8 pr-3 rounded-lg border border-gray-200 text-xs focus:ring-1 focus:ring-[#0d9488] outline-none" />
-                </div>
-                <select value={sect2.sortField} onChange={e => setSect2({...sect2, sortField: e.target.value})} className="h-8 px-2 rounded-lg border border-gray-200 text-[10px] font-bold">
-                  <option value="createdAt">Placed</option>
-                  <option value="customer">Customer</option>
-                  <option value="total">Total</option>
-                  <option value="appointment">Appointment</option>
-                  <option value="status">Status</option>
-                  <option value="id">Order</option>
-                </select>
-                <button type="button" onClick={() => setSect2({...sect2, sortOrder: sect2.sortOrder === "asc" ? "desc" : "asc"})} className="h-8 px-2 rounded-lg border border-gray-200 text-[10px] font-bold">
-                  {sect2.sortOrder === "asc" ? "Asc" : "Desc"}
-                </button>
-                <select value={sect2.perPage} onChange={e => setSect2({...sect2, perPage: Number(e.target.value)})} className="h-8 px-2 rounded-lg border border-gray-200 text-[10px] font-bold">
-                  <option value={10}>10</option><option value={20}>20</option><option value={50}>50</option>
-                </select>
-                <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500">
-                  <input type="checkbox" onChange={() => selectAll(visibleIds(sect2Filtered, sect2.perPage))}
-                    checked={visibleIds(sect2Filtered, sect2.perPage).length > 0 && visibleIds(sect2Filtered, sect2.perPage).every(id => selection.has(id))}
-                    className="w-4 h-4 rounded border-gray-300 text-[#0d9488] focus:ring-[#0d9488]" />
-                  Select
-                </label>
-              </div>
-            </div>
-            {!sect2.collapsed && renderTiles(sect2Filtered.slice(0, sect2.perPage))}
-          </section>
-
-          {/* ── SECTION 3: ARCHIVES & CANCELLATIONS ── */}
-          <section>
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
-              <h2
-                className="text-sm font-black uppercase tracking-widest text-gray-400 flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity select-none"
-                onClick={() => setSect3({...sect3, collapsed: !sect3.collapsed})}
-              >
-                {sect3.collapsed ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronUp className="w-4 h-4 text-gray-400" />}
-                Archives & Cancellations <span className="bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full text-[10px]">{archived.length}</span>
-              </h2>
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <Search className="w-3 h-3 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input type="text" placeholder="Search..." value={sect3.search} onChange={e => setSect3({...sect3, search: e.target.value})}
-                    className="h-8 pl-8 pr-3 rounded-lg border border-gray-200 text-xs focus:ring-1 focus:ring-[#0d9488] outline-none" />
-                </div>
-                <select value={sect3.perPage} onChange={e => setSect3({...sect3, perPage: Number(e.target.value)})} className="h-8 px-2 rounded-lg border border-gray-200 text-[10px] font-bold">
-                  <option value={10}>10</option><option value={20}>20</option><option value={50}>50</option>
-                </select>
-                <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500">
-                  <input type="checkbox" onChange={() => selectAll(visibleIds(sect3Filtered, sect3.perPage))}
-                    checked={visibleIds(sect3Filtered, sect3.perPage).length > 0 && visibleIds(sect3Filtered, sect3.perPage).every(id => selection.has(id))}
-                    className="w-4 h-4 rounded border-gray-300 text-[#0d9488] focus:ring-[#0d9488]" />
-                  Select
-                </label>
-              </div>
-            </div>
-            {!sect3.collapsed && <div className="opacity-70">{renderTiles(sect3Filtered.slice(0, sect3.perPage))}</div>}
-          </section>
-        </div>
+        <AdminOrdersBrowser
+          orders={orders}
+          staff={staff}
+          selection={selection}
+          storageKey={adminOrdersViewStorageKey(user)}
+          onToggleSelect={toggleSelect}
+          onSelectIds={selectAll}
+          onStudioChange={setStudio}
+        />
       )}
 
       {/* ── BULK ACTION BAR ── */}
