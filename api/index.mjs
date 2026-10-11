@@ -18165,14 +18165,14 @@ function parsePlanBoard(sheets) {
       money2.set(business2, { revenue: null, expenses: null, sawRevenue: false, sawExpense: false });
     }
     rows.slice(headerAt + 1).forEach((row, index) => {
-      const business2 = businessOf(cellAt(row, headers.business));
-      const kind = sectionOf(cellAt(row, headers.section));
+      const business2 = businessOf(cellAt$1(row, headers.business));
+      const kind = sectionOf(cellAt$1(row, headers.section));
       if (!business2 || !kind) return;
       const purse = money2.get(business2);
       const buckets = lists.get(business2);
       if (!purse || !buckets) return;
       if (kind === "revenue" || kind === "expense") {
-        const amount = parseMoney(cellAt(row, headers.amount));
+        const amount = parseMoney(cellAt$1(row, headers.amount));
         if (kind === "revenue") {
           purse.sawRevenue = true;
           if (amount != null) purse.revenue = roundMoney((purse.revenue ?? 0) + amount);
@@ -18182,15 +18182,15 @@ function parsePlanBoard(sheets) {
         }
         return;
       }
-      const item = cellAt(row, headers.item);
+      const item = cellAt$1(row, headers.item);
       if (!item) return;
-      const status2 = cellAt(row, headers.status);
+      const status2 = cellAt$1(row, headers.status);
       buckets[kind].push({
         item,
-        date: dateKey(cellAt(row, headers.date)),
-        amount: parseMoney(cellAt(row, headers.amount)),
+        date: dateKey(cellAt$1(row, headers.date)),
+        amount: parseMoney(cellAt$1(row, headers.amount)),
         status: status2 || null,
-        notes: cellAt(row, headers.notes) || null,
+        notes: cellAt$1(row, headers.notes) || null,
         done: kind === "todos" && isDone(status2),
         index
       });
@@ -18214,8 +18214,10 @@ function parsePlanBoard(sheets) {
 }
 function findPlanSheet(sheets) {
   if (!Array.isArray(sheets)) return void 0;
-  return sheets.find((sheet) => {
-    if (!sheet || typeof sheet !== "object") return false;
+  const grids = sheets.filter((sheet) => Boolean(sheet) && typeof sheet === "object");
+  const data = grids.find((sheet) => normalizeTabTitle(String(sheet.title || "")) === "plan board data");
+  if (data) return data;
+  return grids.find((sheet) => {
     const title = normalizeTabTitle(String(sheet.title || ""));
     return title === "plan board" || title.includes("plan board");
   });
@@ -18235,7 +18237,7 @@ function headerMap(row) {
   if (map.business == null || map.section == null) return null;
   return map;
 }
-function cellAt(row, index) {
+function cellAt$1(row, index) {
   if (index == null) return "";
   return row[index] || "";
 }
@@ -18279,11 +18281,11 @@ function sortLines(lines) {
     return a.index - b.index;
   }).map(({ index: _index, ...line }) => line);
 }
-const WEEK_AMOUNT = ["cash this week", "this week cash", "collected this week", "week collected", "revenue this week"];
+const WEEK_AMOUNT = ["cash collected this week", "cash this week", "this week cash", "collected this week", "week collected", "revenue this week"];
 const WEEK_GOAL = ["week goal", "this week goal", "weekly goal", "goal this week"];
 const MONTH_AMOUNT = ["cash this month", "this month cash", "collected this month", "month collected", "revenue this month", "mtd cash", "month to date"];
 const MONTH_GOAL = ["month goal", "this month goal", "monthly goal", "goal this month"];
-const SAVINGS_AMOUNT = ["savings", "savings balance", "saved", "reserve balance"];
+const SAVINGS_AMOUNT = ["payroll reserve", "savings", "savings balance", "saved", "reserve balance"];
 const SAVINGS_GOAL = ["savings goal", "reserve goal", "savings target"];
 const MONEY_SECTIONS = ["money in", "money in by payment", "payments", "by payment", "payment method"];
 const AR_SECTIONS = ["accounts receivable", "receivables", "money owed to us", "outstanding invoices", "ar"];
@@ -18307,9 +18309,13 @@ function emptyOwnerSuiteData(now = /* @__PURE__ */ new Date()) {
     decisions: [],
     tracker: { goal: null, current: null, rows: [] },
     horizons: [],
+    scorecard: emptyScorecard(),
     bots: { state: "unknown", entries: [] },
     planBoard: emptyPlanBoard()
   };
+}
+function emptyScorecard() {
+  return { metrics: [], rag: [], nextWeek: [], payments: [] };
 }
 function parseOwnerSuite(sheets, now = /* @__PURE__ */ new Date()) {
   const data = emptyOwnerSuiteData(now);
@@ -18330,7 +18336,19 @@ function parseOwnerSuite(sheets, now = /* @__PURE__ */ new Date()) {
   data.moneyIn = moneyIn(safeSheets);
   data.receivables = parties(safeSheets, AR_SECTIONS, ["receivable", "ar", "outstanding"]);
   data.owes = owes(safeSheets);
+  data.scorecard = fridayScorecard(findSheet(safeSheets, ["friday scorecard", "scorecard"]));
+  if (data.cashWeek.amount == null) {
+    const week = data.scorecard.metrics.find((metric) => matchesAlias(metric.label, WEEK_AMOUNT, WEEK_GOAL));
+    if (week?.amount != null) data.cashWeek.amount = week.amount;
+  }
+  if (data.savings.amount == null) {
+    const reserve = data.scorecard.metrics.find((metric) => matchesAlias(metric.label, SAVINGS_AMOUNT, SAVINGS_GOAL));
+    if (reserve?.amount != null) data.savings.amount = reserve.amount;
+  }
   data.businesses = businesses(findSheet(safeSheets, ["businesses", "business"]));
+  if (!data.businesses.length) {
+    data.businesses = data.scorecard.rag.map((row) => business(row.name, row.tone, null));
+  }
   const plan = weekPlan(findSheet(safeSheets, ["this week"]), now);
   data.today = plan.today;
   data.calendar = plan.calendar;
@@ -18360,9 +18378,13 @@ function rowsOf(sheet) {
   return sheet.rows.map((row) => Array.isArray(row) ? row.map((item) => cell(item)) : []);
 }
 function parseMoney(raw) {
-  const text2 = cell(raw);
-  if (!text2 || /^(-|—|n\/a|na|tbd)$/i.test(text2)) return null;
+  const original = cell(raw);
+  if (!original || /^(-|—|–|n\/a|na|tbd)$/i.test(original)) return null;
+  const text2 = original.replace(/^~\s*/, "").replace(/\s*\+\s*$/, "").trim();
+  if (!text2 || /^(-|—|–|n\/a|na|tbd)$/i.test(text2)) return null;
   if (/[a-z]/i.test(text2.replace(/[$%,\s().-]/g, "")) && !/^\$/.test(text2)) return null;
+  const figures = text2.replace(/,/g, "").match(/\d+(?:\.\d+)?/g) || [];
+  if (figures.length !== 1) return null;
   const negative = /^\(.*\)$/.test(text2) || text2.startsWith("-");
   const numeric2 = text2.replace(/[$,%\s]/g, "").replace(/[()]/g, "");
   if (!numeric2 || numeric2 === "-" || numeric2 === ".") return null;
@@ -18381,11 +18403,17 @@ function parsePercent(raw) {
 function norm(value) {
   return value.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9%]+/g, " ").replace(/\s+/g, " ").trim();
 }
+function phraseHas(name, alias) {
+  if (!name || !alias) return false;
+  if (name === alias) return true;
+  const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?:^|\\s)${escaped}(?:\\s|$)`).test(name);
+}
 function matchesAlias(value, aliases, avoid = []) {
   const name = norm(value);
   if (!name) return false;
-  if (avoid.some((alias) => name === alias || name.startsWith(`${alias} `))) return false;
-  return aliases.some((alias) => name === alias || name.startsWith(`${alias} `) || name.startsWith(`${alias}:`));
+  if (avoid.some((alias) => phraseHas(name, alias))) return false;
+  return aliases.some((alias) => phraseHas(name, alias));
 }
 function inlineNumber(value, aliases) {
   const name = norm(value);
@@ -18555,20 +18583,97 @@ function recordToParty(record) {
     detail: pick(record, ["detail", "note", "notes", "due date", "status", "when"]) || null
   };
 }
+const BUSINESS_FIELDS = [
+  { field: "name", phrases: ["business", "company"] },
+  { field: "status", phrases: ["rag", "status", "health", "ryg", "color"] },
+  { field: "note", phrases: ["where it stands", "notes", "note", "detail", "comment"] },
+  { field: "milestone", phrases: ["next milestone"] },
+  { field: "milestoneDue", phrases: ["milestone due"] },
+  { field: "nextDate", phrases: ["next date on the calendar", "next date"] },
+  { field: "target", phrases: ["30 day target"] },
+  { field: "targetAmount", phrases: ["30 day $"] },
+  { field: "owners", phrases: ["owner"] },
+  { field: "profitCheck", phrases: ["profit check", "15% profit"] }
+];
 function businesses(sheet) {
-  const records = tableRecords(rowsOf(sheet));
+  const rows = rowsOf(sheet);
+  const headerAt = rows.findIndex((row) => businessHeader(row) != null);
+  if (headerAt >= 0) {
+    const header = businessHeader(rows[headerAt]);
+    if (header) {
+      return rows.slice(headerAt + 1).flatMap((row) => {
+        const name = cellAt(row, header.name);
+        if (!name || phraseHas(norm(name), "business")) return [];
+        const status2 = cellAt(row, header.status);
+        const note = cellAt(row, header.note) || null;
+        const targetRaw = cellAt(row, header.targetAmount);
+        return [business(name, status2, note, {
+          milestone: cellAt(row, header.milestone) || null,
+          milestoneDue: cellAt(row, header.milestoneDue) || null,
+          nextDate: cellAt(row, header.nextDate) || null,
+          target: cellAt(row, header.target) || null,
+          targetAmount: parseMoney(targetRaw),
+          owners: cellAt(row, header.owners) || null,
+          profitCheck: cellAt(row, header.profitCheck) || null
+        })];
+      }).filter((item) => item.name);
+    }
+  }
+  const records = tableRecords(rows);
   const fromTable = records.map((record) => {
     const name = pick(record, ["business", "name", "company"]);
-    const status2 = pick(record, ["status", "health", "ryg", "color", "state"]);
-    const note = pick(record, ["note", "notes", "detail", "comment"]) || null;
+    const status2 = pick(record, ["status", "health", "ryg", "rag", "color", "state"]);
+    const note = pick(record, ["where it stands", "note", "notes", "detail", "comment"]) || null;
     return business(name, status2, note);
   }).filter((item) => item.name);
   if (fromTable.length) return fromTable;
-  return pairs(rowsOf(sheet)).map((item) => business(item.name, item.detail || "", null)).filter((item) => item.name && !isHeaderRow([item.name]));
+  return pairs(rows).map((item) => business(item.name, item.detail || "", null)).filter((item) => item.name && !isHeaderRow([item.name]));
 }
-function business(name, status2, note) {
+function businessHeader(row) {
+  const map = {};
+  const score = {};
+  row.forEach((value, index) => {
+    const key = looseHeader(value);
+    if (!key) return;
+    let best = null;
+    for (const field of BUSINESS_FIELDS) {
+      for (const phrase of field.phrases) {
+        if ((key === phrase || key.includes(phrase)) && (!best || phrase.length > best.score)) {
+          best = { field: field.field, score: phrase.length };
+        }
+      }
+    }
+    if (!best) return;
+    if (score[best.field] == null || best.score > (score[best.field] || 0)) {
+      map[best.field] = index;
+      score[best.field] = best.score;
+    }
+  });
+  if (map.name == null || map.status == null) return null;
+  return map;
+}
+function looseHeader(value) {
+  return value.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9$%]+/g, " ").replace(/\s+/g, " ").trim();
+}
+function cellAt(row, index) {
+  if (index == null) return "";
+  return row[index] || "";
+}
+function business(name, status2, note, extra = {}) {
   const tone = toneOf(status2);
-  return { name, tone, label: toneLabel(tone), note };
+  return {
+    name,
+    tone,
+    label: toneLabel(tone, status2),
+    note,
+    milestone: extra.milestone ?? null,
+    milestoneDue: extra.milestoneDue ?? null,
+    nextDate: extra.nextDate ?? null,
+    target: extra.target ?? null,
+    targetAmount: extra.targetAmount ?? null,
+    owners: extra.owners ?? null,
+    profitCheck: extra.profitCheck ?? null
+  };
 }
 function toneOf(raw) {
   const name = norm(raw);
@@ -18576,7 +18681,7 @@ function toneOf(raw) {
   if (name === "g" || name === "green" || name === "good" || name === "ok" || name === "okay" || name.includes("green") || name.includes("on track") || name.includes("healthy")) {
     return "green";
   }
-  if (name === "y" || name === "yellow" || name.includes("yellow") || name.includes("watch") || name.includes("caution") || name.includes("attention")) {
+  if (name === "y" || name === "a" || name === "yellow" || name === "amber" || name.includes("yellow") || name.includes("amber") || name.includes("watch") || name.includes("caution") || name.includes("attention")) {
     return "yellow";
   }
   if (name === "r" || name === "red" || name.includes("red") || name.includes("behind") || name.includes("off track") || name.includes("risk") || name.includes("late")) {
@@ -18584,7 +18689,12 @@ function toneOf(raw) {
   }
   return "unknown";
 }
-function toneLabel(tone) {
+function toneLabel(tone, raw) {
+  const name = norm(raw);
+  const colorWord = name === "r" || name === "y" || name === "g" || name === "a" || name === "red" || name === "yellow" || name === "green" || name === "amber" || name.includes("yellow") || name.includes("amber") || name.includes("green") || /(^|\s)red(\s|$)/.test(name);
+  if (colorWord && tone === "green") return "Green";
+  if (colorWord && tone === "yellow") return "Yellow";
+  if (colorWord && tone === "red") return "Red";
   if (tone === "green") return "On track";
   if (tone === "yellow") return "Watch";
   if (tone === "red") return "Behind";
@@ -18656,31 +18766,233 @@ function tracker(sheet) {
   })).filter((row) => row.label && !matchesAlias(row.label, ["goal", "current", "target", "source", "amount"]));
   return { goal, current, rows: breakdown };
 }
-function horizons(sheet) {
+function fridayScorecard(sheet) {
+  const card = emptyScorecard();
   const rows = rowsOf(sheet);
-  const header = rows.find((row) => row.filter(Boolean).length >= 2);
-  if (header) {
-    const columns = header.map((value, index) => ({ horizon: horizonKey(value), index })).filter((column) => column.horizon != null);
-    if (columns.length >= 2) {
-      const headerAt = rows.indexOf(header);
-      return columns.map((column) => ({
-        horizon: column.horizon,
-        items: rows.slice(headerAt + 1).map((row) => cell(row[column.index])).filter(Boolean)
-      })).filter((column) => column.items.length);
+  let section = null;
+  let columns = { label: 0, value: 1 };
+  for (const row of rows) {
+    if (row.every((value2) => !cell(value2))) {
+      section = null;
+      continue;
+    }
+    const next = scorecardSection(row);
+    if (next) {
+      section = next;
+      columns = scorecardColumns(row, next);
+      continue;
+    }
+    if (!section) continue;
+    const label = cell(row[columns.label]);
+    const value = cell(row[columns.value]);
+    if (!label || scorecardSection(row)) continue;
+    if (section === "metrics") {
+      if (norm(label) === "metric" || norm(label) === "value") continue;
+      card.metrics.push({ label, amount: parseMoney(value), text: value || null });
+    } else if (section === "rag") {
+      if (phraseHas(norm(label), "business")) continue;
+      card.rag.push({ name: label, tone: toneOf(value) });
+    } else if (section === "targets") {
+      card.nextWeek.push({ text: label, owner: value || null });
+    } else if (section === "payments") {
+      card.payments.push({ payment: label, date: value || null });
     }
   }
+  return card;
+}
+function scorecardSection(row) {
+  const cells = row.map((value) => norm(value)).filter(Boolean);
+  if (cells.length < 2) return null;
+  const blob = cells.join(" ");
+  if (cells.some((value) => value === "metric" || value === "metrics") && cells.some((value) => value === "value" || value === "values")) {
+    return "metrics";
+  }
+  if (cells.some((value) => value === "business" || value === "businesses") && cells.some((value) => value === "rag")) return "rag";
+  if (blob.includes("next week target")) return "targets";
+  if (blob.includes("week cash detail")) return "payments";
+  return null;
+}
+function scorecardColumns(row, section) {
+  const keys = row.map((value) => norm(value));
+  if (section === "metrics") {
+    return { label: Math.max(0, keys.findIndex((value) => value === "metric" || value === "metrics")), value: Math.max(1, keys.findIndex((value) => value === "value" || value === "values")) };
+  }
+  if (section === "rag") {
+    return { label: Math.max(0, keys.findIndex((value) => value === "business" || value === "businesses")), value: Math.max(1, keys.findIndex((value) => value === "rag")) };
+  }
+  if (section === "payments") {
+    const date = keys.findIndex((value) => value === "date");
+    return { label: 0, value: date >= 0 ? date : 1 };
+  }
+  const owner = keys.findIndex((value) => value === "owner" || value === "owners");
+  return { label: 0, value: owner >= 0 ? owner : 1 };
+}
+function horizons(sheet) {
+  const rows = rowsOf(sheet);
+  const columns = columnHorizons(rows);
+  if (columns.length) return columns;
+  const listed = milestoneListHorizons(rows);
+  if (listed.length) return listed;
+  const sections = sectionHorizons(rows);
+  if (sections.length) return sections;
+  return recordHorizons(rows);
+}
+function columnHorizons(rows) {
+  for (let i = 0; i < rows.length; i += 1) {
+    const columns = rows[i].map((value, index) => ({ horizon: horizonKey(value), index })).filter((column) => column.horizon != null);
+    if (columns.length < 2) continue;
+    const plans = columns.map((column) => ({
+      horizon: column.horizon,
+      items: rows.slice(i + 1).map((row) => cell(row[column.index])).filter((item) => Boolean(item) && horizonKey(item) == null)
+    })).filter((column) => column.items.length);
+    if (plans.length) return plans;
+  }
+  return [];
+}
+function milestoneListHorizons(rows) {
+  const headerAt = rows.findIndex((row) => row.some((value) => norm(value) === "date") && row.some((value) => norm(value) === "milestone"));
+  if (headerAt < 0) return [];
+  const header = rows[headerAt];
+  const dateCol = header.findIndex((value) => norm(value) === "date");
+  const milestoneCol = header.findIndex((value) => norm(value) === "milestone");
+  const anchors = horizonAnchors(rows);
+  const groups = /* @__PURE__ */ new Map();
+  for (const row of rows.slice(headerAt + 1)) {
+    const when = cell(row[dateCol]);
+    const milestone = cell(row[milestoneCol]);
+    if (!when && !milestone) continue;
+    if (norm(when) === "date" && norm(milestone) === "milestone") continue;
+    const marked = dayMark(milestone) || dayMark(when);
+    const iso = parseLooseDate(when, anchors.year, anchors.startMonth);
+    const horizon = marked || (iso ? bucketDate(iso, anchors) : "later");
+    const item = milestone && when ? `${when} · ${milestone}` : milestone || when;
+    pushHorizon(groups, horizon, item);
+  }
+  collectStarMilestones(rows, anchors, groups);
+  return packHorizons(groups);
+}
+function sectionHorizons(rows) {
+  const groups = /* @__PURE__ */ new Map();
+  let current = null;
+  for (const row of rows) {
+    const filled = row.map((value) => cell(value)).filter(Boolean);
+    if (!filled.length) continue;
+    const section = filled.length === 1 ? dayMark(filled[0]) || horizonKey(filled[0]) : null;
+    if (section) {
+      current = section;
+      continue;
+    }
+    if (!current) continue;
+    pushHorizon(groups, current, filled.join(" · "));
+  }
+  return packHorizons(groups);
+}
+function recordHorizons(rows) {
   const records = tableRecords(rows);
-  const grouped = /* @__PURE__ */ new Map();
+  const groups = /* @__PURE__ */ new Map();
   for (const record of records) {
     const horizon = horizonKey(pick(record, ["horizon", "window", "days", "phase"]));
-    const item = pick(record, ["item", "plan", "focus", "goal", "task"]);
+    const item = pick(record, ["item", "plan", "focus", "goal", "task", "milestone"]);
     if (!horizon || !item) continue;
-    grouped.set(horizon, [...grouped.get(horizon) || [], item]);
+    pushHorizon(groups, horizon, item);
   }
-  return ["30", "60", "90"].flatMap((horizon) => {
-    const items = grouped.get(horizon) || [];
+  return packHorizons(groups);
+}
+function pushHorizon(groups, horizon, item) {
+  const text2 = cell(item);
+  if (!text2) return;
+  const existing = [...groups.values()].flat();
+  if (existing.some((value) => sameHorizonItem(value, text2))) return;
+  groups.set(horizon, [...groups.get(horizon) || [], text2]);
+}
+function sameHorizonItem(left, right) {
+  const clean2 = (value) => norm(value.replace(/★/g, " "));
+  return clean2(left) === clean2(right);
+}
+function packHorizons(groups) {
+  return ["30", "60", "90", "later"].flatMap((horizon) => {
+    const items = groups.get(horizon) || [];
     return items.length ? [{ horizon, items }] : [];
   });
+}
+function horizonAnchors(rows) {
+  const note = rows.slice(0, 3).map((row) => row.join(" ")).join("\n");
+  const start = note.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2},?\s+(20\d{2})/i);
+  const year = start ? Number(start[2]) : Number(note.match(/\b(20\d{2})\b/)?.[1] || (/* @__PURE__ */ new Date()).getFullYear());
+  const startMonth = start ? monthIndex(start[1]) : null;
+  return {
+    year,
+    startMonth,
+    day30: anchorDate(note, "30", year, startMonth),
+    day60: anchorDate(note, "60", year, startMonth),
+    day90: anchorDate(note, "90", year, startMonth)
+  };
+}
+function anchorDate(text2, day, defaultYear, startMonth) {
+  const match = text2.match(new RegExp(`\\bday\\s*${day}\\s*=\\s*([a-z]+)\\s+(\\d{1,2})(?:\\s*,\\s*(20\\d{2}))?`, "i"));
+  if (!match) return null;
+  return toIso(match[1], Number(match[2]), match[3] ? Number(match[3]) : null, defaultYear, startMonth);
+}
+function bucketDate(iso, anchors) {
+  if (anchors.day30 && iso <= anchors.day30) return "30";
+  if (anchors.day60 && iso <= anchors.day60) return "60";
+  if (anchors.day90 && iso <= anchors.day90) return "90";
+  return "later";
+}
+function dayMark(text2) {
+  const match = text2.match(/\bDAY\s*(30|60|90)\b/i);
+  if (!match) return null;
+  return match[1];
+}
+function parseLooseDate(value, defaultYear, startMonth) {
+  const text2 = cell(value);
+  if (/^20\d{2}-\d{2}-\d{2}$/.test(text2)) return text2;
+  const named = text2.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:\s*,?\s*(20\d{2}))?\b/i);
+  if (named && Number(named[2]) <= 31) {
+    return toIso(named[1], Number(named[2]), named[3] ? Number(named[3]) : null, defaultYear, startMonth);
+  }
+  const monthYear = text2.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(20\d{2})\b/i);
+  if (monthYear) return toIso(monthYear[1], 1, Number(monthYear[2]), defaultYear, startMonth);
+  return null;
+}
+function toIso(monthName2, day, year, defaultYear, startMonth) {
+  const month = monthIndex(monthName2);
+  if (!month || day < 1 || day > 31) return null;
+  let resolved = year ?? defaultYear;
+  if (year == null && startMonth != null && month < startMonth) resolved += 1;
+  return `${resolved}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+function monthIndex(name) {
+  const key = name.toLowerCase().slice(0, 3);
+  const months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+  const index = months.indexOf(key);
+  return index < 0 ? null : index + 1;
+}
+function collectStarMilestones(rows, anchors, groups) {
+  let month = null;
+  let year = null;
+  for (const row of rows) {
+    for (const value of row) {
+      const header = value.trim().match(/^(january|february|march|april|may|june|july|august|september|october|november|december)\s+(20\d{2})$/i);
+      if (!header) continue;
+      month = monthIndex(header[1]);
+      year = Number(header[2]);
+    }
+    if (month == null || year == null) continue;
+    for (const value of row) {
+      if (!value.includes("★")) continue;
+      const text2 = value.split("★").slice(1).join("★").replace(/\s+/g, " ").trim();
+      if (!text2) continue;
+      const dayMatch = value.split("\n")[0].trim().match(/^(\d{1,2})$/);
+      const day = dayMatch ? Number(dayMatch[1]) : null;
+      const iso = day ? toIso(monthName(month), day, year, year, null) : null;
+      const horizon = iso ? bucketDate(iso, anchors) : "later";
+      pushHorizon(groups, horizon, `★ ${text2}`);
+    }
+  }
+}
+function monthName(month) {
+  return ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"][month - 1] || "jan";
 }
 function horizonKey(value) {
   const name = norm(value);
@@ -18690,7 +19002,7 @@ function horizonKey(value) {
   return null;
 }
 function bots(sheet) {
-  if (!sheet) return { state: "missing", entries: [] };
+  if (!sheet) return { state: "empty", entries: [] };
   const records = tableRecords(rowsOf(sheet));
   if (!records.length) return { state: "empty", entries: [] };
   const groups = /* @__PURE__ */ new Map();
@@ -18943,8 +19255,29 @@ const TAB_ALIASES = [
   { aliases: ["owes"] },
   { aliases: ["decisions"] },
   { aliases: ["action log"] },
-  { aliases: ["plan board"] }
+  { aliases: ["plan board data", "plan board"] }
 ];
+function selectOwnerTabs(titles) {
+  const cleaned = titles.filter(Boolean);
+  const picked = [];
+  for (const wanted of TAB_ALIASES) {
+    const match = matchOwnerTab(cleaned, wanted.aliases);
+    if (match && !picked.includes(match)) picked.push(match);
+  }
+  return picked;
+}
+function matchOwnerTab(titles, aliases) {
+  const named = titles.map((title) => ({ title, name: normalizeTabTitle(title) }));
+  for (const alias of aliases) {
+    const exact = named.find((item) => item.name === alias);
+    if (exact) return exact.title;
+  }
+  for (const alias of aliases) {
+    const partial = named.find((item) => item.name.includes(alias));
+    if (partial) return partial.title;
+  }
+  return void 0;
+}
 let cache = null;
 function resolveSheetsCredentials(env = ownerRuntimeEnv()) {
   const fromFirebase = credentialsFromJson(env.FIREBASE_SERVICE_ACCOUNT);
@@ -19034,10 +19367,7 @@ async function fetchScorecard(credentials) {
     fields: "sheets.properties.title"
   });
   const titles = (meta.data.sheets || []).map((sheet) => sheet.properties?.title || "").filter(Boolean);
-  const matched = TAB_ALIASES.map((wanted) => titles.find((title) => {
-    const name = title.toLowerCase().replace(/\$/g, "").replace(/[^a-z0-9]+/g, " ").trim();
-    return wanted.aliases.some((alias) => name === alias || name.includes(alias));
-  })).filter((title) => Boolean(title));
+  const matched = selectOwnerTabs(titles);
   if (!matched.length) return [];
   const values = await sheets.spreadsheets.values.batchGet({
     spreadsheetId: OWNER_SHEET_ID,
