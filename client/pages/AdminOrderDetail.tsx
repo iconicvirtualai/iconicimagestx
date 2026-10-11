@@ -22,6 +22,7 @@ import { formatChicagoDate } from "@shared/clientHome";
 import { staffInvoicePath } from "@shared/staffInvoice";
 import { orderChargeSummary, orderServiceLines } from "@shared/orderPackageLines";
 import type { GalleryReleaseReport } from "@shared/galleryRelease";
+import { publicClientUrl } from "@shared/publicSiteUrl";
 
 // ─── Status system ────────────────────────────────────────────────────────────
 const ORDER_STATUSES = [
@@ -295,7 +296,7 @@ export default function AdminOrderDetail() {
       if (!res.ok) throw new Error(result.error || "Could not deliver gallery.");
       toast.success("Gallery delivery sent.");
       if (galleryId) void loadRelease(galleryId);
-      if (result.deliveryUrl) window.open(result.deliveryUrl, "_blank", "noopener,noreferrer");
+      if (galleryId) window.open(publicClientUrl(`/gallery/${galleryId}`), "_blank", "noopener,noreferrer");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not deliver gallery.");
     } finally {
@@ -765,7 +766,7 @@ export default function AdminOrderDetail() {
           </div>
           {order.gallery?.deliveryUrl || order.gallery?.galleryUrl ? (
             <div className="p-4 bg-gray-50 rounded-xl">
-              <a href={order.gallery.deliveryUrl || order.gallery.galleryUrl} target="_blank" rel="noopener noreferrer"
+              <a href={order.gallery.id ? publicClientUrl(`/gallery/${order.gallery.id}`) : (order.gallery.deliveryUrl || order.gallery.galleryUrl)} target="_blank" rel="noopener noreferrer"
                 className="flex items-center gap-2 text-[#0d9488] font-bold text-sm">
                 View Gallery <ExternalLink className="w-4 h-4" />
               </a>

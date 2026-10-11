@@ -4,6 +4,9 @@
  * This module does not import the mailer and does not send.
  */
 
+import { galleryDeliverySubject } from "./galleryDelivery.ts";
+import { invoicePayLinkFor } from "./invoicePayLink.ts";
+import { publicClientUrl } from "./publicSiteUrl.ts";
 import { mailboxAddress } from "./clientNotify.ts";
 import { isDeliveryQaClient, type DeliveryQaClientRecord } from "./deliveryQaClient.ts";
 import { PLAYTEST_ADDRESS } from "./listingAccess.ts";
@@ -15,8 +18,8 @@ import {
   buildDeliveryQaSeed,
 } from "./deliveryQaSeed.ts";
 
-/** Same fallback sendEmail uses when no subject override and no stored template subject. */
-export const DELIVERY_QA_EMAIL_SUBJECT = "Message from Iconic Images";
+/** Subject deliverGalleryToClient sends. The address is the playtest property. */
+export const DELIVERY_QA_EMAIL_SUBJECT = galleryDeliverySubject(PLAYTEST_ADDRESS);
 export const DELIVERY_QA_EMAIL_TEMPLATE = "gallery_delivery";
 
 export interface DeliveryQaSendRecord extends DeliveryQaClientRecord {
@@ -32,7 +35,7 @@ export interface DeliveryQaSendPreview {
   to: typeof DELIVERY_QA_CLIENT_EMAIL;
   subject: typeof DELIVERY_QA_EMAIL_SUBJECT;
   galleryUrl: string;
-  paymentUrl: string;
+  paymentUrl: string | null;
   invoiceAmount: string;
   expiresAt: string;
   clientName: string;
@@ -56,8 +59,12 @@ export function deliveryQaSendPreview(origin?: string): DeliveryQaSendPreview {
     template: DELIVERY_QA_EMAIL_TEMPLATE,
     to: DELIVERY_QA_CLIENT_EMAIL,
     subject: DELIVERY_QA_EMAIL_SUBJECT,
-    galleryUrl: `${plan.origin}/gallery/${DELIVERY_QA_IDS.gallery}`,
-    paymentUrl: `${plan.origin}/invoice/${DELIVERY_QA_IDS.invoice}`,
+    galleryUrl: publicClientUrl(`/gallery/${DELIVERY_QA_IDS.gallery}`),
+    paymentUrl: invoicePayLinkFor({
+      id: DELIVERY_QA_IDS.invoice,
+      status: String(invoice?.data.status || "sent"),
+      payToken: invoice?.data.payToken,
+    }),
     invoiceAmount: `$${total.toFixed(2)}`,
     expiresAt: "30 days",
     clientName: DELIVERY_QA_CLIENT_NAME,
@@ -73,11 +80,11 @@ export function formatDeliveryQaSendDryRun(preview: DeliveryQaSendPreview): stri
     `template: ${preview.template}`,
     `recipient: ${preview.to}`,
     `subject: ${preview.subject}`,
-    "subject source: built-in sendEmail subject. An active emailTemplates document with category gallery_delivery replaces it on a real send. This preview does not read that document.",
+    "subject source: gallery delivery subject. It leads with Your gallery is ready and adds the property address. A stored email template does not replace it.",
     `clientName: ${preview.clientName}`,
     `address: ${preview.address}`,
     `galleryUrl: ${preview.galleryUrl}`,
-    `paymentUrl: ${preview.paymentUrl}`,
+    `paymentUrl: ${preview.paymentUrl || "(omitted — no pay token, or the invoice is paid or comped)"}`,
     `invoiceAmount: ${preview.invoiceAmount}`,
     `expiresAt: ${preview.expiresAt}`,
     "",

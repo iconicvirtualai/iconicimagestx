@@ -22,6 +22,7 @@ import {
   type InvoiceAnchor,
   type InvoiceLinkPlan,
 } from "@shared/orderProjectInvoice";
+import { clientInvoiceUrl } from "@shared/invoicePayLink";
 import { db } from "@/lib/firebase";
 
 async function collectIds(field: "orderRequestId" | "orderId" | "listingId", value: string | null): Promise<string[]> {
@@ -51,11 +52,8 @@ function changedFields(
   return out;
 }
 
-function paymentUrl(invoiceId: string): string {
-  const origin = typeof window !== "undefined" && window.location?.origin
-    ? window.location.origin
-    : "https://iconicimagestx.com";
-  return `${origin}/invoice/${invoiceId}`;
+function paymentUrl(invoiceId: string): string | null {
+  return clientInvoiceUrl({ id: invoiceId, status: "draft" });
 }
 
 /** Write foreign keys. Creates the invoice document only when `source` is set and none exists. */
@@ -79,11 +77,12 @@ async function commitPlan(plan: InvoiceLinkPlan, source: BookingInvoiceDraftInpu
     if (!invoiceSnap.exists()) {
       if (source) {
         const draft = buildLinkedInvoiceDraft(source);
+        const payLink = paymentUrl(plan.createId);
         tx.set(invoiceRef, {
           ...draft,
           ...plan.invoiceFields,
           invoiceNumber: draftInvoiceNumber(plan.createId),
-          paymentUrl: paymentUrl(plan.createId),
+          ...(payLink ? { paymentUrl: payLink } : {}),
           createdAt: now,
           updatedAt: now,
         });

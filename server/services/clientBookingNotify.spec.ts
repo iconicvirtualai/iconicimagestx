@@ -73,8 +73,8 @@ describe("client booking mail and the notify switch", () => {
       template: "account_password_setup",
       variables: { clientName: "Ada", clientEmail: client, setupUrl: "https://example.test/setup" },
     });
-    expect(confirmed).toEqual({ sent: false });
-    expect(password).toEqual({ sent: false });
+    expect(confirmed).toEqual({ sent: false, delivery: "suppressed" });
+    expect(password).toEqual({ sent: false, delivery: "suppressed" });
     expect(sendMail).not.toHaveBeenCalled();
   });
 
@@ -90,8 +90,8 @@ describe("client booking mail and the notify switch", () => {
       template: "account_password_setup",
       variables: { clientName: "Ada", clientEmail: client, setupUrl: "https://example.test/setup" },
     });
-    expect(confirmed).toEqual({ sent: true });
-    expect(password).toEqual({ sent: true });
+    expect(confirmed).toEqual({ sent: true, delivery: "sent" });
+    expect(password).toEqual({ sent: true, delivery: "sent" });
     expect(sendMail).toHaveBeenCalledTimes(2);
     for (const call of sendMail.mock.calls) {
       expect(call[0].to).toBe(client);
@@ -111,8 +111,8 @@ describe("client booking mail and the notify switch", () => {
       template: "account_password_setup",
       variables: { clientName: "Ada", clientEmail: client, setupUrl: "https://example.test/setup" },
     });
-    expect(confirmed).toEqual({ sent: false });
-    expect(password).toEqual({ sent: false });
+    expect(confirmed).toEqual({ sent: false, delivery: "suppressed" });
+    expect(password).toEqual({ sent: false, delivery: "suppressed" });
     expect(sendMail).not.toHaveBeenCalled();
   });
 
@@ -123,7 +123,7 @@ describe("client booking mail and the notify switch", () => {
       template: "booking_received",
       variables: { clientName: "Ada", address: "1 Main St", total: "$199.00" },
     });
-    expect(received).toEqual({ sent: true });
+    expect(received).toEqual({ sent: true, delivery: "sent" });
     expect(sendMail).toHaveBeenCalledTimes(1);
     expect(sendMail.mock.calls[0][0].to).toBe(client);
     expect(sendMail.mock.calls[0][0].html).toContain("Ada");

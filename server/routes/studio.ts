@@ -121,6 +121,11 @@ router.post("/delivery-queue/move", requireCoordinator, async (req: Authenticate
       galleryId,
       status,
       expiresInDays: Number(req.body?.expiresInDays),
+      actor: {
+        email: req.user?.email || null,
+        name: typeof req.user?.name === "string" ? req.user.name : null,
+        uid: req.user?.uid || null,
+      },
     });
     return res.json({ success: true, ...result });
   } catch (err) {

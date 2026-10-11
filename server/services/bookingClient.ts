@@ -7,6 +7,7 @@
 import { randomBytes } from "crypto";
 import admin from "firebase-admin";
 import { cleanPersonName, normalizeEmail } from "../../shared/listingAccess";
+import { publicClientUrl } from "../../shared/publicSiteUrl";
 import { upsertPortalClient } from "./clientAccounts";
 import { planBookingAccount } from "./bookingAccountPlan";
 
@@ -26,10 +27,6 @@ export interface BookingClientResult {
   createdAccount: boolean;
   passwordSetupLink: string | null;
   skipReason: "staff_email" | "invalid_email" | null;
-}
-
-function appUrl() {
-  return process.env.APP_URL || process.env.FRONTEND_URL || "https://iconicimagestx.com";
 }
 
 export async function attachBookingClient(input: BookingClientInput): Promise<BookingClientResult> {
@@ -99,7 +96,7 @@ export async function attachBookingClient(input: BookingClientInput): Promise<Bo
 }
 
 async function createPasswordSetupLink(email: string): Promise<string | null> {
-  const continueUrl = `${appUrl().replace(/\/$/, "")}/portal`;
+  const continueUrl = publicClientUrl("/portal");
   try {
     return await admin.auth().generatePasswordResetLink(email, {
       url: continueUrl,
