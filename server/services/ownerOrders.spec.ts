@@ -196,22 +196,22 @@ describe("owner order rate limit", () => {
     for (let i = 0; i < 5; i += 1) {
       expect(consumeOwnerOrderRateLimit("Cadi@IconicImagesTX.com", start + i).ok).toBe(true);
     }
-    expect(consumeOwnerOrderRateLimit("cadi@iconicimagestx.com", start + 5)).toEqual({
+    expect(consumeOwnerOrderRateLimit(INTENDED_OWNER_EMAIL, start + 5)).toEqual({
       ok: false,
       error: "Too many orders. You can submit 5 per minute.",
     });
     expect(consumeOwnerOrderRateLimit("other@iconicimagestx.com", start + 5).ok).toBe(true);
-    expect(consumeOwnerOrderRateLimit("cadi@iconicimagestx.com", start + 60_000).ok).toBe(true);
+    expect(consumeOwnerOrderRateLimit(INTENDED_OWNER_EMAIL, start + 60_000).ok).toBe(true);
 
     resetOwnerOrderRateLimitForTests();
     for (let i = 0; i < 50; i += 1) {
-      expect(consumeOwnerOrderRateLimit("cadi@iconicimagestx.com", start + i * 60_000).ok).toBe(true);
+      expect(consumeOwnerOrderRateLimit(INTENDED_OWNER_EMAIL, start + i * 60_000).ok).toBe(true);
     }
-    expect(consumeOwnerOrderRateLimit("cadi@iconicimagestx.com", start + 50 * 60_000)).toEqual({
+    expect(consumeOwnerOrderRateLimit(INTENDED_OWNER_EMAIL, start + 50 * 60_000)).toEqual({
       ok: false,
       error: "Too many orders. You can submit 50 per day.",
     });
-    expect(consumeOwnerOrderRateLimit("cadi@iconicimagestx.com", start + 24 * 60 * 60 * 1000).ok).toBe(true);
+    expect(consumeOwnerOrderRateLimit(INTENDED_OWNER_EMAIL, start + 24 * 60 * 60 * 1000).ok).toBe(true);
   });
 
   it("does not count invalid text or a failed write", async () => {
