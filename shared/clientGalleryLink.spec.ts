@@ -78,7 +78,14 @@ describe("decideClientGalleryLink", () => {
     expect(result.openGalleryId).toBeNull();
     expect(result.project.id).toBe(LISTING_ID);
     expect(result.project.images).toEqual([displayMedia(0, "front.jpg"), displayMedia(1, "mls.jpg")]);
-    expect(result.project.videos).toEqual([]);
+    const walkthrough = `/api/media/display/${LISTING_ID}/3`;
+    expect(result.project.videos).toEqual([{
+      url: null,
+      name: "Walkthrough",
+      poster: walkthrough,
+      thumbnailUrl: walkthrough,
+      displayUrl: walkthrough,
+    }]);
     expect(result.project.tourUrl).toBe("https://my.matterport.com/show/?m=abc");
     expect(result.project.floorPlans).toEqual([displayMedia(2, "Level 1.jpg")]);
     expect(result.project.view).toBe("public");
@@ -244,7 +251,14 @@ describe("decideClientGalleryLink", () => {
     if (paid.ok !== true || paid.kind !== "listing") throw new Error("expected the listing studio");
     expect(paid.project.view).toBe("public");
     expect(paid.project.images).toEqual([displayMedia(0, "front.jpg"), displayMedia(1, "mls.jpg")]);
-    expect(paid.project.videos).toEqual([]);
+    const walkthrough = `/api/media/display/${LISTING_ID}/3`;
+    expect(paid.project.videos).toEqual([{
+      url: null,
+      name: "Walkthrough",
+      poster: walkthrough,
+      thumbnailUrl: walkthrough,
+      displayUrl: walkthrough,
+    }]);
     expect(JSON.stringify(paid.project)).not.toContain("final.jpg");
     expect(JSON.stringify(paid.project)).not.toContain("front-full.jpg");
     expect(JSON.stringify(paid.project)).not.toContain("delivery.zip");
