@@ -34,6 +34,7 @@ import AgentLandingPage from "./pages/AgentLandingPage";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import ClientStudio from "./pages/ClientStudio";
+import ClientListingSitePage from "./pages/ClientListingSitePage";
 import ClientInvoice from "./pages/ClientInvoice";
 import PublicGallery from "./pages/PublicGallery";
 import ListingPresentation from "./pages/ListingPresentation";
@@ -136,6 +137,7 @@ const App = () => (
             <Route path="/studio" element={<Navigate to="/studio-105" replace />} />
             {/* Bare /gallery has no project id. The client portal is the door. */}
             <Route path="/gallery" element={<Navigate to="/portal" replace />} />
+            <Route path="/studio/:listingId/site" element={<ClientListingSitePage />} />
             <Route path="/studio/:listingId" element={<ClientStudio />} />
             <Route path="/gallery/:galleryId" element={<PublicGallery />} />
             <Route path="/present/:token" element={<ListingPresentation />} />

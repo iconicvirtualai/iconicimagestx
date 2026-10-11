@@ -65,6 +65,7 @@ vi.mock("firebase-admin", () => {
 });
 
 import { handlePublicGalleryLink } from "./galleryLink";
+import { invoicePayLinkFor } from "../../shared/invoicePayLink";
 import { buildDeliveryQaSeed, DELIVERY_QA_IDS } from "../../shared/deliveryQaSeed";
 import { publicMediaItem } from "../../shared/paymentAccess";
 
@@ -118,6 +119,7 @@ beforeEach(() => {
     total: 400,
     amountDue: 400,
     clientEmail: "invoice-pii@example.com",
+    payToken: "samplePayToken0123456789ab",
   });
   seed("clients", "owner-uid", { email: "ada@example.com", linkedClientId: "client-ada" });
   seed("clients", "other-uid", { email: "bob@example.com" });
@@ -178,6 +180,7 @@ function expectMarketingView(body: Record<string, unknown>) {
     "walkthrough.mp4",
     "final.jpg",
     "level1.jpg",
+    "samplePayToken0123456789ab",
   ]) {
     expect(json).not.toContain(secret);
   }
@@ -241,6 +244,11 @@ describe("GET /api/galleries/link/:id studio share", () => {
     const locked = await openStudio("Bearer owner-token");
     expect(locked.statusCode).toBe(200);
     expectOwnerView(locked.body, false);
+    expect((locked.body.project as { payUrl?: string }).payUrl).toBe(invoicePayLinkFor({
+      id: "inv_private_1",
+      status: "sent",
+      payToken: "samplePayToken0123456789ab",
+    }));
 
     seed("invoices", "inv_private_1", { status: "paid", total: 400, amountDue: 0, clientEmail: "invoice-pii@example.com" });
     seed("listings", LISTING_ID, listing("paid"));

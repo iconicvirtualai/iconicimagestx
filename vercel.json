@@ -307,6 +307,14 @@
       "destination": "/seo/app.html"
     },
     {
+      "source": "/studio/:listingId/site",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/studio/:listingId/site/",
+      "destination": "/seo/private.html"
+    },
+    {
       "source": "/studio/:listingId",
       "destination": "/seo/private.html"
     },

@@ -97,6 +97,8 @@ export interface OwnerStudioProject extends Omit<PublicStudioProject, "view"> {
   /** True when the owning client may download. Shared links still do not offer downloads. */
   downloadsUnlocked: boolean;
   invoice: { status: string } | null;
+  /** Tokenized pay link from invoicePayLinkFor. Present only on the owner response, and only while a token exists. */
+  payUrl?: string;
   files: StudioMedia[];
 }
 
