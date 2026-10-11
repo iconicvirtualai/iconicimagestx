@@ -72,6 +72,7 @@ beforeEach(() => {
   delete process.env.VERCEL;
   delete process.env.VERCEL_ENV;
   delete process.env.VERCEL_URL;
+  delete process.env.VERCEL_PROJECT_PRODUCTION_URL;
   delete process.env.APP_URL;
   seed("listings", LISTING_ID, qaListingData());
 });
@@ -231,6 +232,7 @@ describe("GET /api/media/display/:listingId/:index", () => {
 
   it("fetches /media from this deployment when public/ is not on disk", async () => {
     process.env.VERCEL = "1";
+    process.env.VERCEL_ENV = "preview";
     process.env.VERCEL_URL = "iconicimagestx-abc.vercel.app";
     process.env.APP_URL = "https://www.iconicimagestx.com";
     const jpeg = await sharp({
@@ -346,6 +348,44 @@ describe("GET /api/media/display/:listingId/:index", () => {
     expect((await openDisplay("0", {}, lockedId, `/api/media/display/p/${token}/0`)).statusCode).toBe(404);
     expect((await openDisplay("0", {}, lockedId, "/api/media/display/p/not-a-real-token-value/0")).statusCode).toBe(404);
     expect((await openDisplay("0", {}, lockedId, "/api/media/display/p/zzzzzzzzzzzzzzzzzzzzzz/0")).statusCode).toBe(404);
+  });
+
+  it("uses the production project host and never the deployment host, APP_URL, or Wix", async () => {
+    process.env.VERCEL = "1";
+    process.env.VERCEL_ENV = "production";
+    process.env.VERCEL_URL = "iconicimagestx-abc.vercel.app";
+    process.env.APP_URL = "https://www.iconicimagestx.com";
+    process.env.VERCEL_PROJECT_PRODUCTION_URL = "iconic-prod.vercel.app";
+    const jpeg = await sharp({
+      create: { width: 4, height: 4, channels: 3, background: { r: 3, g: 3, b: 3 } },
+    }).jpeg().toBuffer();
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push(String(url));
+      expect(init?.redirect).toBe("error");
+      return new Response(jpeg, { status: 200, headers: { "content-type": "image/jpeg" } });
+    }));
+    try {
+      const named = await openDisplay("0", { host: "www.iconicimagestx.com" });
+      expect(named.statusCode).toBe(200);
+      expect(calls).toEqual(["https://iconic-prod.vercel.app/media/photos/listing-living-01.jpg"]);
+
+      delete process.env.VERCEL_PROJECT_PRODUCTION_URL;
+      calls.length = 0;
+      const fallback = await openDisplay("0", { host: "iconicimagestx-abc.vercel.app" });
+      expect(fallback.statusCode).toBe(200);
+      expect(calls).toEqual(["https://iconicimagestx.vercel.app/media/photos/listing-living-01.jpg"]);
+
+      process.env.VERCEL_PROJECT_PRODUCTION_URL = "https://www.iconicimagestx.com";
+      calls.length = 0;
+      const wixProduction = await openDisplay("0", { host: "evil.example" });
+      expect(wixProduction.statusCode).toBe(200);
+      expect(calls).toEqual(["https://iconicimagestx.vercel.app/media/photos/listing-living-01.jpg"]);
+      expect(calls.join(" ")).not.toContain("iconicimagestx.com");
+      expect(calls.join(" ")).not.toContain("iconicimagestx-abc.vercel.app");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("never fetches APP_URL, including the Wix host", async () => {

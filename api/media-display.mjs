@@ -432,6 +432,38 @@ function readPrefs(value) {
 function text$1(value) {
   return typeof value === "string" ? value.trim() : "";
 }
+const BUSINESS_CONTACT_LINE = "26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380 | 281.356.0965 | photos@iconicimagestx.com";
+function parseContactLine(line) {
+  const parts = line.split(" | ");
+  if (parts.length !== 3) {
+    throw new Error("BUSINESS_CONTACT_LINE must be address | phone | email");
+  }
+  const [address, phoneDisplay, email] = parts;
+  const addressParts = address.split(", ");
+  if (addressParts.length !== 3) {
+    throw new Error("Public address must be street, city, ST ZIP");
+  }
+  const [streetAddress, city, stateZip] = addressParts;
+  const [state, postalCode] = stateZip.split(" ");
+  if (!streetAddress || !city || !state || !postalCode || !phoneDisplay || !email) {
+    throw new Error("BUSINESS_CONTACT_LINE is missing a public contact field");
+  }
+  const phoneDigits = phoneDisplay.replace(/\D/g, "");
+  return {
+    line,
+    address,
+    streetAddress,
+    addressLine2: `${city}, ${state} ${postalCode}`,
+    city,
+    state,
+    postalCode,
+    phoneDisplay,
+    phoneHref: `tel:+1${phoneDigits}`,
+    email,
+    emailHref: `mailto:${email}`
+  };
+}
+parseContactLine(BUSINESS_CONTACT_LINE);
 const DEFAULT_SITE_ORIGIN = "https://iconicimagestx.vercel.app";
 function readConfiguredOrigin() {
   const nodeOrigin = typeof process !== "undefined" ? process.env?.VITE_SITE_ORIGIN : "";
@@ -607,7 +639,8 @@ const FETCH_TIMEOUT_MS = 8e3;
 const RATE_WINDOW_MS = 6e4;
 const RATE_MAX_DEFAULT = 180;
 const ALLOWED_HOSTS = /* @__PURE__ */ new Set(["firebasestorage.googleapis.com", "storage.googleapis.com"]);
-const PROJECT_HOSTS = /* @__PURE__ */ new Set(["iconicimagestx.vercel.app"]);
+const PRODUCTION_HOST = "iconicimagestx.vercel.app";
+const WIX_HOSTS = /* @__PURE__ */ new Set(["iconicimagestx.com", "www.iconicimagestx.com"]);
 const VIDEO_EXT = /\.(mp4|m4v|mov|webm)$/i;
 const IMAGE_EXT = /\.(jpe?g|png|webp|gif)$/i;
 const displayLimiter = createRateLimiter({
@@ -691,19 +724,35 @@ function hostnameOf(value) {
     return "";
   }
 }
+function isWixHost(host) {
+  return WIX_HOSTS.has(host);
+}
+function configuredProductionHost() {
+  const configured = hostnameOf(process.env.VERCEL_PROJECT_PRODUCTION_URL);
+  if (configured && !isWixHost(configured)) return configured;
+  return PRODUCTION_HOST;
+}
 function deploymentHosts() {
-  const hosts = new Set(PROJECT_HOSTS);
-  const vercel = hostnameOf(process.env.VERCEL_URL);
-  if (vercel) hosts.add(vercel);
+  const hosts = /* @__PURE__ */ new Set([PRODUCTION_HOST]);
+  const production = hostnameOf(process.env.VERCEL_PROJECT_PRODUCTION_URL);
+  if (production && !isWixHost(production)) hosts.add(production);
+  if (process.env.VERCEL_ENV === "preview") {
+    const preview = hostnameOf(process.env.VERCEL_URL);
+    if (preview && !isWixHost(preview)) hosts.add(preview);
+  }
   return hosts;
 }
 function chooseOwnHost(req) {
-  const vercel = hostnameOf(process.env.VERCEL_URL);
-  if (vercel) return vercel;
+  if (process.env.VERCEL_ENV === "production") return configuredProductionHost();
+  if (process.env.VERCEL_ENV === "preview") {
+    const preview = hostnameOf(process.env.VERCEL_URL);
+    if (preview && !isWixHost(preview)) return preview;
+    return "";
+  }
   const header = req.headers?.host;
   const raw = Array.isArray(header) ? header[0] : header;
   const requestHost = hostnameOf(typeof raw === "string" ? raw.split(",")[0] : "");
-  if (requestHost && deploymentHosts().has(requestHost)) return requestHost;
+  if (requestHost && !isWixHost(requestHost) && deploymentHosts().has(requestHost)) return requestHost;
   return "";
 }
 function mediaPathname(sourceUrl, allowVideo = false) {
