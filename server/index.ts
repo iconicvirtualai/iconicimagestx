@@ -38,6 +38,7 @@ import { photographerCalendarRoster } from "./services/photographerRoster";
 import { clientNotifyLive } from "../shared/clientNotify";
 import { requireAdmin, requireStaff } from "./middleware/auth";
 import { handleListingPhotoUpload } from "./routes/listingPhotos";
+import { handleMediaDisplay } from "./routes/mediaDisplay";
 import { handleGetPublicPortalListing } from "./routes/portalListing";
 import presentationsRouter, { handlePresentationShell } from "./routes/presentations";
 import photoEditRequestsRouter from "./routes/photoEditRequests";
@@ -221,6 +222,7 @@ export function createServer() {
   app.use("/api/messages", messagingRouter);
   app.use("/api/clients", clientsRouter);
   app.get("/api/portal/listings/:id", handleGetPublicPortalListing);
+  app.get("/api/media/display/:listingId/:index", handleMediaDisplay);
   app.use("/api/staff", staffRouter);
   // Vercel does not chain rewrites. /present/:token is rewritten to this
   // function and the original path is what arrives here. Vite dev leaves the

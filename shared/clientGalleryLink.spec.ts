@@ -12,6 +12,11 @@ function stringValues(value: unknown, found: string[] = []): string[] {
 
 const LISTING_ID = "V92oe4gWihszc95tEcVQ";
 
+function displayMedia(index: number, name: string) {
+  const url = `/api/media/display/${LISTING_ID}/${index}`;
+  return { url, displayUrl: url, name };
+}
+
 function listing(overrides: Record<string, unknown> = {}): GalleryLinkDoc {
   return {
     id: LISTING_ID,
@@ -72,10 +77,10 @@ describe("decideClientGalleryLink", () => {
     if (result.ok !== true || result.kind !== "listing") throw new Error("expected the listing studio");
     expect(result.openGalleryId).toBeNull();
     expect(result.project.id).toBe(LISTING_ID);
-    expect(result.project.images).toEqual([{ url: "https://cdn.example/final.jpg", name: "front.jpg" }]);
+    expect(result.project.images).toEqual([displayMedia(0, "front.jpg")]);
     expect(result.project.videos).toEqual([]);
     expect(result.project.tourUrl).toBe("https://my.matterport.com/show/?m=abc");
-    expect(result.project.floorPlans).toEqual([{ url: "https://cdn.example/level1.jpg", name: "Level 1.jpg" }]);
+    expect(result.project.floorPlans).toEqual([displayMedia(1, "Level 1.jpg")]);
     expect(result.project.view).toBe("public");
     expect(result.project.agentName).toBe("Ada Agent");
     expect(result.project).not.toHaveProperty("clientName");
@@ -100,9 +105,11 @@ describe("decideClientGalleryLink", () => {
     expect(body).not.toContain("order_private_1");
     expect(body).not.toContain("private-balance-8841");
     expect(body).not.toContain("walkthrough.mp4");
+    expect(body).not.toContain("final.jpg");
+    expect(body).not.toContain("level1.jpg");
   });
 
-  it("keeps a display image and a stream on the public share and leaves the original file off", () => {
+  it("points public photos at the display route and keeps a locked video to its poster", () => {
     const result = decideClientGalleryLink({
       ...empty,
       id: LISTING_ID,
@@ -142,16 +149,27 @@ describe("decideClientGalleryLink", () => {
     expect(result.ok).toBe(true);
     if (result.ok !== true || result.kind !== "listing") throw new Error("expected the listing studio");
     expect(result.project.view).toBe("public");
-    expect(result.project.images.map((image) => image.url)).toEqual(["https://cdn.example/exterior-display.jpg"]);
-    expect(result.project.videos.map((video) => video.url)).toEqual(["https://cdn.example/walkthrough/stream.m3u8"]);
+    expect(result.project.images).toEqual([displayMedia(0, "exterior-full.jpg")]);
+    const poster = `/api/media/display/${LISTING_ID}/2`;
+    expect(result.project.videos).toEqual([{
+      url: null,
+      name: "Walkthrough",
+      poster,
+      thumbnailUrl: poster,
+      displayUrl: poster,
+    }]);
     expect(result.project.tourUrl).toContain("matterport.com");
-    expect(result.project.floorPlans.map((plan) => plan.url)).toEqual(["https://cdn.example/level1.jpg"]);
+    expect(result.project.floorPlans).toEqual([displayMedia(1, "Level 1.jpg")]);
     expect(result.project.agentName).toBe("Ada Agent");
     const body = JSON.stringify(result.project);
     for (const hidden of [
       "luxury-exterior-full.jpg",
       "only-original.jpg",
       "walkthrough-raw.mp4",
+      "walkthrough/stream.m3u8",
+      "walkthrough-poster.jpg",
+      "exterior-display.jpg",
+      "level1.jpg",
       "plan.pdf",
       "delivery.zip",
       "front-full.jpg",
@@ -222,9 +240,12 @@ describe("decideClientGalleryLink", () => {
     expect(paid.ok).toBe(true);
     if (paid.ok !== true || paid.kind !== "listing") throw new Error("expected the listing studio");
     expect(paid.project.view).toBe("public");
-    expect(paid.project.images).toEqual([{ url: "https://cdn.example/final.jpg", name: "front.jpg" }]);
+    expect(paid.project.images).toEqual([displayMedia(0, "front.jpg")]);
+    expect(paid.project.videos).toEqual([]);
+    expect(JSON.stringify(paid.project)).not.toContain("final.jpg");
     expect(JSON.stringify(paid.project)).not.toContain("front-full.jpg");
     expect(JSON.stringify(paid.project)).not.toContain("delivery.zip");
+    expect(JSON.stringify(paid.project)).not.toContain("walkthrough.mp4");
   });
 
   it("gives the owner delivery files only after the existing payment lock opens", () => {

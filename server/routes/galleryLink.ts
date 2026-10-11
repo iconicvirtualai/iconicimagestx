@@ -13,6 +13,8 @@ import {
   type GalleryLinkDoc,
   type OwnerStudioProject,
 } from "../../shared/clientGalleryLink";
+import { studioDownloadsUnlocked } from "../../shared/lockImpact";
+import { publicShareVideos } from "../../shared/publicShare";
 import { clientCanViewListing, staffCanAccessListing } from "../../shared/listingAccess";
 import { isActiveStaffRecord } from "../../shared/staffAccess";
 import { isTempAdminEnabled, liveServerEnv } from "../../shared/tempAdmin";
@@ -187,21 +189,51 @@ async function readStudioCaller(req: { headers: { authorization?: string } }): P
 }
 
 /**
- * Public callers keep the download-free share.
- * The owning client and staff with listing access get delivery files.
- * Download URLs still follow the existing payment lock.
+ * Public callers get display-route photos. Branded video is added only when
+ * the same unlock as the owner view is open. The owning client and staff
+ * with listing access get delivery files. Download URLs still follow that lock.
  */
+function sharePlaybackOpen(
+  listing: GalleryLinkDoc,
+  invoice: Record<string, unknown> | null,
+  related: GalleryLinkDoc[],
+): boolean {
+  return studioDownloadsUnlocked({
+    listing: {
+      id: listing.id,
+      invoiceStatus: listing.invoiceStatus,
+      paymentStatus: listing.paymentStatus,
+      invoice: listing.invoice,
+      downloadEnabled: listing.downloadEnabled === true || related.some((doc) => doc.downloadEnabled === true),
+      downloadsReleased: listing.downloadsReleased === true || related.some((doc) => doc.downloadsReleased === true),
+      lockDownloads: listing.lockDownloads,
+    },
+    galleries: [],
+    invoice,
+  });
+}
+
 async function finishGalleryLink(
   result: ClientGalleryLinkResult,
   caller: StudioCaller | null,
 ): Promise<ClientGalleryLinkResult> {
   if (!result.ok || result.kind !== "listing") return result;
   const listing = docRecord(await db().collection("listings").doc(result.project.id).get());
-  if (!listing || !callerCanOpenPrivateStudio(listing, caller)) return result;
+  if (!listing) return result;
   const [invoice, related] = await Promise.all([
     invoiceForListing(listing),
     relatedForListing(listing),
   ]);
+  if (!callerCanOpenPrivateStudio(listing, caller)) {
+    if (result.project.view !== "public") return result;
+    return {
+      ...result,
+      project: {
+        ...result.project,
+        videos: publicShareVideos(listing, sharePlaybackOpen(listing, invoice, related)),
+      },
+    };
+  }
   if (result.project.view !== "public") return result;
   // Staff release flags and staff-set paid/comped listing fields stay open.
   // A stale copied paid field on an explicitly unpaid invoice stays open too.

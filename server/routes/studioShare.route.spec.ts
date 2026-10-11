@@ -151,10 +151,12 @@ function expectMarketingView(body: Record<string, unknown>) {
   expect(project.view).toBe("public");
   expect(project.address).toBe("100 Playtest Lane, Austin, TX 78701");
   expect(project.agentName).toBe("Ada Agent");
-  expect(project.images).toEqual([{ url: "https://cdn.example/final.jpg", name: "front.jpg" }]);
+  const photo = `/api/media/display/${LISTING_ID}/0`;
+  const plan = `/api/media/display/${LISTING_ID}/1`;
+  expect(project.images).toEqual([{ url: photo, displayUrl: photo, name: "front.jpg" }]);
   expect(project.videos).toEqual([]);
   expect(project.tourUrl).toBe("https://my.matterport.com/show/?m=abc");
-  expect(project.floorPlans).toEqual([{ url: "https://cdn.example/level1.jpg", name: "Level 1.jpg" }]);
+  expect(project.floorPlans).toEqual([{ url: plan, displayUrl: plan, name: "Level 1.jpg" }]);
   const json = JSON.stringify(body);
   for (const secret of [
     "ada@example.com",
@@ -174,6 +176,8 @@ function expectMarketingView(body: Record<string, unknown>) {
     "amountDue",
     "downloadsUnlocked",
     "walkthrough.mp4",
+    "final.jpg",
+    "level1.jpg",
   ]) {
     expect(json).not.toContain(secret);
   }
@@ -289,8 +293,18 @@ describe("GET /api/galleries/link/:id studio share", () => {
 
     const shared = await openStudio(undefined, DELIVERY_QA_IDS.listing);
     expect(shared.statusCode).toBe(200);
-    expect((shared.body.project as { view?: string }).view).toBe("public");
+    const sharedProject = shared.body.project as {
+      view?: string;
+      images?: Array<{ url?: string; displayUrl?: string }>;
+      floorPlans?: Array<{ url?: string }>;
+      videos?: Array<{ url?: string | null }>;
+    };
+    expect(sharedProject.view).toBe("public");
     expect(leaked(shared.body)).toEqual([]);
+    expect(sharedProject.images?.[0]?.url).toBe(`/api/media/display/${DELIVERY_QA_IDS.listing}/0`);
+    expect(sharedProject.images?.[0]?.displayUrl).toBe(`/api/media/display/${DELIVERY_QA_IDS.listing}/0`);
+    expect(sharedProject.floorPlans?.[0]?.url).toBe(`/api/media/display/${DELIVERY_QA_IDS.listing}/1`);
+    expect(sharedProject.videos ?? []).toEqual([]);
     expect(JSON.stringify(shared.body)).toContain("100 Playtest Lane, Austin, TX 78701");
     expect(JSON.stringify(shared.body)).toContain("my.matterport.com/show");
     expect(shared.body.project).not.toHaveProperty("files");
@@ -336,10 +350,10 @@ describe("GET /api/galleries/link/:id studio share", () => {
     expect(JSON.stringify(paid.body)).not.toContain("amountDue");
     const paidShare = await openStudio(undefined, DELIVERY_QA_IDS.listing);
     expect((paidShare.body.project as { view?: string }).view).toBe("public");
-    expect(leaked(paidShare.body)).toEqual([]);
+    expectPlaybackShare(paidShare.body);
     const paidOther = await openStudio("Bearer other-token", DELIVERY_QA_IDS.listing);
     expect((paidOther.body.project as { view?: string }).view).toBe("public");
-    expect(leaked(paidOther.body)).toEqual([]);
+    expectPlaybackShare(paidOther.body);
 
     seed("invoices", DELIVERY_QA_IDS.invoice, invoice?.data || {});
     const listingDoc = plan.documents.find((doc) => doc.id === DELIVERY_QA_IDS.listing);
@@ -376,7 +390,33 @@ describe("GET /api/galleries/link/:id studio share", () => {
     expect((released.body.project as { downloadsUnlocked?: boolean }).downloadsUnlocked).toBe(true);
     expect(JSON.stringify(released.body.project)).toContain("/media/blaze/01_BUILT_v2.mp4");
     const releasedShare = await openStudio(undefined, DELIVERY_QA_IDS.listing);
-    expect(leaked(releasedShare.body)).toEqual([]);
+    expectPlaybackShare(releasedShare.body);
     expect(JSON.stringify(releasedShare.body)).toContain("my.matterport.com/show");
   });
 });
+
+function expectPlaybackShare(body: Record<string, unknown>) {
+  const project = body.project as {
+    images?: Array<{ url?: string }>;
+    videos?: Array<{ url?: string | null; noDownload?: boolean }>;
+  };
+  expect(project.images?.[0]?.url).toBe(`/api/media/display/${DELIVERY_QA_IDS.listing}/0`);
+  const videos = project.videos ?? [];
+  expect(videos.map((video) => video.noDownload)).toEqual([true, true]);
+  expect(videos.map((video) => video.url)).toEqual([
+    "https://cdn.example/media/blaze/01_BUILT_v2.mp4",
+    "https://cdn.example/media/videos/snap-reels/snap-reel-01.mp4",
+  ]);
+  const json = JSON.stringify(body);
+  for (const hidden of [
+    "/media/video/product-photography.mp4",
+    "/media/photos/luxury-exterior.jpg",
+    "/media/photos/listing-living-01.jpg",
+    "/media/photos/drone-hero.jpg",
+    "/media/playtest/TEST-delivery-qa-floorplan.png",
+    "/media/playtest/TEST-delivery-qa-floorplan.pdf",
+    "/media/playtest/TEST-delivery-qa-other.zip",
+  ]) {
+    expect(json).not.toContain(hidden);
+  }
+}

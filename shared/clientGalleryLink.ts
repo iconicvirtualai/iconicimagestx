@@ -7,6 +7,7 @@
 import { addressText } from "./addressText.ts";
 import { frameFromListingImage } from "./iconicStudio";
 import { studioDownloadsUnlocked } from "./lockImpact.ts";
+import { publicShareMedia, publicShareVideos } from "./publicShare.ts";
 import {
   lockDownloadsOn,
   requirePaymentOn,
@@ -49,6 +50,10 @@ export interface StudioMedia {
   embedUrl?: string;
   poster?: string | null;
   thumbnailUrl?: string | null;
+  /** Public share display route. Same bytes as `url` for photos and floor plans. */
+  displayUrl?: string;
+  /** Share player hint. The UI sets controlsList=nodownload. */
+  noDownload?: true;
 }
 
 export interface StudioRevision {
@@ -643,18 +648,6 @@ function lockedOwnerMedia(listing: GalleryLinkDoc, pub: PublicStudioProject) {
   }, needles);
 }
 
-function playableShareVideo(video: StudioMedia): boolean {
-  return Boolean(
-    video.url
-    || video.poster
-    || video.thumbnailUrl
-    || video.streamUrl
-    || video.previewUrl
-    || video.playbackUrl
-    || video.embedUrl,
-  );
-}
-
 /** Matterport and other non-file embeds stored on listing.tours. */
 function embedTour(listing: GalleryLinkDoc, needles: string[]): string {
   const groups = [listing.tours, listing.tourLinks];
@@ -675,28 +668,19 @@ function embedTour(listing: GalleryLinkDoc, needles: string[]): string {
 }
 
 /**
- * Public share media. Same rules as the locked owner view: a display image,
- * preview, or stream, or nothing. Original, MLS, full-res, and raw video URLs
- * stay off even when a separate display size was never stored.
+ * Public share media. Photos, aerials, and floor-plan images point at the
+ * display route. Video files stay off until the route applies playback.
  */
 function displaySafeShareMedia(listing: GalleryLinkDoc) {
-  const safe = lockedOwnerMedia(listing, {
-    id: listing.id,
-    address: "",
-    agentName: "",
-    services: [],
-    images: [],
-    videos: [],
-    tourUrl: publicTour(listing),
-    floorPlans: [],
-    notice: null,
-    view: "public",
-  });
+  const share = publicShareMedia(listing);
   const needles = listingOriginalNeedles(listing);
+  const tour = publicTour(listing);
+  const safeTour = tour && !isOriginalFileUrl(tour) && !containsOriginal(tour, needles) ? tour : "";
   return {
-    ...safe,
-    videos: safe.videos.filter(playableShareVideo),
-    tourUrl: safe.tourUrl || embedTour(listing, needles),
+    images: share.images,
+    floorPlans: share.floorPlans,
+    videos: publicShareVideos(listing, false),
+    tourUrl: safeTour || embedTour(listing, needles),
   };
 }
 
