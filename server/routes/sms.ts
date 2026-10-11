@@ -25,6 +25,7 @@ import { requireStaff, requireCoordinator, type AuthenticatedRequest } from "../
 import { recordAddressText } from "../../shared/addressText";
 import { bookingDateLabel } from "../../shared/clientHome";
 import { clientNotifyBlockReason, clientNotifyLive } from "../../shared/clientNotify";
+import { refuseQaStaffPhone } from "../services/qaStaffAssign";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -145,6 +146,17 @@ router.post("/conversation", requireStaff, async (req: AuthenticatedRequest, res
     if (!orderId || !photographerPhone || !clientPhone) {
       return res.status(400).json({ error: "orderId, photographerPhone, clientPhone required." });
     }
+
+    const [staffSnap, orderLike] = await Promise.all([
+      db().collection("staff").get(),
+      findOrderLikeDocument(String(orderId)),
+    ]);
+    const refusal = refuseQaStaffPhone({
+      photographerPhone,
+      staff: staffSnap.docs.map((item) => ({ id: item.id, ...item.data() })),
+      record: orderLike ? { id: orderLike.id, ...orderLike.data() } : { id: String(orderId) },
+    });
+    if (refusal) return res.status(refusal.status).json({ error: refusal.error });
 
     // Check if conversation already exists for this order
     const existing = await db().collection("conversations")

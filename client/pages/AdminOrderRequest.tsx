@@ -38,6 +38,7 @@ import {
   LIFE_OF_THE_LISTING_CARE_PRICE_LABEL,
   LIFE_OF_THE_LISTING_CARE_SUMMARY_LABEL,
 } from "@shared/lifeOfTheListingCare";
+import { filterAssignableStaff, qaStaffAssignmentError, recordAllowsQaStaff } from "@shared/qaStaff";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtAddr(a: unknown): string {
@@ -230,6 +231,12 @@ export default function AdminOrderRequest() {
   const handleCreateProject = async () => {
     if (!id || !order) return;
     if (order.listingId) { navigate(`/admin/listing/${order.listingId}`); return; }
+    const selectedStaff = staff.filter((person) => selectedProviders.includes(person.id));
+    const blocked = qaStaffAssignmentError(selectedStaff, order);
+    if (blocked) {
+      toast.error(blocked);
+      return;
+    }
     setSaving(true);
     try {
       const clientEmail = String(order.email || order.clientEmail || "").trim().toLowerCase();
@@ -306,7 +313,7 @@ export default function AdminOrderRequest() {
         staff,
       });
       toast.success("Scheduled."); setShowSchedule(false);
-    } catch (err) { console.error(err); toast.error("Failed."); }
+    } catch (err) { console.error(err); toast.error(err instanceof Error ? err.message : "Failed."); }
     finally { setSaving(false); }
   };
 
@@ -643,11 +650,11 @@ export default function AdminOrderRequest() {
                 <div><p className={`${labelCls}`}>Date *</p><input type="date" value={schedDate} onChange={e => setSchedDate(e.target.value)} className={`${editInputCls}`} /></div>
                 <div><p className={`${labelCls}`}>Time</p><input type="time" value={schedTime} onChange={e => setSchedTime(e.target.value)} className={`${editInputCls}`} /></div>
               </div>
-              {staff.filter(s => ["photographer", "admin", "coordinator"].includes(s.role)).length > 0 && (
+              {filterAssignableStaff(staff.filter(s => ["photographer", "admin", "coordinator"].includes(s.role)), { forPlaytest: recordAllowsQaStaff(order) }).length > 0 && (
                 <div>
                   <p className={`${labelCls} mb-2`}>Assign Provider(s)</p>
                   <div className="flex flex-wrap gap-2">
-                    {staff.filter(s => ["photographer", "admin", "coordinator"].includes(s.role)).map(s => {
+                    {filterAssignableStaff(staff.filter(s => ["photographer", "admin", "coordinator"].includes(s.role)), { forPlaytest: recordAllowsQaStaff(order) }).map(s => {
                       const sel = selectedProviders.includes(s.id);
                       return (
                         <button key={s.id} onClick={() => setSelectedProviders(sel ? selectedProviders.filter(p => p !== s.id) : [...selectedProviders, s.id])}

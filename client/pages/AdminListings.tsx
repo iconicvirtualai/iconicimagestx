@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 import StaffActionQueue from "@/components/StaffActionQueue";
 import { recordAddressText } from "@shared/addressText";
+import { filterAssignableStaff, qaStaffAssignmentError, recordAllowsQaStaff } from "@shared/qaStaff";
 import { choosePortalClient, listingAppointmentDate } from "@shared/listingWrite";
 import {
   LISTING_QUEUE,
@@ -70,6 +71,8 @@ interface Client {
   phone: string;
   firebaseUid?: string | null;
   portalAccess?: boolean | null;
+  playtest?: boolean;
+  linkedClientId?: string;
 }
 
 interface StaffMember {
@@ -78,6 +81,27 @@ interface StaffMember {
   firstName?: string;
   lastName?: string;
   role: string;
+  email?: string;
+  qaOnly?: unknown;
+  playtest?: unknown;
+}
+
+const ASSIGNABLE_ROLES = ["photographer", "admin", "coordinator"];
+
+function staffPickerRows(snap: { docs: Array<{ id: string; data: () => Record<string, any> }> }): StaffMember[] {
+  return snap.docs.map((item) => {
+    const data = item.data();
+    return {
+      id: item.id,
+      name: data.name || `${data.firstName || ""} ${data.lastName || ""}`.trim() || item.id,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      role: data.role,
+      email: data.email,
+      qaOnly: data.qaOnly,
+      playtest: data.playtest,
+    };
+  }).filter((person) => ASSIGNABLE_ROLES.includes(person.role));
 }
 
 interface ServiceItem {
@@ -288,17 +312,7 @@ export default function AdminListings() {
 
     getDocs(collection(db, "staff"))
       .then(snap => {
-        const all = snap.docs.map(d => {
-          const data = d.data();
-          return {
-            id: d.id,
-            name: data.name || `${data.firstName || ""} ${data.lastName || ""}`.trim() || d.id,
-            firstName: data.firstName,
-            lastName: data.lastName,
-            role: data.role,
-          };
-        }) as StaffMember[];
-        setPhotographers(all.filter(s => ["photographer", "admin", "coordinator"].includes(s.role)));
+        setPhotographers(staffPickerRows(snap));
       })
       .catch(console.error);
 
@@ -314,11 +328,7 @@ export default function AdminListings() {
   React.useEffect(() => {
     getDocs(collection(db, "staff"))
       .then(snap => {
-        const all = snap.docs.map(d => {
-          const data = d.data();
-          return { id: d.id, name: data.name || `${data.firstName || ""} ${data.lastName || ""}`.trim(), role: data.role };
-        }) as StaffMember[];
-        setPhotographers(all.filter(s => ["photographer", "admin", "coordinator"].includes(s.role)));
+        setPhotographers(staffPickerRows(snap));
       })
       .catch(console.error);
 
@@ -345,6 +355,11 @@ export default function AdminListings() {
     return map;
   }, [projects, priceIndex, priceSettled, priceView]);
   const form = projectType === "real_estate" ? reForm : bizForm;
+  const selectedClient = clients.find((client) => client.id === form.clientId) || null;
+  const assignablePhotographers = filterAssignableStaff(photographers, {
+    forPlaytest: recordAllowsQaStaff(selectedClient),
+  });
+  const listedPhotographers = filterAssignableStaff(photographers, { forPlaytest: false });
 
   const handleClientSearch = (val: string) => {
     if (projectType === "real_estate") {
@@ -413,12 +428,19 @@ export default function AdminListings() {
       return;
     }
 
+    const selectedStaff = photographers.filter((person) => form.photographerIds.includes(person.id));
+    const blocked = qaStaffAssignmentError(selectedStaff, selectedClient);
+    if (blocked) {
+      toast.error(blocked);
+      return;
+    }
+
     setSaving(true);
     try {
       const clientName = `${form.firstName} ${form.lastName}`.trim();
       const selectedServices = services.filter(s => form.serviceIds.includes(s.id));
       const serviceNames = selectedServices.map(s => s.name);
-      const photographerNames = photographers.filter(p => form.photographerIds.includes(p.id)).map(p => p.name);
+      const photographerNames = assignablePhotographers.filter(p => form.photographerIds.includes(p.id)).map(p => p.name);
 
       const clientEmail = form.email.toLowerCase().trim();
       const chosen = choosePortalClient(clients, { clientId: form.clientId, email: clientEmail });
@@ -774,7 +796,7 @@ export default function AdminListings() {
               <label className={labelCls}>Photographer</label>
               <select value={photographerFilter} onChange={e => setPhotographerFilter(e.target.value)} className={inputCls}>
                 <option value="">All Photographers</option>
-                {photographers.map(p => (
+                {listedPhotographers.map(p => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
@@ -1088,9 +1110,9 @@ export default function AdminListings() {
               {/* Photographers dropdown */}
               <div>
                 <label className={labelCls}>Photographer(s)</label>
-                {photographers.length > 0 ? (
+                {assignablePhotographers.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
-                    {photographers.map(p => {
+                    {assignablePhotographers.map(p => {
                       const sel = form.photographerIds.includes(p.id);
                       return (
                         <button key={p.id} type="button"

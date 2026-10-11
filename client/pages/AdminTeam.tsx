@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { isQaStaff } from "@shared/qaStaff";
 
 type Role = "admin" | "coordinator" | "photographer" | "editor";
 
@@ -29,6 +30,8 @@ interface StaffMember {
   lastName: string;
   role: Role;
   isActive: boolean;
+  qaOnly?: boolean;
+  playtest?: boolean;
 }
 
 const ROLE_OPTIONS: Role[] = ["admin", "coordinator", "photographer", "editor"];
@@ -118,9 +121,11 @@ export default function AdminTeam() {
     }
   };
 
+  const opsStaff = staff.filter((member) => !isQaStaff(member));
+  const qaStaff = staff.filter((member) => isQaStaff(member));
   const roleGroups = ROLE_OPTIONS.map((role) => ({
     role,
-    members: staff.filter((s) => s.role === role),
+    members: opsStaff.filter((s) => s.role === role),
   })).filter((g) => g.members.length > 0);
 
   return (
@@ -128,7 +133,7 @@ export default function AdminTeam() {
       {/* Header */}
       <div className="flex items-center justify-between mb-10">
         <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">
-          {staff.length} member{staff.length !== 1 ? "s" : ""} · {staff.filter((s) => s.isActive).length} active
+          {opsStaff.length} member{opsStaff.length !== 1 ? "s" : ""} · {opsStaff.filter((s) => s.isActive).length} active
         </p>
         <Button onClick={openAdd} className="bg-[#0d9488] hover:bg-[#0f766e] text-white font-bold rounded-xl">
           <Plus className="w-4 h-4 mr-2" /> Add Member
@@ -192,7 +197,7 @@ export default function AdminTeam() {
           <div className="w-8 h-8 rounded-full bg-[#0d9488]/20 mx-auto mb-3 animate-pulse" />
           <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Loading...</p>
         </div>
-      ) : staff.length === 0 ? (
+      ) : opsStaff.length === 0 && qaStaff.length === 0 ? (
         <div className="bg-white rounded-[2rem] border border-gray-100 p-12 text-center">
           <UserCircle className="w-10 h-10 text-gray-200 mx-auto mb-4" />
           <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No team members yet</p>
@@ -207,47 +212,90 @@ export default function AdminTeam() {
               </p>
               <div className="space-y-3">
                 {members.map((member) => (
-                  <div
+                  <TeamMemberRow
                     key={member.uid}
-                    className={`bg-white rounded-[2rem] border border-gray-100 shadow-sm p-5 flex items-center gap-4 ${!member.isActive ? "opacity-50" : ""}`}
-                  >
-                    <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0">
-                      <UserCircle className="w-6 h-6 text-gray-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-0.5">
-                        <p className="font-black text-sm text-black">{member.firstName} {member.lastName}</p>
-                        <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full ${ROLE_BADGE[member.role]}`}>
-                          {ROLE_LABEL[member.role]}
-                        </span>
-                        {!member.isActive && (
-                          <span className="text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-gray-100 text-gray-400">Inactive</span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-400 font-bold">{member.email}</p>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <button onClick={() => openEdit(member)} className="p-2 rounded-lg text-gray-400 hover:text-[#0d9488] hover:bg-[#0d9488]/5 transition-colors" title="Edit">
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeactivate(member)}
-                        className={`p-2 rounded-lg transition-colors ${member.isActive ? "text-gray-400 hover:text-yellow-500 hover:bg-yellow-50" : "text-teal-500 hover:bg-teal-50"}`}
-                        title={member.isActive ? "Deactivate" : "Reactivate"}
-                      >
-                        {member.isActive ? <X className="w-4 h-4" /> : <Check className="w-4 h-4" />}
-                      </button>
-                      <button onClick={() => handleDelete(member)} className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Remove">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
+                    member={member}
+                    onEdit={openEdit}
+                    onDeactivate={handleDeactivate}
+                    onDelete={handleDelete}
+                  />
                 ))}
               </div>
             </div>
           ))}
+          {qaStaff.length > 0 && (
+            <details className="bg-white rounded-[2rem] border border-dashed border-gray-200">
+              <summary className="cursor-pointer list-none px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400">
+                QA / test accounts · {qaStaff.length} — excluded from team counts
+              </summary>
+              <div className="space-y-3 px-6 pb-6">
+                {qaStaff.map((member) => (
+                  <TeamMemberRow
+                    key={member.uid}
+                    member={member}
+                    qa
+                    onEdit={openEdit}
+                    onDeactivate={handleDeactivate}
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </div>
+            </details>
+          )}
         </div>
       )}
     </AdminLayout>
+  );
+}
+
+function TeamMemberRow({
+  member,
+  qa = false,
+  onEdit,
+  onDeactivate,
+  onDelete,
+}: {
+  member: StaffMember;
+  qa?: boolean;
+  onEdit: (member: StaffMember) => void;
+  onDeactivate: (member: StaffMember) => void;
+  onDelete: (member: StaffMember) => void;
+}) {
+  return (
+    <div className={`bg-white rounded-[2rem] border border-gray-100 shadow-sm p-5 flex items-center gap-4 ${!member.isActive ? "opacity-50" : ""}`}>
+      <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0">
+        <UserCircle className="w-6 h-6 text-gray-400" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-3 mb-0.5">
+          <p className="font-black text-sm text-black">{member.firstName} {member.lastName}</p>
+          <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full ${ROLE_BADGE[member.role]}`}>
+            {ROLE_LABEL[member.role]}
+          </span>
+          {qa && (
+            <span className="text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">QA</span>
+          )}
+          {!member.isActive && (
+            <span className="text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-gray-100 text-gray-400">Inactive</span>
+          )}
+        </div>
+        <p className="text-xs text-gray-400 font-bold">{member.email}</p>
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <button onClick={() => onEdit(member)} className="p-2 rounded-lg text-gray-400 hover:text-[#0d9488] hover:bg-[#0d9488]/5 transition-colors" title="Edit">
+          <Pencil className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => onDeactivate(member)}
+          className={`p-2 rounded-lg transition-colors ${member.isActive ? "text-gray-400 hover:text-yellow-500 hover:bg-yellow-50" : "text-teal-500 hover:bg-teal-50"}`}
+          title={member.isActive ? "Deactivate" : "Reactivate"}
+        >
+          {member.isActive ? <X className="w-4 h-4" /> : <Check className="w-4 h-4" />}
+        </button>
+        <button onClick={() => onDelete(member)} className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Remove">
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
   );
 }

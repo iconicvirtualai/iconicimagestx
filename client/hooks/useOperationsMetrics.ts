@@ -13,6 +13,7 @@ import {
   addDays,
 } from "date-fns";
 import { fetchPhotographerRoster, mergeCalendarRoster } from "@/lib/photographerRoster";
+import { assigneeNamesForOps, filterAssignableStaff } from "@shared/qaStaff";
 import {
   appointmentRevenue,
   centralNoonDate,
@@ -62,6 +63,10 @@ export function useOperationsMetrics() {
   const [staff, setStaff] = React.useState<any[]>([]);
   const [calendarEvents, setCalendarEvents] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const opsStaff = React.useMemo(
+    () => filterAssignableStaff(staff, { forPlaytest: false }),
+    [staff],
+  );
 
   React.useEffect(() => {
     const unsubOrders = onSnapshot(collection(db, "orderRequests"), (snap) => {
@@ -116,7 +121,7 @@ export function useOperationsMetrics() {
         } catch (error) {
           console.warn("[useOperationsMetrics] Photographer roster unavailable:", error);
         }
-        const calendars = mergeCalendarRoster(rosterPeople, staff);
+        const calendars = mergeCalendarRoster(rosterPeople, opsStaff);
         const response = await fetch("/api/calendar/schedule", {
           method: "POST",
           headers: {
@@ -140,7 +145,7 @@ export function useOperationsMetrics() {
 
     loadCalendarEvents();
     return () => { cancelled = true; };
-  }, [staff, user]);
+  }, [opsStaff, user]);
 
   const metrics = React.useMemo(() => {
     if (loading) return null;
@@ -201,8 +206,10 @@ export function useOperationsMetrics() {
     scheduledWeek.forEach(i => {
       const calendarMatch = calendarWeekEvents.find((event) => !matchedCalendarIds.has(event.id) && matchesCalendarMetricEvent(i, event));
       if (calendarMatch) matchedCalendarIds.add(calendarMatch.id);
-      const names = getAssignedNames(i, staff);
-      const resolvedNames = names.length > 0 ? names : (calendarMatch?.photographerName ? [calendarMatch.photographerName] : []);
+      const names = assigneeNamesForOps(getAssignedNames(i, staff), staff);
+      const resolvedNames = names.length > 0
+        ? names
+        : assigneeNamesForOps(calendarMatch?.photographerName ? [calendarMatch.photographerName] : [], staff);
       if (resolvedNames.length === 0) unassignedAppointmentsThisWeek += 1;
       resolvedNames.forEach((name) => {
         shooters[name] = (shooters[name] || 0) + 1;
@@ -210,7 +217,9 @@ export function useOperationsMetrics() {
     });
     calendarWeekEvents.forEach((event) => {
       if (matchedCalendarIds.has(event.id) || !event.photographerName) return;
-      shooters[event.photographerName] = (shooters[event.photographerName] || 0) + 1;
+      assigneeNamesForOps([event.photographerName], staff).forEach((name) => {
+        shooters[name] = (shooters[name] || 0) + 1;
+      });
     });
 
     const notScheduledCount = orderRequests.filter(or => {
@@ -264,8 +273,10 @@ export function useOperationsMetrics() {
     const teamData: Record<string, { rev: number; vol: number; last: Date }> = {};
     revenueAppointments.forEach(i => {
       const calendarMatch = calendarWeekEvents.find((event) => matchesCalendarMetricEvent(i, event));
-      const names = getAssignedNames(i, staff);
-      const resolvedNames = names.length > 0 ? names : (calendarMatch?.photographerName ? [calendarMatch.photographerName] : []);
+      const names = assigneeNamesForOps(getAssignedNames(i, staff), staff);
+      const resolvedNames = names.length > 0
+        ? names
+        : assigneeNamesForOps(calendarMatch?.photographerName ? [calendarMatch.photographerName] : [], staff);
       const date = getApptDate(i) || getCreatedAt(i) || new Date(0);
       const revenue = appointmentRevenue(i);
       resolvedNames.forEach((name) => {

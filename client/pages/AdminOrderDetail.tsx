@@ -23,6 +23,7 @@ import { staffInvoicePath } from "@shared/staffInvoice";
 import { orderChargeSummary, orderServiceLines } from "@shared/orderPackageLines";
 import type { GalleryReleaseReport } from "@shared/galleryRelease";
 import { publicClientUrl } from "@shared/publicSiteUrl";
+import { filterAssignableStaff, recordAllowsQaStaff } from "@shared/qaStaff";
 
 // ─── Status system ────────────────────────────────────────────────────────────
 const ORDER_STATUSES = [
@@ -580,7 +581,7 @@ export default function AdminOrderDetail() {
                   <p className="text-xs text-gray-400 mb-3">No providers assigned yet.</p>
                   {editing && staff.length > 0 && (
                     <div className="space-y-1">
-                      {staff.filter(s => ["photographer","admin","coordinator"].includes(s.role)).map(s => (
+                      {filterAssignableStaff(staff.filter(s => ["photographer","admin","coordinator"].includes(s.role)), { forPlaytest: recordAllowsQaStaff(order) }).map(s => (
                         <button key={s.id} onClick={() => {
                           const current = editForm.assignedProviders || [];
                           if (!current.find((p: any) => p.providerId === s.id)) {
