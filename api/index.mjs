@@ -20059,6 +20059,8 @@ function sheetRange(a1) {
 }
 const OWNER_WHY = "Freedom to be outside with my dogs, kids, nieces, pig and garden, and to fly to Puerto Rico whenever I want. More traveling, more giving.";
 const NOT_FOUND = { error: "Not found" };
+const OWNER_LOGIN_REDIRECT = "/admin/login?next=/admin/owners";
+const OWNER_PAGE_PATHS = /* @__PURE__ */ new Set(["/admin/owners", "/admin/owners/", "/owners", "/owners/"]);
 function mountOwners(app) {
   const page = ["/admin/owners", "/admin/owners/", "/owners", "/owners/", "/api/owners/page"];
   app.get(page, (req, res) => {
@@ -20131,9 +20133,20 @@ async function handleSession(req, res) {
 async function handleOwnersPage(req, res) {
   setPrivate(res);
   const owner = await resolveOwnerIdentity(req.headers);
-  if (!owner) return res.status(404).type("html").send(NOT_FOUND_HTML);
+  if (!owner) {
+    if (OWNER_PAGE_PATHS.has(req.path) && !hasBearer(req)) {
+      res.setHeader("Location", OWNER_LOGIN_REDIRECT);
+      return res.status(302).end();
+    }
+    return res.status(404).type("html").send(NOT_FOUND_HTML);
+  }
   const html = injectDevPreamble(injectRobots(await readSpaShell() || FALLBACK_SHELL));
   return res.status(200).type("html").send(html);
+}
+function hasBearer(req) {
+  const value = req.headers.authorization;
+  const header = Array.isArray(value) ? value[0] : value;
+  return typeof header === "string" && header.trim().length > 0;
 }
 function setPrivate(res) {
   res.setHeader("Cache-Control", "private, no-store, max-age=0");

@@ -69,8 +69,13 @@ describe("owners suite access", () => {
     const page = await read("/admin/owners");
     const alias = await read("/owners");
     const api = await read("/api/owners/suite");
-    for (const hit of [page, alias, api]) {
-      expect(hit.response.status).toBe(404);
+    const apiPage = await read("/api/owners/page");
+    for (const hit of [page, alias]) {
+      expect(hit.response.status).toBe(302);
+      expect(hit.response.headers.get("location")).toBe("/admin/login?next=/admin/owners");
+    }
+    for (const hit of [page, alias, api, apiPage]) {
+      if (hit !== page && hit !== alias) expect(hit.response.status).toBe(404);
       expect(hit.response.headers.get("cache-control")).toContain("private");
       expect(hit.response.headers.get("cache-control")).toContain("no-store");
       expect(hit.response.headers.get("x-robots-tag")).toContain("noindex");
@@ -79,8 +84,9 @@ describe("owners suite access", () => {
       expect(hit.text).not.toContain(OWNER_WHY);
       expect(hit.text).not.toContain("Fall mini sessions");
       expect(hit.text.toLowerCase()).not.toContain("forbidden");
+      expect(hit.text.toLowerCase()).not.toContain("owner");
     }
-    expect(page.text).toContain("Page not found");
+    expect(apiPage.text).toContain("Page not found");
   });
 
   it("denies a non-owner admin, including the temp admin token", async () => {
@@ -196,7 +202,7 @@ describe("owners suite access", () => {
     expect(api.response.status).toBe(404);
   });
 
-  it("rewrites owner pages to the API function before the SPA fallback and 404s when signed out", async () => {
+  it("rewrites owner pages to the API function before the SPA fallback and sends signed-out visits to login", async () => {
     const vercel = JSON.parse(fs.readFileSync("vercel.json", "utf8")) as {
       functions: Record<string, unknown>;
       rewrites: Array<{ source: string; destination: string }>;
@@ -240,9 +246,17 @@ describe("owners suite access", () => {
       });
     }
     expect(signedOut).toEqual([
-      { path: "/owners", status: 404, notFound: true, noindex: true, leaksWhy: false },
-      { path: "/admin/owners", status: 404, notFound: true, noindex: true, leaksWhy: false },
+      { path: "/owners", status: 302, notFound: false, noindex: true, leaksWhy: false },
+      { path: "/admin/owners", status: 302, notFound: false, noindex: true, leaksWhy: false },
     ]);
+    for (const path of ["/owners/", "/admin/owners/"]) {
+      const hit = await read(path);
+      expect(hit.response.status).toBe(302);
+      expect(hit.response.headers.get("location")).toBe("/admin/login?next=/admin/owners");
+    }
+    // A session cookie for someone off the allowlist is treated as signed out.
+    const stale = await read("/admin/owners", { cookie: "owners_session=not-a-real-session" });
+    expect(stale.response.status).toBe(302);
   });
 
   it("keeps the route out of the staff shell and ahead of the public SPA rewrite", () => {
