@@ -123,13 +123,17 @@ export async function moveMediaDelivery(input: {
   galleryId: string;
   status: string;
   expiresInDays?: number;
+  actor?: { email?: string | null; name?: string | null; uid?: string | null };
 }) {
   if (!isMediaDeliveryStatus(input.status)) {
     throw httpError(400, "Status must be pending, undelivered, or delivered.");
   }
   const galleryId = input.galleryId.trim();
   if (input.status === "delivered") {
-    const delivered = await deliverGalleryToClient(galleryId, { expiresInDays: input.expiresInDays });
+    const delivered = await deliverGalleryToClient(galleryId, {
+      expiresInDays: input.expiresInDays,
+      actor: input.actor,
+    });
     return {
       galleryId,
       galleryStatus: delivered.galleryStatus,

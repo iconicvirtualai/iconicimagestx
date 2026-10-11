@@ -90,7 +90,7 @@ describe("client notify test allowlist", () => {
         template,
         variables: { clientName: "Ops", clientEmail: QA, setupUrl: "https://example.test/setup" },
       });
-      expect(result).toEqual({ sent: true });
+      expect(result).toEqual({ sent: true, delivery: "allowlist" });
       expect(sendMail).toHaveBeenCalledTimes(1);
       const message = lastSent();
       expect(message.to).toBe(QA);
@@ -106,7 +106,7 @@ describe("client notify test allowlist", () => {
     for (const template of GATED) {
       sendMail.mockClear();
       const result = await sendEmail({ to: CLIENT, template });
-      expect(result).toEqual({ sent: false });
+      expect(result).toEqual({ sent: false, delivery: "suppressed" });
       expect(sendMail).not.toHaveBeenCalled();
     }
   });
@@ -121,7 +121,7 @@ describe("client notify test allowlist", () => {
       template: "invoice",
       variables: { clientName: "Ada", invoiceNumber: "INV-1", amount: "$10.00" },
     });
-    expect(result).toEqual({ sent: true });
+    expect(result).toEqual({ sent: true, delivery: "allowlist" });
     expect(sendMail).toHaveBeenCalledTimes(1);
     const message = lastSent();
     expect(message.to).toBe(QA);
@@ -143,7 +143,7 @@ describe("client notify test allowlist", () => {
       replyTo: "studio@iconicimagestx.com",
       template: "gallery_delivery",
     });
-    expect(result).toEqual({ sent: true });
+    expect(result).toEqual({ sent: true, delivery: "allowlist" });
     const message = lastSent();
     expect(message.to).toBe(QA);
     expect(message.cc).toBeUndefined();
@@ -165,7 +165,7 @@ describe("client notify test allowlist", () => {
       replyTo: QA,
       template: "payment_receipt",
     });
-    expect(result).toEqual({ sent: false });
+    expect(result).toEqual({ sent: false, delivery: "suppressed" });
     expect(sendMail).not.toHaveBeenCalled();
   });
 
@@ -180,26 +180,26 @@ describe("client notify test allowlist", () => {
     ]) {
       sendMail.mockClear();
       const result = await sendEmail({ to: address, cc: QA, template: "invoice" });
-      expect(result).toEqual({ sent: true });
+      expect(result).toEqual({ sent: true, delivery: "allowlist" });
       expect(lastSent().to).toBe(QA);
       expect(recipientFields()).toBe(QA);
       expect(recipientFields()).not.toContain(address);
       sendMail.mockClear();
       const alone = await sendEmail({ to: address, template: "account_password_setup" });
-      expect(alone).toEqual({ sent: false });
+      expect(alone).toEqual({ sent: false, delivery: "suppressed" });
       expect(sendMail).not.toHaveBeenCalled();
     }
 
     useNotifyEnv({ NOTIFY_TEST_ALLOWLIST: "ops@iconicimagestx.com" });
     const listedBase = await sendEmail({ to: " OPS@IconicImagesTX.com ", template: "gallery_delivery" });
-    expect(listedBase).toEqual({ sent: true });
+    expect(listedBase).toEqual({ sent: true, delivery: "allowlist" });
     expect(lastSent().to).toBe("ops@iconicimagestx.com");
     sendMail.mockClear();
     const plusTag = await sendEmail({ to: QA, template: "gallery_delivery" });
-    expect(plusTag).toEqual({ sent: false });
+    expect(plusTag).toEqual({ sent: false, delivery: "suppressed" });
     expect(sendMail).not.toHaveBeenCalled();
     const otherIconic = await sendEmail({ to: "photos@iconicimagestx.com", template: "invoice" });
-    expect(otherIconic).toEqual({ sent: false });
+    expect(otherIconic).toEqual({ sent: false, delivery: "suppressed" });
     expect(sendMail).not.toHaveBeenCalled();
   });
 
@@ -215,12 +215,12 @@ describe("client notify test allowlist", () => {
           replyTo: QA,
           template,
         });
-        expect(result).toEqual({ sent: false });
+        expect(result).toEqual({ sent: false, delivery: "suppressed" });
         expect(sendMail).not.toHaveBeenCalled();
       }
       sendMail.mockClear();
       const received = await sendEmail({ to: CLIENT, template: "booking_received" });
-      expect(received).toEqual({ sent: true });
+      expect(received).toEqual({ sent: true, delivery: "sent" });
       expect(lastSent().to).toBe(CLIENT);
     }
   });
@@ -234,7 +234,7 @@ describe("client notify test allowlist", () => {
       replyTo: "agent@broker.com",
       template: "order_confirmed",
     });
-    expect(result).toEqual({ sent: true });
+    expect(result).toEqual({ sent: true, delivery: "sent" });
     expect(lastSent()).toMatchObject({
       to: CLIENT,
       cc: "agent@broker.com",
@@ -250,7 +250,7 @@ describe("client notify test allowlist", () => {
       cc: "agent@broker.com",
       template: "booking_received",
     });
-    expect(received).toEqual({ sent: true });
+    expect(received).toEqual({ sent: true, delivery: "sent" });
     expect(lastSent().to).toBe(CLIENT);
     expect(lastSent().cc).toBe("agent@broker.com");
 
@@ -260,7 +260,7 @@ describe("client notify test allowlist", () => {
       template: "office_new_order",
       audience: "staff",
     });
-    expect(office).toEqual({ sent: true });
+    expect(office).toEqual({ sent: true, delivery: "sent" });
     expect(lastSent().to).toBe("photos@iconicimagestx.com, coord@iconicimagestx.com");
   });
 });

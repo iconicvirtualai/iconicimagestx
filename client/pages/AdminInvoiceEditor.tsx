@@ -34,9 +34,9 @@ import {
   type InvoicePresetKind,
 } from "@shared/invoicePresets";
 import { invoicePageInvoiceNumber } from "@shared/orderProjectInvoice";
+import { clientInvoiceUrl } from "@shared/invoicePayLink";
 import {
   billToAddressText,
-  clientPaymentPath,
   findStaffCatalogPackage,
   repriceInvoiceAdjustments,
   splitStaffInvoiceLines,
@@ -314,7 +314,15 @@ export default function AdminInvoiceEditor() {
 
   const copyPaymentLink = async () => {
     if (!invoiceId) return;
-    const url = `${window.location.origin}${clientPaymentPath(invoiceId)}`;
+    const url = clientInvoiceUrl({
+      id: invoiceId,
+      status: invoice?.status,
+      payToken: invoice?.payToken,
+    });
+    if (!url) {
+      toast.error("No client pay link yet. A guessable invoice id needs a pay token.");
+      return;
+    }
     try {
       await navigator.clipboard.writeText(url);
       toast.success("Payment link copied.");

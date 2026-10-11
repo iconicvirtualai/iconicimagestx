@@ -62,7 +62,7 @@ beforeEach(() => {
   resetContactThreadStoreForTests();
   sendEmailMock.mockReset();
   sendSMSMock.mockReset();
-  sendEmailMock.mockResolvedValue({ sent: true });
+  sendEmailMock.mockResolvedValue({ sent: true, delivery: "sent" });
   sendSMSMock.mockResolvedValue({ sid: "SM123", status: "queued" });
 });
 

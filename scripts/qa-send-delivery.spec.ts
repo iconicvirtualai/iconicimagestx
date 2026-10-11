@@ -91,13 +91,21 @@ describe("delivery QA send", () => {
     });
     expect(parseDeliveryQaSendArgs([])).toEqual({ playtest: false, dryRun: false, unknown: [] });
 
+    const savedPublic = process.env.PUBLIC_SITE_URL;
+    const savedVite = process.env.VITE_PUBLIC_SITE_URL;
+    delete process.env.PUBLIC_SITE_URL;
+    delete process.env.VITE_PUBLIC_SITE_URL;
     const preview = deliveryQaSendPreview("https://iconicimagestx.vercel.app");
+    if (savedPublic === undefined) delete process.env.PUBLIC_SITE_URL;
+    else process.env.PUBLIC_SITE_URL = savedPublic;
+    if (savedVite === undefined) delete process.env.VITE_PUBLIC_SITE_URL;
+    else process.env.VITE_PUBLIC_SITE_URL = savedVite;
     expect(preview).toMatchObject({
       template: "gallery_delivery",
       to: "ops+deliveryqa@iconicimagestx.com",
-      subject: "Message from Iconic Images",
+      subject: "Your gallery is ready: 100 Playtest Lane, Austin, TX 78701",
       galleryUrl: "https://iconicimagestx.vercel.app/gallery/playtest-delivery-qa-gallery",
-      paymentUrl: "https://iconicimagestx.vercel.app/invoice/playtest-delivery-qa-invoice",
+      paymentUrl: null,
       invoiceAmount: "$1.00",
     });
 
@@ -114,7 +122,12 @@ describe("delivery QA send", () => {
       ["scripts/qa-send-delivery.ts", "--playtest", "--dry-run"],
       {
         cwd: fileURLToPath(new URL("..", import.meta.url)),
-        env: { ...process.env, APP_URL: "https://iconicimagestx.vercel.app" },
+        env: {
+          ...process.env,
+          APP_URL: "https://www.iconicimagestx.com",
+          PUBLIC_SITE_URL: "",
+          VITE_PUBLIC_SITE_URL: "",
+        },
         encoding: "utf8",
       },
     );
