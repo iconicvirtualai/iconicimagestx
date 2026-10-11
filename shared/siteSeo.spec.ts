@@ -98,7 +98,11 @@ describe("public page meta", () => {
     expect(isNoIndexPath("/studio-105")).toBe(false);
     expect(isNoIndexPath("/login")).toBe(false);
     expect(isNoIndexPath("/gallery")).toBe(false);
+    expect(isNoIndexPath("/invoice")).toBe(true);
+    expect(isNoIndexPath("/invoice/inv-1")).toBe(true);
+    expect(isNoIndexPath("/invoice/inv-1/")).toBe(true);
     expect(metaPlan("/portal").kind).toBe("noindex");
+    expect(metaPlan("/invoice/inv-1").kind).toBe("noindex");
     expect(metaPlan("/about").kind).toBe("public");
     expect(metaPlan("/go").kind).toBe("preserve-title");
     expect(metaPlan("/present/abcdefghijklmnopqrstuv").kind).toBe("hands-off");
@@ -115,6 +119,7 @@ describe("public page meta", () => {
     expect(robots).toContain("Disallow: /studio/");
     expect(robots).toContain("Disallow: /gallery/");
     expect(robots).toContain("Disallow: /api");
+    expect(robots).toContain("Disallow: /invoice");
     expect(robots).toContain(`Sitemap: ${DEFAULT_SITE_ORIGIN}/sitemap.xml`);
     expect(robots).not.toContain("Disallow: /studio-105");
   });
