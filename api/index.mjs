@@ -635,7 +635,7 @@ function addressText(value) {
   if (typeof value === "string") return value.trim();
   if (typeof value !== "object" || Array.isArray(value)) return "";
   const address = value;
-  const formatted = text$d(address.formatted) || text$d(address.label);
+  const formatted = text$e(address.formatted) || text$e(address.label);
   if (formatted) return formatted;
   return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
 }
@@ -648,7 +648,7 @@ function recordAddressText(record) {
   }
   return "";
 }
-function text$d(value) {
+function text$e(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const services = [
@@ -2774,14 +2774,14 @@ function clientListingPath(listingId) {
 function buildClientListing(id, data) {
   const images = data.images;
   const projectType2 = data.projectType === "business" || data.projectType === "real_estate" ? data.projectType : "";
-  const status = typeof data.status === "string" && data.status.trim() ? data.status.trim() : "scheduled";
+  const status2 = typeof data.status === "string" && data.status.trim() ? data.status.trim() : "scheduled";
   const appointmentDate = calendarDateKey(data.shootDate || data.apptDate || data.appointmentDate || data.scheduledDate);
   const addressParts2 = listingCardAddress(data);
   const amenities = listingCardAmenities(data);
   return {
     id,
     address: addressText(data.propertyAddress || data.address || data.shootLocation) || "Listing",
-    status,
+    status: status2,
     projectType: projectType2,
     imageCount: Array.isArray(images) ? images.length : 0,
     coverUrl: listingCoverUrl(images),
@@ -2808,7 +2808,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
       createdAt: data.createdAt
     }, now),
     status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
-    clientName: text$c(data.clientName),
+    clientName: text$d(data.clientName),
     address: addressText(data.billToAddress || data.address || data.propertyAddress),
     createdAt,
     issuedOn: formatPortalDate(data.createdAt) || formatPortalDate(data.sentAt) || formatPortalDate(data.paidAt),
@@ -2818,7 +2818,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
     fees: storedAmount(data.fees),
     travel: storedAmount(data.travel),
     promoDiscount: storedAmount(data.promoDiscount),
-    promoCode: text$c(data.promoCode),
+    promoCode: text$d(data.promoCode),
     tax: storedAmount(data.tax),
     total: storedAmount(data.total),
     amountPaid: storedAmount(data.amountPaid),
@@ -2840,8 +2840,8 @@ function buildClientAppointment(id, data, orderRequest) {
   }
   const proposedDate = firstDate$1(data.proposedDate, data.alternateDate, data.counterDate);
   const proposedTime = firstTime(data.proposedTime, data.alternateTime, data.counterTime);
-  const status = typeof data.status === "string" ? data.status.trim() : "";
-  const iconicAccepted = ACCEPTED.has(statusKey$1(status)) || statusKey$1(status) === "pending_confirmation" || statusKey$1(status) === "rescheduled";
+  const status2 = typeof data.status === "string" ? data.status.trim() : "";
+  const iconicAccepted = ACCEPTED.has(statusKey$1(status2)) || statusKey$1(status2) === "pending_confirmation" || statusKey$1(status2) === "rescheduled";
   let date = scheduledDate;
   let time = scheduledTime;
   if (proposedDate && iconicAccepted && proposedDate !== (requestedDate || scheduledDate)) {
@@ -2854,7 +2854,7 @@ function buildClientAppointment(id, data, orderRequest) {
   return {
     id,
     address: addressText(data.addressLabel || data.address) || "Appointment",
-    status,
+    status: status2,
     date,
     time,
     requestedDate,
@@ -2869,15 +2869,15 @@ function storedLines(lineItems, services2) {
     if (typeof item === "string" && item.trim()) return [{ name: item.trim(), qty: null, amount: null }];
     if (!item || typeof item !== "object") return [];
     const record = item;
-    const named = text$c(record.name) || text$c(record.label);
-    const description = text$c(record.description);
+    const named = text$d(record.name) || text$d(record.label);
+    const description = text$d(record.description);
     const name = named || description;
     const qty = storedQty(record.qty ?? record.quantity);
     const amount = storedAmount(record.price ?? record.amount ?? record.total);
     if (!name && amount == null && qty == null) return [];
     const line = { name: name || "Line item", qty, amount };
-    const id = text$c(record.id);
-    const category = text$c(record.category);
+    const id = text$d(record.id);
+    const category = text$d(record.category);
     if (id) line.id = id;
     if (category) line.category = category;
     if (named && description) line.description = description;
@@ -2913,7 +2913,7 @@ function isoStamp(value) {
   if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
   return null;
 }
-function text$c(value) {
+function text$d(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function roundMoney$3(value) {
@@ -3384,40 +3384,40 @@ function bookingListingGroups(input) {
   for (const doc of requests) {
     const node = nodeId("orderRequests", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("listings", text$b(doc.data.listingId)));
-    uf.link(node, nodeId("orders", text$b(doc.data.orderId) || text$b(doc.data.convertedToOrderId)));
-    uf.link(node, nodeId("invoices", text$b(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$b(doc.data.galleryId)));
+    uf.link(node, nodeId("listings", text$c(doc.data.listingId)));
+    uf.link(node, nodeId("orders", text$c(doc.data.orderId) || text$c(doc.data.convertedToOrderId)));
+    uf.link(node, nodeId("invoices", text$c(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$c(doc.data.galleryId)));
   }
   for (const doc of orders) {
     const node = nodeId("orders", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$b(doc.data.orderRequestId)));
-    uf.link(node, nodeId("listings", text$b(doc.data.listingId)));
-    uf.link(node, nodeId("invoices", text$b(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$b(doc.data.galleryId)));
+    uf.link(node, nodeId("orderRequests", text$c(doc.data.orderRequestId)));
+    uf.link(node, nodeId("listings", text$c(doc.data.listingId)));
+    uf.link(node, nodeId("invoices", text$c(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$c(doc.data.galleryId)));
   }
   for (const doc of invoices) {
     const node = nodeId("invoices", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$b(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$b(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$b(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$c(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$c(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$c(doc.data.listingId)));
   }
   for (const doc of appointments) {
     const node = nodeId("appointments", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$b(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$b(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$b(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$c(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$c(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$c(doc.data.listingId)));
   }
   for (const doc of galleries) {
     const node = nodeId("galleries", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$b(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$b(doc.data.orderId)));
-    uf.link(node, nodeId("invoices", text$b(doc.data.invoiceId)));
-    uf.link(node, nodeId("listings", text$b(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$c(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$c(doc.data.orderId)));
+    uf.link(node, nodeId("invoices", text$c(doc.data.invoiceId)));
+    uf.link(node, nodeId("listings", text$c(doc.data.listingId)));
   }
   const groups = [];
   for (const nodes of uf.components()) {
@@ -3477,7 +3477,7 @@ function fillEmptyListingFields(existing, desired) {
   return patch;
 }
 function clientOwnsListing(listing, clients) {
-  const clientId2 = text$b(listing.clientId);
+  const clientId2 = text$c(listing.clientId);
   const email = normalizeEmail$1(listing.clientEmail || listing.email);
   if (!clientId2 && !email) return true;
   if (clientId2 && clients.ids.includes(clientId2)) return true;
@@ -3549,10 +3549,10 @@ function chooseListing(group, listings, clients) {
 }
 function listingMatches(doc, group) {
   if (doc.id === group.stableId || group.preferredListingIds.includes(doc.id)) return true;
-  const requestId = text$b(doc.data.orderRequestId);
-  const orderId = text$b(doc.data.orderId);
-  const invoiceId = text$b(doc.data.invoiceId);
-  const appointmentId = text$b(doc.data.appointmentId);
+  const requestId = text$c(doc.data.orderRequestId);
+  const orderId = text$c(doc.data.orderId);
+  const invoiceId = text$c(doc.data.invoiceId);
+  const appointmentId = text$c(doc.data.appointmentId);
   return Boolean(
     requestId && group.orderRequestIds.includes(requestId) || orderId && group.orderIds.includes(orderId) || invoiceId && group.invoiceIds.includes(invoiceId) || appointmentId && group.appointmentIds.includes(appointmentId)
   );
@@ -3562,7 +3562,7 @@ function linksFor(group, listingId, listings, clients) {
   const links = [];
   const push = (collection, docs) => {
     for (const doc of docs) {
-      const current = text$b(doc.data.listingId);
+      const current = text$c(doc.data.listingId);
       if (current === listingId) continue;
       if (current && isPortalListingId(current) && ownedIds.has(current)) continue;
       links.push({ collection, id: doc.id });
@@ -3579,7 +3579,7 @@ function clientsFor(group, identity) {
   const ids = /* @__PURE__ */ new Set();
   const emails = /* @__PURE__ */ new Set();
   const addId = (value) => {
-    const id = text$b(value);
+    const id = text$c(value);
     if (id) ids.add(id);
   };
   const addEmail = (value) => {
@@ -3598,7 +3598,7 @@ function clientsFor(group, identity) {
 function preferredListingIds(group) {
   const ids = [];
   const push = (value) => {
-    const id = text$b(value);
+    const id = text$c(value);
     if (id && isPortalListingId(id) && !ids.includes(id)) ids.push(id);
   };
   for (const doc of [...group.orderRequests, ...group.orders, ...group.invoices, ...group.appointments, ...group.galleries]) {
@@ -3633,9 +3633,9 @@ function bestAddress(group) {
   }
   for (const doc of propertyDocs(group)) {
     for (const key of ["address", "propertyAddress", "shootLocation"]) {
-      if (typeof doc.data[key] === "string" && text$b(doc.data[key])) return text$b(doc.data[key]);
+      if (typeof doc.data[key] === "string" && text$c(doc.data[key])) return text$c(doc.data[key]);
     }
-    if (text$b(doc.data.addressLabel)) return text$b(doc.data.addressLabel);
+    if (text$c(doc.data.addressLabel)) return text$c(doc.data.addressLabel);
   }
   return null;
 }
@@ -3651,7 +3651,7 @@ function firstScheduleDate(group) {
 function firstScheduleTime(group) {
   for (const doc of [...group.appointments, ...group.orders, ...group.orderRequests]) {
     for (const key of ["scheduledTime", "appointmentTime", "apptTime", "requestedTime"]) {
-      const value = text$b(doc.data[key]);
+      const value = text$c(doc.data[key]);
       if (value && !/^tbd$/i.test(value)) return value;
     }
   }
@@ -3668,7 +3668,7 @@ function projectType(group) {
     if (doc.data.projectType === "real_estate") return "real_estate";
     const service = doc.data.selectedService;
     if (service && typeof service === "object") {
-      const category = text$b(service.category);
+      const category = text$c(service.category);
       if (category === "business" || category === "branding") return "business";
       if (category === "listings") return "real_estate";
     }
@@ -3694,7 +3694,7 @@ function namesFrom(value) {
   for (const item of value) {
     if (typeof item === "string" && item.trim()) names.push(item.trim());
     else if (item && typeof item === "object") {
-      const name = text$b(item.name);
+      const name = text$c(item.name);
       if (name) names.push(name);
     }
     if (names.length >= 40) break;
@@ -3719,8 +3719,8 @@ function accessInfo(group) {
   return [firstText$2(group, ["accessMethod"]), firstText$2(group, ["lockboxCode"])].filter(Boolean).join(" - ");
 }
 function clientId(group, identity) {
-  const bookingIds = propertyDocs(group).map((doc) => text$b(doc.data.clientId)).filter(Boolean);
-  const identityIds = (identity?.ids || []).map((id) => text$b(id)).filter(Boolean);
+  const bookingIds = propertyDocs(group).map((doc) => text$c(doc.data.clientId)).filter(Boolean);
+  const identityIds = (identity?.ids || []).map((id) => text$c(id)).filter(Boolean);
   return bookingIds.find((id) => identityIds.includes(id)) || bookingIds[0] || identityIds[0] || "";
 }
 function clientEmail(group, identity) {
@@ -3734,8 +3734,8 @@ function clientEmail(group, identity) {
 }
 function clientName$1(group) {
   for (const doc of propertyDocs(group)) {
-    if (text$b(doc.data.clientName)) return text$b(doc.data.clientName);
-    const joined = `${text$b(doc.data.firstName)} ${text$b(doc.data.lastName)}`.trim();
+    if (text$c(doc.data.clientName)) return text$c(doc.data.clientName);
+    const joined = `${text$c(doc.data.firstName)} ${text$c(doc.data.lastName)}`.trim();
     if (joined) return joined;
   }
   return "";
@@ -3743,7 +3743,7 @@ function clientName$1(group) {
 function chosenInvoiceId(group) {
   const known = new Set(group.invoiceIds);
   for (const doc of [...group.orderRequests, ...group.orders]) {
-    const id = text$b(doc.data.invoiceId);
+    const id = text$c(doc.data.invoiceId);
     if (id && known.has(id)) return id;
   }
   return newestDoc(group.invoices)?.id || group.invoiceIds[0] || "";
@@ -3752,7 +3752,7 @@ function chosenId(docs, ids, pointers = [], keys = []) {
   const known = new Set(ids);
   for (const doc of pointers) {
     for (const key of keys) {
-      const id = text$b(doc.data[key]);
+      const id = text$c(doc.data[key]);
       if (id && known.has(id)) return id;
     }
   }
@@ -3764,7 +3764,7 @@ function propertyDocs(group) {
 function firstText$2(group, keys) {
   for (const doc of propertyDocs(group)) {
     for (const key of keys) {
-      const value = text$b(doc.data[key]);
+      const value = text$c(doc.data[key]);
       if (value) return value;
     }
   }
@@ -3832,7 +3832,7 @@ function hasAddress(value) {
   if (typeof value === "string") return value.trim().length > 0;
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record = value;
-  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$b(record[key]).length > 0);
+  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$c(record[key]).length > 0);
 }
 function statusKey(value) {
   return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
@@ -3864,14 +3864,14 @@ function isEmpty(value) {
 function isSentinel$1(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$b(value) {
+function text$c(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function cleanDocs(docs) {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
   for (const doc of docs || []) {
-    const id = text$b(doc?.id);
+    const id = text$c(doc?.id);
     if (!id || seen.has(id)) continue;
     seen.add(id);
     out.push({ id, data: doc.data && typeof doc.data === "object" ? doc.data : {} });
@@ -3950,7 +3950,7 @@ async function ensureBookingListingForRequest(orderRequestId) {
     galleries: []
   });
   const identity = {
-    ids: text$a(request.data.clientId) ? [text$a(request.data.clientId)] : [],
+    ids: text$b(request.data.clientId) ? [text$b(request.data.clientId)] : [],
     email: normalizeEmail$1(request.data.clientEmail || request.data.email)
   };
   const plans = await plansFor(bundle, identity);
@@ -4003,7 +4003,7 @@ async function applyBookingListingPlan(plan) {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
       created = true;
-      console.info(`[Listings] Created ${plan.listingId} for booking ${text$a(plan.createFields.orderRequestId) || text$a(plan.createFields.orderId) || text$a(plan.createFields.invoiceId)}`);
+      console.info(`[Listings] Created ${plan.listingId} for booking ${text$b(plan.createFields.orderRequestId) || text$b(plan.createFields.orderId) || text$b(plan.createFields.invoiceId)}`);
     } catch (err) {
       if (!alreadyExists(err)) throw err;
       await fillListing(ref, plan.createFields);
@@ -4032,7 +4032,7 @@ async function linkRecord(collectionName, id, listingId) {
   const ref = db$o().collection(collectionName).doc(id);
   const snap = await ref.get();
   if (!snap.exists) return;
-  if (text$a(snap.data()?.listingId) === listingId) return;
+  if (text$b(snap.data()?.listingId) === listingId) return;
   await ref.update({
     listingId,
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -4046,9 +4046,9 @@ async function loadVisibleSeeds(identity) {
   const keep = (map, docs) => {
     for (const doc of docs) {
       if (!visibleToPortalClient({
-        clientId: text$a(doc.data.clientId),
-        email: text$a(doc.data.email),
-        clientEmail: text$a(doc.data.clientEmail)
+        clientId: text$b(doc.data.clientId),
+        email: text$b(doc.data.email),
+        clientEmail: text$b(doc.data.clientEmail)
       }, identity)) continue;
       if (!map.has(doc.id)) map.set(doc.id, doc);
     }
@@ -4087,23 +4087,23 @@ async function hydrateBundle(seed) {
   const galleries = mapDocs(seed.galleries);
   const requestIds = new Set(requests.keys());
   for (const doc of [...orders.values(), ...invoices.values(), ...appointments.values()]) {
-    const id = text$a(doc.data.orderRequestId);
+    const id = text$b(doc.data.orderRequestId);
     if (id) requestIds.add(id);
   }
   await readMissing("orderRequests", requestIds, requests);
   const orderIds = new Set(orders.keys());
   for (const doc of requests.values()) {
-    const id = text$a(doc.data.convertedToOrderId) || text$a(doc.data.orderId);
+    const id = text$b(doc.data.convertedToOrderId) || text$b(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   for (const doc of [...invoices.values(), ...appointments.values()]) {
-    const id = text$a(doc.data.orderId);
+    const id = text$b(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   await readMissing("orders", orderIds, orders);
   const invoiceIds = new Set(invoices.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$a(doc.data.invoiceId);
+    const id = text$b(doc.data.invoiceId);
     if (id) invoiceIds.add(id);
   }
   await readMissing("invoices", invoiceIds, invoices);
@@ -4113,7 +4113,7 @@ async function hydrateBundle(seed) {
   mergeDocs(appointments, await queryIn("appointments", "orderId", [...orders.keys()]));
   const galleryIds = new Set(galleries.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$a(doc.data.galleryId);
+    const id = text$b(doc.data.galleryId);
     if (id) galleryIds.add(id);
   }
   await readMissing("galleries", galleryIds, galleries);
@@ -4231,7 +4231,7 @@ function alreadyExists(err) {
 function isSentinel(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$a(value) {
+function text$b(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function chunk(items, size) {
@@ -4342,7 +4342,7 @@ function synthesizePackageLine(record) {
 }
 function packageLabel(record) {
   for (const key of PACKAGE_LABEL_KEYS) {
-    const value = text$9(record[key]);
+    const value = text$a(record[key]);
     if (value) return value;
   }
   return "";
@@ -4378,7 +4378,7 @@ function moneyOrNull$1(value) {
 function nested$2(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$9(value) {
+function text$a(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function roundMoney$1(value) {
@@ -4401,7 +4401,7 @@ function officeNewOrderEmail(saved, options) {
   const notes = notesOf(saved);
   const fields = [
     ["Order number", orderNumber],
-    ["Admin link", text$8(options?.adminUrl) || NOT_PROVIDED],
+    ["Admin link", text$9(options?.adminUrl) || NOT_PROVIDED],
     ["Client name", clientName2],
     ["Client email", firstText$1(saved, ["clientEmail", "email"])],
     ["Client phone", firstText$1(saved, ["clientPhone", "phone"])],
@@ -4448,14 +4448,14 @@ ${notes}`.toUpperCase().includes("TEST ORDER");
 function orderNumberOf(saved) {
   const explicit = firstText$1(saved, ["orderNumber", "orderCode", "displayId"]);
   if (explicit) return explicit;
-  const id = text$8(saved.id);
+  const id = text$9(saved.id);
   if (!id) return NOT_PROVIDED;
   return `ORD-${id.slice(-5).toUpperCase()}`;
 }
 function clientNameOf(saved) {
   const named = firstText$1(saved, ["clientName", "customerName"]);
   if (named) return named;
-  const joined = [text$8(saved.firstName), text$8(saved.lastName)].filter(Boolean).join(" ");
+  const joined = [text$9(saved.firstName), text$9(saved.lastName)].filter(Boolean).join(" ");
   return joined || NOT_PROVIDED;
 }
 function agentContactOf(saved) {
@@ -4473,7 +4473,7 @@ function agentField(saved, keys, nestedKey) {
   if (direct !== NOT_PROVIDED) return direct;
   for (const holder of [saved.agent, saved.listingAgent, saved.realtor]) {
     const record = nested$1(holder);
-    const value = text$8(record[nestedKey]);
+    const value = text$9(record[nestedKey]);
     if (value) return value;
   }
   return "";
@@ -4482,7 +4482,7 @@ function digits(value) {
   return value === NOT_PROVIDED ? "" : value.replace(/\D/g, "");
 }
 function notesOf(saved) {
-  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$8(saved[key])).filter(Boolean);
+  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$9(saved[key])).filter(Boolean);
   return parts.length ? parts.join("\n") : NOT_PROVIDED;
 }
 function lockboxOf(saved) {
@@ -4490,12 +4490,12 @@ function lockboxOf(saved) {
   return code || NOT_PROVIDED;
 }
 function occupancyOf(saved) {
-  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$8(saved[key])).filter(Boolean);
+  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$9(saved[key])).filter(Boolean);
   return parts.length ? parts.join(", ") : NOT_PROVIDED;
 }
 function bookedVia(saved) {
-  const lead = text$8(saved.leadSource);
-  const source = text$8(saved.source);
+  const lead = text$9(saved.leadSource);
+  const source = text$9(saved.source);
   const blob = `${lead} ${source}`.toLowerCase();
   if (!blob.trim()) return NOT_PROVIDED;
   if (/admin/.test(blob)) return "Admin";
@@ -4505,7 +4505,7 @@ function bookedVia(saved) {
 }
 function paymentOf(saved, total) {
   const invoice = nested$1(saved.invoice);
-  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$8(value).toLowerCase()).find(Boolean) || "";
+  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$9(value).toLowerCase()).find(Boolean) || "";
   if (/partial/.test(explicit)) return "Partial";
   if (/\bpaid\b/.test(explicit) && !/unpaid/.test(explicit)) return "Paid";
   if (/unpaid/.test(explicit)) return "Unpaid";
@@ -4612,7 +4612,7 @@ function moneyOrNull(value) {
 function nested$1(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$8(value) {
+function text$9(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function escapeHtml$4(value) {
@@ -4687,7 +4687,7 @@ function buildAdminOrderTile(record) {
   const packageName = skin2?.title || named || "Custom order";
   const charges = orderChargeSummary(record, lines);
   return {
-    id: text$7(record.id) || packageName,
+    id: text$8(record.id) || packageName,
     orderCode: orderCode(kind, record),
     kind,
     typeLabel: kind === "business" ? "Business" : "Listing",
@@ -4709,7 +4709,7 @@ function buildAdminOrderTile(record) {
   };
 }
 function orderKind(record, skin2) {
-  const raw = text$7(record.projectType || record.orderType || record.type).toLowerCase();
+  const raw = text$8(record.projectType || record.orderType || record.type).toLowerCase();
   if (raw === "business" || raw === "brand" || raw === "social") return "business";
   if (raw === "real_estate" || raw === "listing" || raw === "property") return "listing";
   if (skin2?.category === "listing") return "listing";
@@ -4723,38 +4723,38 @@ function channelFor(skin2, kind) {
   return kind === "business" ? "Human Brand" : "Listings & Spaces";
 }
 function orderCode(kind, record) {
-  const explicit = text$7(record.orderCode || record.orderNumber || record.displayId);
+  const explicit = text$8(record.orderCode || record.orderNumber || record.displayId);
   if (explicit) return explicit.toUpperCase();
-  const id = text$7(record.id);
+  const id = text$8(record.id);
   const prefix = kind === "listing" ? "L" : "B";
   const digits2 = id.replace(/\D/g, "");
   const tail = (digits2 || id.replace(/[^a-zA-Z0-9]/g, "")).slice(-5).toUpperCase().padStart(5, "0");
   return `ORD - ${prefix} - ${tail}`;
 }
 function heroFromRecord(record) {
-  const explicit = text$7(record.heroUrl) || text$7(record.coverUrl) || text$7(record.coverImage);
+  const explicit = text$8(record.heroUrl) || text$8(record.coverUrl) || text$8(record.coverImage);
   if (explicit) return explicit;
   const images = record.images;
   if (!Array.isArray(images)) return "";
   for (const image of images) {
     if (typeof image === "string" && image.trim()) return image.trim();
     if (image && typeof image === "object") {
-      const url = text$7(image.url) || text$7(image.thumbnailUrl);
+      const url = text$8(image.url) || text$8(image.thumbnailUrl);
       if (url) return url;
     }
   }
   return "";
 }
 function clientName(record) {
-  const named = text$7(record.clientName) || text$7(record.customerName) || text$7(record.agentName) || [text$7(record.firstName), text$7(record.lastName)].filter(Boolean).join(" ");
+  const named = text$8(record.clientName) || text$8(record.customerName) || text$8(record.agentName) || [text$8(record.firstName), text$8(record.lastName)].filter(Boolean).join(" ");
   return named || "—";
 }
 function appointmentLabel(record) {
   const raw = record.appointmentDate ?? record.apptDate ?? record.scheduledDate ?? record.requestedDate;
   const key = calendarDateKey(raw);
   const date = formatShootDateLabel(key, typeof raw === "string" ? raw : void 0);
-  const time = text$7(record.scheduledTime || record.appointmentTime || record.requestedTime);
-  const photographer = text$7(record.assignedPhotographerName || record.photographerName || record.photographerPreference);
+  const time = text$8(record.scheduledTime || record.appointmentTime || record.requestedTime);
+  const photographer = text$8(record.assignedPhotographerName || record.photographerName || record.photographerPreference);
   return [date, time, photographer].filter(Boolean).join(" · ") || "—";
 }
 function tilePrice(amount) {
@@ -4797,15 +4797,15 @@ function paidState(record) {
   const paid = money$3(invoice.amountPaid ?? record.amountPaid);
   if (paid > 0 && total > 0 && paid + 9e-3 < total) return "partial";
   if (/\bpaid\b/.test(explicit) || record.paidAt || paid > 0 && (total === 0 || paid >= total)) return "paid";
-  const status = normalize(record.status);
-  if (status === "paid" || status === "delivered_paid") return "paid";
+  const status2 = normalize(record.status);
+  if (status2 === "paid" || status2 === "delivered_paid") return "paid";
   return "unpaid";
 }
 function deliveryState(record) {
-  const status = normalize(record.status);
+  const status2 = normalize(record.status);
   const delivery = normalize(record.deliveryStatus || record.galleryStatus);
-  if (record.deliveredAt || status.includes("delivered") || delivery === "delivered") return "delivered";
-  if (status === "in_progress" || status === "pending" || status === "pending_edit" || status === "in_review" || status === "editing" || status === "scheduled" || status === "confirmed" || status === "appt_scheduled" || status === "consult_scheduled" || delivery === "pending" || delivery === "undelivered" || delivery === "in_progress" || delivery === "ready_for_review") return "in_progress";
+  if (record.deliveredAt || status2.includes("delivered") || delivery === "delivered") return "delivered";
+  if (status2 === "in_progress" || status2 === "pending" || status2 === "pending_edit" || status2 === "in_review" || status2 === "editing" || status2 === "scheduled" || status2 === "confirmed" || status2 === "appt_scheduled" || status2 === "consult_scheduled" || delivery === "pending" || delivery === "undelivered" || delivery === "in_progress" || delivery === "ready_for_review") return "in_progress";
   return "not_delivered";
 }
 function nested(value) {
@@ -4822,7 +4822,7 @@ function money$3(value) {
   }
   return 0;
 }
-function text$7(value) {
+function text$8(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const router$m = Router();
@@ -5629,9 +5629,9 @@ const router$l = Router();
 const db$m = () => admin.firestore();
 router$l.get("/", requireStaff, async (req, res) => {
   try {
-    const { status, photographerId, limit = "50", startAfter } = req.query;
+    const { status: status2, photographerId, limit = "50", startAfter } = req.query;
     let query = db$m().collection("orders").orderBy("createdAt", "desc");
-    if (status) query = query.where("status", "==", status);
+    if (status2) query = query.where("status", "==", status2);
     if (photographerId) {
       query = query.where("assignedPhotographerId", "==", photographerId);
     }
@@ -5766,36 +5766,36 @@ const VALID_TRANSITIONS = {
 };
 router$l.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
-    const { status, note } = req.body;
+    const { status: status2, note } = req.body;
     const orderDoc = await db$m().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
     const currentStatus = orderDoc.data().status;
     const validNext = VALID_TRANSITIONS[currentStatus] || [];
-    if (!validNext.includes(status)) {
+    if (!validNext.includes(status2)) {
       return res.status(400).json({
-        error: `Cannot transition from '${currentStatus}' to '${status}'.`,
+        error: `Cannot transition from '${currentStatus}' to '${status2}'.`,
         validTransitions: validNext
       });
     }
     const updates = {
-      status,
+      status: status2,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    if (status === "completed") {
+    if (status2 === "completed") {
       updates.completedAt = admin.firestore.FieldValue.serverTimestamp();
     }
     await orderDoc.ref.update(updates);
     const apptSnapshot = await db$m().collection("appointments").where("orderId", "==", req.params.id).limit(1).get();
     if (!apptSnapshot.empty) {
-      const apptStatus = status === "in_progress" ? "in_progress" : status === "shot_complete" || status === "editing" ? "completed" : status === "cancelled" ? "cancelled" : void 0;
+      const apptStatus = status2 === "in_progress" ? "in_progress" : status2 === "shot_complete" || status2 === "editing" ? "completed" : status2 === "cancelled" ? "cancelled" : void 0;
       if (apptStatus) {
         await apptSnapshot.docs[0].ref.update({ status: apptStatus });
       }
     }
     await db$m().collection("agentLogs").add({
       agent: "nora",
-      action: `Order status changed: ${currentStatus} → ${status}`,
-      summary: `Order ${req.params.id} transitioned to ${status}`,
+      action: `Order status changed: ${currentStatus} → ${status2}`,
+      summary: `Order ${req.params.id} transitioned to ${status2}`,
       status: "completed",
       relatedId: req.params.id,
       relatedType: "order",
@@ -5804,7 +5804,7 @@ router$l.patch("/:id/status", requireCoordinator, async (req, res) => {
       details: note || "",
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    return res.json({ success: true, status });
+    return res.json({ success: true, status: status2 });
   } catch (err) {
     console.error("[Orders] Status update error:", err);
     return res.status(500).json({ error: "Failed to update order status." });
@@ -5852,9 +5852,9 @@ function invoiceBalance(invoice) {
 }
 function invoiceAllowsDownload(invoice) {
   if (!invoice) return false;
-  const status = statusOf$1(invoice);
-  if (CLOSED_STATUSES.has(status)) return false;
-  if (SETTLED_STATUSES.has(status)) return true;
+  const status2 = statusOf$1(invoice);
+  if (CLOSED_STATUSES.has(status2)) return false;
+  if (SETTLED_STATUSES.has(status2)) return true;
   const hasMoney = ["total", "amountDue", "amountPaid"].some((key) => numeric(invoice[key]) != null);
   if (!hasMoney) return false;
   const { total, amountPaid, amountDue } = invoiceBalance(invoice);
@@ -5881,8 +5881,8 @@ function clientGalleryDownloadsUnlocked(gate = {}) {
 }
 function amountStillDue(invoice) {
   if (!invoice) return 0;
-  const status = statusOf$1(invoice);
-  if (SETTLED_STATUSES.has(status) || CLOSED_STATUSES.has(status)) return 0;
+  const status2 = statusOf$1(invoice);
+  if (SETTLED_STATUSES.has(status2) || CLOSED_STATUSES.has(status2)) return 0;
   const { total, amountPaid, amountDue } = invoiceBalance(invoice);
   const computedDue = Math.max(0, total - amountPaid);
   const statedDue = numeric(invoice.amountDue);
@@ -6135,6 +6135,51 @@ function frameFromListingImage(raw, index = 0) {
     studioRole: typeof item.studioRole === "string" ? item.studioRole : void 0
   };
 }
+const SETTLED = /* @__PURE__ */ new Set(["paid", "comped"]);
+function text$7(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function status(value) {
+  return text$7(value).toLowerCase();
+}
+function settled(value) {
+  return SETTLED.has(status(value));
+}
+function nestedInvoiceStatus(listing) {
+  const nested2 = listing?.invoice;
+  if (!nested2 || typeof nested2 !== "object") return "";
+  return text$7(nested2.status);
+}
+function releaseFlags(subject) {
+  const listing = subject.listing;
+  return {
+    downloadEnabled: listing?.downloadEnabled === true || subject.galleries.some((gallery) => gallery.downloadEnabled === true),
+    downloadsReleased: listing?.downloadsReleased === true || subject.galleries.some((gallery) => gallery.downloadsReleased === true)
+  };
+}
+function copiedPaidFields(listing) {
+  if (!listing) return [];
+  const fields = [];
+  if (settled(listing.paymentStatus)) fields.push(`listing.paymentStatus=${status(listing.paymentStatus)}`);
+  if (settled(listing.invoiceStatus)) fields.push(`listing.invoiceStatus=${status(listing.invoiceStatus)}`);
+  const nested2 = nestedInvoiceStatus(listing);
+  if (settled(nested2)) fields.push(`listing.invoice.status=${status(nested2)}`);
+  return fields;
+}
+function strictStudioDownloadsUnlocked(subject) {
+  const flags = releaseFlags(subject);
+  const invoice = subject.invoice && typeof subject.invoice === "object" ? subject.invoice : null;
+  return clientGalleryDownloadsUnlocked({
+    invoice,
+    downloadEnabled: flags.downloadEnabled,
+    downloadsReleased: flags.downloadsReleased,
+    lockDownloads: subject.listing?.lockDownloads
+  });
+}
+function studioDownloadsUnlocked(subject) {
+  if (strictStudioDownloadsUnlocked(subject)) return true;
+  return copiedPaidFields(subject.listing).length > 0;
+}
 const RELEASED_GALLERY_STATUSES = ["delivered", "approved"];
 const ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 function invalidGalleryLinkMessage(id) {
@@ -6155,16 +6200,16 @@ function httpUrl(value) {
   return url.startsWith("https://") || url.startsWith("http://") ? url : "";
 }
 function galleryResult(doc, via) {
-  const status = statusOf(doc) || "unknown";
+  const status2 = statusOf(doc) || "unknown";
   const released = isReleased(doc);
   const prefix = via ? `${via} ` : "";
-  const staffNote = released ? `${prefix}Gallery ${doc.id} is ${status}. Open /gallery/${doc.id}.` : `${prefix}Gallery ${doc.id} exists, but its status is “${status}”. Photos stay hidden until a coordinator sets it to delivered or approved. This is not a missing link. The delivery URL is /gallery/${doc.id}.`;
+  const staffNote = released ? `${prefix}Gallery ${doc.id} is ${status2}. Open /gallery/${doc.id}.` : `${prefix}Gallery ${doc.id} exists, but its status is “${status2}”. Photos stay hidden until a coordinator sets it to delivered or approved. This is not a missing link. The delivery URL is /gallery/${doc.id}.`;
   return {
     ok: true,
     kind: "gallery",
     galleryId: doc.id,
     released,
-    status,
+    status: status2,
     staffNote
   };
 }
@@ -6318,8 +6363,8 @@ function invoiceOf(listing) {
   if (nested2 && typeof nested2 === "object" && typeof nested2.status === "string") {
     return { status: nested2.status };
   }
-  const status = text$6(listing.invoiceStatus);
-  return status ? { status } : null;
+  const status2 = text$6(listing.invoiceStatus);
+  return status2 ? { status: status2 } : null;
 }
 function pickReleasedGallery(listing, related) {
   const preferred = text$6(listing.galleryId) || text$6(listing.playtestGalleryId);
@@ -6386,16 +6431,197 @@ function publicProject(listing, _related, notice) {
     view: "public"
   };
 }
+const ORIGINAL_FILE = /\.(mp4|m4v|mov|webm|avi|mkv|zip|pdf|dng|cr2|cr3|nef|nrw|arw|srf|sr2|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic|heif)(\?|#|$)/i;
+const DISPLAY_IMAGE = /\.(jpe?g|png|webp|gif)(\?|#|$)/i;
+const FILE_URL_KEYS = ["downloadUrl", "fileUrl", "originalUrl", "fullResUrl", "mlsUrl", "zipUrl", "printUrl", "reelUrl", "mp4Url", "rawUrl", "src"];
+const STREAM_KEYS = ["streamUrl", "previewUrl", "playbackUrl", "embedUrl"];
+const DISPLAY_IMAGE_KEYS = ["previewUrl", "displayUrl", "webUrl", "thumbnailUrl", "poster", "posterUrl"];
+function isOriginalFileUrl(url) {
+  return ORIGINAL_FILE.test(url.split("#")[0]);
+}
+function isDisplayImageUrl(url) {
+  return DISPLAY_IMAGE.test(url.split("#")[0]);
+}
+function isStreamUrl(url) {
+  if (!url || isOriginalFileUrl(url)) return false;
+  if (/\.m3u8(\?|#|$)/i.test(url)) return true;
+  return /(youtube\.com|youtu\.be|vimeo\.com|player\.vimeo\.com|mux\.com|stream\.mux|cloudflarestream\.com)/i.test(url);
+}
+function isFullResOrMls(row) {
+  const category = text$6(row.category).toLowerCase();
+  const type = text$6(row.type).toLowerCase();
+  if (category === "mls" || category === "full-res" || category === "fullres" || type === "mls") return true;
+  const label = `${text$6(row.fileName)} ${text$6(row.name)} ${text$6(row.title)} ${text$6(row.path)} ${text$6(row.storagePath)}`.toLowerCase();
+  if (/(^|[^a-z0-9])(full[\s_-]?res|mls)([^a-z0-9]|$)/.test(label)) return true;
+  return /\/(mls|full)\//.test(label);
+}
+function rowIsDeliveryOriginal(row) {
+  if (row.downloadable === true || isFullResOrMls(row)) return true;
+  const type = text$6(row.type).toLowerCase();
+  if (type === "video" || type === "reel" || type === "file") return true;
+  const content = text$6(row.contentType).toLowerCase();
+  if (content.startsWith("video/") || content === "application/zip" || content === "application/pdf") return true;
+  const candidates = [row.url, row.shareUrl, row.embedUrl, ...FILE_URL_KEYS.map((key) => row[key])];
+  return candidates.some((value) => isOriginalFileUrl(httpUrl(value) || text$6(value)));
+}
+function pushNeedle(needles, value) {
+  const raw = text$6(value);
+  if (raw.length >= 12) needles.push(raw);
+}
+function walkOriginalNeedles(value, needles, inheritedOriginal = false) {
+  if (Array.isArray(value)) {
+    for (const item of value) walkOriginalNeedles(item, needles, inheritedOriginal);
+    return;
+  }
+  const row = rowOf(value);
+  if (!row) return;
+  for (const key of FILE_URL_KEYS) pushNeedle(needles, row[key]);
+  const original = inheritedOriginal || rowIsDeliveryOriginal(row);
+  if (original) {
+    const fileUrls = new Set(FILE_URL_KEYS.map((key) => httpUrl(row[key])).filter(Boolean));
+    for (const key of ["url", "shareUrl", "embedUrl", "sourcePath", "storagePath", "path"]) {
+      const raw = text$6(row[key]);
+      if (!raw) continue;
+      const asUrl = httpUrl(raw);
+      if (asUrl && isStreamUrl(asUrl)) continue;
+      if (!inheritedOriginal && (key === "url" || key === "shareUrl") && asUrl && isDisplayImageUrl(asUrl) && !fileUrls.has(asUrl) && !isFullResOrMls(row) && row.downloadable !== true) continue;
+      pushNeedle(needles, raw);
+    }
+    for (const key of DISPLAY_IMAGE_KEYS) {
+      const url = httpUrl(row[key]);
+      if (!url || isDisplayImageUrl(url) || isStreamUrl(url)) continue;
+      pushNeedle(needles, url);
+    }
+  }
+  for (const child of Object.values(row)) {
+    if (child && typeof child === "object") walkOriginalNeedles(child, needles, original);
+  }
+}
+function listingOriginalNeedles(listing) {
+  const needles = [];
+  for (const key of ["zipUrl", "downloadUrl", "mlsUrl", "mlsPackageUrl", "fullResUrl", "fileUrl", "originalUrl", "mp4Url"]) {
+    pushNeedle(needles, listing[key]);
+  }
+  for (const group of [listing.images, listing.videos, listing.files, listing.downloads, listing.mlsFiles, listing.floorplans, listing.floorPlans, listing.tours]) {
+    if (!Array.isArray(group)) continue;
+    for (const item of group) walkOriginalNeedles(item, needles);
+  }
+  return [...new Set(needles)];
+}
+function containsOriginal(value, needles) {
+  return needles.some((needle) => value === needle || value.includes(needle));
+}
+function scrubOriginals(value, needles) {
+  const walk = (input) => {
+    if (typeof input === "string") return containsOriginal(input, needles) ? null : input;
+    if (Array.isArray(input)) return input.map(walk);
+    if (input && typeof input === "object") {
+      const out = {};
+      for (const [key, child] of Object.entries(input)) {
+        out[key] = walk(child);
+      }
+      return out;
+    }
+    return input;
+  };
+  return walk(value);
+}
+function displayImageCandidate(row, needles) {
+  for (const key of DISPLAY_IMAGE_KEYS) {
+    const url = httpUrl(row[key]);
+    if (!url || !isDisplayImageUrl(url) || containsOriginal(url, needles)) continue;
+    return url;
+  }
+  return "";
+}
+function lockedPhoto(row, index, needles) {
+  const frame = frameFromListingImage(row, index);
+  if (!frame || frame.raw) return null;
+  const display = displayImageCandidate(row, needles);
+  if (display) return { url: display, name: frame.name };
+  const url = httpUrl(row.url);
+  if (!url || !isDisplayImageUrl(url) || isOriginalFileUrl(url) || containsOriginal(url, needles)) return null;
+  if (isPrivateMedia(frame.path, frame.name, url) || isFullResOrMls(row) || row.downloadable === true) return null;
+  return { url, name: frame.name };
+}
+function lockedVideo(row, needles) {
+  const name = mediaName(row, "Video");
+  let stream = "";
+  let streamKey = "";
+  for (const key of STREAM_KEYS) {
+    const url = httpUrl(row[key]);
+    if (!url || !isStreamUrl(url) || containsOriginal(url, needles)) continue;
+    stream = url;
+    streamKey = key;
+    break;
+  }
+  const poster = displayImageCandidate(row, needles);
+  if (!name && !stream && !poster) return null;
+  const media = { url: stream || null, name };
+  if (stream && streamKey) media[streamKey] = stream;
+  if (poster) {
+    media.poster = poster;
+    media.thumbnailUrl = poster;
+  }
+  return media;
+}
+function lockedOwnerMedia(listing, pub) {
+  const needles = listingOriginalNeedles(listing);
+  const images = [];
+  if (Array.isArray(listing.images)) {
+    listing.images.forEach((item, index) => {
+      const row = rowOf(item);
+      if (!row) return;
+      const photo = lockedPhoto(row, index, needles);
+      if (photo) images.push(photo);
+    });
+  }
+  const videos = [];
+  if (Array.isArray(listing.videos)) {
+    for (const item of listing.videos) {
+      const row = rowOf(item);
+      if (!row) continue;
+      const video = lockedVideo(row, needles);
+      if (video) videos.push(video);
+    }
+  }
+  const floorPlans = [];
+  for (const group of [listing.floorplans, listing.floorPlans]) {
+    if (!Array.isArray(group)) continue;
+    group.forEach((item, index) => {
+      const row = rowOf(item);
+      if (!row) return;
+      const plan = lockedPhoto(row, index, needles);
+      if (plan) floorPlans.push(plan);
+    });
+  }
+  const tourUrl = pub.tourUrl && !isOriginalFileUrl(pub.tourUrl) && !containsOriginal(pub.tourUrl, needles) ? pub.tourUrl : "";
+  return scrubOriginals({
+    images: images.slice(0, 200),
+    videos: videos.slice(0, 40),
+    floorPlans: floorPlans.slice(0, 40),
+    tourUrl
+  }, needles);
+}
 function ownerStudioProject(listing, pub, gate = {}) {
-  const invoiceStatus = text$6(gate.invoice?.status) || text$6(invoiceOf(listing)?.status);
+  const authoritativeInvoice = Object.prototype.hasOwnProperty.call(gate, "invoice");
+  const invoiceDoc = authoritativeInvoice && gate.invoice && typeof gate.invoice === "object" ? gate.invoice : null;
+  const invoiceStatus = authoritativeInvoice ? text$6(invoiceDoc?.status) : text$6(invoiceOf(listing)?.status);
   const invoice = invoiceStatus ? { status: invoiceStatus } : null;
-  const downloadsUnlocked = clientGalleryDownloadsUnlocked({
-    invoice,
-    downloadEnabled: gate.downloadEnabled ?? listing.downloadEnabled,
-    downloadsReleased: gate.downloadsReleased ?? listing.downloadsReleased,
-    lockDownloads: listing.lockDownloads
+  const downloadsUnlocked = studioDownloadsUnlocked({
+    listing: {
+      id: listing.id,
+      invoiceStatus: listing.invoiceStatus,
+      paymentStatus: listing.paymentStatus,
+      invoice: listing.invoice,
+      downloadEnabled: gate.downloadEnabled ?? listing.downloadEnabled,
+      downloadsReleased: gate.downloadsReleased ?? listing.downloadsReleased,
+      lockDownloads: listing.lockDownloads
+    },
+    galleries: [],
+    invoice: authoritativeInvoice ? invoiceDoc : null
   });
-  return {
+  const project = {
     ...pub,
     view: "owner",
     clientName: text$6(listing.clientName),
@@ -6408,6 +6634,12 @@ function ownerStudioProject(listing, pub, gate = {}) {
     invoice,
     images: downloadsUnlocked ? ownerImageDownloads(listing, pub.images) : pub.images,
     files: downloadsUnlocked ? ownerFiles(listing) : []
+  };
+  if (downloadsUnlocked || gate.staffAccess === true) return project;
+  return {
+    ...project,
+    ...lockedOwnerMedia(listing, pub),
+    files: []
   };
 }
 function pointerMessage(id, via, galleryId, listingId) {
@@ -6723,8 +6955,8 @@ function orderEditDocId(listingId, slot) {
   return `order_${clean}`;
 }
 const AERIAL_NAME = /aerial|drone/i;
-function galleryStatusNeedsReleaseGate(status) {
-  return RELEASED_GALLERY_STATUSES.includes(status);
+function galleryStatusNeedsReleaseGate(status2) {
+  return RELEASED_GALLERY_STATUSES.includes(status2);
 }
 function isAerialAssetName(value) {
   return AERIAL_NAME.test(value);
@@ -6903,8 +7135,8 @@ const RELEASED_QUEUE_STATUSES = /* @__PURE__ */ new Set(["delivered", "approved"
 function isMediaDeliveryStatus(value) {
   return MEDIA_DELIVERY_STATUSES.includes(value);
 }
-function mediaDeliveryFromGalleryStatus(status) {
-  const value = String(status || "").trim();
+function mediaDeliveryFromGalleryStatus(status2) {
+  const value = String(status2 || "").trim();
   if (RELEASED_QUEUE_STATUSES.has(value)) return "delivered";
   if (value === "ready_for_review") return "undelivered";
   if (EARLY_GALLERY_STATUSES.has(value)) return "pending";
@@ -6987,11 +7219,11 @@ function applyLinkedRecordPresence(rows, presence, galleryIdByListing = /* @__PU
 function tallyStudioJobs(jobs) {
   const studio = emptyStudio();
   for (const job of jobs) {
-    const status = String(job.status || "");
-    if (status === "pending" || status === "processing") studio.active += 1;
-    else if (status === "review") studio.review += 1;
-    else if (status === "approved") studio.approved += 1;
-    else if (status === "failed" || status === "rejected") studio.failed += 1;
+    const status2 = String(job.status || "");
+    if (status2 === "pending" || status2 === "processing") studio.active += 1;
+    else if (status2 === "review") studio.review += 1;
+    else if (status2 === "approved") studio.approved += 1;
+    else if (status2 === "failed" || status2 === "rejected") studio.failed += 1;
   }
   return studio;
 }
@@ -7294,16 +7526,16 @@ const DELIVERY_INSPECTION_NOTES = [
 ];
 const INSPECTION_MISSING_KEY_NOTE = "Inspection skipped. Review this photo.";
 const INSPECTION_FAILED_NOTE = "Inspection did not finish. Review this photo.";
-function deliveryInspection(status, notes) {
-  return { status, notes: [...notes] };
+function deliveryInspection(status2, notes) {
+  return { status: status2, notes: [...notes] };
 }
 const MAX_SOURCE_BYTES = 2e7;
 class OpenAiEditError extends Error {
   status;
-  constructor(message, status) {
+  constructor(message, status2) {
     super(message);
     this.name = "OpenAiEditError";
-    this.status = status;
+    this.status = status2;
   }
 }
 function readOpenAiApiKey(env) {
@@ -7362,7 +7594,7 @@ function isTimeoutError(err) {
   const name = err.name;
   return name === "TimeoutError" || name === "AbortError";
 }
-function openAiErrorNote(status, body) {
+function openAiErrorNote(status2, body) {
   let message = "";
   let code = "";
   try {
@@ -7375,11 +7607,11 @@ function openAiErrorNote(status, body) {
   if (code === "moderation_blocked" || /moderation/i.test(message)) {
     return "OpenAI blocked this edit. Revise the prompt and queue it again.";
   }
-  if (status === 401) return "OpenAI rejected the API key. Check OPENAI_API_KEY on the server.";
-  if (status === 429) return "OpenAI rate limit reached. Wait a moment and queue the edit again.";
+  if (status2 === 401) return "OpenAI rejected the API key. Check OPENAI_API_KEY on the server.";
+  if (status2 === 429) return "OpenAI rate limit reached. Wait a moment and queue the edit again.";
   const detail = message.replace(/\s+/g, " ").slice(0, 180);
-  if (detail) return `OpenAI could not edit this photo (${status}). ${detail}`;
-  return `OpenAI could not edit this photo (${status}). Queue the edit again.`;
+  if (detail) return `OpenAI could not edit this photo (${status2}). ${detail}`;
+  return `OpenAI could not edit this photo (${status2}). Queue the edit again.`;
 }
 async function editListingPhotoWithOpenAI(input) {
   const apiKey = input.apiKey.trim();
@@ -7539,8 +7771,8 @@ async function inspectFinishedListingJpeg(input) {
 }
 const db$k = () => admin.firestore();
 const bucket = () => admin.storage().bucket();
-function httpError$3(status, message) {
-  return Object.assign(new Error(message), { status });
+function httpError$3(status2, message) {
+  return Object.assign(new Error(message), { status: status2 });
 }
 async function bumpRawIngestJob(input) {
   const file = {
@@ -7741,14 +7973,14 @@ async function prepareOrderEditJobs(input) {
   const { listing, plan } = await loadOrderEditContext(input.listingId);
   const frames = listingFrames(listing.data);
   const drafts = orderEditDrafts(plan, frames);
-  const settled = /* @__PURE__ */ new Set(["review", "approved", "rejected", "processing", "failed"]);
-  if (input.retryFailed) settled.delete("failed");
+  const settled2 = /* @__PURE__ */ new Set(["review", "approved", "rejected", "processing", "failed"]);
+  if (input.retryFailed) settled2.delete("failed");
   let prepared = 0;
   for (const draft of drafts) {
     const ref = db$k().collection("editJobs").doc(orderEditDocId(input.listingId, draft.slot));
     const snap = await ref.get();
     const current = snap.data() || {};
-    if (snap.exists && settled.has(String(current.status || ""))) continue;
+    if (snap.exists && settled2.has(String(current.status || ""))) continue;
     const payload = {
       kind: "ai_edit",
       origin: "order",
@@ -8360,8 +8592,8 @@ async function loadGalleryReleaseForGallery(galleryId) {
   });
 }
 const db$i = () => admin.firestore();
-function httpError$2(status, message, extra) {
-  return Object.assign(new Error(message), { status, ...extra });
+function httpError$2(status2, message, extra) {
+  return Object.assign(new Error(message), { status: status2, ...extra });
 }
 function appUrl$1() {
   return process.env.APP_URL || "https://iconicimagestx.com";
@@ -8608,11 +8840,11 @@ async function finishGalleryLink(result, caller) {
     relatedForListing(listing)
   ]);
   if (result.project.view !== "public") return result;
-  const status = typeof invoice?.status === "string" ? invoice.status : "";
   const project = ownerStudioProject(listing, result.project, {
-    invoice: status ? { status } : null,
+    invoice: invoice ?? null,
     downloadEnabled: listing.downloadEnabled === true || related.some((doc) => doc.downloadEnabled === true),
-    downloadsReleased: listing.downloadsReleased === true || related.some((doc) => doc.downloadsReleased === true)
+    downloadsReleased: listing.downloadsReleased === true || related.some((doc) => doc.downloadsReleased === true),
+    staffAccess: Boolean(caller?.staffRole)
   });
   return { ...result, project };
 }
@@ -8726,9 +8958,9 @@ function clientGalleryPayload(id, gallery, gate) {
 }
 router$k.get("/", requireStaff, async (req, res) => {
   try {
-    const { status, orderId } = req.query;
+    const { status: status2, orderId } = req.query;
     let query = db$g().collection("galleries").orderBy("createdAt", "desc");
-    if (status) query = query.where("status", "==", status);
+    if (status2) query = query.where("status", "==", status2);
     if (orderId) query = query.where("orderId", "==", orderId);
     const snapshot = await query.limit(100).get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -8908,25 +9140,25 @@ router$k.get("/:id/release", requireCoordinator, async (req, res) => {
     const report = await loadGalleryReleaseForGallery(req.params.id);
     return res.json(report);
   } catch (err) {
-    const status = err.status;
-    if (status === 404) return res.status(404).json({ error: "Gallery not found." });
+    const status2 = err.status;
+    if (status2 === 404) return res.status(404).json({ error: "Gallery not found." });
     console.error("[Galleries] Release check error:", err);
     return res.status(500).json({ error: "Failed to check gallery release." });
   }
 });
 router$k.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
-    const { status } = req.body;
+    const { status: status2 } = req.body;
     const validStatuses = ["pending_upload", "raw_uploaded", "editing", "ready_for_review", "approved", "delivered"];
-    if (!validStatuses.includes(status)) {
+    if (!validStatuses.includes(status2)) {
       return res.status(400).json({ error: "Invalid status." });
     }
-    if (galleryStatusNeedsReleaseGate(status)) {
+    if (galleryStatusNeedsReleaseGate(status2)) {
       if (!adminReady$5(res)) return;
       if (await holdIfOrderIncomplete(res, req.params.id)) return;
     }
     await db$g().collection("galleries").doc(req.params.id).update({
-      status,
+      status: status2,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
     return res.json({ success: true });
@@ -10576,11 +10808,11 @@ function buildPortalListingDetail(sources) {
   const website = readWebsite(listing.portalWebsite);
   const invoices = readInvoices(sources.invoices || []);
   const activity = buildActivity(sources, photos, videos, floorplans, tours);
-  const status = text$3(listing.status) || text$3(sources.order?.status) || text$3(sources.orderRequest?.status) || "open";
+  const status2 = text$3(listing.status) || text$3(sources.order?.status) || text$3(sources.orderRequest?.status) || "open";
   return applyStoredPortalData({
     id,
     title: address.formatted || "Listing",
-    status,
+    status: status2,
     address,
     facts: FACT_DEFS.map((fact) => {
       const value = factText(readFact(records, fact.keys));
@@ -11138,12 +11370,12 @@ function buildActivity(sources, photos, videos, floorplans, tours, invoices) {
   }
   for (const appointment of sources.appointments || []) {
     const when = appointment.createdAt || appointment.scheduledDate;
-    const status = text$3(appointment.status);
+    const status2 = text$3(appointment.status);
     push(eventOf(
       `appointment-${text$3(appointment.id) || events.length}`,
       when,
       "appointment",
-      status === "confirmed" ? "Appointment confirmed" : "Appointment requested"
+      status2 === "confirmed" ? "Appointment confirmed" : "Appointment requested"
     ));
   }
   const order = sources.order;
@@ -11174,12 +11406,12 @@ function buildActivity(sources, photos, videos, floorplans, tours, invoices) {
     push(eventOf(`tour-${tour.id}`, tour.uploadedAt, "tour", `${tour.provider} tour added`));
   }
   for (const gallery of sources.galleries || []) {
-    const status = text$3(gallery.status).replace(/_/g, " ") || "opened";
+    const status2 = text$3(gallery.status).replace(/_/g, " ") || "opened";
     push(eventOf(
       `gallery-${text$3(gallery.id) || events.length}`,
       gallery.updatedAt || gallery.createdAt,
       "gallery",
-      `Gallery ${status}`
+      `Gallery ${status2}`
     ));
   }
   for (const invoice of sources.invoices || []) {
@@ -11189,8 +11421,8 @@ function buildActivity(sources, photos, videos, floorplans, tours, invoices) {
       id,
       createdAt: invoice.createdAt
     });
-    const status = text$3(invoice.status) || "draft";
-    const summary = status === "paid" ? `Payment recorded on ${number}` : `Invoice ${number} is ${status.replace(/_/g, " ")}`;
+    const status2 = text$3(invoice.status) || "draft";
+    const summary = status2 === "paid" ? `Payment recorded on ${number}` : `Invoice ${number} is ${status2.replace(/_/g, " ")}`;
     push(eventOf(`invoice-${id || number}`, invoice.paidAt || invoice.updatedAt || invoice.createdAt, "invoice", summary));
   }
   for (const entry2 of rowsFrom(sources.listing.auditLog)) {
@@ -11256,9 +11488,9 @@ const REPLACEMENT_LIMIT = 4e6;
 const REPLACEMENT_TYPES = /* @__PURE__ */ new Set(["image/jpeg", "image/png", "image/webp"]);
 class PhotoEditRequestError extends Error {
   status;
-  constructor(status, message) {
+  constructor(status2, message) {
     super(message);
-    this.status = status;
+    this.status = status2;
   }
 }
 const db$c = () => admin.firestore();
@@ -11370,9 +11602,9 @@ function text$2(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function sendKnownError$3(res, err, fallback) {
-  const status = err instanceof PhotoEditRequestError ? err.status : err.status;
-  if (status && status >= 400 && status < 500) {
-    return res.status(status).json({ error: err instanceof Error ? err.message : fallback });
+  const status2 = err instanceof PhotoEditRequestError ? err.status : err.status;
+  if (status2 && status2 >= 400 && status2 < 500) {
+    return res.status(status2).json({ error: err instanceof Error ? err.message : fallback });
   }
   console.error("[Portal listing]", err);
   return res.status(500).json({ error: fallback });
@@ -11613,9 +11845,9 @@ function asRecord$1(value) {
 }
 router$g.get("/", requireStaff, async (req, res) => {
   try {
-    const { status, search, limit = "50" } = req.query;
+    const { status: status2, search, limit = "50" } = req.query;
     let query = db$a().collection("clients").orderBy("createdAt", "desc");
-    if (status) query = query.where("status", "==", status);
+    if (status2) query = query.where("status", "==", status2);
     const snapshot = await query.limit(Number(limit)).get();
     let clients = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     if (search) {
@@ -11962,8 +12194,8 @@ function readSetupSecret(headerValue2) {
   return "";
 }
 const db$9 = () => admin.firestore();
-function httpError$1(status, error) {
-  return Object.assign(new Error(error), { status });
+function httpError$1(status2, error) {
+  return Object.assign(new Error(error), { status: status2 });
 }
 async function bootstrapPlaytest(input) {
   const photographerInput = input.photographer || {};
@@ -12262,9 +12494,9 @@ router$f.post("/playtest", async (req, res) => {
     const result = await bootstrapPlaytest(req.body || {});
     return res.status(201).json(result);
   } catch (err) {
-    const status = err.status;
-    if (status && status >= 400 && status < 500) {
-      return res.status(status).json({ error: err instanceof Error ? err.message : "Playtest setup failed." });
+    const status2 = err.status;
+    if (status2 && status2 >= 400 && status2 < 500) {
+      return res.status(status2).json({ error: err instanceof Error ? err.message : "Playtest setup failed." });
     }
     console.error("[Staff] Playtest bootstrap error:", err);
     return res.status(500).json({ error: "Playtest setup failed." });
@@ -12402,9 +12634,9 @@ function followUploadWithQueue(listingId, autoQueue) {
   if (decision.kick) kickStudioQueue(listingId);
 }
 function sendKnownError$2(res, err, fallback) {
-  const status = err.status;
-  if (status && status >= 400 && status < 500) {
-    return res.status(status).json({ error: err instanceof Error ? err.message : fallback });
+  const status2 = err.status;
+  if (status2 && status2 >= 400 && status2 < 500) {
+    return res.status(status2).json({ error: err instanceof Error ? err.message : fallback });
   }
   console.error("[Listings]", err);
   return res.status(500).json({ error: fallback });
@@ -14904,8 +15136,8 @@ async function runReminderSweep(req, res) {
     tomorrow.setDate(tomorrow.getDate() + 1);
     for (const appointmentDoc of appointments.docs) {
       const appointment = appointmentDoc.data();
-      const status = String(appointment.status || "").toLowerCase();
-      if (!["confirmed", "scheduled"].includes(status)) continue;
+      const status2 = String(appointment.status || "").toLowerCase();
+      if (!["confirmed", "scheduled"].includes(status2)) continue;
       const scheduledDate = toDate(appointment.scheduledDate);
       if (!scheduledDate) continue;
       const orderRecord = await loadOrderForAppointment(appointment);
@@ -14995,10 +15227,10 @@ router$a.get("/run-reminders", runReminderSweep);
 router$a.post("/run-reminders", runReminderSweep);
 router$a.get("/logs", requireStaff, async (req, res) => {
   try {
-    const { agent, status, requiresReview, limit = "50" } = req.query;
+    const { agent, status: status2, requiresReview, limit = "50" } = req.query;
     let query = db$4().collection("agentLogs").orderBy("createdAt", "desc");
     if (agent) query = query.where("agent", "==", agent);
-    if (status) query = query.where("status", "==", status);
+    if (status2) query = query.where("status", "==", status2);
     if (requiresReview === "true") {
       query = query.where("requiresHumanReview", "==", true);
     }
@@ -15032,7 +15264,7 @@ router$a.post("/log", async (req, res) => {
       agent,
       action,
       summary,
-      status,
+      status: status2,
       relatedId,
       relatedType,
       priority,
@@ -15046,7 +15278,7 @@ router$a.post("/log", async (req, res) => {
       agent,
       action,
       summary,
-      status: status || "completed",
+      status: status2 || "completed",
       relatedId: relatedId || null,
       relatedType: relatedType || null,
       priority: priority || "normal",
@@ -15065,9 +15297,9 @@ const router$9 = Router();
 const db$3 = () => admin.firestore();
 router$9.get("/", requireStaff, async (req, res) => {
   try {
-    const { status, listingId, orderId, limit = "100" } = req.query;
+    const { status: status2, listingId, orderId, limit = "100" } = req.query;
     let q = db$3().collection("mediaJobs").orderBy("createdAt", "desc");
-    if (status) q = q.where("status", "==", status);
+    if (status2) q = q.where("status", "==", status2);
     if (listingId) q = q.where("listingId", "==", listingId);
     if (orderId) q = q.where("orderId", "==", orderId);
     const snapshot = await q.limit(Math.min(Number(limit), 200)).get();
@@ -15138,15 +15370,15 @@ router$9.post("/", requireStaff, async (req, res) => {
 });
 router$9.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
-    const { status, resultItems = [], error = "", requiresHumanReview } = req.body;
+    const { status: status2, resultItems = [], error = "", requiresHumanReview } = req.body;
     const valid = ["queued", "processing", "ready_for_review", "completed", "failed", "cancelled"];
-    if (!valid.includes(status)) return res.status(400).json({ error: "Invalid status." });
+    if (!valid.includes(status2)) return res.status(400).json({ error: "Invalid status." });
     await db$3().collection("mediaJobs").doc(req.params.id).update({
-      status,
+      status: status2,
       resultItems,
       error,
-      requiresHumanReview: requiresHumanReview ?? status !== "completed",
-      completedAt: status === "completed" ? admin.firestore.FieldValue.serverTimestamp() : null,
+      requiresHumanReview: requiresHumanReview ?? status2 !== "completed",
+      completedAt: status2 === "completed" ? admin.firestore.FieldValue.serverTimestamp() : null,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
     return res.json({ success: true });
@@ -15156,8 +15388,8 @@ router$9.patch("/:id/status", requireCoordinator, async (req, res) => {
   }
 });
 const db$2 = () => admin.firestore();
-function httpError(status, message) {
-  return Object.assign(new Error(message), { status });
+function httpError(status2, message) {
+  return Object.assign(new Error(message), { status: status2 });
 }
 function asString(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -15288,9 +15520,9 @@ function requireStaffOrQueueCron(req, res, next) {
   return requireStaff(req, res, next);
 }
 function sendKnownError$1(res, err, fallback) {
-  const status = err.status;
-  if (status && status >= 400 && status < 500) {
-    return res.status(status).json({ error: err instanceof Error ? err.message : fallback });
+  const status2 = err.status;
+  if (status2 && status2 >= 400 && status2 < 500) {
+    return res.status(status2).json({ error: err instanceof Error ? err.message : fallback });
   }
   console.error("[Studio]", err);
   return res.status(500).json({ error: fallback });
@@ -15331,18 +15563,18 @@ router$8.get("/delivery-queue", requireStaff, async (req, res) => {
 });
 router$8.post("/delivery-queue/move", requireCoordinator, async (req, res) => {
   const galleryId = String(req.body?.galleryId || "").trim();
-  const status = String(req.body?.status || "").trim();
+  const status2 = String(req.body?.status || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(galleryId)) {
     return res.status(400).json({ error: "A valid gallery id is required." });
   }
-  if (!isMediaDeliveryStatus(status)) {
+  if (!isMediaDeliveryStatus(status2)) {
     return res.status(400).json({ error: "Status must be pending, undelivered, or delivered." });
   }
   if (!adminReady$1(res)) return;
   try {
     const result = await moveMediaDelivery({
       galleryId,
-      status,
+      status: status2,
       expiresInDays: Number(req.body?.expiresInDays)
     });
     return res.json({ success: true, ...result });
@@ -15651,10 +15883,10 @@ router$7.post(
       res.setHeader("Cache-Control", "no-store");
       return res.status(200).send(edited.bytes);
     } catch (err) {
-      const status = err instanceof OpenAiEditError && err.status ? err.status : 502;
+      const status2 = err instanceof OpenAiEditError && err.status ? err.status : 502;
       const message = err instanceof Error ? err.message : "The scratch edit failed.";
-      if (status >= 500) console.error("[Studio scratch]", message);
-      return res.status(status).json({ error: message });
+      if (status2 >= 500) console.error("[Studio scratch]", message);
+      return res.status(status2).json({ error: message });
     }
   }
 );
@@ -17138,9 +17370,9 @@ function adminReady(res) {
   return false;
 }
 function sendKnownError(res, err, fallback) {
-  const status = err instanceof PhotoEditRequestError ? err.status : err.status;
-  if (status && status >= 400 && status < 500 || status === 503) {
-    return res.status(status).json({ error: err instanceof Error ? err.message : fallback });
+  const status2 = err instanceof PhotoEditRequestError ? err.status : err.status;
+  if (status2 && status2 >= 400 && status2 < 500 || status2 === 503) {
+    return res.status(status2).json({ error: err instanceof Error ? err.message : fallback });
   }
   console.error("[Photo edit request]", err);
   return res.status(500).json({ error: fallback });
@@ -17387,14 +17619,14 @@ function parsePlanBoard(sheets) {
       }
       const item = cellAt(row, headers.item);
       if (!item) return;
-      const status = cellAt(row, headers.status);
+      const status2 = cellAt(row, headers.status);
       buckets[kind].push({
         item,
         date: dateKey(cellAt(row, headers.date)),
         amount: parseMoney(cellAt(row, headers.amount)),
-        status: status || null,
+        status: status2 || null,
         notes: cellAt(row, headers.notes) || null,
-        done: kind === "todos" && isDone(status),
+        done: kind === "todos" && isDone(status2),
         index
       });
     });
@@ -17457,8 +17689,8 @@ function sectionOf(value) {
   if (key === "todo" || key === "todos") return "todos";
   return null;
 }
-function isDone(status) {
-  const key = status.toLowerCase().replace(/[^a-z]+/g, " ").trim();
+function isDone(status2) {
+  const key = status2.toLowerCase().replace(/[^a-z]+/g, " ").trim();
   return key === "done" || key === "complete" || key === "completed";
 }
 function dateKey(value) {
@@ -17762,15 +17994,15 @@ function businesses(sheet) {
   const records = tableRecords(rowsOf(sheet));
   const fromTable = records.map((record) => {
     const name = pick(record, ["business", "name", "company"]);
-    const status = pick(record, ["status", "health", "ryg", "color", "state"]);
+    const status2 = pick(record, ["status", "health", "ryg", "color", "state"]);
     const note = pick(record, ["note", "notes", "detail", "comment"]) || null;
-    return business(name, status, note);
+    return business(name, status2, note);
   }).filter((item) => item.name);
   if (fromTable.length) return fromTable;
   return pairs(rowsOf(sheet)).map((item) => business(item.name, item.detail || "", null)).filter((item) => item.name && !isHeaderRow([item.name]));
 }
-function business(name, status, note) {
-  const tone = toneOf(status);
+function business(name, status2, note) {
+  const tone = toneOf(status2);
   return { name, tone, label: toneLabel(tone), note };
 }
 function toneOf(raw) {
@@ -18194,8 +18426,8 @@ async function loadOwnerSuite(options = {}) {
     cache = { expires: Date.now() + CACHE_MS, payload };
     return payload;
   } catch (error) {
-    const status = error && typeof error === "object" && "code" in error ? String(error.code) : "error";
-    console.error(`[Owners] Scorecard read failed (${status})`);
+    const status2 = error && typeof error === "object" && "code" in error ? String(error.code) : "error";
+    console.error(`[Owners] Scorecard read failed (${status2})`);
     const payload = {
       data: unknownData(now),
       source: "empty",

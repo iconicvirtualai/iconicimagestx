@@ -56,6 +56,7 @@ vi.mock("firebase-admin", () => {
         if (token === "owner-token") return { uid: "owner-uid", email: "ada@example.com" };
         if (token === "other-token") return { uid: "other-uid", email: "bob@example.com" };
         if (token === "staff-token") return { uid: "staff-uid", email: "staff@iconicimagestx.com" };
+        if (token === "qa-owner-token") return { uid: "qa-owner-uid", email: "ops+deliveryqa@iconicimagestx.com" };
         throw new Error("invalid");
       },
     }),
@@ -64,6 +65,17 @@ vi.mock("firebase-admin", () => {
 });
 
 import { handlePublicGalleryLink } from "./galleryLink";
+import { buildDeliveryQaSeed, DELIVERY_QA_IDS } from "../../shared/deliveryQaSeed";
+import { publicMediaItem } from "../../shared/paymentAccess";
+
+function stringValues(value: unknown, found: string[] = []): string[] {
+  if (typeof value === "string") found.push(value);
+  else if (Array.isArray(value)) value.forEach((item) => stringValues(item, found));
+  else if (value && typeof value === "object") {
+    Object.values(value as Record<string, unknown>).forEach((item) => stringValues(item, found));
+  }
+  return found;
+}
 
 function listing(invoiceStatus = "sent") {
   return {
@@ -112,11 +124,11 @@ beforeEach(() => {
   seed("staff", "staff-uid", { role: "admin", isActive: true });
 });
 
-async function openStudio(authorization?: string) {
+async function openStudio(authorization?: string, id = LISTING_ID) {
   let statusCode = 200;
   let body: Record<string, unknown> = {};
   const req = {
-    params: { id: LISTING_ID },
+    params: { id },
     headers: authorization ? { authorization } : {},
   };
   const res = {
@@ -235,5 +247,121 @@ describe("GET /api/galleries/link/:id studio share", () => {
     const { statusCode, body } = await openStudio("Bearer staff-token");
     expect(statusCode).toBe(200);
     expectOwnerView(body, false);
+  });
+
+  it("keeps original files off the locked delivery QA owner view", async () => {
+    const plan = buildDeliveryQaSeed({ origin: "https://cdn.example" });
+    for (const doc of plan.documents) {
+      const data = { ...doc.data };
+      if (doc.collection === "listings") {
+        data.studioEnabled = true;
+        data.lockStudio = false;
+        data.invoiceStatus = "sent";
+        data.paymentStatus = "unpaid";
+        data.downloadEnabled = false;
+        data.downloadsReleased = false;
+      }
+      seed(doc.collection, doc.id, data);
+    }
+    seed("clients", "qa-owner-uid", {
+      email: "ops+deliveryqa@iconicimagestx.com",
+      linkedClientId: DELIVERY_QA_IDS.client,
+    });
+
+    const originals = [
+      "/media/blaze/01_BUILT_v2.mp4",
+      "/media/video/product-photography.mp4",
+      "/media/videos/snap-reels/snap-reel-01.mp4",
+      "/media/photos/luxury-exterior.jpg",
+      "/media/photos/listing-living-01.jpg",
+      "/media/playtest/TEST-delivery-qa-floorplan.pdf",
+      "/media/playtest/TEST-delivery-qa-other.zip",
+      "public/media/blaze/01_BUILT_v2.mp4",
+      "public/media/photos/luxury-exterior.jpg",
+    ];
+    const leaked = (payload: unknown) => {
+      const values = stringValues(payload);
+      return originals.filter((piece) => values.some((value) => value === piece || value.includes(piece)));
+    };
+
+    const shared = await openStudio(undefined, DELIVERY_QA_IDS.listing);
+    expect(shared.statusCode).toBe(200);
+    expect((shared.body.project as { view?: string }).view).toBe("public");
+    expect(JSON.stringify(shared.body)).toContain("/media/blaze/01_BUILT_v2.mp4");
+
+    const locked = await openStudio("Bearer qa-owner-token", DELIVERY_QA_IDS.listing);
+    expect(locked.statusCode).toBe(200);
+    const lockedProject = locked.body.project as {
+      view?: string;
+      downloadsUnlocked?: boolean;
+      invoice?: { status?: string };
+      files?: unknown[];
+    };
+    expect(lockedProject.view).toBe("owner");
+    expect(lockedProject.downloadsUnlocked).toBe(false);
+    expect(lockedProject.invoice).toEqual({ status: "sent" });
+    expect(lockedProject.files).toEqual([]);
+    expect(leaked(lockedProject)).toEqual([]);
+    const lockedPublic = plan.media.map((item) => publicMediaItem(item as unknown as Record<string, unknown>, false));
+    const publicBlob = JSON.stringify(lockedPublic);
+    for (const item of plan.media) {
+      for (const value of [item.url, item.shareUrl, item.embedUrl, item.poster, item.sourcePath]) {
+        if (typeof value !== "string" || !value || publicBlob.includes(value)) continue;
+        expect(JSON.stringify(lockedProject)).not.toContain(value);
+      }
+    }
+
+    const staff = await openStudio("Bearer staff-token", DELIVERY_QA_IDS.listing);
+    expect(staff.statusCode).toBe(200);
+    expect((staff.body.project as { downloadsUnlocked?: boolean }).downloadsUnlocked).toBe(false);
+    expect(JSON.stringify(staff.body.project)).toContain("/media/blaze/01_BUILT_v2.mp4");
+
+    const invoice = plan.documents.find((doc) => doc.id === DELIVERY_QA_IDS.invoice);
+    seed("invoices", DELIVERY_QA_IDS.invoice, {
+      ...(invoice?.data || {}),
+      status: "paid",
+      amountPaid: 1,
+      amountDue: 0,
+    });
+    const paid = await openStudio("Bearer qa-owner-token", DELIVERY_QA_IDS.listing);
+    expect((paid.body.project as { downloadsUnlocked?: boolean }).downloadsUnlocked).toBe(true);
+    expect(JSON.stringify(paid.body.project)).toContain("/media/blaze/01_BUILT_v2.mp4");
+    expect(JSON.stringify(paid.body.project)).toContain("/media/photos/luxury-exterior.jpg");
+    expect(JSON.stringify(paid.body)).not.toContain("amountDue");
+
+    seed("invoices", DELIVERY_QA_IDS.invoice, invoice?.data || {});
+    const listingDoc = plan.documents.find((doc) => doc.id === DELIVERY_QA_IDS.listing);
+    const galleryDoc = plan.documents.find((doc) => doc.id === DELIVERY_QA_IDS.gallery);
+    const lockedListing = {
+      ...(listingDoc?.data || {}),
+      studioEnabled: true,
+      lockStudio: false,
+      invoiceStatus: "sent",
+      paymentStatus: "unpaid",
+      downloadEnabled: false,
+      downloadsReleased: false,
+    };
+    seed("listings", DELIVERY_QA_IDS.listing, { ...lockedListing, invoiceStatus: "paid" });
+    const stalePaid = await openStudio("Bearer qa-owner-token", DELIVERY_QA_IDS.listing);
+    const staleProject = stalePaid.body.project as { downloadsUnlocked?: boolean; invoice?: { status?: string } };
+    expect(staleProject.downloadsUnlocked).toBe(true);
+    expect(staleProject.invoice).toEqual({ status: "sent" });
+    expect(JSON.stringify(stalePaid.body.project)).toContain("/media/blaze/01_BUILT_v2.mp4");
+    expect(JSON.stringify(stalePaid.body.project)).toContain("/media/photos/luxury-exterior.jpg");
+
+    seed("listings", DELIVERY_QA_IDS.listing, { ...lockedListing, paymentStatus: "comped" });
+    const comped = await openStudio("Bearer qa-owner-token", DELIVERY_QA_IDS.listing);
+    expect((comped.body.project as { downloadsUnlocked?: boolean }).downloadsUnlocked).toBe(true);
+    expect(JSON.stringify(comped.body.project)).toContain("/media/blaze/01_BUILT_v2.mp4");
+
+    seed("listings", DELIVERY_QA_IDS.listing, lockedListing);
+    seed("galleries", DELIVERY_QA_IDS.gallery, {
+      ...(galleryDoc?.data || {}),
+      downloadsReleased: true,
+      downloadEnabled: true,
+    });
+    const released = await openStudio("Bearer qa-owner-token", DELIVERY_QA_IDS.listing);
+    expect((released.body.project as { downloadsUnlocked?: boolean }).downloadsUnlocked).toBe(true);
+    expect(JSON.stringify(released.body.project)).toContain("/media/blaze/01_BUILT_v2.mp4");
   });
 });

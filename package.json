@@ -20,6 +20,7 @@
     "test": "vitest --run",
     "seed:booking-catalog": "tsx scripts/seed-booking-catalog.ts",
     "seed:delivery-qa": "tsx scripts/seed-delivery-qa.ts",
+    "report:lock-impact": "tsx scripts/report-lock-impact.ts",
     "qa:send-delivery": "tsx scripts/qa-send-delivery.ts",
     "format.fix": "prettier --write .",
     "typecheck": "tsc"
