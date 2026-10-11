@@ -7,10 +7,10 @@ import admin from "firebase-admin";
 import nodemailer from "nodemailer";
 import twilio from "twilio";
 import { google } from "googleapis";
-import crypto, { randomBytes, randomUUID, createHmac, timingSafeEqual as timingSafeEqual$1 } from "crypto";
+import crypto, { randomBytes, randomUUID, createHmac as createHmac$1, timingSafeEqual as timingSafeEqual$1 } from "crypto";
+import { createHmac, randomBytes as randomBytes$1, timingSafeEqual } from "node:crypto";
 import Stripe from "stripe";
 import * as XLSX from "xlsx";
-import { randomBytes as randomBytes$1, timingSafeEqual } from "node:crypto";
 const STAFF_ROLES$1 = ["admin", "coordinator", "photographer", "editor"];
 function isStaffRole$1(role) {
   return typeof role === "string" && STAFF_ROLES$1.includes(role);
@@ -637,7 +637,7 @@ function addressText(value) {
   if (typeof value === "string") return value.trim();
   if (typeof value !== "object" || Array.isArray(value)) return "";
   const address = value;
-  const formatted = text$e(address.formatted) || text$e(address.label);
+  const formatted = text$f(address.formatted) || text$f(address.label);
   if (formatted) return formatted;
   return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
 }
@@ -650,7 +650,7 @@ function recordAddressText(record) {
   }
   return "";
 }
-function text$e(value) {
+function text$f(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const services = [
@@ -2810,7 +2810,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
       createdAt: data.createdAt
     }, now),
     status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
-    clientName: text$d(data.clientName),
+    clientName: text$e(data.clientName),
     address: addressText(data.billToAddress || data.address || data.propertyAddress),
     createdAt,
     issuedOn: formatPortalDate(data.createdAt) || formatPortalDate(data.sentAt) || formatPortalDate(data.paidAt),
@@ -2820,7 +2820,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
     fees: storedAmount(data.fees),
     travel: storedAmount(data.travel),
     promoDiscount: storedAmount(data.promoDiscount),
-    promoCode: text$d(data.promoCode),
+    promoCode: text$e(data.promoCode),
     tax: storedAmount(data.tax),
     total: storedAmount(data.total),
     amountPaid: storedAmount(data.amountPaid),
@@ -2871,15 +2871,15 @@ function storedLines(lineItems, services2) {
     if (typeof item === "string" && item.trim()) return [{ name: item.trim(), qty: null, amount: null }];
     if (!item || typeof item !== "object") return [];
     const record = item;
-    const named = text$d(record.name) || text$d(record.label);
-    const description = text$d(record.description);
+    const named = text$e(record.name) || text$e(record.label);
+    const description = text$e(record.description);
     const name = named || description;
     const qty = storedQty(record.qty ?? record.quantity);
     const amount = storedAmount(record.price ?? record.amount ?? record.total);
     if (!name && amount == null && qty == null) return [];
     const line = { name: name || "Line item", qty, amount };
-    const id = text$d(record.id);
-    const category = text$d(record.category);
+    const id = text$e(record.id);
+    const category = text$e(record.category);
     if (id) line.id = id;
     if (category) line.category = category;
     if (named && description) line.description = description;
@@ -2915,7 +2915,7 @@ function isoStamp(value) {
   if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
   return null;
 }
-function text$d(value) {
+function text$e(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function roundMoney$3(value) {
@@ -3386,40 +3386,40 @@ function bookingListingGroups(input) {
   for (const doc of requests) {
     const node = nodeId("orderRequests", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("listings", text$c(doc.data.listingId)));
-    uf.link(node, nodeId("orders", text$c(doc.data.orderId) || text$c(doc.data.convertedToOrderId)));
-    uf.link(node, nodeId("invoices", text$c(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$c(doc.data.galleryId)));
+    uf.link(node, nodeId("listings", text$d(doc.data.listingId)));
+    uf.link(node, nodeId("orders", text$d(doc.data.orderId) || text$d(doc.data.convertedToOrderId)));
+    uf.link(node, nodeId("invoices", text$d(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$d(doc.data.galleryId)));
   }
   for (const doc of orders) {
     const node = nodeId("orders", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$c(doc.data.orderRequestId)));
-    uf.link(node, nodeId("listings", text$c(doc.data.listingId)));
-    uf.link(node, nodeId("invoices", text$c(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$c(doc.data.galleryId)));
+    uf.link(node, nodeId("orderRequests", text$d(doc.data.orderRequestId)));
+    uf.link(node, nodeId("listings", text$d(doc.data.listingId)));
+    uf.link(node, nodeId("invoices", text$d(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$d(doc.data.galleryId)));
   }
   for (const doc of invoices) {
     const node = nodeId("invoices", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$c(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$c(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$c(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$d(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$d(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$d(doc.data.listingId)));
   }
   for (const doc of appointments) {
     const node = nodeId("appointments", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$c(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$c(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$c(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$d(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$d(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$d(doc.data.listingId)));
   }
   for (const doc of galleries) {
     const node = nodeId("galleries", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$c(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$c(doc.data.orderId)));
-    uf.link(node, nodeId("invoices", text$c(doc.data.invoiceId)));
-    uf.link(node, nodeId("listings", text$c(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$d(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$d(doc.data.orderId)));
+    uf.link(node, nodeId("invoices", text$d(doc.data.invoiceId)));
+    uf.link(node, nodeId("listings", text$d(doc.data.listingId)));
   }
   const groups = [];
   for (const nodes of uf.components()) {
@@ -3479,7 +3479,7 @@ function fillEmptyListingFields(existing, desired) {
   return patch;
 }
 function clientOwnsListing(listing, clients) {
-  const clientId2 = text$c(listing.clientId);
+  const clientId2 = text$d(listing.clientId);
   const email = normalizeEmail$1(listing.clientEmail || listing.email);
   if (!clientId2 && !email) return true;
   if (clientId2 && clients.ids.includes(clientId2)) return true;
@@ -3551,10 +3551,10 @@ function chooseListing(group, listings, clients) {
 }
 function listingMatches(doc, group) {
   if (doc.id === group.stableId || group.preferredListingIds.includes(doc.id)) return true;
-  const requestId = text$c(doc.data.orderRequestId);
-  const orderId = text$c(doc.data.orderId);
-  const invoiceId = text$c(doc.data.invoiceId);
-  const appointmentId = text$c(doc.data.appointmentId);
+  const requestId = text$d(doc.data.orderRequestId);
+  const orderId = text$d(doc.data.orderId);
+  const invoiceId = text$d(doc.data.invoiceId);
+  const appointmentId = text$d(doc.data.appointmentId);
   return Boolean(
     requestId && group.orderRequestIds.includes(requestId) || orderId && group.orderIds.includes(orderId) || invoiceId && group.invoiceIds.includes(invoiceId) || appointmentId && group.appointmentIds.includes(appointmentId)
   );
@@ -3564,7 +3564,7 @@ function linksFor(group, listingId, listings, clients) {
   const links = [];
   const push = (collection, docs) => {
     for (const doc of docs) {
-      const current = text$c(doc.data.listingId);
+      const current = text$d(doc.data.listingId);
       if (current === listingId) continue;
       if (current && isPortalListingId(current) && ownedIds.has(current)) continue;
       links.push({ collection, id: doc.id });
@@ -3581,7 +3581,7 @@ function clientsFor(group, identity) {
   const ids = /* @__PURE__ */ new Set();
   const emails = /* @__PURE__ */ new Set();
   const addId = (value) => {
-    const id = text$c(value);
+    const id = text$d(value);
     if (id) ids.add(id);
   };
   const addEmail = (value) => {
@@ -3600,7 +3600,7 @@ function clientsFor(group, identity) {
 function preferredListingIds(group) {
   const ids = [];
   const push = (value) => {
-    const id = text$c(value);
+    const id = text$d(value);
     if (id && isPortalListingId(id) && !ids.includes(id)) ids.push(id);
   };
   for (const doc of [...group.orderRequests, ...group.orders, ...group.invoices, ...group.appointments, ...group.galleries]) {
@@ -3635,9 +3635,9 @@ function bestAddress(group) {
   }
   for (const doc of propertyDocs(group)) {
     for (const key of ["address", "propertyAddress", "shootLocation"]) {
-      if (typeof doc.data[key] === "string" && text$c(doc.data[key])) return text$c(doc.data[key]);
+      if (typeof doc.data[key] === "string" && text$d(doc.data[key])) return text$d(doc.data[key]);
     }
-    if (text$c(doc.data.addressLabel)) return text$c(doc.data.addressLabel);
+    if (text$d(doc.data.addressLabel)) return text$d(doc.data.addressLabel);
   }
   return null;
 }
@@ -3653,7 +3653,7 @@ function firstScheduleDate(group) {
 function firstScheduleTime(group) {
   for (const doc of [...group.appointments, ...group.orders, ...group.orderRequests]) {
     for (const key of ["scheduledTime", "appointmentTime", "apptTime", "requestedTime"]) {
-      const value = text$c(doc.data[key]);
+      const value = text$d(doc.data[key]);
       if (value && !/^tbd$/i.test(value)) return value;
     }
   }
@@ -3670,7 +3670,7 @@ function projectType(group) {
     if (doc.data.projectType === "real_estate") return "real_estate";
     const service = doc.data.selectedService;
     if (service && typeof service === "object") {
-      const category = text$c(service.category);
+      const category = text$d(service.category);
       if (category === "business" || category === "branding") return "business";
       if (category === "listings") return "real_estate";
     }
@@ -3696,7 +3696,7 @@ function namesFrom(value) {
   for (const item of value) {
     if (typeof item === "string" && item.trim()) names.push(item.trim());
     else if (item && typeof item === "object") {
-      const name = text$c(item.name);
+      const name = text$d(item.name);
       if (name) names.push(name);
     }
     if (names.length >= 40) break;
@@ -3721,8 +3721,8 @@ function accessInfo(group) {
   return [firstText$2(group, ["accessMethod"]), firstText$2(group, ["lockboxCode"])].filter(Boolean).join(" - ");
 }
 function clientId(group, identity) {
-  const bookingIds = propertyDocs(group).map((doc) => text$c(doc.data.clientId)).filter(Boolean);
-  const identityIds = (identity?.ids || []).map((id) => text$c(id)).filter(Boolean);
+  const bookingIds = propertyDocs(group).map((doc) => text$d(doc.data.clientId)).filter(Boolean);
+  const identityIds = (identity?.ids || []).map((id) => text$d(id)).filter(Boolean);
   return bookingIds.find((id) => identityIds.includes(id)) || bookingIds[0] || identityIds[0] || "";
 }
 function clientEmail(group, identity) {
@@ -3736,8 +3736,8 @@ function clientEmail(group, identity) {
 }
 function clientName$1(group) {
   for (const doc of propertyDocs(group)) {
-    if (text$c(doc.data.clientName)) return text$c(doc.data.clientName);
-    const joined = `${text$c(doc.data.firstName)} ${text$c(doc.data.lastName)}`.trim();
+    if (text$d(doc.data.clientName)) return text$d(doc.data.clientName);
+    const joined = `${text$d(doc.data.firstName)} ${text$d(doc.data.lastName)}`.trim();
     if (joined) return joined;
   }
   return "";
@@ -3745,7 +3745,7 @@ function clientName$1(group) {
 function chosenInvoiceId(group) {
   const known = new Set(group.invoiceIds);
   for (const doc of [...group.orderRequests, ...group.orders]) {
-    const id = text$c(doc.data.invoiceId);
+    const id = text$d(doc.data.invoiceId);
     if (id && known.has(id)) return id;
   }
   return newestDoc(group.invoices)?.id || group.invoiceIds[0] || "";
@@ -3754,7 +3754,7 @@ function chosenId(docs, ids, pointers = [], keys = []) {
   const known = new Set(ids);
   for (const doc of pointers) {
     for (const key of keys) {
-      const id = text$c(doc.data[key]);
+      const id = text$d(doc.data[key]);
       if (id && known.has(id)) return id;
     }
   }
@@ -3766,7 +3766,7 @@ function propertyDocs(group) {
 function firstText$2(group, keys) {
   for (const doc of propertyDocs(group)) {
     for (const key of keys) {
-      const value = text$c(doc.data[key]);
+      const value = text$d(doc.data[key]);
       if (value) return value;
     }
   }
@@ -3834,7 +3834,7 @@ function hasAddress(value) {
   if (typeof value === "string") return value.trim().length > 0;
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record = value;
-  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$c(record[key]).length > 0);
+  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$d(record[key]).length > 0);
 }
 function statusKey(value) {
   return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
@@ -3866,14 +3866,14 @@ function isEmpty(value) {
 function isSentinel$1(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$c(value) {
+function text$d(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function cleanDocs(docs) {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
   for (const doc of docs || []) {
-    const id = text$c(doc?.id);
+    const id = text$d(doc?.id);
     if (!id || seen.has(id)) continue;
     seen.add(id);
     out.push({ id, data: doc.data && typeof doc.data === "object" ? doc.data : {} });
@@ -3952,7 +3952,7 @@ async function ensureBookingListingForRequest(orderRequestId) {
     galleries: []
   });
   const identity = {
-    ids: text$b(request.data.clientId) ? [text$b(request.data.clientId)] : [],
+    ids: text$c(request.data.clientId) ? [text$c(request.data.clientId)] : [],
     email: normalizeEmail$1(request.data.clientEmail || request.data.email)
   };
   const plans = await plansFor(bundle, identity);
@@ -4005,7 +4005,7 @@ async function applyBookingListingPlan(plan) {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
       created = true;
-      console.info(`[Listings] Created ${plan.listingId} for booking ${text$b(plan.createFields.orderRequestId) || text$b(plan.createFields.orderId) || text$b(plan.createFields.invoiceId)}`);
+      console.info(`[Listings] Created ${plan.listingId} for booking ${text$c(plan.createFields.orderRequestId) || text$c(plan.createFields.orderId) || text$c(plan.createFields.invoiceId)}`);
     } catch (err) {
       if (!alreadyExists(err)) throw err;
       await fillListing(ref, plan.createFields);
@@ -4034,7 +4034,7 @@ async function linkRecord(collectionName, id, listingId) {
   const ref = db$o().collection(collectionName).doc(id);
   const snap = await ref.get();
   if (!snap.exists) return;
-  if (text$b(snap.data()?.listingId) === listingId) return;
+  if (text$c(snap.data()?.listingId) === listingId) return;
   await ref.update({
     listingId,
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -4048,9 +4048,9 @@ async function loadVisibleSeeds(identity) {
   const keep = (map, docs) => {
     for (const doc of docs) {
       if (!visibleToPortalClient({
-        clientId: text$b(doc.data.clientId),
-        email: text$b(doc.data.email),
-        clientEmail: text$b(doc.data.clientEmail)
+        clientId: text$c(doc.data.clientId),
+        email: text$c(doc.data.email),
+        clientEmail: text$c(doc.data.clientEmail)
       }, identity)) continue;
       if (!map.has(doc.id)) map.set(doc.id, doc);
     }
@@ -4089,23 +4089,23 @@ async function hydrateBundle(seed) {
   const galleries = mapDocs(seed.galleries);
   const requestIds = new Set(requests.keys());
   for (const doc of [...orders.values(), ...invoices.values(), ...appointments.values()]) {
-    const id = text$b(doc.data.orderRequestId);
+    const id = text$c(doc.data.orderRequestId);
     if (id) requestIds.add(id);
   }
   await readMissing("orderRequests", requestIds, requests);
   const orderIds = new Set(orders.keys());
   for (const doc of requests.values()) {
-    const id = text$b(doc.data.convertedToOrderId) || text$b(doc.data.orderId);
+    const id = text$c(doc.data.convertedToOrderId) || text$c(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   for (const doc of [...invoices.values(), ...appointments.values()]) {
-    const id = text$b(doc.data.orderId);
+    const id = text$c(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   await readMissing("orders", orderIds, orders);
   const invoiceIds = new Set(invoices.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$b(doc.data.invoiceId);
+    const id = text$c(doc.data.invoiceId);
     if (id) invoiceIds.add(id);
   }
   await readMissing("invoices", invoiceIds, invoices);
@@ -4115,7 +4115,7 @@ async function hydrateBundle(seed) {
   mergeDocs(appointments, await queryIn("appointments", "orderId", [...orders.keys()]));
   const galleryIds = new Set(galleries.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$b(doc.data.galleryId);
+    const id = text$c(doc.data.galleryId);
     if (id) galleryIds.add(id);
   }
   await readMissing("galleries", galleryIds, galleries);
@@ -4233,7 +4233,7 @@ function alreadyExists(err) {
 function isSentinel(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$b(value) {
+function text$c(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function chunk(items, size) {
@@ -4344,7 +4344,7 @@ function synthesizePackageLine(record) {
 }
 function packageLabel(record) {
   for (const key of PACKAGE_LABEL_KEYS) {
-    const value = text$a(record[key]);
+    const value = text$b(record[key]);
     if (value) return value;
   }
   return "";
@@ -4380,7 +4380,7 @@ function moneyOrNull$1(value) {
 function nested$2(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$a(value) {
+function text$b(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function roundMoney$1(value) {
@@ -4403,7 +4403,7 @@ function officeNewOrderEmail(saved, options) {
   const notes = notesOf(saved);
   const fields = [
     ["Order number", orderNumber],
-    ["Admin link", text$9(options?.adminUrl) || NOT_PROVIDED],
+    ["Admin link", text$a(options?.adminUrl) || NOT_PROVIDED],
     ["Client name", clientName2],
     ["Client email", firstText$1(saved, ["clientEmail", "email"])],
     ["Client phone", firstText$1(saved, ["clientPhone", "phone"])],
@@ -4450,14 +4450,14 @@ ${notes}`.toUpperCase().includes("TEST ORDER");
 function orderNumberOf(saved) {
   const explicit = firstText$1(saved, ["orderNumber", "orderCode", "displayId"]);
   if (explicit) return explicit;
-  const id = text$9(saved.id);
+  const id = text$a(saved.id);
   if (!id) return NOT_PROVIDED;
   return `ORD-${id.slice(-5).toUpperCase()}`;
 }
 function clientNameOf(saved) {
   const named = firstText$1(saved, ["clientName", "customerName"]);
   if (named) return named;
-  const joined = [text$9(saved.firstName), text$9(saved.lastName)].filter(Boolean).join(" ");
+  const joined = [text$a(saved.firstName), text$a(saved.lastName)].filter(Boolean).join(" ");
   return joined || NOT_PROVIDED;
 }
 function agentContactOf(saved) {
@@ -4475,7 +4475,7 @@ function agentField(saved, keys, nestedKey) {
   if (direct !== NOT_PROVIDED) return direct;
   for (const holder of [saved.agent, saved.listingAgent, saved.realtor]) {
     const record = nested$1(holder);
-    const value = text$9(record[nestedKey]);
+    const value = text$a(record[nestedKey]);
     if (value) return value;
   }
   return "";
@@ -4484,7 +4484,7 @@ function digits(value) {
   return value === NOT_PROVIDED ? "" : value.replace(/\D/g, "");
 }
 function notesOf(saved) {
-  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$9(saved[key])).filter(Boolean);
+  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$a(saved[key])).filter(Boolean);
   return parts.length ? parts.join("\n") : NOT_PROVIDED;
 }
 function lockboxOf(saved) {
@@ -4492,12 +4492,12 @@ function lockboxOf(saved) {
   return code || NOT_PROVIDED;
 }
 function occupancyOf(saved) {
-  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$9(saved[key])).filter(Boolean);
+  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$a(saved[key])).filter(Boolean);
   return parts.length ? parts.join(", ") : NOT_PROVIDED;
 }
 function bookedVia(saved) {
-  const lead = text$9(saved.leadSource);
-  const source = text$9(saved.source);
+  const lead = text$a(saved.leadSource);
+  const source = text$a(saved.source);
   const blob = `${lead} ${source}`.toLowerCase();
   if (!blob.trim()) return NOT_PROVIDED;
   if (/admin/.test(blob)) return "Admin";
@@ -4507,7 +4507,7 @@ function bookedVia(saved) {
 }
 function paymentOf(saved, total) {
   const invoice = nested$1(saved.invoice);
-  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$9(value).toLowerCase()).find(Boolean) || "";
+  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$a(value).toLowerCase()).find(Boolean) || "";
   if (/partial/.test(explicit)) return "Partial";
   if (/\bpaid\b/.test(explicit) && !/unpaid/.test(explicit)) return "Paid";
   if (/unpaid/.test(explicit)) return "Unpaid";
@@ -4614,7 +4614,7 @@ function moneyOrNull(value) {
 function nested$1(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$9(value) {
+function text$a(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function escapeHtml$4(value) {
@@ -4689,7 +4689,7 @@ function buildAdminOrderTile(record) {
   const packageName = skin2?.title || named || "Custom order";
   const charges = orderChargeSummary(record, lines);
   return {
-    id: text$8(record.id) || packageName,
+    id: text$9(record.id) || packageName,
     orderCode: orderCode(kind, record),
     kind,
     typeLabel: kind === "business" ? "Business" : "Listing",
@@ -4711,7 +4711,7 @@ function buildAdminOrderTile(record) {
   };
 }
 function orderKind(record, skin2) {
-  const raw = text$8(record.projectType || record.orderType || record.type).toLowerCase();
+  const raw = text$9(record.projectType || record.orderType || record.type).toLowerCase();
   if (raw === "business" || raw === "brand" || raw === "social") return "business";
   if (raw === "real_estate" || raw === "listing" || raw === "property") return "listing";
   if (skin2?.category === "listing") return "listing";
@@ -4725,38 +4725,38 @@ function channelFor(skin2, kind) {
   return kind === "business" ? "Human Brand" : "Listings & Spaces";
 }
 function orderCode(kind, record) {
-  const explicit = text$8(record.orderCode || record.orderNumber || record.displayId);
+  const explicit = text$9(record.orderCode || record.orderNumber || record.displayId);
   if (explicit) return explicit.toUpperCase();
-  const id = text$8(record.id);
+  const id = text$9(record.id);
   const prefix = kind === "listing" ? "L" : "B";
   const digits2 = id.replace(/\D/g, "");
   const tail = (digits2 || id.replace(/[^a-zA-Z0-9]/g, "")).slice(-5).toUpperCase().padStart(5, "0");
   return `ORD - ${prefix} - ${tail}`;
 }
 function heroFromRecord(record) {
-  const explicit = text$8(record.heroUrl) || text$8(record.coverUrl) || text$8(record.coverImage);
+  const explicit = text$9(record.heroUrl) || text$9(record.coverUrl) || text$9(record.coverImage);
   if (explicit) return explicit;
   const images = record.images;
   if (!Array.isArray(images)) return "";
   for (const image of images) {
     if (typeof image === "string" && image.trim()) return image.trim();
     if (image && typeof image === "object") {
-      const url = text$8(image.url) || text$8(image.thumbnailUrl);
+      const url = text$9(image.url) || text$9(image.thumbnailUrl);
       if (url) return url;
     }
   }
   return "";
 }
 function clientName(record) {
-  const named = text$8(record.clientName) || text$8(record.customerName) || text$8(record.agentName) || [text$8(record.firstName), text$8(record.lastName)].filter(Boolean).join(" ");
+  const named = text$9(record.clientName) || text$9(record.customerName) || text$9(record.agentName) || [text$9(record.firstName), text$9(record.lastName)].filter(Boolean).join(" ");
   return named || "—";
 }
 function appointmentLabel(record) {
   const raw = record.appointmentDate ?? record.apptDate ?? record.scheduledDate ?? record.requestedDate;
   const key = calendarDateKey(raw);
   const date = formatShootDateLabel(key, typeof raw === "string" ? raw : void 0);
-  const time = text$8(record.scheduledTime || record.appointmentTime || record.requestedTime);
-  const photographer = text$8(record.assignedPhotographerName || record.photographerName || record.photographerPreference);
+  const time = text$9(record.scheduledTime || record.appointmentTime || record.requestedTime);
+  const photographer = text$9(record.assignedPhotographerName || record.photographerName || record.photographerPreference);
   return [date, time, photographer].filter(Boolean).join(" · ") || "—";
 }
 function tilePrice(amount) {
@@ -4824,7 +4824,7 @@ function money$3(value) {
   }
   return 0;
 }
-function text$8(value) {
+function text$9(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const router$m = Router();
@@ -5945,6 +5945,338 @@ function publicMediaItem(item, canDownload) {
     thumbnailUrl: publicText(item.thumbnailUrl) || publicText(item.poster)
   };
 }
+const OWNER_DISPLAY_TTL_MS = 4 * 60 * 60 * 1e3;
+const DEV_SECRET = "iconic-owner-display-dev-v1";
+const ID_PATTERN$1 = /^[A-Za-z0-9_-]{8,128}$/;
+function ownerDisplaySecret(env = process.env) {
+  const explicit = env.OWNER_SESSION_SECRET?.trim();
+  if (explicit && explicit.length >= 16) return explicit;
+  const serviceAccount = env.FIREBASE_SERVICE_ACCOUNT;
+  if (serviceAccount && serviceAccount.length >= 32) {
+    return createHmac("sha256", "iconic-owner-display-v1").update(serviceAccount).digest("hex");
+  }
+  const sheetsKey = env.OWNER_SHEETS_SA_KEY;
+  if (sheetsKey && sheetsKey.length >= 32) {
+    return createHmac("sha256", "iconic-owner-display-v1").update(sheetsKey).digest("hex");
+  }
+  if (!isHostedDeployment(env)) return DEV_SECRET;
+  return null;
+}
+function signOwnerDisplayToken(claims, now = Date.now(), env = process.env) {
+  const secret = ownerDisplaySecret(env);
+  if (!secret || !ID_PATTERN$1.test(claims.id)) return null;
+  if (claims.scope !== "listing" && claims.scope !== "gallery") return null;
+  const body = Buffer.from(JSON.stringify({
+    s: claims.scope,
+    id: claims.id,
+    exp: now + OWNER_DISPLAY_TTL_MS
+  })).toString("base64url");
+  const sig = createHmac("sha256", secret).update(body).digest("base64url");
+  return `${body}.${sig}`;
+}
+function ownerDisplayPath(token, index) {
+  return `/api/media/display/o/${encodeURIComponent(token)}/${index}`;
+}
+const RASTER = /\.(jpe?g|png|webp|gif)(\?|#|$)/i;
+const VIDEO_FILE = /\.(mp4|m4v|mov|webm)(\?|#|$)/i;
+const BLOCKED_EXT = /\.(zip|pdf|dng|cr2|cr3|nef|nrw|arw|srf|sr2|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic|heif|mp4|m4v|mov|webm)(\?|#|$)/i;
+const FILE_KEYS = ["downloadUrl", "fileUrl", "originalUrl", "fullResUrl", "mlsUrl", "zipUrl", "printUrl", "reelUrl", "mp4Url", "rawUrl", "src"];
+const DISPLAY_KEYS = ["previewUrl", "displayUrl", "webUrl", "thumbnailUrl"];
+function text$8(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function rowOf$2(item) {
+  return item && typeof item === "object" ? item : null;
+}
+function shareableUrl$1(value) {
+  const url = text$8(value);
+  if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
+  if (url.startsWith("/")) return url;
+  if (url.startsWith("https://") || url.startsWith("http://")) return url;
+  return "";
+}
+function mediaName$1(row, fallback) {
+  return text$8(row.name) || text$8(row.fileName) || text$8(row.title) || fallback;
+}
+function labelOf(row) {
+  return `${text$8(row.fileName)} ${text$8(row.name)} ${text$8(row.title)} ${text$8(row.path)} ${text$8(row.storagePath)}`.toLowerCase();
+}
+function isMls(row) {
+  const category = text$8(row.category).toLowerCase();
+  const type = text$8(row.type).toLowerCase();
+  if (category === "mls" || type === "mls") return true;
+  const label = labelOf(row);
+  if (/(^|[^a-z0-9])mls([^a-z0-9]|$)/.test(label)) return true;
+  return /\/mls\//.test(label);
+}
+function isFullRes(row) {
+  const category = text$8(row.category).toLowerCase();
+  const type = text$8(row.type).toLowerCase();
+  if (category === "full-res" || category === "fullres" || type === "full-res" || type === "fullres") return true;
+  const label = labelOf(row);
+  if (/(^|[^a-z0-9])full[\s_-]?res([^a-z0-9]|$)/.test(label)) return true;
+  return /\/full\//.test(label);
+}
+function isRasterUrl(url, row) {
+  if (!url || BLOCKED_EXT.test(url.split("#")[0]) || VIDEO_FILE.test(url.split("#")[0])) return false;
+  if (RASTER.test(url.split("#")[0])) return true;
+  const content = text$8(row.contentType).toLowerCase();
+  return /^image\/(jpeg|jpg|png|webp|gif)/.test(content);
+}
+function blockedFileUrls(row, includeOwnUrl) {
+  const blocked = /* @__PURE__ */ new Set();
+  for (const key of FILE_KEYS) {
+    const url = shareableUrl$1(row[key]);
+    if (url) blocked.add(url);
+  }
+  if (includeOwnUrl) {
+    const own = shareableUrl$1(row.url);
+    const share = shareableUrl$1(row.shareUrl);
+    if (own) blocked.add(own);
+    if (share) blocked.add(share);
+  }
+  return blocked;
+}
+function separateDisplay(row) {
+  const blocked = blockedFileUrls(row, isFullRes(row));
+  for (const key of DISPLAY_KEYS) {
+    const url = shareableUrl$1(row[key]);
+    if (!url || !isRasterUrl(url, row) || blocked.has(url)) continue;
+    if (/\/mls\//i.test(url) || /\/full\//i.test(url)) continue;
+    return url;
+  }
+  return "";
+}
+function rasterShareSource(row, legacyDropTagged = false) {
+  if (legacyDropTagged && isMls(row)) return "";
+  const type = text$8(row.type).toLowerCase();
+  if (type === "video" || type === "reel" || type === "file" || type === "matterport") return "";
+  const content = text$8(row.contentType).toLowerCase();
+  if (content.startsWith("video/") || content === "application/pdf" || content === "application/zip") return "";
+  const path2 = `${text$8(row.path)} ${text$8(row.storagePath)}`.toLowerCase();
+  if (/\/(raw|downloads?|print|zips?)\//.test(path2)) return "";
+  const display = separateDisplay(row);
+  if (legacyDropTagged && isFullRes(row)) return display;
+  if (display) return display;
+  const url = shareableUrl$1(row.url) || shareableUrl$1(row.shareUrl);
+  if (!url || !isRasterUrl(url, row)) return "";
+  if (legacyDropTagged && /\/(mls|full)\//i.test(url)) return "";
+  if (/\/(raw|downloads?|print|zips?)\//i.test(url)) return "";
+  return url;
+}
+function rasterPoster(row, legacyDropTagged = false) {
+  if (legacyDropTagged && isMls(row)) return "";
+  for (const key of ["poster", "posterUrl", "thumbnailUrl"]) {
+    const url = shareableUrl$1(row[key]);
+    if (!url || !isRasterUrl(url, row)) continue;
+    if (legacyDropTagged && /\/(mls|full)\//i.test(url)) continue;
+    return url;
+  }
+  return "";
+}
+function floorSource(row, legacyDropTagged = false) {
+  if (legacyDropTagged && (isMls(row) || isFullRes(row))) return separateDisplay(row);
+  return rasterShareSource(row, legacyDropTagged) || rasterPoster(row, legacyDropTagged);
+}
+function shareDisplayPath(listingId, index) {
+  return `/api/media/display/${encodeURIComponent(listingId)}/${index}`;
+}
+function pushDisplay(items, seen, name, sourceUrl, kind) {
+  if (!sourceUrl || seen.has(sourceUrl) || items.length >= 240) return;
+  seen.add(sourceUrl);
+  items.push({ name, sourceUrl, kind });
+}
+function shareDisplayItems(listing, options = {}) {
+  const legacy = options.legacyDropTagged === true;
+  const items = [];
+  const seen = /* @__PURE__ */ new Set();
+  if (Array.isArray(listing.images)) {
+    listing.images.forEach((item, index) => {
+      const row = rowOf$2(item);
+      if (!row) return;
+      pushDisplay(items, seen, mediaName$1(row, `Photo ${index + 1}`), rasterShareSource(row, legacy), "image");
+    });
+  }
+  for (const group of [listing.floorplans, listing.floorPlans]) {
+    if (!Array.isArray(group)) continue;
+    group.forEach((item, index) => {
+      const row = rowOf$2(item);
+      if (!row) return;
+      pushDisplay(items, seen, mediaName$1(row, `Floor plan ${index + 1}`), floorSource(row, legacy), "floorPlan");
+    });
+  }
+  if (Array.isArray(listing.videos)) {
+    listing.videos.forEach((item) => {
+      const row = rowOf$2(item);
+      if (!row) return;
+      pushDisplay(items, seen, mediaName$1(row, "Video"), rasterPoster(row, legacy), "poster");
+    });
+  }
+  return items;
+}
+function videoFileUrl(row) {
+  const url = shareableUrl$1(row.url) || shareableUrl$1(row.shareUrl);
+  if (!url || !VIDEO_FILE.test(url.split("#")[0])) return "";
+  return url;
+}
+function ownerPosterSource(row) {
+  return rasterPoster(row) || videoFileUrl(row);
+}
+function listingOwnerDisplayItems(listing) {
+  const items = [...shareDisplayItems(listing)];
+  const seen = new Set(items.map((item) => item.sourceUrl));
+  if (!Array.isArray(listing.videos)) return items;
+  listing.videos.forEach((item) => {
+    const row = rowOf$2(item);
+    if (!row || rasterPoster(row)) return;
+    pushDisplay(items, seen, mediaName$1(row, "Video"), videoFileUrl(row), "poster");
+  });
+  return items;
+}
+function isGalleryFloor(row) {
+  const type = text$8(row.type).toLowerCase();
+  const category = text$8(row.category).toLowerCase();
+  return type === "floorplan" || type === "floor-plan" || category === "floorplan" || category === "floor-plan";
+}
+function galleryOwnerDisplayItems(media) {
+  const items = [];
+  const seen = /* @__PURE__ */ new Set();
+  const rows = media.map(rowOf$2).filter((row) => Boolean(row));
+  for (const row of rows) {
+    const type = text$8(row.type).toLowerCase();
+    if (type === "video" || type === "reel" || type === "matterport" || type === "tour" || type === "file" || type === "pdf") continue;
+    const source = rasterShareSource(row);
+    if (!source) continue;
+    const floor = isGalleryFloor(row);
+    pushDisplay(items, seen, mediaName$1(row, floor ? "Floor plan" : "Photo"), source, floor ? "floorPlan" : "image");
+  }
+  for (const row of rows) {
+    const type = text$8(row.type).toLowerCase();
+    if (type !== "video" && type !== "reel") continue;
+    const poster = rasterPoster(row);
+    if (poster) {
+      pushDisplay(items, seen, mediaName$1(row, "Video"), poster, "poster");
+      continue;
+    }
+    pushDisplay(items, seen, mediaName$1(row, "Video"), videoFileUrl(row), "poster");
+  }
+  return items;
+}
+function displayMedia(listingId, index, name) {
+  const url = shareDisplayPath(listingId, index);
+  return { url, displayUrl: url, name };
+}
+function posterIndex(row, items) {
+  const poster = rasterPoster(row);
+  if (!poster) return -1;
+  return items.findIndex((item) => item.sourceUrl === poster);
+}
+function isUnbranded(row) {
+  const category = text$8(row.category).toLowerCase();
+  const type = text$8(row.type).toLowerCase();
+  if (category === "unbranded" || type === "unbranded") return true;
+  const name = `${text$8(row.name)} ${text$8(row.fileName)} ${text$8(row.title)}`.toLowerCase();
+  return name.includes("unbranded");
+}
+function isBrandedPlayback(row) {
+  if (isMls(row) || isUnbranded(row)) return false;
+  const category = text$8(row.category).toLowerCase();
+  const type = text$8(row.type).toLowerCase();
+  if (category === "branded" || type === "branded") return true;
+  const name = `${text$8(row.name)} ${text$8(row.fileName)} ${text$8(row.title)}`.toLowerCase();
+  return /(^|[^a-z])branded([^a-z]|$)/.test(name);
+}
+function isReelPlayback(row) {
+  if (isMls(row) || isUnbranded(row)) return false;
+  const category = text$8(row.category).toLowerCase();
+  const type = text$8(row.type).toLowerCase();
+  return category === "reel" || type === "reel";
+}
+function deliveredVideoUrl(row) {
+  const url = shareableUrl$1(row.url) || shareableUrl$1(row.shareUrl);
+  if (!url || !VIDEO_FILE.test(url.split("#")[0])) return "";
+  if (/\/mls\//i.test(url)) return "";
+  return url;
+}
+function withPoster(media, listingId, index) {
+  if (index < 0) return media;
+  const poster = shareDisplayPath(listingId, index);
+  return { ...media, poster, thumbnailUrl: poster, displayUrl: poster };
+}
+function publicShareVideos(listing, playback) {
+  if (!Array.isArray(listing.videos)) return [];
+  const items = shareDisplayItems(listing);
+  const videos = [];
+  for (const item of listing.videos) {
+    const row = rowOf$2(item);
+    if (!row) continue;
+    const name = mediaName$1(row, "Video");
+    const posterAt = posterIndex(row, items);
+    if (playback && (isBrandedPlayback(row) || isReelPlayback(row))) {
+      const url = deliveredVideoUrl(row);
+      if (!url) continue;
+      videos.push(withPoster({ url, name, noDownload: true }, listing.id, posterAt));
+      continue;
+    }
+    if (posterAt < 0) continue;
+    videos.push(withPoster({ url: null, name }, listing.id, posterAt));
+  }
+  return videos.slice(0, 40);
+}
+function publicShareMedia(listing) {
+  const images = [];
+  const floorPlans = [];
+  shareDisplayItems(listing).forEach((item, index) => {
+    const media = displayMedia(listing.id, index, item.name);
+    if (item.kind === "image") images.push(media);
+    if (item.kind === "floorPlan") floorPlans.push(media);
+  });
+  return {
+    images: images.slice(0, 200),
+    floorPlans: floorPlans.slice(0, 40)
+  };
+}
+function rowOf$1(item) {
+  return item && typeof item === "object" ? item : {};
+}
+function matterportUrl(row) {
+  for (const key of ["embedUrl", "url", "shareUrl"]) {
+    const value = row[key];
+    if (typeof value !== "string") continue;
+    const url = value.trim();
+    if (!url) continue;
+    try {
+      if (new URL(url).hostname.toLowerCase().includes("matterport.com")) return url;
+    } catch {
+    }
+  }
+  return "";
+}
+function lockedClientGalleryMedia(galleryId, items, canDownload) {
+  const rows = items.map(rowOf$1);
+  if (canDownload) return rows.map((row) => publicMediaItem(row, true));
+  const display = galleryOwnerDisplayItems(rows);
+  const token = signOwnerDisplayToken({ scope: "gallery", id: galleryId });
+  const href = (source) => {
+    if (!token || !source) return null;
+    const index = display.findIndex((item) => item.sourceUrl === source);
+    if (index < 0) return null;
+    return ownerDisplayPath(token, index);
+  };
+  return rows.map((row) => {
+    const base = publicMediaItem(row, false);
+    const tour = matterportUrl(row);
+    if (tour) return { ...base, url: tour, shareUrl: tour, embedUrl: tour };
+    const type = typeof row.type === "string" ? row.type.toLowerCase() : "";
+    if (type === "video" || type === "reel") {
+      const poster = href(ownerPosterSource(row));
+      return { ...base, poster, thumbnailUrl: poster };
+    }
+    const image = href(rasterShareSource(row));
+    if (!image) return base;
+    return { ...base, url: image };
+  });
+}
 const AI_EDIT_PRESETS = [
   {
     id: "virtual_stage",
@@ -6201,6 +6533,12 @@ function httpUrl(value) {
   const url = text$6(value);
   return url.startsWith("https://") || url.startsWith("http://") ? url : "";
 }
+function shareableUrl(value) {
+  const url = text$6(value);
+  if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
+  if (url.startsWith("/")) return url;
+  return httpUrl(url);
+}
 function galleryResult(doc, via) {
   const status2 = statusOf(doc) || "unknown";
   const released = isReleased(doc);
@@ -6420,17 +6758,27 @@ function listingResult(listing, related) {
   };
 }
 function publicProject(listing, _related, notice) {
+  const safe = displaySafeShareMedia(listing);
   return {
     id: listing.id,
     address: addressOf(listing),
     agentName: agentNameOf$1(listing),
     services: servicesOf(listing),
-    images: publicImages(listing),
-    videos: publicVideos(listing),
-    tourUrl: publicTour(listing),
-    floorPlans: publicFloorPlans(listing),
+    images: safe.images,
+    videos: safe.videos,
+    tourUrl: safe.tourUrl,
+    floorPlans: safe.floorPlans,
     notice,
     view: "public"
+  };
+}
+function ownerMediaSource(listing, pub) {
+  return {
+    ...pub,
+    images: publicImages(listing),
+    videos: publicVideos(listing),
+    floorPlans: publicFloorPlans(listing),
+    tourUrl: publicTour(listing)
   };
 }
 const ORIGINAL_FILE = /\.(mp4|m4v|mov|webm|avi|mkv|zip|pdf|dng|cr2|cr3|nef|nrw|arw|srf|sr2|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic|heif)(\?|#|$)/i;
@@ -6480,11 +6828,11 @@ function walkOriginalNeedles(value, needles, inheritedOriginal = false) {
   for (const key of FILE_URL_KEYS) pushNeedle(needles, row[key]);
   const original = inheritedOriginal || rowIsDeliveryOriginal(row);
   if (original) {
-    const fileUrls = new Set(FILE_URL_KEYS.map((key) => httpUrl(row[key])).filter(Boolean));
+    const fileUrls = new Set(FILE_URL_KEYS.map((key) => shareableUrl(row[key])).filter(Boolean));
     for (const key of ["url", "shareUrl", "embedUrl", "sourcePath", "storagePath", "path"]) {
       const raw = text$6(row[key]);
       if (!raw) continue;
-      const asUrl = httpUrl(raw);
+      const asUrl = shareableUrl(raw);
       if (asUrl && isStreamUrl(asUrl)) continue;
       if (!inheritedOriginal && (key === "url" || key === "shareUrl") && asUrl && isDisplayImageUrl(asUrl) && !fileUrls.has(asUrl) && !isFullResOrMls(row) && row.downloadable !== true) continue;
       pushNeedle(needles, raw);
@@ -6528,82 +6876,85 @@ function scrubOriginals(value, needles) {
   };
   return walk(value);
 }
-function displayImageCandidate(row, needles) {
-  for (const key of DISPLAY_IMAGE_KEYS) {
-    const url = httpUrl(row[key]);
-    if (!url || !isDisplayImageUrl(url) || containsOriginal(url, needles)) continue;
-    return url;
-  }
-  return "";
-}
-function lockedPhoto(row, index, needles) {
-  const frame = frameFromListingImage(row, index);
-  if (!frame || frame.raw) return null;
-  const display = displayImageCandidate(row, needles);
-  if (display) return { url: display, name: frame.name };
-  const url = httpUrl(row.url);
-  if (!url || !isDisplayImageUrl(url) || isOriginalFileUrl(url) || containsOriginal(url, needles)) return null;
-  if (isPrivateMedia(frame.path, frame.name, url) || isFullResOrMls(row) || row.downloadable === true) return null;
-  return { url, name: frame.name };
-}
-function lockedVideo(row, needles) {
-  const name = mediaName(row, "Video");
-  let stream = "";
-  let streamKey = "";
-  for (const key of STREAM_KEYS) {
-    const url = httpUrl(row[key]);
-    if (!url || !isStreamUrl(url) || containsOriginal(url, needles)) continue;
-    stream = url;
-    streamKey = key;
-    break;
-  }
-  const poster = displayImageCandidate(row, needles);
-  if (!name && !stream && !poster) return null;
-  const media = { url: stream || null, name };
-  if (stream && streamKey) media[streamKey] = stream;
-  if (poster) {
-    media.poster = poster;
-    media.thumbnailUrl = poster;
-  }
-  return media;
-}
 function lockedOwnerMedia(listing, pub) {
   const needles = listingOriginalNeedles(listing);
+  const items = listingOwnerDisplayItems(listing);
+  const token = signOwnerDisplayToken({ scope: "listing", id: listing.id });
+  const href = (index) => token && index >= 0 ? ownerDisplayPath(token, index) : "";
   const images = [];
-  if (Array.isArray(listing.images)) {
-    listing.images.forEach((item, index) => {
-      const row = rowOf(item);
-      if (!row) return;
-      const photo = lockedPhoto(row, index, needles);
-      if (photo) images.push(photo);
-    });
-  }
+  const floorPlans = [];
+  items.forEach((item, index) => {
+    const url = href(index);
+    if (!url) return;
+    const media = { url, displayUrl: url, name: item.name };
+    if (item.kind === "image") images.push(media);
+    if (item.kind === "floorPlan") floorPlans.push(media);
+  });
   const videos = [];
   if (Array.isArray(listing.videos)) {
     for (const item of listing.videos) {
       const row = rowOf(item);
       if (!row) continue;
-      const video = lockedVideo(row, needles);
-      if (video) videos.push(video);
+      const name = mediaName(row, "Video");
+      let stream = "";
+      let streamKey = "";
+      for (const key of STREAM_KEYS) {
+        const url = shareableUrl(row[key]);
+        if (!url || !isStreamUrl(url) || containsOriginal(url, needles)) continue;
+        stream = url;
+        streamKey = key;
+        break;
+      }
+      const posterAt = items.findIndex((entry2) => entry2.sourceUrl === ownerPosterSource(row));
+      const poster = href(posterAt);
+      if (!name && !stream && !poster) continue;
+      const media = { url: stream || null, name };
+      if (stream && streamKey) media[streamKey] = stream;
+      if (poster) {
+        media.poster = poster;
+        media.thumbnailUrl = poster;
+        media.displayUrl = poster;
+      }
+      videos.push(media);
     }
   }
-  const floorPlans = [];
-  for (const group of [listing.floorplans, listing.floorPlans]) {
-    if (!Array.isArray(group)) continue;
-    group.forEach((item, index) => {
-      const row = rowOf(item);
-      if (!row) return;
-      const plan = lockedPhoto(row, index, needles);
-      if (plan) floorPlans.push(plan);
-    });
-  }
-  const tourUrl = pub.tourUrl && !isOriginalFileUrl(pub.tourUrl) && !containsOriginal(pub.tourUrl, needles) ? pub.tourUrl : "";
+  const embedded = embedTour(listing, needles);
+  const listed = pub.tourUrl && !isOriginalFileUrl(pub.tourUrl) && !containsOriginal(pub.tourUrl, needles) ? pub.tourUrl : "";
   return scrubOriginals({
     images: images.slice(0, 200),
     videos: videos.slice(0, 40),
     floorPlans: floorPlans.slice(0, 40),
-    tourUrl
+    tourUrl: embedded || listed
   }, needles);
+}
+function embedTour(listing, needles) {
+  const groups = [listing.tours, listing.tourLinks];
+  for (const group of groups) {
+    if (!Array.isArray(group)) continue;
+    for (const item of group) {
+      const row = rowOf(item);
+      if (!row) continue;
+      for (const key of ["embedUrl", "url", "shareUrl"]) {
+        const url = shareableUrl(row[key]);
+        if (!url || isOriginalFileUrl(url) || containsOriginal(url, needles)) continue;
+        const type = text$6(row.type).toLowerCase();
+        if (type === "matterport" || type === "tour" || /matterport\.com/i.test(url)) return url;
+      }
+    }
+  }
+  return "";
+}
+function displaySafeShareMedia(listing) {
+  const share = publicShareMedia(listing);
+  const needles = listingOriginalNeedles(listing);
+  const tour = publicTour(listing);
+  const safeTour = tour && !isOriginalFileUrl(tour) && !containsOriginal(tour, needles) ? tour : "";
+  return {
+    images: share.images,
+    floorPlans: share.floorPlans,
+    videos: publicShareVideos(listing, false),
+    tourUrl: safeTour || embedTour(listing, needles)
+  };
 }
 function ownerStudioProject(listing, pub, gate = {}) {
   const authoritativeInvoice = Object.prototype.hasOwnProperty.call(gate, "invoice");
@@ -6623,8 +6974,9 @@ function ownerStudioProject(listing, pub, gate = {}) {
     galleries: [],
     invoice: authoritativeInvoice ? invoiceDoc : null
   });
+  const source = ownerMediaSource(listing, pub);
   const project = {
-    ...pub,
+    ...source,
     view: "owner",
     clientName: text$6(listing.clientName),
     clientEmail: text$6(listing.clientEmail),
@@ -6634,13 +6986,13 @@ function ownerStudioProject(listing, pub, gate = {}) {
     requirePayment: requirePaymentOn(listing.requirePayment),
     downloadsUnlocked,
     invoice,
-    images: downloadsUnlocked ? ownerImageDownloads(listing, pub.images) : pub.images,
+    images: downloadsUnlocked ? ownerImageDownloads(listing, source.images) : source.images,
     files: downloadsUnlocked ? ownerFiles(listing) : []
   };
   if (downloadsUnlocked || gate.staffAccess === true) return project;
   return {
     ...project,
-    ...lockedOwnerMedia(listing, pub),
+    ...lockedOwnerMedia(listing, source),
     files: []
   };
 }
@@ -8833,14 +9185,39 @@ async function readStudioCaller(req) {
     return null;
   }
 }
+function sharePlaybackOpen(listing, invoice, related) {
+  return studioDownloadsUnlocked({
+    listing: {
+      id: listing.id,
+      invoiceStatus: listing.invoiceStatus,
+      paymentStatus: listing.paymentStatus,
+      invoice: listing.invoice,
+      downloadEnabled: listing.downloadEnabled === true || related.some((doc) => doc.downloadEnabled === true),
+      downloadsReleased: listing.downloadsReleased === true || related.some((doc) => doc.downloadsReleased === true),
+      lockDownloads: listing.lockDownloads
+    },
+    galleries: [],
+    invoice
+  });
+}
 async function finishGalleryLink(result, caller) {
   if (!result.ok || result.kind !== "listing") return result;
   const listing = docRecord(await db$h().collection("listings").doc(result.project.id).get());
-  if (!listing || !callerCanOpenPrivateStudio(listing, caller)) return result;
+  if (!listing) return result;
   const [invoice, related] = await Promise.all([
     invoiceForListing(listing),
     relatedForListing(listing)
   ]);
+  if (!callerCanOpenPrivateStudio(listing, caller)) {
+    if (result.project.view !== "public") return result;
+    return {
+      ...result,
+      project: {
+        ...result.project,
+        videos: publicShareVideos(listing, sharePlaybackOpen(listing, invoice, related))
+      }
+    };
+  }
   if (result.project.view !== "public") return result;
   const project = ownerStudioProject(listing, result.project, {
     invoice: invoice ?? null,
@@ -8952,10 +9329,7 @@ function clientGalleryPayload(id, gallery, gate) {
     invoiceStatus: invoice?.status || null,
     lockTitle: unlocked ? null : ICONIC_DOWNLOAD_LOCK.title,
     lockMessage: unlocked ? null : ICONIC_DOWNLOAD_LOCK.message,
-    mediaItems: showMedia ? media.map((item) => publicMediaItem(
-      item && typeof item === "object" ? item : {},
-      unlocked
-    )) : []
+    mediaItems: showMedia ? lockedClientGalleryMedia(id, media, unlocked) : []
   };
 }
 router$k.get("/", requireStaff, async (req, res) => {
@@ -13699,7 +14073,8 @@ function createRateLimiter(options) {
       const now = options.now ? options.now() : Date.now();
       const windowStart = now - options.windowMs;
       const recent = (hits.get(key) ?? []).filter((stamp2) => stamp2 > windowStart);
-      if (recent.length >= options.max) {
+      const max = typeof options.max === "function" ? options.max() : options.max;
+      if (recent.length >= max) {
         const retryAfterSec = Math.max(1, Math.ceil((recent[0] + options.windowMs - now) / 1e3));
         hits.set(key, recent);
         return { allowed: false, retryAfterSec };
@@ -16868,22 +17243,6 @@ function isPresentationToken(value) {
 function createPresentationToken(randomBytes2) {
   return randomBytes2(18).toString("base64url");
 }
-function safePresentationUrl(value) {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.startsWith("//") || trimmed.startsWith("/\\")) return null;
-  if (trimmed.startsWith("/")) {
-    if (trimmed.includes("..")) return null;
-    return trimmed;
-  }
-  try {
-    const url = new URL(trimmed);
-    if (url.protocol === "https:" || url.protocol === "http:") return url.toString();
-  } catch {
-    return null;
-  }
-  return null;
-}
 function text(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -16922,20 +17281,21 @@ function pushDraft(drafts, row, index, folders, fallbackRoom = "") {
   const looksLikeImage = !contentType || contentType.startsWith("image/") || IMAGE_EXT.test(name) || IMAGE_EXT.test(path2);
   if (!looksLikeImage) return;
   if (contentType && !contentType.startsWith("image/") && !IMAGE_EXT.test(name)) return;
-  const url = safePresentationUrl(row.url) || safePresentationUrl(row.shareUrl);
-  if (!url) return;
+  const sourceUrl = rasterShareSource(row);
+  if (!sourceUrl) return;
   const room = roomFromFields(row, folders) || fallbackRoom;
   const order = typeof row.order === "number" && Number.isFinite(row.order) ? row.order : index;
   const final = row.studioApproved === true || text(row.studioRole) === "final" || path2.includes("/finals/");
   drafts.push({
-    id: text(row.id) || path2 || url,
-    url,
+    id: text(row.id) || path2 || sourceUrl,
+    url: sourceUrl,
     alt: room ? `${room} photograph` : "Listing photograph",
     room,
     order,
     index,
     path: path2,
     sourcePath: text(row.sourcePath),
+    sourceUrl,
     final
   });
 }
@@ -16987,29 +17347,34 @@ function preferFinals(drafts) {
     return true;
   });
 }
-function dedupe(drafts) {
-  const seen = /* @__PURE__ */ new Set();
-  const photos = [];
-  const sorted = [...drafts].sort((a, b) => a.order - b.order || a.index - b.index);
-  for (const item of sorted) {
-    const key = item.path || item.url;
-    if (seen.has(key) || seen.has(item.url)) continue;
-    seen.add(key);
-    seen.add(item.url);
-    photos.push({
-      id: item.id,
-      url: item.url,
-      alt: item.alt,
-      room: item.room
-    });
-  }
-  return photos.slice(0, 200);
-}
-function collectPresentationPhotos(source) {
+function presentationDrafts(source) {
   const hidden = hiddenPresentationKeys(source.listing);
   const fromListing = listingDrafts(source.listing, hidden);
   const fromGalleries = galleryDrafts(source.galleries, fromListing.length, hidden);
-  return dedupe(preferFinals([...fromListing, ...fromGalleries]));
+  const seen = /* @__PURE__ */ new Set();
+  const photos = [];
+  const sorted = [...preferFinals([...fromListing, ...fromGalleries])].sort((a, b) => a.order - b.order || a.index - b.index);
+  for (const item of sorted) {
+    const key = item.path || item.sourceUrl;
+    if (!item.sourceUrl || seen.has(key) || seen.has(item.sourceUrl)) continue;
+    seen.add(key);
+    seen.add(item.sourceUrl);
+    photos.push(item);
+  }
+  return photos.slice(0, 200);
+}
+function presentationDisplayPath(token, index) {
+  return `/api/media/display/p/${encodeURIComponent(token)}/${index}`;
+}
+function collectPresentationPhotos(source) {
+  const drafts = presentationDrafts(source);
+  const tokenRoute = TOKEN_PATTERN.test(source.token);
+  return drafts.map((item, index) => ({
+    id: item.id,
+    url: tokenRoute ? presentationDisplayPath(source.token, index) : item.sourceUrl,
+    alt: item.alt,
+    room: item.room
+  }));
 }
 function presentationRooms(photos) {
   const rooms = [];
@@ -17463,11 +17828,11 @@ function ownerSessionSecret(env = ownerRuntimeEnv()) {
   if (explicit && explicit.length >= 16) return explicit;
   const serviceAccount = env.FIREBASE_SERVICE_ACCOUNT;
   if (serviceAccount && serviceAccount.length >= 32) {
-    return createHmac("sha256", "iconic-owners-suite-v1").update(serviceAccount).digest("hex");
+    return createHmac$1("sha256", "iconic-owners-suite-v1").update(serviceAccount).digest("hex");
   }
   const sheetsKey = env.OWNER_SHEETS_SA_KEY;
   if (sheetsKey && sheetsKey.length >= 32) {
-    return createHmac("sha256", "iconic-owners-suite-v1").update(sheetsKey).digest("hex");
+    return createHmac$1("sha256", "iconic-owners-suite-v1").update(sheetsKey).digest("hex");
   }
   return null;
 }
@@ -17477,13 +17842,13 @@ function signOwnerSession(identity, secret, now = Date.now()) {
     uid: identity.uid,
     exp: now + SESSION_MS
   })).toString("base64url");
-  const sig = createHmac("sha256", secret).update(body).digest("base64url");
+  const sig = createHmac$1("sha256", secret).update(body).digest("base64url");
   return `${body}.${sig}`;
 }
 function readOwnerSession(token, secret, now = Date.now()) {
   const [body, sig] = token.split(".");
   if (!body || !sig) return null;
-  const expected = createHmac("sha256", secret).update(body).digest("base64url");
+  const expected = createHmac$1("sha256", secret).update(body).digest("base64url");
   const actualBuf = Buffer.from(sig);
   const expectedBuf = Buffer.from(expected);
   if (actualBuf.length !== expectedBuf.length || !timingSafeEqual$1(actualBuf, expectedBuf)) return null;

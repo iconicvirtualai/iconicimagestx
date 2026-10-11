@@ -1,6 +1,7 @@
 export interface RateLimitOptions {
   windowMs: number;
-  max: number;
+  /** Fixed cap, or a function so a process can read the cap at check time. */
+  max: number | (() => number);
   now?: () => number;
 }
 
@@ -22,7 +23,8 @@ export function createRateLimiter(options: RateLimitOptions) {
       const windowStart = now - options.windowMs;
       const recent = (hits.get(key) ?? []).filter((stamp) => stamp > windowStart);
 
-      if (recent.length >= options.max) {
+      const max = typeof options.max === "function" ? options.max() : options.max;
+      if (recent.length >= max) {
         const retryAfterSec = Math.max(1, Math.ceil((recent[0] + options.windowMs - now) / 1000));
         hits.set(key, recent);
         return { allowed: false, retryAfterSec };

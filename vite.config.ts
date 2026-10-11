@@ -36,7 +36,7 @@ function expressPlugin(): Plugin {
   return {
     name: "express-plugin",
     apply: "serve", // Only apply during development (serve mode)
-    configureServer(server) {
+    async configureServer(server) {
       // Serve the standalone guest-prep sheet at a clean path before the SPA fallback.
       server.middlewares.use((req, res, next) => {
         const raw = req.url || "";
@@ -57,6 +57,11 @@ function expressPlugin(): Plugin {
 
       process.env.ICONIC_VITE_DEV = "1";
       const app = createServer();
+      // Dynamic import so the Vercel api/index build never traces sharp.
+      const { handleMediaDisplay } = await import("./server/routes/mediaDisplay");
+      app.get("/api/media/display/p/:token/:index", handleMediaDisplay);
+      app.get("/api/media/display/o/:signedToken/:index", handleMediaDisplay);
+      app.get("/api/media/display/:listingId/:index", handleMediaDisplay);
 
       // Add Express app as middleware to Vite dev server
       server.middlewares.use(app);

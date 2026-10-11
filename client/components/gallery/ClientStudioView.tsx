@@ -44,6 +44,12 @@ function firstStudioMediaUrl(video: unknown, fields: readonly string[]): string 
   return "";
 }
 
+function studioPosterUrl(video: unknown): string {
+  if (!video || typeof video !== "object") return "";
+  const record = video as Record<string, unknown>;
+  return studioHttpUrl(record.poster) || studioHttpUrl(record.thumbnailUrl) || studioHttpUrl(record.displayUrl);
+}
+
 function studioHttpUrl(value: unknown): string {
   if (typeof value !== "string") return "";
   const url = value.trim();
@@ -219,20 +225,20 @@ export function ClientStudioView({
                   <p className="font-bold text-sm mb-2">{v.name || `Video ${i+1}`}</p>
                   {owner ? (
                     <OwnerStudioVideo video={v} canDownload={canDownloadFiles} />
-                  ) : (
-                    v.url && (
-                      <video
-                        src={v.url}
-                        controls
-                        playsInline
-                        preload="metadata"
-                        controlsList="nodownload noplaybackrate"
-                        disablePictureInPicture
-                        onContextMenu={blockPublicVideoMenu}
-                        className="block h-auto w-full max-w-full rounded-xl bg-black"
-                      />
-                    )
-                  )}
+                  ) : v.url ? (
+                    <video
+                      src={v.url}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      controlsList="nodownload noplaybackrate"
+                      disablePictureInPicture
+                      onContextMenu={blockPublicVideoMenu}
+                      className="block h-auto w-full max-w-full rounded-xl bg-black"
+                    />
+                  ) : studioPosterUrl(v) ? (
+                    <img src={studioPosterUrl(v)} alt="" className="block h-auto w-full max-w-full rounded-xl object-contain bg-gray-100" />
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -249,6 +255,18 @@ export function ClientStudioView({
               {tours.map((t: any, i: number) => (
                 <div key={i} className="bg-gray-50 rounded-2xl p-6">
                   <p className="font-bold mb-2">3D Virtual Tour</p>
+                  {typeof t.url === "string" && /matterport\.com/i.test(t.url) ? (
+                    <div className="relative mb-4 aspect-video w-full overflow-hidden rounded-xl bg-black">
+                      <iframe
+                        title="3D tour"
+                        src={t.url}
+                        allow="fullscreen; xr-spatial-tracking"
+                        allowFullScreen
+                        loading="lazy"
+                        className="absolute inset-0 h-full w-full border-0"
+                      />
+                    </div>
+                  ) : null}
                   <a href={t.url} target="_blank" rel="noopener noreferrer" className="text-[#0d9488] font-bold flex items-center gap-2">
                     Open Tour <ExternalLink className="w-4 h-4" />
                   </a>
@@ -416,6 +434,8 @@ function OwnerStudioVideo({ video, canDownload }: { video: unknown; canDownload:
           onContextMenu={blockPublicVideoMenu}
           className="block h-auto w-full max-w-full rounded-xl bg-black"
         />
+      ) : studioPosterUrl(video) ? (
+        <img src={studioPosterUrl(video)} alt="" className="block h-auto w-full max-w-full rounded-xl object-contain bg-gray-100" />
       ) : (
         <p className="text-sm font-semibold text-gray-500">Video available after payment</p>
       )}
@@ -451,8 +471,13 @@ function OwnerStudioFileDownloads({ files }: { files: unknown }) {
   );
 }
 
+function floorPlanIsImage(url: string): boolean {
+  if (url.includes("/api/media/display/")) return true;
+  return /\.(jpe?g|png|webp|gif)(\?|$)/i.test(url);
+}
+
 function floorPlanBody(plan: { url?: string; name?: string }) {
-  return /\.(jpe?g|png|webp|gif)(\?|$)/i.test(String(plan.url || "")) ? (
+  return floorPlanIsImage(String(plan.url || "")) ? (
     <img src={plan.url} alt={plan.name || "Floor plan"} className="mt-3 max-h-[480px] w-full rounded-xl object-contain bg-white" />
   ) : (
     <a href={plan.url} target="_blank" rel="noopener noreferrer" className="text-[#0d9488] font-bold flex items-center gap-2">
