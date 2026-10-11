@@ -188,12 +188,21 @@ function LineRow({ line }: { line: InvoiceFaceLine }) {
   return (
     <div className={columnGrid("border-b border-[#6b7280] py-2.5")}>
       <div className="min-w-0">
-        <p className="font-bold uppercase tracking-[0.12em]" style={{ color: TEAL }}>{line.name || "Service"}</p>
-        {line.description ? <p className="mt-1 text-xs leading-relaxed text-neutral-500">{line.description}</p> : null}
+        <p
+          className="text-[13px] font-bold uppercase leading-snug tracking-[0.04em] sm:text-base sm:tracking-[0.12em]"
+          style={{ color: TEAL, ...itemNameWrap }}
+        >
+          {line.name || "Service"}
+        </p>
+        {line.description ? (
+          <p className="mt-1 text-xs leading-relaxed text-neutral-500" style={itemNameWrap}>
+            {line.description}
+          </p>
+        ) : null}
       </div>
-      <p className="text-center text-sm font-bold" style={{ color: TEAL }}>{qtyLabel}</p>
-      <MoneyAmount className="text-sm font-bold" style={{ color: TEAL }}>{money(unit)}</MoneyAmount>
-      <MoneyAmount className="text-sm font-bold" style={{ color: TEAL }}>{money(line.price)}</MoneyAmount>
+      <p className="text-center text-xs font-bold sm:text-sm" style={{ color: TEAL }}>{qtyLabel}</p>
+      <MoneyAmount className="min-w-0 text-xs font-bold sm:min-w-[5.5rem] sm:text-sm" style={{ color: TEAL }}>{money(unit)}</MoneyAmount>
+      <MoneyAmount className="min-w-0 text-xs font-bold sm:min-w-[5.5rem] sm:text-sm" style={{ color: TEAL }}>{money(line.price)}</MoneyAmount>
     </div>
   );
 }
@@ -322,6 +331,8 @@ function splitBillTo(children: React.ReactNode): { billTo: React.ReactNode; rest
   return { billTo, rest };
 }
 
+const itemNameWrap = { wordBreak: "normal", overflowWrap: "normal", hyphens: "none" } as const;
+
 function columnGrid(extra: string): string {
-  return `grid grid-cols-[minmax(0,1fr)_2.4rem_minmax(5.5rem,auto)_minmax(5.5rem,auto)] items-center gap-x-2 px-3 sm:grid-cols-[minmax(0,1fr)_4.5rem_6.5rem_6.5rem] sm:gap-x-3 sm:px-5 ${extra}`;
+  return `grid grid-cols-[minmax(0,1fr)_2rem_4.55rem_4.55rem] items-center gap-x-1.5 px-2.5 sm:grid-cols-[minmax(0,1fr)_4.5rem_6.5rem_6.5rem] sm:gap-x-3 sm:px-5 ${extra}`;
 }
