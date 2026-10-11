@@ -5,7 +5,7 @@ import { Save, Settings, Shield, Bell, Clock, DollarSign, Camera, Mail, Globe } 
 import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { toast } from "sonner";
-import { BUSINESS_CONTACT } from "@shared/businessContact";
+import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "@shared/businessContact";
 
 const labelCls = "text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1";
 const inputCls = "w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30";
@@ -28,7 +28,7 @@ function Toggle({ label, description, value, onChange }: { label: string; descri
 export default function AdminSettings() {
   const [settings, setSettings] = React.useState<any>({
     // Company
-    companyName: "Iconic Images Photography, LLC",
+    companyName: LEGAL_BUSINESS_NAME,
     companyEmail: BUSINESS_CONTACT.email,
     companyPhone: BUSINESS_CONTACT.phoneDisplay,
     companyAddress: BUSINESS_CONTACT.address,

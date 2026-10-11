@@ -6,6 +6,9 @@
 export const BUSINESS_CONTACT_LINE =
   "26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380 | 281.356.0965 | photos@iconicimagestx.com";
 
+/** Legal entity name. Marketing copy keeps the brand "Iconic Images". */
+export const LEGAL_BUSINESS_NAME = "Iconic Images Photography, LLC";
+
 function parseContactLine(line: string) {
   const parts = line.split(" | ");
   if (parts.length !== 3) {
@@ -45,7 +48,7 @@ export function businessContactJsonLd() {
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
     name: "Iconic Images",
-    legalName: "Iconic Images Photography, LLC",
+    legalName: LEGAL_BUSINESS_NAME,
     url: "https://iconicimagestx.com",
     email: BUSINESS_CONTACT.email,
     telephone: BUSINESS_CONTACT.phoneDisplay,

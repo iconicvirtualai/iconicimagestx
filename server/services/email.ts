@@ -6,7 +6,7 @@
 
 import nodemailer from "nodemailer";
 import admin from "firebase-admin";
-import { BUSINESS_CONTACT } from "../../shared/businessContact";
+import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "../../shared/businessContact";
 import { clientNotifyBlockReason, emailAllowed, narrowGatedClientRecipients, notifyTestAllowlist } from "../../shared/clientNotify";
 
 const db = () => admin.firestore();
@@ -175,6 +175,7 @@ function getFallbackTemplate(
       ${content}
       <div style="border-top: 1px solid #eee; margin-top: 30px; padding-top: 20px; text-align: center; color: #999; font-size: 12px;">
         <p>${BUSINESS_CONTACT.line}</p>
+        <p>${LEGAL_BUSINESS_NAME}</p>
         <p>Iconic Images TX | iconicimagestx.com</p>
         <p>Questions? Reply to this email or message us through your client portal.</p>
       </div>

@@ -17,7 +17,7 @@ import {
   LIFE_OF_THE_LISTING_CARE_SUMMARY_LABEL,
 } from "@shared/lifeOfTheListingCare";
 import { addressText } from "@shared/addressText";
-import { BUSINESS_CONTACT } from "@shared/businessContact";
+import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "@shared/businessContact";
 import { formatChicagoDate } from "@shared/clientHome";
 import { staffInvoicePath } from "@shared/staffInvoice";
 import { orderChargeSummary, orderServiceLines } from "@shared/orderPackageLines";
@@ -640,7 +640,7 @@ export default function AdminOrderDetail() {
               <p className="text-sm text-gray-400">{invoice.invoiceNumber || order.orderNumber}</p>
             </div>
             <div className="text-right">
-              <p className="text-sm font-bold">Iconic Images Photography, LLC</p>
+              <p className="text-sm font-bold">{LEGAL_BUSINESS_NAME}</p>
               <p className="text-xs text-gray-400">{BUSINESS_CONTACT.line}</p>
             </div>
           </div>

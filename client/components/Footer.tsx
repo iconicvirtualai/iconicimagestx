@@ -3,6 +3,7 @@ import { Facebook, Instagram } from "lucide-react";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { LegalLinks } from "@/components/LegalLinks";
 import { PublicContactLine } from "@/components/PublicContactLine";
+import { LEGAL_BUSINESS_NAME } from "@shared/businessContact";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -15,7 +16,7 @@ export default function Footer() {
           {/* Copyright & Brand */}
           <div className="flex flex-col md:flex-row items-center gap-4 md:gap-8">
             <span className="text-sm opacity-80">
-              © {currentYear} Iconic Images Inc.
+              © {currentYear} {LEGAL_BUSINESS_NAME}
             </span>
             <nav className="flex flex-wrap justify-center gap-6">
               <a href="/" className="text-sm font-medium hover:text-white/80 transition-colors">Home</a>

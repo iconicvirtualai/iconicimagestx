@@ -1,9 +1,9 @@
-import { BUSINESS_CONTACT } from "@shared/businessContact";
+import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "@shared/businessContact";
 import { ICONIC_BUSINESS } from "@shared/iconicBusiness";
 
 /** Public legal identity. Contact fields come from the shared business contact. */
 export const LEGAL = {
-  entity: ICONIC_BUSINESS.entity,
+  entity: LEGAL_BUSINESS_NAME,
   brand: ICONIC_BUSINESS.brand,
   brandSite: ICONIC_BUSINESS.brandSite,
   email: BUSINESS_CONTACT.email,
