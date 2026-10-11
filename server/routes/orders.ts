@@ -8,6 +8,7 @@ import { Router } from "express";
 import admin from "firebase-admin";
 import { requireCoordinator, requireStaff, type AuthenticatedRequest } from "../middleware/auth";
 import { chicagoNoonDate } from "../../shared/clientHome";
+import { refuseQaStaffAssignment } from "../services/qaStaffAssign";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -156,6 +157,19 @@ router.patch("/:id", requireCoordinator, async (req, res) => {
     allowed.forEach((key) => {
       if (key in req.body) updates[key] = req.body[key];
     });
+
+    const photographerId = typeof updates.assignedPhotographerId === "string"
+      ? updates.assignedPhotographerId.trim()
+      : "";
+    if (photographerId) {
+      const orderDoc = await db().collection("orders").doc(req.params.id).get();
+      if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
+      const refusal = await refuseQaStaffAssignment({
+        staffIds: [photographerId],
+        record: { id: orderDoc.id, ...(orderDoc.data() || {}) },
+      });
+      if (refusal) return res.status(refusal.status).json({ error: refusal.error });
+    }
 
     // Date-only strings are Central noon. UTC midnight would show as the previous Chicago day.
     if (updates.scheduledDate && typeof updates.scheduledDate === "string") {

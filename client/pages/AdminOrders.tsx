@@ -11,6 +11,7 @@ import { listingLinkFields } from "@shared/orderProjectInvoice";
 import { Button } from "@/components/ui/button";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 import { upsertScheduledAppointment } from "@/lib/scheduleRecords";
+import { filterAssignableStaff, recordAllowsQaStaff } from "@shared/qaStaff";
 import { recordAddressText } from "@shared/addressText";
 import { buildAdminOrderTile, type AdminStudioId } from "@shared/adminOrderTile";
 import { exclusiveOrderBuckets } from "@shared/orderPackageLines";
@@ -427,11 +428,18 @@ function BulkScheduleFlow({ ids, orders, staff, onClose }: any) {
 
   React.useEffect(() => {
     if (order) {
+      const allowed = new Set(
+        filterAssignableStaff(staff, { forPlaytest: recordAllowsQaStaff(order) }).map((person: any) => person.id),
+      );
       setDate(order.appointmentDate || "");
       setTime(order.appointmentTime || "");
-      setProviders((order.assignedProviders || []).map((p: any) => p.providerId));
+      setProviders((order.assignedProviders || []).map((p: any) => p.providerId).filter((id: string) => {
+        if (staff.length === 0) return true;
+        const person = staff.find((item: any) => item.id === id);
+        return !person || allowed.has(id);
+      }));
     }
-  }, [order]);
+  }, [order, staff]);
 
   const handleNext = async () => {
     setSaving(true);
@@ -451,7 +459,7 @@ function BulkScheduleFlow({ ids, orders, staff, onClose }: any) {
         toast.success("All orders scheduled.");
         onClose();
       }
-    } catch (err) { toast.error("Failed to schedule."); }
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Failed to schedule."); }
     finally { setSaving(false); }
   };
 
@@ -491,7 +499,7 @@ function BulkScheduleFlow({ ids, orders, staff, onClose }: any) {
           <div>
             <label className="text-[10px] font-black uppercase text-gray-400 block mb-3">Assign Providers</label>
             <div className="flex flex-wrap gap-2">
-              {staff.map((s: any) => {
+              {filterAssignableStaff(staff, { forPlaytest: recordAllowsQaStaff(order) }).map((s: any) => {
                 const sel = providers.includes(s.id);
                 return (
                   <button key={s.id} onClick={() => setProviders(sel ? providers.filter(p => p !== s.id) : [...providers, s.id])}
