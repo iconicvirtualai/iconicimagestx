@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { clientLoginAction, clientReturnPath, staffHomePath } from "@shared/staffAccess";
@@ -6,6 +6,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import Footer from "@/components/Footer";
+
+/**
+ * Successful create-account lands on the client home. If this login is already
+ * an active staff session, use the same staff home as sign-in.
+ */
+export function accountCreationDestination(session: {
+  loading: boolean;
+  user: unknown;
+  userType: "staff" | "client" | null;
+  staffProfile?: { role?: string } | null;
+}): string {
+  if (!session.loading && session.user && session.userType === "staff") {
+    return staffHomePath(session.staffProfile?.role);
+  }
+  return "/portal/home";
+}
 
 export default function Login() {
   const { signIn, user, userType, staffProfile, loading, resetPassword, registerClient } = useAuth();
@@ -21,6 +37,9 @@ export default function Login() {
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
+  const submittingRef = useRef(false);
+  const sessionRef = useRef({ user, userType, staffProfile, loading });
+  sessionRef.current = { user, userType, staffProfile, loading };
 
   useEffect(() => {
     // Staff home is a different gate. Client home waits until clients/{uid}
@@ -60,6 +79,7 @@ export default function Login() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current) return;
     if (!firstName.trim() || !lastName.trim()) {
       toast.error("Enter your first and last name.");
       return;
@@ -76,14 +96,21 @@ export default function Login() {
       }
     }
 
+    submittingRef.current = true;
     setSubmitting(true);
+    let created = false;
     try {
       await registerClient(email, password, { firstName, lastName, phone });
+      created = true;
       toast.success("Account created. Welcome in.");
+      navigate(accountCreationDestination(sessionRef.current), { replace: true });
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Could not create the account.");
     } finally {
-      setSubmitting(false);
+      if (!created) {
+        submittingRef.current = false;
+        setSubmitting(false);
+      }
     }
   };
 
