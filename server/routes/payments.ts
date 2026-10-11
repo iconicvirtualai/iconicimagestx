@@ -7,9 +7,11 @@
 import { Router, type Request, type Response } from "express";
 import Stripe from "stripe";
 import admin from "firebase-admin";
-import crypto from "crypto";
 import { requireCoordinator, requireAuth, type AuthenticatedRequest } from "../middleware/auth";
+import { appFirestore } from "../lib/appFirestore";
 import { sendEmail } from "../services/email";
+import { buildPaymentReceipt } from "../services/paymentReceiptEmail";
+import { receiveSquareWebhook } from "../services/squarePaidUnlock";
 import { clientNotifyLive } from "../../shared/clientNotify";
 import { addressText } from "../../shared/addressText";
 import { bookingDateLabel } from "../../shared/clientHome";
@@ -32,18 +34,13 @@ import { isActiveStaffRecord } from "../../shared/staffAccess";
 import { isTempAdminEnabled, liveServerEnv } from "../../shared/tempAdmin";
 import { payTokenMatches } from "../lib/payToken";
 import { resolveClientIdentity } from "../services/clientAccounts";
-import { matchSquarePaymentInvoice } from "../services/squarePaymentMatch";
 
 const router = Router();
-const db = () => admin.firestore();
+const db = () => appFirestore();
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20",
 });
-
-function appUrl() {
-  return process.env.APP_URL || "https://iconicimagestx.com";
-}
 
 function stripeReady() {
   return Boolean(process.env.STRIPE_SECRET_KEY);
@@ -307,9 +304,21 @@ async function applySuccessfulPayment({
   });
 
   if (invoice.clientEmail) {
+    const rendered = buildPaymentReceipt({
+      invoice,
+      invoiceId,
+      unlocked: newAmountDue <= 0,
+      amountPaid: newAmountPaid,
+      balance: newAmountDue,
+      galleryId: invoice.galleryId,
+      listing: typeof invoice.listingId === "string" ? { id: invoice.listingId } : null,
+    });
     await sendEmail({
       to: invoice.clientEmail,
       template: "payment_receipt",
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
       variables: {
         clientName: invoice.clientName,
         amount: money(amount),
@@ -431,9 +440,21 @@ router.post("/send-receipt", requireCoordinator, async (req, res) => {
       return res.status(409).json({ error: "Invoice is not paid. Send the pay link instead." });
     }
 
+    const rendered = buildPaymentReceipt({
+      invoice,
+      invoiceId: invoiceDoc.id,
+      unlocked: true,
+      amountPaid: Number(invoice.amountPaid || invoice.total) || 0,
+      balance: amountStillDue(invoice),
+      galleryId: invoice.galleryId,
+      listing: typeof invoice.listingId === "string" ? { id: invoice.listingId } : null,
+    });
     await sendEmail({
       to: invoice.clientEmail,
       template: "payment_receipt",
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
       variables: {
         clientName: invoice.clientName,
         amount: money(invoice.amountPaid || invoice.total),
@@ -738,110 +759,14 @@ router.post("/webhook", async (req: Request, res: Response) => {
   }
 });
 
-function squareNotificationUrls(): string[] {
-  const explicit = process.env.SQUARE_WEBHOOK_NOTIFICATION_URL;
-  const urls = [
-    explicit,
-    `${appUrl()}/api/payments/square-webhook`,
-    process.env.FRONTEND_URL
-      ? `${process.env.FRONTEND_URL.replace(/\/$/, "")}/api/payments/square-webhook`
-      : "",
-  ].filter((url): url is string => Boolean(url));
-  return [...new Set(urls)];
-}
-
-function squareSignatureValid(rawBody: string, received: string | undefined, key: string): boolean {
-  if (!received) return false;
-  const receivedBuf = Buffer.from(received);
-  return squareNotificationUrls().some((url) => {
-    const expected = crypto.createHmac("sha256", key).update(url + rawBody).digest("base64");
-    const expectedBuf = Buffer.from(expected);
-    if (expectedBuf.length !== receivedBuf.length) return false;
-    return crypto.timingSafeEqual(expectedBuf, receivedBuf);
-  });
-}
-
-async function findInvoiceForSquarePayment(payment: Record<string, unknown>) {
-  const hit = await matchSquarePaymentInvoice(payment, {
-    async byId(id) {
-      const snap = await db().collection("invoices").doc(id).get();
-      if (!snap.exists) return null;
-      return { id: snap.id, data: snap.data() || {} };
-    },
-    async byField(field, value) {
-      const snap = await db().collection("invoices").where(field, "==", value).limit(1).get();
-      if (snap.empty) return null;
-      const doc = snap.docs[0];
-      return { id: doc.id, data: doc.data() || {} };
-    },
-  });
-  if (!hit) return null;
-  const snap = await db().collection("invoices").doc(hit.id).get();
-  return snap.exists ? snap : null;
-}
-
 router.post("/square-webhook", async (req: Request, res: Response) => {
-  try {
-    const rawBody = Buffer.isBuffer(req.body)
-      ? req.body.toString("utf8")
-      : JSON.stringify(req.body || {});
-    const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
-    if (!signatureKey) {
-      console.error("[Payments] Square webhook rejected: SQUARE_WEBHOOK_SIGNATURE_KEY is not set.");
-      return res.status(401).json({ error: "Square webhook signature key is not configured." });
-    }
-
-    const received = Array.isArray(req.headers["x-square-hmacsha256-signature"])
-      ? req.headers["x-square-hmacsha256-signature"][0]
-      : req.headers["x-square-hmacsha256-signature"];
-    if (!squareSignatureValid(rawBody, received, signatureKey)) {
-      return res.status(400).json({ error: "Invalid Square webhook signature." });
-    }
-
-    const event = JSON.parse(rawBody);
-    const payment = event?.data?.object?.payment || event?.data?.object;
-    if (!payment?.id || payment.status !== "COMPLETED") return res.json({ received: true });
-
-    const invoiceDoc = await findInvoiceForSquarePayment(payment);
-    if (!invoiceDoc) {
-      await db().collection("agentLogs").add({
-        agent: "travis",
-        action: "Unmatched Square payment",
-        summary: `Square payment ${payment.id} could not be matched to an invoice`,
-        status: "flagged",
-        relatedType: "invoice",
-        priority: "high",
-        requiresHumanReview: true,
-        details: payment.order_id || payment.note || "",
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-      return res.json({ received: true, unmatched: true });
-    }
-
-    const invoice = invoiceDoc.data() || {};
-    if (invoiceProvider(invoice) === "stripe") {
-      return res.json({ received: true, ignored: "stripe-invoice" });
-    }
-
-    const amountCents = Number(payment.amount_money?.amount ?? payment.total_money?.amount ?? 0);
-    const amount = amountCents / 100;
-    if (amount <= 0) return res.json({ received: true, ignored: "zero-amount" });
-
-    await applySuccessfulPayment({
-      invoiceId: invoiceDoc.id,
-      orderId: invoice.orderId,
-      clientId: invoice.clientId,
-      clientName: invoice.clientName,
-      amount,
-      method: "square",
-      squarePaymentId: payment.id,
-    });
-
-    return res.json({ received: true });
-  } catch (err) {
-    console.error("[Payments] Square webhook error:", err);
-    return res.status(500).json({ error: "Square webhook handler failed." });
-  }
+  const signatureHeader = req.headers["x-square-hmacsha256-signature"];
+  const signature = Array.isArray(signatureHeader) ? signatureHeader[0] : signatureHeader;
+  const result = await receiveSquareWebhook({
+    rawBody: req.body,
+    signature: typeof signature === "string" ? signature : undefined,
+  });
+  return res.status(result.status).json(result.body);
 });
 
 router.get("/transactions", requireCoordinator, async (req, res) => {

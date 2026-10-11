@@ -99,7 +99,8 @@ export function createServer() {
     credentials: true,
   }));
 
-  // Payment webhooks need raw body — mount BEFORE express.json()
+  // Payment webhooks need the raw body — mount BEFORE express.json().
+  // Square signs SQUARE_WEBHOOK_NOTIFICATION_URL + these exact bytes.
   app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
   app.use("/api/payments/square-webhook", express.raw({ type: "application/json" }));
 
