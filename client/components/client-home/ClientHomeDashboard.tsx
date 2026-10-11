@@ -323,13 +323,23 @@ function InvoiceDetail({ invoice }: { invoice: ClientInvoiceStatement }) {
         <MoneyRow label="Amount paid" value={invoice.amountPaid} />
         <MoneyRow label="Amount due" value={invoice.amountDue} />
       </div>
-      <button
-        type="button"
-        onClick={() => downloadInvoicePdf(invoice)}
-        className="inline-flex items-center gap-2 rounded-xl bg-black text-white px-4 py-2.5 text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800"
-      >
-        <Download className="w-3.5 h-3.5" /> Download PDF
-      </button>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => downloadInvoicePdf(invoice)}
+          className="inline-flex items-center gap-2 rounded-xl bg-black text-white px-4 py-2.5 text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800"
+        >
+          <Download className="w-3.5 h-3.5" /> Download PDF
+        </button>
+        {invoice.payPath ? (
+          <Link
+            to={invoice.payPath}
+            className="inline-flex items-center rounded-xl border border-black px-4 py-2.5 text-[10px] font-black uppercase tracking-widest"
+          >
+            View invoice
+          </Link>
+        ) : null}
+      </div>
     </div>
   );
 }

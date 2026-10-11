@@ -1,7 +1,9 @@
 import { invoiceDeliveryAction } from "@shared/bookingInvoice";
 
 export async function deliverInvoiceEmail(invoiceId: string, token: string) {
-  const infoRes = await fetch(`/api/payments/invoice/${encodeURIComponent(invoiceId)}`);
+  const infoRes = await fetch(`/api/payments/invoice/${encodeURIComponent(invoiceId)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
   const info = await infoRes.json().catch(() => ({}));
   if (!infoRes.ok) throw new Error(info.error || "Invoice could not be loaded.");
 

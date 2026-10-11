@@ -21,6 +21,7 @@ import {
   type PortalMediaChange,
   type PortalMediaKind,
 } from "../../shared/portalListingDetail";
+import { invoiceRedirectTarget, legacyInvoiceDocIds } from "../../shared/invoicePay";
 import { jsonSafe } from "../lib/firestoreJson";
 import { resolveClientIdentity } from "../services/clientAccounts";
 import { filePhotoEditRequest, PhotoEditRequestError } from "../services/photoEditRequests";
@@ -75,6 +76,21 @@ async function readWhere(collectionName: string, field: string, value: string): 
   }
 }
 
+async function readLiveInvoice(id: string): Promise<Record<string, unknown> | null> {
+  const seen = new Set<string>();
+  let current = id;
+  for (let hop = 0; hop < 4; hop += 1) {
+    if (!current || seen.has(current)) return null;
+    seen.add(current);
+    const doc = await readDoc("invoices", current);
+    if (!doc) return null;
+    const next = invoiceRedirectTarget(doc);
+    if (!next || next === current) return next ? null : doc;
+    current = next;
+  }
+  return null;
+}
+
 function unique(records: Array<Record<string, unknown> | null | undefined>): Array<Record<string, unknown>> {
   const seen = new Set<string>();
   const out: Array<Record<string, unknown>> = [];
@@ -102,9 +118,14 @@ async function loadSources(listingId: string, listing: Record<string, unknown>):
   ]);
   const order = orders.find((record) => record.id === orderId) || orders[0] || null;
   const invoiceIds = [text(listing.invoiceId), text(order?.invoiceId), text(orderRequest?.invoiceId)].filter(Boolean);
+  const legacyIds = [
+    ...legacyInvoiceDocIds({ orderRequestId: text(orderRequest?.id), listingId }),
+    ...legacyInvoiceDocIds({ orderRequestId: text(order?.orderRequestId), listingId: text(order?.listingId) || listingId }),
+  ].filter((id) => !invoiceIds.includes(id));
   const galleryId = text(listing.galleryId) || text(orderRequest?.galleryId) || text(order?.galleryId);
-  const [invoiceDocs, invoicesByListing, invoicesByOrder, invoicesByRequest, galleryDoc, galleriesByListing, galleriesByOrder, appointmentsByRequest, appointmentsByOrder, appointmentsByListing] = await Promise.all([
-    Promise.all(invoiceIds.map((id) => readDoc("invoices", id))),
+  const [invoiceDocs, legacyDocs, invoicesByListing, invoicesByOrder, invoicesByRequest, galleryDoc, galleriesByListing, galleriesByOrder, appointmentsByRequest, appointmentsByOrder, appointmentsByListing] = await Promise.all([
+    Promise.all(invoiceIds.map((id) => readLiveInvoice(id))),
+    Promise.all(legacyIds.map((id) => readLiveInvoice(id))),
     readWhere("invoices", "listingId", listingId),
     readWhere("invoices", "orderId", text(order?.id)),
     readWhere("invoices", "orderRequestId", text(orderRequest?.id)),
@@ -120,7 +141,11 @@ async function loadSources(listingId: string, listing: Record<string, unknown>):
     listing,
     orderRequest,
     order,
-    invoices: unique([...invoiceDocs, ...invoicesByListing, ...invoicesByOrder, ...invoicesByRequest]),
+    invoices: unique([
+      ...invoiceDocs,
+      ...legacyDocs,
+      ...[...invoicesByListing, ...invoicesByOrder, ...invoicesByRequest].filter((record) => !invoiceRedirectTarget(record)),
+    ]),
     galleries: unique([galleryDoc, ...galleriesByListing, ...galleriesByOrder]),
     appointments: unique([...appointmentsByRequest, ...appointmentsByOrder, ...appointmentsByListing]),
   };
