@@ -4,7 +4,7 @@
  */
 
 import { google } from "googleapis";
-import { emptyOwnerSuiteData, parseOwnerSuite, type OwnerSuiteData, type SheetGrid } from "../../shared/ownerSuite";
+import { emptyOwnerSuiteData, normalizeTabTitle, parseOwnerSuite, type OwnerSuiteData, type SheetGrid } from "../../shared/ownerSuite";
 import { ownerSuiteFixtureGrids } from "./ownerSuiteFixtures";
 import { ownerFixturesEnabled, ownerRuntimeEnv } from "./ownerGate";
 
@@ -22,8 +22,31 @@ const TAB_ALIASES: Array<{ aliases: string[] }> = [
   { aliases: ["owes"] },
   { aliases: ["decisions"] },
   { aliases: ["action log"] },
-  { aliases: ["plan board"] },
+  { aliases: ["plan board data", "plan board"] },
 ];
+
+export function selectOwnerTabs(titles: string[]): string[] {
+  const cleaned = titles.filter(Boolean);
+  const picked: string[] = [];
+  for (const wanted of TAB_ALIASES) {
+    const match = matchOwnerTab(cleaned, wanted.aliases);
+    if (match && !picked.includes(match)) picked.push(match);
+  }
+  return picked;
+}
+
+function matchOwnerTab(titles: string[], aliases: string[]): string | undefined {
+  const named = titles.map((title) => ({ title, name: normalizeTabTitle(title) }));
+  for (const alias of aliases) {
+    const exact = named.find((item) => item.name === alias);
+    if (exact) return exact.title;
+  }
+  for (const alias of aliases) {
+    const partial = named.find((item) => item.name.includes(alias));
+    if (partial) return partial.title;
+  }
+  return undefined;
+}
 
 export interface SheetsCredentials {
   client_email: string;
@@ -143,10 +166,7 @@ async function fetchScorecard(credentials: SheetsCredentials): Promise<SheetGrid
   const titles = (meta.data.sheets || [])
     .map((sheet) => sheet.properties?.title || "")
     .filter(Boolean);
-  const matched = TAB_ALIASES.map((wanted) => titles.find((title) => {
-    const name = title.toLowerCase().replace(/\$/g, "").replace(/[^a-z0-9]+/g, " ").trim();
-    return wanted.aliases.some((alias) => name === alias || name.includes(alias));
-  })).filter((title): title is string => Boolean(title));
+  const matched = selectOwnerTabs(titles);
   if (!matched.length) return [];
   const values = await sheets.spreadsheets.values.batchGet({
     spreadsheetId: OWNER_SHEET_ID,

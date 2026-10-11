@@ -88,4 +88,37 @@ describe("plan board parser", () => {
     expect(JSON.stringify(dot)).not.toContain("hidden");
     expect(JSON.stringify(board)).not.toContain("Blank business");
   });
+
+  it("prefers Plan Board Data and falls back to Plan Board when that tab is missing", () => {
+    const preferred = parsePlanBoard([
+      {
+        title: "Plan Board",
+        rows: [
+          ["Business", "Section", "Item", "Date", "Amount", "Status", "Notes"],
+          ["Iconic Studios", "To-do", "Visual only placeholder", "2026-10-12", "0", "", ""],
+        ],
+      },
+      {
+        title: "Plan Board Data",
+        rows: [
+          ["Business", "Section", "Item", "Date", "Amount", "Status", "Notes"],
+          ["KDP", "To-do", "Data tab placeholder", "2026-10-12", "0", "", "Placeholder note"],
+        ],
+      },
+    ]);
+    const kdp = preferred.columns.find((column) => column.business === "KDP");
+    expect(kdp?.todos[0]).toMatchObject({ item: "Data tab placeholder", date: "2026-10-12", amount: 0, status: null, notes: "Placeholder note" });
+    expect(JSON.stringify(preferred)).not.toContain("Visual only placeholder");
+
+    const fallback = parsePlanBoard([
+      {
+        title: "Plan Board",
+        rows: [
+          ["Business", "Section", "Item", "Date", "Amount", "Status", "Notes"],
+          ["Iconic Studios", "To-do", "Visual only placeholder", "2026-10-12", "0", "", ""],
+        ],
+      },
+    ]);
+    expect(fallback.columns.find((column) => column.business === "Iconic Studios")?.todos[0].item).toBe("Visual only placeholder");
+  });
 });

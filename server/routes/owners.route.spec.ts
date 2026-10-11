@@ -222,6 +222,8 @@ describe("owners suite access", () => {
     expect(page).not.toContain("italic");
     expect(page).toContain("Montserrat");
     expect(page).toContain("Inter, system-ui, sans-serif");
+    expect(page).toContain("No action log yet");
+    expect(page).not.toContain("Coming soon");
     const plan = fs.readFileSync("client/components/owners/PlanBoard.tsx", "utf8");
     expect(plan).not.toContain("Cormorant");
     expect(plan).not.toContain("font-serif");

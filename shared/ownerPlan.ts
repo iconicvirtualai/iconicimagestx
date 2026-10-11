@@ -144,11 +144,13 @@ export function parsePlanBoard(sheets: unknown): PlanBoard {
 
 function findPlanSheet(sheets: unknown): SheetGrid | undefined {
   if (!Array.isArray(sheets)) return undefined;
-  return sheets.find((sheet) => {
-    if (!sheet || typeof sheet !== "object") return false;
-    const title = normalizeTabTitle(String((sheet as SheetGrid).title || ""));
+  const grids = sheets.filter((sheet): sheet is SheetGrid => Boolean(sheet) && typeof sheet === "object");
+  const data = grids.find((sheet) => normalizeTabTitle(String(sheet.title || "")) === "plan board data");
+  if (data) return data;
+  return grids.find((sheet) => {
+    const title = normalizeTabTitle(String(sheet.title || ""));
     return title === "plan board" || title.includes("plan board");
-  }) as SheetGrid | undefined;
+  });
 }
 
 function cleanRows(rows: unknown): string[][] {

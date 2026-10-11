@@ -162,7 +162,7 @@ function money(value: number | null): string {
   }).format(value);
 }
 
-function OwnersSuiteView({
+export function OwnersSuiteView({
   payload,
   refreshing,
   showOps,
@@ -247,6 +247,8 @@ function OwnersSuiteView({
           </div>
         </section>
 
+        <ScorecardCard scorecard={data.scorecard} />
+
         <div className="grid gap-3 md:grid-cols-2">
           <Card kicker="Savings" title={data.savings.note || "Reserve"}>
             {data.savings.amount == null && data.savings.goal == null ? (
@@ -283,6 +285,10 @@ function OwnersSuiteView({
                   </span>
                   <h3 className="owners-heading text-[1.35rem] leading-none text-[#f7f1e4]">{business.name}</h3>
                   <p className="mt-2 text-[11px] leading-snug text-[#9fb0c7]">{business.note || "No note"}</p>
+                  {business.milestone ? <p className="mt-2 text-[11px] leading-snug text-[#d5deea]">{business.milestone}</p> : null}
+                  {business.milestoneDue ? <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#e8c872]">{business.milestoneDue}</p> : null}
+                  {business.target ? <p className="mt-1 text-[11px] leading-snug text-[#d5deea]">{business.target}</p> : null}
+                  {business.owners ? <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9fb0c7]">{business.owners}</p> : null}
                 </article>
               ))}
             </div>
@@ -354,7 +360,7 @@ function OwnersSuiteView({
               <div className="grid gap-2">
                 {data.horizons.map((horizon) => (
                   <article key={horizon.horizon} className="rounded-2xl bg-[#071422] px-3 py-3">
-                    <p className="owners-heading text-3xl leading-none text-[#e8c872]">{horizon.horizon}</p>
+                    <p className="owners-heading text-3xl leading-none text-[#e8c872]">{horizon.horizon === "later" ? "Later" : horizon.horizon}</p>
                     <ul className="mt-2 space-y-1">
                       {horizon.items.map((item) => (
                         <li key={item} className="text-xs leading-snug text-[#d5deea]">{item}</li>
@@ -515,13 +521,67 @@ function WeekStrip({ generatedAt, items }: { generatedAt: string; items: OwnerSu
   );
 }
 
+function ScorecardCard({ scorecard }: { scorecard: OwnerSuiteData["scorecard"] | undefined }) {
+  if (!scorecard) return null;
+  const hasRows = scorecard.metrics.length + scorecard.rag.length + scorecard.nextWeek.length + scorecard.payments.length > 0;
+  if (!hasRows) return null;
+  return (
+    <Card kicker="Friday" title="Scorecard">
+      {scorecard.metrics.length > 0 ? (
+        <ul className="space-y-2">
+          {scorecard.metrics.map((metric) => (
+            <li key={metric.label} className="flex items-start justify-between gap-3 rounded-2xl bg-[#071422] px-3 py-3">
+              <span className="min-w-0 text-sm text-[#d5deea]">{metric.label}</span>
+              <span className="shrink-0 text-sm font-semibold text-[#f4e2b0]">{metric.text || (metric.amount == null ? "—" : String(metric.amount))}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {scorecard.rag.length > 0 ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {scorecard.rag.map((row) => (
+            <span key={row.name} className="inline-flex items-center gap-2 rounded-full bg-[#071422] px-3 py-1 text-[11px] font-semibold text-[#f7f1e4]">
+              <span className={`h-2 w-2 rounded-full ${toneClass(row.tone)}`} />
+              {row.name}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {scorecard.nextWeek.length > 0 ? (
+        <div className="mt-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#9fb0c7]">Next week</p>
+          <ul className="mt-2 space-y-2">
+            {scorecard.nextWeek.map((row) => (
+              <li key={`${row.text}-${row.owner}`} className="rounded-2xl bg-[#071422] px-3 py-3">
+                <p className="text-sm text-[#f7f1e4]">{row.text}</p>
+                {row.owner ? <p className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#e8c872]">{row.owner}</p> : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {scorecard.payments.length > 0 ? (
+        <div className="mt-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#9fb0c7]">Week cash detail</p>
+          <ul className="mt-2 space-y-2">
+            {scorecard.payments.map((row) => (
+              <li key={`${row.payment}-${row.date}`} className="flex items-center justify-between gap-3 text-sm">
+                <span className="min-w-0 text-[#d5deea]">{row.payment}</span>
+                <span className="shrink-0 text-[#f4e2b0]">{row.date || "—"}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
 function BotCard({ state, entries }: { state: OwnerSuiteData["bots"]["state"]; entries: OwnerSuiteData["bots"]["entries"] }) {
   return (
     <Card kicker="Bots" title="Activity">
-      {state === "missing" ? (
-        <p className="text-sm text-[#9fb0c7]">Coming soon</p>
-      ) : state !== "ready" || entries.length === 0 ? (
-        <Empty />
+      {state !== "ready" || entries.length === 0 ? (
+        <p className="text-sm text-[#9fb0c7]">No action log yet</p>
       ) : (
         <ul className="space-y-2">
           {entries.map((entry) => (
