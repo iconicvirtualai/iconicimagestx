@@ -74,18 +74,29 @@ describe("invoice button", () => {
 });
 
 describe("planInvoiceLink", () => {
-  it("uses one stable id for an order and the project created from it", () => {
-    const fromOrder = planInvoiceLink({ orderRequestId: "req1", listingId: "list1" });
-    const fromProject = planInvoiceLink({ orderRequestId: "req1", listingId: "list1" });
+  const autoId = "AbCdEfGhIjKlMnOpQrSt";
+
+  it("uses the caller's auto-id for an order and the project created from it", () => {
+    const fromOrder = planInvoiceLink({ orderRequestId: "req1", listingId: "list1", createId: autoId });
+    const fromProject = planInvoiceLink({ orderRequestId: "req1", listingId: "list1", createId: autoId });
     expect(fromOrder.attached).toBe(false);
-    expect(fromOrder.createId).toBe(orderInvoiceDocId("req1"));
+    expect(fromOrder.createId).toBe(autoId);
+    expect(fromOrder.createId).not.toBe(orderInvoiceDocId("req1"));
     expect(fromProject.createId).toBe(fromOrder.createId);
-    expect(fromOrder.orderRequestFields).toMatchObject({ invoiceId: "ordreq_req1", listingId: "list1" });
-    expect(fromOrder.listingFields).toMatchObject({ invoiceId: "ordreq_req1", orderRequestId: "req1" });
+    expect(fromOrder.orderRequestFields).toMatchObject({ invoiceId: autoId, listingId: "list1" });
+    expect(fromOrder.listingFields).toMatchObject({ invoiceId: autoId, orderRequestId: "req1" });
     expect(fromOrder.invoiceFields).toMatchObject({ orderRequestId: "req1", listingId: "list1" });
     expect(fromOrder.invoiceFields).not.toHaveProperty("total");
     expect(fromOrder.invoiceFields).not.toHaveProperty("lineItems");
     expect(fromOrder.invoiceFields).not.toHaveProperty("amountDue");
+  });
+
+  it("does not derive a listing or order id when nothing is linked", () => {
+    const plan = planInvoiceLink({ orderRequestId: "req1", listingId: "list1", createId: "listing_list1" });
+    expect(plan.attached).toBe(false);
+    expect(plan.createId).toBe("");
+    expect(plan.orderRequestFields).toBeNull();
+    expect(plan.listingFields).toBeNull();
   });
 
   it("reuses an invoice discovered by orderRequestId when the order field was never set", () => {
@@ -119,24 +130,25 @@ describe("planInvoiceLink", () => {
   });
 
   it("does not mint a second id when create runs again", () => {
-    const first = planInvoiceLink({ orderRequestId: "req1", listingId: "list1" });
+    const stored = "AbCdEfGhIjKlMnOpQrSt";
     const second = planInvoiceLink({
       orderRequestId: "req1",
       listingId: "list1",
-      orderInvoiceId: first.createId,
-      foundInvoiceIds: [first.createId],
+      orderInvoiceId: stored,
+      createId: "ZzYyXxWwVvUuTtSsRrQq",
+      foundInvoiceIds: [stored],
     });
     expect(second.attached).toBe(true);
-    expect(second.createId).toBe(first.createId);
+    expect(second.createId).toBe(stored);
   });
 
-  it("gives a project with no order its own stable invoice", () => {
-    const plan = planInvoiceLink({ listingId: "listOnly" });
+  it("gives a project with no order the supplied auto-id", () => {
+    const plan = planInvoiceLink({ listingId: "listOnly", createId: autoId });
     expect(plan.attached).toBe(false);
-    expect(plan.createId).toBe("listing_listOnly");
+    expect(plan.createId).toBe(autoId);
     expect(plan.orderRequestFields).toBeNull();
     expect(plan.orderFields).toBeNull();
-    expect(plan.listingFields).toEqual({ invoiceId: "listing_listOnly" });
+    expect(plan.listingFields).toEqual({ invoiceId: autoId });
   });
 });
 
@@ -212,6 +224,9 @@ describe("admin UI wires the shared invoice", () => {
     expect(clientLib).not.toContain("sendEmail");
     expect(clientLib).not.toContain("sendSMS");
     expect(clientLib).not.toContain("attachSquareInvoice");
+    expect(clientLib).toContain('doc(collection(db, "invoices"))');
+    expect(clientLib).toContain("legacyInvoiceDocIds");
+    expect(clientLib).not.toContain("orderInvoiceDocId(");
   });
 
   it("stamps confirm links without changing the emailed booking total", () => {

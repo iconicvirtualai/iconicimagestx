@@ -1,4 +1,7 @@
 import admin from "firebase-admin";
+import { createPayToken, invoiceRedirectTarget } from "../../shared/invoicePay";
+import { clientInvoiceUrl } from "../../shared/invoicePayLink";
+import { publicClientUrl } from "../../shared/publicSiteUrl";
 import { PLAYTEST_ADDRESS, isStaffRole, normalizeEmail } from "../../shared/listingAccess";
 
 const db = () => admin.firestore();
@@ -82,8 +85,8 @@ export async function bootstrapPlaytest(input: PlaytestBootstrapInput) {
       ? { ...client, status: clientStatus }
       : { status: clientStatus, email: clientEmail || null },
     listing,
-    gallery: gallery ? { ...gallery, url: `${origin}${gallery.urlPath}` } : null,
-    invoice: invoice ? { ...invoice, url: `${origin}${invoice.urlPath}` } : null,
+    gallery: gallery ? { ...gallery, url: publicClientUrl(gallery.urlPath) } : null,
+    invoice: invoice ? { ...invoice, url: invoice.urlPath } : null,
     next: [
       `Sign in as the photographer at ${origin}/admin/login`,
       `Upload at ${origin}/admin/upload or ${origin}/admin/photographer`,
@@ -200,9 +203,16 @@ async function upsertPlaytestDelivery(
 ) {
   const orderId = `playtest-order-${client.id}`;
   const galleryId = `playtest-gallery-${client.id}`;
-  const invoiceId = `playtest-invoice-${client.id}`;
   const now = admin.firestore.FieldValue.serverTimestamp();
   const listingSnap = await db().collection("listings").doc(listingId).get();
+  const storedInvoiceId = typeof listingSnap.data()?.invoiceId === "string" ? listingSnap.data()!.invoiceId.trim() : "";
+  const legacyInvoiceId = `playtest-invoice-${client.id}`;
+  const foundInvoice = (storedInvoiceId ? await playtestInvoiceRecord(storedInvoiceId) : null)
+    || (legacyInvoiceId !== storedInvoiceId ? await playtestInvoiceRecord(legacyInvoiceId) : null);
+  const invoiceId = foundInvoice?.id || db().collection("invoices").doc().id;
+  const existingToken = typeof foundInvoice?.data.payToken === "string" ? foundInvoice.data.payToken.trim() : "";
+  const payToken = existingToken || createPayToken();
+  const urlPath = clientInvoiceUrl({ id: invoiceId, status: "sent", payToken }) || "";
   const images = listingSnap.exists && Array.isArray(listingSnap.data()?.images) ? listingSnap.data()!.images : [];
   const mediaItems = images
     .filter((image: { url?: string }) => image?.url)
@@ -229,6 +239,7 @@ async function upsertPlaytestDelivery(
     clientName: client.name,
     clientEmail: client.email,
     status: "delivered",
+    invoiceId,
     downloadEnabled: true,
     mediaItems,
     deliveredAt: now,
@@ -253,12 +264,15 @@ async function upsertPlaytestDelivery(
     amountPaid: 0,
     amountDue: 150,
     status: "sent",
+    payToken,
+    paymentUrl: urlPath,
     createdAt: now,
     updatedAt: now,
   }, { merge: true });
 
   await db().collection("listings").doc(listingId).set({
     playtestGalleryId: galleryId,
+    invoiceId,
     clientId: client.id,
     clientEmail: client.email,
     clientName: client.name,
@@ -267,6 +281,23 @@ async function upsertPlaytestDelivery(
 
   return {
     gallery: { id: galleryId, urlPath: `/gallery/${galleryId}` },
-    invoice: { id: invoiceId, urlPath: `/invoice/${invoiceId}`, status: "sent", amountDue: 150 },
+    invoice: { id: invoiceId, urlPath, status: "sent", amountDue: 150 },
   };
+}
+
+/** Reuse a stored or legacy playtest invoice. A redirect points at the live doc. */
+async function playtestInvoiceRecord(id: string): Promise<{ id: string; data: Record<string, unknown> } | null> {
+  const seen = new Set<string>();
+  let current = id;
+  for (let hop = 0; hop < 4; hop += 1) {
+    if (!current || seen.has(current)) return null;
+    seen.add(current);
+    const snap = await db().collection("invoices").doc(current).get();
+    if (!snap.exists) return null;
+    const data = (snap.data() || {}) as Record<string, unknown>;
+    const next = invoiceRedirectTarget(data);
+    if (!next || next === snap.id) return { id: snap.id, data };
+    current = next;
+  }
+  return null;
 }

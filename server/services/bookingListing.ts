@@ -5,6 +5,7 @@
  */
 
 import admin from "firebase-admin";
+import { invoiceRedirectTarget, legacyInvoiceDocIds } from "../../shared/invoicePay";
 import { normalizeEmail } from "../../shared/listingAccess";
 import { visibleToPortalClient } from "../../shared/listingWrite";
 import {
@@ -240,8 +241,24 @@ async function hydrateBundle(seed: Bundle): Promise<Bundle> {
     if (id) invoiceIds.add(id);
   }
   await readMissing("invoices", invoiceIds, invoices);
+  const legacyIds = new Set<string>();
+  for (const doc of requests.values()) {
+    for (const id of legacyInvoiceDocIds({ orderRequestId: doc.id, listingId: text(doc.data.listingId) })) {
+      legacyIds.add(id);
+    }
+  }
+  for (const doc of orders.values()) {
+    for (const id of legacyInvoiceDocIds({
+      orderRequestId: text(doc.data.orderRequestId),
+      listingId: text(doc.data.listingId),
+    })) {
+      legacyIds.add(id);
+    }
+  }
+  await readMissing("invoices", legacyIds, invoices);
   mergeDocs(invoices, await queryIn("invoices", "orderRequestId", [...requests.keys()]));
   mergeDocs(invoices, await queryIn("invoices", "orderId", [...orders.keys()]));
+  await followInvoiceRedirects(invoices);
 
   mergeDocs(appointments, await queryIn("appointments", "orderRequestId", [...requests.keys()]));
   mergeDocs(appointments, await queryIn("appointments", "orderId", [...orders.keys()]));
@@ -291,6 +308,18 @@ async function loadListingsForGroups(
   mergeDocs(found, await queryIn("listings", "orderId", [...orderIds]));
   mergeDocs(found, await queryIn("listings", "invoiceId", [...invoiceIds]));
   return [...found.values()];
+}
+
+async function followInvoiceRedirects(invoices: Map<string, BookingListingDoc>) {
+  const targets = new Set<string>();
+  for (const doc of invoices.values()) {
+    const next = invoiceRedirectTarget(doc.data);
+    if (next && next !== doc.id) targets.add(next);
+  }
+  await readMissing("invoices", targets, invoices);
+  for (const [id, doc] of [...invoices.entries()]) {
+    if (invoiceRedirectTarget(doc.data)) invoices.delete(id);
+  }
 }
 
 async function readMissing(collectionName: string, ids: Set<string>, into: Map<string, BookingListingDoc>) {

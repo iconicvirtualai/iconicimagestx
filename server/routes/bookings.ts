@@ -15,6 +15,7 @@ import { ensureBookingListingForRequest } from "../services/bookingListing";
 import { clientNotifyBlockReason, clientNotifyLive, isNotifyTestAllowlisted } from "../../shared/clientNotify";
 import { lifeOfTheListingCareSelected } from "../../shared/lifeOfTheListingCare";
 import { buildBookingInvoiceDraft, existingInvoiceId } from "../../shared/bookingInvoice";
+import { createPayToken } from "../../shared/invoicePay";
 import { nextSequentialInvoiceNumber, planInvoiceLink } from "../../shared/orderProjectInvoice";
 import { clientInvoiceUrl } from "../../shared/invoicePayLink";
 import { publicClientUrl } from "../../shared/publicSiteUrl";
@@ -776,6 +777,8 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       }
     } else {
       const invoiceRef = db().collection("invoices").doc();
+      const payToken = createPayToken();
+      const paymentUrl = clientInvoiceUrl({ id: invoiceRef.id, status: "draft", payToken });
       const draft = buildBookingInvoiceDraft({
         lineItems: requestLineItems,
         total: requestTotal,
@@ -794,9 +797,8 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
         galleryId: galleryRef.id,
         ...(listingId ? { listingId } : {}),
         invoiceNumber: await generateInvoiceNumber(),
-        ...(clientInvoiceUrl({ id: invoiceRef.id, status: "draft" })
-          ? { paymentUrl: clientInvoiceUrl({ id: invoiceRef.id, status: "draft" }) }
-          : {}),
+        payToken,
+        ...(paymentUrl ? { paymentUrl } : {}),
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -966,12 +968,13 @@ async function createBookingInvoiceDraft(input: {
     travel: input.travel,
   });
   const invoiceRef = db().collection("invoices").doc();
+  const payToken = createPayToken();
+  const paymentUrl = clientInvoiceUrl({ id: invoiceRef.id, status: "draft", payToken });
   await invoiceRef.set({
     ...draft,
     invoiceNumber: await generateInvoiceNumber(),
-    ...(clientInvoiceUrl({ id: invoiceRef.id, status: "draft" })
-      ? { paymentUrl: clientInvoiceUrl({ id: invoiceRef.id, status: "draft" }) }
-      : {}),
+    payToken,
+    ...(paymentUrl ? { paymentUrl } : {}),
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });

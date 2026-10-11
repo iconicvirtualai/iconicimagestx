@@ -7,6 +7,7 @@
 import { brandedInvoicePdf, brandedInvoicePdfFilename, type BrandedInvoicePdfInput } from "./brandedInvoicePdf.ts";
 import { iconicBusinessFooterLines } from "./iconicBusiness.ts";
 import { invoiceFaceFromStored } from "./invoiceFace.ts";
+import { invoicePayLinkFor } from "./invoicePayLink.ts";
 import { orderHistoryInvoiceNumber } from "./orderProjectInvoice.ts";
 import { addressText } from "./addressText.ts";
 import {
@@ -111,6 +112,8 @@ export interface ClientInvoiceStatement {
   total: number | null;
   amountPaid: number | null;
   amountDue: number | null;
+  /** Tokenized /invoice/{id}?t= path. Absent when the invoice has no pay token. */
+  payPath?: string | null;
 }
 
 export interface ClientAppointment {
@@ -319,6 +322,7 @@ export function buildClientInvoice(id: string, data: Record<string, unknown>, no
     total: storedAmount(data.total),
     amountPaid: storedAmount(data.amountPaid),
     amountDue: storedAmount(data.amountDue),
+    payPath: invoicePayLinkFor({ id, payToken: data.payToken, status: data.status }),
   };
 }
 

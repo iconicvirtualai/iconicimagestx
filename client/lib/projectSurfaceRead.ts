@@ -10,6 +10,7 @@ import {
   projectSurfaceForListing,
   type ProjectSurface,
 } from "@shared/projectSurfaceStatus";
+import { invoiceRedirectTarget, legacyInvoiceDocIds } from "@shared/invoicePay";
 import { db } from "@/lib/firebase";
 
 function textId(value: unknown): string | null {
@@ -29,6 +30,26 @@ async function readWhere(collectionName: string, field: string, value: string | 
   if (!value) return [];
   const snap = await getDocs(query(collection(db, collectionName), where(field, "==", value), limit(5)));
   return snap.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
+}
+
+function liveOrNull(record: Record<string, unknown> | null): Record<string, unknown> | null {
+  if (!record || invoiceRedirectTarget(record)) return null;
+  return record;
+}
+
+async function readLiveInvoice(id: string | null): Promise<Record<string, unknown> | null> {
+  const seen = new Set<string>();
+  let current = id;
+  for (let hop = 0; hop < 4; hop += 1) {
+    if (!current || seen.has(current)) return null;
+    seen.add(current);
+    const doc = await readDoc("invoices", current);
+    if (!doc) return null;
+    const next = invoiceRedirectTarget(doc);
+    if (!next || next === current) return next ? null : doc;
+    current = next;
+  }
+  return null;
 }
 
 function unique(records: Array<Record<string, unknown> | null | undefined>): Record<string, unknown>[] {
@@ -71,16 +92,26 @@ export async function readProjectSurface(listing: Record<string, unknown>): Prom
   const [extraOrders, extraRequests, directInvoices, invoicesByListing, ...relatedInvoices] = await Promise.all([
     Promise.all(extraOrderIds.map((id) => readDoc("orders", id))),
     Promise.all(extraRequestIds.map((id) => readDoc("orderRequests", id))),
-    Promise.all(keys.invoiceIds.map((id) => readDoc("invoices", id))),
+    Promise.all(keys.invoiceIds.map((id) => readLiveInvoice(id))),
     readWhere("invoices", "listingId", listingId),
     ...keys.orderIds.map((id) => readWhere("invoices", "orderId", id)),
     ...keys.orderRequestIds.map((id) => readWhere("invoices", "orderRequestId", id)),
   ]);
 
+  const legacyIds = new Set<string>();
+  for (const requestId of keys.orderRequestIds) {
+    for (const id of legacyInvoiceDocIds({ orderRequestId: requestId, listingId })) legacyIds.add(id);
+  }
+  if (listingId) {
+    for (const id of legacyInvoiceDocIds({ listingId })) legacyIds.add(id);
+  }
+  const legacyInvoices = await Promise.all([...legacyIds].map((id) => readLiveInvoice(id)));
+
   const invoices = unique([
-    ...directInvoices,
-    ...invoicesByListing,
-    ...relatedInvoices.flat(),
+    ...directInvoices.map((record) => liveOrNull(record)).filter((record): record is Record<string, unknown> => Boolean(record)),
+    ...invoicesByListing.filter((record) => !invoiceRedirectTarget(record)),
+    ...relatedInvoices.flat().filter((record) => !invoiceRedirectTarget(record)),
+    ...legacyInvoices,
   ]);
 
   return projectSurfaceForListing(listing, buildBillingIndex({
