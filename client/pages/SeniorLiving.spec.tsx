@@ -137,6 +137,9 @@ describe("senior living page", () => {
     expect(html).toContain(BUSINESS_CONTACT.email);
     expect(html).toContain(BUSINESS_CONTACT.phoneDisplay);
     expect(html).toContain(BUSINESS_CONTACT.address);
+    expect(
+      container?.querySelector("[data-testid='senior-call']")?.getAttribute("href"),
+    ).toBe(BUSINESS_CONTACT.phoneHref);
     expect(html.toLowerCase()).not.toContain(["cadi", "@"].join(""));
     expect(BUSINESS_CONTACT.email).toBe("photos@iconicimagestx.com");
   });
@@ -253,6 +256,7 @@ describe("senior living page", () => {
     expect(source).not.toMatch(/\bfont-serif\b|Cormorant|Garamond|cursive/);
     expect(source).toContain("object-top");
     expect(source).toContain("photos.slice(1)");
+    expect(source.match(/#FFE14A/g)).toHaveLength(1);
     const communityName = ["sun", "dale"].join("");
     expect(source.toLowerCase()).not.toContain(communityName);
     expect(source).not.toContain(["cadi", "@"].join(""));

@@ -34,10 +34,15 @@ import { TRAVEL_ZONES } from "@shared/travelZones";
 export const SENIOR_LIVING_CTA = "Schedule when you're ready for us to come!";
 
 const pageType =
-  "min-h-screen overflow-x-clip bg-black font-[Inter,ui-sans-serif,system-ui,sans-serif] text-white [overflow-wrap:normal] [word-break:normal] [hyphens:manual] [&_*]:[overflow-wrap:normal] [&_*]:[word-break:normal] [&_*]:[hyphens:manual]";
+  "min-h-screen overflow-x-clip bg-[#F6F3EE] font-[Inter,ui-sans-serif,system-ui,sans-serif] text-neutral-950 [overflow-wrap:normal] [word-break:normal] [hyphens:manual] [&_*]:[overflow-wrap:normal] [&_*]:[word-break:normal] [&_*]:[hyphens:manual]";
+
+const bodyText = "text-lg leading-relaxed text-neutral-900 sm:text-xl";
 
 const fieldClass =
-  "mt-1 w-full min-w-0 max-w-full rounded-xl border border-black/10 bg-white px-3 py-3 text-base text-neutral-950 outline-none placeholder:text-neutral-500 focus:border-[#FFE14A] focus:ring-2 focus:ring-[#FFE14A]";
+  "mt-2 w-full min-h-12 min-w-0 max-w-full rounded-lg border border-neutral-400 bg-white px-4 py-3 text-lg text-neutral-950 outline-none placeholder:text-neutral-600 focus:border-neutral-950 focus:ring-2 focus:ring-neutral-950";
+
+const ctaClass =
+  "inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-[#FFE14A] px-6 py-3 text-center text-lg font-semibold leading-snug text-neutral-950 hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:w-auto";
 
 function Photo({
   photo,
@@ -74,7 +79,7 @@ function TravelNote() {
   return (
     <p
       data-testid="travel-zones"
-      className="text-base leading-relaxed text-white/80"
+      className={bodyText}
     >
       {freeZone
         ? `Travel is free within ${freeZone.outerMiles} miles. Then `
@@ -87,7 +92,7 @@ function TravelNote() {
             {separator}
             <MoneyAmount
               data-zone={zone.zone}
-              className="min-w-0 text-left text-white"
+              className="min-w-0 text-left text-neutral-950"
             >
               {formatUsd(zone.feeCents / 100)}
             </MoneyAmount>
@@ -192,26 +197,26 @@ export default function SeniorLiving() {
 
   return (
     <div className={pageType}>
-      <header className="bg-black">
-        <div className="mx-auto flex w-full max-w-6xl items-center px-4 py-4">
-          <Link to="/" className="flex min-w-0 items-center gap-2 text-white">
+      <header className="border-b border-neutral-200 bg-[#F6F3EE]">
+        <div className="mx-auto flex w-full max-w-6xl items-center px-4 py-3">
+          <Link
+            to="/"
+            className="inline-flex min-h-12 min-w-0 items-center"
+          >
             <img
-              src="/media/logos/camera-logo-white-on-black.png"
-              alt=""
-              className="h-9 w-9 shrink-0 rounded-lg"
+              src="/media/logos/logo-black-large.png"
+              alt="Iconic Images"
+              className="h-12 w-auto max-w-full"
             />
-            <span className="truncate text-sm font-extrabold tracking-tight">
-              ICONIC IMAGES
-            </span>
           </Link>
         </div>
       </header>
 
       <main>
-        <section data-testid="senior-hero" className="bg-black">
-          <div className="mx-auto w-full max-w-6xl px-4 pb-12 pt-6 sm:pb-16 sm:pt-10">
+        <section data-testid="senior-hero" className="bg-[#F6F3EE]">
+          <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:pb-20 sm:pt-10">
             {heroPhoto ? (
-              <div className="mb-6 overflow-hidden rounded-3xl border-2 border-[#FFE14A]">
+              <div className="overflow-hidden rounded-2xl">
                 <div className="aspect-[16/9] w-full">
                   <Photo
                     photo={heroPhoto}
@@ -222,26 +227,28 @@ export default function SeniorLiving() {
                 </div>
               </div>
             ) : null}
-            <div className="max-w-3xl border-2 border-[#FFE14A] p-5 sm:p-8">
-              <p className="text-sm font-bold uppercase tracking-wide text-[#FFE14A]">
-                Senior living
-              </p>
-              <h1 className="mt-3 text-[2.35rem] font-extrabold leading-[1.05] text-white sm:text-6xl">
+            <div className="relative z-10 -mt-20 max-w-3xl rounded-2xl bg-[#1C1917] p-6 text-white sm:-mt-32 sm:p-10">
+              <h1 className="text-[2rem] font-semibold leading-tight sm:text-4xl">
                 Virtual tours and photography
               </h1>
-              <p className="mt-4 max-w-xl text-lg leading-relaxed text-white/85">
+              <p className="mt-4 max-w-xl text-lg leading-relaxed sm:text-xl">
                 For communities in Spring, The Woodlands, and Houston.
               </p>
-              <p className="mt-3 max-w-xl text-base leading-relaxed text-white/70">
+              <p className="mt-3 max-w-xl text-lg leading-relaxed sm:text-xl">
                 The sample tour is from a Woodlands-area senior living community.
               </p>
-              <a
-                href="#schedule"
-                data-testid="senior-cta"
-                className="mt-8 inline-flex w-full max-w-full items-center justify-center rounded-full bg-[#FFE14A] px-5 py-4 text-center text-base font-bold leading-snug text-black hover:bg-[#ffe866] sm:w-auto"
-              >
-                {SENIOR_LIVING_CTA}
-              </a>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <a href="#schedule" data-testid="senior-cta" className={ctaClass}>
+                  {SENIOR_LIVING_CTA}
+                </a>
+                <a
+                  href={BUSINESS_CONTACT.phoneHref}
+                  data-testid="senior-call"
+                  className="inline-flex min-h-12 w-full items-center justify-center rounded-lg border-2 border-white px-6 py-3 text-center text-lg font-semibold leading-snug text-white sm:w-auto"
+                >
+                  Call {BUSINESS_CONTACT.phoneDisplay}
+                </a>
+              </div>
             </div>
           </div>
         </section>
@@ -250,13 +257,13 @@ export default function SeniorLiving() {
           <section
             data-testid="senior-gallery"
             aria-label="Photos of a Woodlands-area senior living community"
-            className="bg-black"
+            className="bg-[#F6F3EE]"
           >
-            <div className="mx-auto w-full max-w-6xl px-4 pb-14">
-              <h2 className="text-2xl font-extrabold text-white">
+            <div className="mx-auto w-full max-w-6xl px-4 pb-16 sm:pb-20">
+              <h2 className="text-3xl font-semibold leading-tight text-neutral-950 sm:text-4xl">
                 A Woodlands-area senior living community
               </h2>
-              <ul className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <ul className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {gallery.map((photo) => (
                   <li
                     key={photo.stem}
@@ -276,22 +283,22 @@ export default function SeniorLiving() {
         ) : null}
 
         <section
-          className="bg-white text-black"
+          className="bg-white text-neutral-950"
           aria-labelledby="sample-tour-heading"
         >
-          <div className="mx-auto w-full max-w-6xl px-4 py-12 sm:py-16">
+          <div className="mx-auto w-full max-w-6xl px-4 py-16 sm:py-20">
             <h2
               id="sample-tour-heading"
-              className="text-3xl font-extrabold leading-tight"
+              className="text-3xl font-semibold leading-tight sm:text-4xl"
             >
               Sample tour
             </h2>
-            <p className="mt-2 text-lg text-neutral-700">
+            <p className={`mt-4 ${bodyText}`}>
               A Woodlands-area senior living community
             </p>
             <div
               data-testid="matterport-tour"
-              className="mt-6 aspect-video w-full max-w-full overflow-hidden rounded-2xl border-2 border-black bg-black"
+              className="mt-8 aspect-video w-full max-w-full overflow-hidden rounded-2xl border border-neutral-300 bg-neutral-950"
             >
               <iframe
                 src={SENIOR_LIVING_MATTERPORT_SRC}
@@ -306,54 +313,56 @@ export default function SeniorLiving() {
         </section>
 
         <section
-          className="bg-[#FFE14A] text-black"
+          className="bg-[#F6F3EE] text-neutral-950"
           aria-labelledby="steps-heading"
         >
-          <div className="mx-auto w-full max-w-6xl px-4 py-12 sm:py-16">
+          <div className="mx-auto w-full max-w-6xl px-4 py-16 sm:py-20">
             <h2
               id="steps-heading"
-              className="text-3xl font-extrabold leading-tight"
+              className="text-3xl font-semibold leading-tight sm:text-4xl"
             >
               How it works
             </h2>
             <ol
               data-testid="senior-steps"
-              className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3"
+              className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3"
             >
               {STEPS.map((step, index) => (
                 <li
                   key={step.title}
-                  className="min-w-0 rounded-2xl bg-black p-5 text-white"
+                  className="min-w-0 rounded-2xl border border-neutral-200 bg-white p-6"
                 >
-                  <p className="text-sm font-bold text-[#FFE14A]">
+                  <p className="text-3xl font-semibold leading-none text-neutral-950">
                     {index + 1}
                   </p>
-                  <h3 className="mt-2 text-2xl font-extrabold">{step.title}</h3>
-                  <p className="mt-2 text-base leading-relaxed text-white/85">
-                    {step.body}
-                  </p>
+                  <h3 className="mt-4 text-2xl font-semibold leading-tight">
+                    {step.title}
+                  </h3>
+                  <p className={`mt-3 ${bodyText}`}>{step.body}</p>
                 </li>
               ))}
             </ol>
           </div>
         </section>
 
-        <section id="schedule" className="scroll-mt-6 bg-white text-black">
-          <div className="mx-auto w-full max-w-2xl px-4 py-12 sm:py-16">
-            <h2 className="text-3xl font-extrabold leading-tight">
+        <section id="schedule" className="scroll-mt-6 bg-white text-neutral-950">
+          <div className="mx-auto w-full max-w-2xl px-4 py-16 sm:py-20">
+            <h2 className="text-3xl font-semibold leading-tight sm:text-4xl">
               Request a visit
             </h2>
-            <p className="mt-2 text-base leading-relaxed text-neutral-700">
+            <p className={`mt-4 ${bodyText}`}>
               Tell us about the community. We will follow up with you.
             </p>
             {done ? (
               <div
                 role="status"
                 data-testid="senior-success"
-                className="mt-8 rounded-2xl bg-black p-6 text-white"
+                className="mt-8 rounded-2xl border border-neutral-300 bg-[#F6F3EE] p-6 text-neutral-950"
               >
-                <h3 className="text-2xl font-extrabold">Request received.</h3>
-                <p className="mt-2 text-base leading-relaxed text-white/85">
+                <h3 className="text-2xl font-semibold leading-tight">
+                  Request received.
+                </h3>
+                <p className={`mt-3 ${bodyText}`}>
                   We have your request and will follow up with you.
                 </p>
               </div>
@@ -382,7 +391,7 @@ export default function SeniorLiving() {
                   </label>
                 </div>
                 <label
-                  className="block text-sm font-semibold"
+                  className="block text-lg font-semibold leading-snug"
                   htmlFor="senior-name"
                 >
                   Name
@@ -397,7 +406,7 @@ export default function SeniorLiving() {
                   />
                 </label>
                 <label
-                  className="block text-sm font-semibold"
+                  className="block text-lg font-semibold leading-snug"
                   htmlFor="senior-community"
                 >
                   Community
@@ -412,7 +421,7 @@ export default function SeniorLiving() {
                   />
                 </label>
                 <label
-                  className="block text-sm font-semibold"
+                  className="block text-lg font-semibold leading-snug"
                   htmlFor="senior-email"
                 >
                   Email
@@ -428,7 +437,7 @@ export default function SeniorLiving() {
                   />
                 </label>
                 <label
-                  className="block text-sm font-semibold"
+                  className="block text-lg font-semibold leading-snug"
                   htmlFor="senior-phone"
                 >
                   Phone
@@ -444,7 +453,7 @@ export default function SeniorLiving() {
                   />
                 </label>
                 <label
-                  className="block text-sm font-semibold"
+                  className="block text-lg font-semibold leading-snug"
                   htmlFor="senior-address"
                 >
                   Address
@@ -459,12 +468,14 @@ export default function SeniorLiving() {
                   />
                 </label>
                 <fieldset>
-                  <legend className="text-sm font-semibold">Services</legend>
-                  <div className="mt-2 grid grid-cols-1 gap-2">
+                  <legend className="text-lg font-semibold leading-snug">
+                    Services
+                  </legend>
+                  <div className="mt-3 grid grid-cols-1 gap-3">
                     {SENIOR_LIVING_SERVICE_IDS.map((id) => (
                       <label
                         key={id}
-                        className="flex min-h-11 min-w-0 items-center gap-3 rounded-xl border border-black/10 px-3 py-2"
+                        className="flex min-h-12 min-w-0 items-center gap-3 rounded-lg border border-neutral-400 bg-white px-4 py-3"
                       >
                         <input
                           type="checkbox"
@@ -472,9 +483,9 @@ export default function SeniorLiving() {
                           value={id}
                           checked={services.includes(id)}
                           onChange={() => toggleService(id)}
-                          className="h-5 w-5 shrink-0 accent-black"
+                          className="h-6 w-6 shrink-0 accent-neutral-950"
                         />
-                        <span className="text-base">
+                        <span className="text-lg leading-snug">
                           {SENIOR_LIVING_SERVICE_LABELS[id]}
                         </span>
                       </label>
@@ -482,7 +493,7 @@ export default function SeniorLiving() {
                   </div>
                 </fieldset>
                 <label
-                  className="block text-sm font-semibold"
+                  className="block text-lg font-semibold leading-snug"
                   htmlFor="senior-dates"
                 >
                   Preferred dates
@@ -496,7 +507,7 @@ export default function SeniorLiving() {
                   />
                 </label>
                 <label
-                  className="block text-sm font-semibold"
+                  className="block text-lg font-semibold leading-snug"
                   htmlFor="senior-notes"
                 >
                   Notes
@@ -513,7 +524,7 @@ export default function SeniorLiving() {
                 {error ? (
                   <p
                     role="alert"
-                    className="text-sm font-semibold text-red-700"
+                    className="text-lg font-semibold leading-snug text-red-800"
                   >
                     {error}
                   </p>
@@ -522,7 +533,7 @@ export default function SeniorLiving() {
                   type="submit"
                   data-testid="senior-submit"
                   disabled={pending}
-                  className="inline-flex w-full max-w-full items-center justify-center rounded-full bg-black px-5 py-4 text-center text-base font-bold leading-snug text-[#FFE14A] disabled:opacity-60"
+                  className="inline-flex min-h-12 w-full max-w-full items-center justify-center rounded-lg bg-neutral-950 px-6 py-3 text-center text-lg font-semibold leading-snug text-white disabled:opacity-60"
                 >
                   {pending ? "Sending" : SENIOR_LIVING_CTA}
                 </button>
@@ -533,50 +544,50 @@ export default function SeniorLiving() {
 
         <section
           data-testid="senior-pricing"
-          className="bg-black text-white"
+          className="bg-[#F6F3EE] text-neutral-950"
           aria-labelledby="pricing-heading"
         >
-          <div className="mx-auto w-full max-w-6xl px-4 py-12 sm:py-16">
+          <div className="mx-auto w-full max-w-6xl px-4 py-16 sm:py-20">
             <h2
               id="pricing-heading"
-              className="text-3xl font-extrabold leading-tight"
+              className="text-3xl font-semibold leading-tight sm:text-4xl"
             >
               Pricing
             </h2>
-            <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
               <article
                 data-testid="price-tour"
-                className="min-w-0 rounded-2xl bg-white p-5 text-black"
+                className="min-w-0 rounded-2xl border border-neutral-200 bg-white p-6 text-neutral-950"
               >
-                <h3 className="text-xl font-extrabold">3D Tour</h3>
-                <p className="mt-3 text-4xl font-extrabold leading-none">
+                <h3 className="text-2xl font-semibold leading-tight">3D Tour</h3>
+                <p className="mt-4 text-4xl font-semibold leading-none">
                   <MoneyAmount className="min-w-0 text-left">
                     {formatUsd(SENIOR_TOUR_PRICE)}
                   </MoneyAmount>
                 </p>
-                <p className="mt-3 text-base leading-relaxed text-neutral-700">
+                <p className={`mt-4 ${bodyText}`}>
                   Up to {SENIOR_TOUR_SQFT_CAP.toLocaleString("en-US")} sq ft.
                 </p>
               </article>
               <article
                 data-testid="price-rooms"
-                className="min-w-0 rounded-2xl bg-white p-5 text-black"
+                className="min-w-0 rounded-2xl border border-neutral-200 bg-white p-6 text-neutral-950"
               >
-                <h3 className="text-xl font-extrabold">
+                <h3 className="text-2xl font-semibold leading-tight">
                   Rooms, spaces or units
                 </h3>
                 <ul className="mt-3 space-y-3">
                   {SENIOR_ROOM_RATES.map((tier) => (
                     <li key={tier.maxCount}>
-                      <p className="text-3xl font-extrabold leading-none">
+                      <p className="text-3xl font-semibold leading-none">
                         <MoneyAmount className="min-w-0 text-left">
                           {formatUsd(tier.each)}
                         </MoneyAmount>
-                        <span className="ml-2 text-base font-semibold text-neutral-700">
+                        <span className="ml-2 text-lg font-semibold text-neutral-900">
                           each
                         </span>
                       </p>
-                      <p className="mt-1 text-base text-neutral-700">
+                      <p className="mt-2 text-lg leading-relaxed text-neutral-900">
                         {tier.minCount === 1
                           ? `Up to ${tier.maxCount}`
                           : `${tier.minCount} to ${tier.maxCount}`}
@@ -587,26 +598,26 @@ export default function SeniorLiving() {
               </article>
               <article
                 data-testid="price-facility"
-                className="min-w-0 rounded-2xl bg-[#FFE14A] p-5 text-black"
+                className="min-w-0 rounded-2xl border border-neutral-200 bg-white p-6 text-neutral-950"
               >
-                <h3 className="text-xl font-extrabold">
+                <h3 className="text-2xl font-semibold leading-tight">
                   Whole-building facilities
                 </h3>
-                <p className="mt-3 text-base leading-relaxed">
+                <p className={`mt-4 ${bodyText}`}>
                   Up to {SENIOR_FACILITY_SQFT_CAP.toLocaleString("en-US")} sq
                   ft.
                 </p>
-                <p className="mt-3 flex flex-wrap items-baseline gap-x-2 text-base leading-relaxed">
+                <p className={`mt-4 flex flex-wrap items-baseline gap-x-2 ${bodyText}`}>
                   <span>from</span>
                   <MoneyAmount
                     data-testid="facility-rate"
-                    className="min-w-0 text-left text-3xl font-extrabold"
+                    className="min-w-0 text-left text-3xl font-semibold"
                   >
                     {formatSeniorFacilityRate(SENIOR_FACILITY_RATE_PER_SQFT)}
                   </MoneyAmount>
                   <span>/ sq ft</span>
                 </p>
-                <p className="mt-3 text-base leading-relaxed">
+                <p className={`mt-4 ${bodyText}`}>
                   Monthly hosting, or a transfer of ownership.
                 </p>
               </article>
@@ -614,9 +625,12 @@ export default function SeniorLiving() {
           </div>
         </section>
 
-        <section className="bg-black" aria-labelledby="travel-heading">
-          <div className="mx-auto w-full max-w-6xl px-4 pb-14 pt-2">
-            <h2 id="travel-heading" className="text-lg font-bold text-white">
+        <section className="bg-[#F6F3EE]" aria-labelledby="travel-heading">
+          <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-2 sm:pb-20">
+            <h2
+              id="travel-heading"
+              className="text-3xl font-semibold leading-tight text-neutral-950 sm:text-4xl"
+            >
               Travel
             </h2>
             <div className="mt-2 max-w-3xl">
@@ -626,12 +640,14 @@ export default function SeniorLiving() {
         </section>
       </main>
 
-      <footer className="border-t border-white/15 bg-black">
-        <div className="mx-auto w-full max-w-6xl px-4 py-8">
-          <p className="text-sm font-bold text-white">{LEGAL_BUSINESS_NAME}</p>
+      <footer className="border-t border-neutral-200 bg-white">
+        <div className="mx-auto w-full max-w-6xl px-4 py-10">
+          <p className="text-lg font-semibold leading-snug text-neutral-950 sm:text-xl">
+            {LEGAL_BUSINESS_NAME}
+          </p>
           <PublicContactLine
-            className="mt-2 max-w-full text-sm leading-relaxed text-white/80"
-            linkClassName="underline underline-offset-4"
+            className={`mt-4 max-w-full ${bodyText}`}
+            linkClassName="inline-flex min-h-12 items-center underline decoration-neutral-950 underline-offset-4"
           />
         </div>
       </footer>
