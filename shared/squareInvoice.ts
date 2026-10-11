@@ -1,12 +1,16 @@
 /**
  * Square invoice sync for a Firestore invoice that already exists.
- * Charge cents are copied from the invoice total. This module never
- * changes that total. Invoices use delivery_method SHARE_MANUALLY so
- * Square does not email the buyer. Publish still notifies the seller,
- * so booking and confirm must not call this. Call it only after the shoot.
+ * Display mode copies charge cents from the invoice total and does not
+ * change that total. Charge mode (INVOICE_PROCESSING_MODE=charge) adds
+ * the 2.8% processing fee only when the invoice does not already have one.
+ * This module does not write the invoice total. Invoices use
+ * delivery_method SHARE_MANUALLY so Square does not email the buyer.
+ * Publish still notifies the seller, so booking and confirm must not call
+ * this. Call it only after the shoot.
  */
 
 import { normalizeBookingLineItems } from "./bookingPricing.ts";
+import { invoiceProcessingMode, squareOrderForProcessingMode } from "./invoiceProcessing.ts";
 import { squarePaymentNote } from "./paymentAccess.ts";
 
 export interface SquareClientDeps {
@@ -26,6 +30,8 @@ export interface SquareInvoiceSource {
   invoiceNumber?: unknown;
   lineItems?: unknown;
   total?: unknown;
+  subtotal?: unknown;
+  processing?: unknown;
   paymentProvider?: unknown;
   squareInvoiceId?: unknown;
 }
@@ -275,7 +281,8 @@ export async function syncSquareInvoice(invoice: SquareInvoiceSource, deps: Squa
     if (String(invoice.paymentProvider || "").toLowerCase() === "stripe") {
       return { ok: true, skipped: true, reason: "stripe" };
     }
-    const total = Number(invoice.total) || 0;
+    const priced = squareOrderForProcessingMode(invoice, invoiceProcessingMode(deps.env));
+    const total = priced.total;
     if (total <= 0) return { ok: true, skipped: true, reason: "nothing-due" };
     if (!squareConfigured(deps.env)) return { ok: true, skipped: true, reason: "not-configured" };
 
@@ -284,7 +291,7 @@ export async function syncSquareInvoice(invoice: SquareInvoiceSource, deps: Squa
 
     const invoiceNumber = typeof invoice.invoiceNumber === "string" ? invoice.invoiceNumber.trim() : "";
     const paymentNote = squarePaymentNote(invoice.id, invoiceNumber || undefined);
-    const pricing = buildSquareOrderPricing(invoice.lineItems, total, paymentNote);
+    const pricing = buildSquareOrderPricing(priced.lineItems, total, paymentNote);
     if (!pricing) return { ok: true, skipped: true, reason: "total-mismatch" };
 
     const deadline = Date.now() + (deps.timeoutMs ?? SYNC_BUDGET_MS);

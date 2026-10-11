@@ -14,6 +14,7 @@ import { clientNotifyLive } from "../../shared/clientNotify";
 import { addressText } from "../../shared/addressText";
 import { bookingDateLabel } from "../../shared/clientHome";
 import { amountStillDue, invoiceAllowsDownload, invoiceIdFromSquareNote, squarePaymentNote } from "../../shared/paymentAccess";
+import { checkoutAmountDue, invoiceProcessingMode } from "../../shared/invoiceProcessing";
 import { invoiceEmailNumber, invoicePageInvoiceNumber, receiptEmailNumber } from "../../shared/orderProjectInvoice";
 import { fetchPublishedSquareInvoiceUrl, resolveSquareCheckoutUrl, squareApiBaseUrl } from "../../shared/squareInvoice";
 import { clientInvoiceUrl, isGuessableInvoiceId } from "../../shared/invoicePayLink";
@@ -404,7 +405,8 @@ router.post("/invoice/:id/checkout", async (req: Request, res: Response) => {
     if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
 
     const invoice = invoiceDoc.data()!;
-    const amountDue = amountStillDue(invoice);
+    // Display mode matches amountStillDue. Charge mode adds 2.8% only when it is not already stored.
+    const amountDue = checkoutAmountDue(invoice, invoiceProcessingMode());
     const provider = invoiceProvider(invoice);
 
     if (invoiceAllowsDownload(invoice)) {
