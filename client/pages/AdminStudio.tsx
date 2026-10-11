@@ -18,9 +18,11 @@ import {
 } from "firebase/firestore";
 import { 
   ref, 
+  uploadBytes,
   uploadBytesResumable, 
   getDownloadURL 
 } from "firebase/storage";
+import { captureVideoPoster } from "@/lib/videoPosterFrame";
 import { 
   Upload, 
   Camera, 
@@ -190,6 +192,22 @@ export default function AdminStudio() {
 
 // --- Upload Portal Section ---
 
+/** JPEG frame about 2s in, uploaded beside the video. Failure leaves the placeholder card. */
+async function videoPosterUrl(file: File, videoPath: string): Promise<string | null> {
+  if (!file.type.startsWith("video/")) return null;
+  try {
+    const frame = await captureVideoPoster(file);
+    if (!frame) return null;
+    const posterPath = `${videoPath.replace(/\.[^.]+$/, "")}-poster.jpg`;
+    const stored = ref(storage, posterPath);
+    await uploadBytes(stored, frame, { contentType: "image/jpeg" });
+    return await getDownloadURL(stored);
+  } catch (err) {
+    console.warn("[Studio] Video poster was not generated.", err);
+    return null;
+  }
+}
+
 function UploadPortal({ listings, user, isAdmin, isEditor }: any) {
   const [selectedListing, setSelectedListing] = React.useState<string | null>(null);
   const [files, setFiles] = React.useState<File[]>([]);
@@ -250,8 +268,19 @@ function UploadPortal({ listings, user, isAdmin, isEditor }: any) {
                 updatedAt: serverTimestamp()
               });
             } else {
+              const posterUrl = await videoPosterUrl(file, path);
+              const video: Record<string, string> = {
+                url,
+                name: file.name,
+                path,
+                uploadedAt: new Date().toISOString(),
+              };
+              if (posterUrl) {
+                video.poster = posterUrl;
+                video.posterUrl = posterUrl;
+              }
               await updateDoc(listingRef, {
-                videos: [...currentVideos, { url, name: file.name, path, uploadedAt: new Date().toISOString() }],
+                videos: [...currentVideos, video],
                 updatedAt: serverTimestamp()
               });
             }
