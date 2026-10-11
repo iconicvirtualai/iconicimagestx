@@ -12,6 +12,7 @@ import {
   BOOKING_PACKAGE_CATEGORY_LABELS,
   BOOKING_PACKAGE_CATEGORY_ORDER,
   catalogPackageSaveData,
+  isPubliclyBookable,
   newCatalogPackageData,
   packagesForStaffEditor,
   type BookingCatalogKind,
@@ -43,6 +44,20 @@ function editsFor(item: StaffCatalogPackage): RowEdits {
 
 function money(value: number): string {
   return (Number(value) || 0).toLocaleString("en-US", { style: "currency", currency: "USD" });
+}
+
+export function AdminCatalogPackageTitle({ item }: { item: StaffCatalogPackage }) {
+  return (
+    <span className="block text-sm font-black text-slate-900">
+      {item.name}
+      {!item.isActive && <span className="ml-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">Hidden</span>}
+      {!isPubliclyBookable(item) && (
+        <span data-testid={`catalog-unpriced-${item.id}`} className="ml-2 text-[10px] font-bold uppercase tracking-widest text-amber-700">
+          Unpriced, hidden from /book
+        </span>
+      )}
+    </span>
+  );
 }
 
 export default function AdminBookingCatalog() {
@@ -256,10 +271,7 @@ export default function AdminBookingCatalog() {
                   onClick={() => setOpenId(open ? null : item.id)}
                 >
                   <span>
-                    <span className="block text-sm font-black text-slate-900">
-                      {item.name}
-                      {!item.isActive && <span className="ml-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">Hidden</span>}
-                    </span>
+                    <AdminCatalogPackageTitle item={item} />
                     <span className="mt-1 block text-[10px] font-bold uppercase tracking-widest text-slate-400">
                       {BOOKING_PACKAGE_CATEGORY_LABELS[item.category]} · {BOOKING_CATALOG_KIND_LABELS[item.bookingKind]} · {item.id}
                     </span>

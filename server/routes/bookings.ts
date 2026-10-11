@@ -20,7 +20,7 @@ import { chargedServiceLines, normalizeBookingLineItems, orderTotalLabel, resolv
 import { applyServerTravel, isTravelFeeLine, travelSummaryText, type TravelAssessment } from "../../shared/travelZones";
 import { planOrderPackageRepair } from "../../shared/orderPackageRepair";
 import { notifyOfficeOfOrder } from "../services/officeOrderNotify";
-import { packagesForStaffEditor } from "../../shared/bookingCatalog";
+import { packagesForStaffEditor, publicBookingCatalogResponse } from "../../shared/bookingCatalog";
 import { normalizeEmail } from "../../shared/listingAccess";
 import { addressText } from "../../shared/addressText";
 import { bookingDateLabel } from "../../shared/clientHome";
@@ -434,6 +434,14 @@ router.post("/", async (req, res) => {
     console.error("[Bookings] Submission error:", err);
     return res.status(500).json({ error: "Failed to submit booking request." });
   }
+});
+
+// ─── GET /api/bookings/catalog — Public packages /book can sell ───────────────
+// Registered before /:id so "catalog" is not read as a booking request id.
+
+router.get("/catalog", async (_req, res) => {
+  const catalog = await loadBookingCatalog();
+  return res.json(publicBookingCatalogResponse(catalog));
 });
 
 // ─── GET /api/bookings — List all order requests (staff only) ─────────────────

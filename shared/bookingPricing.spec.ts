@@ -9,10 +9,13 @@ import {
   catalogPackageSaveData,
   catalogPriceIsBookable,
   hardcodedChargePrice,
+  isPubliclyBookable,
   newCatalogPackageData,
   packagesForStaffEditor,
   promoDiscountFor,
   PROMO_DISCOUNTS,
+  publicBookingCatalogResponse,
+  resolvePublicPackageDeepLink,
 } from "./bookingCatalog";
 import { bookingEmbedAvailability } from "./bookingEmbeds";
 import {
@@ -492,6 +495,11 @@ describe("booking catalog parity", () => {
     expect(offerIds).not.toContain("studio-noir");
     expect(offerIds).not.toContain("studio-blanc");
     expect(bookingPriceHolds().services.map((item) => item.id).sort()).toEqual(["studio-blanc", "studio-noir"]);
+    const published = publicBookingCatalogResponse().packages.map((item) => item.id);
+    expect(published).not.toContain("studio-noir");
+    expect(published).not.toContain("studio-blanc");
+    expect(published).toContain("listing-essentials");
+    expect(published).toContain("aerial-drone");
   });
 
   it("rejects a booking that includes a $0 or unpriced catalog item", () => {
@@ -568,11 +576,70 @@ describe("booking catalog parity", () => {
     expect(guard).toContain("return res.status(400).json({ error: unpriced })");
     expect(writeAt).toBeGreaterThan(postStart);
 
-    expect(bookingForm).toContain("bookingPriceHolds(catalog)");
-    expect(bookingForm).toContain("CALL_FOR_PRICING_LABEL");
-    expect(bookingForm).toContain("data-testid={`price-hold-${id}`}");
-    expect(bookingForm).toContain('aria-disabled="true"');
+    expect(bookingForm).not.toContain("bookingPriceHolds");
+    expect(bookingForm).not.toContain("CALL_FOR_PRICING_LABEL");
+    expect(bookingForm).not.toContain("price-hold-");
+    expect(bookingForm).toContain("isPubliclyBookable");
+    expect(bookingForm).toContain('searchParams.get("package")');
+    expect(bookingForm).toContain("resolvePublicPackageDeepLink");
+    expect(catalogSource).toContain("export function isPubliclyBookable");
     expect(catalogSource).toContain('CALL_FOR_PRICING_LABEL = "Call for pricing"');
+    expect(bookingsRoute).toContain('router.get("/catalog"');
+    expect(bookingsRoute).toContain("publicBookingCatalogResponse(catalog)");
+    expect(bookingsRoute.indexOf('router.get("/catalog"')).toBeLessThan(bookingsRoute.indexOf('router.get("/:id"'));
+  });
+
+  it("hides unpriced packages and add-ons from the public catalog and still rejects the POST", () => {
+    expect(isPubliclyBookable(null)).toBe(false);
+    expect(isPubliclyBookable({})).toBe(false);
+    expect(isPubliclyBookable({ price: null })).toBe(false);
+    expect(isPubliclyBookable({ price: Number.NaN })).toBe(false);
+    expect(isPubliclyBookable({ price: 0 })).toBe(false);
+    expect(isPubliclyBookable({ price: -5 })).toBe(false);
+    expect(isPubliclyBookable({ price: "0" })).toBe(false);
+    expect(isPubliclyBookable({ price: "  " })).toBe(false);
+    expect(isPubliclyBookable({ price: 1 })).toBe(true);
+    expect(catalogPriceIsBookable(249)).toBe(isPubliclyBookable({ price: 249 }));
+
+    const missing = packagesForStaffEditor([
+      {
+        id: "twilight-hold",
+        name: "Twilight Hold",
+        bookingKind: "addon",
+        category: "addon",
+        addonGroup: "The Space",
+        isActive: true,
+      },
+      { id: "studio-noir", price: 450 },
+    ]);
+    const response = publicBookingCatalogResponse(missing);
+    const ids = response.packages.map((item) => item.id);
+    expect(ids).not.toContain("twilight-hold");
+    expect(ids).not.toContain("studio-blanc");
+    expect(ids).toContain("studio-noir");
+    expect(ids).toContain("listing-essentials");
+    expect(ids).toContain("aerial-drone");
+    expect(bookingOffer(missing).services.map((item) => item.id)).toContain("studio-noir");
+    expect(bookingOffer(missing).services.map((item) => item.id)).not.toContain("studio-blanc");
+    expect(bookingOffer(missing).addOns.some((group) => group.items.some((item) => item.id === "twilight-hold"))).toBe(false);
+    expect(bookingOffer(missing).addOns.some((group) => group.items.some((item) => item.id === "aerial-drone"))).toBe(true);
+
+    expect(resolvePublicPackageDeepLink("studio-blanc", missing)).toEqual({ selectedId: "", hidden: true });
+    expect(resolvePublicPackageDeepLink("twilight-hold", missing)).toEqual({ selectedId: "", hidden: true });
+    expect(resolvePublicPackageDeepLink("studio-noir", missing)).toEqual({ selectedId: "studio-noir", hidden: false });
+    expect(resolvePublicPackageDeepLink("listing-essentials", missing)).toEqual({
+      selectedId: "listing-essentials",
+      hidden: false,
+    });
+    expect(resolvePublicPackageDeepLink("not-a-package", missing)).toEqual({
+      selectedId: "not-a-package",
+      hidden: false,
+    });
+
+    expect(packagesForStaffEditor([], { includeInactive: true }).some((item) => item.id === "studio-blanc")).toBe(true);
+    expect(unpricedCatalogBookingError({ selectedAddOns: ["twilight-hold"] }, missing))
+      .toBe(`Twilight Hold is not available to book until a price is set. ${CALL_FOR_PRICING_LABEL}.`);
+    expect(unpricedCatalogBookingError({ selectedService: "studio-noir" }, missing)).toBeNull();
   });
 
   it("keeps the submitted name and price when a package is not in the catalog", () => {
