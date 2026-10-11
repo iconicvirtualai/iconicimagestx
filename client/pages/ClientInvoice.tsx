@@ -10,29 +10,48 @@ import {
   InvoiceLineTable,
 } from "@/components/invoice/BrandedInvoice";
 import { downloadBrandedInvoice } from "@/lib/downloadBrandedInvoice";
+import { useAuth } from "@/contexts/AuthContext";
 import { invoiceFaceFromStored } from "@shared/invoiceFace";
 import { invoicePageInvoiceNumber } from "@shared/orderProjectInvoice";
 import { ICONIC_DOWNLOAD_LOCK } from "@shared/paymentAccess";
 
+function payQuery(token: string): string {
+  if (!token) return "";
+  return `?t=${encodeURIComponent(token)}`;
+}
+
 export default function ClientInvoice() {
   const { invoiceId } = useParams<{ invoiceId: string }>();
   const [searchParams] = useSearchParams();
+  const { user, loading: authLoading } = useAuth();
+  const payToken = searchParams.get("t") || "";
   const [invoice, setInvoice] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [checkingOut, setCheckingOut] = React.useState(false);
   const [error, setError] = React.useState("");
 
   React.useEffect(() => {
-    if (!invoiceId) return;
-    fetch(`/api/payments/invoice/${invoiceId}`)
-      .then(async res => {
+    if (!invoiceId || authLoading) return;
+    let cancelled = false;
+    const query = payQuery(payToken);
+    (async () => {
+      try {
+        const headers: Record<string, string> = {};
+        if (user) headers.Authorization = `Bearer ${await user.getIdToken()}`;
+        const res = await fetch(`/api/payments/invoice/${encodeURIComponent(invoiceId)}${query}`, { headers });
         if (!res.ok) throw new Error(await res.text());
-        return res.json();
-      })
-      .then(setInvoice)
-      .catch(() => setError("We could not open this invoice. Please contact Iconic Images."))
-      .finally(() => setLoading(false));
-  }, [invoiceId]);
+        const data = await res.json();
+        if (!cancelled) setInvoice(data);
+      } catch {
+        if (!cancelled) setError("We could not open this invoice. Please contact Iconic Images.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [invoiceId, payToken, user, authLoading]);
 
   if (loading) return <div className="min-h-screen bg-white flex items-center justify-center"><div className="w-8 h-8 border-4 border-[#1d4ed8] border-t-transparent rounded-full animate-spin" /></div>;
 
@@ -64,9 +83,11 @@ export default function ClientInvoice() {
     if (!invoiceId) return;
     setCheckingOut(true);
     try {
-      const res = await fetch(`/api/payments/invoice/${invoiceId}/checkout`, {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (user) headers.Authorization = `Bearer ${await user.getIdToken()}`;
+      const res = await fetch(`/api/payments/invoice/${encodeURIComponent(invoiceId)}/checkout${payQuery(payToken)}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
       });
       const result = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(result.error || "Could not start payment.");

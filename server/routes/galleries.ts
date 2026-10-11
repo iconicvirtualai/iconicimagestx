@@ -14,6 +14,8 @@ import {
 } from "../../shared/paymentAccess";
 import { lockedClientGalleryMedia } from "../../shared/lockedClientMedia";
 import { recordAddressText } from "../../shared/addressText";
+import { invoicePayLinkFor } from "../../shared/invoicePayLink";
+import { readInvoiceDoc } from "../lib/invoiceDoc";
 import { galleryStatusNeedsReleaseGate } from "../../shared/galleryRelease";
 import { deliverGalleryToClient } from "../services/galleryDeliver";
 import { loadGalleryReleaseForGallery } from "../services/galleryReleaseGate";
@@ -48,13 +50,17 @@ async function holdIfOrderIncomplete(
 }
 
 async function invoiceForGallery(gallery: Record<string, unknown>) {
+  const load = (id: string) => db().collection("invoices").doc(id).get();
   if (typeof gallery.invoiceId === "string" && gallery.invoiceId) {
-    const doc = await db().collection("invoices").doc(gallery.invoiceId).get();
-    if (doc.exists) return { id: doc.id, ...doc.data() };
+    const doc = await readInvoiceDoc(load, gallery.invoiceId);
+    if (doc) return { id: doc.id, ...doc.data };
   }
   if (typeof gallery.orderId === "string" && gallery.orderId) {
     const snap = await db().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
-    if (!snap.empty) return { id: snap.docs[0].id, ...snap.docs[0].data() };
+    if (!snap.empty) {
+      const doc = await readInvoiceDoc(load, snap.docs[0].id);
+      if (doc) return { id: doc.id, ...doc.data };
+    }
   }
   return null;
 }
@@ -101,6 +107,13 @@ function clientGalleryPayload(id: string, gallery: Record<string, unknown>, gate
     downloadEnabled: unlocked,
     paymentRequired: !unlocked,
     invoiceId: invoice?.id || null,
+    invoicePayPath: invoice?.id
+      ? invoicePayLinkFor({
+          id: String(invoice.id),
+          payToken: invoice.payToken,
+          status: invoice.status,
+        })
+      : null,
     invoiceStatus: invoice?.status || null,
     lockTitle: unlocked ? null : ICONIC_DOWNLOAD_LOCK.title,
     lockMessage: unlocked ? null : ICONIC_DOWNLOAD_LOCK.message,

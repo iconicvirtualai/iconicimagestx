@@ -4,6 +4,7 @@
  */
 
 import { buildBookingInvoiceDraft, type BookingInvoiceDraftInput } from "./bookingInvoice.ts";
+import { isDerivedInvoiceId } from "./invoicePay.ts";
 
 export function nonEmptyId(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -38,6 +39,11 @@ export interface InvoiceAnchor {
   listingInvoiceId?: unknown;
   /** Invoice document ids found by orderRequestId, orderId, or listingId. */
   foundInvoiceIds?: unknown[];
+  /**
+   * Firestore auto-id to use when nothing is linked yet.
+   * Derived listing_ / ordreq_ / playtest- ids are ignored here.
+   */
+  createId?: unknown;
 }
 
 export interface InvoiceLinkPlan {
@@ -64,7 +70,8 @@ function compact(fields: Record<string, string | null | undefined>): Record<stri
 /**
  * Pick one invoice for this order and project.
  * The id stored on the order wins, then the listing, then a discovered document.
- * When none exist, the id is stable for the order (or the project, if there is no order).
+ * A new invoice uses the caller's Firestore auto-id. This function does not
+ * derive listing_ or ordreq_ ids. Those remain a read-only lookup for old docs.
  */
 export function planInvoiceLink(anchor: InvoiceAnchor): InvoiceLinkPlan {
   const orderRequestId = nonEmptyId(anchor.orderRequestId);
@@ -75,13 +82,13 @@ export function planInvoiceLink(anchor: InvoiceAnchor): InvoiceLinkPlan {
   const found = (anchor.foundInvoiceIds || [])
     .map(nonEmptyId)
     .filter((id): id is string => Boolean(id));
+  const requested = nonEmptyId(anchor.createId);
+  const fresh = requested && !isDerivedInvoiceId(requested) ? requested : null;
 
   const invoiceId = orderInvoiceId || listingInvoiceId || found[0] || null;
-  const createId = invoiceId
-    || (orderRequestId ? orderInvoiceDocId(orderRequestId) : null)
-    || (listingId ? listingInvoiceDocId(listingId) : null);
+  const createId = invoiceId || fresh || "";
 
-  if (!createId) {
+  if (!createId && !orderRequestId && !listingId && !orderId) {
     throw new Error("An order or project is required to link an invoice.");
   }
 
@@ -90,20 +97,21 @@ export function planInvoiceLink(anchor: InvoiceAnchor): InvoiceLinkPlan {
     orderId,
     listingId,
   });
+  const linkId = createId || null;
 
   return {
     invoiceId,
     attached: Boolean(invoiceId),
     createId,
     invoiceFields,
-    orderRequestFields: orderRequestId
-      ? compact({ invoiceId: createId, listingId, orderId: orderId })
+    orderRequestFields: orderRequestId && linkId
+      ? compact({ invoiceId: linkId, listingId, orderId })
       : null,
-    listingFields: listingId
-      ? compact({ invoiceId: createId, orderRequestId, orderId })
+    listingFields: listingId && linkId
+      ? compact({ invoiceId: linkId, orderRequestId, orderId })
       : null,
-    orderFields: orderId
-      ? compact({ invoiceId: createId, orderRequestId, listingId })
+    orderFields: orderId && linkId
+      ? compact({ invoiceId: linkId, orderRequestId, listingId })
       : null,
   };
 }

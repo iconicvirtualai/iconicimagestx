@@ -156,7 +156,7 @@ describe("client invoice page", () => {
     expect(clientInvoice).toContain("invoicePageInvoiceNumber");
     expect(clientInvoice).toContain("invoice.invoiceNumber");
     expect(clientInvoice).toContain("id: invoiceId");
-    expect(clientInvoice).toContain('fetch(`/api/payments/invoice/${invoiceId}/checkout`');
+    expect(clientInvoice).toContain("fetch(`/api/payments/invoice/${encodeURIComponent(invoiceId)}/checkout${payQuery(payToken)}`");
     expect(clientInvoice).toContain("Pay Securely");
     expect(clientInvoice).toContain("ICONIC_DOWNLOAD_LOCK.message");
     expect(orderHistory).toContain("downloadBrandedInvoice(clientInvoicePdfInput(invoice))");
