@@ -31,6 +31,7 @@ import studioScratchRouter from "./routes/studioScratch";
 import placesRouter from "./routes/places";
 import smsRouter from "./routes/sms";
 import contactRouter from "./routes/contact";
+import seniorLivingRouter from "./routes/seniorLiving";
 import liveChatRouter from "./routes/liveChat";
 import contactThreadsRouter from "./routes/contactThreads";
 import { listCalendarScheduleEvents, verifyCalendarWriteAccess } from "./services/calendar";
@@ -245,6 +246,7 @@ export function createServer() {
   app.use("/api/contact", contactThreadsRouter);
   app.use("/api/contact", liveChatRouter);
   app.use("/api/contact", contactRouter);
+  app.use("/api/senior-living", seniorLivingRouter);
 
   // ─── Error handler ─────────────────────────────────────────────────
   app.use(

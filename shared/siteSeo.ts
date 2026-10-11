@@ -86,6 +86,13 @@ export const PUBLIC_PAGES: readonly PublicPage[] = [
     description: "Schedule listing photography or video with Iconic Images in Spring, The Woodlands, or Houston.",
   },
   {
+    path: "/senior-living",
+    file: "seo/senior-living.html",
+    title: "Senior Living Virtual Tours & Photography | Iconic Images",
+    description:
+      "Virtual tours and photography for senior living communities in Spring, The Woodlands, and Houston.",
+  },
+  {
     path: "/privacy",
     file: "seo/privacy.html",
     title: "Privacy Policy | Iconic Images",

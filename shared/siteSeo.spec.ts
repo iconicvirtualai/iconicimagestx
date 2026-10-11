@@ -43,6 +43,7 @@ describe("public page meta", () => {
       "/contact",
       "/socials",
       "/book",
+      "/senior-living",
       "/privacy",
       "/terms",
       "/login",
@@ -56,6 +57,15 @@ describe("public page meta", () => {
       expect(page.description).not.toMatch(/\d+\.\d{2}/);
       expect(page.title).not.toMatch(/iconic credits/i);
     }
+  });
+
+  it("publishes the senior living campaign title and a plain description", () => {
+    const page = PUBLIC_PAGES.find((item) => item.path === "/senior-living");
+    expect(page?.file).toBe("seo/senior-living.html");
+    expect(page?.title).toBe("Senior Living Virtual Tours & Photography | Iconic Images");
+    expect(page?.description).toBe(
+      "Virtual tours and photography for senior living communities in Spring, The Woodlands, and Houston.",
+    );
   });
 
   it("injects title, description, canonical, and social tags into the shell", () => {

@@ -179,6 +179,14 @@
       "destination": "/seo/book.html"
     },
     {
+      "source": "/senior-living",
+      "destination": "/seo/senior-living.html"
+    },
+    {
+      "source": "/senior-living/",
+      "destination": "/seo/senior-living.html"
+    },
+    {
       "source": "/privacy",
       "destination": "/seo/privacy.html"
     },
