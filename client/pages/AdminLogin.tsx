@@ -8,6 +8,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { staffLoginAction } from "@shared/staffAccess";
+import { PASSWORD_RESET_NOTICE, passwordResetFailureMessage } from "@/lib/passwordReset";
 import { openOwnerSession } from "@/lib/openOwnerSession";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,13 +79,16 @@ export default function AdminLogin() {
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resetEmail) return;
+    if (!resetEmail || submitting) return;
+    setSubmitting(true);
     try {
       await resetPassword(resetEmail);
-      toast.success("Reset email sent. Check your inbox.");
+      toast.success(PASSWORD_RESET_NOTICE);
       setShowReset(false);
-    } catch {
-      toast.error("Failed to send reset email.");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : passwordResetFailureMessage(err));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -172,9 +176,10 @@ export default function AdminLogin() {
             />
             <Button
               type="submit"
+              disabled={submitting}
               className="w-full bg-white text-black hover:bg-gray-100"
             >
-              Send Reset Link
+              {submitting ? "Sending..." : "Send Reset Link"}
             </Button>
             <div className="text-center">
               <button
