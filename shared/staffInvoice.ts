@@ -390,7 +390,7 @@ function invoiceTotals(
     fees,
     travel,
     tax,
-    amountPaid,
+    amountPaid: cents(Math.max(0, Number(amountPaid) || 0)),
     processing: automatic ? null : cents(Math.max(0, Number(form.processing) || 0)),
     applyProcessing: automatic,
     comped,

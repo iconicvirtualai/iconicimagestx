@@ -34,6 +34,7 @@ const APP_SHELL_SOURCES = [
   "/services/virtual-staging/ai-tool",
   "/services/virtual-staging/pro-order",
   "/services/virtual-staging/checkout",
+  "/dev/invoice-template",
 ];
 
 /** Stays in APP_SHELL_SOURCES so rewrite order does not move. Served noindex. */
@@ -115,6 +116,8 @@ export const NOINDEX_HEADER_SOURCES = [
   "/invoice/(.*)",
   "/podcast-guest-prep",
   "/podcast-guest-prep/",
+  "/dev/invoice-template",
+  "/dev/invoice-template/",
 ];
 
 export function buildVercelHeaders(): HeaderRule[] {

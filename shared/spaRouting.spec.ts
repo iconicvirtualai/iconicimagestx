@@ -162,6 +162,8 @@ describe("spa rewrite coverage", () => {
       "/invoice/(.*)",
       "/podcast-guest-prep",
       "/podcast-guest-prep/",
+      "/dev/invoice-template",
+      "/dev/invoice-template/",
     ]);
     for (const rule of vercel.headers) {
       expect(rule.headers).toEqual([{ key: "X-Robots-Tag", value: "noindex, nofollow" }]);
