@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { isDeliveryQaClient } from "../shared/deliveryQaClient.ts";
 import { DELIVERY_QA_CLIENT_EMAIL, DELIVERY_QA_IDS } from "../shared/deliveryQaSeed.ts";
 import {
   deliveryQaSendPreview,
@@ -47,7 +48,38 @@ describe("delivery QA send", () => {
     })).toEqual([
       `galleries/${DELIVERY_QA_IDS.gallery} clientId is not ${DELIVERY_QA_IDS.client}.`,
       `orders/${DELIVERY_QA_IDS.order} clientEmail is not ${DELIVERY_QA_CLIENT_EMAIL}.`,
-      `clients/${DELIVERY_QA_IDS.client} is not marked playtest.`,
+      `clients/${DELIVERY_QA_IDS.client} is not the delivery QA client.`,
+    ]);
+  });
+
+  it("accepts the linked portal login and refuses an unlinked or non-playtest client", () => {
+    const login = {
+      ...playtest,
+      playtest: undefined,
+      linkedClientId: DELIVERY_QA_IDS.client,
+      email: DELIVERY_QA_CLIENT_EMAIL,
+    };
+    expect(isDeliveryQaClient(login)).toBe(true);
+    expect(deliveryQaSendRefusals({
+      gallery: playtest,
+      order: playtest,
+      client: login,
+    })).toEqual([]);
+
+    expect(deliveryQaSendRefusals({
+      gallery: playtest,
+      order: playtest,
+      client: { ...playtest, playtest: false, linkedClientId: undefined, email: DELIVERY_QA_CLIENT_EMAIL },
+    })).toEqual([
+      `clients/${DELIVERY_QA_IDS.client} is not the delivery QA client.`,
+    ]);
+    expect(deliveryQaSendRefusals({
+      gallery: playtest,
+      order: playtest,
+      client: { ...playtest, playtest: false, email: "client@example.com" },
+    })).toEqual([
+      `clients/${DELIVERY_QA_IDS.client} is not the delivery QA client.`,
+      `clients/${DELIVERY_QA_IDS.client} email is not ${DELIVERY_QA_CLIENT_EMAIL}.`,
     ]);
   });
 
@@ -88,5 +120,8 @@ describe("delivery QA send", () => {
     );
     expect(stdout).toBe(formatDeliveryQaSendDryRun(preview));
     expect(stdout).toContain("No email sent.");
+    expect(stdout).toContain("SMTP_PASS is a Vercel secret");
+    expect(stdout).toContain("Deliver Gallery");
+    expect(source).toContain("SMTP_PASS is a Vercel secret");
   });
 });

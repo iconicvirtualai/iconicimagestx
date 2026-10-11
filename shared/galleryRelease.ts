@@ -7,6 +7,7 @@
  */
 
 import { RELEASED_GALLERY_STATUSES } from "./clientGalleryLink";
+import { isPlaytestDeliveryQaGallery } from "./deliveryQaClient";
 import { ORDER_GALLERY_RELEASE, type OrderEditPlan } from "./orderEditPlan";
 
 export interface GalleryReleaseJob {
@@ -121,6 +122,22 @@ export function unlinkedGalleryRelease(): GalleryReleaseReport {
     satisfied: 0,
     gaps: [],
     message: "No package is linked to this gallery, so the order gate does not hold it.",
+  };
+}
+
+/**
+ * Deliver Gallery on the playtest QA gallery must not 409.
+ * The seeded line is not a package. This still clears the hold when the
+ * gallery is the playtest document, so a later package match cannot block it.
+ * A gallery with that id and playtest not true keeps the normal gate.
+ */
+export function releaseForPlaytestDeliveryQaGallery(
+  gallery: { id?: unknown; playtest?: unknown } | null | undefined,
+): GalleryReleaseReport | null {
+  if (!isPlaytestDeliveryQaGallery(gallery)) return null;
+  return {
+    ...unlinkedGalleryRelease(),
+    message: "Playtest delivery QA gallery. The order gate does not hold it.",
   };
 }
 

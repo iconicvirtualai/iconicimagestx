@@ -5,6 +5,7 @@
  */
 
 import { mailboxAddress } from "./clientNotify.ts";
+import { isDeliveryQaClient, type DeliveryQaClientRecord } from "./deliveryQaClient.ts";
 import { PLAYTEST_ADDRESS } from "./listingAccess.ts";
 import {
   DELIVERY_QA_CLIENT_EMAIL,
@@ -18,12 +19,10 @@ import {
 export const DELIVERY_QA_EMAIL_SUBJECT = "Message from Iconic Images";
 export const DELIVERY_QA_EMAIL_TEMPLATE = "gallery_delivery";
 
-export interface DeliveryQaSendRecord {
+export interface DeliveryQaSendRecord extends DeliveryQaClientRecord {
   exists: boolean;
-  playtest: unknown;
   clientId?: unknown;
   orderId?: unknown;
-  email?: unknown;
   clientEmail?: unknown;
   phone?: unknown;
 }
@@ -86,11 +85,16 @@ export function formatDeliveryQaSendDryRun(preview: DeliveryQaSendPreview): stri
     `- galleries/${DELIVERY_QA_IDS.gallery}`,
     `- orders/${DELIVERY_QA_IDS.order}`,
     `- clients/${DELIVERY_QA_IDS.client}`,
-    "It sends nothing unless every document exists, playtest is true, and the client email is exactly ops+deliveryqa@iconicimagestx.com.",
+    "It sends nothing unless the gallery and order are playtest, the client is the delivery QA client, and the client email is exactly ops+deliveryqa@iconicimagestx.com.",
     "It then calls deliverGalleryToClient. That function calls sendEmail.",
     "sendEmail keeps the CLIENT_NOTIFY_LIVE and NOTIFY_TEST_ALLOWLIST gate.",
     "This script does not set those variables and does not call the mail transport itself.",
     "A non-empty client phone is refused, because deliverGalleryToClient would also send SMS.",
+    "",
+    "SMTP_PASS is a Vercel secret, so this live command cannot send from a laptop.",
+    "Staff send the real delivery email by clicking Deliver Gallery on the playtest order in the app.",
+    "That button calls the same deliverGalleryToClient path.",
+    "The playtest gallery clears the release gate, so that button is not held.",
     "",
   ];
   return `${lines.join("\n")}\n`;
@@ -128,7 +132,7 @@ export function deliveryQaSendRefusals(input: {
   }
 
   if (!input.client.exists) reasons.push(`${clientPath} does not exist.`);
-  else if (input.client.playtest !== true) reasons.push(`${clientPath} is not marked playtest.`);
+  else if (!isDeliveryQaClient(input.client)) reasons.push(`${clientPath} is not the delivery QA client.`);
   if (input.client.exists && !exactQaEmail(input.client.email)) {
     reasons.push(`${clientPath} email is not ${DELIVERY_QA_CLIENT_EMAIL}.`);
   }
