@@ -6482,6 +6482,10 @@ function decideClientGalleryLink(input) {
     message: `No gallery and no project uses ${input.id}. Checked galleries/${input.id}, listings/${input.id}, galleries with listingId ${input.id}, orders/${input.id}, and orderRequests/${input.id}. /studio/${input.id} opens a project whose Client Studio link is on. /gallery/${input.id} opens a delivery gallery. This app does not resolve Fotello ids. Copy the link from the project file or the gallery delivery URL.`
   };
 }
+const DELIVERY_QA_GALLERY_ID = "playtest-delivery-qa-gallery";
+function isPlaytestDeliveryQaGallery(record) {
+  return !!record && record.id === DELIVERY_QA_GALLERY_ID && record.playtest === true;
+}
 const ORDER_GALLERY_RELEASE = "hold_until_order_complete";
 const SHOWCASE_PHOTO_COUNT = 30;
 const ICONIC_POLISH_TREATMENTS = [
@@ -6772,6 +6776,13 @@ function unlinkedGalleryRelease() {
     satisfied: 0,
     gaps: [],
     message: "No package is linked to this gallery, so the order gate does not hold it."
+  };
+}
+function releaseForPlaytestDeliveryQaGallery(gallery) {
+  if (!isPlaytestDeliveryQaGallery(gallery)) return null;
+  return {
+    ...unlinkedGalleryRelease(),
+    message: "Playtest delivery QA gallery. The order gate does not hold it."
   };
 }
 function gapLine(id, label, required, satisfied) {
@@ -8320,6 +8331,8 @@ async function loadGalleryReleaseForGallery(galleryId) {
     throw Object.assign(new Error("Gallery not found."), { status: 404 });
   }
   const gallery = { id: snap.id, ...snap.data() || {} };
+  const playtestRelease = releaseForPlaytestDeliveryQaGallery(gallery);
+  if (playtestRelease) return playtestRelease;
   const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
   if (listingId) {
     const listingSnap = await db$j().collection("listings").doc(listingId).get();
