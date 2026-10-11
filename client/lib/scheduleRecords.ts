@@ -9,6 +9,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { recordAddressText } from "@shared/addressText";
+import { qaStaffAssignmentError } from "@shared/qaStaff";
 import { db } from "./firebase";
 
 const GENERIC_ASSIGNEES = new Set([
@@ -210,6 +211,10 @@ export async function upsertScheduledAppointment({
   staff: any[];
   status?: "scheduled" | "confirmed";
 }) {
+  const chosen = (staff || []).filter((person) => providerIds.includes(person?.id));
+  const blocked = qaStaffAssignmentError(chosen, order);
+  if (blocked) throw new Error(blocked);
+
   const scheduledDate = scheduleDateTimestamp(date);
   const assignedProviders = providerAssignments(providerIds, staff);
   const photographerNames = assignedProviders.map((provider) => provider.name).filter(Boolean);

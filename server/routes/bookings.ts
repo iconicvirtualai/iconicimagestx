@@ -28,6 +28,7 @@ import { addressText } from "../../shared/addressText";
 import { bookingDateLabel } from "../../shared/clientHome";
 import { storedServiceLocationFields } from "../../shared/serviceLocation";
 import { buildAdminOrderTile } from "../../shared/adminOrderTile";
+import { refuseQaStaffAssignment } from "../services/qaStaffAssign";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -556,7 +557,12 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
     let photographer: Record<string, any> | null = null;
     if (assignedPhotographerId) {
       const staffDoc = await db().collection("staff").doc(assignedPhotographerId).get();
-      photographer = staffDoc.exists ? staffDoc.data()! : null;
+      photographer = staffDoc.exists ? { id: staffDoc.id, ...staffDoc.data()! } : null;
+      const refusal = await refuseQaStaffAssignment({
+        staff: photographer ? [photographer] : [],
+        record: { id: requestDoc.id, ...request },
+      });
+      if (refusal) return res.status(refusal.status).json({ error: refusal.error });
     }
 
     // Find or create client record. Prefer the portal account attached at submit.

@@ -41,6 +41,7 @@ import {
 } from "date-fns";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 import { fetchPhotographerRoster, mergeCalendarRoster } from "@/lib/photographerRoster";
+import { filterAssignableStaff } from "@shared/qaStaff";
 import {
   classifyCalendarEvent,
   countUnassignedShoots,
@@ -146,7 +147,7 @@ export default function AdminSchedule() {
   const [selectedAppt, setSelectedAppt] = React.useState<Appointment | null>(null);
 
   const roster = React.useMemo(
-    () => mergeCalendarRoster(rosterPeople, staff),
+    () => mergeCalendarRoster(rosterPeople, filterAssignableStaff(staff, { forPlaytest: false })),
     [rosterPeople, staff],
   );
 
