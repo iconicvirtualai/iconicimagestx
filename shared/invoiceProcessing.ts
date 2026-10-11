@@ -191,6 +191,30 @@ export function formatInvoiceDisplayDate(value: unknown): string {
   return `${MONTHS[index]} ${day}, ${year}`;
 }
 
+/**
+ * Printed invoice amounts. Whole dollars drop the cents (`$ 549`).
+ * A non-zero cent part stays (`$ 15.37`). This does not round the charge.
+ */
+export function formatInvoiceAmount(value: number): string {
+  const numeric = Number(value);
+  const cents = Number.isFinite(numeric) ? Math.round(numeric * 100) : 0;
+  const sign = cents < 0 ? "-" : "";
+  const abs = Math.abs(cents);
+  const dollars = Math.floor(abs / 100);
+  const rem = abs % 100;
+  const digits = dollars.toLocaleString("en-US");
+  const body = rem === 0 ? digits : `${digits}.${String(rem).padStart(2, "0")}`;
+  return `${sign}$ ${body}`;
+}
+
+/** Invoice footer only. The public contact line stays dotted. */
+export function formatInvoicePhone(display: string): string {
+  const digits = display.replace(/\D/g, "");
+  const local = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+  if (local.length !== 10) return display;
+  return `${local.slice(0, 3)} | ${local.slice(3, 6)} | ${local.slice(6)}`;
+}
+
 export function saleSubtotal(invoice: { subtotal?: unknown; lineItems?: unknown } | null | undefined): number {
   if (!invoice) return 0;
   const explicit = explicitMoney(invoice.subtotal);

@@ -67,6 +67,7 @@ const lines = {
 export default function InvoiceTemplatePreview() {
   const [params] = useSearchParams();
   const sample = params.get("sample") === "lines" ? lines : showcase;
+  const overlay = params.get("overlay") === "1";
   return (
     <main className="min-h-screen bg-white">
       <div className="mx-auto w-full max-w-[840px]">
@@ -77,7 +78,7 @@ export default function InvoiceTemplatePreview() {
           billToAddress={sample.billToAddress}
           face={sample.face}
           notes={sample.notes}
-          footer={(
+          footer={overlay ? undefined : (
             <button type="button" className="h-12 w-full rounded-xl bg-[#0d9488] text-sm font-bold text-white">
               Pay Securely
             </button>

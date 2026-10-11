@@ -6,7 +6,9 @@ import {
   checkoutAmountDue,
   computeInvoiceTotals,
   estimateBookingCharge,
+  formatInvoiceAmount,
   formatInvoiceDisplayDate,
+  formatInvoicePhone,
   invoiceBlankRowCount,
   presentInvoiceMoney,
   processingEnabled,
@@ -114,6 +116,18 @@ describe("processing kill switch", () => {
     expect(formatInvoiceDisplayDate("2027-01-01")).toBe("JAN. 01, 2027");
     expect(invoiceBlankRowCount(1)).toBe(5);
     expect(invoiceBlankRowCount(6)).toBe(0);
+  });
+});
+
+describe("invoice amount format", () => {
+  it("prints a spaced dollar sign and cents only when they are non-zero", () => {
+    expect(formatInvoiceAmount(549)).toBe("$ 549");
+    expect(formatInvoiceAmount(15.37)).toBe("$ 15.37");
+    expect(formatInvoiceAmount(564.37)).toBe("$ 564.37");
+    expect(formatInvoiceAmount(0)).toBe("$ 0");
+    expect(formatInvoiceAmount(1048)).toBe("$ 1,048");
+    expect(formatInvoiceAmount(-50)).toBe("-$ 50");
+    expect(formatInvoicePhone("281.356.0965")).toBe("281 | 356 | 0965");
   });
 });
 

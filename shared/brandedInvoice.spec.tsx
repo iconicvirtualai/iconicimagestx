@@ -125,9 +125,9 @@ describe("branded invoice pdf", () => {
     expect(pdf).toContain("PROMOTIONS");
     expect(pdf).toContain("FEES");
     expect(pdf).not.toContain("INCLUDED");
-    expect(pdf).toContain("$15.37");
-    expect(pdf).toContain("$549.00");
-    expect(pdf).toContain("$564.37");
+    expect(pdf).toContain("$ 15.37");
+    expect(pdf).toContain("$ 549");
+    expect(pdf).toContain("$ 564.37");
     expect(pdf).toContain("NOTES:");
     expect(pdf).toContain("Gate code is 1234.");
     expect(pdf).toContain("PAYMENT INFORMATION:");
@@ -136,7 +136,7 @@ describe("branded invoice pdf", () => {
     expect(pdf).toContain("26410 Oakridge Dr. Ste 105 - 108");
     expect(pdf).toContain("Spring, TX 77380");
     expect(pdf).toContain("photos@iconicimagestx.com");
-    expect(pdf).toContain("281.356.0965");
+    expect(pdf).toContain("281 | 356 | 0965");
     expect(pdf).not.toContain(retiredMarketing);
     expect(pdf).not.toContain(retiredSuite);
     expect(pdf).not.toContain("cadi" + "@");
@@ -158,8 +158,8 @@ describe("branded invoice pdf", () => {
       face,
     }));
     expect(pdf).toContain("PROCESSING");
-    expect(pdf).toContain("$0.00");
-    expect(pdf).toContain("$549.00");
+    expect(pdf).toContain("$ 0");
+    expect(pdf).toContain("$ 549");
     expect(pdf).not.toContain("$564.37");
     expect(pdf).not.toContain("INCLUDED");
   });
@@ -180,8 +180,8 @@ describe("branded invoice pdf", () => {
       face,
     }));
     expect(pdf).toContain("PROCESSING");
-    expect(pdf).toContain("$4.00");
-    expect(pdf).toContain("$104.00");
+    expect(pdf).toContain("$ 4");
+    expect(pdf).toContain("$ 104");
     expect(pdf).not.toContain("$2.80");
   });
 });
@@ -223,7 +223,7 @@ describe("invoice business footer", () => {
     expect(html).toContain("Iconic Images Photography, LLC");
     expect(html).toContain("26410 Oakridge Dr. Ste 105 - 108");
     expect(html).toContain("Spring, TX 77380");
-    expect(html).toContain("281.356.0965");
+    expect(html).toContain("281 | 356 | 0965");
     expect(html).toContain("photos@iconicimagestx.com");
     const withPay = renderToStaticMarkup(
       <BrandedInvoiceShell invoiceNumber="INV-2026-1" amountPaid={0} amountDue={10} footer={<button type="button">Pay Securely</button>}>
@@ -258,8 +258,8 @@ describe("invoice summary markup", () => {
     expect(legacy).toContain('data-slot="money"');
     expect(legacy).toContain("whitespace-nowrap");
     expect(legacy).toContain('data-invoice-row="processing"');
-    expect(legacy).toContain("$0.00");
-    expect(legacy).toContain("$549.00");
+    expect(legacy).toContain("$ 0");
+    expect(legacy).toContain("$ 549");
     expect(legacy).not.toContain("$564.37");
     expect(legacy).not.toContain("INCLUDED");
     expect(legacy).not.toContain("not an extra charge");
@@ -275,8 +275,8 @@ describe("invoice summary markup", () => {
         })}
       />,
     );
-    expect(charged).toContain("$15.37");
-    expect(charged).toContain("$564.37");
+    expect(charged).toContain("$ 15.37");
+    expect(charged).toContain("$ 564.37");
     expect(charged).not.toContain("INCLUDED");
   });
 
@@ -287,8 +287,8 @@ describe("invoice summary markup", () => {
       />,
     );
     expect(shown).toContain("Processing");
-    expect(shown).toContain("$5.00");
-    expect(shown).toContain("$85.00");
+    expect(shown).toContain("$ 5");
+    expect(shown).toContain("$ 85");
     expect(shown).not.toContain("$2.24");
   });
 

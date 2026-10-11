@@ -128,6 +128,7 @@ export default function ClientInvoice() {
           amountPaid={face.amountPaid}
           amountDue={face.amountDue}
           notes={notes}
+          templateFrame
           footer={(
             <>
               <button

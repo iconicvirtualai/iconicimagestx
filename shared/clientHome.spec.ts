@@ -189,14 +189,14 @@ describe("invoice statements", () => {
     expect(pdf).toContain("INVOICE");
     expect(pdf).toContain("DESCRIPTION");
     expect(pdf).toContain("TOTAL");
-    expect(pdf).toContain("$250.00");
+    expect(pdf).toContain("$ 250");
     expect(pdf).toContain("PROCESSING");
-    expect(pdf).toContain("$0.00");
+    expect(pdf).toContain("$ 0");
     expect(pdf).toContain("PAYMENT INFORMATION:");
     expect(pdf).toContain("Iconic Images Photography, LLC");
     expect(pdf).toContain("26410 Oakridge Dr. Ste 105 - 108");
     expect(pdf).toContain("Spring, TX 77380");
-    expect(pdf).toContain("281.356.0965");
+    expect(pdf).toContain("281 | 356 | 0965");
     expect(pdf).toContain("photos@iconicimagestx.com");
     expect(pdf).not.toContain("Pay Securely");
     expect(pdf).not.toContain("checkout");
@@ -230,7 +230,7 @@ describe("invoice statements", () => {
     expect(pdf).toContain("DESCRIPTION");
     expect(pdf).toContain("PROCESSING");
     expect(pdf).toContain("TOTAL");
-    expect(pdf).toContain("$0.00");
+    expect(pdf).toContain("$ 0");
     expect(pdf).not.toContain("No line items yet");
   });
 
@@ -249,7 +249,7 @@ describe("invoice statements", () => {
     expect(pdf).toContain("TWILIGHT");
     expect(pdf).toContain("ADA (AGENT)");
     expect(pdf).toContain("TOTAL");
-    expect(pdf).toContain("$80.00");
+    expect(pdf).toContain("$ 80");
     expect(pdf).toContain("PROCESSING");
     expect(pdf).not.toContain("$2.24");
     expect(pdf).toContain("Iconic Images Photography, LLC");
@@ -276,8 +276,8 @@ describe("invoice statements", () => {
     expect(input.face.services.map((line) => line.name)).toEqual(["Photos"]);
     const pdf = pdfPageText(invoicePdf(statement));
     expect(pdf.split("PROCESSING").length - 1).toBe(1);
-    expect(pdf).toContain("$6.00");
-    expect(pdf).toContain("$106.00");
+    expect(pdf).toContain("$ 6");
+    expect(pdf).toContain("$ 106");
     expect(pdf.split("PHOTOS").length - 1).toBe(1);
   });
 });
