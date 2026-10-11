@@ -1,104 +1,219 @@
 /**
- * 2.8% processing added on top of a sale, rounded half-up to cents.
+ * Processing on the Iconic invoice face.
  *
- * The cents formula matches the charge-mode helper on draft PR #132
- * (`processingFee` / `estimateBookingCharge`):
- *   floor((round(baseCents) * 28 + 500) / 1000)
- * which is round(baseCents * 0.028) without a binary float.
+ * Today the charged total is the stored invoice total. A processing amount
+ * is included only when staff already saved one. Nothing adds 2.8% by itself.
  *
- * On /book the processing base is max(0, service subtotal − promo).
- * Travel is quoted on its own line and is added after the fee.
- * Tax is not part of a booking estimate.
- *
- * INVOICE_PROCESSING_MODE=off (also disabled, legacy, or 0) is the
- * server-only kill switch. The booking page reads `processingEnabled`
- * from GET /api/bookings/catalog. Unset means the fee is on.
+ * `display` (the default) prints 2.8% of the subtotal and does not add it
+ * to the total or to checkout. `charge` adds that fee on top, and only when
+ * the invoice does not already have a processing amount.
  */
 
-import { buildSubmittedLineItems, sumLineItemPrices, type BookingPriceInput } from "./bookingPricing.ts";
+import { normalizeBookingLineItems } from "./bookingPricing.ts";
+import { adjustmentKind, isPromoInvoiceLine, type InvoiceFace } from "./invoiceFace.ts";
+import { amountStillDue, type InvoiceLike } from "./paymentAccess.ts";
 
 export const PROCESSING_FEE_RATE = 0.028;
 export const INVOICE_PROCESSING_MODE_ENV = "INVOICE_PROCESSING_MODE";
-export const BOOKING_PROCESSING_LABEL = "Processing (2.8%)";
+export const DEFAULT_INVOICE_PROCESSING_MODE = "display" as const;
+export const INVOICE_TABLE_MIN_ROWS = 6;
 
-export interface BookingEstimate {
-  /** Service lines before promo. */
+const MONTHS = ["JAN.", "FEB.", "MAR.", "APR.", "MAY.", "JUN.", "JUL.", "AUG.", "SEP.", "OCT.", "NOV.", "DEC."];
+const CHICAGO = "America/Chicago";
+
+export type InvoiceProcessingMode = "display" | "charge";
+export type ProcessingPresentation = "included" | "added" | "stored";
+
+export interface PresentedInvoiceMoney {
+  mode: InvoiceProcessingMode;
   subtotal: number;
-  promotions: number;
-  /** max(0, subtotal − promotions). Travel stays outside. */
-  processingBase: number;
   processing: number;
+  presentation: ProcessingPresentation;
+  promotions: number;
+  fees: number;
   travel: number;
-  /** processingBase + processing + travel. */
+  tax: number;
+  /** Invoice total. In display mode this is the stored total checkout is based on. */
   total: number;
+  amountPaid: number;
+  amountDue: number;
 }
 
-/**
- * Server-only. Unset means new bookings include processing.
- * Do not call this from the client bundle.
- */
-export function processingEnabled(
+export function invoiceProcessingMode(
   env?: { INVOICE_PROCESSING_MODE?: string | null } | NodeJS.ProcessEnv,
-): boolean {
+): InvoiceProcessingMode {
   const source = env ?? process.env;
   const raw = String(source?.INVOICE_PROCESSING_MODE ?? "").trim().toLowerCase();
-  return raw !== "off" && raw !== "disabled" && raw !== "legacy" && raw !== "0";
+  return raw === "charge" ? "charge" : DEFAULT_INVOICE_PROCESSING_MODE;
 }
 
-/** 2.8% of the processing base, in dollars, rounded half-up to cents. */
-export function processingFee(base: number): number {
-  return fromCents(processingFeeCents(toCents(base)));
+/** 2.8% of the sale subtotal, rounded to cents. Zero for blank or negative sales. */
+export function processingFee(subtotal: number): number {
+  const base = Number(subtotal);
+  if (!Number.isFinite(base) || base <= 0) return 0;
+  const cents = Math.round(base * 100);
+  return Math.round((cents * 28) / 1000) / 100;
 }
 
-/** Integer cents. round(baseCents * 0.028), half-up. Zero when the base is not positive. */
-export function processingFeeCents(baseCents: number): number {
-  const cents = Math.round(Number(baseCents));
-  if (!Number.isFinite(cents) || cents <= 0) return 0;
-  return Math.floor((cents * 28 + 500) / 1000);
+export function invoiceBlankRowCount(itemCount: number): number {
+  const count = Number.isFinite(itemCount) ? Math.max(0, Math.floor(itemCount)) : 0;
+  if (count >= INVOICE_TABLE_MIN_ROWS) return 0;
+  return INVOICE_TABLE_MIN_ROWS - count;
+}
+
+/** Template date, for example JAN. 01, 2027. Date-only values stay on that day. */
+export function formatInvoiceDisplayDate(value: unknown): string {
+  const key = invoiceCalendarDay(value);
+  if (!key) return "";
+  const [year, month, day] = key.split("-");
+  const index = Number(month) - 1;
+  if (!year || !day || index < 0 || index > 11) return "";
+  return `${MONTHS[index]} ${day}, ${year}`;
+}
+
+export function saleSubtotal(invoice: { subtotal?: unknown; lineItems?: unknown } | null | undefined): number {
+  if (!invoice) return 0;
+  const explicit = explicitMoney(invoice.subtotal);
+  if (explicit != null) return Math.max(0, explicit);
+  const lines = normalizeBookingLineItems(invoice.lineItems);
+  const services = lines.filter((item) => !isPromoInvoiceLine(item) && !adjustmentKind(item));
+  return roundMoney(Math.max(0, services.reduce((sum, item) => sum + item.price, 0)));
+}
+
+/** Staff-saved processing already inside the invoice total. Zero when there is none. */
+export function storedProcessingAmount(
+  invoice: { processing?: unknown; lineItems?: unknown } | null | undefined,
+): number {
+  if (!invoice) return 0;
+  const explicit = explicitMoney(invoice.processing);
+  if (explicit != null) return explicit > 0 ? explicit : 0;
+  const match = normalizeBookingLineItems(invoice.lineItems).find((item) => adjustmentKind(item) === "processing");
+  if (!match || match.price === 0) return 0;
+  return roundMoney(Math.abs(match.price));
 }
 
 /**
- * /book Total Estimate. The service subtotal is the catalog lines before
- * promo. Promo uses the same floor as calculateSidebarTotal. Travel is added
- * after processing and is not part of the 2.8% base.
+ * Totals printed on the invoice. Display mode never changes `total`.
+ * Charge mode adds `processingFee(subtotal)` only when processing is not already stored.
  */
-export function estimateBookingCharge(
-  input: BookingPriceInput,
-  travel = 0,
-  applyProcessing = true,
-): BookingEstimate {
-  const items = buildSubmittedLineItems({ ...input, promo: null });
-  const subtotal = roundMoney(sumLineItemPrices(items));
-  const promotions = nonNegativeMoney(input.promo?.discount ?? 0);
-  const processingBase = roundMoney(Math.max(0, subtotal - promotions));
-  const travelAmount = nonNegativeMoney(travel);
-  const processing = applyProcessing && processingBase > 0 ? processingFee(processingBase) : 0;
+export function presentInvoiceMoney(
+  face: InvoiceFace,
+  mode: InvoiceProcessingMode = invoiceProcessingMode(),
+): PresentedInvoiceMoney {
+  const stored = face.processing != null && face.processing !== 0 ? roundMoney(face.processing) : 0;
+  const quoted = stored > 0 ? stored : processingFee(face.subtotal);
+  const added = mode === "charge" && stored === 0 ? quoted : 0;
+  const total = roundMoney(face.total + added);
+  const amountPaid = roundMoney(face.amountPaid);
+  const amountDue = added > 0 ? roundMoney(Math.max(0, total - amountPaid)) : roundMoney(face.amountDue);
   return {
-    subtotal,
-    promotions,
-    processingBase,
-    processing,
-    travel: travelAmount,
-    total: roundMoney(processingBase + processing + travelAmount),
+    mode,
+    subtotal: roundMoney(face.subtotal),
+    processing: quoted,
+    presentation: stored > 0 ? "stored" : added > 0 ? "added" : "included",
+    promotions: roundMoney(face.promotions),
+    fees: roundMoney(face.fees),
+    travel: roundMoney(face.travel),
+    tax: roundMoney(face.tax),
+    total,
+    amountPaid,
+    amountDue,
   };
 }
 
-function toCents(value: number): number {
-  if (!Number.isFinite(value) || value <= 0) return 0;
-  return Math.round(value * 100);
+/**
+ * Dollars Square quick-pay and Stripe checkout charge.
+ * Display mode returns the same balance checkout charges today.
+ */
+export function checkoutAmountDue(
+  invoice: InvoiceLike,
+  mode: InvoiceProcessingMode = invoiceProcessingMode(),
+): number {
+  const due = amountStillDue(invoice);
+  if (mode !== "charge" || due <= 0) return due;
+  if (storedProcessingAmount(invoice) > 0) return due;
+  const fee = processingFee(saleSubtotal(invoice));
+  if (fee <= 0) return due;
+  return roundMoney(due + fee);
 }
 
-function fromCents(cents: number): number {
-  return roundMoney(cents / 100);
+/**
+ * Square order lines and total for the active mode.
+ * Display mode returns the stored lines and total unchanged.
+ */
+export function squareOrderForProcessingMode(
+  invoice: { lineItems?: unknown; total?: unknown; subtotal?: unknown; processing?: unknown },
+  mode: InvoiceProcessingMode,
+): { lineItems: unknown; total: number; added: number } {
+  const total = roundMoney(Number(invoice.total) || 0);
+  if (mode !== "charge" || storedProcessingAmount(invoice) > 0) {
+    return { lineItems: invoice.lineItems, total, added: 0 };
+  }
+  const fee = processingFee(saleSubtotal(invoice));
+  if (fee <= 0) return { lineItems: invoice.lineItems, total, added: 0 };
+  const lines = Array.isArray(invoice.lineItems) ? invoice.lineItems.slice() : [];
+  lines.push({
+    id: "adjustment-processing",
+    name: "Processing",
+    qty: 1,
+    unitPrice: fee,
+    price: fee,
+    category: "adjustment-processing",
+  });
+  return { lineItems: lines, total: roundMoney(total + fee), added: fee };
 }
 
-function nonNegativeMoney(value: unknown): number {
+function explicitMoney(value: unknown): number | null {
+  if (value == null || value === "") return null;
   const amount = Number(value);
-  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  if (!Number.isFinite(amount)) return null;
   return roundMoney(amount);
 }
 
 function roundMoney(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.round(value * 100) / 100;
+}
+
+function invoiceCalendarDay(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    const dateOnly = trimmed.match(/^(\d{4}-\d{2}-\d{2})(?:T00:00:00(?:\.000)?Z)?$/);
+    if (dateOnly) return dateOnly[1];
+    const parsed = new Date(trimmed);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return chicagoKey(parsed);
+  }
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : chicagoKey(value);
+  if (typeof value === "number" && Number.isFinite(value)) return chicagoKey(new Date(value));
+  if (typeof value === "object") {
+    const record = value as { seconds?: unknown; _seconds?: unknown; toDate?: () => Date };
+    if (typeof record.toDate === "function") {
+      const date = record.toDate();
+      if (date instanceof Date && !Number.isNaN(date.getTime())) return chicagoKey(date);
+    }
+    const seconds = typeof record.seconds === "number"
+      ? record.seconds
+      : typeof record._seconds === "number"
+        ? record._seconds
+        : null;
+    if (seconds == null) return null;
+    return chicagoKey(new Date(seconds * 1000));
+  }
+  return null;
+}
+
+function chicagoKey(date: Date): string | null {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: CHICAGO,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  if (!year || !month || !day) return null;
+  return `${year}-${month}-${day}`;
 }

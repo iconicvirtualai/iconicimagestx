@@ -6,6 +6,8 @@ import { createServer } from "./server";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), ['VITE_', 'NEXT_PUBLIC_']);
+  // Baked into the client so the printed total matches checkout. Empty means display.
+  env.INVOICE_PROCESSING_MODE = process.env.INVOICE_PROCESSING_MODE || "";
   return {
     server: {
       host: "::",

@@ -1,72 +1,144 @@
+import { readFileSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { calculateSidebarTotal } from "./bookingPricing.ts";
+import { invoiceFaceFromStored } from "./invoiceFace";
+import { amountStillDue } from "./paymentAccess";
 import {
-  BOOKING_PROCESSING_LABEL,
-  estimateBookingCharge,
-  processingEnabled,
+  checkoutAmountDue,
+  formatInvoiceDisplayDate,
+  invoiceBlankRowCount,
+  invoiceProcessingMode,
+  presentInvoiceMoney,
   processingFee,
-  processingFeeCents,
-} from "./invoiceProcessing.ts";
+  saleSubtotal,
+  squareOrderForProcessingMode,
+  storedProcessingAmount,
+} from "./invoiceProcessing";
 
-describe("processing cents", () => {
-  it("adds 2.8% on top of $75 and rounds half-up to $2.10", () => {
-    expect(processingFee(75)).toBe(2.1);
-    expect(processingFeeCents(7500)).toBe(210);
-    const estimate = estimateBookingCharge({ selectedBasics: ["apprentice-25"] });
-    expect(calculateSidebarTotal({ selectedBasics: ["apprentice-25"] })).toBe(75);
-    expect(estimate.processingBase).toBe(75);
-    expect(estimate.processing).toBe(2.1);
-    expect(estimate.total).toBe(77.1);
-    expect(estimate.processing + estimate.processingBase).toBeCloseTo(77.1, 2);
-  });
+const showcase = {
+  lineItems: [{ name: "The Showcase", qty: 1, unitPrice: 549, price: 549 }],
+  subtotal: 549,
+  total: 549,
+  amountPaid: 0,
+  amountDue: 549,
+  status: "sent",
+};
 
-  it("matches the Showcase example of $549 + $15.37", () => {
-    const estimate = estimateBookingCharge({ selectedService: "listing-showcase" });
-    expect(estimate.processingBase).toBe(549);
-    expect(estimate.processing).toBe(15.37);
-    expect(estimate.total).toBe(564.37);
-  });
-
-  it("rounds a half cent up and a fraction under a half cent down", () => {
-    // 125 cents * 0.028 = 3.5 cents → 4
-    expect(processingFeeCents(125)).toBe(4);
-    expect(processingFee(1.25)).toBe(0.04);
-    // 17 cents * 0.028 = 0.476 cents → 0; 18 cents * 0.028 = 0.504 → 1
-    expect(processingFeeCents(17)).toBe(0);
-    expect(processingFeeCents(18)).toBe(1);
-    expect(processingFeeCents(0)).toBe(0);
-    expect(processingFeeCents(-100)).toBe(0);
+describe("processingFee", () => {
+  it("rounds 2.8% of the subtotal to cents", () => {
+    expect(processingFee(549)).toBe(15.37);
+    expect(processingFee(100)).toBe(2.8);
+    expect(processingFee(10)).toBe(0.28);
+    expect(processingFee(1)).toBe(0.03);
     expect(processingFee(0)).toBe(0);
+    expect(processingFee(-20)).toBe(0);
+    expect(processingFee(Number.NaN)).toBe(0);
+  });
+});
+
+describe("invoice processing mode", () => {
+  it("defaults to display and accepts only charge as the other mode", () => {
+    expect(invoiceProcessingMode({})).toBe("display");
+    expect(invoiceProcessingMode({ INVOICE_PROCESSING_MODE: "" })).toBe("display");
+    expect(invoiceProcessingMode({ INVOICE_PROCESSING_MODE: "display" })).toBe("display");
+    expect(invoiceProcessingMode({ INVOICE_PROCESSING_MODE: "nope" })).toBe("display");
+    expect(invoiceProcessingMode({ INVOICE_PROCESSING_MODE: " CHARGE " })).toBe("charge");
   });
 
-  it("keeps travel outside the 2.8% base and applies promo before the fee", () => {
-    const traveled = estimateBookingCharge({ selectedBasics: ["apprentice-25"] }, 50);
-    expect(traveled.processing).toBe(2.1);
-    expect(traveled.travel).toBe(50);
-    expect(traveled.total).toBe(127.1);
+  it("formats the template date", () => {
+    expect(formatInvoiceDisplayDate("2027-01-01")).toBe("JAN. 01, 2027");
+    expect(formatInvoiceDisplayDate("2027-01-01T00:00:00.000Z")).toBe("JAN. 01, 2027");
+    expect(formatInvoiceDisplayDate("")).toBe("");
+  });
 
-    const discounted = estimateBookingCharge({
-      selectedBasics: ["apprentice-25"],
-      promo: { code: "NEWYEAR", discount: 50 },
+  it("pads a short line-item table without padding a long one", () => {
+    expect(invoiceBlankRowCount(1)).toBe(5);
+    expect(invoiceBlankRowCount(4)).toBe(2);
+    expect(invoiceBlankRowCount(6)).toBe(0);
+    expect(invoiceBlankRowCount(9)).toBe(0);
+  });
+});
+
+describe("presented totals", () => {
+  const face = invoiceFaceFromStored(showcase);
+
+  it("shows 2.8% in display mode and keeps the total equal to checkout", () => {
+    const shown = presentInvoiceMoney(face, "display");
+    expect(shown.presentation).toBe("included");
+    expect(shown.processing).toBe(15.37);
+    expect(shown.total).toBe(549);
+    expect(shown.total).toBe(face.total);
+    expect(checkoutAmountDue(showcase, "display")).toBe(amountStillDue(showcase));
+    expect(shown.total).toBe(checkoutAmountDue(showcase, "display"));
+  });
+
+  it("adds 2.8% in charge mode to the total and the checkout amount", () => {
+    const shown = presentInvoiceMoney(face, "charge");
+    expect(shown.presentation).toBe("added");
+    expect(shown.processing).toBe(15.37);
+    expect(shown.total).toBe(564.37);
+    expect(shown.amountDue).toBe(564.37);
+    expect(checkoutAmountDue(showcase, "charge")).toBe(564.37);
+    expect(shown.total).toBe(checkoutAmountDue(showcase, "charge"));
+  });
+
+  it("does not add 2.8% when processing is already stored on the invoice", () => {
+    const stored = {
+      ...showcase,
+      processing: 6,
+      total: 555,
+      amountDue: 555,
+    };
+    const faceStored = invoiceFaceFromStored(stored);
+    expect(storedProcessingAmount(stored)).toBe(6);
+    expect(presentInvoiceMoney(faceStored, "display").presentation).toBe("stored");
+    expect(presentInvoiceMoney(faceStored, "charge")).toMatchObject({
+      presentation: "stored",
+      processing: 6,
+      total: 555,
     });
-    expect(discounted.processingBase).toBe(25);
-    expect(discounted.processing).toBe(0.7);
-    expect(discounted.total).toBe(25.7);
+    expect(checkoutAmountDue(stored, "charge")).toBe(amountStillDue(stored));
+    expect(checkoutAmountDue(stored, "charge")).toBe(555);
   });
 
-  it("skips the fee when processing is off", () => {
-    const estimate = estimateBookingCharge({ selectedBasics: ["apprentice-25"] }, 0, false);
-    expect(estimate.processing).toBe(0);
-    expect(estimate.total).toBe(75);
-    expect(BOOKING_PROCESSING_LABEL).toBe("Processing (2.8%)");
+  it("adds the fee to the remaining balance after a partial payment", () => {
+    const partial = { ...showcase, amountPaid: 100, amountDue: 449 };
+    const shown = presentInvoiceMoney(invoiceFaceFromStored(partial), "charge");
+    expect(shown.total).toBe(564.37);
+    expect(shown.amountDue).toBe(464.37);
+    expect(checkoutAmountDue(partial, "charge")).toBe(464.37);
+    expect(checkoutAmountDue(partial, "display")).toBe(449);
   });
 
-  it("treats the server kill switch as off only for the known values", () => {
-    expect(processingEnabled({})).toBe(true);
-    expect(processingEnabled({ INVOICE_PROCESSING_MODE: "off" })).toBe(false);
-    expect(processingEnabled({ INVOICE_PROCESSING_MODE: "disabled" })).toBe(false);
-    expect(processingEnabled({ INVOICE_PROCESSING_MODE: "legacy" })).toBe(false);
-    expect(processingEnabled({ INVOICE_PROCESSING_MODE: "0" })).toBe(false);
-    expect(processingEnabled({ INVOICE_PROCESSING_MODE: "on" })).toBe(true);
+  it("leaves a paid invoice at zero in both modes", () => {
+    const paid = { ...showcase, status: "paid", amountPaid: 549, amountDue: 0 };
+    expect(checkoutAmountDue(paid, "display")).toBe(0);
+    expect(checkoutAmountDue(paid, "charge")).toBe(0);
+  });
+
+  it("gives Square the stored total in display mode and the fee in charge mode", () => {
+    const lines = showcase.lineItems;
+    const displayOrder = squareOrderForProcessingMode(showcase, "display");
+    expect(displayOrder.total).toBe(549);
+    expect(displayOrder.added).toBe(0);
+    expect(displayOrder.lineItems).toBe(lines);
+
+    const chargeOrder = squareOrderForProcessingMode({ lineItems: lines, total: 549 }, "charge");
+    expect(chargeOrder.added).toBe(processingFee(saleSubtotal({ lineItems: lines })));
+    expect(chargeOrder.total).toBe(564.37);
+    expect(Array.isArray(chargeOrder.lineItems)).toBe(true);
+    expect(chargeOrder.lineItems).not.toBe(lines);
+    expect(lines).toHaveLength(1);
+  });
+});
+
+describe("invoice logo files", () => {
+  it("keeps the web logo transparent, about 600px wide, and under 150KB", () => {
+    const pngPath = new URL("../public/media/logos/iconic-graffiti-logo.png", import.meta.url);
+    const webpPath = new URL("../public/media/logos/iconic-graffiti-logo.webp", import.meta.url);
+    const png = readFileSync(pngPath);
+    expect(statSync(pngPath).size).toBeLessThan(150_000);
+    expect(statSync(webpPath).size).toBeLessThan(150_000);
+    expect(png.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+    expect(png.readUInt32BE(16)).toBe(600);
   });
 });
