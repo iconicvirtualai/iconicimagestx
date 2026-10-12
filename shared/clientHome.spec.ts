@@ -14,6 +14,17 @@ import {
 
 const TODAY = "2026-10-03";
 
+/** Text drawn on the invoice page, without the logo image bytes. */
+function pdfPageText(bytes: Uint8Array): string {
+  const raw = new TextDecoder("latin1").decode(bytes);
+  const start = raw.lastIndexOf("stream\n");
+  const end = raw.indexOf("\nendstream", start);
+  const content = start >= 0 && end > start ? raw.slice(start, end) : raw;
+  return [...content.matchAll(/\((?:\\.|[^\\)])*\)/g)]
+    .map((match) => match[0].slice(1, -1).replace(/\\([()\\])/g, "$1"))
+    .join("\n");
+}
+
 describe("stored appointment dates", () => {
   it("keeps a booking-form date on the day the agent picked", () => {
     expect(calendarDateKey("Saturday, October 3, 2026")).toBe("2026-10-03");
@@ -172,22 +183,25 @@ describe("invoice statements", () => {
       lineItems: [{ name: "Photos", qty: 1, price: 250 }],
       createdAt: "2026-09-15T18:00:00.000Z",
     });
-    const pdf = new TextDecoder().decode(invoicePdf(statement));
+    const pdf = pdfPageText(invoicePdf(statement));
     expect(pdf).toContain("INV-2026-1042");
-    expect(pdf).toContain("Photos");
-    expect(pdf).toContain("ICONIC IMAGES");
-    expect(pdf).toContain("LINE ITEMS");
+    expect(pdf).toContain("PHOTOS");
+    expect(pdf).toContain("INVOICE");
+    expect(pdf).toContain("DESCRIPTION");
     expect(pdf).toContain("TOTAL");
-    expect(pdf).toContain("PAYMENT");
+    expect(pdf).toContain("$ 250");
+    expect(pdf).toContain("PROCESSING");
+    expect(pdf).toContain("$ 0");
+    expect(pdf).toContain("PAYMENT INFORMATION:");
     expect(pdf).toContain("Iconic Images Photography, LLC");
-    expect(pdf).toContain("26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380");
-    expect(pdf).toContain("281.356.0965");
+    expect(pdf).toContain("26410 Oakridge Dr. Ste 105 - 108");
+    expect(pdf).toContain("Spring, TX 77380");
+    expect(pdf).toContain("281 | 356 | 0965");
     expect(pdf).toContain("photos@iconicimagestx.com");
-    expect(pdf).toContain("iconicimagestx.com");
-    expect(pdf).not.toContain("Processing");
     expect(pdf).not.toContain("Pay Securely");
     expect(pdf).not.toContain("checkout");
     expect(pdf).not.toContain("http");
+    expect(pdf).not.toContain("$7.00");
     expect(statement.processing).toBeNull();
     expect(statement.payPath).toBeNull();
   });
@@ -212,9 +226,12 @@ describe("invoice statements", () => {
     const input = clientInvoicePdfInput(statement);
     expect(input.face.services).toEqual([]);
     expect(input.face.processing).toBeNull();
-    const pdf = new TextDecoder().decode(invoicePdf(statement));
-    expect(pdf).toContain("No line items yet");
-    expect(pdf).not.toContain("Processing");
+    const pdf = pdfPageText(invoicePdf(statement));
+    expect(pdf).toContain("DESCRIPTION");
+    expect(pdf).toContain("PROCESSING");
+    expect(pdf).toContain("TOTAL");
+    expect(pdf).toContain("$ 0");
+    expect(pdf).not.toContain("No line items yet");
   });
 
   it("downloads the branded pdf of the stored invoice", () => {
@@ -225,12 +242,16 @@ describe("invoice statements", () => {
       total: 80,
       lineItems: [{ name: "Twilight", price: 80 }],
     });
-    const pdf = new TextDecoder().decode(invoicePdf(statement));
-    expect(pdf.startsWith("%PDF-1.4")).toBe(true);
+    const bytes = invoicePdf(statement);
+    expect(new TextDecoder().decode(bytes.subarray(0, 8))).toBe("%PDF-1.4");
+    const pdf = pdfPageText(bytes);
     expect(pdf).toContain("INV-2026-9");
-    expect(pdf).toContain("Twilight");
-    expect(pdf).toContain("Ada \\(Agent\\)");
-    expect(pdf).toContain("AMOUNT DUE");
+    expect(pdf).toContain("TWILIGHT");
+    expect(pdf).toContain("ADA (AGENT)");
+    expect(pdf).toContain("TOTAL");
+    expect(pdf).toContain("$ 80");
+    expect(pdf).toContain("PROCESSING");
+    expect(pdf).not.toContain("$2.24");
     expect(pdf).toContain("Iconic Images Photography, LLC");
     expect(pdf).not.toContain("Pay securely");
     expect(pdf).not.toContain("checkout");
@@ -253,9 +274,10 @@ describe("invoice statements", () => {
     expect(statement.processing).toBe(6);
     expect(input.face.processing).toBe(6);
     expect(input.face.services.map((line) => line.name)).toEqual(["Photos"]);
-    const pdf = new TextDecoder().decode(invoicePdf(statement));
-    expect(pdf).toContain("Processing");
-    expect(pdf).toContain("$6.00");
-    expect(pdf).toContain("Photos");
+    const pdf = pdfPageText(invoicePdf(statement));
+    expect(pdf.split("PROCESSING").length - 1).toBe(1);
+    expect(pdf).toContain("$ 6");
+    expect(pdf).toContain("$ 106");
+    expect(pdf.split("PHOTOS").length - 1).toBe(1);
   });
 });

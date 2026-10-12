@@ -16,7 +16,6 @@ import {
   promoDiscountFor,
   type StaffCatalogPackage,
 } from "./bookingCatalog.ts";
-
 export interface BookingPriceInput {
   selectedService?: string;
   selectedBasics?: string[];

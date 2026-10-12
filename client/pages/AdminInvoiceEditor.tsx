@@ -415,8 +415,10 @@ export default function AdminInvoiceEditor() {
 
       <BrandedInvoiceShell
         invoiceNumber={invoiceNumber}
+        issuedAt={invoice.createdAt}
         status={String(invoice.status || "draft")}
         amountPaid={Number(invoice.amountPaid) || 0}
+        notes={form.notes}
         amountDue={quote.amountDue}
         footer={(
           <>

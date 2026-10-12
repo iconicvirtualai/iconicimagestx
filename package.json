@@ -21,6 +21,7 @@
     "seed:booking-catalog": "tsx scripts/seed-booking-catalog.ts",
     "seed:delivery-qa": "tsx scripts/seed-delivery-qa.ts",
     "report:lock-impact": "tsx scripts/report-lock-impact.ts",
+    "report:processing-impact": "tsx scripts/report-processing-impact.ts",
     "report:share-photos": "tsx scripts/report-share-photos.ts",
     "qa:send-delivery": "tsx scripts/qa-send-delivery.ts",
     "migrate:invoice-ids": "tsx scripts/migrate-invoice-ids.ts",
