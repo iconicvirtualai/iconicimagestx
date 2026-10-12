@@ -10,13 +10,18 @@ import {
   presentInvoiceMoney,
   type PresentedInvoiceMoney,
 } from "@shared/invoiceProcessing";
-import { TEMPLATE_H, TEMPLATE_W, invoiceTemplate as T } from "@shared/invoiceTemplate";
+import { INTER_CAP_RATIO, TEMPLATE_H, TEMPLATE_W, invoiceTemplate as T } from "@shared/invoiceTemplate";
 
 const YELLOW = "#FFD400";
 const TEAL = "#00B4C6";
 const PINK = "#FF2D78";
 const GREEN = "#00A651";
-const FONT = '"Inter", Helvetica, Arial, sans-serif';
+const FONT = '"InvoiceInter", "Inter", Helvetica, Arial, sans-serif';
+const INVOICE_FONT_FACE = `
+@font-face{font-family:"InvoiceInter";src:url("/media/fonts/inter-300.ttf") format("truetype");font-weight:300;font-style:normal;font-display:block;}
+@font-face{font-family:"InvoiceInter";src:url("/media/fonts/inter-400.ttf") format("truetype");font-weight:400;font-style:normal;font-display:block;}
+@font-face{font-family:"InvoiceInter";src:url("/media/fonts/inter-700.ttf") format("truetype");font-weight:700;font-style:normal;font-display:block;}
+`;
 
 const OnDarkContext = React.createContext(false);
 
@@ -54,9 +59,10 @@ export function BrandedInvoiceShell({
   return (
     <article
       className={templateFrame ? "bg-white text-black" : "flex min-h-[920px] flex-col overflow-hidden bg-white text-black sm:min-h-[1100px]"}
-      style={{ fontFamily: FONT, containerType: "inline-size" }}
+      style={{ fontFamily: FONT, fontKerning: "none", fontVariantLigatures: "none", containerType: "inline-size" }}
       data-testid="branded-invoice"
     >
+      <style>{INVOICE_FONT_FACE}</style>
       {placed?.lines && placed.face ? (
         <>
           <style>{FRAME_CSS}</style>
@@ -329,11 +335,12 @@ export function InvoiceNotes({ notes }: { notes?: string | null }) {
 
 export function InvoiceCameraIcon({ className = "h-11 w-14 shrink-0 text-white" }: { className?: string }) {
   return (
-    <svg data-testid="invoice-camera" viewBox="0 0 64 48" className={className} fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-      <rect x="1.5" y="1.5" width="61" height="45" rx="12" />
-      <rect x="18" y="16" width="28" height="16" rx="2.5" />
-      <path d="M26 16l2-3.5h8L38 16" />
-      <circle cx="32" cy="24" r="4.5" />
+    <svg data-testid="invoice-camera" viewBox="0 0 73 71" className={className} fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
+      <rect x="1.5" y="11.5" width="70" height="58" rx="14" />
+      <rect x="7.5" y="5.5" width="8" height="6" rx="1.5" />
+      <rect x="29" y="1.5" width="16" height="11" rx="2.5" />
+      <rect x="9.5" y="19.5" width="53" height="42" rx="8" />
+      <circle cx="36" cy="36" r="11" />
     </svg>
   );
 }
@@ -385,7 +392,7 @@ function yp(y: number) {
   return `${(y / TEMPLATE_H) * 100}%`;
 }
 function capEm(cap: number) {
-  return `${(cap / 0.727 / TEMPLATE_W) * 100}cqw`;
+  return `${(cap / INTER_CAP_RATIO / TEMPLATE_W) * 100}cqw`;
 }
 
 const FRAME_CSS = `
@@ -461,7 +468,7 @@ function TemplateFrame({
   return (
     <div className="invoice-template-wide" style={{ position: "relative", width: "100%", height: `${(TEMPLATE_H / TEMPLATE_W) * 100}cqw` }}>
       <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: yp(T.headerH), background: "#000" }} />
-      <h1 style={placedText({ left: xp(T.title.x), top: yp(T.title.y), color: YELLOW, fontSize: capEm(T.title.cap), fontWeight: 800, letterSpacing: `${T.title.track}em` })}>INVOICE</h1>
+      <h1 style={placedText({ left: xp(T.title.x), top: yp(T.title.y), color: YELLOW, fontSize: capEm(T.title.cap), fontWeight: 700, letterSpacing: `${T.title.track}em` })}>INVOICE</h1>
       <p style={placedText({ left: xp(T.invoiceNo.x), top: yp(T.invoiceNo.y), color: "#fff", fontSize: capEm(T.invoiceNo.cap), fontWeight: 700, letterSpacing: `${T.invoiceNo.track}em` })}>INVOICE NO : {invoiceNumber}</p>
       {date ? <p style={placedText({ left: xp(T.date.x), top: yp(T.date.y), color: "#fff", fontSize: capEm(T.date.cap), fontWeight: 700, letterSpacing: `${T.date.track}em` })}>{date}</p> : null}
       {status ? <p style={placedText({ left: xp(T.date.x), top: yp(T.date.y + 28), color: "rgba(255,255,255,0.75)", fontSize: capEm(12), fontWeight: 600, letterSpacing: "0.12em" })}>{status.toUpperCase()}</p> : null}

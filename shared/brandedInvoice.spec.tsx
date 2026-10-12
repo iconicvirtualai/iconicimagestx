@@ -108,6 +108,10 @@ describe("branded invoice pdf", () => {
     });
     const pdf = new TextDecoder().decode(bytes);
     expect(pdf.startsWith("%PDF-1.4")).toBe(true);
+    expect(pdf).toContain("/BaseFont /Inter-Light");
+    expect(pdf).toContain("/BaseFont /Inter-Regular");
+    expect(pdf).toContain("/BaseFont /Inter-Bold");
+    expect(pdf).not.toContain("/Helvetica");
     expect(pdf).toContain("/Subtype /Image");
     expect(pdf).toContain("/Width 600");
     expect(pdf).toContain("/SMask");
