@@ -138,7 +138,7 @@ describe("client booking mail and the notify switch", () => {
     useNotifyEnv({});
     const address = "100 Congress Ave, Austin, TX 78701";
     expect(clientOrderConfirmedSubject(address)).toBe(`Your Iconic order is confirmed: ${address}`);
-    expect(bookings).toContain("subject: clientOrderConfirmedSubject(displayAddress)");
+    expect(bookings).toContain("subject: clientOrderConfirmedSubject(displayAddress, orderNumber)");
     const received = await sendEmail({
       to: client,
       template: "booking_received",
