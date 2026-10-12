@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const sendMail = vi.hoisted(() => vi.fn(async (message: { to?: string; html?: string }) => {
+const sendMail = vi.hoisted(() => vi.fn(async (message: { to?: string; html?: string; subject?: string }) => {
   void message;
   return { messageId: "test-message" };
 }));
@@ -24,7 +24,7 @@ vi.mock("firebase-admin", () => ({
   },
 }));
 
-import { sendEmail } from "./email";
+import { clientOrderConfirmedSubject, sendEmail } from "./email";
 
 const bookings = readFileSync(new URL("../routes/bookings.ts", import.meta.url), "utf8");
 const envExample = readFileSync(new URL("../../.env.example", import.meta.url), "utf8");
@@ -132,5 +132,21 @@ describe("client booking mail and the notify switch", () => {
     expect(message?.to).toBe(client);
     expect(message?.html).toContain("Ada");
     expect(message?.to).not.toContain("photos@iconicimagestx.com");
+  });
+
+  it("uses the property address as the client confirmation subject", async () => {
+    useNotifyEnv({});
+    const address = "100 Congress Ave, Austin, TX 78701";
+    expect(clientOrderConfirmedSubject(address)).toBe(`Your Iconic order is confirmed: ${address}`);
+    expect(bookings).toContain("subject: clientOrderConfirmedSubject(displayAddress)");
+    const received = await sendEmail({
+      to: client,
+      template: "booking_received",
+      subject: clientOrderConfirmedSubject(address),
+      variables: { clientName: "Ada", address, total: "$77.10" },
+    });
+    expect(received).toEqual({ sent: true, delivery: "sent" });
+    expect(sendMail.mock.calls[0]?.[0].subject).toBe("Your Iconic order is confirmed: 100 Congress Ave, Austin, TX 78701");
+    expect(sendMail.mock.calls[0]?.[0].subject).not.toBe("Message from Iconic Images");
   });
 });

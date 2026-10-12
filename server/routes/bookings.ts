@@ -7,7 +7,8 @@
 import { Router } from "express";
 import admin from "firebase-admin";
 import { requireCoordinator, type AuthenticatedRequest } from "../middleware/auth";
-import { sendEmail } from "../services/email";
+import { clientOrderConfirmedSubject, sendEmail } from "../services/email";
+import { processingEnabled } from "../../shared/invoiceProcessing";
 import { sendSMS, SMS_TEMPLATES } from "../services/sms";
 import { createCalendarBookingEvent } from "../services/calendar";
 import { attachBookingClient, createRequestedAppointment, sendFirebasePasswordEmail } from "../services/bookingClient";
@@ -185,6 +186,34 @@ router.post("/", async (req, res) => {
 
     const docRef = await db().collection("orderRequests").add(orderRequest);
 
+    // Same short code /admin/orders prints. Stamp it before the office email
+    // so the template receives the order number and package name.
+    let orderNumber = docRef.id;
+    let packageName = "";
+    try {
+      const tile = buildAdminOrderTile({
+        id: docRef.id,
+        selectedService: selectedService || null,
+        lineItems,
+        services: lineItems,
+        clientName,
+        address: savedAddress,
+      });
+      orderNumber = tile.orderCode;
+      packageName = tile.packageName === "Custom order" ? "" : tile.packageName;
+    } catch (err) {
+      console.error("[Bookings] Order number format failed:", err);
+    }
+    try {
+      await docRef.update({
+        orderNumber,
+        ...(packageName ? { packageName } : {}),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (err) {
+      console.error("[Bookings] Order number was not saved:", err);
+    }
+
     const normalizedEmail = orderRequest.email;
     // Password setup follows the client-mail gate. An exact allowlist address
     // can still receive it while notifications are off, including in RED.
@@ -286,6 +315,7 @@ router.post("/", async (req, res) => {
     clientEmailStatus = await sendEmail({
       to: email,
       template: "booking_received",
+      subject: clientOrderConfirmedSubject(displayAddress),
       variables: {
         clientName,
         address: displayAddress,
@@ -383,7 +413,12 @@ router.post("/", async (req, res) => {
     let officeAlertStatus: "sent" | "failed" | "skipped" = "skipped";
     try {
       const savedSnap = await docRef.get();
-      const savedOrder = { id: savedSnap.id, ...(savedSnap.data() || {}) } as Record<string, unknown>;
+      const savedOrder = {
+        id: savedSnap.id,
+        ...(savedSnap.data() || {}),
+        orderNumber,
+        ...(packageName ? { packageName } : {}),
+      } as Record<string, unknown>;
       const alert = await notifyOfficeOfOrder({
         isNewOrder: true,
         saved: savedOrder,
@@ -412,19 +447,6 @@ router.post("/", async (req, res) => {
 
     // Firestore draft stays for staff. Square billing waits until after the shoot.
 
-    // Same short code /admin/orders prints for this saved request. Display only.
-    let orderNumber = docRef.id;
-    try {
-      orderNumber = buildAdminOrderTile({
-        id: docRef.id,
-        selectedService: selectedService || null,
-        lineItems,
-        services: lineItems,
-      }).orderCode;
-    } catch (err) {
-      console.error("[Bookings] Order number format failed:", err);
-    }
-
     return res.status(201).json({
       success: true,
       requestId: docRef.id,
@@ -445,7 +467,10 @@ router.post("/", async (req, res) => {
 
 router.get("/catalog", async (_req, res) => {
   const catalog = await loadBookingCatalog();
-  return res.json(publicBookingCatalogResponse(catalog));
+  return res.json({
+    ...publicBookingCatalogResponse(catalog),
+    processingEnabled: processingEnabled(),
+  });
 });
 
 // ─── GET /api/bookings — List all order requests (staff only) ─────────────────

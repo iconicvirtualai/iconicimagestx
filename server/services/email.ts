@@ -66,6 +66,11 @@ interface SendEmailOptions {
 
 // ─── Main Send Function ───────────────────────────────────────────────────────
 
+/** Client copy sent when /book accepts the order. Address is the property line. */
+export function clientOrderConfirmedSubject(address: string): string {
+  return `Your Iconic order is confirmed: ${address}`;
+}
+
 export async function sendEmail(options: SendEmailOptions): Promise<{ sent: boolean; delivery: EmailDelivery }> {
   const { template, audience, variables = {}, subject: subjectOverride, html, attachments } = options;
   let to = options.to;

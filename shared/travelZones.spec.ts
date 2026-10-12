@@ -277,7 +277,7 @@ describe("booking pipeline wiring", () => {
     expect(bookings).toContain('template: "order_confirmed"');
     expect(bookings).not.toContain('template: "invoice"');
 
-    expect(bookingForm).toContain("calculateSidebarTotal(bookingPriceInput())");
+    expect(bookingForm).toContain("estimateBookingCharge(");
     expect(bookingForm).toContain("travelFeeDollars(travel)");
     expect(bookingForm).toContain('data-testid="booking-estimator"');
     expect(bookingForm).toContain('data-testid="travel-fee-line"');

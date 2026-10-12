@@ -267,6 +267,9 @@ function createTransport() {
     auth: { user, pass }
   });
 }
+function clientOrderConfirmedSubject(address) {
+  return `Your Iconic order is confirmed: ${address}`;
+}
 async function sendEmail(options) {
   const { template, audience, variables = {}, subject: subjectOverride, html, attachments } = options;
   let to = options.to;
@@ -487,178 +490,6 @@ function getFallbackTemplate(type, vars) {
     `)
   };
   return templates[type] || base(`<p>You have a new notification from Iconic Images.</p>`);
-}
-let _client = null;
-function getClient() {
-  if (_client) return _client;
-  const sid = process.env.TWILIO_ACCOUNT_SID;
-  const token = process.env.TWILIO_AUTH_TOKEN;
-  if (!sid || !token) {
-    throw new Error("Twilio credentials not configured (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN).");
-  }
-  _client = twilio(sid, token);
-  return _client;
-}
-function normalisePhone(raw) {
-  const digits2 = raw.replace(/\D/g, "");
-  if (digits2.length === 10) return `+1${digits2}`;
-  if (digits2.length === 11 && digits2.startsWith("1")) return `+${digits2}`;
-  return `+${digits2}`;
-}
-async function sendSMS({ to, body, from, kind }) {
-  if (kind === STAFF_INBOUND_SMS_KIND && !isStaffInboundSmsDestination(to)) {
-    console.error(`[SMS] Refused staff_inbound to ${to}. Only the office Google Voice number is allowed.`);
-    return { sid: "", status: "refused", suppressed: true };
-  }
-  if (!smsAllowed(kind)) {
-    console.warn(`[SMS] Suppressed to ${to} — ${clientNotifyBlockReason()}. No message sent.`);
-    return { sid: "", status: "suppressed", suppressed: true };
-  }
-  const fromNumber = from || process.env.TWILIO_PHONE_NUMBER;
-  if (!fromNumber) throw new Error("TWILIO_PHONE_NUMBER not set.");
-  const client = getClient();
-  const message = await client.messages.create({
-    to: normalisePhone(to),
-    from: fromNumber,
-    body
-  });
-  console.log(`[SMS] Sent to ${to} — SID: ${message.sid}`);
-  return { sid: message.sid, status: message.status };
-}
-async function sendSMSCampaign(recipients, bodyTemplate, messagingServiceSid) {
-  if (!clientNotifyLive()) {
-    console.warn(`[SMS] Suppressed campaign to ${recipients.length} recipients — ${clientNotifyBlockReason()}.`);
-    return recipients.map((recipient) => ({ phone: recipient.phone, error: "suppressed" }));
-  }
-  const client = getClient();
-  const sid = messagingServiceSid || process.env.TWILIO_MESSAGING_SERVICE_SID;
-  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
-  const results = [];
-  for (const recipient of recipients) {
-    if (!recipient.phone) continue;
-    const body = bodyTemplate.replace(/\{\{name\}\}/gi, recipient.name || "there");
-    try {
-      const msg = await client.messages.create({
-        to: normalisePhone(recipient.phone),
-        ...sid ? { messagingServiceSid: sid } : { from: fromNumber },
-        body
-      });
-      results.push({ phone: recipient.phone, sid: msg.sid });
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      console.error(`[SMS] Campaign send failed for ${recipient.phone}:`, errorMessage);
-      results.push({ phone: recipient.phone, error: errorMessage });
-    }
-    await new Promise((r) => setTimeout(r, 50));
-  }
-  return results;
-}
-async function createMaskedConversation(friendlyName, photographer, client, webhookUrl) {
-  if (!clientNotifyLive()) {
-    console.warn(`[SMS] Suppressed masked conversation — ${clientNotifyBlockReason()}. No SMS sent.`);
-    throw new Error("Client notifications are off.");
-  }
-  const client_sdk = getClient();
-  const conversation = await client_sdk.conversations.v1.conversations.create({
-    friendlyName,
-    timers: {
-      inactive: "P30D",
-      // auto-close after 30 days inactive
-      closed: "P60D"
-    }
-  });
-  const conversationSid = conversation.sid;
-  if (webhookUrl) {
-    await client_sdk.conversations.v1.conversations(conversationSid).webhooks.create({
-      target: "webhook",
-      "configuration.method": "post",
-      "configuration.url": webhookUrl,
-      "configuration.filters": ["onMessageAdded"]
-    });
-  }
-  const photographerParticipant = await client_sdk.conversations.v1.conversations(conversationSid).participants.create({
-    "messagingBinding.type": "sms",
-    "messagingBinding.address": normalisePhone(photographer.phone),
-    identity: `photographer_${normalisePhone(photographer.phone).replace("+", "")}`
-  });
-  const clientParticipant = await client_sdk.conversations.v1.conversations(conversationSid).participants.create({
-    "messagingBinding.type": "sms",
-    "messagingBinding.address": normalisePhone(client.phone),
-    identity: `client_${normalisePhone(client.phone).replace("+", "")}`
-  });
-  console.log(`[Conversations] Created: ${conversationSid} (${friendlyName})`);
-  return {
-    conversationSid,
-    photographerParticipantSid: photographerParticipant.sid,
-    clientParticipantSid: clientParticipant.sid
-  };
-}
-async function sendConversationMessage(conversationSid, body, author = "Iconic Images") {
-  if (!clientNotifyLive()) {
-    console.warn(`[SMS] Suppressed conversation message — ${clientNotifyBlockReason()}. No SMS sent.`);
-    throw new Error("Client notifications are off.");
-  }
-  const client_sdk = getClient();
-  const message = await client_sdk.conversations.v1.conversations(conversationSid).messages.create({ body, author });
-  return { sid: message.sid };
-}
-async function closeConversation(conversationSid) {
-  const client_sdk = getClient();
-  await client_sdk.conversations.v1.conversations(conversationSid).update({ state: "closed" });
-  console.log(`[Conversations] Closed: ${conversationSid}`);
-}
-const SMS_TEMPLATES = {
-  bookingConfirmation: (name, date, address, total) => `Hi ${name}! We've received your booking request for ${address}.
-
-⚠️ THIS IS NOT A CONFIRMATION. Our team will review your request and reach out shortly to confirm your appointment.
-
-Requested date: ${date}
-Estimated total: ${total}
-
-Questions? Reply to this text, or reach us at ${BUSINESS_CONTACT.line}. — Iconic Images 📸`,
-  appointmentReminder24h: (name, date, time, address) => `Hey ${name}, reminder! Your Iconic Images shoot is tomorrow 📸
-
-🕐 ${time}
-📍 ${address}
-
-Reply CONFIRM to confirm or call us to reschedule.`,
-  appointmentReminder1h: (name, time) => `Hi ${name}! Your photographer is on the way — arriving around ${time} 📸
-Reply to this text with any last-minute notes!`,
-  photosDelivered: (name, galleryUrl) => `🎉 ${name}, your photos are ready!
-
-View your gallery: ${galleryUrl}
-
-Questions or edits? Just reply here. — Iconic Images`,
-  photographerIntro: (photographerName, clientName2, date) => `Hi ${clientName2}! I'm ${photographerName}, your Iconic Images photographer for ${date}. Feel free to text me here with any questions before the shoot! 📸`,
-  newBookingAlert: (address, date, services2) => `🔔 NEW BOOKING — Iconic Images
-
-📍 ${address}
-📅 ${date}
-🏠 ${services2}
-
-Check dashboard for details.`
-};
-const RECORD_ADDRESS_KEYS = ["addressLabel", "address", "propertyAddress", "shootLocation", "location"];
-function addressText(value) {
-  if (!value) return "";
-  if (typeof value === "string") return value.trim();
-  if (typeof value !== "object" || Array.isArray(value)) return "";
-  const address = value;
-  const formatted = text$h(address.formatted) || text$h(address.label);
-  if (formatted) return formatted;
-  return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
-}
-function recordAddressText(record) {
-  if (!record || typeof record !== "object") return addressText(record);
-  const row = record;
-  for (const key of RECORD_ADDRESS_KEYS) {
-    const label = addressText(row[key]);
-    if (label) return label;
-  }
-  return "";
-}
-function text$h(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 const services = [
   // Listings
@@ -1662,6 +1493,183 @@ function unpricedCatalogBookingError(body, catalog) {
   const listNames = [...names];
   const verb = listNames.length === 1 ? "is" : "are";
   return `${joinCatalogNames(listNames)} ${verb} not available to book until a price is set. ${CALL_FOR_PRICING_LABEL}.`;
+}
+function processingEnabled(env) {
+  const source = process.env;
+  const raw = String(source?.INVOICE_PROCESSING_MODE ?? "").trim().toLowerCase();
+  return raw !== "off" && raw !== "disabled" && raw !== "legacy" && raw !== "0";
+}
+let _client = null;
+function getClient() {
+  if (_client) return _client;
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  if (!sid || !token) {
+    throw new Error("Twilio credentials not configured (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN).");
+  }
+  _client = twilio(sid, token);
+  return _client;
+}
+function normalisePhone(raw) {
+  const digits2 = raw.replace(/\D/g, "");
+  if (digits2.length === 10) return `+1${digits2}`;
+  if (digits2.length === 11 && digits2.startsWith("1")) return `+${digits2}`;
+  return `+${digits2}`;
+}
+async function sendSMS({ to, body, from, kind }) {
+  if (kind === STAFF_INBOUND_SMS_KIND && !isStaffInboundSmsDestination(to)) {
+    console.error(`[SMS] Refused staff_inbound to ${to}. Only the office Google Voice number is allowed.`);
+    return { sid: "", status: "refused", suppressed: true };
+  }
+  if (!smsAllowed(kind)) {
+    console.warn(`[SMS] Suppressed to ${to} — ${clientNotifyBlockReason()}. No message sent.`);
+    return { sid: "", status: "suppressed", suppressed: true };
+  }
+  const fromNumber = from || process.env.TWILIO_PHONE_NUMBER;
+  if (!fromNumber) throw new Error("TWILIO_PHONE_NUMBER not set.");
+  const client = getClient();
+  const message = await client.messages.create({
+    to: normalisePhone(to),
+    from: fromNumber,
+    body
+  });
+  console.log(`[SMS] Sent to ${to} — SID: ${message.sid}`);
+  return { sid: message.sid, status: message.status };
+}
+async function sendSMSCampaign(recipients, bodyTemplate, messagingServiceSid) {
+  if (!clientNotifyLive()) {
+    console.warn(`[SMS] Suppressed campaign to ${recipients.length} recipients — ${clientNotifyBlockReason()}.`);
+    return recipients.map((recipient) => ({ phone: recipient.phone, error: "suppressed" }));
+  }
+  const client = getClient();
+  const sid = messagingServiceSid || process.env.TWILIO_MESSAGING_SERVICE_SID;
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+  const results = [];
+  for (const recipient of recipients) {
+    if (!recipient.phone) continue;
+    const body = bodyTemplate.replace(/\{\{name\}\}/gi, recipient.name || "there");
+    try {
+      const msg = await client.messages.create({
+        to: normalisePhone(recipient.phone),
+        ...sid ? { messagingServiceSid: sid } : { from: fromNumber },
+        body
+      });
+      results.push({ phone: recipient.phone, sid: msg.sid });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error(`[SMS] Campaign send failed for ${recipient.phone}:`, errorMessage);
+      results.push({ phone: recipient.phone, error: errorMessage });
+    }
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  return results;
+}
+async function createMaskedConversation(friendlyName, photographer, client, webhookUrl) {
+  if (!clientNotifyLive()) {
+    console.warn(`[SMS] Suppressed masked conversation — ${clientNotifyBlockReason()}. No SMS sent.`);
+    throw new Error("Client notifications are off.");
+  }
+  const client_sdk = getClient();
+  const conversation = await client_sdk.conversations.v1.conversations.create({
+    friendlyName,
+    timers: {
+      inactive: "P30D",
+      // auto-close after 30 days inactive
+      closed: "P60D"
+    }
+  });
+  const conversationSid = conversation.sid;
+  if (webhookUrl) {
+    await client_sdk.conversations.v1.conversations(conversationSid).webhooks.create({
+      target: "webhook",
+      "configuration.method": "post",
+      "configuration.url": webhookUrl,
+      "configuration.filters": ["onMessageAdded"]
+    });
+  }
+  const photographerParticipant = await client_sdk.conversations.v1.conversations(conversationSid).participants.create({
+    "messagingBinding.type": "sms",
+    "messagingBinding.address": normalisePhone(photographer.phone),
+    identity: `photographer_${normalisePhone(photographer.phone).replace("+", "")}`
+  });
+  const clientParticipant = await client_sdk.conversations.v1.conversations(conversationSid).participants.create({
+    "messagingBinding.type": "sms",
+    "messagingBinding.address": normalisePhone(client.phone),
+    identity: `client_${normalisePhone(client.phone).replace("+", "")}`
+  });
+  console.log(`[Conversations] Created: ${conversationSid} (${friendlyName})`);
+  return {
+    conversationSid,
+    photographerParticipantSid: photographerParticipant.sid,
+    clientParticipantSid: clientParticipant.sid
+  };
+}
+async function sendConversationMessage(conversationSid, body, author = "Iconic Images") {
+  if (!clientNotifyLive()) {
+    console.warn(`[SMS] Suppressed conversation message — ${clientNotifyBlockReason()}. No SMS sent.`);
+    throw new Error("Client notifications are off.");
+  }
+  const client_sdk = getClient();
+  const message = await client_sdk.conversations.v1.conversations(conversationSid).messages.create({ body, author });
+  return { sid: message.sid };
+}
+async function closeConversation(conversationSid) {
+  const client_sdk = getClient();
+  await client_sdk.conversations.v1.conversations(conversationSid).update({ state: "closed" });
+  console.log(`[Conversations] Closed: ${conversationSid}`);
+}
+const SMS_TEMPLATES = {
+  bookingConfirmation: (name, date, address, total) => `Hi ${name}! We've received your booking request for ${address}.
+
+⚠️ THIS IS NOT A CONFIRMATION. Our team will review your request and reach out shortly to confirm your appointment.
+
+Requested date: ${date}
+Estimated total: ${total}
+
+Questions? Reply to this text, or reach us at ${BUSINESS_CONTACT.line}. — Iconic Images 📸`,
+  appointmentReminder24h: (name, date, time, address) => `Hey ${name}, reminder! Your Iconic Images shoot is tomorrow 📸
+
+🕐 ${time}
+📍 ${address}
+
+Reply CONFIRM to confirm or call us to reschedule.`,
+  appointmentReminder1h: (name, time) => `Hi ${name}! Your photographer is on the way — arriving around ${time} 📸
+Reply to this text with any last-minute notes!`,
+  photosDelivered: (name, galleryUrl) => `🎉 ${name}, your photos are ready!
+
+View your gallery: ${galleryUrl}
+
+Questions or edits? Just reply here. — Iconic Images`,
+  photographerIntro: (photographerName, clientName2, date) => `Hi ${clientName2}! I'm ${photographerName}, your Iconic Images photographer for ${date}. Feel free to text me here with any questions before the shoot! 📸`,
+  newBookingAlert: (address, date, services2) => `🔔 NEW BOOKING — Iconic Images
+
+📍 ${address}
+📅 ${date}
+🏠 ${services2}
+
+Check dashboard for details.`
+};
+const RECORD_ADDRESS_KEYS = ["addressLabel", "address", "propertyAddress", "shootLocation", "location"];
+function addressText(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value !== "object" || Array.isArray(value)) return "";
+  const address = value;
+  const formatted = text$h(address.formatted) || text$h(address.label);
+  if (formatted) return formatted;
+  return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
+}
+function recordAddressText(record) {
+  if (!record || typeof record !== "object") return addressText(record);
+  const row = record;
+  for (const key of RECORD_ADDRESS_KEYS) {
+    const label = addressText(row[key]);
+    if (label) return label;
+  }
+  return "";
+}
+function text$h(value) {
+  return typeof value === "string" ? value.trim() : "";
 }
 const PLAYTEST_ADDRESS = "100 Playtest Lane, Austin, TX 78701";
 const STAFF_ROLES = ["admin", "coordinator", "photographer", "editor"];
@@ -4558,6 +4566,170 @@ function text$c(value) {
 function roundMoney$2(value) {
   return Math.round(value * 100) / 100;
 }
+const LISTING_HERO = "/media/launch/hero_day_exterior_front.jpg";
+const BUSINESS_HERO = "/media/photos/lifestyle-mtz04327.jpg";
+const BRAND_SESSION_LOCATION = "N/A — brand session";
+const PAID_LABEL = {
+  paid: "Paid",
+  unpaid: "Unpaid",
+  partial: "Partial"
+};
+const DELIVERY_LABEL = {
+  delivered: "Delivered",
+  in_progress: "In progress",
+  not_delivered: "Not delivered"
+};
+function buildAdminOrderTile(record) {
+  const lines = orderServiceLines(record);
+  const priced = lines.length > 0 ? { ...record, lineItems: lines, services: lines } : record;
+  const skin2 = resolvePackageSkinFromOrder(priced);
+  const kind = orderKind(priced, skin2);
+  const studio = kind === "business" ? studioFromRecord(priced) : null;
+  const heroUrl = heroFromRecord(record) || (kind === "business" ? BUSINESS_HERO : LISTING_HERO);
+  const paid = paidState(record);
+  const delivery = deliveryState(record);
+  const named = lines[0] ? cleanPackageName(lines[0].name) : "";
+  const packageName = skin2?.title || named || "Custom order";
+  const charges = orderChargeSummary(record, lines);
+  return {
+    id: text$b(record.id) || packageName,
+    orderCode: orderCode(kind, record),
+    kind,
+    typeLabel: kind === "business" ? "Business" : "Listing",
+    heroUrl,
+    heroAlt: `${packageName} order`,
+    packageName,
+    skinLabel: skin2 ? clientSkinLabel(skin2) : "Client skin: Custom",
+    priceLabel: skin2 ? packagePriceDisplay(skin2) : lines.length > 0 || charges.total > 0 ? tilePrice(charges.total) : "—",
+    priceNote: skin2?.priceNote || "",
+    paid,
+    paidLabel: PAID_LABEL[paid],
+    delivery,
+    deliveryLabel: DELIVERY_LABEL[delivery],
+    clientName: clientName(record),
+    appointmentDate: appointmentLabel(record),
+    location: locationLabel(kind, record),
+    studio,
+    channel: channelFor(skin2, kind)
+  };
+}
+function orderKind(record, skin2) {
+  const raw = text$b(record.projectType || record.orderType || record.type).toLowerCase();
+  if (raw === "business" || raw === "brand" || raw === "social") return "business";
+  if (raw === "real_estate" || raw === "listing" || raw === "property") return "listing";
+  if (skin2?.category === "listing") return "listing";
+  if (skin2) return "business";
+  return "listing";
+}
+function channelFor(skin2, kind) {
+  if (skin2?.category === "social") return "Social";
+  if (skin2?.category === "human-brand") return "Human Brand";
+  if (skin2?.category === "listing") return "Listings & Spaces";
+  return kind === "business" ? "Human Brand" : "Listings & Spaces";
+}
+function orderCode(kind, record) {
+  const explicit = text$b(record.orderCode || record.orderNumber || record.displayId);
+  if (explicit) return explicit.toUpperCase();
+  const id = text$b(record.id);
+  const prefix = kind === "listing" ? "L" : "B";
+  const digits2 = id.replace(/\D/g, "");
+  const tail = (digits2 || id.replace(/[^a-zA-Z0-9]/g, "")).slice(-5).toUpperCase().padStart(5, "0");
+  return `ORD - ${prefix} - ${tail}`;
+}
+function heroFromRecord(record) {
+  const explicit = text$b(record.heroUrl) || text$b(record.coverUrl) || text$b(record.coverImage);
+  if (explicit) return explicit;
+  const images = record.images;
+  if (!Array.isArray(images)) return "";
+  for (const image of images) {
+    if (typeof image === "string" && image.trim()) return image.trim();
+    if (image && typeof image === "object") {
+      const url = text$b(image.url) || text$b(image.thumbnailUrl);
+      if (url) return url;
+    }
+  }
+  return "";
+}
+function clientName(record) {
+  const named = text$b(record.clientName) || text$b(record.customerName) || text$b(record.agentName) || [text$b(record.firstName), text$b(record.lastName)].filter(Boolean).join(" ");
+  return named || "—";
+}
+function appointmentLabel(record) {
+  const raw = record.appointmentDate ?? record.apptDate ?? record.scheduledDate ?? record.requestedDate;
+  const key = calendarDateKey(raw);
+  const date = formatShootDateLabel(key, typeof raw === "string" ? raw : void 0);
+  const time = text$b(record.scheduledTime || record.appointmentTime || record.requestedTime);
+  const photographer = text$b(record.assignedPhotographerName || record.photographerName || record.photographerPreference);
+  return [date, time, photographer].filter(Boolean).join(" · ") || "—";
+}
+function tilePrice(amount) {
+  const rounded = Math.round(amount * 100) / 100;
+  if (Number.isInteger(rounded)) return `$${rounded.toLocaleString("en-US")}`;
+  return `$${rounded.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+function locationLabel(kind, record) {
+  const raw = addressText(record.address || record.propertyAddress || record.shootLocation || record.location);
+  if (kind === "business" && isBrandSession(raw)) return BRAND_SESSION_LOCATION;
+  return raw || "—";
+}
+function isBrandSession(value) {
+  const key = value.trim().toLowerCase();
+  if (!key || key === "—" || key === "-" || key === "n/a" || key === "na") return true;
+  return /brand session/.test(key);
+}
+function studioFromRecord(record) {
+  const explicit = record.studio ?? record.studioId ?? record.room ?? record.shootStudio;
+  if (explicit != null && String(explicit).trim()) return resolveAdminStudio(explicit);
+  const blob = `${JSON.stringify(record.serviceIds || "")} ${JSON.stringify(record.services || "")}`.toLowerCase();
+  if (/studio-blanc|studio blanc/.test(blob)) return "studio-blanc";
+  if (/studio-noir|studio noir/.test(blob)) return "studio-noir";
+  if (/podcast/.test(blob)) return "podcast-studio";
+  return "offsite";
+}
+function resolveAdminStudio(value) {
+  const textValue = String(value ?? "").trim().toLowerCase().replace(/[_-]+/g, " ");
+  if (/noir/.test(textValue)) return "studio-noir";
+  if (/blanc/.test(textValue)) return "studio-blanc";
+  if (/podcast/.test(textValue)) return "podcast-studio";
+  if (/off\s*site|on location/.test(textValue)) return "offsite";
+  return "offsite";
+}
+function paidState(record) {
+  const invoice = nested$1(record.invoice);
+  const explicit = [record.paymentStatus, record.invoiceStatus, invoice.status].map((value) => normalize(value)).join(" ");
+  if (/\bpartial\b/.test(explicit) || normalize(record.status) === "partial") return "partial";
+  const total = money$3(invoice.total ?? record.total ?? record.amount);
+  const paid = money$3(invoice.amountPaid ?? record.amountPaid);
+  if (paid > 0 && total > 0 && paid + 9e-3 < total) return "partial";
+  if (/\bpaid\b/.test(explicit) || record.paidAt || paid > 0 && (total === 0 || paid >= total)) return "paid";
+  const status2 = normalize(record.status);
+  if (status2 === "paid" || status2 === "delivered_paid") return "paid";
+  return "unpaid";
+}
+function deliveryState(record) {
+  const status2 = normalize(record.status);
+  const delivery = normalize(record.deliveryStatus || record.galleryStatus);
+  if (record.deliveredAt || status2.includes("delivered") || delivery === "delivered") return "delivered";
+  if (status2 === "in_progress" || status2 === "pending" || status2 === "pending_edit" || status2 === "in_review" || status2 === "editing" || status2 === "scheduled" || status2 === "confirmed" || status2 === "appt_scheduled" || status2 === "consult_scheduled" || delivery === "pending" || delivery === "undelivered" || delivery === "in_progress" || delivery === "ready_for_review") return "in_progress";
+  return "not_delivered";
+}
+function nested$1(value) {
+  return value && typeof value === "object" ? value : {};
+}
+function normalize(value) {
+  return String(value ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+function money$3(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value.replace(/[$,\s]/g, ""));
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return 0;
+}
+function text$b(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
 const NOT_PROVIDED = "Not provided";
 function officeNewOrderEmail(saved, options) {
   const catalog = options?.catalog ?? packagesForStaffEditor([]);
@@ -4567,7 +4739,8 @@ function officeNewOrderEmail(saved, options) {
   const addOns2 = packageLine ? lines.filter((line) => line !== packageLine) : lines;
   const features = packageFeatures(packageLine, catalog);
   const deliverables = describeDeliverables(features);
-  const packageName = packageLine ? cleanPackageName(packageLine.name) : NOT_PROVIDED;
+  const fromLine = packageLine ? cleanPackageName(packageLine.name) : "";
+  const packageName = fromLine || explicitPackageName(saved);
   const orderNumber = orderNumberOf(saved);
   const address = addressText(saved.addressLabel) || addressText(saved.address) || addressText(saved.propertyAddress) || addressText(saved.shootLocation) || NOT_PROVIDED;
   const requestedDate = firstDate(saved, ["scheduledDate", "requestedDate", "appointmentDate", "requestedDates"]);
@@ -4575,7 +4748,7 @@ function officeNewOrderEmail(saved, options) {
   const notes = notesOf(saved);
   const fields = [
     ["Order number", orderNumber],
-    ["Admin link", text$b(options?.adminUrl) || NOT_PROVIDED],
+    ["Admin link", text$a(options?.adminUrl) || NOT_PROVIDED],
     ["Client name", clientName2],
     ["Client email", firstText$1(saved, ["clientEmail", "email"])],
     ["Client phone", firstText$1(saved, ["clientPhone", "phone"])],
@@ -4613,23 +4786,37 @@ function officeNewOrderEmail(saved, options) {
   const subject = isTestOrder(clientName2, notes) ? `[TEST] ${subjectCore}` : subjectCore;
   const plain = fields.map(([label, value]) => `${label}: ${value}`).join("\n");
   const html = `<div style="font-family:Arial,sans-serif;max-width:640px;color:#111"><h1 style="font-size:18px">${escapeHtml$4(subject)}</h1><table style="width:100%;border-collapse:collapse">${fields.map(([label, value]) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:bold;vertical-align:top">${escapeHtml$4(label)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:pre-wrap">${escapeHtml$4(value)}</td></tr>`).join("")}</table></div>`;
-  return { subject, text: plain, html };
+  return { subject, text: plain, html, orderNumber, packageName };
 }
 function isTestOrder(clientName2, notes) {
   return `${clientName2}
 ${notes}`.toUpperCase().includes("TEST ORDER");
 }
 function orderNumberOf(saved) {
-  const explicit = firstText$1(saved, ["orderNumber", "orderCode", "displayId"]);
-  if (explicit) return explicit;
-  const id = text$b(saved.id);
-  if (!id) return NOT_PROVIDED;
-  return `ORD-${id.slice(-5).toUpperCase()}`;
+  for (const key of ["orderNumber", "orderCode", "displayId"]) {
+    const value = text$a(saved[key]);
+    if (value && value !== NOT_PROVIDED) return value;
+  }
+  if (!text$a(saved.id)) return NOT_PROVIDED;
+  return buildAdminOrderTile(saved).orderCode;
+}
+function explicitPackageName(saved) {
+  for (const key of ["packageName", "serviceName"]) {
+    const value = text$a(saved[key]);
+    if (value && value !== NOT_PROVIDED) return cleanPackageName(value) || value;
+  }
+  const selected = text$a(saved.selectedService);
+  if (text$a(saved.id) || selected) {
+    const tileName = buildAdminOrderTile(saved).packageName;
+    if (tileName && tileName !== "Custom order") return tileName;
+  }
+  if (selected && selected !== NOT_PROVIDED) return cleanPackageName(selected) || selected;
+  return NOT_PROVIDED;
 }
 function clientNameOf(saved) {
   const named = firstText$1(saved, ["clientName", "customerName"]);
   if (named) return named;
-  const joined = [text$b(saved.firstName), text$b(saved.lastName)].filter(Boolean).join(" ");
+  const joined = [text$a(saved.firstName), text$a(saved.lastName)].filter(Boolean).join(" ");
   return joined || NOT_PROVIDED;
 }
 function agentContactOf(saved) {
@@ -4646,8 +4833,8 @@ function agentField(saved, keys, nestedKey) {
   const direct = firstText$1(saved, keys);
   if (direct !== NOT_PROVIDED) return direct;
   for (const holder of [saved.agent, saved.listingAgent, saved.realtor]) {
-    const record = nested$1(holder);
-    const value = text$b(record[nestedKey]);
+    const record = nested(holder);
+    const value = text$a(record[nestedKey]);
     if (value) return value;
   }
   return "";
@@ -4656,7 +4843,7 @@ function digits(value) {
   return value === NOT_PROVIDED ? "" : value.replace(/\D/g, "");
 }
 function notesOf(saved) {
-  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$b(saved[key])).filter(Boolean);
+  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$a(saved[key])).filter(Boolean);
   return parts.length ? parts.join("\n") : NOT_PROVIDED;
 }
 function lockboxOf(saved) {
@@ -4664,12 +4851,12 @@ function lockboxOf(saved) {
   return code || NOT_PROVIDED;
 }
 function occupancyOf(saved) {
-  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$b(saved[key])).filter(Boolean);
+  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$a(saved[key])).filter(Boolean);
   return parts.length ? parts.join(", ") : NOT_PROVIDED;
 }
 function bookedVia(saved) {
-  const lead = text$b(saved.leadSource);
-  const source = text$b(saved.source);
+  const lead = text$a(saved.leadSource);
+  const source = text$a(saved.source);
   const blob = `${lead} ${source}`.toLowerCase();
   if (!blob.trim()) return NOT_PROVIDED;
   if (/admin/.test(blob)) return "Admin";
@@ -4678,8 +4865,8 @@ function bookedVia(saved) {
   return lead || source;
 }
 function paymentOf(saved, total) {
-  const invoice = nested$1(saved.invoice);
-  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$b(value).toLowerCase()).find(Boolean) || "";
+  const invoice = nested(saved.invoice);
+  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$a(value).toLowerCase()).find(Boolean) || "";
   if (/partial/.test(explicit)) return "Partial";
   if (/\bpaid\b/.test(explicit) && !/unpaid/.test(explicit)) return "Paid";
   if (/unpaid/.test(explicit)) return "Unpaid";
@@ -4690,7 +4877,7 @@ function paymentOf(saved, total) {
   return NOT_PROVIDED;
 }
 function moneyField(saved, key, computed) {
-  const pricing = nested$1(saved.pricing);
+  const pricing = nested(saved.pricing);
   const direct = moneyOrNull(saved[key]) ?? moneyOrNull(pricing[key]);
   if (direct != null) return formatMoney(direct);
   if (computed != null) return formatMoney(computed);
@@ -4783,10 +4970,10 @@ function moneyOrNull(value) {
   }
   return null;
 }
-function nested$1(value) {
+function nested(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$b(value) {
+function text$a(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function escapeHtml$4(value) {
@@ -4831,174 +5018,13 @@ async function notifyOfficeOfOrder(input) {
     html: message.html,
     variables: {
       subject: message.subject,
-      body: message.text
+      body: message.text,
+      orderNumber: message.orderNumber,
+      packageName: message.packageName,
+      serviceName: message.packageName
     }
   });
   return { sent: result.sent };
-}
-const LISTING_HERO = "/media/launch/hero_day_exterior_front.jpg";
-const BUSINESS_HERO = "/media/photos/lifestyle-mtz04327.jpg";
-const BRAND_SESSION_LOCATION = "N/A — brand session";
-const PAID_LABEL = {
-  paid: "Paid",
-  unpaid: "Unpaid",
-  partial: "Partial"
-};
-const DELIVERY_LABEL = {
-  delivered: "Delivered",
-  in_progress: "In progress",
-  not_delivered: "Not delivered"
-};
-function buildAdminOrderTile(record) {
-  const lines = orderServiceLines(record);
-  const priced = lines.length > 0 ? { ...record, lineItems: lines, services: lines } : record;
-  const skin2 = resolvePackageSkinFromOrder(priced);
-  const kind = orderKind(priced, skin2);
-  const studio = kind === "business" ? studioFromRecord(priced) : null;
-  const heroUrl = heroFromRecord(record) || (kind === "business" ? BUSINESS_HERO : LISTING_HERO);
-  const paid = paidState(record);
-  const delivery = deliveryState(record);
-  const named = lines[0] ? cleanPackageName(lines[0].name) : "";
-  const packageName = skin2?.title || named || "Custom order";
-  const charges = orderChargeSummary(record, lines);
-  return {
-    id: text$a(record.id) || packageName,
-    orderCode: orderCode(kind, record),
-    kind,
-    typeLabel: kind === "business" ? "Business" : "Listing",
-    heroUrl,
-    heroAlt: `${packageName} order`,
-    packageName,
-    skinLabel: skin2 ? clientSkinLabel(skin2) : "Client skin: Custom",
-    priceLabel: skin2 ? packagePriceDisplay(skin2) : lines.length > 0 || charges.total > 0 ? tilePrice(charges.total) : "—",
-    priceNote: skin2?.priceNote || "",
-    paid,
-    paidLabel: PAID_LABEL[paid],
-    delivery,
-    deliveryLabel: DELIVERY_LABEL[delivery],
-    clientName: clientName(record),
-    appointmentDate: appointmentLabel(record),
-    location: locationLabel(kind, record),
-    studio,
-    channel: channelFor(skin2, kind)
-  };
-}
-function orderKind(record, skin2) {
-  const raw = text$a(record.projectType || record.orderType || record.type).toLowerCase();
-  if (raw === "business" || raw === "brand" || raw === "social") return "business";
-  if (raw === "real_estate" || raw === "listing" || raw === "property") return "listing";
-  if (skin2?.category === "listing") return "listing";
-  if (skin2) return "business";
-  return "listing";
-}
-function channelFor(skin2, kind) {
-  if (skin2?.category === "social") return "Social";
-  if (skin2?.category === "human-brand") return "Human Brand";
-  if (skin2?.category === "listing") return "Listings & Spaces";
-  return kind === "business" ? "Human Brand" : "Listings & Spaces";
-}
-function orderCode(kind, record) {
-  const explicit = text$a(record.orderCode || record.orderNumber || record.displayId);
-  if (explicit) return explicit.toUpperCase();
-  const id = text$a(record.id);
-  const prefix = kind === "listing" ? "L" : "B";
-  const digits2 = id.replace(/\D/g, "");
-  const tail = (digits2 || id.replace(/[^a-zA-Z0-9]/g, "")).slice(-5).toUpperCase().padStart(5, "0");
-  return `ORD - ${prefix} - ${tail}`;
-}
-function heroFromRecord(record) {
-  const explicit = text$a(record.heroUrl) || text$a(record.coverUrl) || text$a(record.coverImage);
-  if (explicit) return explicit;
-  const images = record.images;
-  if (!Array.isArray(images)) return "";
-  for (const image of images) {
-    if (typeof image === "string" && image.trim()) return image.trim();
-    if (image && typeof image === "object") {
-      const url = text$a(image.url) || text$a(image.thumbnailUrl);
-      if (url) return url;
-    }
-  }
-  return "";
-}
-function clientName(record) {
-  const named = text$a(record.clientName) || text$a(record.customerName) || text$a(record.agentName) || [text$a(record.firstName), text$a(record.lastName)].filter(Boolean).join(" ");
-  return named || "—";
-}
-function appointmentLabel(record) {
-  const raw = record.appointmentDate ?? record.apptDate ?? record.scheduledDate ?? record.requestedDate;
-  const key = calendarDateKey(raw);
-  const date = formatShootDateLabel(key, typeof raw === "string" ? raw : void 0);
-  const time = text$a(record.scheduledTime || record.appointmentTime || record.requestedTime);
-  const photographer = text$a(record.assignedPhotographerName || record.photographerName || record.photographerPreference);
-  return [date, time, photographer].filter(Boolean).join(" · ") || "—";
-}
-function tilePrice(amount) {
-  const rounded = Math.round(amount * 100) / 100;
-  if (Number.isInteger(rounded)) return `$${rounded.toLocaleString("en-US")}`;
-  return `$${rounded.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-function locationLabel(kind, record) {
-  const raw = addressText(record.address || record.propertyAddress || record.shootLocation || record.location);
-  if (kind === "business" && isBrandSession(raw)) return BRAND_SESSION_LOCATION;
-  return raw || "—";
-}
-function isBrandSession(value) {
-  const key = value.trim().toLowerCase();
-  if (!key || key === "—" || key === "-" || key === "n/a" || key === "na") return true;
-  return /brand session/.test(key);
-}
-function studioFromRecord(record) {
-  const explicit = record.studio ?? record.studioId ?? record.room ?? record.shootStudio;
-  if (explicit != null && String(explicit).trim()) return resolveAdminStudio(explicit);
-  const blob = `${JSON.stringify(record.serviceIds || "")} ${JSON.stringify(record.services || "")}`.toLowerCase();
-  if (/studio-blanc|studio blanc/.test(blob)) return "studio-blanc";
-  if (/studio-noir|studio noir/.test(blob)) return "studio-noir";
-  if (/podcast/.test(blob)) return "podcast-studio";
-  return "offsite";
-}
-function resolveAdminStudio(value) {
-  const textValue = String(value ?? "").trim().toLowerCase().replace(/[_-]+/g, " ");
-  if (/noir/.test(textValue)) return "studio-noir";
-  if (/blanc/.test(textValue)) return "studio-blanc";
-  if (/podcast/.test(textValue)) return "podcast-studio";
-  if (/off\s*site|on location/.test(textValue)) return "offsite";
-  return "offsite";
-}
-function paidState(record) {
-  const invoice = nested(record.invoice);
-  const explicit = [record.paymentStatus, record.invoiceStatus, invoice.status].map((value) => normalize(value)).join(" ");
-  if (/\bpartial\b/.test(explicit) || normalize(record.status) === "partial") return "partial";
-  const total = money$3(invoice.total ?? record.total ?? record.amount);
-  const paid = money$3(invoice.amountPaid ?? record.amountPaid);
-  if (paid > 0 && total > 0 && paid + 9e-3 < total) return "partial";
-  if (/\bpaid\b/.test(explicit) || record.paidAt || paid > 0 && (total === 0 || paid >= total)) return "paid";
-  const status2 = normalize(record.status);
-  if (status2 === "paid" || status2 === "delivered_paid") return "paid";
-  return "unpaid";
-}
-function deliveryState(record) {
-  const status2 = normalize(record.status);
-  const delivery = normalize(record.deliveryStatus || record.galleryStatus);
-  if (record.deliveredAt || status2.includes("delivered") || delivery === "delivered") return "delivered";
-  if (status2 === "in_progress" || status2 === "pending" || status2 === "pending_edit" || status2 === "in_review" || status2 === "editing" || status2 === "scheduled" || status2 === "confirmed" || status2 === "appt_scheduled" || status2 === "consult_scheduled" || delivery === "pending" || delivery === "undelivered" || delivery === "in_progress" || delivery === "ready_for_review") return "in_progress";
-  return "not_delivered";
-}
-function nested(value) {
-  return value && typeof value === "object" ? value : {};
-}
-function normalize(value) {
-  return String(value ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
-}
-function money$3(value) {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string" && value.trim()) {
-    const parsed = Number(value.replace(/[$,\s]/g, ""));
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return 0;
-}
-function text$a(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 const DELIVERY_QA_CLIENT_EMAIL = "ops+deliveryqa@iconicimagestx.com";
 const DELIVERY_QA_CLIENT_ID = "playtest-delivery-qa-client";
@@ -5366,6 +5392,31 @@ router$o.post("/", async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
     const docRef = await db$o().collection("orderRequests").add(orderRequest);
+    let orderNumber = docRef.id;
+    let packageName = "";
+    try {
+      const tile = buildAdminOrderTile({
+        id: docRef.id,
+        selectedService: selectedService || null,
+        lineItems,
+        services: lineItems,
+        clientName: clientName2,
+        address: savedAddress
+      });
+      orderNumber = tile.orderCode;
+      packageName = tile.packageName === "Custom order" ? "" : tile.packageName;
+    } catch (err) {
+      console.error("[Bookings] Order number format failed:", err);
+    }
+    try {
+      await docRef.update({
+        orderNumber,
+        ...packageName ? { packageName } : {},
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    } catch (err) {
+      console.error("[Bookings] Order number was not saved:", err);
+    }
     const normalizedEmail = orderRequest.email;
     const passwordSetupAllowed = clientNotifyLive() || isNotifyTestAllowlisted(normalizedEmail);
     let account = {
@@ -5449,6 +5500,7 @@ router$o.post("/", async (req, res) => {
     clientEmailStatus = await sendEmail({
       to: email,
       template: "booking_received",
+      subject: clientOrderConfirmedSubject(displayAddress),
       variables: {
         clientName: clientName2,
         address: displayAddress,
@@ -5533,7 +5585,12 @@ router$o.post("/", async (req, res) => {
     let officeAlertStatus = "skipped";
     try {
       const savedSnap = await docRef.get();
-      const savedOrder = { id: savedSnap.id, ...savedSnap.data() || {} };
+      const savedOrder = {
+        id: savedSnap.id,
+        ...savedSnap.data() || {},
+        orderNumber,
+        ...packageName ? { packageName } : {}
+      };
       const alert = await notifyOfficeOfOrder({
         isNewOrder: true,
         saved: savedOrder,
@@ -5557,17 +5614,6 @@ router$o.post("/", async (req, res) => {
       notifications,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     }).catch((err) => console.error("[Bookings] Notification status was not saved:", err));
-    let orderNumber = docRef.id;
-    try {
-      orderNumber = buildAdminOrderTile({
-        id: docRef.id,
-        selectedService: selectedService || null,
-        lineItems,
-        services: lineItems
-      }).orderCode;
-    } catch (err) {
-      console.error("[Bookings] Order number format failed:", err);
-    }
     return res.status(201).json({
       success: true,
       requestId: docRef.id,
@@ -5584,7 +5630,10 @@ router$o.post("/", async (req, res) => {
 });
 router$o.get("/catalog", async (_req, res) => {
   const catalog = await loadBookingCatalog();
-  return res.json(publicBookingCatalogResponse(catalog));
+  return res.json({
+    ...publicBookingCatalogResponse(catalog),
+    processingEnabled: processingEnabled()
+  });
 });
 router$o.get("/", requireCoordinator, async (_req, res) => {
   try {

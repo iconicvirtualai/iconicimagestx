@@ -4,6 +4,7 @@
  * This module does not send mail and does not address the client.
  */
 
+import { buildAdminOrderTile } from "./adminOrderTile.ts";
 import { addressText } from "./addressText.ts";
 import { formatChicagoDate } from "./clientHome.ts";
 import { packagesForStaffEditor, type StaffCatalogPackage } from "./bookingCatalog.ts";
@@ -16,6 +17,8 @@ export interface OfficeOrderEmail {
   subject: string;
   text: string;
   html: string;
+  orderNumber: string;
+  packageName: string;
 }
 
 const FIELD_LABELS = [
@@ -66,7 +69,8 @@ export function officeNewOrderEmail(
   const addOns = packageLine ? lines.filter((line) => line !== packageLine) : lines;
   const features = packageFeatures(packageLine, catalog);
   const deliverables = describeDeliverables(features);
-  const packageName = packageLine ? cleanPackageName(packageLine.name) : NOT_PROVIDED;
+  const fromLine = packageLine ? cleanPackageName(packageLine.name) : "";
+  const packageName = fromLine || explicitPackageName(saved);
   const orderNumber = orderNumberOf(saved);
   const address = addressText(saved.addressLabel)
     || addressText(saved.address)
@@ -118,7 +122,7 @@ export function officeNewOrderEmail(
   const subject = isTestOrder(clientName, notes) ? `[TEST] ${subjectCore}` : subjectCore;
   const plain = fields.map(([label, value]) => `${label}: ${value}`).join("\n");
   const html = `<div style="font-family:Arial,sans-serif;max-width:640px;color:#111"><h1 style="font-size:18px">${escapeHtml(subject)}</h1><table style="width:100%;border-collapse:collapse">${fields.map(([label, value]) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:bold;vertical-align:top">${escapeHtml(label)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:pre-wrap">${escapeHtml(value)}</td></tr>`).join("")}</table></div>`;
-  return { subject, text: plain, html };
+  return { subject, text: plain, html, orderNumber, packageName };
 }
 
 export function officeOrderEmailFieldLabels(): readonly string[] {
@@ -130,11 +134,29 @@ function isTestOrder(clientName: string, notes: string): boolean {
 }
 
 function orderNumberOf(saved: Record<string, unknown>): string {
-  const explicit = firstText(saved, ["orderNumber", "orderCode", "displayId"]);
-  if (explicit) return explicit;
-  const id = text(saved.id);
-  if (!id) return NOT_PROVIDED;
-  return `ORD-${id.slice(-5).toUpperCase()}`;
+  for (const key of ["orderNumber", "orderCode", "displayId"]) {
+    const value = text(saved[key]);
+    if (value && value !== NOT_PROVIDED) return value;
+  }
+  // A missing field used to come back from firstText as the words "Not provided",
+  // which is truthy, so the id fallback never ran and the subject was
+  // "New order Not provided".
+  if (!text(saved.id)) return NOT_PROVIDED;
+  return buildAdminOrderTile(saved).orderCode;
+}
+
+function explicitPackageName(saved: Record<string, unknown>): string {
+  for (const key of ["packageName", "serviceName"]) {
+    const value = text(saved[key]);
+    if (value && value !== NOT_PROVIDED) return cleanPackageName(value) || value;
+  }
+  const selected = text(saved.selectedService);
+  if (text(saved.id) || selected) {
+    const tileName = buildAdminOrderTile(saved).packageName;
+    if (tileName && tileName !== "Custom order") return tileName;
+  }
+  if (selected && selected !== NOT_PROVIDED) return cleanPackageName(selected) || selected;
+  return NOT_PROVIDED;
 }
 
 function clientNameOf(saved: Record<string, unknown>): string {

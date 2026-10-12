@@ -59,6 +59,9 @@ export async function notifyOfficeOfOrder(input: {
     variables: {
       subject: message.subject,
       body: message.text,
+      orderNumber: message.orderNumber,
+      packageName: message.packageName,
+      serviceName: message.packageName,
     },
   });
   return { sent: result.sent };

@@ -28,11 +28,11 @@ import {
 } from "@shared/bookingCatalog";
 import {
   buildSubmittedLineItems,
-  calculateSidebarTotal,
   hasBookingSelection,
   sumLineItemPrices,
   type BookingPriceInput,
 } from "@shared/bookingPricing";
+import { BOOKING_PROCESSING_LABEL, estimateBookingCharge } from "@shared/invoiceProcessing";
 import {
   assessTravel,
   travelCustomerLine,
@@ -127,6 +127,15 @@ interface BookingFormProps {
   initialCategoryId?: string;
 }
 
+function ProcessingEstimateLine({ amount }: { amount: number }) {
+  return (
+    <div data-testid="booking-processing-line" className="mb-3 flex items-baseline justify-between gap-3 text-[11px]">
+      <span className="min-w-0 font-bold text-gray-500">{BOOKING_PROCESSING_LABEL}</span>
+      <MoneyAmount className="font-black text-black">${amount.toFixed(2)}</MoneyAmount>
+    </div>
+  );
+}
+
 function TravelFeeLine({ travel }: { travel: TravelAssessment }) {
   const line = travelCustomerLine(travel);
   return (
@@ -189,7 +198,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     teaserMonthContent: false,
     teaserPersonalBrand: false,
     teaserSocialConsult: false,
-    socialMarketingPermission: true,
+    socialMarketingPermission: false,
     smsConsent: false,
     marketingDoing: "",
     resultsBothering: "",
@@ -201,6 +210,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   });
 
   const [catalog, setCatalog] = useState<StaffCatalogPackage[]>(() => packagesForStaffEditor([]));
+  const [processingOn, setProcessingOn] = useState(true);
   const offer = useMemo(() => bookingOffer(catalog), [catalog]);
   const services = offer.services;
   const addOns = offer.addOns;
@@ -213,6 +223,21 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   const virtualStagingUnitPrice = offer.virtualStaging?.price ?? 0;
   const specializedSocialPrice = offer.specializedSocial?.price ?? 0;
   const specializedBothPrice = offer.specializedBoth?.price ?? 0;
+
+  // The server says whether new bookings include processing. Default is on.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/bookings/catalog")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data || typeof data.processingEnabled !== "boolean") return;
+        setProcessingOn(data.processingEnabled);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Booking prices come from the packages catalog. A failed read keeps the seed.
   useEffect(() => {
@@ -506,10 +531,6 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
 
   const handleBookNow = async (e?: React.FormEvent) => {
   if (e) e.preventDefault();
-  if (!formData.smsConsent) {
-    toast.error("Check the box to agree to Iconic Images booking and appointment text messages.");
-    return;
-  }
   const bookedService = services.find((item) => item.id === formData.selectedService);
   const skipsServiceLocation = Boolean(
     bookedService && ["branding", "business", "growth", "studio"].includes(bookedService.category),
@@ -556,7 +577,11 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
 
   const travel = assessTravel(formData.servicePlace ?? formData.address);
   const showTravelLine = Boolean(formData.servicePlace) || formData.address.trim().length > 0;
-  const calculateTotal = () => Math.round((calculateSidebarTotal(bookingPriceInput()) + travelFeeDollars(travel)) * 100) / 100;
+  const estimate = estimateBookingCharge(
+    bookingPriceInput(),
+    showTravelLine ? travelFeeDollars(travel) : 0,
+    processingOn,
+  );
 
   const handleApplyPromo = () => {
     const promo = promoDiscountFor(promoInput);
@@ -687,11 +712,14 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
             <TravelFeeLine travel={travel} />
           </div>
         )}
+        {processingOn && hasBookingSelection(bookingPriceInput()) && (
+          <ProcessingEstimateLine amount={estimate.processing} />
+        )}
         <div className="flex justify-between items-center mb-4">
           <span className="text-[10px] font-black uppercase text-gray-400">Total Estimate</span>
           {hasBookingSelection(bookingPriceInput()) ? (
             <MoneyAmount data-testid="booking-total" className="text-2xl font-black text-black" style={{ color: settings.global.primaryColor }}>
-              ${calculateTotal()}
+              ${estimate.total.toFixed(2)}
             </MoneyAmount>
           ) : (
             <span data-testid="booking-total" className="text-sm font-bold uppercase tracking-widest text-gray-400">
@@ -1392,10 +1420,13 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                <div data-testid="order-summary-before-submit" className="rounded-2xl border border-gray-100 bg-gray-50 p-5 space-y-3">
                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Order summary</p>
                  <TravelFeeLine travel={travel} />
+                 {processingOn && hasBookingSelection(bookingPriceInput()) && (
+                   <ProcessingEstimateLine amount={estimate.processing} />
+                 )}
                  <div className="flex items-baseline justify-between gap-3 border-t border-gray-200 pt-3">
                    <span className="min-w-0 text-[10px] font-black uppercase text-gray-400">Total estimate</span>
                    {hasBookingSelection(bookingPriceInput()) ? (
-                     <MoneyAmount className="text-lg font-black text-black">${calculateTotal()}</MoneyAmount>
+                     <MoneyAmount className="text-lg font-black text-black">${estimate.total.toFixed(2)}</MoneyAmount>
                    ) : (
                      <span className="text-sm font-bold uppercase tracking-widest text-gray-400">Select a package</span>
                    )}
@@ -1562,7 +1593,8 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
               lifeOfTheListingCare: false,
               premiumUpgrade: false,
               virtualStagingCredits: 0,
-              smsConsent: false
+              smsConsent: false,
+              socialMarketingPermission: false
             }));
           }}
         />

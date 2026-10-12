@@ -147,7 +147,7 @@ describe("booking total contract", () => {
   });
 
   it("wires the booking form through the shared helpers", () => {
-    expect(bookingForm).toContain("calculateSidebarTotal(bookingPriceInput())");
+    expect(bookingForm).toContain("estimateBookingCharge(");
     expect(bookingForm).toContain("hasBookingSelection(bookingPriceInput())");
     expect(bookingForm).toContain("Select a package");
     expect(bookingForm).toContain("buildSubmittedLineItems(bookingPriceInput())");
