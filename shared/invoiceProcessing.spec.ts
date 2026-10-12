@@ -14,7 +14,9 @@ import {
   processingEnabled,
   processingFee,
   processingFeeCents,
+  BOOKING_PROCESSING_LABEL,
 } from "./invoiceProcessing";
+import { calculateSidebarTotal } from "./bookingPricing";
 import { formatProcessingImpactReport, processingImpactFixtureScan } from "./processingImpact";
 
 describe("processingFee", () => {
@@ -142,6 +144,36 @@ describe("booking estimate", () => {
     });
     expect(free.processing).toBe(0);
     expect(free.total).toBe(0);
+  });
+
+  it("adds 2.8% on top of a $75 booking and keeps travel and promo outside the wrong base", () => {
+    expect(processingFee(75)).toBe(2.1);
+    expect(processingFeeCents(7500)).toBe(210);
+    expect(processingFeeCents(17)).toBe(0);
+    expect(processingFeeCents(18)).toBe(1);
+    const estimate = estimateBookingCharge({ selectedBasics: ["apprentice-25"] });
+    expect(calculateSidebarTotal({ selectedBasics: ["apprentice-25"] })).toBe(75);
+    expect(estimate.processingBase).toBe(75);
+    expect(estimate.processing).toBe(2.1);
+    expect(estimate.total).toBe(77.1);
+
+    const traveled = estimateBookingCharge({ selectedBasics: ["apprentice-25"] }, 50);
+    expect(traveled.processing).toBe(2.1);
+    expect(traveled.travel).toBe(50);
+    expect(traveled.total).toBe(127.1);
+
+    const discounted = estimateBookingCharge({
+      selectedBasics: ["apprentice-25"],
+      promo: { code: "NEWYEAR", discount: 50 },
+    });
+    expect(discounted.processingBase).toBe(25);
+    expect(discounted.processing).toBe(0.7);
+    expect(discounted.total).toBe(25.7);
+
+    const off = estimateBookingCharge({ selectedBasics: ["apprentice-25"] }, 0, false);
+    expect(off.processing).toBe(0);
+    expect(off.total).toBe(75);
+    expect(BOOKING_PROCESSING_LABEL).toBe("Processing (2.8%)");
   });
 });
 

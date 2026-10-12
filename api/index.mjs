@@ -491,6 +491,178 @@ function getFallbackTemplate(type, vars) {
   };
   return templates[type] || base(`<p>You have a new notification from Iconic Images.</p>`);
 }
+let _client = null;
+function getClient() {
+  if (_client) return _client;
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  if (!sid || !token) {
+    throw new Error("Twilio credentials not configured (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN).");
+  }
+  _client = twilio(sid, token);
+  return _client;
+}
+function normalisePhone(raw) {
+  const digits2 = raw.replace(/\D/g, "");
+  if (digits2.length === 10) return `+1${digits2}`;
+  if (digits2.length === 11 && digits2.startsWith("1")) return `+${digits2}`;
+  return `+${digits2}`;
+}
+async function sendSMS({ to, body, from, kind }) {
+  if (kind === STAFF_INBOUND_SMS_KIND && !isStaffInboundSmsDestination(to)) {
+    console.error(`[SMS] Refused staff_inbound to ${to}. Only the office Google Voice number is allowed.`);
+    return { sid: "", status: "refused", suppressed: true };
+  }
+  if (!smsAllowed(kind)) {
+    console.warn(`[SMS] Suppressed to ${to} — ${clientNotifyBlockReason()}. No message sent.`);
+    return { sid: "", status: "suppressed", suppressed: true };
+  }
+  const fromNumber = from || process.env.TWILIO_PHONE_NUMBER;
+  if (!fromNumber) throw new Error("TWILIO_PHONE_NUMBER not set.");
+  const client = getClient();
+  const message = await client.messages.create({
+    to: normalisePhone(to),
+    from: fromNumber,
+    body
+  });
+  console.log(`[SMS] Sent to ${to} — SID: ${message.sid}`);
+  return { sid: message.sid, status: message.status };
+}
+async function sendSMSCampaign(recipients, bodyTemplate, messagingServiceSid) {
+  if (!clientNotifyLive()) {
+    console.warn(`[SMS] Suppressed campaign to ${recipients.length} recipients — ${clientNotifyBlockReason()}.`);
+    return recipients.map((recipient) => ({ phone: recipient.phone, error: "suppressed" }));
+  }
+  const client = getClient();
+  const sid = messagingServiceSid || process.env.TWILIO_MESSAGING_SERVICE_SID;
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+  const results = [];
+  for (const recipient of recipients) {
+    if (!recipient.phone) continue;
+    const body = bodyTemplate.replace(/\{\{name\}\}/gi, recipient.name || "there");
+    try {
+      const msg = await client.messages.create({
+        to: normalisePhone(recipient.phone),
+        ...sid ? { messagingServiceSid: sid } : { from: fromNumber },
+        body
+      });
+      results.push({ phone: recipient.phone, sid: msg.sid });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error(`[SMS] Campaign send failed for ${recipient.phone}:`, errorMessage);
+      results.push({ phone: recipient.phone, error: errorMessage });
+    }
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  return results;
+}
+async function createMaskedConversation(friendlyName, photographer, client, webhookUrl) {
+  if (!clientNotifyLive()) {
+    console.warn(`[SMS] Suppressed masked conversation — ${clientNotifyBlockReason()}. No SMS sent.`);
+    throw new Error("Client notifications are off.");
+  }
+  const client_sdk = getClient();
+  const conversation = await client_sdk.conversations.v1.conversations.create({
+    friendlyName,
+    timers: {
+      inactive: "P30D",
+      // auto-close after 30 days inactive
+      closed: "P60D"
+    }
+  });
+  const conversationSid = conversation.sid;
+  if (webhookUrl) {
+    await client_sdk.conversations.v1.conversations(conversationSid).webhooks.create({
+      target: "webhook",
+      "configuration.method": "post",
+      "configuration.url": webhookUrl,
+      "configuration.filters": ["onMessageAdded"]
+    });
+  }
+  const photographerParticipant = await client_sdk.conversations.v1.conversations(conversationSid).participants.create({
+    "messagingBinding.type": "sms",
+    "messagingBinding.address": normalisePhone(photographer.phone),
+    identity: `photographer_${normalisePhone(photographer.phone).replace("+", "")}`
+  });
+  const clientParticipant = await client_sdk.conversations.v1.conversations(conversationSid).participants.create({
+    "messagingBinding.type": "sms",
+    "messagingBinding.address": normalisePhone(client.phone),
+    identity: `client_${normalisePhone(client.phone).replace("+", "")}`
+  });
+  console.log(`[Conversations] Created: ${conversationSid} (${friendlyName})`);
+  return {
+    conversationSid,
+    photographerParticipantSid: photographerParticipant.sid,
+    clientParticipantSid: clientParticipant.sid
+  };
+}
+async function sendConversationMessage(conversationSid, body, author = "Iconic Images") {
+  if (!clientNotifyLive()) {
+    console.warn(`[SMS] Suppressed conversation message — ${clientNotifyBlockReason()}. No SMS sent.`);
+    throw new Error("Client notifications are off.");
+  }
+  const client_sdk = getClient();
+  const message = await client_sdk.conversations.v1.conversations(conversationSid).messages.create({ body, author });
+  return { sid: message.sid };
+}
+async function closeConversation(conversationSid) {
+  const client_sdk = getClient();
+  await client_sdk.conversations.v1.conversations(conversationSid).update({ state: "closed" });
+  console.log(`[Conversations] Closed: ${conversationSid}`);
+}
+const SMS_TEMPLATES = {
+  bookingConfirmation: (name, date, address, total) => `Hi ${name}! We've received your booking request for ${address}.
+
+⚠️ THIS IS NOT A CONFIRMATION. Our team will review your request and reach out shortly to confirm your appointment.
+
+Requested date: ${date}
+Estimated total: ${total}
+
+Questions? Reply to this text, or reach us at ${BUSINESS_CONTACT.line}. — Iconic Images 📸`,
+  appointmentReminder24h: (name, date, time, address) => `Hey ${name}, reminder! Your Iconic Images shoot is tomorrow 📸
+
+🕐 ${time}
+📍 ${address}
+
+Reply CONFIRM to confirm or call us to reschedule.`,
+  appointmentReminder1h: (name, time) => `Hi ${name}! Your photographer is on the way — arriving around ${time} 📸
+Reply to this text with any last-minute notes!`,
+  photosDelivered: (name, galleryUrl) => `🎉 ${name}, your photos are ready!
+
+View your gallery: ${galleryUrl}
+
+Questions or edits? Just reply here. — Iconic Images`,
+  photographerIntro: (photographerName, clientName2, date) => `Hi ${clientName2}! I'm ${photographerName}, your Iconic Images photographer for ${date}. Feel free to text me here with any questions before the shoot! 📸`,
+  newBookingAlert: (address, date, services2) => `🔔 NEW BOOKING — Iconic Images
+
+📍 ${address}
+📅 ${date}
+🏠 ${services2}
+
+Check dashboard for details.`
+};
+const RECORD_ADDRESS_KEYS = ["addressLabel", "address", "propertyAddress", "shootLocation", "location"];
+function addressText(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value !== "object" || Array.isArray(value)) return "";
+  const address = value;
+  const formatted = text$h(address.formatted) || text$h(address.label);
+  if (formatted) return formatted;
+  return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
+}
+function recordAddressText(record) {
+  if (!record || typeof record !== "object") return addressText(record);
+  const row = record;
+  for (const key of RECORD_ADDRESS_KEYS) {
+    const label = addressText(row[key]);
+    if (label) return label;
+  }
+  return "";
+}
+function text$h(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
 const services = [
   // Listings
   {
@@ -1202,7 +1374,7 @@ function findCatalogItem(catalog, id) {
   const priced = matches.filter((item) => item.price === price);
   return priced.length === 1 ? priced[0] : void 0;
 }
-function roundMoney$6(value) {
+function roundMoney$8(value) {
   return Math.round(value * 100) / 100;
 }
 function catalogLineName(pkg, qty = 1) {
@@ -1216,13 +1388,13 @@ function catalogLineName(pkg, qty = 1) {
 }
 function catalogLine(pkg, qty = 1) {
   const count = qty > 0 ? qty : 1;
-  const unitPrice = roundMoney$6(pkg.price);
+  const unitPrice = roundMoney$8(pkg.price);
   const line = {
     id: pkg.bookingId || pkg.id,
     name: catalogLineName(pkg, count),
     unitPrice,
     qty: count,
-    price: roundMoney$6(unitPrice * count)
+    price: roundMoney$8(unitPrice * count)
   };
   if (pkg.description) line.description = pkg.description;
   if (pkg.category) line.category = pkg.category;
@@ -1437,7 +1609,7 @@ function resolveSubmittedBooking(body, catalog) {
   }
   return {
     lineItems,
-    total: roundMoney$6(sumLineItemPrices(lineItems)),
+    total: roundMoney$8(sumLineItemPrices(lineItems)),
     promoCode: promo?.code ?? null,
     promoDiscount: promo?.discount ?? 0,
     selectedService: selectedService || null,
@@ -1494,182 +1666,220 @@ function unpricedCatalogBookingError(body, catalog) {
   const verb = listNames.length === 1 ? "is" : "are";
   return `${joinCatalogNames(listNames)} ${verb} not available to book until a price is set. ${CALL_FOR_PRICING_LABEL}.`;
 }
+const ADJUSTMENT_LINE_IDS = {
+  processing: "adjustment-processing",
+  fees: "adjustment-fees",
+  travel: "adjustment-travel"
+};
+function isPromoInvoiceLine(item) {
+  const name = String(item.name || "");
+  const id = String(item.id || "");
+  return name.startsWith("Promo Code:") || id.startsWith("promo-");
+}
+function adjustmentKind(item) {
+  const id = String(item.id || "");
+  const category = String(item.category || "");
+  const kinds = Object.keys(ADJUSTMENT_LINE_IDS);
+  for (const kind of kinds) {
+    const key = ADJUSTMENT_LINE_IDS[kind];
+    if (id === key || category === key) return kind;
+  }
+  return null;
+}
+function invoiceAdjustmentLine(kind, amount) {
+  const price = roundMoney$7(Math.max(0, amount));
+  const name = kind === "processing" ? "Processing" : kind === "fees" ? "Fees" : "Travel";
+  return {
+    id: ADJUSTMENT_LINE_IDS[kind],
+    name,
+    unitPrice: price,
+    qty: 1,
+    price,
+    category: ADJUSTMENT_LINE_IDS[kind]
+  };
+}
+function roundMoney$7(value) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.round(value * 100) / 100;
+}
+const CLOSED_STATUSES = /* @__PURE__ */ new Set(["void", "voided", "cancelled", "canceled"]);
+const SETTLED_STATUSES = /* @__PURE__ */ new Set(["paid", "comped"]);
+function statusOf$1(invoice) {
+  return String(invoice?.status || "").toLowerCase();
+}
+function numeric(value) {
+  if (value == null || value === "") return null;
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : null;
+}
+function invoiceBalance(invoice) {
+  const total = numeric(invoice?.total) ?? 0;
+  const amountPaid = numeric(invoice?.amountPaid) ?? 0;
+  const statedDue = numeric(invoice?.amountDue);
+  const computedDue = Math.max(0, total - amountPaid);
+  const amountDue = statedDue == null ? computedDue : Math.max(0, statedDue);
+  return { total, amountPaid, amountDue };
+}
+function invoiceAllowsDownload(invoice) {
+  if (!invoice) return false;
+  const status2 = statusOf$1(invoice);
+  if (CLOSED_STATUSES.has(status2)) return false;
+  if (SETTLED_STATUSES.has(status2)) return true;
+  const hasMoney = ["total", "amountDue", "amountPaid"].some((key) => numeric(invoice[key]) != null);
+  if (!hasMoney) return false;
+  const { total, amountPaid, amountDue } = invoiceBalance(invoice);
+  const statedDue = numeric(invoice.amountDue);
+  if (total <= 0 && (statedDue == null || statedDue <= 0)) return true;
+  if (statedDue != null && statedDue <= 0 && amountPaid <= 0 && total > 0) return false;
+  return amountDue <= 0 && amountPaid > 0;
+}
+const ICONIC_DOWNLOAD_LOCK = {
+  title: "Your Iconic files are locked",
+  message: "Iconic Images invoices after the shoot. Downloads open when that invoice is paid, or when our team releases the gallery."
+};
+function lockDownloadsOn(value) {
+  return value !== false;
+}
+function requirePaymentOn(value) {
+  return value !== false;
+}
+function clientGalleryDownloadsUnlocked(gate2 = {}) {
+  if (gate2.downloadsReleased === true) return true;
+  if (gate2.lockDownloads === false) return true;
+  if (gate2.downloadEnabled === true) return true;
+  return invoiceAllowsDownload(gate2.invoice);
+}
+function amountStillDue(invoice) {
+  if (!invoice) return 0;
+  const status2 = statusOf$1(invoice);
+  if (SETTLED_STATUSES.has(status2) || CLOSED_STATUSES.has(status2)) return 0;
+  const { total, amountPaid, amountDue } = invoiceBalance(invoice);
+  const computedDue = Math.max(0, total - amountPaid);
+  const statedDue = numeric(invoice.amountDue);
+  if (statedDue != null && statedDue <= 0 && computedDue > 0 && amountPaid <= 0) return computedDue;
+  return amountDue;
+}
+function squarePaymentNote(invoiceId, invoiceNumber) {
+  const label = invoiceNumber ? `Iconic Images invoice ${invoiceNumber}` : "Iconic Images invoice";
+  return `${label} invoiceId:${invoiceId}`;
+}
+function invoiceIdFromSquareNote(note) {
+  if (typeof note !== "string") return null;
+  const match = note.match(/invoiceId:([A-Za-z0-9_-]+)/);
+  return match?.[1] || null;
+}
+const LINK_MEDIA_TYPES = /* @__PURE__ */ new Set(["video", "reel", "tour", "matterport"]);
+function publicText(value) {
+  return typeof value === "string" && value.trim() ? value : null;
+}
+function publicSize(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) return value;
+  return null;
+}
+function publicFileSize(value) {
+  const parsed = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return parsed;
+}
+function publicMediaItem(item, canDownload) {
+  const type = publicText(item.type) || "photo";
+  const title = publicText(item.title) || publicText(item.fileName) || "Media";
+  const fileName2 = publicText(item.fileName) || title;
+  const base = {
+    id: publicText(item.id) || void 0,
+    fileName: fileName2,
+    title,
+    name: publicText(item.name) || fileName2,
+    type,
+    category: publicText(item.category),
+    contentType: publicText(item.contentType),
+    width: publicSize(item.width),
+    height: publicSize(item.height),
+    fileSize: publicFileSize(item.fileSize),
+    canDownload: Boolean(canDownload && item.downloadable !== false && !LINK_MEDIA_TYPES.has(type)),
+    locked: !canDownload
+  };
+  if (!canDownload) {
+    return { ...base, url: null, shareUrl: null, embedUrl: null, poster: null, thumbnailUrl: null };
+  }
+  const url = publicText(item.shareUrl) || publicText(item.embedUrl) || publicText(item.url);
+  return {
+    ...base,
+    url,
+    shareUrl: publicText(item.shareUrl) || publicText(item.url) || publicText(item.embedUrl),
+    embedUrl: publicText(item.embedUrl) || publicText(item.url),
+    poster: publicText(item.poster) || publicText(item.thumbnailUrl),
+    thumbnailUrl: publicText(item.thumbnailUrl) || publicText(item.poster)
+  };
+}
 function processingEnabled(env) {
   const source = process.env;
   const raw = String(source?.INVOICE_PROCESSING_MODE ?? "").trim().toLowerCase();
   return raw !== "off" && raw !== "disabled" && raw !== "legacy" && raw !== "0";
 }
-let _client = null;
-function getClient() {
-  if (_client) return _client;
-  const sid = process.env.TWILIO_ACCOUNT_SID;
-  const token = process.env.TWILIO_AUTH_TOKEN;
-  if (!sid || !token) {
-    throw new Error("Twilio credentials not configured (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN).");
-  }
-  _client = twilio(sid, token);
-  return _client;
+function processingFee(base) {
+  return fromCents(processingFeeCents(toCents(base)));
 }
-function normalisePhone(raw) {
-  const digits2 = raw.replace(/\D/g, "");
-  if (digits2.length === 10) return `+1${digits2}`;
-  if (digits2.length === 11 && digits2.startsWith("1")) return `+${digits2}`;
-  return `+${digits2}`;
+function processingFeeCents(baseCents) {
+  const cents2 = Math.round(Number(baseCents));
+  if (!Number.isFinite(cents2) || cents2 <= 0) return 0;
+  return Math.floor((cents2 * 28 + 500) / 1e3);
 }
-async function sendSMS({ to, body, from, kind }) {
-  if (kind === STAFF_INBOUND_SMS_KIND && !isStaffInboundSmsDestination(to)) {
-    console.error(`[SMS] Refused staff_inbound to ${to}. Only the office Google Voice number is allowed.`);
-    return { sid: "", status: "refused", suppressed: true };
+function computeInvoiceTotals(input) {
+  const subtotal = nonNegativeMoney(input.subtotal);
+  const promotions = nonNegativeMoney(input.promotions);
+  const fees = nonNegativeMoney(input.fees);
+  const travel = nonNegativeMoney(input.travel);
+  const tax = nonNegativeMoney(input.tax);
+  const amountPaid = nonNegativeMoney(input.amountPaid);
+  const netServices = roundMoney$6(Math.max(0, subtotal - promotions));
+  const processingBase = roundMoney$6(Math.max(0, netServices + fees));
+  const saleBeforeProcessing = roundMoney$6(netServices + fees + travel + tax);
+  const comped = input.comped === true;
+  const stored = input.processing == null || !Number.isFinite(Number(input.processing)) ? null : nonNegativeMoney(input.processing);
+  let processing = 0;
+  let processingPolicy = "waived";
+  if (comped || saleBeforeProcessing <= 0 || processingBase <= 0) {
+    processing = 0;
+    processingPolicy = "waived";
+  } else if (stored != null) {
+    processing = stored;
+    processingPolicy = "stored";
+  } else if (input.applyProcessing !== false) {
+    processing = processingFee(processingBase);
+    processingPolicy = "included";
   }
-  if (!smsAllowed(kind)) {
-    console.warn(`[SMS] Suppressed to ${to} — ${clientNotifyBlockReason()}. No message sent.`);
-    return { sid: "", status: "suppressed", suppressed: true };
-  }
-  const fromNumber = from || process.env.TWILIO_PHONE_NUMBER;
-  if (!fromNumber) throw new Error("TWILIO_PHONE_NUMBER not set.");
-  const client = getClient();
-  const message = await client.messages.create({
-    to: normalisePhone(to),
-    from: fromNumber,
-    body
-  });
-  console.log(`[SMS] Sent to ${to} — SID: ${message.sid}`);
-  return { sid: message.sid, status: message.status };
-}
-async function sendSMSCampaign(recipients, bodyTemplate, messagingServiceSid) {
-  if (!clientNotifyLive()) {
-    console.warn(`[SMS] Suppressed campaign to ${recipients.length} recipients — ${clientNotifyBlockReason()}.`);
-    return recipients.map((recipient) => ({ phone: recipient.phone, error: "suppressed" }));
-  }
-  const client = getClient();
-  const sid = messagingServiceSid || process.env.TWILIO_MESSAGING_SERVICE_SID;
-  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
-  const results = [];
-  for (const recipient of recipients) {
-    if (!recipient.phone) continue;
-    const body = bodyTemplate.replace(/\{\{name\}\}/gi, recipient.name || "there");
-    try {
-      const msg = await client.messages.create({
-        to: normalisePhone(recipient.phone),
-        ...sid ? { messagingServiceSid: sid } : { from: fromNumber },
-        body
-      });
-      results.push({ phone: recipient.phone, sid: msg.sid });
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      console.error(`[SMS] Campaign send failed for ${recipient.phone}:`, errorMessage);
-      results.push({ phone: recipient.phone, error: errorMessage });
-    }
-    await new Promise((r) => setTimeout(r, 50));
-  }
-  return results;
-}
-async function createMaskedConversation(friendlyName, photographer, client, webhookUrl) {
-  if (!clientNotifyLive()) {
-    console.warn(`[SMS] Suppressed masked conversation — ${clientNotifyBlockReason()}. No SMS sent.`);
-    throw new Error("Client notifications are off.");
-  }
-  const client_sdk = getClient();
-  const conversation = await client_sdk.conversations.v1.conversations.create({
-    friendlyName,
-    timers: {
-      inactive: "P30D",
-      // auto-close after 30 days inactive
-      closed: "P60D"
-    }
-  });
-  const conversationSid = conversation.sid;
-  if (webhookUrl) {
-    await client_sdk.conversations.v1.conversations(conversationSid).webhooks.create({
-      target: "webhook",
-      "configuration.method": "post",
-      "configuration.url": webhookUrl,
-      "configuration.filters": ["onMessageAdded"]
-    });
-  }
-  const photographerParticipant = await client_sdk.conversations.v1.conversations(conversationSid).participants.create({
-    "messagingBinding.type": "sms",
-    "messagingBinding.address": normalisePhone(photographer.phone),
-    identity: `photographer_${normalisePhone(photographer.phone).replace("+", "")}`
-  });
-  const clientParticipant = await client_sdk.conversations.v1.conversations(conversationSid).participants.create({
-    "messagingBinding.type": "sms",
-    "messagingBinding.address": normalisePhone(client.phone),
-    identity: `client_${normalisePhone(client.phone).replace("+", "")}`
-  });
-  console.log(`[Conversations] Created: ${conversationSid} (${friendlyName})`);
+  const total = roundMoney$6(saleBeforeProcessing + processing);
   return {
-    conversationSid,
-    photographerParticipantSid: photographerParticipant.sid,
-    clientParticipantSid: clientParticipant.sid
+    subtotal,
+    promotions,
+    fees,
+    travel,
+    tax,
+    processingBase,
+    processing,
+    total,
+    amountPaid,
+    amountDue: roundMoney$6(Math.max(0, total - amountPaid)),
+    processingPolicy
   };
 }
-async function sendConversationMessage(conversationSid, body, author = "Iconic Images") {
-  if (!clientNotifyLive()) {
-    console.warn(`[SMS] Suppressed conversation message — ${clientNotifyBlockReason()}. No SMS sent.`);
-    throw new Error("Client notifications are off.");
-  }
-  const client_sdk = getClient();
-  const message = await client_sdk.conversations.v1.conversations(conversationSid).messages.create({ body, author });
-  return { sid: message.sid };
+function toCents(value) {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return Math.round(value * 100);
 }
-async function closeConversation(conversationSid) {
-  const client_sdk = getClient();
-  await client_sdk.conversations.v1.conversations(conversationSid).update({ state: "closed" });
-  console.log(`[Conversations] Closed: ${conversationSid}`);
+function fromCents(cents2) {
+  return roundMoney$6(cents2 / 100);
 }
-const SMS_TEMPLATES = {
-  bookingConfirmation: (name, date, address, total) => `Hi ${name}! We've received your booking request for ${address}.
-
-⚠️ THIS IS NOT A CONFIRMATION. Our team will review your request and reach out shortly to confirm your appointment.
-
-Requested date: ${date}
-Estimated total: ${total}
-
-Questions? Reply to this text, or reach us at ${BUSINESS_CONTACT.line}. — Iconic Images 📸`,
-  appointmentReminder24h: (name, date, time, address) => `Hey ${name}, reminder! Your Iconic Images shoot is tomorrow 📸
-
-🕐 ${time}
-📍 ${address}
-
-Reply CONFIRM to confirm or call us to reschedule.`,
-  appointmentReminder1h: (name, time) => `Hi ${name}! Your photographer is on the way — arriving around ${time} 📸
-Reply to this text with any last-minute notes!`,
-  photosDelivered: (name, galleryUrl) => `🎉 ${name}, your photos are ready!
-
-View your gallery: ${galleryUrl}
-
-Questions or edits? Just reply here. — Iconic Images`,
-  photographerIntro: (photographerName, clientName2, date) => `Hi ${clientName2}! I'm ${photographerName}, your Iconic Images photographer for ${date}. Feel free to text me here with any questions before the shoot! 📸`,
-  newBookingAlert: (address, date, services2) => `🔔 NEW BOOKING — Iconic Images
-
-📍 ${address}
-📅 ${date}
-🏠 ${services2}
-
-Check dashboard for details.`
-};
-const RECORD_ADDRESS_KEYS = ["addressLabel", "address", "propertyAddress", "shootLocation", "location"];
-function addressText(value) {
-  if (!value) return "";
-  if (typeof value === "string") return value.trim();
-  if (typeof value !== "object" || Array.isArray(value)) return "";
-  const address = value;
-  const formatted = text$h(address.formatted) || text$h(address.label);
-  if (formatted) return formatted;
-  return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
+function nonNegativeMoney(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  return roundMoney$6(amount);
 }
-function recordAddressText(record) {
-  if (!record || typeof record !== "object") return addressText(record);
-  const row = record;
-  for (const key of RECORD_ADDRESS_KEYS) {
-    const label = addressText(row[key]);
-    if (label) return label;
-  }
-  return "";
-}
-function text$h(value) {
-  return typeof value === "string" ? value.trim() : "";
+function roundMoney$6(value) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.round(value * 100) / 100;
 }
 const PLAYTEST_ADDRESS = "100 Playtest Lane, Austin, TX 78701";
 const STAFF_ROLES = ["admin", "coordinator", "photographer", "editor"];
@@ -1992,6 +2202,35 @@ function buildBookingInvoiceDraft(input) {
     travelFields.travelFeeCents = input.travel.travelFeeCents;
     travelFields.travelQuoted = input.travel.travelQuoted;
   }
+  const tax = Number(input.pricing?.tax) || 0;
+  if (input.applyProcessing) {
+    const priced = applyProcessingToDraftLines(lineItems, {
+      promoDiscount: Number(input.promoDiscount) || 0,
+      tax
+    });
+    lineItems = priced.lineItems;
+    total = priced.total;
+    return {
+      orderRequestId: input.orderRequestId || null,
+      orderId: null,
+      clientId: input.clientId || null,
+      clientEmail: normalizeEmail$1(input.clientEmail),
+      clientName: input.clientName,
+      lineItems,
+      subtotal: priced.subtotal,
+      tax,
+      total,
+      amountPaid: 0,
+      amountDue: total,
+      status: "draft",
+      paymentProvider: "square",
+      promoCode: input.promoCode || null,
+      promoDiscount: priced.promotions,
+      processing: priced.processing,
+      processingPolicy: priced.processingPolicy,
+      ...travelFields
+    };
+  }
   return {
     orderRequestId: input.orderRequestId || null,
     orderId: null,
@@ -2000,7 +2239,7 @@ function buildBookingInvoiceDraft(input) {
     clientName: input.clientName,
     lineItems,
     subtotal: input.travel ? total : Number(input.pricing?.subtotal ?? total) || 0,
-    tax: Number(input.pricing?.tax) || 0,
+    tax,
     total,
     amountPaid: 0,
     amountDue: total,
@@ -2010,6 +2249,43 @@ function buildBookingInvoiceDraft(input) {
     promoDiscount: Number(input.promoDiscount) || 0,
     ...travelFields
   };
+}
+function applyProcessingToDraftLines(lineItems, input) {
+  const services2 = lineItems.filter((item) => !isPromoInvoiceLine(item) && !adjustmentKind(item) && !isTravelFeeLine(item));
+  const promoLines = lineItems.filter((item) => isPromoInvoiceLine(item));
+  const travelLines = lineItems.filter((item) => isTravelFeeLine(item));
+  const feeLines = lineItems.filter((item) => adjustmentKind(item) === "fees");
+  const storedProcessing = lineItems.find((item) => adjustmentKind(item) === "processing");
+  const subtotal = roundDraftMoney(services2.reduce((sum, item) => sum + item.price, 0));
+  const promoFromLines = roundDraftMoney(promoLines.reduce((sum, item) => sum + Math.abs(item.price), 0));
+  const promotions = promoFromLines > 0 ? promoFromLines : roundDraftMoney(Math.max(0, input.promoDiscount));
+  const fees = roundDraftMoney(feeLines.reduce((sum, item) => sum + item.price, 0));
+  const travel = roundDraftMoney(travelLines.reduce((sum, item) => sum + item.price, 0));
+  const totals = computeInvoiceTotals({
+    subtotal,
+    promotions,
+    fees,
+    travel,
+    tax: input.tax,
+    processing: storedProcessing ? storedProcessing.price : null,
+    applyProcessing: !storedProcessing
+  });
+  const next = [
+    ...services2,
+    ...promoLines,
+    ...feeLines,
+    ...travelLines
+  ];
+  if (totals.processing > 0 && !storedProcessing) {
+    next.push(invoiceAdjustmentLine("processing", totals.processing));
+  } else if (storedProcessing) {
+    next.push(storedProcessing);
+  }
+  return { ...totals, lineItems: next };
+}
+function roundDraftMoney(value) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.round(value * 100) / 100;
 }
 function existingInvoiceId(value) {
   if (typeof value !== "string") return null;
@@ -5040,117 +5316,6 @@ function isPlaytestDeliveryQaGallery(record) {
 function exactQaEmail(value) {
   return mailboxAddress(typeof value === "string" ? value : "") === DELIVERY_QA_CLIENT_EMAIL;
 }
-const CLOSED_STATUSES = /* @__PURE__ */ new Set(["void", "voided", "cancelled", "canceled"]);
-const SETTLED_STATUSES = /* @__PURE__ */ new Set(["paid", "comped"]);
-function statusOf$1(invoice) {
-  return String(invoice?.status || "").toLowerCase();
-}
-function numeric(value) {
-  if (value == null || value === "") return null;
-  const amount = Number(value);
-  return Number.isFinite(amount) ? amount : null;
-}
-function invoiceBalance(invoice) {
-  const total = numeric(invoice?.total) ?? 0;
-  const amountPaid = numeric(invoice?.amountPaid) ?? 0;
-  const statedDue = numeric(invoice?.amountDue);
-  const computedDue = Math.max(0, total - amountPaid);
-  const amountDue = statedDue == null ? computedDue : Math.max(0, statedDue);
-  return { total, amountPaid, amountDue };
-}
-function invoiceAllowsDownload(invoice) {
-  if (!invoice) return false;
-  const status2 = statusOf$1(invoice);
-  if (CLOSED_STATUSES.has(status2)) return false;
-  if (SETTLED_STATUSES.has(status2)) return true;
-  const hasMoney = ["total", "amountDue", "amountPaid"].some((key) => numeric(invoice[key]) != null);
-  if (!hasMoney) return false;
-  const { total, amountPaid, amountDue } = invoiceBalance(invoice);
-  const statedDue = numeric(invoice.amountDue);
-  if (total <= 0 && (statedDue == null || statedDue <= 0)) return true;
-  if (statedDue != null && statedDue <= 0 && amountPaid <= 0 && total > 0) return false;
-  return amountDue <= 0 && amountPaid > 0;
-}
-const ICONIC_DOWNLOAD_LOCK = {
-  title: "Your Iconic files are locked",
-  message: "Iconic Images invoices after the shoot. Downloads open when that invoice is paid, or when our team releases the gallery."
-};
-function lockDownloadsOn(value) {
-  return value !== false;
-}
-function requirePaymentOn(value) {
-  return value !== false;
-}
-function clientGalleryDownloadsUnlocked(gate2 = {}) {
-  if (gate2.downloadsReleased === true) return true;
-  if (gate2.lockDownloads === false) return true;
-  if (gate2.downloadEnabled === true) return true;
-  return invoiceAllowsDownload(gate2.invoice);
-}
-function amountStillDue(invoice) {
-  if (!invoice) return 0;
-  const status2 = statusOf$1(invoice);
-  if (SETTLED_STATUSES.has(status2) || CLOSED_STATUSES.has(status2)) return 0;
-  const { total, amountPaid, amountDue } = invoiceBalance(invoice);
-  const computedDue = Math.max(0, total - amountPaid);
-  const statedDue = numeric(invoice.amountDue);
-  if (statedDue != null && statedDue <= 0 && computedDue > 0 && amountPaid <= 0) return computedDue;
-  return amountDue;
-}
-function squarePaymentNote(invoiceId, invoiceNumber) {
-  const label = invoiceNumber ? `Iconic Images invoice ${invoiceNumber}` : "Iconic Images invoice";
-  return `${label} invoiceId:${invoiceId}`;
-}
-function invoiceIdFromSquareNote(note) {
-  if (typeof note !== "string") return null;
-  const match = note.match(/invoiceId:([A-Za-z0-9_-]+)/);
-  return match?.[1] || null;
-}
-const LINK_MEDIA_TYPES = /* @__PURE__ */ new Set(["video", "reel", "tour", "matterport"]);
-function publicText(value) {
-  return typeof value === "string" && value.trim() ? value : null;
-}
-function publicSize(value) {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string" && value.trim()) return value;
-  return null;
-}
-function publicFileSize(value) {
-  const parsed = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
-  if (!Number.isFinite(parsed) || parsed < 0) return null;
-  return parsed;
-}
-function publicMediaItem(item, canDownload) {
-  const type = publicText(item.type) || "photo";
-  const title = publicText(item.title) || publicText(item.fileName) || "Media";
-  const fileName2 = publicText(item.fileName) || title;
-  const base = {
-    id: publicText(item.id) || void 0,
-    fileName: fileName2,
-    title,
-    name: publicText(item.name) || fileName2,
-    type,
-    category: publicText(item.category),
-    contentType: publicText(item.contentType),
-    width: publicSize(item.width),
-    height: publicSize(item.height),
-    fileSize: publicFileSize(item.fileSize),
-    canDownload: Boolean(canDownload && item.downloadable !== false && !LINK_MEDIA_TYPES.has(type)),
-    locked: !canDownload
-  };
-  if (!canDownload) {
-    return { ...base, url: null, shareUrl: null, embedUrl: null, poster: null, thumbnailUrl: null };
-  }
-  const url = publicText(item.shareUrl) || publicText(item.embedUrl) || publicText(item.url);
-  return {
-    ...base,
-    url,
-    shareUrl: publicText(item.shareUrl) || publicText(item.url) || publicText(item.embedUrl),
-    embedUrl: publicText(item.embedUrl) || publicText(item.url),
-    poster: publicText(item.poster) || publicText(item.thumbnailUrl),
-    thumbnailUrl: publicText(item.thumbnailUrl) || publicText(item.poster)
-  };
-}
 const SETTLED = /* @__PURE__ */ new Set(["paid", "comped"]);
 function text$9(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -5333,12 +5498,23 @@ router$o.post("/", async (req, res) => {
       return res.status(400).json({ error: "No services selected." });
     }
     const traveled = applyServerTravel(keptLines, savedAddress);
-    const lineItems = traveled.lineItems;
-    const total = traveled.total;
     const travel = traveled.travel;
     const promoCode = resolved.promoCode;
     const promoDiscount = resolved.promoDiscount;
-    const pricing = { subtotal: total, tax: 0, total };
+    const sale = buildBookingInvoiceDraft({
+      lineItems: traveled.lineItems,
+      total: traveled.total,
+      pricing: { subtotal: traveled.total, tax: 0 },
+      clientEmail: email,
+      clientName: clientName2,
+      promoCode,
+      promoDiscount,
+      travel,
+      applyProcessing: processingEnabled()
+    });
+    const lineItems = sale.lineItems;
+    const total = sale.total;
+    const pricing = { subtotal: sale.subtotal, tax: sale.tax, total: sale.total };
     const selectedService = resolved.selectedService;
     const selectedBasics = resolved.selectedBasics;
     const selectedAddOns = resolved.selectedAddOns;
@@ -5359,6 +5535,8 @@ router$o.post("/", async (req, res) => {
       vibeNote: vibeNote || "",
       promoCode: promoCode || null,
       promoDiscount: Number(promoDiscount) || 0,
+      processing: sale.processing ?? 0,
+      processingPolicy: sale.processingPolicy ?? (processingEnabled() ? "included" : "waived"),
       travelZone: travel.travelZone,
       travelMiles: travel.travelMiles,
       travelFeeCents: travel.travelFeeCents,
@@ -5454,7 +5632,7 @@ router$o.post("/", async (req, res) => {
           addressLabel: displayAddress,
           scheduledDate: typeof scheduledDate === "string" ? scheduledDate : null,
           scheduledTime: typeof scheduledTime === "string" ? scheduledTime : null,
-          services: lineItems,
+          services: traveled.lineItems,
           notes: typeof vibeNote === "string" ? vibeNote : ""
         });
       } catch (err) {
@@ -5473,7 +5651,8 @@ router$o.post("/", async (req, res) => {
         promoCode,
         promoDiscount,
         travel,
-        clientId: account.clientId
+        clientId: account.clientId,
+        prepared: sale
       });
       invoiceId = created.invoiceId;
       try {
@@ -5930,7 +6109,10 @@ router$o.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         orderRequestId: req.params.id,
         promoCode: request.promoCode,
         promoDiscount: request.promoDiscount,
-        travel
+        travel,
+        // A request quoted with processing already has the fee on its lines.
+        // Older requests have no policy, so confirming them does not add one.
+        applyProcessing: request.processingPolicy === "included"
       });
       await invoiceRef.set({
         ...draft,
@@ -6054,7 +6236,7 @@ async function linkClientIdByEmail(email) {
 }
 async function createBookingInvoiceDraft(input) {
   const clientId2 = input.clientId || await linkClientIdByEmail(input.email);
-  const draft = buildBookingInvoiceDraft({
+  const draft = input.prepared ? { ...input.prepared, orderRequestId: input.orderRequestId, clientId: clientId2 || input.prepared.clientId } : buildBookingInvoiceDraft({
     lineItems: input.lineItems,
     total: input.total,
     pricing: input.pricing,
@@ -10692,6 +10874,7 @@ function invoiceMoney(invoice) {
     amountPaid: invoice.amountPaid,
     amountDue: invoice.amountDue,
     processing: invoice.processing ?? null,
+    processingPolicy: invoice.processingPolicy ?? null,
     fees: invoice.fees ?? null,
     travel: invoice.travel ?? null,
     promoDiscount: invoice.promoDiscount ?? null,
