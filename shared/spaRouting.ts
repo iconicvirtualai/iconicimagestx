@@ -46,6 +46,8 @@ const RESERVED: Rewrite[] = [
   { source: "/api/media/display/p/(.*)", destination: "/api/media-display" },
   { source: "/api/media/display/o/(.*)", destination: "/api/media-display" },
   { source: "/api/media/display/(.*)", destination: "/api/media-display" },
+  { source: "/api/site-content/media", destination: "/api/media-display" },
+  { source: "/api/site-content/dropbox", destination: "/api/media-display" },
   { source: "/api", destination: "/api/index" },
   { source: "/api/(.*)", destination: "/api/index" },
   // Vercel does not chain rewrites. /present/:token arrives at the API

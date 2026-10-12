@@ -1,6 +1,6 @@
 /**
  * Merge a saved page over the hardcoded defaults.
- * Unknown pages are dropped. Field ids the site still renders are kept.
+ * Unknown pages, blocks, and fields are dropped. Known field ids keep the saved copy.
  */
 
 import {
@@ -26,9 +26,12 @@ function cleanField(field: ContentField, fallback?: ContentField): ContentField 
   return next;
 }
 
-function cleanItem(item: ContentItem): ContentItem | null {
+function cleanItem(item: ContentItem, allowed: Set<string> | null): ContentItem | null {
   if (!item?.id || !Array.isArray(item.fields)) return null;
-  const fields = item.fields.map((field) => cleanField(field)).filter((field): field is ContentField => Boolean(field));
+  const fields = item.fields
+    .map((field) => cleanField(field))
+    .filter((field): field is ContentField => Boolean(field))
+    .filter((field) => !allowed || allowed.has(field.id));
   if (!fields.length) return null;
   return { id: String(item.id).slice(0, 80), fields };
 }
@@ -40,15 +43,12 @@ function cleanBlock(block: ContentBlock, fallback?: ContentBlock): ContentBlock 
     const incoming = block.fields?.find((item) => item.id === field.id);
     return cleanField(incoming || field, field)!;
   });
-  for (const incoming of block.fields ?? []) {
-    if (!fields.some((field) => field.id === incoming.id)) {
-      const cleaned = cleanField(incoming);
-      if (cleaned) fields.push(cleaned);
-    }
-  }
-  const items = Array.isArray(block.items)
-    ? block.items.map(cleanItem).filter((item): item is ContentItem => Boolean(item)).slice(0, MAX_ITEMS)
-    : fallback?.items;
+  const allowedItemFields = new Set((fallback?.items ?? []).flatMap((item) => item.fields.map((field) => field.id)));
+  const items = fallback?.items
+    ? (Array.isArray(block.items)
+      ? block.items.map((item) => cleanItem(item, allowedItemFields)).filter((item): item is ContentItem => Boolean(item)).slice(0, MAX_ITEMS)
+      : fallback.items)
+    : undefined;
   return {
     id: String(block.id),
     label: String(block.label || fallback?.label || block.id),
@@ -68,12 +68,6 @@ export function mergeContent(overlay: ContentPage | null | undefined): ContentPa
     const incoming = overlay.blocks?.find((item) => item.id === block.id);
     return incoming ? cleanBlock(incoming, block)! : cleanBlock(block, block)!;
   });
-  for (const incoming of overlay.blocks ?? []) {
-    if (!blocks.some((block) => block.id === incoming.id)) {
-      const cleaned = cleanBlock(incoming);
-      if (cleaned) blocks.push(cleaned);
-    }
-  }
   blocks.sort((a, b) => {
     const ai = order.indexOf(a.id);
     const bi = order.indexOf(b.id);

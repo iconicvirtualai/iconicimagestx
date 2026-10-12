@@ -8,9 +8,11 @@ import nodemailer from "nodemailer";
 import twilio from "twilio";
 import { google } from "googleapis";
 import crypto, { randomBytes, randomUUID, createHmac as createHmac$1, timingSafeEqual as timingSafeEqual$1 } from "crypto";
-import { createHmac, timingSafeEqual, randomBytes as randomBytes$1 } from "node:crypto";
+import { createHmac, timingSafeEqual, randomBytes as randomBytes$1, randomUUID as randomUUID$1 } from "node:crypto";
 import Stripe from "stripe";
 import * as XLSX from "xlsx";
+import os from "os";
+import { lookup } from "node:dns/promises";
 const STAFF_ROLES$1 = ["admin", "coordinator", "photographer", "editor"];
 function isStaffRole$1(role) {
   return typeof role === "string" && STAFF_ROLES$1.includes(role);
@@ -5053,11 +5055,11 @@ function lockDownloadsOn(value) {
 function requirePaymentOn(value) {
   return value !== false;
 }
-function clientGalleryDownloadsUnlocked(gate = {}) {
-  if (gate.downloadsReleased === true) return true;
-  if (gate.lockDownloads === false) return true;
-  if (gate.downloadEnabled === true) return true;
-  return invoiceAllowsDownload(gate.invoice);
+function clientGalleryDownloadsUnlocked(gate2 = {}) {
+  if (gate2.downloadsReleased === true) return true;
+  if (gate2.lockDownloads === false) return true;
+  if (gate2.downloadEnabled === true) return true;
+  return invoiceAllowsDownload(gate2.invoice);
 }
 function amountStillDue(invoice) {
   if (!invoice) return 0;
@@ -5227,7 +5229,7 @@ function refuseQaStaffPhone(input) {
   if (!match) return null;
   return refusal(qaStaffAssignmentError([match], input.record));
 }
-const router$n = Router();
+const router$o = Router();
 const db$o = () => admin.firestore();
 function appUrl$2() {
   return process.env.APP_URL || "https://iconicimagestx.com";
@@ -5260,7 +5262,7 @@ async function loadBookingCatalog() {
     return packagesForStaffEditor([]);
   }
 }
-router$n.post("/", async (req, res) => {
+router$o.post("/", async (req, res) => {
   try {
     const {
       firstName,
@@ -5580,11 +5582,11 @@ router$n.post("/", async (req, res) => {
     return res.status(500).json({ error: "Failed to submit booking request." });
   }
 });
-router$n.get("/catalog", async (_req, res) => {
+router$o.get("/catalog", async (_req, res) => {
   const catalog = await loadBookingCatalog();
   return res.json(publicBookingCatalogResponse(catalog));
 });
-router$n.get("/", requireCoordinator, async (_req, res) => {
+router$o.get("/", requireCoordinator, async (_req, res) => {
   try {
     const snapshot = await db$o().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
     const requests = snapshot.docs.map((doc) => ({
@@ -5597,7 +5599,7 @@ router$n.get("/", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking requests." });
   }
 });
-router$n.get("/:id", requireCoordinator, async (req, res) => {
+router$o.get("/:id", requireCoordinator, async (req, res) => {
   try {
     const doc = await db$o().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) {
@@ -5609,7 +5611,7 @@ router$n.get("/:id", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking request." });
   }
 });
-router$n.patch("/:id/confirm", requireCoordinator, async (req, res) => {
+router$o.patch("/:id/confirm", requireCoordinator, async (req, res) => {
   try {
     const { assignedPhotographerId, assignedPhotographerName, scheduledDate, scheduledTime, internalNotes } = req.body;
     const requestDoc = await db$o().collection("orderRequests").doc(req.params.id).get();
@@ -5948,7 +5950,7 @@ router$n.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to confirm booking." });
   }
 });
-router$n.patch("/:id/decline", requireCoordinator, async (req, res) => {
+router$o.patch("/:id/decline", requireCoordinator, async (req, res) => {
   try {
     const { reason } = req.body;
     const doc = await db$o().collection("orderRequests").doc(req.params.id).get();
@@ -6042,9 +6044,9 @@ async function generateInvoiceNumber() {
     year
   );
 }
-const router$m = Router();
+const router$n = Router();
 const db$n = () => admin.firestore();
-router$m.get("/", requireStaff, async (req, res) => {
+router$n.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, photographerId, limit = "50", startAfter } = req.query;
     let query = db$n().collection("orders").orderBy("createdAt", "desc");
@@ -6072,7 +6074,7 @@ router$m.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch orders." });
   }
 });
-router$m.get("/dashboard", requireStaff, async (_req, res) => {
+router$n.get("/dashboard", requireStaff, async (_req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -6105,7 +6107,7 @@ router$m.get("/dashboard", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch dashboard stats." });
   }
 });
-router$m.get("/:id", requireStaff, async (req, res) => {
+router$n.get("/:id", requireStaff, async (req, res) => {
   try {
     const orderDoc = await db$n().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
@@ -6140,7 +6142,7 @@ router$m.get("/:id", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch order." });
   }
 });
-router$m.patch("/:id", requireCoordinator, async (req, res) => {
+router$n.patch("/:id", requireCoordinator, async (req, res) => {
   try {
     const allowed = [
       "status",
@@ -6191,7 +6193,7 @@ const VALID_TRANSITIONS = {
   completed: [],
   cancelled: []
 };
-router$m.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$n.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2, note } = req.body;
     const orderDoc = await db$n().collection("orders").doc(req.params.id).get();
@@ -6237,7 +6239,7 @@ router$m.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update order status." });
   }
 });
-router$m.get("/:id/timeline", requireStaff, async (req, res) => {
+router$n.get("/:id/timeline", requireStaff, async (req, res) => {
   try {
     const [messages, editRequests, agentLogs] = await Promise.all([
       db$n().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
@@ -7250,9 +7252,9 @@ function displaySafeShareMedia(listing) {
     tourUrl: safeTour || embedTour(listing, needles)
   };
 }
-function ownerStudioProject(listing, pub, gate = {}) {
-  const authoritativeInvoice = Object.prototype.hasOwnProperty.call(gate, "invoice");
-  const invoiceDoc = authoritativeInvoice && gate.invoice && typeof gate.invoice === "object" ? gate.invoice : null;
+function ownerStudioProject(listing, pub, gate2 = {}) {
+  const authoritativeInvoice = Object.prototype.hasOwnProperty.call(gate2, "invoice");
+  const invoiceDoc = authoritativeInvoice && gate2.invoice && typeof gate2.invoice === "object" ? gate2.invoice : null;
   const invoiceStatus = authoritativeInvoice ? text$7(invoiceDoc?.status) : text$7(invoiceOf(listing)?.status);
   const invoice = invoiceStatus ? { status: invoiceStatus } : null;
   const downloadsUnlocked = studioDownloadsUnlocked({
@@ -7261,8 +7263,8 @@ function ownerStudioProject(listing, pub, gate = {}) {
       invoiceStatus: listing.invoiceStatus,
       paymentStatus: listing.paymentStatus,
       invoice: listing.invoice,
-      downloadEnabled: gate.downloadEnabled ?? listing.downloadEnabled,
-      downloadsReleased: gate.downloadsReleased ?? listing.downloadsReleased,
+      downloadEnabled: gate2.downloadEnabled ?? listing.downloadEnabled,
+      downloadsReleased: gate2.downloadsReleased ?? listing.downloadsReleased,
       lockDownloads: listing.lockDownloads
     },
     galleries: [],
@@ -7283,7 +7285,7 @@ function ownerStudioProject(listing, pub, gate = {}) {
     images: downloadsUnlocked ? ownerImageDownloads(listing, source.images) : source.images,
     files: downloadsUnlocked ? ownerFiles(listing) : []
   };
-  if (downloadsUnlocked || gate.staffAccess === true) return project;
+  if (downloadsUnlocked || gate2.staffAccess === true) return project;
   return {
     ...project,
     ...lockedOwnerMedia(listing, source),
@@ -7792,10 +7794,10 @@ function galleryDeliveredHistoryEntry(input) {
     email: input.email
   };
 }
-function staffLabel(actor) {
-  const email = clean(actor?.email);
-  const name = clean(actor?.name);
-  const uid = clean(actor?.uid);
+function staffLabel(actor2) {
+  const email = clean(actor2?.email);
+  const name = clean(actor2?.name);
+  const uid = clean(actor2?.uid);
   if (name && email) return `${name} (${email})`;
   return email || name || uid || "staff";
 }
@@ -8058,8 +8060,8 @@ function ensureBucketCors() {
   }
   return corsAttempt;
 }
-function firebaseDownloadUrl(bucketName, storagePath, token) {
-  return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(storagePath)}?alt=media&token=${token}`;
+function firebaseDownloadUrl(bucketName2, storagePath, token) {
+  return `https://firebasestorage.googleapis.com/v0/b/${bucketName2}/o/${encodeURIComponent(storagePath)}?alt=media&token=${token}`;
 }
 async function createListingUploadUrl(listingId, fileName2, contentType, folder) {
   await ensureBucketCors();
@@ -9326,8 +9328,8 @@ async function deliverGalleryToClient(galleryId, options) {
     throw httpError$2(409, report.message, { report });
   }
   const gallery = galleryDoc.data() || {};
-  const gate = await downloadGateForGallery$1(gallery);
-  const downloadEnabled = clientGalleryDownloadsUnlocked(gate);
+  const gate2 = await downloadGateForGallery$1(gallery);
+  const downloadEnabled = clientGalleryDownloadsUnlocked(gate2);
   const expiresInDays = Number(options?.expiresInDays) > 0 ? Number(options?.expiresInDays) : 30;
   const expiresAt = admin.firestore.Timestamp.fromDate(
     new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1e3)
@@ -9662,7 +9664,7 @@ const handlePublicGalleryLink = async (req, res) => {
     return res.status(500).json({ code: "lookup_failed", error: message, message });
   }
 };
-const router$l = Router();
+const router$m = Router();
 const db$h = () => admin.firestore();
 const storage = () => admin.storage().bucket();
 function cleanPosterUrl(value) {
@@ -9728,9 +9730,9 @@ async function downloadGateForGallery(gallery) {
     lockDownloads: listing.lockDownloads
   };
 }
-function clientGalleryPayload(id, gallery, gate) {
-  const unlocked = clientGalleryDownloadsUnlocked(gate);
-  const invoice = gate.invoice;
+function clientGalleryPayload(id, gallery, gate2) {
+  const unlocked = clientGalleryDownloadsUnlocked(gate2);
+  const invoice = gate2.invoice;
   const showMedia = ["delivered", "approved"].includes(String(gallery.status || ""));
   const media = [
     ...Array.isArray(gallery.mediaItems) ? gallery.mediaItems : [],
@@ -9758,7 +9760,7 @@ function clientGalleryPayload(id, gallery, gate) {
     mediaItems: showMedia ? lockedClientGalleryMedia(id, media, unlocked) : []
   };
 }
-router$l.get("/", requireStaff, async (req, res) => {
+router$m.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, orderId } = req.query;
     let query = db$h().collection("galleries").orderBy("createdAt", "desc");
@@ -9781,7 +9783,7 @@ function malformedPublicGalleryId(id) {
   if (/^__.*__$/.test(id)) return true;
   return /[\u0000-\u001F\u007F]/.test(id);
 }
-router$l.get("/public/:id", async (req, res) => {
+router$m.get("/public/:id", async (req, res) => {
   const id = typeof req.params.id === "string" ? req.params.id : "";
   if (malformedPublicGalleryId(id)) {
     console.warn("[Galleries] Public gallery id rejected.");
@@ -9798,8 +9800,8 @@ router$l.get("/public/:id", async (req, res) => {
       return publicGalleryNotFound(res);
     }
     const gallery = doc.data();
-    const gate = await downloadGateForGallery(gallery);
-    return res.json(clientGalleryPayload(doc.id, gallery, gate));
+    const gate2 = await downloadGateForGallery(gallery);
+    return res.json(clientGalleryPayload(doc.id, gallery, gate2));
   } catch (err) {
     console.error("[Galleries] Public fetch error:", err);
     const code = err.code;
@@ -9809,8 +9811,8 @@ router$l.get("/public/:id", async (req, res) => {
     return res.status(500).json({ error: "We couldn't open this gallery." });
   }
 });
-router$l.get("/link/:id", handlePublicGalleryLink);
-router$l.get("/:id", requireAuth, async (req, res) => {
+router$m.get("/link/:id", handlePublicGalleryLink);
+router$m.get("/:id", requireAuth, async (req, res) => {
   try {
     const doc = await db$h().collection("galleries").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Gallery not found." });
@@ -9823,9 +9825,9 @@ router$l.get("/:id", requireAuth, async (req, res) => {
       if (!["delivered", "approved"].includes(gallery.status)) {
         return res.status(403).json({ error: "Gallery not yet available." });
       }
-      const gate = await downloadGateForGallery(gallery);
+      const gate2 = await downloadGateForGallery(gallery);
       return res.json({
-        ...clientGalleryPayload(doc.id, gallery, gate),
+        ...clientGalleryPayload(doc.id, gallery, gate2),
         clientName: gallery.clientName || null
       });
     }
@@ -9834,7 +9836,7 @@ router$l.get("/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch gallery." });
   }
 });
-router$l.post("/:id/upload-url", requirePhotographer, async (req, res) => {
+router$m.post("/:id/upload-url", requirePhotographer, async (req, res) => {
   try {
     const { fileName: fileName2, fileType, isRaw: isRaw2 = false } = req.body;
     if (!fileName2 || !fileType) {
@@ -9859,7 +9861,7 @@ router$l.post("/:id/upload-url", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to generate upload URL." });
   }
 });
-router$l.post("/:id/media", requirePhotographer, async (req, res) => {
+router$m.post("/:id/media", requirePhotographer, async (req, res) => {
   try {
     const {
       storagePath,
@@ -9913,7 +9915,7 @@ router$l.post("/:id/media", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to register media." });
   }
 });
-router$l.post("/:id/media-link", requireCoordinator, async (req, res) => {
+router$m.post("/:id/media-link", requireCoordinator, async (req, res) => {
   try {
     const { url, title, type = "video", embedUrl, thumbnailUrl, downloadable = false, poster, posterUrl } = req.body;
     if (!url) return res.status(400).json({ error: "url required." });
@@ -9949,7 +9951,7 @@ router$l.post("/:id/media-link", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to register media link." });
   }
 });
-router$l.get("/:id/release", requireCoordinator, async (req, res) => {
+router$m.get("/:id/release", requireCoordinator, async (req, res) => {
   if (!adminReady$5(res)) return;
   try {
     const report = await loadGalleryReleaseForGallery(req.params.id);
@@ -9961,7 +9963,7 @@ router$l.get("/:id/release", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to check gallery release." });
   }
 });
-router$l.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$m.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2 } = req.body;
     const validStatuses = ["pending_upload", "raw_uploaded", "editing", "ready_for_review", "approved", "delivered"];
@@ -9983,7 +9985,7 @@ router$l.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update gallery status." });
   }
 });
-router$l.post("/:id/deliver", requireCoordinator, async (req, res) => {
+router$m.post("/:id/deliver", requireCoordinator, async (req, res) => {
   try {
     if (!adminReady$5(res)) return;
     const result = await deliverGalleryToClient(req.params.id, {
@@ -10012,7 +10014,7 @@ router$l.post("/:id/deliver", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to deliver gallery." });
   }
 });
-router$l.patch("/:id/downloads", requireCoordinator, async (req, res) => {
+router$m.patch("/:id/downloads", requireCoordinator, async (req, res) => {
   if (!adminReady$5(res)) return;
   try {
     if (typeof req.body?.released !== "boolean") {
@@ -10049,7 +10051,7 @@ router$l.patch("/:id/downloads", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update gallery downloads." });
   }
 });
-router$l.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
+router$m.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
   try {
     const galleryDoc = await db$h().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
@@ -10139,24 +10141,24 @@ function payTokenMatches(stored, presented, equal = timingSafeEqual) {
   const same = equal(left, candidate);
   return same && right.length === left.length;
 }
-async function matchSquarePaymentInvoice(payment, lookup) {
+async function matchSquarePaymentInvoice(payment, lookup2) {
   const steps = [];
   const noteId = invoiceIdFromSquareNote(payment.note || payment.payment_note);
-  if (noteId) steps.push(() => lookup.byId(noteId));
+  if (noteId) steps.push(() => lookup2.byId(noteId));
   const referenceId = typeof payment.reference_id === "string" ? payment.reference_id.trim() : "";
-  if (referenceId) steps.push(() => lookup.byId(referenceId));
+  if (referenceId) steps.push(() => lookup2.byId(referenceId));
   const orderId = typeof payment.order_id === "string" ? payment.order_id.trim() : "";
-  if (orderId) steps.push(() => lookup.byField("squareOrderId", orderId));
-  if (orderId) steps.push(() => lookup.byField("squareDepositOrderId", orderId));
+  if (orderId) steps.push(() => lookup2.byField("squareOrderId", orderId));
+  if (orderId) steps.push(() => lookup2.byField("squareDepositOrderId", orderId));
   const linkRaw = payment.payment_link_id || payment.paymentLinkId;
   const linkId = typeof linkRaw === "string" ? linkRaw.trim() : "";
-  if (linkId) steps.push(() => lookup.byField("squarePaymentLinkId", linkId));
-  if (linkId) steps.push(() => lookup.byField("squareDepositPaymentLinkId", linkId));
+  if (linkId) steps.push(() => lookup2.byField("squarePaymentLinkId", linkId));
+  if (linkId) steps.push(() => lookup2.byField("squareDepositPaymentLinkId", linkId));
   const paymentId = typeof payment.id === "string" ? payment.id.trim() : "";
-  if (paymentId) steps.push(() => lookup.byField("squarePaymentId", paymentId));
+  if (paymentId) steps.push(() => lookup2.byField("squarePaymentId", paymentId));
   for (const step of steps) {
     const hit = await step();
-    if (hit) return followInvoiceRedirect(hit, lookup.byId);
+    if (hit) return followInvoiceRedirect(hit, lookup2.byId);
   }
   return null;
 }
@@ -10542,7 +10544,7 @@ function parseSeniorLivingOrder(body) {
     quote: quoted.quote
   };
 }
-const router$k = Router();
+const router$l = Router();
 const db$g = () => admin.firestore();
 const stripe$1 = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
@@ -10881,7 +10883,7 @@ async function applyDepositPayment({
     });
   });
 }
-router$k.post("/create-intent", requireAuth, async (req, res) => {
+router$l.post("/create-intent", requireAuth, async (req, res) => {
   try {
     if (!stripeReady()) {
       return res.status(503).json({ error: "Studio Noir Stripe payments are not configured yet." });
@@ -10919,7 +10921,7 @@ router$k.post("/create-intent", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to create payment intent." });
   }
 });
-router$k.post("/send-invoice", requireCoordinator, async (req, res) => {
+router$l.post("/send-invoice", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
@@ -10961,7 +10963,7 @@ router$k.post("/send-invoice", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send invoice." });
   }
 });
-router$k.post("/send-receipt", requireCoordinator, async (req, res) => {
+router$l.post("/send-receipt", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
@@ -10991,7 +10993,7 @@ router$k.post("/send-receipt", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send receipt." });
   }
 });
-router$k.get("/invoice/:id", async (req, res) => {
+router$l.get("/invoice/:id", async (req, res) => {
   try {
     const invoiceDoc = await loadInvoice(req.params.id);
     if (!invoiceDoc) return invoiceNotFound(res);
@@ -11051,7 +11053,7 @@ router$k.get("/invoice/:id", async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch invoice." });
   }
 });
-router$k.post("/invoice/:id/checkout", async (req, res) => {
+router$l.post("/invoice/:id/checkout", async (req, res) => {
   try {
     const invoiceDoc = await loadInvoice(req.params.id);
     if (!invoiceDoc) return invoiceNotFound(res);
@@ -11208,7 +11210,7 @@ router$k.post("/invoice/:id/checkout", async (req, res) => {
     return res.status(500).json({ error: "Failed to start checkout." });
   }
 });
-router$k.post("/invoice/:id/deposit-checkout", async (req, res) => {
+router$l.post("/invoice/:id/deposit-checkout", async (req, res) => {
   try {
     if (!seniorDepositCheckoutLive()) return invoiceNotFound(res);
     const invoiceDoc = await loadInvoice(req.params.id);
@@ -11298,7 +11300,7 @@ router$k.post("/invoice/:id/deposit-checkout", async (req, res) => {
     return res.status(500).json({ error: "Failed to start the deposit checkout." });
   }
 });
-router$k.post("/webhook", async (req, res) => {
+router$l.post("/webhook", async (req, res) => {
   const sig = req.headers["stripe-signature"];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
   let event;
@@ -11373,7 +11375,7 @@ async function findInvoiceForSquarePayment(payment) {
   const snap = await db$g().collection("invoices").doc(hit.id).get();
   return snap.exists ? snap : null;
 }
-router$k.post("/square-webhook", async (req, res) => {
+router$l.post("/square-webhook", async (req, res) => {
   try {
     const rawBody = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : JSON.stringify(req.body || {});
     const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
@@ -11433,7 +11435,7 @@ router$k.post("/square-webhook", async (req, res) => {
     return res.status(500).json({ error: "Square webhook handler failed." });
   }
 });
-router$k.get("/transactions", requireCoordinator, async (req, res) => {
+router$l.get("/transactions", requireCoordinator, async (req, res) => {
   try {
     const { startDate, endDate, limit = "50" } = req.query;
     let query = db$g().collection("transactions").orderBy("createdAt", "desc");
@@ -11516,7 +11518,7 @@ async function handleStripeRefund(charge) {
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   });
 }
-const router$j = Router();
+const router$k = Router();
 const db$f = () => admin.firestore();
 const VSAI_API_BASE = "https://api.virtualstagingai.app/v1";
 const VSAI_API_KEY = process.env.VSAI_API_KEY || process.env.VIRTUAL_STAGING_AI_API_KEY || "";
@@ -11524,7 +11526,7 @@ const VSAI_PRICE_CENTS = parseInt(process.env.VSAI_PRICE_CENTS || "1500", 10);
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
 });
-router$j.post("/create", requireAuth, async (req, res) => {
+router$k.post("/create", requireAuth, async (req, res) => {
   try {
     if (!VSAI_API_KEY) {
       console.error("[VSAI] VSAI_API_KEY is not set");
@@ -11599,7 +11601,7 @@ router$j.post("/create", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$j.get("/result/:jobId", requireAuth, async (req, res) => {
+router$k.get("/result/:jobId", requireAuth, async (req, res) => {
   try {
     const jobDoc = await db$f().collection("vsaiJobs").doc(req.params.jobId).get();
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
@@ -11674,7 +11676,7 @@ router$j.get("/result/:jobId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$j.get("/result/:jobId/file", requireAuth, async (req, res) => {
+router$k.get("/result/:jobId/file", requireAuth, async (req, res) => {
   try {
     const jobDoc = await db$f().collection("vsaiJobs").doc(req.params.jobId).get();
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
@@ -11696,7 +11698,7 @@ router$j.get("/result/:jobId/file", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$j.post("/variation", requireAuth, async (req, res) => {
+router$k.post("/variation", requireAuth, async (req, res) => {
   try {
     const { jobId, style: newStyle, roomType: newRoomType } = req.body;
     if (!jobId) {
@@ -11780,7 +11782,7 @@ router$j.post("/variation", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$j.post("/checkout", requireAuth, async (req, res) => {
+router$k.post("/checkout", requireAuth, async (req, res) => {
   try {
     const { jobIds, successUrl, cancelUrl } = req.body;
     if (!jobIds || !Array.isArray(jobIds) || jobIds.length === 0) {
@@ -11849,7 +11851,7 @@ router$j.post("/checkout", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$j.post(
+router$k.post(
   "/webhook/stripe",
   // Raw body needed — mount before express.json() parses it
   async (req, res) => {
@@ -11887,7 +11889,7 @@ router$j.post(
     res.json({ received: true });
   }
 );
-router$j.get("/options", (_req, res) => {
+router$k.get("/options", (_req, res) => {
   return res.json({
     roomTypes: [
       { value: "living", label: "Living Room" },
@@ -11917,9 +11919,9 @@ router$j.get("/options", (_req, res) => {
 function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
 }
-const router$i = Router();
+const router$j = Router();
 const db$e = () => admin.firestore();
-router$i.post("/email", requireStaff, async (req, res) => {
+router$j.post("/email", requireStaff, async (req, res) => {
   try {
     const { to, subject, body, orderId, clientId: clientId2 } = req.body;
     if (!to || !body?.trim()) {
@@ -11951,7 +11953,7 @@ router$i.post("/email", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to send email." });
   }
 });
-router$i.get("/:orderId", requireAuth, async (req, res) => {
+router$j.get("/:orderId", requireAuth, async (req, res) => {
   try {
     const orderDoc = await db$e().collection("orders").doc(req.params.orderId).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
@@ -11980,7 +11982,7 @@ router$i.get("/:orderId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch messages." });
   }
 });
-router$i.post("/:orderId", requireAuth, async (req, res) => {
+router$j.post("/:orderId", requireAuth, async (req, res) => {
   try {
     const { content, attachments } = req.body;
     if (!content?.trim()) {
@@ -12035,7 +12037,7 @@ router$i.post("/:orderId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to send message." });
   }
 });
-router$i.get("/unread/count", requireStaff, async (_req, res) => {
+router$j.get("/unread/count", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$e().collection("messages").where("isRead", "==", false).where("senderType", "==", "client").get();
     return res.json({ unreadCount: snapshot.size });
@@ -13414,13 +13416,13 @@ const handlePatchPortalWebsite = async (req, res) => {
     return sendKnownError$3(res, err, "Could not save the listing site.");
   }
 };
-const router$h = Router();
+const router$i = Router();
 const db$b = () => admin.firestore();
 const HOME_LIMIT = 100;
 function asRecord$1(value) {
   return value && typeof value === "object" ? value : {};
 }
-router$h.get("/", requireStaff, async (req, res) => {
+router$i.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, search, limit = "50" } = req.query;
     let query = db$b().collection("clients").orderBy("createdAt", "desc");
@@ -13447,7 +13449,7 @@ function adminReady$3(res) {
   });
   return false;
 }
-router$h.post("/register", async (req, res) => {
+router$i.post("/register", async (req, res) => {
   if (!adminReady$3(res)) return;
   const firstName = cleanPersonName(req.body?.firstName);
   const lastName = cleanPersonName(req.body?.lastName);
@@ -13509,7 +13511,7 @@ router$h.post("/register", async (req, res) => {
     return res.status(500).json({ error: "Could not create the client account." });
   }
 });
-router$h.get("/me/home", requireAuth, async (req, res) => {
+router$i.get("/me/home", requireAuth, async (req, res) => {
   if (!adminReady$3(res)) return;
   try {
     const identity = await resolveClientIdentity(req.user.uid, req.user.email);
@@ -13658,12 +13660,12 @@ router$h.get("/me/home", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to load your portal." });
   }
 });
-router$h.get("/me/listings/:id", requireAuth, handleGetPortalListing);
-router$h.patch("/me/listings/:id/data", requireAuth, handlePatchPortalData);
-router$h.patch("/me/listings/:id/media", requireAuth, handlePatchPortalMedia);
-router$h.patch("/me/listings/:id/website", requireAuth, handlePatchPortalWebsite);
-router$h.post("/me/listings/:id/photo-edit-requests", requireAuth, handleCreatePhotoEditRequest);
-router$h.get("/me", requireAuth, async (req, res) => {
+router$i.get("/me/listings/:id", requireAuth, handleGetPortalListing);
+router$i.patch("/me/listings/:id/data", requireAuth, handlePatchPortalData);
+router$i.patch("/me/listings/:id/media", requireAuth, handlePatchPortalMedia);
+router$i.patch("/me/listings/:id/website", requireAuth, handlePatchPortalWebsite);
+router$i.post("/me/listings/:id/photo-edit-requests", requireAuth, handleCreatePhotoEditRequest);
+router$i.get("/me", requireAuth, async (req, res) => {
   try {
     const directDoc = await db$b().collection("clients").doc(req.user.uid).get();
     if (directDoc.exists) {
@@ -13679,7 +13681,7 @@ router$h.get("/me", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch profile." });
   }
 });
-router$h.get("/:id", requireStaff, async (req, res) => {
+router$i.get("/:id", requireStaff, async (req, res) => {
   try {
     const doc = await db$b().collection("clients").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Client not found." });
@@ -13696,7 +13698,7 @@ router$h.get("/:id", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch client." });
   }
 });
-router$h.post("/", requireCoordinator, async (req, res) => {
+router$i.post("/", requireCoordinator, async (req, res) => {
   try {
     const { firstName, lastName, email, phone, address, notes, tags } = req.body;
     if (!firstName || !lastName || !email) {
@@ -13726,7 +13728,7 @@ router$h.post("/", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to create client." });
   }
 });
-router$h.patch("/:id", requireCoordinator, async (req, res) => {
+router$i.patch("/:id", requireCoordinator, async (req, res) => {
   try {
     const allowed = ["firstName", "lastName", "phone", "address", "status", "notes", "tags", "company"];
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
@@ -13753,6 +13755,163 @@ async function orderRequestsById(ids) {
     console.error("[Clients] Order request schedule lookup failed:", err);
   }
   return map;
+}
+function ownerAllowlist(raw) {
+  if (raw == null) return [];
+  const emails = raw.split(/[,;\s]+/).map((email) => email.trim().toLowerCase()).filter((email) => email.includes("@"));
+  return [...new Set(emails)];
+}
+function isOwnerEmail(email, allowlist) {
+  if (!email) return false;
+  if (allowlist.length === 0) return false;
+  return allowlist.includes(email.trim().toLowerCase());
+}
+const HISTORY_LIMIT = 10;
+function textField(id, label, value) {
+  return { id, label, kind: "text", value };
+}
+function areaField(id, label, value) {
+  return { id, label, kind: "textarea", value };
+}
+function linkField(id, label, value, href) {
+  return { id, label, kind: "link", value, href };
+}
+function imageField(id, label, value) {
+  return { id, label, kind: "image", value };
+}
+function videoField(id, label, value) {
+  return { id, label, kind: "video", value };
+}
+function block(id, label, fields, items) {
+  return { id, label, hidden: false, fields, ...items ? { items } : {} };
+}
+function contentPage(id, path2, label, seoTitle, seoDescription, blocks) {
+  return { id, path: path2, label, seoTitle, seoDescription, blocks };
+}
+function normalizeSiteEditorFlags(input) {
+  let view = input?.view === true;
+  let edit = input?.edit === true;
+  let publish = input?.publish === true;
+  if (publish) edit = true;
+  if (edit) view = true;
+  if (!view) {
+    edit = false;
+    publish = false;
+  }
+  return { view, edit, publish };
+}
+function siteEditorAccess(input) {
+  if (input.role === "admin" || isOwnerEmail(input.email, input.ownerEmails)) {
+    return { view: true, edit: true, publish: true, locked: true };
+  }
+  return { ...normalizeSiteEditorFlags(input.flags), locked: false };
+}
+function allows(access, level) {
+  if (level === "view") return access.view;
+  if (level === "edit") return access.edit;
+  return access.publish;
+}
+function stripPage(page2) {
+  const { id, path: path2, label, seoTitle, seoDescription, blocks } = page2;
+  return { id, path: path2, label, seoTitle, seoDescription, blocks: blocks.map(cloneBlock) };
+}
+function cloneBlock(blockValue) {
+  return {
+    id: blockValue.id,
+    label: blockValue.label,
+    hidden: blockValue.hidden === true,
+    fields: blockValue.fields.map((field) => ({ ...field })),
+    ...blockValue.items ? { items: blockValue.items.map((item) => ({ id: item.id, fields: item.fields.map((field) => ({ ...field })) })) } : {}
+  };
+}
+function pushRevision(existing, next, actor2, now = (/* @__PURE__ */ new Date()).toISOString()) {
+  const prior = existing ? stripPage(existing) : null;
+  const revisions = [...existing?.revisions ?? []];
+  if (prior) {
+    revisions.unshift({
+      id: `rev_${now}`,
+      at: existing?.publishedAt || now,
+      byUid: existing?.publishedByUid || actor2.uid,
+      byName: existing?.publishedByName || actor2.name,
+      snapshot: prior
+    });
+  }
+  return revisions.slice(0, HISTORY_LIMIT);
+}
+function revertTo(page2, revisionId, actor2, now = (/* @__PURE__ */ new Date()).toISOString()) {
+  const revision = page2.revisions?.find((item) => item.id === revisionId);
+  if (!revision) return null;
+  const current = stripPage(page2);
+  const revisions = [
+    {
+      id: `rev_${now}`,
+      at: page2.publishedAt || now,
+      byUid: page2.publishedByUid || actor2.uid,
+      byName: page2.publishedByName || actor2.name,
+      snapshot: current
+    },
+    ...(page2.revisions ?? []).filter((item) => item.id !== revisionId)
+  ].slice(0, HISTORY_LIMIT);
+  return {
+    ...revision.snapshot,
+    revisions,
+    publishedAt: now,
+    publishedByUid: actor2.uid,
+    publishedByName: actor2.name
+  };
+}
+const DROPBOX_HOSTS = /* @__PURE__ */ new Set(["dropbox.com", "www.dropbox.com", "dl.dropboxusercontent.com"]);
+function isAllowedDropboxHost(hostname) {
+  const host = hostname.trim().toLowerCase().replace(/\.+$/, "");
+  if (!host || host.includes("..")) return false;
+  if (isIpLiteral(host)) return false;
+  if (DROPBOX_HOSTS.has(host)) return true;
+  return host.endsWith(".dropboxusercontent.com") && host.length > ".dropboxusercontent.com".length;
+}
+function isIpLiteral(host) {
+  if (host.startsWith("[") || host.includes(":")) return true;
+  return /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
+}
+function isPrivateAddress(ip) {
+  const value = ip.toLowerCase().replace(/^\[|\]$/g, "");
+  if (value === "::1" || value === "0.0.0.0") return true;
+  if (value.startsWith("fe80:") || value.startsWith("fc") || value.startsWith("fd")) return true;
+  const parts = value.split(".").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part))) return value.includes(":");
+  const [a, b] = parts;
+  if (a === 10 || a === 127 || a === 0) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  return false;
+}
+function prepareDropboxUrl(raw) {
+  let url;
+  try {
+    url = new URL(raw.trim());
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:") return null;
+  if (url.username || url.password) return null;
+  if (!isAllowedDropboxHost(url.hostname)) return null;
+  if (url.pathname.includes("/scl/fo/") || url.pathname.includes("/sh/")) return null;
+  url.searchParams.set("dl", "1");
+  if (url.pathname.includes("/scl/fi/")) url.searchParams.set("raw", "1");
+  return url;
+}
+const SITE_IMAGE_BYTES = 25 * 1024 * 1024;
+const SITE_VIDEO_BYTES = 80 * 1024 * 1024;
+function sniffMedia(bytes) {
+  if (bytes.length >= 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) return "image";
+  if (bytes.length >= 8 && bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 && bytes[3] === 71) return "image";
+  if (bytes.length >= 12 && bytes[0] === 82 && bytes[1] === 73 && bytes[2] === 70 && bytes[3] === 70 && bytes[8] === 87 && bytes[9] === 69 && bytes[10] === 66 && bytes[11] === 80) return "image";
+  if (bytes.length >= 12) {
+    const brand = String.fromCharCode(bytes[4], bytes[5], bytes[6], bytes[7]);
+    if (brand === "ftyp") return "video";
+  }
+  return null;
 }
 function secretsMatch(provided, expected) {
   if (typeof provided !== "string" || typeof expected !== "string") return false;
@@ -14011,9 +14170,9 @@ async function playtestInvoiceRecord(id) {
   }
   return null;
 }
-const router$g = Router();
+const router$h = Router();
 const db$9 = () => admin.firestore();
-router$g.get("/", requireStaff, async (_req, res) => {
+router$h.get("/", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$9().collection("staff").where("isActive", "==", true).orderBy("firstName").get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -14021,7 +14180,7 @@ router$g.get("/", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch staff." });
   }
 });
-router$g.post("/", requireAdmin, async (req, res) => {
+router$h.post("/", requireAdmin, async (req, res) => {
   try {
     const { firstName, lastName, email, phone, role, tempPassword } = req.body;
     if (!firstName || !lastName || !email || !role || !tempPassword) {
@@ -14057,13 +14216,25 @@ router$g.post("/", requireAdmin, async (req, res) => {
     return res.status(500).json({ error: "Failed to create staff member." });
   }
 });
-router$g.patch("/:id", requireAdmin, async (req, res) => {
+router$h.patch("/:id", requireAdmin, async (req, res) => {
   try {
     const allowed = ["firstName", "lastName", "phone", "role", "isActive"];
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
     allowed.forEach((k) => {
       if (k in req.body) updates[k] = req.body[k];
     });
+    if (req.body.siteEditor && typeof req.body.siteEditor === "object") {
+      const existing = await db$9().collection("staff").doc(req.params.id).get();
+      const data = existing.data() || {};
+      const nextRole = typeof updates.role === "string" ? updates.role : data.role;
+      const access = siteEditorAccess({
+        role: nextRole,
+        email: data.email,
+        flags: req.body.siteEditor,
+        ownerEmails: ownerAllowlist(process.env.OWNER_EMAILS)
+      });
+      updates.siteEditor = access.locked ? { view: true, edit: true, publish: true } : normalizeSiteEditorFlags(req.body.siteEditor);
+    }
     await db$9().collection("staff").doc(req.params.id).update(updates);
     return res.json({ success: true });
   } catch (err) {
@@ -14085,7 +14256,7 @@ function requireSetupSecret(req, res) {
   }
   return true;
 }
-router$g.post("/playtest", async (req, res) => {
+router$h.post("/playtest", async (req, res) => {
   if (!requireSetupSecret(req, res)) return;
   if (!admin.apps.length) {
     return res.status(503).json({
@@ -14104,7 +14275,7 @@ router$g.post("/playtest", async (req, res) => {
     return res.status(500).json({ error: "Playtest setup failed." });
   }
 });
-router$g.post("/setup", async (req, res) => {
+router$h.post("/setup", async (req, res) => {
   try {
     if (isHostedDeployment(liveServerEnv())) {
       const secret = process.env.STAFF_SETUP_SECRET;
@@ -14175,7 +14346,7 @@ function kickStudioQueue(listingId, env = process.env) {
   });
   return { dispatched: true };
 }
-const router$f = Router();
+const router$g = Router();
 const db$8 = () => admin.firestore();
 const DIRECT_UPLOAD_LIMIT = 3e6;
 function adminReady$2(res) {
@@ -14243,7 +14414,7 @@ function sendKnownError$2(res, err, fallback) {
   console.error("[Listings]", err);
   return res.status(500).json({ error: fallback });
 }
-router$f.get("/assigned", requirePhotographer, async (req, res) => {
+router$g.get("/assigned", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const uid = req.user.uid;
@@ -14272,7 +14443,7 @@ router$f.get("/assigned", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to load assigned jobs." });
   }
 });
-router$f.get("/:id", requireAuth, async (req, res) => {
+router$g.get("/:id", requireAuth, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const listing = await assertListingAccess(req, req.params.id);
@@ -14287,7 +14458,7 @@ router$f.get("/:id", requireAuth, async (req, res) => {
     return sendKnownError$2(res, err, "Failed to load listing.");
   }
 });
-router$f.post("/:id/photos/upload-url", requirePhotographer, async (req, res) => {
+router$g.post("/:id/photos/upload-url", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const fileName2 = safeStorageFileName(req.body?.fileName);
@@ -14305,7 +14476,7 @@ router$f.post("/:id/photos/upload-url", requirePhotographer, async (req, res) =>
     return sendKnownError$2(res, err, "Failed to prepare the upload. Check FIREBASE_STORAGE_BUCKET.");
   }
 });
-router$f.post("/:id/photos", requirePhotographer, async (req, res) => {
+router$g.post("/:id/photos", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const listingId = req.params.id;
@@ -14351,7 +14522,7 @@ router$f.post("/:id/photos", requirePhotographer, async (req, res) => {
     return sendKnownError$2(res, err, "Failed to save the uploaded photo.");
   }
 });
-const router$e = Router();
+const router$f = Router();
 const db$7 = () => admin.firestore();
 function mailchimpConfig() {
   const apiKey = process.env.MAILCHIMP_API_KEY || "";
@@ -14379,7 +14550,7 @@ async function mailchimpRequest(path2, init = {}) {
   }
   return data;
 }
-router$e.get("/", requireCoordinator, async (_req, res) => {
+router$f.get("/", requireCoordinator, async (_req, res) => {
   try {
     const snapshot = await db$7().collection("campaigns").orderBy("createdAt", "desc").limit(50).get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -14387,7 +14558,7 @@ router$e.get("/", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch campaigns." });
   }
 });
-router$e.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
+router$f.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
   try {
     const { apiKey, serverPrefix } = mailchimpConfig();
     if (!apiKey || !serverPrefix) {
@@ -14418,7 +14589,7 @@ router$e.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
     });
   }
 });
-router$e.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
+router$f.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
   try {
     const { listId, audience = "all" } = req.body;
     if (!listId) return res.status(400).json({ error: "listId required." });
@@ -14481,7 +14652,7 @@ router$e.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: err instanceof Error ? err.message : "Failed to sync Mailchimp." });
   }
 });
-router$e.post("/", requireCoordinator, async (req, res) => {
+router$f.post("/", requireCoordinator, async (req, res) => {
   try {
     const { name, type, subject, body, audience, audienceIds, scheduledAt } = req.body;
     if (!name || !body || !audience) {
@@ -14506,7 +14677,7 @@ router$e.post("/", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to create campaign." });
   }
 });
-router$e.post("/:id/send", requireCoordinator, async (req, res) => {
+router$f.post("/:id/send", requireCoordinator, async (req, res) => {
   try {
     const campaignDoc = await db$7().collection("campaigns").doc(req.params.id).get();
     if (!campaignDoc.exists) return res.status(404).json({ error: "Campaign not found." });
@@ -15318,7 +15489,7 @@ function createRateLimiter(options) {
     }
   };
 }
-const router$d = Router();
+const router$e = Router();
 const MAX_ROWS = 1e4;
 const unsubscribeLimit = createRateLimiter({ windowMs: 60 * 60 * 1e3, max: 20 });
 function requireMarketing$1(permission) {
@@ -15355,7 +15526,7 @@ function publicContact(contact, suppression) {
     suppressed: blocked ? reasonLabel(blocked.reason, blocked.hold) : ""
   };
 }
-router$d.get("/overview", requireMarketing$1("view"), async (_req, res) => {
+router$e.get("/overview", requireMarketing$1("view"), async (_req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const [contacts, suppression, segments] = await Promise.all([
@@ -15371,7 +15542,7 @@ router$d.get("/overview", requireMarketing$1("view"), async (_req, res) => {
     segments: segments.length
   });
 });
-router$d.get("/contacts", requireMarketing$1("view"), async (req, res) => {
+router$e.get("/contacts", requireMarketing$1("view"), async (req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const [contacts, suppression] = await Promise.all([store.listContacts(), store.listSuppression()]);
@@ -15387,7 +15558,7 @@ router$d.get("/contacts", requireMarketing$1("view"), async (req, res) => {
   const tags = [...new Set(contacts.flatMap((contact) => contact.tags))].sort((a, b) => a.localeCompare(b));
   res.json({ contacts: filtered, tags, total: contacts.length });
 });
-router$d.get("/contacts/detail", requireMarketing$1("view"), async (req, res) => {
+router$e.get("/contacts/detail", requireMarketing$1("view"), async (req, res) => {
   const email = normalizeEmail(req.query.email);
   if (!isValidEmail(email)) return res.status(400).json({ error: "A valid email is required." });
   const store = getMarketingStore();
@@ -15404,7 +15575,7 @@ router$d.get("/contacts/detail", requireMarketing$1("view"), async (req, res) =>
     activity: events.sort((a, b) => b.at.localeCompare(a.at))
   });
 });
-router$d.post("/contacts", requireMarketing$1("manage"), async (req, res) => {
+router$e.post("/contacts", requireMarketing$1("manage"), async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   if (!isValidEmail(email)) return res.status(400).json({ error: "A valid email is required." });
   const store = getMarketingStore();
@@ -15429,7 +15600,7 @@ router$d.post("/contacts", requireMarketing$1("manage"), async (req, res) => {
   await store.saveContacts([contact]);
   res.json({ contact });
 });
-router$d.post("/contacts/tags", requireMarketing$1("manage"), async (req, res) => {
+router$e.post("/contacts/tags", requireMarketing$1("manage"), async (req, res) => {
   const emails = Array.isArray(req.body?.emails) ? req.body.emails.map((email) => normalizeEmail(email)) : [];
   const add = Array.isArray(req.body?.add) ? req.body.add.map(String) : [];
   const remove = Array.isArray(req.body?.remove) ? req.body.remove.map(String) : [];
@@ -15442,11 +15613,11 @@ router$d.post("/contacts/tags", requireMarketing$1("manage"), async (req, res) =
   await store.saveContacts(next);
   res.json({ updated: next.length });
 });
-router$d.post("/contacts/sync", requireMarketing$1("manage"), async (_req, res) => {
+router$e.post("/contacts/sync", requireMarketing$1("manage"), async (_req, res) => {
   const result = await syncCustomerContacts();
   res.json(result);
 });
-router$d.post("/imports/parse", requireMarketing$1("manage"), async (req, res) => {
+router$e.post("/imports/parse", requireMarketing$1("manage"), async (req, res) => {
   try {
     const table = parseTabularUpload({
       text: typeof req.body?.text === "string" ? req.body.text : "",
@@ -15466,7 +15637,7 @@ router$d.post("/imports/parse", requireMarketing$1("manage"), async (req, res) =
     res.status(400).json({ error: err instanceof Error ? err.message : "Could not read that file." });
   }
 });
-router$d.post("/imports/commit", requireMarketing$1("manage"), async (req, res) => {
+router$e.post("/imports/commit", requireMarketing$1("manage"), async (req, res) => {
   const headers = Array.isArray(req.body?.headers) ? req.body.headers.map(String) : [];
   const rows = Array.isArray(req.body?.rows) ? req.body.rows.map((row) => Array.isArray(row) ? row.map(String) : []) : [];
   const mapping = req.body?.mapping && typeof req.body.mapping === "object" ? req.body.mapping : {};
@@ -15484,7 +15655,7 @@ router$d.post("/imports/commit", requireMarketing$1("manage"), async (req, res) 
   await store.saveContacts(plan.upserts);
   res.json({ summary: plan.summary });
 });
-router$d.get("/segments", requireMarketing$1("view"), async (_req, res) => {
+router$e.get("/segments", requireMarketing$1("view"), async (_req, res) => {
   const store = getMarketingStore();
   const [segments, contacts] = await Promise.all([store.listSegments(), store.listContacts()]);
   res.json({
@@ -15494,7 +15665,7 @@ router$d.get("/segments", requireMarketing$1("view"), async (_req, res) => {
     }))
   });
 });
-router$d.post("/segments", requireMarketing$1("manage"), async (req, res) => {
+router$e.post("/segments", requireMarketing$1("manage"), async (req, res) => {
   const name = String(req.body?.name || "").trim();
   if (!name) return res.status(400).json({ error: "Name the segment." });
   const store = getMarketingStore();
@@ -15511,11 +15682,11 @@ router$d.post("/segments", requireMarketing$1("manage"), async (req, res) => {
   await store.saveSegment(segment);
   res.json({ segment });
 });
-router$d.delete("/segments/:id", requireMarketing$1("manage"), async (req, res) => {
+router$e.delete("/segments/:id", requireMarketing$1("manage"), async (req, res) => {
   await getMarketingStore().deleteSegment(req.params.id);
   res.json({ ok: true });
 });
-router$d.get("/suppression", requireMarketing$1("view"), async (_req, res) => {
+router$e.get("/suppression", requireMarketing$1("view"), async (_req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const entries = await store.listSuppression();
@@ -15523,7 +15694,7 @@ router$d.get("/suppression", requireMarketing$1("view"), async (_req, res) => {
     entries: entries.sort((a, b) => a.value.localeCompare(b.value))
   });
 });
-router$d.post("/suppression", requireMarketing$1("manage"), async (req, res) => {
+router$e.post("/suppression", requireMarketing$1("manage"), async (req, res) => {
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const entry2 = buildSuppression(now, {
     kind: req.body?.kind === "domain" || req.body?.kind === "name" ? req.body.kind : "email",
@@ -15542,11 +15713,11 @@ router$d.post("/suppression", requireMarketing$1("manage"), async (req, res) => 
   await store.saveSuppression({ ...entry2, createdAt: existing?.createdAt || now, source: existing?.source || "manual" });
   res.json({ entry: entry2 });
 });
-router$d.delete("/suppression/:id", requireMarketing$1("manage"), async (req, res) => {
+router$e.delete("/suppression/:id", requireMarketing$1("manage"), async (req, res) => {
   await getMarketingStore().deleteSuppression(decodeURIComponent(req.params.id));
   res.json({ ok: true });
 });
-router$d.post("/unsubscribe", async (req, res) => {
+router$e.post("/unsubscribe", async (req, res) => {
   const limit = unsubscribeLimit.check(clientIp(req));
   if (!limit.allowed) return res.status(429).json({ error: "Too many attempts. Try again later." });
   const email = normalizeEmail(req.body?.email);
@@ -15990,7 +16161,7 @@ function createGmassClient(env = process.env, fetchImpl = fetch) {
 function getGmassClient() {
   return createGmassClient();
 }
-const router$c = Router();
+const router$d = Router();
 function requireMarketing(permission) {
   return async (req, res, next) => {
     await requireStaff(req, res, () => {
@@ -16136,7 +16307,7 @@ function sendBlocked(res, gmass) {
   }
   return false;
 }
-router$c.get("/dashboard", requireMarketing("view"), async (_req, res) => {
+router$d.get("/dashboard", requireMarketing("view"), async (_req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const [contacts, suppression, segments, campaigns, reports] = await Promise.all([
@@ -16171,11 +16342,11 @@ router$c.get("/dashboard", requireMarketing("view"), async (_req, res) => {
     alerts: rows.filter((row) => row.stats?.pauseRecommended)
   });
 });
-router$c.get("/campaigns", requireMarketing("view"), async (_req, res) => {
+router$d.get("/campaigns", requireMarketing("view"), async (_req, res) => {
   const campaigns = await getMarketingStore().listCampaigns();
   res.json({ campaigns: campaigns.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) });
 });
-router$c.post("/campaigns", requireMarketing("manage"), async (req, res) => {
+router$d.post("/campaigns", requireMarketing("manage"), async (req, res) => {
   const store = getMarketingStore();
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const settings = await store.getSettings();
@@ -16188,12 +16359,12 @@ router$c.post("/campaigns", requireMarketing("manage"), async (req, res) => {
   await store.saveCampaign(campaign);
   res.status(201).json({ campaign });
 });
-router$c.get("/campaigns/:id", requireMarketing("view"), async (req, res) => {
+router$d.get("/campaigns/:id", requireMarketing("view"), async (req, res) => {
   const campaign = await getMarketingStore().getCampaign(req.params.id);
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
   res.json({ campaign });
 });
-router$c.post("/campaigns/:id", requireMarketing("manage"), async (req, res) => {
+router$d.post("/campaigns/:id", requireMarketing("manage"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -16208,7 +16379,7 @@ router$c.post("/campaigns/:id", requireMarketing("manage"), async (req, res) => 
   await store.saveCampaign(campaign);
   res.json({ campaign });
 });
-router$c.post("/campaigns/:id/duplicate", requireMarketing("manage"), async (req, res) => {
+router$d.post("/campaigns/:id/duplicate", requireMarketing("manage"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -16230,7 +16401,7 @@ router$c.post("/campaigns/:id/duplicate", requireMarketing("manage"), async (req
   await store.saveCampaign(copy);
   res.status(201).json({ campaign: copy });
 });
-router$c.post("/campaigns/:id/preview", requireMarketing("send"), async (req, res) => {
+router$d.post("/campaigns/:id/preview", requireMarketing("send"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -16249,7 +16420,7 @@ router$c.post("/campaigns/:id/preview", requireMarketing("send"), async (req, re
   await store.saveCampaign(campaign);
   res.json({ confirmation });
 });
-router$c.post("/campaigns/:id/test", requireMarketing("send"), async (req, res) => {
+router$d.post("/campaigns/:id/test", requireMarketing("send"), async (req, res) => {
   const to = normalizeEmail(req.body?.to);
   if (!isValidEmail(to)) return res.status(400).json({ error: "Enter a test email address." });
   const gmass = getGmassClient();
@@ -16281,7 +16452,7 @@ router$c.post("/campaigns/:id/test", requireMarketing("send"), async (req, res) 
   }
   res.json({ ok: true, to });
 });
-router$c.post("/campaigns/:id/send", requireMarketing("send"), async (req, res) => {
+router$d.post("/campaigns/:id/send", requireMarketing("send"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -16315,8 +16486,8 @@ router$c.post("/campaigns/:id/send", requireMarketing("send"), async (req, res) 
   if (!fromEmail) return;
   const gmass = getGmassClient();
   if (sendBlocked(res, gmass)) return;
-  const page = `${originOf$1(req)}/unsubscribe`;
-  const html = withUnsubscribeFooter(applyMerge(current.html, mergeValues({}, page)), page);
+  const page2 = `${originOf$1(req)}/unsubscribe`;
+  const html = withUnsubscribeFooter(applyMerge(current.html, mergeValues({}, page2)), page2);
   try {
     const draft = await gmass.createDraft({
       subject: current.subject,
@@ -16371,7 +16542,7 @@ router$c.post("/campaigns/:id/send", requireMarketing("send"), async (req, res) 
     return res.status(502).json({ error: message });
   }
 });
-router$c.get("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
+router$d.get("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
   const store = getMarketingStore();
   const [campaign, report] = await Promise.all([
     store.getCampaign(req.params.id),
@@ -16380,7 +16551,7 @@ router$c.get("/campaigns/:id/report", requireMarketing("view"), async (req, res)
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
   res.json({ campaign, report });
 });
-router$c.post("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
+router$d.post("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
   const store = getMarketingStore();
   const campaign = await store.getCampaign(req.params.id);
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
@@ -16397,7 +16568,7 @@ router$c.post("/campaigns/:id/report", requireMarketing("view"), async (req, res
     for (const metric of metrics) {
       const rows = [];
       let offset = 0;
-      for (let page = 0; page < 20; page += 1) {
+      for (let page2 = 0; page2 < 20; page2 += 1) {
         const payload = await gmass.report(campaign.gmassCampaignId, metric, { limit: 200, offset });
         const data = Array.isArray(payload) ? payload : payload?.data || [];
         rows.push(...data);
@@ -16455,11 +16626,11 @@ router$c.post("/campaigns/:id/report", requireMarketing("view"), async (req, res
     res.status(502).json({ error: err instanceof Error ? err.message : "Could not refresh the GMass report." });
   }
 });
-router$c.get("/templates", requireMarketing("view"), async (_req, res) => {
+router$d.get("/templates", requireMarketing("view"), async (_req, res) => {
   const templates = await getMarketingStore().listTemplates();
   res.json({ templates });
 });
-router$c.post("/templates", requireMarketing("manage"), async (req, res) => {
+router$d.post("/templates", requireMarketing("manage"), async (req, res) => {
   const name = String(req.body?.name || "").trim();
   const html = String(req.body?.html || "");
   if (!name || !html) return res.status(400).json({ error: "A template needs a name and HTML." });
@@ -16474,15 +16645,15 @@ router$c.post("/templates", requireMarketing("manage"), async (req, res) => {
   await getMarketingStore().saveTemplate(template);
   res.json({ template });
 });
-router$c.delete("/templates/:id", requireMarketing("manage"), async (req, res) => {
+router$d.delete("/templates/:id", requireMarketing("manage"), async (req, res) => {
   await getMarketingStore().deleteTemplate(req.params.id);
   res.json({ ok: true });
 });
-router$c.get("/settings", requireMarketing("view"), async (_req, res) => {
+router$d.get("/settings", requireMarketing("view"), async (_req, res) => {
   const settings = await getMarketingStore().getSettings();
   res.json({ settings });
 });
-router$c.get("/account", requireMarketing("view"), async (_req, res) => {
+router$d.get("/account", requireMarketing("view"), async (_req, res) => {
   const settings = await getMarketingStore().getSettings();
   const gmass = getGmassClient();
   const base = {
@@ -16504,7 +16675,7 @@ router$c.get("/account", requireMarketing("view"), async (_req, res) => {
   ]);
   res.json({ ...base, user, warmup, domains });
 });
-router$c.post("/settings", requireMarketing("send"), async (req, res) => {
+router$d.post("/settings", requireMarketing("send"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getSettings();
   const next = {
@@ -16527,7 +16698,7 @@ router$c.post("/settings", requireMarketing("send"), async (req, res) => {
   await store.saveSettings(next);
   res.json({ settings: next });
 });
-router$c.post("/account/unsubscribes", requireMarketing("send"), async (req, res) => {
+router$d.post("/account/unsubscribes", requireMarketing("send"), async (req, res) => {
   const gmass = getGmassClient();
   if (!gmass.configured) return res.status(503).json({ error: "Set GMASS_API_KEY before syncing a suppression to GMass." });
   const email = normalizeEmail(req.body?.email);
@@ -16547,7 +16718,7 @@ router$c.post("/account/unsubscribes", requireMarketing("send"), async (req, res
   }
   res.json({ ok: true });
 });
-router$c.post("/demo/sample-report", requireMarketing("send"), async (req, res) => {
+router$d.post("/demo/sample-report", requireMarketing("send"), async (req, res) => {
   if (process.env.MARKETING_DEMO !== "true" || isHostedDeployment(liveServerEnv())) {
     return res.status(404).json({ error: "Not found." });
   }
@@ -16585,7 +16756,7 @@ router$c.post("/demo/sample-report", requireMarketing("send"), async (req, res) 
   await store.saveReport(report);
   res.json({ campaign, report });
 });
-const router$b = Router();
+const router$c = Router();
 const db$5 = () => admin.firestore();
 function isAgentAuthorized(req) {
   const serviceKey = req.headers["x-agent-key"];
@@ -16627,7 +16798,7 @@ async function loadOrderForAppointment(appointment) {
   const orderDoc = await db$5().collection("orders").doc(String(appointment.orderId)).get();
   return orderDoc.exists ? { id: orderDoc.id, ref: orderDoc.ref, data: orderDoc.data() || {} } : null;
 }
-router$b.get("/briefing", requireStaff, async (_req, res) => {
+router$c.get("/briefing", requireStaff, async (_req, res) => {
   try {
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
@@ -16826,9 +16997,9 @@ async function runReminderSweep(req, res) {
     return res.status(500).json({ error: "Failed to run reminder sweep." });
   }
 }
-router$b.get("/run-reminders", runReminderSweep);
-router$b.post("/run-reminders", runReminderSweep);
-router$b.get("/logs", requireStaff, async (req, res) => {
+router$c.get("/run-reminders", runReminderSweep);
+router$c.post("/run-reminders", runReminderSweep);
+router$c.get("/logs", requireStaff, async (req, res) => {
   try {
     const { agent, status: status2, requiresReview, limit = "50" } = req.query;
     let query = db$5().collection("agentLogs").orderBy("createdAt", "desc");
@@ -16843,7 +17014,7 @@ router$b.get("/logs", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch agent logs." });
   }
 });
-router$b.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
+router$c.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
   try {
     const { notes } = req.body;
     await db$5().collection("agentLogs").doc(req.params.id).update({
@@ -16858,7 +17029,7 @@ router$b.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to resolve flag." });
   }
 });
-router$b.post("/log", async (req, res) => {
+router$c.post("/log", async (req, res) => {
   try {
     if (!isAgentAuthorized(req)) {
       return res.status(401).json({ error: "Invalid agent key." });
@@ -16896,9 +17067,9 @@ router$b.post("/log", async (req, res) => {
     return res.status(500).json({ error: "Failed to log agent action." });
   }
 });
-const router$a = Router();
+const router$b = Router();
 const db$4 = () => admin.firestore();
-router$a.get("/", requireStaff, async (req, res) => {
+router$b.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, listingId, orderId, limit = "100" } = req.query;
     let q = db$4().collection("mediaJobs").orderBy("createdAt", "desc");
@@ -16912,7 +17083,7 @@ router$a.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch media jobs." });
   }
 });
-router$a.post("/", requireStaff, async (req, res) => {
+router$b.post("/", requireStaff, async (req, res) => {
   try {
     const {
       listingId,
@@ -16971,7 +17142,7 @@ router$a.post("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to create media job." });
   }
 });
-router$a.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$b.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2, resultItems = [], error = "", requiresHumanReview } = req.body;
     const valid = ["queued", "processing", "ready_for_review", "completed", "failed", "cancelled"];
@@ -17105,7 +17276,7 @@ async function moveMediaDelivery(input) {
     label: MEDIA_DELIVERY_LABELS[input.status]
   };
 }
-const router$9 = Router();
+const router$a = Router();
 function adminReady$1(res) {
   if (admin.apps.length) return true;
   res.status(503).json({
@@ -17133,7 +17304,7 @@ function sendKnownError$1(res, err, fallback) {
   console.error("[Studio]", err);
   return res.status(500).json({ error: fallback });
 }
-router$9.get("/workspace", requireStaff, async (req, res) => {
+router$a.get("/workspace", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = typeof req.query.listingId === "string" ? req.query.listingId : "";
@@ -17155,7 +17326,7 @@ router$9.get("/workspace", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to load Studio.");
   }
 });
-router$9.get("/delivery-queue", requireStaff, async (req, res) => {
+router$a.get("/delivery-queue", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const rows = await listMediaDeliveryQueue({
@@ -17167,7 +17338,7 @@ router$9.get("/delivery-queue", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to load the delivery queue.");
   }
 });
-router$9.post("/delivery-queue/move", requireCoordinator, async (req, res) => {
+router$a.post("/delivery-queue/move", requireCoordinator, async (req, res) => {
   const galleryId = String(req.body?.galleryId || "").trim();
   const status2 = String(req.body?.status || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(galleryId)) {
@@ -17204,7 +17375,7 @@ router$9.post("/delivery-queue/move", requireCoordinator, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to update delivery.");
   }
 });
-router$9.post("/order-edits", requireStaff, async (req, res) => {
+router$a.post("/order-edits", requireStaff, async (req, res) => {
   const listingId = String(req.body?.listingId || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -17218,7 +17389,7 @@ router$9.post("/order-edits", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to queue the order edits.");
   }
 });
-router$9.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => {
+router$a.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => {
   let listingId = String(req.body?.listingId || "").trim();
   if (listingId && !/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -17248,7 +17419,7 @@ router$9.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => 
     return sendKnownError$1(res, err, "Failed to advance the order edit queue.");
   }
 });
-router$9.post("/iconic-polish", requireStaff, async (req, res) => {
+router$a.post("/iconic-polish", requireStaff, async (req, res) => {
   const listingId = String(req.body?.listingId || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -17265,7 +17436,7 @@ router$9.post("/iconic-polish", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to save Iconic Polish.");
   }
 });
-router$9.post("/ai-edit", requireStaff, async (req, res) => {
+router$a.post("/ai-edit", requireStaff, async (req, res) => {
   const parsed = parseAiEditRequest(req.body);
   if (parsed.ok === false) return res.status(400).json({ error: parsed.error });
   if (!adminReady$1(res)) return;
@@ -17285,7 +17456,7 @@ router$9.post("/ai-edit", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to enqueue the AI edit.");
   }
 });
-router$9.post("/adjust", requireStaff, async (req, res) => {
+router$a.post("/adjust", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
@@ -17308,7 +17479,7 @@ router$9.post("/adjust", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to save the adjustment.");
   }
 });
-router$9.post("/reject", requireStaff, async (req, res) => {
+router$a.post("/reject", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
@@ -17325,7 +17496,7 @@ router$9.post("/reject", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to reject the edit.");
   }
 });
-router$9.post("/approve", requireStaff, async (req, res) => {
+router$a.post("/approve", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
@@ -17412,10 +17583,10 @@ function isJpeg(bytes) {
   return bytes.length > 32 && bytes[0] === 255 && bytes[1] === 216;
 }
 async function readGrassReference(env = process.env) {
-  for (const filePath of grassReferenceCandidates(env)) {
+  for (const filePath2 of grassReferenceCandidates(env)) {
     try {
-      const bytes = await fs.readFile(filePath);
-      if (isJpeg(bytes)) return { bytes, contentType: "image/jpeg", path: filePath };
+      const bytes = await fs.readFile(filePath2);
+      if (isJpeg(bytes)) return { bytes, contentType: "image/jpeg", path: filePath2 };
     } catch {
     }
   }
@@ -17466,16 +17637,16 @@ async function editScratchPhoto(input) {
     downloadName: scratchDownloadName(input.fileName || "scratch.jpg")
   };
 }
-const router$8 = Router();
+const router$9 = Router();
 function headerValue(value) {
   if (Array.isArray(value)) return value[0] || "";
   return value || "";
 }
-router$8.get("/", requireCoordinator, async (_req, res) => {
+router$9.get("/", requireCoordinator, async (_req, res) => {
   const grass = await grassReferenceStatus();
   return res.json({ grass, twilightPrompt: orderExteriorTwilightPrompt() });
 });
-router$8.post(
+router$9.post(
   "/",
   requireCoordinator,
   express.raw({ type: "image/jpeg", limit: "4mb" }),
@@ -17501,13 +17672,13 @@ router$8.post(
     }
   }
 );
-router$8.use((err, _req, res, next) => {
+router$9.use((err, _req, res, next) => {
   if (err?.type === "entity.too.large" || err?.status === 413) {
     return res.status(413).json({ error: "That photo is too large for the scratch pad. Export a smaller JPEG." });
   }
   return next(err);
 });
-const router$7 = Router();
+const router$8 = Router();
 const GOOGLE_KEY = process.env.GOOGLE_MAPS_API_KEY || "";
 function fromGoogle(p) {
   return {
@@ -17534,7 +17705,7 @@ function fromNominatim(r, idx) {
     secondary: parts.slice(1).join(", ")
   };
 }
-router$7.get("/autocomplete", async (req, res) => {
+router$8.get("/autocomplete", async (req, res) => {
   const input = (req.query.input || "").trim();
   if (!input || input.length < 2) {
     return res.json({ suggestions: [] });
@@ -17570,7 +17741,7 @@ router$7.get("/autocomplete", async (req, res) => {
     return res.json({ suggestions: [] });
   }
 });
-router$7.get("/distance", async (req, res) => {
+router$8.get("/distance", async (req, res) => {
   const destination = (req.query.destination || "").trim();
   const origin = (req.query.origin || process.env.STUDIO_ADDRESS || "The Woodlands, TX 77380").trim();
   if (!destination) {
@@ -17597,7 +17768,7 @@ router$7.get("/distance", async (req, res) => {
     return res.status(500).json({ error: "Failed to calculate distance." });
   }
 });
-const router$6 = Router();
+const router$7 = Router();
 const db$2 = () => admin.firestore();
 async function findOrderLikeDocument(id) {
   const orderRequestDoc = await db$2().collection("orderRequests").doc(id).get();
@@ -17606,7 +17777,7 @@ async function findOrderLikeDocument(id) {
   if (orderDoc.exists) return orderDoc;
   return null;
 }
-router$6.post("/send", requireStaff, async (req, res) => {
+router$7.post("/send", requireStaff, async (req, res) => {
   try {
     const { to, body, orderId } = req.body;
     if (!to || !body) return res.status(400).json({ error: "to and body required." });
@@ -17644,7 +17815,7 @@ router$6.post("/send", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$6.post("/remind/:orderId", requireStaff, async (req, res) => {
+router$7.post("/remind/:orderId", requireStaff, async (req, res) => {
   try {
     const { type = "24h" } = req.body;
     const orderDoc = await findOrderLikeDocument(req.params.orderId);
@@ -17686,7 +17857,7 @@ router$6.post("/remind/:orderId", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$6.post("/conversation", requireStaff, async (req, res) => {
+router$7.post("/conversation", requireStaff, async (req, res) => {
   try {
     const { orderId, photographerPhone, photographerName, clientPhone, clientName: clientName2 } = req.body;
     if (!orderId || !photographerPhone || !clientPhone) {
@@ -17738,7 +17909,7 @@ router$6.post("/conversation", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$6.get("/conversations", requireStaff, async (_req, res) => {
+router$7.get("/conversations", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$2().collection("conversations").orderBy("createdAt", "desc").limit(50).get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -17746,7 +17917,7 @@ router$6.get("/conversations", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch conversations." });
   }
 });
-router$6.post("/conversation/:id/close", requireStaff, async (req, res) => {
+router$7.post("/conversation/:id/close", requireStaff, async (req, res) => {
   try {
     const convoDoc = await db$2().collection("conversations").doc(req.params.id).get();
     if (!convoDoc.exists) return res.status(404).json({ error: "Conversation not found." });
@@ -17758,7 +17929,7 @@ router$6.post("/conversation/:id/close", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$6.post("/webhook", express_raw_or_json, async (req, res) => {
+router$7.post("/webhook", express_raw_or_json, async (req, res) => {
   try {
     const authToken = process.env.TWILIO_AUTH_TOKEN;
     if (authToken && process.env.NODE_ENV === "production") {
@@ -17819,7 +17990,7 @@ router$6.post("/webhook", express_raw_or_json, async (req, res) => {
     return res.status(200).send("");
   }
 });
-router$6.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
+router$7.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
   try {
     const campaignDoc = await db$2().collection("campaigns").doc(req.params.id).get();
     if (!campaignDoc.exists) return res.status(404).json({ error: "Campaign not found." });
@@ -17862,7 +18033,7 @@ router$6.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$6.post("/opt-out", async (req, res) => {
+router$7.post("/opt-out", async (req, res) => {
   try {
     const { From, Body } = req.body;
     if (!From) return res.status(200).send("");
@@ -17881,8 +18052,8 @@ router$6.post("/opt-out", async (req, res) => {
 function express_raw_or_json(req, _res, next) {
   next();
 }
-const router$5 = Router();
-router$5.post("/", async (req, res) => {
+const router$6 = Router();
+router$6.post("/", async (req, res) => {
   try {
     const { name, email, subject, message, phone } = req.body;
     if (!name || !email || !subject || !message) {
@@ -17926,7 +18097,7 @@ router$5.post("/", async (req, res) => {
     });
   }
 });
-const router$4 = Router();
+const router$5 = Router();
 const SENIOR_LIVING_RATE_WINDOW_MS = 15 * 60 * 1e3;
 const SENIOR_LIVING_RATE_MAX = 5;
 const limiter = createRateLimiter({
@@ -17950,10 +18121,10 @@ async function nextInvoiceNumber() {
     return `INV-${year}-${String(Date.now()).slice(-6)}`;
   }
 }
-router$4.get("/config", (_req, res) => {
+router$5.get("/config", (_req, res) => {
   res.json({ depositCheckoutLive: seniorDepositCheckoutLive() });
 });
-router$4.post("/order", async (req, res) => {
+router$5.post("/order", async (req, res) => {
   const limit = limiter.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
@@ -18226,7 +18397,7 @@ router$4.post("/order", async (req, res) => {
     });
   }
 });
-router$4.post("/", async (req, res) => {
+router$5.post("/", async (req, res) => {
   const limit = limiter.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
@@ -18401,12 +18572,12 @@ async function deliverLiveChat(input) {
     notConfigured ? "not_configured" : "failed"
   );
 }
-const router$3 = Router();
+const router$4 = Router();
 const liveChatLimiter = createRateLimiter({
   windowMs: LIVE_CHAT_WINDOW_MS,
   max: LIVE_CHAT_MAX_PER_WINDOW
 });
-router$3.post("/live-chat", async (req, res) => {
+router$4.post("/live-chat", async (req, res) => {
   const parsed = parseLiveChatBody(req.body);
   if (parsed.ok === false) {
     return res.status(400).json({ error: parsed.error });
@@ -18636,7 +18807,7 @@ async function appendStaffReply(id, text2, senderName = "Iconic Images") {
   }));
   return updated ? toContactThreadView(updated) : null;
 }
-const router$2 = Router();
+const router$3 = Router();
 const THREAD_ID_RE = /^[a-f0-9]{32}$/;
 const postLimiter = createRateLimiter({
   windowMs: LIVE_CHAT_WINDOW_MS,
@@ -18650,7 +18821,7 @@ function threadToken(req) {
   const header = req.header("x-contact-thread-token");
   return typeof header === "string" ? header.trim() : "";
 }
-router$2.get("/staff/threads", requireCoordinator, async (_req, res) => {
+router$3.get("/staff/threads", requireCoordinator, async (_req, res) => {
   try {
     const threads = await listContactThreads();
     return res.json({ threads });
@@ -18659,7 +18830,7 @@ router$2.get("/staff/threads", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Couldn't load contact chats." });
   }
 });
-router$2.post("/staff/threads/:id/reply", requireCoordinator, async (req, res) => {
+router$3.post("/staff/threads/:id/reply", requireCoordinator, async (req, res) => {
   const id = routeParam(req.params.id);
   if (!THREAD_ID_RE.test(id)) {
     return res.status(404).json({ error: "Conversation not found." });
@@ -18680,7 +18851,7 @@ router$2.post("/staff/threads/:id/reply", requireCoordinator, async (req, res) =
     return res.status(500).json({ error: "Couldn't save the reply." });
   }
 });
-router$2.get("/threads/:id", async (req, res) => {
+router$3.get("/threads/:id", async (req, res) => {
   const id = routeParam(req.params.id);
   const token = threadToken(req);
   if (!THREAD_ID_RE.test(id) || !token) {
@@ -18695,7 +18866,7 @@ router$2.get("/threads/:id", async (req, res) => {
     return res.status(500).json({ error: "Couldn't load this chat." });
   }
 });
-router$2.post("/threads", async (req, res) => {
+router$3.post("/threads", async (req, res) => {
   const parsed = parseLiveChatBody(req.body);
   if (parsed.ok === false) {
     return res.status(400).json({ error: parsed.error });
@@ -18807,6 +18978,86 @@ const handleListingPhotoUpload = async (req, res) => {
 };
 const DEFAULT_SITE_ORIGIN = "https://iconicimagestx.vercel.app";
 const GENERIC_TITLE = "Iconic Images - Creative Media Partners";
+const PUBLIC_PAGES = [
+  {
+    path: "/",
+    file: "index.html",
+    title: "Iconic Images | Real Estate Media in Spring, The Woodlands, and Houston",
+    description: "Photography, video, and listing media for real estate agents in Spring, The Woodlands, and Houston."
+  },
+  {
+    path: "/about",
+    file: "seo/about.html",
+    title: "About | Iconic Images",
+    description: "Iconic Images is a Spring, Texas studio for real estate media, serving The Woodlands, Houston, and nearby communities since 2016."
+  },
+  {
+    path: "/pricing",
+    file: "seo/pricing.html",
+    title: "Pricing | Iconic Images",
+    description: "Listing, branding, and media packages from Iconic Images for agents in Spring, The Woodlands, and Houston."
+  },
+  {
+    path: "/studio-105",
+    file: "seo/studio-105.html",
+    title: "Studio 105 | Iconic Images",
+    description: "Studio 105 in Spring has two portrait rooms, Studio Noir and Studio Blanc, for headshots, brand films, and product photos."
+  },
+  {
+    path: "/portfolio",
+    file: "seo/portfolio.html",
+    title: "Portfolio | Iconic Images",
+    description: "Listing photos, aerials, portraits, and virtual staging by Iconic Images in Spring, The Woodlands, and Houston."
+  },
+  {
+    path: "/stock-footage",
+    file: "seo/stock-footage.html",
+    title: "Stock Footage | Iconic Images",
+    description: "Neighborhood photo stills from Iconic Images for agents listing homes in Spring, The Woodlands, and Houston."
+  },
+  {
+    path: "/contact",
+    file: "seo/contact.html",
+    title: "Contact | Iconic Images",
+    description: "Contact Iconic Images in Spring, Texas about real estate photography and video in The Woodlands and Houston."
+  },
+  {
+    path: "/socials",
+    file: "seo/socials.html",
+    title: "Socials | Iconic Images",
+    description: "Instagram, Facebook, and TikTok from Iconic Images, a real estate media studio in Spring, The Woodlands, and Houston."
+  },
+  {
+    path: "/book",
+    file: "seo/book.html",
+    title: "Book a Shoot | Iconic Images",
+    description: "Schedule listing photography or video with Iconic Images in Spring, The Woodlands, or Houston."
+  },
+  {
+    path: "/senior-living",
+    file: "seo/senior-living.html",
+    title: "Senior Living Virtual Tours & Photography | Iconic Images",
+    description: "Virtual tours and photography for senior living communities in Spring, The Woodlands, and Houston."
+  },
+  {
+    path: "/privacy",
+    file: "seo/privacy.html",
+    title: "Privacy Policy | Iconic Images",
+    description: `Privacy Policy for ${LEGAL_BUSINESS_NAME}, a real estate media studio based in Spring, Texas.`
+  },
+  {
+    path: "/terms",
+    file: "seo/terms.html",
+    title: "Terms and Conditions | Iconic Images",
+    description: "Terms and Conditions for photography, video, and listing media from Iconic Images in Texas."
+  },
+  {
+    path: "/login",
+    file: "seo/login.html",
+    title: "Client Login | Iconic Images",
+    description: "Client sign-in for Iconic Images. View your listings and delivered media."
+  }
+];
 function readConfiguredOrigin() {
   const nodeOrigin = typeof process !== "undefined" ? process.env?.VITE_SITE_ORIGIN : "";
   return String(nodeOrigin || "").trim().replace(/\/$/, "");
@@ -19143,7 +19394,7 @@ ${next}`;
 function escapeHtml$1(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
-const router$1 = Router();
+const router$2 = Router();
 const db = () => admin.firestore();
 function originOf(req) {
   const configured = process.env.APP_URL;
@@ -19187,7 +19438,7 @@ async function loadPresentation(token, origin) {
   const galleries = await galleriesForListing(listing.id, listing);
   return buildPresentation({ token, listing, galleries, origin });
 }
-router$1.get("/presentations/:token", async (req, res) => {
+router$2.get("/presentations/:token", async (req, res) => {
   const token = String(req.params.token || "");
   if (!isPresentationToken(token)) {
     return res.status(400).json({ error: "That presentation link is not valid." });
@@ -19224,8 +19475,8 @@ const handlePresentationShell = async (req, res) => {
   const rendered = await renderPresentationShell(String(req.params.token || ""), originOf(req));
   res.status(rendered.status).type("html").send(rendered.html);
 };
-router$1.get("/presentations/shell/:token", handlePresentationShell);
-router$1.post("/listings/:id/presentation", requireStaff, async (req, res) => {
+router$2.get("/presentations/shell/:token", handlePresentationShell);
+router$2.post("/listings/:id/presentation", requireStaff, async (req, res) => {
   const listingId = String(req.params.id || "");
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -19320,7 +19571,7 @@ function escapeHtml(value) {
 function escapeAttr(value) {
   return escapeHtml(value).replace(/"/g, "&quot;");
 }
-const router = Router();
+const router$1 = Router();
 function adminReady(res) {
   if (admin.apps.length) return true;
   res.status(503).json({ error: "Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT." });
@@ -19352,13 +19603,13 @@ async function advance(req, res, to) {
     return sendKnownError(res, err, "Could not update that edit request.");
   }
 }
-router.post("/listings/:id/photo-edit-requests/:requestId/sent", requireStaff, async (req, res) => {
+router$1.post("/listings/:id/photo-edit-requests/:requestId/sent", requireStaff, async (req, res) => {
   return advance(req, res, "sent_out");
 });
-router.post("/listings/:id/photo-edit-requests/:requestId/received", requireStaff, async (req, res) => {
+router$1.post("/listings/:id/photo-edit-requests/:requestId/received", requireStaff, async (req, res) => {
   return advance(req, res, "received_back");
 });
-router.post("/listings/:id/photo-edit-requests/:requestId/replacement", requireStaff, async (req, res) => {
+router$1.post("/listings/:id/photo-edit-requests/:requestId/replacement", requireStaff, async (req, res) => {
   if (!adminReady(res)) return;
   const listingId = portalListingId(req.params.id);
   const requestId = typeof req.params.requestId === "string" ? req.params.requestId.trim() : "";
@@ -19381,16 +19632,6 @@ router.post("/listings/:id/photo-edit-requests/:requestId/replacement", requireS
     return sendKnownError(res, err, "Could not attach that replacement.");
   }
 });
-function ownerAllowlist(raw) {
-  if (raw == null) return [];
-  const emails = raw.split(/[,;\s]+/).map((email) => email.trim().toLowerCase()).filter((email) => email.includes("@"));
-  return [...new Set(emails)];
-}
-function isOwnerEmail(email, allowlist) {
-  if (!email) return false;
-  if (allowlist.length === 0) return false;
-  return allowlist.includes(email.trim().toLowerCase());
-}
 const OWNER_FIXTURE_BEARER = "owner-fixture";
 const OWNER_SESSION_COOKIE = "owners_session";
 const SESSION_MS = 12 * 60 * 60 * 1e3;
@@ -19861,17 +20102,17 @@ function sectionBlock(rows, aliases) {
   for (let r = 0; r < rows.length; r += 1) {
     const filled = rows[r].filter(Boolean);
     if (filled.length !== 1 || !matchesAlias(filled[0], aliases)) continue;
-    const block = [];
+    const block2 = [];
     for (let i = r + 1; i < rows.length; i += 1) {
       const next = rows[i].filter(Boolean);
       if (next.length === 0) {
-        if (block.length) break;
+        if (block2.length) break;
         continue;
       }
       if (next.length === 1 && isSectionTitle(next[0])) break;
-      block.push(rows[i]);
+      block2.push(rows[i]);
     }
-    return block;
+    return block2;
   }
   return null;
 }
@@ -19909,8 +20150,8 @@ function pairs(rows) {
 function moneyIn(sheets) {
   const collected = [];
   for (const sheet of sheets) {
-    const block = sectionBlock(rowsOf(sheet), MONEY_SECTIONS);
-    if (block) collected.push(...pairs(block).map((item) => ({ method: item.name, amount: item.amount })));
+    const block2 = sectionBlock(rowsOf(sheet), MONEY_SECTIONS);
+    if (block2) collected.push(...pairs(block2).map((item) => ({ method: item.name, amount: item.amount })));
   }
   if (collected.length) return collected;
   for (const sheet of sheets) {
@@ -19931,8 +20172,8 @@ function pickMatchesOnly(value) {
 function parties(sheets, sections, kinds) {
   const fromSections = [];
   for (const sheet of sheets) {
-    const block = sectionBlock(rowsOf(sheet), sections);
-    if (block) fromSections.push(...pairs(block));
+    const block2 = sectionBlock(rowsOf(sheet), sections);
+    if (block2) fromSections.push(...pairs(block2));
   }
   if (fromSections.length) return fromSections;
   return recordsByKind(sheets, kinds);
@@ -20974,8 +21215,8 @@ const NOT_FOUND = { error: "Not found" };
 const OWNER_LOGIN_REDIRECT = "/admin/login?next=/admin/owners";
 const OWNER_PAGE_PATHS = /* @__PURE__ */ new Set(["/admin/owners", "/admin/owners/", "/owners", "/owners/"]);
 function mountOwners(app) {
-  const page = ["/admin/owners", "/admin/owners/", "/owners", "/owners/", "/api/owners/page"];
-  app.get(page, (req, res) => {
+  const page2 = ["/admin/owners", "/admin/owners/", "/owners", "/owners/", "/api/owners/page"];
+  app.get(page2, (req, res) => {
     void handleOwnersPage(req, res);
   });
   app.get("/api/owners/suite", (req, res) => {
@@ -21135,6 +21376,892 @@ const FALLBACK_SHELL = `<!doctype html>
     <script type="module" src="/client/main.tsx"><\/script>
   </body>
 </html>`;
+function seo(path2) {
+  const page2 = PUBLIC_PAGES.find((item) => item.path === path2);
+  return {
+    title: page2?.title ?? "Iconic Images",
+    description: page2?.description ?? ""
+  };
+}
+function linkItem(id, label, href) {
+  return { id, fields: [linkField("link", label, label, href)] };
+}
+function pairItem(id, label, before, after, afterKind = "image") {
+  return {
+    id,
+    fields: [
+      textField("label", "Label", label),
+      imageField("before", "Before", before),
+      afterKind === "video" ? videoField("after", "After", after) : imageField("after", "After", after)
+    ]
+  };
+}
+const HERO_IMAGE = "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F6529795874414a1e9fe845f3eb948e94?format=webp&width=1600&height=900";
+const BUILDER_PAIRS = [
+  pairItem("builder-1", "Listing film", "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Faecac2467163410db0180e8fdd8a98f7?format=webp&width=800&height=1200", "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F4ea5feebdab84ee585ffaa811d803379?alt=media&token=dda6499e-44a2-47a4-a456-1cacb39b6ae4&apiKey=0ed22311ac6a4dbebeda1b4230c2746c", "video"),
+  pairItem("builder-2", "Vertical cut", "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fe7a04734046e4171bfccc96600f0870f?format=webp&width=800&height=1200", "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fba0e88982aa140c2bd2a033055391c4a?alt=media&token=2faaf53d-9e02-4887-aa85-08c6f971cee4&apiKey=0ed22311ac6a4dbebeda1b4230c2746c", "video"),
+  pairItem("builder-3", "Property film", "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F1bc44dc912bd4cd4848b7cbe64db7001?format=webp&width=800&height=1200", "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F4203b3fa6d2046f6b3aebe85986706ad?alt=media&token=60e7a23a-12d3-45d9-8063-8fa212dc4c4c&apiKey=0ed22311ac6a4dbebeda1b4230c2746c", "video"),
+  pairItem("builder-4", "Detail film", "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F54911d726f0a43b684406564dac1e5e8?format=webp&width=800&height=1200", "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F4be86e27da6548d59c567aa0bdfc66e9?alt=media&token=927f0df1-6342-47f7-809f-131e4df074d6&apiKey=0ed22311ac6a4dbebeda1b4230c2746c", "video")
+];
+const STILL_PAIRS = [
+  pairItem("twilight-pool", "Twilight conversion", "/media/before-after/twilight-pool-day.jpg", "/media/before-after/twilight-pool-lifestyle.jpg"),
+  pairItem("pavilion-lifestyle", "Lifestyle staging", "/media/before-after/pavilion-empty.jpg", "/media/before-after/pavilion-lifestyle.jpg"),
+  pairItem("pasture-lifestyle", "Pasture lifestyle", "/media/before-after/pasture-animals.jpg", "/media/before-after/pasture-lifestyle.jpg"),
+  pairItem("living-declutter", "Virtual declutter", "/media/before-after/living-occupied.jpg", "/media/before-after/living-declutter.jpg")
+];
+function page(id, path2, label, blocks, title, description) {
+  const meta = seo(path2);
+  return contentPage(id, path2, label, title ?? meta.title, description ?? meta.description, blocks);
+}
+const PAGES = [
+  page("chrome", "", "Header, footer, and promo", [
+    block("promo", "Promo bar", [
+      textField("visible", "Show promo bar", "true"),
+      textField("text", "Promo text", "FREE AI STAGING ON YOUR FIRST ORDER - CODE: ICONICAI")
+    ]),
+    block("brand", "Logo and color", [
+      textField("logoText", "Logo wordmark", "ICONIC"),
+      textField("primaryColor", "Accent color", "#0d9488"),
+      imageField("logo", "Logo image", "/media/logos/camera-logo-white-on-black.png")
+    ]),
+    block("nav", "Navigation", [], [
+      linkItem("about", "About", "/about"),
+      linkItem("pricing", "Pricing", "/pricing"),
+      linkItem("studio", "Studio 105", "/studio-105"),
+      linkItem("portfolio", "Portfolio", "/portfolio"),
+      linkItem("stock", "Stock Footage", "/stock-footage"),
+      linkItem("contact", "Contact Us", "/contact")
+    ]),
+    block("headerCtas", "Header buttons", [
+      linkField("login", "Log in", "Log in", "/login"),
+      linkField("book", "Book Now", "Book Now", "/book")
+    ]),
+    block("footer", "Footer links", [
+      textField("copyright", "Copyright name", LEGAL_BUSINESS_NAME)
+    ], [
+      linkItem("home", "Home", "/"),
+      linkItem("pricing", "Pricing", "/pricing"),
+      linkItem("socials", "Socials", "/socials"),
+      linkItem("portfolio", "Portfolio", "/portfolio"),
+      linkItem("studio", "Studio 105", "/studio-105"),
+      linkItem("contact", "Contact Us", "/contact"),
+      linkItem("login", "Client Login", "/login")
+    ]),
+    block("socials", "Social profiles", [], [
+      linkItem("facebook", "Facebook", "https://facebook.com/iconicimagestx"),
+      linkItem("instagram", "Instagram", "https://instagram.com/iconicimagestx"),
+      linkItem("tiktok", "TikTok", "https://tiktok.com/@iconicimagestx")
+    ])
+  ], "Iconic Images", "Shared header, footer, and promo."),
+  page("home", "/", "Home", [
+    block("hero", "Hero", [
+      textField("kicker", "Kicker", "Your Brand, Made"),
+      textField("title", "Headline", "ICONIC"),
+      areaField("line1", "Supporting line", "Media Production. Virtual Staging. Content Management."),
+      areaField("line2", "Body", 'ICONIC is the dedicated creative crew for businesses and agents who demand more than "good enough".'),
+      textField("weAre", "Rotator label", "WE ARE YOUR:"),
+      imageField("image", "Background", HERO_IMAGE),
+      linkField("ctaRealEstate", "Real estate button", "I'm in Real Estate", "/pricing#listings"),
+      linkField("ctaBusiness", "Business button", "I own a Business", "/pricing#branding-personal")
+    ], [
+      { id: "cap-1", fields: [textField("label", "Capability", "Cinematic Filmmakers")] },
+      { id: "cap-2", fields: [textField("label", "Capability", "Social Architects")] },
+      { id: "cap-3", fields: [textField("label", "Capability", "REEL Producers")] },
+      { id: "cap-4", fields: [textField("label", "Capability", "Private Editing Studio")] },
+      { id: "cap-5", fields: [textField("label", "Capability", "Content Managers")] },
+      { id: "cap-6", fields: [textField("label", "Capability", "Personal Production Team")] }
+    ]),
+    block("beforeAfter", "Before and after", [
+      textField("beforeLabel", "Before label", "Before"),
+      textField("afterLabel", "After label", "After")
+    ], [...STILL_PAIRS, ...BUILDER_PAIRS]),
+    block("raising", "We are the bar", [
+      textField("titleLead", "Title lead", "We"),
+      textField("titleAccent", "Title accent", "ARE"),
+      textField("titleTail", "Title tail", "the Bar."),
+      areaField("body", "Body", "We don’t follow trends. We break patterns. We don’t undercut. We outperform.")
+    ]),
+    block("market", "Our market", [
+      textField("titleLead", "Title lead", "This Is"),
+      textField("titleAccent", "Title accent", "OUR"),
+      textField("titleTail", "Title tail", "Market."),
+      areaField("body", "Body", "Iconic was built here. We’ve invested here. We’ve shaped here. Winning brands don’t chase. They choose Iconic.")
+    ]),
+    block("solution", "High-impact video", [
+      textField("badge", "Badge", "Built for Creative Excellence"),
+      textField("title", "Headline", "Your All-in-One Solution for High-Impact Media Content"),
+      areaField("body", "Body", "Transform your raw ideas into engaging cinematic media in minutes. Whether you're a high-growth startup serving multiple clients or an established enterprise, Iconic helps you create professional-grade visual content seamlessly.")
+    ], [
+      { id: "product", fields: [videoField("video", "Video", "/media/video/product-photography.mp4"), textField("title", "Title", "Product Photography")] },
+      { id: "vertical", fields: [videoField("video", "Video", "/media/reels/superpower-reel-12s.mp4"), textField("title", "Title", "Vertical Reel")] },
+      { id: "content", fields: [videoField("video", "Video", "/media/video/content-web-clip.mp4"), textField("title", "Title", "Content Package")] },
+      { id: "snap-luxury", fields: [videoField("video", "Video", "/media/videos/snap-reels/snap-reel-01.mp4"), textField("title", "Title", "Snap Reel · Luxury Tour")] },
+      { id: "snap-modern", fields: [videoField("video", "Video", "/media/videos/snap-reels/snap-reel-02.mp4"), textField("title", "Title", "Snap Reel · Modern Living")] },
+      { id: "snap-kitchen", fields: [videoField("video", "Video", "/media/videos/snap-reels/snap-reel-03.mp4"), textField("title", "Title", "Snap Reel · Kitchen Glow")] },
+      { id: "snap-arrival", fields: [videoField("video", "Video", "/media/videos/snap-reels/snap-reel-04.mp4"), textField("title", "Title", "Snap Reel · Grand Arrival")] }
+    ]),
+    block("stats", "Stats", [], [
+      { id: "assets", fields: [textField("value", "Value", "100,000+"), textField("label", "Label", "Media assets produced")] },
+      { id: "turnaround", fields: [textField("value", "Value", "24 hrs"), textField("label", "Label", "Avg. turnaround time")] },
+      { id: "engagement", fields: [textField("value", "Value", "+403%"), textField("label", "Label", "More brand engagement")] }
+    ]),
+    block("steps", "Steps", [
+      textField("badge", "Badge", "4 STEPS TO RESULTS"),
+      textField("title", "Headline", "From vision to viral in minutes, not days"),
+      areaField("body", "Body", "Placing an order with Iconic is as simple as it gets. We handle the heavy lifting so you can focus on growth.")
+    ], [
+      { id: "step-1", fields: [textField("step", "Step", "STEP 1"), textField("title", "Title", "Book your session"), areaField("body", "Body", "Select your creative service and schedule a time through our seamless partnership portal in just a few clicks.")] },
+      { id: "step-2", fields: [textField("step", "Step", "STEP 2"), textField("title", "Title", "We capture the vision"), areaField("body", "Body", "Our professional creative team arrives on-site with state-of-the-art equipment to capture high-impact raw media.")] },
+      { id: "step-3", fields: [textField("step", "Step", "STEP 3"), textField("title", "Title", "Rapid post-production"), areaField("body", "Body", "Our expert editors transform raw clips into polished, cinematic masterpieces that perfectly align with your brand.")] },
+      { id: "step-4", fields: [textField("step", "Step", "STEP 4"), textField("title", "Title", "Delivery & launch"), areaField("body", "Body", "Receive your ready-to-post assets within 24 hours. Download, publish, and dominate your social feed instantly.")] }
+    ]),
+    block("network", "The network", [
+      textField("titleLead", "Title lead", "Built Bigger Than"),
+      textField("titleAccent", "Title accent", "One Brand"),
+      areaField("body", "Body", "Iconic isn’t here to squeeze the market; we’re here to expand it.")
+    ]),
+    block("audience", "Who it’s for", [
+      textField("badge", "Badge", "WHO IT'S FOR"),
+      textField("title", "Headline", "Tailored for real estate and visual storytelling professionals"),
+      areaField("body", "Body", "Iconic simplifies media creation for real estate professionals, builders, and business owners — helping you showcase your vision and grow your presence.")
+    ]),
+    block("audienceDetails", "Audiences", [], [
+      { id: "realtors", fields: [textField("title", "Title", "Realtors & Brokers"), areaField("body", "Body", "Attract leads, close faster, and win more listings with engaging property videos."), imageField("image", "Image", "/media/photos/lifestyle-mtz04327.jpg")] },
+      { id: "photographers", fields: [textField("title", "Title", "Photographers"), areaField("body", "Body", "Upsell AI videos with every order. More profit, no effort."), imageField("image", "Image", "/media/photos/studio-mtz01691.jpg")] },
+      { id: "media", fields: [textField("title", "Title", "Real Estate Media Companies"), areaField("body", "Body", "Scale your business and stay competitive with AI property videos — no extra overhead."), imageField("image", "Image", "/media/photos/drone-hero.jpg")] },
+      { id: "developers", fields: [textField("title", "Title", "Developers & Builders"), areaField("body", "Body", "Showcase new construction and development projects with cinematic fly-throughs."), imageField("image", "Image", "/media/photos/luxury-exterior.jpg")] },
+      { id: "business", fields: [textField("title", "Title", "Small Business Owners"), areaField("body", "Body", "Professional media content to tell your brand story and engage your local community."), imageField("image", "Image", "/media/photos/lifestyle-daughtery-mtz00636.jpg")] },
+      { id: "online", fields: [textField("title", "Title", "Online Appearance"), areaField("body", "Body", "High-impact visual identity for anyone looking to dominate their digital space."), imageField("image", "Image", "/media/photos/headshot-gracepoint-1.jpg")] }
+    ]),
+    block("snapReels", "Snap Reels", [
+      textField("kicker", "Kicker", "Essentials"),
+      textField("title", "Headline", "Snap Reels"),
+      areaField("body", "Body", "Listing stills, turned into a 9:16 Snap Reel. Same-day vertical video from the photos we already shoot.")
+    ], [
+      { id: "marias", fields: [videoField("video", "Video", "/media/videos/snap-reels/MariasWay_MarketingSnap_v1.mp4"), textField("title", "Title", "Marias Way"), textField("vibe", "Caption", "Evening light through the house, paced for a vertical scroll")] },
+      { id: "heron", fields: [videoField("video", "Video", "/media/videos/snap-reels/HeronWing_MarketingSnap_v1.mp4"), textField("title", "Title", "Heron Wing"), textField("vibe", "Caption", "Clean lines and still water, cut for the feed")] },
+      { id: "blue", fields: [videoField("video", "Video", "/media/videos/snap-reels/BlueLake_MarketingSnap_v1.mp4"), textField("title", "Title", "Blue Lake"), textField("vibe", "Caption", "Golden hour from the terrace to the lake")] }
+    ]),
+    block("features", "Add-on tools", [
+      textField("badge", "Badge", "ADDITIONAL FEATURES"),
+      textField("title", "Headline", "Go beyond basic editing with powerful add-on tools"),
+      areaField("body", "Body", "Iconic isn't just about reels — enhance your content with smart AI tools designed to polish, extend, and personalize every video.")
+    ], [
+      { id: "snap", fields: [textField("title", "Title", "Snap Reels"), areaField("body", "Body", "Turn the listing stills into a 9:16 Snap Reel. A vertical cut buyers can watch before they ever book a showing.")] },
+      { id: "import", fields: [textField("title", "Title", "One Click Import"), areaField("body", "Body", "Pull listing photos directly from Realtor.com or Zillow to start your video in seconds.")] },
+      { id: "staging", fields: [textField("title", "Title", "AI Virtual Staging"), areaField("body", "Body", "Instantly furnish empty rooms with realistic AI staging to showcase your property's full potential.")] },
+      { id: "edits", fields: [textField("title", "Title", "AI Photo Edits"), areaField("body", "Body", "Make your listing photos stand out with AI-powered enhancements — like twilights, lawn repairs, and other edits that instantly elevate any property.")] },
+      { id: "studio", fields: [textField("title", "Title", "Studio"), areaField("body", "Body", "Iconic's built-in editor that allows you to customize your videos with templates, music, captions, branding, and even your own photos or clips.")] },
+      { id: "voice", fields: [textField("title", "Title", "AI Voiceovers"), areaField("body", "Body", "Instantly generate natural-sounding narrations from a wide range of voices.")] },
+      { id: "captions", fields: [textField("title", "Title", "Social Media Captions"), areaField("body", "Body", "Automatically create captions optimized for Instagram, Facebook, LinkedIn, YouTube, and X.")] },
+      { id: "avatars", fields: [textField("title", "Title", "AI Avatars"), areaField("body", "Body", "Create professional video presentations with AI-generated avatars for a personal touch.")] }
+    ]),
+    block("reviews", "Reviews", [
+      textField("badge", "Badge", "TESTIMONIALS"),
+      textField("title", "Headline", "What our clients are saying"),
+      areaField("body", "Body", "Agents and businesses trust Iconic Images for listing photography, video, and a fast, professional turnaround."),
+      linkField("cta", "Button", "Book a shoot", "/book")
+    ]),
+    block("faq", "FAQ", [
+      textField("badge", "Badge", "FAQ"),
+      textField("title", "Headline", "Got questions? We've got answers."),
+      areaField("body", "Body", "Everything you need to know about Iconic in a nutshell.")
+    ], [
+      { id: "time", fields: [textField("question", "Question", "How long does video processing take?"), areaField("answer", "Answer", "Typically, our high-end media assets are delivered within 24 hours of capture. Our rapid post-production workflow is optimized for social media timelines.")] },
+      { id: "portrait", fields: [textField("question", "Question", "Does Iconic support portrait mode?"), areaField("answer", "Answer", "Yes, we specialize in both cinematic landscape and scroll-stopping vertical content optimized for Reels, TikTok, and Shorts.")] },
+      { id: "images", fields: [textField("question", "Question", "How many images can I use per video?"), areaField("answer", "Answer", "Our standard cinematic reel utilizes between 15-25 of the best property shots, but this can be customized based on your specific project needs.")] },
+      { id: "length", fields: [textField("question", "Question", "How long is each video?"), areaField("answer", "Answer", "Most property reels are between 30-60 seconds, which is the 'sweet spot' for high engagement across modern social platforms.")] }
+    ]),
+    block("partnership", "Closing call to action", [
+      textField("title", "Headline", "Let's Create Something ICONIC Together."),
+      areaField("body", "Body", "Whether you're looking for creative services, strategic partnership, or media licensing solutions, our team is ready to discuss your vision and bring it to life."),
+      linkField("cta", "Button", "Get your free Iconic Video", "/book")
+    ])
+  ]),
+  page("pricing", "/pricing", "Pricing", [
+    block("hero", "Hero", [
+      textField("badge", "Badge", "Pricing & Packages"),
+      textField("titleLead", "Title lead", "The Perfect"),
+      textField("titleAccent", "Title accent", "Price"),
+      textField("titleTail", "Title tail", "for Your Presence"),
+      textField("subtitle", "Subtitle", "Media that moves as fast as you do."),
+      videoField("background", "Background video", "/media/video/content-web-clip.mp4")
+    ]),
+    block("chips", "Section jumps", [], [
+      { id: "listings", fields: [textField("label", "Label", "FOR LISTINGS"), textField("anchor", "Anchor", "listings")] },
+      { id: "branding", fields: [textField("label", "Label", "FOR BRANDING"), textField("anchor", "Anchor", "branding")] },
+      { id: "business", fields: [textField("label", "Label", "FOR BUSINESS"), textField("anchor", "Anchor", "social")] },
+      { id: "growth", fields: [textField("label", "Label", "FOR GROWTH"), textField("anchor", "Anchor", "brand-identity")] }
+    ]),
+    block("assistant", "AI assistant card", [
+      textField("title", "Title", "Not sure where to start?"),
+      textField("subtitle", "Subtitle", "Let our AI guide you"),
+      linkField("cta", "Link", "Let our AI guide you", "/pricing/ai-assistant")
+    ]),
+    block("doors", "Choose a path", [
+      textField("title", "Headline", "Do you have..."),
+      textField("timeTitle", "Time door title", "MORE TIME THAN MONEY"),
+      areaField("timeBody", "Time door body", "I’m ready to hustle, I just need the tools and the professional polish to win."),
+      textField("timeCta", "Time door button", "I'M READY TO HUSTLE →"),
+      textField("moneyTitle", "Money door title", "MORE MONEY THAN TIME"),
+      areaField("moneyBody", "Money door body", "I’m ready to scale, I need my time back and my brand on autopilot."),
+      textField("moneyCta", "Money door button", "I'M READY TO SCALE →")
+    ]),
+    block("listings", "Listings section", [
+      textField("title", "Headline", "Listings & Spaces (The Property)"),
+      areaField("body", "Body", "Targeting the listing lifecycle: Pre-launch buzz, active sale, and post-close legacy. Every package now includes a Listing Reel as the core deliverable. We don't just shoot; we trend.")
+    ]),
+    block("brandStages", "Personal brand", [
+      textField("titleLead", "Title lead", "Elevate Your"),
+      textField("titleAccent", "Title accent", "Personal Brand"),
+      areaField("body", "Body", "Three beats. A stiff standard headshot, a polished Iconic corporate portrait, then a lifestyle frame with some life in it.")
+    ], [
+      { id: "standard", fields: [textField("label", "Label", "Standard"), imageField("image", "Photo", "/media/photos/standard-headshot.jpg"), textField("note", "Note", "Flat light. A stiff crop. Easy to scroll past.")] },
+      { id: "corporate", fields: [textField("label", "Label", "Iconic Corporate"), imageField("image", "Photo", "/media/photos/lifestyle-mtz04327.jpg"), textField("note", "Note", "Polished, confident, and ready for the brand.")] },
+      { id: "lifestyle", fields: [textField("label", "Label", "Iconic Lifestyle"), imageField("image", "Photo", "/media/photos/lifestyle-kennedy-mtz01127.jpg"), textField("note", "Note", "Alive. Warm. The frame people actually stop for.")] }
+    ])
+  ]),
+  page("book", "/book", "Book", [
+    block("seoNote", "Booking page", [
+      areaField("note", "Editor note", "The booking form, package prices, and promo math stay on the booking catalog so a copy edit cannot change what a client is charged.")
+    ])
+  ]),
+  page("seniorLiving", "/senior-living", "Senior Living", [
+    block("hero", "Hero", [
+      textField("titleLead", "Title lead", "Virtual tours for"),
+      textField("titleAccent", "Title accent", "senior living"),
+      areaField("location", "Location", "For communities in Spring, The Woodlands, and Houston."),
+      areaField("sampleNote", "Sample note", "The sample tour is from a Woodlands-area senior living community."),
+      linkField("cta", "Primary button", "Schedule when you're ready for us to come!", "#schedule"),
+      imageField("hero", "Hero photo", "/senior-living/senior-living-01-hero.jpg")
+    ]),
+    block("gallery", "Photo gallery", [
+      textField("title", "Headline", "A Woodlands-area senior living community")
+    ]),
+    block("tour", "Sample tour", [
+      textField("title", "Headline", "Sample tour"),
+      textField("embedTitle", "Tour title", "Sample tour of a Woodlands-area senior living community")
+    ])
+  ]),
+  page("contact", "/contact", "Contact", [
+    block("hero", "Hero", [
+      textField("kicker", "Kicker", "CONTACT US"),
+      textField("titleLead", "Title lead", "We'd love to"),
+      textField("titleAccent", "Title accent", "hear from you"),
+      areaField("body", "Body", "Have a question or feedback? We'd love to hear from you. Send us a message and we'll respond as soon as possible."),
+      textField("chatKicker", "Chat kicker", "LIVE CHAT"),
+      textField("chatLabel", "Chat label", "Start Chat")
+    ])
+  ]),
+  page("about", "/about", "About", [
+    block("hero", "Hero", [
+      textField("badge", "Badge", "Decade of Excellence"),
+      textField("titleLead", "Title lead", "A Decade of"),
+      textField("titleAccent", "Title accent", "Setting the Standard."),
+      areaField("body", "Body", "Est. 2016. 10 Years. Thousands of Listings. Millions in Commission Generated for our Partners.")
+    ], [
+      { id: "est", fields: [imageField("image", "Photo", "/media/about/tiles/01_est_2016.jpg"), textField("label", "Label", "Est. 2016")] },
+      { id: "engine", fields: [imageField("image", "Photo", "/media/about/tiles/02_the_engine.jpg"), textField("label", "Label", "The Engine")] },
+      { id: "scale", fields: [imageField("image", "Photo", "/media/about/tiles/03_scale.jpg"), textField("label", "Label", "Scale")] },
+      { id: "growth", fields: [imageField("image", "Photo", "/media/about/tiles/04_growth.jpg"), textField("label", "Label", "Growth")] },
+      { id: "legacy", fields: [imageField("image", "Photo", "/media/about/tiles/05_legacy.jpg"), textField("label", "Label", "Legacy")] },
+      { id: "cinematic", fields: [imageField("image", "Photo", "/media/about/tiles/06_cinematic.jpg"), textField("label", "Label", "Cinematic")] },
+      { id: "market", fields: [imageField("image", "Photo", "/media/about/tiles/08_market_lead.jpg"), textField("label", "Label", "Market Lead")] }
+    ]),
+    block("hub", "Intelligence hub", [
+      textField("kicker", "Kicker", "THE INTELLIGENCE HUB: BEYOND THE LENS"),
+      textField("title", "Headline", "Where Vision Meets Velocity."),
+      areaField("body", "Body", "At Iconic Images, we don’t just capture real estate; we engineer market ownership. In a world of infinite scrolling, 'pretty pictures' are the bare minimum."),
+      textField("philosophyTitle", "Philosophy title", "THE ICONIC PHILOSOPHY"),
+      areaField("philosophy", "Philosophy", "We believe the agent is the architect of the deal, but the media is the fuel.")
+    ])
+  ]),
+  page("portfolio", "/portfolio", "Portfolio", [
+    block("hero", "Hero", [
+      textField("kicker", "Kicker", "Selected Work"),
+      textField("title", "Headline", "Portfolio"),
+      areaField("body", "Body", "People, families, studio, holiday, headshots, listings, aerials, and virtual staging from Iconic Images.")
+    ])
+  ]),
+  page("studio105", "/studio-105", "Studio 105", [
+    block("hero", "Hero", [
+      textField("kicker", "Kicker", "The physical studio"),
+      textField("title", "Headline", "Studio 105")
+    ]),
+    block("rooms", "Rooms", [], [
+      { id: "studio-noir", fields: [textField("name", "Name", "Studio Noir"), textField("vibe", "Vibe", "Dark / dramatic"), areaField("summary", "Summary", "A controlled black room for portraits with edge, branding films, and product that needs mood.")] },
+      { id: "studio-blanc", fields: [textField("name", "Name", "Studio Blanc"), textField("vibe", "Vibe", "Bright / white"), areaField("summary", "Summary", "A clean white room for crisp headshots, bright product, and holiday minis.")] }
+    ])
+  ]),
+  page("socials", "/socials", "Socials", [
+    block("hero", "Hero", [
+      textField("kicker", "Kicker", "Iconic channels"),
+      textField("titleLead", "Title lead", "ICONIC"),
+      textField("titleAccent", "Title accent", "EVERYWHERE."),
+      areaField("body", "Body", "Follow Iconic Images. The frames below are from our own library."),
+      textField("stillsTitle", "Stills heading", "Selected stills")
+    ], [
+      { id: "drone", fields: [imageField("image", "Photo", "/media/photos/drone-hero.jpg"), textField("caption", "Caption", "Aerial still from an Iconic listing shoot.")] },
+      { id: "pool", fields: [imageField("image", "Photo", "/media/before-after/twilight-pool-lifestyle.jpg"), textField("caption", "Caption", "Twilight conversion of a rear pool.")] },
+      { id: "interior", fields: [imageField("image", "Photo", "/media/photos/luxury-interior.jpg"), textField("caption", "Caption", "Listing interior from the Iconic library.")] }
+    ])
+  ]),
+  page("stock", "/stock-footage", "Stock footage", [
+    block("hero", "Hero", [
+      textField("title", "Headline", "Stock Footage Library"),
+      areaField("body", "Body", "Premium, professionally photographed real estate images by neighborhood. License instantly and use for your listings, marketing, or staging inspiration.")
+    ])
+  ]),
+  page("virtualStaging", "/services/virtual-staging", "Virtual staging", [
+    block("hero", "Hero", [
+      textField("titleLead", "Title lead", "AI"),
+      textField("titleAccent", "Title accent", "Virtual Staging"),
+      areaField("body", "Body", "Transform empty spaces into beautifully furnished rooms instantly. Our AI-powered staging helps buyers visualize their future home."),
+      textField("free", "Free line", "Try for free"),
+      linkField("cta", "Button", "Try for free", "/services/virtual-staging/select")
+    ]),
+    block("pricing", "Pricing intro", [
+      textField("titleLead", "Title lead", "Flexible"),
+      textField("titleAccent", "Title accent", "Pricing"),
+      areaField("body", "Body", "Choose between our lightning-fast AI tool or professional human edits for the ultimate quality.")
+    ])
+  ]),
+  page("go", "/go", "Go", [
+    block("hero", "Hero", [
+      textField("eyebrow", "Eyebrow", "Iconic Images"),
+      textField("title", "Headline", "Real estate media that sells"),
+      areaField("body", "Body", "Listing photos, film, and brand media from Iconic Images. Book a shoot when you are ready."),
+      linkField("cta", "Button", "Book a shoot", "/book"),
+      textField("documentTitle", "Browser title", "Iconic Images | Book your shoot")
+    ])
+  ], "Iconic Images | Book your shoot", "Listing photos, film, and brand media from Iconic Images. Book a shoot when you are ready."),
+  page("agents", "/agents", "Agents", [
+    block("hero", "Hero", [
+      textField("badge", "Badge", "Exclusive Offer for Real Estate Agents"),
+      textField("titleLead", "Title lead", "Get"),
+      textField("titleAccent", "Title accent", "10X More Eyes"),
+      textField("titleTail", "Title tail", "On Your Listings"),
+      areaField("body", "Body", "Top-producing agents don't just list homes—they create experiences. Iconic Images provides the cinematic content you need to dominate your market and win every listing presentation.")
+    ])
+  ]),
+  page("privacy", "/privacy", "Privacy", [
+    block("hero", "Title", [
+      textField("title", "Headline", "Privacy Policy")
+    ])
+  ]),
+  page("terms", "/terms", "Terms", [
+    block("hero", "Title", [
+      textField("title", "Headline", "Terms and Conditions")
+    ])
+  ]),
+  page("login", "/login", "Login", [
+    block("hero", "Sign in", [
+      textField("title", "Wordmark", "ICONIC")
+    ])
+  ]),
+  page("aiAssistant", "/pricing/ai-assistant", "AI assistant", [
+    block("hero", "Hero", [
+      textField("badge", "Badge", "AI Media Strategist"),
+      textField("titleLead", "Title lead", "Find your"),
+      textField("titleAccent", "Title accent", "perfect match"),
+      areaField("body", "Body", "Answer a few questions and our AI will determine which service or package best suits your specific business goals.")
+    ])
+  ]),
+  page("unsubscribe", "/unsubscribe", "Unsubscribe", [
+    block("hero", "Title", [
+      textField("title", "Headline", "Unsubscribe")
+    ])
+  ])
+];
+function defaultPages() {
+  return JSON.parse(JSON.stringify(PAGES));
+}
+function defaultPage(id) {
+  return defaultPages().find((item) => item.id === id) ?? null;
+}
+function knownPageIds() {
+  return PAGES.map((item) => item.id);
+}
+const MAX_TEXT = 2e4;
+const MAX_ITEMS = 80;
+function cleanField(field, fallback) {
+  const kind = field?.kind || fallback?.kind;
+  if (!kind || !field?.id) return null;
+  const value = String(field.value ?? fallback?.value ?? "").slice(0, MAX_TEXT);
+  const next = { id: String(field.id), label: String(field.label || fallback?.label || field.id), kind, value };
+  if (kind === "link" || field.href != null || fallback?.href != null) {
+    next.href = String(field.href ?? fallback?.href ?? "").slice(0, 2e3);
+  }
+  return next;
+}
+function cleanItem(item, allowed) {
+  if (!item?.id || !Array.isArray(item.fields)) return null;
+  const fields = item.fields.map((field) => cleanField(field)).filter((field) => Boolean(field)).filter((field) => !allowed || allowed.has(field.id));
+  if (!fields.length) return null;
+  return { id: String(item.id).slice(0, 80), fields };
+}
+function cleanBlock(block2, fallback) {
+  if (!block2?.id) return null;
+  const baseFields = fallback?.fields ?? [];
+  const fields = baseFields.map((field) => {
+    const incoming = block2.fields?.find((item) => item.id === field.id);
+    return cleanField(incoming || field, field);
+  });
+  const allowedItemFields = new Set((fallback?.items ?? []).flatMap((item) => item.fields.map((field) => field.id)));
+  const items = fallback?.items ? Array.isArray(block2.items) ? block2.items.map((item) => cleanItem(item, allowedItemFields)).filter((item) => Boolean(item)).slice(0, MAX_ITEMS) : fallback.items : void 0;
+  return {
+    id: String(block2.id),
+    label: String(block2.label || fallback?.label || block2.id),
+    hidden: block2.hidden === true,
+    fields,
+    ...items ? { items } : {}
+  };
+}
+function mergeContent(overlay) {
+  if (!overlay?.id) return null;
+  const base = defaultPage(overlay.id);
+  if (!base) return null;
+  const order = Array.isArray(overlay.blocks) ? overlay.blocks.map((block2) => block2.id) : [];
+  const blocks = base.blocks.map((block2) => {
+    const incoming = overlay.blocks?.find((item) => item.id === block2.id);
+    return incoming ? cleanBlock(incoming, block2) : cleanBlock(block2, block2);
+  });
+  blocks.sort((a, b) => {
+    const ai = order.indexOf(a.id);
+    const bi = order.indexOf(b.id);
+    if (ai === -1 && bi === -1) return 0;
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+  return stripPage({
+    ...base,
+    seoTitle: String(overlay.seoTitle ?? base.seoTitle).slice(0, 300),
+    seoDescription: String(overlay.seoDescription ?? base.seoDescription).slice(0, 500),
+    blocks
+  });
+}
+const memory = { published: {}, drafts: {} };
+const filePath = path.join(os.tmpdir(), "iconic-site-content.json");
+function siteContentUsesMemory() {
+  return process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory" || !admin.apps.length;
+}
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+async function readFileStore() {
+  try {
+    const raw = await fs.readFile(filePath, "utf8");
+    const parsed = JSON.parse(raw);
+    return { published: parsed.published || {}, drafts: parsed.drafts || {} };
+  } catch {
+    return { published: {}, drafts: {} };
+  }
+}
+async function writeFileStore(next) {
+  await fs.writeFile(filePath, JSON.stringify(next));
+}
+async function listPublished() {
+  if (siteContentUsesMemory()) {
+    if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") {
+      return Object.values(memory.published).map((page2) => stripPage(page2));
+    }
+    const stored = await readFileStore();
+    return Object.values(stored.published).map((page2) => stripPage(page2));
+  }
+  const snap = await admin.firestore().collection("siteContent").get();
+  return snap.docs.map((doc) => stripPage(doc.data()));
+}
+async function readPublished(id) {
+  if (siteContentUsesMemory()) {
+    if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") {
+      return memory.published[id] ? clone(memory.published[id]) : null;
+    }
+    const stored = await readFileStore();
+    return stored.published[id] ? clone(stored.published[id]) : null;
+  }
+  const doc = await admin.firestore().collection("siteContent").doc(id).get();
+  return doc.exists ? doc.data() : null;
+}
+async function writePublished(page2) {
+  if (siteContentUsesMemory()) {
+    if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") {
+      memory.published[page2.id] = clone(page2);
+      return;
+    }
+    const stored = await readFileStore();
+    stored.published[page2.id] = page2;
+    await writeFileStore(stored);
+    return;
+  }
+  await admin.firestore().collection("siteContent").doc(page2.id).set(page2);
+}
+async function readDraft(id) {
+  if (siteContentUsesMemory()) {
+    if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") {
+      return memory.drafts[id] ? clone(memory.drafts[id]) : null;
+    }
+    const stored = await readFileStore();
+    return stored.drafts[id] ? clone(stored.drafts[id]) : null;
+  }
+  const doc = await admin.firestore().collection("siteContentDrafts").doc(id).get();
+  return doc.exists ? stripPage(doc.data()) : null;
+}
+async function writeDraft(page2, meta) {
+  const stored = { ...stripPage(page2), savedAt: meta.at, savedByUid: meta.byUid, savedByName: meta.byName };
+  if (siteContentUsesMemory()) {
+    if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") {
+      memory.drafts[page2.id] = clone(stripPage(page2));
+      return;
+    }
+    const file = await readFileStore();
+    file.drafts[page2.id] = stripPage(page2);
+    await writeFileStore(file);
+    return;
+  }
+  await admin.firestore().collection("siteContentDrafts").doc(page2.id).set(stored);
+}
+async function deleteDraft(id) {
+  if (siteContentUsesMemory()) {
+    if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") {
+      delete memory.drafts[id];
+      return;
+    }
+    const stored = await readFileStore();
+    delete stored.drafts[id];
+    await writeFileStore(stored);
+    return;
+  }
+  await admin.firestore().collection("siteContentDrafts").doc(id).delete();
+}
+async function listDraftIds() {
+  if (siteContentUsesMemory()) {
+    if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") return Object.keys(memory.drafts);
+    const stored = await readFileStore();
+    return Object.keys(stored.drafts);
+  }
+  const snap = await admin.firestore().collection("siteContentDrafts").get();
+  return snap.docs.map((doc) => doc.id);
+}
+function historyOf(page2) {
+  return (page2?.revisions ?? []).slice(0, 10).map((revision) => ({
+    id: revision.id,
+    at: revision.at,
+    byUid: revision.byUid,
+    byName: revision.byName,
+    snapshot: stripPage(revision.snapshot)
+  }));
+}
+const blobs = /* @__PURE__ */ new Map();
+function siteMediaBlob(id) {
+  return blobs.get(id) ?? null;
+}
+function bucketName() {
+  return process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET || "";
+}
+async function optimizeImage(bytes) {
+  const sharp = (await import("sharp")).default;
+  const body = await sharp(bytes, { failOn: "none" }).rotate().resize({ width: 2e3, withoutEnlargement: true }).webp({ quality: 82 }).toBuffer();
+  return { body, type: "image/webp", ext: "webp" };
+}
+async function saveObject(pageId, ext, body, type) {
+  const safePage = pageId.replace(/[^a-z0-9-]/gi, "").slice(0, 40) || "page";
+  const objectPath = `site-content/${safePage}/${Date.now()}-${randomUUID$1()}.${ext}`;
+  const bucket2 = bucketName();
+  if (admin.apps.length && bucket2 && process.env.NODE_ENV !== "test" && process.env.SITE_CONTENT_STORE !== "memory") {
+    const token = randomUUID$1();
+    await admin.storage().bucket(bucket2).file(objectPath).save(body, {
+      resumable: false,
+      metadata: { contentType: type, metadata: { firebaseStorageDownloadTokens: token } }
+    });
+    return `https://firebasestorage.googleapis.com/v0/b/${bucket2}/o/${encodeURIComponent(objectPath)}?alt=media&token=${token}`;
+  }
+  const id = randomUUID$1();
+  blobs.set(id, { body, type });
+  return `/api/site-content/blob/${id}`;
+}
+async function storeSiteUpload(pageId, bytes) {
+  const kind = sniffMedia(bytes);
+  if (!kind) {
+    const error = new Error("Upload a JPG, PNG, WebP, MP4, or MOV file.");
+    error.status = 415;
+    throw error;
+  }
+  if (kind === "image" && bytes.length > SITE_IMAGE_BYTES) {
+    const error = new Error("That image is over 25 MB.");
+    error.status = 413;
+    throw error;
+  }
+  if (kind === "video" && bytes.length > SITE_VIDEO_BYTES) {
+    const error = new Error("That video is over 80 MB.");
+    error.status = 413;
+    throw error;
+  }
+  if (kind === "video") {
+    const brand = bytes.length >= 12 ? String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]) : "";
+    const ext = brand.toLowerCase().includes("qt") ? "mov" : "mp4";
+    const url2 = await saveObject(pageId, ext, bytes, ext === "mov" ? "video/quicktime" : "video/mp4");
+    return { url: url2, kind };
+  }
+  const optimized = await optimizeImage(bytes);
+  const url = await saveObject(pageId, optimized.ext, optimized.body, optimized.type);
+  return { url, kind: "image" };
+}
+async function assertPublicHost(hostname) {
+  const records = await lookup(hostname, { all: true, verbatim: true });
+  if (!records.length) throw new Error("That Dropbox link could not be resolved.");
+  for (const record of records) {
+    if (isPrivateAddress(record.address)) throw new Error("That Dropbox link is not allowed.");
+  }
+}
+async function importDropboxFile(rawUrl) {
+  const start = prepareDropboxUrl(rawUrl);
+  if (!start) {
+    const error = new Error("Paste a Dropbox file link. Folder links need Dropbox connect, which is not set up yet.");
+    error.status = 400;
+    throw error;
+  }
+  let current = start;
+  for (let hop = 0; hop < 4; hop += 1) {
+    await assertPublicHost(current.hostname);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15e3);
+    let response;
+    try {
+      response = await fetch(current, { redirect: "manual", signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      if (!location) throw new Error("Dropbox redirected without a destination.");
+      const next = new URL(location, current);
+      if (next.protocol !== "https:" || next.username || next.password || !isAllowedDropboxHost(next.hostname)) {
+        throw new Error("Dropbox redirected to a host that is not allowed.");
+      }
+      current = next;
+      continue;
+    }
+    if (!response.ok || !response.body) throw new Error("Dropbox did not return the file.");
+    const reader = response.body.getReader();
+    const chunks = [];
+    let total = 0;
+    while (true) {
+      const step = await reader.read();
+      if (step.done) break;
+      total += step.value.byteLength;
+      if (total > SITE_VIDEO_BYTES) throw new Error("That Dropbox file is over the upload limit.");
+      chunks.push(step.value);
+    }
+    const bytes = Buffer.concat(chunks.map((chunk2) => Buffer.from(chunk2)));
+    const kind = sniffMedia(bytes);
+    if (!kind) throw new Error("That Dropbox file is not a JPG, PNG, WebP, MP4, or MOV.");
+    if (kind === "image" && bytes.length > SITE_IMAGE_BYTES) throw new Error("That image is over 25 MB.");
+    return { bytes, kind };
+  }
+  throw new Error("Dropbox redirected too many times.");
+}
+const router = Router();
+function actor(req) {
+  const email = req.user?.email || "";
+  const name = email === "temp-admin@iconicimagestx.com" ? "Temporary Admin" : email || req.user?.uid || "Staff";
+  return { uid: req.user?.uid || "staff", name };
+}
+async function accessFor(req) {
+  const ownerEmails = ownerAllowlist(process.env.OWNER_EMAILS);
+  if (process.env.NODE_ENV === "test" && req.testFlags !== void 0) {
+    return siteEditorAccess({
+      role: req.staffRole,
+      email: req.user?.email,
+      flags: req.testFlags,
+      ownerEmails
+    });
+  }
+  let flags = null;
+  let email = req.user?.email || null;
+  let role = req.staffRole || null;
+  if (req.user?.uid && req.user.uid !== "temp-admin-uid") {
+    try {
+      const admin2 = await import("firebase-admin");
+      if (admin2.default.apps.length) {
+        const doc = await admin2.default.firestore().collection("staff").doc(req.user.uid).get();
+        const data = doc.data();
+        if (data) {
+          flags = data.siteEditor ?? null;
+          email = data.email || email;
+          role = data.role || role;
+        }
+      }
+    } catch (err) {
+      console.error("[Site editor] staff lookup failed:", err);
+    }
+  }
+  return siteEditorAccess({ role, email, flags, ownerEmails });
+}
+function gate(level) {
+  return async (req, res, next) => {
+    const editorReq = req;
+    const run = async () => {
+      const access = await accessFor(editorReq);
+      editorReq.siteAccess = access;
+      if (!allows(access, level)) {
+        return res.status(403).json({ error: level === "publish" ? "Only owner/admin can publish." : "Site editor permission required." });
+      }
+      return next();
+    };
+    if (process.env.NODE_ENV === "test" && req.header("x-test-staff")) {
+      const parsed = JSON.parse(req.header("x-test-staff") || "{}");
+      editorReq.user = { uid: parsed.uid || "test", email: parsed.email || "" };
+      editorReq.staffRole = parsed.role;
+      editorReq.testFlags = parsed.flags ?? null;
+      return run();
+    }
+    return requireStaff(editorReq, res, () => {
+      void run();
+    });
+  };
+}
+async function workspacePage(id) {
+  const base = defaultPage(id);
+  if (!base) return null;
+  const published = await readPublished(id);
+  const draft = await readDraft(id);
+  return mergeContent(draft || (published ? stripPage(published) : base));
+}
+router.get("/", async (_req, res) => {
+  const pages = await listPublished();
+  return res.json({ pages });
+});
+router.get("/blob/:id", (req, res) => {
+  const blob = siteMediaBlob(req.params.id);
+  if (!blob) return res.status(404).json({ error: "File not found." });
+  res.setHeader("Content-Type", blob.type);
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  return res.send(blob.body);
+});
+router.get("/workspace", gate("view"), async (req, res) => {
+  const editorReq = req;
+  const ids = knownPageIds();
+  const pages = [];
+  const published = {};
+  const history = {};
+  for (const id of ids) {
+    const page2 = await workspacePage(id);
+    if (page2) pages.push(page2);
+    const stored = await readPublished(id);
+    published[id] = stored ? stripPage(stored) : null;
+    history[id] = historyOf(stored);
+  }
+  const draftIds = await listDraftIds();
+  return res.json({
+    access: editorReq.siteAccess,
+    pages,
+    published,
+    history,
+    draftIds
+  });
+});
+router.put("/:id", gate("edit"), async (req, res) => {
+  const id = req.params.id;
+  if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
+  const merged = mergeContent({ ...req.body, id });
+  if (!merged) return res.status(400).json({ error: "Page could not be saved." });
+  const who = actor(req);
+  await writeDraft(merged, { at: (/* @__PURE__ */ new Date()).toISOString(), byUid: who.uid, byName: who.name });
+  return res.json({ page: merged });
+});
+router.post("/:id/discard", gate("edit"), async (req, res) => {
+  const id = req.params.id;
+  if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
+  await deleteDraft(id);
+  const page2 = await workspacePage(id);
+  return res.json({ page: page2 });
+});
+router.post("/:id/release", gate("publish"), async (req, res) => {
+  const id = req.params.id;
+  if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
+  const draft = await readDraft(id);
+  const current = await readPublished(id);
+  const raw = draft || (req.body?.page ? { ...req.body.page, id } : null) || (current ? stripPage(current) : defaultPage(id));
+  const source = mergeContent(raw);
+  if (!source) return res.status(400).json({ error: "Nothing to publish." });
+  const who = actor(req);
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const revisions = pushRevision(current, source, who, now);
+  await writePublished({
+    ...source,
+    revisions,
+    publishedAt: now,
+    publishedByUid: who.uid,
+    publishedByName: who.name
+  });
+  await deleteDraft(id);
+  return res.json({ page: stripPage(source), publishedAt: now, publishedByName: who.name });
+});
+router.post("/release-all", gate("publish"), async (req, res) => {
+  const who = actor(req);
+  const publishedIds = [];
+  for (const id of await listDraftIds()) {
+    const draft = await readDraft(id);
+    const source = draft ? mergeContent(draft) : null;
+    if (!source || !defaultPage(id)) continue;
+    const current = await readPublished(id);
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    await writePublished({
+      ...source,
+      revisions: pushRevision(current, source, who, now),
+      publishedAt: now,
+      publishedByUid: who.uid,
+      publishedByName: who.name
+    });
+    await deleteDraft(id);
+    publishedIds.push(id);
+  }
+  return res.json({ publishedIds });
+});
+router.post("/:id/revert", gate("publish"), async (req, res) => {
+  const id = req.params.id;
+  if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
+  const current = await readPublished(id);
+  if (!current) return res.status(404).json({ error: "That page has no published history." });
+  const who = actor(req);
+  const restored = revertTo(current, String(req.body?.revisionId || ""), who);
+  const source = restored ? mergeContent(restored) : null;
+  if (!restored || !source) return res.status(404).json({ error: "That version was not found." });
+  await writePublished({
+    ...source,
+    revisions: restored.revisions,
+    publishedAt: restored.publishedAt,
+    publishedByUid: restored.publishedByUid,
+    publishedByName: restored.publishedByName
+  });
+  return res.json({ page: stripPage(source) });
+});
+router.post("/media", gate("edit"), async (req, res) => {
+  try {
+    const pageId = String(req.body?.pageId || "page");
+    if (!defaultPage(pageId) && pageId !== "page") return res.status(404).json({ error: "Unknown page." });
+    const raw = String(req.body?.dataBase64 || "");
+    const bytes = Buffer.from(raw, "base64");
+    if (!bytes.length) return res.status(400).json({ error: "No file was received." });
+    const stored = await storeSiteUpload(defaultPage(pageId) ? pageId : "page", bytes);
+    return res.json(stored);
+  } catch (err) {
+    const status2 = err.status || 400;
+    return res.status(status2).json({ error: err instanceof Error ? err.message : "Upload failed." });
+  }
+});
+router.post("/dropbox", gate("edit"), async (req, res) => {
+  try {
+    const pageId = String(req.body?.pageId || "page");
+    const imported = await importDropboxFile(String(req.body?.url || ""));
+    const stored = await storeSiteUpload(defaultPage(pageId) ? pageId : "page", imported.bytes);
+    return res.json(stored);
+  } catch (err) {
+    const status2 = err.status || 400;
+    return res.status(status2).json({ error: err instanceof Error ? err.message : "Dropbox import failed." });
+  }
+});
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
 const API_BUILD_MARKER = "auth-square-2026-09-28";
 if (!admin.apps.length) {
@@ -21175,6 +22302,8 @@ function createServer() {
   }));
   app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
   app.use("/api/payments/square-webhook", express.raw({ type: "application/json" }));
+  app.use("/api/site-content/media", express.json({ limit: "120mb" }));
+  app.use("/api/site-content/dropbox", express.json({ limit: "1mb" }));
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: true }));
   app.post(
@@ -21256,35 +22385,36 @@ function createServer() {
     res.json({ live: clientNotifyLive() });
   });
   mountOwners(app);
-  app.use("/api/bookings", router$n);
-  app.use("/api/orders", router$m);
-  app.use("/api/galleries", router$l);
-  app.use("/api/payments", router$k);
-  app.use("/api/vsai", router$j);
-  app.use("/api/messages", router$i);
-  app.use("/api/clients", router$h);
+  app.use("/api/bookings", router$o);
+  app.use("/api/orders", router$n);
+  app.use("/api/galleries", router$m);
+  app.use("/api/payments", router$l);
+  app.use("/api/vsai", router$k);
+  app.use("/api/messages", router$j);
+  app.use("/api/clients", router$i);
   app.get("/api/portal/listings/:id", handleGetPublicPortalListing);
-  app.use("/api/staff", router$g);
+  app.use("/api/staff", router$h);
+  app.use("/api/site-content", router);
   app.get("/present/:token", (req, res, next) => {
     if (process.env.ICONIC_VITE_DEV === "1") return next();
     return handlePresentationShell(req, res);
   });
+  app.use("/api", router$2);
+  app.use("/api/listings", router$g);
   app.use("/api", router$1);
-  app.use("/api/listings", router$f);
-  app.use("/api", router);
-  app.use("/api/campaigns", router$e);
+  app.use("/api/campaigns", router$f);
+  app.use("/api/marketing", router$e);
   app.use("/api/marketing", router$d);
-  app.use("/api/marketing", router$c);
-  app.use("/api/agents", router$b);
-  app.use("/api/media-jobs", router$a);
-  app.use("/api/studio", router$9);
-  app.use("/api/studio/scratch", router$8);
-  app.use("/api/places", router$7);
-  app.use("/api/sms", router$6);
-  app.use("/api/contact", router$2);
+  app.use("/api/agents", router$c);
+  app.use("/api/media-jobs", router$b);
+  app.use("/api/studio", router$a);
+  app.use("/api/studio/scratch", router$9);
+  app.use("/api/places", router$8);
+  app.use("/api/sms", router$7);
   app.use("/api/contact", router$3);
-  app.use("/api/contact", router$5);
-  app.use("/api/senior-living", router$4);
+  app.use("/api/contact", router$4);
+  app.use("/api/contact", router$6);
+  app.use("/api/senior-living", router$5);
   app.use(
     (err, _req, res, _next) => {
       console.error("[Server] Unhandled error:", err);

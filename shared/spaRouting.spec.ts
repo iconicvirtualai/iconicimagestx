@@ -29,8 +29,9 @@ describe("vercel function split", () => {
     expect(index).not.toContain("@img/sharp");
     expect(media).toMatch(/from ["']sharp["']/);
     expect(media).toMatch(/from ["']firebase-admin["']/);
+    expect(media).toMatch(/from ["']express["']/);
+    expect(media).not.toContain("createServer");
     expect(media).not.toMatch(/from ["']googleapis["']/);
-    expect(media).not.toMatch(/from ["']express["']/);
     expect(media).not.toMatch(/from ["']stripe["']/);
     const vercel = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8")) as {
       functions: Record<string, { includeFiles?: string | string[]; excludeFiles?: string }>;
@@ -127,6 +128,8 @@ describe("spa rewrite coverage", () => {
     expect(firstMatchingRewrite("/present/preview", vercel.rewrites)?.destination).toBe("/api/index");
     expect(firstMatchingRewrite("/podcast-guest-prep", vercel.rewrites)?.destination).toBe("/podcast-guest-prep.html");
     expect(firstMatchingRewrite("/book", vercel.rewrites)?.destination).toBe("/seo/book.html");
+    expect(firstMatchingRewrite("/api/site-content/media", vercel.rewrites)?.destination).toBe("/api/media-display");
+    expect(firstMatchingRewrite("/api/site-content/dropbox", vercel.rewrites)?.destination).toBe("/api/media-display");
     expect(firstMatchingRewrite("/api/media/display/listingid1/0", vercel.rewrites)?.destination).toBe("/api/media-display");
     expect(firstMatchingRewrite("/api/media/display/p/abcdefghijklmnopqrstuv/0", vercel.rewrites)?.destination).toBe("/api/media-display");
     expect(firstMatchingRewrite("/api/media/display/o/token.sig/0", vercel.rewrites)?.destination).toBe("/api/media-display");

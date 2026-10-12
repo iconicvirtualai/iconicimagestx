@@ -15,12 +15,12 @@ import { mergeContent } from "./siteEditorMerge.ts";
 
 describe("site editor permissions", () => {
   it("gives the owner and admins every permission", () => {
-    expect(siteEditorAccess({ role: "admin", email: "someone@example.com", flags: { view: false, edit: false, publish: false }, ownerEmails: ["cadi@iconicimagestx.com"] })).toMatchObject({ view: true, edit: true, publish: true, locked: true });
-    expect(siteEditorAccess({ role: "coordinator", email: "cadi@iconicimagestx.com", flags: null, ownerEmails: ["cadi@iconicimagestx.com"] }).publish).toBe(true);
+    expect(siteEditorAccess({ role: "admin", email: "someone@example.com", flags: { view: false, edit: false, publish: false }, ownerEmails: ["owner@example.com"] })).toMatchObject({ view: true, edit: true, publish: true, locked: true });
+    expect(siteEditorAccess({ role: "coordinator", email: "owner@example.com", flags: null, ownerEmails: ["owner@example.com"] }).publish).toBe(true);
   });
 
   it("keeps everyone else closed until a permission is granted", () => {
-    const access = siteEditorAccess({ role: "photographer", email: "pat@example.com", flags: null, ownerEmails: ["cadi@iconicimagestx.com"] });
+    const access = siteEditorAccess({ role: "photographer", email: "pat@example.com", flags: null, ownerEmails: ["owner@example.com"] });
     expect(access).toMatchObject({ view: false, edit: false, publish: false, locked: false });
     expect(normalizeSiteEditorFlags({ publish: true })).toEqual({ view: true, edit: true, publish: true });
   });
@@ -74,5 +74,16 @@ describe("published merge", () => {
     const merged = mergeContent({ ...home, seoTitle: "Custom", blocks: home.blocks.map((block) => block.id === "hero" ? { ...block, fields: block.fields.map((field) => field.id === "title" ? { ...field, value: "HELLO" } : field) } : block) });
     expect(merged?.seoTitle).toBe("Custom");
     expect(stripPage({ ...merged!, revisions: [] }).blocks.find((block) => block.id === "hero")?.fields.find((field) => field.id === "title")?.value).toBe("HELLO");
+    const dirty = mergeContent({
+      ...home,
+      blocks: [
+        ...home.blocks,
+        { id: "not-a-section", label: "Extra", fields: [{ id: "x", label: "X", kind: "text", value: "nope" }] },
+      ].map((block) => block.id === "hero"
+        ? { ...block, fields: [...block.fields, { id: "injected", label: "Injected", kind: "text" as const, value: "nope" }] }
+        : block),
+    });
+    expect(dirty?.blocks.some((block) => block.id === "not-a-section")).toBe(false);
+    expect(dirty?.blocks.find((block) => block.id === "hero")?.fields.some((field) => field.id === "injected")).toBe(false);
   });
 });

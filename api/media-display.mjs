@@ -1,9 +1,14 @@
 import "dotenv/config";
 import admin from "firebase-admin";
-import { createHmac, timingSafeEqual, createHash } from "node:crypto";
+import express, { Router } from "express";
+import { createHmac, timingSafeEqual, createHash, randomUUID } from "node:crypto";
 import { stat, realpath, readFile } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
+import fs from "fs/promises";
+import os from "os";
+import path$1 from "path";
+import { lookup } from "node:dns/promises";
 const RAW_EXT$1 = /\.(cr2|cr3|nef|nrw|arw|srf|sr2|dng|raw|rw2|orf|raf|pef|3fr|fff|iiq)$/i;
 const PREVIEW_EXT = /\.(jpe?g|png|webp|gif)$/i;
 function isRawStudioFile(name, contentType) {
@@ -40,6 +45,19 @@ function frameFromListingImage(raw, index = 0) {
 function isHostedDeployment(env) {
   if (env.VERCEL === "1" || env.VERCEL_ENV) return true;
   return env.NODE_ENV === "production";
+}
+function isTempAdminEnabled(env = liveServerEnv()) {
+  if (env.ENABLE_TEMP_ADMIN !== "true") return false;
+  return !isHostedDeployment(env);
+}
+function liveServerEnv(env = process.env) {
+  return {
+    ENABLE_TEMP_ADMIN: env.ENABLE_TEMP_ADMIN,
+    VERCEL: env.VERCEL,
+    VERCEL_ENV: env.VERCEL_ENV,
+    // Bracket access so production server bundles keep the runtime value.
+    NODE_ENV: env["NODE_ENV"]
+  };
 }
 const DEV_SECRET = "iconic-owner-display-dev-v1";
 const ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
@@ -443,6 +461,7 @@ function text$1(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const BUSINESS_CONTACT_LINE = "26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380 | 281.356.0965 | photos@iconicimagestx.com";
+const LEGAL_BUSINESS_NAME = "Iconic Images Photography, LLC";
 function parseContactLine(line) {
   const parts = line.split(" | ");
   if (parts.length !== 3) {
@@ -475,6 +494,86 @@ function parseContactLine(line) {
 }
 parseContactLine(BUSINESS_CONTACT_LINE);
 const DEFAULT_SITE_ORIGIN = "https://iconicimagestx.vercel.app";
+const PUBLIC_PAGES = [
+  {
+    path: "/",
+    file: "index.html",
+    title: "Iconic Images | Real Estate Media in Spring, The Woodlands, and Houston",
+    description: "Photography, video, and listing media for real estate agents in Spring, The Woodlands, and Houston."
+  },
+  {
+    path: "/about",
+    file: "seo/about.html",
+    title: "About | Iconic Images",
+    description: "Iconic Images is a Spring, Texas studio for real estate media, serving The Woodlands, Houston, and nearby communities since 2016."
+  },
+  {
+    path: "/pricing",
+    file: "seo/pricing.html",
+    title: "Pricing | Iconic Images",
+    description: "Listing, branding, and media packages from Iconic Images for agents in Spring, The Woodlands, and Houston."
+  },
+  {
+    path: "/studio-105",
+    file: "seo/studio-105.html",
+    title: "Studio 105 | Iconic Images",
+    description: "Studio 105 in Spring has two portrait rooms, Studio Noir and Studio Blanc, for headshots, brand films, and product photos."
+  },
+  {
+    path: "/portfolio",
+    file: "seo/portfolio.html",
+    title: "Portfolio | Iconic Images",
+    description: "Listing photos, aerials, portraits, and virtual staging by Iconic Images in Spring, The Woodlands, and Houston."
+  },
+  {
+    path: "/stock-footage",
+    file: "seo/stock-footage.html",
+    title: "Stock Footage | Iconic Images",
+    description: "Neighborhood photo stills from Iconic Images for agents listing homes in Spring, The Woodlands, and Houston."
+  },
+  {
+    path: "/contact",
+    file: "seo/contact.html",
+    title: "Contact | Iconic Images",
+    description: "Contact Iconic Images in Spring, Texas about real estate photography and video in The Woodlands and Houston."
+  },
+  {
+    path: "/socials",
+    file: "seo/socials.html",
+    title: "Socials | Iconic Images",
+    description: "Instagram, Facebook, and TikTok from Iconic Images, a real estate media studio in Spring, The Woodlands, and Houston."
+  },
+  {
+    path: "/book",
+    file: "seo/book.html",
+    title: "Book a Shoot | Iconic Images",
+    description: "Schedule listing photography or video with Iconic Images in Spring, The Woodlands, or Houston."
+  },
+  {
+    path: "/senior-living",
+    file: "seo/senior-living.html",
+    title: "Senior Living Virtual Tours & Photography | Iconic Images",
+    description: "Virtual tours and photography for senior living communities in Spring, The Woodlands, and Houston."
+  },
+  {
+    path: "/privacy",
+    file: "seo/privacy.html",
+    title: "Privacy Policy | Iconic Images",
+    description: `Privacy Policy for ${LEGAL_BUSINESS_NAME}, a real estate media studio based in Spring, Texas.`
+  },
+  {
+    path: "/terms",
+    file: "seo/terms.html",
+    title: "Terms and Conditions | Iconic Images",
+    description: "Terms and Conditions for photography, video, and listing media from Iconic Images in Texas."
+  },
+  {
+    path: "/login",
+    file: "seo/login.html",
+    title: "Client Login | Iconic Images",
+    description: "Client sign-in for Iconic Images. View your listings and delivered media."
+  }
+];
 function readConfiguredOrigin() {
   const nodeOrigin = typeof process !== "undefined" ? process.env?.VITE_SITE_ORIGIN : "";
   return String(nodeOrigin || "").trim().replace(/\/$/, "");
@@ -1044,6 +1143,1117 @@ const handleMediaDisplay = async (req, res) => {
   res.setHeader("Content-Length", String(jpeg.length));
   return res.status(200).end(jpeg);
 };
+function ownerAllowlist(raw) {
+  if (raw == null) return [];
+  const emails = raw.split(/[,;\s]+/).map((email) => email.trim().toLowerCase()).filter((email) => email.includes("@"));
+  return [...new Set(emails)];
+}
+function isOwnerEmail(email, allowlist) {
+  if (!email) return false;
+  if (allowlist.length === 0) return false;
+  return allowlist.includes(email.trim().toLowerCase());
+}
+const HISTORY_LIMIT = 10;
+function textField(id, label, value) {
+  return { id, label, kind: "text", value };
+}
+function areaField(id, label, value) {
+  return { id, label, kind: "textarea", value };
+}
+function linkField(id, label, value, href) {
+  return { id, label, kind: "link", value, href };
+}
+function imageField(id, label, value) {
+  return { id, label, kind: "image", value };
+}
+function videoField(id, label, value) {
+  return { id, label, kind: "video", value };
+}
+function block(id, label, fields, items) {
+  return { id, label, hidden: false, fields, ...items ? { items } : {} };
+}
+function contentPage(id, path2, label, seoTitle, seoDescription, blocks) {
+  return { id, path: path2, label, seoTitle, seoDescription, blocks };
+}
+function normalizeSiteEditorFlags(input) {
+  let view = input?.view === true;
+  let edit = input?.edit === true;
+  let publish = input?.publish === true;
+  if (publish) edit = true;
+  if (edit) view = true;
+  if (!view) {
+    edit = false;
+    publish = false;
+  }
+  return { view, edit, publish };
+}
+function siteEditorAccess(input) {
+  if (input.role === "admin" || isOwnerEmail(input.email, input.ownerEmails)) {
+    return { view: true, edit: true, publish: true, locked: true };
+  }
+  return { ...normalizeSiteEditorFlags(input.flags), locked: false };
+}
+function allows(access, level) {
+  if (level === "view") return access.view;
+  if (level === "edit") return access.edit;
+  return access.publish;
+}
+function stripPage(page2) {
+  const { id, path: path2, label, seoTitle, seoDescription, blocks } = page2;
+  return { id, path: path2, label, seoTitle, seoDescription, blocks: blocks.map(cloneBlock) };
+}
+function cloneBlock(blockValue) {
+  return {
+    id: blockValue.id,
+    label: blockValue.label,
+    hidden: blockValue.hidden === true,
+    fields: blockValue.fields.map((field) => ({ ...field })),
+    ...blockValue.items ? { items: blockValue.items.map((item) => ({ id: item.id, fields: item.fields.map((field) => ({ ...field })) })) } : {}
+  };
+}
+function pushRevision(existing, next, actor2, now = (/* @__PURE__ */ new Date()).toISOString()) {
+  const prior = existing ? stripPage(existing) : null;
+  const revisions = [...existing?.revisions ?? []];
+  if (prior) {
+    revisions.unshift({
+      id: `rev_${now}`,
+      at: existing?.publishedAt || now,
+      byUid: existing?.publishedByUid || actor2.uid,
+      byName: existing?.publishedByName || actor2.name,
+      snapshot: prior
+    });
+  }
+  return revisions.slice(0, HISTORY_LIMIT);
+}
+function revertTo(page2, revisionId, actor2, now = (/* @__PURE__ */ new Date()).toISOString()) {
+  const revision = page2.revisions?.find((item) => item.id === revisionId);
+  if (!revision) return null;
+  const current = stripPage(page2);
+  const revisions = [
+    {
+      id: `rev_${now}`,
+      at: page2.publishedAt || now,
+      byUid: page2.publishedByUid || actor2.uid,
+      byName: page2.publishedByName || actor2.name,
+      snapshot: current
+    },
+    ...(page2.revisions ?? []).filter((item) => item.id !== revisionId)
+  ].slice(0, HISTORY_LIMIT);
+  return {
+    ...revision.snapshot,
+    revisions,
+    publishedAt: now,
+    publishedByUid: actor2.uid,
+    publishedByName: actor2.name
+  };
+}
+const DROPBOX_HOSTS = /* @__PURE__ */ new Set(["dropbox.com", "www.dropbox.com", "dl.dropboxusercontent.com"]);
+function isAllowedDropboxHost(hostname) {
+  const host = hostname.trim().toLowerCase().replace(/\.+$/, "");
+  if (!host || host.includes("..")) return false;
+  if (isIpLiteral(host)) return false;
+  if (DROPBOX_HOSTS.has(host)) return true;
+  return host.endsWith(".dropboxusercontent.com") && host.length > ".dropboxusercontent.com".length;
+}
+function isIpLiteral(host) {
+  if (host.startsWith("[") || host.includes(":")) return true;
+  return /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
+}
+function isPrivateAddress(ip) {
+  const value = ip.toLowerCase().replace(/^\[|\]$/g, "");
+  if (value === "::1" || value === "0.0.0.0") return true;
+  if (value.startsWith("fe80:") || value.startsWith("fc") || value.startsWith("fd")) return true;
+  const parts = value.split(".").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part))) return value.includes(":");
+  const [a, b] = parts;
+  if (a === 10 || a === 127 || a === 0) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  return false;
+}
+function prepareDropboxUrl(raw) {
+  let url;
+  try {
+    url = new URL(raw.trim());
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:") return null;
+  if (url.username || url.password) return null;
+  if (!isAllowedDropboxHost(url.hostname)) return null;
+  if (url.pathname.includes("/scl/fo/") || url.pathname.includes("/sh/")) return null;
+  url.searchParams.set("dl", "1");
+  if (url.pathname.includes("/scl/fi/")) url.searchParams.set("raw", "1");
+  return url;
+}
+const SITE_IMAGE_BYTES = 25 * 1024 * 1024;
+const SITE_VIDEO_BYTES = 80 * 1024 * 1024;
+function sniffMedia(bytes) {
+  if (bytes.length >= 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) return "image";
+  if (bytes.length >= 8 && bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 && bytes[3] === 71) return "image";
+  if (bytes.length >= 12 && bytes[0] === 82 && bytes[1] === 73 && bytes[2] === 70 && bytes[3] === 70 && bytes[8] === 87 && bytes[9] === 69 && bytes[10] === 66 && bytes[11] === 80) return "image";
+  if (bytes.length >= 12) {
+    const brand = String.fromCharCode(bytes[4], bytes[5], bytes[6], bytes[7]);
+    if (brand === "ftyp") return "video";
+  }
+  return null;
+}
+function seo(path2) {
+  const page2 = PUBLIC_PAGES.find((item) => item.path === path2);
+  return {
+    title: page2?.title ?? "Iconic Images",
+    description: page2?.description ?? ""
+  };
+}
+function linkItem(id, label, href) {
+  return { id, fields: [linkField("link", label, label, href)] };
+}
+function pairItem(id, label, before, after, afterKind = "image") {
+  return {
+    id,
+    fields: [
+      textField("label", "Label", label),
+      imageField("before", "Before", before),
+      afterKind === "video" ? videoField("after", "After", after) : imageField("after", "After", after)
+    ]
+  };
+}
+const HERO_IMAGE = "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F6529795874414a1e9fe845f3eb948e94?format=webp&width=1600&height=900";
+const BUILDER_PAIRS = [
+  pairItem("builder-1", "Listing film", "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Faecac2467163410db0180e8fdd8a98f7?format=webp&width=800&height=1200", "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F4ea5feebdab84ee585ffaa811d803379?alt=media&token=dda6499e-44a2-47a4-a456-1cacb39b6ae4&apiKey=0ed22311ac6a4dbebeda1b4230c2746c", "video"),
+  pairItem("builder-2", "Vertical cut", "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fe7a04734046e4171bfccc96600f0870f?format=webp&width=800&height=1200", "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2Fba0e88982aa140c2bd2a033055391c4a?alt=media&token=2faaf53d-9e02-4887-aa85-08c6f971cee4&apiKey=0ed22311ac6a4dbebeda1b4230c2746c", "video"),
+  pairItem("builder-3", "Property film", "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F1bc44dc912bd4cd4848b7cbe64db7001?format=webp&width=800&height=1200", "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F4203b3fa6d2046f6b3aebe85986706ad?alt=media&token=60e7a23a-12d3-45d9-8063-8fa212dc4c4c&apiKey=0ed22311ac6a4dbebeda1b4230c2746c", "video"),
+  pairItem("builder-4", "Detail film", "https://cdn.builder.io/api/v1/image/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F54911d726f0a43b684406564dac1e5e8?format=webp&width=800&height=1200", "https://cdn.builder.io/o/assets%2F0ed22311ac6a4dbebeda1b4230c2746c%2F4be86e27da6548d59c567aa0bdfc66e9?alt=media&token=927f0df1-6342-47f7-809f-131e4df074d6&apiKey=0ed22311ac6a4dbebeda1b4230c2746c", "video")
+];
+const STILL_PAIRS = [
+  pairItem("twilight-pool", "Twilight conversion", "/media/before-after/twilight-pool-day.jpg", "/media/before-after/twilight-pool-lifestyle.jpg"),
+  pairItem("pavilion-lifestyle", "Lifestyle staging", "/media/before-after/pavilion-empty.jpg", "/media/before-after/pavilion-lifestyle.jpg"),
+  pairItem("pasture-lifestyle", "Pasture lifestyle", "/media/before-after/pasture-animals.jpg", "/media/before-after/pasture-lifestyle.jpg"),
+  pairItem("living-declutter", "Virtual declutter", "/media/before-after/living-occupied.jpg", "/media/before-after/living-declutter.jpg")
+];
+function page(id, path2, label, blocks, title, description) {
+  const meta = seo(path2);
+  return contentPage(id, path2, label, title ?? meta.title, description ?? meta.description, blocks);
+}
+const PAGES = [
+  page("chrome", "", "Header, footer, and promo", [
+    block("promo", "Promo bar", [
+      textField("visible", "Show promo bar", "true"),
+      textField("text", "Promo text", "FREE AI STAGING ON YOUR FIRST ORDER - CODE: ICONICAI")
+    ]),
+    block("brand", "Logo and color", [
+      textField("logoText", "Logo wordmark", "ICONIC"),
+      textField("primaryColor", "Accent color", "#0d9488"),
+      imageField("logo", "Logo image", "/media/logos/camera-logo-white-on-black.png")
+    ]),
+    block("nav", "Navigation", [], [
+      linkItem("about", "About", "/about"),
+      linkItem("pricing", "Pricing", "/pricing"),
+      linkItem("studio", "Studio 105", "/studio-105"),
+      linkItem("portfolio", "Portfolio", "/portfolio"),
+      linkItem("stock", "Stock Footage", "/stock-footage"),
+      linkItem("contact", "Contact Us", "/contact")
+    ]),
+    block("headerCtas", "Header buttons", [
+      linkField("login", "Log in", "Log in", "/login"),
+      linkField("book", "Book Now", "Book Now", "/book")
+    ]),
+    block("footer", "Footer links", [
+      textField("copyright", "Copyright name", LEGAL_BUSINESS_NAME)
+    ], [
+      linkItem("home", "Home", "/"),
+      linkItem("pricing", "Pricing", "/pricing"),
+      linkItem("socials", "Socials", "/socials"),
+      linkItem("portfolio", "Portfolio", "/portfolio"),
+      linkItem("studio", "Studio 105", "/studio-105"),
+      linkItem("contact", "Contact Us", "/contact"),
+      linkItem("login", "Client Login", "/login")
+    ]),
+    block("socials", "Social profiles", [], [
+      linkItem("facebook", "Facebook", "https://facebook.com/iconicimagestx"),
+      linkItem("instagram", "Instagram", "https://instagram.com/iconicimagestx"),
+      linkItem("tiktok", "TikTok", "https://tiktok.com/@iconicimagestx")
+    ])
+  ], "Iconic Images", "Shared header, footer, and promo."),
+  page("home", "/", "Home", [
+    block("hero", "Hero", [
+      textField("kicker", "Kicker", "Your Brand, Made"),
+      textField("title", "Headline", "ICONIC"),
+      areaField("line1", "Supporting line", "Media Production. Virtual Staging. Content Management."),
+      areaField("line2", "Body", 'ICONIC is the dedicated creative crew for businesses and agents who demand more than "good enough".'),
+      textField("weAre", "Rotator label", "WE ARE YOUR:"),
+      imageField("image", "Background", HERO_IMAGE),
+      linkField("ctaRealEstate", "Real estate button", "I'm in Real Estate", "/pricing#listings"),
+      linkField("ctaBusiness", "Business button", "I own a Business", "/pricing#branding-personal")
+    ], [
+      { id: "cap-1", fields: [textField("label", "Capability", "Cinematic Filmmakers")] },
+      { id: "cap-2", fields: [textField("label", "Capability", "Social Architects")] },
+      { id: "cap-3", fields: [textField("label", "Capability", "REEL Producers")] },
+      { id: "cap-4", fields: [textField("label", "Capability", "Private Editing Studio")] },
+      { id: "cap-5", fields: [textField("label", "Capability", "Content Managers")] },
+      { id: "cap-6", fields: [textField("label", "Capability", "Personal Production Team")] }
+    ]),
+    block("beforeAfter", "Before and after", [
+      textField("beforeLabel", "Before label", "Before"),
+      textField("afterLabel", "After label", "After")
+    ], [...STILL_PAIRS, ...BUILDER_PAIRS]),
+    block("raising", "We are the bar", [
+      textField("titleLead", "Title lead", "We"),
+      textField("titleAccent", "Title accent", "ARE"),
+      textField("titleTail", "Title tail", "the Bar."),
+      areaField("body", "Body", "We don’t follow trends. We break patterns. We don’t undercut. We outperform.")
+    ]),
+    block("market", "Our market", [
+      textField("titleLead", "Title lead", "This Is"),
+      textField("titleAccent", "Title accent", "OUR"),
+      textField("titleTail", "Title tail", "Market."),
+      areaField("body", "Body", "Iconic was built here. We’ve invested here. We’ve shaped here. Winning brands don’t chase. They choose Iconic.")
+    ]),
+    block("solution", "High-impact video", [
+      textField("badge", "Badge", "Built for Creative Excellence"),
+      textField("title", "Headline", "Your All-in-One Solution for High-Impact Media Content"),
+      areaField("body", "Body", "Transform your raw ideas into engaging cinematic media in minutes. Whether you're a high-growth startup serving multiple clients or an established enterprise, Iconic helps you create professional-grade visual content seamlessly.")
+    ], [
+      { id: "product", fields: [videoField("video", "Video", "/media/video/product-photography.mp4"), textField("title", "Title", "Product Photography")] },
+      { id: "vertical", fields: [videoField("video", "Video", "/media/reels/superpower-reel-12s.mp4"), textField("title", "Title", "Vertical Reel")] },
+      { id: "content", fields: [videoField("video", "Video", "/media/video/content-web-clip.mp4"), textField("title", "Title", "Content Package")] },
+      { id: "snap-luxury", fields: [videoField("video", "Video", "/media/videos/snap-reels/snap-reel-01.mp4"), textField("title", "Title", "Snap Reel · Luxury Tour")] },
+      { id: "snap-modern", fields: [videoField("video", "Video", "/media/videos/snap-reels/snap-reel-02.mp4"), textField("title", "Title", "Snap Reel · Modern Living")] },
+      { id: "snap-kitchen", fields: [videoField("video", "Video", "/media/videos/snap-reels/snap-reel-03.mp4"), textField("title", "Title", "Snap Reel · Kitchen Glow")] },
+      { id: "snap-arrival", fields: [videoField("video", "Video", "/media/videos/snap-reels/snap-reel-04.mp4"), textField("title", "Title", "Snap Reel · Grand Arrival")] }
+    ]),
+    block("stats", "Stats", [], [
+      { id: "assets", fields: [textField("value", "Value", "100,000+"), textField("label", "Label", "Media assets produced")] },
+      { id: "turnaround", fields: [textField("value", "Value", "24 hrs"), textField("label", "Label", "Avg. turnaround time")] },
+      { id: "engagement", fields: [textField("value", "Value", "+403%"), textField("label", "Label", "More brand engagement")] }
+    ]),
+    block("steps", "Steps", [
+      textField("badge", "Badge", "4 STEPS TO RESULTS"),
+      textField("title", "Headline", "From vision to viral in minutes, not days"),
+      areaField("body", "Body", "Placing an order with Iconic is as simple as it gets. We handle the heavy lifting so you can focus on growth.")
+    ], [
+      { id: "step-1", fields: [textField("step", "Step", "STEP 1"), textField("title", "Title", "Book your session"), areaField("body", "Body", "Select your creative service and schedule a time through our seamless partnership portal in just a few clicks.")] },
+      { id: "step-2", fields: [textField("step", "Step", "STEP 2"), textField("title", "Title", "We capture the vision"), areaField("body", "Body", "Our professional creative team arrives on-site with state-of-the-art equipment to capture high-impact raw media.")] },
+      { id: "step-3", fields: [textField("step", "Step", "STEP 3"), textField("title", "Title", "Rapid post-production"), areaField("body", "Body", "Our expert editors transform raw clips into polished, cinematic masterpieces that perfectly align with your brand.")] },
+      { id: "step-4", fields: [textField("step", "Step", "STEP 4"), textField("title", "Title", "Delivery & launch"), areaField("body", "Body", "Receive your ready-to-post assets within 24 hours. Download, publish, and dominate your social feed instantly.")] }
+    ]),
+    block("network", "The network", [
+      textField("titleLead", "Title lead", "Built Bigger Than"),
+      textField("titleAccent", "Title accent", "One Brand"),
+      areaField("body", "Body", "Iconic isn’t here to squeeze the market; we’re here to expand it.")
+    ]),
+    block("audience", "Who it’s for", [
+      textField("badge", "Badge", "WHO IT'S FOR"),
+      textField("title", "Headline", "Tailored for real estate and visual storytelling professionals"),
+      areaField("body", "Body", "Iconic simplifies media creation for real estate professionals, builders, and business owners — helping you showcase your vision and grow your presence.")
+    ]),
+    block("audienceDetails", "Audiences", [], [
+      { id: "realtors", fields: [textField("title", "Title", "Realtors & Brokers"), areaField("body", "Body", "Attract leads, close faster, and win more listings with engaging property videos."), imageField("image", "Image", "/media/photos/lifestyle-mtz04327.jpg")] },
+      { id: "photographers", fields: [textField("title", "Title", "Photographers"), areaField("body", "Body", "Upsell AI videos with every order. More profit, no effort."), imageField("image", "Image", "/media/photos/studio-mtz01691.jpg")] },
+      { id: "media", fields: [textField("title", "Title", "Real Estate Media Companies"), areaField("body", "Body", "Scale your business and stay competitive with AI property videos — no extra overhead."), imageField("image", "Image", "/media/photos/drone-hero.jpg")] },
+      { id: "developers", fields: [textField("title", "Title", "Developers & Builders"), areaField("body", "Body", "Showcase new construction and development projects with cinematic fly-throughs."), imageField("image", "Image", "/media/photos/luxury-exterior.jpg")] },
+      { id: "business", fields: [textField("title", "Title", "Small Business Owners"), areaField("body", "Body", "Professional media content to tell your brand story and engage your local community."), imageField("image", "Image", "/media/photos/lifestyle-daughtery-mtz00636.jpg")] },
+      { id: "online", fields: [textField("title", "Title", "Online Appearance"), areaField("body", "Body", "High-impact visual identity for anyone looking to dominate their digital space."), imageField("image", "Image", "/media/photos/headshot-gracepoint-1.jpg")] }
+    ]),
+    block("snapReels", "Snap Reels", [
+      textField("kicker", "Kicker", "Essentials"),
+      textField("title", "Headline", "Snap Reels"),
+      areaField("body", "Body", "Listing stills, turned into a 9:16 Snap Reel. Same-day vertical video from the photos we already shoot.")
+    ], [
+      { id: "marias", fields: [videoField("video", "Video", "/media/videos/snap-reels/MariasWay_MarketingSnap_v1.mp4"), textField("title", "Title", "Marias Way"), textField("vibe", "Caption", "Evening light through the house, paced for a vertical scroll")] },
+      { id: "heron", fields: [videoField("video", "Video", "/media/videos/snap-reels/HeronWing_MarketingSnap_v1.mp4"), textField("title", "Title", "Heron Wing"), textField("vibe", "Caption", "Clean lines and still water, cut for the feed")] },
+      { id: "blue", fields: [videoField("video", "Video", "/media/videos/snap-reels/BlueLake_MarketingSnap_v1.mp4"), textField("title", "Title", "Blue Lake"), textField("vibe", "Caption", "Golden hour from the terrace to the lake")] }
+    ]),
+    block("features", "Add-on tools", [
+      textField("badge", "Badge", "ADDITIONAL FEATURES"),
+      textField("title", "Headline", "Go beyond basic editing with powerful add-on tools"),
+      areaField("body", "Body", "Iconic isn't just about reels — enhance your content with smart AI tools designed to polish, extend, and personalize every video.")
+    ], [
+      { id: "snap", fields: [textField("title", "Title", "Snap Reels"), areaField("body", "Body", "Turn the listing stills into a 9:16 Snap Reel. A vertical cut buyers can watch before they ever book a showing.")] },
+      { id: "import", fields: [textField("title", "Title", "One Click Import"), areaField("body", "Body", "Pull listing photos directly from Realtor.com or Zillow to start your video in seconds.")] },
+      { id: "staging", fields: [textField("title", "Title", "AI Virtual Staging"), areaField("body", "Body", "Instantly furnish empty rooms with realistic AI staging to showcase your property's full potential.")] },
+      { id: "edits", fields: [textField("title", "Title", "AI Photo Edits"), areaField("body", "Body", "Make your listing photos stand out with AI-powered enhancements — like twilights, lawn repairs, and other edits that instantly elevate any property.")] },
+      { id: "studio", fields: [textField("title", "Title", "Studio"), areaField("body", "Body", "Iconic's built-in editor that allows you to customize your videos with templates, music, captions, branding, and even your own photos or clips.")] },
+      { id: "voice", fields: [textField("title", "Title", "AI Voiceovers"), areaField("body", "Body", "Instantly generate natural-sounding narrations from a wide range of voices.")] },
+      { id: "captions", fields: [textField("title", "Title", "Social Media Captions"), areaField("body", "Body", "Automatically create captions optimized for Instagram, Facebook, LinkedIn, YouTube, and X.")] },
+      { id: "avatars", fields: [textField("title", "Title", "AI Avatars"), areaField("body", "Body", "Create professional video presentations with AI-generated avatars for a personal touch.")] }
+    ]),
+    block("reviews", "Reviews", [
+      textField("badge", "Badge", "TESTIMONIALS"),
+      textField("title", "Headline", "What our clients are saying"),
+      areaField("body", "Body", "Agents and businesses trust Iconic Images for listing photography, video, and a fast, professional turnaround."),
+      linkField("cta", "Button", "Book a shoot", "/book")
+    ]),
+    block("faq", "FAQ", [
+      textField("badge", "Badge", "FAQ"),
+      textField("title", "Headline", "Got questions? We've got answers."),
+      areaField("body", "Body", "Everything you need to know about Iconic in a nutshell.")
+    ], [
+      { id: "time", fields: [textField("question", "Question", "How long does video processing take?"), areaField("answer", "Answer", "Typically, our high-end media assets are delivered within 24 hours of capture. Our rapid post-production workflow is optimized for social media timelines.")] },
+      { id: "portrait", fields: [textField("question", "Question", "Does Iconic support portrait mode?"), areaField("answer", "Answer", "Yes, we specialize in both cinematic landscape and scroll-stopping vertical content optimized for Reels, TikTok, and Shorts.")] },
+      { id: "images", fields: [textField("question", "Question", "How many images can I use per video?"), areaField("answer", "Answer", "Our standard cinematic reel utilizes between 15-25 of the best property shots, but this can be customized based on your specific project needs.")] },
+      { id: "length", fields: [textField("question", "Question", "How long is each video?"), areaField("answer", "Answer", "Most property reels are between 30-60 seconds, which is the 'sweet spot' for high engagement across modern social platforms.")] }
+    ]),
+    block("partnership", "Closing call to action", [
+      textField("title", "Headline", "Let's Create Something ICONIC Together."),
+      areaField("body", "Body", "Whether you're looking for creative services, strategic partnership, or media licensing solutions, our team is ready to discuss your vision and bring it to life."),
+      linkField("cta", "Button", "Get your free Iconic Video", "/book")
+    ])
+  ]),
+  page("pricing", "/pricing", "Pricing", [
+    block("hero", "Hero", [
+      textField("badge", "Badge", "Pricing & Packages"),
+      textField("titleLead", "Title lead", "The Perfect"),
+      textField("titleAccent", "Title accent", "Price"),
+      textField("titleTail", "Title tail", "for Your Presence"),
+      textField("subtitle", "Subtitle", "Media that moves as fast as you do."),
+      videoField("background", "Background video", "/media/video/content-web-clip.mp4")
+    ]),
+    block("chips", "Section jumps", [], [
+      { id: "listings", fields: [textField("label", "Label", "FOR LISTINGS"), textField("anchor", "Anchor", "listings")] },
+      { id: "branding", fields: [textField("label", "Label", "FOR BRANDING"), textField("anchor", "Anchor", "branding")] },
+      { id: "business", fields: [textField("label", "Label", "FOR BUSINESS"), textField("anchor", "Anchor", "social")] },
+      { id: "growth", fields: [textField("label", "Label", "FOR GROWTH"), textField("anchor", "Anchor", "brand-identity")] }
+    ]),
+    block("assistant", "AI assistant card", [
+      textField("title", "Title", "Not sure where to start?"),
+      textField("subtitle", "Subtitle", "Let our AI guide you"),
+      linkField("cta", "Link", "Let our AI guide you", "/pricing/ai-assistant")
+    ]),
+    block("doors", "Choose a path", [
+      textField("title", "Headline", "Do you have..."),
+      textField("timeTitle", "Time door title", "MORE TIME THAN MONEY"),
+      areaField("timeBody", "Time door body", "I’m ready to hustle, I just need the tools and the professional polish to win."),
+      textField("timeCta", "Time door button", "I'M READY TO HUSTLE →"),
+      textField("moneyTitle", "Money door title", "MORE MONEY THAN TIME"),
+      areaField("moneyBody", "Money door body", "I’m ready to scale, I need my time back and my brand on autopilot."),
+      textField("moneyCta", "Money door button", "I'M READY TO SCALE →")
+    ]),
+    block("listings", "Listings section", [
+      textField("title", "Headline", "Listings & Spaces (The Property)"),
+      areaField("body", "Body", "Targeting the listing lifecycle: Pre-launch buzz, active sale, and post-close legacy. Every package now includes a Listing Reel as the core deliverable. We don't just shoot; we trend.")
+    ]),
+    block("brandStages", "Personal brand", [
+      textField("titleLead", "Title lead", "Elevate Your"),
+      textField("titleAccent", "Title accent", "Personal Brand"),
+      areaField("body", "Body", "Three beats. A stiff standard headshot, a polished Iconic corporate portrait, then a lifestyle frame with some life in it.")
+    ], [
+      { id: "standard", fields: [textField("label", "Label", "Standard"), imageField("image", "Photo", "/media/photos/standard-headshot.jpg"), textField("note", "Note", "Flat light. A stiff crop. Easy to scroll past.")] },
+      { id: "corporate", fields: [textField("label", "Label", "Iconic Corporate"), imageField("image", "Photo", "/media/photos/lifestyle-mtz04327.jpg"), textField("note", "Note", "Polished, confident, and ready for the brand.")] },
+      { id: "lifestyle", fields: [textField("label", "Label", "Iconic Lifestyle"), imageField("image", "Photo", "/media/photos/lifestyle-kennedy-mtz01127.jpg"), textField("note", "Note", "Alive. Warm. The frame people actually stop for.")] }
+    ])
+  ]),
+  page("book", "/book", "Book", [
+    block("seoNote", "Booking page", [
+      areaField("note", "Editor note", "The booking form, package prices, and promo math stay on the booking catalog so a copy edit cannot change what a client is charged.")
+    ])
+  ]),
+  page("seniorLiving", "/senior-living", "Senior Living", [
+    block("hero", "Hero", [
+      textField("titleLead", "Title lead", "Virtual tours for"),
+      textField("titleAccent", "Title accent", "senior living"),
+      areaField("location", "Location", "For communities in Spring, The Woodlands, and Houston."),
+      areaField("sampleNote", "Sample note", "The sample tour is from a Woodlands-area senior living community."),
+      linkField("cta", "Primary button", "Schedule when you're ready for us to come!", "#schedule"),
+      imageField("hero", "Hero photo", "/senior-living/senior-living-01-hero.jpg")
+    ]),
+    block("gallery", "Photo gallery", [
+      textField("title", "Headline", "A Woodlands-area senior living community")
+    ]),
+    block("tour", "Sample tour", [
+      textField("title", "Headline", "Sample tour"),
+      textField("embedTitle", "Tour title", "Sample tour of a Woodlands-area senior living community")
+    ])
+  ]),
+  page("contact", "/contact", "Contact", [
+    block("hero", "Hero", [
+      textField("kicker", "Kicker", "CONTACT US"),
+      textField("titleLead", "Title lead", "We'd love to"),
+      textField("titleAccent", "Title accent", "hear from you"),
+      areaField("body", "Body", "Have a question or feedback? We'd love to hear from you. Send us a message and we'll respond as soon as possible."),
+      textField("chatKicker", "Chat kicker", "LIVE CHAT"),
+      textField("chatLabel", "Chat label", "Start Chat")
+    ])
+  ]),
+  page("about", "/about", "About", [
+    block("hero", "Hero", [
+      textField("badge", "Badge", "Decade of Excellence"),
+      textField("titleLead", "Title lead", "A Decade of"),
+      textField("titleAccent", "Title accent", "Setting the Standard."),
+      areaField("body", "Body", "Est. 2016. 10 Years. Thousands of Listings. Millions in Commission Generated for our Partners.")
+    ], [
+      { id: "est", fields: [imageField("image", "Photo", "/media/about/tiles/01_est_2016.jpg"), textField("label", "Label", "Est. 2016")] },
+      { id: "engine", fields: [imageField("image", "Photo", "/media/about/tiles/02_the_engine.jpg"), textField("label", "Label", "The Engine")] },
+      { id: "scale", fields: [imageField("image", "Photo", "/media/about/tiles/03_scale.jpg"), textField("label", "Label", "Scale")] },
+      { id: "growth", fields: [imageField("image", "Photo", "/media/about/tiles/04_growth.jpg"), textField("label", "Label", "Growth")] },
+      { id: "legacy", fields: [imageField("image", "Photo", "/media/about/tiles/05_legacy.jpg"), textField("label", "Label", "Legacy")] },
+      { id: "cinematic", fields: [imageField("image", "Photo", "/media/about/tiles/06_cinematic.jpg"), textField("label", "Label", "Cinematic")] },
+      { id: "market", fields: [imageField("image", "Photo", "/media/about/tiles/08_market_lead.jpg"), textField("label", "Label", "Market Lead")] }
+    ]),
+    block("hub", "Intelligence hub", [
+      textField("kicker", "Kicker", "THE INTELLIGENCE HUB: BEYOND THE LENS"),
+      textField("title", "Headline", "Where Vision Meets Velocity."),
+      areaField("body", "Body", "At Iconic Images, we don’t just capture real estate; we engineer market ownership. In a world of infinite scrolling, 'pretty pictures' are the bare minimum."),
+      textField("philosophyTitle", "Philosophy title", "THE ICONIC PHILOSOPHY"),
+      areaField("philosophy", "Philosophy", "We believe the agent is the architect of the deal, but the media is the fuel.")
+    ])
+  ]),
+  page("portfolio", "/portfolio", "Portfolio", [
+    block("hero", "Hero", [
+      textField("kicker", "Kicker", "Selected Work"),
+      textField("title", "Headline", "Portfolio"),
+      areaField("body", "Body", "People, families, studio, holiday, headshots, listings, aerials, and virtual staging from Iconic Images.")
+    ])
+  ]),
+  page("studio105", "/studio-105", "Studio 105", [
+    block("hero", "Hero", [
+      textField("kicker", "Kicker", "The physical studio"),
+      textField("title", "Headline", "Studio 105")
+    ]),
+    block("rooms", "Rooms", [], [
+      { id: "studio-noir", fields: [textField("name", "Name", "Studio Noir"), textField("vibe", "Vibe", "Dark / dramatic"), areaField("summary", "Summary", "A controlled black room for portraits with edge, branding films, and product that needs mood.")] },
+      { id: "studio-blanc", fields: [textField("name", "Name", "Studio Blanc"), textField("vibe", "Vibe", "Bright / white"), areaField("summary", "Summary", "A clean white room for crisp headshots, bright product, and holiday minis.")] }
+    ])
+  ]),
+  page("socials", "/socials", "Socials", [
+    block("hero", "Hero", [
+      textField("kicker", "Kicker", "Iconic channels"),
+      textField("titleLead", "Title lead", "ICONIC"),
+      textField("titleAccent", "Title accent", "EVERYWHERE."),
+      areaField("body", "Body", "Follow Iconic Images. The frames below are from our own library."),
+      textField("stillsTitle", "Stills heading", "Selected stills")
+    ], [
+      { id: "drone", fields: [imageField("image", "Photo", "/media/photos/drone-hero.jpg"), textField("caption", "Caption", "Aerial still from an Iconic listing shoot.")] },
+      { id: "pool", fields: [imageField("image", "Photo", "/media/before-after/twilight-pool-lifestyle.jpg"), textField("caption", "Caption", "Twilight conversion of a rear pool.")] },
+      { id: "interior", fields: [imageField("image", "Photo", "/media/photos/luxury-interior.jpg"), textField("caption", "Caption", "Listing interior from the Iconic library.")] }
+    ])
+  ]),
+  page("stock", "/stock-footage", "Stock footage", [
+    block("hero", "Hero", [
+      textField("title", "Headline", "Stock Footage Library"),
+      areaField("body", "Body", "Premium, professionally photographed real estate images by neighborhood. License instantly and use for your listings, marketing, or staging inspiration.")
+    ])
+  ]),
+  page("virtualStaging", "/services/virtual-staging", "Virtual staging", [
+    block("hero", "Hero", [
+      textField("titleLead", "Title lead", "AI"),
+      textField("titleAccent", "Title accent", "Virtual Staging"),
+      areaField("body", "Body", "Transform empty spaces into beautifully furnished rooms instantly. Our AI-powered staging helps buyers visualize their future home."),
+      textField("free", "Free line", "Try for free"),
+      linkField("cta", "Button", "Try for free", "/services/virtual-staging/select")
+    ]),
+    block("pricing", "Pricing intro", [
+      textField("titleLead", "Title lead", "Flexible"),
+      textField("titleAccent", "Title accent", "Pricing"),
+      areaField("body", "Body", "Choose between our lightning-fast AI tool or professional human edits for the ultimate quality.")
+    ])
+  ]),
+  page("go", "/go", "Go", [
+    block("hero", "Hero", [
+      textField("eyebrow", "Eyebrow", "Iconic Images"),
+      textField("title", "Headline", "Real estate media that sells"),
+      areaField("body", "Body", "Listing photos, film, and brand media from Iconic Images. Book a shoot when you are ready."),
+      linkField("cta", "Button", "Book a shoot", "/book"),
+      textField("documentTitle", "Browser title", "Iconic Images | Book your shoot")
+    ])
+  ], "Iconic Images | Book your shoot", "Listing photos, film, and brand media from Iconic Images. Book a shoot when you are ready."),
+  page("agents", "/agents", "Agents", [
+    block("hero", "Hero", [
+      textField("badge", "Badge", "Exclusive Offer for Real Estate Agents"),
+      textField("titleLead", "Title lead", "Get"),
+      textField("titleAccent", "Title accent", "10X More Eyes"),
+      textField("titleTail", "Title tail", "On Your Listings"),
+      areaField("body", "Body", "Top-producing agents don't just list homes—they create experiences. Iconic Images provides the cinematic content you need to dominate your market and win every listing presentation.")
+    ])
+  ]),
+  page("privacy", "/privacy", "Privacy", [
+    block("hero", "Title", [
+      textField("title", "Headline", "Privacy Policy")
+    ])
+  ]),
+  page("terms", "/terms", "Terms", [
+    block("hero", "Title", [
+      textField("title", "Headline", "Terms and Conditions")
+    ])
+  ]),
+  page("login", "/login", "Login", [
+    block("hero", "Sign in", [
+      textField("title", "Wordmark", "ICONIC")
+    ])
+  ]),
+  page("aiAssistant", "/pricing/ai-assistant", "AI assistant", [
+    block("hero", "Hero", [
+      textField("badge", "Badge", "AI Media Strategist"),
+      textField("titleLead", "Title lead", "Find your"),
+      textField("titleAccent", "Title accent", "perfect match"),
+      areaField("body", "Body", "Answer a few questions and our AI will determine which service or package best suits your specific business goals.")
+    ])
+  ]),
+  page("unsubscribe", "/unsubscribe", "Unsubscribe", [
+    block("hero", "Title", [
+      textField("title", "Headline", "Unsubscribe")
+    ])
+  ])
+];
+function defaultPages() {
+  return JSON.parse(JSON.stringify(PAGES));
+}
+function defaultPage(id) {
+  return defaultPages().find((item) => item.id === id) ?? null;
+}
+function knownPageIds() {
+  return PAGES.map((item) => item.id);
+}
+const MAX_TEXT = 2e4;
+const MAX_ITEMS = 80;
+function cleanField(field, fallback) {
+  const kind = field?.kind || fallback?.kind;
+  if (!kind || !field?.id) return null;
+  const value = String(field.value ?? fallback?.value ?? "").slice(0, MAX_TEXT);
+  const next = { id: String(field.id), label: String(field.label || fallback?.label || field.id), kind, value };
+  if (kind === "link" || field.href != null || fallback?.href != null) {
+    next.href = String(field.href ?? fallback?.href ?? "").slice(0, 2e3);
+  }
+  return next;
+}
+function cleanItem(item, allowed) {
+  if (!item?.id || !Array.isArray(item.fields)) return null;
+  const fields = item.fields.map((field) => cleanField(field)).filter((field) => Boolean(field)).filter((field) => !allowed || allowed.has(field.id));
+  if (!fields.length) return null;
+  return { id: String(item.id).slice(0, 80), fields };
+}
+function cleanBlock(block2, fallback) {
+  if (!block2?.id) return null;
+  const baseFields = fallback?.fields ?? [];
+  const fields = baseFields.map((field) => {
+    const incoming = block2.fields?.find((item) => item.id === field.id);
+    return cleanField(incoming || field, field);
+  });
+  const allowedItemFields = new Set((fallback?.items ?? []).flatMap((item) => item.fields.map((field) => field.id)));
+  const items = fallback?.items ? Array.isArray(block2.items) ? block2.items.map((item) => cleanItem(item, allowedItemFields)).filter((item) => Boolean(item)).slice(0, MAX_ITEMS) : fallback.items : void 0;
+  return {
+    id: String(block2.id),
+    label: String(block2.label || fallback?.label || block2.id),
+    hidden: block2.hidden === true,
+    fields,
+    ...items ? { items } : {}
+  };
+}
+function mergeContent(overlay) {
+  if (!overlay?.id) return null;
+  const base = defaultPage(overlay.id);
+  if (!base) return null;
+  const order = Array.isArray(overlay.blocks) ? overlay.blocks.map((block2) => block2.id) : [];
+  const blocks = base.blocks.map((block2) => {
+    const incoming = overlay.blocks?.find((item) => item.id === block2.id);
+    return incoming ? cleanBlock(incoming, block2) : cleanBlock(block2, block2);
+  });
+  blocks.sort((a, b) => {
+    const ai = order.indexOf(a.id);
+    const bi = order.indexOf(b.id);
+    if (ai === -1 && bi === -1) return 0;
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+  return stripPage({
+    ...base,
+    seoTitle: String(overlay.seoTitle ?? base.seoTitle).slice(0, 300),
+    seoDescription: String(overlay.seoDescription ?? base.seoDescription).slice(0, 500),
+    blocks
+  });
+}
+const STAFF_ROLES = ["admin", "coordinator", "photographer", "editor"];
+function isStaffRole(role) {
+  return typeof role === "string" && STAFF_ROLES.includes(role);
+}
+function isActiveStaffRecord(data) {
+  if (!data) return false;
+  if (data.isActive === false) return false;
+  return isStaffRole(data.role);
+}
+function tempAdminAllowed() {
+  return isTempAdminEnabled(liveServerEnv());
+}
+function roleAtLeast(role, minimum) {
+  if (!role) return false;
+  if (role === "admin") return true;
+  if (role === "coordinator") return minimum !== "admin";
+  return role === "photographer";
+}
+async function resolveRole(uid, decoded) {
+  if (tempAdminAllowed() && uid === "temp-admin-uid") {
+    return "admin";
+  }
+  try {
+    const staffDoc = await admin.firestore().collection("staff").doc(uid).get();
+    if (!staffDoc.exists) return null;
+    const data = staffDoc.data();
+    if (!isActiveStaffRecord(data)) return null;
+    return data.role;
+  } catch (err) {
+    console.error("[Auth] Firestore staff lookup failed:", err);
+    const claimRole = decoded.role;
+    if (decoded.isStaff === true && isActiveStaffRecord({ role: claimRole, isActive: true })) {
+      return claimRole;
+    }
+    return null;
+  }
+}
+async function requireAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (tempAdminAllowed() && authHeader === "Bearer temp-admin-token") {
+    req.user = {
+      uid: "temp-admin-uid",
+      email: "temp-admin@iconicimagestx.com"
+    };
+    return next();
+  }
+  if (!authHeader?.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "No authentication token provided." });
+  }
+  const token = authHeader.split("Bearer ")[1];
+  try {
+    req.user = await admin.auth().verifyIdToken(token);
+    next();
+  } catch {
+    return res.status(401).json({ error: "Invalid or expired token." });
+  }
+}
+async function requireStaff(req, res, next) {
+  await requireAuth(req, res, async () => {
+    const role = await resolveRole(req.user.uid, req.user);
+    if (!role) return res.status(403).json({ error: "Staff access required." });
+    req.staffRole = role;
+    req.isAdmin = role === "admin";
+    req.isCoordinator = role === "admin" || role === "coordinator";
+    req.isPhotographer = roleAtLeast(role, "photographer");
+    next();
+  });
+}
+const memory = { published: {}, drafts: {} };
+const filePath = path$1.join(os.tmpdir(), "iconic-site-content.json");
+function siteContentUsesMemory() {
+  return process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory" || !admin.apps.length;
+}
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+async function readFileStore() {
+  try {
+    const raw = await fs.readFile(filePath, "utf8");
+    const parsed = JSON.parse(raw);
+    return { published: parsed.published || {}, drafts: parsed.drafts || {} };
+  } catch {
+    return { published: {}, drafts: {} };
+  }
+}
+async function writeFileStore(next) {
+  await fs.writeFile(filePath, JSON.stringify(next));
+}
+async function listPublished() {
+  if (siteContentUsesMemory()) {
+    if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") {
+      return Object.values(memory.published).map((page2) => stripPage(page2));
+    }
+    const stored = await readFileStore();
+    return Object.values(stored.published).map((page2) => stripPage(page2));
+  }
+  const snap = await admin.firestore().collection("siteContent").get();
+  return snap.docs.map((doc) => stripPage(doc.data()));
+}
+async function readPublished(id) {
+  if (siteContentUsesMemory()) {
+    if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") {
+      return memory.published[id] ? clone(memory.published[id]) : null;
+    }
+    const stored = await readFileStore();
+    return stored.published[id] ? clone(stored.published[id]) : null;
+  }
+  const doc = await admin.firestore().collection("siteContent").doc(id).get();
+  return doc.exists ? doc.data() : null;
+}
+async function writePublished(page2) {
+  if (siteContentUsesMemory()) {
+    if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") {
+      memory.published[page2.id] = clone(page2);
+      return;
+    }
+    const stored = await readFileStore();
+    stored.published[page2.id] = page2;
+    await writeFileStore(stored);
+    return;
+  }
+  await admin.firestore().collection("siteContent").doc(page2.id).set(page2);
+}
+async function readDraft(id) {
+  if (siteContentUsesMemory()) {
+    if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") {
+      return memory.drafts[id] ? clone(memory.drafts[id]) : null;
+    }
+    const stored = await readFileStore();
+    return stored.drafts[id] ? clone(stored.drafts[id]) : null;
+  }
+  const doc = await admin.firestore().collection("siteContentDrafts").doc(id).get();
+  return doc.exists ? stripPage(doc.data()) : null;
+}
+async function writeDraft(page2, meta) {
+  const stored = { ...stripPage(page2), savedAt: meta.at, savedByUid: meta.byUid, savedByName: meta.byName };
+  if (siteContentUsesMemory()) {
+    if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") {
+      memory.drafts[page2.id] = clone(stripPage(page2));
+      return;
+    }
+    const file = await readFileStore();
+    file.drafts[page2.id] = stripPage(page2);
+    await writeFileStore(file);
+    return;
+  }
+  await admin.firestore().collection("siteContentDrafts").doc(page2.id).set(stored);
+}
+async function deleteDraft(id) {
+  if (siteContentUsesMemory()) {
+    if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") {
+      delete memory.drafts[id];
+      return;
+    }
+    const stored = await readFileStore();
+    delete stored.drafts[id];
+    await writeFileStore(stored);
+    return;
+  }
+  await admin.firestore().collection("siteContentDrafts").doc(id).delete();
+}
+async function listDraftIds() {
+  if (siteContentUsesMemory()) {
+    if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") return Object.keys(memory.drafts);
+    const stored = await readFileStore();
+    return Object.keys(stored.drafts);
+  }
+  const snap = await admin.firestore().collection("siteContentDrafts").get();
+  return snap.docs.map((doc) => doc.id);
+}
+function historyOf(page2) {
+  return (page2?.revisions ?? []).slice(0, 10).map((revision) => ({
+    id: revision.id,
+    at: revision.at,
+    byUid: revision.byUid,
+    byName: revision.byName,
+    snapshot: stripPage(revision.snapshot)
+  }));
+}
+const blobs = /* @__PURE__ */ new Map();
+function siteMediaBlob(id) {
+  return blobs.get(id) ?? null;
+}
+function bucketName() {
+  return process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET || "";
+}
+async function optimizeImage(bytes) {
+  const sharp2 = (await import("sharp")).default;
+  const body = await sharp2(bytes, { failOn: "none" }).rotate().resize({ width: 2e3, withoutEnlargement: true }).webp({ quality: 82 }).toBuffer();
+  return { body, type: "image/webp", ext: "webp" };
+}
+async function saveObject(pageId, ext, body, type) {
+  const safePage = pageId.replace(/[^a-z0-9-]/gi, "").slice(0, 40) || "page";
+  const objectPath = `site-content/${safePage}/${Date.now()}-${randomUUID()}.${ext}`;
+  const bucket = bucketName();
+  if (admin.apps.length && bucket && process.env.NODE_ENV !== "test" && process.env.SITE_CONTENT_STORE !== "memory") {
+    const token = randomUUID();
+    await admin.storage().bucket(bucket).file(objectPath).save(body, {
+      resumable: false,
+      metadata: { contentType: type, metadata: { firebaseStorageDownloadTokens: token } }
+    });
+    return `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(objectPath)}?alt=media&token=${token}`;
+  }
+  const id = randomUUID();
+  blobs.set(id, { body, type });
+  return `/api/site-content/blob/${id}`;
+}
+async function storeSiteUpload(pageId, bytes) {
+  const kind = sniffMedia(bytes);
+  if (!kind) {
+    const error = new Error("Upload a JPG, PNG, WebP, MP4, or MOV file.");
+    error.status = 415;
+    throw error;
+  }
+  if (kind === "image" && bytes.length > SITE_IMAGE_BYTES) {
+    const error = new Error("That image is over 25 MB.");
+    error.status = 413;
+    throw error;
+  }
+  if (kind === "video" && bytes.length > SITE_VIDEO_BYTES) {
+    const error = new Error("That video is over 80 MB.");
+    error.status = 413;
+    throw error;
+  }
+  if (kind === "video") {
+    const brand = bytes.length >= 12 ? String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]) : "";
+    const ext = brand.toLowerCase().includes("qt") ? "mov" : "mp4";
+    const url2 = await saveObject(pageId, ext, bytes, ext === "mov" ? "video/quicktime" : "video/mp4");
+    return { url: url2, kind };
+  }
+  const optimized = await optimizeImage(bytes);
+  const url = await saveObject(pageId, optimized.ext, optimized.body, optimized.type);
+  return { url, kind: "image" };
+}
+async function assertPublicHost(hostname) {
+  const records = await lookup(hostname, { all: true, verbatim: true });
+  if (!records.length) throw new Error("That Dropbox link could not be resolved.");
+  for (const record of records) {
+    if (isPrivateAddress(record.address)) throw new Error("That Dropbox link is not allowed.");
+  }
+}
+async function importDropboxFile(rawUrl) {
+  const start = prepareDropboxUrl(rawUrl);
+  if (!start) {
+    const error = new Error("Paste a Dropbox file link. Folder links need Dropbox connect, which is not set up yet.");
+    error.status = 400;
+    throw error;
+  }
+  let current = start;
+  for (let hop = 0; hop < 4; hop += 1) {
+    await assertPublicHost(current.hostname);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15e3);
+    let response;
+    try {
+      response = await fetch(current, { redirect: "manual", signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      if (!location) throw new Error("Dropbox redirected without a destination.");
+      const next = new URL(location, current);
+      if (next.protocol !== "https:" || next.username || next.password || !isAllowedDropboxHost(next.hostname)) {
+        throw new Error("Dropbox redirected to a host that is not allowed.");
+      }
+      current = next;
+      continue;
+    }
+    if (!response.ok || !response.body) throw new Error("Dropbox did not return the file.");
+    const reader = response.body.getReader();
+    const chunks = [];
+    let total = 0;
+    while (true) {
+      const step = await reader.read();
+      if (step.done) break;
+      total += step.value.byteLength;
+      if (total > SITE_VIDEO_BYTES) throw new Error("That Dropbox file is over the upload limit.");
+      chunks.push(step.value);
+    }
+    const bytes = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
+    const kind = sniffMedia(bytes);
+    if (!kind) throw new Error("That Dropbox file is not a JPG, PNG, WebP, MP4, or MOV.");
+    if (kind === "image" && bytes.length > SITE_IMAGE_BYTES) throw new Error("That image is over 25 MB.");
+    return { bytes, kind };
+  }
+  throw new Error("Dropbox redirected too many times.");
+}
+const router = Router();
+function actor(req) {
+  const email = req.user?.email || "";
+  const name = email === "temp-admin@iconicimagestx.com" ? "Temporary Admin" : email || req.user?.uid || "Staff";
+  return { uid: req.user?.uid || "staff", name };
+}
+async function accessFor(req) {
+  const ownerEmails = ownerAllowlist(process.env.OWNER_EMAILS);
+  if (process.env.NODE_ENV === "test" && req.testFlags !== void 0) {
+    return siteEditorAccess({
+      role: req.staffRole,
+      email: req.user?.email,
+      flags: req.testFlags,
+      ownerEmails
+    });
+  }
+  let flags = null;
+  let email = req.user?.email || null;
+  let role = req.staffRole || null;
+  if (req.user?.uid && req.user.uid !== "temp-admin-uid") {
+    try {
+      const admin2 = await import("firebase-admin");
+      if (admin2.default.apps.length) {
+        const doc = await admin2.default.firestore().collection("staff").doc(req.user.uid).get();
+        const data = doc.data();
+        if (data) {
+          flags = data.siteEditor ?? null;
+          email = data.email || email;
+          role = data.role || role;
+        }
+      }
+    } catch (err) {
+      console.error("[Site editor] staff lookup failed:", err);
+    }
+  }
+  return siteEditorAccess({ role, email, flags, ownerEmails });
+}
+function gate(level) {
+  return async (req, res, next) => {
+    const editorReq = req;
+    const run = async () => {
+      const access = await accessFor(editorReq);
+      editorReq.siteAccess = access;
+      if (!allows(access, level)) {
+        return res.status(403).json({ error: level === "publish" ? "Only owner/admin can publish." : "Site editor permission required." });
+      }
+      return next();
+    };
+    if (process.env.NODE_ENV === "test" && req.header("x-test-staff")) {
+      const parsed = JSON.parse(req.header("x-test-staff") || "{}");
+      editorReq.user = { uid: parsed.uid || "test", email: parsed.email || "" };
+      editorReq.staffRole = parsed.role;
+      editorReq.testFlags = parsed.flags ?? null;
+      return run();
+    }
+    return requireStaff(editorReq, res, () => {
+      void run();
+    });
+  };
+}
+async function workspacePage(id) {
+  const base = defaultPage(id);
+  if (!base) return null;
+  const published = await readPublished(id);
+  const draft = await readDraft(id);
+  return mergeContent(draft || (published ? stripPage(published) : base));
+}
+router.get("/", async (_req, res) => {
+  const pages = await listPublished();
+  return res.json({ pages });
+});
+router.get("/blob/:id", (req, res) => {
+  const blob = siteMediaBlob(req.params.id);
+  if (!blob) return res.status(404).json({ error: "File not found." });
+  res.setHeader("Content-Type", blob.type);
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  return res.send(blob.body);
+});
+router.get("/workspace", gate("view"), async (req, res) => {
+  const editorReq = req;
+  const ids = knownPageIds();
+  const pages = [];
+  const published = {};
+  const history = {};
+  for (const id of ids) {
+    const page2 = await workspacePage(id);
+    if (page2) pages.push(page2);
+    const stored = await readPublished(id);
+    published[id] = stored ? stripPage(stored) : null;
+    history[id] = historyOf(stored);
+  }
+  const draftIds = await listDraftIds();
+  return res.json({
+    access: editorReq.siteAccess,
+    pages,
+    published,
+    history,
+    draftIds
+  });
+});
+router.put("/:id", gate("edit"), async (req, res) => {
+  const id = req.params.id;
+  if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
+  const merged = mergeContent({ ...req.body, id });
+  if (!merged) return res.status(400).json({ error: "Page could not be saved." });
+  const who = actor(req);
+  await writeDraft(merged, { at: (/* @__PURE__ */ new Date()).toISOString(), byUid: who.uid, byName: who.name });
+  return res.json({ page: merged });
+});
+router.post("/:id/discard", gate("edit"), async (req, res) => {
+  const id = req.params.id;
+  if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
+  await deleteDraft(id);
+  const page2 = await workspacePage(id);
+  return res.json({ page: page2 });
+});
+router.post("/:id/release", gate("publish"), async (req, res) => {
+  const id = req.params.id;
+  if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
+  const draft = await readDraft(id);
+  const current = await readPublished(id);
+  const raw = draft || (req.body?.page ? { ...req.body.page, id } : null) || (current ? stripPage(current) : defaultPage(id));
+  const source = mergeContent(raw);
+  if (!source) return res.status(400).json({ error: "Nothing to publish." });
+  const who = actor(req);
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const revisions = pushRevision(current, source, who, now);
+  await writePublished({
+    ...source,
+    revisions,
+    publishedAt: now,
+    publishedByUid: who.uid,
+    publishedByName: who.name
+  });
+  await deleteDraft(id);
+  return res.json({ page: stripPage(source), publishedAt: now, publishedByName: who.name });
+});
+router.post("/release-all", gate("publish"), async (req, res) => {
+  const who = actor(req);
+  const publishedIds = [];
+  for (const id of await listDraftIds()) {
+    const draft = await readDraft(id);
+    const source = draft ? mergeContent(draft) : null;
+    if (!source || !defaultPage(id)) continue;
+    const current = await readPublished(id);
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    await writePublished({
+      ...source,
+      revisions: pushRevision(current, source, who, now),
+      publishedAt: now,
+      publishedByUid: who.uid,
+      publishedByName: who.name
+    });
+    await deleteDraft(id);
+    publishedIds.push(id);
+  }
+  return res.json({ publishedIds });
+});
+router.post("/:id/revert", gate("publish"), async (req, res) => {
+  const id = req.params.id;
+  if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
+  const current = await readPublished(id);
+  if (!current) return res.status(404).json({ error: "That page has no published history." });
+  const who = actor(req);
+  const restored = revertTo(current, String(req.body?.revisionId || ""), who);
+  const source = restored ? mergeContent(restored) : null;
+  if (!restored || !source) return res.status(404).json({ error: "That version was not found." });
+  await writePublished({
+    ...source,
+    revisions: restored.revisions,
+    publishedAt: restored.publishedAt,
+    publishedByUid: restored.publishedByUid,
+    publishedByName: restored.publishedByName
+  });
+  return res.json({ page: stripPage(source) });
+});
+router.post("/media", gate("edit"), async (req, res) => {
+  try {
+    const pageId = String(req.body?.pageId || "page");
+    if (!defaultPage(pageId) && pageId !== "page") return res.status(404).json({ error: "Unknown page." });
+    const raw = String(req.body?.dataBase64 || "");
+    const bytes = Buffer.from(raw, "base64");
+    if (!bytes.length) return res.status(400).json({ error: "No file was received." });
+    const stored = await storeSiteUpload(defaultPage(pageId) ? pageId : "page", bytes);
+    return res.json(stored);
+  } catch (err) {
+    const status = err.status || 400;
+    return res.status(status).json({ error: err instanceof Error ? err.message : "Upload failed." });
+  }
+});
+router.post("/dropbox", gate("edit"), async (req, res) => {
+  try {
+    const pageId = String(req.body?.pageId || "page");
+    const imported = await importDropboxFile(String(req.body?.url || ""));
+    const stored = await storeSiteUpload(defaultPage(pageId) ? pageId : "page", imported.bytes);
+    return res.json(stored);
+  } catch (err) {
+    const status = err.status || 400;
+    return res.status(status).json({ error: err instanceof Error ? err.message : "Dropbox import failed." });
+  }
+});
 if (!admin.apps.length) {
   const bucket = process.env.VITE_FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET;
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
@@ -1075,7 +2285,21 @@ function adapt(res) {
   };
   return wrapped;
 }
+let siteApp = null;
+function siteContentApp() {
+  if (!siteApp) {
+    siteApp = express();
+    siteApp.use("/api/site-content/media", express.json({ limit: "120mb" }));
+    siteApp.use("/api/site-content/dropbox", express.json({ limit: "1mb" }));
+    siteApp.use("/api/site-content", router);
+  }
+  return siteApp;
+}
 function mediaDisplayHandler(req, res) {
+  const url = req.url || "";
+  if (url.startsWith("/api/site-content/media") || url.startsWith("/api/site-content/dropbox")) {
+    return siteContentApp()(req, res);
+  }
   return handleMediaDisplay(req, adapt(res));
 }
 export {

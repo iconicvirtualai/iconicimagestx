@@ -45,7 +45,7 @@ describe("site content API", () => {
     const afterDraft = await fetch(`${baseUrl}/api/site-content`);
     expect(await afterDraft.json()).toEqual({ pages: [] });
 
-    const refused = await fetch(`${baseUrl}/api/site-content/home/publish`, {
+    const refused = await fetch(`${baseUrl}/api/site-content/home/release`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -55,7 +55,7 @@ describe("site content API", () => {
     });
     expect(refused.status).toBe(403);
 
-    const published = await fetch(`${baseUrl}/api/site-content/home/publish`, {
+    const published = await fetch(`${baseUrl}/api/site-content/home/release`, {
       method: "POST",
       headers: { Authorization: "Bearer temp-admin-token", "Content-Type": "application/json" },
       body: "{}",
@@ -65,6 +65,13 @@ describe("site content API", () => {
     expect(live.pages).toHaveLength(1);
     expect(live.pages[0].seoTitle).toBe("Draft title");
     expect(live.pages[0].revisions).toBeUndefined();
+
+    const unknown = await fetch(`${baseUrl}/api/site-content/not-a-page/revert`, {
+      method: "POST",
+      headers: { Authorization: "Bearer temp-admin-token", "Content-Type": "application/json" },
+      body: JSON.stringify({ revisionId: "rev_x" }),
+    });
+    expect(unknown.status).toBe(404);
   });
 
   it("rejects a folder link and a non-dropbox host before fetching", async () => {

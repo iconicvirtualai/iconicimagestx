@@ -37,6 +37,7 @@ export default defineConfig({
         "zlib",
         "dotenv/config",
         "dotenv",
+        "express",
         "firebase-admin",
         "firebase-admin/app",
         "firebase-admin/firestore",

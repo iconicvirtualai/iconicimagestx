@@ -175,7 +175,7 @@ export default function AdminSiteEditor() {
     if (!page || !workspace?.access.publish) return;
     setBusy(true);
     await fetch(`/api/site-content/${page.id}`, { method: "PUT", headers: await authHeaders(), body: JSON.stringify(page) });
-    const response = await fetch(`/api/site-content/${page.id}/publish`, { method: "POST", headers: await authHeaders(), body: "{}" });
+    const response = await fetch(`/api/site-content/${page.id}/release`, { method: "POST", headers: await authHeaders(), body: "{}" });
     setBusy(false);
     if (!response.ok) {
       setMessage("Publish was refused.");

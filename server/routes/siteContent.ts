@@ -160,12 +160,13 @@ router.post("/:id/discard", gate("edit"), async (req, res) => {
   return res.json({ page });
 });
 
-router.post("/:id/publish", gate("publish"), async (req, res) => {
+router.post("/:id/release", gate("publish"), async (req, res) => {
   const id = req.params.id;
   if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
   const draft = await readDraft(id);
   const current = await readPublished(id);
-  const source = draft || (req.body?.page ? mergeContent({ ...req.body.page, id }) : null) || (current ? stripPage(current) : defaultPage(id));
+  const raw = draft || (req.body?.page ? { ...req.body.page, id } : null) || (current ? stripPage(current) : defaultPage(id));
+  const source = mergeContent(raw as ContentPage);
   if (!source) return res.status(400).json({ error: "Nothing to publish." });
   const who = actor(req as EditorRequest);
   const now = new Date().toISOString();
@@ -181,17 +182,18 @@ router.post("/:id/publish", gate("publish"), async (req, res) => {
   return res.json({ page: stripPage(source), publishedAt: now, publishedByName: who.name });
 });
 
-router.post("/publish-all", gate("publish"), async (req, res) => {
+router.post("/release-all", gate("publish"), async (req, res) => {
   const who = actor(req as EditorRequest);
   const publishedIds: string[] = [];
   for (const id of await listDraftIds()) {
     const draft = await readDraft(id);
-    if (!draft || !defaultPage(id)) continue;
+    const source = draft ? mergeContent(draft) : null;
+    if (!source || !defaultPage(id)) continue;
     const current = await readPublished(id);
     const now = new Date().toISOString();
     await writePublished({
-      ...draft,
-      revisions: pushRevision(current, draft, who, now),
+      ...source,
+      revisions: pushRevision(current, source, who, now),
       publishedAt: now,
       publishedByUid: who.uid,
       publishedByName: who.name,
@@ -204,13 +206,21 @@ router.post("/publish-all", gate("publish"), async (req, res) => {
 
 router.post("/:id/revert", gate("publish"), async (req, res) => {
   const id = req.params.id;
+  if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
   const current = await readPublished(id);
   if (!current) return res.status(404).json({ error: "That page has no published history." });
   const who = actor(req as EditorRequest);
   const restored = revertTo(current, String(req.body?.revisionId || ""), who);
-  if (!restored) return res.status(404).json({ error: "That version was not found." });
-  await writePublished(restored);
-  return res.json({ page: stripPage(restored) });
+  const source = restored ? mergeContent(restored) : null;
+  if (!restored || !source) return res.status(404).json({ error: "That version was not found." });
+  await writePublished({
+    ...source,
+    revisions: restored.revisions,
+    publishedAt: restored.publishedAt,
+    publishedByUid: restored.publishedByUid,
+    publishedByName: restored.publishedByName,
+  });
+  return res.json({ page: stripPage(source) });
 });
 
 router.post("/media", gate("edit"), async (req, res) => {
