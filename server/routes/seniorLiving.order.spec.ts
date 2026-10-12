@@ -166,6 +166,11 @@ describe("POST /api/senior-living/order", () => {
       saved: expect.objectContaining({
         depositAmount: 128.5,
         hostingLabel: "Monthly hosting",
+        vibeNote: expect.stringContaining("Invoice the 50% deposit manually"),
+      }),
+    }));
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({
+      saved: expect.objectContaining({
         vibeNote: expect.stringContaining("Tour hosting: Monthly hosting. Pricing confirmed with your quote"),
       }),
     }));

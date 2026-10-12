@@ -307,6 +307,8 @@ describe("senior living page", () => {
       "utf8",
     );
     expect(orderSource).not.toMatch(/\b0\.0[5-7]\b|\$0\.0[5-7]/);
+    expect(orderSource).not.toContain("deposit-checkout");
+    expect(orderSource).not.toContain("Pay deposit");
     expect(source).not.toMatch(/\b17\b|\b84\b/);
     expect(source).not.toMatch(/\bfont-serif\b|Cormorant|Garamond|cursive/);
     expect(source).toContain("object-top");
@@ -343,6 +345,9 @@ describe("senior living page", () => {
     expect(container?.textContent).toContain("Deposit due today (50%)");
     expect(container?.textContent).toContain("Balance due after the shoot");
     expect(container?.textContent).toContain("Processing fee (2.8%)");
+    expect(container?.textContent).toContain("Request booking");
+    expect(container?.querySelector("[data-testid='senior-pay']")).toBeNull();
+    expect(container?.textContent).not.toMatch(/Pay deposit/);
 
     await click("senior-back");
     await click("senior-back");
@@ -360,26 +365,18 @@ describe("senior living page", () => {
     });
     await click("senior-next");
     await click("senior-next");
-    fetchMock.mockImplementation(async (url: string) => {
-      if (String(url).includes("deposit-checkout")) {
-        return {
-          ok: false,
-          json: async () => ({ error: "Square payments are not configured yet." }),
-        };
-      }
-      return {
-        ok: true,
-        json: async () => ({
-          success: true,
-          orderNumber: "ORD - L - 10001",
-          invoiceId: "inv1",
-          payToken: "tok",
-          confirmationEmail: false,
-        }),
-      };
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        orderNumber: "ORD - L - 10001",
+        invoiceId: "inv1",
+        payToken: "tok",
+        confirmationEmail: false,
+      }),
     });
-    await click("senior-pay");
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await click("senior-request-booking");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("/api/senior-living/order");
     expect(init.method).toBe("POST");
@@ -389,9 +386,7 @@ describe("senior living page", () => {
     expect(body.email).toBe("ada@community.example");
     expect(body.scheduledTime).toBe("9:00 AM");
     expect(body.companyWebsite).toBe("");
-    expect(fetchMock.mock.calls[1][0]).toBe(
-      "/api/payments/invoice/inv1/deposit-checkout",
-    );
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes("deposit-checkout"))).toBe(false);
     expect(
       container?.querySelector("[data-testid='senior-order-number']")?.textContent,
     ).toBe("ORD - L - 10001");
@@ -399,5 +394,6 @@ describe("senior living page", () => {
     expect(container?.textContent).not.toMatch(
       /check your email|emailed you|confirmation email|we will email/i,
     );
+    expect(container?.textContent).not.toContain("Invoice the 50% deposit manually");
   });
 });

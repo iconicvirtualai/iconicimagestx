@@ -5,6 +5,8 @@ import {
   SENIOR_LIVING_DEPOSIT_PERCENT,
   SENIOR_LIVING_DEPOSIT_REQUIRED,
   SENIOR_LIVING_HOSTING_NOTE,
+  SENIOR_LIVING_MANUAL_DEPOSIT_NOTE,
+  seniorDepositCheckoutLive,
   SENIOR_LIVING_OPS_EMAIL,
   SENIOR_LIVING_PROCESSING_RATE,
   parseSeniorLivingOrder,
@@ -43,6 +45,13 @@ describe("senior living pricing config", () => {
     expect(seniorFacilityExampleLine()).toBe("a 20,000 sq ft community = $2,000");
     expect(seniorFacilityRateLine()).not.toMatch(/\$0\.0[5-7]/);
     expect(seniorFacilityExampleLine()).not.toMatch(/\$0\.0[5-7]/);
+    expect(SENIOR_LIVING_DEPOSIT_LINE).toBe(
+      "Reserve your date with a 50% deposit. We'll send your deposit invoice shortly. The balance is due after the shoot.",
+    );
+    expect(SENIOR_LIVING_MANUAL_DEPOSIT_NOTE).toBe("Invoice the 50% deposit manually");
+    expect(seniorDepositCheckoutLive({})).toBe(false);
+    expect(seniorDepositCheckoutLive({ SENIOR_DEPOSIT_CHECKOUT_LIVE: "TRUE" })).toBe(false);
+    expect(seniorDepositCheckoutLive({ SENIOR_DEPOSIT_CHECKOUT_LIVE: "true" })).toBe(true);
     expect(formatUsd(SENIOR_TOUR_PRICE)).toBe("$250");
     expect(SENIOR_ROOM_RATES.map((tier) => tier.each)).toEqual([199, 175]);
   });

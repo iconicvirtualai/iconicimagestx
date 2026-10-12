@@ -29,7 +29,7 @@ const fieldClass =
 const buttonClass =
   "inline-flex min-h-12 w-full max-w-full items-center justify-center rounded-lg bg-neutral-950 px-6 py-3 text-center text-lg font-semibold leading-snug text-white disabled:opacity-60";
 
-const stepTitles = ["Services", "Community", "Schedule", "Review"] as const;
+const stepTitles = ["Services", "Community", "Schedule", "Request booking"] as const;
 
 function startOfToday(): Date {
   const today = new Date();
@@ -60,7 +60,6 @@ export function SeniorLivingOrder() {
   const [confirmation, setConfirmation] = useState<{
     orderNumber: string;
     confirmationEmail: boolean;
-    payError: string;
   } | null>(null);
 
   const months = useMemo(
@@ -145,7 +144,6 @@ export function SeniorLivingOrder() {
         setConfirmation({
           orderNumber: "",
           confirmationEmail: false,
-          payError: "",
         });
         return;
       }
@@ -168,32 +166,17 @@ export function SeniorLivingOrder() {
         payToken?: string;
         confirmationEmail?: boolean;
       } | null;
-      if (!response.ok || !data?.success || !data.orderNumber || !data.invoiceId) {
+      if (!response.ok || !data?.success || !data.orderNumber) {
         setError(
           data?.error ||
             `We could not save that order. Please call ${BUSINESS_CONTACT.phoneDisplay}.`,
         );
         return;
       }
-      let payError = "";
-      let checkoutUrl = "";
-      const pay = await fetch(`/api/payments/invoice/${data.invoiceId}/deposit-checkout`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ t: data.payToken || "" }),
-      });
-      const payBody = (await pay.json().catch(() => null)) as {
-        checkoutUrl?: string;
-        error?: string;
-      } | null;
-      if (pay.ok && payBody?.checkoutUrl) checkoutUrl = payBody.checkoutUrl;
-      else payError = payBody?.error || "The deposit checkout could not be started.";
       setConfirmation({
         orderNumber: data.orderNumber,
         confirmationEmail: data.confirmationEmail === true,
-        payError,
       });
-      if (checkoutUrl) window.location.assign(checkoutUrl);
     } catch {
       setError(
         `We could not save that order. Please call ${BUSINESS_CONTACT.phoneDisplay}.`,
@@ -221,11 +204,6 @@ export function SeniorLivingOrder() {
         {confirmation.confirmationEmail ? (
           <p className="text-lg leading-relaxed text-neutral-950">
             We will email you a confirmation.
-          </p>
-        ) : null}
-        {confirmation.payError ? (
-          <p role="alert" className="text-lg font-semibold leading-snug text-red-800">
-            {confirmation.payError}
           </p>
         ) : null}
         <p className="text-lg leading-relaxed text-neutral-950">
@@ -489,8 +467,8 @@ export function SeniorLivingOrder() {
             Continue
           </button>
         ) : (
-          <button type="submit" data-testid="senior-pay" disabled={pending} className={buttonClass}>
-            {pending ? "Starting checkout" : "Pay deposit"}
+          <button type="submit" data-testid="senior-request-booking" disabled={pending} className={buttonClass}>
+            {pending ? "Sending" : "Request booking"}
           </button>
         )}
       </div>

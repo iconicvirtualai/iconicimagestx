@@ -28,7 +28,20 @@ export const SENIOR_LIVING_OPS_EMAIL = "ops@iconicimagestx.com";
 export const SENIOR_LIVING_DEPOSIT_REQUIRED = true;
 export const SENIOR_LIVING_DEPOSIT_PERCENT = 50;
 export const SENIOR_LIVING_DEPOSIT_LINE =
-  "Reserve your date with a 50% deposit. The balance is due after the shoot.";
+  "Reserve your date with a 50% deposit. We'll send your deposit invoice shortly. The balance is due after the shoot.";
+
+/** Ops only. The public page does not charge the deposit online while checkout is off. */
+export const SENIOR_LIVING_MANUAL_DEPOSIT_NOTE = "Invoice the 50% deposit manually";
+
+/**
+ * Online Square deposit checkout. Off unless this is exactly "true".
+ * Unset, "TRUE", "1", and "false" stay off.
+ */
+export function seniorDepositCheckoutLive(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  return env.SENIOR_DEPOSIT_CHECKOUT_LIVE === "true";
+}
 
 /** Added on top of services and travel. Senior living orders only. */
 export const SENIOR_LIVING_PROCESSING_RATE = 0.028;

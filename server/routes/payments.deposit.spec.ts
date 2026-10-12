@@ -89,6 +89,7 @@ const envBackup = {
   SQUARE_LOCATION_ID: process.env.SQUARE_LOCATION_ID,
   SQUARE_WEBHOOK_SIGNATURE_KEY: process.env.SQUARE_WEBHOOK_SIGNATURE_KEY,
   APP_URL: process.env.APP_URL,
+  SENIOR_DEPOSIT_CHECKOUT_LIVE: process.env.SENIOR_DEPOSIT_CHECKOUT_LIVE,
 };
 
 let server: Server;
@@ -101,6 +102,7 @@ beforeAll(async () => {
   process.env.SQUARE_LOCATION_ID = "loc-test";
   process.env.SQUARE_WEBHOOK_SIGNATURE_KEY = "whsec-test";
   process.env.APP_URL = "https://deposit.test";
+  process.env.SENIOR_DEPOSIT_CHECKOUT_LIVE = "true";
   fetchMock.mockImplementation((url: unknown, init?: RequestInit) => {
     const target = String(url);
     if (target.includes("squareup.com")) {
@@ -135,6 +137,8 @@ afterAll(async () => {
   process.env.SQUARE_LOCATION_ID = envBackup.SQUARE_LOCATION_ID;
   process.env.SQUARE_WEBHOOK_SIGNATURE_KEY = envBackup.SQUARE_WEBHOOK_SIGNATURE_KEY;
   process.env.APP_URL = envBackup.APP_URL;
+  if (envBackup.SENIOR_DEPOSIT_CHECKOUT_LIVE === undefined) delete process.env.SENIOR_DEPOSIT_CHECKOUT_LIVE;
+  else process.env.SENIOR_DEPOSIT_CHECKOUT_LIVE = envBackup.SENIOR_DEPOSIT_CHECKOUT_LIVE;
   vi.unstubAllGlobals();
   if (!server) return;
   await new Promise<void>((resolve, reject) => {
@@ -185,6 +189,21 @@ function sign(body: string) {
     .digest("base64");
 }
 
+describe("deposit checkout while the flag is off", () => {
+  it("returns 404 and does not start Square", async () => {
+    delete process.env.SENIOR_DEPOSIT_CHECKOUT_LIVE;
+    const response = await fetch(`${baseUrl}/api/payments/invoice/inv-sl/deposit-checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ t: TOKEN }),
+    });
+    expect(response.status).toBe(404);
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes("squareup.com"))).toBe(false);
+    expect((store.collections.invoices.get("inv-sl") || {}).status).toBe("draft");
+    process.env.SENIOR_DEPOSIT_CHECKOUT_LIVE = "true";
+  });
+});
+
 describe("deposit checkout", () => {
   it("charges only the deposit and leaves a senior living invoice as a draft", async () => {
     const response = await fetch(`${baseUrl}/api/payments/invoice/inv-sl/deposit-checkout`, {
@@ -228,6 +247,48 @@ describe("deposit checkout", () => {
     const squareCall = fetchMock.mock.calls.find((call) => String(call[0]).includes("squareup.com"));
     const sent = JSON.parse(String(squareCall?.[1].body));
     expect(sent.quick_pay.price_money.amount).toBe(25000);
+  });
+});
+
+describe("Square webhook while deposit checkout is off", () => {
+  it("leaves the full-payment path in place", async () => {
+    delete process.env.SENIOR_DEPOSIT_CHECKOUT_LIVE;
+    seed("invoices", "inv-sl", {
+      ...(store.collections.invoices.get("inv-sl") || {}),
+      clientEmail: "",
+      squareDepositPaymentLinkId: "dep-link",
+      squareDepositOrderId: "dep-order",
+    });
+    const raw = JSON.stringify({
+      data: {
+        object: {
+          payment: {
+            id: "pay-dep-off",
+            status: "COMPLETED",
+            amount_money: { amount: 12850 },
+            payment_link_id: "dep-link",
+            order_id: "dep-order",
+            note: "invoiceId:inv-sl",
+          },
+        },
+      },
+    });
+    const response = await fetch(`${baseUrl}/api/payments/square-webhook`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-square-hmacsha256-signature": sign(raw),
+      },
+      body: raw,
+    });
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.deposit).toBeUndefined();
+    const invoice = store.collections.invoices.get("inv-sl") || {};
+    expect(invoice.status).toBe("partial");
+    expect(invoice.depositPaidAt).toBeUndefined();
+    expect(invoice.amountDue).toBe(128.5);
+    process.env.SENIOR_DEPOSIT_CHECKOUT_LIVE = "true";
   });
 });
 

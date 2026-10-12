@@ -33,6 +33,7 @@ import { isTempAdminEnabled, liveServerEnv } from "../../shared/tempAdmin";
 import { payTokenMatches } from "../lib/payToken";
 import { resolveClientIdentity } from "../services/clientAccounts";
 import { matchSquarePaymentInvoice } from "../services/squarePaymentMatch";
+import { seniorDepositCheckoutLive } from "../../shared/seniorLiving";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -799,6 +800,7 @@ router.post("/invoice/:id/checkout", async (req: Request, res: Response) => {
 
 router.post("/invoice/:id/deposit-checkout", async (req: Request, res: Response) => {
   try {
+    if (!seniorDepositCheckoutLive()) return invoiceNotFound(res);
     const invoiceDoc = await loadInvoice(req.params.id);
     if (!invoiceDoc) return invoiceNotFound(res);
 
@@ -1018,7 +1020,7 @@ router.post("/square-webhook", async (req: Request, res: Response) => {
     const amount = amountCents / 100;
     if (amount <= 0) return res.json({ received: true, ignored: "zero-amount" });
 
-    if (isDepositSquarePayment(invoice, payment)) {
+    if (seniorDepositCheckoutLive() && isDepositSquarePayment(invoice, payment)) {
       await applyDepositPayment({
         invoiceId: invoiceDoc.id,
         amount,

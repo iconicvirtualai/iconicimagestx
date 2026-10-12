@@ -13,6 +13,7 @@ import { createPayToken } from "../../shared/invoicePay";
 import { nextSequentialInvoiceNumber } from "../../shared/orderProjectInvoice";
 import {
   SENIOR_LIVING_DEPOSIT_LINE,
+  SENIOR_LIVING_MANUAL_DEPOSIT_NOTE,
   SENIOR_LIVING_DEPOSIT_PERCENT,
   SENIOR_LIVING_DEPOSIT_REQUIRED,
   SENIOR_LIVING_HOSTING_NOTE,
@@ -153,6 +154,7 @@ router.post("/order", async (req, res) => {
         `Balance due after the shoot: ${quote.balanceDue}`,
         `Processing: ${quote.processing}`,
         `Tour hosting: ${hostingNote}`,
+        SENIOR_LIVING_MANUAL_DEPOSIT_NOTE,
         value.notes,
       ].filter(Boolean).join("\n"),
       status: "new",
@@ -299,6 +301,7 @@ router.post("/order", async (req, res) => {
         `Deposit due today: ${quote.depositAmount}`,
         `Balance due after the shoot: ${quote.balanceDue}`,
         `Tour hosting: ${hostingNote}`,
+        SENIOR_LIVING_MANUAL_DEPOSIT_NOTE,
         SENIOR_LIVING_DEPOSIT_LINE,
         value.notes,
       ].filter(Boolean).join("\n"),
@@ -322,7 +325,7 @@ router.post("/order", async (req, res) => {
           template: "senior_living_order",
           audience: "client",
           subject: `Order ${orderNumber} received`,
-          html: `<p>We received order ${orderNumber}. The balance is due after the shoot.</p>`,
+          html: `<p>We received order ${orderNumber}. ${SENIOR_LIVING_DEPOSIT_LINE}</p>`,
           variables: { clientName: value.name, orderNumber },
         });
       } catch (error) {
