@@ -54,6 +54,35 @@ describe("office new order delivery", () => {
     expect(message.subject).toContain("ORD-L-00534");
     expect(message.html).toContain("Hollywood");
     expect(message.html).toContain("$199.00");
+    expect(message.variables).toMatchObject({
+      orderNumber: "ORD-L-00534",
+      packageName: "Hollywood",
+      serviceName: "Hollywood",
+    });
+  });
+
+  it("passes the admin order code and package name when the saved record omitted them", async () => {
+    await notifyOfficeOfOrder({
+      isNewOrder: true,
+      saved: {
+        id: "order74499",
+        clientName: "Test Client",
+        email: "client@example.com",
+        address: "100 Congress Ave, Austin, TX 78701",
+        lineItems: [{ id: "hollywood", name: "Hollywood", price: 199, qty: 1 }],
+        total: 199,
+        packageName: "Hollywood",
+      },
+      env: { ADMIN_EMAIL: "office@iconicimagestx.com" },
+    });
+    const message = sendEmailMock.mock.calls[0][0];
+    expect(message.subject?.startsWith("New order ORD - L - 74499 — Hollywood")).toBe(true);
+    expect(message.subject).not.toContain("New order Not provided");
+    expect(message.variables?.orderNumber).toBe("ORD - L - 74499");
+    expect(message.variables?.packageName).toBe("Hollywood");
+    expect(message.variables?.serviceName).toBe("Hollywood");
+    expect(message.html).toContain("ORD - L - 74499");
+    expect(message.html).toContain("Hollywood");
   });
 
   it("prefixes [TEST] from the saved client name", async () => {
@@ -120,5 +149,12 @@ describe("order package backfill", () => {
     expect(post.indexOf("const savedSnap = await docRef.get()")).toBeLessThan(post.indexOf("notifyOfficeOfOrder"));
     expect(post).toContain("isNewOrder: true");
     expect(post).toContain("saved: savedOrder");
+    const savedOrderBlock = post.slice(post.indexOf("const savedOrder"), post.indexOf("notifyOfficeOfOrder"));
+    expect(savedOrderBlock).toContain("orderNumber,");
+    expect(savedOrderBlock).toContain("packageName");
+    const officeNotify = readFileSync(new URL("./officeOrderNotify.ts", import.meta.url), "utf8");
+    expect(officeNotify).toContain("orderNumber: message.orderNumber");
+    expect(officeNotify).toContain("packageName: message.packageName");
+    expect(officeNotify).toContain("serviceName: message.packageName");
   });
 });

@@ -172,6 +172,38 @@ describe("office new order email", () => {
     expect(email.text).not.toContain("[object Object]");
   });
 
+  it("uses the admin order code and package name when the saved record omitted them", () => {
+    const email = officeNewOrderEmail({
+      id: "order74499",
+      clientName: "Test Client",
+      email: "test@example.com",
+      address: "100 Congress Ave, Austin, TX 78701",
+      lineItems: [{ id: "hollywood", name: "Hollywood", price: 199, qty: 1 }],
+      total: 199,
+      scheduledDate: "2026-10-12",
+    }, { catalog });
+    expect(email.orderNumber).toBe("ORD - L - 74499");
+    expect(email.packageName).toBe("Hollywood");
+    expect(email.subject).toBe("New order ORD - L - 74499 — Hollywood — 100 Congress Ave, Austin, TX 78701 — Oct 12, 2026");
+    expect(email.subject).not.toContain(NOT_PROVIDED);
+    expect(email.text).toContain("Order number: ORD - L - 74499");
+    expect(email.text).toContain("Package: Hollywood");
+    expect(email.text).not.toContain(`Order number: ${NOT_PROVIDED}`);
+  });
+
+  it("reads a passed service name when the saved lines do not name a package", () => {
+    const email = officeNewOrderEmail({
+      id: "order74499",
+      serviceName: "The Essentials",
+      total: 249,
+      address: "100 Congress Ave, Austin, TX 78701",
+    });
+    expect(email.packageName).toBe("The Essentials");
+    expect(email.subject).toContain("The Essentials");
+    expect(email.text).toContain("Package: The Essentials");
+    expect(email.orderNumber).toBe("ORD - L - 74499");
+  });
+
   it("shows Not provided for every missing field and does not throw", () => {
     const email = officeNewOrderEmail({});
     expect(email.subject).toBe(`New order ${NOT_PROVIDED} — ${NOT_PROVIDED} — ${NOT_PROVIDED} — ${NOT_PROVIDED}`);

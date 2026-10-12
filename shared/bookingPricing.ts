@@ -2,11 +2,11 @@
  * Customer booking totals.
  *
  * Prices come from the booking catalog (seed, overlaid with Firestore `packages`
- * when a catalog is passed). calculateSidebarTotal matches the booking form
- * total, including the Math.max(0, …) promo floor. buildSubmittedLineItems is
- * the submitted line list. Its `price` fields are the extended amounts, and
- * sumLineItemPrices is the submitted total. Life of the Listing Care is
- * accepted on the input and never added to either number.
+ * when a catalog is passed). calculateSidebarTotal is the service total after
+ * the Math.max(0, …) promo floor. The customer-facing Total Estimate adds
+ * travel and processingFee via estimateBookingCharge. buildSubmittedLineItems
+ * is the submitted line list. Its `price` fields are the extended amounts.
+ * Life of the Listing Care is accepted on the input and never added.
  */
 
 import {
