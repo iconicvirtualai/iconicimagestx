@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { MoneyAmount } from "@/components/MoneyAmount";
+import { SeniorLivingOrder } from "@/components/SeniorLivingOrder";
 import { PublicContactLine } from "@/components/PublicContactLine";
 import {
   publishedSeniorLivingPhotos,
@@ -15,16 +15,12 @@ import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "@shared/businessContact";
 import {
   formatSeniorFacilityRate,
   formatUsd,
-  parseSeniorLivingRequest,
   SENIOR_FACILITY_RATE_PER_SQFT,
   SENIOR_FACILITY_SQFT_CAP,
   SENIOR_LIVING_DEPOSIT_LINE,
-  SENIOR_LIVING_SERVICE_IDS,
-  SENIOR_LIVING_SERVICE_LABELS,
   SENIOR_ROOM_RATES,
   SENIOR_TOUR_PRICE,
   SENIOR_TOUR_SQFT_CAP,
-  type SeniorLivingServiceId,
 } from "@shared/seniorLiving";
 import { TRAVEL_ZONES } from "@shared/travelZones";
 
@@ -39,9 +35,6 @@ const pageType =
   "min-h-screen overflow-x-clip bg-[#F6F3EE] font-[Inter,ui-sans-serif,system-ui,sans-serif] text-neutral-950 [overflow-wrap:normal] [word-break:normal] [hyphens:manual] [&_*]:[overflow-wrap:normal] [&_*]:[word-break:normal] [&_*]:[hyphens:manual]";
 
 const bodyText = "text-lg leading-relaxed text-neutral-900 sm:text-xl";
-
-const fieldClass =
-  "mt-2 w-full min-h-12 min-w-0 max-w-full rounded-lg border border-neutral-400 bg-white px-4 py-3 text-lg text-neutral-950 outline-none placeholder:text-neutral-600 focus:border-neutral-950 focus:ring-2 focus:ring-neutral-950";
 
 const ctaClass =
   "inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-[#FFE14A] px-6 py-3 text-center text-lg font-semibold leading-snug text-neutral-950 hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:w-auto";
@@ -125,77 +118,6 @@ export default function SeniorLiving() {
   const photos = publishedSeniorLivingPhotos();
   const heroPhoto = photos[0];
   const gallery = photos.slice(1);
-  const [name, setName] = useState("");
-  const [community, setCommunity] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [services, setServices] = useState<SeniorLivingServiceId[]>([]);
-  const [preferredDates, setPreferredDates] = useState("");
-  const [notes, setNotes] = useState("");
-  const [companyWebsite, setCompanyWebsite] = useState("");
-  const [error, setError] = useState("");
-  const [pending, setPending] = useState(false);
-  const [done, setDone] = useState(false);
-
-  function toggleService(id: SeniorLivingServiceId) {
-    setServices((current) =>
-      current.includes(id)
-        ? current.filter((item) => item !== id)
-        : [...current, id],
-    );
-  }
-
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const payload = {
-      name,
-      community,
-      email,
-      phone,
-      address,
-      services,
-      preferredDates,
-      notes,
-      companyWebsite,
-    };
-    const parsed = parseSeniorLivingRequest(payload);
-    if (parsed.ok === false) {
-      if (parsed.honeypot === true) {
-        setDone(true);
-        return;
-      }
-      setError(parsed.error);
-      return;
-    }
-    setError("");
-    setPending(true);
-    try {
-      const response = await fetch("/api/senior-living", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = (await response.json().catch(() => null)) as {
-        success?: boolean;
-        error?: string;
-      } | null;
-      if (!response.ok || !data?.success) {
-        setError(
-          data?.error ||
-            `We could not send that. Please call ${BUSINESS_CONTACT.phoneDisplay}.`,
-        );
-        return;
-      }
-      setDone(true);
-    } catch {
-      setError(
-        `We could not send that. Please call ${BUSINESS_CONTACT.phoneDisplay}.`,
-      );
-    } finally {
-      setPending(false);
-    }
-  }
 
   return (
     <div className={pageType}>
@@ -380,214 +302,12 @@ export default function SeniorLiving() {
         <section id="schedule" className="scroll-mt-6 bg-white text-neutral-950">
           <div className="mx-auto w-full max-w-2xl px-4 py-16 sm:py-20">
             <h2 className="text-3xl font-semibold leading-tight sm:text-4xl">
-              Request a visit
+              Order a visit
             </h2>
             <p className={`mt-4 ${bodyText}`}>
-              Tell us about the community. We will follow up with you.
+              Choose the services, the date, and pay the deposit to reserve it.
             </p>
-            {done ? (
-              <div
-                role="status"
-                data-testid="senior-success"
-                className="mt-8 rounded-2xl border border-neutral-300 bg-[#F6F3EE] p-6 text-neutral-950"
-              >
-                <h3 className="text-2xl font-semibold leading-tight">
-                  Request received.
-                </h3>
-                <p className={`mt-3 ${bodyText}`}>
-                  We have your request and will follow up with you.
-                </p>
-                <p className={`mt-3 ${bodyText}`}>{SENIOR_LIVING_DEPOSIT_LINE}</p>
-              </div>
-            ) : (
-              <form
-                data-testid="senior-request"
-                className="relative mt-8 space-y-4"
-                onSubmit={onSubmit}
-                noValidate
-              >
-                <div
-                  className="absolute h-px w-px overflow-hidden"
-                  aria-hidden="true"
-                >
-                  <label>
-                    Company website
-                    <input
-                      name="companyWebsite"
-                      tabIndex={-1}
-                      autoComplete="off"
-                      value={companyWebsite}
-                      onChange={(event) =>
-                        setCompanyWebsite(event.target.value)
-                      }
-                    />
-                  </label>
-                </div>
-                <label
-                  className="block text-lg font-semibold leading-snug"
-                  htmlFor="senior-name"
-                >
-                  Name
-                  <input
-                    id="senior-name"
-                    name="name"
-                    autoComplete="name"
-                    maxLength={80}
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    className={fieldClass}
-                  />
-                </label>
-                <label
-                  className="block text-lg font-semibold leading-snug"
-                  htmlFor="senior-community"
-                >
-                  Community
-                  <input
-                    id="senior-community"
-                    name="community"
-                    autoComplete="organization"
-                    maxLength={120}
-                    value={community}
-                    onChange={(event) => setCommunity(event.target.value)}
-                    className={fieldClass}
-                  />
-                </label>
-                <label
-                  className="block text-lg font-semibold leading-snug"
-                  htmlFor="senior-email"
-                >
-                  Email
-                  <input
-                    id="senior-email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    maxLength={120}
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    className={fieldClass}
-                  />
-                </label>
-                <label
-                  className="block text-lg font-semibold leading-snug"
-                  htmlFor="senior-phone"
-                >
-                  Phone
-                  <input
-                    id="senior-phone"
-                    name="phone"
-                    type="tel"
-                    autoComplete="tel"
-                    maxLength={30}
-                    value={phone}
-                    onChange={(event) => setPhone(event.target.value)}
-                    className={fieldClass}
-                  />
-                </label>
-                <label
-                  className="block text-lg font-semibold leading-snug"
-                  htmlFor="senior-address"
-                >
-                  Address
-                  <input
-                    id="senior-address"
-                    name="address"
-                    autoComplete="street-address"
-                    maxLength={200}
-                    value={address}
-                    onChange={(event) => setAddress(event.target.value)}
-                    className={fieldClass}
-                  />
-                </label>
-                <fieldset>
-                  <legend className="text-lg font-semibold leading-snug">
-                    Services
-                  </legend>
-                  <div className="mt-3 grid grid-cols-1 gap-3">
-                    {SENIOR_LIVING_SERVICE_IDS.map((id) => (
-                      <label
-                        key={id}
-                        className="flex min-h-12 min-w-0 items-center gap-3 rounded-lg border border-neutral-400 bg-white px-4 py-3"
-                      >
-                        <input
-                          type="checkbox"
-                          name="services"
-                          value={id}
-                          checked={services.includes(id)}
-                          onChange={() => toggleService(id)}
-                          className="h-6 w-6 shrink-0 accent-neutral-950"
-                        />
-                        <span className="text-lg leading-snug">
-                          {SENIOR_LIVING_SERVICE_LABELS[id]}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-                <label
-                  className="block text-lg font-semibold leading-snug"
-                  htmlFor="senior-dates"
-                >
-                  Preferred dates
-                  <input
-                    id="senior-dates"
-                    name="preferredDates"
-                    maxLength={160}
-                    value={preferredDates}
-                    onChange={(event) => setPreferredDates(event.target.value)}
-                    className={fieldClass}
-                  />
-                </label>
-                <label
-                  className="block text-lg font-semibold leading-snug"
-                  htmlFor="senior-notes"
-                >
-                  Notes
-                  <textarea
-                    id="senior-notes"
-                    name="notes"
-                    rows={4}
-                    maxLength={2000}
-                    value={notes}
-                    onChange={(event) => setNotes(event.target.value)}
-                    className={fieldClass}
-                  />
-                </label>
-                <div
-                  data-testid="senior-summary"
-                  className="rounded-2xl border border-neutral-300 bg-[#F6F3EE] p-4"
-                >
-                  <p className="text-lg font-semibold leading-snug">Summary</p>
-                  <p className={`mt-2 ${bodyText}`}>
-                    {services.length > 0
-                      ? services
-                          .map((id) => SENIOR_LIVING_SERVICE_LABELS[id])
-                          .join(", ")
-                      : "No services selected yet."}
-                  </p>
-                  <p className={`mt-2 ${bodyText}`}>
-                    {SENIOR_LIVING_DEPOSIT_LINE}
-                  </p>
-                </div>
-                {error ? (
-                  <p
-                    role="alert"
-                    className="text-lg font-semibold leading-snug text-red-800"
-                  >
-                    {error}
-                  </p>
-                ) : null}
-                <button
-                  type="submit"
-                  data-testid="senior-submit"
-                  disabled={pending}
-                  className="inline-flex min-h-12 w-full max-w-full items-center justify-center rounded-lg bg-neutral-950 px-6 py-3 text-center text-lg font-semibold leading-snug text-white disabled:opacity-60"
-                >
-                  {pending ? "Sending" : SENIOR_LIVING_CTA}
-                </button>
-              </form>
-            )}
+            <SeniorLivingOrder />
           </div>
         </section>
 

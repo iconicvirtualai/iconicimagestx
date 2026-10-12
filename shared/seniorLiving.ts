@@ -1,3 +1,5 @@
+import { assessTravel, travelInvoiceLine, type TravelAssessment } from "./travelZones.ts";
+
 /**
  * Senior living campaign pricing and request shape.
  *
@@ -27,6 +29,21 @@ export const SENIOR_LIVING_DEPOSIT_REQUIRED = true;
 export const SENIOR_LIVING_DEPOSIT_PERCENT = 50;
 export const SENIOR_LIVING_DEPOSIT_LINE =
   "Reserve your date with a 50% deposit. The balance is due after the shoot.";
+
+/** Added on top of services and travel. Senior living orders only. */
+export const SENIOR_LIVING_PROCESSING_RATE = 0.028;
+export const SENIOR_LIVING_PROCESSING_LABEL = "Processing fee (2.8%)";
+
+/** Same static list BookingForm offers. Not a live calendar. */
+export const SENIOR_LIVING_SCHEDULE_TIMES = [
+  "9:00 AM",
+  "11:00 AM",
+  "1:00 PM",
+  "3:00 PM",
+  "5:00 PM",
+] as const;
+
+export const SENIOR_LIVING_ORDER_SOURCE = "senior-living";
 
 export const SENIOR_LIVING_SERVICE_IDS = [
   "tour-3d",
@@ -236,4 +253,233 @@ export function seniorLivingOfficeEnv(
     parts.push(SENIOR_LIVING_OPS_EMAIL);
   }
   return { ...env, ADMIN_EMAIL: parts.join(", ") };
+}
+
+export interface SeniorLivingLine {
+  id: string;
+  name: string;
+  qty: number;
+  unitPrice: number;
+  price: number;
+}
+
+export interface SeniorLivingQuote {
+  lines: SeniorLivingLine[];
+  serviceSubtotal: number;
+  travel: TravelAssessment;
+  travelLine: SeniorLivingLine;
+  processing: number;
+  total: number;
+  depositAmount: number;
+  balanceDue: number;
+}
+
+export interface SeniorLivingOrderInput {
+  tour: boolean;
+  roomCount: number;
+  facilitySqft: number;
+  community: string;
+  address: string;
+  name: string;
+  title: string;
+  phone: string;
+  email: string;
+  onsiteContact: string;
+  notes: string;
+  scheduledDate: string;
+  scheduledTime: string;
+}
+
+function cents(amount: number): number {
+  return Math.round(amount * 100);
+}
+
+function dollars(amountCents: number): number {
+  return amountCents / 100;
+}
+
+export function seniorRoomUnitPrice(count: number): number | null {
+  if (!Number.isInteger(count) || count < 1) return null;
+  const tier = SENIOR_ROOM_RATES.find(
+    (band) => count >= band.minCount && count <= band.maxCount,
+  );
+  return tier ? tier.each : null;
+}
+
+export function quoteSeniorLivingOrder(input: {
+  tour: boolean;
+  roomCount: number;
+  facilitySqft: number;
+  address: string;
+}): { ok: true; quote: SeniorLivingQuote } | { ok: false; error: string } {
+  const lines: SeniorLivingLine[] = [];
+  if (input.tour) {
+    lines.push({
+      id: "tour-3d",
+      name: SENIOR_LIVING_SERVICE_LABELS["tour-3d"],
+      qty: 1,
+      unitPrice: SENIOR_TOUR_PRICE,
+      price: SENIOR_TOUR_PRICE,
+    });
+  }
+  const roomCount = input.roomCount;
+  if (roomCount !== 0) {
+    if (!Number.isInteger(roomCount) || roomCount < 0) {
+      return { ok: false, error: "Enter a room count from 0 to 20." };
+    }
+    if (roomCount > SENIOR_ROOM_RATES[SENIOR_ROOM_RATES.length - 1].maxCount) {
+      return { ok: false, error: "Room count cannot be more than 20." };
+    }
+    const each = seniorRoomUnitPrice(roomCount);
+    if (each == null) {
+      return { ok: false, error: "Enter a room count from 0 to 20." };
+    }
+    lines.push({
+      id: "rooms",
+      name: SENIOR_LIVING_SERVICE_LABELS.rooms,
+      qty: roomCount,
+      unitPrice: each,
+      price: dollars(cents(each) * roomCount),
+    });
+  }
+  const facilitySqft = input.facilitySqft;
+  if (facilitySqft !== 0) {
+    if (!Number.isInteger(facilitySqft) || facilitySqft < 0) {
+      return { ok: false, error: "Enter a facility size up to 20,000 sq ft." };
+    }
+    if (facilitySqft > SENIOR_FACILITY_SQFT_CAP) {
+      return { ok: false, error: "Facility size cannot be more than 20,000 sq ft." };
+    }
+    const price = dollars(Math.round(facilitySqft * SENIOR_FACILITY_RATE_PER_SQFT * 100));
+    lines.push({
+      id: "facility",
+      name: SENIOR_LIVING_SERVICE_LABELS.facility,
+      qty: 1,
+      unitPrice: price,
+      price,
+    });
+  }
+  if (lines.length === 0) {
+    return { ok: false, error: "Choose at least one service." };
+  }
+
+  const serviceSubtotal = dollars(
+    lines.reduce((sum, line) => sum + cents(line.price), 0),
+  );
+  const travel = assessTravel(input.address);
+  const travelItem = travelInvoiceLine(travel);
+  const travelLine: SeniorLivingLine = {
+    id: travelItem.id,
+    name: travelItem.name,
+    qty: travelItem.qty,
+    unitPrice: travelItem.unitPrice,
+    price: travelItem.price,
+  };
+  const priced = cents(serviceSubtotal) + cents(travelLine.price);
+  const processing = dollars(Math.round(priced * SENIOR_LIVING_PROCESSING_RATE));
+  const total = dollars(priced + cents(processing));
+  const depositAmount = dollars(
+    Math.round(cents(total) * (SENIOR_LIVING_DEPOSIT_PERCENT / 100)),
+  );
+  const balanceDue = dollars(cents(total) - cents(depositAmount));
+  return {
+    ok: true,
+    quote: {
+      lines,
+      serviceSubtotal,
+      travel,
+      travelLine,
+      processing,
+      total,
+      depositAmount,
+      balanceDue,
+    },
+  };
+}
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function parseSeniorLivingOrder(
+  body: unknown,
+):
+  | { ok: true; value: SeniorLivingOrderInput; quote: SeniorLivingQuote }
+  | { ok: false; honeypot: true }
+  | { ok: false; honeypot: false; error: string } {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return { ok: false, honeypot: false, error: "That order could not be read." };
+  }
+  const raw = body as Record<string, unknown>;
+  if (text(raw.companyWebsite)) return { ok: false, honeypot: true };
+
+  const roomCount = raw.roomCount == null || raw.roomCount === "" ? 0 : Number(raw.roomCount);
+  const facilitySqft =
+    raw.facilitySqft == null || raw.facilitySqft === "" ? 0 : Number(raw.facilitySqft);
+  const quoted = quoteSeniorLivingOrder({
+    tour: raw.tour === true,
+    roomCount,
+    facilitySqft,
+    address: text(raw.address),
+  });
+  if (quoted.ok === false) return { ok: false, honeypot: false, error: quoted.error };
+  if (quoted.quote.travel.travelQuoted) {
+    return {
+      ok: false,
+      honeypot: false,
+      error: "We could not price travel for that address. Call us and we will quote the trip.",
+    };
+  }
+
+  const name = oneLine(text(raw.name), 80);
+  const community = oneLine(text(raw.community), 120);
+  const title = oneLine(text(raw.title), 80);
+  const email = oneLine(text(raw.email), 120);
+  const phone = oneLine(text(raw.phone), 30);
+  const address = oneLine(text(raw.address), 200);
+  const onsiteContact = oneLine(text(raw.onsiteContact), 120);
+  const notes = text(raw.notes).replace(/\u0000/g, "").trim().slice(0, 2000);
+  const scheduledDate = oneLine(text(raw.scheduledDate), 10);
+  const scheduledTime = oneLine(text(raw.scheduledTime), 20);
+
+  if (name.length < 2) return { ok: false, honeypot: false, error: "Enter your name." };
+  if (community.length < 2) return { ok: false, honeypot: false, error: "Enter the community name." };
+  if (title.length < 2) return { ok: false, honeypot: false, error: "Enter your title." };
+  if (!EMAIL_RE.test(email)) return { ok: false, honeypot: false, error: "Enter a valid email." };
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 10 || digits.length > 15) {
+    return { ok: false, honeypot: false, error: "Enter a phone number." };
+  }
+  if (address.length < 5) return { ok: false, honeypot: false, error: "Enter the community address." };
+  if (onsiteContact.length < 2) {
+    return { ok: false, honeypot: false, error: "Enter the onsite contact." };
+  }
+  if (!DATE_RE.test(scheduledDate) || Number.isNaN(Date.parse(`${scheduledDate}T12:00:00`))) {
+    return { ok: false, honeypot: false, error: "Choose a date." };
+  }
+  const chosen = new Date(`${scheduledDate}T12:00:00`);
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  if (chosen < start) return { ok: false, honeypot: false, error: "Choose a date that has not passed." };
+  if (!(SENIOR_LIVING_SCHEDULE_TIMES as readonly string[]).includes(scheduledTime)) {
+    return { ok: false, honeypot: false, error: "Choose a time." };
+  }
+
+  return {
+    ok: true,
+    value: {
+      tour: raw.tour === true,
+      roomCount,
+      facilitySqft,
+      community,
+      address,
+      name,
+      title,
+      phone,
+      email,
+      onsiteContact,
+      notes,
+      scheduledDate,
+      scheduledTime,
+    },
+    quote: quoted.quote,
+  };
 }

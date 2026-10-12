@@ -30,10 +30,12 @@ export async function matchSquarePaymentInvoice(
 
   const orderId = typeof payment.order_id === "string" ? payment.order_id.trim() : "";
   if (orderId) steps.push(() => lookup.byField("squareOrderId", orderId));
+  if (orderId) steps.push(() => lookup.byField("squareDepositOrderId", orderId));
 
   const linkRaw = payment.payment_link_id || payment.paymentLinkId;
   const linkId = typeof linkRaw === "string" ? linkRaw.trim() : "";
   if (linkId) steps.push(() => lookup.byField("squarePaymentLinkId", linkId));
+  if (linkId) steps.push(() => lookup.byField("squareDepositPaymentLinkId", linkId));
 
   const paymentId = typeof payment.id === "string" ? payment.id.trim() : "";
   if (paymentId) steps.push(() => lookup.byField("squarePaymentId", paymentId));

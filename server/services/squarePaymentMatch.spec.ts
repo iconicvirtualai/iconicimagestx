@@ -38,6 +38,14 @@ describe("Square invoice matching", () => {
     const fromReference = await matchSquarePaymentInvoice({ reference_id: "listing_studio1" }, find);
     const fromOrder = await matchSquarePaymentInvoice({ order_id: "sq-order-1" }, find);
     const fromLink = await matchSquarePaymentInvoice({ payment_link_id: "sq-link-1" }, find);
+    const depositDocs = {
+      inv_deposit: { squareDepositPaymentLinkId: "sq-dep-link", squareDepositOrderId: "sq-dep-order" },
+    };
+    const depositFind = lookup(depositDocs);
+    const fromDepositLink = await matchSquarePaymentInvoice({ payment_link_id: "sq-dep-link" }, depositFind);
+    const fromDepositOrder = await matchSquarePaymentInvoice({ order_id: "sq-dep-order" }, depositFind);
+    expect(fromDepositLink?.id).toBe("inv_deposit");
+    expect(fromDepositOrder?.id).toBe("inv_deposit");
     const fromPayment = await matchSquarePaymentInvoice({ id: "sq-pay-1" }, find);
 
     for (const hit of [fromNote, fromReference, fromOrder, fromLink, fromPayment]) {

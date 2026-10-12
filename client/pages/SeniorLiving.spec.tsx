@@ -65,18 +65,28 @@ function setValue(id: string, value: string) {
   input.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
-async function fillValid() {
+async function click(testId: string) {
   await act(async () => {
-    setValue("senior-name", "Ada Lovelace");
-    setValue("senior-community", "A Woodlands-area senior living community");
-    setValue("senior-email", "ada@community.example");
-    setValue("senior-phone", "281-555-0199");
-    setValue("senior-address", "100 Oak St, Spring, TX 77380");
-    setValue("senior-dates", "April 14 or 15");
-    container
-      ?.querySelector<HTMLInputElement>('input[value="tour-3d"]')
-      ?.click();
+    container?.querySelector<HTMLButtonElement>(`[data-testid="${testId}"]`)?.click();
   });
+}
+
+async function fillOrder() {
+  await act(async () => {
+    container?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.click();
+  });
+  await click("senior-next");
+  await act(async () => {
+    setValue("senior-community", "A Woodlands-area senior living community");
+    setValue("senior-address", "100 Oak St, Spring, TX 77380");
+    setValue("senior-name", "Ada Lovelace");
+    setValue("senior-title", "Director");
+    setValue("senior-phone", "281-555-0199");
+    setValue("senior-email", "ada@community.example");
+    setValue("senior-onsite", "Front desk");
+  });
+  await click("senior-next");
+  await click("senior-next");
 }
 
 beforeEach(async () => {
@@ -302,22 +312,26 @@ describe("senior living page", () => {
     expect(manifest.toLowerCase()).not.toContain(communityName);
   });
 
-  it("validates the form before sending and shows success without a client email", async () => {
+  it("walks the order form and confirms the order number without promising email", async () => {
     await act(async () => {
       container?.querySelector<HTMLFormElement>("form")?.requestSubmit();
     });
     expect(container?.querySelector("[role='alert']")?.textContent).toBe(
-      "Enter your name.",
+      "Choose at least one service.",
     );
     expect(fetchMock).not.toHaveBeenCalled();
 
-    await fillValid();
+    await fillOrder();
+    expect(container?.textContent).toContain("Deposit due today (50%)");
+    expect(container?.textContent).toContain("Balance due after the shoot");
+    expect(container?.textContent).toContain("Processing fee (2.8%)");
+
+    await click("senior-back");
+    await click("senior-back");
     await act(async () => {
       setValue("senior-email", "not-an-email");
     });
-    await act(async () => {
-      container?.querySelector<HTMLFormElement>("form")?.requestSubmit();
-    });
+    await click("senior-next");
     expect(container?.querySelector("[role='alert']")?.textContent).toBe(
       "Enter a valid email.",
     );
@@ -326,29 +340,45 @@ describe("senior living page", () => {
     await act(async () => {
       setValue("senior-email", "ada@community.example");
     });
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => ({ success: true, message: "Request received." }),
+    await click("senior-next");
+    await click("senior-next");
+    fetchMock.mockImplementation(async (url: string) => {
+      if (String(url).includes("deposit-checkout")) {
+        return {
+          ok: false,
+          json: async () => ({ error: "Square payments are not configured yet." }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          success: true,
+          orderNumber: "ORD - L - 10001",
+          invoiceId: "inv1",
+          payToken: "tok",
+          confirmationEmail: false,
+        }),
+      };
     });
-    await act(async () => {
-      container?.querySelector<HTMLFormElement>("form")?.requestSubmit();
-    });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await click("senior-pay");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe("/api/senior-living");
+    expect(url).toBe("/api/senior-living/order");
     expect(init.method).toBe("POST");
     const body = JSON.parse(init.body);
-    expect(body.services).toEqual(["tour-3d"]);
+    expect(body.tour).toBe(true);
     expect(body.email).toBe("ada@community.example");
+    expect(body.scheduledTime).toBe("9:00 AM");
     expect(body.companyWebsite).toBe("");
+    expect(fetchMock.mock.calls[1][0]).toBe(
+      "/api/payments/invoice/inv1/deposit-checkout",
+    );
     expect(
-      container?.querySelector("[data-testid='senior-success']")?.textContent,
-    ).toContain("Request received.");
-    expect(
-      container?.querySelector("[data-testid='senior-success']")?.textContent,
-    ).toContain(SENIOR_LIVING_DEPOSIT_LINE);
+      container?.querySelector("[data-testid='senior-order-number']")?.textContent,
+    ).toBe("ORD - L - 10001");
+    expect(container?.textContent).toContain(SENIOR_LIVING_DEPOSIT_LINE);
     expect(container?.textContent).not.toMatch(
-      /check your email|emailed you|confirmation email/i,
+      /check your email|emailed you|confirmation email|we will email/i,
     );
   });
 });

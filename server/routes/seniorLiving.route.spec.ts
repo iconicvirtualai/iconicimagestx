@@ -200,8 +200,10 @@ describe("senior living request route", () => {
     const index = readFileSync(new URL("../index.ts", import.meta.url), "utf8");
     expect(source).toContain("notifyOfficeOfOrder");
     expect(source).toContain("seniorLivingOfficeEnv");
-    expect(source).not.toContain("sendEmail");
-    expect(source).not.toContain("booking_received");
+    const requestHandler = source.split('router.post("/",')[1] || "";
+    expect(requestHandler).not.toContain("sendEmail");
+    expect(requestHandler).not.toContain("booking_received");
+    expect(source).toContain("clientNotifyLive");
     expect(source).not.toContain(["cadi", "@"].join(""));
     expect(index).toContain(
       'app.use("/api/senior-living", seniorLivingRouter)',

@@ -290,7 +290,7 @@ async function applySuccessfulPayment({
     });
   }
 
-  await db().collection("transactions").add({
+    await db().collection("transactions").add({
     type: "payment",
     orderId: resolvedOrderId,
     invoiceId,
@@ -322,6 +322,109 @@ async function applySuccessfulPayment({
       },
     }).catch(console.error);
   }
+}
+
+function roundMoney(amount: number): number {
+  return Math.round(amount * 100) / 100;
+}
+
+function isDepositSquarePayment(invoice: Record<string, unknown>, payment: Record<string, unknown>): boolean {
+  if (invoice.depositRequired !== true) return false;
+  const linkRaw = payment.payment_link_id || payment.paymentLinkId;
+  const linkId = typeof linkRaw === "string" ? linkRaw.trim() : "";
+  const orderId = typeof payment.order_id === "string" ? payment.order_id.trim() : "";
+  const depositLink = typeof invoice.squareDepositPaymentLinkId === "string"
+    ? invoice.squareDepositPaymentLinkId
+    : "";
+  const depositOrder = typeof invoice.squareDepositOrderId === "string"
+    ? invoice.squareDepositOrderId
+    : "";
+  if (linkId && depositLink && linkId === depositLink) return true;
+  if (orderId && depositOrder && orderId === depositOrder) return true;
+  return false;
+}
+
+/**
+ * Senior-living deposit only. Leaves the invoice in draft so the after-shoot
+ * send bills the remaining balance. Does not publish a Square invoice.
+ */
+async function applyDepositPayment({
+  invoiceId,
+  amount,
+  squarePaymentId,
+}: {
+  invoiceId: string;
+  amount: number;
+  squarePaymentId?: string;
+}) {
+  const invoiceRef = db().collection("invoices").doc(invoiceId);
+  const invoiceDoc = await invoiceRef.get();
+  if (!invoiceDoc.exists) return;
+  const invoice = invoiceDoc.data() || {};
+  const payments = Array.isArray(invoice.payments) ? invoice.payments : [];
+  if (squarePaymentId && payments.some((entry) => {
+    return entry && typeof entry === "object" && (entry as { squarePaymentId?: string }).squarePaymentId === squarePaymentId;
+  })) {
+    return;
+  }
+  if (await paymentAlreadyRecorded({ squarePaymentId })) return;
+
+  const total = Number(invoice.total) || 0;
+  const depositPaid = roundMoney((Number(invoice.depositPaid) || 0) + amount);
+  const amountDue = roundMoney(Math.max(0, total - depositPaid));
+  const nextPayments = [
+    ...payments,
+    {
+      type: "deposit",
+      amount,
+      ...(squarePaymentId ? { squarePaymentId } : {}),
+      paidAt: new Date().toISOString(),
+    },
+  ];
+
+  await invoiceRef.update({
+    depositPaid,
+    depositPaidAt: admin.firestore.FieldValue.serverTimestamp(),
+    payments: nextPayments,
+    amountPaid: depositPaid,
+    amountDue,
+    status: "draft",
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  const orderId = typeof invoice.orderId === "string" ? invoice.orderId : "";
+  if (orderId) {
+    await db().collection("orders").doc(orderId).update({
+      depositPaid,
+      balanceDue: amountDue,
+      paymentStatus: amountDue <= 0 ? "paid" : "partial",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }).catch((err) => console.error("[Payments] Deposit order balance update failed:", err));
+  }
+  const orderRequestId = typeof invoice.orderRequestId === "string" ? invoice.orderRequestId : "";
+  if (orderRequestId) {
+    await db().collection("orderRequests").doc(orderRequestId).update({
+      depositPaid,
+      balanceDue: amountDue,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }).catch((err) => console.error("[Payments] Deposit request balance update failed:", err));
+  }
+
+  await db().collection("transactions").add({
+    type: "payment",
+    kind: "deposit",
+    orderId,
+    invoiceId,
+    clientId: invoice.clientId || "",
+    clientName: invoice.clientName || "",
+    amount,
+    paymentMethod: "square",
+    status: "completed",
+    ...(squarePaymentId ? { squarePaymentId } : {}),
+    processedAt: admin.firestore.FieldValue.serverTimestamp(),
+    processedBy: "system",
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
 }
 
 // Legacy/private Stripe intent route. Keep this available for Studio Noir tools only.
@@ -694,6 +797,94 @@ router.post("/invoice/:id/checkout", async (req: Request, res: Response) => {
   }
 });
 
+router.post("/invoice/:id/deposit-checkout", async (req: Request, res: Response) => {
+  try {
+    const invoiceDoc = await loadInvoice(req.params.id);
+    if (!invoiceDoc) return invoiceNotFound(res);
+
+    const invoice = invoiceDoc.data() || {};
+    const audience = await audienceFor(req, invoice);
+    const view = decideInvoiceView({
+      invoiceId: invoiceDoc.id,
+      payToken: invoice.payToken,
+      presentedToken: presentedPayToken(req),
+      audience,
+      matches: payTokenMatches,
+    });
+    if (view === "deny") return invoiceNotFound(res);
+
+    if (invoice.depositRequired !== true) {
+      return res.status(403).json({ error: "This invoice does not take a deposit." });
+    }
+    const orderId = typeof invoice.orderId === "string" ? invoice.orderId : "";
+    const orderSnap = orderId ? await db().collection("orders").doc(orderId).get() : null;
+    const order = orderSnap && orderSnap.exists ? orderSnap.data() || {} : null;
+    if (!order || order.source !== "senior-living") {
+      return res.status(403).json({ error: "Deposits are only for senior living orders." });
+    }
+    const alreadyPaid = (Number(invoice.depositPaid) || 0) > 0 || Boolean(invoice.depositPaidAt);
+    if (alreadyPaid) {
+      return res.status(409).json({ error: "The deposit is already paid." });
+    }
+    if (String(invoice.status || "draft") !== "draft") {
+      return res.status(409).json({ error: "The deposit can only be paid while the invoice is a draft." });
+    }
+    const depositAmount = Number(invoice.depositAmount);
+    if (!Number.isFinite(depositAmount) || depositAmount <= 0) {
+      return res.status(400).json({ error: "This invoice has no deposit amount." });
+    }
+    if (!squareReady()) return res.status(503).json({ error: "Square payments are not configured yet." });
+
+    const payToken = await payTokenForLink(invoiceDoc);
+    const response = await fetch(`${squareBaseUrl()}/v2/online-checkout/payment-links`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Square-Version": process.env.SQUARE_VERSION || "2026-08-20",
+        Authorization: `Bearer ${process.env.SQUARE_ACCESS_TOKEN}`,
+      },
+      body: JSON.stringify({
+        idempotency_key: `${invoiceDoc.id}-deposit-${Date.now()}`,
+        quick_pay: {
+          name: `Iconic Images deposit ${invoice.invoiceNumber || invoiceDoc.id}`,
+          price_money: {
+            amount: Math.round(depositAmount * 100),
+            currency: "USD",
+          },
+          location_id: process.env.SQUARE_LOCATION_ID,
+        },
+        checkout_options: {
+          redirect_url: clientInvoiceUrl({
+            id: invoiceDoc.id,
+            payToken,
+            status: "draft",
+          }, undefined, { paid: "deposit" }) || "",
+        },
+        pre_populated_data: {
+          buyer_email: invoice.clientEmail || undefined,
+        },
+        payment_note: squarePaymentNote(invoiceDoc.id, invoice.invoiceNumber),
+      }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      console.error("[Payments] Square deposit checkout error:", result);
+      return res.status(500).json({ error: "Failed to start the deposit checkout." });
+    }
+    const link = result.payment_link;
+    await invoiceDoc.ref.update({
+      squareDepositPaymentLinkId: link?.id || null,
+      squareDepositOrderId: link?.order_id || null,
+      paymentProvider: "square",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return res.json({ checkoutUrl: link?.url || "", provider: "square" });
+  } catch (err) {
+    console.error("[Payments] Deposit checkout error:", err);
+    return res.status(500).json({ error: "Failed to start the deposit checkout." });
+  }
+});
+
 router.post("/webhook", async (req: Request, res: Response) => {
   const sig = req.headers["stripe-signature"] as string;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
@@ -826,6 +1017,15 @@ router.post("/square-webhook", async (req: Request, res: Response) => {
     const amountCents = Number(payment.amount_money?.amount ?? payment.total_money?.amount ?? 0);
     const amount = amountCents / 100;
     if (amount <= 0) return res.json({ received: true, ignored: "zero-amount" });
+
+    if (isDepositSquarePayment(invoice, payment)) {
+      await applyDepositPayment({
+        invoiceId: invoiceDoc.id,
+        amount,
+        squarePaymentId: payment.id,
+      });
+      return res.json({ received: true, deposit: true });
+    }
 
     await applySuccessfulPayment({
       invoiceId: invoiceDoc.id,

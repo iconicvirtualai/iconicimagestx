@@ -5,6 +5,8 @@ import {
   SENIOR_LIVING_DEPOSIT_PERCENT,
   SENIOR_LIVING_DEPOSIT_REQUIRED,
   SENIOR_LIVING_OPS_EMAIL,
+  SENIOR_LIVING_PROCESSING_RATE,
+  quoteSeniorLivingOrder,
   SENIOR_ROOM_RATES,
   SENIOR_TOUR_PRICE,
   formatSeniorFacilityRate,
@@ -34,6 +36,50 @@ describe("senior living pricing config", () => {
     );
     expect(formatUsd(SENIOR_TOUR_PRICE)).toBe("$250");
     expect(SENIOR_ROOM_RATES.map((tier) => tier.each)).toEqual([199, 175]);
+  });
+});
+
+describe("senior living deposit math", () => {
+  it("adds the 2.8% processing line on top and takes half of that total", () => {
+    expect(SENIOR_LIVING_PROCESSING_RATE).toBe(0.028);
+    const quoted = quoteSeniorLivingOrder({
+      tour: true,
+      roomCount: 0,
+      facilitySqft: 0,
+      address: "100 Oak St, Spring, TX 77380",
+    });
+    expect(quoted.ok).toBe(true);
+    if (!quoted.ok) return;
+    expect(quoted.quote.travel.travelQuoted).toBe(false);
+    expect(quoted.quote.travelLine.price).toBe(0);
+    expect(quoted.quote.serviceSubtotal).toBe(250);
+    expect(quoted.quote.processing).toBe(7);
+    expect(quoted.quote.total).toBe(257);
+    expect(quoted.quote.depositAmount).toBe(128.5);
+    expect(quoted.quote.balanceDue).toBe(128.5);
+    expect(quoted.quote.depositAmount + quoted.quote.balanceDue).toBe(quoted.quote.total);
+  });
+
+  it("prices rooms by the tier, travel, and processing before the 50% deposit", () => {
+    const quoted = quoteSeniorLivingOrder({
+      tour: false,
+      roomCount: 12,
+      facilitySqft: 0,
+      address: "100 Oak St, Spring, TX 77380",
+    });
+    expect(quoted.ok).toBe(true);
+    if (!quoted.ok) return;
+    const rooms = quoted.quote.lines.find((line) => line.id === "rooms");
+    expect(rooms).toMatchObject({ qty: 12, unitPrice: 175, price: 2100 });
+    const travelCents = quoted.quote.travel.travelFeeCents || 0;
+    const pricedCents = 210000 + travelCents;
+    const processingCents = Math.round(pricedCents * SENIOR_LIVING_PROCESSING_RATE);
+    const totalCents = pricedCents + processingCents;
+    const depositCents = Math.round(totalCents * (SENIOR_LIVING_DEPOSIT_PERCENT / 100));
+    expect(Math.round(quoted.quote.processing * 100)).toBe(processingCents);
+    expect(Math.round(quoted.quote.total * 100)).toBe(totalCents);
+    expect(Math.round(quoted.quote.depositAmount * 100)).toBe(depositCents);
+    expect(Math.round(quoted.quote.balanceDue * 100)).toBe(totalCents - depositCents);
   });
 });
 
