@@ -291,7 +291,7 @@ async function applySuccessfulPayment({
     });
   }
 
-    await db().collection("transactions").add({
+  await db().collection("transactions").add({
     type: "payment",
     orderId: resolvedOrderId,
     invoiceId,
@@ -335,10 +335,10 @@ function isDepositSquarePayment(invoice: Record<string, unknown>, payment: Recor
   const linkId = typeof linkRaw === "string" ? linkRaw.trim() : "";
   const orderId = typeof payment.order_id === "string" ? payment.order_id.trim() : "";
   const depositLink = typeof invoice.squareDepositPaymentLinkId === "string"
-    ? invoice.squareDepositPaymentLinkId
+    ? invoice.squareDepositPaymentLinkId.trim()
     : "";
   const depositOrder = typeof invoice.squareDepositOrderId === "string"
-    ? invoice.squareDepositOrderId
+    ? invoice.squareDepositOrderId.trim()
     : "";
   if (linkId && depositLink && linkId === depositLink) return true;
   if (orderId && depositOrder && orderId === depositOrder) return true;
@@ -349,6 +349,23 @@ function isDepositSquarePayment(invoice: Record<string, unknown>, payment: Recor
  * Senior-living deposit only. Leaves the invoice in draft so the after-shoot
  * send bills the remaining balance. Does not publish a Square invoice.
  */
+function depositPaymentRecorded(
+  payments: unknown,
+  squarePaymentId: string,
+): boolean {
+  if (!squarePaymentId || !Array.isArray(payments)) return false;
+  return payments.some((entry) => {
+    return entry
+      && typeof entry === "object"
+      && (entry as { squarePaymentId?: string }).squarePaymentId === squarePaymentId;
+  });
+}
+
+/**
+ * Senior-living deposit only. Leaves the invoice in draft so the after-shoot
+ * send bills the remaining balance. Does not publish a Square invoice.
+ * The payment id is the idempotency key: a repeat delivery does not add again.
+ */
 async function applyDepositPayment({
   invoiceId,
   amount,
@@ -358,73 +375,79 @@ async function applyDepositPayment({
   amount: number;
   squarePaymentId?: string;
 }) {
+  const paymentKey = squarePaymentId?.trim() || "";
   const invoiceRef = db().collection("invoices").doc(invoiceId);
-  const invoiceDoc = await invoiceRef.get();
-  if (!invoiceDoc.exists) return;
-  const invoice = invoiceDoc.data() || {};
-  const payments = Array.isArray(invoice.payments) ? invoice.payments : [];
-  if (squarePaymentId && payments.some((entry) => {
-    return entry && typeof entry === "object" && (entry as { squarePaymentId?: string }).squarePaymentId === squarePaymentId;
-  })) {
-    return;
-  }
-  if (await paymentAlreadyRecorded({ squarePaymentId })) return;
+  const transactionRef = db().collection("transactions").doc(
+    paymentKey ? `square-${paymentKey}` : `deposit-${invoiceId}`,
+  );
 
-  const total = Number(invoice.total) || 0;
-  const depositPaid = roundMoney((Number(invoice.depositPaid) || 0) + amount);
-  const amountDue = roundMoney(Math.max(0, total - depositPaid));
-  const nextPayments = [
-    ...payments,
-    {
-      type: "deposit",
+  await db().runTransaction(async (tx) => {
+    const invoiceSnap = await tx.get(invoiceRef);
+    if (!invoiceSnap.exists) return;
+    const invoice = invoiceSnap.data() || {};
+    const transactionSnap = await tx.get(transactionRef);
+    if (transactionSnap.exists || depositPaymentRecorded(invoice.payments, paymentKey)) return;
+    if ((Number(invoice.depositPaid) || 0) > 0 || invoice.depositPaidAt) return;
+
+    const total = Number(invoice.total) || 0;
+    const depositPaid = roundMoney((Number(invoice.depositPaid) || 0) + amount);
+    const amountDue = roundMoney(Math.max(0, total - depositPaid));
+    const payments = Array.isArray(invoice.payments) ? invoice.payments : [];
+    const nextPayments = [
+      ...payments,
+      {
+        type: "deposit",
+        amount,
+        ...(paymentKey ? { squarePaymentId: paymentKey } : {}),
+        paidAt: new Date().toISOString(),
+      },
+    ];
+    const orderId = typeof invoice.orderId === "string" ? invoice.orderId : "";
+    const orderRequestId = typeof invoice.orderRequestId === "string" ? invoice.orderRequestId : "";
+    const orderRef = orderId ? db().collection("orders").doc(orderId) : null;
+    const requestRef = orderRequestId ? db().collection("orderRequests").doc(orderRequestId) : null;
+    const orderSnap = orderRef ? await tx.get(orderRef) : null;
+    const requestSnap = requestRef ? await tx.get(requestRef) : null;
+
+    tx.update(invoiceRef, {
+      depositPaid,
+      depositPaidAt: admin.firestore.FieldValue.serverTimestamp(),
+      payments: nextPayments,
+      amountPaid: depositPaid,
+      amountDue,
+      status: "draft",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    if (orderRef && orderSnap?.exists) {
+      tx.update(orderRef, {
+        depositPaid,
+        balanceDue: amountDue,
+        paymentStatus: amountDue <= 0 ? "paid" : "partial",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    if (requestRef && requestSnap?.exists) {
+      tx.update(requestRef, {
+        depositPaid,
+        balanceDue: amountDue,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    tx.set(transactionRef, {
+      type: "payment",
+      kind: "deposit",
+      orderId,
+      invoiceId,
+      clientId: invoice.clientId || "",
+      clientName: invoice.clientName || "",
       amount,
-      ...(squarePaymentId ? { squarePaymentId } : {}),
-      paidAt: new Date().toISOString(),
-    },
-  ];
-
-  await invoiceRef.update({
-    depositPaid,
-    depositPaidAt: admin.firestore.FieldValue.serverTimestamp(),
-    payments: nextPayments,
-    amountPaid: depositPaid,
-    amountDue,
-    status: "draft",
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
-
-  const orderId = typeof invoice.orderId === "string" ? invoice.orderId : "";
-  if (orderId) {
-    await db().collection("orders").doc(orderId).update({
-      depositPaid,
-      balanceDue: amountDue,
-      paymentStatus: amountDue <= 0 ? "paid" : "partial",
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }).catch((err) => console.error("[Payments] Deposit order balance update failed:", err));
-  }
-  const orderRequestId = typeof invoice.orderRequestId === "string" ? invoice.orderRequestId : "";
-  if (orderRequestId) {
-    await db().collection("orderRequests").doc(orderRequestId).update({
-      depositPaid,
-      balanceDue: amountDue,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }).catch((err) => console.error("[Payments] Deposit request balance update failed:", err));
-  }
-
-  await db().collection("transactions").add({
-    type: "payment",
-    kind: "deposit",
-    orderId,
-    invoiceId,
-    clientId: invoice.clientId || "",
-    clientName: invoice.clientName || "",
-    amount,
-    paymentMethod: "square",
-    status: "completed",
-    ...(squarePaymentId ? { squarePaymentId } : {}),
-    processedAt: admin.firestore.FieldValue.serverTimestamp(),
-    processedBy: "system",
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      paymentMethod: "square",
+      status: "completed",
+      ...(paymentKey ? { squarePaymentId: paymentKey } : {}),
+      processedAt: admin.firestore.FieldValue.serverTimestamp(),
+      processedBy: "system",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
   });
 }
 
@@ -835,6 +858,18 @@ router.post("/invoice/:id/deposit-checkout", async (req: Request, res: Response)
     if (!Number.isFinite(depositAmount) || depositAmount <= 0) {
       return res.status(400).json({ error: "This invoice has no deposit amount." });
     }
+    const storedLinkId = typeof invoice.squareDepositPaymentLinkId === "string"
+      ? invoice.squareDepositPaymentLinkId.trim()
+      : "";
+    const storedOrderId = typeof invoice.squareDepositOrderId === "string"
+      ? invoice.squareDepositOrderId.trim()
+      : "";
+    const storedUrl = typeof invoice.squareDepositCheckoutUrl === "string"
+      ? invoice.squareDepositCheckoutUrl.trim()
+      : "";
+    if (storedUrl && (storedLinkId || storedOrderId)) {
+      return res.json({ checkoutUrl: storedUrl, provider: "square" });
+    }
     if (!squareReady()) return res.status(503).json({ error: "Square payments are not configured yet." });
 
     await payTokenForLink(invoiceDoc);
@@ -847,7 +882,7 @@ router.post("/invoice/:id/deposit-checkout", async (req: Request, res: Response)
         Authorization: `Bearer ${process.env.SQUARE_ACCESS_TOKEN}`,
       },
       body: JSON.stringify({
-        idempotency_key: `${invoiceDoc.id}-deposit-${Date.now()}`,
+        idempotency_key: `${invoiceDoc.id}-deposit`,
         quick_pay: {
           name: `Iconic Images deposit ${invoice.invoiceNumber || invoiceDoc.id}`,
           price_money: {
@@ -871,13 +906,15 @@ router.post("/invoice/:id/deposit-checkout", async (req: Request, res: Response)
       return res.status(500).json({ error: "Failed to start the deposit checkout." });
     }
     const link = result.payment_link;
+    const checkoutUrl = typeof link?.url === "string" ? link.url : "";
     await invoiceDoc.ref.update({
       squareDepositPaymentLinkId: link?.id || null,
       squareDepositOrderId: link?.order_id || null,
+      ...(checkoutUrl ? { squareDepositCheckoutUrl: checkoutUrl } : {}),
       paymentProvider: "square",
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
-    return res.json({ checkoutUrl: link?.url || "", provider: "square" });
+    return res.json({ checkoutUrl, provider: "square" });
   } catch (err) {
     console.error("[Payments] Deposit checkout error:", err);
     return res.status(500).json({ error: "Failed to start the deposit checkout." });
@@ -1017,7 +1054,7 @@ router.post("/square-webhook", async (req: Request, res: Response) => {
     const amount = amountCents / 100;
     if (amount <= 0) return res.json({ received: true, ignored: "zero-amount" });
 
-    if (seniorDepositCheckoutLive() && isDepositSquarePayment(invoice, payment)) {
+    if (isDepositSquarePayment(invoice, payment)) {
       await applyDepositPayment({
         invoiceId: invoiceDoc.id,
         amount,
