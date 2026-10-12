@@ -1,8 +1,11 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import { BOT_ROUTINES } from "@shared/botRoutines";
+import { formatApprovalWhen, ORDER_APPROVAL_STATUSES, type OrderApproval, type OrderApprovalStatus } from "@shared/orderApproval";
 import { OWNER_ORDER_TEXT_MAX, type OwnerOrder, type OwnerOrdersResponse } from "@shared/ownerOrders";
 import type { OwnerSuiteData } from "@shared/ownerSuite";
 import PlanBoard from "@/components/owners/PlanBoard";
+import { setOrderApproval } from "@/lib/orderApproval";
 import NotFound from "@/pages/NotFound";
 import { useAuth } from "@/contexts/AuthContext";
 import { auth } from "@/lib/firebase";
@@ -89,6 +92,10 @@ export default function OwnersSuite() {
     } catch {
       if (!isCancelled()) setOrdersNotice("Orders could not be read.");
     }
+    if (!isCancelled()) {
+      const sample = demoOrders();
+      if (sample) setOrders(sample);
+    }
   }
 
   async function submitOrder(text: string): Promise<boolean> {
@@ -117,6 +124,12 @@ export default function OwnersSuite() {
     } finally {
       setOrdersSubmitting(false);
     }
+  }
+
+  async function approveOrder(orderId: string, status: OrderApprovalStatus, note: string): Promise<OrderApproval> {
+    const approval = await setOrderApproval(orderId, { status, note }, await ownerHeaders());
+    setOrders((current) => current.map((order) => (order.id === orderId ? { ...order, approval } : order)));
+    return approval;
   }
 
   useEffect(() => {
@@ -177,6 +190,7 @@ export default function OwnersSuite() {
       orderError={orderError}
       ordersSubmitting={ordersSubmitting}
       onSubmitOrder={submitOrder}
+      onApproveOrder={approveOrder}
       onRefresh={() => void refresh()}
       onSignOut={() => void signOut()}
     />
@@ -233,6 +247,7 @@ export function OwnersSuiteView({
   orderError = null,
   ordersSubmitting = false,
   onSubmitOrder,
+  onApproveOrder,
   onRefresh,
   onSignOut,
 }: {
@@ -244,6 +259,7 @@ export function OwnersSuiteView({
   orderError?: string | null;
   ordersSubmitting?: boolean;
   onSubmitOrder?: (text: string) => Promise<boolean>;
+  onApproveOrder?: (orderId: string, status: OrderApprovalStatus, note: string) => Promise<OrderApproval>;
   onRefresh: () => void;
   onSignOut: () => void;
 }) {
@@ -317,7 +333,10 @@ export function OwnersSuiteView({
           error={orderError}
           submitting={ordersSubmitting}
           onSubmit={onSubmitOrder}
+          onApprove={onApproveOrder}
         />
+
+        <BotRoutines />
 
         <section className="rounded-[28px] border border-[#e8c872]/35 bg-[#102844] p-5 shadow-[0_18px_50px_rgba(0,0,0,0.28)]">
           <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#e8c872]">Cash</p>
@@ -489,18 +508,52 @@ function WhyHero({ quote }: { quote: string }) {
   );
 }
 
+const APPROVAL_SANS = { fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", fontStyle: "normal" as const };
+
+/** Sample rows for a local preview of the approval controls. Dev builds only. */
+function demoOrders(): OwnerOrder[] | null {
+  if (!import.meta.env.DEV || typeof window === "undefined") return null;
+  if (new URLSearchParams(window.location.search).get("demo") !== "1") return null;
+  return [
+    {
+      id: "demo-lake",
+      timestamp: "2026-10-12 2:10 PM CT",
+      text: "Reshoot the living room wide and send the gallery tonight.",
+      status: "New",
+      ownerBot: "Cadi 2.0",
+      reply: "On it",
+      approval: {
+        status: "Go for it!",
+        note: "",
+        by: "owner@example.com",
+        at: "2026-10-12T19:15:00.000Z",
+      },
+    },
+    {
+      id: "demo-kitchen",
+      timestamp: "2026-10-12 11:40 AM CT",
+      text: "Hold the kitchen set until the twilight frames are in.",
+      status: "New",
+      ownerBot: "",
+      reply: "",
+    },
+  ];
+}
+
 function OrdersForCadi({
   orders,
   notice,
   error,
   submitting,
   onSubmit,
+  onApprove,
 }: {
   orders: OwnerOrder[];
   notice: string | null;
   error: string | null;
   submitting: boolean;
   onSubmit?: (text: string) => Promise<boolean>;
+  onApprove?: (orderId: string, status: OrderApprovalStatus, note: string) => Promise<OrderApproval>;
 }) {
   const [draft, setDraft] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
@@ -566,32 +619,154 @@ function OrdersForCadi({
         {orders.length === 0 ? (
           <p className="mt-4 text-sm text-[#9fb0c7]">No orders yet</p>
         ) : (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full border-collapse text-left text-sm" style={suiteFont}>
-              <thead>
-                <tr className="text-[10px] font-black uppercase tracking-[0.14em] text-[#9fb0c7]">
-                  <th className="px-2 py-2 font-black">Timestamp</th>
-                  <th className="px-2 py-2 font-black">Order text</th>
-                  <th className="px-2 py-2 font-black">Status</th>
-                  <th className="px-2 py-2 font-black">Owner bot</th>
-                  <th className="px-2 py-2 font-black">Cadi 2.0 reply</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((order, index) => (
-                  <tr key={`${order.timestamp}-${index}`} className="border-t border-[#e8c872]/15 align-top">
-                    <td className="px-2 py-3 text-xs text-[#e8c872]">{order.timestamp}</td>
-                    <td className="whitespace-pre-wrap px-2 py-3 text-[#f7f1e4]">{order.text}</td>
-                    <td className="px-2 py-3 text-[#d5deea]">{order.status || "—"}</td>
-                    <td className="px-2 py-3 text-[#d5deea]">{order.ownerBot || "—"}</td>
-                    <td className="whitespace-pre-wrap px-2 py-3 text-[#d5deea]">{order.reply || "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ul className="mt-4 space-y-3">
+            {orders.map((order, index) => (
+              <OrderApprovalCard key={order.id || `${order.timestamp}-${index}`} order={order} onApprove={onApprove} />
+            ))}
+          </ul>
         )}
       </Card>
+    </section>
+  );
+}
+
+function OrderApprovalCard({
+  order,
+  onApprove,
+}: {
+  order: OwnerOrder;
+  onApprove?: (orderId: string, status: OrderApprovalStatus, note: string) => Promise<OrderApproval>;
+}) {
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [note, setNote] = useState(order.approval?.status === "Needs Revisions" ? order.approval.note : "");
+  const [busy, setBusy] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  async function choose(status: OrderApprovalStatus) {
+    setLocalError(null);
+    if (status === "Needs Revisions") {
+      if (!noteOpen) {
+        setNoteOpen(true);
+        return;
+      }
+      if (!note.trim()) {
+        setLocalError("Add a note for Needs Revisions.");
+        return;
+      }
+    }
+    if (!order.id) {
+      setLocalError("This order is not linked to an order record yet.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await onApprove?.(order.id, status, status === "Needs Revisions" ? note.trim() : "");
+      if (status !== "Needs Revisions") setNoteOpen(false);
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : "The approval could not be saved.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <li className="rounded-2xl border border-[#e8c872]/20 bg-[#071422] p-4" style={APPROVAL_SANS} data-order-approval>
+      <dl className="grid gap-3 text-sm sm:grid-cols-2">
+        <OrderField label="Timestamp" value={order.timestamp} />
+        <OrderField label="Status" value={order.status || "—"} />
+        <OrderField label="Order text" value={order.text} wide />
+        <OrderField label="Owner bot" value={order.ownerBot || "—"} />
+        <OrderField label="Cadi 2.0 reply" value={order.reply || "—"} />
+      </dl>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        {order.approval ? (
+          <>
+            <span className="inline-flex min-h-8 items-center rounded-full bg-[#e8c872] px-3 text-xs font-semibold text-[#071422]">
+              {order.approval.status}
+            </span>
+            <span className="text-xs text-[#d5deea]">{order.approval.by}</span>
+            <span className="text-xs text-[#9fb0c7]">{formatApprovalWhen(order.approval.at)}</span>
+          </>
+        ) : (
+          <span className="inline-flex min-h-8 items-center rounded-full border border-[#e8c872]/30 px-3 text-xs font-semibold text-[#9fb0c7]">
+            No approval yet
+          </span>
+        )}
+      </div>
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+        {ORDER_APPROVAL_STATUSES.map((status) => (
+          <button
+            key={status}
+            type="button"
+            disabled={busy}
+            onClick={() => void choose(status)}
+            className={`min-h-12 w-full rounded-2xl px-4 text-sm font-semibold sm:flex-1 ${
+              status === "Go for it!"
+                ? "bg-[#e8c872] text-[#071422]"
+                : "border border-[#e8c872]/40 bg-[#102844] text-[#f7f1e4]"
+            } disabled:opacity-60`}
+            style={APPROVAL_SANS}
+          >
+            {status}
+          </button>
+        ))}
+      </div>
+      {noteOpen ? (
+        <label className="mt-3 block text-sm text-[#d5deea]" style={APPROVAL_SANS}>
+          Note
+          <textarea
+            value={note}
+            required
+            aria-required="true"
+            onChange={(event) => {
+              setNote(event.target.value);
+              if (localError) setLocalError(null);
+            }}
+            placeholder="What needs to change"
+            className="mt-2 min-h-24 w-full resize-y rounded-2xl border border-[#e8c872]/30 bg-[#102844] px-3 py-3 text-sm text-[#f7f1e4] outline-none"
+            style={APPROVAL_SANS}
+          />
+        </label>
+      ) : null}
+      {localError ? (
+        <p role="alert" className="mt-3 text-sm text-rose-200">
+          {localError}
+        </p>
+      ) : null}
+    </li>
+  );
+}
+
+function OrderField({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
+  return (
+    <div className={wide ? "sm:col-span-2" : undefined}>
+      <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9fb0c7]">{label}</dt>
+      <dd className="mt-1 whitespace-pre-wrap text-sm text-[#f7f1e4]" style={APPROVAL_SANS}>{value}</dd>
+    </div>
+  );
+}
+
+function BotRoutines() {
+  return (
+    <section className="rounded-[28px] border border-[#e8c872]/30 bg-[#102844] p-5" style={APPROVAL_SANS} data-bot-routines>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#e8c872]">Bots</p>
+      <h2 className="mt-1 text-2xl font-semibold leading-tight text-[#f7f1e4]" style={APPROVAL_SANS}>
+        What the bots are doing
+      </h2>
+      <ul className="mt-4 space-y-3">
+        {BOT_ROUTINES.map((bot) => (
+          <li key={bot.name} className="rounded-2xl bg-[#071422] px-4 py-4" style={APPROVAL_SANS}>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <p className="text-lg font-semibold text-[#f7f1e4]">{bot.name}</p>
+              <span className="inline-flex min-h-8 w-fit items-center rounded-full border border-[#e8c872]/40 px-3 text-xs font-semibold text-[#f4e2b0]">
+                {bot.status}
+              </span>
+            </div>
+            <p className="mt-2 text-sm leading-relaxed text-[#d5deea]">{bot.summary}</p>
+            <p className="mt-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#9fb0c7]">{bot.when}</p>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
