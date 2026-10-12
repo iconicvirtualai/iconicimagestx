@@ -6,6 +6,7 @@
 
 import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "./businessContact.ts";
 import { INVOICE_INTER_FONTS } from "./invoiceInterFonts.ts";
+import { INVOICE_CAMERA_IMAGE } from "./invoiceCameraImage.ts";
 import { INVOICE_LOGO_IMAGE } from "./invoiceLogoImage.ts";
 import type { InvoiceFace, InvoiceFaceLine } from "./invoiceFace.ts";
 import {
@@ -40,7 +41,13 @@ export function brandedInvoicePdfFilename(invoiceNumber: string): string {
 
 export function brandedInvoicePdf(input: BrandedInvoicePdfInput): Uint8Array {
   const content = layout(input);
-  return pdfDocument(content, decode64(INVOICE_LOGO_IMAGE.rgb), decode64(INVOICE_LOGO_IMAGE.alpha));
+  return pdfDocument(
+    content,
+    decode64(INVOICE_LOGO_IMAGE.rgb),
+    decode64(INVOICE_LOGO_IMAGE.alpha),
+    decode64(INVOICE_CAMERA_IMAGE.rgb),
+    decode64(INVOICE_CAMERA_IMAGE.alpha),
+  );
 }
 
 const PAGE_W = 612;
@@ -194,7 +201,11 @@ function layout(input: BrandedInvoicePdfInput): string {
   ops.push(textRight(X(T.contact.right), base(T.contact.y + T.contact.line, T.contact.cap), contactSize, "F2", WHITE, BUSINESS_CONTACT.addressLine2));
   const thanksSize = capSize(T.thanks.cap);
   ops.push(text(X(T.thanks.x), base(T.thanks.y, T.thanks.cap), thanksSize, "F3", TEAL, "THANK YOU FOR BEING ICONIC", track(T.thanks.cap, T.thanks.track)));
-  ops.push(camera(X(T.camera.x), PAGE_H - ((T.camera.y + T.camera.h) / TEMPLATE_H) * PAGE_H, X(T.camera.w), (T.camera.h / TEMPLATE_H) * PAGE_H));
+  const cameraW = X(T.camera.w);
+  const cameraH = (T.camera.h / TEMPLATE_H) * PAGE_H;
+  const cameraX = X(T.camera.x);
+  const cameraY = PAGE_H - ((T.camera.y + T.camera.h) / TEMPLATE_H) * PAGE_H;
+  ops.push(`q\n${num(cameraW)} 0 0 ${num(cameraH)} ${num(cameraX)} ${num(cameraY)} cm\n/Im2 Do\nQ`);
   return ops.filter(Boolean).join("\n");
 }
 
@@ -218,32 +229,6 @@ function tableRows(lines: InvoiceFaceLine[]): Array<{ name: string; qty: string;
 function promoAmount(value: number): string {
   if (value > 0) return formatInvoiceAmount(-value);
   return formatInvoiceAmount(0);
-}
-
-function camera(x: number, y: number, w = 38, h = 28): string {
-  const sx = w / 73;
-  const sy = h / 71;
-  const vx = (value: number) => x + value * sx;
-  const vy = (value: number) => y + (71 - value) * sy;
-  const stroke = 3 * ((sx + sy) / 2);
-  const box = (left: number, top: number, width: number, height: number, radius: number) =>
-    roundedPath(vx(left), vy(top + height), width * sx, height * sy, radius * ((sx + sy) / 2));
-  return [
-    "q",
-    "1 1 1 RG",
-    `${num(stroke)} w`,
-    box(1.5, 11.5, 70, 58, 14),
-    "S",
-    box(7.5, 5.5, 8, 6, 1.5),
-    "S",
-    box(29, 1.5, 16, 11, 2.5),
-    "S",
-    box(9.5, 19.5, 53, 42, 8),
-    "S",
-    circlePath(vx(36), vy(36), 11 * ((sx + sy) / 2)),
-    "S",
-    "Q",
-  ].join("\n");
 }
 
 function fillRect(x: number, y: number, w: number, h: number, rgb: RGB): string {
@@ -293,18 +278,6 @@ function roundedPath(x: number, y: number, w: number, h: number, r: number): str
     `${num(x + radius - k)} ${num(y + h)} ${num(x)} ${num(y + h - radius + k)} ${num(x)} ${num(y + h - radius)} c`,
     `${num(x)} ${num(y + radius)} l`,
     `${num(x)} ${num(y + radius - k)} ${num(x + radius - k)} ${num(y)} ${num(x + radius)} ${num(y)} c`,
-    "h",
-  ].join("\n");
-}
-
-function circlePath(cx: number, cy: number, r: number): string {
-  const k = r * 0.5522847498;
-  return [
-    `${num(cx + r)} ${num(cy)} m`,
-    `${num(cx + r)} ${num(cy + k)} ${num(cx + k)} ${num(cy + r)} ${num(cx)} ${num(cy + r)} c`,
-    `${num(cx - k)} ${num(cy + r)} ${num(cx - r)} ${num(cy + k)} ${num(cx - r)} ${num(cy)} c`,
-    `${num(cx - r)} ${num(cy - k)} ${num(cx - k)} ${num(cy - r)} ${num(cx)} ${num(cy - r)} c`,
-    `${num(cx + k)} ${num(cy - r)} ${num(cx + r)} ${num(cy - k)} ${num(cx + r)} ${num(cy)} c`,
     "h",
   ].join("\n");
 }
@@ -411,7 +384,7 @@ function decode64(value: string): Uint8Array {
   return bytes;
 }
 
-function pdfDocument(content: string, rgb: Uint8Array, alpha: Uint8Array): Uint8Array {
+function pdfDocument(content: string, rgb: Uint8Array, alpha: Uint8Array, cameraRgb: Uint8Array, cameraAlpha: Uint8Array): Uint8Array {
   const chunks: Uint8Array[] = [];
   const offsets: number[] = [];
   let cursor = 0;
@@ -473,13 +446,27 @@ function pdfDocument(content: string, rgb: Uint8Array, alpha: Uint8Array): Uint8
     ),
   );
   addObj(
+    16,
+    byteObject(
+      `<< /Type /XObject /Subtype /Image /Width ${INVOICE_CAMERA_IMAGE.width} /Height ${INVOICE_CAMERA_IMAGE.height} /ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /FlateDecode /Length ${cameraAlpha.length} >>\nstream\n`,
+      cameraAlpha,
+    ),
+  );
+  addObj(
+    17,
+    byteObject(
+      `<< /Type /XObject /Subtype /Image /Width ${INVOICE_CAMERA_IMAGE.width} /Height ${INVOICE_CAMERA_IMAGE.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length ${cameraRgb.length} /SMask 16 0 R >>\nstream\n`,
+      cameraRgb,
+    ),
+  );
+  addObj(
     14,
-    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Contents 15 0 R /Resources << /Font << /F1 3 0 R /F2 6 0 R /F3 9 0 R >> /XObject << /Im1 13 0 R >> >> >>`,
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Contents 15 0 R /Resources << /Font << /F1 3 0 R /F2 6 0 R /F3 9 0 R >> /XObject << /Im1 13 0 R /Im2 17 0 R >> >> >>`,
   );
   addObj(15, byteObject(`<< /Length ${contentBytes.length} >>\nstream\n`, contentBytes));
 
   const xrefAt = cursor;
-  const size = 16;
+  const size = 18;
   let xref = `xref\n0 ${size}\n0000000000 65535 f \n`;
   for (let id = 1; id < size; id++) xref += `${String(offsets[id]).padStart(10, "0")} 00000 n \n`;
   xref += `trailer\n<< /Size ${size} /Root 1 0 R >>\nstartxref\n${xrefAt}\n%%EOF`;

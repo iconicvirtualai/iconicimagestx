@@ -335,13 +335,13 @@ export function InvoiceNotes({ notes }: { notes?: string | null }) {
 
 export function InvoiceCameraIcon({ className = "h-11 w-14 shrink-0 text-white" }: { className?: string }) {
   return (
-    <svg data-testid="invoice-camera" viewBox="0 0 73 71" className={className} fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
-      <rect x="1.5" y="11.5" width="70" height="58" rx="14" />
-      <rect x="7.5" y="5.5" width="8" height="6" rx="1.5" />
-      <rect x="29" y="1.5" width="16" height="11" rx="2.5" />
-      <rect x="9.5" y="19.5" width="53" height="42" rx="8" />
-      <circle cx="36" cy="36" r="11" />
-    </svg>
+    <img
+      data-testid="invoice-camera"
+      src="/media/logos/iconic-camera-logo.png"
+      alt=""
+      className={className}
+      style={{ filter: "invert(1)", objectFit: "fill" }}
+    />
   );
 }
 
