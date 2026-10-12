@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { MoneyAmount } from "@/components/MoneyAmount";
 import { SeniorLivingOrder } from "@/components/SeniorLivingOrder";
@@ -17,13 +18,13 @@ import {
   formatUsd,
   SENIOR_FACILITY_RATE_PER_SQFT,
   SENIOR_FACILITY_SQFT_CAP,
-  SENIOR_LIVING_DEPOSIT_LINE,
   SENIOR_LIVING_HOSTING_NOTE,
   SENIOR_LIVING_HOSTING_OPTIONS,
   SENIOR_ROOM_RATES,
   SENIOR_TOUR_PRICE,
   SENIOR_TOUR_SQFT_CAP,
   seniorFacilityPrice,
+  seniorLivingDepositCopy,
 } from "@shared/seniorLiving";
 import { TRAVEL_ZONES } from "@shared/travelZones";
 
@@ -102,25 +103,43 @@ function TravelNote() {
   );
 }
 
-const STEPS = [
-  {
-    title: "Schedule",
-    body: `Tell us the community and a date that works. ${SENIOR_LIVING_DEPOSIT_LINE}`,
-  },
-  {
-    title: "Shoot",
-    body: "We come out and capture the tour and the rooms.",
-  },
-  {
-    title: "Content Ready",
-    body: "The tour and photos are ready to publish.",
-  },
-];
-
 export default function SeniorLiving() {
+  const [depositCheckoutLive, setDepositCheckoutLive] = useState(false);
+  const depositCopy = seniorLivingDepositCopy(depositCheckoutLive);
   const photos = publishedSeniorLivingPhotos();
   const heroPhoto = photos[0];
   const gallery = photos.slice(1);
+  const steps = [
+    {
+      title: "Schedule",
+      body: `Tell us the community and a date that works. ${depositCopy}`,
+    },
+    {
+      title: "Shoot",
+      body: "We come out and capture the tour and the rooms.",
+    },
+    {
+      title: "Content Ready",
+      body: "The tour and photos are ready to publish.",
+    },
+  ];
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const response = await fetch("/api/senior-living/config");
+        const data = (await response.json()) as { depositCheckoutLive?: boolean };
+        if (!cancelled && data.depositCheckoutLive === true) setDepositCheckoutLive(true);
+      } catch {
+        // Request booking stays in place when the public config cannot be read.
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className={pageType}>
@@ -181,7 +200,7 @@ export default function SeniorLiving() {
                 data-testid="senior-deposit"
                 className="mt-4 max-w-xl text-lg leading-relaxed text-white sm:text-xl"
               >
-                {SENIOR_LIVING_DEPOSIT_LINE}
+                {depositCopy}
               </p>
             </div>
           </div>
@@ -288,7 +307,7 @@ export default function SeniorLiving() {
               data-testid="senior-steps"
               className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-3"
             >
-              {STEPS.map((step, index) => (
+              {steps.map((step, index) => (
                 <li key={step.title} className="min-w-0">
                   <h3 className="text-2xl font-bold leading-tight sm:text-3xl">
                     {index + 1} {step.title}.
@@ -308,9 +327,11 @@ export default function SeniorLiving() {
               Order a visit
             </h2>
             <p className={`mt-4 ${bodyText}`}>
-              Choose the services, the date, and pay the deposit to reserve it.
+              {depositCheckoutLive
+                ? "Choose the services, the date, and pay the deposit to reserve it."
+                : "Choose the services, the date, and request the booking to reserve it."}
             </p>
-            <SeniorLivingOrder />
+            <SeniorLivingOrder depositCheckoutLive={depositCheckoutLive} />
           </div>
         </section>
 
@@ -400,7 +421,7 @@ export default function SeniorLiving() {
               </article>
             </div>
             <p className={`mt-8 max-w-3xl ${bodyText}`}>
-              {SENIOR_LIVING_DEPOSIT_LINE}
+              {depositCopy}
             </p>
           </div>
         </section>

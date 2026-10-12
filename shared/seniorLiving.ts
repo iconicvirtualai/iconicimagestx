@@ -27,11 +27,34 @@ export const SENIOR_LIVING_OPS_EMAIL = "ops@iconicimagestx.com";
 /** Senior living only. Other bookings still pay after the shoot. */
 export const SENIOR_LIVING_DEPOSIT_REQUIRED = true;
 export const SENIOR_LIVING_DEPOSIT_PERCENT = 50;
+/** Shown when online checkout is off. Request booking is the safety fallback. */
 export const SENIOR_LIVING_DEPOSIT_LINE =
   "Reserve your date with a 50% deposit. We'll send your deposit invoice shortly. The balance is due after the shoot.";
 
-/** Ops only. The public page does not charge the deposit online while checkout is off. */
+/** Shown when SENIOR_DEPOSIT_CHECKOUT_LIVE is exactly "true". */
+export const SENIOR_LIVING_DEPOSIT_LINE_ONLINE =
+  "Reserve your date with a 50% deposit, paid securely online. The balance is due after the shoot.";
+
+export const SENIOR_LIVING_DEPOSIT_RECEIVED = "Deposit received";
+
+export const SENIOR_LIVING_PAY_STEP = "Pay 50% deposit";
+export const SENIOR_LIVING_REQUEST_STEP = "Request booking";
+
+/** Ops only. Used when the public page cannot charge the deposit online. */
 export const SENIOR_LIVING_MANUAL_DEPOSIT_NOTE = "Invoice the 50% deposit manually";
+
+export function seniorLivingDepositCopy(live: boolean): string {
+  return live ? SENIOR_LIVING_DEPOSIT_LINE_ONLINE : SENIOR_LIVING_DEPOSIT_LINE;
+}
+
+/** Square sends the buyer here after a deposit payment. */
+export function seniorLivingDepositReturnPath(orderNumber: string): string {
+  const params = new URLSearchParams({
+    deposit: "received",
+    order: orderNumber,
+  });
+  return `/senior-living?${params.toString()}`;
+}
 
 /**
  * Online Square deposit checkout. Off unless this is exactly "true".

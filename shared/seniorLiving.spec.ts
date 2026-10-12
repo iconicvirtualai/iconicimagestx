@@ -2,11 +2,16 @@ import { describe, expect, it } from "vitest";
 import {
   SENIOR_FACILITY_RATE_PER_SQFT,
   SENIOR_LIVING_DEPOSIT_LINE,
+  SENIOR_LIVING_DEPOSIT_LINE_ONLINE,
   SENIOR_LIVING_DEPOSIT_PERCENT,
+  SENIOR_LIVING_DEPOSIT_RECEIVED,
   SENIOR_LIVING_DEPOSIT_REQUIRED,
   SENIOR_LIVING_HOSTING_NOTE,
   SENIOR_LIVING_MANUAL_DEPOSIT_NOTE,
+  SENIOR_LIVING_PAY_STEP,
   seniorDepositCheckoutLive,
+  seniorLivingDepositCopy,
+  seniorLivingDepositReturnPath,
   SENIOR_LIVING_OPS_EMAIL,
   SENIOR_LIVING_PROCESSING_RATE,
   parseSeniorLivingOrder,
@@ -47,6 +52,16 @@ describe("senior living pricing config", () => {
     expect(seniorFacilityExampleLine()).not.toMatch(/\$0\.0[5-7]/);
     expect(SENIOR_LIVING_DEPOSIT_LINE).toBe(
       "Reserve your date with a 50% deposit. We'll send your deposit invoice shortly. The balance is due after the shoot.",
+    );
+    expect(SENIOR_LIVING_DEPOSIT_LINE_ONLINE).toBe(
+      "Reserve your date with a 50% deposit, paid securely online. The balance is due after the shoot.",
+    );
+    expect(seniorLivingDepositCopy(false)).toBe(SENIOR_LIVING_DEPOSIT_LINE);
+    expect(seniorLivingDepositCopy(true)).toBe(SENIOR_LIVING_DEPOSIT_LINE_ONLINE);
+    expect(SENIOR_LIVING_DEPOSIT_RECEIVED).toBe("Deposit received");
+    expect(SENIOR_LIVING_PAY_STEP).toBe("Pay 50% deposit");
+    expect(seniorLivingDepositReturnPath("ORD - L - 10001")).toBe(
+      "/senior-living?deposit=received&order=ORD+-+L+-+10001",
     );
     expect(SENIOR_LIVING_MANUAL_DEPOSIT_NOTE).toBe("Invoice the 50% deposit manually");
     expect(seniorDepositCheckoutLive({})).toBe(false);

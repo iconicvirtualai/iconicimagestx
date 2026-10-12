@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   addMonths,
   eachDayOfInterval,
@@ -13,12 +14,15 @@ import {
   parseSeniorLivingOrder,
   quoteSeniorLivingOrder,
   SENIOR_FACILITY_SQFT_CAP,
-  SENIOR_LIVING_DEPOSIT_LINE,
+  SENIOR_LIVING_DEPOSIT_RECEIVED,
   SENIOR_LIVING_HOSTING_NOTE,
   SENIOR_LIVING_HOSTING_OPTIONS,
+  SENIOR_LIVING_PAY_STEP,
   SENIOR_LIVING_PROCESSING_LABEL,
+  SENIOR_LIVING_REQUEST_STEP,
   SENIOR_LIVING_SCHEDULE_TIMES,
   SENIOR_ROOM_RATES,
+  seniorLivingDepositCopy,
   seniorLivingHostingLabel,
   type SeniorLivingHostingId,
 } from "@shared/seniorLiving";
@@ -29,7 +33,11 @@ const fieldClass =
 const buttonClass =
   "inline-flex min-h-12 w-full max-w-full items-center justify-center rounded-lg bg-neutral-950 px-6 py-3 text-center text-lg font-semibold leading-snug text-white disabled:opacity-60";
 
-const stepTitles = ["Services", "Community", "Schedule", "Request booking"] as const;
+export const seniorCheckoutNavigation = {
+  assign(url: string) {
+    window.location.assign(url);
+  },
+};
 
 function startOfToday(): Date {
   const today = new Date();
@@ -37,7 +45,16 @@ function startOfToday(): Date {
   return today;
 }
 
-export function SeniorLivingOrder() {
+export function SeniorLivingOrder({
+  depositCheckoutLive = false,
+}: {
+  depositCheckoutLive?: boolean;
+}) {
+  const [params] = useSearchParams();
+  const returnedOrder = params.get("deposit") === "received" ? params.get("order") || "" : "";
+  const depositCopy = seniorLivingDepositCopy(depositCheckoutLive);
+  const finalStep = depositCheckoutLive ? SENIOR_LIVING_PAY_STEP : SENIOR_LIVING_REQUEST_STEP;
+  const stepTitles = ["Services", "Community", "Schedule", finalStep] as const;
   const [step, setStep] = useState(1);
   const [tour, setTour] = useState(false);
   const [hosting, setHosting] = useState<SeniorLivingHostingId | "">("");
@@ -60,6 +77,10 @@ export function SeniorLivingOrder() {
   const [confirmation, setConfirmation] = useState<{
     orderNumber: string;
     confirmationEmail: boolean;
+  } | null>(null);
+  const [readyCheckout, setReadyCheckout] = useState<{
+    invoiceId: string;
+    payToken: string;
   } | null>(null);
 
   const months = useMemo(
@@ -132,6 +153,29 @@ export function SeniorLivingOrder() {
     setStep((current) => Math.min(4, current + 1));
   }
 
+  async function redirectToDeposit(invoiceId: string, payToken: string) {
+    const response = await fetch(
+      `/api/payments/invoice/${encodeURIComponent(invoiceId)}/deposit-checkout`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ t: payToken }),
+      },
+    );
+    const data = (await response.json().catch(() => null)) as {
+      checkoutUrl?: string;
+      error?: string;
+    } | null;
+    if (!response.ok || !data?.checkoutUrl) {
+      setError(
+        data?.error ||
+          `We could not start the deposit checkout. Please call ${BUSINESS_CONTACT.phoneDisplay}.`,
+      );
+      return;
+    }
+    seniorCheckoutNavigation.assign(data.checkoutUrl);
+  }
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (step < 4) {
@@ -153,6 +197,10 @@ export function SeniorLivingOrder() {
     setError("");
     setPending(true);
     try {
+      if (depositCheckoutLive && readyCheckout) {
+        await redirectToDeposit(readyCheckout.invoiceId, readyCheckout.payToken);
+        return;
+      }
       const response = await fetch("/api/senior-living/order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -173,6 +221,17 @@ export function SeniorLivingOrder() {
         );
         return;
       }
+      if (depositCheckoutLive) {
+        if (!data.invoiceId || !data.payToken) {
+          setError(
+            `We could not start the deposit checkout. Please call ${BUSINESS_CONTACT.phoneDisplay}.`,
+          );
+          return;
+        }
+        setReadyCheckout({ invoiceId: data.invoiceId, payToken: data.payToken });
+        await redirectToDeposit(data.invoiceId, data.payToken);
+        return;
+      }
       setConfirmation({
         orderNumber: data.orderNumber,
         confirmationEmail: data.confirmationEmail === true,
@@ -184,6 +243,23 @@ export function SeniorLivingOrder() {
     } finally {
       setPending(false);
     }
+  }
+
+  if (returnedOrder) {
+    return (
+      <div data-testid="senior-confirmation" className="mt-8 space-y-4">
+        <h2 className="text-3xl font-semibold leading-tight">{SENIOR_LIVING_DEPOSIT_RECEIVED}</h2>
+        <p className="text-lg leading-relaxed text-neutral-950">
+          Order number{" "}
+          <span data-testid="senior-order-number" className="font-semibold">
+            {returnedOrder}
+          </span>
+        </p>
+        <p className="text-lg leading-relaxed text-neutral-950">
+          Call {BUSINESS_CONTACT.phoneDisplay} if you need to change the date.
+        </p>
+      </div>
+    );
   }
 
   if (confirmation) {
@@ -200,7 +276,7 @@ export function SeniorLivingOrder() {
         ) : (
           <p className="text-lg leading-relaxed text-neutral-950">Request received.</p>
         )}
-        <p className="text-lg leading-relaxed text-neutral-950">{SENIOR_LIVING_DEPOSIT_LINE}</p>
+        <p className="text-lg leading-relaxed text-neutral-950">{depositCopy}</p>
         {confirmation.confirmationEmail ? (
           <p className="text-lg leading-relaxed text-neutral-950">
             We will email you a confirmation.
@@ -236,7 +312,7 @@ export function SeniorLivingOrder() {
         Step {step} of 4. {stepTitles[step - 1]}
       </p>
       <p data-testid="senior-summary" className="text-lg leading-relaxed text-neutral-950">
-        {SENIOR_LIVING_DEPOSIT_LINE}
+        {depositCopy}
       </p>
 
       {step === 1 ? (
@@ -467,8 +543,13 @@ export function SeniorLivingOrder() {
             Continue
           </button>
         ) : (
-          <button type="submit" data-testid="senior-request-booking" disabled={pending} className={buttonClass}>
-            {pending ? "Sending" : "Request booking"}
+          <button
+            type="submit"
+            data-testid={depositCheckoutLive ? "senior-pay-deposit" : "senior-request-booking"}
+            disabled={pending}
+            className={buttonClass}
+          >
+            {pending ? (depositCheckoutLive ? "Starting checkout" : "Sending") : finalStep}
           </button>
         )}
       </div>

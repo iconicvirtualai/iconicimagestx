@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { seniorCheckoutNavigation } from "@/components/SeniorLivingOrder";
 import SeniorLiving, { SENIOR_LIVING_CTA } from "./SeniorLiving";
 import {
   publishedSeniorLivingPhotos,
@@ -21,6 +22,9 @@ import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "@shared/businessContact";
 import {
   SENIOR_FACILITY_RATE_PER_SQFT,
   SENIOR_LIVING_DEPOSIT_LINE,
+  SENIOR_LIVING_DEPOSIT_LINE_ONLINE,
+  SENIOR_LIVING_DEPOSIT_RECEIVED,
+  SENIOR_LIVING_PAY_STEP,
   SENIOR_ROOM_RATES,
   SENIOR_TOUR_PRICE,
   SENIOR_TOUR_SQFT_CAP,
@@ -66,6 +70,10 @@ function setValue(id: string, value: string) {
   const setter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
   setter?.call(input, value);
   input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function callsTo(fragment: string) {
+  return fetchMock.mock.calls.filter((call) => String(call[0]).includes(fragment));
 }
 
 async function click(testId: string) {
@@ -307,8 +315,10 @@ describe("senior living page", () => {
       "utf8",
     );
     expect(orderSource).not.toMatch(/\b0\.0[5-7]\b|\$0\.0[5-7]/);
-    expect(orderSource).not.toContain("deposit-checkout");
-    expect(orderSource).not.toContain("Pay deposit");
+    expect(orderSource).toContain("deposit-checkout");
+    expect(orderSource).toContain("window.location.assign");
+    expect(orderSource).toContain("depositCheckoutLive");
+    expect(orderSource).toContain("SENIOR_LIVING_DEPOSIT_RECEIVED");
     expect(source).not.toMatch(/\b17\b|\b84\b/);
     expect(source).not.toMatch(/\bfont-serif\b|Cormorant|Garamond|cursive/);
     expect(source).toContain("object-top");
@@ -333,7 +343,8 @@ describe("senior living page", () => {
     expect(container?.querySelector("[role='alert']")?.textContent).toBe(
       "Choose at least one service.",
     );
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(callsTo("/api/senior-living/order")).toHaveLength(0);
+    expect(callsTo("deposit-checkout")).toHaveLength(0);
 
     await fillOrder();
     expect(
@@ -358,7 +369,8 @@ describe("senior living page", () => {
     expect(container?.querySelector("[role='alert']")?.textContent).toBe(
       "Enter a valid email.",
     );
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(callsTo("/api/senior-living/order")).toHaveLength(0);
+    expect(callsTo("deposit-checkout")).toHaveLength(0);
 
     await act(async () => {
       setValue("senior-email", "ada@community.example");
@@ -376,8 +388,9 @@ describe("senior living page", () => {
       }),
     });
     await click("senior-request-booking");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0];
+    expect(callsTo("/api/senior-living/order")).toHaveLength(1);
+    expect(callsTo("deposit-checkout")).toHaveLength(0);
+    const [url, init] = callsTo("/api/senior-living/order")[0];
     expect(url).toBe("/api/senior-living/order");
     expect(init.method).toBe("POST");
     const body = JSON.parse(init.body);
@@ -386,7 +399,6 @@ describe("senior living page", () => {
     expect(body.email).toBe("ada@community.example");
     expect(body.scheduledTime).toBe("9:00 AM");
     expect(body.companyWebsite).toBe("");
-    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes("deposit-checkout"))).toBe(false);
     expect(
       container?.querySelector("[data-testid='senior-order-number']")?.textContent,
     ).toBe("ORD - L - 10001");
@@ -395,5 +407,108 @@ describe("senior living page", () => {
       /check your email|emailed you|confirmation email|we will email/i,
     );
     expect(container?.textContent).not.toContain("Invoice the 50% deposit manually");
+    expect(container?.textContent).not.toContain(SENIOR_LIVING_DEPOSIT_RECEIVED);
+  });
+
+  it("pays the deposit online when checkout is live and shows deposit received after Square returns", async () => {
+    const assign = vi.spyOn(seniorCheckoutNavigation, "assign").mockImplementation(() => undefined);
+    let checkoutOk = true;
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/senior-living/config")) {
+        return { ok: true, json: async () => ({ depositCheckoutLive: true }) };
+      }
+      if (url.includes("/api/senior-living/order")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            orderNumber: "ORD - L - 10001",
+            invoiceId: "inv1",
+            payToken: "tok",
+            confirmationEmail: false,
+          }),
+        };
+      }
+      if (url.includes("deposit-checkout")) {
+        return checkoutOk
+          ? { ok: true, json: async () => ({ checkoutUrl: "https://square.test/pay" }) }
+          : { ok: false, status: 500, json: async () => ({ error: "Square is unavailable." }) };
+      }
+      return { ok: false, status: 404, json: async () => ({}) };
+    });
+
+    act(() => {
+      root?.unmount();
+    });
+    container?.remove();
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await act(async () => {
+      root?.render(
+        <MemoryRouter>
+          <SeniorLiving />
+        </MemoryRouter>,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+
+    expect(
+      container?.querySelector('[data-testid="senior-deposit"]')?.textContent,
+    ).toBe(SENIOR_LIVING_DEPOSIT_LINE_ONLINE);
+    expect(container?.textContent).toContain(SENIOR_LIVING_DEPOSIT_LINE_ONLINE);
+    expect(container?.textContent).not.toContain(SENIOR_LIVING_DEPOSIT_LINE);
+
+    checkoutOk = false;
+    await fillOrder();
+    expect(container?.textContent).toContain(SENIOR_LIVING_PAY_STEP);
+    expect(container?.querySelector("[data-testid='senior-request-booking']")).toBeNull();
+    expect(container?.querySelector("[data-testid='senior-pay-deposit']")?.textContent).toBe(
+      SENIOR_LIVING_PAY_STEP,
+    );
+    expect(
+      container?.querySelector("[data-testid='senior-hosting']")?.textContent,
+    ).toBe(`Monthly hosting. ${SENIOR_LIVING_HOSTING_NOTE}`);
+    await click("senior-pay-deposit");
+    expect(container?.querySelector("[role='alert']")?.textContent).toBe("Square is unavailable.");
+    expect(assign).not.toHaveBeenCalled();
+    expect(container?.textContent).not.toContain(SENIOR_LIVING_DEPOSIT_RECEIVED);
+    expect(callsTo("/api/senior-living/order")).toHaveLength(1);
+    expect(callsTo("deposit-checkout")).toHaveLength(1);
+
+    checkoutOk = true;
+    await click("senior-pay-deposit");
+    expect(callsTo("/api/senior-living/order")).toHaveLength(1);
+    expect(callsTo("deposit-checkout")).toHaveLength(2);
+    const checkoutCall = callsTo("deposit-checkout")[1];
+    expect(String(checkoutCall[0])).toBe("/api/payments/invoice/inv1/deposit-checkout");
+    expect(JSON.parse(String(checkoutCall[1].body))).toEqual({ t: "tok" });
+    expect(assign).toHaveBeenCalledWith("https://square.test/pay");
+    expect(container?.textContent).not.toContain(SENIOR_LIVING_DEPOSIT_RECEIVED);
+
+    act(() => {
+      root?.unmount();
+    });
+    container?.remove();
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await act(async () => {
+      root?.render(
+        <MemoryRouter
+          initialEntries={["/senior-living?deposit=received&order=ORD%20-%20L%20-%2010001"]}
+        >
+          <SeniorLiving />
+        </MemoryRouter>,
+      );
+    });
+    expect(
+      container?.querySelector("[data-testid='senior-order-number']")?.textContent,
+    ).toBe("ORD - L - 10001");
+    expect(container?.textContent).toContain(SENIOR_LIVING_DEPOSIT_RECEIVED);
+    expect(container?.querySelector("[data-testid='senior-order']")).toBeNull();
+    expect(container?.querySelector("[data-testid='senior-pay-deposit']")).toBeNull();
+    assign.mockRestore();
   });
 });

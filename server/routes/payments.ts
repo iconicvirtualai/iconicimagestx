@@ -33,7 +33,7 @@ import { isTempAdminEnabled, liveServerEnv } from "../../shared/tempAdmin";
 import { payTokenMatches } from "../lib/payToken";
 import { resolveClientIdentity } from "../services/clientAccounts";
 import { matchSquarePaymentInvoice } from "../services/squarePaymentMatch";
-import { seniorDepositCheckoutLive } from "../../shared/seniorLiving";
+import { seniorDepositCheckoutLive, seniorLivingDepositReturnPath } from "../../shared/seniorLiving";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -837,7 +837,8 @@ router.post("/invoice/:id/deposit-checkout", async (req: Request, res: Response)
     }
     if (!squareReady()) return res.status(503).json({ error: "Square payments are not configured yet." });
 
-    const payToken = await payTokenForLink(invoiceDoc);
+    await payTokenForLink(invoiceDoc);
+    const orderNumber = String(invoice.orderNumber || order.orderNumber || "");
     const response = await fetch(`${squareBaseUrl()}/v2/online-checkout/payment-links`, {
       method: "POST",
       headers: {
@@ -856,11 +857,7 @@ router.post("/invoice/:id/deposit-checkout", async (req: Request, res: Response)
           location_id: process.env.SQUARE_LOCATION_ID,
         },
         checkout_options: {
-          redirect_url: clientInvoiceUrl({
-            id: invoiceDoc.id,
-            payToken,
-            status: "draft",
-          }, undefined, { paid: "deposit" }) || "",
+          redirect_url: `${appUrl()}${seniorLivingDepositReturnPath(orderNumber)}`,
         },
         pre_populated_data: {
           buyer_email: invoice.clientEmail || undefined,

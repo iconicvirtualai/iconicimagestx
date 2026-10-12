@@ -12,7 +12,6 @@ import { clientNotifyLive } from "../../shared/clientNotify";
 import { createPayToken } from "../../shared/invoicePay";
 import { nextSequentialInvoiceNumber } from "../../shared/orderProjectInvoice";
 import {
-  SENIOR_LIVING_DEPOSIT_LINE,
   SENIOR_LIVING_MANUAL_DEPOSIT_NOTE,
   SENIOR_LIVING_DEPOSIT_PERCENT,
   SENIOR_LIVING_DEPOSIT_REQUIRED,
@@ -22,6 +21,8 @@ import {
   SENIOR_LIVING_REQUESTS,
   parseSeniorLivingOrder,
   parseSeniorLivingRequest,
+  seniorDepositCheckoutLive,
+  seniorLivingDepositCopy,
   seniorLivingHostingLabel,
   seniorLivingOfficeEnv,
   seniorLivingOfficeRecord,
@@ -69,6 +70,10 @@ async function nextInvoiceNumber(): Promise<string> {
   }
 }
 
+router.get("/config", (_req, res) => {
+  res.json({ depositCheckoutLive: seniorDepositCheckoutLive() });
+});
+
 router.post("/order", async (req, res) => {
   const limit = limiter.check(clientIp(req));
   if (!limit.allowed) {
@@ -94,6 +99,9 @@ router.post("/order", async (req, res) => {
   const { value, quote } = parsed;
   const hostingLabel = seniorLivingHostingLabel(value.hosting) || "";
   const hostingNote = `${hostingLabel}. ${SENIOR_LIVING_HOSTING_NOTE}`;
+  const checkoutLive = seniorDepositCheckoutLive();
+  const depositCopy = seniorLivingDepositCopy(checkoutLive);
+  const manualDepositNote = checkoutLive ? "" : SENIOR_LIVING_MANUAL_DEPOSIT_NOTE;
   const lineItems = [
     ...quote.lines,
     quote.travelLine,
@@ -147,14 +155,14 @@ router.post("/order", async (req, res) => {
       hostingLabel,
       notes: value.notes,
       vibeNote: [
-        SENIOR_LIVING_DEPOSIT_LINE,
+        depositCopy,
         `Deposit required: yes`,
         `Deposit percent: ${SENIOR_LIVING_DEPOSIT_PERCENT}`,
         `Deposit due today: ${quote.depositAmount}`,
         `Balance due after the shoot: ${quote.balanceDue}`,
         `Processing: ${quote.processing}`,
         `Tour hosting: ${hostingNote}`,
-        SENIOR_LIVING_MANUAL_DEPOSIT_NOTE,
+        manualDepositNote,
         value.notes,
       ].filter(Boolean).join("\n"),
       status: "new",
@@ -301,8 +309,8 @@ router.post("/order", async (req, res) => {
         `Deposit due today: ${quote.depositAmount}`,
         `Balance due after the shoot: ${quote.balanceDue}`,
         `Tour hosting: ${hostingNote}`,
-        SENIOR_LIVING_MANUAL_DEPOSIT_NOTE,
-        SENIOR_LIVING_DEPOSIT_LINE,
+        manualDepositNote,
+        depositCopy,
         value.notes,
       ].filter(Boolean).join("\n"),
     };
@@ -325,7 +333,7 @@ router.post("/order", async (req, res) => {
           template: "senior_living_order",
           audience: "client",
           subject: `Order ${orderNumber} received`,
-          html: `<p>We received order ${orderNumber}. ${SENIOR_LIVING_DEPOSIT_LINE}</p>`,
+          html: `<p>We received order ${orderNumber}. ${depositCopy}</p>`,
           variables: { clientName: value.name, orderNumber },
         });
       } catch (error) {

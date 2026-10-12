@@ -105,6 +105,7 @@ beforeEach(() => {
   notify.mockClear();
   sendEmail.mockClear();
   delete process.env.CLIENT_NOTIFY_LIVE;
+  delete process.env.SENIOR_DEPOSIT_CHECKOUT_LIVE;
 });
 
 function orderBody() {
@@ -128,6 +129,22 @@ function orderBody() {
     hosting: "monthly-hosting",
   };
 }
+
+describe("GET /api/senior-living/config", () => {
+  it("reports deposit checkout only when the flag is exactly true", async () => {
+    const off = await fetch(`${baseUrl}/api/senior-living/config`);
+    expect(off.status).toBe(200);
+    expect(await off.json()).toEqual({ depositCheckoutLive: false });
+
+    process.env.SENIOR_DEPOSIT_CHECKOUT_LIVE = "TRUE";
+    const wrongCase = await fetch(`${baseUrl}/api/senior-living/config`);
+    expect(await wrongCase.json()).toEqual({ depositCheckoutLive: false });
+
+    process.env.SENIOR_DEPOSIT_CHECKOUT_LIVE = "true";
+    const on = await fetch(`${baseUrl}/api/senior-living/config`);
+    expect(await on.json()).toEqual({ depositCheckoutLive: true });
+  });
+});
 
 describe("POST /api/senior-living/order", () => {
   it("creates a senior living order and a draft deposit invoice", async () => {
@@ -188,6 +205,39 @@ describe("POST /api/senior-living/order", () => {
     expect(sendEmail).toHaveBeenCalledTimes(1);
     expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
       to: "ada@community.example",
+      html: expect.stringContaining(
+        "Reserve your date with a 50% deposit. We'll send your deposit invoice shortly. The balance is due after the shoot.",
+      ),
     }));
+  });
+
+  it("omits the manual invoice note when online checkout is live", async () => {
+    process.env.SENIOR_DEPOSIT_CHECKOUT_LIVE = "true";
+    process.env.CLIENT_NOTIFY_LIVE = "true";
+    const response = await fetch(`${baseUrl}/api/senior-living/order`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(orderBody()),
+    });
+    expect(response.status).toBe(201);
+    const body = await response.json();
+    expect(body.depositAmount).toBe(128.5);
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({
+      saved: expect.objectContaining({
+        vibeNote: expect.stringContaining(
+          "Reserve your date with a 50% deposit, paid securely online. The balance is due after the shoot.",
+        ),
+      }),
+    }));
+    const saved = notify.mock.calls[0]?.[0]?.saved as { vibeNote?: string };
+    expect(saved.vibeNote).not.toContain("Invoice the 50% deposit manually");
+    expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
+      html: expect.stringContaining(
+        "Reserve your date with a 50% deposit, paid securely online. The balance is due after the shoot.",
+      ),
+    }));
+    const requests = [...(store.collections.orderRequests || new Map()).values()];
+    expect(String(requests[0]?.vibeNote)).not.toContain("Invoice the 50% deposit manually");
+    expect(String(requests[0]?.vibeNote)).toContain("paid securely online");
   });
 });

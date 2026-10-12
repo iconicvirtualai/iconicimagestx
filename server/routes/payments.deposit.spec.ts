@@ -176,9 +176,15 @@ beforeEach(() => {
     depositPaid: 0,
     orderId: "order-sl",
     orderRequestId: "req-sl",
+    orderNumber: "ORD - L - 10001",
     source: "senior-living",
   });
-  seed("orders", "order-sl", { source: "senior-living", total: 257, balanceDue: 257 });
+  seed("orders", "order-sl", {
+    source: "senior-living",
+    total: 257,
+    balanceDue: 257,
+    orderNumber: "ORD - L - 10001",
+  });
   seed("orderRequests", "req-sl", { source: "senior-living", balanceDue: 257 });
 });
 
@@ -217,6 +223,9 @@ describe("deposit checkout", () => {
     const squareCall = fetchMock.mock.calls.find((call) => String(call[0]).includes("squareup.com"));
     const sent = JSON.parse(String(squareCall?.[1].body));
     expect(sent.quick_pay.price_money.amount).toBe(12850);
+    expect(sent.checkout_options.redirect_url).toBe(
+      "https://deposit.test/senior-living?deposit=received&order=ORD+-+L+-+10001",
+    );
     const invoice = store.collections.invoices.get("inv-sl") || {};
     expect(invoice.status).toBe("draft");
     expect(invoice.sentAt).toBeUndefined();
