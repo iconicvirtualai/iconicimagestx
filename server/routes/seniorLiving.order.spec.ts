@@ -125,6 +125,7 @@ function orderBody() {
     notes: "Use the main entrance.",
     scheduledDate,
     scheduledTime: "9:00 AM",
+    hosting: "monthly-hosting",
   };
 }
 
@@ -149,6 +150,8 @@ describe("POST /api/senior-living/order", () => {
     expect(orders[0].total).toBe(257);
     expect(orders[0].balanceDue).toBe(257);
     expect(orders[0].scheduledTime).toBe("9:00 AM");
+    expect(orders[0].hosting).toBe("monthly-hosting");
+    expect(orders[0].hostingLabel).toBe("Monthly hosting");
 
     const invoices = [...(store.collections.invoices || new Map()).values()];
     expect(invoices).toHaveLength(1);
@@ -162,7 +165,8 @@ describe("POST /api/senior-living/order", () => {
     expect(notify).toHaveBeenCalledWith(expect.objectContaining({
       saved: expect.objectContaining({
         depositAmount: 128.5,
-        vibeNote: expect.stringContaining("Deposit required: yes"),
+        hostingLabel: "Monthly hosting",
+        vibeNote: expect.stringContaining("Tour hosting: Monthly hosting. Pricing confirmed with your quote"),
       }),
     }));
   });

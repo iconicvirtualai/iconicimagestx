@@ -7,7 +7,7 @@ import { assessTravel, travelInvoiceLine, type TravelAssessment } from "./travel
  * The page renders that constant. Do not copy the number into a component.
  */
 
-export const SENIOR_FACILITY_RATE_PER_SQFT = 0.05;
+export const SENIOR_FACILITY_RATE_PER_SQFT = 0.1;
 
 export const SENIOR_TOUR_PRICE = 250;
 export const SENIOR_TOUR_SQFT_CAP = 3_000;
@@ -44,6 +44,16 @@ export const SENIOR_LIVING_SCHEDULE_TIMES = [
 ] as const;
 
 export const SENIOR_LIVING_ORDER_SOURCE = "senior-living";
+
+/** Tour delivery. No price is published. The choice is not added to the total. */
+export const SENIOR_LIVING_HOSTING_OPTIONS = [
+  { id: "monthly-hosting", label: "Monthly hosting" },
+  { id: "transfer-of-ownership", label: "Transfer of ownership" },
+] as const;
+
+export type SeniorLivingHostingId = (typeof SENIOR_LIVING_HOSTING_OPTIONS)[number]["id"];
+
+export const SENIOR_LIVING_HOSTING_NOTE = "Pricing confirmed with your quote";
 
 export const SENIOR_LIVING_SERVICE_IDS = [
   "tour-3d",
@@ -108,6 +118,27 @@ export function formatSeniorFacilityRate(
   rate = SENIOR_FACILITY_RATE_PER_SQFT,
 ): string {
   return formatUsd(rate);
+}
+
+/** Whole dollars when the rate and size land on a cent. */
+export function seniorFacilityPrice(sqft: number): number {
+  const centsPerSqft = Math.round(SENIOR_FACILITY_RATE_PER_SQFT * 100);
+  return (sqft * centsPerSqft) / 100;
+}
+
+export function seniorFacilityRateLine(): string {
+  return `Whole-building facilities: ${formatSeniorFacilityRate()} per sq ft`;
+}
+
+export function seniorFacilityExampleLine(): string {
+  const size = SENIOR_FACILITY_SQFT_CAP.toLocaleString("en-US");
+  return `a ${size} sq ft community = ${formatUsd(seniorFacilityPrice(SENIOR_FACILITY_SQFT_CAP))}`;
+}
+
+export function seniorLivingHostingLabel(id: unknown): string | null {
+  const key = typeof id === "string" ? id.trim() : "";
+  const match = SENIOR_LIVING_HOSTING_OPTIONS.find((option) => option.id === key);
+  return match ? match.label : null;
 }
 
 export function parseSeniorLivingRequest(
@@ -288,6 +319,7 @@ export interface SeniorLivingOrderInput {
   notes: string;
   scheduledDate: string;
   scheduledTime: string;
+  hosting: SeniorLivingHostingId;
 }
 
 function cents(amount: number): number {
@@ -350,7 +382,7 @@ export function quoteSeniorLivingOrder(input: {
     if (facilitySqft > SENIOR_FACILITY_SQFT_CAP) {
       return { ok: false, error: "Facility size cannot be more than 20,000 sq ft." };
     }
-    const price = dollars(Math.round(facilitySqft * SENIOR_FACILITY_RATE_PER_SQFT * 100));
+    const price = seniorFacilityPrice(facilitySqft);
     lines.push({
       id: "facility",
       name: SENIOR_LIVING_SERVICE_LABELS.facility,
@@ -462,6 +494,15 @@ export function parseSeniorLivingOrder(
   if (!(SENIOR_LIVING_SCHEDULE_TIMES as readonly string[]).includes(scheduledTime)) {
     return { ok: false, honeypot: false, error: "Choose a time." };
   }
+  const hostingLabel = seniorLivingHostingLabel(raw.hosting);
+  if (!hostingLabel) {
+    return {
+      ok: false,
+      honeypot: false,
+      error: "Choose monthly hosting or a transfer of ownership.",
+    };
+  }
+  const hosting = text(raw.hosting) as SeniorLivingHostingId;
 
   return {
     ok: true,
@@ -479,6 +520,7 @@ export function parseSeniorLivingOrder(
       notes,
       scheduledDate,
       scheduledTime,
+      hosting,
     },
     quote: quoted.quote,
   };

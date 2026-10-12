@@ -15,11 +15,13 @@ import {
   SENIOR_LIVING_DEPOSIT_LINE,
   SENIOR_LIVING_DEPOSIT_PERCENT,
   SENIOR_LIVING_DEPOSIT_REQUIRED,
+  SENIOR_LIVING_HOSTING_NOTE,
   SENIOR_LIVING_ORDER_SOURCE,
   SENIOR_LIVING_PROCESSING_LABEL,
   SENIOR_LIVING_REQUESTS,
   parseSeniorLivingOrder,
   parseSeniorLivingRequest,
+  seniorLivingHostingLabel,
   seniorLivingOfficeEnv,
   seniorLivingOfficeRecord,
 } from "../../shared/seniorLiving";
@@ -89,6 +91,8 @@ router.post("/order", async (req, res) => {
   }
 
   const { value, quote } = parsed;
+  const hostingLabel = seniorLivingHostingLabel(value.hosting) || "";
+  const hostingNote = `${hostingLabel}. ${SENIOR_LIVING_HOSTING_NOTE}`;
   const lineItems = [
     ...quote.lines,
     quote.travelLine,
@@ -138,6 +142,8 @@ router.post("/order", async (req, res) => {
       balanceDue: quote.total,
       scheduledDate: value.scheduledDate,
       scheduledTime: value.scheduledTime,
+      hosting: value.hosting,
+      hostingLabel,
       notes: value.notes,
       vibeNote: [
         SENIOR_LIVING_DEPOSIT_LINE,
@@ -146,6 +152,7 @@ router.post("/order", async (req, res) => {
         `Deposit due today: ${quote.depositAmount}`,
         `Balance due after the shoot: ${quote.balanceDue}`,
         `Processing: ${quote.processing}`,
+        `Tour hosting: ${hostingNote}`,
         value.notes,
       ].filter(Boolean).join("\n"),
       status: "new",
@@ -188,6 +195,8 @@ router.post("/order", async (req, res) => {
       balanceDue: quote.total,
       scheduledDate: value.scheduledDate,
       scheduledTime: value.scheduledTime,
+      hosting: value.hosting,
+      hostingLabel,
       notes: value.notes,
       status: "confirmed",
       source: SENIOR_LIVING_ORDER_SOURCE,
@@ -230,6 +239,8 @@ router.post("/order", async (req, res) => {
       payToken,
       invoiceNumber,
       orderNumber,
+      hosting: value.hosting,
+      hostingLabel,
       notes: value.notes,
       travelZone: quote.travel.travelZone,
       travelMiles: quote.travel.travelMiles,
@@ -274,6 +285,8 @@ router.post("/order", async (req, res) => {
       scheduledDate: value.scheduledDate,
       scheduledTime: value.scheduledTime,
       requestedDate: value.scheduledDate,
+      hosting: value.hosting,
+      hostingLabel,
       source: SENIOR_LIVING_ORDER_SOURCE,
       leadSource: "Senior living page",
       notes: value.notes,
@@ -285,6 +298,7 @@ router.post("/order", async (req, res) => {
         `Deposit percent: ${SENIOR_LIVING_DEPOSIT_PERCENT}`,
         `Deposit due today: ${quote.depositAmount}`,
         `Balance due after the shoot: ${quote.balanceDue}`,
+        `Tour hosting: ${hostingNote}`,
         SENIOR_LIVING_DEPOSIT_LINE,
         value.notes,
       ].filter(Boolean).join("\n"),

@@ -18,9 +18,12 @@ import {
   SENIOR_FACILITY_RATE_PER_SQFT,
   SENIOR_FACILITY_SQFT_CAP,
   SENIOR_LIVING_DEPOSIT_LINE,
+  SENIOR_LIVING_HOSTING_NOTE,
+  SENIOR_LIVING_HOSTING_OPTIONS,
   SENIOR_ROOM_RATES,
   SENIOR_TOUR_PRICE,
   SENIOR_TOUR_SQFT_CAP,
+  seniorFacilityPrice,
 } from "@shared/seniorLiving";
 import { TRAVEL_ZONES } from "@shared/travelZones";
 
@@ -372,23 +375,28 @@ export default function SeniorLiving() {
                 <h3 className="text-2xl font-semibold leading-tight">
                   Whole-building facilities
                 </h3>
-                <p className={`mt-4 ${bodyText}`}>
-                  Up to {SENIOR_FACILITY_SQFT_CAP.toLocaleString("en-US")} sq
-                  ft.
-                </p>
-                <p className={`mt-4 flex flex-wrap items-baseline gap-x-2 ${bodyText}`}>
-                  <span>from</span>
-                  <MoneyAmount
-                    data-testid="facility-rate"
-                    className="min-w-0 text-left text-3xl font-semibold"
-                  >
+                <p className={`mt-4 ${bodyText}`} data-testid="facility-rate">
+                  Whole-building facilities:{" "}
+                  <MoneyAmount className="min-w-0 text-left">
                     {formatSeniorFacilityRate(SENIOR_FACILITY_RATE_PER_SQFT)}
+                  </MoneyAmount>{" "}
+                  per sq ft
+                </p>
+                <p className={`mt-4 ${bodyText}`} data-testid="facility-example">
+                  a {SENIOR_FACILITY_SQFT_CAP.toLocaleString("en-US")} sq ft
+                  community ={" "}
+                  <MoneyAmount className="min-w-0 text-left">
+                    {formatUsd(seniorFacilityPrice(SENIOR_FACILITY_SQFT_CAP))}
                   </MoneyAmount>
-                  <span>/ sq ft</span>
                 </p>
-                <p className={`mt-4 ${bodyText}`}>
-                  Monthly hosting, or a transfer of ownership.
-                </p>
+                <div className="mt-4 space-y-2" data-testid="facility-hosting">
+                  {SENIOR_LIVING_HOSTING_OPTIONS.map((option) => (
+                    <p key={option.id} className={bodyText}>
+                      {option.label}
+                    </p>
+                  ))}
+                  <p className={bodyText}>{SENIOR_LIVING_HOSTING_NOTE}</p>
+                </div>
               </article>
             </div>
             <p className={`mt-8 max-w-3xl ${bodyText}`}>

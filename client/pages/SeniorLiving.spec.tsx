@@ -21,11 +21,14 @@ import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "@shared/businessContact";
 import {
   SENIOR_FACILITY_RATE_PER_SQFT,
   SENIOR_LIVING_DEPOSIT_LINE,
-  SENIOR_FACILITY_SQFT_CAP,
   SENIOR_ROOM_RATES,
   SENIOR_TOUR_PRICE,
   SENIOR_TOUR_SQFT_CAP,
+  SENIOR_LIVING_HOSTING_NOTE,
+  SENIOR_LIVING_HOSTING_OPTIONS,
   formatSeniorFacilityRate,
+  seniorFacilityExampleLine,
+  seniorFacilityRateLine,
   formatUsd,
 } from "@shared/seniorLiving";
 import { TRAVEL_ZONES } from "@shared/travelZones";
@@ -74,6 +77,7 @@ async function click(testId: string) {
 async function fillOrder() {
   await act(async () => {
     container?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.click();
+    container?.querySelector<HTMLInputElement>('input[name="hosting"]')?.click();
   });
   await click("senior-next");
   await act(async () => {
@@ -248,14 +252,17 @@ describe("senior living page", () => {
     }
     expect(pricing).toContain("Up to 10");
     expect(pricing).toContain("11 to 20");
+    expect(pricing).toContain(seniorFacilityRateLine());
+    expect(pricing).toContain(seniorFacilityExampleLine());
     expect(pricing).toContain(
       formatSeniorFacilityRate(SENIOR_FACILITY_RATE_PER_SQFT),
     );
-    expect(pricing).toContain(
-      `Up to ${SENIOR_FACILITY_SQFT_CAP.toLocaleString("en-US")} sq ft`,
-    );
-    expect(pricing).toContain("/ sq ft");
-    expect(pricing).toContain("Monthly hosting, or a transfer of ownership.");
+    for (const option of SENIOR_LIVING_HOSTING_OPTIONS) {
+      expect(pricing).toContain(option.label);
+    }
+    expect(pricing).toContain(SENIOR_LIVING_HOSTING_NOTE);
+    expect(pricing).not.toMatch(/\$0\.0[5-7]|from\s+\$0\.|\/ sq ft/);
+    expect(pricing).not.toContain("Monthly hosting, or a transfer of ownership.");
     expect(pricing).not.toMatch(/2\.8%|processing fee/i);
 
     const travel =
@@ -294,7 +301,12 @@ describe("senior living page", () => {
     expect(source).toContain("SENIOR_FACILITY_RATE_PER_SQFT");
     expect(source).toContain("MoneyAmount");
     expect(source).not.toMatch(/\$50|\$75|\$100|\$125|\$150|\$250|\$199|\$175/);
-    expect(source).not.toMatch(/\b0\.05\b/);
+    expect(source).not.toMatch(/\b0\.0[5-7]\b/);
+    const orderSource = readFileSync(
+      path.join(process.cwd(), "client/components/SeniorLivingOrder.tsx"),
+      "utf8",
+    );
+    expect(orderSource).not.toMatch(/\b0\.0[5-7]\b|\$0\.0[5-7]/);
     expect(source).not.toMatch(/\b17\b|\b84\b/);
     expect(source).not.toMatch(/\bfont-serif\b|Cormorant|Garamond|cursive/);
     expect(source).toContain("object-top");
@@ -322,6 +334,12 @@ describe("senior living page", () => {
     expect(fetchMock).not.toHaveBeenCalled();
 
     await fillOrder();
+    expect(
+      container?.querySelector("[data-testid='senior-hosting']")?.textContent,
+    ).toBe(`Monthly hosting. ${SENIOR_LIVING_HOSTING_NOTE}`);
+    expect(
+      container?.querySelector("[data-testid='senior-hosting']")?.textContent,
+    ).not.toMatch(/\$/);
     expect(container?.textContent).toContain("Deposit due today (50%)");
     expect(container?.textContent).toContain("Balance due after the shoot");
     expect(container?.textContent).toContain("Processing fee (2.8%)");
@@ -367,6 +385,7 @@ describe("senior living page", () => {
     expect(init.method).toBe("POST");
     const body = JSON.parse(init.body);
     expect(body.tour).toBe(true);
+    expect(body.hosting).toBe("monthly-hosting");
     expect(body.email).toBe("ada@community.example");
     expect(body.scheduledTime).toBe("9:00 AM");
     expect(body.companyWebsite).toBe("");

@@ -14,9 +14,13 @@ import {
   quoteSeniorLivingOrder,
   SENIOR_FACILITY_SQFT_CAP,
   SENIOR_LIVING_DEPOSIT_LINE,
+  SENIOR_LIVING_HOSTING_NOTE,
+  SENIOR_LIVING_HOSTING_OPTIONS,
   SENIOR_LIVING_PROCESSING_LABEL,
   SENIOR_LIVING_SCHEDULE_TIMES,
   SENIOR_ROOM_RATES,
+  seniorLivingHostingLabel,
+  type SeniorLivingHostingId,
 } from "@shared/seniorLiving";
 
 const fieldClass =
@@ -36,6 +40,7 @@ function startOfToday(): Date {
 export function SeniorLivingOrder() {
   const [step, setStep] = useState(1);
   const [tour, setTour] = useState(false);
+  const [hosting, setHosting] = useState<SeniorLivingHostingId | "">("");
   const [roomCount, setRoomCount] = useState("");
   const [facilitySqft, setFacilitySqft] = useState("");
   const [community, setCommunity] = useState("");
@@ -95,6 +100,7 @@ export function SeniorLivingOrder() {
       notes,
       scheduledDate,
       scheduledTime,
+      hosting,
       companyWebsite,
     };
   }
@@ -102,6 +108,10 @@ export function SeniorLivingOrder() {
   function goNext() {
     if (step === 1 && quoted.ok === false) {
       setError(quoted.error);
+      return;
+    }
+    if (step === 1 && !seniorLivingHostingLabel(hosting)) {
+      setError("Choose monthly hosting or a transfer of ownership.");
       return;
     }
     if (step === 2) {
@@ -282,6 +292,23 @@ export function SeniorLivingOrder() {
               className={fieldClass}
             />
           </label>
+          <fieldset className="space-y-3" data-testid="senior-hosting-choice">
+            <legend className="text-lg font-semibold leading-snug">Tour hosting</legend>
+            {SENIOR_LIVING_HOSTING_OPTIONS.map((option) => (
+              <label key={option.id} className="flex min-h-12 items-center gap-3 text-lg font-semibold leading-snug">
+                <input
+                  type="radio"
+                  name="hosting"
+                  value={option.id}
+                  className="h-12 w-12 shrink-0"
+                  checked={hosting === option.id}
+                  onChange={() => setHosting(option.id)}
+                />
+                {option.label}
+              </label>
+            ))}
+            <p className="text-lg leading-relaxed text-neutral-950">{SENIOR_LIVING_HOSTING_NOTE}</p>
+          </fieldset>
           <p className="text-lg font-semibold leading-snug" data-testid="senior-subtotal">
             Subtotal{" "}
             {quoted.ok ? (
@@ -420,6 +447,9 @@ export function SeniorLivingOrder() {
               <MoneyAmount className="min-w-0 text-left">{formatUsd(quoted.quote.processing)}</MoneyAmount>
             </li>
           </ul>
+          <p className="text-lg leading-relaxed" data-testid="senior-hosting">
+            {seniorLivingHostingLabel(hosting)}. {SENIOR_LIVING_HOSTING_NOTE}
+          </p>
           <p className="text-lg font-semibold">
             Total <MoneyAmount className="min-w-0 text-left">{formatUsd(quoted.quote.total)}</MoneyAmount>
           </p>

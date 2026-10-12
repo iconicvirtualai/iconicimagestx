@@ -4,9 +4,14 @@ import {
   SENIOR_LIVING_DEPOSIT_LINE,
   SENIOR_LIVING_DEPOSIT_PERCENT,
   SENIOR_LIVING_DEPOSIT_REQUIRED,
+  SENIOR_LIVING_HOSTING_NOTE,
   SENIOR_LIVING_OPS_EMAIL,
   SENIOR_LIVING_PROCESSING_RATE,
+  parseSeniorLivingOrder,
   quoteSeniorLivingOrder,
+  seniorFacilityExampleLine,
+  seniorFacilityPrice,
+  seniorFacilityRateLine,
   SENIOR_ROOM_RATES,
   SENIOR_TOUR_PRICE,
   formatSeniorFacilityRate,
@@ -29,11 +34,15 @@ const valid = {
 
 describe("senior living pricing config", () => {
   it("keeps the facility rate on one constant", () => {
-    expect(SENIOR_FACILITY_RATE_PER_SQFT).toBe(0.05);
-    expect(formatSeniorFacilityRate()).toBe("$0.05");
+    expect(SENIOR_FACILITY_RATE_PER_SQFT).toBe(0.1);
+    expect(formatSeniorFacilityRate()).toBe("$0.10");
     expect(formatSeniorFacilityRate(SENIOR_FACILITY_RATE_PER_SQFT)).toBe(
-      formatUsd(0.05),
+      formatUsd(0.1),
     );
+    expect(seniorFacilityRateLine()).toBe("Whole-building facilities: $0.10 per sq ft");
+    expect(seniorFacilityExampleLine()).toBe("a 20,000 sq ft community = $2,000");
+    expect(seniorFacilityRateLine()).not.toMatch(/\$0\.0[5-7]/);
+    expect(seniorFacilityExampleLine()).not.toMatch(/\$0\.0[5-7]/);
     expect(formatUsd(SENIOR_TOUR_PRICE)).toBe("$250");
     expect(SENIOR_ROOM_RATES.map((tier) => tier.each)).toEqual([199, 175]);
   });
@@ -58,6 +67,45 @@ describe("senior living deposit math", () => {
     expect(quoted.quote.depositAmount).toBe(128.5);
     expect(quoted.quote.balanceDue).toBe(128.5);
     expect(quoted.quote.depositAmount + quoted.quote.balanceDue).toBe(quoted.quote.total);
+  });
+
+  it("prices 20,000 sq ft at $0.10 and takes half of the total with processing", () => {
+    const quoted = quoteSeniorLivingOrder({
+      tour: false,
+      roomCount: 0,
+      facilitySqft: 20_000,
+      address: "100 Oak St, Spring, TX 77380",
+    });
+    expect(quoted.ok).toBe(true);
+    if (!quoted.ok) return;
+    expect(seniorFacilityPrice(20_000)).toBe(2000);
+    expect(quoted.quote.serviceSubtotal).toBe(2000);
+    expect(quoted.quote.travelLine.price).toBe(0);
+    expect(quoted.quote.processing).toBe(56);
+    expect(quoted.quote.total).toBe(2056);
+    expect(quoted.quote.depositAmount).toBe(1028);
+    expect(quoted.quote.balanceDue).toBe(1028);
+    const order = parseSeniorLivingOrder({
+      tour: false,
+      roomCount: 0,
+      facilitySqft: 20_000,
+      community: "A Woodlands-area senior living community",
+      address: "100 Oak St, Spring, TX 77380",
+      name: "Ada Lovelace",
+      title: "Director",
+      phone: "281-555-0199",
+      email: "ada@community.example",
+      onsiteContact: "Front desk",
+      notes: "",
+      scheduledDate: "2099-01-15",
+      scheduledTime: "9:00 AM",
+      hosting: "monthly-hosting",
+    });
+    expect(order.ok).toBe(true);
+    if (!order.ok) return;
+    expect(order.quote.total).toBe(2056);
+    expect(order.value.hosting).toBe("monthly-hosting");
+    expect(order.quote.lines.some((line) => line.name === "Monthly hosting")).toBe(false);
   });
 
   it("prices rooms by the tier, travel, and processing before the 50% deposit", () => {
