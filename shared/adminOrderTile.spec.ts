@@ -88,3 +88,20 @@ describe("admin order tiles share packageSkins", () => {
     expect(tile.appointmentDate).toContain("Armando");
   });
 });
+
+import { orderCodeTail as __tail } from "./adminOrderTile";
+describe("order code tail (ORD-L-00000 regression)", () => {
+  it("never returns all zeros for digit-poor Firestore ids", () => {
+    for (const id of ["abcDEFghiJKLmnoPQRst", "aB0cDeFgHiJkLmNoPqRs", "x00yz", ""]) {
+      expect(__tail(id)).toMatch(/^[1-9]\d{4}$/);
+    }
+  });
+  it("keeps the last five digits when the id has them", () => {
+    expect(__tail("ab7cd44ef9g9h")).toBe("74499");
+  });
+  it("gives different codes for different ids and salts", () => {
+    const codes = new Set(["kQzWxYvUtSrPoNmLkJiH", "HiJkLmNoPrStUvWxYzQk", "aaaaaaaaaaaaaaaaaaaa", "aaaaaaaaaaaaaaaaaaab"].map((id) => __tail(id)));
+    expect(codes.size).toBe(4);
+    expect(__tail("abc", 1)).not.toBe(__tail("abc", 2));
+  });
+});
