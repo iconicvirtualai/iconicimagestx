@@ -27,6 +27,7 @@ import {
   seniorLivingDepositCopy,
 } from "@shared/seniorLiving";
 import { TRAVEL_ZONES } from "@shared/travelZones";
+import { useSiteHref, useSiteText } from "@/content/siteContent";
 
 /**
  * /book preselects a catalog package with ?service= or ?package=.
@@ -104,6 +105,15 @@ function TravelNote() {
 }
 
 export default function SeniorLiving() {
+  const heroImage = useSiteText("seniorLiving", "hero", "hero", "/senior-living/senior-living-01-hero.jpg");
+  const heroLead = useSiteText("seniorLiving", "hero", "titleLead", "Virtual tours for");
+  const heroAccent = useSiteText("seniorLiving", "hero", "titleAccent", "senior living");
+  const location = useSiteText("seniorLiving", "hero", "location", "For communities in Spring, The Woodlands, and Houston.");
+  const sampleNote = useSiteText("seniorLiving", "hero", "sampleNote", "The sample tour is from a Woodlands-area senior living community.");
+  const ctaLabel = useSiteText("seniorLiving", "hero", "cta", SENIOR_LIVING_CTA);
+  const ctaHref = useSiteHref("seniorLiving", "hero", "cta", "#schedule");
+  const galleryTitle = useSiteText("seniorLiving", "gallery", "title", "A Woodlands-area senior living community");
+  const tourTitle = useSiteText("seniorLiving", "tour", "title", "Sample tour");
   const [depositCheckoutLive, setDepositCheckoutLive] = useState(false);
   const depositCopy = seniorLivingDepositCopy(depositCheckoutLive);
   const photos = publishedSeniorLivingPhotos();
@@ -161,9 +171,20 @@ export default function SeniorLiving() {
       <main>
         <section data-testid="senior-hero" className="bg-[#F6F3EE]">
           <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:pb-20 sm:pt-10">
-            {heroPhoto ? (
+            {heroImage !== "/senior-living/senior-living-01-hero.jpg" ? (
               <div className="overflow-hidden rounded-2xl">
                 <div className="aspect-[16/9] w-full">
+                  <img
+                    src={heroImage}
+                    alt=""
+                    data-site-page="seniorLiving" data-site-block="hero" data-site-field="hero" data-site-kind="image"
+                    className="h-full w-full object-cover object-top sm:object-center"
+                  />
+                </div>
+              </div>
+            ) : heroPhoto ? (
+              <div className="overflow-hidden rounded-2xl">
+                <div data-site-page="seniorLiving" data-site-block="hero" data-site-field="hero" data-site-kind="image" className="aspect-[16/9] w-full">
                   <Photo
                     photo={heroPhoto}
                     sizes="100vw"
@@ -175,18 +196,18 @@ export default function SeniorLiving() {
             ) : null}
             <div className="relative z-10 -mt-20 max-w-3xl rounded-2xl bg-[#1A1A1A] p-6 text-white sm:-mt-32 sm:p-10">
               <h1 className="text-[2rem] font-bold leading-tight text-white sm:text-4xl">
-                Virtual tours for{" "}
-                <span className="text-[#FFE14A]">senior living</span>
+                <span data-site-page="seniorLiving" data-site-block="hero" data-site-field="titleLead" data-site-kind="text">{heroLead}</span>{" "}
+                <span className="text-[#FFE14A]" data-site-page="seniorLiving" data-site-block="hero" data-site-field="titleAccent" data-site-kind="text">{heroAccent}</span>
               </h1>
-              <p className="mt-4 max-w-xl text-lg leading-relaxed sm:text-xl">
-                For communities in Spring, The Woodlands, and Houston.
+              <p className="mt-4 max-w-xl text-lg leading-relaxed sm:text-xl" data-site-page="seniorLiving" data-site-block="hero" data-site-field="location" data-site-kind="text">
+                {location}
               </p>
-              <p className="mt-3 max-w-xl text-lg leading-relaxed sm:text-xl">
-                The sample tour is from a Woodlands-area senior living community.
+              <p className="mt-3 max-w-xl text-lg leading-relaxed sm:text-xl" data-site-page="seniorLiving" data-site-block="hero" data-site-field="sampleNote" data-site-kind="text">
+                {sampleNote}
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                <a href="#schedule" data-testid="senior-cta" className={ctaClass}>
-                  {SENIOR_LIVING_CTA}
+                <a href={ctaHref} data-testid="senior-cta" data-site-page="seniorLiving" data-site-block="hero" data-site-field="cta" data-site-kind="text" className={ctaClass}>
+                  {ctaLabel}
                 </a>
                 <a
                   href={BUSINESS_CONTACT.phoneHref}
@@ -213,8 +234,8 @@ export default function SeniorLiving() {
             className="bg-[#F6F3EE]"
           >
             <div className="mx-auto w-full max-w-6xl px-4 pb-16 sm:pb-20">
-              <h2 className="text-3xl font-semibold leading-tight text-neutral-950 sm:text-4xl">
-                A Woodlands-area senior living community
+              <h2 className="text-3xl font-semibold leading-tight text-neutral-950 sm:text-4xl" data-site-page="seniorLiving" data-site-block="gallery" data-site-field="title" data-site-kind="text">
+                {galleryTitle}
               </h2>
               <ul className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {gallery.map((photo) => (
@@ -244,7 +265,7 @@ export default function SeniorLiving() {
               id="sample-tour-heading"
               className="text-3xl font-semibold leading-tight sm:text-4xl"
             >
-              Sample tour
+              <span data-site-page="seniorLiving" data-site-block="tour" data-site-field="title" data-site-kind="text">{tourTitle}</span>
             </h2>
             <p className={`mt-4 ${bodyText}`}>
               A Woodlands-area senior living community

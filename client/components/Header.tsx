@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { itemLink, itemText, useSiteHref, useSiteItems, useSiteText } from "@/content/siteContent";
 
 export default function Header() {
   const settings = useSiteSettings();
@@ -23,14 +24,22 @@ export default function Header() {
     setIsMenuOpen(!isMenuOpen);
   };
 
-  const menuItems = [
-    { label: "About", href: "/about" },
-    { label: "Pricing", href: "/pricing" },
-    { label: "Studio 105", href: "/studio-105" },
-    { label: "Portfolio", href: "/portfolio" },
-    { label: "Stock Footage", href: "/stock-footage" },
-    { label: "Contact Us", href: "/contact" },
-  ];
+  const navItems = useSiteItems("chrome", "nav");
+  const menuItems = navItems
+    ? navItems.map((item) => ({ label: itemText(item, "link"), href: itemLink(item, "link") || "/" }))
+    : [
+        { label: "About", href: "/about" },
+        { label: "Pricing", href: "/pricing" },
+        { label: "Studio 105", href: "/studio-105" },
+        { label: "Portfolio", href: "/portfolio" },
+        { label: "Stock Footage", href: "/stock-footage" },
+        { label: "Contact Us", href: "/contact" },
+      ];
+  const loginLabel = useSiteText("chrome", "headerCtas", "login", "Log in");
+  const loginHref = useSiteHref("chrome", "headerCtas", "login", "/login");
+  const bookLabel = useSiteText("chrome", "headerCtas", "book", "Book Now");
+  const bookHref = useSiteHref("chrome", "headerCtas", "book", "/book");
+  const logoSrc = useSiteText("chrome", "brand", "logo", "/media/logos/camera-logo-white-on-black.png");
 
   return (
     <header className={`fixed ${showPromo ? "top-[44px]" : "top-4"} left-0 right-0 z-50 px-6 transition-all duration-300`}>
@@ -41,8 +50,12 @@ export default function Header() {
         <Link to="/" className="flex items-center gap-2 flex-shrink-0 group">
           <div className="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center transition-transform group-hover:scale-105 bg-black ring-1 ring-white/15">
             <img
-              src="/media/logos/camera-logo-white-on-black.png"
+              src={logoSrc}
               alt="Iconic Images"
+              data-site-page="chrome"
+              data-site-block="brand"
+              data-site-field="logo"
+              data-site-kind="image"
               className="w-full h-full object-cover"
             />
           </div>
@@ -66,12 +79,12 @@ export default function Header() {
 
         {/* Right side buttons */}
         <div className="hidden lg:flex items-center gap-4">
-          <Link to="/login">
-            <span className="text-xs font-bold text-white/70 hover:text-white cursor-pointer transition-colors">Log in</span>
+          <Link to={loginHref}>
+            <span data-site-page="chrome" data-site-block="headerCtas" data-site-field="login" data-site-kind="text" className="text-xs font-bold text-white/70 hover:text-white cursor-pointer transition-colors">{loginLabel}</span>
           </Link>
-          <Link to="/book">
+          <Link to={bookHref}>
             <Button className="rounded-xl px-5 py-1.5 h-8 text-[10px] font-black uppercase tracking-widest bg-white text-black hover:bg-gray-200">
-              Book Now
+              <span data-site-page="chrome" data-site-block="headerCtas" data-site-field="book" data-site-kind="text">{bookLabel}</span>
             </Button>
           </Link>
         </div>
@@ -105,15 +118,15 @@ export default function Header() {
               </Link>
             ))}
             <Link
-              to="/login"
+              to={loginHref}
               className="text-xs font-bold text-white/70 hover:text-white transition-colors"
               onClick={() => setIsMenuOpen(false)}
             >
-              Log in
+              {loginLabel}
             </Link>
-            <Link to="/book" onClick={() => setIsMenuOpen(false)}>
+            <Link to={bookHref} onClick={() => setIsMenuOpen(false)}>
               <Button className="w-full rounded-xl px-5 py-1.5 h-10 text-[10px] font-black uppercase tracking-widest bg-white text-black hover:bg-gray-200">
-                Book Now
+                {bookLabel}
               </Button>
             </Link>
           </nav>

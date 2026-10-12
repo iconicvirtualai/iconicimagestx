@@ -6,6 +6,7 @@ import { MessageCircle, ArrowRight, Phone } from "lucide-react";
 import { toast } from "sonner";
 import { BUSINESS_CONTACT } from "@shared/businessContact";
 import { PublicContactLine } from "@/components/PublicContactLine";
+import { useSiteText } from "@/content/siteContent";
 
 interface FormData {
   name: string;
@@ -16,6 +17,12 @@ interface FormData {
 }
 
 export default function Contact() {
+  const kicker = useSiteText("contact", "hero", "kicker", "CONTACT US");
+  const titleLead = useSiteText("contact", "hero", "titleLead", "We'd love to");
+  const titleAccent = useSiteText("contact", "hero", "titleAccent", "hear from you");
+  const intro = useSiteText("contact", "hero", "body", "Have a question or feedback? We'd love to hear from you. Send us a message and we'll respond as soon as possible.");
+  const chatKicker = useSiteText("contact", "hero", "chatKicker", "LIVE CHAT");
+  const chatLabel = useSiteText("contact", "hero", "chatLabel", "Start Chat");
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<FormData>({
@@ -86,14 +93,13 @@ export default function Contact() {
               <div className="space-y-10">
                 <div>
                   <div className="font-bold tracking-wider text-xs uppercase mb-5 accent-text-bordered">
-                    CONTACT US
+                    <span data-site-page="contact" data-site-block="hero" data-site-field="kicker" data-site-kind="text">{kicker}</span>
                   </div>
                   <h1 className="text-4xl md:text-6xl font-bold text-black mb-6 leading-[1.1] tracking-tight">
-                    We'd love to <span className="accent-text-bordered">hear from you</span>
+                    <span data-site-page="contact" data-site-block="hero" data-site-field="titleLead" data-site-kind="text">{titleLead}</span> <span className="accent-text-bordered" data-site-page="contact" data-site-block="hero" data-site-field="titleAccent" data-site-kind="text">{titleAccent}</span>
                   </h1>
                   <p className="text-gray-500 text-base leading-relaxed max-w-xl">
-                    Have a question or feedback? We'd love to hear from you. Send us a
-                    message and we'll respond as soon as possible.
+                    <span data-site-page="contact" data-site-block="hero" data-site-field="body" data-site-kind="text">{intro}</span>
                   </p>
 
                   {/* Chat & Call Options */}
@@ -106,9 +112,9 @@ export default function Contact() {
                         <MessageCircle className="w-5 h-5" />
                       </div>
                       <div className="flex-1 min-w-[120px]">
-                        <div className="text-[9px] font-bold tracking-widest accent-text-bordered uppercase mb-0.5">LIVE CHAT</div>
-                        <div className="text-base font-bold text-black group-hover:accent-text-bordered transition-colors flex items-center gap-2">
-                          Start Chat
+                        <div data-site-page="contact" data-site-block="hero" data-site-field="chatKicker" data-site-kind="text" className="text-[9px] font-bold tracking-widest accent-text-bordered uppercase mb-0.5">{chatKicker}</div>
+                        <div data-site-page="contact" data-site-block="hero" data-site-field="chatLabel" data-site-kind="text" className="text-base font-bold text-black group-hover:accent-text-bordered transition-colors flex items-center gap-2">
+                          {chatLabel}
                           <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0" />
                         </div>
                       </div>

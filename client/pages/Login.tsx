@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import Footer from "@/components/Footer";
+import { useSiteText } from "@/content/siteContent";
 
 /**
  * Successful create-account lands on the client home. If this login is already
@@ -24,6 +25,7 @@ export function accountCreationDestination(session: {
 }
 
 export default function Login() {
+  const wordmark = useSiteText("login", "hero", "title", "ICONIC");
   const { signIn, user, userType, staffProfile, loading, resetPassword, registerClient } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -147,7 +149,7 @@ export default function Login() {
     <div className="flex flex-1 items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="text-center mb-10">
-          <h1 className="text-white text-3xl font-bold tracking-wider">ICONIC</h1>
+          <h1 data-site-page="login" data-site-block="hero" data-site-field="title" data-site-kind="text" className="text-white text-3xl font-bold tracking-wider">{wordmark}</h1>
           <p className="text-gray-500 text-xs tracking-[0.3em] uppercase mt-1">
             Client Portal
           </p>

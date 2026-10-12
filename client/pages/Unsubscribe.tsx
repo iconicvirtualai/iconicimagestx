@@ -1,7 +1,10 @@
 import { FormEvent, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { useSiteText } from "@/content/siteContent";
+
 export default function Unsubscribe() {
+  const title = useSiteText("unsubscribe", "hero", "title", "Unsubscribe");
   const [params] = useSearchParams();
   const [email, setEmail] = useState(params.get("email") || "");
   const [done, setDone] = useState("");
@@ -32,7 +35,7 @@ export default function Unsubscribe() {
     <main className="flex min-h-screen items-center justify-center bg-[#f4f7f8] px-4">
       <form onSubmit={submit} className="w-full max-w-md rounded-3xl border border-gray-100 bg-white p-8 shadow-sm">
         <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#0d9488]">Iconic Images</p>
-        <h1 className="mt-2 text-2xl font-black text-gray-900">Unsubscribe</h1>
+        <h1 data-site-page="unsubscribe" data-site-block="hero" data-site-field="title" data-site-kind="text" className="mt-2 text-2xl font-black text-gray-900">{title}</h1>
         <p className="mt-2 text-sm leading-relaxed text-gray-600">
           This removes the address from Iconic marketing email. Order updates and invoices are separate.
         </p>

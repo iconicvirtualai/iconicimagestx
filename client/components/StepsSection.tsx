@@ -2,6 +2,7 @@ import { Calendar, Camera, Scissors, Rocket, ArrowRight, Download, Share2 } from
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
 
 function BookStepVisual() {
   const days = ["M", "T", "W", "T", "F", "S", "S"];
@@ -100,6 +101,11 @@ function DeliveryStepVisual() {
 
 export default function StepsSection() {
   const settings = useSiteSettings();
+  const badge = useSiteText("home", "steps", "badge", "4 STEPS TO RESULTS");
+  const headline = useSiteText("home", "steps", "title", "From vision to viral in minutes, not days");
+  const defaultHeadline = headline === "From vision to viral in minutes, not days";
+  const intro = useSiteText("home", "steps", "body", "Placing an order with Iconic is as simple as it gets. We handle the heavy lifting so you can focus on growth.");
+  const stepItems = useSiteItems("home", "steps");
   const steps = [
     {
       step: "STEP 1",
@@ -130,6 +136,17 @@ export default function StepsSection() {
       visual: <DeliveryStepVisual />,
     },
   ];
+  const shown = steps.map((item, index) => {
+    const saved = stepItems?.[index];
+    if (!saved) return { ...item, id: String(index) };
+    return {
+      ...item,
+      id: saved.id,
+      step: itemText(saved, "step", item.step),
+      title: itemText(saved, "title", item.title),
+      description: itemText(saved, "body", item.description),
+    };
+  });
 
   return (
     <section className="bg-gray-50 py-20 md:py-24 relative overflow-hidden">
@@ -137,37 +154,35 @@ export default function StepsSection() {
         <div className="text-center mb-12">
           {/* Badge */}
           <div className="inline-flex items-center px-4 py-1.5 rounded-md bg-black border border-black mb-6 shadow-sm">
-            <span className="text-[12px] font-bold tracking-wider uppercase accent-text-bordered">
-              4 STEPS TO RESULTS
+            <span data-site-page="home" data-site-block="steps" data-site-field="badge" data-site-kind="text" className="text-[12px] font-bold tracking-wider uppercase accent-text-bordered">
+              {badge}
             </span>
           </div>
 
-          {/* Headline */}
-          <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-6 leading-[1.1] tracking-tight text-black max-w-5xl mx-auto">
-            From vision to viral in <br className="hidden md:block" />
-            <span className="accent-text-bordered">minutes</span>, not days
+          <h2 data-site-page="home" data-site-block="steps" data-site-field="title" data-site-kind="text" className="text-3xl md:text-5xl lg:text-6xl font-bold mb-6 leading-[1.1] tracking-tight text-black max-w-5xl mx-auto">
+            {defaultHeadline ? <>From vision to viral in <br className="hidden md:block" /><span className="accent-text-bordered">minutes</span>, not days</> : headline}
           </h2>
 
-          <p className="text-base md:text-lg text-gray-500 max-w-2xl mx-auto leading-relaxed">
-            Placing an order with Iconic is as simple as it gets. We handle the heavy lifting so you can focus on growth.
+          <p data-site-page="home" data-site-block="steps" data-site-field="body" data-site-kind="text" className="text-base md:text-lg text-gray-500 max-w-2xl mx-auto leading-relaxed">
+            {intro}
           </p>
         </div>
 
         {/* Steps Grid - Updated to 4 columns as per screenshot */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-4 max-w-[1400px] mx-auto">
-          {steps.map((item, index) => (
+          {shown.map((item, index) => (
             <div
-              key={index}
+              key={item.id}
               className="bg-white rounded-[1.5rem] p-6 border border-gray-100 shadow-sm flex flex-col h-full hover:shadow-xl transition-all duration-300 group"
             >
               <div className="mb-6">
-                <span className="text-[10px] font-bold tracking-widest text-gray-400 uppercase block mb-2">
+                <span data-site-page="home" data-site-block="steps" data-site-item={item.id} data-site-field="step" data-site-kind="text" className="text-[10px] font-bold tracking-widest text-gray-400 uppercase block mb-2">
                   {item.step}
                 </span>
-                <h3 className="text-lg font-bold text-black mb-3 leading-tight transition-all" onMouseEnter={(e) => { e.currentTarget.classList.add('accent-text-bordered'); }} onMouseLeave={(e) => { e.currentTarget.classList.remove('accent-text-bordered'); }}>
+                <h3 data-site-page="home" data-site-block="steps" data-site-item={item.id} data-site-field="title" data-site-kind="text" className="text-lg font-bold text-black mb-3 leading-tight transition-all" onMouseEnter={(e) => { e.currentTarget.classList.add('accent-text-bordered'); }} onMouseLeave={(e) => { e.currentTarget.classList.remove('accent-text-bordered'); }}>
                   {item.title}
                 </h3>
-                <p className="text-sm text-gray-500 leading-relaxed min-h-[60px]">
+                <p data-site-page="home" data-site-block="steps" data-site-item={item.id} data-site-field="body" data-site-kind="text" className="text-sm text-gray-500 leading-relaxed min-h-[60px]">
                   {item.description}
                 </p>
               </div>

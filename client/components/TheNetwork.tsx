@@ -1,8 +1,14 @@
 import { motion } from "framer-motion";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { useSiteText } from "@/content/siteContent";
+
+const NETWORK_BODY = "Iconic isn’t here to squeeze the market; we’re here to expand it.";
 
 export default function TheNetwork() {
   const settings = useSiteSettings();
+  const titleLead = useSiteText("home", "network", "titleLead", "Built Bigger Than");
+  const titleAccent = useSiteText("home", "network", "titleAccent", "One Brand");
+  const body = useSiteText("home", "network", "body", NETWORK_BODY);
 
   return (
     <section className="py-24 bg-white relative overflow-hidden">
@@ -26,10 +32,14 @@ export default function TheNetwork() {
             transition={{ duration: 0.8 }}
           >
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-8 tracking-tight text-black">
-              Built Bigger Than <span className="accent-text-bordered">One Brand</span>
+              <span data-site-page="home" data-site-block="network" data-site-field="titleLead" data-site-kind="text">{titleLead}</span>{" "}
+              <span className="accent-text-bordered" data-site-page="home" data-site-block="network" data-site-field="titleAccent" data-site-kind="text">{titleAccent}</span>
             </h2>
-            
-            <div className="space-y-6 text-xl md:text-2xl text-gray-500 leading-relaxed font-medium">
+
+            {body !== NETWORK_BODY ? (
+              <p data-site-page="home" data-site-block="network" data-site-field="body" data-site-kind="text" className="text-xl md:text-2xl text-gray-500 leading-relaxed font-medium">{body}</p>
+            ) : null}
+            <div data-site-page="home" data-site-block="network" data-site-field="body" data-site-kind="text" className={`space-y-6 text-xl md:text-2xl text-gray-500 leading-relaxed font-medium ${body !== NETWORK_BODY ? "hidden" : ""}`}>
               <p>
                 Iconic isn’t here to squeeze the market;<br />
                 we’re here to <span className="text-black font-bold">expand it.</span>

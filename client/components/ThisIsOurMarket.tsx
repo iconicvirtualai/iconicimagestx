@@ -1,8 +1,15 @@
 import { motion } from "framer-motion";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { useSiteText } from "@/content/siteContent";
+
+const MARKET_BODY = "Iconic was built here. We’ve invested here. We’ve shaped here. Winning brands don’t chase. They choose Iconic.";
 
 export default function ThisIsOurMarket() {
   const settings = useSiteSettings();
+  const titleLead = useSiteText("home", "market", "titleLead", "This Is");
+  const titleAccent = useSiteText("home", "market", "titleAccent", "OUR");
+  const titleTail = useSiteText("home", "market", "titleTail", "Market.");
+  const body = useSiteText("home", "market", "body", MARKET_BODY);
 
   return (
     <section className="py-24 bg-black overflow-hidden relative border-t border-white/5">
@@ -20,10 +27,15 @@ export default function ThisIsOurMarket() {
               transition={{ duration: 0.8 }}
             >
               <h2 className="text-4xl md:text-5xl font-black mb-8 tracking-tight text-white uppercase">
-                This Is <span className="text-teal-400">OUR</span> Market.
+                <span data-site-page="home" data-site-block="market" data-site-field="titleLead" data-site-kind="text">{titleLead}</span>{" "}
+                <span className="text-teal-400" data-site-page="home" data-site-block="market" data-site-field="titleAccent" data-site-kind="text">{titleAccent}</span>{" "}
+                <span data-site-page="home" data-site-block="market" data-site-field="titleTail" data-site-kind="text">{titleTail}</span>
               </h2>
 
-              <div className="space-y-6 text-xl md:text-2xl text-gray-400 leading-relaxed font-medium">
+              {body !== MARKET_BODY ? (
+                <p data-site-page="home" data-site-block="market" data-site-field="body" data-site-kind="text" className="text-xl md:text-2xl text-gray-400 leading-relaxed font-medium">{body}</p>
+              ) : null}
+              <div data-site-page="home" data-site-block="market" data-site-field="body" data-site-kind="text" className={`space-y-6 text-xl md:text-2xl text-gray-400 leading-relaxed font-medium ${body !== MARKET_BODY ? "hidden" : ""}`}>
                 <p>
                   Iconic was <span className="text-white font-bold">built here.</span><br />
                   We’ve <span className="text-teal-400 font-bold italic">invested here.</span><br />

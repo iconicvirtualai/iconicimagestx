@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
 import { FEATURED_SNAP_REEL } from "@/lib/snapReels";
 import { beforeAfterById } from "@/lib/beforeAfter";
 
@@ -13,6 +14,7 @@ const FeatureCard = ({
   colSpan = "col-span-1",
   ctaText,
   ctaLink,
+  itemId,
 }: {
   title: string;
   description: string;
@@ -20,13 +22,14 @@ const FeatureCard = ({
   colSpan?: string;
   ctaText?: string;
   ctaLink?: string;
+  itemId?: string;
 }) => {
   const settings = useSiteSettings();
   return (
     <div className={`bg-[#f8fdff] rounded-2xl border border-dashed border-[#ccfbf1] p-6 flex flex-col ${colSpan} relative group`}>
       <div className="flex-1 mb-6">
         <div className="flex justify-between items-start mb-2">
-          <h3 className="text-lg font-bold text-black">{title}</h3>
+          <h3 data-site-page="home" data-site-block="features" data-site-item={itemId} data-site-field="title" data-site-kind="text" className="text-lg font-bold text-black">{title}</h3>
           {ctaLink && (
             <Link to={ctaLink}>
               <Button size="sm" className="text-white text-[10px] h-7 px-3 rounded-lg md:opacity-0 md:group-hover:opacity-100 transition-opacity" style={{ backgroundColor: settings.global.primaryColor }}>
@@ -35,7 +38,7 @@ const FeatureCard = ({
             </Link>
           )}
         </div>
-        <p className="text-gray-500 text-[11px] leading-relaxed">
+        <p data-site-page="home" data-site-block="features" data-site-item={itemId} data-site-field="body" data-site-kind="text" className="text-gray-500 text-[11px] leading-relaxed">
           {description}
         </p>
       </div>
@@ -152,24 +155,38 @@ const VirtualStagingSnippet = () => {
   );
 };
 
+const FEATURE_TITLE = "Go beyond basic editing with powerful add-on tools";
+const FEATURE_BODY = "Iconic isn't just about reels — enhance your content with smart AI tools designed to polish, extend, and personalize every video.";
+
 export default function FeaturesSection() {
   const settings = useSiteSettings();
+  const badge = useSiteText("home", "features", "badge", "ADDITIONAL FEATURES");
+  const title = useSiteText("home", "features", "title", FEATURE_TITLE);
+  const body = useSiteText("home", "features", "body", FEATURE_BODY);
+  const saved = useSiteItems("home", "features");
+  const copy = (id: string, fallbackTitle: string, fallbackBody: string) => {
+    const item = saved?.find((entry) => entry.id === id);
+    return {
+      title: item ? itemText(item, "title") : fallbackTitle,
+      description: item ? itemText(item, "body") : fallbackBody,
+      itemId: id,
+    };
+  };
   return (
     <section className="bg-white py-20 md:py-24">
       <div className="container mx-auto px-4">
         {/* Section Header */}
         <div className="text-center mb-16">
           <div className="inline-flex items-center px-3 py-1 rounded-md bg-black border border-black mb-6 shadow-lg">
-            <span className="text-[10px] font-bold tracking-wider uppercase accent-text-bordered">
-              ADDITIONAL FEATURES
+            <span data-site-page="home" data-site-block="features" data-site-field="badge" data-site-kind="text" className="text-[10px] font-bold tracking-wider uppercase accent-text-bordered">
+              {badge}
             </span>
           </div>
-          <h2 className="text-3xl md:text-5xl font-bold mb-6 text-black max-w-4xl mx-auto tracking-tight">
-            Go beyond basic editing with <span className="accent-text-bordered">powerful</span> add-on tools
+          <h2 data-site-page="home" data-site-block="features" data-site-field="title" data-site-kind="text" className="text-3xl md:text-5xl font-bold mb-6 text-black max-w-4xl mx-auto tracking-tight">
+            {title === FEATURE_TITLE ? <>Go beyond basic editing with <span className="accent-text-bordered">powerful</span> add-on tools</> : title}
           </h2>
-          <p className="text-gray-500 max-w-2xl mx-auto text-sm leading-relaxed">
-            Iconic isn't just about reels — enhance your content with smart AI tools
-            designed to polish, extend, and personalize every video.
+          <p data-site-page="home" data-site-block="features" data-site-field="body" data-site-kind="text" className="text-gray-500 max-w-2xl mx-auto text-sm leading-relaxed">
+            {body}
           </p>
         </div>
 
@@ -178,8 +195,7 @@ export default function FeaturesSection() {
 
           {/* Snap Reels */}
           <FeatureCard
-            title="Snap Reels"
-            description="Turn the listing stills into a 9:16 Snap Reel. A vertical cut buyers can watch before they ever book a showing."
+            {...copy("snap", "Snap Reels", "Turn the listing stills into a 9:16 Snap Reel. A vertical cut buyers can watch before they ever book a showing.")}
             colSpan="md:col-span-2"
           >
             <div className="flex h-full items-center justify-center p-4 gap-4">
@@ -205,8 +221,7 @@ export default function FeaturesSection() {
 
           {/* One Click Import */}
           <FeatureCard
-            title="One Click Import"
-            description="Pull listing photos directly from Realtor.com or Zillow to start your video in seconds."
+            {...copy("import", "One Click Import", "Pull listing photos directly from Realtor.com or Zillow to start your video in seconds.")}
           >
             <div className="flex flex-col h-full p-4 items-center justify-center gap-4 bg-[#f0f9ff]/30">
               <div className="flex gap-4">
@@ -222,8 +237,7 @@ export default function FeaturesSection() {
 
           {/* AI Virtual Staging */}
           <FeatureCard
-            title="AI Virtual Staging"
-            description="Instantly furnish empty rooms with realistic AI staging to showcase your property's full potential."
+            {...copy("staging", "AI Virtual Staging", "Instantly furnish empty rooms with realistic AI staging to showcase your property's full potential.")}
             ctaText="TRY NOW"
             ctaLink="/services/virtual-staging"
           >
@@ -232,8 +246,7 @@ export default function FeaturesSection() {
 
           {/* AI Photo Edits */}
           <FeatureCard
-            title="AI Photo Edits"
-            description="Make your listing photos stand out with AI-powered enhancements — like twilights, lawn repairs, and other edits that instantly elevate any property."
+            {...copy("edits", "AI Photo Edits", "Make your listing photos stand out with AI-powered enhancements — like twilights, lawn repairs, and other edits that instantly elevate any property.")}
             colSpan="md:col-span-2"
           >
             <AiPhotoEditSnippet />
@@ -241,8 +254,7 @@ export default function FeaturesSection() {
 
           {/* Studio */}
           <FeatureCard
-            title="Studio"
-            description="Iconic's built-in editor that allows you to customize your videos with templates, music, captions, branding, and even your own photos or clips."
+            {...copy("studio", "Studio", "Iconic's built-in editor that allows you to customize your videos with templates, music, captions, branding, and even your own photos or clips.")}
             colSpan="md:col-span-2"
           >
             <div className="bg-[#fcfdfd] h-full flex flex-col p-4">
@@ -271,8 +283,7 @@ export default function FeaturesSection() {
 
           {/* AI Voiceovers */}
           <FeatureCard
-            title="AI Voiceovers"
-            description="Instantly generate natural-sounding narrations from a wide range of voices."
+            {...copy("voice", "AI Voiceovers", "Instantly generate natural-sounding narrations from a wide range of voices.")}
           >
             <div className="flex flex-col h-full p-4 items-center justify-center gap-4 bg-[#f0fdfa]/30">
               <div className="w-full bg-white border border-gray-100 rounded-lg p-3 shadow-md flex items-center gap-3">
@@ -293,8 +304,7 @@ export default function FeaturesSection() {
 
           {/* Social Media Captions */}
           <FeatureCard
-            title="Social Media Captions"
-            description="Automatically create captions optimized for Instagram, Facebook, LinkedIn, YouTube, and X."
+            {...copy("captions", "Social Media Captions", "Automatically create captions optimized for Instagram, Facebook, LinkedIn, YouTube, and X.")}
           >
             <div className="flex flex-col h-full p-4 items-center justify-center gap-4">
               <div className="flex gap-2 mb-2">
@@ -312,8 +322,7 @@ export default function FeaturesSection() {
 
           {/* AI Avatars */}
           <FeatureCard
-            title="AI Avatars"
-            description="Create professional video presentations with AI-generated avatars for a personal touch."
+            {...copy("avatars", "AI Avatars", "Create professional video presentations with AI-generated avatars for a personal touch.")}
             colSpan="md:col-span-2"
           >
             <div className="flex h-full items-center justify-center p-4 gap-6">

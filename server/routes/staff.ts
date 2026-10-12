@@ -8,6 +8,8 @@ import { Router } from "express";
 import admin from "firebase-admin";
 import { requireAdmin, requireStaff } from "../middleware/auth";
 import { isHostedDeployment, liveServerEnv } from "../../shared/tempAdmin";
+import { ownerAllowlist } from "../../shared/ownerAccess";
+import { normalizeSiteEditorFlags, siteEditorAccess } from "../../shared/siteEditor";
 import { readSetupSecret, secretsMatch } from "../lib/playtestPolicy";
 import { bootstrapPlaytest } from "../services/playtestBootstrap";
 
@@ -74,6 +76,20 @@ router.patch("/:id", requireAdmin, async (req, res) => {
     const allowed = ["firstName","lastName","phone","role","isActive"];
     const updates: Record<string, unknown> = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
     allowed.forEach((k) => { if (k in req.body) updates[k] = req.body[k]; });
+    if (req.body.siteEditor && typeof req.body.siteEditor === "object") {
+      const existing = await db().collection("staff").doc(req.params.id).get();
+      const data = existing.data() || {};
+      const nextRole = typeof updates.role === "string" ? updates.role : data.role;
+      const access = siteEditorAccess({
+        role: nextRole,
+        email: data.email,
+        flags: req.body.siteEditor,
+        ownerEmails: ownerAllowlist(process.env.OWNER_EMAILS),
+      });
+      updates.siteEditor = access.locked
+        ? { view: true, edit: true, publish: true }
+        : normalizeSiteEditorFlags(req.body.siteEditor);
+    }
     await db().collection("staff").doc(req.params.id).update(updates);
     return res.json({ success: true });
   } catch (err) {

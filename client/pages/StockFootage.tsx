@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { SmsConsentField } from "@/components/SmsConsentField";
 import { ChevronLeft, ChevronRight, X, Download, Lock } from "lucide-react";
 import { useState } from "react";
+import { useSiteText } from "@/content/siteContent";
 
 interface PhotoGallery {
   id: string;
@@ -17,6 +18,8 @@ interface PhotoGallery {
 }
 
 export default function StockFootage() {
+  const title = useSiteText("stock", "hero", "title", "Stock Footage Library");
+  const intro = useSiteText("stock", "hero", "body", "Premium, professionally photographed real estate images by neighborhood. License instantly and use for your listings, marketing, or staging inspiration.");
   const [selectedNeighborhood, setSelectedNeighborhood] = useState<string | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showCheckout, setShowCheckout] = useState(false);
@@ -154,8 +157,8 @@ export default function StockFootage() {
           {/* Hero Section */}
           <section className="pt-24 pb-12 bg-gradient-to-b from-black to-gray-900">
             <div className="container mx-auto px-4">
-              <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">Stock Footage Library</h1>
-              <p className="text-gray-400 text-lg max-w-2xl">Premium, professionally photographed real estate images by neighborhood. License instantly and use for your listings, marketing, or staging inspiration.</p>
+              <h1 data-site-page="stock" data-site-block="hero" data-site-field="title" data-site-kind="text" className="text-4xl md:text-5xl font-bold text-white mb-4">{title}</h1>
+              <p data-site-page="stock" data-site-block="hero" data-site-field="body" data-site-kind="text" className="text-gray-400 text-lg max-w-2xl">{intro}</p>
             </div>
           </section>
 

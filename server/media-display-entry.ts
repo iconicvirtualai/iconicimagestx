@@ -5,7 +5,9 @@
 import "dotenv/config";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import admin from "firebase-admin";
+import express from "express";
 import { handleMediaDisplay } from "./routes/mediaDisplay";
+import siteContentRouter from "./routes/siteContent";
 
 if (!admin.apps.length) {
   const bucket = process.env.VITE_FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET;
@@ -45,6 +47,22 @@ function adapt(res: ServerResponse): DisplayResponse {
   return wrapped;
 }
 
+let siteApp: ReturnType<typeof express> | null = null;
+
+function siteContentApp() {
+  if (!siteApp) {
+    siteApp = express();
+    siteApp.use("/api/site-content/media", express.json({ limit: "120mb" }));
+    siteApp.use("/api/site-content/dropbox", express.json({ limit: "1mb" }));
+    siteApp.use("/api/site-content", siteContentRouter);
+  }
+  return siteApp;
+}
+
 export default function mediaDisplayHandler(req: IncomingMessage, res: ServerResponse) {
+  const url = req.url || "";
+  if (url.startsWith("/api/site-content/media") || url.startsWith("/api/site-content/dropbox")) {
+    return siteContentApp()(req as never, res as never);
+  }
   return handleMediaDisplay(req as never, adapt(res) as never, (() => undefined) as never);
 }

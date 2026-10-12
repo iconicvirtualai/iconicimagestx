@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import { SNAP_REELS } from "@/lib/snapReels";
 import { AI_BEFORE_AFTER, AERIAL_STILLS, PRIMARY_SUITE_STILL } from "@/lib/beforeAfter";
 import { LAUNCH_STILLS } from "@/lib/launchStills";
+import { useSiteText } from "@/content/siteContent";
 
 type Category = "All" | "People" | "Families" | "Studio" | "Holiday" | "Headshots" | "Listings" | "Aerial" | "Virtual Staging";
 
@@ -72,6 +73,9 @@ const FILTER_LABEL: Record<Category, string> = {
 };
 
 export default function Portfolio() {
+  const kicker = useSiteText("portfolio", "hero", "kicker", "Selected Work");
+  const title = useSiteText("portfolio", "hero", "title", "Portfolio");
+  const intro = useSiteText("portfolio", "hero", "body", "People, families, studio, holiday, headshots, listings, aerials, and virtual staging from Iconic Images.");
   const [filter, setFilter] = useState<Category>("All");
   const [active, setActive] = useState<Photo | null>(null);
 
@@ -92,13 +96,13 @@ export default function Portfolio() {
         <section className="pt-36 pb-20">
           <div className="max-w-[1200px] mx-auto px-6">
             <p className="text-[11px] font-black uppercase tracking-[0.45em] text-teal-400 mb-4">
-              Selected Work
+              <span data-site-page="portfolio" data-site-block="hero" data-site-field="kicker" data-site-kind="text">{kicker}</span>
             </p>
             <h1 className="text-5xl md:text-7xl font-black uppercase tracking-tighter leading-none">
-              Portfolio
+              <span data-site-page="portfolio" data-site-block="hero" data-site-field="title" data-site-kind="text">{title}</span>
             </h1>
             <p className="mt-6 max-w-2xl text-lg text-gray-300 leading-relaxed">
-              People, families, studio, holiday, headshots, listings, aerials, and virtual staging from Iconic Images.
+              <span data-site-page="portfolio" data-site-block="hero" data-site-field="body" data-site-kind="text">{intro}</span>
             </p>
 
             <div className="mt-10 flex flex-wrap gap-2">

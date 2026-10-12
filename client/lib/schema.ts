@@ -23,6 +23,7 @@ export interface StaffMember {
   role: UserRole;
   isActive: boolean;
   assignedOrders: string[];  // order IDs
+  siteEditor?: { view: boolean; edit: boolean; publish: boolean };
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

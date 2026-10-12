@@ -1,4 +1,5 @@
 import Layout from "@/components/Layout";
+import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
 import { Facebook, Instagram, Share2, ArrowUpRight, Heart } from "lucide-react";
 
 const STILLS = [
@@ -57,6 +58,17 @@ const PLATFORMS = [
 ];
 
 export default function Socials() {
+  const kicker = useSiteText("socials", "hero", "kicker", "Iconic channels");
+  const titleLead = useSiteText("socials", "hero", "titleLead", "ICONIC");
+  const titleAccent = useSiteText("socials", "hero", "titleAccent", "EVERYWHERE.");
+  const intro = useSiteText("socials", "hero", "body", "Follow Iconic Images. The frames below are from our own library.");
+  const stillsTitle = useSiteText("socials", "hero", "stillsTitle", "Selected stills");
+  const stillItems = useSiteItems("socials", "hero");
+  const stills = STILLS.map((still, index) => {
+    const item = stillItems?.[index];
+    if (!item) return still;
+    return { ...still, id: item.id, image: itemText(item, "image", still.image), description: itemText(item, "caption", still.description) };
+  });
   return (
     <Layout>
       <div className="bg-[#fafafa] text-black">
@@ -65,23 +77,23 @@ export default function Socials() {
             <div className="max-w-xl mb-12">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black border border-black mb-4 shadow-lg">
                 <Share2 className="w-3.5 h-3.5 text-white" />
-                <span className="text-[9px] font-bold uppercase tracking-widest accent-text-bordered">Iconic channels</span>
+                <span data-site-page="socials" data-site-block="hero" data-site-field="kicker" data-site-kind="text" className="text-[9px] font-bold uppercase tracking-widest accent-text-bordered">{kicker}</span>
               </div>
               <h1 className="text-4xl md:text-5xl font-bold text-black tracking-tighter leading-none mb-4">
-                ICONIC <span className="accent-text-bordered">EVERYWHERE.</span>
+                <span data-site-page="socials" data-site-block="hero" data-site-field="titleLead" data-site-kind="text">{titleLead}</span> <span className="accent-text-bordered" data-site-page="socials" data-site-block="hero" data-site-field="titleAccent" data-site-kind="text">{titleAccent}</span>
               </h1>
               <p className="text-lg text-gray-500 font-medium leading-relaxed max-w-lg">
-                Follow Iconic Images. The frames below are from our own library.
+                <span data-site-page="socials" data-site-block="hero" data-site-field="body" data-site-kind="text">{intro}</span>
               </p>
             </div>
 
             <div className="mb-20">
-              <h2 className="text-xl font-bold text-black uppercase tracking-widest mb-6">Selected stills</h2>
+              <h2 data-site-page="socials" data-site-block="hero" data-site-field="stillsTitle" data-site-kind="text" className="text-xl font-bold text-black uppercase tracking-widest mb-6">{stillsTitle}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                {STILLS.map((still) => (
+                {stills.map((still) => (
                   <figure key={still.id} className="bg-white rounded-[1.8rem] overflow-hidden border border-gray-100 shadow-lg">
                     <div className="relative aspect-[4/5] overflow-hidden">
-                      <img src={still.image} alt={still.description} className="w-full h-full object-cover" />
+                      <img src={still.image} alt={still.description} data-site-page="socials" data-site-block="hero" data-site-item={String(still.id)} data-site-field="image" data-site-kind="image" className="w-full h-full object-cover" />
                       <div className="absolute top-5 left-5 px-3 py-1 rounded-full bg-white/90 text-[9px] font-bold uppercase tracking-widest text-black">
                         {still.platform}
                       </div>

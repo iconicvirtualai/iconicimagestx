@@ -4,6 +4,7 @@ import { services } from "@/lib/services";
 import { Button } from "@/components/ui/button";
 import { MessageCircle, X, Send, User, Sparkles, ArrowRight, ChevronRight, Check, DollarSign, Target, Rocket } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useSiteText } from "@/content/siteContent";
 
 interface Message {
   id: string;
@@ -46,6 +47,10 @@ const getPackageRecommendation = (id: string): PackageRecommendation | undefined
 };
 
 export default function AIPricingAssistant() {
+  const badge = useSiteText("aiAssistant", "hero", "badge", "AI Media Strategist");
+  const titleLead = useSiteText("aiAssistant", "hero", "titleLead", "Find your");
+  const titleAccent = useSiteText("aiAssistant", "hero", "titleAccent", "perfect match");
+  const intro = useSiteText("aiAssistant", "hero", "body", "Answer a few questions and our AI will determine which service or package best suits your specific business goals.");
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -142,15 +147,15 @@ export default function AIPricingAssistant() {
             <div className="text-center mb-12">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-black border border-black mb-6 shadow-lg">
                 <Sparkles className="w-4 h-4 text-white" />
-                <span className="text-[12px] font-bold tracking-wider uppercase accent-text-bordered">
-                  AI Media Strategist
+                <span data-site-page="aiAssistant" data-site-block="hero" data-site-field="badge" data-site-kind="text" className="text-[12px] font-bold tracking-wider uppercase accent-text-bordered">
+                  {badge}
                 </span>
               </div>
               <h1 className="text-4xl md:text-5xl font-bold text-black mb-4 tracking-tight">
-                Find your <span className="accent-text-bordered">perfect match</span>
+                <span data-site-page="aiAssistant" data-site-block="hero" data-site-field="titleLead" data-site-kind="text">{titleLead}</span> <span className="accent-text-bordered" data-site-page="aiAssistant" data-site-block="hero" data-site-field="titleAccent" data-site-kind="text">{titleAccent}</span>
               </h1>
-              <p className="text-gray-500 text-lg max-w-2xl mx-auto">
-                Answer a few questions and our AI will determine which service or package best suits your specific business goals.
+              <p data-site-page="aiAssistant" data-site-block="hero" data-site-field="body" data-site-kind="text" className="text-gray-500 text-lg max-w-2xl mx-auto">
+                {intro}
               </p>
             </div>
 

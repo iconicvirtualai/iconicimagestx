@@ -43,6 +43,7 @@ import { handleGetPublicPortalListing } from "./routes/portalListing";
 import presentationsRouter, { handlePresentationShell } from "./routes/presentations";
 import photoEditRequestsRouter from "./routes/photoEditRequests";
 import { mountOwners } from "./routes/owners";
+import siteContentRouter from "./routes/siteContent";
 
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
 const API_BUILD_MARKER = "auth-square-2026-09-28";
@@ -103,6 +104,10 @@ export function createServer() {
   // Payment webhooks need raw body — mount BEFORE express.json()
   app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
   app.use("/api/payments/square-webhook", express.raw({ type: "application/json" }));
+
+  // Site media can carry a video. The public JSON limit stays 10mb.
+  app.use("/api/site-content/media", express.json({ limit: "120mb" }));
+  app.use("/api/site-content/dropbox", express.json({ limit: "1mb" }));
 
   // Standard middleware
   app.use(express.json({ limit: "10mb" }));
@@ -223,6 +228,7 @@ export function createServer() {
   app.use("/api/clients", clientsRouter);
   app.get("/api/portal/listings/:id", handleGetPublicPortalListing);
   app.use("/api/staff", staffRouter);
+  app.use("/api/site-content", siteContentRouter);
   // Vercel does not chain rewrites. /present/:token is rewritten to this
   // function and the original path is what arrives here. Vite dev leaves the
   // request to the SPA so ListingPresentation still boots from the client.
