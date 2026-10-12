@@ -26,7 +26,7 @@ describe("live order confirmation emails", () => {
     expect(blocks[0]).not.toContain("photos@iconicimagestx.com");
     expect(blocks[0]).toContain("clientName");
     expect(blocks[0]).toContain("address: displayAddress");
-    expect(blocks[0]).toContain("subject: clientOrderConfirmedSubject(displayAddress)");
+    expect(blocks[0]).toContain("subject: clientOrderConfirmedSubject(displayAddress, orderNumber)");
     expect(blocks[0]).toContain("total: money(total)");
     expect(blocks[0]).toContain("requestId: docRef.id");
     expect(blocks[0]).toContain("dashboardUrl:");

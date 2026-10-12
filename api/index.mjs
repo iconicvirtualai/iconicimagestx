@@ -267,8 +267,9 @@ function createTransport() {
     auth: { user, pass }
   });
 }
-function clientOrderConfirmedSubject(address) {
-  return `Your Iconic order is confirmed: ${address}`;
+function clientOrderConfirmedSubject(address, orderNumber) {
+  const code = orderNumber && /^#\d{3,}$/.test(orderNumber) ? ` ${orderNumber}` : "";
+  return `Your Iconic order${code} is confirmed: ${address}`;
 }
 async function sendEmail(options) {
   const { template, audience, variables = {}, subject: subjectOverride, html, attachments } = options;
@@ -4908,9 +4909,20 @@ function orderCode(kind, record) {
   if (explicit) return explicit.toUpperCase();
   const id = text$b(record.id);
   const prefix = kind === "listing" ? "L" : "B";
+  return `ORD - ${prefix} - ${orderCodeTail(id)}`;
+}
+function orderCodeTail(id, salt = 0) {
   const digits2 = id.replace(/\D/g, "");
-  const tail = (digits2 || id.replace(/[^a-zA-Z0-9]/g, "")).slice(-5).toUpperCase().padStart(5, "0");
-  return `ORD - ${prefix} - ${tail}`;
+  if (salt === 0 && digits2.length >= 5) {
+    const last = digits2.slice(-5);
+    if (!/^0+$/.test(last)) return last;
+  }
+  let h = 2166136261 ^ salt;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return String(1e4 + (h >>> 0) % 9e4);
 }
 function heroFromRecord(record) {
   const explicit = text$b(record.heroUrl) || text$b(record.coverUrl) || text$b(record.coverImage);
@@ -5302,6 +5314,10 @@ async function notifyOfficeOfOrder(input) {
   });
   return { sent: result.sent };
 }
+function formatOrderNumber(n) {
+  if (!Number.isInteger(n) || n < 1) throw new Error(`Invalid order number ${n}`);
+  return `#${String(n).padStart(3, "0")}`;
+}
 const DELIVERY_QA_CLIENT_EMAIL = "ops+deliveryqa@iconicimagestx.com";
 const DELIVERY_QA_CLIENT_ID = "playtest-delivery-qa-client";
 const DELIVERY_QA_GALLERY_ID = "playtest-delivery-qa-gallery";
@@ -5582,6 +5598,7 @@ router$o.post("/", async (req, res) => {
         address: savedAddress
       });
       orderNumber = tile.orderCode;
+      orderNumber = await nextOrderNumber();
       packageName = tile.packageName === "Custom order" ? "" : tile.packageName;
     } catch (err) {
       console.error("[Bookings] Order number format failed:", err);
@@ -5679,7 +5696,7 @@ router$o.post("/", async (req, res) => {
     clientEmailStatus = await sendEmail({
       to: email,
       template: "booking_received",
-      subject: clientOrderConfirmedSubject(displayAddress),
+      subject: clientOrderConfirmedSubject(displayAddress, orderNumber),
       variables: {
         clientName: clientName2,
         address: displayAddress,
@@ -6274,6 +6291,23 @@ async function generateInvoiceNumber() {
     snapshot.docs.map((entry2) => entry2.data().invoiceNumber),
     year
   );
+}
+async function nextOrderNumber() {
+  const ref = db$o().collection("counters").doc("orderNumbers");
+  let seed = 0;
+  const snap = await ref.get();
+  if (!snap.exists) {
+    const agg = await db$o().collection("orderRequests").count().get();
+    seed = agg.data().count;
+  }
+  const n = await db$o().runTransaction(async (tx) => {
+    const cur = await tx.get(ref);
+    const last = cur.exists ? Number(cur.data()?.last) || 0 : seed;
+    const next = last + 1;
+    tx.set(ref, { last: next, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    return next;
+  });
+  return formatOrderNumber(n);
 }
 const router$n = Router();
 const db$n = () => admin.firestore();
