@@ -17,9 +17,15 @@ import Layout from "@/components/Layout";
 import BookingForm from "@/components/BookingForm";
 import { Button } from "@/components/ui/button";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { useSiteText } from "@/content/siteContent";
 
 export default function AgentLandingPage() {
   const settings = useSiteSettings();
+  const badge = useSiteText("agents", "hero", "badge", "Exclusive Offer for Real Estate Agents");
+  const titleLead = useSiteText("agents", "hero", "titleLead", "Get");
+  const titleAccent = useSiteText("agents", "hero", "titleAccent", "10X More Eyes");
+  const titleTail = useSiteText("agents", "hero", "titleTail", "On Your Listings");
+  const intro = useSiteText("agents", "hero", "body", "Top-producing agents don't just list homes—they create experiences. Iconic Images provides the cinematic content you need to dominate your market and win every listing presentation.");
   const [searchParams] = useSearchParams();
   const [utmSource, setUtmSource] = useState<string | null>(null);
 
@@ -83,15 +89,15 @@ export default function AgentLandingPage() {
                 className="space-y-8"
               >
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-black text-white text-xs font-black uppercase tracking-widest shadow-lg">
-                  <Sparkles className="w-3 h-3 text-white" /> Exclusive Offer for Real Estate Agents
+                  <Sparkles className="w-3 h-3 text-white" /> <span data-site-page="agents" data-site-block="hero" data-site-field="badge" data-site-kind="text">{badge}</span>
                 </div>
 
                 <h1 className="text-5xl lg:text-7xl font-black uppercase leading-[0.9] tracking-tighter text-black">
-                  Get <span className="accent-text-bordered">10X More Eyes</span> On Your Listings
+                  <span data-site-page="agents" data-site-block="hero" data-site-field="titleLead" data-site-kind="text">{titleLead}</span> <span className="accent-text-bordered" data-site-page="agents" data-site-block="hero" data-site-field="titleAccent" data-site-kind="text">{titleAccent}</span> <span data-site-page="agents" data-site-block="hero" data-site-field="titleTail" data-site-kind="text">{titleTail}</span>
                 </h1>
                 
-                <p className="text-lg lg:text-xl text-gray-600 max-w-xl font-medium">
-                  Top-producing agents don't just list homes—they create experiences. Iconic Images provides the cinematic content you need to dominate your market and win every listing presentation.
+                <p data-site-page="agents" data-site-block="hero" data-site-field="body" data-site-kind="text" className="text-lg lg:text-xl text-gray-600 max-w-xl font-medium">
+                  {intro}
                 </p>
 
                 <div className="flex flex-col sm:flex-row gap-4">

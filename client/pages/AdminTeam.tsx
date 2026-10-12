@@ -20,6 +20,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { isQaStaff } from "@shared/qaStaff";
+import { INTENDED_OWNER_EMAIL } from "@shared/ownerAccess";
+import { normalizeSiteEditorFlags, type SiteEditorFlags } from "@shared/siteEditor";
+import { useAuth } from "@/contexts/AuthContext";
 
 type Role = "admin" | "coordinator" | "photographer" | "editor";
 
@@ -32,6 +35,7 @@ interface StaffMember {
   isActive: boolean;
   qaOnly?: boolean;
   playtest?: boolean;
+  siteEditor?: SiteEditorFlags;
 }
 
 const ROLE_OPTIONS: Role[] = ["admin", "coordinator", "photographer", "editor"];
@@ -50,15 +54,19 @@ const ROLE_LABEL: Record<Role, string> = {
   editor:       "Editor",
 };
 
+const EMPTY_FLAGS: SiteEditorFlags = { view: false, edit: false, publish: false };
+
 const BLANK: Omit<StaffMember, "uid"> = {
   email: "",
   firstName: "",
   lastName: "",
   role: "photographer",
   isActive: true,
+  siteEditor: EMPTY_FLAGS,
 };
 
 export default function AdminTeam() {
+  const { user } = useAuth();
   const [staff, setStaff] = React.useState<StaffMember[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [showForm, setShowForm] = React.useState(false);
@@ -78,7 +86,7 @@ export default function AdminTeam() {
 
   const openEdit = (member: StaffMember) => {
     setEditing(member);
-    setForm({ email: member.email, firstName: member.firstName, lastName: member.lastName, role: member.role, isActive: member.isActive });
+    setForm({ email: member.email, firstName: member.firstName, lastName: member.lastName, role: member.role, isActive: member.isActive, siteEditor: normalizeSiteEditorFlags(member.siteEditor) });
     setShowForm(true);
   };
 
@@ -88,6 +96,15 @@ export default function AdminTeam() {
     try {
       if (editing) {
         await updateDoc(doc(db, "staff", editing.uid), { ...form });
+        if (user && !editing.uid.startsWith("manual_")) {
+          const token = await user.getIdToken();
+          const response = await fetch(`/api/staff/${editing.uid}`, {
+            method: "PATCH",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ siteEditor: form.siteEditor }),
+          });
+          if (!response.ok) toast.error("Site editor permissions were not saved.");
+        }
         toast.success("Team member updated.");
       } else {
         const uid = `manual_${Date.now()}`;
@@ -180,6 +197,12 @@ export default function AdminTeam() {
               </select>
             </div>
           </div>
+
+          <SiteEditorToggles
+            flags={normalizeSiteEditorFlags(form.siteEditor)}
+            locked={form.role === "admin" || form.email.trim().toLowerCase() === INTENDED_OWNER_EMAIL}
+            onChange={(siteEditor) => setForm((current) => ({ ...current, siteEditor }))}
+          />
 
           <div className="flex items-center gap-3">
             <Button onClick={handleSave} disabled={saving} className="bg-[#0d9488] hover:bg-[#0f766e] text-white font-bold rounded-xl">
@@ -295,6 +318,34 @@ function TeamMemberRow({
         <button onClick={() => onDelete(member)} className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Remove">
           <Trash2 className="w-4 h-4" />
         </button>
+      </div>
+    </div>
+  );
+}
+
+function SiteEditorToggles({
+  flags,
+  locked,
+  onChange,
+}: {
+  flags: SiteEditorFlags;
+  locked: boolean;
+  onChange: (flags: SiteEditorFlags) => void;
+}) {
+  const set = (key: keyof SiteEditorFlags, value: boolean) => {
+    onChange(normalizeSiteEditorFlags({ ...flags, [key]: value }));
+  };
+  return (
+    <div className="mb-6 rounded-2xl border border-gray-100 p-4">
+      <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Site editor access</p>
+      <p className="mt-1 text-xs text-gray-400">{locked ? "Owner and admin always have view, edit, and publish." : "Publish is limited to the owner and admins unless you turn it on here."}</p>
+      <div className="mt-3 flex flex-wrap gap-4">
+        {(["view", "edit", "publish"] as const).map((key) => (
+          <label key={key} className="flex min-h-11 items-center gap-2 text-sm font-semibold">
+            <input type="checkbox" className="h-5 w-5 accent-[#0d9488]" checked={locked ? true : flags[key]} disabled={locked} onChange={(event) => set(key, event.target.checked)} />
+            {key === "view" ? "View" : key === "edit" ? "Edit drafts" : "Publish"}
+          </label>
+        ))}
       </div>
     </div>
   );

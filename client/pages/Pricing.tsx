@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { Check, X, ArrowRight, Star, ChevronRight, Info, Sparkles, Zap, Trophy, Crown, Camera, Video, Layout as LayoutIcon, Box, Users, Clock, DollarSign, Palette, Rocket, Mic } from "lucide-react";
 import { useState } from "react";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { itemText, useSiteHref, useSiteItems, useSiteText } from "@/content/siteContent";
 import {
   APPRENTICESHIP_BRIDGE_COPY,
   APPRENTICESHIP_OVERAGE_LABEL,
@@ -15,6 +16,7 @@ import {
 
 const BRAND_STAGES = [
   {
+    id: "standard",
     label: "Standard",
     src: "/media/photos/standard-headshot.jpg",
     alt: "Stiff standard headshot",
@@ -22,6 +24,7 @@ const BRAND_STAGES = [
     note: "Flat light. A stiff crop. Easy to scroll past.",
   },
   {
+    id: "corporate",
     label: "Iconic Corporate",
     src: "/media/photos/lifestyle-mtz04327.jpg",
     alt: "Polished corporate lifestyle portrait in a royal blue suit",
@@ -29,6 +32,7 @@ const BRAND_STAGES = [
     note: "Polished, confident, and ready for the brand.",
   },
   {
+    id: "lifestyle",
     label: "Iconic Lifestyle",
     src: "/media/photos/lifestyle-kennedy-mtz01127.jpg",
     alt: "Warm smiling lifestyle portrait",
@@ -41,26 +45,35 @@ function BrandTransformation({
   stage,
   onStage,
   accent,
+  lead,
+  accentText,
+  body,
+  stages,
 }: {
   stage: number;
   onStage: (stage: number) => void;
   accent: string;
+  lead: string;
+  accentText: string;
+  body: string;
+  stages: typeof BRAND_STAGES;
 }) {
-  const current = BRAND_STAGES[stage] ?? BRAND_STAGES[0];
+  const current = stages[stage] ?? stages[0];
 
   return (
     <div className="max-w-4xl mx-auto px-4 text-center">
       <h2 className="text-4xl md:text-6xl font-black text-black mb-6 tracking-tight">
-        Elevate Your <span className="accent-text-bordered">Personal Brand</span>
+        <span data-site-page="pricing" data-site-block="brandStages" data-site-field="titleLead" data-site-kind="text">{lead}</span>{" "}
+        <span className="accent-text-bordered" data-site-page="pricing" data-site-block="brandStages" data-site-field="titleAccent" data-site-kind="text">{accentText}</span>
       </h2>
-      <p className="text-lg text-gray-500 mb-10 max-w-2xl mx-auto font-medium">
-        Three beats. A stiff standard headshot, a polished Iconic corporate portrait, then a lifestyle frame with some life in it.
+      <p data-site-page="pricing" data-site-block="brandStages" data-site-field="body" data-site-kind="text" className="text-lg text-gray-500 mb-10 max-w-2xl mx-auto font-medium">
+        {body}
       </p>
 
       <div className="flex flex-wrap justify-center gap-2 mb-6">
-        {BRAND_STAGES.map((item, index) => (
+        {stages.map((item, index) => (
           <button
-            key={item.label}
+            key={item.id}
             type="button"
             onClick={() => onStage(index)}
             className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.18em] border transition-colors ${
@@ -68,7 +81,7 @@ function BrandTransformation({
             }`}
             style={stage === index ? { backgroundColor: accent } : undefined}
           >
-            {item.label}
+            <span data-site-page="pricing" data-site-block="brandStages" data-site-item={item.id} data-site-field="label" data-site-kind="text">{item.label}</span>
           </button>
         ))}
       </div>
@@ -77,13 +90,14 @@ function BrandTransformation({
         <img
           src={current.src}
           alt={current.alt}
+          data-site-page="pricing" data-site-block="brandStages" data-site-item={current.id} data-site-field="image" data-site-kind="image"
           className={`absolute inset-0 h-full w-full object-cover object-[center_18%] ${current.treatment}`}
         />
         <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black/70 to-transparent text-left">
           <div className="inline-block rounded-full bg-black/70 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white">
             {current.label}
           </div>
-          <p className="mt-2 text-sm font-medium text-white">{current.note}</p>
+          <p data-site-page="pricing" data-site-block="brandStages" data-site-item={current.id} data-site-field="note" data-site-kind="text" className="mt-2 text-sm font-medium text-white">{current.note}</p>
         </div>
       </div>
 
@@ -110,6 +124,28 @@ function BrandTransformation({
 
 export default function Pricing() {
   const settings = useSiteSettings();
+  const priceBadge = useSiteText("pricing", "hero", "badge", "Pricing & Packages");
+  const priceLead = useSiteText("pricing", "hero", "titleLead", "The Perfect");
+  const priceAccent = useSiteText("pricing", "hero", "titleAccent", "Price");
+  const priceTail = useSiteText("pricing", "hero", "titleTail", "for Your Presence");
+  const priceSubtitle = useSiteText("pricing", "hero", "subtitle", "Media that moves as fast as you do.");
+  const chipItems = useSiteItems("pricing", "chips");
+  const assistantTitle = useSiteText("pricing", "assistant", "title", "Not sure where to start?");
+  const assistantSubtitle = useSiteText("pricing", "assistant", "subtitle", "Let our AI guide you");
+  const assistantHref = useSiteHref("pricing", "assistant", "cta", "/pricing/ai-assistant");
+  const doorsTitle = useSiteText("pricing", "doors", "title", "Do you have...");
+  const timeTitle = useSiteText("pricing", "doors", "timeTitle", "MORE TIME THAN MONEY");
+  const timeBody = useSiteText("pricing", "doors", "timeBody", "I’m ready to hustle, I just need the tools and the professional polish to win.");
+  const timeCta = useSiteText("pricing", "doors", "timeCta", "I'M READY TO HUSTLE →");
+  const moneyTitle = useSiteText("pricing", "doors", "moneyTitle", "MORE MONEY THAN TIME");
+  const moneyBody = useSiteText("pricing", "doors", "moneyBody", "I’m ready to scale, I need my time back and my brand on autopilot.");
+  const moneyCta = useSiteText("pricing", "doors", "moneyCta", "I'M READY TO SCALE →");
+  const listingsTitle = useSiteText("pricing", "listings", "title", "Listings & Spaces (The Property)");
+  const listingsBody = useSiteText("pricing", "listings", "body", "Targeting the listing lifecycle: Pre-launch buzz, active sale, and post-close legacy. Every package now includes a Listing Reel as the core deliverable. We don't just shoot; we trend.");
+  const brandLead = useSiteText("pricing", "brandStages", "titleLead", "Elevate Your");
+  const brandAccent = useSiteText("pricing", "brandStages", "titleAccent", "Personal Brand");
+  const brandBody = useSiteText("pricing", "brandStages", "body", "Three beats. A stiff standard headshot, a polished Iconic corporate portrait, then a lifestyle frame with some life in it.");
+  const brandItems = useSiteItems("pricing", "brandStages");
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
   const [brandStage, setBrandStage] = useState(1);
   const [selectedPhotoPkg, setSelectedPhotoPkg] = useState<string | null>(null);
@@ -444,25 +480,25 @@ export default function Pricing() {
 
             <div className="relative z-10 pt-24 pb-16 text-center px-4 max-w-5xl mx-auto">
             <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-black border border-black mb-6 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-500">
-              <span className="text-[12px] font-bold tracking-wider uppercase accent-text-bordered">
-                Pricing & Packages
+              <span data-site-page="pricing" data-site-block="hero" data-site-field="badge" data-site-kind="text" className="text-[12px] font-bold tracking-wider uppercase accent-text-bordered">
+                {priceBadge}
               </span>
             </div>
             <h1 className="text-4xl md:text-6xl font-bold text-black mb-6 tracking-tight leading-[1.1]">
-              The Perfect <span className="accent-text-bordered">Price</span> for Your Presence
+              <span data-site-page="pricing" data-site-block="hero" data-site-field="titleLead" data-site-kind="text">{priceLead}</span> <span className="accent-text-bordered" data-site-page="pricing" data-site-block="hero" data-site-field="titleAccent" data-site-kind="text">{priceAccent}</span> <span data-site-page="pricing" data-site-block="hero" data-site-field="titleTail" data-site-kind="text">{priceTail}</span>
             </h1>
             <p className="text-lg text-gray-500 mb-10 max-w-2xl mx-auto font-medium">
-              Media that moves as fast as you do.
+              <span data-site-page="pricing" data-site-block="hero" data-site-field="subtitle" data-site-kind="text">{priceSubtitle}</span>
             </p>
 
             {/* Hyperlink Bubbles */}
             <div className="flex flex-wrap justify-center gap-4 mb-16">
-              {[
+              {(chipItems ? chipItems.map((item) => ({ label: itemText(item, "label"), id: itemText(item, "anchor") })) : [
                 { label: "FOR LISTINGS", id: "listings" },
                 { label: "FOR BRANDING", id: "branding" },
                 { label: "FOR BUSINESS", id: "social" },
                 { label: "FOR GROWTH", id: "brand-identity" }
-              ].map((bubble) => (
+              ]).map((bubble) => (
                 <button
                   key={bubble.id}
                   onClick={() => scrollToSection(bubble.id)}
@@ -491,15 +527,15 @@ export default function Pricing() {
             {/* AI Assistant CTA - Smaller */}
             {settings.pricing.showAIAssistant && (
               <div className="mt-8 p-px bg-black rounded-[2rem] shadow-lg max-w-lg mx-auto transform hover:scale-[1.01] transition-transform duration-500">
-                <Link to="/pricing/ai-assistant" className="block bg-white rounded-[1.9rem] p-6 relative overflow-hidden group">
+                <Link to={assistantHref} className="block bg-white rounded-[1.9rem] p-6 relative overflow-hidden group">
                   <div className="relative z-10 flex items-center gap-6">
                     <div className="w-12 h-12 rounded-[1rem] bg-[#f0fdfa] border border-[#ccfbf1] flex items-center justify-center shrink-0">
                       <Sparkles className="w-6 h-6" style={{ color: settings.global.primaryColor }} />
                     </div>
                     <div className="text-left flex-1">
-                      <h3 className="text-lg font-bold text-black mb-1">{settings.pricing.aiAssistantTitle}</h3>
-                      <div className="flex items-center gap-2 font-bold text-xs accent-text-bordered">
-                        {settings.pricing.aiAssistantSubtitle} <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                      <h3 data-site-page="pricing" data-site-block="assistant" data-site-field="title" data-site-kind="text" className="text-lg font-bold text-black mb-1">{assistantTitle}</h3>
+                      <div data-site-page="pricing" data-site-block="assistant" data-site-field="subtitle" data-site-kind="text" className="flex items-center gap-2 font-bold text-xs accent-text-bordered">
+                        {assistantSubtitle} <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                       </div>
                     </div>
                   </div>
@@ -514,7 +550,7 @@ export default function Pricing() {
           <section className="py-16 bg-white border-y border-gray-50">
             <div className="max-w-5xl mx-auto px-4">
               <div className="text-center mb-12">
-                <h2 className="text-2xl font-black text-black uppercase tracking-widest mb-2">Do you have...</h2>
+                <h2 data-site-page="pricing" data-site-block="doors" data-site-field="title" data-site-kind="text" className="text-2xl font-black text-black uppercase tracking-widest mb-2">{doorsTitle}</h2>
                 <div className="w-20 h-1 mx-auto rounded-full" style={{ backgroundColor: settings.global.primaryColor }}></div>
               </div>
 
@@ -534,12 +570,12 @@ export default function Pricing() {
                     <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm border border-gray-100 group-hover:scale-110 transition-transform">
                       <Clock className="w-8 h-8" style={{ color: settings.global.primaryColor }} />
                     </div>
-                    <h3 className="text-2xl font-black text-black mb-4">MORE TIME THAN MONEY</h3>
-                    <p className="text-gray-500 text-sm mb-8 leading-relaxed">
-                      I’m ready to hustle, I just need the tools and the professional polish to win.
+                    <h3 data-site-page="pricing" data-site-block="doors" data-site-field="timeTitle" data-site-kind="text" className="text-2xl font-black text-black mb-4">{timeTitle}</h3>
+                    <p data-site-page="pricing" data-site-block="doors" data-site-field="timeBody" data-site-kind="text" className="text-gray-500 text-sm mb-8 leading-relaxed">
+                      {timeBody}
                     </p>
-                    <Button className="bg-white border-2 border-black text-black hover:bg-black hover:text-white font-bold px-8 py-6 rounded-xl transition-all">
-                      I'M READY TO HUSTLE →
+                    <Button data-site-page="pricing" data-site-block="doors" data-site-field="timeCta" data-site-kind="text" className="bg-white border-2 border-black text-black hover:bg-black hover:text-white font-bold px-8 py-6 rounded-xl transition-all">
+                      {timeCta}
                     </Button>
                   </div>
                 </div>
@@ -559,12 +595,12 @@ export default function Pricing() {
                     <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm border border-gray-100 group-hover:scale-110 transition-transform">
                       <DollarSign className="w-8 h-8" style={{ color: settings.global.primaryColor }} />
                     </div>
-                    <h3 className="text-2xl font-black text-black mb-4">MORE MONEY THAN TIME</h3>
-                    <p className="text-gray-500 text-sm mb-8 leading-relaxed">
-                      I’m ready to scale, I need my time back and my brand on autopilot.
+                    <h3 data-site-page="pricing" data-site-block="doors" data-site-field="moneyTitle" data-site-kind="text" className="text-2xl font-black text-black mb-4">{moneyTitle}</h3>
+                    <p data-site-page="pricing" data-site-block="doors" data-site-field="moneyBody" data-site-kind="text" className="text-gray-500 text-sm mb-8 leading-relaxed">
+                      {moneyBody}
                     </p>
-                    <Button className="text-white font-bold px-8 py-6 rounded-xl transition-all shadow-lg" style={{ backgroundColor: settings.global.primaryColor }}>
-                      I'M READY TO SCALE →
+                    <Button data-site-page="pricing" data-site-block="doors" data-site-field="moneyCta" data-site-kind="text" className="text-white font-bold px-8 py-6 rounded-xl transition-all shadow-lg" style={{ backgroundColor: settings.global.primaryColor }}>
+                      {moneyCta}
                     </Button>
                   </div>
                 </div>
@@ -576,12 +612,11 @@ export default function Pricing() {
           <section id="listings" className="py-24 bg-white">
             <div className="max-w-[1400px] mx-auto px-4">
               <div className="text-center mb-20 max-w-3xl mx-auto">
-                <h2 className="text-4xl md:text-5xl font-bold text-black mb-6 tracking-tight">
-                  Listings & Spaces <span className="text-gray-300">(The Property)</span>
+                <h2 data-site-page="pricing" data-site-block="listings" data-site-field="title" data-site-kind="text" className="text-4xl md:text-5xl font-bold text-black mb-6 tracking-tight">
+                  {listingsTitle}
                 </h2>
-                <p className="text-lg text-gray-500 leading-relaxed">
-                  Targeting the listing lifecycle: Pre-launch buzz, active sale, and post-close legacy.
-                  Every package now includes a Listing Reel as the core deliverable. <span className="font-bold text-black">We don't just shoot; we trend.</span>
+                <p data-site-page="pricing" data-site-block="listings" data-site-field="body" data-site-kind="text" className="text-lg text-gray-500 leading-relaxed">
+                  {listingsBody}
                 </p>
               </div>
 
@@ -892,7 +927,25 @@ export default function Pricing() {
 
           {/* Personal brand transformation */}
           <section id="branding-personal" className="py-24 bg-[#fafafa]">
-            <BrandTransformation stage={brandStage} onStage={setBrandStage} accent={settings.global.primaryColor} />
+            <BrandTransformation
+              stage={brandStage}
+              onStage={setBrandStage}
+              accent={settings.global.primaryColor}
+              lead={brandLead}
+              accentText={brandAccent}
+              body={brandBody}
+              stages={(brandItems ? BRAND_STAGES.map((stage, index) => {
+                const item = brandItems[index];
+                if (!item) return stage;
+                return {
+                  ...stage,
+                  id: item.id,
+                  label: itemText(item, "label", stage.label),
+                  src: itemText(item, "image", stage.src),
+                  note: itemText(item, "note", stage.note),
+                };
+              }) : BRAND_STAGES)}
+            />
           </section>
 
           {/* Section 2: Iconic Branding */}

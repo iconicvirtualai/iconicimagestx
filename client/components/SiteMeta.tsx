@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { metaPlan, type MetaPlan } from "@shared/siteSeo";
+import { useSiteContent } from "@/content/siteContent";
 
 const CLEAR_SELECTOR = [
   'meta[name="description"]',
@@ -54,15 +55,22 @@ export function applyMetaPlan(doc: Document, plan: MetaPlan) {
 
 export default function SiteMeta() {
   const { pathname } = useLocation();
+  const { pages } = useSiteContent();
+  const published = pages.find((page) => page.path === pathname);
   useEffect(() => {
     let cancelled = false;
     // Run after page effects (Go and presentations set their own titles).
     queueMicrotask(() => {
-      if (!cancelled) applyMetaPlan(document, metaPlan(pathname));
+      if (cancelled) return;
+      applyMetaPlan(document, metaPlan(pathname));
+      if (!published?.seoTitle) return;
+      document.title = published.seoTitle;
+      const description = document.head.querySelector('meta[name="description"]');
+      if (description && published.seoDescription) description.setAttribute("content", published.seoDescription);
     });
     return () => {
       cancelled = true;
     };
-  }, [pathname]);
+  }, [pathname, published]);
   return null;
 }

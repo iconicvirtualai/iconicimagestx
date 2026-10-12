@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
+import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
 
 const ROOMS = [
   {
@@ -28,16 +29,23 @@ const ROOMS = [
 ];
 
 export default function Studio105() {
+  const kicker = useSiteText("studio105", "hero", "kicker", "The physical studio");
+  const title = useSiteText("studio105", "hero", "title", "Studio 105");
+  const roomItems = useSiteItems("studio105", "rooms");
+  const rooms = roomItems?.length ? ROOMS.map((room) => {
+    const item = roomItems.find((entry) => entry.id === room.id);
+    return item ? { ...room, name: itemText(item, "name"), vibe: itemText(item, "vibe"), summary: itemText(item, "summary") } : room;
+  }) : ROOMS;
   return (
     <Layout>
       <div className="bg-black text-white">
         <section className="pt-36 pb-16">
           <div className="max-w-[1100px] mx-auto px-6">
             <p className="text-[11px] font-black uppercase tracking-[0.45em] text-teal-400 mb-4">
-              The physical studio
+              <span data-site-page="studio105" data-site-block="hero" data-site-field="kicker" data-site-kind="text">{kicker}</span>
             </p>
             <h1 className="text-5xl md:text-7xl font-black uppercase tracking-tighter leading-none">
-              Studio 105
+              <span data-site-page="studio105" data-site-block="hero" data-site-field="title" data-site-kind="text">{title}</span>
             </h1>
             <p className="mt-6 max-w-2xl text-lg text-gray-300 leading-relaxed">
               Two rooms. One standard. Book Studio Noir when the frame should feel dramatic, or Studio Blanc when it should feel clean and bright.
@@ -47,7 +55,7 @@ export default function Studio105() {
 
         <section className="pb-24">
           <div className="max-w-[1100px] mx-auto px-6 grid gap-6 md:grid-cols-2">
-            {ROOMS.map((room) => (
+            {rooms.map((room) => (
               <article key={room.id} className={`relative overflow-hidden rounded-[2rem] border p-8 md:p-10 ${room.card}`}>
                 <div className={`pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full blur-3xl ${room.glow}`} />
                 <p className={`relative inline-flex rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] ${room.chip}`}>

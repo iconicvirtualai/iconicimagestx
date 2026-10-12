@@ -16,6 +16,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Routes, Route, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { AuthProvider } from "./contexts/AuthContext";
+import { SiteContentProvider } from "./content/siteContent";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { LocalBusinessJsonLd } from "./components/LocalBusinessJsonLd";
 import SiteMeta from "./components/SiteMeta";
@@ -55,7 +56,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminListingFile from "./pages/AdminListingFile";
 import AdminCustomerCenter from "./pages/AdminCustomerCenter";
 import AdminClientAccount from "./pages/AdminClientAccount";
-import AdminSiteCustomizer from "./pages/AdminSiteCustomizer";
+import AdminSiteEditor from "./pages/AdminSiteEditor";
 import AdminEmailTemplates from "./pages/AdminEmailTemplates";
 import AdminCurrentPricing from "./pages/AdminCurrentPricing";
 import AdminOrderDetail from "./pages/AdminOrderDetail";
@@ -106,6 +107,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <SiteContentProvider>
         <LocalBusinessJsonLd />
         <ScrollToTop />
         <SiteMeta />
@@ -194,7 +196,7 @@ const App = () => (
             <Route path="/admin/upload" element={<ProtectedRoute requiredRole="photographer"><AdminUpload /></ProtectedRoute>} />
             <Route path="/admin/editor" element={<ProtectedRoute requiredRole="editor"><AdminEditor /></ProtectedRoute>} />
             <Route path="/admin/team" element={<ProtectedRoute requiredRole="admin"><AdminTeam /></ProtectedRoute>} />
-            <Route path="/admin/edit-site" element={<ProtectedRoute requiredRole="admin"><AdminSiteCustomizer /></ProtectedRoute>} />
+            <Route path="/admin/edit-site" element={<ProtectedRoute requiredRole="staff"><AdminSiteEditor /></ProtectedRoute>} />
             <Route path="/admin/email-templates" element={<ProtectedRoute requiredRole="admin"><AdminEmailTemplates /></ProtectedRoute>} />
             <Route path="/admin/current-pricing" element={<ProtectedRoute requiredRole="admin"><AdminCurrentPricing /></ProtectedRoute>} />
             
@@ -212,6 +214,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
+        </SiteContentProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

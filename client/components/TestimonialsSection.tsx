@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Star, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CLIENT_REVIEWS, reviewMonogram, type ClientReview } from "@/lib/clientReviews";
+import { useSiteHref, useSiteText } from "@/content/siteContent";
 
 function cardsPerView() {
   if (typeof window === "undefined") return 3;
@@ -16,6 +17,11 @@ function pageCount(total: number, perView: number) {
 }
 
 export default function TestimonialsSection() {
+  const badge = useSiteText("home", "reviews", "badge", "TESTIMONIALS");
+  const title = useSiteText("home", "reviews", "title", "What our clients are saying");
+  const body = useSiteText("home", "reviews", "body", "Agents and businesses trust Iconic Images for listing photography, video, and a fast, professional turnaround.");
+  const cta = useSiteText("home", "reviews", "cta", "Book a shoot");
+  const ctaHref = useSiteHref("home", "reviews", "cta", "/book");
   const [perView, setPerView] = useState(cardsPerView);
   const [page, setPage] = useState(0);
   const pages = pageCount(CLIENT_REVIEWS.length, perView);
@@ -41,21 +47,21 @@ export default function TestimonialsSection() {
     <section className="bg-gray-50 py-20 md:py-24 overflow-hidden" aria-labelledby="client-reviews-heading">
       <div className="container mx-auto px-4 text-center max-w-6xl">
         <div className="inline-flex items-center px-4 py-1.5 rounded-md bg-white border border-[#ccfbf1] mb-8 shadow-sm">
-          <span className="text-[12px] font-bold tracking-wider text-[#0d9488] uppercase">
-            TESTIMONIALS
+          <span data-site-page="home" data-site-block="reviews" data-site-field="badge" data-site-kind="text" className="text-[12px] font-bold tracking-wider text-[#0d9488] uppercase">
+            {badge}
           </span>
         </div>
 
-        <h2 id="client-reviews-heading" className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6 leading-[1.2] tracking-tight text-black max-w-4xl mx-auto">
-          What our clients are saying
+        <h2 id="client-reviews-heading" data-site-page="home" data-site-block="reviews" data-site-field="title" data-site-kind="text" className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6 leading-[1.2] tracking-tight text-black max-w-4xl mx-auto">
+          {title}
         </h2>
-        <p className="text-base md:text-lg text-gray-500 mb-10 max-w-3xl mx-auto leading-relaxed">
-          Agents and businesses trust Iconic Images for listing photography, video, and a fast, professional turnaround.
+        <p data-site-page="home" data-site-block="reviews" data-site-field="body" data-site-kind="text" className="text-base md:text-lg text-gray-500 mb-10 max-w-3xl mx-auto leading-relaxed">
+          {body}
         </p>
 
         <div className="mb-20">
           <Button asChild className="bg-[#0f766e] text-white hover:bg-[#0d9488] font-bold text-lg px-12 py-7 rounded-xl shadow-lg shadow-teal-100 transition-all hover:scale-105">
-            <Link to="/book">Book a shoot &rarr;</Link>
+            <Link to={ctaHref} data-site-page="home" data-site-block="reviews" data-site-field="cta" data-site-kind="text">{cta} &rarr;</Link>
           </Button>
         </div>
 

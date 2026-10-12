@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { CheckCircle2, Sparkles, UserCheck } from "lucide-react";
 import { beforeAfterById, type BeforeAfterPair } from "@/lib/beforeAfter";
+import { useSiteHref, useSiteText } from "@/content/siteContent";
 
 const SHOWCASE: BeforeAfterPair[] = [
   beforeAfterById("pavilion-lifestyle"),
@@ -10,6 +11,14 @@ const SHOWCASE: BeforeAfterPair[] = [
 ];
 
 export default function VirtualStaging() {
+  const titleLead = useSiteText("virtualStaging", "hero", "titleLead", "AI");
+  const titleAccent = useSiteText("virtualStaging", "hero", "titleAccent", "Virtual Staging");
+  const intro = useSiteText("virtualStaging", "hero", "body", "Transform empty spaces into beautifully furnished rooms instantly. Our AI-powered staging helps buyers visualize their future home.");
+  const freeLine = useSiteText("virtualStaging", "hero", "free", "Try for free");
+  const ctaHref = useSiteHref("virtualStaging", "hero", "cta", "/services/virtual-staging/select");
+  const priceLead = useSiteText("virtualStaging", "pricing", "titleLead", "Flexible");
+  const priceAccent = useSiteText("virtualStaging", "pricing", "titleAccent", "Pricing");
+  const priceBody = useSiteText("virtualStaging", "pricing", "body", "Choose between our lightning-fast AI tool or professional human edits for the ultimate quality.");
   return (
     <Layout>
       <div className="bg-white text-black">
@@ -17,20 +26,19 @@ export default function VirtualStaging() {
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center mb-16">
             <h1 className="text-4xl md:text-6xl font-bold mb-6 tracking-tight">
-              AI <span className="text-[#0d9488]">Virtual Staging</span>
+              <span data-site-page="virtualStaging" data-site-block="hero" data-site-field="titleLead" data-site-kind="text">{titleLead}</span> <span className="text-[#0d9488]" data-site-page="virtualStaging" data-site-block="hero" data-site-field="titleAccent" data-site-kind="text">{titleAccent}</span>
             </h1>
             <p className="text-xl text-gray-500 mb-8 leading-relaxed">
-              Transform empty spaces into beautifully furnished rooms instantly. 
-              Our AI-powered staging helps buyers visualize their future home.
+              <span data-site-page="virtualStaging" data-site-block="hero" data-site-field="body" data-site-kind="text">{intro}</span>
             </p>
             
             {/* Try for Free Text */}
             <p className="text-[#0d9488] font-bold text-sm uppercase tracking-widest mb-4">
-              Try for free
+              <span data-site-page="virtualStaging" data-site-block="hero" data-site-field="free" data-site-kind="text">{freeLine}</span>
             </p>
             
             <div className="flex flex-wrap justify-center gap-4">
-              <Link to="/services/virtual-staging/select">
+              <Link to={ctaHref} data-site-page="virtualStaging" data-site-block="hero" data-site-field="cta" data-site-kind="text">
                 <Button className="bg-[#0d9488] hover:bg-[#0f766e] text-white px-8 py-6 text-lg rounded-xl shadow-lg">
                   Upload Your Photos
                 </Button>
@@ -102,8 +110,8 @@ export default function VirtualStaging() {
           {/* Pricing Section */}
           <div className="mb-24">
             <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-5xl font-bold mb-4 tracking-tight">Flexible <span className="text-[#0d9488]">Pricing</span></h2>
-              <p className="text-gray-500 max-w-2xl mx-auto">Choose between our lightning-fast AI tool or professional human edits for the ultimate quality.</p>
+              <h2 className="text-3xl md:text-5xl font-bold mb-4 tracking-tight"><span data-site-page="virtualStaging" data-site-block="pricing" data-site-field="titleLead" data-site-kind="text">{priceLead}</span> <span className="text-[#0d9488]" data-site-page="virtualStaging" data-site-block="pricing" data-site-field="titleAccent" data-site-kind="text">{priceAccent}</span></h2>
+              <p data-site-page="virtualStaging" data-site-block="pricing" data-site-field="body" data-site-kind="text" className="text-gray-500 max-w-2xl mx-auto">{priceBody}</p>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
@@ -146,7 +154,7 @@ export default function VirtualStaging() {
                   </li>
                 </ul>
 
-                <Link to="/services/virtual-staging/select">
+                <Link to={ctaHref}>
                   <Button className="w-full bg-black text-white hover:bg-gray-800 py-6 rounded-xl font-bold">
                     Get Started
                   </Button>
@@ -196,7 +204,7 @@ export default function VirtualStaging() {
                   </li>
                 </ul>
 
-                <Link to="/services/virtual-staging/select">
+                <Link to={ctaHref}>
                   <Button className="w-full bg-[#0d9488] hover:bg-[#0f766e] text-white py-6 rounded-xl font-bold border-none shadow-lg shadow-teal-900/20">
                     Order Professional Staging
                   </Button>

@@ -59,6 +59,7 @@ export default defineConfig({
         "googleapis",
         "zod",
         "serverless-http",
+        "sharp",
       ],
       output: {
         format: "es",

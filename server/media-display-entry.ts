@@ -6,6 +6,7 @@ import "dotenv/config";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import admin from "firebase-admin";
 import { handleMediaDisplay } from "./routes/mediaDisplay";
+import { createServer } from "./index";
 
 if (!admin.apps.length) {
   const bucket = process.env.VITE_FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET;
@@ -45,6 +46,13 @@ function adapt(res: ServerResponse): DisplayResponse {
   return wrapped;
 }
 
+let siteApp: ReturnType<typeof createServer> | null = null;
+
 export default function mediaDisplayHandler(req: IncomingMessage, res: ServerResponse) {
+  const url = req.url || "";
+  if (url.startsWith("/api/site-content/media") || url.startsWith("/api/site-content/dropbox")) {
+    if (!siteApp) siteApp = createServer();
+    return siteApp(req as never, res as never);
+  }
   return handleMediaDisplay(req as never, adapt(res) as never, (() => undefined) as never);
 }

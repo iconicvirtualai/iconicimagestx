@@ -1,9 +1,14 @@
 import * as React from "react";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
 
 export default function FAQSection() {
   const settings = useSiteSettings();
-  const faqs = [
+  const customFaqs = useSiteItems("home", "faq");
+  const faqs = customFaqs ? customFaqs.map((item) => ({
+    question: itemText(item, "question"),
+    answer: itemText(item, "answer"),
+  })) : [
     {
       question: "How long does video processing take?",
       answer: "Typically, our high-end media assets are delivered within 24 hours of capture. Our rapid post-production workflow is optimized for social media timelines.",
@@ -30,15 +35,15 @@ export default function FAQSection() {
         {/* Section Header */}
         <div className="text-center mb-20">
           <div className="inline-flex items-center px-4 py-1.5 rounded-md bg-black border border-black mb-8 shadow-lg">
-            <span className="text-[12px] font-bold tracking-wider uppercase accent-text-bordered">
-              FAQ
+            <span data-site-page="home" data-site-block="faq" data-site-field="badge" data-site-kind="text" className="text-[12px] font-bold tracking-wider uppercase accent-text-bordered">
+              {useSiteText("home", "faq", "badge", "FAQ")}
             </span>
           </div>
           <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold mb-6 leading-[1.2] tracking-tight text-black max-w-5xl mx-auto text-balance [overflow-wrap:normal] [word-break:normal]">
-            Got questions? We've got <span className="whitespace-nowrap"><span className="accent-text-bordered">answers</span>.</span>
+            <span data-site-page="home" data-site-block="faq" data-site-field="title" data-site-kind="text">{useSiteText("home", "faq", "title", "Got questions? We've got answers.")}</span>
           </h2>
           <p className="text-lg md:text-xl text-gray-500 max-w-2xl mx-auto leading-relaxed">
-            Everything you need to know about Iconic in a nutshell.
+            <span data-site-page="home" data-site-block="faq" data-site-field="body" data-site-kind="text">{useSiteText("home", "faq", "body", "Everything you need to know about Iconic in a nutshell.")}</span>
           </p>
         </div>
 

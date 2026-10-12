@@ -2,11 +2,13 @@ import { Link } from "react-router-dom";
 import LegalDocument, { legalScrollMarginClassName } from "@/components/LegalDocument";
 import LegalContact from "@/components/LegalContact";
 import { LEGAL } from "@/lib/legal";
+import { useSiteText } from "@/content/siteContent";
 
 export default function Terms() {
+  const title = useSiteText("terms", "hero", "title", "Terms and Conditions");
   return (
     <LegalDocument>
-          <h1 id="terms-and-conditions" className={`${legalScrollMarginClassName} text-4xl font-bold text-gray-900 mb-2`}>Terms and Conditions</h1>
+          <h1 id="terms-and-conditions" data-site-page="terms" data-site-block="hero" data-site-field="title" data-site-kind="text" className={`${legalScrollMarginClassName} text-4xl font-bold text-gray-900 mb-2`}>{title}</h1>
           <p className="text-sm text-gray-500 mb-4">Last updated: {LEGAL.lastUpdated}</p>
           <p className="text-sm text-gray-600 mb-10">
             These Terms and Conditions are the terms of service for {LEGAL.brand} / {LEGAL.brandSite}. They are a

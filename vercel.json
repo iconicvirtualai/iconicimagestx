@@ -67,6 +67,14 @@
       "destination": "/api/media-display"
     },
     {
+      "source": "/api/site-content/media",
+      "destination": "/api/media-display"
+    },
+    {
+      "source": "/api/site-content/dropbox",
+      "destination": "/api/media-display"
+    },
+    {
       "source": "/api",
       "destination": "/api/index"
     },

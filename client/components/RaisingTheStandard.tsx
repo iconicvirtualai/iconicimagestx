@@ -1,8 +1,15 @@
 import { motion } from "framer-motion";
 import { Quote } from "lucide-react";
 import { FEATURED_REVIEW, reviewMonogram } from "@/lib/clientReviews";
+import { useSiteText } from "@/content/siteContent";
+
+const RAISING_BODY = "We don’t follow trends. We break patterns. We don’t undercut. We outperform.";
 
 export default function RaisingTheStandard() {
+  const titleLead = useSiteText("home", "raising", "titleLead", "We");
+  const titleAccent = useSiteText("home", "raising", "titleAccent", "ARE");
+  const titleTail = useSiteText("home", "raising", "titleTail", "the Bar.");
+  const body = useSiteText("home", "raising", "body", RAISING_BODY);
   return (
     <section className="py-24 bg-black overflow-hidden border-t border-white/5">
       <div className="container mx-auto px-4">
@@ -37,10 +44,15 @@ export default function RaisingTheStandard() {
               transition={{ duration: 0.8 }}
             >
               <h2 className="text-4xl md:text-5xl font-black mb-8 tracking-tight text-white uppercase">
-                We <span className="text-teal-400">ARE</span> the Bar.
+                <span data-site-page="home" data-site-block="raising" data-site-field="titleLead" data-site-kind="text">{titleLead}</span>{" "}
+                <span className="text-teal-400" data-site-page="home" data-site-block="raising" data-site-field="titleAccent" data-site-kind="text">{titleAccent}</span>{" "}
+                <span data-site-page="home" data-site-block="raising" data-site-field="titleTail" data-site-kind="text">{titleTail}</span>
               </h2>
 
-              <div className="space-y-6 text-xl md:text-2xl text-gray-400 leading-relaxed font-medium">
+              {body !== RAISING_BODY ? (
+                <p data-site-page="home" data-site-block="raising" data-site-field="body" data-site-kind="text" className="text-xl md:text-2xl text-gray-400 leading-relaxed font-medium">{body}</p>
+              ) : null}
+              <div data-site-page="home" data-site-block="raising" data-site-field="body" data-site-kind="text" className={`space-y-6 text-xl md:text-2xl text-gray-400 leading-relaxed font-medium ${body !== RAISING_BODY ? "hidden" : ""}`}>
                 <p>
                   We don’t follow <span className="text-white font-bold">trends.</span><br />
                   We break <span className="text-teal-400 font-bold italic">patterns.</span>

@@ -2,10 +2,14 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { AI_BEFORE_AFTER } from "@/lib/beforeAfter";
+import { itemText, useSiteItems, useSiteText } from "@/content/siteContent";
 import BeforeAfterTile from "./BeforeAfterTile";
 
 export default function MediaCarousel() {
   const settings = useSiteSettings();
+  const customPairs = useSiteItems("home", "beforeAfter");
+  const beforeLabel = useSiteText("home", "beforeAfter", "beforeLabel", "Before");
+  const afterLabel = useSiteText("home", "beforeAfter", "afterLabel", "After");
 
   // Use settings from site_settings.json if available, otherwise fallback to these defaults
   const mediaPairs = settings.homepage.mediaCarousel?.length > 0
@@ -44,7 +48,17 @@ export default function MediaCarousel() {
     aspect: "16/9" as const,
   }));
 
-  const carouselPairs = [...stillPairs, ...mediaPairs];
+  const contentPairs = customPairs?.map((item) => ({
+    id: item.id,
+    before: { type: "image" as const, url: itemText(item, "before") },
+    after: {
+      type: (item.fields.find((field) => field.id === "after")?.kind === "video" ? "video" : "image") as "image" | "video",
+      url: itemText(item, "after"),
+    },
+    aspect: "16/9" as const,
+  }));
+
+  const carouselPairs = contentPairs ?? [...stillPairs, ...mediaPairs];
 
   // Double the items for seamless loop
   const displayPairs = [...carouselPairs, ...carouselPairs, ...carouselPairs];
@@ -69,9 +83,9 @@ export default function MediaCarousel() {
     <div className="relative w-full overflow-hidden bg-black pb-24">
       {/* Before / After Centered Indicator Above Tracks */}
       <div className="flex items-center justify-center gap-6 mb-12 animate-pulse-slow">
-        <span className="text-[10px] md:text-[12px] font-black uppercase tracking-[0.5em] text-gray-500">Before</span>
+        <span data-site-page="home" data-site-block="beforeAfter" data-site-field="beforeLabel" data-site-kind="text" className="text-[10px] md:text-[12px] font-black uppercase tracking-[0.5em] text-gray-500">{beforeLabel}</span>
         <div className="w-16 h-[1px] bg-white/10"></div>
-        <span className="text-[10px] md:text-[12px] font-black uppercase tracking-[0.5em] text-white">After</span>
+        <span data-site-page="home" data-site-block="beforeAfter" data-site-field="afterLabel" data-site-kind="text" className="text-[10px] md:text-[12px] font-black uppercase tracking-[0.5em] text-white">{afterLabel}</span>
       </div>
 
       {/* Separation Bar - Fixed in Center */}

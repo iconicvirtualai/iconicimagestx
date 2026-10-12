@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { findField } from "@shared/siteEditor";
+import { useSiteContent } from "@/content/siteContent";
 
 // Default Site Settings Schema
 export const DEFAULT_SITE_SETTINGS = {
@@ -136,5 +138,21 @@ export function useSiteSettings() {
     };
   }, []);
 
-  return settings;
+  const { pages } = useSiteContent();
+  const chrome = pages.find((page) => page.id === "chrome");
+  if (!chrome) return settings;
+  const color = findField(chrome, "brand", "primaryColor")?.value;
+  const logo = findField(chrome, "brand", "logoText")?.value;
+  const promo = findField(chrome, "promo", "text")?.value;
+  const visible = findField(chrome, "promo", "visible")?.value;
+  return {
+    ...settings,
+    global: {
+      ...settings.global,
+      ...(color ? { primaryColor: color } : {}),
+      ...(logo ? { logoText: logo } : {}),
+      ...(promo ? { promoBarText: promo } : {}),
+      ...(visible === "true" || visible === "false" ? { showPromoBar: visible === "true" } : {}),
+    },
+  };
 }

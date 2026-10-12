@@ -1,4 +1,6 @@
+import { Fragment, type ReactNode } from "react";
 import Layout from "@/components/Layout";
+import { useSitePage } from "@/content/siteContent";
 import HeroSection from "@/components/HeroSection";
 import MediaCarousel from "@/components/MediaCarousel";
 import SolutionSection from "@/components/SolutionSection";
@@ -18,6 +20,35 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 export default function Index() {
   const settings = useSiteSettings();
+  const home = useSitePage("home");
+
+  const sections: Record<string, ReactNode> = {
+    hero: <HeroSection />,
+    beforeAfter: <MediaCarousel />,
+    raising: <RaisingTheStandard />,
+    market: <ThisIsOurMarket />,
+    solution: <SolutionSection />,
+    stats: <StatsBar />,
+    steps: <StepsSection />,
+    network: <TheNetwork />,
+    audience: <AudienceSection />,
+    audienceDetails: <AudienceDetails />,
+    snapReels: <SnapReelsStrip />,
+    features: <FeaturesSection />,
+    reviews: <TestimonialsSection />,
+    faq: <FAQSection />,
+    partnership: <PartnershipCTA />,
+  };
+
+  if (home) {
+    return (
+      <Layout>
+        {home.blocks.filter((block) => !block.hidden && sections[block.id]).map((block) => (
+          <Fragment key={block.id}>{sections[block.id]}</Fragment>
+        ))}
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
