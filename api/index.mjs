@@ -244,7 +244,7 @@ function narrowGatedClientRecipients(input, env = process.env) {
     held
   };
 }
-const db$r = () => admin.firestore();
+const db$s = () => admin.firestore();
 class EmailNotConfiguredError extends Error {
   code = "email_not_configured";
   constructor() {
@@ -298,7 +298,7 @@ async function sendEmail(options) {
   let htmlBody = html || getFallbackTemplate(template, variables);
   try {
     if (!html && admin.apps.length) {
-      const templateDoc = await db$r().collection("emailTemplates").where("category", "==", template).where("isActive", "==", true).limit(1).get();
+      const templateDoc = await db$s().collection("emailTemplates").where("category", "==", template).where("isActive", "==", true).limit(1).get();
       if (!templateDoc.empty) {
         const tmpl = templateDoc.docs[0].data();
         if (!subjectOverride && typeof tmpl.subject === "string" && tmpl.subject.trim()) {
@@ -642,7 +642,7 @@ function addressText(value) {
   if (typeof value === "string") return value.trim();
   if (typeof value !== "object" || Array.isArray(value)) return "";
   const address = value;
-  const formatted = text$g(address.formatted) || text$g(address.label);
+  const formatted = text$h(address.formatted) || text$h(address.label);
   if (formatted) return formatted;
   return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
 }
@@ -655,7 +655,7 @@ function recordAddressText(record) {
   }
   return "";
 }
-function text$g(value) {
+function text$h(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const services = [
@@ -1369,7 +1369,7 @@ function findCatalogItem(catalog, id) {
   const priced = matches.filter((item) => item.price === price);
   return priced.length === 1 ? priced[0] : void 0;
 }
-function roundMoney$5(value) {
+function roundMoney$6(value) {
   return Math.round(value * 100) / 100;
 }
 function catalogLineName(pkg, qty = 1) {
@@ -1383,13 +1383,13 @@ function catalogLineName(pkg, qty = 1) {
 }
 function catalogLine(pkg, qty = 1) {
   const count = qty > 0 ? qty : 1;
-  const unitPrice = roundMoney$5(pkg.price);
+  const unitPrice = roundMoney$6(pkg.price);
   const line = {
     id: pkg.bookingId || pkg.id,
     name: catalogLineName(pkg, count),
     unitPrice,
     qty: count,
-    price: roundMoney$5(unitPrice * count)
+    price: roundMoney$6(unitPrice * count)
   };
   if (pkg.description) line.description = pkg.description;
   if (pkg.category) line.category = pkg.category;
@@ -1604,7 +1604,7 @@ function resolveSubmittedBooking(body, catalog) {
   }
   return {
     lineItems,
-    total: roundMoney$5(sumLineItemPrices(lineItems)),
+    total: roundMoney$6(sumLineItemPrices(lineItems)),
     promoCode: promo?.code ?? null,
     promoDiscount: promo?.discount ?? 0,
     selectedService: selectedService || null,
@@ -1891,7 +1891,7 @@ function applyServerTravel(lineItems, address, clientTravelFeeCents) {
   const next = [...kept, travelInvoiceLine(travel)];
   return {
     lineItems: next,
-    total: roundMoney$4(sumLineItemPrices(next)),
+    total: roundMoney$5(sumLineItemPrices(next)),
     travel
   };
 }
@@ -1954,17 +1954,17 @@ function zipFrom(value) {
 function finiteOrNull(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
-function sidebarMoney(cents) {
-  const dollars = cents / 100;
-  return Number.isInteger(dollars) ? `$${dollars}` : `$${dollars.toFixed(2)}`;
+function sidebarMoney(cents2) {
+  const dollars2 = cents2 / 100;
+  return Number.isInteger(dollars2) ? `$${dollars2}` : `$${dollars2.toFixed(2)}`;
 }
-function emailMoney(cents) {
-  return `$${(cents / 100).toFixed(2)}`;
+function emailMoney(cents2) {
+  return `$${(cents2 / 100).toFixed(2)}`;
 }
 function roundMiles(miles) {
   return Math.round(miles * 100) / 100;
 }
-function roundMoney$4(value) {
+function roundMoney$5(value) {
   return Math.round(value * 100) / 100;
 }
 function toRad(degrees) {
@@ -2221,16 +2221,16 @@ const SETTLED$1 = /* @__PURE__ */ new Set(["paid", "comped"]);
 function isGuessableInvoiceId(id) {
   return id.startsWith("listing_") || id.startsWith("ordreq_") || id.startsWith("playtest-");
 }
-function text$f(value) {
+function text$g(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function settled$1(invoice) {
-  return SETTLED$1.has(text$f(invoice?.status).toLowerCase());
+  return SETTLED$1.has(text$g(invoice?.status).toLowerCase());
 }
 function invoicePayLinkFor(invoice, env, extra) {
   if (!invoice || settled$1(invoice)) return null;
-  const id = text$f(invoice.id);
-  const token = text$f(invoice.payToken);
+  const id = text$g(invoice.id);
+  const token = text$g(invoice.payToken);
   if (!id || !token) return null;
   const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
   url.searchParams.set("t", token);
@@ -2241,7 +2241,7 @@ function clientInvoiceUrl(invoice, env, extra) {
   const tokenized = invoicePayLinkFor(invoice, env, extra);
   if (tokenized) return tokenized;
   if (!invoice || settled$1(invoice)) return null;
-  const id = text$f(invoice.id);
+  const id = text$g(invoice.id);
   if (!id || isGuessableInvoiceId(id)) return null;
   const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
   applyQuery(url, extra);
@@ -2250,7 +2250,7 @@ function clientInvoiceUrl(invoice, env, extra) {
 function applyQuery(url, extra) {
   if (!extra) return;
   for (const [key, value] of Object.entries(extra)) {
-    const textValue = text$f(value);
+    const textValue = text$g(value);
     if (textValue && key !== "t") url.searchParams.set(key, textValue);
   }
 }
@@ -2886,10 +2886,10 @@ function clockTime(value) {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 function storedAmount(value) {
-  if (typeof value === "number" && Number.isFinite(value)) return roundMoney$3(value);
+  if (typeof value === "number" && Number.isFinite(value)) return roundMoney$4(value);
   if (typeof value === "string" && value.trim()) {
     const parsed = Number(value.replace(/[$,\s]/g, ""));
-    if (Number.isFinite(parsed)) return roundMoney$3(parsed);
+    if (Number.isFinite(parsed)) return roundMoney$4(parsed);
   }
   return null;
 }
@@ -2955,7 +2955,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
       createdAt: data.createdAt
     }, now),
     status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
-    clientName: text$e(data.clientName),
+    clientName: text$f(data.clientName),
     address: addressText(data.billToAddress || data.address || data.propertyAddress),
     createdAt,
     issuedOn: formatPortalDate(data.createdAt) || formatPortalDate(data.sentAt) || formatPortalDate(data.paidAt),
@@ -2965,7 +2965,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
     fees: storedAmount(data.fees),
     travel: storedAmount(data.travel),
     promoDiscount: storedAmount(data.promoDiscount),
-    promoCode: text$e(data.promoCode),
+    promoCode: text$f(data.promoCode),
     tax: storedAmount(data.tax),
     total: storedAmount(data.total),
     amountPaid: storedAmount(data.amountPaid),
@@ -3017,15 +3017,15 @@ function storedLines(lineItems, services2) {
     if (typeof item === "string" && item.trim()) return [{ name: item.trim(), qty: null, amount: null }];
     if (!item || typeof item !== "object") return [];
     const record = item;
-    const named = text$e(record.name) || text$e(record.label);
-    const description = text$e(record.description);
+    const named = text$f(record.name) || text$f(record.label);
+    const description = text$f(record.description);
     const name = named || description;
     const qty = storedQty(record.qty ?? record.quantity);
     const amount = storedAmount(record.price ?? record.amount ?? record.total);
     if (!name && amount == null && qty == null) return [];
     const line = { name: name || "Line item", qty, amount };
-    const id = text$e(record.id);
-    const category = text$e(record.category);
+    const id = text$f(record.id);
+    const category = text$f(record.category);
     if (id) line.id = id;
     if (category) line.category = category;
     if (named && description) line.description = description;
@@ -3061,10 +3061,10 @@ function isoStamp(value) {
   if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
   return null;
 }
-function text$e(value) {
+function text$f(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function roundMoney$3(value) {
+function roundMoney$4(value) {
   return Math.round(value * 100) / 100;
 }
 const MONTHS = {
@@ -3292,17 +3292,17 @@ async function listCalendarScheduleEvents({
   const readFailures = results.filter((result) => result.status === "rejected").length;
   return { configured: true, events, readFailures };
 }
-const db$q = () => admin.firestore();
+const db$r = () => admin.firestore();
 async function upsertPortalClient(input) {
   const email = normalizeEmail$1(input.email);
   const firstName = cleanPersonName(input.firstName);
   const lastName = cleanPersonName(input.lastName);
   const phone = String(input.phone || "").trim().slice(0, 40);
   const now = admin.firestore.FieldValue.serverTimestamp();
-  const existing = email ? await db$q().collection("clients").where("email", "==", email).limit(5).get() : null;
+  const existing = email ? await db$r().collection("clients").where("email", "==", email).limit(5).get() : null;
   const linked = existing?.docs.find((doc) => doc.id !== input.uid);
   const linkedData = linked?.data() || {};
-  const uidRef = db$q().collection("clients").doc(input.uid);
+  const uidRef = db$r().collection("clients").doc(input.uid);
   const uidSnap = await uidRef.get();
   const previous = uidSnap.exists ? uidSnap.data() || {} : {};
   await uidRef.set({
@@ -3334,7 +3334,7 @@ async function upsertPortalClient(input) {
 }
 async function resolveClientIdentity(uid, email) {
   const ids = /* @__PURE__ */ new Set([uid]);
-  const direct = await db$q().collection("clients").doc(uid).get();
+  const direct = await db$r().collection("clients").doc(uid).get();
   let profile = direct.exists ? { id: direct.id, ...direct.data() } : null;
   const redirectId = typeof profile?._redirect === "string" ? profile._redirect : "";
   if (redirectId) ids.add(redirectId);
@@ -3342,14 +3342,14 @@ async function resolveClientIdentity(uid, email) {
   if (linkedId) ids.add(linkedId);
   const normalized = normalizeEmail$1(email || profile?.email);
   if (normalized) {
-    const matches = await db$q().collection("clients").where("email", "==", normalized).limit(10).get();
+    const matches = await db$r().collection("clients").where("email", "==", normalized).limit(10).get();
     for (const doc of matches.docs) {
       ids.add(doc.id);
       if (!profile) profile = { id: doc.id, ...doc.data() };
     }
   }
   if (redirectId && profile && !profile.email) {
-    const real = await db$q().collection("clients").doc(redirectId).get();
+    const real = await db$r().collection("clients").doc(redirectId).get();
     if (real.exists) profile = { id: real.id, ...real.data(), portalDocId: uid };
   }
   return { ids: [...ids], profile, email: normalized };
@@ -3378,7 +3378,7 @@ function planBookingAccount(input) {
     skipReason: null
   };
 }
-const db$p = () => admin.firestore();
+const db$q = () => admin.firestore();
 async function attachBookingClient(input) {
   const email = normalizeEmail$1(input.email);
   if (!email || !email.includes("@")) {
@@ -3387,7 +3387,7 @@ async function attachBookingClient(input) {
   const firstName = cleanPersonName(input.firstName) || "Client";
   const lastName = cleanPersonName(input.lastName);
   const phone = String(input.phone || "").trim().slice(0, 40);
-  const staffHit = await db$p().collection("staff").where("email", "==", email).limit(1).get();
+  const staffHit = await db$q().collection("staff").where("email", "==", email).limit(1).get();
   let authUid = null;
   if (staffHit.empty) {
     try {
@@ -3469,7 +3469,7 @@ async function sendFirebasePasswordEmail(email) {
 }
 async function createRequestedAppointment(input) {
   const now = admin.firestore.FieldValue.serverTimestamp();
-  await db$p().collection("appointments").add({
+  await db$q().collection("appointments").add({
     orderRequestId: input.orderRequestId,
     clientId: input.clientId,
     clientName: input.clientName,
@@ -3529,40 +3529,40 @@ function bookingListingGroups(input) {
   for (const doc of requests) {
     const node = nodeId("orderRequests", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("listings", text$d(doc.data.listingId)));
-    uf.link(node, nodeId("orders", text$d(doc.data.orderId) || text$d(doc.data.convertedToOrderId)));
-    uf.link(node, nodeId("invoices", text$d(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$d(doc.data.galleryId)));
+    uf.link(node, nodeId("listings", text$e(doc.data.listingId)));
+    uf.link(node, nodeId("orders", text$e(doc.data.orderId) || text$e(doc.data.convertedToOrderId)));
+    uf.link(node, nodeId("invoices", text$e(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$e(doc.data.galleryId)));
   }
   for (const doc of orders) {
     const node = nodeId("orders", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$d(doc.data.orderRequestId)));
-    uf.link(node, nodeId("listings", text$d(doc.data.listingId)));
-    uf.link(node, nodeId("invoices", text$d(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$d(doc.data.galleryId)));
+    uf.link(node, nodeId("orderRequests", text$e(doc.data.orderRequestId)));
+    uf.link(node, nodeId("listings", text$e(doc.data.listingId)));
+    uf.link(node, nodeId("invoices", text$e(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$e(doc.data.galleryId)));
   }
   for (const doc of invoices) {
     const node = nodeId("invoices", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$d(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$d(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$d(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$e(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$e(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$e(doc.data.listingId)));
   }
   for (const doc of appointments) {
     const node = nodeId("appointments", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$d(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$d(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$d(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$e(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$e(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$e(doc.data.listingId)));
   }
   for (const doc of galleries) {
     const node = nodeId("galleries", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$d(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$d(doc.data.orderId)));
-    uf.link(node, nodeId("invoices", text$d(doc.data.invoiceId)));
-    uf.link(node, nodeId("listings", text$d(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$e(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$e(doc.data.orderId)));
+    uf.link(node, nodeId("invoices", text$e(doc.data.invoiceId)));
+    uf.link(node, nodeId("listings", text$e(doc.data.listingId)));
   }
   const groups = [];
   for (const nodes of uf.components()) {
@@ -3622,7 +3622,7 @@ function fillEmptyListingFields(existing, desired) {
   return patch;
 }
 function clientOwnsListing(listing, clients) {
-  const clientId2 = text$d(listing.clientId);
+  const clientId2 = text$e(listing.clientId);
   const email = normalizeEmail$1(listing.clientEmail || listing.email);
   if (!clientId2 && !email) return true;
   if (clientId2 && clients.ids.includes(clientId2)) return true;
@@ -3694,10 +3694,10 @@ function chooseListing(group, listings, clients) {
 }
 function listingMatches(doc, group) {
   if (doc.id === group.stableId || group.preferredListingIds.includes(doc.id)) return true;
-  const requestId = text$d(doc.data.orderRequestId);
-  const orderId = text$d(doc.data.orderId);
-  const invoiceId = text$d(doc.data.invoiceId);
-  const appointmentId = text$d(doc.data.appointmentId);
+  const requestId = text$e(doc.data.orderRequestId);
+  const orderId = text$e(doc.data.orderId);
+  const invoiceId = text$e(doc.data.invoiceId);
+  const appointmentId = text$e(doc.data.appointmentId);
   return Boolean(
     requestId && group.orderRequestIds.includes(requestId) || orderId && group.orderIds.includes(orderId) || invoiceId && group.invoiceIds.includes(invoiceId) || appointmentId && group.appointmentIds.includes(appointmentId)
   );
@@ -3707,7 +3707,7 @@ function linksFor(group, listingId, listings, clients) {
   const links = [];
   const push = (collection, docs) => {
     for (const doc of docs) {
-      const current = text$d(doc.data.listingId);
+      const current = text$e(doc.data.listingId);
       if (current === listingId) continue;
       if (current && isPortalListingId(current) && ownedIds.has(current)) continue;
       links.push({ collection, id: doc.id });
@@ -3724,7 +3724,7 @@ function clientsFor(group, identity) {
   const ids = /* @__PURE__ */ new Set();
   const emails = /* @__PURE__ */ new Set();
   const addId = (value) => {
-    const id = text$d(value);
+    const id = text$e(value);
     if (id) ids.add(id);
   };
   const addEmail = (value) => {
@@ -3743,7 +3743,7 @@ function clientsFor(group, identity) {
 function preferredListingIds(group) {
   const ids = [];
   const push = (value) => {
-    const id = text$d(value);
+    const id = text$e(value);
     if (id && isPortalListingId(id) && !ids.includes(id)) ids.push(id);
   };
   for (const doc of [...group.orderRequests, ...group.orders, ...group.invoices, ...group.appointments, ...group.galleries]) {
@@ -3778,9 +3778,9 @@ function bestAddress(group) {
   }
   for (const doc of propertyDocs(group)) {
     for (const key of ["address", "propertyAddress", "shootLocation"]) {
-      if (typeof doc.data[key] === "string" && text$d(doc.data[key])) return text$d(doc.data[key]);
+      if (typeof doc.data[key] === "string" && text$e(doc.data[key])) return text$e(doc.data[key]);
     }
-    if (text$d(doc.data.addressLabel)) return text$d(doc.data.addressLabel);
+    if (text$e(doc.data.addressLabel)) return text$e(doc.data.addressLabel);
   }
   return null;
 }
@@ -3796,7 +3796,7 @@ function firstScheduleDate(group) {
 function firstScheduleTime(group) {
   for (const doc of [...group.appointments, ...group.orders, ...group.orderRequests]) {
     for (const key of ["scheduledTime", "appointmentTime", "apptTime", "requestedTime"]) {
-      const value = text$d(doc.data[key]);
+      const value = text$e(doc.data[key]);
       if (value && !/^tbd$/i.test(value)) return value;
     }
   }
@@ -3813,7 +3813,7 @@ function projectType(group) {
     if (doc.data.projectType === "real_estate") return "real_estate";
     const service = doc.data.selectedService;
     if (service && typeof service === "object") {
-      const category = text$d(service.category);
+      const category = text$e(service.category);
       if (category === "business" || category === "branding") return "business";
       if (category === "listings") return "real_estate";
     }
@@ -3839,7 +3839,7 @@ function namesFrom(value) {
   for (const item of value) {
     if (typeof item === "string" && item.trim()) names.push(item.trim());
     else if (item && typeof item === "object") {
-      const name = text$d(item.name);
+      const name = text$e(item.name);
       if (name) names.push(name);
     }
     if (names.length >= 40) break;
@@ -3864,8 +3864,8 @@ function accessInfo(group) {
   return [firstText$2(group, ["accessMethod"]), firstText$2(group, ["lockboxCode"])].filter(Boolean).join(" - ");
 }
 function clientId(group, identity) {
-  const bookingIds = propertyDocs(group).map((doc) => text$d(doc.data.clientId)).filter(Boolean);
-  const identityIds = (identity?.ids || []).map((id) => text$d(id)).filter(Boolean);
+  const bookingIds = propertyDocs(group).map((doc) => text$e(doc.data.clientId)).filter(Boolean);
+  const identityIds = (identity?.ids || []).map((id) => text$e(id)).filter(Boolean);
   return bookingIds.find((id) => identityIds.includes(id)) || bookingIds[0] || identityIds[0] || "";
 }
 function clientEmail(group, identity) {
@@ -3879,8 +3879,8 @@ function clientEmail(group, identity) {
 }
 function clientName$1(group) {
   for (const doc of propertyDocs(group)) {
-    if (text$d(doc.data.clientName)) return text$d(doc.data.clientName);
-    const joined = `${text$d(doc.data.firstName)} ${text$d(doc.data.lastName)}`.trim();
+    if (text$e(doc.data.clientName)) return text$e(doc.data.clientName);
+    const joined = `${text$e(doc.data.firstName)} ${text$e(doc.data.lastName)}`.trim();
     if (joined) return joined;
   }
   return "";
@@ -3888,7 +3888,7 @@ function clientName$1(group) {
 function chosenInvoiceId(group) {
   const known = new Set(group.invoiceIds);
   for (const doc of [...group.orderRequests, ...group.orders]) {
-    const id = text$d(doc.data.invoiceId);
+    const id = text$e(doc.data.invoiceId);
     if (id && known.has(id)) return id;
   }
   return newestDoc(group.invoices)?.id || group.invoiceIds[0] || "";
@@ -3897,7 +3897,7 @@ function chosenId(docs, ids, pointers = [], keys = []) {
   const known = new Set(ids);
   for (const doc of pointers) {
     for (const key of keys) {
-      const id = text$d(doc.data[key]);
+      const id = text$e(doc.data[key]);
       if (id && known.has(id)) return id;
     }
   }
@@ -3909,7 +3909,7 @@ function propertyDocs(group) {
 function firstText$2(group, keys) {
   for (const doc of propertyDocs(group)) {
     for (const key of keys) {
-      const value = text$d(doc.data[key]);
+      const value = text$e(doc.data[key]);
       if (value) return value;
     }
   }
@@ -3977,7 +3977,7 @@ function hasAddress(value) {
   if (typeof value === "string") return value.trim().length > 0;
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record = value;
-  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$d(record[key]).length > 0);
+  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$e(record[key]).length > 0);
 }
 function statusKey(value) {
   return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
@@ -4009,14 +4009,14 @@ function isEmpty(value) {
 function isSentinel$1(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$d(value) {
+function text$e(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function cleanDocs(docs) {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
   for (const doc of docs || []) {
-    const id = text$d(doc?.id);
+    const id = text$e(doc?.id);
     if (!id || seen.has(id)) continue;
     seen.add(id);
     out.push({ id, data: doc.data && typeof doc.data === "object" ? doc.data : {} });
@@ -4063,7 +4063,7 @@ class UnionFind {
     return root;
   }
 }
-const db$o = () => admin.firestore();
+const db$p = () => admin.firestore();
 const LINK_COLLECTIONS = /* @__PURE__ */ new Set([
   "orderRequests",
   "orders",
@@ -4084,7 +4084,7 @@ const LOCK_FIELDS = /* @__PURE__ */ new Set(["lockDownloads", "requirePayment", 
 async function ensureBookingListingForRequest(orderRequestId) {
   const id = orderRequestId.trim();
   if (!id) return null;
-  const snap = await db$o().collection("orderRequests").doc(id).get();
+  const snap = await db$p().collection("orderRequests").doc(id).get();
   if (!snap.exists) return null;
   const request = asDoc(snap.id, snap.data());
   const bundle = await hydrateBundle({
@@ -4095,7 +4095,7 @@ async function ensureBookingListingForRequest(orderRequestId) {
     galleries: []
   });
   const identity = {
-    ids: text$c(request.data.clientId) ? [text$c(request.data.clientId)] : [],
+    ids: text$d(request.data.clientId) ? [text$d(request.data.clientId)] : [],
     email: normalizeEmail$1(request.data.clientEmail || request.data.email)
   };
   const plans = await plansFor(bundle, identity);
@@ -4138,7 +4138,7 @@ async function plansFor(bundle, identity) {
 }
 async function applyBookingListingPlan(plan) {
   if (!isPortalListingId(plan.listingId)) throw new Error("Listing id is not valid.");
-  const ref = db$o().collection("listings").doc(plan.listingId);
+  const ref = db$p().collection("listings").doc(plan.listingId);
   let created = false;
   if (plan.create) {
     try {
@@ -4148,7 +4148,7 @@ async function applyBookingListingPlan(plan) {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
       created = true;
-      console.info(`[Listings] Created ${plan.listingId} for booking ${text$c(plan.createFields.orderRequestId) || text$c(plan.createFields.orderId) || text$c(plan.createFields.invoiceId)}`);
+      console.info(`[Listings] Created ${plan.listingId} for booking ${text$d(plan.createFields.orderRequestId) || text$d(plan.createFields.orderId) || text$d(plan.createFields.invoiceId)}`);
     } catch (err) {
       if (!alreadyExists(err)) throw err;
       await fillListing(ref, plan.createFields);
@@ -4174,10 +4174,10 @@ async function fillListing(ref, desired) {
 }
 async function linkRecord(collectionName, id, listingId) {
   if (!LINK_COLLECTIONS.has(collectionName) || !id) return;
-  const ref = db$o().collection(collectionName).doc(id);
+  const ref = db$p().collection(collectionName).doc(id);
   const snap = await ref.get();
   if (!snap.exists) return;
-  if (text$c(snap.data()?.listingId) === listingId) return;
+  if (text$d(snap.data()?.listingId) === listingId) return;
   await ref.update({
     listingId,
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -4191,9 +4191,9 @@ async function loadVisibleSeeds(identity) {
   const keep = (map, docs) => {
     for (const doc of docs) {
       if (!visibleToPortalClient({
-        clientId: text$c(doc.data.clientId),
-        email: text$c(doc.data.email),
-        clientEmail: text$c(doc.data.clientEmail)
+        clientId: text$d(doc.data.clientId),
+        email: text$d(doc.data.email),
+        clientEmail: text$d(doc.data.clientEmail)
       }, identity)) continue;
       if (!map.has(doc.id)) map.set(doc.id, doc);
     }
@@ -4232,36 +4232,36 @@ async function hydrateBundle(seed) {
   const galleries = mapDocs(seed.galleries);
   const requestIds = new Set(requests.keys());
   for (const doc of [...orders.values(), ...invoices.values(), ...appointments.values()]) {
-    const id = text$c(doc.data.orderRequestId);
+    const id = text$d(doc.data.orderRequestId);
     if (id) requestIds.add(id);
   }
   await readMissing("orderRequests", requestIds, requests);
   const orderIds = new Set(orders.keys());
   for (const doc of requests.values()) {
-    const id = text$c(doc.data.convertedToOrderId) || text$c(doc.data.orderId);
+    const id = text$d(doc.data.convertedToOrderId) || text$d(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   for (const doc of [...invoices.values(), ...appointments.values()]) {
-    const id = text$c(doc.data.orderId);
+    const id = text$d(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   await readMissing("orders", orderIds, orders);
   const invoiceIds = new Set(invoices.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$c(doc.data.invoiceId);
+    const id = text$d(doc.data.invoiceId);
     if (id) invoiceIds.add(id);
   }
   await readMissing("invoices", invoiceIds, invoices);
   const legacyIds = /* @__PURE__ */ new Set();
   for (const doc of requests.values()) {
-    for (const id of legacyInvoiceDocIds({ orderRequestId: doc.id, listingId: text$c(doc.data.listingId) })) {
+    for (const id of legacyInvoiceDocIds({ orderRequestId: doc.id, listingId: text$d(doc.data.listingId) })) {
       legacyIds.add(id);
     }
   }
   for (const doc of orders.values()) {
     for (const id of legacyInvoiceDocIds({
-      orderRequestId: text$c(doc.data.orderRequestId),
-      listingId: text$c(doc.data.listingId)
+      orderRequestId: text$d(doc.data.orderRequestId),
+      listingId: text$d(doc.data.listingId)
     })) {
       legacyIds.add(id);
     }
@@ -4274,7 +4274,7 @@ async function hydrateBundle(seed) {
   mergeDocs(appointments, await queryIn("appointments", "orderId", [...orders.keys()]));
   const galleryIds = new Set(galleries.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$c(doc.data.galleryId);
+    const id = text$d(doc.data.galleryId);
     if (id) galleryIds.add(id);
   }
   await readMissing("galleries", galleryIds, galleries);
@@ -4326,7 +4326,7 @@ async function followInvoiceRedirects(invoices) {
 async function readMissing(collectionName, ids, into) {
   const missing = [...ids].filter((id) => id && !into.has(id)).slice(0, 100);
   if (missing.length === 0) return;
-  const snaps = await db$o().getAll(...missing.map((id) => db$o().collection(collectionName).doc(id)));
+  const snaps = await db$p().getAll(...missing.map((id) => db$p().collection(collectionName).doc(id)));
   snaps.forEach((snap) => {
     if (!snap.exists || into.has(snap.id)) return;
     into.set(snap.id, asDoc(snap.id, snap.data()));
@@ -4336,14 +4336,14 @@ async function queryIn(collectionName, field, values) {
   const unique2 = [...new Set(values.map((value) => value.trim()).filter(Boolean))];
   const docs = [];
   for (const part of chunk(unique2, 30)) {
-    const snap = await db$o().collection(collectionName).where(field, "in", part).limit(100).get();
+    const snap = await db$p().collection(collectionName).where(field, "in", part).limit(100).get();
     snap.docs.forEach((doc) => docs.push(asDoc(doc.id, doc.data())));
   }
   return docs;
 }
 async function queryEqual(collectionName, field, value) {
   if (!value) return [];
-  const snap = await db$o().collection(collectionName).where(field, "==", value).limit(100).get();
+  const snap = await db$p().collection(collectionName).where(field, "==", value).limit(100).get();
   return snap.docs.map((doc) => asDoc(doc.id, doc.data()));
 }
 function mergeDocs(into, docs) {
@@ -4403,7 +4403,7 @@ function alreadyExists(err) {
 function isSentinel(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$c(value) {
+function text$d(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function chunk(items, size) {
@@ -4452,7 +4452,7 @@ function nestedTotal(pricing) {
 function warnWhenStoredTotalDiffers(record, lineItems) {
   const stored = [money$4(record.total), money$4(nestedTotal(record.pricing))].filter((amount) => amount != null);
   if (stored.length === 0) return;
-  const rebuilt = roundMoney$2(sumLineItemPrices(chargedServiceLines(lineItems)));
+  const rebuilt = roundMoney$3(sumLineItemPrices(chargedServiceLines(lineItems)));
   const drifted = [...new Set(stored.filter((amount) => Math.abs(amount - rebuilt) > 9e-3))];
   if (drifted.length === 0) return;
   console.warn(
@@ -4460,14 +4460,14 @@ function warnWhenStoredTotalDiffers(record, lineItems) {
   );
 }
 function money$4(value) {
-  if (typeof value === "number" && Number.isFinite(value)) return roundMoney$2(value);
+  if (typeof value === "number" && Number.isFinite(value)) return roundMoney$3(value);
   if (typeof value === "string" && value.trim()) {
     const parsed = Number(value.replace(/[$,\s]/g, ""));
-    if (Number.isFinite(parsed)) return roundMoney$2(parsed);
+    if (Number.isFinite(parsed)) return roundMoney$3(parsed);
   }
   return void 0;
 }
-function roundMoney$2(value) {
+function roundMoney$3(value) {
   return Math.round(value * 100) / 100;
 }
 const PACKAGE_LABEL_KEYS = [
@@ -4489,14 +4489,14 @@ function orderServiceLines(record, linked) {
   return synthesized ? [synthesized] : [];
 }
 function orderChargeSummary(record, lines) {
-  const lineSubtotal = roundMoney$1(lines.reduce((sum, line) => sum + line.price, 0));
+  const lineSubtotal = roundMoney$2(lines.reduce((sum, line) => sum + line.price, 0));
   const pricing = nested$2(record?.pricing);
   const tax = moneyOrNull$1(record?.tax) ?? moneyOrNull$1(pricing.tax) ?? 0;
   const storedTotal = moneyOrNull$1(record?.total) ?? moneyOrNull$1(pricing.total);
-  const total = storedTotal ?? roundMoney$1(lineSubtotal + tax);
+  const total = storedTotal ?? roundMoney$2(lineSubtotal + tax);
   const storedSubtotal = moneyOrNull$1(record?.subtotal) ?? moneyOrNull$1(pricing.subtotal);
   const subtotal = lineSubtotal > 0 ? lineSubtotal : storedSubtotal && storedSubtotal > 0 ? storedSubtotal : total;
-  return { subtotal: roundMoney$1(subtotal), tax: roundMoney$1(tax), total: roundMoney$1(total) };
+  return { subtotal: roundMoney$2(subtotal), tax: roundMoney$2(tax), total: roundMoney$2(total) };
 }
 function storedServiceLines(record) {
   if (!record) return [];
@@ -4514,7 +4514,7 @@ function synthesizePackageLine(record) {
 }
 function packageLabel(record) {
   for (const key of PACKAGE_LABEL_KEYS) {
-    const value = text$b(record[key]);
+    const value = text$c(record[key]);
     if (value) return value;
   }
   return "";
@@ -4550,10 +4550,10 @@ function moneyOrNull$1(value) {
 function nested$2(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$b(value) {
+function text$c(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function roundMoney$1(value) {
+function roundMoney$2(value) {
   return Math.round(value * 100) / 100;
 }
 const NOT_PROVIDED = "Not provided";
@@ -4573,7 +4573,7 @@ function officeNewOrderEmail(saved, options) {
   const notes = notesOf(saved);
   const fields = [
     ["Order number", orderNumber],
-    ["Admin link", text$a(options?.adminUrl) || NOT_PROVIDED],
+    ["Admin link", text$b(options?.adminUrl) || NOT_PROVIDED],
     ["Client name", clientName2],
     ["Client email", firstText$1(saved, ["clientEmail", "email"])],
     ["Client phone", firstText$1(saved, ["clientPhone", "phone"])],
@@ -4620,14 +4620,14 @@ ${notes}`.toUpperCase().includes("TEST ORDER");
 function orderNumberOf(saved) {
   const explicit = firstText$1(saved, ["orderNumber", "orderCode", "displayId"]);
   if (explicit) return explicit;
-  const id = text$a(saved.id);
+  const id = text$b(saved.id);
   if (!id) return NOT_PROVIDED;
   return `ORD-${id.slice(-5).toUpperCase()}`;
 }
 function clientNameOf(saved) {
   const named = firstText$1(saved, ["clientName", "customerName"]);
   if (named) return named;
-  const joined = [text$a(saved.firstName), text$a(saved.lastName)].filter(Boolean).join(" ");
+  const joined = [text$b(saved.firstName), text$b(saved.lastName)].filter(Boolean).join(" ");
   return joined || NOT_PROVIDED;
 }
 function agentContactOf(saved) {
@@ -4645,7 +4645,7 @@ function agentField(saved, keys, nestedKey) {
   if (direct !== NOT_PROVIDED) return direct;
   for (const holder of [saved.agent, saved.listingAgent, saved.realtor]) {
     const record = nested$1(holder);
-    const value = text$a(record[nestedKey]);
+    const value = text$b(record[nestedKey]);
     if (value) return value;
   }
   return "";
@@ -4654,7 +4654,7 @@ function digits(value) {
   return value === NOT_PROVIDED ? "" : value.replace(/\D/g, "");
 }
 function notesOf(saved) {
-  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$a(saved[key])).filter(Boolean);
+  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$b(saved[key])).filter(Boolean);
   return parts.length ? parts.join("\n") : NOT_PROVIDED;
 }
 function lockboxOf(saved) {
@@ -4662,12 +4662,12 @@ function lockboxOf(saved) {
   return code || NOT_PROVIDED;
 }
 function occupancyOf(saved) {
-  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$a(saved[key])).filter(Boolean);
+  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$b(saved[key])).filter(Boolean);
   return parts.length ? parts.join(", ") : NOT_PROVIDED;
 }
 function bookedVia(saved) {
-  const lead = text$a(saved.leadSource);
-  const source = text$a(saved.source);
+  const lead = text$b(saved.leadSource);
+  const source = text$b(saved.source);
   const blob = `${lead} ${source}`.toLowerCase();
   if (!blob.trim()) return NOT_PROVIDED;
   if (/admin/.test(blob)) return "Admin";
@@ -4677,7 +4677,7 @@ function bookedVia(saved) {
 }
 function paymentOf(saved, total) {
   const invoice = nested$1(saved.invoice);
-  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$a(value).toLowerCase()).find(Boolean) || "";
+  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$b(value).toLowerCase()).find(Boolean) || "";
   if (/partial/.test(explicit)) return "Partial";
   if (/\bpaid\b/.test(explicit) && !/unpaid/.test(explicit)) return "Paid";
   if (/unpaid/.test(explicit)) return "Unpaid";
@@ -4784,7 +4784,7 @@ function moneyOrNull(value) {
 function nested$1(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$a(value) {
+function text$b(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function escapeHtml$4(value) {
@@ -4806,6 +4806,7 @@ function officeStaffRecipients(env = process.env) {
   return recipients;
 }
 async function notifyOfficeOfOrder(input) {
+  if (!input.isNewOrder) return { sent: false, reason: "not-new" };
   const env = input.env ?? process.env;
   const saved = input.saved || {};
   const clientEmails = new Set(
@@ -4859,7 +4860,7 @@ function buildAdminOrderTile(record) {
   const packageName = skin2?.title || named || "Custom order";
   const charges = orderChargeSummary(record, lines);
   return {
-    id: text$9(record.id) || packageName,
+    id: text$a(record.id) || packageName,
     orderCode: orderCode(kind, record),
     kind,
     typeLabel: kind === "business" ? "Business" : "Listing",
@@ -4881,7 +4882,7 @@ function buildAdminOrderTile(record) {
   };
 }
 function orderKind(record, skin2) {
-  const raw = text$9(record.projectType || record.orderType || record.type).toLowerCase();
+  const raw = text$a(record.projectType || record.orderType || record.type).toLowerCase();
   if (raw === "business" || raw === "brand" || raw === "social") return "business";
   if (raw === "real_estate" || raw === "listing" || raw === "property") return "listing";
   if (skin2?.category === "listing") return "listing";
@@ -4895,38 +4896,38 @@ function channelFor(skin2, kind) {
   return kind === "business" ? "Human Brand" : "Listings & Spaces";
 }
 function orderCode(kind, record) {
-  const explicit = text$9(record.orderCode || record.orderNumber || record.displayId);
+  const explicit = text$a(record.orderCode || record.orderNumber || record.displayId);
   if (explicit) return explicit.toUpperCase();
-  const id = text$9(record.id);
+  const id = text$a(record.id);
   const prefix = kind === "listing" ? "L" : "B";
   const digits2 = id.replace(/\D/g, "");
   const tail = (digits2 || id.replace(/[^a-zA-Z0-9]/g, "")).slice(-5).toUpperCase().padStart(5, "0");
   return `ORD - ${prefix} - ${tail}`;
 }
 function heroFromRecord(record) {
-  const explicit = text$9(record.heroUrl) || text$9(record.coverUrl) || text$9(record.coverImage);
+  const explicit = text$a(record.heroUrl) || text$a(record.coverUrl) || text$a(record.coverImage);
   if (explicit) return explicit;
   const images = record.images;
   if (!Array.isArray(images)) return "";
   for (const image of images) {
     if (typeof image === "string" && image.trim()) return image.trim();
     if (image && typeof image === "object") {
-      const url = text$9(image.url) || text$9(image.thumbnailUrl);
+      const url = text$a(image.url) || text$a(image.thumbnailUrl);
       if (url) return url;
     }
   }
   return "";
 }
 function clientName(record) {
-  const named = text$9(record.clientName) || text$9(record.customerName) || text$9(record.agentName) || [text$9(record.firstName), text$9(record.lastName)].filter(Boolean).join(" ");
+  const named = text$a(record.clientName) || text$a(record.customerName) || text$a(record.agentName) || [text$a(record.firstName), text$a(record.lastName)].filter(Boolean).join(" ");
   return named || "—";
 }
 function appointmentLabel(record) {
   const raw = record.appointmentDate ?? record.apptDate ?? record.scheduledDate ?? record.requestedDate;
   const key = calendarDateKey(raw);
   const date = formatShootDateLabel(key, typeof raw === "string" ? raw : void 0);
-  const time = text$9(record.scheduledTime || record.appointmentTime || record.requestedTime);
-  const photographer = text$9(record.assignedPhotographerName || record.photographerName || record.photographerPreference);
+  const time = text$a(record.scheduledTime || record.appointmentTime || record.requestedTime);
+  const photographer = text$a(record.assignedPhotographerName || record.photographerName || record.photographerPreference);
   return [date, time, photographer].filter(Boolean).join(" · ") || "—";
 }
 function tilePrice(amount) {
@@ -4994,7 +4995,7 @@ function money$3(value) {
   }
   return 0;
 }
-function text$9(value) {
+function text$a(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const DELIVERY_QA_CLIENT_EMAIL = "ops+deliveryqa@iconicimagestx.com";
@@ -5123,11 +5124,11 @@ function publicMediaItem(item, canDownload) {
   };
 }
 const SETTLED = /* @__PURE__ */ new Set(["paid", "comped"]);
-function text$8(value) {
+function text$9(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function status(value) {
-  return text$8(value).toLowerCase();
+  return text$9(value).toLowerCase();
 }
 function settled(value) {
   return SETTLED.has(status(value));
@@ -5135,12 +5136,12 @@ function settled(value) {
 function isPlaytestDoc(doc) {
   if (!doc) return false;
   if (doc.playtest === true) return true;
-  return text$8(doc.id).toLowerCase().startsWith("playtest-");
+  return text$9(doc.id).toLowerCase().startsWith("playtest-");
 }
 function nestedInvoiceStatus(listing) {
   const nested2 = listing?.invoice;
   if (!nested2 || typeof nested2 !== "object") return "";
-  return text$8(nested2.status);
+  return text$9(nested2.status);
 }
 function releaseFlags(subject) {
   const listing = subject.listing;
@@ -5226,9 +5227,9 @@ function refuseQaStaffPhone(input) {
   if (!match) return null;
   return refusal(qaStaffAssignmentError([match], input.record));
 }
-const router$m = Router();
-const db$n = () => admin.firestore();
-function appUrl$1() {
+const router$n = Router();
+const db$o = () => admin.firestore();
+function appUrl$2() {
   return process.env.APP_URL || "https://iconicimagestx.com";
 }
 function addressLabel(address) {
@@ -5252,14 +5253,14 @@ function money$2(value) {
 }
 async function loadBookingCatalog() {
   try {
-    const snap = await db$n().collection("packages").get();
+    const snap = await db$o().collection("packages").get();
     return packagesForStaffEditor(snap.docs.map((entry2) => ({ id: entry2.id, ...entry2.data() })));
   } catch (err) {
     console.error("[Bookings] Catalog read failed — using the seeded catalog", err);
     return packagesForStaffEditor([]);
   }
 }
-router$m.post("/", async (req, res) => {
+router$n.post("/", async (req, res) => {
   try {
     const {
       firstName,
@@ -5362,7 +5363,7 @@ router$m.post("/", async (req, res) => {
       submittedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    const docRef = await db$n().collection("orderRequests").add(orderRequest);
+    const docRef = await db$o().collection("orderRequests").add(orderRequest);
     const normalizedEmail = orderRequest.email;
     const passwordSetupAllowed = clientNotifyLive() || isNotifyTestAllowlisted(normalizedEmail);
     let account = {
@@ -5458,7 +5459,7 @@ router$m.post("/", async (req, res) => {
         accessMethod: accessLine,
         squareFootage: squareFootage ? `${squareFootage} sq ft` : "",
         travelFee: travelSummaryText(travel),
-        dashboardUrl: `${appUrl$1()}/admin/order-request/${docRef.id}`
+        dashboardUrl: `${appUrl$2()}/admin/order-request/${docRef.id}`
       }
     }).then((result) => result.sent ? "sent" : "failed").catch((err) => {
       console.error("[Bookings] Confirmation email failed:", err);
@@ -5534,7 +5535,7 @@ router$m.post("/", async (req, res) => {
       const alert = await notifyOfficeOfOrder({
         isNewOrder: true,
         saved: savedOrder,
-        adminUrl: `${appUrl$1()}/admin/order-request/${savedSnap.id}`
+        adminUrl: `${appUrl$2()}/admin/order-request/${savedSnap.id}`
       });
       officeAlertStatus = alert.sent ? "sent" : "skipped";
     } catch (err) {
@@ -5579,13 +5580,13 @@ router$m.post("/", async (req, res) => {
     return res.status(500).json({ error: "Failed to submit booking request." });
   }
 });
-router$m.get("/catalog", async (_req, res) => {
+router$n.get("/catalog", async (_req, res) => {
   const catalog = await loadBookingCatalog();
   return res.json(publicBookingCatalogResponse(catalog));
 });
-router$m.get("/", requireCoordinator, async (_req, res) => {
+router$n.get("/", requireCoordinator, async (_req, res) => {
   try {
-    const snapshot = await db$n().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
+    const snapshot = await db$o().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
     const requests = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data()
@@ -5596,9 +5597,9 @@ router$m.get("/", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking requests." });
   }
 });
-router$m.get("/:id", requireCoordinator, async (req, res) => {
+router$n.get("/:id", requireCoordinator, async (req, res) => {
   try {
-    const doc = await db$n().collection("orderRequests").doc(req.params.id).get();
+    const doc = await db$o().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) {
       return res.status(404).json({ error: "Booking request not found." });
     }
@@ -5608,10 +5609,10 @@ router$m.get("/:id", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking request." });
   }
 });
-router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
+router$n.patch("/:id/confirm", requireCoordinator, async (req, res) => {
   try {
     const { assignedPhotographerId, assignedPhotographerName, scheduledDate, scheduledTime, internalNotes } = req.body;
-    const requestDoc = await db$n().collection("orderRequests").doc(req.params.id).get();
+    const requestDoc = await db$o().collection("orderRequests").doc(req.params.id).get();
     if (!requestDoc.exists) {
       return res.status(404).json({ error: "Booking request not found." });
     }
@@ -5673,7 +5674,7 @@ router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     }
     let photographer = null;
     if (assignedPhotographerId) {
-      const staffDoc = await db$n().collection("staff").doc(assignedPhotographerId).get();
+      const staffDoc = await db$o().collection("staff").doc(assignedPhotographerId).get();
       photographer = staffDoc.exists ? { id: staffDoc.id, ...staffDoc.data() } : null;
       const refusal2 = await refuseQaStaffAssignment({
         staff: photographer ? [photographer] : [],
@@ -5683,7 +5684,7 @@ router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     }
     let clientId2;
     const attachedClientId = typeof request.clientId === "string" ? request.clientId.trim() : "";
-    const attachedClient = attachedClientId ? await db$n().collection("clients").doc(attachedClientId).get() : null;
+    const attachedClient = attachedClientId ? await db$o().collection("clients").doc(attachedClientId).get() : null;
     if (attachedClient?.exists) {
       clientId2 = attachedClient.id;
       await attachedClient.ref.update({
@@ -5692,7 +5693,7 @@ router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
     } else {
-      const existingClients = await db$n().collection("clients").where("email", "==", requestEmail).limit(1).get();
+      const existingClients = await db$o().collection("clients").where("email", "==", requestEmail).limit(1).get();
       if (!existingClients.empty) {
         clientId2 = existingClients.docs[0].id;
         await existingClients.docs[0].ref.update({
@@ -5701,7 +5702,7 @@ router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
       } else {
-        const clientRef = await db$n().collection("clients").add({
+        const clientRef = await db$o().collection("clients").add({
           firstName: requestFirstName,
           lastName: requestLastName,
           email: requestEmail,
@@ -5757,8 +5758,8 @@ router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    const orderRef = await db$n().collection("orders").add(orderData);
-    const existingAppointment = await db$n().collection("appointments").where("orderRequestId", "==", req.params.id).limit(1).get();
+    const orderRef = await db$o().collection("orders").add(orderData);
+    const existingAppointment = await db$o().collection("appointments").where("orderRequestId", "==", req.params.id).limit(1).get();
     const confirmedAppointment = {
       orderId: orderRef.id,
       orderRequestId: req.params.id,
@@ -5778,7 +5779,7 @@ router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       internalNotes: internalNotes || "",
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    const appointmentRef = existingAppointment.empty ? db$n().collection("appointments").doc() : existingAppointment.docs[0].ref;
+    const appointmentRef = existingAppointment.empty ? db$o().collection("appointments").doc() : existingAppointment.docs[0].ref;
     if (existingAppointment.empty) {
       await appointmentRef.set({
         ...confirmedAppointment,
@@ -5787,7 +5788,7 @@ router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     } else {
       await appointmentRef.update(confirmedAppointment);
     }
-    const galleryRef = await db$n().collection("galleries").add({
+    const galleryRef = await db$o().collection("galleries").add({
       orderId: orderRef.id,
       clientId: clientId2,
       clientName: requestClientName,
@@ -5816,7 +5817,7 @@ router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       notes: internalNotes || request.vibeNote || ""
     }).catch(async (err) => {
       console.error("[Bookings] Calendar event creation failed:", err);
-      await db$n().collection("agentLogs").add({
+      await db$o().collection("agentLogs").add({
         agent: "nora",
         action: "Calendar event failed",
         summary: `Google Calendar event was not created for order ${orderRef.id}`,
@@ -5850,7 +5851,7 @@ router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     let listingId = existingInvoiceId(request.listingId);
     let invoiceId = linkedInvoiceId;
     if (linkedInvoiceId) {
-      const existingInvoice = await db$n().collection("invoices").doc(linkedInvoiceId).get();
+      const existingInvoice = await db$o().collection("invoices").doc(linkedInvoiceId).get();
       if (existingInvoice.exists) {
         await existingInvoice.ref.update({
           orderId: orderRef.id,
@@ -5865,7 +5866,7 @@ router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         console.error(`[Bookings] Confirm kept invoiceId ${linkedInvoiceId} but the invoice doc is missing. Not creating a second invoice.`);
       }
     } else {
-      const invoiceRef = db$n().collection("invoices").doc();
+      const invoiceRef = db$o().collection("invoices").doc();
       const payToken = createPayToken();
       const paymentUrl = clientInvoiceUrl({ id: invoiceRef.id, status: "draft", payToken });
       const draft = buildBookingInvoiceDraft({
@@ -5947,10 +5948,10 @@ router$m.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to confirm booking." });
   }
 });
-router$m.patch("/:id/decline", requireCoordinator, async (req, res) => {
+router$n.patch("/:id/decline", requireCoordinator, async (req, res) => {
   try {
     const { reason } = req.body;
-    const doc = await db$n().collection("orderRequests").doc(req.params.id).get();
+    const doc = await db$o().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Not found." });
     await doc.ref.update({
       status: "declined",
@@ -5971,16 +5972,16 @@ async function stampDurableLinks(input) {
     orderInvoiceId: input.invoiceId
   });
   const now = admin.firestore.FieldValue.serverTimestamp();
-  const invoiceRef = db$n().collection("invoices").doc(plan.createId);
+  const invoiceRef = db$o().collection("invoices").doc(plan.createId);
   const invoiceSnap = await invoiceRef.get();
   if (invoiceSnap.exists && Object.keys(plan.invoiceFields).length > 0) {
     await invoiceRef.update({ ...plan.invoiceFields, updatedAt: now });
   }
   if (plan.orderFields) {
-    await db$n().collection("orders").doc(input.orderId).update({ ...plan.orderFields, updatedAt: now });
+    await db$o().collection("orders").doc(input.orderId).update({ ...plan.orderFields, updatedAt: now });
   }
   if (input.listingId && plan.listingFields) {
-    await db$n().collection("listings").doc(input.listingId).update({ ...plan.listingFields, updatedAt: now });
+    await db$o().collection("listings").doc(input.listingId).update({ ...plan.listingFields, updatedAt: now });
   }
 }
 function linesForConfirmedOrder(request) {
@@ -5993,7 +5994,7 @@ async function linkClientIdByEmail(email) {
   try {
     const normalized = normalizeEmail$1(email);
     if (!normalized) return null;
-    const snap = await db$n().collection("clients").where("email", "==", normalized).limit(1).get();
+    const snap = await db$o().collection("clients").where("email", "==", normalized).limit(1).get();
     return snap.empty ? null : snap.docs[0].id;
   } catch (err) {
     console.error("[Bookings] Client lookup for invoice failed:", err);
@@ -6014,7 +6015,7 @@ async function createBookingInvoiceDraft(input) {
     promoDiscount: input.promoDiscount,
     travel: input.travel
   });
-  const invoiceRef = db$n().collection("invoices").doc();
+  const invoiceRef = db$o().collection("invoices").doc();
   const payToken = createPayToken();
   const paymentUrl = clientInvoiceUrl({ id: invoiceRef.id, status: "draft", payToken });
   await invoiceRef.set({
@@ -6029,7 +6030,7 @@ async function createBookingInvoiceDraft(input) {
 }
 async function generateInvoiceNumber() {
   const year = (/* @__PURE__ */ new Date()).getFullYear();
-  const snapshot = await db$n().collection("invoices").where("invoiceNumber", ">=", `INV-${year}-`).where("invoiceNumber", "<", `INV-${year + 1}`).get().catch((err) => {
+  const snapshot = await db$o().collection("invoices").where("invoiceNumber", ">=", `INV-${year}-`).where("invoiceNumber", "<", `INV-${year + 1}`).get().catch((err) => {
     console.error("[Bookings] Invoice number lookup failed:", err);
     return null;
   });
@@ -6041,12 +6042,12 @@ async function generateInvoiceNumber() {
     year
   );
 }
-const router$l = Router();
-const db$m = () => admin.firestore();
-router$l.get("/", requireStaff, async (req, res) => {
+const router$m = Router();
+const db$n = () => admin.firestore();
+router$m.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, photographerId, limit = "50", startAfter } = req.query;
-    let query = db$m().collection("orders").orderBy("createdAt", "desc");
+    let query = db$n().collection("orders").orderBy("createdAt", "desc");
     if (status2) query = query.where("status", "==", status2);
     if (photographerId) {
       query = query.where("assignedPhotographerId", "==", photographerId);
@@ -6054,7 +6055,7 @@ router$l.get("/", requireStaff, async (req, res) => {
     const limitNum = Math.min(Number(limit), 200);
     query = query.limit(limitNum);
     if (startAfter) {
-      const cursorDoc = await db$m().collection("orders").doc(startAfter).get();
+      const cursorDoc = await db$n().collection("orders").doc(startAfter).get();
       if (cursorDoc.exists) {
         query = query.startAfter(cursorDoc);
       }
@@ -6071,16 +6072,16 @@ router$l.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch orders." });
   }
 });
-router$l.get("/dashboard", requireStaff, async (_req, res) => {
+router$m.get("/dashboard", requireStaff, async (_req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const [allOrders, todayOrders, monthTransactions, pendingRequests] = await Promise.all([
-      db$m().collection("orders").get(),
-      db$m().collection("orders").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(todayStart)).get(),
-      db$m().collection("transactions").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(monthStart)).where("status", "==", "completed").get(),
-      db$m().collection("orderRequests").where("status", "==", "new").get()
+      db$n().collection("orders").get(),
+      db$n().collection("orders").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(todayStart)).get(),
+      db$n().collection("transactions").where("createdAt", ">=", admin.firestore.Timestamp.fromDate(monthStart)).where("status", "==", "completed").get(),
+      db$n().collection("orderRequests").where("status", "==", "new").get()
     ]);
     const statusCounts = {};
     allOrders.docs.forEach((d) => {
@@ -6104,25 +6105,25 @@ router$l.get("/dashboard", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch dashboard stats." });
   }
 });
-router$l.get("/:id", requireStaff, async (req, res) => {
+router$m.get("/:id", requireStaff, async (req, res) => {
   try {
-    const orderDoc = await db$m().collection("orders").doc(req.params.id).get();
+    const orderDoc = await db$n().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
     const order = { id: orderDoc.id, ...orderDoc.data() };
     const [gallery, invoice, appointment, messages] = await Promise.all([
-      db$m().collection("galleries").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
+      db$n().collection("galleries").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
         console.error("[Orders] Gallery lookup failed:", err);
         return null;
       }),
-      db$m().collection("invoices").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
+      db$n().collection("invoices").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
         console.error("[Orders] Invoice lookup failed:", err);
         return null;
       }),
-      db$m().collection("appointments").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
+      db$n().collection("appointments").where("orderId", "==", req.params.id).limit(1).get().catch((err) => {
         console.error("[Orders] Appointment lookup failed:", err);
         return null;
       }),
-      db$m().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "desc").limit(20).get().catch((err) => {
+      db$n().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "desc").limit(20).get().catch((err) => {
         console.error("[Orders] Messages lookup failed:", err);
         return null;
       })
@@ -6139,7 +6140,7 @@ router$l.get("/:id", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch order." });
   }
 });
-router$l.patch("/:id", requireCoordinator, async (req, res) => {
+router$m.patch("/:id", requireCoordinator, async (req, res) => {
   try {
     const allowed = [
       "status",
@@ -6158,7 +6159,7 @@ router$l.patch("/:id", requireCoordinator, async (req, res) => {
     });
     const photographerId = typeof updates.assignedPhotographerId === "string" ? updates.assignedPhotographerId.trim() : "";
     if (photographerId) {
-      const orderDoc = await db$m().collection("orders").doc(req.params.id).get();
+      const orderDoc = await db$n().collection("orders").doc(req.params.id).get();
       if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
       const refusal2 = await refuseQaStaffAssignment({
         staffIds: [photographerId],
@@ -6172,7 +6173,7 @@ router$l.patch("/:id", requireCoordinator, async (req, res) => {
         updates.scheduledDate = admin.firestore.Timestamp.fromDate(anchored);
       }
     }
-    await db$m().collection("orders").doc(req.params.id).update(updates);
+    await db$n().collection("orders").doc(req.params.id).update(updates);
     return res.json({ success: true });
   } catch (err) {
     console.error("[Orders] Update error:", err);
@@ -6190,10 +6191,10 @@ const VALID_TRANSITIONS = {
   completed: [],
   cancelled: []
 };
-router$l.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$m.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2, note } = req.body;
-    const orderDoc = await db$m().collection("orders").doc(req.params.id).get();
+    const orderDoc = await db$n().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
     const currentStatus = orderDoc.data().status;
     const validNext = VALID_TRANSITIONS[currentStatus] || [];
@@ -6211,14 +6212,14 @@ router$l.patch("/:id/status", requireCoordinator, async (req, res) => {
       updates.completedAt = admin.firestore.FieldValue.serverTimestamp();
     }
     await orderDoc.ref.update(updates);
-    const apptSnapshot = await db$m().collection("appointments").where("orderId", "==", req.params.id).limit(1).get();
+    const apptSnapshot = await db$n().collection("appointments").where("orderId", "==", req.params.id).limit(1).get();
     if (!apptSnapshot.empty) {
       const apptStatus = status2 === "in_progress" ? "in_progress" : status2 === "shot_complete" || status2 === "editing" ? "completed" : status2 === "cancelled" ? "cancelled" : void 0;
       if (apptStatus) {
         await apptSnapshot.docs[0].ref.update({ status: apptStatus });
       }
     }
-    await db$m().collection("agentLogs").add({
+    await db$n().collection("agentLogs").add({
       agent: "nora",
       action: `Order status changed: ${currentStatus} → ${status2}`,
       summary: `Order ${req.params.id} transitioned to ${status2}`,
@@ -6236,12 +6237,12 @@ router$l.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update order status." });
   }
 });
-router$l.get("/:id/timeline", requireStaff, async (req, res) => {
+router$m.get("/:id/timeline", requireStaff, async (req, res) => {
   try {
     const [messages, editRequests, agentLogs] = await Promise.all([
-      db$m().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
-      db$m().collection("editRequests").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
-      db$m().collection("agentLogs").where("relatedId", "==", req.params.id).orderBy("createdAt", "asc").get()
+      db$n().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
+      db$n().collection("editRequests").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
+      db$n().collection("agentLogs").where("relatedId", "==", req.params.id).orderBy("createdAt", "asc").get()
     ]);
     const timeline = [
       ...messages.docs.map((d) => ({ type: "message", ...d.data(), id: d.id })),
@@ -6295,36 +6296,36 @@ const VIDEO_FILE = /\.(mp4|m4v|mov|webm)(\?|#|$)/i;
 const BLOCKED_EXT = /\.(zip|pdf|dng|cr2|cr3|nef|nrw|arw|srf|sr2|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic|heif|mp4|m4v|mov|webm)(\?|#|$)/i;
 const FILE_KEYS = ["downloadUrl", "fileUrl", "originalUrl", "fullResUrl", "mlsUrl", "zipUrl", "printUrl", "reelUrl", "mp4Url", "rawUrl", "src"];
 const DISPLAY_KEYS = ["previewUrl", "displayUrl", "webUrl", "thumbnailUrl"];
-function text$7(value) {
+function text$8(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function rowOf$2(item) {
   return item && typeof item === "object" ? item : null;
 }
 function shareableUrl$1(value) {
-  const url = text$7(value);
+  const url = text$8(value);
   if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
   if (url.startsWith("/")) return url;
   if (url.startsWith("https://") || url.startsWith("http://")) return url;
   return "";
 }
 function mediaName$1(row, fallback) {
-  return text$7(row.name) || text$7(row.fileName) || text$7(row.title) || fallback;
+  return text$8(row.name) || text$8(row.fileName) || text$8(row.title) || fallback;
 }
 function labelOf(row) {
-  return `${text$7(row.fileName)} ${text$7(row.name)} ${text$7(row.title)} ${text$7(row.path)} ${text$7(row.storagePath)}`.toLowerCase();
+  return `${text$8(row.fileName)} ${text$8(row.name)} ${text$8(row.title)} ${text$8(row.path)} ${text$8(row.storagePath)}`.toLowerCase();
 }
 function isMls(row) {
-  const category = text$7(row.category).toLowerCase();
-  const type = text$7(row.type).toLowerCase();
+  const category = text$8(row.category).toLowerCase();
+  const type = text$8(row.type).toLowerCase();
   if (category === "mls" || type === "mls") return true;
   const label = labelOf(row);
   if (/(^|[^a-z0-9])mls([^a-z0-9]|$)/.test(label)) return true;
   return /\/mls\//.test(label);
 }
 function isFullRes(row) {
-  const category = text$7(row.category).toLowerCase();
-  const type = text$7(row.type).toLowerCase();
+  const category = text$8(row.category).toLowerCase();
+  const type = text$8(row.type).toLowerCase();
   if (category === "full-res" || category === "fullres" || type === "full-res" || type === "fullres") return true;
   const label = labelOf(row);
   if (/(^|[^a-z0-9])full[\s_-]?res([^a-z0-9]|$)/.test(label)) return true;
@@ -6333,7 +6334,7 @@ function isFullRes(row) {
 function isRasterUrl(url, row) {
   if (!url || BLOCKED_EXT.test(url.split("#")[0]) || VIDEO_FILE.test(url.split("#")[0])) return false;
   if (RASTER.test(url.split("#")[0])) return true;
-  const content = text$7(row.contentType).toLowerCase();
+  const content = text$8(row.contentType).toLowerCase();
   return /^image\/(jpeg|jpg|png|webp|gif)/.test(content);
 }
 function blockedFileUrls(row, includeOwnUrl) {
@@ -6362,11 +6363,11 @@ function separateDisplay(row) {
 }
 function rasterShareSource(row, legacyDropTagged = false) {
   if (legacyDropTagged && isMls(row)) return "";
-  const type = text$7(row.type).toLowerCase();
+  const type = text$8(row.type).toLowerCase();
   if (type === "video" || type === "reel" || type === "file" || type === "matterport") return "";
-  const content = text$7(row.contentType).toLowerCase();
+  const content = text$8(row.contentType).toLowerCase();
   if (content.startsWith("video/") || content === "application/pdf" || content === "application/zip") return "";
-  const path2 = `${text$7(row.path)} ${text$7(row.storagePath)}`.toLowerCase();
+  const path2 = `${text$8(row.path)} ${text$8(row.storagePath)}`.toLowerCase();
   if (/\/(raw|downloads?|print|zips?)\//.test(path2)) return "";
   const display = separateDisplay(row);
   if (legacyDropTagged && isFullRes(row)) return display;
@@ -6396,11 +6397,11 @@ function videoFileUrl(row) {
 function videoPlaceholderSource(row) {
   if (rasterPoster(row)) return "";
   const file = videoFileUrl(row);
-  const type = text$7(row.type).toLowerCase();
-  const content = text$7(row.contentType).toLowerCase();
+  const type = text$8(row.type).toLowerCase();
+  const content = text$8(row.contentType).toLowerCase();
   const named = type === "video" || type === "reel" || content.startsWith("video/");
   if (!file && !named) return "";
-  const id = text$7(row.id) || file || text$7(row.path) || text$7(row.storagePath) || text$7(row.name) || text$7(row.fileName);
+  const id = text$8(row.id) || file || text$8(row.path) || text$8(row.storagePath) || text$8(row.name) || text$8(row.fileName);
   if (!id) return "";
   return `${VIDEO_PLACEHOLDER_PREFIX}${encodeURIComponent(id)}`;
 }
@@ -6460,8 +6461,8 @@ function listingOwnerDisplayItems(listing) {
   return items;
 }
 function isGalleryFloor(row) {
-  const type = text$7(row.type).toLowerCase();
-  const category = text$7(row.category).toLowerCase();
+  const type = text$8(row.type).toLowerCase();
+  const category = text$8(row.category).toLowerCase();
   return type === "floorplan" || type === "floor-plan" || category === "floorplan" || category === "floor-plan";
 }
 function galleryOwnerDisplayItems(media) {
@@ -6469,7 +6470,7 @@ function galleryOwnerDisplayItems(media) {
   const seen = /* @__PURE__ */ new Set();
   const rows = media.map(rowOf$2).filter((row) => Boolean(row));
   for (const row of rows) {
-    const type = text$7(row.type).toLowerCase();
+    const type = text$8(row.type).toLowerCase();
     if (type === "video" || type === "reel" || type === "matterport" || type === "tour" || type === "file" || type === "pdf") continue;
     const source = rasterShareSource(row);
     if (!source) continue;
@@ -6477,7 +6478,7 @@ function galleryOwnerDisplayItems(media) {
     pushDisplay(items, seen, mediaName$1(row, floor ? "Floor plan" : "Photo"), source, floor ? "floorPlan" : "image");
   }
   for (const row of rows) {
-    const type = text$7(row.type).toLowerCase();
+    const type = text$8(row.type).toLowerCase();
     if (type !== "video" && type !== "reel") continue;
     const poster = rasterPoster(row) || videoPlaceholderSource(row);
     pushDisplay(items, seen, mediaName$1(row, "Video"), poster, "poster");
@@ -6494,24 +6495,24 @@ function posterIndex(row, items) {
   return items.findIndex((item) => item.sourceUrl === poster);
 }
 function isUnbranded(row) {
-  const category = text$7(row.category).toLowerCase();
-  const type = text$7(row.type).toLowerCase();
+  const category = text$8(row.category).toLowerCase();
+  const type = text$8(row.type).toLowerCase();
   if (category === "unbranded" || type === "unbranded") return true;
-  const name = `${text$7(row.name)} ${text$7(row.fileName)} ${text$7(row.title)}`.toLowerCase();
+  const name = `${text$8(row.name)} ${text$8(row.fileName)} ${text$8(row.title)}`.toLowerCase();
   return name.includes("unbranded");
 }
 function isBrandedPlayback(row) {
   if (isMls(row) || isUnbranded(row)) return false;
-  const category = text$7(row.category).toLowerCase();
-  const type = text$7(row.type).toLowerCase();
+  const category = text$8(row.category).toLowerCase();
+  const type = text$8(row.type).toLowerCase();
   if (category === "branded" || type === "branded") return true;
-  const name = `${text$7(row.name)} ${text$7(row.fileName)} ${text$7(row.title)}`.toLowerCase();
+  const name = `${text$8(row.name)} ${text$8(row.fileName)} ${text$8(row.title)}`.toLowerCase();
   return /(^|[^a-z])branded([^a-z]|$)/.test(name);
 }
 function isReelPlayback(row) {
   if (isMls(row) || isUnbranded(row)) return false;
-  const category = text$7(row.category).toLowerCase();
-  const type = text$7(row.type).toLowerCase();
+  const category = text$8(row.category).toLowerCase();
+  const type = text$8(row.type).toLowerCase();
   return category === "reel" || type === "reel";
 }
 function deliveredVideoUrl(row) {
@@ -6819,15 +6820,15 @@ function statusOf(doc) {
 function isReleased(doc) {
   return RELEASED_GALLERY_STATUSES.includes(statusOf(doc));
 }
-function text$6(value) {
+function text$7(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function httpUrl(value) {
-  const url = text$6(value);
+  const url = text$7(value);
   return url.startsWith("https://") || url.startsWith("http://") ? url : "";
 }
 function shareableUrl(value) {
-  const url = text$6(value);
+  const url = text$7(value);
   if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
   if (url.startsWith("/")) return url;
   return httpUrl(url);
@@ -6869,7 +6870,7 @@ function isPrivateMedia(path2, name, url) {
   return PRIVATE_FILE.test(name) || PRIVATE_FILE.test(url);
 }
 function mediaName(row, fallback) {
-  return text$6(row.name) || text$6(row.fileName) || text$6(row.title) || fallback;
+  return text$7(row.name) || text$7(row.fileName) || text$7(row.title) || fallback;
 }
 function publicImages(listing) {
   if (!Array.isArray(listing.images)) return [];
@@ -6891,7 +6892,7 @@ function publicVideos(listing) {
     if (!row) continue;
     const url = httpUrl(row.url);
     const name = mediaName(row, "Video");
-    if (!url || isPrivateMedia(text$6(row.path) || text$6(row.storagePath), name, url)) continue;
+    if (!url || isPrivateMedia(text$7(row.path) || text$7(row.storagePath), name, url)) continue;
     videos.push({ url, name });
   }
   return videos.slice(0, 40);
@@ -6904,10 +6905,10 @@ function publicTour(listing) {
   return "";
 }
 function agentNameOf$1(listing) {
-  const direct = text$6(listing.agentName) || text$6(listing.listingAgent);
+  const direct = text$7(listing.agentName) || text$7(listing.listingAgent);
   if (direct) return direct;
   const agent = listing.agent;
-  if (agent && typeof agent === "object") return text$6(agent.name);
+  if (agent && typeof agent === "object") return text$7(agent.name);
   if (typeof agent === "string") return agent.trim();
   return "";
 }
@@ -6921,7 +6922,7 @@ function publicFloorPlans(listing) {
       if (!row) continue;
       const url = httpUrl(row.url) || httpUrl(row.shareUrl);
       const name = mediaName(row, "Floor plan");
-      const path2 = text$6(row.path) || text$6(row.storagePath);
+      const path2 = text$7(row.path) || text$7(row.storagePath);
       if (!url || isPrivateMedia(path2, name, url)) continue;
       plans.push({ url, name });
     }
@@ -6951,7 +6952,7 @@ function ownerFiles(listing) {
       const row = rowOf(item);
       if (!row) return;
       const name = mediaName(row, `File ${index + 1}`);
-      const path2 = text$6(row.path) || text$6(row.storagePath);
+      const path2 = text$7(row.path) || text$7(row.storagePath);
       const display = httpUrl(row.url);
       const download = downloadUrlOf(row);
       if (download) push(download, name);
@@ -6982,12 +6983,12 @@ function ownerRevisions(listing) {
     const row = rowOf(item) || {};
     const photoIndex = typeof row.photoIndex === "number" ? row.photoIndex : null;
     return {
-      id: text$6(row.id) || `revision-${index + 1}`,
-      type: text$6(row.type) || "gallery",
+      id: text$7(row.id) || `revision-${index + 1}`,
+      type: text$7(row.type) || "gallery",
       photoIndex,
-      description: text$6(row.description),
-      status: text$6(row.status) || "pending",
-      createdAt: text$6(row.createdAt)
+      description: text$7(row.description),
+      status: text$7(row.status) || "pending",
+      createdAt: text$7(row.createdAt)
     };
   });
 }
@@ -6996,11 +6997,11 @@ function invoiceOf(listing) {
   if (nested2 && typeof nested2 === "object" && typeof nested2.status === "string") {
     return { status: nested2.status };
   }
-  const status2 = text$6(listing.invoiceStatus);
+  const status2 = text$7(listing.invoiceStatus);
   return status2 ? { status: status2 } : null;
 }
 function pickReleasedGallery(listing, related) {
-  const preferred = text$6(listing.galleryId) || text$6(listing.playtestGalleryId);
+  const preferred = text$7(listing.galleryId) || text$7(listing.playtestGalleryId);
   const released = related.filter((doc) => isReleased(doc));
   if (preferred) {
     const match = released.find((doc) => doc.id === preferred);
@@ -7091,24 +7092,24 @@ function isStreamUrl(url) {
   return /(youtube\.com|youtu\.be|vimeo\.com|player\.vimeo\.com|mux\.com|stream\.mux|cloudflarestream\.com)/i.test(url);
 }
 function isFullResOrMls(row) {
-  const category = text$6(row.category).toLowerCase();
-  const type = text$6(row.type).toLowerCase();
+  const category = text$7(row.category).toLowerCase();
+  const type = text$7(row.type).toLowerCase();
   if (category === "mls" || category === "full-res" || category === "fullres" || type === "mls") return true;
-  const label = `${text$6(row.fileName)} ${text$6(row.name)} ${text$6(row.title)} ${text$6(row.path)} ${text$6(row.storagePath)}`.toLowerCase();
+  const label = `${text$7(row.fileName)} ${text$7(row.name)} ${text$7(row.title)} ${text$7(row.path)} ${text$7(row.storagePath)}`.toLowerCase();
   if (/(^|[^a-z0-9])(full[\s_-]?res|mls)([^a-z0-9]|$)/.test(label)) return true;
   return /\/(mls|full)\//.test(label);
 }
 function rowIsDeliveryOriginal(row) {
   if (row.downloadable === true || isFullResOrMls(row)) return true;
-  const type = text$6(row.type).toLowerCase();
+  const type = text$7(row.type).toLowerCase();
   if (type === "video" || type === "reel" || type === "file") return true;
-  const content = text$6(row.contentType).toLowerCase();
+  const content = text$7(row.contentType).toLowerCase();
   if (content.startsWith("video/") || content === "application/zip" || content === "application/pdf") return true;
   const candidates = [row.url, row.shareUrl, row.embedUrl, ...FILE_URL_KEYS.map((key) => row[key])];
-  return candidates.some((value) => isOriginalFileUrl(httpUrl(value) || text$6(value)));
+  return candidates.some((value) => isOriginalFileUrl(httpUrl(value) || text$7(value)));
 }
 function pushNeedle(needles, value) {
-  const raw = text$6(value);
+  const raw = text$7(value);
   if (raw.length >= 12) needles.push(raw);
 }
 function walkOriginalNeedles(value, needles, inheritedOriginal = false) {
@@ -7123,7 +7124,7 @@ function walkOriginalNeedles(value, needles, inheritedOriginal = false) {
   if (original) {
     const fileUrls = new Set(FILE_URL_KEYS.map((key) => shareableUrl(row[key])).filter(Boolean));
     for (const key of ["url", "shareUrl", "embedUrl", "sourcePath", "storagePath", "path"]) {
-      const raw = text$6(row[key]);
+      const raw = text$7(row[key]);
       if (!raw) continue;
       const asUrl = shareableUrl(raw);
       if (asUrl && isStreamUrl(asUrl)) continue;
@@ -7230,7 +7231,7 @@ function embedTour(listing, needles) {
       for (const key of ["embedUrl", "url", "shareUrl"]) {
         const url = shareableUrl(row[key]);
         if (!url || isOriginalFileUrl(url) || containsOriginal(url, needles)) continue;
-        const type = text$6(row.type).toLowerCase();
+        const type = text$7(row.type).toLowerCase();
         if (type === "matterport" || type === "tour" || /matterport\.com/i.test(url)) return url;
       }
     }
@@ -7252,7 +7253,7 @@ function displaySafeShareMedia(listing) {
 function ownerStudioProject(listing, pub, gate = {}) {
   const authoritativeInvoice = Object.prototype.hasOwnProperty.call(gate, "invoice");
   const invoiceDoc = authoritativeInvoice && gate.invoice && typeof gate.invoice === "object" ? gate.invoice : null;
-  const invoiceStatus = authoritativeInvoice ? text$6(invoiceDoc?.status) : text$6(invoiceOf(listing)?.status);
+  const invoiceStatus = authoritativeInvoice ? text$7(invoiceDoc?.status) : text$7(invoiceOf(listing)?.status);
   const invoice = invoiceStatus ? { status: invoiceStatus } : null;
   const downloadsUnlocked = studioDownloadsUnlocked({
     listing: {
@@ -7271,9 +7272,9 @@ function ownerStudioProject(listing, pub, gate = {}) {
   const project = {
     ...source,
     view: "owner",
-    clientName: text$6(listing.clientName),
-    clientEmail: text$6(listing.clientEmail),
-    clientPhone: text$6(listing.clientPhone),
+    clientName: text$7(listing.clientName),
+    clientEmail: text$7(listing.clientEmail),
+    clientPhone: text$7(listing.clientPhone),
     revisions: ownerRevisions(listing),
     lockDownloads: lockDownloadsOn(listing.lockDownloads),
     requirePayment: requirePaymentOn(listing.requirePayment),
@@ -7319,8 +7320,8 @@ function decideClientGalleryLink(input) {
   }
   if (input.pointedListing) return listingResult(input.pointedListing, input.relatedGalleries);
   if (input.order) {
-    const galleryId = text$6(input.order.galleryId);
-    const listingId = text$6(input.order.listingId);
+    const galleryId = text$7(input.order.galleryId);
+    const listingId = text$7(input.order.listingId);
     if (galleryId || listingId) {
       return {
         ok: false,
@@ -7337,8 +7338,8 @@ function decideClientGalleryLink(input) {
     };
   }
   if (input.orderRequest) {
-    const galleryId = text$6(input.orderRequest.galleryId);
-    const listingId = text$6(input.orderRequest.listingId);
+    const galleryId = text$7(input.orderRequest.galleryId);
+    const listingId = text$7(input.orderRequest.listingId);
     if (galleryId || listingId) {
       return {
         ok: false,
@@ -8031,7 +8032,7 @@ function jsonSafe(value) {
   }
   return value;
 }
-const db$l = () => admin.firestore();
+const db$m = () => admin.firestore();
 const bucket$1 = () => admin.storage().bucket();
 const BROWSER_ORIGINS = [
   "https://iconicimagestx.vercel.app",
@@ -8095,7 +8096,7 @@ async function registerListingPhoto(options) {
   if (!isListingStoragePath(listingId, storagePath)) {
     throw Object.assign(new Error("Storage path is not inside this listing."), { status: 400 });
   }
-  const listingRef = db$l().collection("listings").doc(listingId);
+  const listingRef = db$m().collection("listings").doc(listingId);
   const listingSnap = await listingRef.get();
   if (!listingSnap.exists) {
     throw Object.assign(new Error("Listing not found."), { status: 404 });
@@ -8154,7 +8155,7 @@ async function syncPlaytestGallery(listingId, listing, image) {
     galleryIds.add(listing.playtestGalleryId);
   }
   if (listing.playtest === true) {
-    const snap = await db$l().collection("galleries").where("listingId", "==", listingId).limit(5).get();
+    const snap = await db$m().collection("galleries").where("listingId", "==", listingId).limit(5).get();
     snap.docs.forEach((doc) => {
       if (doc.data().playtest === true) galleryIds.add(doc.id);
     });
@@ -8173,7 +8174,7 @@ async function syncPlaytestGallery(listingId, listing, image) {
     uploadedAt: image.uploadedAt
   };
   for (const galleryId of galleryIds) {
-    const ref = db$l().collection("galleries").doc(galleryId);
+    const ref = db$m().collection("galleries").doc(galleryId);
     const snap = await ref.get();
     if (!snap.exists || snap.data()?.playtest !== true) continue;
     const items = Array.isArray(snap.data()?.mediaItems) ? snap.data().mediaItems : [];
@@ -8446,7 +8447,7 @@ async function inspectFinishedListingJpeg(input) {
   }
   return parseDeliveryInspection(body) || deliveryInspection("flag", [INSPECTION_FAILED_NOTE]);
 }
-const db$k = () => admin.firestore();
+const db$l = () => admin.firestore();
 const bucket = () => admin.storage().bucket();
 function httpError$3(status2, message) {
   return Object.assign(new Error(message), { status: status2 });
@@ -8458,7 +8459,7 @@ async function bumpRawIngestJob(input) {
     name: input.image.name || input.image.path.split("/").pop() || "raw",
     contentType: input.image.contentType || ""
   };
-  const ref = db$k().collection("editJobs").doc(ingestJobId(input.listingId));
+  const ref = db$l().collection("editJobs").doc(ingestJobId(input.listingId));
   const snap = await ref.get();
   if (!snap.exists) {
     await ref.set({
@@ -8490,7 +8491,7 @@ async function bumpRawIngestJob(input) {
   return { id: ref.id, created: false, fileCount: files.length + 1 };
 }
 async function loadListing$1(listingId) {
-  const snap = await db$k().collection("listings").doc(listingId).get();
+  const snap = await db$l().collection("listings").doc(listingId).get();
   if (!snap.exists) throw httpError$3(404, "Listing not found.");
   return { id: snap.id, ref: snap.ref, data: snap.data() || {} };
 }
@@ -8502,10 +8503,10 @@ async function listingDelivery(listingId, data) {
     };
     push(data.galleryId);
     push(data.playtestGalleryId);
-    const snap = await db$k().collection("galleries").where("listingId", "==", listingId).limit(5).get();
+    const snap = await db$l().collection("galleries").where("listingId", "==", listingId).limit(5).get();
     snap.docs.forEach((doc) => ids.push(doc.id));
     for (const galleryId of [...new Set(ids)]) {
-      const doc = await db$k().collection("galleries").doc(galleryId).get();
+      const doc = await db$l().collection("galleries").doc(galleryId).get();
       if (!doc.exists) continue;
       const galleryStatus = typeof doc.data()?.status === "string" ? doc.data().status : "";
       const deliveryStatus = mediaDeliveryFromGalleryStatus(galleryStatus);
@@ -8525,14 +8526,14 @@ async function listingDelivery(listingId, data) {
 async function listingsForRole(uid, role) {
   if (role === "photographer") {
     const [byUid, byIds] = await Promise.all([
-      db$k().collection("listings").where("photographerUid", "==", uid).limit(50).get(),
-      db$k().collection("listings").where("photographerIds", "array-contains", uid).limit(50).get()
+      db$l().collection("listings").where("photographerUid", "==", uid).limit(50).get(),
+      db$l().collection("listings").where("photographerIds", "array-contains", uid).limit(50).get()
     ]);
     const merged = /* @__PURE__ */ new Map();
     for (const doc of [...byUid.docs, ...byIds.docs]) merged.set(doc.id, doc);
     return [...merged.values()].map((doc) => ({ id: doc.id, data: doc.data() }));
   }
-  const snap = await db$k().collection("listings").limit(80).get();
+  const snap = await db$l().collection("listings").limit(80).get();
   return snap.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
 }
 async function assertStudioAccess(uid, role, listingId) {
@@ -8604,7 +8605,7 @@ async function loadOrderEditContext(listingId) {
   let order = null;
   const orderId = typeof listing.data.orderId === "string" ? listing.data.orderId : "";
   if (orderId) {
-    const snap = await db$k().collection("orders").doc(orderId).get();
+    const snap = await db$l().collection("orders").doc(orderId).get();
     if (snap.exists) order = snap.data() || {};
   }
   const plan = planOrderEdits({
@@ -8654,7 +8655,7 @@ async function prepareOrderEditJobs(input) {
   if (input.retryFailed) settled2.delete("failed");
   let prepared = 0;
   for (const draft of drafts) {
-    const ref = db$k().collection("editJobs").doc(orderEditDocId(input.listingId, draft.slot));
+    const ref = db$l().collection("editJobs").doc(orderEditDocId(input.listingId, draft.slot));
     const snap = await ref.get();
     const current = snap.data() || {};
     if (snap.exists && settled2.has(String(current.status || ""))) continue;
@@ -8684,7 +8685,7 @@ async function prepareOrderEditJobs(input) {
     await ref.set(payload, { merge: true });
     prepared += 1;
   }
-  const jobSnap = await db$k().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
+  const jobSnap = await db$l().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
   const jobs = queueJobsFromSnap(jobSnap.docs);
   const advance2 = orderQueueAdvancePlan(jobs);
   const waiting = jobs.filter((job) => job.origin === "order" && job.status === "pending" && !job.sourcePath).length;
@@ -8692,7 +8693,7 @@ async function prepareOrderEditJobs(input) {
 }
 async function claimOrderEdit(ref, now = Date.now()) {
   try {
-    await db$k().runTransaction(async (tx) => {
+    await db$l().runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       if (!snap.exists) throw new Error("missing");
       const data = snap.data() || {};
@@ -8719,7 +8720,7 @@ async function claimOrderEdit(ref, now = Date.now()) {
 }
 async function advanceOrderEditQueue(input) {
   const prepared = await prepareOrderEditJobs(input);
-  const jobSnap = await db$k().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
+  const jobSnap = await db$l().collection("editJobs").where("listingId", "==", input.listingId).limit(200).get();
   const advance2 = orderQueueAdvancePlan(queueJobsFromSnap(jobSnap.docs));
   const waiting = queueJobsFromSnap(jobSnap.docs).filter((job) => job.origin === "order" && job.status === "pending" && !job.sourcePath).length;
   if (!advance2.nextId) {
@@ -8842,7 +8843,7 @@ async function enqueueOrderEditsFromUpload(input) {
   return prepareOrderEditJobs({ ...input, retryFailed: false });
 }
 async function nextOrderEditListingId() {
-  const snap = await db$k().collection("editJobs").where("status", "==", "pending").limit(40).get();
+  const snap = await db$l().collection("editJobs").where("status", "==", "pending").limit(40).get();
   for (const doc of snap.docs) {
     const data = doc.data() || {};
     if (data.origin === "order" && data.sourcePath && typeof data.listingId === "string" && data.listingId) {
@@ -8859,7 +8860,7 @@ async function enqueueAiEdit(input) {
     throw httpError$3(400, "Choose a JPEG, PNG, or WebP. RAW stays in the queue until a preview exists.");
   }
   const beforeUrl = frame.url || input.imageUrl;
-  const ref = await db$k().collection("editJobs").add({
+  const ref = await db$l().collection("editJobs").add({
     kind: "ai_edit",
     origin: "staff_override",
     type: input.type,
@@ -8927,7 +8928,7 @@ async function enqueueAiEdit(input) {
   }
 }
 async function rejectStudioJob(input) {
-  const ref = db$k().collection("editJobs").doc(input.jobId);
+  const ref = db$l().collection("editJobs").doc(input.jobId);
   const snap = await ref.get();
   if (!snap.exists) throw httpError$3(404, "Edit job not found.");
   const job = snap.data() || {};
@@ -8965,7 +8966,7 @@ async function saveAdjustedJpeg(input) {
     existingUrl: saved.url,
     extra: { studioRole: "adjusted", sourcePath: input.sourcePath }
   });
-  const job = await db$k().collection("editJobs").add({
+  const job = await db$l().collection("editJobs").add({
     kind: "adjust",
     type: "adjust",
     listingId: input.listingId,
@@ -9031,11 +9032,11 @@ async function addFinalToGalleries(listingId, listing, image) {
   const ids = /* @__PURE__ */ new Set();
   if (typeof listing.galleryId === "string" && listing.galleryId) ids.add(listing.galleryId);
   if (typeof listing.playtestGalleryId === "string" && listing.playtestGalleryId) ids.add(listing.playtestGalleryId);
-  const snap = await db$k().collection("galleries").where("listingId", "==", listingId).limit(10).get();
+  const snap = await db$l().collection("galleries").where("listingId", "==", listingId).limit(10).get();
   snap.docs.forEach((doc) => ids.add(doc.id));
   const updated = [];
   for (const galleryId of ids) {
-    const ref = db$k().collection("galleries").doc(galleryId);
+    const ref = db$l().collection("galleries").doc(galleryId);
     const gallerySnap = await ref.get();
     if (!gallerySnap.exists) continue;
     const data = gallerySnap.data() || {};
@@ -9088,7 +9089,7 @@ async function approveStudioFinal(input) {
     uploadedBy: input.uploadedBy
   });
   if (input.jobId) {
-    await db$k().collection("editJobs").doc(input.jobId).set({
+    await db$l().collection("editJobs").doc(input.jobId).set({
       status: "approved",
       resultPath: copied.storagePath,
       resultUrl: copied.url,
@@ -9107,7 +9108,7 @@ async function approveStudioFinal(input) {
 async function loadStudioWorkspace(input) {
   const listings = await listingsForRole(input.uid, input.role);
   const allowed = new Set(listings.map((item) => item.id));
-  const jobSnap = await db$k().collection("editJobs").limit(150).get();
+  const jobSnap = await db$l().collection("editJobs").limit(150).get();
   const jobs = jobSnap.docs.map((doc) => jsonSafe({ id: doc.id, ...doc.data() })).filter((job) => {
     const listingId = String(job.listingId || "");
     if (input.role === "photographer") return allowed.has(listingId);
@@ -9154,7 +9155,7 @@ async function loadStudioWorkspace(input) {
     listing
   };
 }
-const db$j = () => admin.firestore();
+const db$k = () => admin.firestore();
 function asMedia(value) {
   if (!Array.isArray(value)) return [];
   return value.flatMap((entry2) => {
@@ -9196,11 +9197,11 @@ async function galleryMediaForListing(listingId, listing, extra) {
   const ids = /* @__PURE__ */ new Set();
   if (typeof listing.galleryId === "string" && listing.galleryId) ids.add(listing.galleryId);
   if (typeof listing.playtestGalleryId === "string" && listing.playtestGalleryId) ids.add(listing.playtestGalleryId);
-  const snap = await db$j().collection("galleries").where("listingId", "==", listingId).limit(10).get();
+  const snap = await db$k().collection("galleries").where("listingId", "==", listingId).limit(10).get();
   snap.docs.forEach((doc) => ids.add(doc.id));
   for (const galleryId of ids) {
     if (extra && galleryId === extra.id) continue;
-    const doc = await db$j().collection("galleries").doc(galleryId).get();
+    const doc = await db$k().collection("galleries").doc(galleryId).get();
     if (!doc.exists) continue;
     const data = doc.data() || {};
     media.push(...asMedia(data.mediaItems), ...asMedia(data.videoLinks), ...asMedia(data.tourLinks));
@@ -9210,7 +9211,7 @@ async function galleryMediaForListing(listingId, listing, extra) {
 async function loadGalleryReleaseReport(listingId, gallery) {
   const { listing, plan } = await loadOrderEditContext(listingId);
   const files = filesFromListing(listing.data);
-  const jobSnap = await db$j().collection("editJobs").where("listingId", "==", listingId).limit(200).get();
+  const jobSnap = await db$k().collection("editJobs").where("listingId", "==", listingId).limit(200).get();
   const jobs = jobSnap.docs.map((doc) => {
     const data = doc.data() || {};
     return {
@@ -9235,7 +9236,7 @@ async function loadGalleryReleaseReport(listingId, gallery) {
   return report;
 }
 async function loadGalleryReleaseForGallery(galleryId) {
-  const snap = await db$j().collection("galleries").doc(galleryId).get();
+  const snap = await db$k().collection("galleries").doc(galleryId).get();
   if (!snap.exists) {
     throw Object.assign(new Error("Gallery not found."), { status: 404 });
   }
@@ -9244,13 +9245,13 @@ async function loadGalleryReleaseForGallery(galleryId) {
   if (playtestRelease) return playtestRelease;
   const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
   if (listingId) {
-    const listingSnap = await db$j().collection("listings").doc(listingId).get();
+    const listingSnap = await db$k().collection("listings").doc(listingId).get();
     if (listingSnap.exists) return loadGalleryReleaseReport(listingId, gallery);
   }
   const orderId = typeof gallery.orderId === "string" ? gallery.orderId.trim() : "";
   let order = null;
   if (orderId) {
-    const orderSnap = await db$j().collection("orders").doc(orderId).get();
+    const orderSnap = await db$k().collection("orders").doc(orderId).get();
     if (orderSnap.exists) order = orderSnap.data() || {};
   }
   const plan = planOrderEdits({
@@ -9268,18 +9269,18 @@ async function loadGalleryReleaseForGallery(galleryId) {
     media: [...asMedia(gallery.mediaItems), ...asMedia(gallery.videoLinks), ...asMedia(gallery.tourLinks)]
   });
 }
-const db$i = () => admin.firestore();
+const db$j = () => admin.firestore();
 function httpError$2(status2, message, extra) {
   return Object.assign(new Error(message), { status: status2, ...extra });
 }
 async function invoiceForGallery$1(gallery) {
-  const load = (id) => db$i().collection("invoices").doc(id).get();
+  const load = (id) => db$j().collection("invoices").doc(id).get();
   if (typeof gallery.invoiceId === "string" && gallery.invoiceId) {
     const doc = await readInvoiceDoc(load, gallery.invoiceId);
     if (doc) return { id: doc.id, ...doc.data };
   }
   if (typeof gallery.orderId === "string" && gallery.orderId) {
-    const snap = await db$i().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
+    const snap = await db$j().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
     if (!snap.empty) {
       const doc = await readInvoiceDoc(load, snap.docs[0].id);
       if (doc) return { id: doc.id, ...doc.data };
@@ -9287,7 +9288,7 @@ async function invoiceForGallery$1(gallery) {
   }
   const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
   if (listingId) {
-    const listing = await db$i().collection("listings").doc(listingId).get();
+    const listing = await db$j().collection("listings").doc(listingId).get();
     const invoiceId = listing.exists && typeof listing.data()?.invoiceId === "string" ? listing.data()?.invoiceId.trim() : "";
     if (invoiceId) {
       const doc = await readInvoiceDoc(load, invoiceId);
@@ -9299,7 +9300,7 @@ async function invoiceForGallery$1(gallery) {
 async function listingDownloadFlags$1(gallery) {
   const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
   if (!listingId) return { lockDownloads: void 0, downloadsReleased: false };
-  const listing = await db$i().collection("listings").doc(listingId).get();
+  const listing = await db$j().collection("listings").doc(listingId).get();
   if (!listing.exists) return { lockDownloads: void 0, downloadsReleased: false };
   const data = listing.data() || {};
   return {
@@ -9318,7 +9319,7 @@ async function downloadGateForGallery$1(gallery) {
   };
 }
 async function deliverGalleryToClient(galleryId, options) {
-  const galleryDoc = await db$i().collection("galleries").doc(galleryId).get();
+  const galleryDoc = await db$j().collection("galleries").doc(galleryId).get();
   if (!galleryDoc.exists) throw httpError$2(404, "Gallery not found.");
   const report = await loadGalleryReleaseForGallery(galleryId);
   if (!report.complete) {
@@ -9341,13 +9342,13 @@ async function deliverGalleryToClient(galleryId, options) {
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   });
   if (gallery.orderId) {
-    await db$i().collection("orders").doc(String(gallery.orderId)).update({
+    await db$j().collection("orders").doc(String(gallery.orderId)).update({
       status: "delivered",
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
   }
   const clientId2 = typeof gallery.clientId === "string" ? gallery.clientId : "";
-  const clientDoc = clientId2 ? await db$i().collection("clients").doc(clientId2).get() : null;
+  const clientDoc = clientId2 ? await db$j().collection("clients").doc(clientId2).get() : null;
   const client = clientDoc?.data();
   const address = recordAddressText(gallery) || "the property";
   const invoice = await invoiceForGallery$1(gallery);
@@ -9417,7 +9418,7 @@ async function recordGalleryDelivered(gallery, input) {
     return;
   }
   if (orderId) {
-    await db$i().collection("orders").doc(orderId).update({
+    await db$j().collection("orders").doc(orderId).update({
       history: admin.firestore.FieldValue.arrayUnion(entry2),
       updatedAt: stamp2
     });
@@ -9425,7 +9426,7 @@ async function recordGalleryDelivered(gallery, input) {
     console.warn("[Galleries] Gallery delivered with no order to attach history to.");
   }
   if (!listingId) return;
-  await db$i().collection("listings").doc(listingId).update({
+  await db$j().collection("listings").doc(listingId).update({
     auditLog: admin.firestore.FieldValue.arrayUnion(entry2),
     updatedAt: stamp2
   }).catch((err) => console.error("[Galleries] Project history was not saved:", err));
@@ -9434,12 +9435,12 @@ async function orderIdForGallery(gallery) {
   if (typeof gallery.orderId === "string" && gallery.orderId.trim()) return gallery.orderId.trim();
   const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
   if (!listingId) return "";
-  const listing = await db$i().collection("listings").doc(listingId).get();
+  const listing = await db$j().collection("listings").doc(listingId).get();
   const orderId = listing.exists ? listing.data()?.orderId : "";
   return typeof orderId === "string" ? orderId.trim() : "";
 }
-const db$h = () => admin.firestore();
-function text$5(value) {
+const db$i = () => admin.firestore();
+function text$6(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function docRecord(snap) {
@@ -9448,7 +9449,7 @@ function docRecord(snap) {
 }
 async function galleriesWhere(field, id) {
   try {
-    const snap = await db$h().collection("galleries").where(field, "==", id).limit(8).get();
+    const snap = await db$i().collection("galleries").where(field, "==", id).limit(8).get();
     return snap.docs.map((doc) => docRecord(doc)).filter((doc) => Boolean(doc));
   } catch (err) {
     console.error(`[Galleries] ${field} lookup failed:`, err);
@@ -9457,11 +9458,11 @@ async function galleriesWhere(field, id) {
 }
 async function galleryById(id) {
   if (!id) return null;
-  return docRecord(await db$h().collection("galleries").doc(id).get());
+  return docRecord(await db$i().collection("galleries").doc(id).get());
 }
 async function relatedForListing(listing) {
   const related = await galleriesWhere("listingId", listing.id);
-  const extras = [text$5(listing.galleryId), text$5(listing.playtestGalleryId)];
+  const extras = [text$6(listing.galleryId), text$6(listing.playtestGalleryId)];
   for (const galleryId of extras) {
     if (!galleryId || related.some((doc) => doc.id === galleryId)) continue;
     const extra = await galleryById(galleryId);
@@ -9471,8 +9472,8 @@ async function relatedForListing(listing) {
 }
 async function resolveClientGalleryLink(id) {
   const [gallerySnap, listingSnap] = await Promise.all([
-    db$h().collection("galleries").doc(id).get(),
-    db$h().collection("listings").doc(id).get()
+    db$i().collection("galleries").doc(id).get(),
+    db$i().collection("listings").doc(id).get()
   ]);
   const gallery = docRecord(gallerySnap);
   const listing = docRecord(listingSnap);
@@ -9504,19 +9505,19 @@ async function resolveClientGalleryLink(id) {
   }
   const relatedGalleries = await galleriesWhere("listingId", id);
   const [orderSnap, requestSnap] = await Promise.all([
-    db$h().collection("orders").doc(id).get(),
-    db$h().collection("orderRequests").doc(id).get()
+    db$i().collection("orders").doc(id).get(),
+    db$i().collection("orderRequests").doc(id).get()
   ]);
   const order = docRecord(orderSnap);
   const orderRequest = docRecord(requestSnap);
   const galleriesByOrderId = order ? await galleriesWhere("orderId", id) : [];
-  const pointedGalleryId = text$5(orderRequest?.galleryId) || text$5(order?.galleryId);
-  const pointedListingId = text$5(orderRequest?.listingId) || text$5(order?.listingId);
+  const pointedGalleryId = text$6(orderRequest?.galleryId) || text$6(order?.galleryId);
+  const pointedListingId = text$6(orderRequest?.listingId) || text$6(order?.listingId);
   const pointedGallery = pointedGalleryId ? await galleryById(pointedGalleryId) : null;
   let pointedListing = null;
   let pointedRelated = relatedGalleries;
   if (!pointedGallery && pointedListingId) {
-    pointedListing = docRecord(await db$h().collection("listings").doc(pointedListingId).get());
+    pointedListing = docRecord(await db$i().collection("listings").doc(pointedListingId).get());
     if (pointedListing) pointedRelated = await relatedForListing(pointedListing);
   }
   return decideClientGalleryLink({
@@ -9532,8 +9533,8 @@ async function resolveClientGalleryLink(id) {
   });
 }
 async function invoiceForListing(listing) {
-  const load = (id) => db$h().collection("invoices").doc(id).get();
-  const invoiceId = text$5(listing.invoiceId);
+  const load = (id) => db$i().collection("invoices").doc(id).get();
+  const invoiceId = text$6(listing.invoiceId);
   if (invoiceId) {
     const doc = await readInvoiceDoc(load, invoiceId);
     if (doc && !invoiceRedirectTarget(doc.data)) return { id: doc.id, ...doc.data };
@@ -9545,10 +9546,10 @@ async function invoiceForListing(listing) {
     const doc = await readInvoiceDoc(load, legacyId);
     if (doc && !invoiceRedirectTarget(doc.data)) return { id: doc.id, ...doc.data };
   }
-  const orderId = text$5(listing.orderId);
+  const orderId = text$6(listing.orderId);
   if (!orderId) return null;
   try {
-    const snap = await db$h().collection("invoices").where("orderId", "==", orderId).limit(1).get();
+    const snap = await db$i().collection("invoices").where("orderId", "==", orderId).limit(1).get();
     if (snap.empty) return null;
     const doc = await readInvoiceDoc(load, snap.docs[0].id);
     if (!doc || invoiceRedirectTarget(doc.data)) return null;
@@ -9578,7 +9579,7 @@ async function readStudioCaller(req) {
       };
     }
     const decoded = await admin.auth().verifyIdToken(token);
-    const staffSnap = await db$h().collection("staff").doc(decoded.uid).get();
+    const staffSnap = await db$i().collection("staff").doc(decoded.uid).get();
     const staff = staffSnap.exists ? staffSnap.data() : null;
     const staffRole = isActiveStaffRecord(staff) ? String(staff?.role || "") : void 0;
     const identity = await resolveClientIdentity(decoded.uid, decoded.email);
@@ -9610,7 +9611,7 @@ function sharePlaybackOpen(listing, invoice, related) {
 }
 async function finishGalleryLink(result, caller) {
   if (!result.ok || result.kind !== "listing") return result;
-  const listing = docRecord(await db$h().collection("listings").doc(result.project.id).get());
+  const listing = docRecord(await db$i().collection("listings").doc(result.project.id).get());
   if (!listing) return result;
   const [invoice, related] = await Promise.all([
     invoiceForListing(listing),
@@ -9661,8 +9662,8 @@ const handlePublicGalleryLink = async (req, res) => {
     return res.status(500).json({ code: "lookup_failed", error: message, message });
   }
 };
-const router$k = Router();
-const db$g = () => admin.firestore();
+const router$l = Router();
+const db$h = () => admin.firestore();
 const storage = () => admin.storage().bucket();
 function cleanPosterUrl(value) {
   if (typeof value !== "string") return null;
@@ -9692,13 +9693,13 @@ async function holdIfOrderIncomplete(res, galleryId) {
   return true;
 }
 async function invoiceForGallery(gallery) {
-  const load = (id) => db$g().collection("invoices").doc(id).get();
+  const load = (id) => db$h().collection("invoices").doc(id).get();
   if (typeof gallery.invoiceId === "string" && gallery.invoiceId) {
     const doc = await readInvoiceDoc(load, gallery.invoiceId);
     if (doc) return { id: doc.id, ...doc.data };
   }
   if (typeof gallery.orderId === "string" && gallery.orderId) {
-    const snap = await db$g().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
+    const snap = await db$h().collection("invoices").where("orderId", "==", gallery.orderId).limit(1).get();
     if (!snap.empty) {
       const doc = await readInvoiceDoc(load, snap.docs[0].id);
       if (doc) return { id: doc.id, ...doc.data };
@@ -9709,7 +9710,7 @@ async function invoiceForGallery(gallery) {
 async function listingDownloadFlags(gallery) {
   const listingId = typeof gallery.listingId === "string" ? gallery.listingId.trim() : "";
   if (!listingId) return { lockDownloads: void 0, downloadsReleased: false };
-  const listing = await db$g().collection("listings").doc(listingId).get();
+  const listing = await db$h().collection("listings").doc(listingId).get();
   if (!listing.exists) return { lockDownloads: void 0, downloadsReleased: false };
   const data = listing.data() || {};
   return {
@@ -9757,10 +9758,10 @@ function clientGalleryPayload(id, gallery, gate) {
     mediaItems: showMedia ? lockedClientGalleryMedia(id, media, unlocked) : []
   };
 }
-router$k.get("/", requireStaff, async (req, res) => {
+router$l.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, orderId } = req.query;
-    let query = db$g().collection("galleries").orderBy("createdAt", "desc");
+    let query = db$h().collection("galleries").orderBy("createdAt", "desc");
     if (status2) query = query.where("status", "==", status2);
     if (orderId) query = query.where("orderId", "==", orderId);
     const snapshot = await query.limit(100).get();
@@ -9780,7 +9781,7 @@ function malformedPublicGalleryId(id) {
   if (/^__.*__$/.test(id)) return true;
   return /[\u0000-\u001F\u007F]/.test(id);
 }
-router$k.get("/public/:id", async (req, res) => {
+router$l.get("/public/:id", async (req, res) => {
   const id = typeof req.params.id === "string" ? req.params.id : "";
   if (malformedPublicGalleryId(id)) {
     console.warn("[Galleries] Public gallery id rejected.");
@@ -9791,7 +9792,7 @@ router$k.get("/public/:id", async (req, res) => {
     return publicGalleryNotFound(res);
   }
   try {
-    const doc = await db$g().collection("galleries").doc(id).get();
+    const doc = await db$h().collection("galleries").doc(id).get();
     if (!doc.exists) {
       console.info("[Galleries] Public gallery not found.", id);
       return publicGalleryNotFound(res);
@@ -9808,13 +9809,13 @@ router$k.get("/public/:id", async (req, res) => {
     return res.status(500).json({ error: "We couldn't open this gallery." });
   }
 });
-router$k.get("/link/:id", handlePublicGalleryLink);
-router$k.get("/:id", requireAuth, async (req, res) => {
+router$l.get("/link/:id", handlePublicGalleryLink);
+router$l.get("/:id", requireAuth, async (req, res) => {
   try {
-    const doc = await db$g().collection("galleries").doc(req.params.id).get();
+    const doc = await db$h().collection("galleries").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Gallery not found." });
     const gallery = doc.data();
-    const staffDoc = await db$g().collection("staff").doc(req.user.uid).get();
+    const staffDoc = await db$h().collection("staff").doc(req.user.uid).get();
     if (!staffDoc.exists) {
       if (gallery.clientId !== req.user.uid) {
         return res.status(403).json({ error: "Access denied." });
@@ -9833,13 +9834,13 @@ router$k.get("/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch gallery." });
   }
 });
-router$k.post("/:id/upload-url", requirePhotographer, async (req, res) => {
+router$l.post("/:id/upload-url", requirePhotographer, async (req, res) => {
   try {
     const { fileName: fileName2, fileType, isRaw: isRaw2 = false } = req.body;
     if (!fileName2 || !fileType) {
       return res.status(400).json({ error: "fileName and fileType required." });
     }
-    const galleryDoc = await db$g().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$h().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const folder = isRaw2 ? "raw" : "edited";
     const safeName = fileName2.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -9858,7 +9859,7 @@ router$k.post("/:id/upload-url", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to generate upload URL." });
   }
 });
-router$k.post("/:id/media", requirePhotographer, async (req, res) => {
+router$l.post("/:id/media", requirePhotographer, async (req, res) => {
   try {
     const {
       storagePath,
@@ -9874,7 +9875,7 @@ router$k.post("/:id/media", requirePhotographer, async (req, res) => {
     if (!storagePath || !fileName2) {
       return res.status(400).json({ error: "storagePath and fileName required." });
     }
-    const galleryDoc = await db$g().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$h().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const file = storage().file(storagePath);
     const [url] = await file.getSignedUrl({
@@ -9912,11 +9913,11 @@ router$k.post("/:id/media", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to register media." });
   }
 });
-router$k.post("/:id/media-link", requireCoordinator, async (req, res) => {
+router$l.post("/:id/media-link", requireCoordinator, async (req, res) => {
   try {
     const { url, title, type = "video", embedUrl, thumbnailUrl, downloadable = false, poster, posterUrl } = req.body;
     if (!url) return res.status(400).json({ error: "url required." });
-    const galleryDoc = await db$g().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$h().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const item = {
       id: `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
@@ -9948,7 +9949,7 @@ router$k.post("/:id/media-link", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to register media link." });
   }
 });
-router$k.get("/:id/release", requireCoordinator, async (req, res) => {
+router$l.get("/:id/release", requireCoordinator, async (req, res) => {
   if (!adminReady$5(res)) return;
   try {
     const report = await loadGalleryReleaseForGallery(req.params.id);
@@ -9960,7 +9961,7 @@ router$k.get("/:id/release", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to check gallery release." });
   }
 });
-router$k.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$l.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2 } = req.body;
     const validStatuses = ["pending_upload", "raw_uploaded", "editing", "ready_for_review", "approved", "delivered"];
@@ -9971,7 +9972,7 @@ router$k.patch("/:id/status", requireCoordinator, async (req, res) => {
       if (!adminReady$5(res)) return;
       if (await holdIfOrderIncomplete(res, req.params.id)) return;
     }
-    await db$g().collection("galleries").doc(req.params.id).update({
+    await db$h().collection("galleries").doc(req.params.id).update({
       status: status2,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -9982,7 +9983,7 @@ router$k.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update gallery status." });
   }
 });
-router$k.post("/:id/deliver", requireCoordinator, async (req, res) => {
+router$l.post("/:id/deliver", requireCoordinator, async (req, res) => {
   try {
     if (!adminReady$5(res)) return;
     const result = await deliverGalleryToClient(req.params.id, {
@@ -10011,14 +10012,14 @@ router$k.post("/:id/deliver", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to deliver gallery." });
   }
 });
-router$k.patch("/:id/downloads", requireCoordinator, async (req, res) => {
+router$l.patch("/:id/downloads", requireCoordinator, async (req, res) => {
   if (!adminReady$5(res)) return;
   try {
     if (typeof req.body?.released !== "boolean") {
       return res.status(400).json({ error: "released must be true or false." });
     }
     const released = req.body.released === true;
-    const galleryDoc = await db$g().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$h().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const gallery = galleryDoc.data() || {};
     const invoice = await invoiceForGallery(gallery);
@@ -10048,9 +10049,9 @@ router$k.patch("/:id/downloads", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update gallery downloads." });
   }
 });
-router$k.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
+router$l.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
   try {
-    const galleryDoc = await db$g().collection("galleries").doc(req.params.id).get();
+    const galleryDoc = await db$h().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
     const gallery = galleryDoc.data();
     const mediaItems = (gallery.mediaItems || []).filter(
@@ -10146,9 +10147,11 @@ async function matchSquarePaymentInvoice(payment, lookup) {
   if (referenceId) steps.push(() => lookup.byId(referenceId));
   const orderId = typeof payment.order_id === "string" ? payment.order_id.trim() : "";
   if (orderId) steps.push(() => lookup.byField("squareOrderId", orderId));
+  if (orderId) steps.push(() => lookup.byField("squareDepositOrderId", orderId));
   const linkRaw = payment.payment_link_id || payment.paymentLinkId;
   const linkId = typeof linkRaw === "string" ? linkRaw.trim() : "";
   if (linkId) steps.push(() => lookup.byField("squarePaymentLinkId", linkId));
+  if (linkId) steps.push(() => lookup.byField("squareDepositPaymentLinkId", linkId));
   const paymentId = typeof payment.id === "string" ? payment.id.trim() : "";
   if (paymentId) steps.push(() => lookup.byField("squarePaymentId", paymentId));
   for (const step of steps) {
@@ -10171,12 +10174,380 @@ async function followInvoiceRedirect(hit, byId) {
   }
   return current;
 }
-const router$j = Router();
-const db$f = () => admin.firestore();
+const SENIOR_FACILITY_RATE_PER_SQFT = 0.1;
+const SENIOR_TOUR_PRICE = 250;
+const SENIOR_ROOM_RATES = [
+  { minCount: 1, maxCount: 10, each: 199 },
+  { minCount: 11, maxCount: 20, each: 175 }
+];
+const SENIOR_FACILITY_SQFT_CAP = 2e4;
+const SENIOR_LIVING_REQUESTS = "seniorLivingRequests";
+const SENIOR_LIVING_OPS_EMAIL = "ops@iconicimagestx.com";
+const SENIOR_LIVING_DEPOSIT_REQUIRED = true;
+const SENIOR_LIVING_DEPOSIT_PERCENT = 50;
+const SENIOR_LIVING_DEPOSIT_LINE = "Reserve your date with a 50% deposit. We'll send your deposit invoice shortly. The balance is due after the shoot.";
+const SENIOR_LIVING_DEPOSIT_LINE_ONLINE = "Reserve your date with a 50% deposit, paid securely online. The balance is due after the shoot.";
+const SENIOR_LIVING_MANUAL_DEPOSIT_NOTE = "Invoice the 50% deposit manually";
+function seniorLivingDepositCopy(live) {
+  return live ? SENIOR_LIVING_DEPOSIT_LINE_ONLINE : SENIOR_LIVING_DEPOSIT_LINE;
+}
+function seniorLivingDepositReturnPath(orderNumber) {
+  const params = new URLSearchParams({
+    deposit: "received",
+    order: orderNumber
+  });
+  return `/senior-living?${params.toString()}`;
+}
+function seniorDepositCheckoutLive(env = process.env) {
+  return env.SENIOR_DEPOSIT_CHECKOUT_LIVE === "true";
+}
+const SENIOR_LIVING_PROCESSING_RATE = 0.028;
+const SENIOR_LIVING_PROCESSING_LABEL = "Processing fee (2.8%)";
+const SENIOR_LIVING_SCHEDULE_TIMES = [
+  "9:00 AM",
+  "11:00 AM",
+  "1:00 PM",
+  "3:00 PM",
+  "5:00 PM"
+];
+const SENIOR_LIVING_ORDER_SOURCE = "senior-living";
+const SENIOR_LIVING_HOSTING_OPTIONS = [
+  { id: "monthly-hosting", label: "Monthly hosting" },
+  { id: "transfer-of-ownership", label: "Transfer of ownership" }
+];
+const SENIOR_LIVING_HOSTING_NOTE = "Pricing confirmed with your quote";
+const SENIOR_LIVING_SERVICE_IDS = [
+  "tour-3d",
+  "rooms",
+  "facility"
+];
+const SENIOR_LIVING_SERVICE_LABELS = {
+  "tour-3d": "3D tour",
+  rooms: "Rooms/units",
+  facility: "Whole-building facility"
+};
+const SERVICE_ID_SET = new Set(SENIOR_LIVING_SERVICE_IDS);
+const EMAIL_RE$2 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function text$5(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function oneLine$1(value, max) {
+  return value.replace(/[\r\n\u0000]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+}
+function seniorFacilityPrice(sqft) {
+  const centsPerSqft = Math.round(SENIOR_FACILITY_RATE_PER_SQFT * 100);
+  return sqft * centsPerSqft / 100;
+}
+function seniorLivingHostingLabel(id) {
+  const key = typeof id === "string" ? id.trim() : "";
+  const match = SENIOR_LIVING_HOSTING_OPTIONS.find((option) => option.id === key);
+  return match ? match.label : null;
+}
+function parseSeniorLivingRequest(body) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return { ok: false, honeypot: false, error: "That request could not be read." };
+  }
+  const raw = body;
+  const trap = text$5(raw.companyWebsite);
+  if (trap) return { ok: false, honeypot: true };
+  const name = oneLine$1(text$5(raw.name), 80);
+  const community = oneLine$1(text$5(raw.community), 120);
+  const email = oneLine$1(text$5(raw.email), 120);
+  const phone = oneLine$1(text$5(raw.phone), 30);
+  const address = oneLine$1(text$5(raw.address), 200);
+  const preferredDates = oneLine$1(text$5(raw.preferredDates), 160);
+  const notes = text$5(raw.notes).replace(/\u0000/g, "").trim().slice(0, 2e3);
+  if (name.length < 2) return { ok: false, honeypot: false, error: "Enter your name." };
+  if (text$5(raw.name).trim().length > 80)
+    return { ok: false, honeypot: false, error: "Name is too long." };
+  if (community.length < 2)
+    return { ok: false, honeypot: false, error: "Enter the community name." };
+  if (text$5(raw.community).trim().length > 120)
+    return { ok: false, honeypot: false, error: "Community name is too long." };
+  if (!EMAIL_RE$2.test(email))
+    return { ok: false, honeypot: false, error: "Enter a valid email." };
+  const digits2 = phone.replace(/\D/g, "");
+  if (digits2.length < 10 || digits2.length > 15)
+    return { ok: false, honeypot: false, error: "Enter a phone number." };
+  if (address.length < 5)
+    return { ok: false, honeypot: false, error: "Enter the community address." };
+  if (text$5(raw.address).trim().length > 200)
+    return { ok: false, honeypot: false, error: "Address is too long." };
+  if (preferredDates.length < 2)
+    return { ok: false, honeypot: false, error: "Enter preferred dates." };
+  if (text$5(raw.preferredDates).trim().length > 160)
+    return { ok: false, honeypot: false, error: "Preferred dates are too long." };
+  if (text$5(raw.notes).trim().length > 2e3)
+    return { ok: false, honeypot: false, error: "Notes are too long." };
+  const servicesRaw = Array.isArray(raw.services) ? raw.services : [];
+  const services2 = [];
+  for (const entry2 of servicesRaw) {
+    const id = text$5(entry2);
+    if (!id) continue;
+    if (!SERVICE_ID_SET.has(id))
+      return { ok: false, honeypot: false, error: "Choose a listed service." };
+    if (!services2.includes(id))
+      services2.push(id);
+  }
+  if (services2.length === 0)
+    return { ok: false, honeypot: false, error: "Choose at least one service." };
+  return {
+    ok: true,
+    value: {
+      name,
+      community,
+      email,
+      phone,
+      address,
+      services: services2,
+      preferredDates,
+      notes
+    }
+  };
+}
+function seniorLivingServiceLabels(services2) {
+  return services2.map((id) => SENIOR_LIVING_SERVICE_LABELS[id]).join(", ");
+}
+function seniorLivingOfficeRecord(id, value) {
+  const serviceLabels = seniorLivingServiceLabels(value.services);
+  const noteLines = [
+    "Quote request. Not invoiced.",
+    `Deposit required: ${"yes"}`,
+    `Deposit percent: ${SENIOR_LIVING_DEPOSIT_PERCENT}`,
+    SENIOR_LIVING_DEPOSIT_LINE,
+    `Community: ${value.community}`,
+    `Services: ${serviceLabels}`,
+    `Preferred dates: ${value.preferredDates}`,
+    value.notes
+  ].filter(Boolean);
+  return {
+    id,
+    kind: "senior-living-request",
+    depositRequired: SENIOR_LIVING_DEPOSIT_REQUIRED,
+    depositPercent: SENIOR_LIVING_DEPOSIT_PERCENT,
+    clientName: value.name,
+    email: value.email,
+    clientEmail: value.email,
+    phone: value.phone,
+    clientPhone: value.phone,
+    community: value.community,
+    address: value.address,
+    propertyAddress: value.address,
+    services: value.services,
+    serviceLabels: value.services.map(
+      (serviceId) => SENIOR_LIVING_SERVICE_LABELS[serviceId]
+    ),
+    preferredDates: value.preferredDates,
+    requestedDate: value.preferredDates,
+    notes: value.notes,
+    vibeNote: noteLines.join("\n"),
+    selectedService: `Senior Living (${serviceLabels})`,
+    lineItems: [
+      {
+        id: "senior-living",
+        name: `Senior Living (${serviceLabels})`,
+        qty: 1,
+        price: 0
+      }
+    ],
+    leadSource: "Senior living page"
+  };
+}
+function seniorLivingOfficeEnv(env = process.env) {
+  const parts = String(env.ADMIN_EMAIL || "").split(/[,;]/).map((part) => part.trim()).filter(Boolean);
+  if (!parts.some((part) => part.toLowerCase() === SENIOR_LIVING_OPS_EMAIL)) {
+    parts.push(SENIOR_LIVING_OPS_EMAIL);
+  }
+  return { ...env, ADMIN_EMAIL: parts.join(", ") };
+}
+function cents(amount) {
+  return Math.round(amount * 100);
+}
+function dollars(amountCents) {
+  return amountCents / 100;
+}
+function seniorRoomUnitPrice(count) {
+  if (!Number.isInteger(count) || count < 1) return null;
+  const tier = SENIOR_ROOM_RATES.find(
+    (band) => count >= band.minCount && count <= band.maxCount
+  );
+  return tier ? tier.each : null;
+}
+function quoteSeniorLivingOrder(input) {
+  const lines = [];
+  if (input.tour) {
+    lines.push({
+      id: "tour-3d",
+      name: SENIOR_LIVING_SERVICE_LABELS["tour-3d"],
+      qty: 1,
+      unitPrice: SENIOR_TOUR_PRICE,
+      price: SENIOR_TOUR_PRICE
+    });
+  }
+  const roomCount = input.roomCount;
+  if (roomCount !== 0) {
+    if (!Number.isInteger(roomCount) || roomCount < 0) {
+      return { ok: false, error: "Enter a room count from 0 to 20." };
+    }
+    if (roomCount > SENIOR_ROOM_RATES[SENIOR_ROOM_RATES.length - 1].maxCount) {
+      return { ok: false, error: "Room count cannot be more than 20." };
+    }
+    const each = seniorRoomUnitPrice(roomCount);
+    if (each == null) {
+      return { ok: false, error: "Enter a room count from 0 to 20." };
+    }
+    lines.push({
+      id: "rooms",
+      name: SENIOR_LIVING_SERVICE_LABELS.rooms,
+      qty: roomCount,
+      unitPrice: each,
+      price: dollars(cents(each) * roomCount)
+    });
+  }
+  const facilitySqft = input.facilitySqft;
+  if (facilitySqft !== 0) {
+    if (!Number.isInteger(facilitySqft) || facilitySqft < 0) {
+      return { ok: false, error: "Enter a facility size up to 20,000 sq ft." };
+    }
+    if (facilitySqft > SENIOR_FACILITY_SQFT_CAP) {
+      return { ok: false, error: "Facility size cannot be more than 20,000 sq ft." };
+    }
+    const price = seniorFacilityPrice(facilitySqft);
+    lines.push({
+      id: "facility",
+      name: SENIOR_LIVING_SERVICE_LABELS.facility,
+      qty: 1,
+      unitPrice: price,
+      price
+    });
+  }
+  if (lines.length === 0) {
+    return { ok: false, error: "Choose at least one service." };
+  }
+  const serviceSubtotal = dollars(
+    lines.reduce((sum, line) => sum + cents(line.price), 0)
+  );
+  const travel = assessTravel(input.address);
+  const travelItem = travelInvoiceLine(travel);
+  const travelLine = {
+    id: travelItem.id,
+    name: travelItem.name,
+    qty: travelItem.qty,
+    unitPrice: travelItem.unitPrice,
+    price: travelItem.price
+  };
+  const priced = cents(serviceSubtotal) + cents(travelLine.price);
+  const processing = dollars(Math.round(priced * SENIOR_LIVING_PROCESSING_RATE));
+  const total = dollars(priced + cents(processing));
+  const depositAmount = dollars(
+    Math.round(cents(total) * (SENIOR_LIVING_DEPOSIT_PERCENT / 100))
+  );
+  const balanceDue = dollars(cents(total) - cents(depositAmount));
+  return {
+    ok: true,
+    quote: {
+      lines,
+      serviceSubtotal,
+      travel,
+      travelLine,
+      processing,
+      total,
+      depositAmount,
+      balanceDue
+    }
+  };
+}
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+function parseSeniorLivingOrder(body) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return { ok: false, honeypot: false, error: "That order could not be read." };
+  }
+  const raw = body;
+  if (text$5(raw.companyWebsite)) return { ok: false, honeypot: true };
+  const roomCount = raw.roomCount == null || raw.roomCount === "" ? 0 : Number(raw.roomCount);
+  const facilitySqft = raw.facilitySqft == null || raw.facilitySqft === "" ? 0 : Number(raw.facilitySqft);
+  const quoted = quoteSeniorLivingOrder({
+    tour: raw.tour === true,
+    roomCount,
+    facilitySqft,
+    address: text$5(raw.address)
+  });
+  if (quoted.ok === false) return { ok: false, honeypot: false, error: quoted.error };
+  if (quoted.quote.travel.travelQuoted) {
+    return {
+      ok: false,
+      honeypot: false,
+      error: "We could not price travel for that address. Call us and we will quote the trip."
+    };
+  }
+  const name = oneLine$1(text$5(raw.name), 80);
+  const community = oneLine$1(text$5(raw.community), 120);
+  const title = oneLine$1(text$5(raw.title), 80);
+  const email = oneLine$1(text$5(raw.email), 120);
+  const phone = oneLine$1(text$5(raw.phone), 30);
+  const address = oneLine$1(text$5(raw.address), 200);
+  const onsiteContact = oneLine$1(text$5(raw.onsiteContact), 120);
+  const notes = text$5(raw.notes).replace(/\u0000/g, "").trim().slice(0, 2e3);
+  const scheduledDate = oneLine$1(text$5(raw.scheduledDate), 10);
+  const scheduledTime = oneLine$1(text$5(raw.scheduledTime), 20);
+  if (name.length < 2) return { ok: false, honeypot: false, error: "Enter your name." };
+  if (community.length < 2) return { ok: false, honeypot: false, error: "Enter the community name." };
+  if (title.length < 2) return { ok: false, honeypot: false, error: "Enter your title." };
+  if (!EMAIL_RE$2.test(email)) return { ok: false, honeypot: false, error: "Enter a valid email." };
+  const digits2 = phone.replace(/\D/g, "");
+  if (digits2.length < 10 || digits2.length > 15) {
+    return { ok: false, honeypot: false, error: "Enter a phone number." };
+  }
+  if (address.length < 5) return { ok: false, honeypot: false, error: "Enter the community address." };
+  if (onsiteContact.length < 2) {
+    return { ok: false, honeypot: false, error: "Enter the onsite contact." };
+  }
+  if (!DATE_RE.test(scheduledDate) || Number.isNaN(Date.parse(`${scheduledDate}T12:00:00`))) {
+    return { ok: false, honeypot: false, error: "Choose a date." };
+  }
+  const chosen = /* @__PURE__ */ new Date(`${scheduledDate}T12:00:00`);
+  const start = /* @__PURE__ */ new Date();
+  start.setHours(0, 0, 0, 0);
+  if (chosen < start) return { ok: false, honeypot: false, error: "Choose a date that has not passed." };
+  if (!SENIOR_LIVING_SCHEDULE_TIMES.includes(scheduledTime)) {
+    return { ok: false, honeypot: false, error: "Choose a time." };
+  }
+  const hostingLabel = seniorLivingHostingLabel(raw.hosting);
+  if (!hostingLabel) {
+    return {
+      ok: false,
+      honeypot: false,
+      error: "Choose monthly hosting or a transfer of ownership."
+    };
+  }
+  const hosting = text$5(raw.hosting);
+  return {
+    ok: true,
+    value: {
+      tour: raw.tour === true,
+      roomCount,
+      facilitySqft,
+      community,
+      address,
+      name,
+      title,
+      phone,
+      email,
+      onsiteContact,
+      notes,
+      scheduledDate,
+      scheduledTime,
+      hosting
+    },
+    quote: quoted.quote
+  };
+}
+const router$k = Router();
+const db$g = () => admin.firestore();
 const stripe$1 = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
 });
-function appUrl() {
+function appUrl$1() {
   return process.env.APP_URL || "https://iconicimagestx.com";
 }
 function stripeReady() {
@@ -10212,7 +10583,7 @@ async function loadInvoice(id) {
   for (let hop = 0; hop < 4; hop += 1) {
     if (!current || seen.has(current)) return null;
     seen.add(current);
-    const snap = await db$f().collection("invoices").doc(current).get();
+    const snap = await db$g().collection("invoices").doc(current).get();
     if (!snap.exists) return null;
     const next = invoiceRedirectTarget(snap.data() || {});
     if (!next || next === snap.id) return snap;
@@ -10235,7 +10606,7 @@ async function audienceFor(req, invoice) {
   try {
     if (isTempAdminEnabled(liveServerEnv()) && token === "temp-admin-token") return "staff";
     const decoded = await admin.auth().verifyIdToken(token);
-    const staffDoc = await db$f().collection("staff").doc(decoded.uid).get();
+    const staffDoc = await db$g().collection("staff").doc(decoded.uid).get();
     const staff = staffDoc.exists ? staffDoc.data() : null;
     if (isActiveStaffRecord(staff) && (staff?.role === "admin" || staff?.role === "coordinator")) {
       return "staff";
@@ -10288,11 +10659,11 @@ async function paymentAlreadyRecorded({
   stripePaymentIntentId
 }) {
   if (squarePaymentId) {
-    const existing = await db$f().collection("transactions").where("squarePaymentId", "==", squarePaymentId).limit(1).get();
+    const existing = await db$g().collection("transactions").where("squarePaymentId", "==", squarePaymentId).limit(1).get();
     if (!existing.empty) return true;
   }
   if (stripePaymentIntentId) {
-    const existing = await db$f().collection("transactions").where("stripePaymentIntentId", "==", stripePaymentIntentId).limit(1).get();
+    const existing = await db$g().collection("transactions").where("stripePaymentIntentId", "==", stripePaymentIntentId).limit(1).get();
     if (!existing.empty) return true;
   }
   return false;
@@ -10303,11 +10674,11 @@ async function unlockGalleriesForInvoice({
   galleryId
 }) {
   const refs = /* @__PURE__ */ new Map();
-  if (galleryId) refs.set(galleryId, db$f().collection("galleries").doc(galleryId));
+  if (galleryId) refs.set(galleryId, db$g().collection("galleries").doc(galleryId));
   const lookups = [
-    db$f().collection("galleries").where("invoiceId", "==", invoiceId).get()
+    db$g().collection("galleries").where("invoiceId", "==", invoiceId).get()
   ];
-  if (orderId) lookups.push(db$f().collection("galleries").where("orderId", "==", orderId).get());
+  if (orderId) lookups.push(db$g().collection("galleries").where("orderId", "==", orderId).get());
   const snaps = await Promise.all(lookups);
   snaps.forEach((snap) => snap.docs.forEach((doc) => refs.set(doc.id, doc.ref)));
   await Promise.all([...refs.values()].map((ref) => ref.update({
@@ -10327,7 +10698,7 @@ async function applySuccessfulPayment({
   squarePaymentId,
   stripePaymentIntentId
 }) {
-  const invoiceRef = db$f().collection("invoices").doc(invoiceId);
+  const invoiceRef = db$g().collection("invoices").doc(invoiceId);
   const invoiceDoc = await invoiceRef.get();
   if (!invoiceDoc.exists) return;
   const invoice = invoiceDoc.data();
@@ -10361,7 +10732,7 @@ async function applySuccessfulPayment({
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   });
   if (resolvedOrderId) {
-    await db$f().collection("orders").doc(resolvedOrderId).update({
+    await db$g().collection("orders").doc(resolvedOrderId).update({
       depositPaid: admin.firestore.FieldValue.increment(amount),
       balanceDue: newAmountDue,
       paymentStatus: newAmountDue <= 0 ? "paid" : "partial",
@@ -10369,7 +10740,7 @@ async function applySuccessfulPayment({
     }).catch((err) => console.error("[Payments] Order balance update failed:", err));
   }
   if (resolvedClientId) {
-    await db$f().collection("clients").doc(resolvedClientId).update({
+    await db$g().collection("clients").doc(resolvedClientId).update({
       totalSpend: admin.firestore.FieldValue.increment(amount),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     }).catch((err) => console.error("[Payments] Client spend update failed:", err));
@@ -10381,7 +10752,7 @@ async function applySuccessfulPayment({
       galleryId: typeof invoice.galleryId === "string" ? invoice.galleryId : void 0
     });
   }
-  await db$f().collection("transactions").add({
+  await db$g().collection("transactions").add({
     type: "payment",
     orderId: resolvedOrderId,
     invoiceId,
@@ -10413,14 +10784,111 @@ async function applySuccessfulPayment({
     }).catch(console.error);
   }
 }
-router$j.post("/create-intent", requireAuth, async (req, res) => {
+function roundMoney$1(amount) {
+  return Math.round(amount * 100) / 100;
+}
+function isDepositSquarePayment(invoice, payment) {
+  if (invoice.depositRequired !== true) return false;
+  const linkRaw = payment.payment_link_id || payment.paymentLinkId;
+  const linkId = typeof linkRaw === "string" ? linkRaw.trim() : "";
+  const orderId = typeof payment.order_id === "string" ? payment.order_id.trim() : "";
+  const depositLink = typeof invoice.squareDepositPaymentLinkId === "string" ? invoice.squareDepositPaymentLinkId.trim() : "";
+  const depositOrder = typeof invoice.squareDepositOrderId === "string" ? invoice.squareDepositOrderId.trim() : "";
+  if (linkId && depositLink && linkId === depositLink) return true;
+  if (orderId && depositOrder && orderId === depositOrder) return true;
+  return false;
+}
+function depositPaymentRecorded(payments, squarePaymentId) {
+  if (!squarePaymentId || !Array.isArray(payments)) return false;
+  return payments.some((entry2) => {
+    return entry2 && typeof entry2 === "object" && entry2.squarePaymentId === squarePaymentId;
+  });
+}
+async function applyDepositPayment({
+  invoiceId,
+  amount,
+  squarePaymentId
+}) {
+  const paymentKey = squarePaymentId?.trim() || "";
+  const invoiceRef = db$g().collection("invoices").doc(invoiceId);
+  const transactionRef = db$g().collection("transactions").doc(
+    paymentKey ? `square-${paymentKey}` : `deposit-${invoiceId}`
+  );
+  await db$g().runTransaction(async (tx) => {
+    const invoiceSnap = await tx.get(invoiceRef);
+    if (!invoiceSnap.exists) return;
+    const invoice = invoiceSnap.data() || {};
+    const transactionSnap = await tx.get(transactionRef);
+    if (transactionSnap.exists || depositPaymentRecorded(invoice.payments, paymentKey)) return;
+    if ((Number(invoice.depositPaid) || 0) > 0 || invoice.depositPaidAt) return;
+    const total = Number(invoice.total) || 0;
+    const depositPaid = roundMoney$1((Number(invoice.depositPaid) || 0) + amount);
+    const amountDue = roundMoney$1(Math.max(0, total - depositPaid));
+    const payments = Array.isArray(invoice.payments) ? invoice.payments : [];
+    const nextPayments = [
+      ...payments,
+      {
+        type: "deposit",
+        amount,
+        ...paymentKey ? { squarePaymentId: paymentKey } : {},
+        paidAt: (/* @__PURE__ */ new Date()).toISOString()
+      }
+    ];
+    const orderId = typeof invoice.orderId === "string" ? invoice.orderId : "";
+    const orderRequestId = typeof invoice.orderRequestId === "string" ? invoice.orderRequestId : "";
+    const orderRef = orderId ? db$g().collection("orders").doc(orderId) : null;
+    const requestRef = orderRequestId ? db$g().collection("orderRequests").doc(orderRequestId) : null;
+    const orderSnap = orderRef ? await tx.get(orderRef) : null;
+    const requestSnap = requestRef ? await tx.get(requestRef) : null;
+    tx.update(invoiceRef, {
+      depositPaid,
+      depositPaidAt: admin.firestore.FieldValue.serverTimestamp(),
+      payments: nextPayments,
+      amountPaid: depositPaid,
+      amountDue,
+      status: "draft",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    if (orderRef && orderSnap?.exists) {
+      tx.update(orderRef, {
+        depositPaid,
+        balanceDue: amountDue,
+        paymentStatus: amountDue <= 0 ? "paid" : "partial",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    }
+    if (requestRef && requestSnap?.exists) {
+      tx.update(requestRef, {
+        depositPaid,
+        balanceDue: amountDue,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    }
+    tx.set(transactionRef, {
+      type: "payment",
+      kind: "deposit",
+      orderId,
+      invoiceId,
+      clientId: invoice.clientId || "",
+      clientName: invoice.clientName || "",
+      amount,
+      paymentMethod: "square",
+      status: "completed",
+      ...paymentKey ? { squarePaymentId: paymentKey } : {},
+      processedAt: admin.firestore.FieldValue.serverTimestamp(),
+      processedBy: "system",
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+  });
+}
+router$k.post("/create-intent", requireAuth, async (req, res) => {
   try {
     if (!stripeReady()) {
       return res.status(503).json({ error: "Studio Noir Stripe payments are not configured yet." });
     }
     const { invoiceId, amount, currency = "usd" } = req.body;
     if (!invoiceId || !amount) return res.status(400).json({ error: "invoiceId and amount required." });
-    const invoiceDoc = await db$f().collection("invoices").doc(invoiceId).get();
+    const invoiceDoc = await db$g().collection("invoices").doc(invoiceId).get();
     if (!invoiceDoc.exists) return res.status(404).json({ error: "Invoice not found." });
     const invoice = invoiceDoc.data();
     if (invoiceProvider(invoice) !== "stripe") {
@@ -10451,7 +10919,7 @@ router$j.post("/create-intent", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to create payment intent." });
   }
 });
-router$j.post("/send-invoice", requireCoordinator, async (req, res) => {
+router$k.post("/send-invoice", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
@@ -10493,7 +10961,7 @@ router$j.post("/send-invoice", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send invoice." });
   }
 });
-router$j.post("/send-receipt", requireCoordinator, async (req, res) => {
+router$k.post("/send-receipt", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
@@ -10523,7 +10991,7 @@ router$j.post("/send-receipt", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send receipt." });
   }
 });
-router$j.get("/invoice/:id", async (req, res) => {
+router$k.get("/invoice/:id", async (req, res) => {
   try {
     const invoiceDoc = await loadInvoice(req.params.id);
     if (!invoiceDoc) return invoiceNotFound(res);
@@ -10583,7 +11051,7 @@ router$j.get("/invoice/:id", async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch invoice." });
   }
 });
-router$j.post("/invoice/:id/checkout", async (req, res) => {
+router$k.post("/invoice/:id/checkout", async (req, res) => {
   try {
     const invoiceDoc = await loadInvoice(req.params.id);
     if (!invoiceDoc) return invoiceNotFound(res);
@@ -10740,7 +11208,97 @@ router$j.post("/invoice/:id/checkout", async (req, res) => {
     return res.status(500).json({ error: "Failed to start checkout." });
   }
 });
-router$j.post("/webhook", async (req, res) => {
+router$k.post("/invoice/:id/deposit-checkout", async (req, res) => {
+  try {
+    if (!seniorDepositCheckoutLive()) return invoiceNotFound(res);
+    const invoiceDoc = await loadInvoice(req.params.id);
+    if (!invoiceDoc) return invoiceNotFound(res);
+    const invoice = invoiceDoc.data() || {};
+    const audience = await audienceFor(req, invoice);
+    const view = decideInvoiceView({
+      invoiceId: invoiceDoc.id,
+      payToken: invoice.payToken,
+      presentedToken: presentedPayToken(req),
+      audience,
+      matches: payTokenMatches
+    });
+    if (view === "deny") return invoiceNotFound(res);
+    if (invoice.depositRequired !== true) {
+      return res.status(403).json({ error: "This invoice does not take a deposit." });
+    }
+    const orderId = typeof invoice.orderId === "string" ? invoice.orderId : "";
+    const orderSnap = orderId ? await db$g().collection("orders").doc(orderId).get() : null;
+    const order = orderSnap && orderSnap.exists ? orderSnap.data() || {} : null;
+    if (!order || order.source !== "senior-living") {
+      return res.status(403).json({ error: "Deposits are only for senior living orders." });
+    }
+    const alreadyPaid = (Number(invoice.depositPaid) || 0) > 0 || Boolean(invoice.depositPaidAt);
+    if (alreadyPaid) {
+      return res.status(409).json({ error: "The deposit is already paid." });
+    }
+    if (String(invoice.status || "draft") !== "draft") {
+      return res.status(409).json({ error: "The deposit can only be paid while the invoice is a draft." });
+    }
+    const depositAmount = Number(invoice.depositAmount);
+    if (!Number.isFinite(depositAmount) || depositAmount <= 0) {
+      return res.status(400).json({ error: "This invoice has no deposit amount." });
+    }
+    const storedLinkId = typeof invoice.squareDepositPaymentLinkId === "string" ? invoice.squareDepositPaymentLinkId.trim() : "";
+    const storedOrderId = typeof invoice.squareDepositOrderId === "string" ? invoice.squareDepositOrderId.trim() : "";
+    const storedUrl = typeof invoice.squareDepositCheckoutUrl === "string" ? invoice.squareDepositCheckoutUrl.trim() : "";
+    if (storedUrl && (storedLinkId || storedOrderId)) {
+      return res.json({ checkoutUrl: storedUrl, provider: "square" });
+    }
+    if (!squareReady()) return res.status(503).json({ error: "Square payments are not configured yet." });
+    await payTokenForLink(invoiceDoc);
+    const orderNumber = String(invoice.orderNumber || order.orderNumber || "");
+    const response = await fetch(`${squareBaseUrl()}/v2/online-checkout/payment-links`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Square-Version": process.env.SQUARE_VERSION || "2026-08-20",
+        Authorization: `Bearer ${process.env.SQUARE_ACCESS_TOKEN}`
+      },
+      body: JSON.stringify({
+        idempotency_key: `${invoiceDoc.id}-deposit`,
+        quick_pay: {
+          name: `Iconic Images deposit ${invoice.invoiceNumber || invoiceDoc.id}`,
+          price_money: {
+            amount: Math.round(depositAmount * 100),
+            currency: "USD"
+          },
+          location_id: process.env.SQUARE_LOCATION_ID
+        },
+        checkout_options: {
+          redirect_url: `${appUrl$1()}${seniorLivingDepositReturnPath(orderNumber)}`
+        },
+        pre_populated_data: {
+          buyer_email: invoice.clientEmail || void 0
+        },
+        payment_note: squarePaymentNote(invoiceDoc.id, invoice.invoiceNumber)
+      })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      console.error("[Payments] Square deposit checkout error:", result);
+      return res.status(500).json({ error: "Failed to start the deposit checkout." });
+    }
+    const link = result.payment_link;
+    const checkoutUrl = typeof link?.url === "string" ? link.url : "";
+    await invoiceDoc.ref.update({
+      squareDepositPaymentLinkId: link?.id || null,
+      squareDepositOrderId: link?.order_id || null,
+      ...checkoutUrl ? { squareDepositCheckoutUrl: checkoutUrl } : {},
+      paymentProvider: "square",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    return res.json({ checkoutUrl, provider: "square" });
+  } catch (err) {
+    console.error("[Payments] Deposit checkout error:", err);
+    return res.status(500).json({ error: "Failed to start the deposit checkout." });
+  }
+});
+router$k.post("/webhook", async (req, res) => {
   const sig = req.headers["stripe-signature"];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
   let event;
@@ -10782,7 +11340,7 @@ function squareNotificationUrls() {
   const explicit = process.env.SQUARE_WEBHOOK_NOTIFICATION_URL;
   const urls = [
     explicit,
-    `${appUrl()}/api/payments/square-webhook`,
+    `${appUrl$1()}/api/payments/square-webhook`,
     process.env.FRONTEND_URL ? `${process.env.FRONTEND_URL.replace(/\/$/, "")}/api/payments/square-webhook` : ""
   ].filter((url) => Boolean(url));
   return [...new Set(urls)];
@@ -10800,22 +11358,22 @@ function squareSignatureValid(rawBody, received, key) {
 async function findInvoiceForSquarePayment(payment) {
   const hit = await matchSquarePaymentInvoice(payment, {
     async byId(id) {
-      const snap2 = await db$f().collection("invoices").doc(id).get();
+      const snap2 = await db$g().collection("invoices").doc(id).get();
       if (!snap2.exists) return null;
       return { id: snap2.id, data: snap2.data() || {} };
     },
     async byField(field, value) {
-      const snap2 = await db$f().collection("invoices").where(field, "==", value).limit(1).get();
+      const snap2 = await db$g().collection("invoices").where(field, "==", value).limit(1).get();
       if (snap2.empty) return null;
       const doc = snap2.docs[0];
       return { id: doc.id, data: doc.data() || {} };
     }
   });
   if (!hit) return null;
-  const snap = await db$f().collection("invoices").doc(hit.id).get();
+  const snap = await db$g().collection("invoices").doc(hit.id).get();
   return snap.exists ? snap : null;
 }
-router$j.post("/square-webhook", async (req, res) => {
+router$k.post("/square-webhook", async (req, res) => {
   try {
     const rawBody = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : JSON.stringify(req.body || {});
     const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
@@ -10832,7 +11390,7 @@ router$j.post("/square-webhook", async (req, res) => {
     if (!payment?.id || payment.status !== "COMPLETED") return res.json({ received: true });
     const invoiceDoc = await findInvoiceForSquarePayment(payment);
     if (!invoiceDoc) {
-      await db$f().collection("agentLogs").add({
+      await db$g().collection("agentLogs").add({
         agent: "travis",
         action: "Unmatched Square payment",
         summary: `Square payment ${payment.id} could not be matched to an invoice`,
@@ -10852,6 +11410,14 @@ router$j.post("/square-webhook", async (req, res) => {
     const amountCents = Number(payment.amount_money?.amount ?? payment.total_money?.amount ?? 0);
     const amount = amountCents / 100;
     if (amount <= 0) return res.json({ received: true, ignored: "zero-amount" });
+    if (isDepositSquarePayment(invoice, payment)) {
+      await applyDepositPayment({
+        invoiceId: invoiceDoc.id,
+        amount,
+        squarePaymentId: payment.id
+      });
+      return res.json({ received: true, deposit: true });
+    }
     await applySuccessfulPayment({
       invoiceId: invoiceDoc.id,
       orderId: invoice.orderId,
@@ -10867,10 +11433,10 @@ router$j.post("/square-webhook", async (req, res) => {
     return res.status(500).json({ error: "Square webhook handler failed." });
   }
 });
-router$j.get("/transactions", requireCoordinator, async (req, res) => {
+router$k.get("/transactions", requireCoordinator, async (req, res) => {
   try {
     const { startDate, endDate, limit = "50" } = req.query;
-    let query = db$f().collection("transactions").orderBy("createdAt", "desc");
+    let query = db$g().collection("transactions").orderBy("createdAt", "desc");
     if (startDate) {
       query = query.where(
         "createdAt",
@@ -10916,7 +11482,7 @@ async function handleStripePaymentSucceeded(intent) {
 async function handleStripePaymentFailed(intent) {
   const { invoiceId } = intent.metadata;
   if (!invoiceId) return;
-  await db$f().collection("agentLogs").add({
+  await db$g().collection("agentLogs").add({
     agent: "travis",
     action: "Studio Noir payment failed",
     summary: `Stripe payment failed for invoice ${invoiceId}`,
@@ -10932,11 +11498,11 @@ async function handleStripePaymentFailed(intent) {
 async function handleStripeRefund(charge) {
   if (!charge.payment_intent) return;
   const intentId = typeof charge.payment_intent === "string" ? charge.payment_intent : charge.payment_intent.id;
-  const invoiceSnap = await db$f().collection("invoices").where("stripePaymentIntentId", "==", intentId).limit(1).get();
+  const invoiceSnap = await db$g().collection("invoices").where("stripePaymentIntentId", "==", intentId).limit(1).get();
   if (invoiceSnap.empty) return;
   const invoiceDoc = invoiceSnap.docs[0];
   const refundAmount = charge.amount_refunded / 100;
-  await db$f().collection("transactions").add({
+  await db$g().collection("transactions").add({
     type: "refund",
     invoiceId: invoiceDoc.id,
     clientId: invoiceDoc.data().clientId,
@@ -10950,15 +11516,15 @@ async function handleStripeRefund(charge) {
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   });
 }
-const router$i = Router();
-const db$e = () => admin.firestore();
+const router$j = Router();
+const db$f = () => admin.firestore();
 const VSAI_API_BASE = "https://api.virtualstagingai.app/v1";
 const VSAI_API_KEY = process.env.VSAI_API_KEY || process.env.VIRTUAL_STAGING_AI_API_KEY || "";
 const VSAI_PRICE_CENTS = parseInt(process.env.VSAI_PRICE_CENTS || "1500", 10);
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
 });
-router$i.post("/create", requireAuth, async (req, res) => {
+router$j.post("/create", requireAuth, async (req, res) => {
   try {
     if (!VSAI_API_KEY) {
       console.error("[VSAI] VSAI_API_KEY is not set");
@@ -11009,7 +11575,7 @@ router$i.post("/create", requireAuth, async (req, res) => {
         error: `VSAI returned no render ID. Response: ${responseText}`
       });
     }
-    const jobRef = await db$e().collection("vsaiJobs").add({
+    const jobRef = await db$f().collection("vsaiJobs").add({
       userId,
       imageUrl,
       roomType,
@@ -11033,9 +11599,9 @@ router$i.post("/create", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$i.get("/result/:jobId", requireAuth, async (req, res) => {
+router$j.get("/result/:jobId", requireAuth, async (req, res) => {
   try {
-    const jobDoc = await db$e().collection("vsaiJobs").doc(req.params.jobId).get();
+    const jobDoc = await db$f().collection("vsaiJobs").doc(req.params.jobId).get();
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
     const job = jobDoc.data();
     if (job.userId !== req.user.uid) {
@@ -11108,9 +11674,9 @@ router$i.get("/result/:jobId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$i.get("/result/:jobId/file", requireAuth, async (req, res) => {
+router$j.get("/result/:jobId/file", requireAuth, async (req, res) => {
   try {
-    const jobDoc = await db$e().collection("vsaiJobs").doc(req.params.jobId).get();
+    const jobDoc = await db$f().collection("vsaiJobs").doc(req.params.jobId).get();
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
     const job = jobDoc.data();
     if (job.userId !== req.user.uid) return res.status(403).json({ error: "Access denied." });
@@ -11130,20 +11696,20 @@ router$i.get("/result/:jobId/file", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$i.post("/variation", requireAuth, async (req, res) => {
+router$j.post("/variation", requireAuth, async (req, res) => {
   try {
     const { jobId, style: newStyle, roomType: newRoomType } = req.body;
     if (!jobId) {
       return res.status(400).json({ error: "jobId required." });
     }
-    let rootJobDoc = await db$e().collection("vsaiJobs").doc(jobId).get();
+    let rootJobDoc = await db$f().collection("vsaiJobs").doc(jobId).get();
     if (!rootJobDoc.exists) return res.status(404).json({ error: "Job not found." });
     let rootJob = rootJobDoc.data();
     if (rootJob.userId !== req.user.uid) {
       return res.status(403).json({ error: "Access denied." });
     }
     while (rootJob.parentJobId) {
-      const parentDoc = await db$e().collection("vsaiJobs").doc(rootJob.parentJobId).get();
+      const parentDoc = await db$f().collection("vsaiJobs").doc(rootJob.parentJobId).get();
       if (!parentDoc.exists) break;
       rootJob = parentDoc.data();
     }
@@ -11187,7 +11753,7 @@ router$i.post("/variation", requireAuth, async (req, res) => {
         error: `VSAI variation error: ${responseText}`
       });
     }
-    const variationRef = await db$e().collection("vsaiJobs").add({
+    const variationRef = await db$f().collection("vsaiJobs").add({
       userId: req.user.uid,
       imageUrl: rootJob.imageUrl,
       roomType: resolvedRoomType,
@@ -11214,7 +11780,7 @@ router$i.post("/variation", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$i.post("/checkout", requireAuth, async (req, res) => {
+router$j.post("/checkout", requireAuth, async (req, res) => {
   try {
     const { jobIds, successUrl, cancelUrl } = req.body;
     if (!jobIds || !Array.isArray(jobIds) || jobIds.length === 0) {
@@ -11222,7 +11788,7 @@ router$i.post("/checkout", requireAuth, async (req, res) => {
     }
     const userId = req.user.uid;
     const jobDocs = await Promise.all(
-      jobIds.map((id) => db$e().collection("vsaiJobs").doc(id).get())
+      jobIds.map((id) => db$f().collection("vsaiJobs").doc(id).get())
     );
     for (let i = 0; i < jobDocs.length; i++) {
       const doc = jobDocs[i];
@@ -11283,7 +11849,7 @@ router$i.post("/checkout", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$i.post(
+router$j.post(
   "/webhook/stripe",
   // Raw body needed — mount before express.json() parses it
   async (req, res) => {
@@ -11306,7 +11872,7 @@ router$i.post(
         const jobIds = JSON.parse(session.metadata.jobIds || "[]");
         await Promise.all(
           jobIds.map(
-            (id) => db$e().collection("vsaiJobs").doc(id).update({
+            (id) => db$f().collection("vsaiJobs").doc(id).update({
               isPaid: true,
               paymentStatus: "paid",
               stripeSessionId: session.id,
@@ -11321,7 +11887,7 @@ router$i.post(
     res.json({ received: true });
   }
 );
-router$i.get("/options", (_req, res) => {
+router$j.get("/options", (_req, res) => {
   return res.json({
     roomTypes: [
       { value: "living", label: "Living Room" },
@@ -11351,9 +11917,9 @@ router$i.get("/options", (_req, res) => {
 function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
 }
-const router$h = Router();
-const db$d = () => admin.firestore();
-router$h.post("/email", requireStaff, async (req, res) => {
+const router$i = Router();
+const db$e = () => admin.firestore();
+router$i.post("/email", requireStaff, async (req, res) => {
   try {
     const { to, subject, body, orderId, clientId: clientId2 } = req.body;
     if (!to || !body?.trim()) {
@@ -11367,7 +11933,7 @@ router$h.post("/email", requireStaff, async (req, res) => {
         message: body.trim()
       }
     });
-    await db$d().collection("messages").add({
+    await db$e().collection("messages").add({
       orderId: orderId || null,
       clientId: clientId2 || null,
       senderId: req.user.uid,
@@ -11385,22 +11951,22 @@ router$h.post("/email", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to send email." });
   }
 });
-router$h.get("/:orderId", requireAuth, async (req, res) => {
+router$i.get("/:orderId", requireAuth, async (req, res) => {
   try {
-    const orderDoc = await db$d().collection("orders").doc(req.params.orderId).get();
+    const orderDoc = await db$e().collection("orders").doc(req.params.orderId).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
     const order = orderDoc.data();
-    const staffDoc = await db$d().collection("staff").doc(req.user.uid).get();
+    const staffDoc = await db$e().collection("staff").doc(req.user.uid).get();
     const isStaff = staffDoc.exists;
     if (!isStaff && order.clientId !== req.user.uid) {
       return res.status(403).json({ error: "Access denied." });
     }
-    const snapshot = await db$d().collection("messages").where("orderId", "==", req.params.orderId).orderBy("createdAt", "asc").limit(100).get();
+    const snapshot = await db$e().collection("messages").where("orderId", "==", req.params.orderId).orderBy("createdAt", "asc").limit(100).get();
     const messages = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     const unread = snapshot.docs.filter(
       (d) => !d.data().isRead && d.data().senderId !== req.user.uid
     );
-    const batch = db$d().batch();
+    const batch = db$e().batch();
     unread.forEach((d) => {
       batch.update(d.ref, {
         isRead: true,
@@ -11414,16 +11980,16 @@ router$h.get("/:orderId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch messages." });
   }
 });
-router$h.post("/:orderId", requireAuth, async (req, res) => {
+router$i.post("/:orderId", requireAuth, async (req, res) => {
   try {
     const { content, attachments } = req.body;
     if (!content?.trim()) {
       return res.status(400).json({ error: "Message content required." });
     }
-    const orderDoc = await db$d().collection("orders").doc(req.params.orderId).get();
+    const orderDoc = await db$e().collection("orders").doc(req.params.orderId).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
     const order = orderDoc.data();
-    const staffDoc = await db$d().collection("staff").doc(req.user.uid).get();
+    const staffDoc = await db$e().collection("staff").doc(req.user.uid).get();
     const isStaff = staffDoc.exists;
     if (!isStaff && order.clientId !== req.user.uid) {
       return res.status(403).json({ error: "Access denied." });
@@ -11435,7 +12001,7 @@ router$h.post("/:orderId", requireAuth, async (req, res) => {
       senderName = `${staff.firstName} ${staff.lastName}`.trim();
       senderType = "staff";
     } else {
-      const clientDoc = await db$d().collection("clients").doc(order.clientId).get();
+      const clientDoc = await db$e().collection("clients").doc(order.clientId).get();
       if (clientDoc.exists) {
         const client = clientDoc.data();
         senderName = `${client.firstName} ${client.lastName}`.trim();
@@ -11451,8 +12017,8 @@ router$h.post("/:orderId", requireAuth, async (req, res) => {
       isRead: false,
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     };
-    const docRef = await db$d().collection("messages").add(message);
-    await db$d().collection("agentLogs").add({
+    const docRef = await db$e().collection("messages").add(message);
+    await db$e().collection("agentLogs").add({
       agent: "nora",
       action: "New message",
       summary: `New message on order ${req.params.orderId} from ${senderName}`,
@@ -11469,9 +12035,9 @@ router$h.post("/:orderId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to send message." });
   }
 });
-router$h.get("/unread/count", requireStaff, async (_req, res) => {
+router$i.get("/unread/count", requireStaff, async (_req, res) => {
   try {
-    const snapshot = await db$d().collection("messages").where("isRead", "==", false).where("senderType", "==", "client").get();
+    const snapshot = await db$e().collection("messages").where("isRead", "==", false).where("senderType", "==", "client").get();
     return res.json({ unreadCount: snapshot.size });
   } catch (err) {
     return res.status(500).json({ error: "Failed to get unread count." });
@@ -12481,11 +13047,11 @@ class PhotoEditRequestError extends Error {
     this.status = status2;
   }
 }
-const db$c = () => admin.firestore();
+const db$d = () => admin.firestore();
 async function writeRequests(listingId, change) {
-  const ref = db$c().collection("listings").doc(listingId);
+  const ref = db$d().collection("listings").doc(listingId);
   let saved = null;
-  await db$c().runTransaction(async (tx) => {
+  await db$d().runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists) throw new PhotoEditRequestError(404, "Listing not found.");
     const result = change(readPhotoEditRequests(snap.data()?.photoEditRequests));
@@ -12541,7 +13107,7 @@ async function savePhotoEditReplacement(input) {
   if (!admin.apps.length) {
     throw new PhotoEditRequestError(503, "File storage is not configured.");
   }
-  const existing = await db$c().collection("listings").doc(input.listingId).get();
+  const existing = await db$d().collection("listings").doc(input.listingId).get();
   if (!existing.exists) throw new PhotoEditRequestError(404, "Listing not found.");
   const known = readPhotoEditRequests(existing.data()?.photoEditRequests);
   if (!known.some((request) => request.id === input.requestId)) {
@@ -12576,7 +13142,7 @@ async function savePhotoEditReplacement(input) {
     }
   }));
 }
-const db$b = () => admin.firestore();
+const db$c = () => admin.firestore();
 const KINDS = /* @__PURE__ */ new Set(["photo", "video", "floorplan", "tour"]);
 function adminReady$4(res) {
   if (admin.apps.length) return true;
@@ -12600,7 +13166,7 @@ function sendKnownError$3(res, err, fallback) {
 async function readDoc(collectionName, id) {
   if (!id) return null;
   try {
-    const snap = await db$b().collection(collectionName).doc(id).get();
+    const snap = await db$c().collection(collectionName).doc(id).get();
     if (!snap.exists) return null;
     return jsonSafe({ id: snap.id, ...snap.data() || {} });
   } catch (err) {
@@ -12611,7 +13177,7 @@ async function readDoc(collectionName, id) {
 async function readWhere(collectionName, field, value) {
   if (!value) return [];
   try {
-    const snap = await db$b().collection(collectionName).where(field, "==", value).limit(10).get();
+    const snap = await db$c().collection(collectionName).where(field, "==", value).limit(10).get();
     return snap.docs.map((doc) => jsonSafe({ id: doc.id, ...doc.data() || {} }));
   } catch (err) {
     console.error(`[Portal listing] ${collectionName}.${field} lookup failed:`, err);
@@ -12690,7 +13256,7 @@ async function loadSources(listingId, listing) {
   };
 }
 async function authorizedListing(req, listingId) {
-  const snap = await db$b().collection("listings").doc(listingId).get();
+  const snap = await db$c().collection("listings").doc(listingId).get();
   if (!snap.exists) {
     throw Object.assign(new Error("Listing not found."), { status: 404 });
   }
@@ -12711,8 +13277,8 @@ function mediaChange(body) {
   return null;
 }
 async function appendPortalWrite(listingId, patch) {
-  const ref = db$b().collection("listings").doc(listingId);
-  await db$b().runTransaction(async (tx) => {
+  const ref = db$c().collection("listings").doc(listingId);
+  await db$c().runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const data = snap.data() || {};
     const existing = Array.isArray(data.portalActivity) ? data.portalActivity : [];
@@ -12732,7 +13298,7 @@ const handleGetPublicPortalListing = async (req, res) => {
   if (!listingId) return res.status(404).json({ error: "Listing not found." });
   if (!adminReady$4(res)) return;
   try {
-    const snap = await db$b().collection("listings").doc(listingId).get();
+    const snap = await db$c().collection("listings").doc(listingId).get();
     if (!snap.exists) return res.status(404).json({ error: "Listing not found." });
     const listing = jsonSafe({ id: snap.id, ...snap.data() || {} });
     const detail = visitorPortalListingDetail(buildPortalListingDetail(await loadSources(listingId, listing)));
@@ -12848,16 +13414,16 @@ const handlePatchPortalWebsite = async (req, res) => {
     return sendKnownError$3(res, err, "Could not save the listing site.");
   }
 };
-const router$g = Router();
-const db$a = () => admin.firestore();
+const router$h = Router();
+const db$b = () => admin.firestore();
 const HOME_LIMIT = 100;
 function asRecord$1(value) {
   return value && typeof value === "object" ? value : {};
 }
-router$g.get("/", requireStaff, async (req, res) => {
+router$h.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, search, limit = "50" } = req.query;
-    let query = db$a().collection("clients").orderBy("createdAt", "desc");
+    let query = db$b().collection("clients").orderBy("createdAt", "desc");
     if (status2) query = query.where("status", "==", status2);
     const snapshot = await query.limit(Number(limit)).get();
     let clients = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -12881,7 +13447,7 @@ function adminReady$3(res) {
   });
   return false;
 }
-router$g.post("/register", async (req, res) => {
+router$h.post("/register", async (req, res) => {
   if (!adminReady$3(res)) return;
   const firstName = cleanPersonName(req.body?.firstName);
   const lastName = cleanPersonName(req.body?.lastName);
@@ -12893,7 +13459,7 @@ router$g.post("/register", async (req, res) => {
     const authHeader = req.headers.authorization;
     if (authHeader?.startsWith("Bearer ")) {
       const decoded = await admin.auth().verifyIdToken(authHeader.slice("Bearer ".length));
-      const staffDoc = await db$a().collection("staff").doc(decoded.uid).get();
+      const staffDoc = await db$b().collection("staff").doc(decoded.uid).get();
       if (staffDoc.exists && staffDoc.data()?.isActive !== false) {
         return res.status(403).json({ error: "Staff accounts cannot register as clients." });
       }
@@ -12910,7 +13476,7 @@ router$g.post("/register", async (req, res) => {
     if (password.length < 6) {
       return res.status(400).json({ error: "Password must be at least 6 characters." });
     }
-    const staffHit = await db$a().collection("staff").where("email", "==", email).limit(1).get();
+    const staffHit = await db$b().collection("staff").where("email", "==", email).limit(1).get();
     if (!staffHit.empty) {
       return res.status(403).json({ error: "This email is a staff login. Use the staff sign-in page." });
     }
@@ -12943,7 +13509,7 @@ router$g.post("/register", async (req, res) => {
     return res.status(500).json({ error: "Could not create the client account." });
   }
 });
-router$g.get("/me/home", requireAuth, async (req, res) => {
+router$h.get("/me/home", requireAuth, async (req, res) => {
   if (!adminReady$3(res)) return;
   try {
     const identity = await resolveClientIdentity(req.user.uid, req.user.email);
@@ -12983,9 +13549,9 @@ router$g.get("/me/home", requireAuth, async (req, res) => {
     };
     for (const clientId2 of identity.ids) {
       const [gallerySnap, invoiceSnap, projectSnap] = await Promise.all([
-        db$a().collection("galleries").where("clientId", "==", clientId2).limit(HOME_LIMIT).get(),
-        db$a().collection("invoices").where("clientId", "==", clientId2).limit(HOME_LIMIT).get(),
-        db$a().collection("listings").where("clientId", "==", clientId2).limit(HOME_LIMIT).get()
+        db$b().collection("galleries").where("clientId", "==", clientId2).limit(HOME_LIMIT).get(),
+        db$b().collection("invoices").where("clientId", "==", clientId2).limit(HOME_LIMIT).get(),
+        db$b().collection("listings").where("clientId", "==", clientId2).limit(HOME_LIMIT).get()
       ]);
       for (const doc of gallerySnap.docs) {
         if (seenGallery.has(doc.id)) continue;
@@ -13004,7 +13570,7 @@ router$g.get("/me/home", requireAuth, async (req, res) => {
       if (projectSnap.size >= HOME_LIMIT) listingsTruncated = true;
       projectSnap.docs.forEach(pushListing);
       try {
-        const appointmentSnap = await db$a().collection("appointments").where("clientId", "==", clientId2).limit(HOME_LIMIT).get();
+        const appointmentSnap = await db$b().collection("appointments").where("clientId", "==", clientId2).limit(HOME_LIMIT).get();
         if (appointmentSnap.size >= HOME_LIMIT) appointmentsTruncated = true;
         appointmentSnap.docs.forEach(pushAppointment);
       } catch (appointmentErr) {
@@ -13031,13 +13597,13 @@ router$g.get("/me/home", requireAuth, async (req, res) => {
     };
     try {
       for (const clientId2 of identity.ids) {
-        const snap = await db$a().collection("orderRequests").where("clientId", "==", clientId2).limit(HOME_LIMIT).get();
+        const snap = await db$b().collection("orderRequests").where("clientId", "==", clientId2).limit(HOME_LIMIT).get();
         snap.docs.forEach(pushOrder);
       }
       if (identity.email) {
         const [byEmail, byClientEmail] = await Promise.all([
-          db$a().collection("orderRequests").where("email", "==", identity.email).limit(HOME_LIMIT).get(),
-          db$a().collection("orderRequests").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get()
+          db$b().collection("orderRequests").where("email", "==", identity.email).limit(HOME_LIMIT).get(),
+          db$b().collection("orderRequests").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get()
         ]);
         byEmail.docs.forEach(pushOrder);
         byClientEmail.docs.forEach(pushOrder);
@@ -13047,7 +13613,7 @@ router$g.get("/me/home", requireAuth, async (req, res) => {
     }
     if (identity.email) {
       try {
-        const byInvoiceEmail = await db$a().collection("invoices").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get();
+        const byInvoiceEmail = await db$b().collection("invoices").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get();
         if (byInvoiceEmail.size >= HOME_LIMIT) invoicesTruncated = true;
         byInvoiceEmail.docs.forEach(pushInvoice);
       } catch (invoiceErr) {
@@ -13056,13 +13622,13 @@ router$g.get("/me/home", requireAuth, async (req, res) => {
     }
     if (identity.email) {
       try {
-        const appointmentsByEmail = await db$a().collection("appointments").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get();
+        const appointmentsByEmail = await db$b().collection("appointments").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get();
         if (appointmentsByEmail.size >= HOME_LIMIT) appointmentsTruncated = true;
         appointmentsByEmail.docs.forEach(pushAppointment);
       } catch (appointmentErr) {
         console.error("[Clients] Appointment email lookup failed:", appointmentErr);
       }
-      const byEmail = await db$a().collection("listings").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get();
+      const byEmail = await db$b().collection("listings").where("clientEmail", "==", identity.email).limit(HOME_LIMIT).get();
       if (byEmail.size >= HOME_LIMIT) listingsTruncated = true;
       byEmail.docs.forEach(pushListing);
     }
@@ -13092,18 +13658,18 @@ router$g.get("/me/home", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to load your portal." });
   }
 });
-router$g.get("/me/listings/:id", requireAuth, handleGetPortalListing);
-router$g.patch("/me/listings/:id/data", requireAuth, handlePatchPortalData);
-router$g.patch("/me/listings/:id/media", requireAuth, handlePatchPortalMedia);
-router$g.patch("/me/listings/:id/website", requireAuth, handlePatchPortalWebsite);
-router$g.post("/me/listings/:id/photo-edit-requests", requireAuth, handleCreatePhotoEditRequest);
-router$g.get("/me", requireAuth, async (req, res) => {
+router$h.get("/me/listings/:id", requireAuth, handleGetPortalListing);
+router$h.patch("/me/listings/:id/data", requireAuth, handlePatchPortalData);
+router$h.patch("/me/listings/:id/media", requireAuth, handlePatchPortalMedia);
+router$h.patch("/me/listings/:id/website", requireAuth, handlePatchPortalWebsite);
+router$h.post("/me/listings/:id/photo-edit-requests", requireAuth, handleCreatePhotoEditRequest);
+router$h.get("/me", requireAuth, async (req, res) => {
   try {
-    const directDoc = await db$a().collection("clients").doc(req.user.uid).get();
+    const directDoc = await db$b().collection("clients").doc(req.user.uid).get();
     if (directDoc.exists) {
       const data = directDoc.data();
       if (data._redirect) {
-        const realDoc = await db$a().collection("clients").doc(data._redirect).get();
+        const realDoc = await db$b().collection("clients").doc(data._redirect).get();
         if (realDoc.exists) return res.json({ id: realDoc.id, ...realDoc.data() });
       }
       return res.json({ id: directDoc.id, ...data });
@@ -13113,13 +13679,13 @@ router$g.get("/me", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch profile." });
   }
 });
-router$g.get("/:id", requireStaff, async (req, res) => {
+router$h.get("/:id", requireStaff, async (req, res) => {
   try {
-    const doc = await db$a().collection("clients").doc(req.params.id).get();
+    const doc = await db$b().collection("clients").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Client not found." });
     const [orders, invoices] = await Promise.all([
-      db$a().collection("orders").where("clientId", "==", req.params.id).orderBy("createdAt", "desc").limit(10).get(),
-      db$a().collection("invoices").where("clientId", "==", req.params.id).orderBy("createdAt", "desc").limit(10).get()
+      db$b().collection("orders").where("clientId", "==", req.params.id).orderBy("createdAt", "desc").limit(10).get(),
+      db$b().collection("invoices").where("clientId", "==", req.params.id).orderBy("createdAt", "desc").limit(10).get()
     ]);
     return res.json({
       client: { id: doc.id, ...doc.data() },
@@ -13130,17 +13696,17 @@ router$g.get("/:id", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch client." });
   }
 });
-router$g.post("/", requireCoordinator, async (req, res) => {
+router$h.post("/", requireCoordinator, async (req, res) => {
   try {
     const { firstName, lastName, email, phone, address, notes, tags } = req.body;
     if (!firstName || !lastName || !email) {
       return res.status(400).json({ error: "firstName, lastName, and email required." });
     }
-    const existing = await db$a().collection("clients").where("email", "==", email.toLowerCase()).limit(1).get();
+    const existing = await db$b().collection("clients").where("email", "==", email.toLowerCase()).limit(1).get();
     if (!existing.empty) {
       return res.status(409).json({ error: "Client with this email already exists.", id: existing.docs[0].id });
     }
-    const ref = await db$a().collection("clients").add({
+    const ref = await db$b().collection("clients").add({
       firstName,
       lastName,
       email: email.toLowerCase().trim(),
@@ -13160,14 +13726,14 @@ router$g.post("/", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to create client." });
   }
 });
-router$g.patch("/:id", requireCoordinator, async (req, res) => {
+router$h.patch("/:id", requireCoordinator, async (req, res) => {
   try {
     const allowed = ["firstName", "lastName", "phone", "address", "status", "notes", "tags", "company"];
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
     allowed.forEach((k) => {
       if (k in req.body) updates[k] = req.body[k];
     });
-    await db$a().collection("clients").doc(req.params.id).update(updates);
+    await db$b().collection("clients").doc(req.params.id).update(updates);
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ error: "Failed to update client." });
@@ -13178,7 +13744,7 @@ async function orderRequestsById(ids) {
   const map = /* @__PURE__ */ new Map();
   if (unique2.length === 0) return map;
   try {
-    const snaps = await db$a().getAll(...unique2.map((id) => db$a().collection("orderRequests").doc(id)));
+    const snaps = await db$b().getAll(...unique2.map((id) => db$b().collection("orderRequests").doc(id)));
     snaps.forEach((snap) => {
       if (!snap.exists) return;
       map.set(snap.id, asRecord$1(jsonSafe(snap.data() || {})));
@@ -13204,7 +13770,7 @@ function readSetupSecret(headerValue2) {
   if (Array.isArray(headerValue2) && typeof headerValue2[0] === "string") return headerValue2[0].trim();
   return "";
 }
-const db$9 = () => admin.firestore();
+const db$a = () => admin.firestore();
 function httpError$1(status2, error) {
   return Object.assign(new Error(error), { status: status2 });
 }
@@ -13232,7 +13798,7 @@ async function bootstrapPlaytest(input) {
   let client = null;
   let clientStatus = clientEmail2 ? "not_found" : "skipped";
   if (clientEmail2) {
-    const matches = await db$9().collection("clients").where("email", "==", clientEmail2).limit(5).get();
+    const matches = await db$a().collection("clients").where("email", "==", clientEmail2).limit(5).get();
     const preferred = matches.docs.find((doc) => doc.data().firebaseUid === doc.id) || matches.docs[0];
     if (preferred) {
       client = {
@@ -13283,7 +13849,7 @@ async function ensurePlaytestStaff(input) {
     const code = err.code;
     if (code !== "auth/email-already-exists") throw err;
     user = await admin.auth().getUserByEmail(input.email);
-    const existing = await db$9().collection("staff").doc(user.uid).get();
+    const existing = await db$a().collection("staff").doc(user.uid).get();
     if (existing.exists && existing.data()?.playtest !== true) {
       throw httpError$1(409, "That email already belongs to a staff account that is not a playtest login. Use a different email.");
     }
@@ -13309,7 +13875,7 @@ async function ensurePlaytestStaff(input) {
     staffPayload.createdAt = now;
     staffPayload.assignedOrders = [];
   }
-  await db$9().collection("staff").doc(user.uid).set(staffPayload, { merge: true });
+  await db$a().collection("staff").doc(user.uid).set(staffPayload, { merge: true });
   try {
     await admin.auth().setCustomUserClaims(user.uid, { isStaff: true, role: input.role });
   } catch (err) {
@@ -13327,7 +13893,7 @@ async function upsertPlaytestListing(photographerUid, client) {
   const id = `playtest-job-${photographerUid}`;
   const now = admin.firestore.FieldValue.serverTimestamp();
   const when = admin.firestore.Timestamp.now();
-  const ref = db$9().collection("listings").doc(id);
+  const ref = db$a().collection("listings").doc(id);
   const existing = await ref.get();
   const previousImages = existing.exists && Array.isArray(existing.data()?.images) ? existing.data().images : [];
   await ref.set({
@@ -13357,11 +13923,11 @@ async function upsertPlaytestDelivery(photographerUid, client, listingId) {
   const orderId = `playtest-order-${client.id}`;
   const galleryId = `playtest-gallery-${client.id}`;
   const now = admin.firestore.FieldValue.serverTimestamp();
-  const listingSnap = await db$9().collection("listings").doc(listingId).get();
+  const listingSnap = await db$a().collection("listings").doc(listingId).get();
   const storedInvoiceId = typeof listingSnap.data()?.invoiceId === "string" ? listingSnap.data().invoiceId.trim() : "";
   const legacyInvoiceId = `playtest-invoice-${client.id}`;
   const foundInvoice = (storedInvoiceId ? await playtestInvoiceRecord(storedInvoiceId) : null) || (legacyInvoiceId !== storedInvoiceId ? await playtestInvoiceRecord(legacyInvoiceId) : null);
-  const invoiceId = foundInvoice?.id || db$9().collection("invoices").doc().id;
+  const invoiceId = foundInvoice?.id || db$a().collection("invoices").doc().id;
   const existingToken = typeof foundInvoice?.data.payToken === "string" ? foundInvoice.data.payToken.trim() : "";
   const payToken = existingToken || createPayToken();
   const urlPath = clientInvoiceUrl({ id: invoiceId, status: "sent", payToken }) || "";
@@ -13378,7 +13944,7 @@ async function upsertPlaytestDelivery(photographerUid, client, listingId) {
     uploadedBy: image.uploadedBy || photographerUid,
     uploadedAt: image.uploadedAt || (/* @__PURE__ */ new Date()).toISOString()
   }));
-  await db$9().collection("galleries").doc(galleryId).set({
+  await db$a().collection("galleries").doc(galleryId).set({
     playtest: true,
     listingId,
     orderId,
@@ -13395,7 +13961,7 @@ async function upsertPlaytestDelivery(photographerUid, client, listingId) {
     createdAt: now,
     updatedAt: now
   }, { merge: true });
-  await db$9().collection("invoices").doc(invoiceId).set({
+  await db$a().collection("invoices").doc(invoiceId).set({
     playtest: true,
     invoiceNumber: `PLAY-${client.id.slice(0, 6).toUpperCase()}`,
     clientId: client.id,
@@ -13417,7 +13983,7 @@ async function upsertPlaytestDelivery(photographerUid, client, listingId) {
     createdAt: now,
     updatedAt: now
   }, { merge: true });
-  await db$9().collection("listings").doc(listingId).set({
+  await db$a().collection("listings").doc(listingId).set({
     playtestGalleryId: galleryId,
     invoiceId,
     clientId: client.id,
@@ -13436,7 +14002,7 @@ async function playtestInvoiceRecord(id) {
   for (let hop = 0; hop < 4; hop += 1) {
     if (!current || seen.has(current)) return null;
     seen.add(current);
-    const snap = await db$9().collection("invoices").doc(current).get();
+    const snap = await db$a().collection("invoices").doc(current).get();
     if (!snap.exists) return null;
     const data = snap.data() || {};
     const next = invoiceRedirectTarget(data);
@@ -13445,17 +14011,17 @@ async function playtestInvoiceRecord(id) {
   }
   return null;
 }
-const router$f = Router();
-const db$8 = () => admin.firestore();
-router$f.get("/", requireStaff, async (_req, res) => {
+const router$g = Router();
+const db$9 = () => admin.firestore();
+router$g.get("/", requireStaff, async (_req, res) => {
   try {
-    const snapshot = await db$8().collection("staff").where("isActive", "==", true).orderBy("firstName").get();
+    const snapshot = await db$9().collection("staff").where("isActive", "==", true).orderBy("firstName").get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
   } catch (err) {
     return res.status(500).json({ error: "Failed to fetch staff." });
   }
 });
-router$f.post("/", requireAdmin, async (req, res) => {
+router$g.post("/", requireAdmin, async (req, res) => {
   try {
     const { firstName, lastName, email, phone, role, tempPassword } = req.body;
     if (!firstName || !lastName || !email || !role || !tempPassword) {
@@ -13466,7 +14032,7 @@ router$f.post("/", requireAdmin, async (req, res) => {
       password: tempPassword,
       displayName: `${firstName} ${lastName}`
     });
-    await db$8().collection("staff").doc(userRecord.uid).set({
+    await db$9().collection("staff").doc(userRecord.uid).set({
       firebaseUid: userRecord.uid,
       firstName,
       lastName,
@@ -13491,14 +14057,14 @@ router$f.post("/", requireAdmin, async (req, res) => {
     return res.status(500).json({ error: "Failed to create staff member." });
   }
 });
-router$f.patch("/:id", requireAdmin, async (req, res) => {
+router$g.patch("/:id", requireAdmin, async (req, res) => {
   try {
     const allowed = ["firstName", "lastName", "phone", "role", "isActive"];
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
     allowed.forEach((k) => {
       if (k in req.body) updates[k] = req.body[k];
     });
-    await db$8().collection("staff").doc(req.params.id).update(updates);
+    await db$9().collection("staff").doc(req.params.id).update(updates);
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ error: "Failed to update staff member." });
@@ -13519,7 +14085,7 @@ function requireSetupSecret(req, res) {
   }
   return true;
 }
-router$f.post("/playtest", async (req, res) => {
+router$g.post("/playtest", async (req, res) => {
   if (!requireSetupSecret(req, res)) return;
   if (!admin.apps.length) {
     return res.status(503).json({
@@ -13538,7 +14104,7 @@ router$f.post("/playtest", async (req, res) => {
     return res.status(500).json({ error: "Playtest setup failed." });
   }
 });
-router$f.post("/setup", async (req, res) => {
+router$g.post("/setup", async (req, res) => {
   try {
     if (isHostedDeployment(liveServerEnv())) {
       const secret = process.env.STAFF_SETUP_SECRET;
@@ -13547,7 +14113,7 @@ router$f.post("/setup", async (req, res) => {
         return res.status(403).json({ error: "Staff setup is disabled." });
       }
     }
-    const existing = await db$8().collection("staff").limit(1).get();
+    const existing = await db$9().collection("staff").limit(1).get();
     if (!existing.empty) {
       return res.status(403).json({ error: "Staff already configured." });
     }
@@ -13560,7 +14126,7 @@ router$f.post("/setup", async (req, res) => {
       password,
       displayName: `${firstName} ${lastName}`
     });
-    await db$8().collection("staff").doc(userRecord.uid).set({
+    await db$9().collection("staff").doc(userRecord.uid).set({
       firebaseUid: userRecord.uid,
       firstName,
       lastName,
@@ -13609,8 +14175,8 @@ function kickStudioQueue(listingId, env = process.env) {
   });
   return { dispatched: true };
 }
-const router$e = Router();
-const db$7 = () => admin.firestore();
+const router$f = Router();
+const db$8 = () => admin.firestore();
 const DIRECT_UPLOAD_LIMIT = 3e6;
 function adminReady$2(res) {
   if (admin.apps.length) return true;
@@ -13623,7 +14189,7 @@ function folderFrom(value) {
   return value === "raw" ? "raw" : "photos";
 }
 async function loadListing(id) {
-  const snap = await db$7().collection("listings").doc(id).get();
+  const snap = await db$8().collection("listings").doc(id).get();
   if (!snap.exists) return null;
   return { id: snap.id, ...snap.data() };
 }
@@ -13633,7 +14199,7 @@ async function assertListingAccess(req, listingId) {
     const error = Object.assign(new Error("Listing not found."), { status: 404 });
     throw error;
   }
-  const staffDoc = await db$7().collection("staff").doc(req.user.uid).get();
+  const staffDoc = await db$8().collection("staff").doc(req.user.uid).get();
   if (staffDoc.exists && staffDoc.data()?.isActive !== false) {
     const role = String(staffDoc.data()?.role || req.staffRole || "");
     if (!staffCanAccessListing(role, req.user.uid, listing)) {
@@ -13677,19 +14243,19 @@ function sendKnownError$2(res, err, fallback) {
   console.error("[Listings]", err);
   return res.status(500).json({ error: fallback });
 }
-router$e.get("/assigned", requirePhotographer, async (req, res) => {
+router$f.get("/assigned", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const uid = req.user.uid;
     const role = req.staffRole || "";
     let docs = [];
     if (role === "admin" || role === "coordinator") {
-      const snap = await db$7().collection("listings").limit(100).get();
+      const snap = await db$8().collection("listings").limit(100).get();
       docs = snap.docs;
     } else {
       const [byUid, byIds] = await Promise.all([
-        db$7().collection("listings").where("photographerUid", "==", uid).limit(50).get(),
-        db$7().collection("listings").where("photographerIds", "array-contains", uid).limit(50).get()
+        db$8().collection("listings").where("photographerUid", "==", uid).limit(50).get(),
+        db$8().collection("listings").where("photographerIds", "array-contains", uid).limit(50).get()
       ]);
       const merged = /* @__PURE__ */ new Map();
       for (const doc of [...byUid.docs, ...byIds.docs]) merged.set(doc.id, doc);
@@ -13706,11 +14272,11 @@ router$e.get("/assigned", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to load assigned jobs." });
   }
 });
-router$e.get("/:id", requireAuth, async (req, res) => {
+router$f.get("/:id", requireAuth, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const listing = await assertListingAccess(req, req.params.id);
-    const staffDoc = await db$7().collection("staff").doc(req.user.uid).get();
+    const staffDoc = await db$8().collection("staff").doc(req.user.uid).get();
     const payload = serializeDoc(listing.id, listing);
     if (!staffDoc.exists) {
       delete payload.notes;
@@ -13721,7 +14287,7 @@ router$e.get("/:id", requireAuth, async (req, res) => {
     return sendKnownError$2(res, err, "Failed to load listing.");
   }
 });
-router$e.post("/:id/photos/upload-url", requirePhotographer, async (req, res) => {
+router$f.post("/:id/photos/upload-url", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const fileName2 = safeStorageFileName(req.body?.fileName);
@@ -13739,7 +14305,7 @@ router$e.post("/:id/photos/upload-url", requirePhotographer, async (req, res) =>
     return sendKnownError$2(res, err, "Failed to prepare the upload. Check FIREBASE_STORAGE_BUCKET.");
   }
 });
-router$e.post("/:id/photos", requirePhotographer, async (req, res) => {
+router$f.post("/:id/photos", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const listingId = req.params.id;
@@ -13785,8 +14351,8 @@ router$e.post("/:id/photos", requirePhotographer, async (req, res) => {
     return sendKnownError$2(res, err, "Failed to save the uploaded photo.");
   }
 });
-const router$d = Router();
-const db$6 = () => admin.firestore();
+const router$e = Router();
+const db$7 = () => admin.firestore();
 function mailchimpConfig() {
   const apiKey = process.env.MAILCHIMP_API_KEY || "";
   const serverPrefix = process.env.MAILCHIMP_SERVER_PREFIX || apiKey.split("-").pop() || "";
@@ -13813,15 +14379,15 @@ async function mailchimpRequest(path2, init = {}) {
   }
   return data;
 }
-router$d.get("/", requireCoordinator, async (_req, res) => {
+router$e.get("/", requireCoordinator, async (_req, res) => {
   try {
-    const snapshot = await db$6().collection("campaigns").orderBy("createdAt", "desc").limit(50).get();
+    const snapshot = await db$7().collection("campaigns").orderBy("createdAt", "desc").limit(50).get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
   } catch (err) {
     return res.status(500).json({ error: "Failed to fetch campaigns." });
   }
 });
-router$d.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
+router$e.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
   try {
     const { apiKey, serverPrefix } = mailchimpConfig();
     if (!apiKey || !serverPrefix) {
@@ -13852,13 +14418,13 @@ router$d.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
     });
   }
 });
-router$d.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
+router$e.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
   try {
     const { listId, audience = "all" } = req.body;
     if (!listId) return res.status(400).json({ error: "listId required." });
-    let recipientQuery = db$6().collection("clients").where("status", "==", "active");
+    let recipientQuery = db$7().collection("clients").where("status", "==", "active");
     if (audience === "vip") {
-      recipientQuery = db$6().collection("clients").where("status", "==", "vip");
+      recipientQuery = db$7().collection("clients").where("status", "==", "vip");
     }
     const clientsSnap = await recipientQuery.get();
     const clients = clientsSnap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((client) => client.email && client.emailMarketingOptOut !== true);
@@ -13896,7 +14462,7 @@ router$d.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
         });
       }
     }
-    await db$6().collection("agentLogs").add({
+    await db$7().collection("agentLogs").add({
       agent: "remmi",
       action: "Mailchimp sync",
       summary: `Synced ${synced} clients to Mailchimp list ${listId}`,
@@ -13915,13 +14481,13 @@ router$d.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: err instanceof Error ? err.message : "Failed to sync Mailchimp." });
   }
 });
-router$d.post("/", requireCoordinator, async (req, res) => {
+router$e.post("/", requireCoordinator, async (req, res) => {
   try {
     const { name, type, subject, body, audience, audienceIds, scheduledAt } = req.body;
     if (!name || !body || !audience) {
       return res.status(400).json({ error: "name, body, and audience required." });
     }
-    const ref = await db$6().collection("campaigns").add({
+    const ref = await db$7().collection("campaigns").add({
       name,
       type: type || "email",
       status: "draft",
@@ -13940,9 +14506,9 @@ router$d.post("/", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to create campaign." });
   }
 });
-router$d.post("/:id/send", requireCoordinator, async (req, res) => {
+router$e.post("/:id/send", requireCoordinator, async (req, res) => {
   try {
-    const campaignDoc = await db$6().collection("campaigns").doc(req.params.id).get();
+    const campaignDoc = await db$7().collection("campaigns").doc(req.params.id).get();
     if (!campaignDoc.exists) return res.status(404).json({ error: "Campaign not found." });
     const campaign = campaignDoc.data();
     if (campaign.status === "sent") {
@@ -13952,9 +14518,9 @@ router$d.post("/:id/send", requireCoordinator, async (req, res) => {
       console.warn(`[Campaigns] Suppressed send for ${req.params.id} — ${clientNotifyBlockReason()}.`);
       return res.status(503).json({ error: "Client notifications are off.", suppressed: true });
     }
-    let recipientQuery = db$6().collection("clients").where("status", "==", "active");
+    let recipientQuery = db$7().collection("clients").where("status", "==", "active");
     if (campaign.audience === "vip") {
-      recipientQuery = db$6().collection("clients").where("status", "==", "vip");
+      recipientQuery = db$7().collection("clients").where("status", "==", "vip");
     }
     const clientsSnap = await recipientQuery.get();
     let clients = clientsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -14001,7 +14567,7 @@ router$d.post("/:id/send", requireCoordinator, async (req, res) => {
     return res.json({ success: true, sent: sentCount });
   } catch (err) {
     console.error("[Campaigns] Send error:", err);
-    await db$6().collection("campaigns").doc(req.params.id).update({ status: "draft" }).catch(() => {
+    await db$7().collection("campaigns").doc(req.params.id).update({ status: "draft" }).catch(() => {
     });
     return res.status(500).json({ error: "Failed to send campaign." });
   }
@@ -14544,14 +15110,14 @@ function getMarketingStore() {
   if (process.env.MARKETING_STORE === "memory" || !admin.apps.length) return memoryStore$1;
   return firestoreStore$1;
 }
-function db$5() {
+function db$6() {
   return admin.firestore();
 }
 async function writeAll(collection, docs) {
   for (let index = 0; index < docs.length; index += 400) {
-    const batch = db$5().batch();
+    const batch = db$6().batch();
     for (const doc of docs.slice(index, index + 400)) {
-      batch.set(db$5().collection(collection).doc(doc.id), doc.data);
+      batch.set(db$6().collection(collection).doc(doc.id), doc.data);
     }
     await batch.commit();
   }
@@ -14565,7 +15131,7 @@ const firestoreStore$1 = {
     await this.saveSettings({ ...settings, suppressionSeededAt: now });
   },
   async listContacts() {
-    const snap = await db$5().collection("marketingContacts").get();
+    const snap = await db$6().collection("marketingContacts").get();
     return snap.docs.map((doc) => doc.data());
   },
   async saveContacts(contacts) {
@@ -14573,35 +15139,35 @@ const firestoreStore$1 = {
   },
   async deleteContacts(emails) {
     for (let index = 0; index < emails.length; index += 400) {
-      const batch = db$5().batch();
+      const batch = db$6().batch();
       for (const email of emails.slice(index, index + 400)) {
-        batch.delete(db$5().collection("marketingContacts").doc(email));
+        batch.delete(db$6().collection("marketingContacts").doc(email));
       }
       await batch.commit();
     }
   },
   async listSegments() {
-    const snap = await db$5().collection("marketingSegments").get();
+    const snap = await db$6().collection("marketingSegments").get();
     return snap.docs.map((doc) => doc.data());
   },
   async saveSegment(segment) {
-    await db$5().collection("marketingSegments").doc(segment.id).set(segment);
+    await db$6().collection("marketingSegments").doc(segment.id).set(segment);
   },
   async deleteSegment(id) {
-    await db$5().collection("marketingSegments").doc(id).delete();
+    await db$6().collection("marketingSegments").doc(id).delete();
   },
   async listSuppression() {
-    const snap = await db$5().collection("marketingSuppression").get();
+    const snap = await db$6().collection("marketingSuppression").get();
     return snap.docs.map((doc) => doc.data());
   },
   async saveSuppression(entry2) {
-    await db$5().collection("marketingSuppression").doc(entry2.id).set(entry2);
+    await db$6().collection("marketingSuppression").doc(entry2.id).set(entry2);
   },
   async deleteSuppression(id) {
-    await db$5().collection("marketingSuppression").doc(id).delete();
+    await db$6().collection("marketingSuppression").doc(id).delete();
   },
   async listEvents(email) {
-    const query = email ? db$5().collection("marketingEvents").where("email", "==", email) : db$5().collection("marketingEvents");
+    const query = email ? db$6().collection("marketingEvents").where("email", "==", email) : db$6().collection("marketingEvents");
     const snap = await query.get();
     return snap.docs.map((doc) => doc.data());
   },
@@ -14609,14 +15175,14 @@ const firestoreStore$1 = {
     await writeAll("marketingEvents", events.map((event) => ({ id: event.id, data: event })));
   },
   async getSettings() {
-    const doc = await db$5().collection("marketingSettings").doc("default").get();
+    const doc = await db$6().collection("marketingSettings").doc("default").get();
     return settingsFrom(doc.exists ? doc.data() : void 0);
   },
   async saveSettings(settings) {
-    await db$5().collection("marketingSettings").doc("default").set(settings);
+    await db$6().collection("marketingSettings").doc("default").set(settings);
   },
   async listClients() {
-    const snap = await db$5().collection("clients").get();
+    const snap = await db$6().collection("clients").get();
     return snap.docs.map((doc) => {
       const data = doc.data();
       return {
@@ -14630,31 +15196,31 @@ const firestoreStore$1 = {
     });
   },
   async listCampaigns() {
-    const snap = await db$5().collection("marketingCampaigns").get();
+    const snap = await db$6().collection("marketingCampaigns").get();
     return snap.docs.map((doc) => doc.data());
   },
   async getCampaign(id) {
-    const doc = await db$5().collection("marketingCampaigns").doc(id).get();
+    const doc = await db$6().collection("marketingCampaigns").doc(id).get();
     return doc.exists ? doc.data() : null;
   },
   async saveCampaign(campaign) {
-    await db$5().collection("marketingCampaigns").doc(campaign.id).set(campaign);
+    await db$6().collection("marketingCampaigns").doc(campaign.id).set(campaign);
   },
   async deleteCampaign(id) {
-    await db$5().collection("marketingCampaigns").doc(id).delete();
+    await db$6().collection("marketingCampaigns").doc(id).delete();
   },
   async listTemplates() {
-    const snap = await db$5().collection("marketingTemplates").get();
+    const snap = await db$6().collection("marketingTemplates").get();
     return snap.docs.map((doc) => doc.data());
   },
   async saveTemplate(template) {
-    await db$5().collection("marketingTemplates").doc(template.id).set(template);
+    await db$6().collection("marketingTemplates").doc(template.id).set(template);
   },
   async deleteTemplate(id) {
-    await db$5().collection("marketingTemplates").doc(id).delete();
+    await db$6().collection("marketingTemplates").doc(id).delete();
   },
   async listSends() {
-    const snap = await db$5().collection("marketingSends").get();
+    const snap = await db$6().collection("marketingSends").get();
     return snap.docs.map((doc) => doc.data());
   },
   async addSends(sends) {
@@ -14664,14 +15230,14 @@ const firestoreStore$1 = {
     })));
   },
   async getReport(campaignId) {
-    const doc = await db$5().collection("marketingReports").doc(campaignId).get();
+    const doc = await db$6().collection("marketingReports").doc(campaignId).get();
     return doc.exists ? doc.data() : null;
   },
   async saveReport(report) {
-    await db$5().collection("marketingReports").doc(report.campaignId).set(report);
+    await db$6().collection("marketingReports").doc(report.campaignId).set(report);
   },
   async listReports() {
-    const snap = await db$5().collection("marketingReports").get();
+    const snap = await db$6().collection("marketingReports").get();
     return snap.docs.map((doc) => doc.data());
   }
 };
@@ -14752,7 +15318,7 @@ function createRateLimiter(options) {
     }
   };
 }
-const router$c = Router();
+const router$d = Router();
 const MAX_ROWS = 1e4;
 const unsubscribeLimit = createRateLimiter({ windowMs: 60 * 60 * 1e3, max: 20 });
 function requireMarketing$1(permission) {
@@ -14789,7 +15355,7 @@ function publicContact(contact, suppression) {
     suppressed: blocked ? reasonLabel(blocked.reason, blocked.hold) : ""
   };
 }
-router$c.get("/overview", requireMarketing$1("view"), async (_req, res) => {
+router$d.get("/overview", requireMarketing$1("view"), async (_req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const [contacts, suppression, segments] = await Promise.all([
@@ -14805,7 +15371,7 @@ router$c.get("/overview", requireMarketing$1("view"), async (_req, res) => {
     segments: segments.length
   });
 });
-router$c.get("/contacts", requireMarketing$1("view"), async (req, res) => {
+router$d.get("/contacts", requireMarketing$1("view"), async (req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const [contacts, suppression] = await Promise.all([store.listContacts(), store.listSuppression()]);
@@ -14821,7 +15387,7 @@ router$c.get("/contacts", requireMarketing$1("view"), async (req, res) => {
   const tags = [...new Set(contacts.flatMap((contact) => contact.tags))].sort((a, b) => a.localeCompare(b));
   res.json({ contacts: filtered, tags, total: contacts.length });
 });
-router$c.get("/contacts/detail", requireMarketing$1("view"), async (req, res) => {
+router$d.get("/contacts/detail", requireMarketing$1("view"), async (req, res) => {
   const email = normalizeEmail(req.query.email);
   if (!isValidEmail(email)) return res.status(400).json({ error: "A valid email is required." });
   const store = getMarketingStore();
@@ -14838,7 +15404,7 @@ router$c.get("/contacts/detail", requireMarketing$1("view"), async (req, res) =>
     activity: events.sort((a, b) => b.at.localeCompare(a.at))
   });
 });
-router$c.post("/contacts", requireMarketing$1("manage"), async (req, res) => {
+router$d.post("/contacts", requireMarketing$1("manage"), async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   if (!isValidEmail(email)) return res.status(400).json({ error: "A valid email is required." });
   const store = getMarketingStore();
@@ -14863,7 +15429,7 @@ router$c.post("/contacts", requireMarketing$1("manage"), async (req, res) => {
   await store.saveContacts([contact]);
   res.json({ contact });
 });
-router$c.post("/contacts/tags", requireMarketing$1("manage"), async (req, res) => {
+router$d.post("/contacts/tags", requireMarketing$1("manage"), async (req, res) => {
   const emails = Array.isArray(req.body?.emails) ? req.body.emails.map((email) => normalizeEmail(email)) : [];
   const add = Array.isArray(req.body?.add) ? req.body.add.map(String) : [];
   const remove = Array.isArray(req.body?.remove) ? req.body.remove.map(String) : [];
@@ -14876,11 +15442,11 @@ router$c.post("/contacts/tags", requireMarketing$1("manage"), async (req, res) =
   await store.saveContacts(next);
   res.json({ updated: next.length });
 });
-router$c.post("/contacts/sync", requireMarketing$1("manage"), async (_req, res) => {
+router$d.post("/contacts/sync", requireMarketing$1("manage"), async (_req, res) => {
   const result = await syncCustomerContacts();
   res.json(result);
 });
-router$c.post("/imports/parse", requireMarketing$1("manage"), async (req, res) => {
+router$d.post("/imports/parse", requireMarketing$1("manage"), async (req, res) => {
   try {
     const table = parseTabularUpload({
       text: typeof req.body?.text === "string" ? req.body.text : "",
@@ -14900,7 +15466,7 @@ router$c.post("/imports/parse", requireMarketing$1("manage"), async (req, res) =
     res.status(400).json({ error: err instanceof Error ? err.message : "Could not read that file." });
   }
 });
-router$c.post("/imports/commit", requireMarketing$1("manage"), async (req, res) => {
+router$d.post("/imports/commit", requireMarketing$1("manage"), async (req, res) => {
   const headers = Array.isArray(req.body?.headers) ? req.body.headers.map(String) : [];
   const rows = Array.isArray(req.body?.rows) ? req.body.rows.map((row) => Array.isArray(row) ? row.map(String) : []) : [];
   const mapping = req.body?.mapping && typeof req.body.mapping === "object" ? req.body.mapping : {};
@@ -14918,7 +15484,7 @@ router$c.post("/imports/commit", requireMarketing$1("manage"), async (req, res) 
   await store.saveContacts(plan.upserts);
   res.json({ summary: plan.summary });
 });
-router$c.get("/segments", requireMarketing$1("view"), async (_req, res) => {
+router$d.get("/segments", requireMarketing$1("view"), async (_req, res) => {
   const store = getMarketingStore();
   const [segments, contacts] = await Promise.all([store.listSegments(), store.listContacts()]);
   res.json({
@@ -14928,7 +15494,7 @@ router$c.get("/segments", requireMarketing$1("view"), async (_req, res) => {
     }))
   });
 });
-router$c.post("/segments", requireMarketing$1("manage"), async (req, res) => {
+router$d.post("/segments", requireMarketing$1("manage"), async (req, res) => {
   const name = String(req.body?.name || "").trim();
   if (!name) return res.status(400).json({ error: "Name the segment." });
   const store = getMarketingStore();
@@ -14945,11 +15511,11 @@ router$c.post("/segments", requireMarketing$1("manage"), async (req, res) => {
   await store.saveSegment(segment);
   res.json({ segment });
 });
-router$c.delete("/segments/:id", requireMarketing$1("manage"), async (req, res) => {
+router$d.delete("/segments/:id", requireMarketing$1("manage"), async (req, res) => {
   await getMarketingStore().deleteSegment(req.params.id);
   res.json({ ok: true });
 });
-router$c.get("/suppression", requireMarketing$1("view"), async (_req, res) => {
+router$d.get("/suppression", requireMarketing$1("view"), async (_req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const entries = await store.listSuppression();
@@ -14957,7 +15523,7 @@ router$c.get("/suppression", requireMarketing$1("view"), async (_req, res) => {
     entries: entries.sort((a, b) => a.value.localeCompare(b.value))
   });
 });
-router$c.post("/suppression", requireMarketing$1("manage"), async (req, res) => {
+router$d.post("/suppression", requireMarketing$1("manage"), async (req, res) => {
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const entry2 = buildSuppression(now, {
     kind: req.body?.kind === "domain" || req.body?.kind === "name" ? req.body.kind : "email",
@@ -14976,11 +15542,11 @@ router$c.post("/suppression", requireMarketing$1("manage"), async (req, res) => 
   await store.saveSuppression({ ...entry2, createdAt: existing?.createdAt || now, source: existing?.source || "manual" });
   res.json({ entry: entry2 });
 });
-router$c.delete("/suppression/:id", requireMarketing$1("manage"), async (req, res) => {
+router$d.delete("/suppression/:id", requireMarketing$1("manage"), async (req, res) => {
   await getMarketingStore().deleteSuppression(decodeURIComponent(req.params.id));
   res.json({ ok: true });
 });
-router$c.post("/unsubscribe", async (req, res) => {
+router$d.post("/unsubscribe", async (req, res) => {
   const limit = unsubscribeLimit.check(clientIp(req));
   if (!limit.allowed) return res.status(429).json({ error: "Too many attempts. Try again later." });
   const email = normalizeEmail(req.body?.email);
@@ -15424,7 +15990,7 @@ function createGmassClient(env = process.env, fetchImpl = fetch) {
 function getGmassClient() {
   return createGmassClient();
 }
-const router$b = Router();
+const router$c = Router();
 function requireMarketing(permission) {
   return async (req, res, next) => {
     await requireStaff(req, res, () => {
@@ -15570,7 +16136,7 @@ function sendBlocked(res, gmass) {
   }
   return false;
 }
-router$b.get("/dashboard", requireMarketing("view"), async (_req, res) => {
+router$c.get("/dashboard", requireMarketing("view"), async (_req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const [contacts, suppression, segments, campaigns, reports] = await Promise.all([
@@ -15605,11 +16171,11 @@ router$b.get("/dashboard", requireMarketing("view"), async (_req, res) => {
     alerts: rows.filter((row) => row.stats?.pauseRecommended)
   });
 });
-router$b.get("/campaigns", requireMarketing("view"), async (_req, res) => {
+router$c.get("/campaigns", requireMarketing("view"), async (_req, res) => {
   const campaigns = await getMarketingStore().listCampaigns();
   res.json({ campaigns: campaigns.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) });
 });
-router$b.post("/campaigns", requireMarketing("manage"), async (req, res) => {
+router$c.post("/campaigns", requireMarketing("manage"), async (req, res) => {
   const store = getMarketingStore();
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const settings = await store.getSettings();
@@ -15622,12 +16188,12 @@ router$b.post("/campaigns", requireMarketing("manage"), async (req, res) => {
   await store.saveCampaign(campaign);
   res.status(201).json({ campaign });
 });
-router$b.get("/campaigns/:id", requireMarketing("view"), async (req, res) => {
+router$c.get("/campaigns/:id", requireMarketing("view"), async (req, res) => {
   const campaign = await getMarketingStore().getCampaign(req.params.id);
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
   res.json({ campaign });
 });
-router$b.post("/campaigns/:id", requireMarketing("manage"), async (req, res) => {
+router$c.post("/campaigns/:id", requireMarketing("manage"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -15642,7 +16208,7 @@ router$b.post("/campaigns/:id", requireMarketing("manage"), async (req, res) => 
   await store.saveCampaign(campaign);
   res.json({ campaign });
 });
-router$b.post("/campaigns/:id/duplicate", requireMarketing("manage"), async (req, res) => {
+router$c.post("/campaigns/:id/duplicate", requireMarketing("manage"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -15664,7 +16230,7 @@ router$b.post("/campaigns/:id/duplicate", requireMarketing("manage"), async (req
   await store.saveCampaign(copy);
   res.status(201).json({ campaign: copy });
 });
-router$b.post("/campaigns/:id/preview", requireMarketing("send"), async (req, res) => {
+router$c.post("/campaigns/:id/preview", requireMarketing("send"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -15683,7 +16249,7 @@ router$b.post("/campaigns/:id/preview", requireMarketing("send"), async (req, re
   await store.saveCampaign(campaign);
   res.json({ confirmation });
 });
-router$b.post("/campaigns/:id/test", requireMarketing("send"), async (req, res) => {
+router$c.post("/campaigns/:id/test", requireMarketing("send"), async (req, res) => {
   const to = normalizeEmail(req.body?.to);
   if (!isValidEmail(to)) return res.status(400).json({ error: "Enter a test email address." });
   const gmass = getGmassClient();
@@ -15715,7 +16281,7 @@ router$b.post("/campaigns/:id/test", requireMarketing("send"), async (req, res) 
   }
   res.json({ ok: true, to });
 });
-router$b.post("/campaigns/:id/send", requireMarketing("send"), async (req, res) => {
+router$c.post("/campaigns/:id/send", requireMarketing("send"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -15805,7 +16371,7 @@ router$b.post("/campaigns/:id/send", requireMarketing("send"), async (req, res) 
     return res.status(502).json({ error: message });
   }
 });
-router$b.get("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
+router$c.get("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
   const store = getMarketingStore();
   const [campaign, report] = await Promise.all([
     store.getCampaign(req.params.id),
@@ -15814,7 +16380,7 @@ router$b.get("/campaigns/:id/report", requireMarketing("view"), async (req, res)
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
   res.json({ campaign, report });
 });
-router$b.post("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
+router$c.post("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
   const store = getMarketingStore();
   const campaign = await store.getCampaign(req.params.id);
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
@@ -15889,11 +16455,11 @@ router$b.post("/campaigns/:id/report", requireMarketing("view"), async (req, res
     res.status(502).json({ error: err instanceof Error ? err.message : "Could not refresh the GMass report." });
   }
 });
-router$b.get("/templates", requireMarketing("view"), async (_req, res) => {
+router$c.get("/templates", requireMarketing("view"), async (_req, res) => {
   const templates = await getMarketingStore().listTemplates();
   res.json({ templates });
 });
-router$b.post("/templates", requireMarketing("manage"), async (req, res) => {
+router$c.post("/templates", requireMarketing("manage"), async (req, res) => {
   const name = String(req.body?.name || "").trim();
   const html = String(req.body?.html || "");
   if (!name || !html) return res.status(400).json({ error: "A template needs a name and HTML." });
@@ -15908,15 +16474,15 @@ router$b.post("/templates", requireMarketing("manage"), async (req, res) => {
   await getMarketingStore().saveTemplate(template);
   res.json({ template });
 });
-router$b.delete("/templates/:id", requireMarketing("manage"), async (req, res) => {
+router$c.delete("/templates/:id", requireMarketing("manage"), async (req, res) => {
   await getMarketingStore().deleteTemplate(req.params.id);
   res.json({ ok: true });
 });
-router$b.get("/settings", requireMarketing("view"), async (_req, res) => {
+router$c.get("/settings", requireMarketing("view"), async (_req, res) => {
   const settings = await getMarketingStore().getSettings();
   res.json({ settings });
 });
-router$b.get("/account", requireMarketing("view"), async (_req, res) => {
+router$c.get("/account", requireMarketing("view"), async (_req, res) => {
   const settings = await getMarketingStore().getSettings();
   const gmass = getGmassClient();
   const base = {
@@ -15938,7 +16504,7 @@ router$b.get("/account", requireMarketing("view"), async (_req, res) => {
   ]);
   res.json({ ...base, user, warmup, domains });
 });
-router$b.post("/settings", requireMarketing("send"), async (req, res) => {
+router$c.post("/settings", requireMarketing("send"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getSettings();
   const next = {
@@ -15961,7 +16527,7 @@ router$b.post("/settings", requireMarketing("send"), async (req, res) => {
   await store.saveSettings(next);
   res.json({ settings: next });
 });
-router$b.post("/account/unsubscribes", requireMarketing("send"), async (req, res) => {
+router$c.post("/account/unsubscribes", requireMarketing("send"), async (req, res) => {
   const gmass = getGmassClient();
   if (!gmass.configured) return res.status(503).json({ error: "Set GMASS_API_KEY before syncing a suppression to GMass." });
   const email = normalizeEmail(req.body?.email);
@@ -15981,7 +16547,7 @@ router$b.post("/account/unsubscribes", requireMarketing("send"), async (req, res
   }
   res.json({ ok: true });
 });
-router$b.post("/demo/sample-report", requireMarketing("send"), async (req, res) => {
+router$c.post("/demo/sample-report", requireMarketing("send"), async (req, res) => {
   if (process.env.MARKETING_DEMO !== "true" || isHostedDeployment(liveServerEnv())) {
     return res.status(404).json({ error: "Not found." });
   }
@@ -16019,8 +16585,8 @@ router$b.post("/demo/sample-report", requireMarketing("send"), async (req, res) 
   await store.saveReport(report);
   res.json({ campaign, report });
 });
-const router$a = Router();
-const db$4 = () => admin.firestore();
+const router$b = Router();
+const db$5 = () => admin.firestore();
 function isAgentAuthorized(req) {
   const serviceKey = req.headers["x-agent-key"];
   const auth = req.headers.authorization;
@@ -16058,10 +16624,10 @@ function sameCalendarDay(a, b) {
 }
 async function loadOrderForAppointment(appointment) {
   if (!appointment.orderId) return null;
-  const orderDoc = await db$4().collection("orders").doc(String(appointment.orderId)).get();
+  const orderDoc = await db$5().collection("orders").doc(String(appointment.orderId)).get();
   return orderDoc.exists ? { id: orderDoc.id, ref: orderDoc.ref, data: orderDoc.data() || {} } : null;
 }
-router$a.get("/briefing", requireStaff, async (_req, res) => {
+router$b.get("/briefing", requireStaff, async (_req, res) => {
   try {
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
@@ -16082,16 +16648,16 @@ router$a.get("/briefing", requireStaff, async (_req, res) => {
       overdueInvoices,
       recentLogs
     ] = await Promise.all([
-      db$4().collection("orderRequests").where("status", "==", "new").get(),
-      db$4().collection("appointments").where("scheduledDate", ">=", todayTs).where("scheduledDate", "<", tomorrowTs).where("status", "in", ["confirmed", "scheduled"]).get(),
-      db$4().collection("appointments").where("scheduledDate", ">=", tomorrowTs).where("scheduledDate", "<", admin.firestore.Timestamp.fromDate(
+      db$5().collection("orderRequests").where("status", "==", "new").get(),
+      db$5().collection("appointments").where("scheduledDate", ">=", todayTs).where("scheduledDate", "<", tomorrowTs).where("status", "in", ["confirmed", "scheduled"]).get(),
+      db$5().collection("appointments").where("scheduledDate", ">=", tomorrowTs).where("scheduledDate", "<", admin.firestore.Timestamp.fromDate(
         new Date(tomorrow.getTime() + 24 * 60 * 60 * 1e3)
       )).where("status", "in", ["confirmed", "scheduled"]).get(),
-      db$4().collection("agentLogs").where("requiresHumanReview", "==", true).where("reviewedAt", "==", null).orderBy("createdAt", "desc").limit(20).get(),
-      db$4().collection("agentLogs").where("priority", "==", "urgent").where("requiresHumanReview", "==", true).orderBy("createdAt", "desc").limit(5).get(),
-      db$4().collection("galleries").where("status", "in", ["raw_uploaded", "editing"]).get(),
-      db$4().collection("invoices").where("status", "==", "overdue").get(),
-      db$4().collection("agentLogs").where("createdAt", ">=", yesterdayTs).orderBy("createdAt", "desc").limit(50).get()
+      db$5().collection("agentLogs").where("requiresHumanReview", "==", true).where("reviewedAt", "==", null).orderBy("createdAt", "desc").limit(20).get(),
+      db$5().collection("agentLogs").where("priority", "==", "urgent").where("requiresHumanReview", "==", true).orderBy("createdAt", "desc").limit(5).get(),
+      db$5().collection("galleries").where("status", "in", ["raw_uploaded", "editing"]).get(),
+      db$5().collection("invoices").where("status", "==", "overdue").get(),
+      db$5().collection("agentLogs").where("createdAt", ">=", yesterdayTs).orderBy("createdAt", "desc").limit(50).get()
     ]);
     const agentSummaries = {
       nora: {
@@ -16167,7 +16733,7 @@ async function runReminderSweep(req, res) {
     today.setHours(0, 0, 0, 0);
     const twoDaysOut = new Date(today);
     twoDaysOut.setDate(twoDaysOut.getDate() + 2);
-    const appointments = await db$4().collection("appointments").where("scheduledDate", ">=", admin.firestore.Timestamp.fromDate(today)).where("scheduledDate", "<", admin.firestore.Timestamp.fromDate(twoDaysOut)).get();
+    const appointments = await db$5().collection("appointments").where("scheduledDate", ">=", admin.firestore.Timestamp.fromDate(today)).where("scheduledDate", "<", admin.firestore.Timestamp.fromDate(twoDaysOut)).get();
     const results = [];
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -16217,7 +16783,7 @@ async function runReminderSweep(req, res) {
           await Promise.all([
             appointmentDoc.ref.update(update),
             orderRecord?.ref.update(update) || Promise.resolve(),
-            db$4().collection("smsLogs").add({
+            db$5().collection("smsLogs").add({
               direction: "outbound",
               to: normalisePhone(String(phone)),
               body,
@@ -16233,7 +16799,7 @@ async function runReminderSweep(req, res) {
           results.push({ appointmentId: appointmentDoc.id, orderId, type, sent: true, sid: result.sid });
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
-          await db$4().collection("agentLogs").add({
+          await db$5().collection("agentLogs").add({
             agent: "nora",
             action: "Reminder send failed",
             summary: `Reminder ${type} failed for order ${orderId}`,
@@ -16260,12 +16826,12 @@ async function runReminderSweep(req, res) {
     return res.status(500).json({ error: "Failed to run reminder sweep." });
   }
 }
-router$a.get("/run-reminders", runReminderSweep);
-router$a.post("/run-reminders", runReminderSweep);
-router$a.get("/logs", requireStaff, async (req, res) => {
+router$b.get("/run-reminders", runReminderSweep);
+router$b.post("/run-reminders", runReminderSweep);
+router$b.get("/logs", requireStaff, async (req, res) => {
   try {
     const { agent, status: status2, requiresReview, limit = "50" } = req.query;
-    let query = db$4().collection("agentLogs").orderBy("createdAt", "desc");
+    let query = db$5().collection("agentLogs").orderBy("createdAt", "desc");
     if (agent) query = query.where("agent", "==", agent);
     if (status2) query = query.where("status", "==", status2);
     if (requiresReview === "true") {
@@ -16277,10 +16843,10 @@ router$a.get("/logs", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch agent logs." });
   }
 });
-router$a.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
+router$b.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
   try {
     const { notes } = req.body;
-    await db$4().collection("agentLogs").doc(req.params.id).update({
+    await db$5().collection("agentLogs").doc(req.params.id).update({
       requiresHumanReview: false,
       status: "completed",
       reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -16292,7 +16858,7 @@ router$a.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to resolve flag." });
   }
 });
-router$a.post("/log", async (req, res) => {
+router$b.post("/log", async (req, res) => {
   try {
     if (!isAgentAuthorized(req)) {
       return res.status(401).json({ error: "Invalid agent key." });
@@ -16311,7 +16877,7 @@ router$a.post("/log", async (req, res) => {
     if (!agent || !action || !summary) {
       return res.status(400).json({ error: "agent, action, and summary required." });
     }
-    const ref = await db$4().collection("agentLogs").add({
+    const ref = await db$5().collection("agentLogs").add({
       agent,
       action,
       summary,
@@ -16330,12 +16896,12 @@ router$a.post("/log", async (req, res) => {
     return res.status(500).json({ error: "Failed to log agent action." });
   }
 });
-const router$9 = Router();
-const db$3 = () => admin.firestore();
-router$9.get("/", requireStaff, async (req, res) => {
+const router$a = Router();
+const db$4 = () => admin.firestore();
+router$a.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, listingId, orderId, limit = "100" } = req.query;
-    let q = db$3().collection("mediaJobs").orderBy("createdAt", "desc");
+    let q = db$4().collection("mediaJobs").orderBy("createdAt", "desc");
     if (status2) q = q.where("status", "==", status2);
     if (listingId) q = q.where("listingId", "==", listingId);
     if (orderId) q = q.where("orderId", "==", orderId);
@@ -16346,7 +16912,7 @@ router$9.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch media jobs." });
   }
 });
-router$9.post("/", requireStaff, async (req, res) => {
+router$a.post("/", requireStaff, async (req, res) => {
   try {
     const {
       listingId,
@@ -16364,7 +16930,7 @@ router$9.post("/", requireStaff, async (req, res) => {
     if (!Array.isArray(mediaItems) || mediaItems.length === 0) {
       return res.status(400).json({ error: "At least one media item is required." });
     }
-    const ref = await db$3().collection("mediaJobs").add({
+    const ref = await db$4().collection("mediaJobs").add({
       listingId: listingId || null,
       orderId: orderId || null,
       galleryId: galleryId || null,
@@ -16387,7 +16953,7 @@ router$9.post("/", requireStaff, async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    await db$3().collection("agentLogs").add({
+    await db$4().collection("agentLogs").add({
       agent: "aicon-editor",
       action: "Media job queued",
       summary: `${mediaItems.length} item(s) queued for ${provider}`,
@@ -16405,12 +16971,12 @@ router$9.post("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to create media job." });
   }
 });
-router$9.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$a.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2, resultItems = [], error = "", requiresHumanReview } = req.body;
     const valid = ["queued", "processing", "ready_for_review", "completed", "failed", "cancelled"];
     if (!valid.includes(status2)) return res.status(400).json({ error: "Invalid status." });
-    await db$3().collection("mediaJobs").doc(req.params.id).update({
+    await db$4().collection("mediaJobs").doc(req.params.id).update({
       status: status2,
       resultItems,
       error,
@@ -16424,7 +16990,7 @@ router$9.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update media job." });
   }
 });
-const db$2 = () => admin.firestore();
+const db$3 = () => admin.firestore();
 function httpError(status2, message) {
   return Object.assign(new Error(message), { status: status2 });
 }
@@ -16435,8 +17001,8 @@ async function listMediaDeliveryQueue(input) {
   const listings = await listingsForRole(input.uid, input.role);
   const allowed = input.role === "photographer" ? new Set(listings.map((item) => item.id)) : null;
   const [gallerySnap, jobSnap] = await Promise.all([
-    db$2().collection("galleries").orderBy("createdAt", "desc").limit(100).get(),
-    db$2().collection("editJobs").limit(200).get()
+    db$3().collection("galleries").orderBy("createdAt", "desc").limit(100).get(),
+    db$3().collection("editJobs").limit(200).get()
   ]);
   const galleries = [];
   for (const doc of gallerySnap.docs) {
@@ -16499,7 +17065,7 @@ async function listMediaDeliveryQueue(input) {
 }
 async function readExistingDocuments(collectionName, ids) {
   if (ids.length === 0) return [];
-  const snaps = await db$2().getAll(...ids.map((id) => db$2().collection(collectionName).doc(id)));
+  const snaps = await db$3().getAll(...ids.map((id) => db$3().collection(collectionName).doc(id)));
   return snaps.map((snap) => ({ id: snap.id, exists: snap.exists }));
 }
 async function moveMediaDelivery(input) {
@@ -16520,7 +17086,7 @@ async function moveMediaDelivery(input) {
       deliveryUrl: delivered.deliveryUrl
     };
   }
-  const snap = await db$2().collection("galleries").doc(galleryId).get();
+  const snap = await db$3().collection("galleries").doc(galleryId).get();
   if (!snap.exists) throw httpError(404, "Gallery not found.");
   const data = snap.data() || {};
   const hasMedia = Array.isArray(data.mediaItems) && data.mediaItems.length > 0;
@@ -16539,7 +17105,7 @@ async function moveMediaDelivery(input) {
     label: MEDIA_DELIVERY_LABELS[input.status]
   };
 }
-const router$8 = Router();
+const router$9 = Router();
 function adminReady$1(res) {
   if (admin.apps.length) return true;
   res.status(503).json({
@@ -16567,7 +17133,7 @@ function sendKnownError$1(res, err, fallback) {
   console.error("[Studio]", err);
   return res.status(500).json({ error: fallback });
 }
-router$8.get("/workspace", requireStaff, async (req, res) => {
+router$9.get("/workspace", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = typeof req.query.listingId === "string" ? req.query.listingId : "";
@@ -16589,7 +17155,7 @@ router$8.get("/workspace", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to load Studio.");
   }
 });
-router$8.get("/delivery-queue", requireStaff, async (req, res) => {
+router$9.get("/delivery-queue", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const rows = await listMediaDeliveryQueue({
@@ -16601,7 +17167,7 @@ router$8.get("/delivery-queue", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to load the delivery queue.");
   }
 });
-router$8.post("/delivery-queue/move", requireCoordinator, async (req, res) => {
+router$9.post("/delivery-queue/move", requireCoordinator, async (req, res) => {
   const galleryId = String(req.body?.galleryId || "").trim();
   const status2 = String(req.body?.status || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(galleryId)) {
@@ -16638,7 +17204,7 @@ router$8.post("/delivery-queue/move", requireCoordinator, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to update delivery.");
   }
 });
-router$8.post("/order-edits", requireStaff, async (req, res) => {
+router$9.post("/order-edits", requireStaff, async (req, res) => {
   const listingId = String(req.body?.listingId || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -16652,7 +17218,7 @@ router$8.post("/order-edits", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to queue the order edits.");
   }
 });
-router$8.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => {
+router$9.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => {
   let listingId = String(req.body?.listingId || "").trim();
   if (listingId && !/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -16682,7 +17248,7 @@ router$8.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => 
     return sendKnownError$1(res, err, "Failed to advance the order edit queue.");
   }
 });
-router$8.post("/iconic-polish", requireStaff, async (req, res) => {
+router$9.post("/iconic-polish", requireStaff, async (req, res) => {
   const listingId = String(req.body?.listingId || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -16699,7 +17265,7 @@ router$8.post("/iconic-polish", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to save Iconic Polish.");
   }
 });
-router$8.post("/ai-edit", requireStaff, async (req, res) => {
+router$9.post("/ai-edit", requireStaff, async (req, res) => {
   const parsed = parseAiEditRequest(req.body);
   if (parsed.ok === false) return res.status(400).json({ error: parsed.error });
   if (!adminReady$1(res)) return;
@@ -16719,7 +17285,7 @@ router$8.post("/ai-edit", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to enqueue the AI edit.");
   }
 });
-router$8.post("/adjust", requireStaff, async (req, res) => {
+router$9.post("/adjust", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
@@ -16742,7 +17308,7 @@ router$8.post("/adjust", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to save the adjustment.");
   }
 });
-router$8.post("/reject", requireStaff, async (req, res) => {
+router$9.post("/reject", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
@@ -16759,7 +17325,7 @@ router$8.post("/reject", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to reject the edit.");
   }
 });
-router$8.post("/approve", requireStaff, async (req, res) => {
+router$9.post("/approve", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
@@ -16900,16 +17466,16 @@ async function editScratchPhoto(input) {
     downloadName: scratchDownloadName(input.fileName || "scratch.jpg")
   };
 }
-const router$7 = Router();
+const router$8 = Router();
 function headerValue(value) {
   if (Array.isArray(value)) return value[0] || "";
   return value || "";
 }
-router$7.get("/", requireCoordinator, async (_req, res) => {
+router$8.get("/", requireCoordinator, async (_req, res) => {
   const grass = await grassReferenceStatus();
   return res.json({ grass, twilightPrompt: orderExteriorTwilightPrompt() });
 });
-router$7.post(
+router$8.post(
   "/",
   requireCoordinator,
   express.raw({ type: "image/jpeg", limit: "4mb" }),
@@ -16935,13 +17501,13 @@ router$7.post(
     }
   }
 );
-router$7.use((err, _req, res, next) => {
+router$8.use((err, _req, res, next) => {
   if (err?.type === "entity.too.large" || err?.status === 413) {
     return res.status(413).json({ error: "That photo is too large for the scratch pad. Export a smaller JPEG." });
   }
   return next(err);
 });
-const router$6 = Router();
+const router$7 = Router();
 const GOOGLE_KEY = process.env.GOOGLE_MAPS_API_KEY || "";
 function fromGoogle(p) {
   return {
@@ -16968,7 +17534,7 @@ function fromNominatim(r, idx) {
     secondary: parts.slice(1).join(", ")
   };
 }
-router$6.get("/autocomplete", async (req, res) => {
+router$7.get("/autocomplete", async (req, res) => {
   const input = (req.query.input || "").trim();
   if (!input || input.length < 2) {
     return res.json({ suggestions: [] });
@@ -17004,7 +17570,7 @@ router$6.get("/autocomplete", async (req, res) => {
     return res.json({ suggestions: [] });
   }
 });
-router$6.get("/distance", async (req, res) => {
+router$7.get("/distance", async (req, res) => {
   const destination = (req.query.destination || "").trim();
   const origin = (req.query.origin || process.env.STUDIO_ADDRESS || "The Woodlands, TX 77380").trim();
   if (!destination) {
@@ -17031,16 +17597,16 @@ router$6.get("/distance", async (req, res) => {
     return res.status(500).json({ error: "Failed to calculate distance." });
   }
 });
-const router$5 = Router();
-const db$1 = () => admin.firestore();
+const router$6 = Router();
+const db$2 = () => admin.firestore();
 async function findOrderLikeDocument(id) {
-  const orderRequestDoc = await db$1().collection("orderRequests").doc(id).get();
+  const orderRequestDoc = await db$2().collection("orderRequests").doc(id).get();
   if (orderRequestDoc.exists) return orderRequestDoc;
-  const orderDoc = await db$1().collection("orders").doc(id).get();
+  const orderDoc = await db$2().collection("orders").doc(id).get();
   if (orderDoc.exists) return orderDoc;
   return null;
 }
-router$5.post("/send", requireStaff, async (req, res) => {
+router$6.post("/send", requireStaff, async (req, res) => {
   try {
     const { to, body, orderId } = req.body;
     if (!to || !body) return res.status(400).json({ error: "to and body required." });
@@ -17049,7 +17615,7 @@ router$5.post("/send", requireStaff, async (req, res) => {
       console.warn(`[SMS] Suppressed staff send to ${to} — ${clientNotifyBlockReason()}.`);
       return res.status(503).json({ error: "Client notifications are off.", suppressed: true });
     }
-    await db$1().collection("smsLogs").add({
+    await db$2().collection("smsLogs").add({
       direction: "outbound",
       to: normalisePhone(to),
       body,
@@ -17060,7 +17626,7 @@ router$5.post("/send", requireStaff, async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
     if (orderId) {
-      await db$1().collection("messages").add({
+      await db$2().collection("messages").add({
         orderId,
         senderId: req.user.uid,
         senderType: "staff",
@@ -17078,7 +17644,7 @@ router$5.post("/send", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$5.post("/remind/:orderId", requireStaff, async (req, res) => {
+router$6.post("/remind/:orderId", requireStaff, async (req, res) => {
   try {
     const { type = "24h" } = req.body;
     const orderDoc = await findOrderLikeDocument(req.params.orderId);
@@ -17103,7 +17669,7 @@ router$5.post("/remind/:orderId", requireStaff, async (req, res) => {
       console.warn(`[SMS] Suppressed reminder to ${phone} — ${clientNotifyBlockReason()}.`);
       return res.status(503).json({ error: "Client notifications are off.", suppressed: true });
     }
-    await db$1().collection("smsLogs").add({
+    await db$2().collection("smsLogs").add({
       direction: "outbound",
       to: normalisePhone(phone),
       body,
@@ -17120,14 +17686,14 @@ router$5.post("/remind/:orderId", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$5.post("/conversation", requireStaff, async (req, res) => {
+router$6.post("/conversation", requireStaff, async (req, res) => {
   try {
     const { orderId, photographerPhone, photographerName, clientPhone, clientName: clientName2 } = req.body;
     if (!orderId || !photographerPhone || !clientPhone) {
       return res.status(400).json({ error: "orderId, photographerPhone, clientPhone required." });
     }
     const [staffSnap, orderLike] = await Promise.all([
-      db$1().collection("staff").get(),
+      db$2().collection("staff").get(),
       findOrderLikeDocument(String(orderId))
     ]);
     const refusal2 = refuseQaStaffPhone({
@@ -17136,7 +17702,7 @@ router$5.post("/conversation", requireStaff, async (req, res) => {
       record: orderLike ? { id: orderLike.id, ...orderLike.data() } : { id: String(orderId) }
     });
     if (refusal2) return res.status(refusal2.status).json({ error: refusal2.error });
-    const existing = await db$1().collection("conversations").where("orderId", "==", orderId).where("status", "==", "active").limit(1).get();
+    const existing = await db$2().collection("conversations").where("orderId", "==", orderId).where("status", "==", "active").limit(1).get();
     if (!existing.empty) {
       return res.json({ conversationSid: existing.docs[0].data().conversationSid, existing: true });
     }
@@ -17148,7 +17714,7 @@ router$5.post("/conversation", requireStaff, async (req, res) => {
       { phone: clientPhone, name: clientName2 },
       webhookUrl
     );
-    await db$1().collection("conversations").add({
+    await db$2().collection("conversations").add({
       orderId,
       conversationSid: result.conversationSid,
       photographerPhone: normalisePhone(photographerPhone),
@@ -17172,17 +17738,17 @@ router$5.post("/conversation", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$5.get("/conversations", requireStaff, async (_req, res) => {
+router$6.get("/conversations", requireStaff, async (_req, res) => {
   try {
-    const snapshot = await db$1().collection("conversations").orderBy("createdAt", "desc").limit(50).get();
+    const snapshot = await db$2().collection("conversations").orderBy("createdAt", "desc").limit(50).get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
   } catch (err) {
     return res.status(500).json({ error: "Failed to fetch conversations." });
   }
 });
-router$5.post("/conversation/:id/close", requireStaff, async (req, res) => {
+router$6.post("/conversation/:id/close", requireStaff, async (req, res) => {
   try {
-    const convoDoc = await db$1().collection("conversations").doc(req.params.id).get();
+    const convoDoc = await db$2().collection("conversations").doc(req.params.id).get();
     if (!convoDoc.exists) return res.status(404).json({ error: "Conversation not found." });
     await closeConversation(convoDoc.data().conversationSid);
     await convoDoc.ref.update({ status: "closed", closedAt: admin.firestore.FieldValue.serverTimestamp() });
@@ -17192,7 +17758,7 @@ router$5.post("/conversation/:id/close", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$5.post("/webhook", express_raw_or_json, async (req, res) => {
+router$6.post("/webhook", express_raw_or_json, async (req, res) => {
   try {
     const authToken = process.env.TWILIO_AUTH_TOKEN;
     if (authToken && process.env.NODE_ENV === "production") {
@@ -17214,7 +17780,7 @@ router$5.post("/webhook", express_raw_or_json, async (req, res) => {
     if (!ConversationSid || !Body) {
       return res.status(200).send("OK");
     }
-    const convoSnap = await db$1().collection("conversations").where("conversationSid", "==", ConversationSid).limit(1).get();
+    const convoSnap = await db$2().collection("conversations").where("conversationSid", "==", ConversationSid).limit(1).get();
     const orderId = convoSnap.empty ? null : convoSnap.docs[0].data().orderId;
     const convoData = convoSnap.empty ? null : convoSnap.docs[0].data();
     let senderType = "client";
@@ -17223,7 +17789,7 @@ router$5.post("/webhook", express_raw_or_json, async (req, res) => {
     } else if (Author === "Iconic Images") {
       senderType = "staff";
     }
-    await db$1().collection("smsLogs").add({
+    await db$2().collection("smsLogs").add({
       direction: "inbound",
       conversationSid: ConversationSid,
       messageSid: MessageSid,
@@ -17235,7 +17801,7 @@ router$5.post("/webhook", express_raw_or_json, async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
     if (orderId) {
-      await db$1().collection("messages").add({
+      await db$2().collection("messages").add({
         orderId,
         senderId: Author,
         senderType,
@@ -17253,9 +17819,9 @@ router$5.post("/webhook", express_raw_or_json, async (req, res) => {
     return res.status(200).send("");
   }
 });
-router$5.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
+router$6.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
   try {
-    const campaignDoc = await db$1().collection("campaigns").doc(req.params.id).get();
+    const campaignDoc = await db$2().collection("campaigns").doc(req.params.id).get();
     if (!campaignDoc.exists) return res.status(404).json({ error: "Campaign not found." });
     const campaign = campaignDoc.data();
     if (campaign.status === "sent") return res.status(400).json({ error: "Campaign already sent." });
@@ -17264,7 +17830,7 @@ router$5.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
       console.warn(`[SMS] Suppressed campaign ${req.params.id} — ${clientNotifyBlockReason()}.`);
       return res.status(503).json({ error: "Client notifications are off.", suppressed: true });
     }
-    const clientsSnap = await db$1().collection("clients").where("smsOptIn", "==", true).get();
+    const clientsSnap = await db$2().collection("clients").where("smsOptIn", "==", true).get();
     let clients = clientsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
     if (campaign.audience === "custom" && campaign.audienceIds?.length) {
       clients = clients.filter((c) => campaign.audienceIds.includes(c.id));
@@ -17291,18 +17857,18 @@ router$5.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     console.error("[SMS Campaign] Error:", errorMessage);
-    await db$1().collection("campaigns").doc(req.params.id).update({ status: "draft" }).catch(() => {
+    await db$2().collection("campaigns").doc(req.params.id).update({ status: "draft" }).catch(() => {
     });
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$5.post("/opt-out", async (req, res) => {
+router$6.post("/opt-out", async (req, res) => {
   try {
     const { From, Body } = req.body;
     if (!From) return res.status(200).send("");
     const keyword = (Body || "").trim().toUpperCase();
     if (["STOP", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"].includes(keyword)) {
-      const snap = await db$1().collection("clients").where("phone", "==", From).limit(1).get();
+      const snap = await db$2().collection("clients").where("phone", "==", From).limit(1).get();
       if (!snap.empty) {
         await snap.docs[0].ref.update({ smsOptIn: false });
       }
@@ -17315,8 +17881,8 @@ router$5.post("/opt-out", async (req, res) => {
 function express_raw_or_json(req, _res, next) {
   next();
 }
-const router$4 = Router();
-router$4.post("/", async (req, res) => {
+const router$5 = Router();
+router$5.post("/", async (req, res) => {
   try {
     const { name, email, subject, message, phone } = req.body;
     if (!name || !email || !subject || !message) {
@@ -17357,6 +17923,352 @@ router$4.post("/", async (req, res) => {
     console.error("[Contact] Error:", error);
     res.status(500).json({
       error: "Failed to send message. Please try again later."
+    });
+  }
+});
+const router$4 = Router();
+const SENIOR_LIVING_RATE_WINDOW_MS = 15 * 60 * 1e3;
+const SENIOR_LIVING_RATE_MAX = 5;
+const limiter = createRateLimiter({
+  windowMs: SENIOR_LIVING_RATE_WINDOW_MS,
+  max: SENIOR_LIVING_RATE_MAX
+});
+function appUrl() {
+  return process.env.APP_URL || "https://iconicimagestx.com";
+}
+const db$1 = () => admin.firestore();
+async function nextInvoiceNumber() {
+  const year = (/* @__PURE__ */ new Date()).getFullYear();
+  try {
+    const snapshot = await db$1().collection("invoices").where("invoiceNumber", ">=", `INV-${year}-`).where("invoiceNumber", "<", `INV-${year + 1}`).get();
+    return nextSequentialInvoiceNumber(
+      snapshot.docs.map((entry2) => entry2.data().invoiceNumber),
+      year
+    );
+  } catch (error) {
+    console.error("[SeniorLiving] Invoice number lookup failed:", error);
+    return `INV-${year}-${String(Date.now()).slice(-6)}`;
+  }
+}
+router$4.get("/config", (_req, res) => {
+  res.json({ depositCheckoutLive: seniorDepositCheckoutLive() });
+});
+router$4.post("/order", async (req, res) => {
+  const limit = limiter.check(clientIp(req));
+  if (!limit.allowed) {
+    res.setHeader("Retry-After", String(limit.retryAfterSec));
+    return res.status(429).json({
+      error: `Too many requests. Please wait and try again, or call ${BUSINESS_CONTACT.phoneDisplay}.`
+    });
+  }
+  const parsed = parseSeniorLivingOrder(req.body);
+  if (parsed.ok === false) {
+    if (parsed.honeypot === true) {
+      return res.json({ success: true, message: "Request received." });
+    }
+    return res.status(400).json({ error: parsed.error });
+  }
+  if (!admin.apps.length) {
+    return res.status(503).json({
+      error: `Orders are not available on this server yet. Please call ${BUSINESS_CONTACT.phoneDisplay}.`
+    });
+  }
+  const { value, quote } = parsed;
+  const hostingLabel = seniorLivingHostingLabel(value.hosting) || "";
+  const hostingNote = `${hostingLabel}. ${SENIOR_LIVING_HOSTING_NOTE}`;
+  const checkoutLive = seniorDepositCheckoutLive();
+  const depositCopy = seniorLivingDepositCopy(checkoutLive);
+  const manualDepositNote = checkoutLive ? "" : SENIOR_LIVING_MANUAL_DEPOSIT_NOTE;
+  const lineItems = [
+    ...quote.lines,
+    quote.travelLine,
+    {
+      id: "processing",
+      name: SENIOR_LIVING_PROCESSING_LABEL,
+      qty: 1,
+      unitPrice: quote.processing,
+      price: quote.processing
+    }
+  ];
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const confirmationEmail = clientNotifyLive();
+  try {
+    const requestRef = await db$1().collection("orderRequests").add({
+      clientName: value.name,
+      email: value.email,
+      clientEmail: value.email,
+      phone: value.phone,
+      clientPhone: value.phone,
+      title: value.title,
+      community: value.community,
+      onsiteContact: value.onsiteContact,
+      address: value.address,
+      propertyAddress: value.address,
+      lineItems,
+      services: lineItems,
+      selectedService: "Senior Living",
+      subtotal: quote.serviceSubtotal,
+      processing: quote.processing,
+      total: quote.total,
+      pricing: {
+        subtotal: quote.serviceSubtotal,
+        tax: 0,
+        processing: quote.processing,
+        total: quote.total
+      },
+      travelZone: quote.travel.travelZone,
+      travelMiles: quote.travel.travelMiles,
+      travelFeeCents: quote.travel.travelFeeCents,
+      travelQuoted: quote.travel.travelQuoted,
+      depositRequired: SENIOR_LIVING_DEPOSIT_REQUIRED,
+      depositPercent: SENIOR_LIVING_DEPOSIT_PERCENT,
+      depositAmount: quote.depositAmount,
+      depositPaid: 0,
+      balanceDue: quote.total,
+      scheduledDate: value.scheduledDate,
+      scheduledTime: value.scheduledTime,
+      hosting: value.hosting,
+      hostingLabel,
+      notes: value.notes,
+      vibeNote: [
+        depositCopy,
+        `Deposit required: yes`,
+        `Deposit percent: ${SENIOR_LIVING_DEPOSIT_PERCENT}`,
+        `Deposit due today: ${quote.depositAmount}`,
+        `Balance due after the shoot: ${quote.balanceDue}`,
+        `Processing: ${quote.processing}`,
+        `Tour hosting: ${hostingNote}`,
+        manualDepositNote,
+        value.notes
+      ].filter(Boolean).join("\n"),
+      status: "new",
+      source: SENIOR_LIVING_ORDER_SOURCE,
+      leadSource: "Senior living page",
+      createdAt: now,
+      submittedAt: now,
+      updatedAt: now
+    });
+    const orderRef = await db$1().collection("orders").add({
+      orderRequestId: requestRef.id,
+      clientName: value.name,
+      clientEmail: value.email,
+      clientPhone: value.phone,
+      title: value.title,
+      community: value.community,
+      onsiteContact: value.onsiteContact,
+      address: value.address,
+      lineItems,
+      services: lineItems,
+      selectedService: "Senior Living",
+      subtotal: quote.serviceSubtotal,
+      processing: quote.processing,
+      pricing: {
+        subtotal: quote.serviceSubtotal,
+        tax: 0,
+        processing: quote.processing,
+        total: quote.total
+      },
+      total: quote.total,
+      travelZone: quote.travel.travelZone,
+      travelMiles: quote.travel.travelMiles,
+      travelFeeCents: quote.travel.travelFeeCents,
+      travelQuoted: quote.travel.travelQuoted,
+      depositRequired: SENIOR_LIVING_DEPOSIT_REQUIRED,
+      depositPercent: SENIOR_LIVING_DEPOSIT_PERCENT,
+      depositAmount: quote.depositAmount,
+      depositPaid: 0,
+      balanceDue: quote.total,
+      scheduledDate: value.scheduledDate,
+      scheduledTime: value.scheduledTime,
+      hosting: value.hosting,
+      hostingLabel,
+      notes: value.notes,
+      status: "confirmed",
+      source: SENIOR_LIVING_ORDER_SOURCE,
+      createdAt: now,
+      updatedAt: now
+    });
+    const orderNumber = buildAdminOrderTile({
+      id: orderRef.id,
+      lineItems,
+      selectedService: "Senior Living",
+      clientName: value.name,
+      address: value.address
+    }).orderCode;
+    const invoiceRef = db$1().collection("invoices").doc();
+    const payToken = createPayToken();
+    const invoiceNumber = await nextInvoiceNumber();
+    await invoiceRef.set({
+      orderId: orderRef.id,
+      orderRequestId: requestRef.id,
+      source: SENIOR_LIVING_ORDER_SOURCE,
+      clientName: value.name,
+      clientEmail: value.email,
+      clientPhone: value.phone,
+      address: value.address,
+      lineItems,
+      subtotal: quote.serviceSubtotal,
+      tax: 0,
+      processing: quote.processing,
+      total: quote.total,
+      amountPaid: 0,
+      amountDue: quote.total,
+      depositRequired: SENIOR_LIVING_DEPOSIT_REQUIRED,
+      depositPercent: SENIOR_LIVING_DEPOSIT_PERCENT,
+      depositAmount: quote.depositAmount,
+      depositPaid: 0,
+      status: "draft",
+      paymentProvider: "square",
+      payToken,
+      invoiceNumber,
+      orderNumber,
+      hosting: value.hosting,
+      hostingLabel,
+      notes: value.notes,
+      travelZone: quote.travel.travelZone,
+      travelMiles: quote.travel.travelMiles,
+      travelFeeCents: quote.travel.travelFeeCents,
+      travelQuoted: quote.travel.travelQuoted,
+      createdAt: now,
+      updatedAt: now
+    });
+    await Promise.all([
+      orderRef.update({ invoiceId: invoiceRef.id, orderNumber, updatedAt: now }),
+      requestRef.update({
+        invoiceId: invoiceRef.id,
+        convertedToOrderId: orderRef.id,
+        orderNumber,
+        updatedAt: now
+      })
+    ]);
+    const saved = {
+      id: orderRef.id,
+      orderNumber,
+      clientName: value.name,
+      email: value.email,
+      clientEmail: value.email,
+      phone: value.phone,
+      clientPhone: value.phone,
+      community: value.community,
+      address: value.address,
+      propertyAddress: value.address,
+      title: value.title,
+      onsiteContact: value.onsiteContact,
+      lineItems,
+      services: lineItems,
+      selectedService: "Senior Living",
+      total: quote.total,
+      processing: quote.processing,
+      depositRequired: true,
+      depositPercent: SENIOR_LIVING_DEPOSIT_PERCENT,
+      depositAmount: quote.depositAmount,
+      balanceDue: quote.balanceDue,
+      scheduledDate: value.scheduledDate,
+      scheduledTime: value.scheduledTime,
+      requestedDate: value.scheduledDate,
+      hosting: value.hosting,
+      hostingLabel,
+      source: SENIOR_LIVING_ORDER_SOURCE,
+      leadSource: "Senior living page",
+      notes: value.notes,
+      vibeNote: [
+        `Community: ${value.community}`,
+        `Title: ${value.title}`,
+        `Onsite contact: ${value.onsiteContact}`,
+        `Deposit required: yes`,
+        `Deposit percent: ${SENIOR_LIVING_DEPOSIT_PERCENT}`,
+        `Deposit due today: ${quote.depositAmount}`,
+        `Balance due after the shoot: ${quote.balanceDue}`,
+        `Tour hosting: ${hostingNote}`,
+        manualDepositNote,
+        depositCopy,
+        value.notes
+      ].filter(Boolean).join("\n")
+    };
+    try {
+      await notifyOfficeOfOrder({
+        isNewOrder: true,
+        saved,
+        adminUrl: `${appUrl()}/admin/orders`,
+        env: seniorLivingOfficeEnv()
+      });
+    } catch (error) {
+      console.error("[SeniorLiving] Office notify failed:", error);
+    }
+    if (confirmationEmail) {
+      try {
+        await sendEmail({
+          to: value.email,
+          template: "senior_living_order",
+          audience: "client",
+          subject: `Order ${orderNumber} received`,
+          html: `<p>We received order ${orderNumber}. ${depositCopy}</p>`,
+          variables: { clientName: value.name, orderNumber }
+        });
+      } catch (error) {
+        console.error("[SeniorLiving] Confirmation email failed:", error);
+      }
+    }
+    return res.status(201).json({
+      success: true,
+      orderId: orderRef.id,
+      orderRequestId: requestRef.id,
+      orderNumber,
+      invoiceId: invoiceRef.id,
+      payToken,
+      depositAmount: quote.depositAmount,
+      confirmationEmail
+    });
+  } catch (error) {
+    console.error("[SeniorLiving] Order failed:", error);
+    return res.status(500).json({
+      error: `We could not save that order. Please call ${BUSINESS_CONTACT.phoneDisplay}.`
+    });
+  }
+});
+router$4.post("/", async (req, res) => {
+  const limit = limiter.check(clientIp(req));
+  if (!limit.allowed) {
+    res.setHeader("Retry-After", String(limit.retryAfterSec));
+    return res.status(429).json({
+      error: `Too many requests. Please wait and try again, or call ${BUSINESS_CONTACT.phoneDisplay}.`
+    });
+  }
+  const parsed = parseSeniorLivingRequest(req.body);
+  if (parsed.ok === false) {
+    if (parsed.honeypot === true) {
+      return res.json({ success: true, message: "Request received." });
+    }
+    return res.status(400).json({ error: parsed.error });
+  }
+  if (!admin.apps.length) {
+    return res.status(503).json({
+      error: `Requests are not available on this server yet. Please call ${BUSINESS_CONTACT.phoneDisplay}.`
+    });
+  }
+  try {
+    const draft = seniorLivingOfficeRecord("pending", parsed.value);
+    const { id: _ignoredId, ...stored } = draft;
+    const ref = await admin.firestore().collection(SENIOR_LIVING_REQUESTS).add({
+      ...stored,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    const saved = seniorLivingOfficeRecord(ref.id, parsed.value);
+    try {
+      await notifyOfficeOfOrder({
+        isNewOrder: true,
+        saved,
+        adminUrl: `${appUrl()}/admin/orders`,
+        env: seniorLivingOfficeEnv()
+      });
+    } catch (error) {
+      console.error("[SeniorLiving] Office notify failed:", error);
+    }
+    return res.status(201).json({ success: true, message: "Request received." });
+  } catch (error) {
+    console.error("[SeniorLiving] Request failed:", error);
+    return res.status(500).json({
+      error: `We could not save that request. Please call ${BUSINESS_CONTACT.phoneDisplay}.`
     });
   }
 });
@@ -20344,34 +21256,35 @@ function createServer() {
     res.json({ live: clientNotifyLive() });
   });
   mountOwners(app);
-  app.use("/api/bookings", router$m);
-  app.use("/api/orders", router$l);
-  app.use("/api/galleries", router$k);
-  app.use("/api/payments", router$j);
-  app.use("/api/vsai", router$i);
-  app.use("/api/messages", router$h);
-  app.use("/api/clients", router$g);
+  app.use("/api/bookings", router$n);
+  app.use("/api/orders", router$m);
+  app.use("/api/galleries", router$l);
+  app.use("/api/payments", router$k);
+  app.use("/api/vsai", router$j);
+  app.use("/api/messages", router$i);
+  app.use("/api/clients", router$h);
   app.get("/api/portal/listings/:id", handleGetPublicPortalListing);
-  app.use("/api/staff", router$f);
+  app.use("/api/staff", router$g);
   app.get("/present/:token", (req, res, next) => {
     if (process.env.ICONIC_VITE_DEV === "1") return next();
     return handlePresentationShell(req, res);
   });
   app.use("/api", router$1);
-  app.use("/api/listings", router$e);
+  app.use("/api/listings", router$f);
   app.use("/api", router);
-  app.use("/api/campaigns", router$d);
+  app.use("/api/campaigns", router$e);
+  app.use("/api/marketing", router$d);
   app.use("/api/marketing", router$c);
-  app.use("/api/marketing", router$b);
-  app.use("/api/agents", router$a);
-  app.use("/api/media-jobs", router$9);
-  app.use("/api/studio", router$8);
-  app.use("/api/studio/scratch", router$7);
-  app.use("/api/places", router$6);
-  app.use("/api/sms", router$5);
+  app.use("/api/agents", router$b);
+  app.use("/api/media-jobs", router$a);
+  app.use("/api/studio", router$9);
+  app.use("/api/studio/scratch", router$8);
+  app.use("/api/places", router$7);
+  app.use("/api/sms", router$6);
   app.use("/api/contact", router$2);
   app.use("/api/contact", router$3);
-  app.use("/api/contact", router$4);
+  app.use("/api/contact", router$5);
+  app.use("/api/senior-living", router$4);
   app.use(
     (err, _req, res, _next) => {
       console.error("[Server] Unhandled error:", err);
