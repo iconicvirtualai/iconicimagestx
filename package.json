@@ -26,7 +26,8 @@
     "migrate:invoice-ids": "tsx scripts/migrate-invoice-ids.ts",
     "backfill:video-posters": "tsx scripts/backfill-video-posters.ts",
     "format.fix": "prettier --write .",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "optimize:senior-living": "tsx scripts/optimize-senior-living.ts"
   },
   "dependencies": {
     "dotenv": "^17.2.1",
