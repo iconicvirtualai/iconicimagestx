@@ -11,6 +11,8 @@ import crypto, { randomBytes, randomUUID, createHmac as createHmac$1, timingSafe
 import { createHmac, timingSafeEqual, randomBytes as randomBytes$1, randomUUID as randomUUID$1 } from "node:crypto";
 import Stripe from "stripe";
 import * as XLSX from "xlsx";
+import fs$1 from "node:fs";
+import path$1 from "node:path";
 import os from "os";
 import { lookup } from "node:dns/promises";
 const STAFF_ROLES$1 = ["admin", "coordinator", "photographer", "editor"];
@@ -648,20 +650,20 @@ function addressText(value) {
   if (typeof value === "string") return value.trim();
   if (typeof value !== "object" || Array.isArray(value)) return "";
   const address = value;
-  const formatted = text$h(address.formatted) || text$h(address.label);
+  const formatted = text$j(address.formatted) || text$j(address.label);
   if (formatted) return formatted;
   return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
 }
-function recordAddressText(record) {
-  if (!record || typeof record !== "object") return addressText(record);
-  const row = record;
+function recordAddressText(record2) {
+  if (!record2 || typeof record2 !== "object") return addressText(record2);
+  const row = record2;
   for (const key of RECORD_ADDRESS_KEYS) {
     const label = addressText(row[key]);
     if (label) return label;
   }
   return "";
 }
-function text$h(value) {
+function text$j(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const services = [
@@ -1388,14 +1390,14 @@ function catalogLineName(pkg, qty = 1) {
   return pkg.name;
 }
 function catalogLine(pkg, qty = 1) {
-  const count = qty > 0 ? qty : 1;
+  const count2 = qty > 0 ? qty : 1;
   const unitPrice = roundMoney$8(pkg.price);
   const line = {
     id: pkg.bookingId || pkg.id,
-    name: catalogLineName(pkg, count),
+    name: catalogLineName(pkg, count2),
     unitPrice,
-    qty: count,
-    price: roundMoney$8(unitPrice * count)
+    qty: count2,
+    price: roundMoney$8(unitPrice * count2)
   };
   if (pkg.description) line.description = pkg.description;
   if (pkg.category) line.category = pkg.category;
@@ -1975,14 +1977,14 @@ function storedServiceLocationFields(value) {
     placeId: place.placeId
   };
 }
-function storedRecordPin(record) {
-  if (!record) return null;
+function storedRecordPin(record2) {
+  if (!record2) return null;
   for (const key of ["address", "propertyAddress", "shootLocation"]) {
-    const location = serviceLocationFromInput(record[key]);
+    const location = serviceLocationFromInput(record2[key]);
     if (location?.kind === "picked") return { lat: location.place.lat, lng: location.place.lng };
   }
-  const lat = readCoord$1(record.lat ?? record.latitude, "lat");
-  const lng = readCoord$1(record.lng ?? record.longitude, "lng");
+  const lat = readCoord$1(record2.lat ?? record2.latitude, "lat");
+  const lng = readCoord$1(record2.lng ?? record2.longitude, "lng");
   if (lat != null && lng != null) return { lat, lng };
   return null;
 }
@@ -2116,20 +2118,20 @@ function applyServerTravel(lineItems, address, clientTravelFeeCents) {
     travel
   };
 }
-function travelFromRecord(record) {
-  if (!record || typeof record.travelQuoted !== "boolean") return null;
+function travelFromRecord(record2) {
+  if (!record2 || typeof record2.travelQuoted !== "boolean") return null;
   return {
-    travelZone: finiteOrNull(record.travelZone),
-    travelMiles: finiteOrNull(record.travelMiles),
-    travelFeeCents: finiteOrNull(record.travelFeeCents),
-    travelQuoted: record.travelQuoted
+    travelZone: finiteOrNull(record2.travelZone),
+    travelMiles: finiteOrNull(record2.travelMiles),
+    travelFeeCents: finiteOrNull(record2.travelFeeCents),
+    travelQuoted: record2.travelQuoted
   };
 }
-function travelTextForRecord(record, options) {
-  if (!record) return null;
-  const stored = travelFromRecord(record);
+function travelTextForRecord(record2, options) {
+  if (!record2) return null;
+  const stored = travelFromRecord(record2);
   if (stored) return travelSummaryText(stored, options);
-  const address = record.address ?? record.propertyAddress ?? record.shootLocation ?? record.addressLabel;
+  const address = record2.address ?? record2.propertyAddress ?? record2.shootLocation ?? record2.addressLabel;
   if (address == null || address === "") return null;
   return travelSummaryText(assessTravel(address), options);
 }
@@ -2508,16 +2510,16 @@ const SETTLED$1 = /* @__PURE__ */ new Set(["paid", "comped"]);
 function isGuessableInvoiceId(id) {
   return id.startsWith("listing_") || id.startsWith("ordreq_") || id.startsWith("playtest-");
 }
-function text$g(value) {
+function text$i(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function settled$1(invoice) {
-  return SETTLED$1.has(text$g(invoice?.status).toLowerCase());
+  return SETTLED$1.has(text$i(invoice?.status).toLowerCase());
 }
 function invoicePayLinkFor(invoice, env, extra) {
   if (!invoice || settled$1(invoice)) return null;
-  const id = text$g(invoice.id);
-  const token = text$g(invoice.payToken);
+  const id = text$i(invoice.id);
+  const token = text$i(invoice.payToken);
   if (!id || !token) return null;
   const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
   url.searchParams.set("t", token);
@@ -2528,7 +2530,7 @@ function clientInvoiceUrl(invoice, env, extra) {
   const tokenized = invoicePayLinkFor(invoice, env, extra);
   if (tokenized) return tokenized;
   if (!invoice || settled$1(invoice)) return null;
-  const id = text$g(invoice.id);
+  const id = text$i(invoice.id);
   if (!id || isGuessableInvoiceId(id)) return null;
   const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
   applyQuery(url, extra);
@@ -2537,7 +2539,7 @@ function clientInvoiceUrl(invoice, env, extra) {
 function applyQuery(url, extra) {
   if (!extra) return;
   for (const [key, value] of Object.entries(extra)) {
-    const textValue = text$g(value);
+    const textValue = text$i(value);
     if (textValue && key !== "t") url.searchParams.set(key, textValue);
   }
 }
@@ -2923,8 +2925,8 @@ function lookFromUnknown(value) {
   if (typeof value === "string" || typeof value === "number") return matchPackageLook(String(value));
   if (Array.isArray(value)) return bestLook(value);
   if (value && typeof value === "object") {
-    const record = value;
-    return bestLook(record.id, record.packageId, record.name, record.title, record.label);
+    const record2 = value;
+    return bestLook(record2.id, record2.packageId, record2.name, record2.title, record2.label);
   }
   return null;
 }
@@ -2959,11 +2961,11 @@ function listingCardAddress(data) {
   let city = "";
   let state = "";
   let zip = "";
-  for (const record of records) {
-    if (!street) street = firstText$3(record, ["street", "line1", "addressLine1", "streetAddress"]);
-    if (!city) city = firstText$3(record, ["city"]);
-    if (!state) state = firstText$3(record, ["state"]);
-    if (!zip) zip = firstText$3(record, ["zip", "postalCode"]);
+  for (const record2 of records) {
+    if (!street) street = firstText$3(record2, ["street", "line1", "addressLine1", "streetAddress"]);
+    if (!city) city = firstText$3(record2, ["city"]);
+    if (!state) state = firstText$3(record2, ["state"]);
+    if (!zip) zip = firstText$3(record2, ["zip", "postalCode"]);
   }
   let locality = joinLocality(city, state, zip);
   if (!street || !locality) {
@@ -3039,9 +3041,9 @@ function joinLocality(city, state, zip) {
   return [city, region].filter(Boolean).join(", ");
 }
 function readRaw(data, keys) {
-  for (const record of factRecords(data)) {
+  for (const record2 of factRecords(data)) {
     for (const key of keys) {
-      const value = record[key];
+      const value = record2[key];
       if (value == null || value === "") continue;
       return value;
     }
@@ -3083,9 +3085,9 @@ function poolLabel(value) {
   if (/^\d+(?:\.\d+)?$/.test(text2)) return text2 === "1" || text2 === "1.0" ? "Y" : text2;
   return "";
 }
-function firstText$3(record, keys) {
+function firstText$3(record2, keys) {
   for (const key of keys) {
-    const value = record[key];
+    const value = record2[key];
     if (typeof value === "string" && value.trim()) return value.trim();
   }
   return "";
@@ -3114,12 +3116,12 @@ function calendarDateKey(value, timeZone = CHICAGO) {
   if (typeof value === "number" && Number.isFinite(value)) return instantDateKey(new Date(value), timeZone);
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : instantDateKey(value, timeZone);
   if (typeof value === "object") {
-    const record = value;
-    if (typeof record.toDate === "function") {
-      const date = record.toDate();
+    const record2 = value;
+    if (typeof record2.toDate === "function") {
+      const date = record2.toDate();
       if (date instanceof Date && !Number.isNaN(date.getTime())) return instantDateKey(date, timeZone);
     }
-    const seconds = typeof record.seconds === "number" ? record.seconds : typeof record._seconds === "number" ? record._seconds : null;
+    const seconds = typeof record2.seconds === "number" ? record2.seconds : typeof record2._seconds === "number" ? record2._seconds : null;
     if (seconds == null) return null;
     return instantDateKey(new Date(seconds * 1e3), timeZone);
   }
@@ -3184,8 +3186,8 @@ function listingCoverUrl(images) {
   if (!Array.isArray(images)) return null;
   for (const image of images) {
     if (!image || typeof image !== "object") continue;
-    const record = image;
-    const candidate = typeof record.url === "string" ? record.url : record.thumbnailUrl;
+    const record2 = image;
+    const candidate = typeof record2.url === "string" ? record2.url : record2.thumbnailUrl;
     if (typeof candidate === "string" && /^https?:\/\//i.test(candidate.trim())) return candidate.trim();
   }
   return null;
@@ -3242,7 +3244,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
       createdAt: data.createdAt
     }, now),
     status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
-    clientName: text$f(data.clientName),
+    clientName: text$h(data.clientName),
     address: addressText(data.billToAddress || data.address || data.propertyAddress),
     createdAt,
     issuedOn: formatPortalDate(data.createdAt) || formatPortalDate(data.sentAt) || formatPortalDate(data.paidAt),
@@ -3252,7 +3254,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
     fees: storedAmount(data.fees),
     travel: storedAmount(data.travel),
     promoDiscount: storedAmount(data.promoDiscount),
-    promoCode: text$f(data.promoCode),
+    promoCode: text$h(data.promoCode),
     tax: storedAmount(data.tax),
     total: storedAmount(data.total),
     amountPaid: storedAmount(data.amountPaid),
@@ -3303,16 +3305,16 @@ function storedLines(lineItems, services2) {
   return raw.flatMap((item) => {
     if (typeof item === "string" && item.trim()) return [{ name: item.trim(), qty: null, amount: null }];
     if (!item || typeof item !== "object") return [];
-    const record = item;
-    const named = text$f(record.name) || text$f(record.label);
-    const description = text$f(record.description);
+    const record2 = item;
+    const named = text$h(record2.name) || text$h(record2.label);
+    const description = text$h(record2.description);
     const name = named || description;
-    const qty = storedQty(record.qty ?? record.quantity);
-    const amount = storedAmount(record.price ?? record.amount ?? record.total);
+    const qty = storedQty(record2.qty ?? record2.quantity);
+    const amount = storedAmount(record2.price ?? record2.amount ?? record2.total);
     if (!name && amount == null && qty == null) return [];
     const line = { name: name || "Line item", qty, amount };
-    const id = text$f(record.id);
-    const category = text$f(record.category);
+    const id = text$h(record2.id);
+    const category = text$h(record2.category);
     if (id) line.id = id;
     if (category) line.category = category;
     if (named && description) line.description = description;
@@ -3348,7 +3350,7 @@ function isoStamp(value) {
   if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
   return null;
 }
-function text$f(value) {
+function text$h(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function roundMoney$4(value) {
@@ -3774,12 +3776,12 @@ async function createRequestedAppointment(input) {
     updatedAt: now
   });
 }
-function visibleToPortalClient(record, identity) {
-  if (!record) return false;
-  if (record.clientId && identity.ids.includes(String(record.clientId))) return true;
+function visibleToPortalClient(record2, identity) {
+  if (!record2) return false;
+  if (record2.clientId && identity.ids.includes(String(record2.clientId))) return true;
   const email = normalizeEmail$1(identity.email);
   if (!email) return false;
-  return [record.email, record.clientEmail].some((value) => normalizeEmail$1(value) === email);
+  return [record2.email, record2.clientEmail].some((value) => normalizeEmail$1(value) === email);
 }
 const PORTAL_LISTING_ID$1 = /^[A-Za-z0-9_-]{4,128}$/;
 const NEVER_FILL = /* @__PURE__ */ new Set([
@@ -3816,40 +3818,40 @@ function bookingListingGroups(input) {
   for (const doc of requests) {
     const node = nodeId("orderRequests", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("listings", text$e(doc.data.listingId)));
-    uf.link(node, nodeId("orders", text$e(doc.data.orderId) || text$e(doc.data.convertedToOrderId)));
-    uf.link(node, nodeId("invoices", text$e(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$e(doc.data.galleryId)));
+    uf.link(node, nodeId("listings", text$g(doc.data.listingId)));
+    uf.link(node, nodeId("orders", text$g(doc.data.orderId) || text$g(doc.data.convertedToOrderId)));
+    uf.link(node, nodeId("invoices", text$g(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$g(doc.data.galleryId)));
   }
   for (const doc of orders) {
     const node = nodeId("orders", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$e(doc.data.orderRequestId)));
-    uf.link(node, nodeId("listings", text$e(doc.data.listingId)));
-    uf.link(node, nodeId("invoices", text$e(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$e(doc.data.galleryId)));
+    uf.link(node, nodeId("orderRequests", text$g(doc.data.orderRequestId)));
+    uf.link(node, nodeId("listings", text$g(doc.data.listingId)));
+    uf.link(node, nodeId("invoices", text$g(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$g(doc.data.galleryId)));
   }
   for (const doc of invoices) {
     const node = nodeId("invoices", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$e(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$e(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$e(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$g(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$g(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$g(doc.data.listingId)));
   }
   for (const doc of appointments) {
     const node = nodeId("appointments", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$e(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$e(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$e(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$g(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$g(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$g(doc.data.listingId)));
   }
   for (const doc of galleries) {
     const node = nodeId("galleries", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$e(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$e(doc.data.orderId)));
-    uf.link(node, nodeId("invoices", text$e(doc.data.invoiceId)));
-    uf.link(node, nodeId("listings", text$e(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$g(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$g(doc.data.orderId)));
+    uf.link(node, nodeId("invoices", text$g(doc.data.invoiceId)));
+    uf.link(node, nodeId("listings", text$g(doc.data.listingId)));
   }
   const groups = [];
   for (const nodes of uf.components()) {
@@ -3909,7 +3911,7 @@ function fillEmptyListingFields(existing, desired) {
   return patch;
 }
 function clientOwnsListing(listing, clients) {
-  const clientId2 = text$e(listing.clientId);
+  const clientId2 = text$g(listing.clientId);
   const email = normalizeEmail$1(listing.clientEmail || listing.email);
   if (!clientId2 && !email) return true;
   if (clientId2 && clients.ids.includes(clientId2)) return true;
@@ -3981,10 +3983,10 @@ function chooseListing(group, listings, clients) {
 }
 function listingMatches(doc, group) {
   if (doc.id === group.stableId || group.preferredListingIds.includes(doc.id)) return true;
-  const requestId = text$e(doc.data.orderRequestId);
-  const orderId = text$e(doc.data.orderId);
-  const invoiceId = text$e(doc.data.invoiceId);
-  const appointmentId = text$e(doc.data.appointmentId);
+  const requestId = text$g(doc.data.orderRequestId);
+  const orderId = text$g(doc.data.orderId);
+  const invoiceId = text$g(doc.data.invoiceId);
+  const appointmentId = text$g(doc.data.appointmentId);
   return Boolean(
     requestId && group.orderRequestIds.includes(requestId) || orderId && group.orderIds.includes(orderId) || invoiceId && group.invoiceIds.includes(invoiceId) || appointmentId && group.appointmentIds.includes(appointmentId)
   );
@@ -3994,7 +3996,7 @@ function linksFor(group, listingId, listings, clients) {
   const links = [];
   const push = (collection, docs) => {
     for (const doc of docs) {
-      const current = text$e(doc.data.listingId);
+      const current = text$g(doc.data.listingId);
       if (current === listingId) continue;
       if (current && isPortalListingId(current) && ownedIds.has(current)) continue;
       links.push({ collection, id: doc.id });
@@ -4011,7 +4013,7 @@ function clientsFor(group, identity) {
   const ids = /* @__PURE__ */ new Set();
   const emails = /* @__PURE__ */ new Set();
   const addId = (value) => {
-    const id = text$e(value);
+    const id = text$g(value);
     if (id) ids.add(id);
   };
   const addEmail = (value) => {
@@ -4030,7 +4032,7 @@ function clientsFor(group, identity) {
 function preferredListingIds(group) {
   const ids = [];
   const push = (value) => {
-    const id = text$e(value);
+    const id = text$g(value);
     if (id && isPortalListingId(id) && !ids.includes(id)) ids.push(id);
   };
   for (const doc of [...group.orderRequests, ...group.orders, ...group.invoices, ...group.appointments, ...group.galleries]) {
@@ -4065,9 +4067,9 @@ function bestAddress(group) {
   }
   for (const doc of propertyDocs(group)) {
     for (const key of ["address", "propertyAddress", "shootLocation"]) {
-      if (typeof doc.data[key] === "string" && text$e(doc.data[key])) return text$e(doc.data[key]);
+      if (typeof doc.data[key] === "string" && text$g(doc.data[key])) return text$g(doc.data[key]);
     }
-    if (text$e(doc.data.addressLabel)) return text$e(doc.data.addressLabel);
+    if (text$g(doc.data.addressLabel)) return text$g(doc.data.addressLabel);
   }
   return null;
 }
@@ -4083,7 +4085,7 @@ function firstScheduleDate(group) {
 function firstScheduleTime(group) {
   for (const doc of [...group.appointments, ...group.orders, ...group.orderRequests]) {
     for (const key of ["scheduledTime", "appointmentTime", "apptTime", "requestedTime"]) {
-      const value = text$e(doc.data[key]);
+      const value = text$g(doc.data[key]);
       if (value && !/^tbd$/i.test(value)) return value;
     }
   }
@@ -4100,7 +4102,7 @@ function projectType(group) {
     if (doc.data.projectType === "real_estate") return "real_estate";
     const service = doc.data.selectedService;
     if (service && typeof service === "object") {
-      const category = text$e(service.category);
+      const category = text$g(service.category);
       if (category === "business" || category === "branding") return "business";
       if (category === "listings") return "real_estate";
     }
@@ -4126,7 +4128,7 @@ function namesFrom(value) {
   for (const item of value) {
     if (typeof item === "string" && item.trim()) names.push(item.trim());
     else if (item && typeof item === "object") {
-      const name = text$e(item.name);
+      const name = text$g(item.name);
       if (name) names.push(name);
     }
     if (names.length >= 40) break;
@@ -4136,12 +4138,12 @@ function namesFrom(value) {
 function firstTotal(group) {
   for (const doc of [...group.orders, ...group.invoices, ...group.orderRequests]) {
     if (doc.data.total != null && doc.data.total !== "") {
-      const parsed = money$5(doc.data.total);
+      const parsed = money$6(doc.data.total);
       if (parsed != null) return parsed;
     }
     const pricing = doc.data.pricing;
     if (pricing && typeof pricing === "object") {
-      const parsed = money$5(pricing.total);
+      const parsed = money$6(pricing.total);
       if (pricing.total != null && pricing.total !== "" && parsed != null) return parsed;
     }
   }
@@ -4151,8 +4153,8 @@ function accessInfo(group) {
   return [firstText$2(group, ["accessMethod"]), firstText$2(group, ["lockboxCode"])].filter(Boolean).join(" - ");
 }
 function clientId(group, identity) {
-  const bookingIds = propertyDocs(group).map((doc) => text$e(doc.data.clientId)).filter(Boolean);
-  const identityIds = (identity?.ids || []).map((id) => text$e(id)).filter(Boolean);
+  const bookingIds = propertyDocs(group).map((doc) => text$g(doc.data.clientId)).filter(Boolean);
+  const identityIds = (identity?.ids || []).map((id) => text$g(id)).filter(Boolean);
   return bookingIds.find((id) => identityIds.includes(id)) || bookingIds[0] || identityIds[0] || "";
 }
 function clientEmail(group, identity) {
@@ -4166,8 +4168,8 @@ function clientEmail(group, identity) {
 }
 function clientName$1(group) {
   for (const doc of propertyDocs(group)) {
-    if (text$e(doc.data.clientName)) return text$e(doc.data.clientName);
-    const joined = `${text$e(doc.data.firstName)} ${text$e(doc.data.lastName)}`.trim();
+    if (text$g(doc.data.clientName)) return text$g(doc.data.clientName);
+    const joined = `${text$g(doc.data.firstName)} ${text$g(doc.data.lastName)}`.trim();
     if (joined) return joined;
   }
   return "";
@@ -4175,7 +4177,7 @@ function clientName$1(group) {
 function chosenInvoiceId(group) {
   const known = new Set(group.invoiceIds);
   for (const doc of [...group.orderRequests, ...group.orders]) {
-    const id = text$e(doc.data.invoiceId);
+    const id = text$g(doc.data.invoiceId);
     if (id && known.has(id)) return id;
   }
   return newestDoc(group.invoices)?.id || group.invoiceIds[0] || "";
@@ -4184,7 +4186,7 @@ function chosenId(docs, ids, pointers = [], keys = []) {
   const known = new Set(ids);
   for (const doc of pointers) {
     for (const key of keys) {
-      const id = text$e(doc.data[key]);
+      const id = text$g(doc.data[key]);
       if (id && known.has(id)) return id;
     }
   }
@@ -4196,7 +4198,7 @@ function propertyDocs(group) {
 function firstText$2(group, keys) {
   for (const doc of propertyDocs(group)) {
     for (const key of keys) {
-      const value = text$e(doc.data[key]);
+      const value = text$g(doc.data[key]);
       if (value) return value;
     }
   }
@@ -4246,16 +4248,16 @@ function readCreatedAt(value) {
   if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
   if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
   if (value && typeof value === "object") {
-    const record = value;
-    if (typeof record.toDate === "function") {
+    const record2 = value;
+    if (typeof record2.toDate === "function") {
       try {
-        const date = record.toDate();
+        const date = record2.toDate();
         if (date instanceof Date && !Number.isNaN(date.getTime())) return date.toISOString();
       } catch {
         return null;
       }
     }
-    const seconds = typeof record.seconds === "number" ? record.seconds : typeof record._seconds === "number" ? record._seconds : null;
+    const seconds = typeof record2.seconds === "number" ? record2.seconds : typeof record2._seconds === "number" ? record2._seconds : null;
     if (seconds != null) return new Date(seconds * 1e3).toISOString();
   }
   return null;
@@ -4263,13 +4265,13 @@ function readCreatedAt(value) {
 function hasAddress(value) {
   if (typeof value === "string") return value.trim().length > 0;
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const record = value;
-  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$e(record[key]).length > 0);
+  const record2 = value;
+  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$g(record2[key]).length > 0);
 }
 function statusKey(value) {
   return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
 }
-function money$5(value) {
+function money$6(value) {
   const parsed = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value.replace(/[$,\s]/g, "")) : Number.NaN;
   if (!Number.isFinite(parsed)) return null;
   return Math.round(parsed * 100) / 100;
@@ -4296,14 +4298,14 @@ function isEmpty(value) {
 function isSentinel$1(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$e(value) {
+function text$g(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function cleanDocs(docs) {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
   for (const doc of docs || []) {
-    const id = text$e(doc?.id);
+    const id = text$g(doc?.id);
     if (!id || seen.has(id)) continue;
     seen.add(id);
     out.push({ id, data: doc.data && typeof doc.data === "object" ? doc.data : {} });
@@ -4382,7 +4384,7 @@ async function ensureBookingListingForRequest(orderRequestId) {
     galleries: []
   });
   const identity = {
-    ids: text$d(request.data.clientId) ? [text$d(request.data.clientId)] : [],
+    ids: text$f(request.data.clientId) ? [text$f(request.data.clientId)] : [],
     email: normalizeEmail$1(request.data.clientEmail || request.data.email)
   };
   const plans = await plansFor(bundle, identity);
@@ -4435,7 +4437,7 @@ async function applyBookingListingPlan(plan) {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
       created = true;
-      console.info(`[Listings] Created ${plan.listingId} for booking ${text$d(plan.createFields.orderRequestId) || text$d(plan.createFields.orderId) || text$d(plan.createFields.invoiceId)}`);
+      console.info(`[Listings] Created ${plan.listingId} for booking ${text$f(plan.createFields.orderRequestId) || text$f(plan.createFields.orderId) || text$f(plan.createFields.invoiceId)}`);
     } catch (err) {
       if (!alreadyExists(err)) throw err;
       await fillListing(ref, plan.createFields);
@@ -4464,7 +4466,7 @@ async function linkRecord(collectionName, id, listingId) {
   const ref = db$p().collection(collectionName).doc(id);
   const snap = await ref.get();
   if (!snap.exists) return;
-  if (text$d(snap.data()?.listingId) === listingId) return;
+  if (text$f(snap.data()?.listingId) === listingId) return;
   await ref.update({
     listingId,
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -4478,9 +4480,9 @@ async function loadVisibleSeeds(identity) {
   const keep = (map, docs) => {
     for (const doc of docs) {
       if (!visibleToPortalClient({
-        clientId: text$d(doc.data.clientId),
-        email: text$d(doc.data.email),
-        clientEmail: text$d(doc.data.clientEmail)
+        clientId: text$f(doc.data.clientId),
+        email: text$f(doc.data.email),
+        clientEmail: text$f(doc.data.clientEmail)
       }, identity)) continue;
       if (!map.has(doc.id)) map.set(doc.id, doc);
     }
@@ -4519,36 +4521,36 @@ async function hydrateBundle(seed) {
   const galleries = mapDocs(seed.galleries);
   const requestIds = new Set(requests.keys());
   for (const doc of [...orders.values(), ...invoices.values(), ...appointments.values()]) {
-    const id = text$d(doc.data.orderRequestId);
+    const id = text$f(doc.data.orderRequestId);
     if (id) requestIds.add(id);
   }
   await readMissing("orderRequests", requestIds, requests);
   const orderIds = new Set(orders.keys());
   for (const doc of requests.values()) {
-    const id = text$d(doc.data.convertedToOrderId) || text$d(doc.data.orderId);
+    const id = text$f(doc.data.convertedToOrderId) || text$f(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   for (const doc of [...invoices.values(), ...appointments.values()]) {
-    const id = text$d(doc.data.orderId);
+    const id = text$f(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   await readMissing("orders", orderIds, orders);
   const invoiceIds = new Set(invoices.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$d(doc.data.invoiceId);
+    const id = text$f(doc.data.invoiceId);
     if (id) invoiceIds.add(id);
   }
   await readMissing("invoices", invoiceIds, invoices);
   const legacyIds = /* @__PURE__ */ new Set();
   for (const doc of requests.values()) {
-    for (const id of legacyInvoiceDocIds({ orderRequestId: doc.id, listingId: text$d(doc.data.listingId) })) {
+    for (const id of legacyInvoiceDocIds({ orderRequestId: doc.id, listingId: text$f(doc.data.listingId) })) {
       legacyIds.add(id);
     }
   }
   for (const doc of orders.values()) {
     for (const id of legacyInvoiceDocIds({
-      orderRequestId: text$d(doc.data.orderRequestId),
-      listingId: text$d(doc.data.listingId)
+      orderRequestId: text$f(doc.data.orderRequestId),
+      listingId: text$f(doc.data.listingId)
     })) {
       legacyIds.add(id);
     }
@@ -4561,7 +4563,7 @@ async function hydrateBundle(seed) {
   mergeDocs(appointments, await queryIn("appointments", "orderId", [...orders.keys()]));
   const galleryIds = new Set(galleries.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$d(doc.data.galleryId);
+    const id = text$f(doc.data.galleryId);
     if (id) galleryIds.add(id);
   }
   await readMissing("galleries", galleryIds, galleries);
@@ -4690,7 +4692,7 @@ function alreadyExists(err) {
 function isSentinel(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$d(value) {
+function text$f(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function chunk(items, size) {
@@ -4701,24 +4703,24 @@ function chunk(items, size) {
 function lifeOfTheListingCareSelected(value) {
   return value === true;
 }
-function planOrderPackageRepair(record, catalog) {
-  if (hasPricedServices(record.lineItems) || hasPricedServices(record.services)) return null;
+function planOrderPackageRepair(record2, catalog) {
+  if (hasPricedServices(record2.lineItems) || hasPricedServices(record2.services)) return null;
   const resolved = resolveSubmittedBooking({
-    selectedService: record.selectedService,
-    selectedBasics: record.selectedBasics,
-    selectedAddOns: record.selectedAddOns,
-    premiumUpgrade: record.premiumUpgrade,
-    virtualStagingCredits: record.virtualStagingCredits,
-    specializedPhotography: record.specializedPhotography,
-    promoCode: record.promoCode,
-    lineItems: record.lineItems,
-    total: record.total ?? nestedTotal(record.pricing),
-    pricing: record.pricing,
-    lifeOfTheListingCare: record.lifeOfTheListingCare
+    selectedService: record2.selectedService,
+    selectedBasics: record2.selectedBasics,
+    selectedAddOns: record2.selectedAddOns,
+    premiumUpgrade: record2.premiumUpgrade,
+    virtualStagingCredits: record2.virtualStagingCredits,
+    specializedPhotography: record2.specializedPhotography,
+    promoCode: record2.promoCode,
+    lineItems: record2.lineItems,
+    total: record2.total ?? nestedTotal(record2.pricing),
+    pricing: record2.pricing,
+    lifeOfTheListingCare: record2.lifeOfTheListingCare
   }, catalog);
   const lineItems = resolved.lineItems.filter((item) => item.name.trim());
   if (chargedServiceLines(lineItems).length === 0) return null;
-  warnWhenStoredTotalDiffers(record, lineItems);
+  warnWhenStoredTotalDiffers(record2, lineItems);
   return {
     lineItems,
     services: lineItems
@@ -4736,8 +4738,8 @@ function nestedTotal(pricing) {
   if (!pricing || typeof pricing !== "object") return void 0;
   return pricing.total;
 }
-function warnWhenStoredTotalDiffers(record, lineItems) {
-  const stored = [money$4(record.total), money$4(nestedTotal(record.pricing))].filter((amount) => amount != null);
+function warnWhenStoredTotalDiffers(record2, lineItems) {
+  const stored = [money$5(record2.total), money$5(nestedTotal(record2.pricing))].filter((amount) => amount != null);
   if (stored.length === 0) return;
   const rebuilt = roundMoney$3(sumLineItemPrices(chargedServiceLines(lineItems)));
   const drifted = [...new Set(stored.filter((amount) => Math.abs(amount - rebuilt) > 9e-3))];
@@ -4746,7 +4748,7 @@ function warnWhenStoredTotalDiffers(record, lineItems) {
     `[Bookings] Package repair kept stored total ${drifted.join(" / ")}; catalog lines total ${rebuilt}.`
   );
 }
-function money$4(value) {
+function money$5(value) {
   if (typeof value === "number" && Number.isFinite(value)) return roundMoney$3(value);
   if (typeof value === "string" && value.trim()) {
     const parsed = Number(value.replace(/[$,\s]/g, ""));
@@ -4767,41 +4769,41 @@ const PACKAGE_LABEL_KEYS = [
 function cleanPackageName(raw) {
   return raw.replace(/\s+[—–-]\s+\$[\d,]+(?:\s*\/\s*\w+)?\s*$/i, "").replace(/\s+\$[\d,]+(?:\s*\/\s*\w+)?\s*$/i, "").trim();
 }
-function orderServiceLines(record, linked) {
-  const own = storedServiceLines(record);
+function orderServiceLines(record2, linked) {
+  const own = storedServiceLines(record2);
   if (own.length > 0) return own;
   const fromLink = storedServiceLines(linked);
   if (fromLink.length > 0) return fromLink;
-  const synthesized = synthesizePackageLine(record) || synthesizePackageLine(linked);
+  const synthesized = synthesizePackageLine(record2) || synthesizePackageLine(linked);
   return synthesized ? [synthesized] : [];
 }
-function orderChargeSummary(record, lines) {
+function orderChargeSummary(record2, lines) {
   const lineSubtotal = roundMoney$2(lines.reduce((sum, line) => sum + line.price, 0));
-  const pricing = nested$2(record?.pricing);
-  const tax = moneyOrNull$1(record?.tax) ?? moneyOrNull$1(pricing.tax) ?? 0;
-  const storedTotal = moneyOrNull$1(record?.total) ?? moneyOrNull$1(pricing.total);
+  const pricing = nested$2(record2?.pricing);
+  const tax = moneyOrNull$1(record2?.tax) ?? moneyOrNull$1(pricing.tax) ?? 0;
+  const storedTotal = moneyOrNull$1(record2?.total) ?? moneyOrNull$1(pricing.total);
   const total = storedTotal ?? roundMoney$2(lineSubtotal + tax);
-  const storedSubtotal = moneyOrNull$1(record?.subtotal) ?? moneyOrNull$1(pricing.subtotal);
+  const storedSubtotal = moneyOrNull$1(record2?.subtotal) ?? moneyOrNull$1(pricing.subtotal);
   const subtotal = lineSubtotal > 0 ? lineSubtotal : storedSubtotal && storedSubtotal > 0 ? storedSubtotal : total;
   return { subtotal: roundMoney$2(subtotal), tax: roundMoney$2(tax), total: roundMoney$2(total) };
 }
-function storedServiceLines(record) {
-  if (!record) return [];
-  const raw = Array.isArray(record.lineItems) && record.lineItems.length > 0 ? record.lineItems : record.services;
+function storedServiceLines(record2) {
+  if (!record2) return [];
+  const raw = Array.isArray(record2.lineItems) && record2.lineItems.length > 0 ? record2.lineItems : record2.services;
   return normalizeBookingLineItems(raw).filter((item) => item.name.trim() && !isPromo(item)).map(toOrderLine);
 }
-function synthesizePackageLine(record) {
-  if (!record) return null;
-  const label = packageLabel(record);
+function synthesizePackageLine(record2) {
+  if (!record2) return null;
+  const label = packageLabel(record2);
   if (!label) return null;
-  const pricing = nested$2(record.pricing);
-  const price = moneyOrNull$1(record.total) ?? moneyOrNull$1(pricing.total) ?? moneyOrNull$1(pricing.subtotal) ?? moneyOrNull$1(record.amount) ?? labeledMoney(label);
+  const pricing = nested$2(record2.pricing);
+  const price = moneyOrNull$1(record2.total) ?? moneyOrNull$1(pricing.total) ?? moneyOrNull$1(pricing.subtotal) ?? moneyOrNull$1(record2.amount) ?? labeledMoney(label);
   if (price == null) return null;
   return { name: cleanPackageName(label) || label, qty: 1, price };
 }
-function packageLabel(record) {
+function packageLabel(record2) {
   for (const key of PACKAGE_LABEL_KEYS) {
-    const value = text$c(record[key]);
+    const value = text$e(record2[key]);
     if (value) return value;
   }
   return "";
@@ -4837,7 +4839,7 @@ function moneyOrNull$1(value) {
 function nested$2(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$c(value) {
+function text$e(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function roundMoney$2(value) {
@@ -4856,21 +4858,21 @@ const DELIVERY_LABEL = {
   in_progress: "In progress",
   not_delivered: "Not delivered"
 };
-function buildAdminOrderTile(record) {
-  const lines = orderServiceLines(record);
-  const priced = lines.length > 0 ? { ...record, lineItems: lines, services: lines } : record;
+function buildAdminOrderTile(record2) {
+  const lines = orderServiceLines(record2);
+  const priced = lines.length > 0 ? { ...record2, lineItems: lines, services: lines } : record2;
   const skin2 = resolvePackageSkinFromOrder(priced);
   const kind = orderKind(priced, skin2);
   const studio = kind === "business" ? studioFromRecord(priced) : null;
-  const heroUrl = heroFromRecord(record) || (kind === "business" ? BUSINESS_HERO : LISTING_HERO);
-  const paid = paidState(record);
-  const delivery = deliveryState(record);
+  const heroUrl = heroFromRecord(record2) || (kind === "business" ? BUSINESS_HERO : LISTING_HERO);
+  const paid = paidState(record2);
+  const delivery = deliveryState(record2);
   const named = lines[0] ? cleanPackageName(lines[0].name) : "";
   const packageName = skin2?.title || named || "Custom order";
-  const charges = orderChargeSummary(record, lines);
+  const charges = orderChargeSummary(record2, lines);
   return {
-    id: text$b(record.id) || packageName,
-    orderCode: orderCode(kind, record),
+    id: text$d(record2.id) || packageName,
+    orderCode: orderCode(kind, record2),
     kind,
     typeLabel: kind === "business" ? "Business" : "Listing",
     heroUrl,
@@ -4883,15 +4885,15 @@ function buildAdminOrderTile(record) {
     paidLabel: PAID_LABEL[paid],
     delivery,
     deliveryLabel: DELIVERY_LABEL[delivery],
-    clientName: clientName(record),
-    appointmentDate: appointmentLabel(record),
-    location: locationLabel(kind, record),
+    clientName: clientName(record2),
+    appointmentDate: appointmentLabel(record2),
+    location: locationLabel(kind, record2),
     studio,
     channel: channelFor(skin2, kind)
   };
 }
-function orderKind(record, skin2) {
-  const raw = text$b(record.projectType || record.orderType || record.type).toLowerCase();
+function orderKind(record2, skin2) {
+  const raw = text$d(record2.projectType || record2.orderType || record2.type).toLowerCase();
   if (raw === "business" || raw === "brand" || raw === "social") return "business";
   if (raw === "real_estate" || raw === "listing" || raw === "property") return "listing";
   if (skin2?.category === "listing") return "listing";
@@ -4904,10 +4906,10 @@ function channelFor(skin2, kind) {
   if (skin2?.category === "listing") return "Listings & Spaces";
   return kind === "business" ? "Human Brand" : "Listings & Spaces";
 }
-function orderCode(kind, record) {
-  const explicit = text$b(record.orderCode || record.orderNumber || record.displayId);
+function orderCode(kind, record2) {
+  const explicit = text$d(record2.orderCode || record2.orderNumber || record2.displayId);
   if (explicit) return explicit.toUpperCase();
-  const id = text$b(record.id);
+  const id = text$d(record2.id);
   const prefix = kind === "listing" ? "L" : "B";
   return `ORD - ${prefix} - ${orderCodeTail(id)}`;
 }
@@ -4924,30 +4926,30 @@ function orderCodeTail(id, salt = 0) {
   }
   return String(1e4 + (h >>> 0) % 9e4);
 }
-function heroFromRecord(record) {
-  const explicit = text$b(record.heroUrl) || text$b(record.coverUrl) || text$b(record.coverImage);
+function heroFromRecord(record2) {
+  const explicit = text$d(record2.heroUrl) || text$d(record2.coverUrl) || text$d(record2.coverImage);
   if (explicit) return explicit;
-  const images = record.images;
+  const images = record2.images;
   if (!Array.isArray(images)) return "";
   for (const image of images) {
     if (typeof image === "string" && image.trim()) return image.trim();
     if (image && typeof image === "object") {
-      const url = text$b(image.url) || text$b(image.thumbnailUrl);
+      const url = text$d(image.url) || text$d(image.thumbnailUrl);
       if (url) return url;
     }
   }
   return "";
 }
-function clientName(record) {
-  const named = text$b(record.clientName) || text$b(record.customerName) || text$b(record.agentName) || [text$b(record.firstName), text$b(record.lastName)].filter(Boolean).join(" ");
+function clientName(record2) {
+  const named = text$d(record2.clientName) || text$d(record2.customerName) || text$d(record2.agentName) || [text$d(record2.firstName), text$d(record2.lastName)].filter(Boolean).join(" ");
   return named || "—";
 }
-function appointmentLabel(record) {
-  const raw = record.appointmentDate ?? record.apptDate ?? record.scheduledDate ?? record.requestedDate;
+function appointmentLabel(record2) {
+  const raw = record2.appointmentDate ?? record2.apptDate ?? record2.scheduledDate ?? record2.requestedDate;
   const key = calendarDateKey(raw);
   const date = formatShootDateLabel(key, typeof raw === "string" ? raw : void 0);
-  const time = text$b(record.scheduledTime || record.appointmentTime || record.requestedTime);
-  const photographer = text$b(record.assignedPhotographerName || record.photographerName || record.photographerPreference);
+  const time = text$d(record2.scheduledTime || record2.appointmentTime || record2.requestedTime);
+  const photographer = text$d(record2.assignedPhotographerName || record2.photographerName || record2.photographerPreference);
   return [date, time, photographer].filter(Boolean).join(" · ") || "—";
 }
 function tilePrice(amount) {
@@ -4955,8 +4957,8 @@ function tilePrice(amount) {
   if (Number.isInteger(rounded)) return `$${rounded.toLocaleString("en-US")}`;
   return `$${rounded.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
-function locationLabel(kind, record) {
-  const raw = addressText(record.address || record.propertyAddress || record.shootLocation || record.location);
+function locationLabel(kind, record2) {
+  const raw = addressText(record2.address || record2.propertyAddress || record2.shootLocation || record2.location);
   if (kind === "business" && isBrandSession(raw)) return BRAND_SESSION_LOCATION;
   return raw || "—";
 }
@@ -4965,10 +4967,10 @@ function isBrandSession(value) {
   if (!key || key === "—" || key === "-" || key === "n/a" || key === "na") return true;
   return /brand session/.test(key);
 }
-function studioFromRecord(record) {
-  const explicit = record.studio ?? record.studioId ?? record.room ?? record.shootStudio;
+function studioFromRecord(record2) {
+  const explicit = record2.studio ?? record2.studioId ?? record2.room ?? record2.shootStudio;
   if (explicit != null && String(explicit).trim()) return resolveAdminStudio(explicit);
-  const blob = `${JSON.stringify(record.serviceIds || "")} ${JSON.stringify(record.services || "")}`.toLowerCase();
+  const blob = `${JSON.stringify(record2.serviceIds || "")} ${JSON.stringify(record2.services || "")}`.toLowerCase();
   if (/studio-blanc|studio blanc/.test(blob)) return "studio-blanc";
   if (/studio-noir|studio noir/.test(blob)) return "studio-noir";
   if (/podcast/.test(blob)) return "podcast-studio";
@@ -4982,22 +4984,22 @@ function resolveAdminStudio(value) {
   if (/off\s*site|on location/.test(textValue)) return "offsite";
   return "offsite";
 }
-function paidState(record) {
-  const invoice = nested$1(record.invoice);
-  const explicit = [record.paymentStatus, record.invoiceStatus, invoice.status].map((value) => normalize(value)).join(" ");
-  if (/\bpartial\b/.test(explicit) || normalize(record.status) === "partial") return "partial";
-  const total = money$3(invoice.total ?? record.total ?? record.amount);
-  const paid = money$3(invoice.amountPaid ?? record.amountPaid);
+function paidState(record2) {
+  const invoice = nested$1(record2.invoice);
+  const explicit = [record2.paymentStatus, record2.invoiceStatus, invoice.status].map((value) => normalize(value)).join(" ");
+  if (/\bpartial\b/.test(explicit) || normalize(record2.status) === "partial") return "partial";
+  const total = money$4(invoice.total ?? record2.total ?? record2.amount);
+  const paid = money$4(invoice.amountPaid ?? record2.amountPaid);
   if (paid > 0 && total > 0 && paid + 9e-3 < total) return "partial";
-  if (/\bpaid\b/.test(explicit) || record.paidAt || paid > 0 && (total === 0 || paid >= total)) return "paid";
-  const status2 = normalize(record.status);
+  if (/\bpaid\b/.test(explicit) || record2.paidAt || paid > 0 && (total === 0 || paid >= total)) return "paid";
+  const status2 = normalize(record2.status);
   if (status2 === "paid" || status2 === "delivered_paid") return "paid";
   return "unpaid";
 }
-function deliveryState(record) {
-  const status2 = normalize(record.status);
-  const delivery = normalize(record.deliveryStatus || record.galleryStatus);
-  if (record.deliveredAt || status2.includes("delivered") || delivery === "delivered") return "delivered";
+function deliveryState(record2) {
+  const status2 = normalize(record2.status);
+  const delivery = normalize(record2.deliveryStatus || record2.galleryStatus);
+  if (record2.deliveredAt || status2.includes("delivered") || delivery === "delivered") return "delivered";
   if (status2 === "in_progress" || status2 === "pending" || status2 === "pending_edit" || status2 === "in_review" || status2 === "editing" || status2 === "scheduled" || status2 === "confirmed" || status2 === "appt_scheduled" || status2 === "consult_scheduled" || delivery === "pending" || delivery === "undelivered" || delivery === "in_progress" || delivery === "ready_for_review") return "in_progress";
   return "not_delivered";
 }
@@ -5007,7 +5009,7 @@ function nested$1(value) {
 function normalize(value) {
   return String(value ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
 }
-function money$3(value) {
+function money$4(value) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.trim()) {
     const parsed = Number(value.replace(/[$,\s]/g, ""));
@@ -5015,7 +5017,7 @@ function money$3(value) {
   }
   return 0;
 }
-function text$b(value) {
+function text$d(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const NOT_PROVIDED = "Not provided";
@@ -5036,7 +5038,7 @@ function officeNewOrderEmail(saved, options) {
   const notes = notesOf(saved);
   const fields = [
     ["Order number", orderNumber],
-    ["Admin link", text$a(options?.adminUrl) || NOT_PROVIDED],
+    ["Admin link", text$c(options?.adminUrl) || NOT_PROVIDED],
     ["Client name", clientName2],
     ["Client email", firstText$1(saved, ["clientEmail", "email"])],
     ["Client phone", firstText$1(saved, ["clientPhone", "phone"])],
@@ -5073,7 +5075,7 @@ function officeNewOrderEmail(saved, options) {
   const subjectCore = `New order ${orderNumber} — ${packageName} — ${address} — ${requestedDate}`;
   const subject = isTestOrder(clientName2, notes) ? `[TEST] ${subjectCore}` : subjectCore;
   const plain = fields.map(([label, value]) => `${label}: ${value}`).join("\n");
-  const html = `<div style="font-family:Arial,sans-serif;max-width:640px;color:#111"><h1 style="font-size:18px">${escapeHtml$4(subject)}</h1><table style="width:100%;border-collapse:collapse">${fields.map(([label, value]) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:bold;vertical-align:top">${escapeHtml$4(label)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:pre-wrap">${escapeHtml$4(value)}</td></tr>`).join("")}</table></div>`;
+  const html = `<div style="font-family:Arial,sans-serif;max-width:640px;color:#111"><h1 style="font-size:18px">${escapeHtml$5(subject)}</h1><table style="width:100%;border-collapse:collapse">${fields.map(([label, value]) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:bold;vertical-align:top">${escapeHtml$5(label)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:pre-wrap">${escapeHtml$5(value)}</td></tr>`).join("")}</table></div>`;
   return { subject, text: plain, html, orderNumber, packageName };
 }
 function isTestOrder(clientName2, notes) {
@@ -5082,19 +5084,19 @@ ${notes}`.toUpperCase().includes("TEST ORDER");
 }
 function orderNumberOf(saved) {
   for (const key of ["orderNumber", "orderCode", "displayId"]) {
-    const value = text$a(saved[key]);
+    const value = text$c(saved[key]);
     if (value && value !== NOT_PROVIDED) return value;
   }
-  if (!text$a(saved.id)) return NOT_PROVIDED;
+  if (!text$c(saved.id)) return NOT_PROVIDED;
   return buildAdminOrderTile(saved).orderCode;
 }
 function explicitPackageName(saved) {
   for (const key of ["packageName", "serviceName"]) {
-    const value = text$a(saved[key]);
+    const value = text$c(saved[key]);
     if (value && value !== NOT_PROVIDED) return cleanPackageName(value) || value;
   }
-  const selected = text$a(saved.selectedService);
-  if (text$a(saved.id) || selected) {
+  const selected = text$c(saved.selectedService);
+  if (text$c(saved.id) || selected) {
     const tileName = buildAdminOrderTile(saved).packageName;
     if (tileName && tileName !== "Custom order") return tileName;
   }
@@ -5104,7 +5106,7 @@ function explicitPackageName(saved) {
 function clientNameOf(saved) {
   const named = firstText$1(saved, ["clientName", "customerName"]);
   if (named) return named;
-  const joined = [text$a(saved.firstName), text$a(saved.lastName)].filter(Boolean).join(" ");
+  const joined = [text$c(saved.firstName), text$c(saved.lastName)].filter(Boolean).join(" ");
   return joined || NOT_PROVIDED;
 }
 function agentContactOf(saved) {
@@ -5121,8 +5123,8 @@ function agentField(saved, keys, nestedKey) {
   const direct = firstText$1(saved, keys);
   if (direct !== NOT_PROVIDED) return direct;
   for (const holder of [saved.agent, saved.listingAgent, saved.realtor]) {
-    const record = nested(holder);
-    const value = text$a(record[nestedKey]);
+    const record2 = nested(holder);
+    const value = text$c(record2[nestedKey]);
     if (value) return value;
   }
   return "";
@@ -5131,7 +5133,7 @@ function digits(value) {
   return value === NOT_PROVIDED ? "" : value.replace(/\D/g, "");
 }
 function notesOf(saved) {
-  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$a(saved[key])).filter(Boolean);
+  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$c(saved[key])).filter(Boolean);
   return parts.length ? parts.join("\n") : NOT_PROVIDED;
 }
 function lockboxOf(saved) {
@@ -5139,12 +5141,12 @@ function lockboxOf(saved) {
   return code || NOT_PROVIDED;
 }
 function occupancyOf(saved) {
-  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$a(saved[key])).filter(Boolean);
+  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$c(saved[key])).filter(Boolean);
   return parts.length ? parts.join(", ") : NOT_PROVIDED;
 }
 function bookedVia(saved) {
-  const lead = text$a(saved.leadSource);
-  const source = text$a(saved.source);
+  const lead = text$c(saved.leadSource);
+  const source = text$c(saved.source);
   const blob = `${lead} ${source}`.toLowerCase();
   if (!blob.trim()) return NOT_PROVIDED;
   if (/admin/.test(blob)) return "Admin";
@@ -5154,7 +5156,7 @@ function bookedVia(saved) {
 }
 function paymentOf(saved, total) {
   const invoice = nested(saved.invoice);
-  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$a(value).toLowerCase()).find(Boolean) || "";
+  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$c(value).toLowerCase()).find(Boolean) || "";
   if (/partial/.test(explicit)) return "Partial";
   if (/\bpaid\b/.test(explicit) && !/unpaid/.test(explicit)) return "Paid";
   if (/unpaid/.test(explicit)) return "Unpaid";
@@ -5199,9 +5201,9 @@ function isAddOn(line, catalog) {
   const match = catalog.find((item) => item.id === line.id || item.bookingId === line.id);
   return match?.bookingKind === "addon" || match?.bookingKind === "upgrade";
 }
-function firstText$1(record, keys) {
+function firstText$1(record2, keys) {
   for (const key of keys) {
-    const value = record[key];
+    const value = record2[key];
     if (Array.isArray(value)) {
       const joined = value.map((entry2) => displayScalar(entry2)).filter((entry2) => entry2 && entry2 !== NOT_PROVIDED).join(", ");
       if (joined) return joined;
@@ -5212,9 +5214,9 @@ function firstText$1(record, keys) {
   }
   return NOT_PROVIDED;
 }
-function firstDate(record, keys) {
+function firstDate(record2, keys) {
   for (const key of keys) {
-    const value = record[key];
+    const value = record2[key];
     const values = Array.isArray(value) ? value : [value];
     for (const entry2 of values) {
       const formatted = formatChicagoDate(entry2);
@@ -5225,9 +5227,9 @@ function firstDate(record, keys) {
 }
 function addressPart(value, keys) {
   if (!value || typeof value !== "object") return NOT_PROVIDED;
-  const record = value;
+  const record2 = value;
   for (const key of keys) {
-    const shown = displayScalar(record[key]);
+    const shown = displayScalar(record2[key]);
     if (shown !== NOT_PROVIDED) return shown;
   }
   return NOT_PROVIDED;
@@ -5237,12 +5239,12 @@ function displayScalar(value) {
   if (typeof value === "number" && Number.isFinite(value)) return String(value);
   if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
   if (value && typeof value === "object") {
-    const record = value;
-    if (typeof record.toDate === "function") {
-      const date = record.toDate();
+    const record2 = value;
+    if (typeof record2.toDate === "function") {
+      const date = record2.toDate();
       if (date instanceof Date && !Number.isNaN(date.getTime())) return date.toISOString().slice(0, 10);
     }
-    const seconds = typeof record.seconds === "number" ? record.seconds : typeof record._seconds === "number" ? record._seconds : null;
+    const seconds = typeof record2.seconds === "number" ? record2.seconds : typeof record2._seconds === "number" ? record2._seconds : null;
     if (seconds != null) return new Date(seconds * 1e3).toISOString().slice(0, 10);
   }
   return NOT_PROVIDED;
@@ -5261,10 +5263,10 @@ function moneyOrNull(value) {
 function nested(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$a(value) {
+function text$c(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function escapeHtml$4(value) {
+function escapeHtml$5(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 const OFFICE_NEW_ORDER_EMAIL_TEMPLATE = "office_new_order";
@@ -5321,23 +5323,23 @@ function formatOrderNumber(n) {
 const DELIVERY_QA_CLIENT_EMAIL = "ops+deliveryqa@iconicimagestx.com";
 const DELIVERY_QA_CLIENT_ID = "playtest-delivery-qa-client";
 const DELIVERY_QA_GALLERY_ID = "playtest-delivery-qa-gallery";
-function isDeliveryQaClient(record) {
-  if (!record) return false;
-  if (record.playtest === true) return true;
-  return record.linkedClientId === DELIVERY_QA_CLIENT_ID && exactQaEmail(record.email);
+function isDeliveryQaClient(record2) {
+  if (!record2) return false;
+  if (record2.playtest === true) return true;
+  return record2.linkedClientId === DELIVERY_QA_CLIENT_ID && exactQaEmail(record2.email);
 }
-function isPlaytestDeliveryQaGallery(record) {
-  return !!record && record.id === DELIVERY_QA_GALLERY_ID && record.playtest === true;
+function isPlaytestDeliveryQaGallery(record2) {
+  return !!record2 && record2.id === DELIVERY_QA_GALLERY_ID && record2.playtest === true;
 }
 function exactQaEmail(value) {
   return mailboxAddress(typeof value === "string" ? value : "") === DELIVERY_QA_CLIENT_EMAIL;
 }
 const SETTLED = /* @__PURE__ */ new Set(["paid", "comped"]);
-function text$9(value) {
+function text$b(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function status(value) {
-  return text$9(value).toLowerCase();
+  return text$b(value).toLowerCase();
 }
 function settled(value) {
   return SETTLED.has(status(value));
@@ -5345,12 +5347,12 @@ function settled(value) {
 function isPlaytestDoc(doc) {
   if (!doc) return false;
   if (doc.playtest === true) return true;
-  return text$9(doc.id).toLowerCase().startsWith("playtest-");
+  return text$b(doc.id).toLowerCase().startsWith("playtest-");
 }
 function nestedInvoiceStatus(listing) {
   const nested2 = listing?.invoice;
   if (!nested2 || typeof nested2 !== "object") return "";
-  return text$9(nested2.status);
+  return text$b(nested2.status);
 }
 function releaseFlags(subject) {
   const listing = subject.listing;
@@ -5387,20 +5389,20 @@ function isQaStaff(staff) {
   if (!staff) return false;
   return staff.qaOnly === true || staff.playtest === true;
 }
-function recordAllowsQaStaff(record) {
-  if (!record) return false;
-  if (isPlaytestDoc(record)) return true;
-  if (isDeliveryQaClient(record)) return true;
+function recordAllowsQaStaff(record2) {
+  if (!record2) return false;
+  if (isPlaytestDoc(record2)) return true;
+  if (isDeliveryQaClient(record2)) return true;
   if (isDeliveryQaClient({
-    playtest: record.playtest,
-    linkedClientId: record.linkedClientId ?? record.clientId,
-    email: record.email ?? record.clientEmail
+    playtest: record2.playtest,
+    linkedClientId: record2.linkedClientId ?? record2.clientId,
+    email: record2.email ?? record2.clientEmail
   })) return true;
-  if (record.client && isDeliveryQaClient(record.client)) return true;
+  if (record2.client && isDeliveryQaClient(record2.client)) return true;
   return false;
 }
-function qaStaffAssignmentError(staff, record) {
-  if (recordAllowsQaStaff(record)) return null;
+function qaStaffAssignmentError(staff, record2) {
+  if (recordAllowsQaStaff(record2)) return null;
   const people = Array.isArray(staff) ? staff : [];
   return people.some((person) => isQaStaff(person)) ? QA_STAFF_ASSIGN_ERROR : null;
 }
@@ -5457,7 +5459,7 @@ function toDate$1(value) {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
-function money$2(value) {
+function money$3(value) {
   return orderTotalLabel(value);
 }
 async function loadBookingCatalog() {
@@ -5700,7 +5702,7 @@ router$o.post("/", async (req, res) => {
       variables: {
         clientName: clientName2,
         address: displayAddress,
-        total: money$2(total),
+        total: money$3(total),
         requestId: docRef.id,
         scheduledDate: bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
         scheduledTime: scheduledTime || "",
@@ -5723,7 +5725,7 @@ router$o.post("/", async (req, res) => {
           firstName,
           bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
           displayAddress,
-          money$2(total)
+          money$3(total)
         )
       }).then((result) => "suppressed" in result && result.suppressed ? "failed" : "sent").catch((err) => {
         console.error("[Bookings] Confirmation SMS failed:", err);
@@ -6563,36 +6565,36 @@ const VIDEO_FILE = /\.(mp4|m4v|mov|webm)(\?|#|$)/i;
 const BLOCKED_EXT = /\.(zip|pdf|dng|cr2|cr3|nef|nrw|arw|srf|sr2|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic|heif|mp4|m4v|mov|webm)(\?|#|$)/i;
 const FILE_KEYS = ["downloadUrl", "fileUrl", "originalUrl", "fullResUrl", "mlsUrl", "zipUrl", "printUrl", "reelUrl", "mp4Url", "rawUrl", "src"];
 const DISPLAY_KEYS = ["previewUrl", "displayUrl", "webUrl", "thumbnailUrl"];
-function text$8(value) {
+function text$a(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function rowOf$2(item) {
   return item && typeof item === "object" ? item : null;
 }
 function shareableUrl$1(value) {
-  const url = text$8(value);
+  const url = text$a(value);
   if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
   if (url.startsWith("/")) return url;
   if (url.startsWith("https://") || url.startsWith("http://")) return url;
   return "";
 }
 function mediaName$1(row, fallback) {
-  return text$8(row.name) || text$8(row.fileName) || text$8(row.title) || fallback;
+  return text$a(row.name) || text$a(row.fileName) || text$a(row.title) || fallback;
 }
 function labelOf(row) {
-  return `${text$8(row.fileName)} ${text$8(row.name)} ${text$8(row.title)} ${text$8(row.path)} ${text$8(row.storagePath)}`.toLowerCase();
+  return `${text$a(row.fileName)} ${text$a(row.name)} ${text$a(row.title)} ${text$a(row.path)} ${text$a(row.storagePath)}`.toLowerCase();
 }
 function isMls(row) {
-  const category = text$8(row.category).toLowerCase();
-  const type = text$8(row.type).toLowerCase();
+  const category = text$a(row.category).toLowerCase();
+  const type = text$a(row.type).toLowerCase();
   if (category === "mls" || type === "mls") return true;
   const label = labelOf(row);
   if (/(^|[^a-z0-9])mls([^a-z0-9]|$)/.test(label)) return true;
   return /\/mls\//.test(label);
 }
 function isFullRes(row) {
-  const category = text$8(row.category).toLowerCase();
-  const type = text$8(row.type).toLowerCase();
+  const category = text$a(row.category).toLowerCase();
+  const type = text$a(row.type).toLowerCase();
   if (category === "full-res" || category === "fullres" || type === "full-res" || type === "fullres") return true;
   const label = labelOf(row);
   if (/(^|[^a-z0-9])full[\s_-]?res([^a-z0-9]|$)/.test(label)) return true;
@@ -6601,7 +6603,7 @@ function isFullRes(row) {
 function isRasterUrl(url, row) {
   if (!url || BLOCKED_EXT.test(url.split("#")[0]) || VIDEO_FILE.test(url.split("#")[0])) return false;
   if (RASTER.test(url.split("#")[0])) return true;
-  const content = text$8(row.contentType).toLowerCase();
+  const content = text$a(row.contentType).toLowerCase();
   return /^image\/(jpeg|jpg|png|webp|gif)/.test(content);
 }
 function blockedFileUrls(row, includeOwnUrl) {
@@ -6630,11 +6632,11 @@ function separateDisplay(row) {
 }
 function rasterShareSource(row, legacyDropTagged = false) {
   if (legacyDropTagged && isMls(row)) return "";
-  const type = text$8(row.type).toLowerCase();
+  const type = text$a(row.type).toLowerCase();
   if (type === "video" || type === "reel" || type === "file" || type === "matterport") return "";
-  const content = text$8(row.contentType).toLowerCase();
+  const content = text$a(row.contentType).toLowerCase();
   if (content.startsWith("video/") || content === "application/pdf" || content === "application/zip") return "";
-  const path2 = `${text$8(row.path)} ${text$8(row.storagePath)}`.toLowerCase();
+  const path2 = `${text$a(row.path)} ${text$a(row.storagePath)}`.toLowerCase();
   if (/\/(raw|downloads?|print|zips?)\//.test(path2)) return "";
   const display = separateDisplay(row);
   if (legacyDropTagged && isFullRes(row)) return display;
@@ -6664,11 +6666,11 @@ function videoFileUrl(row) {
 function videoPlaceholderSource(row) {
   if (rasterPoster(row)) return "";
   const file = videoFileUrl(row);
-  const type = text$8(row.type).toLowerCase();
-  const content = text$8(row.contentType).toLowerCase();
+  const type = text$a(row.type).toLowerCase();
+  const content = text$a(row.contentType).toLowerCase();
   const named = type === "video" || type === "reel" || content.startsWith("video/");
   if (!file && !named) return "";
-  const id = text$8(row.id) || file || text$8(row.path) || text$8(row.storagePath) || text$8(row.name) || text$8(row.fileName);
+  const id = text$a(row.id) || file || text$a(row.path) || text$a(row.storagePath) || text$a(row.name) || text$a(row.fileName);
   if (!id) return "";
   return `${VIDEO_PLACEHOLDER_PREFIX}${encodeURIComponent(id)}`;
 }
@@ -6728,8 +6730,8 @@ function listingOwnerDisplayItems(listing) {
   return items;
 }
 function isGalleryFloor(row) {
-  const type = text$8(row.type).toLowerCase();
-  const category = text$8(row.category).toLowerCase();
+  const type = text$a(row.type).toLowerCase();
+  const category = text$a(row.category).toLowerCase();
   return type === "floorplan" || type === "floor-plan" || category === "floorplan" || category === "floor-plan";
 }
 function galleryOwnerDisplayItems(media) {
@@ -6737,7 +6739,7 @@ function galleryOwnerDisplayItems(media) {
   const seen = /* @__PURE__ */ new Set();
   const rows = media.map(rowOf$2).filter((row) => Boolean(row));
   for (const row of rows) {
-    const type = text$8(row.type).toLowerCase();
+    const type = text$a(row.type).toLowerCase();
     if (type === "video" || type === "reel" || type === "matterport" || type === "tour" || type === "file" || type === "pdf") continue;
     const source = rasterShareSource(row);
     if (!source) continue;
@@ -6745,7 +6747,7 @@ function galleryOwnerDisplayItems(media) {
     pushDisplay(items, seen, mediaName$1(row, floor ? "Floor plan" : "Photo"), source, floor ? "floorPlan" : "image");
   }
   for (const row of rows) {
-    const type = text$8(row.type).toLowerCase();
+    const type = text$a(row.type).toLowerCase();
     if (type !== "video" && type !== "reel") continue;
     const poster = rasterPoster(row) || videoPlaceholderSource(row);
     pushDisplay(items, seen, mediaName$1(row, "Video"), poster, "poster");
@@ -6762,24 +6764,24 @@ function posterIndex(row, items) {
   return items.findIndex((item) => item.sourceUrl === poster);
 }
 function isUnbranded(row) {
-  const category = text$8(row.category).toLowerCase();
-  const type = text$8(row.type).toLowerCase();
+  const category = text$a(row.category).toLowerCase();
+  const type = text$a(row.type).toLowerCase();
   if (category === "unbranded" || type === "unbranded") return true;
-  const name = `${text$8(row.name)} ${text$8(row.fileName)} ${text$8(row.title)}`.toLowerCase();
+  const name = `${text$a(row.name)} ${text$a(row.fileName)} ${text$a(row.title)}`.toLowerCase();
   return name.includes("unbranded");
 }
 function isBrandedPlayback(row) {
   if (isMls(row) || isUnbranded(row)) return false;
-  const category = text$8(row.category).toLowerCase();
-  const type = text$8(row.type).toLowerCase();
+  const category = text$a(row.category).toLowerCase();
+  const type = text$a(row.type).toLowerCase();
   if (category === "branded" || type === "branded") return true;
-  const name = `${text$8(row.name)} ${text$8(row.fileName)} ${text$8(row.title)}`.toLowerCase();
+  const name = `${text$a(row.name)} ${text$a(row.fileName)} ${text$a(row.title)}`.toLowerCase();
   return /(^|[^a-z])branded([^a-z]|$)/.test(name);
 }
 function isReelPlayback(row) {
   if (isMls(row) || isUnbranded(row)) return false;
-  const category = text$8(row.category).toLowerCase();
-  const type = text$8(row.type).toLowerCase();
+  const category = text$a(row.category).toLowerCase();
+  const type = text$a(row.type).toLowerCase();
   return category === "reel" || type === "reel";
 }
 function deliveredVideoUrl(row) {
@@ -7087,15 +7089,15 @@ function statusOf(doc) {
 function isReleased(doc) {
   return RELEASED_GALLERY_STATUSES.includes(statusOf(doc));
 }
-function text$7(value) {
+function text$9(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function httpUrl(value) {
-  const url = text$7(value);
+  const url = text$9(value);
   return url.startsWith("https://") || url.startsWith("http://") ? url : "";
 }
 function shareableUrl(value) {
-  const url = text$7(value);
+  const url = text$9(value);
   if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
   if (url.startsWith("/")) return url;
   return httpUrl(url);
@@ -7137,7 +7139,7 @@ function isPrivateMedia(path2, name, url) {
   return PRIVATE_FILE.test(name) || PRIVATE_FILE.test(url);
 }
 function mediaName(row, fallback) {
-  return text$7(row.name) || text$7(row.fileName) || text$7(row.title) || fallback;
+  return text$9(row.name) || text$9(row.fileName) || text$9(row.title) || fallback;
 }
 function publicImages(listing) {
   if (!Array.isArray(listing.images)) return [];
@@ -7159,7 +7161,7 @@ function publicVideos(listing) {
     if (!row) continue;
     const url = httpUrl(row.url);
     const name = mediaName(row, "Video");
-    if (!url || isPrivateMedia(text$7(row.path) || text$7(row.storagePath), name, url)) continue;
+    if (!url || isPrivateMedia(text$9(row.path) || text$9(row.storagePath), name, url)) continue;
     videos.push({ url, name });
   }
   return videos.slice(0, 40);
@@ -7172,10 +7174,10 @@ function publicTour(listing) {
   return "";
 }
 function agentNameOf$1(listing) {
-  const direct = text$7(listing.agentName) || text$7(listing.listingAgent);
+  const direct = text$9(listing.agentName) || text$9(listing.listingAgent);
   if (direct) return direct;
   const agent = listing.agent;
-  if (agent && typeof agent === "object") return text$7(agent.name);
+  if (agent && typeof agent === "object") return text$9(agent.name);
   if (typeof agent === "string") return agent.trim();
   return "";
 }
@@ -7189,7 +7191,7 @@ function publicFloorPlans(listing) {
       if (!row) continue;
       const url = httpUrl(row.url) || httpUrl(row.shareUrl);
       const name = mediaName(row, "Floor plan");
-      const path2 = text$7(row.path) || text$7(row.storagePath);
+      const path2 = text$9(row.path) || text$9(row.storagePath);
       if (!url || isPrivateMedia(path2, name, url)) continue;
       plans.push({ url, name });
     }
@@ -7219,7 +7221,7 @@ function ownerFiles(listing) {
       const row = rowOf(item);
       if (!row) return;
       const name = mediaName(row, `File ${index + 1}`);
-      const path2 = text$7(row.path) || text$7(row.storagePath);
+      const path2 = text$9(row.path) || text$9(row.storagePath);
       const display = httpUrl(row.url);
       const download = downloadUrlOf(row);
       if (download) push(download, name);
@@ -7250,12 +7252,12 @@ function ownerRevisions(listing) {
     const row = rowOf(item) || {};
     const photoIndex = typeof row.photoIndex === "number" ? row.photoIndex : null;
     return {
-      id: text$7(row.id) || `revision-${index + 1}`,
-      type: text$7(row.type) || "gallery",
+      id: text$9(row.id) || `revision-${index + 1}`,
+      type: text$9(row.type) || "gallery",
       photoIndex,
-      description: text$7(row.description),
-      status: text$7(row.status) || "pending",
-      createdAt: text$7(row.createdAt)
+      description: text$9(row.description),
+      status: text$9(row.status) || "pending",
+      createdAt: text$9(row.createdAt)
     };
   });
 }
@@ -7264,11 +7266,11 @@ function invoiceOf(listing) {
   if (nested2 && typeof nested2 === "object" && typeof nested2.status === "string") {
     return { status: nested2.status };
   }
-  const status2 = text$7(listing.invoiceStatus);
+  const status2 = text$9(listing.invoiceStatus);
   return status2 ? { status: status2 } : null;
 }
 function pickReleasedGallery(listing, related) {
-  const preferred = text$7(listing.galleryId) || text$7(listing.playtestGalleryId);
+  const preferred = text$9(listing.galleryId) || text$9(listing.playtestGalleryId);
   const released = related.filter((doc) => isReleased(doc));
   if (preferred) {
     const match = released.find((doc) => doc.id === preferred);
@@ -7359,24 +7361,24 @@ function isStreamUrl(url) {
   return /(youtube\.com|youtu\.be|vimeo\.com|player\.vimeo\.com|mux\.com|stream\.mux|cloudflarestream\.com)/i.test(url);
 }
 function isFullResOrMls(row) {
-  const category = text$7(row.category).toLowerCase();
-  const type = text$7(row.type).toLowerCase();
+  const category = text$9(row.category).toLowerCase();
+  const type = text$9(row.type).toLowerCase();
   if (category === "mls" || category === "full-res" || category === "fullres" || type === "mls") return true;
-  const label = `${text$7(row.fileName)} ${text$7(row.name)} ${text$7(row.title)} ${text$7(row.path)} ${text$7(row.storagePath)}`.toLowerCase();
+  const label = `${text$9(row.fileName)} ${text$9(row.name)} ${text$9(row.title)} ${text$9(row.path)} ${text$9(row.storagePath)}`.toLowerCase();
   if (/(^|[^a-z0-9])(full[\s_-]?res|mls)([^a-z0-9]|$)/.test(label)) return true;
   return /\/(mls|full)\//.test(label);
 }
 function rowIsDeliveryOriginal(row) {
   if (row.downloadable === true || isFullResOrMls(row)) return true;
-  const type = text$7(row.type).toLowerCase();
+  const type = text$9(row.type).toLowerCase();
   if (type === "video" || type === "reel" || type === "file") return true;
-  const content = text$7(row.contentType).toLowerCase();
+  const content = text$9(row.contentType).toLowerCase();
   if (content.startsWith("video/") || content === "application/zip" || content === "application/pdf") return true;
   const candidates = [row.url, row.shareUrl, row.embedUrl, ...FILE_URL_KEYS.map((key) => row[key])];
-  return candidates.some((value) => isOriginalFileUrl(httpUrl(value) || text$7(value)));
+  return candidates.some((value) => isOriginalFileUrl(httpUrl(value) || text$9(value)));
 }
 function pushNeedle(needles, value) {
-  const raw = text$7(value);
+  const raw = text$9(value);
   if (raw.length >= 12) needles.push(raw);
 }
 function walkOriginalNeedles(value, needles, inheritedOriginal = false) {
@@ -7391,7 +7393,7 @@ function walkOriginalNeedles(value, needles, inheritedOriginal = false) {
   if (original) {
     const fileUrls = new Set(FILE_URL_KEYS.map((key) => shareableUrl(row[key])).filter(Boolean));
     for (const key of ["url", "shareUrl", "embedUrl", "sourcePath", "storagePath", "path"]) {
-      const raw = text$7(row[key]);
+      const raw = text$9(row[key]);
       if (!raw) continue;
       const asUrl = shareableUrl(raw);
       if (asUrl && isStreamUrl(asUrl)) continue;
@@ -7498,7 +7500,7 @@ function embedTour(listing, needles) {
       for (const key of ["embedUrl", "url", "shareUrl"]) {
         const url = shareableUrl(row[key]);
         if (!url || isOriginalFileUrl(url) || containsOriginal(url, needles)) continue;
-        const type = text$7(row.type).toLowerCase();
+        const type = text$9(row.type).toLowerCase();
         if (type === "matterport" || type === "tour" || /matterport\.com/i.test(url)) return url;
       }
     }
@@ -7520,7 +7522,7 @@ function displaySafeShareMedia(listing) {
 function ownerStudioProject(listing, pub, gate2 = {}) {
   const authoritativeInvoice = Object.prototype.hasOwnProperty.call(gate2, "invoice");
   const invoiceDoc = authoritativeInvoice && gate2.invoice && typeof gate2.invoice === "object" ? gate2.invoice : null;
-  const invoiceStatus = authoritativeInvoice ? text$7(invoiceDoc?.status) : text$7(invoiceOf(listing)?.status);
+  const invoiceStatus = authoritativeInvoice ? text$9(invoiceDoc?.status) : text$9(invoiceOf(listing)?.status);
   const invoice = invoiceStatus ? { status: invoiceStatus } : null;
   const downloadsUnlocked = studioDownloadsUnlocked({
     listing: {
@@ -7539,9 +7541,9 @@ function ownerStudioProject(listing, pub, gate2 = {}) {
   const project = {
     ...source,
     view: "owner",
-    clientName: text$7(listing.clientName),
-    clientEmail: text$7(listing.clientEmail),
-    clientPhone: text$7(listing.clientPhone),
+    clientName: text$9(listing.clientName),
+    clientEmail: text$9(listing.clientEmail),
+    clientPhone: text$9(listing.clientPhone),
     revisions: ownerRevisions(listing),
     lockDownloads: lockDownloadsOn(listing.lockDownloads),
     requirePayment: requirePaymentOn(listing.requirePayment),
@@ -7587,8 +7589,8 @@ function decideClientGalleryLink(input) {
   }
   if (input.pointedListing) return listingResult(input.pointedListing, input.relatedGalleries);
   if (input.order) {
-    const galleryId = text$7(input.order.galleryId);
-    const listingId = text$7(input.order.listingId);
+    const galleryId = text$9(input.order.galleryId);
+    const listingId = text$9(input.order.listingId);
     if (galleryId || listingId) {
       return {
         ok: false,
@@ -7605,8 +7607,8 @@ function decideClientGalleryLink(input) {
     };
   }
   if (input.orderRequest) {
-    const galleryId = text$7(input.orderRequest.galleryId);
-    const listingId = text$7(input.orderRequest.listingId);
+    const galleryId = text$9(input.orderRequest.galleryId);
+    const listingId = text$9(input.orderRequest.listingId);
     if (galleryId || listingId) {
       return {
         ok: false,
@@ -7738,12 +7740,12 @@ function planOrderEdits(input = {}) {
     if (aerials || /full aerials|aerial drone/i.test(text2)) {
       const previous = deliverables.get("aerials");
       const stated = aerials ? Number(aerials[1]) : null;
-      const count2 = stated != null ? Math.max(stated, previous?.count || 0) : previous?.count ?? null;
+      const count22 = stated != null ? Math.max(stated, previous?.count || 0) : previous?.count ?? null;
       deliverables.set("aerials", {
         id: "aerials",
-        label: count2 ? `${count2} aerial stills` : "Aerial stills",
+        label: count22 ? `${count22} aerial stills` : "Aerial stills",
         kind: "capture",
-        count: count2
+        count: count22
       });
     }
     if (/snap/i.test(text2) && /reel/i.test(text2)) {
@@ -7771,8 +7773,8 @@ function planOrderEdits(input = {}) {
     photoCount = SHOWCASE_PHOTO_COUNT;
     photoFull = false;
   }
-  const count = Math.min(8, Math.max(0, twilightCount));
-  const twilight = Array.from({ length: count }, (_, index) => {
+  const count2 = Math.min(8, Math.max(0, twilightCount));
+  const twilight = Array.from({ length: count2 }, (_, index) => {
     const role = twilightRole(index);
     return { slot: `twilight-${role}`, role, prompt: twilightPrompt(role, iconicPolish) };
   });
@@ -9707,7 +9709,7 @@ async function orderIdForGallery(gallery) {
   return typeof orderId === "string" ? orderId.trim() : "";
 }
 const db$i = () => admin.firestore();
-function text$6(value) {
+function text$8(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function docRecord(snap) {
@@ -9729,7 +9731,7 @@ async function galleryById(id) {
 }
 async function relatedForListing(listing) {
   const related = await galleriesWhere("listingId", listing.id);
-  const extras = [text$6(listing.galleryId), text$6(listing.playtestGalleryId)];
+  const extras = [text$8(listing.galleryId), text$8(listing.playtestGalleryId)];
   for (const galleryId of extras) {
     if (!galleryId || related.some((doc) => doc.id === galleryId)) continue;
     const extra = await galleryById(galleryId);
@@ -9778,8 +9780,8 @@ async function resolveClientGalleryLink(id) {
   const order = docRecord(orderSnap);
   const orderRequest = docRecord(requestSnap);
   const galleriesByOrderId = order ? await galleriesWhere("orderId", id) : [];
-  const pointedGalleryId = text$6(orderRequest?.galleryId) || text$6(order?.galleryId);
-  const pointedListingId = text$6(orderRequest?.listingId) || text$6(order?.listingId);
+  const pointedGalleryId = text$8(orderRequest?.galleryId) || text$8(order?.galleryId);
+  const pointedListingId = text$8(orderRequest?.listingId) || text$8(order?.listingId);
   const pointedGallery = pointedGalleryId ? await galleryById(pointedGalleryId) : null;
   let pointedListing = null;
   let pointedRelated = relatedGalleries;
@@ -9801,7 +9803,7 @@ async function resolveClientGalleryLink(id) {
 }
 async function invoiceForListing(listing) {
   const load = (id) => db$i().collection("invoices").doc(id).get();
-  const invoiceId = text$6(listing.invoiceId);
+  const invoiceId = text$8(listing.invoiceId);
   if (invoiceId) {
     const doc = await readInvoiceDoc(load, invoiceId);
     if (doc && !invoiceRedirectTarget(doc.data)) return { id: doc.id, ...doc.data };
@@ -9813,7 +9815,7 @@ async function invoiceForListing(listing) {
     const doc = await readInvoiceDoc(load, legacyId);
     if (doc && !invoiceRedirectTarget(doc.data)) return { id: doc.id, ...doc.data };
   }
-  const orderId = text$6(listing.orderId);
+  const orderId = text$8(listing.orderId);
   if (!orderId) return null;
   try {
     const snap = await db$i().collection("invoices").where("orderId", "==", orderId).limit(1).get();
@@ -10495,7 +10497,7 @@ const SENIOR_LIVING_SERVICE_LABELS = {
 };
 const SERVICE_ID_SET = new Set(SENIOR_LIVING_SERVICE_IDS);
 const EMAIL_RE$2 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-function text$5(value) {
+function text$7(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function oneLine$1(value, max) {
@@ -10515,21 +10517,21 @@ function parseSeniorLivingRequest(body) {
     return { ok: false, honeypot: false, error: "That request could not be read." };
   }
   const raw = body;
-  const trap = text$5(raw.companyWebsite);
+  const trap = text$7(raw.companyWebsite);
   if (trap) return { ok: false, honeypot: true };
-  const name = oneLine$1(text$5(raw.name), 80);
-  const community = oneLine$1(text$5(raw.community), 120);
-  const email = oneLine$1(text$5(raw.email), 120);
-  const phone = oneLine$1(text$5(raw.phone), 30);
-  const address = oneLine$1(text$5(raw.address), 200);
-  const preferredDates = oneLine$1(text$5(raw.preferredDates), 160);
-  const notes = text$5(raw.notes).replace(/\u0000/g, "").trim().slice(0, 2e3);
+  const name = oneLine$1(text$7(raw.name), 80);
+  const community = oneLine$1(text$7(raw.community), 120);
+  const email = oneLine$1(text$7(raw.email), 120);
+  const phone = oneLine$1(text$7(raw.phone), 30);
+  const address = oneLine$1(text$7(raw.address), 200);
+  const preferredDates = oneLine$1(text$7(raw.preferredDates), 160);
+  const notes = text$7(raw.notes).replace(/\u0000/g, "").trim().slice(0, 2e3);
   if (name.length < 2) return { ok: false, honeypot: false, error: "Enter your name." };
-  if (text$5(raw.name).trim().length > 80)
+  if (text$7(raw.name).trim().length > 80)
     return { ok: false, honeypot: false, error: "Name is too long." };
   if (community.length < 2)
     return { ok: false, honeypot: false, error: "Enter the community name." };
-  if (text$5(raw.community).trim().length > 120)
+  if (text$7(raw.community).trim().length > 120)
     return { ok: false, honeypot: false, error: "Community name is too long." };
   if (!EMAIL_RE$2.test(email))
     return { ok: false, honeypot: false, error: "Enter a valid email." };
@@ -10538,18 +10540,18 @@ function parseSeniorLivingRequest(body) {
     return { ok: false, honeypot: false, error: "Enter a phone number." };
   if (address.length < 5)
     return { ok: false, honeypot: false, error: "Enter the community address." };
-  if (text$5(raw.address).trim().length > 200)
+  if (text$7(raw.address).trim().length > 200)
     return { ok: false, honeypot: false, error: "Address is too long." };
   if (preferredDates.length < 2)
     return { ok: false, honeypot: false, error: "Enter preferred dates." };
-  if (text$5(raw.preferredDates).trim().length > 160)
+  if (text$7(raw.preferredDates).trim().length > 160)
     return { ok: false, honeypot: false, error: "Preferred dates are too long." };
-  if (text$5(raw.notes).trim().length > 2e3)
+  if (text$7(raw.notes).trim().length > 2e3)
     return { ok: false, honeypot: false, error: "Notes are too long." };
   const servicesRaw = Array.isArray(raw.services) ? raw.services : [];
   const services2 = [];
   for (const entry2 of servicesRaw) {
-    const id = text$5(entry2);
+    const id = text$7(entry2);
     if (!id) continue;
     if (!SERVICE_ID_SET.has(id))
       return { ok: false, honeypot: false, error: "Choose a listed service." };
@@ -10633,10 +10635,10 @@ function cents(amount) {
 function dollars(amountCents) {
   return amountCents / 100;
 }
-function seniorRoomUnitPrice(count) {
-  if (!Number.isInteger(count) || count < 1) return null;
+function seniorRoomUnitPrice(count2) {
+  if (!Number.isInteger(count2) || count2 < 1) return null;
   const tier = SENIOR_ROOM_RATES.find(
-    (band) => count >= band.minCount && count <= band.maxCount
+    (band) => count2 >= band.minCount && count2 <= band.maxCount
   );
   return tier ? tier.each : null;
 }
@@ -10730,14 +10732,14 @@ function parseSeniorLivingOrder(body) {
     return { ok: false, honeypot: false, error: "That order could not be read." };
   }
   const raw = body;
-  if (text$5(raw.companyWebsite)) return { ok: false, honeypot: true };
+  if (text$7(raw.companyWebsite)) return { ok: false, honeypot: true };
   const roomCount = raw.roomCount == null || raw.roomCount === "" ? 0 : Number(raw.roomCount);
   const facilitySqft = raw.facilitySqft == null || raw.facilitySqft === "" ? 0 : Number(raw.facilitySqft);
   const quoted = quoteSeniorLivingOrder({
     tour: raw.tour === true,
     roomCount,
     facilitySqft,
-    address: text$5(raw.address)
+    address: text$7(raw.address)
   });
   if (quoted.ok === false) return { ok: false, honeypot: false, error: quoted.error };
   if (quoted.quote.travel.travelQuoted) {
@@ -10747,16 +10749,16 @@ function parseSeniorLivingOrder(body) {
       error: "We could not price travel for that address. Call us and we will quote the trip."
     };
   }
-  const name = oneLine$1(text$5(raw.name), 80);
-  const community = oneLine$1(text$5(raw.community), 120);
-  const title = oneLine$1(text$5(raw.title), 80);
-  const email = oneLine$1(text$5(raw.email), 120);
-  const phone = oneLine$1(text$5(raw.phone), 30);
-  const address = oneLine$1(text$5(raw.address), 200);
-  const onsiteContact = oneLine$1(text$5(raw.onsiteContact), 120);
-  const notes = text$5(raw.notes).replace(/\u0000/g, "").trim().slice(0, 2e3);
-  const scheduledDate = oneLine$1(text$5(raw.scheduledDate), 10);
-  const scheduledTime = oneLine$1(text$5(raw.scheduledTime), 20);
+  const name = oneLine$1(text$7(raw.name), 80);
+  const community = oneLine$1(text$7(raw.community), 120);
+  const title = oneLine$1(text$7(raw.title), 80);
+  const email = oneLine$1(text$7(raw.email), 120);
+  const phone = oneLine$1(text$7(raw.phone), 30);
+  const address = oneLine$1(text$7(raw.address), 200);
+  const onsiteContact = oneLine$1(text$7(raw.onsiteContact), 120);
+  const notes = text$7(raw.notes).replace(/\u0000/g, "").trim().slice(0, 2e3);
+  const scheduledDate = oneLine$1(text$7(raw.scheduledDate), 10);
+  const scheduledTime = oneLine$1(text$7(raw.scheduledTime), 20);
   if (name.length < 2) return { ok: false, honeypot: false, error: "Enter your name." };
   if (community.length < 2) return { ok: false, honeypot: false, error: "Enter the community name." };
   if (title.length < 2) return { ok: false, honeypot: false, error: "Enter your title." };
@@ -10787,7 +10789,7 @@ function parseSeniorLivingOrder(body) {
       error: "Choose monthly hosting or a transfer of ownership."
     };
   }
-  const hosting = text$5(raw.hosting);
+  const hosting = text$7(raw.hosting);
   return {
     ok: true,
     value: {
@@ -10832,7 +10834,7 @@ function invoiceProvider(invoice) {
   const channel = String(invoice.channel || invoice.brand || invoice.bookingType || "").toLowerCase();
   return channel.includes("studio noir") || channel.includes("studionoir") ? "stripe" : "square";
 }
-function money$1(value) {
+function money$2(value) {
   return `$${(Number(value) || 0).toFixed(2)}`;
 }
 function invoiceNotFound(res) {
@@ -11041,13 +11043,13 @@ async function applySuccessfulPayment({
       template: "payment_receipt",
       variables: {
         clientName: invoice.clientName,
-        amount: money$1(amount),
+        amount: money$2(amount),
         invoiceNumber: receiptEmailNumber({
           invoiceNumber: invoice.invoiceNumber,
           id: invoiceId,
           createdAt: invoice.createdAt
         }),
-        balance: money$1(newAmountDue)
+        balance: money$2(newAmountDue)
       }
     }).catch(console.error);
   }
@@ -11211,7 +11213,7 @@ router$l.post("/send-invoice", requireCoordinator, async (req, res) => {
           id: invoiceDoc.id,
           createdAt: invoice.createdAt
         }),
-        amount: money$1(invoice.total),
+        amount: money$2(invoice.total),
         paymentUrl,
         dueDate: bookingDateLabel(invoice.dueDate, "Upon receipt")
       }
@@ -11244,13 +11246,13 @@ router$l.post("/send-receipt", requireCoordinator, async (req, res) => {
       template: "payment_receipt",
       variables: {
         clientName: invoice.clientName,
-        amount: money$1(invoice.amountPaid || invoice.total),
+        amount: money$2(invoice.amountPaid || invoice.total),
         invoiceNumber: receiptEmailNumber({
           invoiceNumber: invoice.invoiceNumber,
           id: invoiceDoc.id,
           createdAt: invoice.createdAt
         }),
-        balance: money$1(amountStillDue(invoice))
+        balance: money$2(amountStillDue(invoice))
       }
     });
     return res.json({ success: true });
@@ -12316,7 +12318,7 @@ const PHOTO_EDIT_REQUEST_LIMIT = 100;
 const PHOTO_EDIT_REPLACEMENT_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const STATUSES = /* @__PURE__ */ new Set(["requested", "sent_out", "received_back"]);
 const REPLACEMENT_TYPES$1 = new Set(PHOTO_EDIT_REPLACEMENT_TYPES);
-function text$4(value, limit) {
+function text$6(value, limit) {
   if (typeof value !== "string") return "";
   return value.replace(/\s+/g, " ").trim().slice(0, limit);
 }
@@ -12332,7 +12334,7 @@ function stamp(value) {
   return Number.isFinite(parsed) ? new Date(parsed).toISOString() : "";
 }
 function idText(value, limit = 80) {
-  const id = text$4(value, limit);
+  const id = text$6(value, limit);
   return /^[A-Za-z0-9_-]{8,80}$/.test(id) ? id : "";
 }
 function photoIdText(value) {
@@ -12348,7 +12350,7 @@ function timelineEntry(value) {
   const row = value && typeof value === "object" ? value : null;
   if (!row || !STATUSES.has(row.status)) return null;
   const at = stamp(row.at);
-  const actorId = text$4(row.actorId, 128);
+  const actorId = text$6(row.actorId, 128);
   if (!at || !actorId) return null;
   if (row.actor !== "client" && row.actor !== "staff") return null;
   return { status: row.status, at, actor: row.actor, actorId };
@@ -12356,11 +12358,11 @@ function timelineEntry(value) {
 function replacementEntry(value, listingId) {
   if (!value || typeof value !== "object") return null;
   const row = value;
-  const name = text$4(row.name, 180);
+  const name = text$6(row.name, 180);
   const path2 = typeof row.path === "string" ? row.path.trim() : "";
   const contentType = typeof row.contentType === "string" ? row.contentType.trim().toLowerCase() : "";
   const attachedAt = stamp(row.attachedAt);
-  const attachedBy = text$4(row.attachedBy, 128);
+  const attachedBy = text$6(row.attachedBy, 128);
   const url = httpsUrl(row.url);
   if (!name || !attachedAt || !attachedBy || !url || !REPLACEMENT_TYPES$1.has(contentType)) return null;
   if (!replacementPath(listingId, path2)) return null;
@@ -12394,10 +12396,10 @@ function parseRequest(value) {
   const row = value && typeof value === "object" ? value : null;
   if (!row) return null;
   const id = idText(row.id);
-  const listingId = idText(row.listingId, 128) || text$4(row.listingId, 128);
+  const listingId = idText(row.listingId, 128) || text$6(row.listingId, 128);
   const photoId = photoIdText(row.photoId);
   const note = noteText(row.note);
-  const clientId2 = text$4(row.clientId, 128);
+  const clientId2 = text$6(row.clientId, 128);
   const createdAt = stamp(row.createdAt);
   const updatedAt = stamp(row.updatedAt);
   if (!id || !listingId || !photoId || !note || !clientId2 || !createdAt || !updatedAt) return null;
@@ -12409,7 +12411,7 @@ function parseRequest(value) {
     id,
     listingId,
     photoId,
-    photoName: text$4(row.photoName, 180) || "Photo",
+    photoName: text$6(row.photoName, 180) || "Photo",
     photoUrl: httpsUrl(row.photoUrl),
     note,
     status: row.status,
@@ -12437,10 +12439,10 @@ function openPhotoEditForPhoto(requests, photoId) {
 }
 function createPhotoEditRequest(input) {
   const id = idText(input.id);
-  const listingId = text$4(input.listingId, 128);
+  const listingId = text$6(input.listingId, 128);
   const photoId = photoIdText(input.photoId);
   const note = noteText(input.note);
-  const clientId2 = text$4(input.clientId, 128);
+  const clientId2 = text$6(input.clientId, 128);
   const at = stamp(input.at);
   if (!id) return { ok: false, status: 400, error: "Could not save that edit request." };
   if (!/^[A-Za-z0-9_-]{4,128}$/.test(listingId)) return { ok: false, status: 400, error: "Listing id is not valid." };
@@ -12460,7 +12462,7 @@ function createPhotoEditRequest(input) {
     id,
     listingId,
     photoId,
-    photoName: text$4(input.photoName, 180) || "Photo",
+    photoName: text$6(input.photoName, 180) || "Photo",
     photoUrl: httpsUrl(input.photoUrl),
     note,
     status: "requested",
@@ -12474,7 +12476,7 @@ function createPhotoEditRequest(input) {
 }
 function advancePhotoEditRequest(input) {
   const requestId = idText(input.requestId);
-  const actorId = text$4(input.actorId, 128);
+  const actorId = text$6(input.actorId, 128);
   const at = stamp(input.at);
   if (!requestId || !actorId || !at) return { ok: false, status: 400, error: "Could not update that edit request." };
   const current = input.requests.find((request2) => request2.id === requestId);
@@ -12566,12 +12568,13 @@ const PORTAL_MARKETING_KIT = [
     note: "Design tools are not connected yet. Reels and shorts for this listing will be chosen here."
   }
 ];
+const WEBSITE_DESIGNS = /* @__PURE__ */ new Set(["index", "two-up", "premiere"]);
 const WEBSITE_FONTS = /* @__PURE__ */ new Set(["sans", "serif", "modern"]);
 const WEBSITE_COLORS = /* @__PURE__ */ new Set(["ink", "teal", "warm"]);
 const WEBSITE_STYLES = /* @__PURE__ */ new Set(["classic", "editorial", "minimal"]);
 const PORTAL_LISTING_ID = /^[A-Za-z0-9_-]{4,128}$/;
 function portalListingId(value) {
-  const id = text$3(value);
+  const id = text$5(value);
   return PORTAL_LISTING_ID.test(id) ? id : "";
 }
 function isInvoiceOrPaymentActivity(event) {
@@ -12592,9 +12595,11 @@ function visitorPortalListingDetail(detail) {
 }
 function defaultPortalWebsite() {
   return {
+    design: "index",
     font: "sans",
     color: "ink",
     style: "classic",
+    published: false,
     showPhotos: true,
     showVideo: true,
     showTours: true,
@@ -12611,14 +12616,14 @@ function hiddenPresentationKeys(listing) {
 }
 function rowHiddenFromPresentation(row, hiddenKeys) {
   if (row.hiddenFromPresentation === true || row.portalHidden === true) return true;
-  const id = text$3(row.id);
-  const path2 = text$3(row.path) || text$3(row.storagePath);
-  const url = text$3(row.url) || text$3(row.shareUrl);
+  const id = text$5(row.id);
+  const path2 = text$5(row.path) || text$5(row.storagePath);
+  const url = text$5(row.url) || text$5(row.shareUrl);
   return [id, path2, url].some((key) => Boolean(key) && hiddenKeys.has(key));
 }
 function buildPortalListingDetail(sources) {
   const listing = sources.listing || {};
-  const id = text$3(listing.id);
+  const id = text$5(listing.id);
   const records = [listing, sources.order, sources.orderRequest].filter(Boolean);
   const address = readAddress(records);
   const store = readMediaStore(listing.portalMedia);
@@ -12630,7 +12635,7 @@ function buildPortalListingDetail(sources) {
   const website = readWebsite(listing.portalWebsite);
   const invoices = readInvoices(sources.invoices || []);
   const activity = buildActivity(sources, photos, videos, floorplans, tours);
-  const status2 = text$3(listing.status) || text$3(sources.order?.status) || text$3(sources.orderRequest?.status) || "open";
+  const status2 = text$5(listing.status) || text$5(sources.order?.status) || text$5(sources.orderRequest?.status) || "open";
   return applyStoredPortalData({
     id,
     title: address.formatted || "Listing",
@@ -12791,13 +12796,16 @@ function applyPortalMediaChange(store, items, change, nowIso) {
 }
 function sanitizeWebsiteSettings(value, base = defaultPortalWebsite()) {
   const row = value && typeof value === "object" ? value : {};
-  const font = text$3(row.font);
-  const color = text$3(row.color);
-  const style = text$3(row.style);
+  const design = text$5(row.design);
+  const font = text$5(row.font);
+  const color = text$5(row.color);
+  const style = text$5(row.style);
   return {
+    design: WEBSITE_DESIGNS.has(design) ? design : base.design,
     font: WEBSITE_FONTS.has(font) ? font : base.font,
     color: WEBSITE_COLORS.has(color) ? color : base.color,
     style: WEBSITE_STYLES.has(style) ? style : base.style,
+    published: boolOr(row.published, base.published),
     showPhotos: boolOr(row.showPhotos, base.showPhotos),
     showVideo: boolOr(row.showVideo, base.showVideo),
     showTours: boolOr(row.showTours, base.showTours),
@@ -12835,7 +12843,7 @@ function readPrefs(value) {
 function readWebsite(value) {
   return sanitizeWebsiteSettings(value, defaultPortalWebsite());
 }
-function text$3(value) {
+function text$5(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function boolOr(value, fallback) {
@@ -12845,8 +12853,8 @@ function asRecord$2(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : null;
 }
 function readFact(records, keys) {
-  for (const record of records) {
-    const bags = [record, asRecord$2(record.property), asRecord$2(record.propertyDetails), asRecord$2(record.listingInfo), asRecord$2(record.details)];
+  for (const record2 of records) {
+    const bags = [record2, asRecord$2(record2.property), asRecord$2(record2.propertyDetails), asRecord$2(record2.listingInfo), asRecord$2(record2.details)];
     for (const bag of bags) {
       if (!bag) continue;
       for (const key of keys) {
@@ -12883,8 +12891,8 @@ function readAddress(records) {
     lng: null,
     mapUrl: null
   };
-  for (const record of records) {
-    fillAddress(address, addressFromRecord(record));
+  for (const record2 of records) {
+    fillAddress(address, addressFromRecord(record2));
   }
   address.formatted = formatPortalAddress(address);
   const geo = address.lat != null && address.lng != null ? { lat: address.lat, lng: address.lng } : null;
@@ -12900,32 +12908,32 @@ function fillAddress(target, source) {
   if (target.lat == null && source.lat != null) target.lat = source.lat;
   if (target.lng == null && source.lng != null) target.lng = source.lng;
 }
-function addressFromRecord(record) {
-  const structured = asRecord$2(record.address) || asRecord$2(record.shootLocation) || asRecord$2(record.propertyAddress);
+function addressFromRecord(record2) {
+  const structured = asRecord$2(record2.address) || asRecord$2(record2.shootLocation) || asRecord$2(record2.propertyAddress);
   const parsed = parseAddressText(
-    text$3(record.addressLine1) ? "" : addressString(record.address) || addressString(record.propertyAddress) || addressString(record.shootLocation) || text$3(structured?.formatted)
+    text$5(record2.addressLine1) ? "" : addressString(record2.address) || addressString(record2.propertyAddress) || addressString(record2.shootLocation) || text$5(structured?.formatted)
   );
-  const line1 = firstText(record, ["addressLine1", "line1", "street", "streetAddress"]) || text$3(structured?.street) || text$3(structured?.line1) || text$3(structured?.addressLine1) || parsed.line1;
-  const line2 = firstText(record, ["addressLine2", "line2", "unit", "street2"]) || text$3(structured?.line2) || text$3(structured?.unit) || parsed.line2;
+  const line1 = firstText(record2, ["addressLine1", "line1", "street", "streetAddress"]) || text$5(structured?.street) || text$5(structured?.line1) || text$5(structured?.addressLine1) || parsed.line1;
+  const line2 = firstText(record2, ["addressLine2", "line2", "unit", "street2"]) || text$5(structured?.line2) || text$5(structured?.unit) || parsed.line2;
   const split = splitUnit(line1);
   return {
     line1: split.line1,
     line2: line2 || split.line2,
-    city: firstText(record, ["city"]) || text$3(structured?.city) || parsed.city,
-    state: firstText(record, ["state"]) || text$3(structured?.state) || parsed.state,
-    zip: firstText(record, ["zip", "postalCode"]) || text$3(structured?.zip) || text$3(structured?.postalCode) || parsed.zip,
+    city: firstText(record2, ["city"]) || text$5(structured?.city) || parsed.city,
+    state: firstText(record2, ["state"]) || text$5(structured?.state) || parsed.state,
+    zip: firstText(record2, ["zip", "postalCode"]) || text$5(structured?.zip) || text$5(structured?.postalCode) || parsed.zip,
     formatted: "",
-    lat: readCoord(record.lat ?? record.latitude ?? structured?.lat ?? structured?.latitude ?? nestedCoord(record, "lat"), "lat"),
-    lng: readCoord(record.lng ?? record.longitude ?? structured?.lng ?? structured?.longitude ?? nestedCoord(record, "lng"), "lng"),
+    lat: readCoord(record2.lat ?? record2.latitude ?? structured?.lat ?? structured?.latitude ?? nestedCoord(record2, "lat"), "lat"),
+    lng: readCoord(record2.lng ?? record2.longitude ?? structured?.lng ?? structured?.longitude ?? nestedCoord(record2, "lng"), "lng"),
     mapUrl: null
   };
 }
 function addressString(value) {
   return addressText(value);
 }
-function firstText(record, keys) {
+function firstText(record2, keys) {
   for (const key of keys) {
-    const value = text$3(record[key]);
+    const value = text$5(record2[key]);
     if (value) return value;
   }
   return "";
@@ -12957,8 +12965,8 @@ function splitUnit(line1) {
   if (!match) return { line1, line2: "" };
   return { line1: match[1].trim(), line2: match[2].trim() };
 }
-function nestedCoord(record, axis) {
-  const geo = asRecord$2(record.geo) || asRecord$2(record.location) || asRecord$2(record.geometry);
+function nestedCoord(record2, axis) {
+  const geo = asRecord$2(record2.geo) || asRecord$2(record2.location) || asRecord$2(record2.geometry);
   if (!geo) return void 0;
   const location = asRecord$2(geo.location) || geo;
   if (axis === "lat") return location.lat ?? location.latitude;
@@ -13005,7 +13013,7 @@ function collectTours(listing, galleries, store) {
     const url = safeHttpUrl(row.url) || safeHttpUrl(row.shareUrl) || safeHttpUrl(row.href);
     if (!url || seen.has(url)) return;
     const provider = providerFor(url, row);
-    const typed = /^(tour|matterport)$/i.test(text$3(row.type)) || provider != null || isTourField(text$3(row.id));
+    const typed = /^(tour|matterport)$/i.test(text$5(row.type)) || provider != null || isTourField(text$5(row.id));
     if (!typed) return;
     seen.add(url);
     const id = mediaId("tour", row, index);
@@ -13013,9 +13021,9 @@ function collectTours(listing, galleries, store) {
     drafts.push({
       id,
       kind: "tour",
-      name: text$3(row.name) || text$3(row.title) || provider || "Virtual tour",
+      name: text$5(row.name) || text$5(row.title) || provider || "Virtual tour",
       url,
-      contentType: text$3(row.contentType),
+      contentType: text$5(row.contentType),
       hidden: prefs?.hidden === true || row.hiddenFromPresentation === true,
       order: prefs?.order ?? index,
       uploadedAt: portalTimestamp(row.uploadedAt || row.createdAt),
@@ -13036,7 +13044,7 @@ function finishMedia(kind, rows, prefs, include) {
     const url = safeHttpUrl(row.url) || safeHttpUrl(row.shareUrl);
     if (!url) return;
     const id = mediaId(kind, row, index);
-    const key = text$3(row.path) || text$3(row.storagePath) || url;
+    const key = text$5(row.path) || text$5(row.storagePath) || url;
     if (seen.has(id) || seen.has(key) || seen.has(url)) return;
     seen.add(id);
     seen.add(key);
@@ -13045,9 +13053,9 @@ function finishMedia(kind, rows, prefs, include) {
     items.push({
       id,
       kind,
-      name: text$3(row.name) || text$3(row.fileName) || text$3(row.title) || `${kind} ${items.length + 1}`,
+      name: text$5(row.name) || text$5(row.fileName) || text$5(row.title) || `${kind} ${items.length + 1}`,
       url,
-      contentType: text$3(row.contentType).toLowerCase(),
+      contentType: text$5(row.contentType).toLowerCase(),
       hidden: pref?.hidden === true || row.hiddenFromPresentation === true || row.portalHidden === true,
       order: pref?.order ?? index,
       uploadedAt: portalTimestamp(row.uploadedAt || row.createdAt)
@@ -13067,7 +13075,7 @@ function galleryRows(galleries) {
   return rows;
 }
 function mediaId(kind, row, index) {
-  const raw = text$3(row.id) || text$3(row.path) || text$3(row.storagePath) || text$3(row.url) || text$3(row.shareUrl) || `${kind}-${index}`;
+  const raw = text$5(row.id) || text$5(row.path) || text$5(row.storagePath) || text$5(row.url) || text$5(row.shareUrl) || `${kind}-${index}`;
   return raw.slice(0, 180);
 }
 const RAW_EXT$1 = /\.(cr2|cr3|nef|nrw|arw|srf|sr2|dng|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic)$/i;
@@ -13075,46 +13083,46 @@ const IMAGE_EXT$1 = /\.(jpe?g|png|webp|gif)$/i;
 const FLOOR_IMAGE = /\.(jpe?g|png)$/i;
 const VIDEO_EXT = /\.(mp4|mov)$/i;
 function fileName(row) {
-  return text$3(row.name) || text$3(row.fileName) || text$3(row.title) || text$3(row.path) || text$3(row.url);
+  return text$5(row.name) || text$5(row.fileName) || text$5(row.title) || text$5(row.path) || text$5(row.url);
 }
 function isRaw(row) {
-  const path2 = text$3(row.path) || text$3(row.storagePath);
+  const path2 = text$5(row.path) || text$5(row.storagePath);
   const name = fileName(row);
   return RAW_EXT$1.test(name) || RAW_EXT$1.test(path2) || path2.includes("/raw/");
 }
 function isFloorplan(row) {
   if (!isRasterFloorplan(row)) return false;
-  const type = text$3(row.type).toLowerCase();
-  const asset = text$3(row.assetType).toLowerCase();
+  const type = text$5(row.type).toLowerCase();
+  const asset = text$5(row.assetType).toLowerCase();
   const name = fileName(row);
   return type === "floorplan" || asset === "floorplan" || /floor\s*plan|floorplan/i.test(name) || type === "image" && asset === "floorplan";
 }
 function isRasterFloorplan(row) {
-  const content = text$3(row.contentType).toLowerCase();
-  const declared = text$3(row.type).toLowerCase();
+  const content = text$5(row.contentType).toLowerCase();
+  const declared = text$5(row.type).toLowerCase();
   const name = fileName(row);
-  const url = text$3(row.url) || text$3(row.shareUrl);
+  const url = text$5(row.url) || text$5(row.shareUrl);
   if (content === "image/jpeg" || content === "image/png" || declared === "image/jpeg" || declared === "image/png") return true;
   return FLOOR_IMAGE.test(name) || FLOOR_IMAGE.test(url.split("?")[0]);
 }
 function isVideo(row) {
-  const type = text$3(row.type).toLowerCase();
+  const type = text$5(row.type).toLowerCase();
   if (type === "tour" || type === "matterport" || type === "floorplan") return false;
-  const content = text$3(row.contentType).toLowerCase();
+  const content = text$5(row.contentType).toLowerCase();
   const name = fileName(row);
-  const url = (text$3(row.url) || text$3(row.shareUrl)).split("?")[0];
+  const url = (text$5(row.url) || text$5(row.shareUrl)).split("?")[0];
   if (content === "video/mp4" || content === "video/quicktime") return true;
   return VIDEO_EXT.test(name) || VIDEO_EXT.test(url);
 }
 function isPhoto(row) {
-  const declared = text$3(row.type).toLowerCase();
-  const asset = text$3(row.assetType).toLowerCase();
+  const declared = text$5(row.type).toLowerCase();
+  const asset = text$5(row.assetType).toLowerCase();
   if (isVideo(row) || declared === "floorplan" || asset === "floorplan" || isRaw(row)) return false;
-  const type = text$3(row.type).toLowerCase();
+  const type = text$5(row.type).toLowerCase();
   if (type === "tour" || type === "matterport" || type === "video" || type === "reel" || type === "file" || type === "document") return false;
-  const content = text$3(row.contentType).toLowerCase();
+  const content = text$5(row.contentType).toLowerCase();
   const name = fileName(row);
-  const path2 = text$3(row.path) || text$3(row.storagePath);
+  const path2 = text$5(row.path) || text$5(row.storagePath);
   if (content.startsWith("video/")) return false;
   if (content && !content.startsWith("image/") && !IMAGE_EXT$1.test(name)) return false;
   return !content || content.startsWith("image/") || IMAGE_EXT$1.test(name) || IMAGE_EXT$1.test(path2);
@@ -13126,14 +13134,14 @@ function providerFor(url, row) {
   } catch {
     return null;
   }
-  if (host.includes("matterport.com") || /matterport/i.test(text$3(row.type)) || /matterport/i.test(text$3(row.name))) return "Matterport";
+  if (host.includes("matterport.com") || /matterport/i.test(text$5(row.type)) || /matterport/i.test(text$5(row.name))) return "Matterport";
   if (host.includes("cloudpano.com")) return "CloudPano";
   if (host.includes("iguide")) return "iGUIDE";
   if (host.includes("kuula.co")) return "Kuula";
   if (host.includes("eyespy360.com")) return "EyeSpy360";
   if (host.includes("asteroom.com")) return "Asteroom";
   if (host.includes("zillow.com") && /3d|tour/i.test(url)) return "Zillow 3D";
-  if (/^(tour|matterport)$/i.test(text$3(row.type))) return "Virtual tour";
+  if (/^(tour|matterport)$/i.test(text$5(row.type))) return "Virtual tour";
   return null;
 }
 function safeHttpUrl(value) {
@@ -13152,10 +13160,10 @@ function readInvoices(invoices) {
   const seen = /* @__PURE__ */ new Set();
   const summaries = [];
   for (const invoice of invoices) {
-    const id = text$3(invoice.id);
+    const id = text$5(invoice.id);
     if (!id || seen.has(id)) continue;
     seen.add(id);
-    const total = money(invoice.total);
+    const total = money$1(invoice.total);
     summaries.push({
       id,
       invoiceNumber: orderHistoryInvoiceNumber({
@@ -13163,14 +13171,14 @@ function readInvoices(invoices) {
         id,
         createdAt: invoice.createdAt
       }),
-      status: text$3(invoice.status) || "draft",
+      status: text$5(invoice.status) || "draft",
       total,
-      amountDue: invoice.amountDue == null ? total : money(invoice.amountDue)
+      amountDue: invoice.amountDue == null ? total : money$1(invoice.amountDue)
     });
   }
   return summaries;
 }
-function money(value) {
+function money$1(value) {
   const number = typeof value === "number" ? value : Number(value);
   return Number.isFinite(number) ? number : 0;
 }
@@ -13184,7 +13192,7 @@ function buildActivity(sources, photos, videos, floorplans, tours, invoices) {
   const request = sources.orderRequest;
   if (request) {
     push(eventOf(
-      `booking-${text$3(request.id) || "request"}`,
+      `booking-${text$5(request.id) || "request"}`,
       request.submittedAt || request.createdAt,
       "booking",
       "Booking request received"
@@ -13192,9 +13200,9 @@ function buildActivity(sources, photos, videos, floorplans, tours, invoices) {
   }
   for (const appointment of sources.appointments || []) {
     const when = appointment.createdAt || appointment.scheduledDate;
-    const status2 = text$3(appointment.status);
+    const status2 = text$5(appointment.status);
     push(eventOf(
-      `appointment-${text$3(appointment.id) || events.length}`,
+      `appointment-${text$5(appointment.id) || events.length}`,
       when,
       "appointment",
       status2 === "confirmed" ? "Appointment confirmed" : "Appointment requested"
@@ -13203,14 +13211,14 @@ function buildActivity(sources, photos, videos, floorplans, tours, invoices) {
   const order = sources.order;
   if (order) {
     push(eventOf(
-      `order-${text$3(order.id) || "order"}`,
+      `order-${text$5(order.id) || "order"}`,
       order.confirmedAt || order.createdAt,
       "booking",
       "Booking confirmed"
     ));
   }
   push(eventOf(
-    `listing-${text$3(sources.listing.id) || "listing"}`,
+    `listing-${text$5(sources.listing.id) || "listing"}`,
     sources.listing.createdAt,
     "listing",
     "Listing file created"
@@ -13228,30 +13236,30 @@ function buildActivity(sources, photos, videos, floorplans, tours, invoices) {
     push(eventOf(`tour-${tour.id}`, tour.uploadedAt, "tour", `${tour.provider} tour added`));
   }
   for (const gallery of sources.galleries || []) {
-    const status2 = text$3(gallery.status).replace(/_/g, " ") || "opened";
+    const status2 = text$5(gallery.status).replace(/_/g, " ") || "opened";
     push(eventOf(
-      `gallery-${text$3(gallery.id) || events.length}`,
+      `gallery-${text$5(gallery.id) || events.length}`,
       gallery.updatedAt || gallery.createdAt,
       "gallery",
       `Gallery ${status2}`
     ));
   }
   for (const invoice of sources.invoices || []) {
-    const id = text$3(invoice.id);
+    const id = text$5(invoice.id);
     const number = orderHistoryInvoiceNumber({
       invoiceNumber: invoice.invoiceNumber,
       id,
       createdAt: invoice.createdAt
     });
-    const status2 = text$3(invoice.status) || "draft";
+    const status2 = text$5(invoice.status) || "draft";
     const summary = status2 === "paid" ? `Payment recorded on ${number}` : `Invoice ${number} is ${status2.replace(/_/g, " ")}`;
     push(eventOf(`invoice-${id || number}`, invoice.paidAt || invoice.updatedAt || invoice.createdAt, "invoice", summary));
   }
   for (const entry2 of rowsFrom(sources.listing.auditLog)) {
-    const action = text$3(entry2.action);
+    const action = text$5(entry2.action);
     if (!action || /lockbox|internal|password|secret/i.test(action)) continue;
     push(eventOf(
-      `audit-${text$3(entry2.id) || action}-${text$3(entry2.at)}`,
+      `audit-${text$5(entry2.id) || action}-${text$5(entry2.at)}`,
       entry2.at || entry2.createdAt,
       "audit",
       action
@@ -13259,10 +13267,10 @@ function buildActivity(sources, photos, videos, floorplans, tours, invoices) {
   }
   for (const entry2 of rowsFrom(sources.listing.portalActivity)) {
     push({
-      id: text$3(entry2.id) || `portal-activity-${events.length}`,
+      id: text$5(entry2.id) || `portal-activity-${events.length}`,
       at: portalTimestamp(entry2.at),
-      kind: text$3(entry2.kind) || "listing",
-      summary: text$3(entry2.summary)
+      kind: text$5(entry2.kind) || "listing",
+      summary: text$5(entry2.summary)
     });
   }
   return events.filter((event) => event.summary).sort((a, b) => {
@@ -13285,16 +13293,16 @@ function portalTimestamp(value) {
   }
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? "" : value.toISOString();
   if (typeof value === "object") {
-    const record = value;
-    if (typeof record.toDate === "function") {
+    const record2 = value;
+    if (typeof record2.toDate === "function") {
       try {
-        const date = record.toDate();
+        const date = record2.toDate();
         return date instanceof Date && !Number.isNaN(date.getTime()) ? date.toISOString() : "";
       } catch {
         return "";
       }
     }
-    const seconds = typeof record.seconds === "number" ? record.seconds : typeof record._seconds === "number" ? record._seconds : null;
+    const seconds = typeof record2.seconds === "number" ? record2.seconds : typeof record2._seconds === "number" ? record2._seconds : null;
     if (seconds != null) {
       const date = new Date(seconds * 1e3);
       return Number.isNaN(date.getTime()) ? "" : date.toISOString();
@@ -13304,6 +13312,186 @@ function portalTimestamp(value) {
 }
 function mediaLabel(item) {
   return item.name || item.kind;
+}
+const LISTING_SITE_DESIGNS = ["index", "two-up", "premiere"];
+new Set(LISTING_SITE_DESIGNS);
+const SLUG$1 = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+function listingSiteSlug(input) {
+  const street = (input.line1 || "").trim();
+  if (!street) return "";
+  const raw = `${street} ${input.city || ""}`.normalize("NFKD").toLowerCase();
+  const slug = raw.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80).replace(/-+$/g, "");
+  return SLUG$1.test(slug) ? slug : "";
+}
+function isListingSiteSlug(value) {
+  return typeof value === "string" && value.length <= 80 && SLUG$1.test(value);
+}
+function text$4(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function record(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+}
+function addressParts$1(listing) {
+  const portal = record(listing.portalData);
+  const saved = record(portal?.address);
+  const structured = record(listing.address) || record(listing.shootLocation) || record(listing.propertyAddress);
+  const line1 = text$4(saved?.line1) || text$4(structured?.street) || text$4(structured?.line1) || text$4(listing.addressLine1);
+  const city = text$4(saved?.city) || text$4(structured?.city) || text$4(listing.city);
+  const state = text$4(saved?.state) || text$4(structured?.state) || text$4(listing.state);
+  const zip = text$4(saved?.zip) || text$4(structured?.zip) || text$4(listing.zip);
+  if (!line1 && typeof listing.address === "string") {
+    const raw = text$4(listing.address);
+    const parts = raw.split(",").map((part) => part.trim()).filter(Boolean);
+    return { line1: parts[0] || raw, city: parts.length >= 3 ? parts[parts.length - 2] : "", formatted: raw };
+  }
+  const locality = [city, [state, zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  return { line1, city, formatted: [line1, locality].filter(Boolean).join(", ") };
+}
+function money(value) {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
+  }
+  const raw = text$4(value);
+  if (!raw || raw === "0") return "";
+  if (raw.startsWith("$")) return raw;
+  const numeric2 = Number(raw.replace(/[$,]/g, ""));
+  if (Number.isFinite(numeric2) && numeric2 > 0) {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(numeric2);
+  }
+  return "";
+}
+function count(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return text$4(value);
+}
+function factValue(listing, keys) {
+  const portal = record(listing.portalData);
+  const facts = record(portal?.facts);
+  for (const key of keys) {
+    const stored = count(facts?.[key]);
+    if (stored) return stored;
+    const direct = count(listing[key]);
+    if (direct) return direct;
+  }
+  return "";
+}
+function agentOf(listing) {
+  const agent = record(listing.agent);
+  const name = text$4(listing.agentName) || text$4(listing.listingAgent) || text$4(agent?.name);
+  return {
+    name,
+    brokerage: text$4(listing.brokerage) || text$4(listing.brokerageName) || text$4(agent?.brokerage),
+    license: text$4(listing.licenseNumber) || text$4(listing.agentLicense) || text$4(agent?.license),
+    phone: text$4(listing.agentPhone) || text$4(agent?.phone),
+    email: text$4(listing.agentEmail) || text$4(agent?.email)
+  };
+}
+function matterportEmbed(value) {
+  if (!value) return "";
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.hostname !== "my.matterport.com") return "";
+    if (url.pathname !== "/show" && url.pathname !== "/show/") return "";
+    const model = url.searchParams.get("m") || "";
+    if (!/^[A-Za-z0-9_-]{4,32}$/.test(model)) return "";
+    return `https://my.matterport.com/show/?m=${encodeURIComponent(model)}`;
+  } catch {
+    return "";
+  }
+}
+function tourUrl(listing) {
+  const direct = [
+    text$4(listing.matterportUrl),
+    text$4(listing.virtualTourUrl),
+    text$4(listing.tourUrl)
+  ];
+  const tours = Array.isArray(listing.tours) ? listing.tours : [];
+  for (const tour of tours) {
+    const row = record(tour);
+    if (!row) continue;
+    direct.push(text$4(row.embedUrl), text$4(row.url));
+  }
+  const hidden = readMediaStore(listing.portalMedia).tours;
+  for (const candidate of direct) {
+    const embed = matterportEmbed(candidate);
+    if (!embed) continue;
+    const model = new URL(embed).searchParams.get("m") || "";
+    const blocked = Object.entries(hidden).some(([id, prefs]) => prefs.hidden && (id === model || id === candidate));
+    if (!blocked) return embed;
+  }
+  return "";
+}
+function hiddenSources(listing) {
+  const store = readMediaStore(listing.portalMedia);
+  const hidden = /* @__PURE__ */ new Set();
+  const groups = [
+    [listing.images, store.photos],
+    [listing.floorplans, store.floorplans],
+    [listing.floorPlans, store.floorplans],
+    [listing.videos, store.videos]
+  ];
+  for (const [items, prefs] of groups) {
+    if (!Array.isArray(items)) continue;
+    for (const item of items) {
+      const row = record(item);
+      if (!row) continue;
+      const id = text$4(row.id);
+      if (!id || !prefs[id]?.hidden) continue;
+      const source = rasterShareSource(row);
+      if (source) hidden.add(source);
+    }
+  }
+  return hidden;
+}
+function buildPublicListingSite(listing) {
+  if (!listing) return null;
+  const website = sanitizeWebsiteSettings(listing.portalWebsite);
+  if (!website.published) return null;
+  const id = text$4(listing.id);
+  if (!/^[A-Za-z0-9_-]{4,128}$/.test(id)) return null;
+  const address = addressParts$1(listing);
+  const slug = listingSiteSlug({ line1: address.line1, city: address.city });
+  if (!slug) return null;
+  const share = listing;
+  const hidden = hiddenSources(share);
+  const items = shareDisplayItems(share);
+  const photos = [];
+  let filmPosterUrl = "";
+  let floorplan = null;
+  items.forEach((item, index) => {
+    if (hidden.has(item.sourceUrl)) return;
+    const url = shareDisplayPath(id, index);
+    if (item.kind === "image" && website.showPhotos) photos.push({ name: item.name, url });
+    if (item.kind === "floorPlan" && website.showFloorplans && !floorplan) floorplan = { name: item.name, url };
+    if (item.kind === "poster" && website.showVideo && !filmPosterUrl && !item.sourceUrl.startsWith("video-placeholder:")) {
+      filmPosterUrl = url;
+    }
+  });
+  const facts = [
+    { label: "Beds", value: factValue(listing, ["beds", "bedrooms"]) },
+    { label: "Baths", value: factValue(listing, ["baths", "bathrooms"]) },
+    { label: "Sq ft", value: factValue(listing, ["sqft", "squareFeet"]) },
+    { label: "Lot", value: factValue(listing, ["lotSize"]) },
+    { label: "Built", value: factValue(listing, ["yearBuilt"]) }
+  ].filter((fact) => fact.value);
+  return {
+    slug,
+    design: website.design,
+    font: website.font,
+    color: website.color,
+    style: website.style,
+    address: address.formatted || address.line1,
+    street: address.line1,
+    city: address.city,
+    price: money(listing.listPrice ?? listing.price),
+    facts,
+    photos,
+    filmPosterUrl,
+    tourEmbedUrl: website.showTours ? tourUrl(listing) : "",
+    floorplan,
+    agent: agentOf(listing)
+  };
 }
 const BUCKET$1 = process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET || "iconic-images-aicon.firebasestorage.app";
 const REPLACEMENT_LIMIT = 4e6;
@@ -13420,7 +13608,7 @@ function adminReady$4(res) {
 function listingIdFrom(value) {
   return portalListingId(value);
 }
-function text$2(value) {
+function text$3(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function sendKnownError$3(res, err, fallback) {
@@ -13469,45 +13657,45 @@ async function readLiveInvoice(id) {
 function unique(records) {
   const seen = /* @__PURE__ */ new Set();
   const out = [];
-  for (const record of records) {
-    if (!record) continue;
-    const id = text$2(record.id);
+  for (const record2 of records) {
+    if (!record2) continue;
+    const id = text$3(record2.id);
     if (id && seen.has(id)) continue;
     if (id) seen.add(id);
-    out.push(record);
+    out.push(record2);
   }
   return out;
 }
 async function loadSources(listingId, listing) {
-  const requestId = text$2(listing.orderRequestId);
+  const requestId = text$3(listing.orderRequestId);
   const requests = unique([
     await readDoc("orderRequests", requestId),
     ...await readWhere("orderRequests", "listingId", listingId)
   ]);
-  const orderRequest = requests.find((record) => record.id === requestId) || requests[0] || null;
-  const orderId = text$2(listing.orderId) || text$2(orderRequest?.convertedToOrderId) || text$2(orderRequest?.orderId);
+  const orderRequest = requests.find((record2) => record2.id === requestId) || requests[0] || null;
+  const orderId = text$3(listing.orderId) || text$3(orderRequest?.convertedToOrderId) || text$3(orderRequest?.orderId);
   const orders = unique([
     await readDoc("orders", orderId),
     ...await readWhere("orders", "listingId", listingId)
   ]);
-  const order = orders.find((record) => record.id === orderId) || orders[0] || null;
-  const invoiceIds = [text$2(listing.invoiceId), text$2(order?.invoiceId), text$2(orderRequest?.invoiceId)].filter(Boolean);
+  const order = orders.find((record2) => record2.id === orderId) || orders[0] || null;
+  const invoiceIds = [text$3(listing.invoiceId), text$3(order?.invoiceId), text$3(orderRequest?.invoiceId)].filter(Boolean);
   const legacyIds = [
-    ...legacyInvoiceDocIds({ orderRequestId: text$2(orderRequest?.id), listingId }),
-    ...legacyInvoiceDocIds({ orderRequestId: text$2(order?.orderRequestId), listingId: text$2(order?.listingId) || listingId })
+    ...legacyInvoiceDocIds({ orderRequestId: text$3(orderRequest?.id), listingId }),
+    ...legacyInvoiceDocIds({ orderRequestId: text$3(order?.orderRequestId), listingId: text$3(order?.listingId) || listingId })
   ].filter((id) => !invoiceIds.includes(id));
-  const galleryId = text$2(listing.galleryId) || text$2(orderRequest?.galleryId) || text$2(order?.galleryId);
+  const galleryId = text$3(listing.galleryId) || text$3(orderRequest?.galleryId) || text$3(order?.galleryId);
   const [invoiceDocs, legacyDocs, invoicesByListing, invoicesByOrder, invoicesByRequest, galleryDoc, galleriesByListing, galleriesByOrder, appointmentsByRequest, appointmentsByOrder, appointmentsByListing] = await Promise.all([
     Promise.all(invoiceIds.map((id) => readLiveInvoice(id))),
     Promise.all(legacyIds.map((id) => readLiveInvoice(id))),
     readWhere("invoices", "listingId", listingId),
-    readWhere("invoices", "orderId", text$2(order?.id)),
-    readWhere("invoices", "orderRequestId", text$2(orderRequest?.id)),
+    readWhere("invoices", "orderId", text$3(order?.id)),
+    readWhere("invoices", "orderRequestId", text$3(orderRequest?.id)),
     readDoc("galleries", galleryId),
     readWhere("galleries", "listingId", listingId),
-    readWhere("galleries", "orderId", text$2(order?.id)),
-    readWhere("appointments", "orderRequestId", text$2(orderRequest?.id)),
-    readWhere("appointments", "orderId", text$2(order?.id)),
+    readWhere("galleries", "orderId", text$3(order?.id)),
+    readWhere("appointments", "orderRequestId", text$3(orderRequest?.id)),
+    readWhere("appointments", "orderId", text$3(order?.id)),
     readWhere("appointments", "listingId", listingId)
   ]);
   return {
@@ -13517,7 +13705,7 @@ async function loadSources(listingId, listing) {
     invoices: unique([
       ...invoiceDocs,
       ...legacyDocs,
-      ...[...invoicesByListing, ...invoicesByOrder, ...invoicesByRequest].filter((record) => !invoiceRedirectTarget(record))
+      ...[...invoicesByListing, ...invoicesByOrder, ...invoicesByRequest].filter((record2) => !invoiceRedirectTarget(record2))
     ]),
     galleries: unique([galleryDoc, ...galleriesByListing, ...galleriesByOrder]),
     appointments: unique([...appointmentsByRequest, ...appointmentsByOrder, ...appointmentsByListing])
@@ -13537,8 +13725,8 @@ async function authorizedListing(req, listingId) {
 }
 function mediaChange(body) {
   const row = body && typeof body === "object" ? body : {};
-  const kind = text$2(row.kind);
-  const id = text$2(row.id);
+  const kind = text$3(row.kind);
+  const id = text$3(row.id);
   if (!KINDS.has(kind) || !id) return null;
   if (typeof row.hidden === "boolean") return { kind, id, hidden: row.hidden };
   if (row.move === "earlier" || row.move === "later") return { kind, id, move: row.move };
@@ -13558,6 +13746,7 @@ async function appendPortalWrite(listingId, patch) {
     if (patch.portalMedia) update.portalMedia = patch.portalMedia;
     if (patch.portalWebsite) update.portalWebsite = patch.portalWebsite;
     if (patch.portalData) update.portalData = patch.portalData;
+    if (patch.listingSiteSlug) update.listingSiteSlug = patch.listingSiteSlug;
     tx.update(ref, update);
   });
 }
@@ -13619,7 +13808,12 @@ const handlePatchPortalData = async (req, res) => {
     const write = portalListingFactsWrite(detail, req.body, (/* @__PURE__ */ new Date()).toISOString());
     if (write.ok === false) return res.status(400).json({ error: write.error });
     if (write.changed) {
-      await appendPortalWrite(listingId, { portalData: write.portalData, activity: write.activity });
+      const addressed = buildPortalListingDetail({ listing: { ...listing, portalData: write.portalData } });
+      await appendPortalWrite(listingId, {
+        portalData: write.portalData,
+        listingSiteSlug: listingSiteSlug({ line1: addressed.address.line1, city: addressed.address.city }),
+        activity: write.activity
+      });
     }
     const refreshed = await authorizedListing(req, listingId);
     return res.json(buildPortalListingDetail(await loadSources(listingId, refreshed)));
@@ -13632,7 +13826,7 @@ const handleCreatePhotoEditRequest = async (req, res) => {
   const listingId = listingIdFrom(req.params.id);
   if (!listingId) return res.status(400).json({ error: "Listing id is not valid." });
   const body = req.body && typeof req.body === "object" ? req.body : {};
-  const photoId = text$2(body.photoId);
+  const photoId = text$3(body.photoId);
   const note = typeof body.note === "string" ? body.note : "";
   if (!photoId) return res.status(400).json({ error: "Choose one photo." });
   try {
@@ -13666,8 +13860,10 @@ const handlePatchPortalWebsite = async (req, res) => {
     const next = sanitizeWebsiteSettings(req.body, current);
     const changed = JSON.stringify(next) !== JSON.stringify(current);
     if (changed) {
+      const detail = buildPortalListingDetail({ listing });
       await appendPortalWrite(listingId, {
         portalWebsite: next,
+        listingSiteSlug: listingSiteSlug({ line1: detail.address.line1, city: detail.address.city }),
         activity: {
           id: `portal-website-${(/* @__PURE__ */ new Date()).toISOString()}`,
           at: (/* @__PURE__ */ new Date()).toISOString(),
@@ -16171,14 +16367,14 @@ const GMASS_LINK_OUT = [
   "Webhooks. The webhook route is for Zapier, and end users manage webhooks in the dashboard."
 ];
 const MERGE = /\{([A-Za-z]+)(?:\|([^}]*))?\}/g;
-function escapeHtml$3(value) {
+function escapeHtml$4(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function applyMerge(template, values) {
   return template.replace(MERGE, (full, key, fallback) => {
     const value = values[key];
-    if (value) return key === "UnsubscribeUrl" ? value : escapeHtml$3(value);
-    if (fallback !== void 0) return escapeHtml$3(fallback);
+    if (value) return key === "UnsubscribeUrl" ? value : escapeHtml$4(value);
+    if (fallback !== void 0) return escapeHtml$4(fallback);
     return full;
   });
 }
@@ -16203,7 +16399,7 @@ function list(value) {
   }
   return [];
 }
-function text$1(row, key) {
+function text$2(row, key) {
   const value = row[key] ?? row[key[0].toUpperCase() + key.slice(1)];
   return value == null ? "" : String(value);
 }
@@ -16220,12 +16416,12 @@ function summarizeGmassReport(input) {
   const unsubscribes = list(input.unsubscribes);
   const replies = list(input.replies);
   const sent = recipients.length || Number(input.aggregate?.recipients || 0);
-  const bounceEmails = new Set(bounces.map((row) => text$1(row, "emailAddress").toLowerCase()).filter(Boolean));
-  const blockEmails = new Set(blocks.map((row) => text$1(row, "emailAddress").toLowerCase()).filter(Boolean));
+  const bounceEmails = new Set(bounces.map((row) => text$2(row, "emailAddress").toLowerCase()).filter(Boolean));
+  const blockEmails = new Set(blocks.map((row) => text$2(row, "emailAddress").toLowerCase()).filter(Boolean));
   const delivered = Math.max(0, sent - (/* @__PURE__ */ new Set([...bounceEmails, ...blockEmails])).size);
-  const uniqueOpens = new Set(opens.map((row) => text$1(row, "emailAddress").toLowerCase()).filter(Boolean)).size || (recipients.length ? 0 : Number(input.aggregate?.opens || 0));
+  const uniqueOpens = new Set(opens.map((row) => text$2(row, "emailAddress").toLowerCase()).filter(Boolean)).size || (recipients.length ? 0 : Number(input.aggregate?.opens || 0));
   const openTotal = opens.reduce((sum, row) => sum + Number(row.openCount || row.OpenCount || 1), 0) || uniqueOpens;
-  const clickEmails = new Set(clicks.map((row) => text$1(row, "emailAddress").toLowerCase()).filter(Boolean));
+  const clickEmails = new Set(clicks.map((row) => text$2(row, "emailAddress").toLowerCase()).filter(Boolean));
   const uniqueClicks = clickEmails.size || (recipients.length ? 0 : Number(input.aggregate?.clicks || 0));
   const replyCount = replies.length || Number(input.aggregate?.replies || 0);
   const bounceCount = bounces.length || Number(input.aggregate?.bounces || 0);
@@ -16233,10 +16429,10 @@ function summarizeGmassReport(input) {
   const unsubCount = unsubscribes.length || Number(input.aggregate?.unsubscribes || 0);
   const linkMap = /* @__PURE__ */ new Map();
   for (const row of clicks) {
-    const url = text$1(row, "url") || "(unknown link)";
+    const url = text$2(row, "url") || "(unknown link)";
     const current = linkMap.get(url) || { clicks: 0, emails: /* @__PURE__ */ new Set() };
     current.clicks += 1;
-    const email = text$1(row, "emailAddress").toLowerCase();
+    const email = text$2(row, "emailAddress").toLowerCase();
     if (email) current.emails.add(email);
     linkMap.set(url, current);
   }
@@ -16250,41 +16446,41 @@ function summarizeGmassReport(input) {
     return byEmail.get(key);
   };
   for (const row of recipients) {
-    const item = ensure(text$1(row, "emailAddress"));
-    if (item) item.sentAt = text$1(row, "sentTime");
+    const item = ensure(text$2(row, "emailAddress"));
+    if (item) item.sentAt = text$2(row, "sentTime");
   }
   for (const row of opens) {
-    const item = ensure(text$1(row, "emailAddress"));
+    const item = ensure(text$2(row, "emailAddress"));
     if (item) item.opens = Number(row.openCount || row.OpenCount || 1);
   }
   for (const row of clicks) {
-    const item = ensure(text$1(row, "emailAddress"));
+    const item = ensure(text$2(row, "emailAddress"));
     if (item) item.clicks += 1;
   }
   for (const row of replies) {
-    const item = ensure(text$1(row, "emailAddress"));
+    const item = ensure(text$2(row, "emailAddress"));
     if (item) item.replied = true;
   }
   for (const row of bounces) {
-    const item = ensure(text$1(row, "emailAddress"));
+    const item = ensure(text$2(row, "emailAddress"));
     if (item) item.bounced = true;
   }
   for (const row of blocks) {
-    const item = ensure(text$1(row, "emailAddress"));
+    const item = ensure(text$2(row, "emailAddress"));
     if (item) item.blocked = true;
   }
   for (const row of unsubscribes) {
-    const item = ensure(text$1(row, "emailAddress"));
+    const item = ensure(text$2(row, "emailAddress"));
     if (item) item.unsubscribed = true;
   }
   const timeline = [
-    ...recipients.map((row) => ({ at: text$1(row, "sentTime"), type: "sent", email: text$1(row, "emailAddress"), detail: "Sent" })),
-    ...opens.map((row) => ({ at: text$1(row, "lastOpenTime"), type: "open", email: text$1(row, "emailAddress"), detail: `${row.openCount || 1} opens` })),
-    ...clicks.map((row) => ({ at: text$1(row, "clickTime"), type: "click", email: text$1(row, "emailAddress"), detail: text$1(row, "url") })),
-    ...replies.map((row) => ({ at: text$1(row, "replyTime"), type: "reply", email: text$1(row, "emailAddress"), detail: "Replied" })),
-    ...bounces.map((row) => ({ at: text$1(row, "bounceTime"), type: "bounce", email: text$1(row, "emailAddress"), detail: text$1(row, "bounceReason") || "Bounced" })),
-    ...blocks.map((row) => ({ at: text$1(row, "blockTime"), type: "block", email: text$1(row, "emailAddress"), detail: text$1(row, "blockReason") || "Blocked" })),
-    ...unsubscribes.map((row) => ({ at: text$1(row, "unsubscribeTime"), type: "unsubscribe", email: text$1(row, "emailAddress"), detail: "Unsubscribed" }))
+    ...recipients.map((row) => ({ at: text$2(row, "sentTime"), type: "sent", email: text$2(row, "emailAddress"), detail: "Sent" })),
+    ...opens.map((row) => ({ at: text$2(row, "lastOpenTime"), type: "open", email: text$2(row, "emailAddress"), detail: `${row.openCount || 1} opens` })),
+    ...clicks.map((row) => ({ at: text$2(row, "clickTime"), type: "click", email: text$2(row, "emailAddress"), detail: text$2(row, "url") })),
+    ...replies.map((row) => ({ at: text$2(row, "replyTime"), type: "reply", email: text$2(row, "emailAddress"), detail: "Replied" })),
+    ...bounces.map((row) => ({ at: text$2(row, "bounceTime"), type: "bounce", email: text$2(row, "emailAddress"), detail: text$2(row, "bounceReason") || "Bounced" })),
+    ...blocks.map((row) => ({ at: text$2(row, "blockTime"), type: "block", email: text$2(row, "emailAddress"), detail: text$2(row, "blockReason") || "Blocked" })),
+    ...unsubscribes.map((row) => ({ at: text$2(row, "unsubscribeTime"), type: "unsubscribe", email: text$2(row, "emailAddress"), detail: "Unsubscribed" }))
   ].filter((item) => item.at).sort((a, b) => b.at.localeCompare(a.at));
   const bounceRate = sent ? bounceCount / sent : 0;
   return {
@@ -18762,7 +18958,7 @@ function parseLiveChatBody(body) {
 function oneLine(value) {
   return value.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
 }
-function escapeHtml$2(value) {
+function escapeHtml$3(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function liveChatSmsBody(input) {
@@ -18798,10 +18994,10 @@ async function deliverLiveChat(input) {
       audience: "staff",
       subject: `Live chat from ${oneLine(input.name).slice(0, 80)}`,
       variables: {
-        senderName: escapeHtml$2(input.name),
-        senderEmail: escapeHtml$2(input.email || "Not provided"),
-        senderPhone: escapeHtml$2(input.phone || "Not provided"),
-        message: escapeHtml$2(input.message)
+        senderName: escapeHtml$3(input.name),
+        senderEmail: escapeHtml$3(input.email || "Not provided"),
+        senderPhone: escapeHtml$3(input.phone || "Not provided"),
+        message: escapeHtml$3(input.message)
       }
     });
     emailDelivered = emailResult.sent;
@@ -19350,15 +19546,15 @@ function isPresentationToken(value) {
 function createPresentationToken(randomBytes2) {
   return randomBytes2(18).toString("base64url");
 }
-function text(value) {
+function text$1(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function roomFromFields(row, folders) {
   for (const key of ["room", "roomName", "roomType", "scene"]) {
-    const value = text(row[key]);
+    const value = text$1(row[key]);
     if (value && value.length <= 48 && !IMAGE_EXT.test(value) && !RAW_EXT.test(value)) return value;
   }
-  const folderId = text(row.folderId);
+  const folderId = text$1(row.folderId);
   if (folderId && folders.has(folderId)) return folders.get(folderId) || "";
   return "";
 }
@@ -19369,8 +19565,8 @@ function folderMap(listing) {
   for (const item of folders) {
     if (!item || typeof item !== "object") continue;
     const row = item;
-    const id = text(row.id);
-    const name = text(row.name);
+    const id = text$1(row.id);
+    const name = text$1(row.name);
     if (id && name) map.set(id, name);
   }
   return map;
@@ -19379,12 +19575,12 @@ function isRawPath(path2, name) {
   return RAW_EXT.test(name) || RAW_EXT.test(path2) || path2.includes("/raw/");
 }
 function pushDraft(drafts, row, index, folders, fallbackRoom = "") {
-  const path2 = text(row.path) || text(row.storagePath);
-  const name = text(row.name) || text(row.fileName) || text(row.title) || path2.split("/").pop() || "";
-  const type = text(row.type).toLowerCase();
+  const path2 = text$1(row.path) || text$1(row.storagePath);
+  const name = text$1(row.name) || text$1(row.fileName) || text$1(row.title) || path2.split("/").pop() || "";
+  const type = text$1(row.type).toLowerCase();
   if (type && SKIP_TYPES.has(type)) return;
   if (isRawPath(path2, name)) return;
-  const contentType = text(row.contentType).toLowerCase();
+  const contentType = text$1(row.contentType).toLowerCase();
   const looksLikeImage = !contentType || contentType.startsWith("image/") || IMAGE_EXT.test(name) || IMAGE_EXT.test(path2);
   if (!looksLikeImage) return;
   if (contentType && !contentType.startsWith("image/") && !IMAGE_EXT.test(name)) return;
@@ -19392,16 +19588,16 @@ function pushDraft(drafts, row, index, folders, fallbackRoom = "") {
   if (!sourceUrl) return;
   const room = roomFromFields(row, folders) || fallbackRoom;
   const order = typeof row.order === "number" && Number.isFinite(row.order) ? row.order : index;
-  const final = row.studioApproved === true || text(row.studioRole) === "final" || path2.includes("/finals/");
+  const final = row.studioApproved === true || text$1(row.studioRole) === "final" || path2.includes("/finals/");
   drafts.push({
-    id: text(row.id) || path2 || sourceUrl,
+    id: text$1(row.id) || path2 || sourceUrl,
     url: sourceUrl,
     alt: room ? `${room} photograph` : "Listing photograph",
     room,
     order,
     index,
     path: path2,
-    sourcePath: text(row.sourcePath),
+    sourcePath: text$1(row.sourcePath),
     sourceUrl,
     final
   });
@@ -19501,13 +19697,13 @@ function addressParts(listing) {
   }
   if (source && typeof source === "object") {
     const row = source;
-    const street = text(row.street);
-    const locality = [text(row.city), [text(row.state), text(row.zip)].filter(Boolean).join(" ")].filter(Boolean).join(", ");
-    const formatted = text(row.formatted);
+    const street = text$1(row.street);
+    const locality = [text$1(row.city), [text$1(row.state), text$1(row.zip)].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+    const formatted = text$1(row.formatted);
     const address = formatted || [street, locality].filter(Boolean).join(", ");
     if (address) return { address, street: street || address, locality: street ? locality : "" };
   }
-  const property = text(listing?.propertyAddress);
+  const property = text$1(listing?.propertyAddress);
   if (property) return { address: property, street: property, locality: "" };
   const labeled = listingAddressLabel({
     address: listing?.address,
@@ -19518,10 +19714,10 @@ function addressParts(listing) {
 }
 function agentNameOf(listing) {
   if (!listing) return "";
-  const direct = text(listing.agentName) || text(listing.listingAgent);
+  const direct = text$1(listing.agentName) || text$1(listing.listingAgent);
   if (direct) return direct;
   const agent = listing.agent;
-  if (agent && typeof agent === "object") return text(agent.name);
+  if (agent && typeof agent === "object") return text$1(agent.name);
   if (typeof agent === "string") return agent.trim();
   return "";
 }
@@ -19530,7 +19726,7 @@ function priceOf(listing) {
   if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(raw);
   }
-  const value = text(raw);
+  const value = text$1(raw);
   if (!value) return "";
   if (value.startsWith("$")) return value;
   const numeric2 = Number(value.replace(/[$,]/g, ""));
@@ -19541,7 +19737,7 @@ function priceOf(listing) {
 }
 function countOf(value) {
   if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  const raw = text(value);
+  const raw = text$1(value);
   return raw;
 }
 function absoluteUrl(origin, url) {
@@ -19563,7 +19759,7 @@ function buildPresentation(source) {
   const description = photos.length ? `${photos.length} photograph${photos.length === 1 ? "" : "s"}${address ? ` of ${address}` : ""}. A private presentation from Iconic Images.` : "A private listing presentation from Iconic Images.";
   return {
     token: source.token,
-    listingId: text(listing?.id) || null,
+    listingId: text$1(listing?.id) || null,
     seeded: false,
     enabled: true,
     address,
@@ -19634,18 +19830,18 @@ function seededPresentation(origin = "") {
 }
 function injectPresentationMeta(html, meta) {
   const tags = [
-    `<title>${escapeHtml$1(meta.title)}</title>`,
-    `<meta name="description" content="${escapeHtml$1(meta.description)}" />`,
+    `<title>${escapeHtml$2(meta.title)}</title>`,
+    `<meta name="description" content="${escapeHtml$2(meta.description)}" />`,
     `<meta name="robots" content="noindex, nofollow" />`,
     `<meta property="og:type" content="website" />`,
-    `<meta property="og:title" content="${escapeHtml$1(meta.title)}" />`,
-    `<meta property="og:description" content="${escapeHtml$1(meta.description)}" />`,
-    `<meta property="og:url" content="${escapeHtml$1(meta.url)}" />`,
-    meta.image ? `<meta property="og:image" content="${escapeHtml$1(meta.image)}" />` : "",
+    `<meta property="og:title" content="${escapeHtml$2(meta.title)}" />`,
+    `<meta property="og:description" content="${escapeHtml$2(meta.description)}" />`,
+    `<meta property="og:url" content="${escapeHtml$2(meta.url)}" />`,
+    meta.image ? `<meta property="og:image" content="${escapeHtml$2(meta.image)}" />` : "",
     `<meta name="twitter:card" content="summary_large_image" />`,
-    `<meta name="twitter:title" content="${escapeHtml$1(meta.title)}" />`,
-    `<meta name="twitter:description" content="${escapeHtml$1(meta.description)}" />`,
-    meta.image ? `<meta name="twitter:image" content="${escapeHtml$1(meta.image)}" />` : ""
+    `<meta name="twitter:title" content="${escapeHtml$2(meta.title)}" />`,
+    `<meta name="twitter:description" content="${escapeHtml$2(meta.description)}" />`,
+    meta.image ? `<meta name="twitter:image" content="${escapeHtml$2(meta.image)}" />` : ""
   ].filter(Boolean).join("\n    ");
   let next = stripPublicMeta(html).replace(/<title>[\s\S]*?<\/title>/gi, "");
   if (next.includes("</head>")) {
@@ -19657,7 +19853,7 @@ ${next}`;
   }
   return next;
 }
-function escapeHtml$1(value) {
+function escapeHtml$2(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 const router$2 = Router();
@@ -19729,7 +19925,7 @@ async function renderPresentationShell(token, origin) {
     if (!presentation) {
       return { status: 404, html: "<!doctype html><title>Presentation</title><p>This presentation link is not active.</p>" };
     }
-    const shell = await readSpaShell$1();
+    const shell = await readSpaShell$2();
     const html = shell ? injectPresentationMeta(shell, presentation.meta) : standalonePresentation(presentation);
     return { status: 200, html };
   } catch (err) {
@@ -19791,7 +19987,7 @@ router$2.post("/listings/:id/presentation", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "The presentation link could not be saved." });
   }
 });
-async function readSpaShell$1() {
+async function readSpaShell$2() {
   const candidates = [
     path.join(process.cwd(), "dist/spa/index.html")
   ];
@@ -19810,20 +20006,20 @@ function standalonePresentation(presentation) {
   const figures = presentation.photos.map((photo, index) => `
     <figure style="margin:0;min-height:100svh;position:relative;background:#070708">
       <img src="${escapeAttr(photo.url)}" alt="${escapeAttr(photo.alt)}" style="width:100%;height:100svh;object-fit:cover;display:block" />
-      <figcaption style="position:absolute;left:1.25rem;bottom:1.5rem;color:#fff;font-family:Georgia,serif;font-size:2rem">${escapeHtml(photo.room || String(index + 1))}</figcaption>
+      <figcaption style="position:absolute;left:1.25rem;bottom:1.5rem;color:#fff;font-family:Georgia,serif;font-size:2rem">${escapeHtml$1(photo.room || String(index + 1))}</figcaption>
     </figure>`).join("");
   const html = `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${escapeHtml(presentation.meta.title)}</title>
+    <title>${escapeHtml$1(presentation.meta.title)}</title>
   </head>
   <body style="margin:0;background:#070708;color:#fff">
     <header style="min-height:100svh;display:flex;align-items:flex-end;padding:2rem;background:#111 url('${escapeAttr(hero?.url || "")}') center/cover">
       <div>
         <p style="letter-spacing:.28em;text-transform:uppercase;font:600 11px/1 sans-serif">Iconic Images</p>
-        <h1 style="font:500 4rem/0.95 Georgia,serif;margin:.4rem 0">${escapeHtml(title)}</h1>
+        <h1 style="font:500 4rem/0.95 Georgia,serif;margin:.4rem 0">${escapeHtml$1(title)}</h1>
       </div>
     </header>
     ${figures}
@@ -19831,11 +20027,129 @@ function standalonePresentation(presentation) {
 </html>`;
   return injectPresentationMeta(html, presentation.meta);
 }
-function escapeHtml(value) {
+function escapeHtml$1(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 function escapeAttr(value) {
-  return escapeHtml(value).replace(/"/g, "&quot;");
+  return escapeHtml$1(value).replace(/"/g, "&quot;");
+}
+const memory$1 = /* @__PURE__ */ new Map();
+function useMemory() {
+  return !admin.apps.length || process.env.NODE_ENV === "test" || process.env.LISTING_SITE_STORE === "memory";
+}
+async function readPublishedListingSite(slug) {
+  if (!isListingSiteSlug(slug)) return null;
+  if (useMemory()) {
+    for (const listing of memory$1.values()) {
+      const site = buildPublicListingSite(listing);
+      if (site?.slug === slug) return site;
+    }
+    return null;
+  }
+  const snap = await admin.firestore().collection("listings").where("listingSiteSlug", "==", slug).limit(5).get();
+  for (const doc of snap.docs) {
+    const listing = jsonSafe({ id: doc.id, ...doc.data() || {} });
+    const site = buildPublicListingSite(listing);
+    if (site?.slug === slug) return site;
+  }
+  return null;
+}
+async function saveListingSiteInquiry(slug, inquiry) {
+  if (!isListingSiteSlug(slug)) return false;
+  if (useMemory()) {
+    for (const listing of memory$1.values()) {
+      const site = buildPublicListingSite(listing);
+      if (site?.slug !== slug) continue;
+      const existing = Array.isArray(listing.listingSiteInquiries) ? listing.listingSiteInquiries : [];
+      listing.listingSiteInquiries = [...existing, inquiry].slice(-50);
+      return true;
+    }
+    return false;
+  }
+  const snap = await admin.firestore().collection("listings").where("listingSiteSlug", "==", slug).limit(5).get();
+  for (const doc of snap.docs) {
+    const listing = jsonSafe({ id: doc.id, ...doc.data() || {} });
+    const site = buildPublicListingSite(listing);
+    if (site?.slug !== slug) continue;
+    await doc.ref.update({
+      listingSiteInquiries: admin.firestore.FieldValue.arrayUnion(inquiry),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    return true;
+  }
+  return false;
+}
+const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+function text(value, max) {
+  return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+async function renderListingSiteShell(slug) {
+  if (!SLUG.test(slug)) {
+    return { status: 404, html: "<!doctype html><title>Listing</title><p>This listing site is not published.</p>" };
+  }
+  try {
+    const site = await readPublishedListingSite(slug);
+    if (!site) {
+      return { status: 404, html: "<!doctype html><title>Listing</title><p>This listing site is not published.</p>" };
+    }
+    const shell = readSpaShell$1();
+    if (shell) return { status: 200, html: shell };
+    return {
+      status: 200,
+      html: `<!doctype html><title>${escapeHtml(site.address)}</title><p>${escapeHtml(site.address)}</p>`
+    };
+  } catch (err) {
+    console.error("[Listing site] Shell failed.", err);
+    return { status: 500, html: "<!doctype html><title>Listing</title><p>This listing site could not be opened.</p>" };
+  }
+}
+const handleListingSiteShell = async (req, res) => {
+  const rendered = await renderListingSiteShell(String(req.params.slug || ""));
+  res.setHeader("Cache-Control", "no-store");
+  res.status(rendered.status).type("html").send(rendered.html);
+};
+const handleGetListingSite = async (req, res) => {
+  const slug = String(req.params.slug || "");
+  if (!isListingSiteSlug(slug)) return res.status(404).json({ error: "This listing site is not published." });
+  try {
+    const site = await readPublishedListingSite(slug);
+    if (!site) return res.status(404).json({ error: "This listing site is not published." });
+    res.setHeader("Cache-Control", "no-store");
+    return res.json(site);
+  } catch (err) {
+    console.error("[Listing site] Read failed.", err);
+    return res.status(500).json({ error: "This listing site could not be opened." });
+  }
+};
+const handleListingSiteInquiry = async (req, res) => {
+  const slug = String(req.params.slug || "");
+  const body = req.body && typeof req.body === "object" ? req.body : {};
+  const name = text(body.name, 80);
+  const contact = text(body.contact, 120);
+  const when = text(body.when, 80);
+  if (body.consent !== true) return res.status(400).json({ error: "Consent is required." });
+  if (!name || !contact) return res.status(400).json({ error: "Add a name and a way to reach you." });
+  try {
+    const saved = await saveListingSiteInquiry(slug, { name, contact, when, at: (/* @__PURE__ */ new Date()).toISOString() });
+    if (!saved) return res.status(404).json({ error: "This listing site is not published." });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("[Listing site] Inquiry failed.", err);
+    return res.status(500).json({ error: "The request could not be saved." });
+  }
+};
+function readSpaShell$1() {
+  const candidates = [
+    path$1.resolve(process.cwd(), "dist/spa/index.html"),
+    path$1.resolve(process.cwd(), "dist/index.html")
+  ];
+  for (const file of candidates) {
+    if (fs$1.existsSync(file)) return fs$1.readFileSync(file, "utf8");
+  }
+  return "";
+}
+function escapeHtml(value) {
+  return value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch] || ch);
 }
 const router$1 = Router();
 function adminReady(res) {
@@ -20422,11 +20736,11 @@ function moneyIn(sheets) {
   if (collected.length) return collected;
   for (const sheet of sheets) {
     const records = tableRecords(rowsOf(sheet));
-    const rows = records.map((record) => ({
-      method: pick(record, ["method", "source", "payment", "tender"]),
-      amount: parseMoney(pick(record, ["amount", "total", "in", "collected"]))
+    const rows = records.map((record2) => ({
+      method: pick(record2, ["method", "source", "payment", "tender"]),
+      amount: parseMoney(pick(record2, ["amount", "total", "in", "collected"]))
     })).filter((row) => row.method && !pickMatchesOnly(row.method));
-    if (rows.length && records.some((record) => pick(record, ["method", "source", "payment", "tender"]))) {
+    if (rows.length && records.some((record2) => pick(record2, ["method", "source", "payment", "tender"]))) {
       return rows;
     }
   }
@@ -20463,9 +20777,9 @@ function splitKind(records) {
   const owesRows = [];
   const receivables = [];
   let sawKind = false;
-  for (const record of records) {
-    const kind = norm(pick(record, ["type", "kind", "category"]));
-    const party = recordToParty(record);
+  for (const record2 of records) {
+    const kind = norm(pick(record2, ["type", "kind", "category"]));
+    const party = recordToParty(record2);
     if (!party.name) continue;
     if (!kind) continue;
     sawKind = true;
@@ -20475,11 +20789,11 @@ function splitKind(records) {
   if (!sawKind) return { owes: [], receivables: [] };
   return { owes: owesRows, receivables };
 }
-function recordToParty(record) {
+function recordToParty(record2) {
   return {
-    name: pick(record, ["name", "who", "client", "customer", "account", "vendor", "business"]),
-    amount: parseMoney(pick(record, ["amount", "balance", "due", "total", "owes"])),
-    detail: pick(record, ["detail", "note", "notes", "due date", "status", "when"]) || null
+    name: pick(record2, ["name", "who", "client", "customer", "account", "vendor", "business"]),
+    amount: parseMoney(pick(record2, ["amount", "balance", "due", "total", "owes"])),
+    detail: pick(record2, ["detail", "note", "notes", "due date", "status", "when"]) || null
   };
 }
 const BUSINESS_FIELDS = [
@@ -20519,10 +20833,10 @@ function businesses(sheet) {
     }
   }
   const records = tableRecords(rows);
-  const fromTable = records.map((record) => {
-    const name = pick(record, ["business", "name", "company"]);
-    const status2 = pick(record, ["status", "health", "ryg", "rag", "color", "state"]);
-    const note = pick(record, ["where it stands", "note", "notes", "detail", "comment"]) || null;
+  const fromTable = records.map((record2) => {
+    const name = pick(record2, ["business", "name", "company"]);
+    const status2 = pick(record2, ["status", "health", "ryg", "rag", "color", "state"]);
+    const note = pick(record2, ["where it stands", "note", "notes", "detail", "comment"]) || null;
     return business(name, status2, note);
   }).filter((item) => item.name);
   if (fromTable.length) return fromTable;
@@ -20603,7 +20917,7 @@ function weekPlan(sheet, now) {
   const todayKey = chicagoDateKey(now);
   const weekday = chicagoWeekday(now);
   const records = tableRecords(rowsOf(sheet));
-  const items = (records.length ? records.map((record) => planFromRecord(record)) : pairs(rowsOf(sheet)).map((item) => ({
+  const items = (records.length ? records.map((record2) => planFromRecord(record2)) : pairs(rowsOf(sheet)).map((item) => ({
     when: null,
     title: item.name,
     detail: item.detail,
@@ -20617,14 +20931,14 @@ function weekPlan(sheet, now) {
     calendar: items.map(stripFlag)
   };
 }
-function planFromRecord(record) {
-  const whenCell = pick(record, ["when", "today", "flag"]);
-  const day = pick(record, ["day", "weekday"]);
-  const date = pick(record, ["date"]);
-  const calendar = pick(record, ["calendar", "event", "appointment"]);
-  const plan = pick(record, ["plan", "focus", "item", "task", "title"]);
-  const where = pick(record, ["where", "location", "place"]);
-  const time = pick(record, ["time"]);
+function planFromRecord(record2) {
+  const whenCell = pick(record2, ["when", "today", "flag"]);
+  const day = pick(record2, ["day", "weekday"]);
+  const date = pick(record2, ["date"]);
+  const calendar = pick(record2, ["calendar", "event", "appointment"]);
+  const plan = pick(record2, ["plan", "focus", "item", "task", "title"]);
+  const where = pick(record2, ["where", "location", "place"]);
+  const time = pick(record2, ["time"]);
   const weekday = weekdayName(day) || weekdayName(date);
   return {
     when: time || null,
@@ -20646,11 +20960,11 @@ function stripFlag(item) {
 }
 function decisions(sheet) {
   const records = tableRecords(rowsOf(sheet));
-  const items = records.length ? records.map((record) => ({
-    title: pick(record, ["decision", "title", "question", "item", "need"]),
-    detail: pick(record, ["detail", "note", "notes", "context"]) || null,
-    by: pick(record, ["by", "due", "needed", "when", "date"]) || null,
-    status: pick(record, ["status", "state"])
+  const items = records.length ? records.map((record2) => ({
+    title: pick(record2, ["decision", "title", "question", "item", "need"]),
+    detail: pick(record2, ["detail", "note", "notes", "context"]) || null,
+    by: pick(record2, ["by", "due", "needed", "when", "date"]) || null,
+    status: pick(record2, ["status", "state"])
   })) : pairs(rowsOf(sheet)).map((item) => ({ title: item.name, detail: item.detail, by: null, status: "" }));
   return items.filter((item) => item.title && !CLOSED_DECISIONS.has(norm(item.status || ""))).map(({ title, detail, by }) => ({ title, detail, by }));
 }
@@ -20659,9 +20973,9 @@ function tracker(sheet) {
   const goal = labeledNumberInRows(rows, ["goal", "target", "tracker goal"], ["savings goal"]);
   const current = labeledNumberInRows(rows, ["current", "collected", "actual", "progress", "to date"]);
   const records = tableRecords(rows);
-  const breakdown = records.map((record) => ({
-    label: pick(record, ["source", "business", "name", "label", "stream"]),
-    amount: parseMoney(pick(record, ["amount", "total", "current", "collected"]))
+  const breakdown = records.map((record2) => ({
+    label: pick(record2, ["source", "business", "name", "label", "stream"]),
+    amount: parseMoney(pick(record2, ["amount", "total", "current", "collected"]))
   })).filter((row) => row.label && !matchesAlias(row.label, ["goal", "current", "target", "source", "amount"]));
   return { goal, current, rows: breakdown };
 }
@@ -20789,9 +21103,9 @@ function sectionHorizons(rows) {
 function recordHorizons(rows) {
   const records = tableRecords(rows);
   const groups = /* @__PURE__ */ new Map();
-  for (const record of records) {
-    const horizon = horizonKey(pick(record, ["horizon", "window", "days", "phase"]));
-    const item = pick(record, ["item", "plan", "focus", "goal", "task", "milestone"]);
+  for (const record2 of records) {
+    const horizon = horizonKey(pick(record2, ["horizon", "window", "days", "phase"]));
+    const item = pick(record2, ["item", "plan", "focus", "goal", "task", "milestone"]);
     if (!horizon || !item) continue;
     pushHorizon(groups, horizon, item);
   }
@@ -20905,17 +21219,17 @@ function bots(sheet) {
   const records = tableRecords(rowsOf(sheet));
   if (!records.length) return { state: "empty", entries: [] };
   const groups = /* @__PURE__ */ new Map();
-  for (const record of records) {
-    const bot = pick(record, ["bot", "agent", "name"]) || "Bot";
-    const loop = pick(record, ["loop", "workflow", "lane"]) || "All loops";
+  for (const record2 of records) {
+    const bot = pick(record2, ["bot", "agent", "name"]) || "Bot";
+    const loop = pick(record2, ["loop", "workflow", "lane"]) || "All loops";
     const key = `${norm(bot)}::${norm(loop)}`;
     const current = groups.get(key) || { bot, loop, actionsDone: 0, salesClosed: 0, accuracy: null, accuracySamples: [] };
-    const actions = parseMoney(pick(record, ["actions", "actions done", "done", "count"]));
-    const sales = parseMoney(pick(record, ["sales closed", "sales", "closed", "sold"]));
-    const accuracy = parsePercent(pick(record, ["accuracy", "score"]));
+    const actions = parseMoney(pick(record2, ["actions", "actions done", "done", "count"]));
+    const sales = parseMoney(pick(record2, ["sales closed", "sales", "closed", "sold"]));
+    const accuracy = parsePercent(pick(record2, ["accuracy", "score"]));
     current.actionsDone = (current.actionsDone || 0) + (actions != null ? actions : 1);
     if (sales != null) current.salesClosed = (current.salesClosed || 0) + sales;
-    else if (/\b(closed|sold|won|paid)\b/i.test(pick(record, ["result", "status", "outcome"]))) {
+    else if (/\b(closed|sold|won|paid)\b/i.test(pick(record2, ["result", "status", "outcome"]))) {
       current.salesClosed = (current.salesClosed || 0) + 1;
     }
     if (accuracy != null) current.accuracySamples.push(accuracy);
@@ -20945,17 +21259,17 @@ function tableRecords(rows) {
   for (const row of rows.slice(headerAt + 1)) {
     if (row.every((item) => !item)) continue;
     if (isSectionTitle(row.filter(Boolean)[0] || "") && row.filter(Boolean).length === 1) break;
-    const record = {};
+    const record2 = {};
     headers.forEach((header, index) => {
       if (!header) return;
-      record[header] = cell(row[index]);
+      record2[header] = cell(row[index]);
     });
-    if (Object.values(record).some(Boolean)) records.push(record);
+    if (Object.values(record2).some(Boolean)) records.push(record2);
   }
   return records;
 }
-function pick(record, aliases) {
-  const entries = Object.entries(record);
+function pick(record2, aliases) {
+  const entries = Object.entries(record2);
   for (const alias of aliases) {
     const exact = entries.find(([key]) => key === alias);
     if (exact?.[1]) return exact[1];
@@ -22276,8 +22590,8 @@ async function storeSiteUpload(pageId, bytes) {
 async function assertPublicHost(hostname) {
   const records = await lookup(hostname, { all: true, verbatim: true });
   if (!records.length) throw new Error("That Dropbox link could not be resolved.");
-  for (const record of records) {
-    if (isPrivateAddress(record.address)) throw new Error("That Dropbox link is not allowed.");
+  for (const record2 of records) {
+    if (isPrivateAddress(record2.address)) throw new Error("That Dropbox link is not allowed.");
   }
 }
 async function importDropboxFile(rawUrl) {
@@ -22659,11 +22973,17 @@ function createServer() {
   app.use("/api/messages", router$j);
   app.use("/api/clients", router$i);
   app.get("/api/portal/listings/:id", handleGetPublicPortalListing);
+  app.get("/api/listing-sites/:slug", handleGetListingSite);
+  app.post("/api/listing-sites/:slug/inquiry", handleListingSiteInquiry);
   app.use("/api/staff", router$h);
   app.use("/api/site-content", router);
   app.get("/present/:token", (req, res, next) => {
     if (process.env.ICONIC_VITE_DEV === "1") return next();
     return handlePresentationShell(req, res);
+  });
+  app.get("/l/:slug", (req, res, next) => {
+    if (process.env.ICONIC_VITE_DEV === "1") return next();
+    return handleListingSiteShell(req, res);
   });
   app.use("/api", router$2);
   app.use("/api/listings", router$g);
