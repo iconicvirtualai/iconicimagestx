@@ -15,6 +15,7 @@ import {
   promoDiscountFor,
   PROMO_DISCOUNTS,
   publicBookingCatalogResponse,
+  publicPackageDeepLinkSelection,
   resolvePublicPackageDeepLink,
 } from "./bookingCatalog";
 import { bookingEmbedAvailability } from "./bookingEmbeds";
@@ -629,6 +630,18 @@ describe("booking catalog parity", () => {
     expect(resolvePublicPackageDeepLink("studio-noir", missing)).toEqual({ selectedId: "studio-noir", hidden: false });
     expect(resolvePublicPackageDeepLink("listing-essentials", missing)).toEqual({
       selectedId: "listing-essentials",
+      hidden: false,
+    });
+    expect(publicPackageDeepLinkSelection("apprentice-25")).toEqual({
+      selectedService: "",
+      selectedBasics: ["apprentice-25"],
+      showBasics: true,
+      hidden: false,
+    });
+    expect(publicPackageDeepLinkSelection("listing-essentials")).toEqual({
+      selectedService: "listing-essentials",
+      selectedBasics: [],
+      showBasics: false,
       hidden: false,
     });
     expect(resolvePublicPackageDeepLink("not-a-package", missing)).toEqual({

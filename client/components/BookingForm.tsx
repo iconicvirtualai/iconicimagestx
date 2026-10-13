@@ -24,6 +24,7 @@ import {
   isPubliclyBookable,
   packagesForStaffEditor,
   promoDiscountFor,
+  publicPackageDeepLinkSelection,
   resolvePublicPackageDeepLink,
   type StaffCatalogPackage,
 } from "@shared/bookingCatalog";
@@ -154,6 +155,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   const isMobile = useIsMobile();
   const [searchParams] = useSearchParams();
   const requestedPackage = (searchParams.get("package") || searchParams.get("service") || initialServiceId || "").trim();
+  const seededSelection = publicPackageDeepLinkSelection(requestedPackage);
   const [step, setStep] = useState<Step>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<BookingSubmitResult | null>(null);
@@ -166,12 +168,10 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
 
   const [expandedCategories, setExpandedCategories] = useState<string[]>(() => {
     if (initialCategoryId) return [initialCategoryId];
-    const seed = packagesForStaffEditor([]);
-    const link = resolvePublicPackageDeepLink(requestedPackage, seed);
-    const service = bookingOffer(seed).services.find((item) => item.id === link.selectedId);
+    const service = bookingOffer(packagesForStaffEditor([])).services.find((item) => item.id === seededSelection.selectedService);
     return service ? [service.category] : ["listings"];
   });
-  const [showBasics, setShowBasics] = useState(false);
+  const [showBasics, setShowBasics] = useState(seededSelection.showBasics);
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -184,8 +184,8 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     serviceDate: undefined as Date | undefined,
     serviceTime: "9:00 AM",
     preferredPhotographer: "Available (Auto-Assign)",
-    selectedService: resolvePublicPackageDeepLink(requestedPackage, packagesForStaffEditor([])).selectedId,
-    selectedBasics: [] as string[],
+    selectedService: seededSelection.selectedService,
+    selectedBasics: seededSelection.selectedBasics,
     selectedAddOns: [] as string[],
     lifeOfTheListingCare: false,
     premiumUpgrade: false,
@@ -270,7 +270,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     }
 
     if (requestedPackage) {
-      const link = resolvePublicPackageDeepLink(requestedPackage, catalog);
+      const link = publicPackageDeepLinkSelection(requestedPackage, catalog);
       if (link.hidden) {
         setFormData(prev => ({
           ...prev,
@@ -278,13 +278,25 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
           selectedBasics: prev.selectedBasics.filter((id) => id !== requestedPackage),
           selectedAddOns: prev.selectedAddOns.filter((id) => id !== requestedPackage),
         }));
+      } else if (link.showBasics) {
+        const apprentice = link.selectedBasics.some((id) => isApprenticeshipPackage(id));
+        setShowBasics(true);
+        setFormData(prev => ({
+          ...prev,
+          selectedService: "",
+          selectedBasics: link.selectedBasics,
+          premiumUpgrade: apprentice ? false : premiumParam,
+          ...(apprentice
+            ? { selectedAddOns: [], virtualStagingCredits: 0, specializedPhotography: "mls" as const }
+            : {}),
+        }));
       } else {
         setFormData(prev => ({
           ...prev,
-          selectedService: link.selectedId,
+          selectedService: link.selectedService,
           premiumUpgrade: premiumParam
         }));
-        const service = services.find(s => s.id === link.selectedId);
+        const service = services.find(s => s.id === link.selectedService);
         if (service) {
           setExpandedCategories([service.category]);
         }

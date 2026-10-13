@@ -190,6 +190,15 @@ describe("spa rewrite coverage", () => {
     expect(emailDollhouse.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
     expect(emailDollhouse.readUInt32BE(16)).toBe(800);
     expect(emailDollhouse.readUInt32BE(20)).toBe(560);
+    for (const path of ["/email/refresher-graphic.jpg", "/email/senior-hero.png", "/email/not-a-page"]) {
+      expect(firstMatchingRewrite(path, vercel.rewrites), path).toBeUndefined();
+      expect(vercel.redirects.some((rule) => compileVercelSource(rule.source).test(path)), path).toBe(false);
+      expect(headerMatches(path), path).toBe(false);
+    }
+    const refresher = readFileSync(new URL("../public/email/refresher-graphic.jpg", import.meta.url));
+    expect(refresher.subarray(0, 3).toString("hex")).toBe("ffd8ff");
+    expect(refresher.readUInt16BE(refresher.indexOf(Buffer.from([0xff, 0xc0])) + 5)).toBe(900);
+    expect(refresher.readUInt16BE(refresher.indexOf(Buffer.from([0xff, 0xc0])) + 7)).toBe(720);
     expect(headerMatches("/present/preview")).toBe(false);
   });
 
