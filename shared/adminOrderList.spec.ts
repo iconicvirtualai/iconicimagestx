@@ -3,6 +3,7 @@ import { resolveListingPriceLabel } from "./listingPrice.ts";
 import {
   ADMIN_ORDER_LIST_COLUMNS,
   adminOrderDetailHref,
+  adminOrderNumberLabel,
   adminOrderPaymentLabel,
   adminOrderPhotographer,
   adminOrderShoot,
@@ -35,17 +36,31 @@ describe("admin orders view memory", () => {
   });
 });
 
-describe("admin order list totals reuse the listings price helper", () => {
-  it("prints the same label resolveListingPriceLabel returns", () => {
+describe("admin order list totals", () => {
+  it("reuses the listings price helper when there is no invoice", () => {
     for (const order of records) {
+      if (order.invoice) continue;
       expect(adminOrderTotalLabel(order)).toBe(resolveListingPriceLabel({ listing: order }));
       expect(row(String(order.id)).totalLabel).toBe(resolveListingPriceLabel({ listing: order }));
     }
-    expect(row("fixture-maple").totalLabel).toBe("$549");
-    expect(row("fixture-oak").totalLabel).toBe("$350.00");
     expect(row("fixture-pine").totalLabel).toBe("$199.00");
-    expect(row("fixture-cedar").totalLabel).toBe("$249");
     expect(row("fixture-birch").totalLabel).toBe("—");
+  });
+
+  it("includes the 2.8% processing fee when invoice data exists", () => {
+    expect(row("fixture-maple").totalLabel).toBe("$641.47");
+    expect(row("fixture-oak").totalLabel).toBe("$359.80");
+    expect(row("fixture-cedar").totalLabel).toBe("$255.97");
+    expect(adminOrderTotalLabel({
+      serviceIds: ["listing-showcase"],
+      invoice: { subtotal: 549, total: 549 },
+    })).toBe("$564.37");
+    expect(adminOrderTotalLabel({
+      invoice: { subtotal: 549, processing: 15.37, total: 564.37 },
+    })).toBe("$564.37");
+    expect(adminOrderTotalLabel({
+      invoice: { subtotal: 549, total: 549, processingPolicy: "waived" },
+    })).toBe("$549.00");
   });
 });
 
@@ -67,7 +82,12 @@ describe("admin order payment status", () => {
 describe("admin order list rows", () => {
   it("uses the short order code, Chicago shoot time, package add-ons, and detail href", () => {
     const maple = row("fixture-maple");
-    expect(maple.orderCode).toBe("ORD - L - 10482");
+    expect(maple.orderCode).toBe("#012");
+    expect(row("fixture-oak").orderCode).toBe("#017");
+    expect(row("fixture-pine").orderCode).toBe("ORD - L - 33018");
+    expect(adminOrderNumberLabel({ orderCode: "ORD - L - 10482" })).toBe("ORD - L - 10482");
+    expect(adminOrderNumberLabel({ orderNumber: "#004", orderCode: "ORD - L - 10482" })).toBe("#004");
+    expect(adminOrderNumberLabel({ orderNumber: 42 })).toBe("#042");
     expect(maple.href).toBe("/admin/orders/fixture-maple");
     expect(adminOrderDetailHref("fixture maple")).toBe("/admin/orders/fixture%20maple");
     expect(maple.clientName).toBe("Sample Client Avery North");
@@ -148,7 +168,7 @@ describe("admin order list sorting", () => {
       "fixture-cedar",
       "fixture-pine",
     ]);
-    expect(sortAdminOrderRows(active, "total", "asc").map((item) => item.totalSort)).toEqual([199, 249, 350, 549]);
+    expect(sortAdminOrderRows(active, "total", "asc").map((item) => item.totalSort)).toEqual([199, 255.97, 359.8, 641.47]);
     const mixed = [
       row("fixture-maple"),
       buildAdminOrderListRow({ ...byId("fixture-oak"), clientName: "sample client blair quinn" }, staff),

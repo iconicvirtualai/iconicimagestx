@@ -1,14 +1,18 @@
 /**
  * Admin orders list rows.
  * Reads fields already on the order list. Does not write and does not fetch.
- * Totals go through resolveListingPriceLabel, the same fallback the listings
- * grid uses (tile price, then stored totals, invoice, then catalog).
+ * Totals go through resolveListingPriceLabel when the order has no invoice.
+ * An invoice total includes the 2.8% processing fee: a stored fee is kept,
+ * and a legacy invoice total gets the fee added once.
  */
 
 import { recordAddressText } from "./addressText.ts";
 import { calendarDateKey, clockTime, formatChicagoDate } from "./clientHome.ts";
 import { buildAdminOrderTile } from "./adminOrderTile.ts";
-import { LISTING_PRICE_MISSING, resolveListingPriceLabel } from "./listingPrice.ts";
+import { invoiceChargeTotal, invoiceFaceFromStored } from "./invoiceFace.ts";
+import { computeInvoiceTotals } from "./invoiceProcessing.ts";
+import { formatAdminMoney, LISTING_PRICE_MISSING, resolveListingPriceLabel } from "./listingPrice.ts";
+import { formatOrderNumber } from "./orderNumber.ts";
 import { cleanPackageName, orderServiceLines } from "./orderPackageLines.ts";
 
 const CHICAGO = "America/Chicago";
@@ -204,8 +208,22 @@ export function adminOrderDetailHref(id: string): string {
   return `/admin/orders/${encodeURIComponent(id)}`;
 }
 
+/**
+ * Order # for the list. A sequential number from counters/orderNumbers
+ * (#003, #004, …) wins. Older orders keep the code they already have.
+ */
+export function adminOrderNumberLabel(record: Record<string, unknown>): string {
+  const sequential = sequentialOrderLabel(record.orderNumber);
+  if (sequential) return sequential;
+  return buildAdminOrderTile(record).orderCode;
+}
+
 export function adminOrderTotalLabel(record: Record<string, unknown>): string {
-  return resolveListingPriceLabel({ listing: record });
+  const invoice = nestedRecord(record.invoice);
+  if (!invoice || !invoiceHasCharge(invoice)) return resolveListingPriceLabel({ listing: record });
+  const withFee = totalIncludingProcessing(invoice);
+  if (withFee == null) return resolveListingPriceLabel({ listing: record });
+  return formatAdminMoney(withFee);
 }
 
 /** Numeric reading of the label resolveListingPriceLabel already produced. */
@@ -343,7 +361,7 @@ export function buildAdminOrderListRow(
   return {
     id,
     href: adminOrderDetailHref(id),
-    orderCode: tile.orderCode,
+    orderCode: adminOrderNumberLabel(record),
     placedLabel: placed.label,
     placedSort: placed.sortKey,
     clientName: named || "—",
@@ -402,7 +420,7 @@ export function adminOrderSearchText(order: Record<string, unknown>): string {
     || text(order.name)
     || [text(order.firstName), text(order.lastName)].filter(Boolean).join(" ");
   const id = order.id == null ? "" : String(order.id);
-  return [name || "—", recordAddressText(order) || "—", id, tile.packageName, tile.skinLabel, tile.orderCode, tile.clientName, tile.channel]
+  return [name || "—", recordAddressText(order) || "—", id, tile.packageName, tile.skinLabel, tile.orderCode, adminOrderNumberLabel(order), tile.clientName, tile.channel]
     .join(" ")
     .toLowerCase();
 }
@@ -417,6 +435,7 @@ export function sampleAdminOrderRecords(): Record<string, unknown>[] {
     {
       id: "fixture-maple",
       orderCode: "ORD - L - 10482",
+      orderNumber: "#012",
       projectType: "real_estate",
       serviceIds: ["listing-showcase"],
       lineItems: [
@@ -442,6 +461,7 @@ export function sampleAdminOrderRecords(): Record<string, unknown>[] {
     {
       id: "fixture-oak",
       orderCode: "ORD - B - 22017",
+      orderNumber: 17,
       projectType: "business",
       status: "consult_scheduled",
       clientName: "Sample Client Blair Quinn",
@@ -658,6 +678,54 @@ function coerceDate(value: unknown): Date | null {
       : null;
   if (seconds == null) return null;
   return new Date(seconds * 1000);
+}
+
+function sequentialOrderLabel(value: unknown): string | null {
+  if (typeof value === "number" && Number.isInteger(value) && value >= 1) return formatOrderNumber(value);
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  const hashed = trimmed.match(/^#(\d+)$/);
+  const digits = hashed ? hashed[1] : (/^\d+$/.test(trimmed) ? trimmed : "");
+  if (!digits) return null;
+  const n = Number(digits);
+  if (!Number.isInteger(n) || n < 1) return null;
+  return formatOrderNumber(n);
+}
+
+function invoiceHasCharge(invoice: Record<string, unknown>): boolean {
+  if (money(invoice.total) != null) return true;
+  if (money(invoice.subtotal) != null) return true;
+  if (money(invoice.amountDue) != null) return true;
+  if (money(invoice.amount) != null) return true;
+  return Array.isArray(invoice.lineItems) && invoice.lineItems.length > 0;
+}
+
+/**
+ * Invoice totals on the list include 2.8%. A stored processing amount is not
+ * added a second time. A waived invoice keeps its stored total. A legacy
+ * invoice with no fee gets processingFee applied to the service base.
+ */
+function totalIncludingProcessing(invoice: Record<string, unknown>): number | null {
+  const face = invoiceFaceFromStored(invoice);
+  const policy = text(invoice.processingPolicy);
+  if (policy === "waived") return face.total > 0 ? face.total : money(invoice.total);
+  if (face.processing != null && face.processing > 0) {
+    const charged = invoiceChargeTotal(face);
+    return face.total + 0.009 >= charged ? face.total : charged;
+  }
+  if (policy === "stored") return face.total > 0 ? face.total : money(invoice.total);
+  const subtotal = face.subtotal > 0
+    ? face.subtotal
+    : (money(invoice.total) ?? money(invoice.amountDue) ?? money(invoice.amount) ?? 0);
+  if (subtotal <= 0) return null;
+  return computeInvoiceTotals({
+    subtotal,
+    promotions: face.promotions,
+    fees: face.fees,
+    travel: face.travel,
+    tax: face.tax,
+    applyProcessing: true,
+  }).total;
 }
 
 function formatPlaced(raw: unknown, date: Date | null): string {

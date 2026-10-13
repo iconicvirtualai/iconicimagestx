@@ -6,8 +6,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AdminOrdersBrowser } from "./AdminOrdersBrowser";
-import { resolveListingPriceLabel } from "@shared/listingPrice";
-import { sampleAdminOrderRecords, sampleAdminOrderStaff } from "@shared/adminOrderList";
+import { adminOrderTotalLabel, sampleAdminOrderRecords, sampleAdminOrderStaff } from "@shared/adminOrderList";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -150,11 +149,13 @@ describe("admin orders list", () => {
     expect(section.textContent).toContain("No invoice");
     const money = [...section.querySelectorAll("[data-slot='money']")].map((node) => node.textContent);
     const maple = orders.find((order) => order.id === "fixture-maple")!;
-    expect(money).toContain(resolveListingPriceLabel({ listing: maple }));
-    expect(money).toContain("$350.00");
+    expect(money).toContain(adminOrderTotalLabel(maple));
+    expect(money).toContain("$641.47");
+    expect(money).toContain("$359.80");
     expect(money).toContain("$199.00");
     expect(section.textContent).toContain("The Showcase + Twilight photos");
-    expect(section.textContent).toContain("ORD - L - 10482");
+    expect(section.textContent).toContain("#012");
+    expect(section.textContent).toContain("ORD - L - 33018");
     expect(section.textContent).toContain("Apr 12, 2026, 10:30 AM");
   });
 
