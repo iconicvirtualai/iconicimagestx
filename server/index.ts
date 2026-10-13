@@ -41,6 +41,7 @@ import { requireAdmin, requireStaff } from "./middleware/auth";
 import { handleListingPhotoUpload } from "./routes/listingPhotos";
 import { handleGetPublicPortalListing } from "./routes/portalListing";
 import presentationsRouter, { handlePresentationShell } from "./routes/presentations";
+import { handleGetListingSite, handleListingSiteInquiry, handleListingSiteShell } from "./routes/listingSite";
 import photoEditRequestsRouter from "./routes/photoEditRequests";
 import { mountOwners } from "./routes/owners";
 import siteContentRouter from "./routes/siteContent";
@@ -227,6 +228,8 @@ export function createServer() {
   app.use("/api/messages", messagingRouter);
   app.use("/api/clients", clientsRouter);
   app.get("/api/portal/listings/:id", handleGetPublicPortalListing);
+  app.get("/api/listing-sites/:slug", handleGetListingSite);
+  app.post("/api/listing-sites/:slug/inquiry", handleListingSiteInquiry);
   app.use("/api/staff", staffRouter);
   app.use("/api/site-content", siteContentRouter);
   // Vercel does not chain rewrites. /present/:token is rewritten to this
@@ -235,6 +238,10 @@ export function createServer() {
   app.get("/present/:token", (req, res, next) => {
     if (process.env.ICONIC_VITE_DEV === "1") return next();
     return handlePresentationShell(req, res, next);
+  });
+  app.get("/l/:slug", (req, res, next) => {
+    if (process.env.ICONIC_VITE_DEV === "1") return next();
+    return handleListingSiteShell(req, res, next);
   });
   app.use("/api", presentationsRouter);
   app.use("/api/listings", listingsRouter);

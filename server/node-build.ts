@@ -5,6 +5,7 @@ import { handleMediaDisplay } from "./routes/mediaDisplay";
 import * as express from "express";
 import { htmlFileForRequestPath } from "@shared/spaRouting";
 import { renderPresentationShell } from "./routes/presentations";
+import { renderListingSiteShell } from "./routes/listingSite";
 
 const app = createServer();
 app.get("/api/media/display/p/:token/:index", handleMediaDisplay);
@@ -51,6 +52,13 @@ app.get("/{*splat}", async (req, res) => {
   if (presentation) {
     const origin = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
     const rendered = await renderPresentationShell(decodeURIComponent(presentation[1]), origin);
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(rendered.status).type("html").send(rendered.html);
+  }
+
+  const listingSite = req.path.match(/^\/l\/([^/]+)\/?$/);
+  if (listingSite) {
+    const rendered = await renderListingSiteShell(decodeURIComponent(listingSite[1]));
     res.setHeader("Cache-Control", "no-store");
     return res.status(rendered.status).type("html").send(rendered.html);
   }
