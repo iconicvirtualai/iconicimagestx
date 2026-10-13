@@ -4,6 +4,8 @@
  * The spreadsheet id stays on the server.
  */
 
+import type { OrderApproval } from "./orderApproval.ts";
+
 export const OWNER_ORDERS_TAB = "Orders";
 
 export const OWNER_ORDERS_HEADERS = [
@@ -24,6 +26,9 @@ export interface OwnerOrder {
   status: string;
   ownerBot: string;
   reply: string;
+  /** Firestore order id, when this row is tied to an order document. */
+  id?: string;
+  approval?: OrderApproval | null;
 }
 
 export interface OwnerOrdersResponse {
