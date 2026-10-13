@@ -21,6 +21,7 @@ import {
   type PortalTourItem,
   type PortalWebsiteSettings,
 } from "@shared/portalListingDetail";
+import { listingSitePath, listingSiteSlug } from "@shared/listingSite";
 import {
   PHOTO_EDIT_NOTE_LIMIT,
   photoEditStatusLabel,
@@ -170,7 +171,16 @@ export function PortalListingDetailView({
           />
         )}
         {tab === "marketing" && <MarketingTab detail={shown} />}
-        {tab === "website" && <WebsiteTab website={website} canEdit={canEdit} saving={saving} onWebsite={onWebsite} onSave={onWebsiteSave} />}
+        {tab === "website" && (
+          <WebsiteTab
+            website={website}
+            address={shown.address}
+            canEdit={canEdit}
+            saving={saving}
+            onWebsite={onWebsite}
+            onSave={onWebsiteSave}
+          />
+        )}
         {tab === "orders" && <OrdersTab detail={shown} />}
         {tab === "activity" && <ActivityTab detail={shown} />}
       </main>
@@ -764,33 +774,65 @@ function MarketingTab({ detail }: { detail: PortalListingDetailModel }) {
 
 function WebsiteTab({
   website,
+  address,
   canEdit,
   saving,
   onWebsite,
   onSave,
 }: {
   website: PortalWebsiteSettings;
+  address: PortalListingDetailModel["address"];
   canEdit: boolean;
   saving: boolean;
   onWebsite: (next: PortalWebsiteSettings) => void;
   onSave: () => void;
 }) {
+  const slug = listingSiteSlug({ line1: address.line1, city: address.city });
   const swatch = website.color === "teal" ? "#0d9488" : website.color === "warm" ? "#9a3412" : "#111111";
   const fontLabel = website.font === "serif" ? "Serif" : website.font === "modern" ? "Modern" : "Sans";
   const colorLabel = website.color === "teal" ? "Teal" : website.color === "warm" ? "Warm" : "Ink";
   const styleLabel = website.style === "editorial" ? "Editorial" : website.style === "minimal" ? "Minimal" : "Classic";
+  const designs: Array<{ id: PortalWebsiteSettings["design"]; name: string; note: string }> = [
+    { id: "index", name: "Index", note: "Numbered rows" },
+    { id: "two-up", name: "Two-Up", note: "Media and story" },
+    { id: "premiere", name: "Premiere", note: "Film first" },
+  ];
   return (
     <section className="bg-white rounded-2xl border border-gray-100 p-5">
       <h2 className="text-xs font-black uppercase tracking-widest text-[#0d9488] mb-1">Listing site</h2>
-      <p className="text-xs text-gray-500 mb-5">Font, color, and which media the listing site should show. The public page is not generated from here yet.</p>
+      {slug ? (
+        <a href={listingSitePath(slug)} className="inline-flex min-h-12 items-center text-sm font-black underline">View site</a>
+      ) : (
+        <p className="text-xs text-gray-500">Add a street and city on the Data tab to open the site.</p>
+      )}
+      <p className="text-xs font-black uppercase tracking-widest text-gray-400 mt-5 mb-2">Design</p>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {designs.map((design) => {
+          const selected = website.design === design.id;
+          return (
+            <button
+              key={design.id}
+              type="button"
+              disabled={!canEdit}
+              aria-pressed={selected}
+              onClick={() => onWebsite({ ...website, design: design.id })}
+              className={`min-h-12 rounded-2xl border p-3 text-left ${selected ? "border-black bg-gray-50" : "border-gray-200"}`}
+            >
+              <DesignThumb id={design.id} />
+              <span className="mt-2 block text-sm font-black">{design.name}</span>
+              <span className="block text-xs text-gray-500">{design.note}</span>
+            </button>
+          );
+        })}
+      </div>
       {canEdit ? (
-        <div className="grid sm:grid-cols-3 gap-4">
+        <div className="grid sm:grid-cols-3 gap-4 mt-5">
           <Choice label="Font" value={website.font} options={[["sans", "Sans"], ["serif", "Serif"], ["modern", "Modern"]]} onChange={(font) => onWebsite({ ...website, font: font as PortalWebsiteSettings["font"] })} />
           <Choice label="Color" value={website.color} options={[["ink", "Ink"], ["teal", "Teal"], ["warm", "Warm"]]} onChange={(color) => onWebsite({ ...website, color: color as PortalWebsiteSettings["color"] })} />
           <Choice label="Style" value={website.style} options={[["classic", "Classic"], ["editorial", "Editorial"], ["minimal", "Minimal"]]} onChange={(style) => onWebsite({ ...website, style: style as PortalWebsiteSettings["style"] })} />
         </div>
       ) : (
-        <div className="grid sm:grid-cols-3 gap-4">
+        <div className="grid sm:grid-cols-3 gap-4 mt-5">
           <Field label="Font" value={fontLabel} />
           <Field label="Color" value={colorLabel} />
           <Field label="Style" value={styleLabel} />
@@ -803,6 +845,7 @@ function WebsiteTab({
       <div className="mt-5 grid sm:grid-cols-2 gap-3">
         {canEdit ? (
           <>
+            <Toggle label="Publish site" checked={website.published} onChange={(published) => onWebsite({ ...website, published })} />
             <Toggle label="Show photos" checked={website.showPhotos} onChange={(showPhotos) => onWebsite({ ...website, showPhotos })} />
             <Toggle label="Show video" checked={website.showVideo} onChange={(showVideo) => onWebsite({ ...website, showVideo })} />
             <Toggle label="Show virtual tours" checked={website.showTours} onChange={(showTours) => onWebsite({ ...website, showTours })} />
@@ -810,6 +853,7 @@ function WebsiteTab({
           </>
         ) : (
           <>
+            <Field label="Published" value={website.published ? "Yes" : "No"} />
             <Field label="Photos" value={website.showPhotos ? "Shown" : "Hidden"} />
             <Field label="Video" value={website.showVideo ? "Shown" : "Hidden"} />
             <Field label="Virtual tours" value={website.showTours ? "Shown" : "Hidden"} />
@@ -821,6 +865,31 @@ function WebsiteTab({
         <Button type="button" className="mt-6 bg-black text-white" disabled={saving} onClick={onSave}>Save site style</Button>
       )}
     </section>
+  );
+}
+
+function DesignThumb({ id }: { id: PortalWebsiteSettings["design"] }) {
+  if (id === "two-up") {
+    return (
+      <span className="grid h-16 grid-cols-2 overflow-hidden rounded-lg border border-gray-200" aria-hidden="true">
+        <span className="bg-[#1E2124]" />
+        <span className="bg-[#F2EFEA]" />
+      </span>
+    );
+  }
+  if (id === "premiere") {
+    return (
+      <span className="grid h-16 place-items-center overflow-hidden rounded-lg bg-[#0B0B0C] text-[10px] tracking-[0.2em] text-[#E8DCC4]" aria-hidden="true">
+        FILM
+      </span>
+    );
+  }
+  return (
+    <span className="grid h-16 content-center gap-1 rounded-lg bg-[#F7F7F5] px-2" aria-hidden="true">
+      <span className="h-1.5 bg-[#0E0E0E]" />
+      <span className="h-1.5 w-2/3 bg-[#0E0E0E]" />
+      <span className="h-1.5 w-1/2 bg-[#0E0E0E]" />
+    </span>
   );
 }
 
