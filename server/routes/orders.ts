@@ -4,14 +4,48 @@
  * Place at: server/routes/orders.ts
  */
 
-import { Router } from "express";
+import { Router, type Response } from "express";
 import admin from "firebase-admin";
 import { requireCoordinator, requireStaff, type AuthenticatedRequest } from "../middleware/auth";
 import { chicagoNoonDate } from "../../shared/clientHome";
 import { refuseQaStaffAssignment } from "../services/qaStaffAssign";
+import { dotOptInResultHtml } from "../../shared/doorsOpenTour";
+import { applyDotOptIn } from "../services/doorsOpenTour";
+import { createRateLimiter } from "../lib/rateLimit";
+import { clientIp } from "../lib/clientIp";
 
 const router = Router();
 const db = () => admin.firestore();
+const dotOptInLimiter = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 30 });
+
+function sendDotOptInPage(res: Response, status: number, ok: boolean | "wait") {
+  res.status(status);
+  res.set({
+    "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "no-store",
+    "Referrer-Policy": "no-referrer",
+    "X-Robots-Tag": "noindex",
+  });
+  res.send(dotOptInResultHtml(ok));
+}
+
+// One click from the receipt. The token is the authorization. Repeating it stays opted in.
+router.get("/dot-opt-in", async (req, res) => {
+  const limit = dotOptInLimiter.check(clientIp(req));
+  if (!limit.allowed) {
+    res.set("Retry-After", String(limit.retryAfterSec));
+    sendDotOptInPage(res, 429, "wait");
+    return;
+  }
+  const token = typeof req.query.t === "string" ? req.query.t : "";
+  try {
+    const result = await applyDotOptIn(token);
+    sendDotOptInPage(res, result === "ok" ? 200 : 404, result === "ok");
+  } catch (err) {
+    console.error("[Orders] Doors Open Tour opt-in failed:", err);
+    sendDotOptInPage(res, 500, false);
+  }
+});
 
 // ─── GET /api/orders — List orders ───────────────────────────────────────────
 

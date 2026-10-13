@@ -210,6 +210,10 @@ describe("deliverGalleryToClient", () => {
     if (!message?.html || !message.subject) throw new Error("No delivery email was sent.");
     expect(message.subject).toBe("Your gallery is ready: 123 Main St");
     expect(message.html).toContain("https://links.example/gallery/gal-1");
+    expect(message.html).toContain("Check out our new interactive Open House Tour by zone - As an Iconic Client, you receive an automatic upgrade on ");
+    expect(message.html).toContain('href="https://doorsopentour.com"');
+    expect(message.html).toContain(" when it's your time to shine!");
+    expect(message.html).not.toContain("utm_");
     expect(message.html).toContain("https://links.example/invoice/inv-1?t=tok-1");
     expect(message.html).not.toContain("iconicimagestx.com/gallery");
     expect(message.html).not.toContain("/invoice/listing_");

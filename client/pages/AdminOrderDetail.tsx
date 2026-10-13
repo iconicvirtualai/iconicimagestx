@@ -24,6 +24,7 @@ import { orderChargeSummary, orderServiceLines } from "@shared/orderPackageLines
 import type { GalleryReleaseReport } from "@shared/galleryRelease";
 import { publicClientUrl } from "@shared/publicSiteUrl";
 import { filterAssignableStaff, recordAllowsQaStaff } from "@shared/qaStaff";
+import { DotOptInBadge } from "@/components/DoorsOpenTour";
 
 // ─── Status system ────────────────────────────────────────────────────────────
 const ORDER_STATUSES = [
@@ -401,6 +402,7 @@ export default function AdminOrderDetail() {
         </button>
         <div className="flex items-center gap-3">
           <span className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${statusBadge.color}`}>{statusBadge.label}</span>
+          <DotOptInBadge value={typeof order.dotOptIn === "boolean" ? order.dotOptIn : linkedRequest?.dotOptIn} />
           <span className="text-[10px] font-mono text-gray-400">{order.orderNumber || order.id}</span>
         </div>
       </div>

@@ -7,6 +7,7 @@
 import nodemailer from "nodemailer";
 import admin from "firebase-admin";
 import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "../../shared/businessContact";
+import { doorsOpenDeliveryEmailHtml, doorsOpenReceiptEmailHtml } from "../../shared/doorsOpenTour";
 import { clientNotifyBlockReason, emailAllowed, narrowGatedClientRecipients, notifyTestAllowlist } from "../../shared/clientNotify";
 
 const db = () => admin.firestore();
@@ -243,6 +244,7 @@ function getFallbackTemplate(
       ${vars.invoiceAmount ? `<p>Iconic Images invoices after the shoot. Downloads stay locked until the <strong>${vars.invoiceAmount}</strong> invoice is paid.</p>` : `<p>Downloads open from your gallery once that invoice is paid, or when our team releases the files.</p>`}
       <p><a href="${vars.galleryUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">View Gallery</a></p>
       ${vars.paymentUrl ? `<p><a href="${vars.paymentUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Pay invoice</a></p>` : ""}
+      ${doorsOpenDeliveryEmailHtml()}
       <p style="color:#999;font-size:12px;">Gallery available for ${vars.expiresAt}.</p>
     `),
     invoice: base(`
@@ -257,6 +259,7 @@ function getFallbackTemplate(
       <p>Hi ${vars.clientName},</p>
       <p>We've received your payment of <strong>${vars.amount}</strong> for invoice ${vars.invoiceNumber}.</p>
       ${vars.balance && vars.balance !== "$0.00" ? `<p>Remaining balance: <strong>${vars.balance}</strong></p>` : "<p>Your account is paid in full. Thank you!</p>"}
+      ${doorsOpenReceiptEmailHtml(vars.dotOptInUrl || "")}
     `),
     manual_message: base(`
       <h2>Message from Iconic Images</h2>
