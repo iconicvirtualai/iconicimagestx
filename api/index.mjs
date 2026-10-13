@@ -7,8 +7,8 @@ import admin from "firebase-admin";
 import nodemailer from "nodemailer";
 import twilio from "twilio";
 import { google } from "googleapis";
-import crypto, { randomBytes, randomUUID, createHmac as createHmac$1, timingSafeEqual as timingSafeEqual$1 } from "crypto";
-import { createHmac, timingSafeEqual, randomBytes as randomBytes$1, randomUUID as randomUUID$1 } from "node:crypto";
+import crypto, { randomBytes, createHmac, timingSafeEqual, randomUUID } from "crypto";
+import { createHmac as createHmac$1, timingSafeEqual as timingSafeEqual$1, randomBytes as randomBytes$1, randomUUID as randomUUID$1 } from "node:crypto";
 import Stripe from "stripe";
 import * as XLSX from "xlsx";
 import fs$1 from "node:fs";
@@ -6528,6 +6528,178 @@ router$n.get("/:id/timeline", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch timeline." });
   }
 });
+const ORDER_APPROVAL_STATUSES = ["Completed", "Go for it!", "Needs Revisions"];
+const NOTE_MAX = 2e3;
+function isOrderApprovalStatus(value) {
+  return typeof value === "string" && ORDER_APPROVAL_STATUSES.includes(value);
+}
+function orderApprovalError(status2, note) {
+  if (!isOrderApprovalStatus(status2)) return "Choose Completed, Go for it!, or Needs Revisions.";
+  const text2 = typeof note === "string" ? note.trim() : "";
+  if (status2 === "Needs Revisions" && !text2) return "Add a note for Needs Revisions.";
+  if (text2.length > NOTE_MAX) return "Notes are limited to 2,000 characters.";
+  return null;
+}
+function ownerAllowlist(raw) {
+  if (raw == null) return [];
+  const emails = raw.split(/[,;\s]+/).map((email) => email.trim().toLowerCase()).filter((email) => email.includes("@"));
+  return [...new Set(emails)];
+}
+function isOwnerEmail(email, allowlist) {
+  if (!email) return false;
+  if (allowlist.length === 0) return false;
+  return allowlist.includes(email.trim().toLowerCase());
+}
+const OWNER_FIXTURE_BEARER = "owner-fixture";
+const OWNER_SESSION_COOKIE = "owners_session";
+const SESSION_MS = 12 * 60 * 60 * 1e3;
+const BLOCKED_BEARERS = /* @__PURE__ */ new Set(["temp-admin-token", OWNER_FIXTURE_BEARER]);
+let tokenVerifier = defaultVerifyIdToken;
+function ownerRuntimeEnv(env = process.env) {
+  return {
+    OWNER_EMAILS: env.OWNER_EMAILS,
+    OWNER_SUITE_FIXTURES: env.OWNER_SUITE_FIXTURES,
+    OWNER_SESSION_SECRET: env.OWNER_SESSION_SECRET,
+    OWNER_SHEETS_SA_EMAIL: env.OWNER_SHEETS_SA_EMAIL,
+    OWNER_SHEETS_SA_KEY: env.OWNER_SHEETS_SA_KEY,
+    FIREBASE_SERVICE_ACCOUNT: env.FIREBASE_SERVICE_ACCOUNT,
+    VERCEL: env.VERCEL,
+    VERCEL_ENV: env.VERCEL_ENV,
+    NODE_ENV: env["NODE_ENV"]
+  };
+}
+function ownerFixturesEnabled(env = ownerRuntimeEnv()) {
+  if (env.OWNER_SUITE_FIXTURES !== "true") return false;
+  return !isHostedDeployment(env);
+}
+function ownerSessionSecret(env = ownerRuntimeEnv()) {
+  const explicit = env.OWNER_SESSION_SECRET?.trim();
+  if (explicit && explicit.length >= 16) return explicit;
+  const serviceAccount = env.FIREBASE_SERVICE_ACCOUNT;
+  if (serviceAccount && serviceAccount.length >= 32) {
+    return createHmac("sha256", "iconic-owners-suite-v1").update(serviceAccount).digest("hex");
+  }
+  const sheetsKey = env.OWNER_SHEETS_SA_KEY;
+  if (sheetsKey && sheetsKey.length >= 32) {
+    return createHmac("sha256", "iconic-owners-suite-v1").update(sheetsKey).digest("hex");
+  }
+  return null;
+}
+function signOwnerSession(identity, secret, now = Date.now()) {
+  const body = Buffer.from(JSON.stringify({
+    email: identity.email.trim().toLowerCase(),
+    uid: identity.uid,
+    exp: now + SESSION_MS
+  })).toString("base64url");
+  const sig = createHmac("sha256", secret).update(body).digest("base64url");
+  return `${body}.${sig}`;
+}
+function readOwnerSession(token, secret, now = Date.now()) {
+  const [body, sig] = token.split(".");
+  if (!body || !sig) return null;
+  const expected = createHmac("sha256", secret).update(body).digest("base64url");
+  const actualBuf = Buffer.from(sig);
+  const expectedBuf = Buffer.from(expected);
+  if (actualBuf.length !== expectedBuf.length || !timingSafeEqual(actualBuf, expectedBuf)) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+    if (!parsed.email || !parsed.uid || typeof parsed.exp !== "number" || parsed.exp < now) return null;
+    return { email: parsed.email.trim().toLowerCase(), uid: parsed.uid };
+  } catch {
+    return null;
+  }
+}
+function sessionCookieHeader(token, env = ownerRuntimeEnv(), maxAge = SESSION_MS / 1e3) {
+  const secure = isHostedDeployment(env);
+  const parts = [
+    `${OWNER_SESSION_COOKIE}=${token}`,
+    "HttpOnly",
+    "SameSite=Lax",
+    "Path=/",
+    `Max-Age=${maxAge}`
+  ];
+  if (secure) parts.push("Secure");
+  return parts.join("; ");
+}
+async function resolveOwnerIdentity(headers, env = ownerRuntimeEnv()) {
+  const allow = ownerAllowlist(env.OWNER_EMAILS);
+  if (allow.length === 0) return null;
+  const authorization = headerString(headers.authorization);
+  if (ownerFixturesEnabled(env) && authorization === `Bearer ${OWNER_FIXTURE_BEARER}`) {
+    return { email: allow[0], uid: "owner-fixture" };
+  }
+  const secret = ownerSessionSecret(env);
+  const cookie = readCookie(headerString(headers.cookie), OWNER_SESSION_COOKIE);
+  if (cookie && secret) {
+    const session = readOwnerSession(cookie, secret);
+    if (session && isOwnerEmail(session.email, allow)) return session;
+  }
+  if (!authorization.startsWith("Bearer ")) return null;
+  const token = authorization.slice("Bearer ".length).trim();
+  if (!token || BLOCKED_BEARERS.has(token)) return null;
+  const verified = await tokenVerifier(token);
+  const email = verified?.email?.trim().toLowerCase();
+  if (!email || !verified?.uid || !isOwnerEmail(email, allow)) return null;
+  return { email, uid: verified.uid };
+}
+async function defaultVerifyIdToken(token) {
+  if (!admin.apps.length) return null;
+  try {
+    const decoded = await admin.auth().verifyIdToken(token);
+    return { email: decoded.email, uid: decoded.uid };
+  } catch {
+    return null;
+  }
+}
+function headerString(value) {
+  if (Array.isArray(value)) return value[0] || "";
+  return value || "";
+}
+function readCookie(header, name) {
+  for (const part of header.split(";")) {
+    const [rawName, ...rest] = part.trim().split("=");
+    if (rawName === name) return rest.join("=") || null;
+  }
+  return null;
+}
+const memory$2 = /* @__PURE__ */ new Map();
+function useMemoryStore() {
+  return !admin.apps.length || process.env.NODE_ENV === "test" || process.env.ORDER_APPROVAL_STORE === "memory";
+}
+async function writeOrderApproval(id, approval) {
+  if (useMemoryStore()) {
+    if (!memory$2.has(id)) return null;
+    memory$2.set(id, { approval });
+    return approval;
+  }
+  const ref = admin.firestore().collection("orders").doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) return null;
+  await ref.update({ approval });
+  return approval;
+}
+const handleOrderApproval = async (req, res) => {
+  const owner = await resolveOwnerIdentity(req.headers);
+  if (owner) return save(req, res, owner.email);
+  return requireAdmin(req, res, () => {
+    const email = req.user?.email || "Admin";
+    void save(req, res, email);
+  });
+};
+async function save(req, res, by) {
+  const error = orderApprovalError(req.body?.status, req.body?.note ?? "");
+  if (error) return res.status(400).json({ error });
+  const note = typeof req.body?.note === "string" ? req.body.note.trim() : "";
+  const approval = {
+    status: req.body.status,
+    note,
+    by,
+    at: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  const saved = await writeOrderApproval(String(req.params.id || ""), approval);
+  if (!saved) return res.status(404).json({ error: "Order not found." });
+  return res.json({ approval: saved });
+}
 const OWNER_DISPLAY_TTL_MS = 4 * 60 * 60 * 1e3;
 const DEV_SECRET = "iconic-owner-display-dev-v1";
 const ID_PATTERN$1 = /^[A-Za-z0-9_-]{8,128}$/;
@@ -6536,11 +6708,11 @@ function ownerDisplaySecret(env = process.env) {
   if (explicit && explicit.length >= 16) return explicit;
   const serviceAccount = env.FIREBASE_SERVICE_ACCOUNT;
   if (serviceAccount && serviceAccount.length >= 32) {
-    return createHmac("sha256", "iconic-owner-display-v1").update(serviceAccount).digest("hex");
+    return createHmac$1("sha256", "iconic-owner-display-v1").update(serviceAccount).digest("hex");
   }
   const sheetsKey = env.OWNER_SHEETS_SA_KEY;
   if (sheetsKey && sheetsKey.length >= 32) {
-    return createHmac("sha256", "iconic-owner-display-v1").update(sheetsKey).digest("hex");
+    return createHmac$1("sha256", "iconic-owner-display-v1").update(sheetsKey).digest("hex");
   }
   if (!isHostedDeployment(env)) return DEV_SECRET;
   return null;
@@ -6554,7 +6726,7 @@ function signOwnerDisplayToken(claims, now = Date.now(), env = process.env) {
     id: claims.id,
     exp: now + OWNER_DISPLAY_TTL_MS
   })).toString("base64url");
-  const sig = createHmac("sha256", secret).update(body).digest("base64url");
+  const sig = createHmac$1("sha256", secret).update(body).digest("base64url");
   return `${body}.${sig}`;
 }
 function ownerDisplayPath(token, index) {
@@ -10399,7 +10571,7 @@ async function fetchPublishedSquareInvoiceUrl(squareInvoiceId, deps) {
   if (!result.ok) return null;
   return publicUrlOf(result.body);
 }
-function payTokenMatches(stored, presented, equal = timingSafeEqual) {
+function payTokenMatches(stored, presented, equal = timingSafeEqual$1) {
   const left = Buffer.from(typeof stored === "string" ? stored : "");
   const right = Buffer.from(typeof presented === "string" ? presented : "");
   if (left.length === 0) return false;
@@ -14217,16 +14389,6 @@ async function orderRequestsById(ids) {
     console.error("[Clients] Order request schedule lookup failed:", err);
   }
   return map;
-}
-function ownerAllowlist(raw) {
-  if (raw == null) return [];
-  const emails = raw.split(/[,;\s]+/).map((email) => email.trim().toLowerCase()).filter((email) => email.includes("@"));
-  return [...new Set(emails)];
-}
-function isOwnerEmail(email, allowlist) {
-  if (!email) return false;
-  if (allowlist.length === 0) return false;
-  return allowlist.includes(email.trim().toLowerCase());
 }
 const HISTORY_LIMIT = 10;
 function textField(id, label, value) {
@@ -19082,7 +19244,7 @@ function newToken() {
 }
 function tokensMatch(stored, provided) {
   if (!stored || !provided || stored.length !== provided.length || stored.length > 128) return false;
-  return timingSafeEqual(Buffer.from(stored), Buffer.from(provided));
+  return timingSafeEqual$1(Buffer.from(stored), Buffer.from(provided));
 }
 function trimMessages(messages) {
   if (messages.length <= MAX_THREAD_MESSAGES) return messages;
@@ -20212,118 +20374,6 @@ router$1.post("/listings/:id/photo-edit-requests/:requestId/replacement", requir
     return sendKnownError(res, err, "Could not attach that replacement.");
   }
 });
-const OWNER_FIXTURE_BEARER = "owner-fixture";
-const OWNER_SESSION_COOKIE = "owners_session";
-const SESSION_MS = 12 * 60 * 60 * 1e3;
-const BLOCKED_BEARERS = /* @__PURE__ */ new Set(["temp-admin-token", OWNER_FIXTURE_BEARER]);
-let tokenVerifier = defaultVerifyIdToken;
-function ownerRuntimeEnv(env = process.env) {
-  return {
-    OWNER_EMAILS: env.OWNER_EMAILS,
-    OWNER_SUITE_FIXTURES: env.OWNER_SUITE_FIXTURES,
-    OWNER_SESSION_SECRET: env.OWNER_SESSION_SECRET,
-    OWNER_SHEETS_SA_EMAIL: env.OWNER_SHEETS_SA_EMAIL,
-    OWNER_SHEETS_SA_KEY: env.OWNER_SHEETS_SA_KEY,
-    FIREBASE_SERVICE_ACCOUNT: env.FIREBASE_SERVICE_ACCOUNT,
-    VERCEL: env.VERCEL,
-    VERCEL_ENV: env.VERCEL_ENV,
-    NODE_ENV: env["NODE_ENV"]
-  };
-}
-function ownerFixturesEnabled(env = ownerRuntimeEnv()) {
-  if (env.OWNER_SUITE_FIXTURES !== "true") return false;
-  return !isHostedDeployment(env);
-}
-function ownerSessionSecret(env = ownerRuntimeEnv()) {
-  const explicit = env.OWNER_SESSION_SECRET?.trim();
-  if (explicit && explicit.length >= 16) return explicit;
-  const serviceAccount = env.FIREBASE_SERVICE_ACCOUNT;
-  if (serviceAccount && serviceAccount.length >= 32) {
-    return createHmac$1("sha256", "iconic-owners-suite-v1").update(serviceAccount).digest("hex");
-  }
-  const sheetsKey = env.OWNER_SHEETS_SA_KEY;
-  if (sheetsKey && sheetsKey.length >= 32) {
-    return createHmac$1("sha256", "iconic-owners-suite-v1").update(sheetsKey).digest("hex");
-  }
-  return null;
-}
-function signOwnerSession(identity, secret, now = Date.now()) {
-  const body = Buffer.from(JSON.stringify({
-    email: identity.email.trim().toLowerCase(),
-    uid: identity.uid,
-    exp: now + SESSION_MS
-  })).toString("base64url");
-  const sig = createHmac$1("sha256", secret).update(body).digest("base64url");
-  return `${body}.${sig}`;
-}
-function readOwnerSession(token, secret, now = Date.now()) {
-  const [body, sig] = token.split(".");
-  if (!body || !sig) return null;
-  const expected = createHmac$1("sha256", secret).update(body).digest("base64url");
-  const actualBuf = Buffer.from(sig);
-  const expectedBuf = Buffer.from(expected);
-  if (actualBuf.length !== expectedBuf.length || !timingSafeEqual$1(actualBuf, expectedBuf)) return null;
-  try {
-    const parsed = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
-    if (!parsed.email || !parsed.uid || typeof parsed.exp !== "number" || parsed.exp < now) return null;
-    return { email: parsed.email.trim().toLowerCase(), uid: parsed.uid };
-  } catch {
-    return null;
-  }
-}
-function sessionCookieHeader(token, env = ownerRuntimeEnv(), maxAge = SESSION_MS / 1e3) {
-  const secure = isHostedDeployment(env);
-  const parts = [
-    `${OWNER_SESSION_COOKIE}=${token}`,
-    "HttpOnly",
-    "SameSite=Lax",
-    "Path=/",
-    `Max-Age=${maxAge}`
-  ];
-  if (secure) parts.push("Secure");
-  return parts.join("; ");
-}
-async function resolveOwnerIdentity(headers, env = ownerRuntimeEnv()) {
-  const allow = ownerAllowlist(env.OWNER_EMAILS);
-  if (allow.length === 0) return null;
-  const authorization = headerString(headers.authorization);
-  if (ownerFixturesEnabled(env) && authorization === `Bearer ${OWNER_FIXTURE_BEARER}`) {
-    return { email: allow[0], uid: "owner-fixture" };
-  }
-  const secret = ownerSessionSecret(env);
-  const cookie = readCookie(headerString(headers.cookie), OWNER_SESSION_COOKIE);
-  if (cookie && secret) {
-    const session = readOwnerSession(cookie, secret);
-    if (session && isOwnerEmail(session.email, allow)) return session;
-  }
-  if (!authorization.startsWith("Bearer ")) return null;
-  const token = authorization.slice("Bearer ".length).trim();
-  if (!token || BLOCKED_BEARERS.has(token)) return null;
-  const verified = await tokenVerifier(token);
-  const email = verified?.email?.trim().toLowerCase();
-  if (!email || !verified?.uid || !isOwnerEmail(email, allow)) return null;
-  return { email, uid: verified.uid };
-}
-async function defaultVerifyIdToken(token) {
-  if (!admin.apps.length) return null;
-  try {
-    const decoded = await admin.auth().verifyIdToken(token);
-    return { email: decoded.email, uid: decoded.uid };
-  } catch {
-    return null;
-  }
-}
-function headerString(value) {
-  if (Array.isArray(value)) return value[0] || "";
-  return value || "";
-}
-function readCookie(header, name) {
-  for (const part of header.split(";")) {
-    const [rawName, ...rest] = part.trim().split("=");
-    if (rawName === name) return rest.join("=") || null;
-  }
-  return null;
-}
 const PLAN_BUSINESSES = [
   "Iconic Images M&M",
   "Iconic Studios",
@@ -22967,6 +23017,7 @@ function createServer() {
   mountOwners(app);
   app.use("/api/bookings", router$o);
   app.use("/api/orders", router$n);
+  app.patch("/api/admin/orders/:id/approval", handleOrderApproval);
   app.use("/api/galleries", router$m);
   app.use("/api/payments", router$l);
   app.use("/api/vsai", router$k);
