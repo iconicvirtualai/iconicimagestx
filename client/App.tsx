@@ -50,6 +50,7 @@ import VirtualStagingCheckout from "./pages/VirtualStagingCheckout";
 import Go from "./pages/Go";
 import ListingCardPreview from "./pages/ListingCardPreview";
 import AdminOrderTiles from "./pages/AdminOrderTiles";
+import AdminOrdersPreview from "./pages/AdminOrdersPreview";
 import NotFound from "./pages/NotFound";
 
 // Admin / ops pages
@@ -138,6 +139,7 @@ const App = () => (
             <Route path="/go" element={<Go />} />
             <Route path="/listing-cards" element={<ProtectedRoute requiredRole="coordinator"><ListingCardPreview /></ProtectedRoute>} />
             <Route path="/admin/order-tiles" element={<AdminOrderTiles />} />
+            <Route path="/admin/orders-preview" element={<AdminOrdersPreview />} />
             {/* Bare /studio has no project id. Studio 105 is the public studio page. */}
             <Route path="/studio" element={<Navigate to="/studio-105" replace />} />
             {/* Bare /gallery has no project id. The client portal is the door. */}
