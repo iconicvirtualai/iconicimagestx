@@ -120,6 +120,7 @@ describe("apprenticeship landing", () => {
     expect(text.toLowerCase()).not.toContain("not configured");
     expect(text).not.toContain("cadi@");
     expect(container?.querySelector("[data-testid=\"apprenticeship-admin-setup\"]")).toBeNull();
+    expect(container?.querySelector("[data-testid=\"apprenticeship-submit\"]")?.textContent).toBe("Book Now!");
     expect(container?.querySelector("[data-testid=\"slot-2026-10-14T14:00:00.000Z\"]")).toBeTruthy();
   });
 

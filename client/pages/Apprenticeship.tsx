@@ -386,7 +386,7 @@ export default function Apprenticeship() {
               disabled={pending}
               className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-black px-6 text-base font-semibold text-white disabled:opacity-60 sm:w-auto"
             >
-              {pending ? "Starting checkout" : "Pay booking fee"}
+              Book Now!
             </button>
           </form>
         </div>
