@@ -29,7 +29,10 @@ describe("live order confirmation emails", () => {
     expect(blocks[0]).toContain("subject: clientOrderConfirmedSubject(displayAddress, orderNumber)");
     expect(blocks[0]).toContain("total: money(total)");
     expect(blocks[0]).toContain("requestId: docRef.id");
-    expect(blocks[0]).toContain("dashboardUrl:");
+    expect(blocks[0]).toContain("dashboardUrl: orderRequestAdminUrl(docRef.id)");
+    expect(bookings).toContain("publicClientUrl(`/admin/order-request/${encodeURIComponent(id)}`)");
+    expect(bookings).not.toContain("APP_URL");
+    expect(bookings).not.toContain("function appUrl");
     expect(bookings).not.toContain('to: "photos@iconicimagestx.com"');
     expect(bookings).not.toContain("officeEmailStatus");
   });
@@ -48,6 +51,7 @@ describe("live order confirmation emails", () => {
     expect(post.match(/notifyOfficeOfOrder\(/g)).toHaveLength(1);
     expect(post).toContain("isNewOrder: true");
     expect(post).toContain("saved: savedOrder");
+    expect(post).toContain("adminUrl: orderRequestAdminUrl(savedSnap.id)");
     expect(post.indexOf("const savedSnap = await docRef.get()")).toBeLessThan(
       post.indexOf("notifyOfficeOfOrder"),
     );

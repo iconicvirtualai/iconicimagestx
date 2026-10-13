@@ -47,15 +47,18 @@ describe("marketing send switch", () => {
 });
 
 describe("marketing public links", () => {
-  it("uses MARKETING_PUBLIC_URL and falls back to APP_URL", () => {
+  it("uses MARKETING_PUBLIC_URL and falls back to the public site, never APP_URL", () => {
     expect(marketingPublicUrl({
       MARKETING_PUBLIC_URL: "https://iconicimagestx.vercel.app/",
       APP_URL: "https://www.iconicimagestx.com",
     })).toBe("https://iconicimagestx.vercel.app");
     expect(marketingPublicUrl({
       APP_URL: "https://www.iconicimagestx.com/",
+      PUBLIC_SITE_URL: "https://links.example",
       FRONTEND_URL: "https://ignored.example",
-    })).toBe("https://www.iconicimagestx.com");
-    expect(marketingPublicUrl({}, "http://127.0.0.1:8080/")).toBe("http://127.0.0.1:8080");
+    })).toBe("https://links.example");
+    expect(marketingPublicUrl({
+      APP_URL: "https://www.iconicimagestx.com",
+    }, "http://127.0.0.1:8080/")).toBe("https://iconicimagestx.vercel.app");
   });
 });

@@ -9,6 +9,7 @@ import admin from "firebase-admin";
 import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "../../shared/businessContact";
 import { doorsOpenDeliveryEmailHtml, doorsOpenReceiptEmailHtml } from "../../shared/doorsOpenTour";
 import { clientNotifyBlockReason, emailAllowed, narrowGatedClientRecipients, notifyTestAllowlist } from "../../shared/clientNotify";
+import { paymentReceiptFromVars } from "./paymentReceiptEmail";
 
 const db = () => admin.firestore();
 
@@ -62,7 +63,25 @@ interface SendEmailOptions {
   subject?: string; // override template subject
   /** When set, this HTML is the message. A stored template cannot replace it. */
   html?: string;
+  /** Plain-text part. Receipts always send one. */
+  text?: string;
   attachments?: Array<{ filename: string; path: string }>;
+}
+
+type EmailDeliveryOverride = (message: {
+  to: string;
+  cc?: string;
+  bcc?: string;
+  subject: string;
+  html: string;
+  text?: string;
+}) => Promise<void>;
+
+/** Fixture and tests. Production leaves this unset and uses SMTP. */
+let emailDeliveryOverride: EmailDeliveryOverride | null = null;
+
+export function setEmailDeliveryOverride(sink: EmailDeliveryOverride | null): void {
+  emailDeliveryOverride = sink;
 }
 
 // ─── Main Send Function ───────────────────────────────────────────────────────
@@ -140,6 +159,14 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ sent: bool
     console.warn(`[Email] Template lookup failed for '${template}'. Using the built-in copy.`, err);
   }
 
+  const textBody = options.text;
+  const delivery: EmailDelivery = emailAllowed(template, process.env, audience) ? "sent" : "allowlist";
+  if (emailDeliveryOverride) {
+    await emailDeliveryOverride({ to, cc, bcc, subject, html: htmlBody, text: textBody });
+    console.log(`[Email] Sent '${template}' to ${to}`);
+    return { sent: true, delivery };
+  }
+
   const transporter = createTransport();
   try {
     await transporter.sendMail({
@@ -150,11 +177,11 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ sent: bool
       ...(replyTo ? { replyTo } : {}),
       subject,
       html: htmlBody,
+      ...(textBody ? { text: textBody } : {}),
       attachments,
     });
 
     console.log(`[Email] Sent '${template}' to ${to}`);
-    const delivery: EmailDelivery = emailAllowed(template, process.env, audience) ? "sent" : "allowlist";
     return { sent: true, delivery };
   } catch (err) {
     console.error(`[Email] Failed to send '${template}' to ${to}:`, err);
@@ -183,6 +210,13 @@ function getFallbackTemplate(
   type: string,
   vars: Record<string, string>
 ): string {
+  if (type === "payment_receipt") {
+    const branded = paymentReceiptFromVars(vars).html;
+    const doorsOpen = doorsOpenReceiptEmailHtml(vars.dotOptInUrl || "");
+    return branded.includes("</body>")
+      ? branded.replace("</body>", `${doorsOpen}</body>`)
+      : `${branded}${doorsOpen}`;
+  }
   const base = (content: string) => `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="background: #000; padding: 20px; text-align: center; margin-bottom: 30px;">
@@ -253,13 +287,6 @@ function getFallbackTemplate(
       <p>Your invoice <strong>${vars.invoiceNumber}</strong> for <strong>${vars.amount}</strong> is ready.</p>
       ${vars.dueDate ? `<p>Due: <strong>${vars.dueDate}</strong></p>` : ""}
       ${vars.paymentUrl ? `<p><a href="${vars.paymentUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Pay Invoice</a></p>` : ""}
-    `),
-    payment_receipt: base(`
-      <h2>Payment received ✓</h2>
-      <p>Hi ${vars.clientName},</p>
-      <p>We've received your payment of <strong>${vars.amount}</strong> for invoice ${vars.invoiceNumber}.</p>
-      ${vars.balance && vars.balance !== "$0.00" ? `<p>Remaining balance: <strong>${vars.balance}</strong></p>` : "<p>Your account is paid in full. Thank you!</p>"}
-      ${doorsOpenReceiptEmailHtml(vars.dotOptInUrl || "")}
     `),
     manual_message: base(`
       <h2>Message from Iconic Images</h2>

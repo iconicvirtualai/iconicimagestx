@@ -164,13 +164,13 @@ function dotOptInPath(token) {
   params.set("t", token);
   return `/api/orders/dot-opt-in?${params.toString()}`;
 }
-function escapeHtml$6(value) {
+function escapeHtml$7(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function linkDoorsOpenTour(sentence) {
   const at = sentence.indexOf(DOORS_OPEN_TOUR_NAME);
-  if (at < 0) return escapeHtml$6(sentence);
-  return escapeHtml$6(sentence.slice(0, at)) + `<a href="${DOORS_OPEN_TOUR_URL}" rel="noreferrer" style="color:#111111;font-weight:600;">${DOORS_OPEN_TOUR_NAME}</a>` + escapeHtml$6(sentence.slice(at + DOORS_OPEN_TOUR_NAME.length));
+  if (at < 0) return escapeHtml$7(sentence);
+  return escapeHtml$7(sentence.slice(0, at)) + `<a href="${DOORS_OPEN_TOUR_URL}" rel="noreferrer" style="color:#111111;font-weight:600;">${DOORS_OPEN_TOUR_NAME}</a>` + escapeHtml$7(sentence.slice(at + DOORS_OPEN_TOUR_NAME.length));
 }
 const noteStyle = "font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:15px;line-height:1.5;color:#333333;margin:16px 0;";
 function doorsOpenDeliveryEmailHtml() {
@@ -180,7 +180,7 @@ function doorsOpenReceiptEmailHtml(optInUrl) {
   const sentence = `<p style="${noteStyle}">${linkDoorsOpenTour(DOT_RECEIPT_LINE)}</p>`;
   const url = optInUrl.trim();
   if (!url.startsWith("https://") || url.includes(" ")) return sentence;
-  return sentence + `<p style="margin:16px 0;"><a href="${escapeHtml$6(url)}" style="font-family:Inter,ui-sans-serif,system-ui,sans-serif;background:#000000;color:#ffffff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">${DOT_OPT_IN_ACTION_LABEL}</a></p>`;
+  return sentence + `<p style="margin:16px 0;"><a href="${escapeHtml$7(url)}" style="font-family:Inter,ui-sans-serif,system-ui,sans-serif;background:#000000;color:#ffffff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">${DOT_OPT_IN_ACTION_LABEL}</a></p>`;
 }
 function dotOptInResultHtml(ok) {
   const title = ok === true ? "Your open house is listed." : ok === "wait" ? "Please try that link again in a moment." : "This link is not valid.";
@@ -298,426 +298,6 @@ function narrowGatedClientRecipients(input, env = process.env) {
     replyTo: replyTo.length > 0 ? replyTo.join(", ") : void 0,
     held
   };
-}
-const db$s = () => admin.firestore();
-class EmailNotConfiguredError extends Error {
-  code = "email_not_configured";
-  constructor() {
-    super("SMTP is not configured. Set SMTP_USER and SMTP_PASS.");
-    this.name = "EmailNotConfiguredError";
-  }
-}
-function createTransport() {
-  const user = process.env.SMTP_USER || process.env.EMAIL_FROM;
-  const pass = process.env.SMTP_PASS;
-  if (!user || !pass) {
-    throw new EmailNotConfiguredError();
-  }
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.gmail.com",
-    port: Number(process.env.SMTP_PORT) || 587,
-    secure: process.env.SMTP_SECURE === "true",
-    auth: { user, pass }
-  });
-}
-function clientOrderConfirmedSubject(address, orderNumber) {
-  const code = orderNumber && /^#\d{3,}$/.test(orderNumber) ? ` ${orderNumber}` : "";
-  return `Your Iconic order${code} is confirmed: ${address}`;
-}
-async function sendEmail(options) {
-  const { template, audience, variables = {}, subject: subjectOverride, html, attachments } = options;
-  let to = options.to;
-  let bcc = options.bcc;
-  let cc = options.cc;
-  let replyTo = options.replyTo;
-  if (!to) {
-    console.warn("[Email] No recipient specified, skipping.");
-    return { sent: false, delivery: "suppressed" };
-  }
-  if (!emailAllowed(template, process.env, audience)) {
-    const narrowed = narrowGatedClientRecipients({ to, cc, bcc, replyTo }, process.env);
-    if (!narrowed) {
-      const why = notifyTestAllowlist().size > 0 ? `${clientNotifyBlockReason()}. Recipient is not an exact NOTIFY_TEST_ALLOWLIST match.` : `${clientNotifyBlockReason()}.`;
-      console.warn(
-        `[Email] Suppressed '${template}' to ${to} — ${why} No message sent.`
-      );
-      return { sent: false, delivery: "suppressed" };
-    }
-    to = narrowed.to;
-    cc = narrowed.cc;
-    bcc = narrowed.bcc;
-    replyTo = narrowed.replyTo;
-    if (narrowed.held.length > 0) {
-      console.warn(
-        `[Email] '${template}' sent only to NOTIFY_TEST_ALLOWLIST. Held: ${narrowed.held.join(", ")}.`
-      );
-    }
-  }
-  let subject = subjectOverride || `Message from Iconic Images`;
-  let htmlBody = html || getFallbackTemplate(template, variables);
-  try {
-    if (!html && admin.apps.length) {
-      const templateDoc = await db$s().collection("emailTemplates").where("category", "==", template).where("isActive", "==", true).limit(1).get();
-      if (!templateDoc.empty) {
-        const tmpl = templateDoc.docs[0].data();
-        if (!subjectOverride && typeof tmpl.subject === "string" && tmpl.subject.trim()) {
-          subject = interpolate(tmpl.subject, variables);
-        }
-        if (typeof tmpl.htmlBody === "string" && tmpl.htmlBody.trim()) {
-          htmlBody = interpolate(tmpl.htmlBody, variables);
-        }
-      }
-    }
-  } catch (err) {
-    console.warn(`[Email] Template lookup failed for '${template}'. Using the built-in copy.`, err);
-  }
-  const transporter = createTransport();
-  try {
-    await transporter.sendMail({
-      from: `"Iconic Images" <${process.env.EMAIL_FROM || process.env.SMTP_USER}>`,
-      to,
-      bcc,
-      cc,
-      ...replyTo ? { replyTo } : {},
-      subject,
-      html: htmlBody,
-      attachments
-    });
-    console.log(`[Email] Sent '${template}' to ${to}`);
-    const delivery = emailAllowed(template, process.env, audience) ? "sent" : "allowlist";
-    return { sent: true, delivery };
-  } catch (err) {
-    console.error(`[Email] Failed to send '${template}' to ${to}:`, err);
-    throw err;
-  } finally {
-    transporter.close();
-  }
-}
-function interpolate(template, variables) {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] ?? `{{${key}}}`);
-}
-function builtinEmailHtml(type, vars) {
-  return getFallbackTemplate(type, vars);
-}
-function getFallbackTemplate(type, vars) {
-  const base = (content) => `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="background: #000; padding: 20px; text-align: center; margin-bottom: 30px;">
-        <h1 style="color: #fff; margin: 0; font-size: 24px;">ICONIC IMAGES</h1>
-        <p style="color: #ccc; margin: 5px 0 0; font-size: 12px; letter-spacing: 2px;">REAL ESTATE MEDIA</p>
-      </div>
-      ${content}
-      <div style="border-top: 1px solid #eee; margin-top: 30px; padding-top: 20px; text-align: center; color: #999; font-size: 12px;">
-        <p>${BUSINESS_CONTACT.line}</p>
-        <p>${LEGAL_BUSINESS_NAME}</p>
-        <p>Iconic Images TX | iconicimagestx.com</p>
-        <p>Questions? Reply to this email or message us through your client portal.</p>
-      </div>
-    </div>
-  `;
-  const templates = {
-    booking_received: base(`
-      <h2 style="color:#0d9488;">We received your booking request!</h2>
-      <p>Hi ${vars.clientName},</p>
-      <p>Thank you for choosing Iconic Images. We've received your booking request for <strong>${vars.address}</strong> and our team will review and confirm your appointment within 1 business day.</p>
-
-      <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;border:1px solid #eee;border-radius:8px;overflow:hidden;">
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;width:42%;color:#555;border-bottom:1px solid #eee;">Requested Date</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.scheduledDate || "TBD — we'll confirm shortly"}</td></tr>
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Requested Time</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.scheduledTime || "—"}</td></tr>
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Property Status</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.propertyStatus || "—"}</td></tr>
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Furnishing</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.furnishingStatus || "—"}</td></tr>
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Access Method</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><strong>${vars.accessMethod || "—"}</strong></td></tr>
-        ${vars.squareFootage ? `<tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Square Footage</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.squareFootage}</td></tr>` : ""}
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Travel</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.travelFee || "Travel quoted"}</td></tr>
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;">Order Total</td><td style="padding:10px 14px;font-weight:bold;color:#0d9488;">${vars.total}</td></tr>
-      </table>
-
-      <p style="color:#888;font-size:13px;">Confirmation ID: <strong>${vars.requestId}</strong> — keep this for your records.</p>
-      <p style="color:#888;font-size:13px;">If any details look incorrect, simply reply to this email and we'll sort it out.</p>
-    `),
-    account_password_setup: base(`
-      <h2 style="color:#0d9488;">Set your portal password</h2>
-      <p>Hi ${vars.clientName},</p>
-      <p>We created a client portal login for <strong>${vars.clientEmail || "your email"}</strong> so you can see this appointment request.</p>
-      <p>This email is only for your password. Your appointment request details are in a separate email.</p>
-      <p><a href="${vars.setupUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Set your password</a></p>
-      <p style="color:#888;font-size:13px;">After that, sign in at <a href="${vars.portalUrl}">${vars.portalUrl}</a>.</p>
-    `),
-    order_confirmed: base(`
-      <h2>Your appointment is confirmed!</h2>
-      <p>Hi ${vars.clientName},</p>
-      <p>Great news — your shoot at <strong>${vars.address}</strong> is confirmed!</p>
-      <p><strong>Date:</strong> ${vars.scheduledDate}<br>
-      <strong>Time:</strong> ${vars.scheduledTime}<br>
-      <strong>Photographer:</strong> ${vars.photographerName}<br>
-      <strong>Travel:</strong> ${vars.travelFee || "Travel quoted"}</p>
-      <p><a href="${vars.portalUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">View Your Portal</a></p>
-    `),
-    gallery_delivery: base(`
-      <h2>Your gallery is ready! 🎉</h2>
-      <p>Hi ${vars.clientName},</p>
-      <p>Your photos for <strong>${vars.address}</strong> are edited and waiting in your Iconic Images gallery.</p>
-      ${vars.invoiceAmount ? `<p>Iconic Images invoices after the shoot. Downloads stay locked until the <strong>${vars.invoiceAmount}</strong> invoice is paid.</p>` : `<p>Downloads open from your gallery once that invoice is paid, or when our team releases the files.</p>`}
-      <p><a href="${vars.galleryUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">View Gallery</a></p>
-      ${vars.paymentUrl ? `<p><a href="${vars.paymentUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Pay invoice</a></p>` : ""}
-      ${doorsOpenDeliveryEmailHtml()}
-      <p style="color:#999;font-size:12px;">Gallery available for ${vars.expiresAt}.</p>
-    `),
-    invoice: base(`
-      <h2>Invoice from Iconic Images</h2>
-      <p>Hi ${vars.clientName},</p>
-      <p>Your invoice <strong>${vars.invoiceNumber}</strong> for <strong>${vars.amount}</strong> is ready.</p>
-      ${vars.dueDate ? `<p>Due: <strong>${vars.dueDate}</strong></p>` : ""}
-      ${vars.paymentUrl ? `<p><a href="${vars.paymentUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Pay Invoice</a></p>` : ""}
-    `),
-    payment_receipt: base(`
-      <h2>Payment received ✓</h2>
-      <p>Hi ${vars.clientName},</p>
-      <p>We've received your payment of <strong>${vars.amount}</strong> for invoice ${vars.invoiceNumber}.</p>
-      ${vars.balance && vars.balance !== "$0.00" ? `<p>Remaining balance: <strong>${vars.balance}</strong></p>` : "<p>Your account is paid in full. Thank you!</p>"}
-      ${doorsOpenReceiptEmailHtml(vars.dotOptInUrl || "")}
-    `),
-    manual_message: base(`
-      <h2>Message from Iconic Images</h2>
-      <div style="line-height:1.6;color:#333;">
-        ${(vars.message || "").replace(/\n/g, "<br>")}
-      </div>
-    `),
-    new_booking_alert: base(`
-      <h2>🔔 New Booking Request</h2>
-
-      <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;border:1px solid #eee;border-radius:8px;overflow:hidden;">
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;width:42%;color:#555;border-bottom:1px solid #eee;">Client</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.clientName}</td></tr>
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Email</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><a href="mailto:${vars.email}">${vars.email}</a></td></tr>
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Phone</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.phone}</td></tr>
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Address</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><strong>${vars.address}</strong></td></tr>
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Requested Date</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.scheduledDate || "TBD"} ${vars.scheduledTime || ""}</td></tr>
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Property Status</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.propertyStatus || "—"} / ${vars.furnishingStatus || "—"}</td></tr>
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Access Method</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><strong>${vars.accessMethod || "—"}</strong></td></tr>
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Square Footage</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.squareFootage || "Not provided"}</td></tr>
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Photographer</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.photographerPreference || "Auto-assign"}</td></tr>
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;">Total</td><td style="padding:10px 14px;font-weight:bold;color:#0d9488;">${vars.total}</td></tr>
-      </table>
-
-      <p><a href="${vars.dashboardUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Review in Dashboard →</a></p>
-    `),
-    contact_form: base(`
-      <h2 style="color:#0d9488;">New Contact Form Submission</h2>
-
-      <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;border:1px solid #eee;border-radius:8px;overflow:hidden;">
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;width:42%;color:#555;border-bottom:1px solid #eee;">From</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.senderName}</td></tr>
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Email</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><a href="mailto:${vars.senderEmail}">${vars.senderEmail}</a></td></tr>
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Phone</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.senderPhone}</td></tr>
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Subject</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><strong>${vars.subject}</strong></td></tr>
-      </table>
-
-      <h3 style="color:#555;margin-top:30px;margin-bottom:10px;">Message:</h3>
-      <div style="background:#f8fafc;padding:15px;border-left:4px solid #0d9488;font-style:italic;color:#666;line-height:1.6;">
-        ${(vars.message || "").replace(/\n/g, "<br>")}
-      </div>
-
-      <p style="margin-top:30px;color:#999;font-size:12px;">
-        <strong>To reply:</strong> Send an email directly to ${vars.senderEmail}
-      </p>
-    `),
-    live_chat: base(`
-      <h2 style="color:#0d9488;">Live chat message</h2>
-      <p>A visitor sent a message from the website chat. Reply to them directly — this alert did not email or text the visitor.</p>
-
-      <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;border:1px solid #eee;border-radius:8px;overflow:hidden;">
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;width:42%;color:#555;border-bottom:1px solid #eee;">From</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.senderName}</td></tr>
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Email</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.senderEmail}</td></tr>
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Phone</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.senderPhone}</td></tr>
-      </table>
-
-      <h3 style="color:#555;margin-top:30px;margin-bottom:10px;">Message:</h3>
-      <div style="background:#f8fafc;padding:15px;border-left:4px solid #0d9488;color:#333;line-height:1.6;">
-        ${(vars.message || "").replace(/\n/g, "<br>")}
-      </div>
-    `),
-    contact_confirmation: base(`
-      <h2 style="color:#0d9488;">We received your message!</h2>
-      <p>Hi ${vars.name},</p>
-      <p>Thank you for reaching out to Iconic Images. We've received your message and our team will review it shortly.</p>
-      <p>We typically respond to inquiries within 24 business hours. If your question is urgent, feel free to call us at <strong>${BUSINESS_CONTACT.phoneDisplay}</strong> or email <strong>${BUSINESS_CONTACT.email}</strong>.</p>
-      <p style="margin-top:30px;color:#888;font-size:12px;">
-        If you have any additional information to add, simply reply to this email or visit <strong>iconicimagestx.com</strong>.
-      </p>
-    `)
-  };
-  return templates[type] || base(`<p>You have a new notification from Iconic Images.</p>`);
-}
-let _client = null;
-function getClient() {
-  if (_client) return _client;
-  const sid = process.env.TWILIO_ACCOUNT_SID;
-  const token = process.env.TWILIO_AUTH_TOKEN;
-  if (!sid || !token) {
-    throw new Error("Twilio credentials not configured (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN).");
-  }
-  _client = twilio(sid, token);
-  return _client;
-}
-function normalisePhone(raw) {
-  const digits2 = raw.replace(/\D/g, "");
-  if (digits2.length === 10) return `+1${digits2}`;
-  if (digits2.length === 11 && digits2.startsWith("1")) return `+${digits2}`;
-  return `+${digits2}`;
-}
-async function sendSMS({ to, body, from, kind }) {
-  if (kind === STAFF_INBOUND_SMS_KIND && !isStaffInboundSmsDestination(to)) {
-    console.error(`[SMS] Refused staff_inbound to ${to}. Only the office Google Voice number is allowed.`);
-    return { sid: "", status: "refused", suppressed: true };
-  }
-  if (!smsAllowed(kind)) {
-    console.warn(`[SMS] Suppressed to ${to} — ${clientNotifyBlockReason()}. No message sent.`);
-    return { sid: "", status: "suppressed", suppressed: true };
-  }
-  const fromNumber = from || process.env.TWILIO_PHONE_NUMBER;
-  if (!fromNumber) throw new Error("TWILIO_PHONE_NUMBER not set.");
-  const client = getClient();
-  const message = await client.messages.create({
-    to: normalisePhone(to),
-    from: fromNumber,
-    body
-  });
-  console.log(`[SMS] Sent to ${to} — SID: ${message.sid}`);
-  return { sid: message.sid, status: message.status };
-}
-async function sendSMSCampaign(recipients, bodyTemplate, messagingServiceSid) {
-  if (!clientNotifyLive()) {
-    console.warn(`[SMS] Suppressed campaign to ${recipients.length} recipients — ${clientNotifyBlockReason()}.`);
-    return recipients.map((recipient) => ({ phone: recipient.phone, error: "suppressed" }));
-  }
-  const client = getClient();
-  const sid = messagingServiceSid || process.env.TWILIO_MESSAGING_SERVICE_SID;
-  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
-  const results = [];
-  for (const recipient of recipients) {
-    if (!recipient.phone) continue;
-    const body = bodyTemplate.replace(/\{\{name\}\}/gi, recipient.name || "there");
-    try {
-      const msg = await client.messages.create({
-        to: normalisePhone(recipient.phone),
-        ...sid ? { messagingServiceSid: sid } : { from: fromNumber },
-        body
-      });
-      results.push({ phone: recipient.phone, sid: msg.sid });
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      console.error(`[SMS] Campaign send failed for ${recipient.phone}:`, errorMessage);
-      results.push({ phone: recipient.phone, error: errorMessage });
-    }
-    await new Promise((r) => setTimeout(r, 50));
-  }
-  return results;
-}
-async function createMaskedConversation(friendlyName, photographer, client, webhookUrl) {
-  if (!clientNotifyLive()) {
-    console.warn(`[SMS] Suppressed masked conversation — ${clientNotifyBlockReason()}. No SMS sent.`);
-    throw new Error("Client notifications are off.");
-  }
-  const client_sdk = getClient();
-  const conversation = await client_sdk.conversations.v1.conversations.create({
-    friendlyName,
-    timers: {
-      inactive: "P30D",
-      // auto-close after 30 days inactive
-      closed: "P60D"
-    }
-  });
-  const conversationSid = conversation.sid;
-  if (webhookUrl) {
-    await client_sdk.conversations.v1.conversations(conversationSid).webhooks.create({
-      target: "webhook",
-      "configuration.method": "post",
-      "configuration.url": webhookUrl,
-      "configuration.filters": ["onMessageAdded"]
-    });
-  }
-  const photographerParticipant = await client_sdk.conversations.v1.conversations(conversationSid).participants.create({
-    "messagingBinding.type": "sms",
-    "messagingBinding.address": normalisePhone(photographer.phone),
-    identity: `photographer_${normalisePhone(photographer.phone).replace("+", "")}`
-  });
-  const clientParticipant = await client_sdk.conversations.v1.conversations(conversationSid).participants.create({
-    "messagingBinding.type": "sms",
-    "messagingBinding.address": normalisePhone(client.phone),
-    identity: `client_${normalisePhone(client.phone).replace("+", "")}`
-  });
-  console.log(`[Conversations] Created: ${conversationSid} (${friendlyName})`);
-  return {
-    conversationSid,
-    photographerParticipantSid: photographerParticipant.sid,
-    clientParticipantSid: clientParticipant.sid
-  };
-}
-async function sendConversationMessage(conversationSid, body, author = "Iconic Images") {
-  if (!clientNotifyLive()) {
-    console.warn(`[SMS] Suppressed conversation message — ${clientNotifyBlockReason()}. No SMS sent.`);
-    throw new Error("Client notifications are off.");
-  }
-  const client_sdk = getClient();
-  const message = await client_sdk.conversations.v1.conversations(conversationSid).messages.create({ body, author });
-  return { sid: message.sid };
-}
-async function closeConversation(conversationSid) {
-  const client_sdk = getClient();
-  await client_sdk.conversations.v1.conversations(conversationSid).update({ state: "closed" });
-  console.log(`[Conversations] Closed: ${conversationSid}`);
-}
-const SMS_TEMPLATES = {
-  bookingConfirmation: (name, date, address, total) => `Hi ${name}! We've received your booking request for ${address}.
-
-⚠️ THIS IS NOT A CONFIRMATION. Our team will review your request and reach out shortly to confirm your appointment.
-
-Requested date: ${date}
-Estimated total: ${total}
-
-Questions? Reply to this text, or reach us at ${BUSINESS_CONTACT.line}. — Iconic Images 📸`,
-  appointmentReminder24h: (name, date, time, address) => `Hey ${name}, reminder! Your Iconic Images shoot is tomorrow 📸
-
-🕐 ${time}
-📍 ${address}
-
-Reply CONFIRM to confirm or call us to reschedule.`,
-  appointmentReminder1h: (name, time) => `Hi ${name}! Your photographer is on the way — arriving around ${time} 📸
-Reply to this text with any last-minute notes!`,
-  photosDelivered: (name, galleryUrl) => `🎉 ${name}, your photos are ready!
-
-View your gallery: ${galleryUrl}
-
-Questions or edits? Just reply here. — Iconic Images`,
-  photographerIntro: (photographerName, clientName2, date) => `Hi ${clientName2}! I'm ${photographerName}, your Iconic Images photographer for ${date}. Feel free to text me here with any questions before the shoot! 📸`,
-  newBookingAlert: (address, date, services2) => `🔔 NEW BOOKING — Iconic Images
-
-📍 ${address}
-📅 ${date}
-🏠 ${services2}
-
-Check dashboard for details.`
-};
-const RECORD_ADDRESS_KEYS = ["addressLabel", "address", "propertyAddress", "shootLocation", "location"];
-function addressText(value) {
-  if (!value) return "";
-  if (typeof value === "string") return value.trim();
-  if (typeof value !== "object" || Array.isArray(value)) return "";
-  const address = value;
-  const formatted = text$j(address.formatted) || text$j(address.label);
-  if (formatted) return formatted;
-  return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
-}
-function recordAddressText(record2) {
-  if (!record2 || typeof record2 !== "object") return addressText(record2);
-  const row = record2;
-  for (const key of RECORD_ADDRESS_KEYS) {
-    const label = addressText(row[key]);
-    if (label) return label;
-  }
-  return "";
-}
-function text$j(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 const services = [
   // Listings
@@ -1875,7 +1455,7 @@ function processingEnabled(env) {
   return raw !== "off" && raw !== "disabled" && raw !== "legacy" && raw !== "0";
 }
 function processingFee(base) {
-  return fromCents(processingFeeCents(toCents(base)));
+  return fromCents(processingFeeCents(toCents$1(base)));
 }
 function processingFeeCents(baseCents) {
   const cents2 = Math.round(Number(baseCents));
@@ -1921,7 +1501,7 @@ function computeInvoiceTotals(input) {
     processingPolicy
   };
 }
-function toCents(value) {
+function toCents$1(value) {
   if (!Number.isFinite(value) || value <= 0) return 0;
   return Math.round(value * 100);
 }
@@ -1996,6 +1576,28 @@ function clientCanViewListing(listing, identity) {
   const email = normalizeEmail$1(identity.email);
   const listingEmail = normalizeEmail$1(listing.clientEmail);
   return Boolean(email && listingEmail && email === listingEmail);
+}
+const RECORD_ADDRESS_KEYS = ["addressLabel", "address", "propertyAddress", "shootLocation", "location"];
+function addressText(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value !== "object" || Array.isArray(value)) return "";
+  const address = value;
+  const formatted = text$k(address.formatted) || text$k(address.label);
+  if (formatted) return formatted;
+  return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
+}
+function recordAddressText(record2) {
+  if (!record2 || typeof record2 !== "object") return addressText(record2);
+  const row = record2;
+  for (const key of RECORD_ADDRESS_KEYS) {
+    const label = addressText(row[key]);
+    if (label) return label;
+  }
+  return "";
+}
+function text$k(value) {
+  return typeof value === "string" ? value.trim() : "";
 }
 const ADDRESS_LIMIT = 300;
 const PLACE_ID_LIMIT = 300;
@@ -2559,6 +2161,748 @@ function publicClientUrl(path2, env) {
   const suffix = path2.startsWith("/") ? path2 : `/${path2}`;
   return `${publicSiteUrl(env)}${suffix}`;
 }
+function presentationLinkForReceipt(listing) {
+  return null;
+}
+const FONT = "Arial, Helvetica, sans-serif";
+const YELLOW = "#FFE500";
+const TEAL = "#14B8C4";
+const GREEN = "#16A34A";
+const ROW = "#F3F4F6";
+function receiptProcessing(input) {
+  const status2 = text$j(input.invoice.status).toLowerCase();
+  const paymentStatus = text$j(input.invoice.paymentStatus).toLowerCase();
+  if (status2 === "comped" || paymentStatus === "comped") return 0;
+  const base = roundCents(input.subtotal - input.promotions + input.fees);
+  const stored = finite(input.invoice.processing);
+  const quoted = stored != null ? Math.max(0, stored) : processingFee(base);
+  const quotedCents = toCents(quoted);
+  if (quotedCents <= 0) return 0;
+  const paidCents = toCents(input.totalPaid);
+  const baseCents = toCents(base);
+  if (paidCents + 1 < baseCents + quotedCents) return 0;
+  return roundCents(quotedCents / 100);
+}
+function receiptLogoUrl(env) {
+  return publicClientUrl("/media/logos/iconic-graffiti-logo.png", env);
+}
+function receiptPaidLabel(date) {
+  const months = ["JAN.", "FEB.", "MAR.", "APR.", "MAY.", "JUN.", "JUL.", "AUG.", "SEP.", "OCT.", "NOV.", "DEC."];
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${months[date.getUTCMonth()]} ${day}, ${date.getUTCFullYear()}`;
+}
+function receiptLines(lineItems) {
+  if (!Array.isArray(lineItems)) return [];
+  const lines = [];
+  for (const item of lineItems) {
+    if (!item || typeof item !== "object") continue;
+    const row = item;
+    const name = typeof row.name === "string" && row.name.trim() ? row.name.trim() : "Service";
+    const qtyRaw = Number(row.qty ?? row.quantity ?? 1);
+    const qty = Number.isFinite(qtyRaw) && qtyRaw > 0 ? qtyRaw : 1;
+    const unit = finite(row.unitPrice);
+    const linePrice = finite(row.price);
+    const explicitTotal = finite(row.total);
+    const total = explicitTotal ?? linePrice ?? (unit != null ? roundCents(unit * qty) : 0);
+    const shownUnit = unit ?? (qty ? roundCents(total / qty) : total);
+    lines.push({ name, qty, unit: shownUnit, total });
+  }
+  return lines;
+}
+function buildPaymentReceipt(input) {
+  const lines = receiptLines(input.invoice.lineItems);
+  const subtotal = finite(input.invoice.subtotal) ?? lines.reduce((sum, line) => sum + line.total, 0);
+  const promotions = finite(input.invoice.promoDiscount) ?? finite(input.invoice.promotions) ?? 0;
+  const fees = finite(input.invoice.fees) ?? 0;
+  const totalPaid = input.amountPaid ?? finite(input.invoice.amountPaid) ?? finite(input.invoice.total) ?? 0;
+  const balance = input.balance ?? 0;
+  const processing = receiptProcessing({
+    invoice: input.invoice,
+    subtotal,
+    promotions,
+    fees,
+    totalPaid
+  });
+  const galleryId = text$j(input.galleryId) || text$j(input.invoice.galleryId);
+  const galleryUrl = galleryId ? publicClientUrl(`/gallery/${encodeURIComponent(galleryId)}`, input.env) : "";
+  const presentationUrl = input.presentationUrl === void 0 ? presentationLinkForReceipt(input.listing) || "" : input.presentationUrl || "";
+  return renderPaymentReceipt({
+    clientName: text$j(input.invoice.clientName) || "there",
+    invoiceNumber: receiptEmailNumber({
+      invoiceNumber: input.invoice.invoiceNumber,
+      id: input.invoiceId,
+      createdAt: input.invoice.createdAt
+    }, input.paidAt),
+    paidAtLabel: receiptPaidLabel(input.paidAt || /* @__PURE__ */ new Date()),
+    lines,
+    subtotal,
+    processing,
+    promotions,
+    fees,
+    totalPaid,
+    balance,
+    galleryUrl,
+    presentationUrl,
+    unlocked: input.unlocked,
+    logoUrl: receiptLogoUrl(input.env)
+  });
+}
+function renderPaymentReceipt(content) {
+  const subject = `Payment received — ${content.invoiceNumber || "Iconic Images"}`;
+  return {
+    subject,
+    html: receiptHtml(content),
+    text: receiptText(content)
+  };
+}
+function paymentReceiptFromVars(vars, env) {
+  let lines = [];
+  if (vars.lineItemsJson) {
+    try {
+      lines = receiptLines(JSON.parse(vars.lineItemsJson));
+    } catch {
+      lines = [];
+    }
+  }
+  const subtotal = dollars$1(vars.subtotal) || lines.reduce((sum, line) => sum + line.total, 0);
+  const promotions = dollars$1(vars.promotions);
+  const fees = dollars$1(vars.fees);
+  const totalPaid = dollars$1(vars.totalPaid) || dollars$1(vars.amount);
+  const invoice = {
+    status: vars.status,
+    paymentStatus: vars.paymentStatus
+  };
+  if (vars.processing != null && vars.processing !== "") invoice.processing = dollars$1(vars.processing);
+  return renderPaymentReceipt({
+    clientName: vars.clientName || "there",
+    invoiceNumber: vars.invoiceNumber || "",
+    paidAtLabel: vars.paidAt || "",
+    lines,
+    subtotal,
+    processing: receiptProcessing({ invoice, subtotal, promotions, fees, totalPaid }),
+    promotions,
+    fees,
+    totalPaid,
+    balance: dollars$1(vars.balance),
+    galleryUrl: vars.galleryUrl || "",
+    presentationUrl: vars.presentationUrl || "",
+    unlocked: vars.unlocked === "true" || dollars$1(vars.balance) <= 0 && totalPaid > 0,
+    logoUrl: vars.logoUrl || receiptLogoUrl(env)
+  });
+}
+function receiptHtml(content) {
+  const rows = content.lines.length > 0 ? content.lines.map((line, index) => lineRow(line, index)).join("") : lineRow({ name: "Payment", qty: 1, unit: content.totalPaid, total: content.totalPaid }, 0);
+  const downloads = content.unlocked ? downloadsBlock(content) : balanceBlock(content);
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml$6(content.invoiceNumber)} receipt</title>
+<style>
+@media only screen and (max-width: 480px) {
+  .totals-desktop { display: none !important; }
+  .totals-mobile { display: table !important; width: 100% !important; }
+}
+</style>
+</head>
+<body style="margin:0;padding:0;background:#ffffff;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;">
+<tr><td align="center" style="padding:0;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:700px;font-family:${FONT};color:#111111;">
+${headerBlock(content)}
+<tr><td style="padding:28px 28px 8px;font-family:${FONT};font-size:14px;line-height:1.5;color:#222222;">
+Hi ${escapeHtml$6(content.clientName)}, we received your payment for invoice ${escapeHtml$6(content.invoiceNumber)}.
+</td></tr>
+<tr><td style="padding:12px 20px 0;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:${FONT};">
+<tr>
+<td bgcolor="#000000" style="background:#000000;color:#ffffff;font-family:${FONT};font-size:11px;font-weight:bold;letter-spacing:1px;padding:12px 14px;">DESCRIPTION</td>
+<td bgcolor="#000000" align="right" style="background:#000000;color:#ffffff;font-family:${FONT};font-size:11px;font-weight:bold;letter-spacing:1px;padding:12px 10px;">QTY.</td>
+<td bgcolor="#000000" align="right" style="background:#000000;color:#ffffff;font-family:${FONT};font-size:11px;font-weight:bold;letter-spacing:1px;padding:12px 10px;">PRICE</td>
+<td bgcolor="#000000" align="right" style="background:#000000;color:#ffffff;font-family:${FONT};font-size:11px;font-weight:bold;letter-spacing:1px;padding:12px 14px;">TOTAL</td>
+</tr>
+${rows}
+</table>
+</td></tr>
+<tr><td style="padding:22px 20px 8px;">
+<table class="totals-desktop" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:2px solid #000000;border-collapse:separate;font-family:${FONT};">
+<tr>
+${totalCell("SUB TOTAL", money$7(content.subtotal), false)}
+${totalCell("PROCESSING", money$7(content.processing), false)}
+${totalCell("PROMOTIONS", money$7(content.promotions), false)}
+${totalCell("FEES", money$7(content.fees), false)}
+${totalCell("TOTAL PAID", money$7(content.totalPaid), true)}
+</tr>
+</table>
+<table class="totals-mobile" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="display:none;border:2px solid #000000;border-collapse:separate;font-family:${FONT};">
+${totalRow("SUB TOTAL", money$7(content.subtotal), false)}
+${totalRow("PROCESSING", money$7(content.processing), false)}
+${totalRow("PROMOTIONS", money$7(content.promotions), false)}
+${totalRow("FEES", money$7(content.fees), false)}
+${totalRow("TOTAL PAID", money$7(content.totalPaid), true)}
+</table>
+</td></tr>
+${downloads}
+${footerBlock()}
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
+}
+function headerBlock(content) {
+  return `<tr><td bgcolor="#000000" style="background:#000000;padding:28px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td valign="top" style="font-family:${FONT};">
+<div style="font-family:${FONT};font-size:32px;line-height:1;font-weight:bold;letter-spacing:6px;color:${YELLOW};">RECEIPT</div>
+<div style="font-family:${FONT};font-size:12px;line-height:1.4;font-weight:bold;letter-spacing:3px;color:${YELLOW};padding-top:10px;">PAYMENT RECEIVED</div>
+<div style="font-family:${FONT};font-size:13px;line-height:1.5;color:#ffffff;padding-top:16px;">INVOICE NO : ${escapeHtml$6(content.invoiceNumber)}</div>
+<div style="font-family:${FONT};font-size:13px;line-height:1.5;color:#ffffff;padding-top:4px;">${escapeHtml$6(content.paidAtLabel)}</div>
+</td>
+<td valign="top" align="right" width="160" style="padding-left:12px;">
+<img src="${escapeHtml$6(content.logoUrl)}" alt="Iconic Images" width="140" style="display:block;border:0;outline:none;text-decoration:none;width:140px;max-width:140px;height:auto;">
+</td>
+</tr>
+</table>
+</td></tr>`;
+}
+function lineRow(line, index) {
+  const bg = index % 2 === 0 ? ROW : "#ffffff";
+  return `<tr>
+<td bgcolor="${bg}" style="background:${bg};font-family:${FONT};font-size:13px;font-weight:bold;letter-spacing:0.5px;color:${TEAL};padding:14px;border-bottom:1px solid #e5e7eb;">${escapeHtml$6(line.name.toUpperCase())}</td>
+<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#374151;padding:14px 10px;border-bottom:1px solid #e5e7eb;">${escapeHtml$6(String(line.qty))}</td>
+<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#374151;padding:14px 10px;border-bottom:1px solid #e5e7eb;">${escapeHtml$6(money$7(line.unit))}</td>
+<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#111111;padding:14px;border-bottom:1px solid #e5e7eb;">${escapeHtml$6(money$7(line.total))}</td>
+</tr>`;
+}
+function totalRow(label, value, emphasis, note) {
+  const valueStyle = emphasis ? "font-size:22px;font-weight:bold;color:#111111;" : "font-size:14px;font-weight:bold;color:#111111;";
+  const noteHtml = "";
+  return `<tr>
+<td style="padding:12px 16px;font-family:${FONT};font-size:11px;font-weight:bold;letter-spacing:0.8px;color:#111111;border-bottom:1px solid #e5e7eb;">${label}</td>
+<td align="right" style="padding:12px 16px;font-family:${FONT};${valueStyle}border-bottom:1px solid #e5e7eb;">${escapeHtml$6(value)}${noteHtml}</td>
+</tr>`;
+}
+function totalCell(label, value, emphasis, note) {
+  const valueStyle = emphasis ? `font-size:22px;font-weight:bold;color:#111111;` : `font-size:14px;font-weight:bold;color:#111111;`;
+  const noteHtml = "";
+  return `<td valign="top" align="center" style="padding:14px 6px;font-family:${FONT};">
+<div style="font-family:${FONT};font-size:10px;font-weight:bold;letter-spacing:0.8px;color:#111111;">${label}</div>
+<div style="font-family:${FONT};${valueStyle}padding-top:6px;">${escapeHtml$6(value)}</div>
+${noteHtml}
+</td>`;
+}
+function downloadsBlock(content) {
+  const presentation = content.presentationUrl.trim();
+  const gallery = content.galleryUrl.trim();
+  if (!presentation && !gallery) return "";
+  const primaryHref = presentation || gallery;
+  const primaryLabel = presentation ? "View your listing presentation" : "Your downloads &amp; invoice";
+  const secondary = presentation && gallery ? `<tr><td align="center" style="padding-top:12px;font-family:${FONT};font-size:14px;">
+<a href="${escapeHtml$6(gallery)}" style="color:${TEAL};font-family:${FONT};font-weight:bold;text-decoration:underline;">Your downloads &amp; invoice</a>
+</td></tr>` : "";
+  return `<tr><td style="padding:28px 24px 12px;">
+<div style="font-family:${FONT};font-size:22px;line-height:1.3;font-weight:bold;color:#111111;">Your downloads are ready</div>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:16px;">
+<tr><td bgcolor="#000000" style="background:#000000;border-radius:4px;">
+<a href="${escapeHtml$6(primaryHref)}" style="display:inline-block;padding:14px 22px;font-family:${FONT};font-size:15px;font-weight:bold;color:${YELLOW};text-decoration:none;">${primaryLabel}</a>
+</td></tr>
+${secondary}
+</table>
+</td></tr>`;
+}
+function balanceBlock(content) {
+  if (content.balance <= 0) return "";
+  return `<tr><td style="padding:20px 24px 8px;font-family:${FONT};font-size:14px;color:#111111;">
+Balance due: <strong>${escapeHtml$6(money$7(content.balance))}</strong>. Downloads stay locked until the invoice is paid in full.
+</td></tr>`;
+}
+function footerBlock() {
+  return `<tr><td bgcolor="#000000" style="background:#000000;padding:28px 24px 22px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td valign="top" style="font-family:${FONT};font-size:13px;line-height:1.55;color:#ffffff;">
+<div style="font-family:${FONT};font-size:12px;font-weight:bold;letter-spacing:0.6px;color:${GREEN};padding-bottom:8px;">PAYMENT INFORMATION:</div>
+${escapeHtml$6(LEGAL_BUSINESS_NAME)}<br>
+${escapeHtml$6(BUSINESS_CONTACT.phoneDisplay)}<br>
+<a href="${escapeHtml$6(BUSINESS_CONTACT.emailHref)}" style="color:#ffffff;text-decoration:none;font-family:${FONT};">${escapeHtml$6(BUSINESS_CONTACT.email)}</a>
+</td>
+<td valign="top" align="right" style="font-family:${FONT};font-size:13px;line-height:1.55;color:#ffffff;">
+${escapeHtml$6(BUSINESS_CONTACT.streetAddress)}<br>
+${escapeHtml$6(BUSINESS_CONTACT.addressLine2)}
+</td>
+</tr>
+</table>
+<div style="font-family:${FONT};font-size:13px;font-weight:bold;letter-spacing:3px;color:${TEAL};padding-top:22px;">THANK YOU FOR BEING ICONIC</div>
+</td></tr>`;
+}
+function receiptText(content) {
+  const itemLines = (content.lines.length > 0 ? content.lines : [{
+    name: "Payment",
+    qty: 1,
+    unit: content.totalPaid,
+    total: content.totalPaid
+  }]).map((line) => `${line.name}  qty ${line.qty}  ${money$7(line.unit)}  ${money$7(line.total)}`);
+  const links = [];
+  if (content.unlocked) {
+    links.push("Your downloads are ready");
+    if (content.presentationUrl) links.push(`View your listing presentation: ${content.presentationUrl}`);
+    if (content.galleryUrl) links.push(`Your downloads & invoice: ${content.galleryUrl}`);
+  } else if (content.balance > 0) {
+    links.push(`Balance due: ${money$7(content.balance)}. Downloads stay locked until the invoice is paid in full.`);
+  }
+  return [
+    "RECEIPT",
+    "PAYMENT RECEIVED",
+    `Invoice ${content.invoiceNumber}`,
+    content.paidAtLabel,
+    "",
+    `Hi ${content.clientName}, we received your payment.`,
+    "",
+    ...itemLines,
+    "",
+    `SUB TOTAL ${money$7(content.subtotal)}`,
+    `PROCESSING ${money$7(content.processing)}`,
+    `PROMOTIONS ${money$7(content.promotions)}`,
+    `FEES ${money$7(content.fees)}`,
+    `TOTAL PAID ${money$7(content.totalPaid)}`,
+    "",
+    ...links,
+    "",
+    "PAYMENT INFORMATION:",
+    LEGAL_BUSINESS_NAME,
+    BUSINESS_CONTACT.phoneDisplay,
+    BUSINESS_CONTACT.email,
+    BUSINESS_CONTACT.address,
+    "",
+    "THANK YOU FOR BEING ICONIC"
+  ].filter((line) => line !== void 0).join("\n");
+}
+function money$7(value) {
+  return (Number(value) || 0).toLocaleString("en-US", { style: "currency", currency: "USD" });
+}
+function roundCents(value) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+function toCents(value) {
+  return Math.round((Number(value) || 0) * 100);
+}
+function finite(value) {
+  if (value == null || value === "") return null;
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : null;
+}
+function dollars$1(value) {
+  if (!value) return 0;
+  const amount = Number(String(value).replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(amount) ? amount : 0;
+}
+function text$j(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function escapeHtml$6(value) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+const db$s = () => admin.firestore();
+class EmailNotConfiguredError extends Error {
+  code = "email_not_configured";
+  constructor() {
+    super("SMTP is not configured. Set SMTP_USER and SMTP_PASS.");
+    this.name = "EmailNotConfiguredError";
+  }
+}
+function createTransport() {
+  const user = process.env.SMTP_USER || process.env.EMAIL_FROM;
+  const pass = process.env.SMTP_PASS;
+  if (!user || !pass) {
+    throw new EmailNotConfiguredError();
+  }
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST || "smtp.gmail.com",
+    port: Number(process.env.SMTP_PORT) || 587,
+    secure: process.env.SMTP_SECURE === "true",
+    auth: { user, pass }
+  });
+}
+function clientOrderConfirmedSubject(address, orderNumber) {
+  const code = orderNumber && /^#\d{3,}$/.test(orderNumber) ? ` ${orderNumber}` : "";
+  return `Your Iconic order${code} is confirmed: ${address}`;
+}
+async function sendEmail(options) {
+  const { template, audience, variables = {}, subject: subjectOverride, html, attachments } = options;
+  let to = options.to;
+  let bcc = options.bcc;
+  let cc = options.cc;
+  let replyTo = options.replyTo;
+  if (!to) {
+    console.warn("[Email] No recipient specified, skipping.");
+    return { sent: false, delivery: "suppressed" };
+  }
+  if (!emailAllowed(template, process.env, audience)) {
+    const narrowed = narrowGatedClientRecipients({ to, cc, bcc, replyTo }, process.env);
+    if (!narrowed) {
+      const why = notifyTestAllowlist().size > 0 ? `${clientNotifyBlockReason()}. Recipient is not an exact NOTIFY_TEST_ALLOWLIST match.` : `${clientNotifyBlockReason()}.`;
+      console.warn(
+        `[Email] Suppressed '${template}' to ${to} — ${why} No message sent.`
+      );
+      return { sent: false, delivery: "suppressed" };
+    }
+    to = narrowed.to;
+    cc = narrowed.cc;
+    bcc = narrowed.bcc;
+    replyTo = narrowed.replyTo;
+    if (narrowed.held.length > 0) {
+      console.warn(
+        `[Email] '${template}' sent only to NOTIFY_TEST_ALLOWLIST. Held: ${narrowed.held.join(", ")}.`
+      );
+    }
+  }
+  let subject = subjectOverride || `Message from Iconic Images`;
+  let htmlBody = html || getFallbackTemplate(template, variables);
+  try {
+    if (!html && admin.apps.length) {
+      const templateDoc = await db$s().collection("emailTemplates").where("category", "==", template).where("isActive", "==", true).limit(1).get();
+      if (!templateDoc.empty) {
+        const tmpl = templateDoc.docs[0].data();
+        if (!subjectOverride && typeof tmpl.subject === "string" && tmpl.subject.trim()) {
+          subject = interpolate(tmpl.subject, variables);
+        }
+        if (typeof tmpl.htmlBody === "string" && tmpl.htmlBody.trim()) {
+          htmlBody = interpolate(tmpl.htmlBody, variables);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`[Email] Template lookup failed for '${template}'. Using the built-in copy.`, err);
+  }
+  const textBody = options.text;
+  const delivery = emailAllowed(template, process.env, audience) ? "sent" : "allowlist";
+  const transporter = createTransport();
+  try {
+    await transporter.sendMail({
+      from: `"Iconic Images" <${process.env.EMAIL_FROM || process.env.SMTP_USER}>`,
+      to,
+      bcc,
+      cc,
+      ...replyTo ? { replyTo } : {},
+      subject,
+      html: htmlBody,
+      ...textBody ? { text: textBody } : {},
+      attachments
+    });
+    console.log(`[Email] Sent '${template}' to ${to}`);
+    return { sent: true, delivery };
+  } catch (err) {
+    console.error(`[Email] Failed to send '${template}' to ${to}:`, err);
+    throw err;
+  } finally {
+    transporter.close();
+  }
+}
+function interpolate(template, variables) {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] ?? `{{${key}}}`);
+}
+function builtinEmailHtml(type, vars) {
+  return getFallbackTemplate(type, vars);
+}
+function getFallbackTemplate(type, vars) {
+  if (type === "payment_receipt") {
+    const branded = paymentReceiptFromVars(vars).html;
+    const doorsOpen = doorsOpenReceiptEmailHtml(vars.dotOptInUrl || "");
+    return branded.includes("</body>") ? branded.replace("</body>", `${doorsOpen}</body>`) : `${branded}${doorsOpen}`;
+  }
+  const base = (content) => `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="background: #000; padding: 20px; text-align: center; margin-bottom: 30px;">
+        <h1 style="color: #fff; margin: 0; font-size: 24px;">ICONIC IMAGES</h1>
+        <p style="color: #ccc; margin: 5px 0 0; font-size: 12px; letter-spacing: 2px;">REAL ESTATE MEDIA</p>
+      </div>
+      ${content}
+      <div style="border-top: 1px solid #eee; margin-top: 30px; padding-top: 20px; text-align: center; color: #999; font-size: 12px;">
+        <p>${BUSINESS_CONTACT.line}</p>
+        <p>${LEGAL_BUSINESS_NAME}</p>
+        <p>Iconic Images TX | iconicimagestx.com</p>
+        <p>Questions? Reply to this email or message us through your client portal.</p>
+      </div>
+    </div>
+  `;
+  const templates = {
+    booking_received: base(`
+      <h2 style="color:#0d9488;">We received your booking request!</h2>
+      <p>Hi ${vars.clientName},</p>
+      <p>Thank you for choosing Iconic Images. We've received your booking request for <strong>${vars.address}</strong> and our team will review and confirm your appointment within 1 business day.</p>
+
+      <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;border:1px solid #eee;border-radius:8px;overflow:hidden;">
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;width:42%;color:#555;border-bottom:1px solid #eee;">Requested Date</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.scheduledDate || "TBD — we'll confirm shortly"}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Requested Time</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.scheduledTime || "—"}</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Property Status</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.propertyStatus || "—"}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Furnishing</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.furnishingStatus || "—"}</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Access Method</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><strong>${vars.accessMethod || "—"}</strong></td></tr>
+        ${vars.squareFootage ? `<tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Square Footage</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.squareFootage}</td></tr>` : ""}
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Travel</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.travelFee || "Travel quoted"}</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;">Order Total</td><td style="padding:10px 14px;font-weight:bold;color:#0d9488;">${vars.total}</td></tr>
+      </table>
+
+      <p style="color:#888;font-size:13px;">Confirmation ID: <strong>${vars.requestId}</strong> — keep this for your records.</p>
+      <p style="color:#888;font-size:13px;">If any details look incorrect, simply reply to this email and we'll sort it out.</p>
+    `),
+    account_password_setup: base(`
+      <h2 style="color:#0d9488;">Set your portal password</h2>
+      <p>Hi ${vars.clientName},</p>
+      <p>We created a client portal login for <strong>${vars.clientEmail || "your email"}</strong> so you can see this appointment request.</p>
+      <p>This email is only for your password. Your appointment request details are in a separate email.</p>
+      <p><a href="${vars.setupUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Set your password</a></p>
+      <p style="color:#888;font-size:13px;">After that, sign in at <a href="${vars.portalUrl}">${vars.portalUrl}</a>.</p>
+    `),
+    order_confirmed: base(`
+      <h2>Your appointment is confirmed!</h2>
+      <p>Hi ${vars.clientName},</p>
+      <p>Great news — your shoot at <strong>${vars.address}</strong> is confirmed!</p>
+      <p><strong>Date:</strong> ${vars.scheduledDate}<br>
+      <strong>Time:</strong> ${vars.scheduledTime}<br>
+      <strong>Photographer:</strong> ${vars.photographerName}<br>
+      <strong>Travel:</strong> ${vars.travelFee || "Travel quoted"}</p>
+      <p><a href="${vars.portalUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">View Your Portal</a></p>
+    `),
+    gallery_delivery: base(`
+      <h2>Your gallery is ready! 🎉</h2>
+      <p>Hi ${vars.clientName},</p>
+      <p>Your photos for <strong>${vars.address}</strong> are edited and waiting in your Iconic Images gallery.</p>
+      ${vars.invoiceAmount ? `<p>Iconic Images invoices after the shoot. Downloads stay locked until the <strong>${vars.invoiceAmount}</strong> invoice is paid.</p>` : `<p>Downloads open from your gallery once that invoice is paid, or when our team releases the files.</p>`}
+      <p><a href="${vars.galleryUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">View Gallery</a></p>
+      ${vars.paymentUrl ? `<p><a href="${vars.paymentUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Pay invoice</a></p>` : ""}
+      ${doorsOpenDeliveryEmailHtml()}
+      <p style="color:#999;font-size:12px;">Gallery available for ${vars.expiresAt}.</p>
+    `),
+    invoice: base(`
+      <h2>Invoice from Iconic Images</h2>
+      <p>Hi ${vars.clientName},</p>
+      <p>Your invoice <strong>${vars.invoiceNumber}</strong> for <strong>${vars.amount}</strong> is ready.</p>
+      ${vars.dueDate ? `<p>Due: <strong>${vars.dueDate}</strong></p>` : ""}
+      ${vars.paymentUrl ? `<p><a href="${vars.paymentUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Pay Invoice</a></p>` : ""}
+    `),
+    manual_message: base(`
+      <h2>Message from Iconic Images</h2>
+      <div style="line-height:1.6;color:#333;">
+        ${(vars.message || "").replace(/\n/g, "<br>")}
+      </div>
+    `),
+    new_booking_alert: base(`
+      <h2>🔔 New Booking Request</h2>
+
+      <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;border:1px solid #eee;border-radius:8px;overflow:hidden;">
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;width:42%;color:#555;border-bottom:1px solid #eee;">Client</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.clientName}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Email</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><a href="mailto:${vars.email}">${vars.email}</a></td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Phone</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.phone}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Address</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><strong>${vars.address}</strong></td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Requested Date</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.scheduledDate || "TBD"} ${vars.scheduledTime || ""}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Property Status</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.propertyStatus || "—"} / ${vars.furnishingStatus || "—"}</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Access Method</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><strong>${vars.accessMethod || "—"}</strong></td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Square Footage</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.squareFootage || "Not provided"}</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Photographer</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.photographerPreference || "Auto-assign"}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;">Total</td><td style="padding:10px 14px;font-weight:bold;color:#0d9488;">${vars.total}</td></tr>
+      </table>
+
+      <p><a href="${vars.dashboardUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Review in Dashboard →</a></p>
+    `),
+    contact_form: base(`
+      <h2 style="color:#0d9488;">New Contact Form Submission</h2>
+
+      <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;border:1px solid #eee;border-radius:8px;overflow:hidden;">
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;width:42%;color:#555;border-bottom:1px solid #eee;">From</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.senderName}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Email</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><a href="mailto:${vars.senderEmail}">${vars.senderEmail}</a></td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Phone</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.senderPhone}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Subject</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><strong>${vars.subject}</strong></td></tr>
+      </table>
+
+      <h3 style="color:#555;margin-top:30px;margin-bottom:10px;">Message:</h3>
+      <div style="background:#f8fafc;padding:15px;border-left:4px solid #0d9488;font-style:italic;color:#666;line-height:1.6;">
+        ${(vars.message || "").replace(/\n/g, "<br>")}
+      </div>
+
+      <p style="margin-top:30px;color:#999;font-size:12px;">
+        <strong>To reply:</strong> Send an email directly to ${vars.senderEmail}
+      </p>
+    `),
+    live_chat: base(`
+      <h2 style="color:#0d9488;">Live chat message</h2>
+      <p>A visitor sent a message from the website chat. Reply to them directly — this alert did not email or text the visitor.</p>
+
+      <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;border:1px solid #eee;border-radius:8px;overflow:hidden;">
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;width:42%;color:#555;border-bottom:1px solid #eee;">From</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.senderName}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Email</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.senderEmail}</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Phone</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.senderPhone}</td></tr>
+      </table>
+
+      <h3 style="color:#555;margin-top:30px;margin-bottom:10px;">Message:</h3>
+      <div style="background:#f8fafc;padding:15px;border-left:4px solid #0d9488;color:#333;line-height:1.6;">
+        ${(vars.message || "").replace(/\n/g, "<br>")}
+      </div>
+    `),
+    contact_confirmation: base(`
+      <h2 style="color:#0d9488;">We received your message!</h2>
+      <p>Hi ${vars.name},</p>
+      <p>Thank you for reaching out to Iconic Images. We've received your message and our team will review it shortly.</p>
+      <p>We typically respond to inquiries within 24 business hours. If your question is urgent, feel free to call us at <strong>${BUSINESS_CONTACT.phoneDisplay}</strong> or email <strong>${BUSINESS_CONTACT.email}</strong>.</p>
+      <p style="margin-top:30px;color:#888;font-size:12px;">
+        If you have any additional information to add, simply reply to this email or visit <strong>iconicimagestx.com</strong>.
+      </p>
+    `)
+  };
+  return templates[type] || base(`<p>You have a new notification from Iconic Images.</p>`);
+}
+let _client = null;
+function getClient() {
+  if (_client) return _client;
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  if (!sid || !token) {
+    throw new Error("Twilio credentials not configured (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN).");
+  }
+  _client = twilio(sid, token);
+  return _client;
+}
+function normalisePhone(raw) {
+  const digits2 = raw.replace(/\D/g, "");
+  if (digits2.length === 10) return `+1${digits2}`;
+  if (digits2.length === 11 && digits2.startsWith("1")) return `+${digits2}`;
+  return `+${digits2}`;
+}
+async function sendSMS({ to, body, from, kind }) {
+  if (kind === STAFF_INBOUND_SMS_KIND && !isStaffInboundSmsDestination(to)) {
+    console.error(`[SMS] Refused staff_inbound to ${to}. Only the office Google Voice number is allowed.`);
+    return { sid: "", status: "refused", suppressed: true };
+  }
+  if (!smsAllowed(kind)) {
+    console.warn(`[SMS] Suppressed to ${to} — ${clientNotifyBlockReason()}. No message sent.`);
+    return { sid: "", status: "suppressed", suppressed: true };
+  }
+  const fromNumber = from || process.env.TWILIO_PHONE_NUMBER;
+  if (!fromNumber) throw new Error("TWILIO_PHONE_NUMBER not set.");
+  const client = getClient();
+  const message = await client.messages.create({
+    to: normalisePhone(to),
+    from: fromNumber,
+    body
+  });
+  console.log(`[SMS] Sent to ${to} — SID: ${message.sid}`);
+  return { sid: message.sid, status: message.status };
+}
+async function sendSMSCampaign(recipients, bodyTemplate, messagingServiceSid) {
+  if (!clientNotifyLive()) {
+    console.warn(`[SMS] Suppressed campaign to ${recipients.length} recipients — ${clientNotifyBlockReason()}.`);
+    return recipients.map((recipient) => ({ phone: recipient.phone, error: "suppressed" }));
+  }
+  const client = getClient();
+  const sid = messagingServiceSid || process.env.TWILIO_MESSAGING_SERVICE_SID;
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+  const results = [];
+  for (const recipient of recipients) {
+    if (!recipient.phone) continue;
+    const body = bodyTemplate.replace(/\{\{name\}\}/gi, recipient.name || "there");
+    try {
+      const msg = await client.messages.create({
+        to: normalisePhone(recipient.phone),
+        ...sid ? { messagingServiceSid: sid } : { from: fromNumber },
+        body
+      });
+      results.push({ phone: recipient.phone, sid: msg.sid });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error(`[SMS] Campaign send failed for ${recipient.phone}:`, errorMessage);
+      results.push({ phone: recipient.phone, error: errorMessage });
+    }
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  return results;
+}
+async function createMaskedConversation(friendlyName, photographer, client, webhookUrl) {
+  if (!clientNotifyLive()) {
+    console.warn(`[SMS] Suppressed masked conversation — ${clientNotifyBlockReason()}. No SMS sent.`);
+    throw new Error("Client notifications are off.");
+  }
+  const client_sdk = getClient();
+  const conversation = await client_sdk.conversations.v1.conversations.create({
+    friendlyName,
+    timers: {
+      inactive: "P30D",
+      // auto-close after 30 days inactive
+      closed: "P60D"
+    }
+  });
+  const conversationSid = conversation.sid;
+  if (webhookUrl) {
+    await client_sdk.conversations.v1.conversations(conversationSid).webhooks.create({
+      target: "webhook",
+      "configuration.method": "post",
+      "configuration.url": webhookUrl,
+      "configuration.filters": ["onMessageAdded"]
+    });
+  }
+  const photographerParticipant = await client_sdk.conversations.v1.conversations(conversationSid).participants.create({
+    "messagingBinding.type": "sms",
+    "messagingBinding.address": normalisePhone(photographer.phone),
+    identity: `photographer_${normalisePhone(photographer.phone).replace("+", "")}`
+  });
+  const clientParticipant = await client_sdk.conversations.v1.conversations(conversationSid).participants.create({
+    "messagingBinding.type": "sms",
+    "messagingBinding.address": normalisePhone(client.phone),
+    identity: `client_${normalisePhone(client.phone).replace("+", "")}`
+  });
+  console.log(`[Conversations] Created: ${conversationSid} (${friendlyName})`);
+  return {
+    conversationSid,
+    photographerParticipantSid: photographerParticipant.sid,
+    clientParticipantSid: clientParticipant.sid
+  };
+}
+async function sendConversationMessage(conversationSid, body, author = "Iconic Images") {
+  if (!clientNotifyLive()) {
+    console.warn(`[SMS] Suppressed conversation message — ${clientNotifyBlockReason()}. No SMS sent.`);
+    throw new Error("Client notifications are off.");
+  }
+  const client_sdk = getClient();
+  const message = await client_sdk.conversations.v1.conversations(conversationSid).messages.create({ body, author });
+  return { sid: message.sid };
+}
+async function closeConversation(conversationSid) {
+  const client_sdk = getClient();
+  await client_sdk.conversations.v1.conversations(conversationSid).update({ state: "closed" });
+  console.log(`[Conversations] Closed: ${conversationSid}`);
+}
+const SMS_TEMPLATES = {
+  bookingConfirmation: (name, date, address, total) => `Hi ${name}! We've received your booking request for ${address}.
+
+⚠️ THIS IS NOT A CONFIRMATION. Our team will review your request and reach out shortly to confirm your appointment.
+
+Requested date: ${date}
+Estimated total: ${total}
+
+Questions? Reply to this text, or reach us at ${BUSINESS_CONTACT.line}. — Iconic Images 📸`,
+  appointmentReminder24h: (name, date, time, address) => `Hey ${name}, reminder! Your Iconic Images shoot is tomorrow 📸
+
+🕐 ${time}
+📍 ${address}
+
+Reply CONFIRM to confirm or call us to reschedule.`,
+  appointmentReminder1h: (name, time) => `Hi ${name}! Your photographer is on the way — arriving around ${time} 📸
+Reply to this text with any last-minute notes!`,
+  photosDelivered: (name, galleryUrl) => `🎉 ${name}, your photos are ready!
+
+View your gallery: ${galleryUrl}
+
+Questions or edits? Just reply here. — Iconic Images`,
+  photographerIntro: (photographerName, clientName2, date) => `Hi ${clientName2}! I'm ${photographerName}, your Iconic Images photographer for ${date}. Feel free to text me here with any questions before the shoot! 📸`,
+  newBookingAlert: (address, date, services2) => `🔔 NEW BOOKING — Iconic Images
+
+📍 ${address}
+📅 ${date}
+🏠 ${services2}
+
+Check dashboard for details.`
+};
 const SETTLED$1 = /* @__PURE__ */ new Set(["paid", "comped"]);
 function isGuessableInvoiceId(id) {
   return id.startsWith("listing_") || id.startsWith("ordreq_") || id.startsWith("playtest-");
@@ -5493,8 +5837,8 @@ function refuseQaStaffPhone(input) {
 }
 const router$o = Router();
 const db$o = () => admin.firestore();
-function appUrl$2() {
-  return process.env.APP_URL || "https://iconicimagestx.com";
+function orderRequestAdminUrl(id) {
+  return publicClientUrl(`/admin/order-request/${encodeURIComponent(id)}`);
 }
 function addressLabel(address) {
   return addressText(address) || "Address not provided";
@@ -5766,7 +6110,7 @@ router$o.post("/", async (req, res) => {
         accessMethod: accessLine,
         squareFootage: squareFootage ? `${squareFootage} sq ft` : "",
         travelFee: travelSummaryText(travel),
-        dashboardUrl: `${appUrl$2()}/admin/order-request/${docRef.id}`
+        dashboardUrl: orderRequestAdminUrl(docRef.id)
       }
     }).then((result) => result.sent ? "sent" : "failed").catch((err) => {
       console.error("[Bookings] Confirmation email failed:", err);
@@ -5847,7 +6191,7 @@ router$o.post("/", async (req, res) => {
       const alert = await notifyOfficeOfOrder({
         isNewOrder: true,
         saved: savedOrder,
-        adminUrl: `${appUrl$2()}/admin/order-request/${savedSnap.id}`
+        adminUrl: orderRequestAdminUrl(savedSnap.id)
       });
       officeAlertStatus = alert.sent ? "sent" : "skipped";
     } catch (err) {
@@ -6369,12 +6713,15 @@ async function nextOrderNumber() {
   });
   return formatOrderNumber(n);
 }
+function appFirestore() {
+  return admin.firestore();
+}
 function textId(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 async function readDoc$1(collection, id) {
   if (!id) return null;
-  const snap = await admin.firestore().collection(collection).doc(id).get();
+  const snap = await appFirestore().collection(collection).doc(id).get();
   if (!snap.exists) return null;
   return { id: snap.id, ref: snap.ref, data: snap.data() || {} };
 }
@@ -6390,7 +6737,7 @@ async function markDotOptIn(collection, id) {
 async function applyDotOptIn(token) {
   const trimmed = token.trim();
   if (trimmed.length < 20 || trimmed.length > 200) return "missing";
-  const db2 = admin.firestore();
+  const db2 = appFirestore();
   const [orders, requests] = await Promise.all([
     db2.collection("orders").where("dotOptInToken", "==", trimmed).limit(5).get(),
     db2.collection("orderRequests").where("dotOptInToken", "==", trimmed).limit(5).get()
@@ -11174,7 +11521,7 @@ function parseSeniorLivingOrder(body) {
   };
 }
 const router$l = Router();
-const db$g = () => admin.firestore();
+const db$g = () => appFirestore();
 const stripe$1 = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
 });
@@ -11300,25 +11647,98 @@ async function paymentAlreadyRecorded({
   }
   return false;
 }
-async function unlockGalleriesForInvoice({
-  invoiceId,
-  orderId,
-  galleryId
-}) {
+async function refsForInvoice(collection, invoiceId, orderId, directId) {
   const refs = /* @__PURE__ */ new Map();
-  if (galleryId) refs.set(galleryId, db$g().collection("galleries").doc(galleryId));
+  if (directId) refs.set(directId, db$g().collection(collection).doc(directId));
   const lookups = [
-    db$g().collection("galleries").where("invoiceId", "==", invoiceId).get()
+    db$g().collection(collection).where("invoiceId", "==", invoiceId).get()
   ];
-  if (orderId) lookups.push(db$g().collection("galleries").where("orderId", "==", orderId).get());
+  if (orderId) lookups.push(db$g().collection(collection).where("orderId", "==", orderId).get());
   const snaps = await Promise.all(lookups);
   snaps.forEach((snap) => snap.docs.forEach((doc) => refs.set(doc.id, doc.ref)));
-  await Promise.all([...refs.values()].map((ref) => ref.update({
+  return refs;
+}
+async function syncDownloadAccess({
+  invoiceId,
+  orderId,
+  invoice,
+  unlocked,
+  auditEntry
+}) {
+  const galleryId = typeof invoice.galleryId === "string" ? invoice.galleryId : void 0;
+  const listingId = typeof invoice.listingId === "string" ? invoice.listingId : void 0;
+  const galleries = await refsForInvoice("galleries", invoiceId, orderId, galleryId);
+  const listings = await refsForInvoice("listings", invoiceId, orderId, listingId);
+  for (const ref of galleries.values()) {
+    const snap = await ref.get().catch(() => null);
+    const linked = snap?.exists ? snap.data()?.listingId : void 0;
+    if (typeof linked === "string" && linked.trim()) {
+      listings.set(linked, db$g().collection("listings").doc(linked));
+    }
+  }
+  const patch = unlocked ? {
+    clientGalleryDownloadsUnlocked: true,
+    lockDownloads: false,
+    downloadsReleased: true,
     downloadEnabled: true,
     paymentStatus: "paid",
+    invoiceStatus: "paid",
     unlockedAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
-  }).catch((err) => console.error("[Payments] Gallery unlock failed:", err))));
+  } : {
+    paymentStatus: "partial",
+    invoiceStatus: "partial",
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  };
+  await Promise.all([...galleries.values()].map((ref) => ref.update(patch).catch((err) => {
+    console.error("[Payments] Gallery unlock failed:", err);
+  })));
+  await Promise.all([...listings.values()].map(async (ref) => {
+    try {
+      if (!auditEntry) {
+        await ref.update(patch);
+        return;
+      }
+      const snap = await ref.get();
+      if (!snap.exists) return;
+      const auditLog = Array.isArray(snap.data()?.auditLog) ? snap.data()?.auditLog : [];
+      await ref.update({ ...patch, auditLog: [...auditLog, auditEntry] });
+    } catch (err) {
+      console.error("[Payments] Listing unlock failed:", err);
+    }
+  }));
+}
+function squarePaymentHistory({
+  amount,
+  unlocked,
+  balance,
+  email,
+  squarePaymentId
+}) {
+  const paidLabel = money$2(amount);
+  const action = unlocked ? `Payment received ${paidLabel} via Square; downloads unlocked` : `Payment received ${paidLabel} via Square`;
+  const balanceNote = !unlocked && balance > 0 ? ` Balance due ${money$2(balance)}.` : "";
+  const mail = email === "allowlist" ? " Email sent via the test allowlist." : email === "sent" ? " Email sent." : email === "failed" ? " Receipt email failed." : " Email suppressed by the notify gate.";
+  return {
+    action,
+    by: "Square",
+    at: (/* @__PURE__ */ new Date()).toISOString(),
+    details: `${action}.${balanceNote}${mail}`.replace(/\s+/g, " ").trim(),
+    email,
+    ...squarePaymentId ? { squarePaymentId } : {}
+  };
+}
+async function appendOrderHistory(orderId, entry2) {
+  if (!orderId) return;
+  const ref = db$g().collection("orders").doc(orderId);
+  try {
+    const snap = await ref.get();
+    if (!snap.exists) return;
+    const history = Array.isArray(snap.data()?.history) ? snap.data()?.history : [];
+    await ref.update({ history: [...history, entry2] });
+  } catch (err) {
+    console.error("[Payments] Order history update failed:", err);
+  }
 }
 async function applySuccessfulPayment({
   invoiceId,
@@ -11341,13 +11761,14 @@ async function applySuccessfulPayment({
   const duplicate = sameSquare || sameStripe || await paymentAlreadyRecorded({ squarePaymentId, stripePaymentIntentId });
   if (duplicate) {
     if (invoiceAllowsDownload(invoice)) {
-      await unlockGalleriesForInvoice({
+      await syncDownloadAccess({
         invoiceId,
         orderId: resolvedOrderId,
-        galleryId: typeof invoice.galleryId === "string" ? invoice.galleryId : void 0
+        invoice,
+        unlocked: true
       });
     }
-    return;
+    return { applied: false, unlocked: false, duplicate: true, email: "suppressed" };
   }
   const currentPaid = Number(invoice.amountPaid) || 0;
   const total = Number(invoice.total) || 0;
@@ -11377,13 +11798,6 @@ async function applySuccessfulPayment({
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     }).catch((err) => console.error("[Payments] Client spend update failed:", err));
   }
-  if (newAmountDue <= 0) {
-    await unlockGalleriesForInvoice({
-      invoiceId,
-      orderId: resolvedOrderId,
-      galleryId: typeof invoice.galleryId === "string" ? invoice.galleryId : void 0
-    });
-  }
   await db$g().collection("transactions").add({
     type: "payment",
     orderId: resolvedOrderId,
@@ -11399,31 +11813,67 @@ async function applySuccessfulPayment({
     processedBy: "system",
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   });
+  const unlocked = newAmountDue <= 0;
+  let email = "suppressed";
   if (invoice.clientEmail) {
-    await deliverPaymentReceipt(invoice, invoiceId, money$2(amount), money$2(newAmountDue)).catch(console.error);
+    try {
+      email = await deliverPaymentReceipt(invoice, invoiceId, newAmountPaid, newAmountDue, unlocked);
+    } catch (err) {
+      console.error("[Payments] Receipt email failed:", err);
+      email = "failed";
+    }
   }
-}
-async function deliverPaymentReceipt(invoice, invoiceId, amount, balance) {
-  const to = typeof invoice.clientEmail === "string" ? invoice.clientEmail : "";
-  if (!to) return;
-  const offer = await ensureDotOptInLink(invoice);
-  const variables = {
-    clientName: String(invoice.clientName || ""),
+  const auditEntry = method === "square" ? squarePaymentHistory({
     amount,
-    invoiceNumber: receiptEmailNumber({
-      invoiceNumber: invoice.invoiceNumber,
-      id: invoiceId,
-      createdAt: invoice.createdAt
-    }),
+    unlocked,
+    balance: newAmountDue,
+    email,
+    squarePaymentId
+  }) : void 0;
+  if (auditEntry) await appendOrderHistory(resolvedOrderId, auditEntry);
+  await syncDownloadAccess({
+    invoiceId,
+    orderId: resolvedOrderId,
+    invoice,
+    unlocked,
+    auditEntry
+  });
+  return { applied: true, unlocked, duplicate: false, email };
+}
+async function deliverPaymentReceipt(invoice, invoiceId, amountPaid, balance, unlocked) {
+  const to = typeof invoice.clientEmail === "string" ? invoice.clientEmail : "";
+  if (!to) return "suppressed";
+  const offer = await ensureDotOptInLink(invoice);
+  const rendered = buildPaymentReceipt({
+    invoice,
+    invoiceId,
+    unlocked,
+    amountPaid,
     balance,
-    dotOptInUrl: offer.url || ""
-  };
-  await sendEmail({
+    galleryId: invoice.galleryId,
+    listing: typeof invoice.listingId === "string" ? { id: invoice.listingId } : null
+  });
+  const doorsOpen = doorsOpenReceiptEmailHtml(offer.url || "");
+  const html = rendered.html.includes("</body>") ? rendered.html.replace("</body>", `${doorsOpen}</body>`) : `${rendered.html}${doorsOpen}`;
+  const result = await sendEmail({
     to,
     template: "payment_receipt",
-    html: builtinEmailHtml("payment_receipt", variables),
-    variables
+    subject: rendered.subject,
+    html,
+    text: rendered.text,
+    variables: {
+      clientName: String(invoice.clientName || ""),
+      amount: money$2(amountPaid),
+      invoiceNumber: receiptEmailNumber({
+        invoiceNumber: invoice.invoiceNumber,
+        id: invoiceId,
+        createdAt: invoice.createdAt
+      }),
+      balance: money$2(balance),
+      dotOptInUrl: offer.url || ""
+    }
   });
+  return result.delivery;
 }
 function roundMoney$1(amount) {
   return Math.round(amount * 100) / 100;
@@ -11615,8 +12065,9 @@ router$l.post("/send-receipt", requireCoordinator, async (req, res) => {
     await deliverPaymentReceipt(
       invoice,
       invoiceDoc.id,
-      money$2(invoice.amountPaid || invoice.total),
-      money$2(amountStillDue(invoice))
+      Number(invoice.amountPaid || invoice.total) || 0,
+      amountStillDue(invoice),
+      true
     );
     return res.json({ success: true });
   } catch (err) {
@@ -12060,7 +12511,7 @@ router$l.post("/square-webhook", async (req, res) => {
       });
       return res.json({ received: true, deposit: true });
     }
-    await applySuccessfulPayment({
+    const settled2 = await applySuccessfulPayment({
       invoiceId: invoiceDoc.id,
       orderId: invoice.orderId,
       clientId: invoice.clientId,
@@ -12069,7 +12520,7 @@ router$l.post("/square-webhook", async (req, res) => {
       method: "square",
       squarePaymentId: payment.id
     });
-    return res.json({ received: true });
+    return res.json({ received: true, ...settled2 ?? {} });
   } catch (err) {
     console.error("[Payments] Square webhook error:", err);
     return res.status(500).json({ error: "Square webhook handler failed." });
@@ -16884,10 +17335,10 @@ function chicagoLocalToIso(localDateTime) {
 function marketingSendLive(env = process.env) {
   return env.MARKETING_SEND_LIVE === "true";
 }
-function marketingPublicUrl(env = process.env, requestOrigin = "") {
-  const configured = String(env.MARKETING_PUBLIC_URL || env.APP_URL || "").trim().replace(/\/$/, "");
+function marketingPublicUrl(env = process.env, _requestOrigin = "") {
+  const configured = String(env.MARKETING_PUBLIC_URL || "").trim().replace(/\/$/, "");
   if (configured) return configured;
-  return requestOrigin.replace(/\/$/, "");
+  return publicSiteUrl(env);
 }
 class GmassSendBlocked extends Error {
   constructor() {

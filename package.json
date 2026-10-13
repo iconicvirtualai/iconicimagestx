@@ -24,6 +24,7 @@
     "report:processing-impact": "tsx scripts/report-processing-impact.ts",
     "report:share-photos": "tsx scripts/report-share-photos.ts",
     "qa:send-delivery": "tsx scripts/qa-send-delivery.ts",
+    "qa:square-webhook": "tsx scripts/qa-square-webhook.ts",
     "migrate:invoice-ids": "tsx scripts/migrate-invoice-ids.ts",
     "backfill:video-posters": "tsx scripts/backfill-video-posters.ts",
     "format.fix": "prettier --write .",
