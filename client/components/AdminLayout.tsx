@@ -4,6 +4,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { staffHomePath } from "@shared/staffAccess";
 import { LogOut } from "lucide-react";
 import { mostSpecificNavHref, navGroups } from "@/lib/adminNav";
+import { StudioJobIndicator } from "@/components/studio-jobs/MyProjectsPanel";
+import { useStudioJobs } from "@/components/studio-jobs/StudioJobRoot";
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -21,6 +23,7 @@ const ROLE_BADGE: Record<string, { label: string; color: string }> = {
 
 export default function AdminLayout({ children, title, mainClassName }: AdminLayoutProps) {
   const { user, staffProfile, loading, isStaff, signOutUser } = useAuth();
+  const { activeCount } = useStudioJobs();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -68,9 +71,9 @@ export default function AdminLayout({ children, title, mainClassName }: AdminLay
   );
 
   return (
-    <div className="flex h-screen bg-[#f4f7f8]">
+    <div className="flex h-screen bg-[#f4f7f8] font-sans">
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 z-20 flex h-screen w-60 flex-col overflow-hidden border-r border-gray-800 bg-[#0a0a0a]">
+      <aside className="fixed left-0 top-0 z-20 hidden h-screen w-60 flex-col overflow-hidden border-r border-gray-800 bg-[#0a0a0a] md:flex">
         <div aria-hidden="true" className="pointer-events-none absolute inset-0">
           <img src="/media/decor/glow-teal.svg" alt="" className="absolute -top-24 -left-16 w-72 opacity-80" />
           <img src="/media/decor/arc.svg" alt="" className="absolute -bottom-16 -right-16 w-56 opacity-60" />
@@ -87,6 +90,10 @@ export default function AdminLayout({ children, title, mainClassName }: AdminLay
               <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Ops Portal</span>
             </div>
           </Link>
+        </div>
+
+        <div className="relative px-3 pt-4">
+          <StudioJobIndicator count={activeCount} tone="dark" />
         </div>
 
         {/* Navigation */}
@@ -146,7 +153,7 @@ export default function AdminLayout({ children, title, mainClassName }: AdminLay
       </aside>
 
       {/* Main Content */}
-      <main className={`relative ml-60 min-w-0 flex-1 overflow-y-auto overflow-x-hidden ${mainClassName || ""}`}>
+      <main className={`relative min-w-0 flex-1 overflow-y-auto overflow-x-hidden md:ml-60 ${mainClassName || ""}`}>
         <AdminDecor />
         <div className="relative z-[1] min-h-full w-full">
           {title && (
@@ -158,17 +165,41 @@ export default function AdminLayout({ children, title, mainClassName }: AdminLay
                 className="pointer-events-none absolute right-6 top-1/2 h-24 w-24 -translate-y-1/2 opacity-70"
               />
               <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-teal-500/70 to-transparent" />
-              <div className="flex w-full items-center justify-between gap-4 px-6 py-5">
-                <h1 className="text-xl font-black text-black uppercase tracking-tight">
+              <div className="flex w-full items-center justify-between gap-3 px-4 py-4 sm:px-6 sm:py-5">
+                <h1 className="min-w-0 text-xl font-black text-black uppercase tracking-tight">
                   {title}
                 </h1>
-                <span className={`relative shrink-0 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${badge.color}`}>
-                  {badge.label}
-                </span>
+                <div className="flex shrink-0 items-center gap-2">
+                  <StudioJobIndicator count={activeCount} />
+                  <span className={`relative hidden text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full sm:inline-flex ${badge.color}`}>
+                    {badge.label}
+                  </span>
+                </div>
               </div>
             </div>
           )}
-          <div className="w-full min-w-0 px-6 py-6">
+          {!title && (
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 md:hidden">
+              <p className="text-sm font-black uppercase tracking-tight">Iconic</p>
+              <StudioJobIndicator count={activeCount} />
+            </div>
+          )}
+          <details className="border-b border-slate-200 bg-white px-4 py-2 md:hidden">
+            <summary className="cursor-pointer py-2 text-sm font-semibold text-gray-700">Menu</summary>
+            <nav className="space-y-4 pb-3">
+              {visibleGroups.map((group) => (
+                <div key={group.label}>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">{group.label}</p>
+                  {group.items.map((item) => (
+                    <Link key={item.href} to={item.href} className="block py-2 text-sm font-semibold text-gray-800">
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              ))}
+            </nav>
+          </details>
+          <div className="w-full min-w-0 px-4 py-4 sm:px-6 sm:py-6">
             {children}
           </div>
         </div>
@@ -179,7 +210,7 @@ export default function AdminLayout({ children, title, mainClassName }: AdminLay
 
 function AdminDecor({ full = false }: { full?: boolean }) {
   return (
-    <div aria-hidden="true" className={`pointer-events-none fixed inset-y-0 right-0 z-0 overflow-hidden ${full ? "left-0" : "left-60"}`}>
+    <div aria-hidden="true" className={`pointer-events-none fixed inset-y-0 right-0 z-0 overflow-hidden ${full ? "left-0" : "left-0 md:left-60"}`}>
       <div className="absolute inset-0 admin-decor-wash" />
       <div className="absolute inset-0 shadow-[inset_0_0_140px_rgba(15,23,42,0.05)]" />
       <img src="/media/decor/arc.svg" alt="" className="absolute -top-8 -right-28 w-[380px] opacity-60" />
