@@ -151,6 +151,17 @@ function parseContactLine(line) {
   };
 }
 const BUSINESS_CONTACT = parseContactLine(BUSINESS_CONTACT_LINE);
+function escapeHtml$8(value) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function clientEmailContactLineHtml(color = "#666666") {
+  const style = `color:${color};text-decoration:underline;`;
+  return [
+    escapeHtml$8(BUSINESS_CONTACT.address),
+    `<a href="${BUSINESS_CONTACT.phoneHref}" style="${style}">${escapeHtml$8(BUSINESS_CONTACT.phoneDisplay)}</a>`,
+    `<a href="${BUSINESS_CONTACT.emailHref}" style="${style}">${escapeHtml$8(BUSINESS_CONTACT.email)}</a>`
+  ].join(" | ");
+}
 const DOORS_OPEN_TOUR_URL = "https://doorsopentour.com";
 const DOT_DELIVERY_LINE = "Check out our new interactive Open House Tour by zone - As an Iconic Client, you receive an automatic upgrade on DoorsOpenTour.com when it's your time to shine!";
 const DOT_RECEIPT_LINE = "Payment received - Thanks for that! Let us know if you want your Open House listed on DoorsOpenTour.com and we'll upgrade your door for free!";
@@ -202,102 +213,108 @@ function dotOptInResultHtml(ok) {
 </body>
 </html>`;
 }
-const ORDER_RECEIVED_EMAIL_TEMPLATE = "booking_received";
-const ORDER_RECEIVED_SMS_KIND = "booking_confirmation";
-const STAFF_INBOUND_EMAIL_TEMPLATE = "live_chat";
-const OFFICE_NEW_ORDER_EMAIL_TEMPLATE$1 = "office_new_order";
-const STAFF_INBOUND_SMS_KIND = "staff_inbound";
-const STAFF_INBOUND_SMS_TO = "+12813560965";
-function clientNotifyLive(env = process.env) {
-  if (env.CLIENT_COMMS_ZONE === "RED") return false;
-  return env.CLIENT_NOTIFY_LIVE === "true";
+const __vite_import_meta_env__ = {};
+const DEFAULT_PUBLIC_SITE_URL = "https://iconicimagestx.vercel.app";
+function livePublicSiteEnv() {
+  const nodePublic = typeof process !== "undefined" ? process.env?.PUBLIC_SITE_URL : void 0;
+  const nodeVite = typeof process !== "undefined" ? process.env?.VITE_PUBLIC_SITE_URL : void 0;
+  const vitePublic = typeof import.meta !== "undefined" && __vite_import_meta_env__ ? void 0 : void 0;
+  return {
+    PUBLIC_SITE_URL: typeof nodePublic === "string" ? nodePublic : void 0,
+    VITE_PUBLIC_SITE_URL: typeof nodeVite === "string" && nodeVite.trim() ? nodeVite : typeof vitePublic === "string" ? vitePublic : void 0
+  };
 }
-function emailAllowed(template, env = process.env, audience) {
-  if (template === ORDER_RECEIVED_EMAIL_TEMPLATE) return true;
-  if (audience === "staff" && template === STAFF_INBOUND_EMAIL_TEMPLATE) return true;
-  if (audience === "staff" && template === OFFICE_NEW_ORDER_EMAIL_TEMPLATE$1) return true;
-  return clientNotifyLive(env);
-}
-function smsAllowed(kind, env = process.env) {
-  if (kind === ORDER_RECEIVED_SMS_KIND) return true;
-  if (kind === STAFF_INBOUND_SMS_KIND) return true;
-  return clientNotifyLive(env);
-}
-function isStaffInboundSmsDestination(to) {
-  const digits2 = to.replace(/\D/g, "");
-  return digits2 === "12813560965" || digits2 === "2813560965";
-}
-function clientNotifyBlockReason(env = process.env) {
-  if (env.CLIENT_COMMS_ZONE === "RED") return "CLIENT_COMMS_ZONE=RED";
-  return "CLIENT_NOTIFY_LIVE is not exactly true";
-}
-const MAILBOX = /^[^\s@,;<>"]+@[^\s@,;<>"]+$/;
-function mailboxAddress(input) {
-  const trimmed = input.trim();
-  if (!trimmed) return null;
-  const wrapped = trimmed.match(/^(?:"[^"]*"|[^<"]*?)\s*<([^<>]+)>\s*$/);
-  const candidate = (wrapped ? wrapped[1] : trimmed).trim().toLowerCase();
-  if (!MAILBOX.test(candidate)) return null;
+function publicSiteUrl(env = livePublicSiteEnv()) {
+  const configured = String(env.PUBLIC_SITE_URL || env.VITE_PUBLIC_SITE_URL || "").trim();
+  const candidate = (configured || DEFAULT_PUBLIC_SITE_URL).replace(/\/+$/, "");
+  let parsed;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    throw new Error("PUBLIC_SITE_URL must be an https URL.");
+  }
+  if (parsed.protocol !== "https:") {
+    throw new Error("PUBLIC_SITE_URL must use https.");
+  }
+  if (!parsed.hostname) {
+    throw new Error("PUBLIC_SITE_URL must be an https URL.");
+  }
   return candidate;
 }
-function notifyTestAllowlist(env = process.env) {
-  const raw = env.NOTIFY_TEST_ALLOWLIST;
-  const allow = /* @__PURE__ */ new Set();
-  if (!raw) return allow;
-  for (const part of raw.split(",")) {
-    const address = mailboxAddress(part);
-    if (address) allow.add(address);
+function publicClientUrl(path2, env) {
+  const suffix = path2.startsWith("/") ? path2 : `/${path2}`;
+  return `${publicSiteUrl(env)}${suffix}`;
+}
+const SETTLED$1 = /* @__PURE__ */ new Set(["paid", "comped"]);
+function isGuessableInvoiceId(id) {
+  return id.startsWith("listing_") || id.startsWith("ordreq_") || id.startsWith("playtest-");
+}
+function text$l(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function settled$1(invoice) {
+  return SETTLED$1.has(text$l(invoice?.status).toLowerCase());
+}
+function invoicePayLinkFor(invoice, env, extra) {
+  if (!invoice || settled$1(invoice)) return null;
+  const id = text$l(invoice.id);
+  const token = text$l(invoice.payToken);
+  if (!id || !token) return null;
+  const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
+  url.searchParams.set("t", token);
+  applyQuery(url, extra);
+  return url.toString();
+}
+function clientInvoiceUrl(invoice, env, extra) {
+  const tokenized = invoicePayLinkFor(invoice, env, extra);
+  if (tokenized) return tokenized;
+  if (!invoice || settled$1(invoice)) return null;
+  const id = text$l(invoice.id);
+  if (!id || isGuessableInvoiceId(id)) return null;
+  const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
+  applyQuery(url, extra);
+  return url.toString();
+}
+function applyQuery(url, extra) {
+  if (!extra) return;
+  for (const [key, value] of Object.entries(extra)) {
+    const textValue = text$l(value);
+    if (textValue && key !== "t") url.searchParams.set(key, textValue);
   }
-  return allow;
 }
-function isNotifyTestAllowlisted(address, env = process.env) {
-  const mailbox = mailboxAddress(address);
-  if (!mailbox) return false;
-  return notifyTestAllowlist(env).has(mailbox);
+function galleryDeliverySubject(address) {
+  const place = typeof address === "string" ? address.trim() : "";
+  if (!place || place.toLowerCase() === "the property") return "Your gallery is ready";
+  return `Your gallery is ready: ${place}`;
 }
-function recipientTokens(value) {
-  if (!value) return [];
-  return value.split(/[,;\n]/).map((part) => part.trim()).filter(Boolean);
+function galleryDeliveryUrl(galleryId, env) {
+  return publicClientUrl(`/gallery/${encodeURIComponent(galleryId)}`, env);
 }
-function keepExact(value, allow, held) {
-  const kept = [];
-  const seen = /* @__PURE__ */ new Set();
-  for (const token of recipientTokens(value)) {
-    const mailbox = mailboxAddress(token);
-    if (mailbox && allow.has(mailbox)) {
-      if (!seen.has(mailbox)) {
-        seen.add(mailbox);
-        kept.push(mailbox);
-      }
-    } else {
-      held.push(token);
-    }
-  }
-  return kept;
+function galleryDeliveryPayUrl(invoice, env) {
+  return invoicePayLinkFor(invoice, env);
 }
-function narrowGatedClientRecipients(input, env = process.env) {
-  const allow = notifyTestAllowlist(env);
-  if (allow.size === 0) return null;
-  const held = [];
-  let to = keepExact(input.to, allow, held);
-  let cc = keepExact(input.cc, allow, held);
-  let bcc = keepExact(input.bcc, allow, held);
-  const replyTo = keepExact(input.replyTo, allow, held);
-  if (to.length === 0 && cc.length > 0) {
-    to = cc;
-    cc = [];
-  } else if (to.length === 0 && bcc.length > 0) {
-    to = bcc;
-    bcc = [];
-  }
-  if (to.length === 0) return null;
+function galleryDeliveredHistoryEntry(input) {
+  const recipients = input.recipients.map((item) => item.trim()).filter(Boolean);
+  const who = recipients.length > 0 ? recipients.join(", ") : "none";
+  const outcome = input.email === "sent" ? "Email sent." : input.email === "allowlist" ? "Email sent via the test allowlist." : "Email suppressed by the notify gate.";
   return {
-    to: to.join(", "),
-    cc: cc.length > 0 ? cc.join(", ") : void 0,
-    bcc: bcc.length > 0 ? bcc.join(", ") : void 0,
-    replyTo: replyTo.length > 0 ? replyTo.join(", ") : void 0,
-    held
+    action: "Gallery delivered",
+    by: staffLabel(input.actor),
+    at: input.at,
+    details: `Recipients: ${who}. ${outcome}`,
+    recipients,
+    email: input.email
   };
+}
+function staffLabel(actor2) {
+  const email = clean(actor2?.email);
+  const name = clean(actor2?.name);
+  const uid = clean(actor2?.uid);
+  if (name && email) return `${name} (${email})`;
+  return email || name || uid || "staff";
+}
+function clean(value) {
+  return typeof value === "string" ? value.trim() : "";
 }
 const services = [
   // Listings
@@ -1449,6 +1466,7 @@ function publicMediaItem(item, canDownload) {
     thumbnailUrl: publicText(item.thumbnailUrl) || publicText(item.poster)
   };
 }
+const BOOKING_PROCESSING_LABEL = "Processing (2.8%)";
 function processingEnabled(env) {
   const source = process.env;
   const raw = String(source?.INVOICE_PROCESSING_MODE ?? "").trim().toLowerCase();
@@ -1517,6 +1535,961 @@ function roundMoney$6(value) {
   if (!Number.isFinite(value)) return 0;
   return Math.round(value * 100) / 100;
 }
+const FONT = "Arial, Helvetica, sans-serif";
+const YELLOW = "#FFE500";
+const TEAL = "#14B8C4";
+const GREEN = "#16A34A";
+const ROW = "#F3F4F6";
+function receiptProcessing(input) {
+  const status2 = text$k(input.invoice.status).toLowerCase();
+  const paymentStatus = text$k(input.invoice.paymentStatus).toLowerCase();
+  if (status2 === "comped" || paymentStatus === "comped") return 0;
+  const base = roundCents(input.subtotal - input.promotions + input.fees);
+  const stored = finite$1(input.invoice.processing);
+  const quoted = stored != null ? Math.max(0, stored) : processingFee(base);
+  const quotedCents = toCents(quoted);
+  if (quotedCents <= 0) return 0;
+  const paidCents = toCents(input.totalPaid);
+  const baseCents = toCents(base);
+  if (paidCents + 1 < baseCents + quotedCents) return 0;
+  return roundCents(quotedCents / 100);
+}
+function receiptLogoUrl(env) {
+  return publicClientUrl("/media/logos/iconic-graffiti-logo.png", env);
+}
+function receiptPaidLabel(date) {
+  const months = ["JAN.", "FEB.", "MAR.", "APR.", "MAY.", "JUN.", "JUL.", "AUG.", "SEP.", "OCT.", "NOV.", "DEC."];
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${months[date.getUTCMonth()]} ${day}, ${date.getUTCFullYear()}`;
+}
+function receiptLines(lineItems) {
+  if (!Array.isArray(lineItems)) return [];
+  const lines = [];
+  for (const item of lineItems) {
+    if (!item || typeof item !== "object") continue;
+    const row = item;
+    const name = typeof row.name === "string" && row.name.trim() ? row.name.trim() : "Service";
+    const qtyRaw = Number(row.qty ?? row.quantity ?? 1);
+    const qty = Number.isFinite(qtyRaw) && qtyRaw > 0 ? qtyRaw : 1;
+    const unit = finite$1(row.unitPrice);
+    const linePrice = finite$1(row.price);
+    const explicitTotal = finite$1(row.total);
+    const total = explicitTotal ?? linePrice ?? (unit != null ? roundCents(unit * qty) : 0);
+    const shownUnit = unit ?? (qty ? roundCents(total / qty) : total);
+    lines.push({ name, qty, unit: shownUnit, total });
+  }
+  return lines;
+}
+function renderPaymentReceipt(content) {
+  const subject = `Payment received — ${content.invoiceNumber || "Iconic Images"}`;
+  return {
+    subject,
+    html: receiptHtml(content),
+    text: receiptText(content)
+  };
+}
+function paymentReceiptFromVars(vars, env) {
+  let lines = [];
+  if (vars.lineItemsJson) {
+    try {
+      lines = receiptLines(JSON.parse(vars.lineItemsJson));
+    } catch {
+      lines = [];
+    }
+  }
+  const subtotal = dollars$1(vars.subtotal) || lines.reduce((sum, line) => sum + line.total, 0);
+  const promotions = dollars$1(vars.promotions);
+  const fees = dollars$1(vars.fees);
+  const totalPaid = dollars$1(vars.totalPaid) || dollars$1(vars.amount);
+  const invoice = {
+    status: vars.status,
+    paymentStatus: vars.paymentStatus
+  };
+  if (vars.processing != null && vars.processing !== "") invoice.processing = dollars$1(vars.processing);
+  return renderPaymentReceipt({
+    clientName: vars.clientName || "there",
+    invoiceNumber: vars.invoiceNumber || "",
+    paidAtLabel: vars.paidAt || "",
+    lines,
+    subtotal,
+    processing: receiptProcessing({ invoice, subtotal, promotions, fees, totalPaid }),
+    promotions,
+    fees,
+    totalPaid,
+    balance: dollars$1(vars.balance),
+    galleryUrl: vars.galleryUrl || "",
+    presentationUrl: vars.presentationUrl || "",
+    unlocked: vars.unlocked === "true" || dollars$1(vars.balance) <= 0 && totalPaid > 0,
+    logoUrl: vars.logoUrl || receiptLogoUrl(env)
+  });
+}
+function receiptHtml(content) {
+  const rows = content.lines.length > 0 ? content.lines.map((line, index) => lineRow(line, index)).join("") : lineRow({ name: "Payment", qty: 1, unit: content.totalPaid, total: content.totalPaid }, 0);
+  const downloads = content.unlocked ? downloadsBlock(content) : balanceBlock(content);
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml$6(content.invoiceNumber)} receipt</title>
+<style>
+@media only screen and (max-width: 480px) {
+  .totals-desktop { display: none !important; }
+  .totals-mobile { display: table !important; width: 100% !important; }
+}
+</style>
+</head>
+<body style="margin:0;padding:0;background:#ffffff;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;">
+<tr><td align="center" style="padding:0;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:700px;font-family:${FONT};color:#111111;">
+${headerBlock(content)}
+<tr><td style="padding:28px 28px 8px;font-family:${FONT};font-size:14px;line-height:1.5;color:#222222;">
+Hi ${escapeHtml$6(content.clientName)}, we received your payment for invoice ${escapeHtml$6(content.invoiceNumber)}.
+</td></tr>
+<tr><td style="padding:0 28px 4px;font-family:${FONT};font-size:14px;line-height:1.5;color:#111111;">${BOOKING_PROCESSING_LABEL}</td></tr>
+<tr><td style="padding:12px 20px 0;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:${FONT};">
+<tr>
+<td bgcolor="#000000" style="background:#000000;color:#ffffff;font-family:${FONT};font-size:11px;font-weight:bold;letter-spacing:1px;padding:12px 14px;">DESCRIPTION</td>
+<td bgcolor="#000000" align="right" style="background:#000000;color:#ffffff;font-family:${FONT};font-size:11px;font-weight:bold;letter-spacing:1px;padding:12px 10px;">QTY.</td>
+<td bgcolor="#000000" align="right" style="background:#000000;color:#ffffff;font-family:${FONT};font-size:11px;font-weight:bold;letter-spacing:1px;padding:12px 10px;">PRICE</td>
+<td bgcolor="#000000" align="right" style="background:#000000;color:#ffffff;font-family:${FONT};font-size:11px;font-weight:bold;letter-spacing:1px;padding:12px 14px;">TOTAL</td>
+</tr>
+${rows}
+</table>
+</td></tr>
+<tr><td style="padding:22px 20px 8px;">
+<table class="totals-desktop" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:2px solid #000000;border-collapse:separate;font-family:${FONT};">
+<tr>
+${totalCell("SUB TOTAL", money$7(content.subtotal), false)}
+${totalCell("PROCESSING", money$7(content.processing), false)}
+${totalCell("PROMOTIONS", money$7(content.promotions), false)}
+${totalCell("FEES", money$7(content.fees), false)}
+${totalCell("TOTAL PAID", money$7(content.totalPaid), true)}
+</tr>
+</table>
+<table class="totals-mobile" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="display:none;border:2px solid #000000;border-collapse:separate;font-family:${FONT};">
+${totalRow("SUB TOTAL", money$7(content.subtotal), false)}
+${totalRow("PROCESSING", money$7(content.processing), false)}
+${totalRow("PROMOTIONS", money$7(content.promotions), false)}
+${totalRow("FEES", money$7(content.fees), false)}
+${totalRow("TOTAL PAID", money$7(content.totalPaid), true)}
+</table>
+</td></tr>
+${downloads}
+${footerBlock()}
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
+}
+function headerBlock(content) {
+  return `<tr><td bgcolor="#000000" style="background:#000000;padding:28px 24px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td valign="top" style="font-family:${FONT};">
+<div style="font-family:${FONT};font-size:32px;line-height:1;font-weight:bold;letter-spacing:6px;color:${YELLOW};">RECEIPT</div>
+<div style="font-family:${FONT};font-size:12px;line-height:1.4;font-weight:bold;letter-spacing:3px;color:${YELLOW};padding-top:10px;">PAYMENT RECEIVED</div>
+<div style="font-family:${FONT};font-size:13px;line-height:1.5;color:#ffffff;padding-top:16px;">INVOICE NO : ${escapeHtml$6(content.invoiceNumber)}</div>
+<div style="font-family:${FONT};font-size:13px;line-height:1.5;color:#ffffff;padding-top:4px;">${escapeHtml$6(content.paidAtLabel)}</div>
+</td>
+<td valign="top" align="right" width="160" style="padding-left:12px;">
+<img src="${escapeHtml$6(content.logoUrl)}" alt="Iconic Images" width="140" style="display:block;border:0;outline:none;text-decoration:none;width:140px;max-width:140px;height:auto;">
+</td>
+</tr>
+</table>
+</td></tr>`;
+}
+function lineRow(line, index) {
+  const bg = index % 2 === 0 ? ROW : "#ffffff";
+  return `<tr>
+<td bgcolor="${bg}" style="background:${bg};font-family:${FONT};font-size:13px;font-weight:bold;letter-spacing:0.5px;color:${TEAL};padding:14px;border-bottom:1px solid #e5e7eb;">${escapeHtml$6(line.name.toUpperCase())}</td>
+<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#374151;padding:14px 10px;border-bottom:1px solid #e5e7eb;">${escapeHtml$6(String(line.qty))}</td>
+<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#374151;padding:14px 10px;border-bottom:1px solid #e5e7eb;">${escapeHtml$6(money$7(line.unit))}</td>
+<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#111111;padding:14px;border-bottom:1px solid #e5e7eb;">${escapeHtml$6(money$7(line.total))}</td>
+</tr>`;
+}
+function totalRow(label, value, emphasis, note) {
+  const valueStyle = emphasis ? "font-size:22px;font-weight:bold;color:#111111;" : "font-size:14px;font-weight:bold;color:#111111;";
+  const noteHtml = "";
+  return `<tr>
+<td style="padding:12px 16px;font-family:${FONT};font-size:11px;font-weight:bold;letter-spacing:0.8px;color:#111111;border-bottom:1px solid #e5e7eb;">${label}</td>
+<td align="right" style="padding:12px 16px;font-family:${FONT};${valueStyle}border-bottom:1px solid #e5e7eb;">${escapeHtml$6(value)}${noteHtml}</td>
+</tr>`;
+}
+function totalCell(label, value, emphasis, note) {
+  const valueStyle = emphasis ? `font-size:22px;font-weight:bold;color:#111111;` : `font-size:14px;font-weight:bold;color:#111111;`;
+  const noteHtml = "";
+  return `<td valign="top" align="center" style="padding:14px 6px;font-family:${FONT};">
+<div style="font-family:${FONT};font-size:10px;font-weight:bold;letter-spacing:0.8px;color:#111111;">${label}</div>
+<div style="font-family:${FONT};${valueStyle}padding-top:6px;">${escapeHtml$6(value)}</div>
+${noteHtml}
+</td>`;
+}
+function downloadsBlock(content) {
+  const presentation = content.presentationUrl.trim();
+  const gallery = content.galleryUrl.trim();
+  if (!presentation && !gallery) return "";
+  const primaryHref = presentation || gallery;
+  const primaryLabel = presentation ? "View your listing presentation" : "Your downloads &amp; invoice";
+  const secondary = presentation && gallery ? `<tr><td align="center" style="padding-top:12px;font-family:${FONT};font-size:14px;">
+<a href="${escapeHtml$6(gallery)}" style="color:${TEAL};font-family:${FONT};font-weight:bold;text-decoration:underline;">Your downloads &amp; invoice</a>
+</td></tr>` : "";
+  return `<tr><td style="padding:28px 24px 12px;">
+<div style="font-family:${FONT};font-size:22px;line-height:1.3;font-weight:bold;color:#111111;">Your downloads are ready</div>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:16px;">
+<tr><td bgcolor="#000000" style="background:#000000;border-radius:4px;">
+<a href="${escapeHtml$6(primaryHref)}" style="display:inline-block;padding:14px 22px;font-family:${FONT};font-size:15px;font-weight:bold;color:${YELLOW};text-decoration:none;">${primaryLabel}</a>
+</td></tr>
+${secondary}
+</table>
+</td></tr>`;
+}
+function balanceBlock(content) {
+  if (content.balance <= 0) return "";
+  return `<tr><td style="padding:20px 24px 8px;font-family:${FONT};font-size:14px;color:#111111;">
+Balance due: <strong>${escapeHtml$6(money$7(content.balance))}</strong>. Downloads stay locked until the invoice is paid in full.
+</td></tr>`;
+}
+function footerBlock() {
+  return `<tr><td bgcolor="#000000" style="background:#000000;padding:28px 24px 22px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td valign="top" style="font-family:${FONT};font-size:13px;line-height:1.55;color:#ffffff;">
+<div style="font-family:${FONT};font-size:12px;font-weight:bold;letter-spacing:0.6px;color:${GREEN};padding-bottom:8px;">PAYMENT INFORMATION:</div>
+${escapeHtml$6(LEGAL_BUSINESS_NAME)}<br>
+<div style="font-family:${FONT};font-size:13px;line-height:1.55;color:#ffffff;padding-top:8px;">${clientEmailContactLineHtml("#ffffff")}</div>
+</td>
+<td valign="top" align="right" style="font-family:${FONT};font-size:13px;line-height:1.55;color:#ffffff;">
+${escapeHtml$6(BUSINESS_CONTACT.streetAddress)}<br>
+${escapeHtml$6(BUSINESS_CONTACT.addressLine2)}
+</td>
+</tr>
+</table>
+<div style="font-family:${FONT};font-size:13px;font-weight:bold;letter-spacing:3px;color:${TEAL};padding-top:22px;">THANK YOU FOR BEING ICONIC</div>
+</td></tr>`;
+}
+function receiptText(content) {
+  const itemLines = (content.lines.length > 0 ? content.lines : [{
+    name: "Payment",
+    qty: 1,
+    unit: content.totalPaid,
+    total: content.totalPaid
+  }]).map((line) => `${line.name}  qty ${line.qty}  ${money$7(line.unit)}  ${money$7(line.total)}`);
+  const links = [];
+  if (content.unlocked) {
+    links.push("Your downloads are ready");
+    if (content.presentationUrl) links.push(`View your listing presentation: ${content.presentationUrl}`);
+    if (content.galleryUrl) links.push(`Your downloads & invoice: ${content.galleryUrl}`);
+  } else if (content.balance > 0) {
+    links.push(`Balance due: ${money$7(content.balance)}. Downloads stay locked until the invoice is paid in full.`);
+  }
+  return [
+    "RECEIPT",
+    "PAYMENT RECEIVED",
+    `Invoice ${content.invoiceNumber}`,
+    content.paidAtLabel,
+    "",
+    `Hi ${content.clientName}, we received your payment.`,
+    BOOKING_PROCESSING_LABEL,
+    "",
+    ...itemLines,
+    "",
+    `SUB TOTAL ${money$7(content.subtotal)}`,
+    `PROCESSING ${money$7(content.processing)}`,
+    `PROMOTIONS ${money$7(content.promotions)}`,
+    `FEES ${money$7(content.fees)}`,
+    `TOTAL PAID ${money$7(content.totalPaid)}`,
+    "",
+    ...links,
+    "",
+    "PAYMENT INFORMATION:",
+    LEGAL_BUSINESS_NAME,
+    BUSINESS_CONTACT.line,
+    "",
+    "THANK YOU FOR BEING ICONIC"
+  ].filter((line) => line !== void 0).join("\n");
+}
+function money$7(value) {
+  return (Number(value) || 0).toLocaleString("en-US", { style: "currency", currency: "USD" });
+}
+function roundCents(value) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+function toCents(value) {
+  return Math.round((Number(value) || 0) * 100);
+}
+function finite$1(value) {
+  if (value == null || value === "") return null;
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : null;
+}
+function dollars$1(value) {
+  if (!value) return 0;
+  const amount = Number(String(value).replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(amount) ? amount : 0;
+}
+function text$k(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function escapeHtml$6(value) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+const EMAIL_TEMPLATES_COLLECTION = "emailTemplates";
+const CLIENT_EMAIL_TEMPLATE_KEYS = [
+  "booking_received",
+  "account_password_setup",
+  "order_confirmed",
+  "gallery_delivery",
+  "invoice",
+  "payment_receipt",
+  "contact_confirmation",
+  "clientConfirmation"
+];
+function isClientEmailTemplate(value) {
+  return CLIENT_EMAIL_TEMPLATE_KEYS.includes(value);
+}
+function fillEmailPlaceholders(template, variables) {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => Object.prototype.hasOwnProperty.call(variables, key) && variables[key] != null ? variables[key] : `{{${key}}}`);
+}
+function readEmailTemplateOverride(data) {
+  if (!data || typeof data !== "object") return null;
+  const row = data;
+  if (typeof row.subject !== "string" || !row.subject.trim()) return null;
+  if (typeof row.htmlBody !== "string" || !row.htmlBody.trim()) return null;
+  return { subject: row.subject.trim(), htmlBody: row.htmlBody };
+}
+function clientOrderReceivedSubject(address, orderNumber) {
+  const code = orderNumber && /^#\d{3,}$/.test(orderNumber) ? ` ${orderNumber}` : "";
+  return `Your Iconic order${code} was received: ${address}`;
+}
+function clientAppointmentConfirmedSubject(address, orderNumber) {
+  const code = orderNumber && /^#\d{3,}$/.test(orderNumber) ? ` ${orderNumber}` : "";
+  return `Your Iconic appointment${code} is confirmed: ${address}`;
+}
+function invoiceEmailSubject(invoiceNumber) {
+  const number = (invoiceNumber || "").trim();
+  return number ? `Invoice ${number} from Iconic Images` : "Invoice from Iconic Images";
+}
+function paymentReceiptEmailSubject(invoiceNumber) {
+  return `Payment received — ${invoiceNumber?.trim() || "Iconic Images"}`;
+}
+function clientConfirmationSubject(orderNumber) {
+  const code = orderNumber && /^#\d{3,}$/.test(orderNumber) ? ` ${orderNumber}` : "";
+  return `We received your Iconic order${code}`;
+}
+function builtinEmailSubject(type, vars = {}) {
+  switch (type) {
+    case "booking_received":
+      return clientOrderReceivedSubject(vars.address || "", vars.orderNumber);
+    case "account_password_setup":
+      return "Set your Iconic Images portal password";
+    case "order_confirmed":
+      return clientAppointmentConfirmedSubject(vars.address || "", vars.orderNumber);
+    case "gallery_delivery":
+      return galleryDeliverySubject(vars.address);
+    case "invoice":
+      return invoiceEmailSubject(vars.invoiceNumber);
+    case "payment_receipt":
+      return paymentReceiptEmailSubject(vars.invoiceNumber);
+    case "contact_confirmation":
+      return "We received your message — Iconic Images";
+    case "clientConfirmation":
+      return clientConfirmationSubject(vars.orderNumber);
+    default:
+      return "";
+  }
+}
+function shell(content) {
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="background: #000; padding: 20px; text-align: center; margin-bottom: 30px;">
+        <h1 style="color: #fff; margin: 0; font-size: 24px;">ICONIC IMAGES</h1>
+        <p style="color: #ccc; margin: 5px 0 0; font-size: 12px; letter-spacing: 2px;">REAL ESTATE MEDIA</p>
+      </div>
+      ${content}
+      <div style="border-top: 1px solid #eee; margin-top: 30px; padding-top: 20px; text-align: center; color: #999; font-size: 12px;">
+        <p>${clientEmailContactLineHtml("#666666")}</p>
+        <p>${LEGAL_BUSINESS_NAME}</p>
+        <p><a href="https://iconicimagestx.com" style="color:#999999;text-decoration:underline;">iconicimagestx.com</a></p>
+        <p>Questions? Reply to this email or message us through your client portal.</p>
+      </div>
+    </div>
+  `;
+}
+function processingLine() {
+  return `<p style="margin:12px 0;font-size:14px;color:#111111;">${BOOKING_PROCESSING_LABEL}</p>`;
+}
+const HTML_SOURCE = {
+  booking_received: shell(`
+      <h2 style="color:#0d9488;">We received your booking request!</h2>
+      <p>Hi {{clientName}},</p>
+      <p>Thank you for choosing Iconic Images. We've received your booking request for <strong>{{address}}</strong> and our team will review and confirm your appointment within 1 business day.</p>
+      <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;border:1px solid #eee;border-radius:8px;overflow:hidden;">
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;width:42%;color:#555;border-bottom:1px solid #eee;">Requested Date</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">{{scheduledDate}}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Requested Time</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">{{scheduledTime}}</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Property Status</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">{{propertyStatus}}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Furnishing</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">{{furnishingStatus}}</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Access Method</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><strong>{{accessMethod}}</strong></td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Square Footage</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">{{squareFootage}}</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Travel</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">{{travelFee}}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">${BOOKING_PROCESSING_LABEL}</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">{{processing}}</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;">Order Total</td><td style="padding:10px 14px;font-weight:bold;color:#0d9488;">{{total}}</td></tr>
+      </table>
+      <p style="color:#888;font-size:13px;">Confirmation ID: <strong>{{requestId}}</strong> — keep this for your records.</p>
+      <p style="color:#888;font-size:13px;">If any details look incorrect, simply reply to this email and we'll sort it out.</p>
+    `),
+  account_password_setup: shell(`
+      <h2 style="color:#0d9488;">Set your portal password</h2>
+      <p>Hi {{clientName}},</p>
+      <p>We created a client portal login for <strong>{{clientEmail}}</strong> so you can see this appointment request.</p>
+      <p>This email is only for your password. Your appointment request details are in a separate email.</p>
+      <p><a href="{{setupUrl}}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Set your password</a></p>
+      <p style="color:#888;font-size:13px;">After that, sign in at <a href="{{portalUrl}}">{{portalUrl}}</a>.</p>
+    `),
+  order_confirmed: shell(`
+      <h2>Your appointment is confirmed!</h2>
+      <p>Hi {{clientName}},</p>
+      <p>Great news — your shoot at <strong>{{address}}</strong> is confirmed!</p>
+      <p>Order <strong>{{orderNumber}}</strong></p>
+      <p><strong>Date:</strong> {{scheduledDate}}<br>
+      <strong>Time:</strong> {{scheduledTime}}<br>
+      <strong>Photographer:</strong> {{photographerName}}<br>
+      <strong>Travel:</strong> {{travelFee}}</p>
+      <p><a href="{{portalUrl}}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">View Your Portal</a></p>
+    `),
+  gallery_delivery: shell(`
+      <h2>Your gallery is ready!</h2>
+      <p>Hi {{clientName}},</p>
+      <p>Your photos for <strong>{{address}}</strong> are edited and waiting in your Iconic Images gallery.</p>
+      <p>Iconic Images invoices after the shoot. Downloads stay locked until the <strong>{{invoiceAmount}}</strong> invoice is paid.</p>
+      ${processingLine()}
+      <p style="margin:0 0 8px;font-size:14px;">{{processing}}</p>
+      <p><a href="{{galleryUrl}}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">View Gallery</a></p>
+      <p><a href="{{paymentUrl}}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Pay invoice</a></p>
+      ${doorsOpenDeliveryEmailHtml()}
+      <p style="color:#999;font-size:12px;">Gallery available for {{expiresAt}}.</p>
+    `),
+  invoice: shell(`
+      <h2>Invoice from Iconic Images</h2>
+      <p>Hi {{clientName}},</p>
+      <p>Your invoice <strong>{{invoiceNumber}}</strong> for <strong>{{amount}}</strong> is ready.</p>
+      ${processingLine()}
+      <p style="margin:0 0 8px;font-size:14px;">{{processing}}</p>
+      <p>Due: <strong>{{dueDate}}</strong></p>
+      <p><a href="{{paymentUrl}}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Pay Invoice</a></p>
+    `),
+  payment_receipt: shell(`
+      <h2>Payment received</h2>
+      <p>Hi {{clientName}},</p>
+      <p>We've received your payment of <strong>{{amount}}</strong> for invoice {{invoiceNumber}}.</p>
+      ${processingLine()}
+      <p style="margin:0 0 8px;font-size:14px;">{{processing}}</p>
+      <p>Paid: {{paidAt}}</p>
+      <p>Remaining balance: <strong>{{balance}}</strong></p>
+      <p><a href="{{galleryUrl}}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Your downloads &amp; invoice</a></p>
+      <p><a href="{{presentationUrl}}">Listing presentation</a></p>
+    `),
+  contact_confirmation: shell(`
+      <h2 style="color:#0d9488;">We received your message!</h2>
+      <p>Hi {{name}},</p>
+      <p>Thank you for reaching out to Iconic Images. We've received your message and our team will review it shortly.</p>
+      <p>We typically respond to inquiries within 24 business hours. If your question is urgent, call or email us using the contact line below.</p>
+      <p style="margin-top:30px;color:#888;font-size:12px;">
+        If you have any additional information to add, simply reply to this email or visit <a href="https://iconicimagestx.com" style="color:#888888;text-decoration:underline;">iconicimagestx.com</a>.
+      </p>
+    `),
+  clientConfirmation: shell(`
+      <h2 style="color:#0d9488;">We received your order</h2>
+      <p>Hi {{clientName}},</p>
+      <p>Thank you for booking with Iconic Images. Your order number is <strong>{{orderNumber}}</strong>.</p>
+      <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;border:1px solid #eee;">
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;width:42%;color:#555;border-bottom:1px solid #eee;">Order</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">{{orderNumber}}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Property</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">{{propertyAddress}}</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Services</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">{{services}}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Details</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">{{lineItems}}</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;">Notes</td><td style="padding:10px 14px;">{{notes}}</td></tr>
+      </table>
+      <p>Total: <strong>{{total}}</strong></p>
+      <p>We'll be in touch to confirm your shoot time.</p>
+    `)
+};
+function galleryDeliveryBuiltin(vars) {
+  const money2 = vars.invoiceAmount ? `<p>Iconic Images invoices after the shoot. Downloads stay locked until the <strong>${vars.invoiceAmount}</strong> invoice is paid.</p>
+      ${processingLine()}
+      <p style="margin:0 0 8px;font-size:14px;">${vars.processing || ""}</p>` : `<p>Downloads open from your gallery once that invoice is paid, or when our team releases the files.</p>`;
+  const pay = vars.paymentUrl ? `<p><a href="${vars.paymentUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Pay invoice</a></p>` : "";
+  return shell(`
+      <h2>Your gallery is ready!</h2>
+      <p>Hi ${vars.clientName || ""},</p>
+      <p>Your photos for <strong>${vars.address || ""}</strong> are edited and waiting in your Iconic Images gallery.</p>
+      ${money2}
+      <p><a href="${vars.galleryUrl || ""}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">View Gallery</a></p>
+      ${pay}
+      ${doorsOpenDeliveryEmailHtml()}
+      <p style="color:#999;font-size:12px;">Gallery available for ${vars.expiresAt || ""}.</p>
+    `);
+}
+function clientBuiltinEmailHtml(type, vars = {}) {
+  if (type === "payment_receipt") {
+    const branded = paymentReceiptFromVars(vars).html;
+    const doorsOpen = doorsOpenReceiptEmailHtml(vars.dotOptInUrl || "");
+    return branded.includes("</body>") ? branded.replace("</body>", `${doorsOpen}</body>`) : `${branded}${doorsOpen}`;
+  }
+  if (type === "gallery_delivery") return galleryDeliveryBuiltin(vars);
+  if (!isClientEmailTemplate(type)) {
+    return shell(`<p>You have a new notification from Iconic Images.</p>`);
+  }
+  return fillEmailPlaceholders(HTML_SOURCE[type], vars);
+}
+({
+  lineItemsJson: JSON.stringify([{ name: "The Showcase", qty: 1, unitPrice: 549, price: 549 }])
+});
+const ORDER_RECEIVED_EMAIL_TEMPLATE = "booking_received";
+const ORDER_RECEIVED_SMS_KIND = "booking_confirmation";
+const STAFF_INBOUND_EMAIL_TEMPLATE = "live_chat";
+const OFFICE_NEW_ORDER_EMAIL_TEMPLATE$1 = "office_new_order";
+const STAFF_INBOUND_SMS_KIND = "staff_inbound";
+const STAFF_INBOUND_SMS_TO = "+12813560965";
+function clientNotifyLive(env = process.env) {
+  if (env.CLIENT_COMMS_ZONE === "RED") return false;
+  return env.CLIENT_NOTIFY_LIVE === "true";
+}
+function emailAllowed(template, env = process.env, audience) {
+  if (template === ORDER_RECEIVED_EMAIL_TEMPLATE) return true;
+  if (audience === "staff" && template === STAFF_INBOUND_EMAIL_TEMPLATE) return true;
+  if (audience === "staff" && template === OFFICE_NEW_ORDER_EMAIL_TEMPLATE$1) return true;
+  return clientNotifyLive(env);
+}
+function smsAllowed(kind, env = process.env) {
+  if (kind === ORDER_RECEIVED_SMS_KIND) return true;
+  if (kind === STAFF_INBOUND_SMS_KIND) return true;
+  return clientNotifyLive(env);
+}
+function isStaffInboundSmsDestination(to) {
+  const digits2 = to.replace(/\D/g, "");
+  return digits2 === "12813560965" || digits2 === "2813560965";
+}
+function clientNotifyBlockReason(env = process.env) {
+  if (env.CLIENT_COMMS_ZONE === "RED") return "CLIENT_COMMS_ZONE=RED";
+  return "CLIENT_NOTIFY_LIVE is not exactly true";
+}
+const MAILBOX = /^[^\s@,;<>"]+@[^\s@,;<>"]+$/;
+function mailboxAddress(input) {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  const wrapped = trimmed.match(/^(?:"[^"]*"|[^<"]*?)\s*<([^<>]+)>\s*$/);
+  const candidate = (wrapped ? wrapped[1] : trimmed).trim().toLowerCase();
+  if (!MAILBOX.test(candidate)) return null;
+  return candidate;
+}
+function notifyTestAllowlist(env = process.env) {
+  const raw = env.NOTIFY_TEST_ALLOWLIST;
+  const allow = /* @__PURE__ */ new Set();
+  if (!raw) return allow;
+  for (const part of raw.split(",")) {
+    const address = mailboxAddress(part);
+    if (address) allow.add(address);
+  }
+  return allow;
+}
+function isNotifyTestAllowlisted(address, env = process.env) {
+  const mailbox = mailboxAddress(address);
+  if (!mailbox) return false;
+  return notifyTestAllowlist(env).has(mailbox);
+}
+function recipientTokens(value) {
+  if (!value) return [];
+  return value.split(/[,;\n]/).map((part) => part.trim()).filter(Boolean);
+}
+function keepExact(value, allow, held) {
+  const kept = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const token of recipientTokens(value)) {
+    const mailbox = mailboxAddress(token);
+    if (mailbox && allow.has(mailbox)) {
+      if (!seen.has(mailbox)) {
+        seen.add(mailbox);
+        kept.push(mailbox);
+      }
+    } else {
+      held.push(token);
+    }
+  }
+  return kept;
+}
+function narrowGatedClientRecipients(input, env = process.env) {
+  const allow = notifyTestAllowlist(env);
+  if (allow.size === 0) return null;
+  const held = [];
+  let to = keepExact(input.to, allow, held);
+  let cc = keepExact(input.cc, allow, held);
+  let bcc = keepExact(input.bcc, allow, held);
+  const replyTo = keepExact(input.replyTo, allow, held);
+  if (to.length === 0 && cc.length > 0) {
+    to = cc;
+    cc = [];
+  } else if (to.length === 0 && bcc.length > 0) {
+    to = bcc;
+    bcc = [];
+  }
+  if (to.length === 0) return null;
+  return {
+    to: to.join(", "),
+    cc: cc.length > 0 ? cc.join(", ") : void 0,
+    bcc: bcc.length > 0 ? bcc.join(", ") : void 0,
+    replyTo: replyTo.length > 0 ? replyTo.join(", ") : void 0,
+    held
+  };
+}
+const db$s = () => admin.firestore();
+class EmailNotConfiguredError extends Error {
+  code = "email_not_configured";
+  constructor() {
+    super("SMTP is not configured. Set SMTP_USER and SMTP_PASS.");
+    this.name = "EmailNotConfiguredError";
+  }
+}
+function createTransport() {
+  const user = process.env.SMTP_USER || process.env.EMAIL_FROM;
+  const pass = process.env.SMTP_PASS;
+  if (!user || !pass) {
+    throw new EmailNotConfiguredError();
+  }
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST || "smtp.gmail.com",
+    port: Number(process.env.SMTP_PORT) || 587,
+    secure: process.env.SMTP_SECURE === "true",
+    auth: { user, pass }
+  });
+}
+async function sendEmail(options) {
+  const { template, audience, variables = {}, subject: subjectOverride, html, attachments } = options;
+  let to = options.to;
+  let bcc = options.bcc;
+  let cc = options.cc;
+  let replyTo = options.replyTo;
+  if (!to) {
+    console.warn("[Email] No recipient specified, skipping.");
+    return { sent: false, delivery: "suppressed" };
+  }
+  if (!emailAllowed(template, process.env, audience)) {
+    const narrowed = narrowGatedClientRecipients({ to, cc, bcc, replyTo }, process.env);
+    if (!narrowed) {
+      const why = notifyTestAllowlist().size > 0 ? `${clientNotifyBlockReason()}. Recipient is not an exact NOTIFY_TEST_ALLOWLIST match.` : `${clientNotifyBlockReason()}.`;
+      console.warn(
+        `[Email] Suppressed '${template}' to ${to} — ${why} No message sent.`
+      );
+      return { sent: false, delivery: "suppressed" };
+    }
+    to = narrowed.to;
+    cc = narrowed.cc;
+    bcc = narrowed.bcc;
+    replyTo = narrowed.replyTo;
+    if (narrowed.held.length > 0) {
+      console.warn(
+        `[Email] '${template}' sent only to NOTIFY_TEST_ALLOWLIST. Held: ${narrowed.held.join(", ")}.`
+      );
+    }
+  }
+  const builtinSubject = builtinEmailSubject(template, variables);
+  let subject = subjectOverride || builtinSubject || `Message from Iconic Images`;
+  let htmlBody = html || builtinEmailHtml(template, variables);
+  let textBody = options.text;
+  try {
+    if (admin.apps.length) {
+      const templateDoc = await db$s().collection(EMAIL_TEMPLATES_COLLECTION).doc(template).get();
+      const override = templateDoc.exists ? readEmailTemplateOverride(templateDoc.data()) : null;
+      if (override) {
+        subject = fillEmailPlaceholders(override.subject, variables);
+        htmlBody = fillEmailPlaceholders(override.htmlBody, variables);
+        textBody = void 0;
+      }
+    }
+  } catch (err) {
+    console.warn(`[Email] Template lookup failed for '${template}'. Using the built-in copy.`, err);
+  }
+  const delivery = emailAllowed(template, process.env, audience) ? "sent" : "allowlist";
+  const transporter = createTransport();
+  try {
+    await transporter.sendMail({
+      from: `"Iconic Images" <${process.env.EMAIL_FROM || process.env.SMTP_USER}>`,
+      to,
+      bcc,
+      cc,
+      ...replyTo ? { replyTo } : {},
+      subject,
+      html: htmlBody,
+      ...textBody ? { text: textBody } : {},
+      attachments
+    });
+    console.log(`[Email] Sent '${template}' to ${to}`);
+    return { sent: true, delivery };
+  } catch (err) {
+    console.error(`[Email] Failed to send '${template}' to ${to}:`, err);
+    throw err;
+  } finally {
+    transporter.close();
+  }
+}
+function builtinEmailHtml(type, vars) {
+  if (type === "booking_received" || type === "account_password_setup" || type === "order_confirmed" || type === "gallery_delivery" || type === "invoice" || type === "payment_receipt" || type === "contact_confirmation" || type === "clientConfirmation") {
+    return clientBuiltinEmailHtml(type, vars);
+  }
+  return getFallbackTemplate(type, vars);
+}
+function getFallbackTemplate(type, vars) {
+  const base = (content) => `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="background: #000; padding: 20px; text-align: center; margin-bottom: 30px;">
+        <h1 style="color: #fff; margin: 0; font-size: 24px;">ICONIC IMAGES</h1>
+        <p style="color: #ccc; margin: 5px 0 0; font-size: 12px; letter-spacing: 2px;">REAL ESTATE MEDIA</p>
+      </div>
+      ${content}
+      <div style="border-top: 1px solid #eee; margin-top: 30px; padding-top: 20px; text-align: center; color: #999; font-size: 12px;">
+        <p>${clientEmailContactLineHtml("#666666")}</p>
+        <p>${LEGAL_BUSINESS_NAME}</p>
+        <p><a href="https://iconicimagestx.com" style="color:#999999;text-decoration:underline;">iconicimagestx.com</a></p>
+        <p>Questions? Reply to this email or message us through your client portal.</p>
+      </div>
+    </div>
+  `;
+  const templates = {
+    manual_message: base(`
+      <h2>Message from Iconic Images</h2>
+      <div style="line-height:1.6;color:#333;">
+        ${(vars.message || "").replace(/\n/g, "<br>")}
+      </div>
+    `),
+    new_booking_alert: base(`
+      <h2>🔔 New Booking Request</h2>
+
+      <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;border:1px solid #eee;border-radius:8px;overflow:hidden;">
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;width:42%;color:#555;border-bottom:1px solid #eee;">Client</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.clientName}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Email</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><a href="mailto:${vars.email}">${vars.email}</a></td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Phone</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.phone}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Address</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><strong>${vars.address}</strong></td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Requested Date</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.scheduledDate || "TBD"} ${vars.scheduledTime || ""}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Property Status</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.propertyStatus || "—"} / ${vars.furnishingStatus || "—"}</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Access Method</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><strong>${vars.accessMethod || "—"}</strong></td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Square Footage</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.squareFootage || "Not provided"}</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Photographer</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.photographerPreference || "Auto-assign"}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;">Total</td><td style="padding:10px 14px;font-weight:bold;color:#0d9488;">${vars.total}</td></tr>
+      </table>
+
+      <p><a href="${vars.dashboardUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Review in Dashboard →</a></p>
+    `),
+    contact_form: base(`
+      <h2 style="color:#0d9488;">New Contact Form Submission</h2>
+
+      <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;border:1px solid #eee;border-radius:8px;overflow:hidden;">
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;width:42%;color:#555;border-bottom:1px solid #eee;">From</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.senderName}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Email</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><a href="mailto:${vars.senderEmail}">${vars.senderEmail}</a></td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Phone</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.senderPhone}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Subject</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><strong>${vars.subject}</strong></td></tr>
+      </table>
+
+      <h3 style="color:#555;margin-top:30px;margin-bottom:10px;">Message:</h3>
+      <div style="background:#f8fafc;padding:15px;border-left:4px solid #0d9488;font-style:italic;color:#666;line-height:1.6;">
+        ${(vars.message || "").replace(/\n/g, "<br>")}
+      </div>
+
+      <p style="margin-top:30px;color:#999;font-size:12px;">
+        <strong>To reply:</strong> Send an email directly to ${vars.senderEmail}
+      </p>
+    `),
+    live_chat: base(`
+      <h2 style="color:#0d9488;">Live chat message</h2>
+      <p>A visitor sent a message from the website chat. Reply to them directly — this alert did not email or text the visitor.</p>
+
+      <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;border:1px solid #eee;border-radius:8px;overflow:hidden;">
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;width:42%;color:#555;border-bottom:1px solid #eee;">From</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.senderName}</td></tr>
+        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Email</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.senderEmail}</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Phone</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.senderPhone}</td></tr>
+      </table>
+
+      <h3 style="color:#555;margin-top:30px;margin-bottom:10px;">Message:</h3>
+      <div style="background:#f8fafc;padding:15px;border-left:4px solid #0d9488;color:#333;line-height:1.6;">
+        ${(vars.message || "").replace(/\n/g, "<br>")}
+      </div>
+    `)
+  };
+  return templates[type] || base(`<p>You have a new notification from Iconic Images.</p>`);
+}
+let _client = null;
+function getClient() {
+  if (_client) return _client;
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  if (!sid || !token) {
+    throw new Error("Twilio credentials not configured (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN).");
+  }
+  _client = twilio(sid, token);
+  return _client;
+}
+function normalisePhone(raw) {
+  const digits2 = raw.replace(/\D/g, "");
+  if (digits2.length === 10) return `+1${digits2}`;
+  if (digits2.length === 11 && digits2.startsWith("1")) return `+${digits2}`;
+  return `+${digits2}`;
+}
+async function sendSMS({ to, body, from, kind }) {
+  if (kind === STAFF_INBOUND_SMS_KIND && !isStaffInboundSmsDestination(to)) {
+    console.error(`[SMS] Refused staff_inbound to ${to}. Only the office Google Voice number is allowed.`);
+    return { sid: "", status: "refused", suppressed: true };
+  }
+  if (!smsAllowed(kind)) {
+    console.warn(`[SMS] Suppressed to ${to} — ${clientNotifyBlockReason()}. No message sent.`);
+    return { sid: "", status: "suppressed", suppressed: true };
+  }
+  const fromNumber = from || process.env.TWILIO_PHONE_NUMBER;
+  if (!fromNumber) throw new Error("TWILIO_PHONE_NUMBER not set.");
+  const client = getClient();
+  const message = await client.messages.create({
+    to: normalisePhone(to),
+    from: fromNumber,
+    body
+  });
+  console.log(`[SMS] Sent to ${to} — SID: ${message.sid}`);
+  return { sid: message.sid, status: message.status };
+}
+async function sendSMSCampaign(recipients, bodyTemplate, messagingServiceSid) {
+  if (!clientNotifyLive()) {
+    console.warn(`[SMS] Suppressed campaign to ${recipients.length} recipients — ${clientNotifyBlockReason()}.`);
+    return recipients.map((recipient) => ({ phone: recipient.phone, error: "suppressed" }));
+  }
+  const client = getClient();
+  const sid = messagingServiceSid || process.env.TWILIO_MESSAGING_SERVICE_SID;
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+  const results = [];
+  for (const recipient of recipients) {
+    if (!recipient.phone) continue;
+    const body = bodyTemplate.replace(/\{\{name\}\}/gi, recipient.name || "there");
+    try {
+      const msg = await client.messages.create({
+        to: normalisePhone(recipient.phone),
+        ...sid ? { messagingServiceSid: sid } : { from: fromNumber },
+        body
+      });
+      results.push({ phone: recipient.phone, sid: msg.sid });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error(`[SMS] Campaign send failed for ${recipient.phone}:`, errorMessage);
+      results.push({ phone: recipient.phone, error: errorMessage });
+    }
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  return results;
+}
+async function createMaskedConversation(friendlyName, photographer, client, webhookUrl) {
+  if (!clientNotifyLive()) {
+    console.warn(`[SMS] Suppressed masked conversation — ${clientNotifyBlockReason()}. No SMS sent.`);
+    throw new Error("Client notifications are off.");
+  }
+  const client_sdk = getClient();
+  const conversation = await client_sdk.conversations.v1.conversations.create({
+    friendlyName,
+    timers: {
+      inactive: "P30D",
+      // auto-close after 30 days inactive
+      closed: "P60D"
+    }
+  });
+  const conversationSid = conversation.sid;
+  if (webhookUrl) {
+    await client_sdk.conversations.v1.conversations(conversationSid).webhooks.create({
+      target: "webhook",
+      "configuration.method": "post",
+      "configuration.url": webhookUrl,
+      "configuration.filters": ["onMessageAdded"]
+    });
+  }
+  const photographerParticipant = await client_sdk.conversations.v1.conversations(conversationSid).participants.create({
+    "messagingBinding.type": "sms",
+    "messagingBinding.address": normalisePhone(photographer.phone),
+    identity: `photographer_${normalisePhone(photographer.phone).replace("+", "")}`
+  });
+  const clientParticipant = await client_sdk.conversations.v1.conversations(conversationSid).participants.create({
+    "messagingBinding.type": "sms",
+    "messagingBinding.address": normalisePhone(client.phone),
+    identity: `client_${normalisePhone(client.phone).replace("+", "")}`
+  });
+  console.log(`[Conversations] Created: ${conversationSid} (${friendlyName})`);
+  return {
+    conversationSid,
+    photographerParticipantSid: photographerParticipant.sid,
+    clientParticipantSid: clientParticipant.sid
+  };
+}
+async function sendConversationMessage(conversationSid, body, author = "Iconic Images") {
+  if (!clientNotifyLive()) {
+    console.warn(`[SMS] Suppressed conversation message — ${clientNotifyBlockReason()}. No SMS sent.`);
+    throw new Error("Client notifications are off.");
+  }
+  const client_sdk = getClient();
+  const message = await client_sdk.conversations.v1.conversations(conversationSid).messages.create({ body, author });
+  return { sid: message.sid };
+}
+async function closeConversation(conversationSid) {
+  const client_sdk = getClient();
+  await client_sdk.conversations.v1.conversations(conversationSid).update({ state: "closed" });
+  console.log(`[Conversations] Closed: ${conversationSid}`);
+}
+const SMS_TEMPLATES = {
+  bookingConfirmation: (name, date, address, total) => `Hi ${name}! We've received your booking request for ${address}.
+
+⚠️ THIS IS NOT A CONFIRMATION. Our team will review your request and reach out shortly to confirm your appointment.
+
+Requested date: ${date}
+Estimated total: ${total}
+
+Questions? Reply to this text, or reach us at ${BUSINESS_CONTACT.line}. — Iconic Images 📸`,
+  appointmentReminder24h: (name, date, time, address) => `Hey ${name}, reminder! Your Iconic Images shoot is tomorrow 📸
+
+🕐 ${time}
+📍 ${address}
+
+Reply CONFIRM to confirm or call us to reschedule.`,
+  appointmentReminder1h: (name, time) => `Hi ${name}! Your photographer is on the way — arriving around ${time} 📸
+Reply to this text with any last-minute notes!`,
+  photosDelivered: (name, galleryUrl) => `🎉 ${name}, your photos are ready!
+
+View your gallery: ${galleryUrl}
+
+Questions or edits? Just reply here. — Iconic Images`,
+  photographerIntro: (photographerName, clientName2, date) => `Hi ${clientName2}! I'm ${photographerName}, your Iconic Images photographer for ${date}. Feel free to text me here with any questions before the shoot! 📸`,
+  newBookingAlert: (address, date, services2) => `🔔 NEW BOOKING — Iconic Images
+
+📍 ${address}
+📅 ${date}
+🏠 ${services2}
+
+Check dashboard for details.`
+};
+const RECORD_ADDRESS_KEYS = ["addressLabel", "address", "propertyAddress", "shootLocation", "location"];
+function addressText(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value !== "object" || Array.isArray(value)) return "";
+  const address = value;
+  const formatted = text$j(address.formatted) || text$j(address.label);
+  if (formatted) return formatted;
+  return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
+}
+function recordAddressText(record2) {
+  if (!record2 || typeof record2 !== "object") return addressText(record2);
+  const row = record2;
+  for (const key of RECORD_ADDRESS_KEYS) {
+    const label = addressText(row[key]);
+    if (label) return label;
+  }
+  return "";
+}
+function text$j(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
 const PLAYTEST_ADDRESS = "100 Playtest Lane, Austin, TX 78701";
 const STAFF_ROLES = ["admin", "coordinator", "photographer", "editor"];
 function normalizeEmail$1(value) {
@@ -1576,28 +2549,6 @@ function clientCanViewListing(listing, identity) {
   const email = normalizeEmail$1(identity.email);
   const listingEmail = normalizeEmail$1(listing.clientEmail);
   return Boolean(email && listingEmail && email === listingEmail);
-}
-const RECORD_ADDRESS_KEYS = ["addressLabel", "address", "propertyAddress", "shootLocation", "location"];
-function addressText(value) {
-  if (!value) return "";
-  if (typeof value === "string") return value.trim();
-  if (typeof value !== "object" || Array.isArray(value)) return "";
-  const address = value;
-  const formatted = text$k(address.formatted) || text$k(address.label);
-  if (formatted) return formatted;
-  return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
-}
-function recordAddressText(record2) {
-  if (!record2 || typeof record2 !== "object") return addressText(record2);
-  const row = record2;
-  for (const key of RECORD_ADDRESS_KEYS) {
-    const label = addressText(row[key]);
-    if (label) return label;
-  }
-  return "";
-}
-function text$k(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 const ADDRESS_LIMIT = 300;
 const PLACE_ID_LIMIT = 300;
@@ -2128,817 +3079,6 @@ function invoiceEmailNumber(source, now = /* @__PURE__ */ new Date()) {
 }
 function receiptEmailNumber(source, now = /* @__PURE__ */ new Date()) {
   return shownInvoiceNumber(source, now);
-}
-const __vite_import_meta_env__ = {};
-const DEFAULT_PUBLIC_SITE_URL = "https://iconicimagestx.vercel.app";
-function livePublicSiteEnv() {
-  const nodePublic = typeof process !== "undefined" ? process.env?.PUBLIC_SITE_URL : void 0;
-  const nodeVite = typeof process !== "undefined" ? process.env?.VITE_PUBLIC_SITE_URL : void 0;
-  const vitePublic = typeof import.meta !== "undefined" && __vite_import_meta_env__ ? void 0 : void 0;
-  return {
-    PUBLIC_SITE_URL: typeof nodePublic === "string" ? nodePublic : void 0,
-    VITE_PUBLIC_SITE_URL: typeof nodeVite === "string" && nodeVite.trim() ? nodeVite : typeof vitePublic === "string" ? vitePublic : void 0
-  };
-}
-function publicSiteUrl(env = livePublicSiteEnv()) {
-  const configured = String(env.PUBLIC_SITE_URL || env.VITE_PUBLIC_SITE_URL || "").trim();
-  const candidate = (configured || DEFAULT_PUBLIC_SITE_URL).replace(/\/+$/, "");
-  let parsed;
-  try {
-    parsed = new URL(candidate);
-  } catch {
-    throw new Error("PUBLIC_SITE_URL must be an https URL.");
-  }
-  if (parsed.protocol !== "https:") {
-    throw new Error("PUBLIC_SITE_URL must use https.");
-  }
-  if (!parsed.hostname) {
-    throw new Error("PUBLIC_SITE_URL must be an https URL.");
-  }
-  return candidate;
-}
-function publicClientUrl(path2, env) {
-  const suffix = path2.startsWith("/") ? path2 : `/${path2}`;
-  return `${publicSiteUrl(env)}${suffix}`;
-}
-function presentationLinkForReceipt(listing) {
-  return null;
-}
-const FONT = "Arial, Helvetica, sans-serif";
-const YELLOW = "#FFE500";
-const TEAL = "#14B8C4";
-const GREEN = "#16A34A";
-const ROW = "#F3F4F6";
-function receiptProcessing(input) {
-  const status2 = text$j(input.invoice.status).toLowerCase();
-  const paymentStatus = text$j(input.invoice.paymentStatus).toLowerCase();
-  if (status2 === "comped" || paymentStatus === "comped") return 0;
-  const base = roundCents(input.subtotal - input.promotions + input.fees);
-  const stored = finite(input.invoice.processing);
-  const quoted = stored != null ? Math.max(0, stored) : processingFee(base);
-  const quotedCents = toCents(quoted);
-  if (quotedCents <= 0) return 0;
-  const paidCents = toCents(input.totalPaid);
-  const baseCents = toCents(base);
-  if (paidCents + 1 < baseCents + quotedCents) return 0;
-  return roundCents(quotedCents / 100);
-}
-function receiptLogoUrl(env) {
-  return publicClientUrl("/media/logos/iconic-graffiti-logo.png", env);
-}
-function receiptPaidLabel(date) {
-  const months = ["JAN.", "FEB.", "MAR.", "APR.", "MAY.", "JUN.", "JUL.", "AUG.", "SEP.", "OCT.", "NOV.", "DEC."];
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  return `${months[date.getUTCMonth()]} ${day}, ${date.getUTCFullYear()}`;
-}
-function receiptLines(lineItems) {
-  if (!Array.isArray(lineItems)) return [];
-  const lines = [];
-  for (const item of lineItems) {
-    if (!item || typeof item !== "object") continue;
-    const row = item;
-    const name = typeof row.name === "string" && row.name.trim() ? row.name.trim() : "Service";
-    const qtyRaw = Number(row.qty ?? row.quantity ?? 1);
-    const qty = Number.isFinite(qtyRaw) && qtyRaw > 0 ? qtyRaw : 1;
-    const unit = finite(row.unitPrice);
-    const linePrice = finite(row.price);
-    const explicitTotal = finite(row.total);
-    const total = explicitTotal ?? linePrice ?? (unit != null ? roundCents(unit * qty) : 0);
-    const shownUnit = unit ?? (qty ? roundCents(total / qty) : total);
-    lines.push({ name, qty, unit: shownUnit, total });
-  }
-  return lines;
-}
-function buildPaymentReceipt(input) {
-  const lines = receiptLines(input.invoice.lineItems);
-  const subtotal = finite(input.invoice.subtotal) ?? lines.reduce((sum, line) => sum + line.total, 0);
-  const promotions = finite(input.invoice.promoDiscount) ?? finite(input.invoice.promotions) ?? 0;
-  const fees = finite(input.invoice.fees) ?? 0;
-  const totalPaid = input.amountPaid ?? finite(input.invoice.amountPaid) ?? finite(input.invoice.total) ?? 0;
-  const balance = input.balance ?? 0;
-  const processing = receiptProcessing({
-    invoice: input.invoice,
-    subtotal,
-    promotions,
-    fees,
-    totalPaid
-  });
-  const galleryId = text$j(input.galleryId) || text$j(input.invoice.galleryId);
-  const galleryUrl = galleryId ? publicClientUrl(`/gallery/${encodeURIComponent(galleryId)}`, input.env) : "";
-  const presentationUrl = input.presentationUrl === void 0 ? presentationLinkForReceipt(input.listing) || "" : input.presentationUrl || "";
-  return renderPaymentReceipt({
-    clientName: text$j(input.invoice.clientName) || "there",
-    invoiceNumber: receiptEmailNumber({
-      invoiceNumber: input.invoice.invoiceNumber,
-      id: input.invoiceId,
-      createdAt: input.invoice.createdAt
-    }, input.paidAt),
-    paidAtLabel: receiptPaidLabel(input.paidAt || /* @__PURE__ */ new Date()),
-    lines,
-    subtotal,
-    processing,
-    promotions,
-    fees,
-    totalPaid,
-    balance,
-    galleryUrl,
-    presentationUrl,
-    unlocked: input.unlocked,
-    logoUrl: receiptLogoUrl(input.env)
-  });
-}
-function renderPaymentReceipt(content) {
-  const subject = `Payment received — ${content.invoiceNumber || "Iconic Images"}`;
-  return {
-    subject,
-    html: receiptHtml(content),
-    text: receiptText(content)
-  };
-}
-function paymentReceiptFromVars(vars, env) {
-  let lines = [];
-  if (vars.lineItemsJson) {
-    try {
-      lines = receiptLines(JSON.parse(vars.lineItemsJson));
-    } catch {
-      lines = [];
-    }
-  }
-  const subtotal = dollars$1(vars.subtotal) || lines.reduce((sum, line) => sum + line.total, 0);
-  const promotions = dollars$1(vars.promotions);
-  const fees = dollars$1(vars.fees);
-  const totalPaid = dollars$1(vars.totalPaid) || dollars$1(vars.amount);
-  const invoice = {
-    status: vars.status,
-    paymentStatus: vars.paymentStatus
-  };
-  if (vars.processing != null && vars.processing !== "") invoice.processing = dollars$1(vars.processing);
-  return renderPaymentReceipt({
-    clientName: vars.clientName || "there",
-    invoiceNumber: vars.invoiceNumber || "",
-    paidAtLabel: vars.paidAt || "",
-    lines,
-    subtotal,
-    processing: receiptProcessing({ invoice, subtotal, promotions, fees, totalPaid }),
-    promotions,
-    fees,
-    totalPaid,
-    balance: dollars$1(vars.balance),
-    galleryUrl: vars.galleryUrl || "",
-    presentationUrl: vars.presentationUrl || "",
-    unlocked: vars.unlocked === "true" || dollars$1(vars.balance) <= 0 && totalPaid > 0,
-    logoUrl: vars.logoUrl || receiptLogoUrl(env)
-  });
-}
-function receiptHtml(content) {
-  const rows = content.lines.length > 0 ? content.lines.map((line, index) => lineRow(line, index)).join("") : lineRow({ name: "Payment", qty: 1, unit: content.totalPaid, total: content.totalPaid }, 0);
-  const downloads = content.unlocked ? downloadsBlock(content) : balanceBlock(content);
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml$6(content.invoiceNumber)} receipt</title>
-<style>
-@media only screen and (max-width: 480px) {
-  .totals-desktop { display: none !important; }
-  .totals-mobile { display: table !important; width: 100% !important; }
-}
-</style>
-</head>
-<body style="margin:0;padding:0;background:#ffffff;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;">
-<tr><td align="center" style="padding:0;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:700px;font-family:${FONT};color:#111111;">
-${headerBlock(content)}
-<tr><td style="padding:28px 28px 8px;font-family:${FONT};font-size:14px;line-height:1.5;color:#222222;">
-Hi ${escapeHtml$6(content.clientName)}, we received your payment for invoice ${escapeHtml$6(content.invoiceNumber)}.
-</td></tr>
-<tr><td style="padding:12px 20px 0;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:${FONT};">
-<tr>
-<td bgcolor="#000000" style="background:#000000;color:#ffffff;font-family:${FONT};font-size:11px;font-weight:bold;letter-spacing:1px;padding:12px 14px;">DESCRIPTION</td>
-<td bgcolor="#000000" align="right" style="background:#000000;color:#ffffff;font-family:${FONT};font-size:11px;font-weight:bold;letter-spacing:1px;padding:12px 10px;">QTY.</td>
-<td bgcolor="#000000" align="right" style="background:#000000;color:#ffffff;font-family:${FONT};font-size:11px;font-weight:bold;letter-spacing:1px;padding:12px 10px;">PRICE</td>
-<td bgcolor="#000000" align="right" style="background:#000000;color:#ffffff;font-family:${FONT};font-size:11px;font-weight:bold;letter-spacing:1px;padding:12px 14px;">TOTAL</td>
-</tr>
-${rows}
-</table>
-</td></tr>
-<tr><td style="padding:22px 20px 8px;">
-<table class="totals-desktop" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:2px solid #000000;border-collapse:separate;font-family:${FONT};">
-<tr>
-${totalCell("SUB TOTAL", money$7(content.subtotal), false)}
-${totalCell("PROCESSING", money$7(content.processing), false)}
-${totalCell("PROMOTIONS", money$7(content.promotions), false)}
-${totalCell("FEES", money$7(content.fees), false)}
-${totalCell("TOTAL PAID", money$7(content.totalPaid), true)}
-</tr>
-</table>
-<table class="totals-mobile" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="display:none;border:2px solid #000000;border-collapse:separate;font-family:${FONT};">
-${totalRow("SUB TOTAL", money$7(content.subtotal), false)}
-${totalRow("PROCESSING", money$7(content.processing), false)}
-${totalRow("PROMOTIONS", money$7(content.promotions), false)}
-${totalRow("FEES", money$7(content.fees), false)}
-${totalRow("TOTAL PAID", money$7(content.totalPaid), true)}
-</table>
-</td></tr>
-${downloads}
-${footerBlock()}
-</table>
-</td></tr>
-</table>
-</body>
-</html>`;
-}
-function headerBlock(content) {
-  return `<tr><td bgcolor="#000000" style="background:#000000;padding:28px 24px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-<tr>
-<td valign="top" style="font-family:${FONT};">
-<div style="font-family:${FONT};font-size:32px;line-height:1;font-weight:bold;letter-spacing:6px;color:${YELLOW};">RECEIPT</div>
-<div style="font-family:${FONT};font-size:12px;line-height:1.4;font-weight:bold;letter-spacing:3px;color:${YELLOW};padding-top:10px;">PAYMENT RECEIVED</div>
-<div style="font-family:${FONT};font-size:13px;line-height:1.5;color:#ffffff;padding-top:16px;">INVOICE NO : ${escapeHtml$6(content.invoiceNumber)}</div>
-<div style="font-family:${FONT};font-size:13px;line-height:1.5;color:#ffffff;padding-top:4px;">${escapeHtml$6(content.paidAtLabel)}</div>
-</td>
-<td valign="top" align="right" width="160" style="padding-left:12px;">
-<img src="${escapeHtml$6(content.logoUrl)}" alt="Iconic Images" width="140" style="display:block;border:0;outline:none;text-decoration:none;width:140px;max-width:140px;height:auto;">
-</td>
-</tr>
-</table>
-</td></tr>`;
-}
-function lineRow(line, index) {
-  const bg = index % 2 === 0 ? ROW : "#ffffff";
-  return `<tr>
-<td bgcolor="${bg}" style="background:${bg};font-family:${FONT};font-size:13px;font-weight:bold;letter-spacing:0.5px;color:${TEAL};padding:14px;border-bottom:1px solid #e5e7eb;">${escapeHtml$6(line.name.toUpperCase())}</td>
-<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#374151;padding:14px 10px;border-bottom:1px solid #e5e7eb;">${escapeHtml$6(String(line.qty))}</td>
-<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#374151;padding:14px 10px;border-bottom:1px solid #e5e7eb;">${escapeHtml$6(money$7(line.unit))}</td>
-<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#111111;padding:14px;border-bottom:1px solid #e5e7eb;">${escapeHtml$6(money$7(line.total))}</td>
-</tr>`;
-}
-function totalRow(label, value, emphasis, note) {
-  const valueStyle = emphasis ? "font-size:22px;font-weight:bold;color:#111111;" : "font-size:14px;font-weight:bold;color:#111111;";
-  const noteHtml = "";
-  return `<tr>
-<td style="padding:12px 16px;font-family:${FONT};font-size:11px;font-weight:bold;letter-spacing:0.8px;color:#111111;border-bottom:1px solid #e5e7eb;">${label}</td>
-<td align="right" style="padding:12px 16px;font-family:${FONT};${valueStyle}border-bottom:1px solid #e5e7eb;">${escapeHtml$6(value)}${noteHtml}</td>
-</tr>`;
-}
-function totalCell(label, value, emphasis, note) {
-  const valueStyle = emphasis ? `font-size:22px;font-weight:bold;color:#111111;` : `font-size:14px;font-weight:bold;color:#111111;`;
-  const noteHtml = "";
-  return `<td valign="top" align="center" style="padding:14px 6px;font-family:${FONT};">
-<div style="font-family:${FONT};font-size:10px;font-weight:bold;letter-spacing:0.8px;color:#111111;">${label}</div>
-<div style="font-family:${FONT};${valueStyle}padding-top:6px;">${escapeHtml$6(value)}</div>
-${noteHtml}
-</td>`;
-}
-function downloadsBlock(content) {
-  const presentation = content.presentationUrl.trim();
-  const gallery = content.galleryUrl.trim();
-  if (!presentation && !gallery) return "";
-  const primaryHref = presentation || gallery;
-  const primaryLabel = presentation ? "View your listing presentation" : "Your downloads &amp; invoice";
-  const secondary = presentation && gallery ? `<tr><td align="center" style="padding-top:12px;font-family:${FONT};font-size:14px;">
-<a href="${escapeHtml$6(gallery)}" style="color:${TEAL};font-family:${FONT};font-weight:bold;text-decoration:underline;">Your downloads &amp; invoice</a>
-</td></tr>` : "";
-  return `<tr><td style="padding:28px 24px 12px;">
-<div style="font-family:${FONT};font-size:22px;line-height:1.3;font-weight:bold;color:#111111;">Your downloads are ready</div>
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:16px;">
-<tr><td bgcolor="#000000" style="background:#000000;border-radius:4px;">
-<a href="${escapeHtml$6(primaryHref)}" style="display:inline-block;padding:14px 22px;font-family:${FONT};font-size:15px;font-weight:bold;color:${YELLOW};text-decoration:none;">${primaryLabel}</a>
-</td></tr>
-${secondary}
-</table>
-</td></tr>`;
-}
-function balanceBlock(content) {
-  if (content.balance <= 0) return "";
-  return `<tr><td style="padding:20px 24px 8px;font-family:${FONT};font-size:14px;color:#111111;">
-Balance due: <strong>${escapeHtml$6(money$7(content.balance))}</strong>. Downloads stay locked until the invoice is paid in full.
-</td></tr>`;
-}
-function footerBlock() {
-  return `<tr><td bgcolor="#000000" style="background:#000000;padding:28px 24px 22px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-<tr>
-<td valign="top" style="font-family:${FONT};font-size:13px;line-height:1.55;color:#ffffff;">
-<div style="font-family:${FONT};font-size:12px;font-weight:bold;letter-spacing:0.6px;color:${GREEN};padding-bottom:8px;">PAYMENT INFORMATION:</div>
-${escapeHtml$6(LEGAL_BUSINESS_NAME)}<br>
-${escapeHtml$6(BUSINESS_CONTACT.phoneDisplay)}<br>
-<a href="${escapeHtml$6(BUSINESS_CONTACT.emailHref)}" style="color:#ffffff;text-decoration:none;font-family:${FONT};">${escapeHtml$6(BUSINESS_CONTACT.email)}</a>
-</td>
-<td valign="top" align="right" style="font-family:${FONT};font-size:13px;line-height:1.55;color:#ffffff;">
-${escapeHtml$6(BUSINESS_CONTACT.streetAddress)}<br>
-${escapeHtml$6(BUSINESS_CONTACT.addressLine2)}
-</td>
-</tr>
-</table>
-<div style="font-family:${FONT};font-size:13px;font-weight:bold;letter-spacing:3px;color:${TEAL};padding-top:22px;">THANK YOU FOR BEING ICONIC</div>
-</td></tr>`;
-}
-function receiptText(content) {
-  const itemLines = (content.lines.length > 0 ? content.lines : [{
-    name: "Payment",
-    qty: 1,
-    unit: content.totalPaid,
-    total: content.totalPaid
-  }]).map((line) => `${line.name}  qty ${line.qty}  ${money$7(line.unit)}  ${money$7(line.total)}`);
-  const links = [];
-  if (content.unlocked) {
-    links.push("Your downloads are ready");
-    if (content.presentationUrl) links.push(`View your listing presentation: ${content.presentationUrl}`);
-    if (content.galleryUrl) links.push(`Your downloads & invoice: ${content.galleryUrl}`);
-  } else if (content.balance > 0) {
-    links.push(`Balance due: ${money$7(content.balance)}. Downloads stay locked until the invoice is paid in full.`);
-  }
-  return [
-    "RECEIPT",
-    "PAYMENT RECEIVED",
-    `Invoice ${content.invoiceNumber}`,
-    content.paidAtLabel,
-    "",
-    `Hi ${content.clientName}, we received your payment.`,
-    "",
-    ...itemLines,
-    "",
-    `SUB TOTAL ${money$7(content.subtotal)}`,
-    `PROCESSING ${money$7(content.processing)}`,
-    `PROMOTIONS ${money$7(content.promotions)}`,
-    `FEES ${money$7(content.fees)}`,
-    `TOTAL PAID ${money$7(content.totalPaid)}`,
-    "",
-    ...links,
-    "",
-    "PAYMENT INFORMATION:",
-    LEGAL_BUSINESS_NAME,
-    BUSINESS_CONTACT.phoneDisplay,
-    BUSINESS_CONTACT.email,
-    BUSINESS_CONTACT.address,
-    "",
-    "THANK YOU FOR BEING ICONIC"
-  ].filter((line) => line !== void 0).join("\n");
-}
-function money$7(value) {
-  return (Number(value) || 0).toLocaleString("en-US", { style: "currency", currency: "USD" });
-}
-function roundCents(value) {
-  return Math.round((Number(value) || 0) * 100) / 100;
-}
-function toCents(value) {
-  return Math.round((Number(value) || 0) * 100);
-}
-function finite(value) {
-  if (value == null || value === "") return null;
-  const amount = Number(value);
-  return Number.isFinite(amount) ? amount : null;
-}
-function dollars$1(value) {
-  if (!value) return 0;
-  const amount = Number(String(value).replace(/[^0-9.-]/g, ""));
-  return Number.isFinite(amount) ? amount : 0;
-}
-function text$j(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-function escapeHtml$6(value) {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-const db$s = () => admin.firestore();
-class EmailNotConfiguredError extends Error {
-  code = "email_not_configured";
-  constructor() {
-    super("SMTP is not configured. Set SMTP_USER and SMTP_PASS.");
-    this.name = "EmailNotConfiguredError";
-  }
-}
-function createTransport() {
-  const user = process.env.SMTP_USER || process.env.EMAIL_FROM;
-  const pass = process.env.SMTP_PASS;
-  if (!user || !pass) {
-    throw new EmailNotConfiguredError();
-  }
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.gmail.com",
-    port: Number(process.env.SMTP_PORT) || 587,
-    secure: process.env.SMTP_SECURE === "true",
-    auth: { user, pass }
-  });
-}
-function clientOrderConfirmedSubject(address, orderNumber) {
-  const code = orderNumber && /^#\d{3,}$/.test(orderNumber) ? ` ${orderNumber}` : "";
-  return `Your Iconic order${code} is confirmed: ${address}`;
-}
-async function sendEmail(options) {
-  const { template, audience, variables = {}, subject: subjectOverride, html, attachments } = options;
-  let to = options.to;
-  let bcc = options.bcc;
-  let cc = options.cc;
-  let replyTo = options.replyTo;
-  if (!to) {
-    console.warn("[Email] No recipient specified, skipping.");
-    return { sent: false, delivery: "suppressed" };
-  }
-  if (!emailAllowed(template, process.env, audience)) {
-    const narrowed = narrowGatedClientRecipients({ to, cc, bcc, replyTo }, process.env);
-    if (!narrowed) {
-      const why = notifyTestAllowlist().size > 0 ? `${clientNotifyBlockReason()}. Recipient is not an exact NOTIFY_TEST_ALLOWLIST match.` : `${clientNotifyBlockReason()}.`;
-      console.warn(
-        `[Email] Suppressed '${template}' to ${to} — ${why} No message sent.`
-      );
-      return { sent: false, delivery: "suppressed" };
-    }
-    to = narrowed.to;
-    cc = narrowed.cc;
-    bcc = narrowed.bcc;
-    replyTo = narrowed.replyTo;
-    if (narrowed.held.length > 0) {
-      console.warn(
-        `[Email] '${template}' sent only to NOTIFY_TEST_ALLOWLIST. Held: ${narrowed.held.join(", ")}.`
-      );
-    }
-  }
-  let subject = subjectOverride || `Message from Iconic Images`;
-  let htmlBody = html || getFallbackTemplate(template, variables);
-  try {
-    if (!html && admin.apps.length) {
-      const templateDoc = await db$s().collection("emailTemplates").where("category", "==", template).where("isActive", "==", true).limit(1).get();
-      if (!templateDoc.empty) {
-        const tmpl = templateDoc.docs[0].data();
-        if (!subjectOverride && typeof tmpl.subject === "string" && tmpl.subject.trim()) {
-          subject = interpolate(tmpl.subject, variables);
-        }
-        if (typeof tmpl.htmlBody === "string" && tmpl.htmlBody.trim()) {
-          htmlBody = interpolate(tmpl.htmlBody, variables);
-        }
-      }
-    }
-  } catch (err) {
-    console.warn(`[Email] Template lookup failed for '${template}'. Using the built-in copy.`, err);
-  }
-  const textBody = options.text;
-  const delivery = emailAllowed(template, process.env, audience) ? "sent" : "allowlist";
-  const transporter = createTransport();
-  try {
-    await transporter.sendMail({
-      from: `"Iconic Images" <${process.env.EMAIL_FROM || process.env.SMTP_USER}>`,
-      to,
-      bcc,
-      cc,
-      ...replyTo ? { replyTo } : {},
-      subject,
-      html: htmlBody,
-      ...textBody ? { text: textBody } : {},
-      attachments
-    });
-    console.log(`[Email] Sent '${template}' to ${to}`);
-    return { sent: true, delivery };
-  } catch (err) {
-    console.error(`[Email] Failed to send '${template}' to ${to}:`, err);
-    throw err;
-  } finally {
-    transporter.close();
-  }
-}
-function interpolate(template, variables) {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] ?? `{{${key}}}`);
-}
-function builtinEmailHtml(type, vars) {
-  return getFallbackTemplate(type, vars);
-}
-function getFallbackTemplate(type, vars) {
-  if (type === "payment_receipt") {
-    const branded = paymentReceiptFromVars(vars).html;
-    const doorsOpen = doorsOpenReceiptEmailHtml(vars.dotOptInUrl || "");
-    return branded.includes("</body>") ? branded.replace("</body>", `${doorsOpen}</body>`) : `${branded}${doorsOpen}`;
-  }
-  const base = (content) => `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="background: #000; padding: 20px; text-align: center; margin-bottom: 30px;">
-        <h1 style="color: #fff; margin: 0; font-size: 24px;">ICONIC IMAGES</h1>
-        <p style="color: #ccc; margin: 5px 0 0; font-size: 12px; letter-spacing: 2px;">REAL ESTATE MEDIA</p>
-      </div>
-      ${content}
-      <div style="border-top: 1px solid #eee; margin-top: 30px; padding-top: 20px; text-align: center; color: #999; font-size: 12px;">
-        <p>${BUSINESS_CONTACT.line}</p>
-        <p>${LEGAL_BUSINESS_NAME}</p>
-        <p>Iconic Images TX | iconicimagestx.com</p>
-        <p>Questions? Reply to this email or message us through your client portal.</p>
-      </div>
-    </div>
-  `;
-  const templates = {
-    booking_received: base(`
-      <h2 style="color:#0d9488;">We received your booking request!</h2>
-      <p>Hi ${vars.clientName},</p>
-      <p>Thank you for choosing Iconic Images. We've received your booking request for <strong>${vars.address}</strong> and our team will review and confirm your appointment within 1 business day.</p>
-
-      <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;border:1px solid #eee;border-radius:8px;overflow:hidden;">
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;width:42%;color:#555;border-bottom:1px solid #eee;">Requested Date</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.scheduledDate || "TBD — we'll confirm shortly"}</td></tr>
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Requested Time</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.scheduledTime || "—"}</td></tr>
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Property Status</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.propertyStatus || "—"}</td></tr>
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Furnishing</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.furnishingStatus || "—"}</td></tr>
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Access Method</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><strong>${vars.accessMethod || "—"}</strong></td></tr>
-        ${vars.squareFootage ? `<tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Square Footage</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.squareFootage}</td></tr>` : ""}
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Travel</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.travelFee || "Travel quoted"}</td></tr>
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;">Order Total</td><td style="padding:10px 14px;font-weight:bold;color:#0d9488;">${vars.total}</td></tr>
-      </table>
-
-      <p style="color:#888;font-size:13px;">Confirmation ID: <strong>${vars.requestId}</strong> — keep this for your records.</p>
-      <p style="color:#888;font-size:13px;">If any details look incorrect, simply reply to this email and we'll sort it out.</p>
-    `),
-    account_password_setup: base(`
-      <h2 style="color:#0d9488;">Set your portal password</h2>
-      <p>Hi ${vars.clientName},</p>
-      <p>We created a client portal login for <strong>${vars.clientEmail || "your email"}</strong> so you can see this appointment request.</p>
-      <p>This email is only for your password. Your appointment request details are in a separate email.</p>
-      <p><a href="${vars.setupUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Set your password</a></p>
-      <p style="color:#888;font-size:13px;">After that, sign in at <a href="${vars.portalUrl}">${vars.portalUrl}</a>.</p>
-    `),
-    order_confirmed: base(`
-      <h2>Your appointment is confirmed!</h2>
-      <p>Hi ${vars.clientName},</p>
-      <p>Great news — your shoot at <strong>${vars.address}</strong> is confirmed!</p>
-      <p><strong>Date:</strong> ${vars.scheduledDate}<br>
-      <strong>Time:</strong> ${vars.scheduledTime}<br>
-      <strong>Photographer:</strong> ${vars.photographerName}<br>
-      <strong>Travel:</strong> ${vars.travelFee || "Travel quoted"}</p>
-      <p><a href="${vars.portalUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">View Your Portal</a></p>
-    `),
-    gallery_delivery: base(`
-      <h2>Your gallery is ready! 🎉</h2>
-      <p>Hi ${vars.clientName},</p>
-      <p>Your photos for <strong>${vars.address}</strong> are edited and waiting in your Iconic Images gallery.</p>
-      ${vars.invoiceAmount ? `<p>Iconic Images invoices after the shoot. Downloads stay locked until the <strong>${vars.invoiceAmount}</strong> invoice is paid.</p>` : `<p>Downloads open from your gallery once that invoice is paid, or when our team releases the files.</p>`}
-      <p><a href="${vars.galleryUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">View Gallery</a></p>
-      ${vars.paymentUrl ? `<p><a href="${vars.paymentUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Pay invoice</a></p>` : ""}
-      ${doorsOpenDeliveryEmailHtml()}
-      <p style="color:#999;font-size:12px;">Gallery available for ${vars.expiresAt}.</p>
-    `),
-    invoice: base(`
-      <h2>Invoice from Iconic Images</h2>
-      <p>Hi ${vars.clientName},</p>
-      <p>Your invoice <strong>${vars.invoiceNumber}</strong> for <strong>${vars.amount}</strong> is ready.</p>
-      ${vars.dueDate ? `<p>Due: <strong>${vars.dueDate}</strong></p>` : ""}
-      ${vars.paymentUrl ? `<p><a href="${vars.paymentUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Pay Invoice</a></p>` : ""}
-    `),
-    manual_message: base(`
-      <h2>Message from Iconic Images</h2>
-      <div style="line-height:1.6;color:#333;">
-        ${(vars.message || "").replace(/\n/g, "<br>")}
-      </div>
-    `),
-    new_booking_alert: base(`
-      <h2>🔔 New Booking Request</h2>
-
-      <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;border:1px solid #eee;border-radius:8px;overflow:hidden;">
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;width:42%;color:#555;border-bottom:1px solid #eee;">Client</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.clientName}</td></tr>
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Email</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><a href="mailto:${vars.email}">${vars.email}</a></td></tr>
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Phone</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.phone}</td></tr>
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Address</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><strong>${vars.address}</strong></td></tr>
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Requested Date</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.scheduledDate || "TBD"} ${vars.scheduledTime || ""}</td></tr>
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Property Status</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.propertyStatus || "—"} / ${vars.furnishingStatus || "—"}</td></tr>
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Access Method</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><strong>${vars.accessMethod || "—"}</strong></td></tr>
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Square Footage</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.squareFootage || "Not provided"}</td></tr>
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Photographer</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.photographerPreference || "Auto-assign"}</td></tr>
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;">Total</td><td style="padding:10px 14px;font-weight:bold;color:#0d9488;">${vars.total}</td></tr>
-      </table>
-
-      <p><a href="${vars.dashboardUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Review in Dashboard →</a></p>
-    `),
-    contact_form: base(`
-      <h2 style="color:#0d9488;">New Contact Form Submission</h2>
-
-      <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;border:1px solid #eee;border-radius:8px;overflow:hidden;">
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;width:42%;color:#555;border-bottom:1px solid #eee;">From</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.senderName}</td></tr>
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Email</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><a href="mailto:${vars.senderEmail}">${vars.senderEmail}</a></td></tr>
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Phone</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.senderPhone}</td></tr>
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Subject</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><strong>${vars.subject}</strong></td></tr>
-      </table>
-
-      <h3 style="color:#555;margin-top:30px;margin-bottom:10px;">Message:</h3>
-      <div style="background:#f8fafc;padding:15px;border-left:4px solid #0d9488;font-style:italic;color:#666;line-height:1.6;">
-        ${(vars.message || "").replace(/\n/g, "<br>")}
-      </div>
-
-      <p style="margin-top:30px;color:#999;font-size:12px;">
-        <strong>To reply:</strong> Send an email directly to ${vars.senderEmail}
-      </p>
-    `),
-    live_chat: base(`
-      <h2 style="color:#0d9488;">Live chat message</h2>
-      <p>A visitor sent a message from the website chat. Reply to them directly — this alert did not email or text the visitor.</p>
-
-      <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;border:1px solid #eee;border-radius:8px;overflow:hidden;">
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;width:42%;color:#555;border-bottom:1px solid #eee;">From</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.senderName}</td></tr>
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Email</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.senderEmail}</td></tr>
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Phone</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.senderPhone}</td></tr>
-      </table>
-
-      <h3 style="color:#555;margin-top:30px;margin-bottom:10px;">Message:</h3>
-      <div style="background:#f8fafc;padding:15px;border-left:4px solid #0d9488;color:#333;line-height:1.6;">
-        ${(vars.message || "").replace(/\n/g, "<br>")}
-      </div>
-    `),
-    contact_confirmation: base(`
-      <h2 style="color:#0d9488;">We received your message!</h2>
-      <p>Hi ${vars.name},</p>
-      <p>Thank you for reaching out to Iconic Images. We've received your message and our team will review it shortly.</p>
-      <p>We typically respond to inquiries within 24 business hours. If your question is urgent, feel free to call us at <strong>${BUSINESS_CONTACT.phoneDisplay}</strong> or email <strong>${BUSINESS_CONTACT.email}</strong>.</p>
-      <p style="margin-top:30px;color:#888;font-size:12px;">
-        If you have any additional information to add, simply reply to this email or visit <strong>iconicimagestx.com</strong>.
-      </p>
-    `)
-  };
-  return templates[type] || base(`<p>You have a new notification from Iconic Images.</p>`);
-}
-let _client = null;
-function getClient() {
-  if (_client) return _client;
-  const sid = process.env.TWILIO_ACCOUNT_SID;
-  const token = process.env.TWILIO_AUTH_TOKEN;
-  if (!sid || !token) {
-    throw new Error("Twilio credentials not configured (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN).");
-  }
-  _client = twilio(sid, token);
-  return _client;
-}
-function normalisePhone(raw) {
-  const digits2 = raw.replace(/\D/g, "");
-  if (digits2.length === 10) return `+1${digits2}`;
-  if (digits2.length === 11 && digits2.startsWith("1")) return `+${digits2}`;
-  return `+${digits2}`;
-}
-async function sendSMS({ to, body, from, kind }) {
-  if (kind === STAFF_INBOUND_SMS_KIND && !isStaffInboundSmsDestination(to)) {
-    console.error(`[SMS] Refused staff_inbound to ${to}. Only the office Google Voice number is allowed.`);
-    return { sid: "", status: "refused", suppressed: true };
-  }
-  if (!smsAllowed(kind)) {
-    console.warn(`[SMS] Suppressed to ${to} — ${clientNotifyBlockReason()}. No message sent.`);
-    return { sid: "", status: "suppressed", suppressed: true };
-  }
-  const fromNumber = from || process.env.TWILIO_PHONE_NUMBER;
-  if (!fromNumber) throw new Error("TWILIO_PHONE_NUMBER not set.");
-  const client = getClient();
-  const message = await client.messages.create({
-    to: normalisePhone(to),
-    from: fromNumber,
-    body
-  });
-  console.log(`[SMS] Sent to ${to} — SID: ${message.sid}`);
-  return { sid: message.sid, status: message.status };
-}
-async function sendSMSCampaign(recipients, bodyTemplate, messagingServiceSid) {
-  if (!clientNotifyLive()) {
-    console.warn(`[SMS] Suppressed campaign to ${recipients.length} recipients — ${clientNotifyBlockReason()}.`);
-    return recipients.map((recipient) => ({ phone: recipient.phone, error: "suppressed" }));
-  }
-  const client = getClient();
-  const sid = messagingServiceSid || process.env.TWILIO_MESSAGING_SERVICE_SID;
-  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
-  const results = [];
-  for (const recipient of recipients) {
-    if (!recipient.phone) continue;
-    const body = bodyTemplate.replace(/\{\{name\}\}/gi, recipient.name || "there");
-    try {
-      const msg = await client.messages.create({
-        to: normalisePhone(recipient.phone),
-        ...sid ? { messagingServiceSid: sid } : { from: fromNumber },
-        body
-      });
-      results.push({ phone: recipient.phone, sid: msg.sid });
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      console.error(`[SMS] Campaign send failed for ${recipient.phone}:`, errorMessage);
-      results.push({ phone: recipient.phone, error: errorMessage });
-    }
-    await new Promise((r) => setTimeout(r, 50));
-  }
-  return results;
-}
-async function createMaskedConversation(friendlyName, photographer, client, webhookUrl) {
-  if (!clientNotifyLive()) {
-    console.warn(`[SMS] Suppressed masked conversation — ${clientNotifyBlockReason()}. No SMS sent.`);
-    throw new Error("Client notifications are off.");
-  }
-  const client_sdk = getClient();
-  const conversation = await client_sdk.conversations.v1.conversations.create({
-    friendlyName,
-    timers: {
-      inactive: "P30D",
-      // auto-close after 30 days inactive
-      closed: "P60D"
-    }
-  });
-  const conversationSid = conversation.sid;
-  if (webhookUrl) {
-    await client_sdk.conversations.v1.conversations(conversationSid).webhooks.create({
-      target: "webhook",
-      "configuration.method": "post",
-      "configuration.url": webhookUrl,
-      "configuration.filters": ["onMessageAdded"]
-    });
-  }
-  const photographerParticipant = await client_sdk.conversations.v1.conversations(conversationSid).participants.create({
-    "messagingBinding.type": "sms",
-    "messagingBinding.address": normalisePhone(photographer.phone),
-    identity: `photographer_${normalisePhone(photographer.phone).replace("+", "")}`
-  });
-  const clientParticipant = await client_sdk.conversations.v1.conversations(conversationSid).participants.create({
-    "messagingBinding.type": "sms",
-    "messagingBinding.address": normalisePhone(client.phone),
-    identity: `client_${normalisePhone(client.phone).replace("+", "")}`
-  });
-  console.log(`[Conversations] Created: ${conversationSid} (${friendlyName})`);
-  return {
-    conversationSid,
-    photographerParticipantSid: photographerParticipant.sid,
-    clientParticipantSid: clientParticipant.sid
-  };
-}
-async function sendConversationMessage(conversationSid, body, author = "Iconic Images") {
-  if (!clientNotifyLive()) {
-    console.warn(`[SMS] Suppressed conversation message — ${clientNotifyBlockReason()}. No SMS sent.`);
-    throw new Error("Client notifications are off.");
-  }
-  const client_sdk = getClient();
-  const message = await client_sdk.conversations.v1.conversations(conversationSid).messages.create({ body, author });
-  return { sid: message.sid };
-}
-async function closeConversation(conversationSid) {
-  const client_sdk = getClient();
-  await client_sdk.conversations.v1.conversations(conversationSid).update({ state: "closed" });
-  console.log(`[Conversations] Closed: ${conversationSid}`);
-}
-const SMS_TEMPLATES = {
-  bookingConfirmation: (name, date, address, total) => `Hi ${name}! We've received your booking request for ${address}.
-
-⚠️ THIS IS NOT A CONFIRMATION. Our team will review your request and reach out shortly to confirm your appointment.
-
-Requested date: ${date}
-Estimated total: ${total}
-
-Questions? Reply to this text, or reach us at ${BUSINESS_CONTACT.line}. — Iconic Images 📸`,
-  appointmentReminder24h: (name, date, time, address) => `Hey ${name}, reminder! Your Iconic Images shoot is tomorrow 📸
-
-🕐 ${time}
-📍 ${address}
-
-Reply CONFIRM to confirm or call us to reschedule.`,
-  appointmentReminder1h: (name, time) => `Hi ${name}! Your photographer is on the way — arriving around ${time} 📸
-Reply to this text with any last-minute notes!`,
-  photosDelivered: (name, galleryUrl) => `🎉 ${name}, your photos are ready!
-
-View your gallery: ${galleryUrl}
-
-Questions or edits? Just reply here. — Iconic Images`,
-  photographerIntro: (photographerName, clientName2, date) => `Hi ${clientName2}! I'm ${photographerName}, your Iconic Images photographer for ${date}. Feel free to text me here with any questions before the shoot! 📸`,
-  newBookingAlert: (address, date, services2) => `🔔 NEW BOOKING — Iconic Images
-
-📍 ${address}
-📅 ${date}
-🏠 ${services2}
-
-Check dashboard for details.`
-};
-const SETTLED$1 = /* @__PURE__ */ new Set(["paid", "comped"]);
-function isGuessableInvoiceId(id) {
-  return id.startsWith("listing_") || id.startsWith("ordreq_") || id.startsWith("playtest-");
-}
-function text$i(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-function settled$1(invoice) {
-  return SETTLED$1.has(text$i(invoice?.status).toLowerCase());
-}
-function invoicePayLinkFor(invoice, env, extra) {
-  if (!invoice || settled$1(invoice)) return null;
-  const id = text$i(invoice.id);
-  const token = text$i(invoice.payToken);
-  if (!id || !token) return null;
-  const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
-  url.searchParams.set("t", token);
-  applyQuery(url, extra);
-  return url.toString();
-}
-function clientInvoiceUrl(invoice, env, extra) {
-  const tokenized = invoicePayLinkFor(invoice, env, extra);
-  if (tokenized) return tokenized;
-  if (!invoice || settled$1(invoice)) return null;
-  const id = text$i(invoice.id);
-  if (!id || isGuessableInvoiceId(id)) return null;
-  const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
-  applyQuery(url, extra);
-  return url.toString();
-}
-function applyQuery(url, extra) {
-  if (!extra) return;
-  for (const [key, value] of Object.entries(extra)) {
-    const textValue = text$i(value);
-    if (textValue && key !== "t") url.searchParams.set(key, textValue);
-  }
 }
 const DIRECT_PACKAGE_KEYS = ["package", "packageName", "packageId", "selectedPackage", "selectedService", "serviceId"];
 const PACKAGE_SKINS = [
@@ -3641,7 +3781,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
       createdAt: data.createdAt
     }, now),
     status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
-    clientName: text$h(data.clientName),
+    clientName: text$i(data.clientName),
     address: addressText(data.billToAddress || data.address || data.propertyAddress),
     createdAt,
     issuedOn: formatPortalDate(data.createdAt) || formatPortalDate(data.sentAt) || formatPortalDate(data.paidAt),
@@ -3651,7 +3791,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
     fees: storedAmount(data.fees),
     travel: storedAmount(data.travel),
     promoDiscount: storedAmount(data.promoDiscount),
-    promoCode: text$h(data.promoCode),
+    promoCode: text$i(data.promoCode),
     tax: storedAmount(data.tax),
     total: storedAmount(data.total),
     amountPaid: storedAmount(data.amountPaid),
@@ -3703,15 +3843,15 @@ function storedLines(lineItems, services2) {
     if (typeof item === "string" && item.trim()) return [{ name: item.trim(), qty: null, amount: null }];
     if (!item || typeof item !== "object") return [];
     const record2 = item;
-    const named = text$h(record2.name) || text$h(record2.label);
-    const description = text$h(record2.description);
+    const named = text$i(record2.name) || text$i(record2.label);
+    const description = text$i(record2.description);
     const name = named || description;
     const qty = storedQty(record2.qty ?? record2.quantity);
     const amount = storedAmount(record2.price ?? record2.amount ?? record2.total);
     if (!name && amount == null && qty == null) return [];
     const line = { name: name || "Line item", qty, amount };
-    const id = text$h(record2.id);
-    const category = text$h(record2.category);
+    const id = text$i(record2.id);
+    const category = text$i(record2.category);
     if (id) line.id = id;
     if (category) line.category = category;
     if (named && description) line.description = description;
@@ -3747,7 +3887,7 @@ function isoStamp(value) {
   if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
   return null;
 }
-function text$h(value) {
+function text$i(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function roundMoney$4(value) {
@@ -4215,40 +4355,40 @@ function bookingListingGroups(input) {
   for (const doc of requests) {
     const node = nodeId("orderRequests", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("listings", text$g(doc.data.listingId)));
-    uf.link(node, nodeId("orders", text$g(doc.data.orderId) || text$g(doc.data.convertedToOrderId)));
-    uf.link(node, nodeId("invoices", text$g(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$g(doc.data.galleryId)));
+    uf.link(node, nodeId("listings", text$h(doc.data.listingId)));
+    uf.link(node, nodeId("orders", text$h(doc.data.orderId) || text$h(doc.data.convertedToOrderId)));
+    uf.link(node, nodeId("invoices", text$h(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$h(doc.data.galleryId)));
   }
   for (const doc of orders) {
     const node = nodeId("orders", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$g(doc.data.orderRequestId)));
-    uf.link(node, nodeId("listings", text$g(doc.data.listingId)));
-    uf.link(node, nodeId("invoices", text$g(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$g(doc.data.galleryId)));
+    uf.link(node, nodeId("orderRequests", text$h(doc.data.orderRequestId)));
+    uf.link(node, nodeId("listings", text$h(doc.data.listingId)));
+    uf.link(node, nodeId("invoices", text$h(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$h(doc.data.galleryId)));
   }
   for (const doc of invoices) {
     const node = nodeId("invoices", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$g(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$g(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$g(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$h(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$h(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$h(doc.data.listingId)));
   }
   for (const doc of appointments) {
     const node = nodeId("appointments", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$g(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$g(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$g(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$h(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$h(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$h(doc.data.listingId)));
   }
   for (const doc of galleries) {
     const node = nodeId("galleries", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$g(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$g(doc.data.orderId)));
-    uf.link(node, nodeId("invoices", text$g(doc.data.invoiceId)));
-    uf.link(node, nodeId("listings", text$g(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$h(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$h(doc.data.orderId)));
+    uf.link(node, nodeId("invoices", text$h(doc.data.invoiceId)));
+    uf.link(node, nodeId("listings", text$h(doc.data.listingId)));
   }
   const groups = [];
   for (const nodes of uf.components()) {
@@ -4308,7 +4448,7 @@ function fillEmptyListingFields(existing, desired) {
   return patch;
 }
 function clientOwnsListing(listing, clients) {
-  const clientId2 = text$g(listing.clientId);
+  const clientId2 = text$h(listing.clientId);
   const email = normalizeEmail$1(listing.clientEmail || listing.email);
   if (!clientId2 && !email) return true;
   if (clientId2 && clients.ids.includes(clientId2)) return true;
@@ -4380,10 +4520,10 @@ function chooseListing(group, listings, clients) {
 }
 function listingMatches(doc, group) {
   if (doc.id === group.stableId || group.preferredListingIds.includes(doc.id)) return true;
-  const requestId = text$g(doc.data.orderRequestId);
-  const orderId = text$g(doc.data.orderId);
-  const invoiceId = text$g(doc.data.invoiceId);
-  const appointmentId = text$g(doc.data.appointmentId);
+  const requestId = text$h(doc.data.orderRequestId);
+  const orderId = text$h(doc.data.orderId);
+  const invoiceId = text$h(doc.data.invoiceId);
+  const appointmentId = text$h(doc.data.appointmentId);
   return Boolean(
     requestId && group.orderRequestIds.includes(requestId) || orderId && group.orderIds.includes(orderId) || invoiceId && group.invoiceIds.includes(invoiceId) || appointmentId && group.appointmentIds.includes(appointmentId)
   );
@@ -4393,7 +4533,7 @@ function linksFor(group, listingId, listings, clients) {
   const links = [];
   const push = (collection, docs) => {
     for (const doc of docs) {
-      const current = text$g(doc.data.listingId);
+      const current = text$h(doc.data.listingId);
       if (current === listingId) continue;
       if (current && isPortalListingId(current) && ownedIds.has(current)) continue;
       links.push({ collection, id: doc.id });
@@ -4410,7 +4550,7 @@ function clientsFor(group, identity) {
   const ids = /* @__PURE__ */ new Set();
   const emails = /* @__PURE__ */ new Set();
   const addId = (value) => {
-    const id = text$g(value);
+    const id = text$h(value);
     if (id) ids.add(id);
   };
   const addEmail = (value) => {
@@ -4429,7 +4569,7 @@ function clientsFor(group, identity) {
 function preferredListingIds(group) {
   const ids = [];
   const push = (value) => {
-    const id = text$g(value);
+    const id = text$h(value);
     if (id && isPortalListingId(id) && !ids.includes(id)) ids.push(id);
   };
   for (const doc of [...group.orderRequests, ...group.orders, ...group.invoices, ...group.appointments, ...group.galleries]) {
@@ -4464,9 +4604,9 @@ function bestAddress(group) {
   }
   for (const doc of propertyDocs(group)) {
     for (const key of ["address", "propertyAddress", "shootLocation"]) {
-      if (typeof doc.data[key] === "string" && text$g(doc.data[key])) return text$g(doc.data[key]);
+      if (typeof doc.data[key] === "string" && text$h(doc.data[key])) return text$h(doc.data[key]);
     }
-    if (text$g(doc.data.addressLabel)) return text$g(doc.data.addressLabel);
+    if (text$h(doc.data.addressLabel)) return text$h(doc.data.addressLabel);
   }
   return null;
 }
@@ -4482,7 +4622,7 @@ function firstScheduleDate(group) {
 function firstScheduleTime(group) {
   for (const doc of [...group.appointments, ...group.orders, ...group.orderRequests]) {
     for (const key of ["scheduledTime", "appointmentTime", "apptTime", "requestedTime"]) {
-      const value = text$g(doc.data[key]);
+      const value = text$h(doc.data[key]);
       if (value && !/^tbd$/i.test(value)) return value;
     }
   }
@@ -4499,7 +4639,7 @@ function projectType(group) {
     if (doc.data.projectType === "real_estate") return "real_estate";
     const service = doc.data.selectedService;
     if (service && typeof service === "object") {
-      const category = text$g(service.category);
+      const category = text$h(service.category);
       if (category === "business" || category === "branding") return "business";
       if (category === "listings") return "real_estate";
     }
@@ -4525,7 +4665,7 @@ function namesFrom(value) {
   for (const item of value) {
     if (typeof item === "string" && item.trim()) names.push(item.trim());
     else if (item && typeof item === "object") {
-      const name = text$g(item.name);
+      const name = text$h(item.name);
       if (name) names.push(name);
     }
     if (names.length >= 40) break;
@@ -4550,8 +4690,8 @@ function accessInfo(group) {
   return [firstText$2(group, ["accessMethod"]), firstText$2(group, ["lockboxCode"])].filter(Boolean).join(" - ");
 }
 function clientId(group, identity) {
-  const bookingIds = propertyDocs(group).map((doc) => text$g(doc.data.clientId)).filter(Boolean);
-  const identityIds = (identity?.ids || []).map((id) => text$g(id)).filter(Boolean);
+  const bookingIds = propertyDocs(group).map((doc) => text$h(doc.data.clientId)).filter(Boolean);
+  const identityIds = (identity?.ids || []).map((id) => text$h(id)).filter(Boolean);
   return bookingIds.find((id) => identityIds.includes(id)) || bookingIds[0] || identityIds[0] || "";
 }
 function clientEmail(group, identity) {
@@ -4565,8 +4705,8 @@ function clientEmail(group, identity) {
 }
 function clientName$1(group) {
   for (const doc of propertyDocs(group)) {
-    if (text$g(doc.data.clientName)) return text$g(doc.data.clientName);
-    const joined = `${text$g(doc.data.firstName)} ${text$g(doc.data.lastName)}`.trim();
+    if (text$h(doc.data.clientName)) return text$h(doc.data.clientName);
+    const joined = `${text$h(doc.data.firstName)} ${text$h(doc.data.lastName)}`.trim();
     if (joined) return joined;
   }
   return "";
@@ -4574,7 +4714,7 @@ function clientName$1(group) {
 function chosenInvoiceId(group) {
   const known = new Set(group.invoiceIds);
   for (const doc of [...group.orderRequests, ...group.orders]) {
-    const id = text$g(doc.data.invoiceId);
+    const id = text$h(doc.data.invoiceId);
     if (id && known.has(id)) return id;
   }
   return newestDoc(group.invoices)?.id || group.invoiceIds[0] || "";
@@ -4583,7 +4723,7 @@ function chosenId(docs, ids, pointers = [], keys = []) {
   const known = new Set(ids);
   for (const doc of pointers) {
     for (const key of keys) {
-      const id = text$g(doc.data[key]);
+      const id = text$h(doc.data[key]);
       if (id && known.has(id)) return id;
     }
   }
@@ -4595,7 +4735,7 @@ function propertyDocs(group) {
 function firstText$2(group, keys) {
   for (const doc of propertyDocs(group)) {
     for (const key of keys) {
-      const value = text$g(doc.data[key]);
+      const value = text$h(doc.data[key]);
       if (value) return value;
     }
   }
@@ -4663,7 +4803,7 @@ function hasAddress(value) {
   if (typeof value === "string") return value.trim().length > 0;
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record2 = value;
-  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$g(record2[key]).length > 0);
+  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$h(record2[key]).length > 0);
 }
 function statusKey(value) {
   return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
@@ -4695,14 +4835,14 @@ function isEmpty(value) {
 function isSentinel$1(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$g(value) {
+function text$h(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function cleanDocs(docs) {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
   for (const doc of docs || []) {
-    const id = text$g(doc?.id);
+    const id = text$h(doc?.id);
     if (!id || seen.has(id)) continue;
     seen.add(id);
     out.push({ id, data: doc.data && typeof doc.data === "object" ? doc.data : {} });
@@ -4781,7 +4921,7 @@ async function ensureBookingListingForRequest(orderRequestId) {
     galleries: []
   });
   const identity = {
-    ids: text$f(request.data.clientId) ? [text$f(request.data.clientId)] : [],
+    ids: text$g(request.data.clientId) ? [text$g(request.data.clientId)] : [],
     email: normalizeEmail$1(request.data.clientEmail || request.data.email)
   };
   const plans = await plansFor(bundle, identity);
@@ -4834,7 +4974,7 @@ async function applyBookingListingPlan(plan) {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
       created = true;
-      console.info(`[Listings] Created ${plan.listingId} for booking ${text$f(plan.createFields.orderRequestId) || text$f(plan.createFields.orderId) || text$f(plan.createFields.invoiceId)}`);
+      console.info(`[Listings] Created ${plan.listingId} for booking ${text$g(plan.createFields.orderRequestId) || text$g(plan.createFields.orderId) || text$g(plan.createFields.invoiceId)}`);
     } catch (err) {
       if (!alreadyExists(err)) throw err;
       await fillListing(ref, plan.createFields);
@@ -4863,7 +5003,7 @@ async function linkRecord(collectionName, id, listingId) {
   const ref = db$p().collection(collectionName).doc(id);
   const snap = await ref.get();
   if (!snap.exists) return;
-  if (text$f(snap.data()?.listingId) === listingId) return;
+  if (text$g(snap.data()?.listingId) === listingId) return;
   await ref.update({
     listingId,
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -4877,9 +5017,9 @@ async function loadVisibleSeeds(identity) {
   const keep = (map, docs) => {
     for (const doc of docs) {
       if (!visibleToPortalClient({
-        clientId: text$f(doc.data.clientId),
-        email: text$f(doc.data.email),
-        clientEmail: text$f(doc.data.clientEmail)
+        clientId: text$g(doc.data.clientId),
+        email: text$g(doc.data.email),
+        clientEmail: text$g(doc.data.clientEmail)
       }, identity)) continue;
       if (!map.has(doc.id)) map.set(doc.id, doc);
     }
@@ -4918,36 +5058,36 @@ async function hydrateBundle(seed) {
   const galleries = mapDocs(seed.galleries);
   const requestIds = new Set(requests.keys());
   for (const doc of [...orders.values(), ...invoices.values(), ...appointments.values()]) {
-    const id = text$f(doc.data.orderRequestId);
+    const id = text$g(doc.data.orderRequestId);
     if (id) requestIds.add(id);
   }
   await readMissing("orderRequests", requestIds, requests);
   const orderIds = new Set(orders.keys());
   for (const doc of requests.values()) {
-    const id = text$f(doc.data.convertedToOrderId) || text$f(doc.data.orderId);
+    const id = text$g(doc.data.convertedToOrderId) || text$g(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   for (const doc of [...invoices.values(), ...appointments.values()]) {
-    const id = text$f(doc.data.orderId);
+    const id = text$g(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   await readMissing("orders", orderIds, orders);
   const invoiceIds = new Set(invoices.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$f(doc.data.invoiceId);
+    const id = text$g(doc.data.invoiceId);
     if (id) invoiceIds.add(id);
   }
   await readMissing("invoices", invoiceIds, invoices);
   const legacyIds = /* @__PURE__ */ new Set();
   for (const doc of requests.values()) {
-    for (const id of legacyInvoiceDocIds({ orderRequestId: doc.id, listingId: text$f(doc.data.listingId) })) {
+    for (const id of legacyInvoiceDocIds({ orderRequestId: doc.id, listingId: text$g(doc.data.listingId) })) {
       legacyIds.add(id);
     }
   }
   for (const doc of orders.values()) {
     for (const id of legacyInvoiceDocIds({
-      orderRequestId: text$f(doc.data.orderRequestId),
-      listingId: text$f(doc.data.listingId)
+      orderRequestId: text$g(doc.data.orderRequestId),
+      listingId: text$g(doc.data.listingId)
     })) {
       legacyIds.add(id);
     }
@@ -4960,7 +5100,7 @@ async function hydrateBundle(seed) {
   mergeDocs(appointments, await queryIn("appointments", "orderId", [...orders.keys()]));
   const galleryIds = new Set(galleries.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$f(doc.data.galleryId);
+    const id = text$g(doc.data.galleryId);
     if (id) galleryIds.add(id);
   }
   await readMissing("galleries", galleryIds, galleries);
@@ -5089,7 +5229,7 @@ function alreadyExists(err) {
 function isSentinel(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$f(value) {
+function text$g(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function chunk(items, size) {
@@ -5200,7 +5340,7 @@ function synthesizePackageLine(record2) {
 }
 function packageLabel(record2) {
   for (const key of PACKAGE_LABEL_KEYS) {
-    const value = text$e(record2[key]);
+    const value = text$f(record2[key]);
     if (value) return value;
   }
   return "";
@@ -5236,7 +5376,7 @@ function moneyOrNull$1(value) {
 function nested$2(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$e(value) {
+function text$f(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function roundMoney$2(value) {
@@ -5268,7 +5408,7 @@ function buildAdminOrderTile(record2) {
   const packageName = skin2?.title || named || "Custom order";
   const charges = orderChargeSummary(record2, lines);
   return {
-    id: text$d(record2.id) || packageName,
+    id: text$e(record2.id) || packageName,
     orderCode: orderCode(kind, record2),
     kind,
     typeLabel: kind === "business" ? "Business" : "Listing",
@@ -5290,7 +5430,7 @@ function buildAdminOrderTile(record2) {
   };
 }
 function orderKind(record2, skin2) {
-  const raw = text$d(record2.projectType || record2.orderType || record2.type).toLowerCase();
+  const raw = text$e(record2.projectType || record2.orderType || record2.type).toLowerCase();
   if (raw === "business" || raw === "brand" || raw === "social") return "business";
   if (raw === "real_estate" || raw === "listing" || raw === "property") return "listing";
   if (skin2?.category === "listing") return "listing";
@@ -5304,9 +5444,9 @@ function channelFor(skin2, kind) {
   return kind === "business" ? "Human Brand" : "Listings & Spaces";
 }
 function orderCode(kind, record2) {
-  const explicit = text$d(record2.orderCode || record2.orderNumber || record2.displayId);
+  const explicit = text$e(record2.orderCode || record2.orderNumber || record2.displayId);
   if (explicit) return explicit.toUpperCase();
-  const id = text$d(record2.id);
+  const id = text$e(record2.id);
   const prefix = kind === "listing" ? "L" : "B";
   return `ORD - ${prefix} - ${orderCodeTail(id)}`;
 }
@@ -5324,29 +5464,29 @@ function orderCodeTail(id, salt = 0) {
   return String(1e4 + (h >>> 0) % 9e4);
 }
 function heroFromRecord(record2) {
-  const explicit = text$d(record2.heroUrl) || text$d(record2.coverUrl) || text$d(record2.coverImage);
+  const explicit = text$e(record2.heroUrl) || text$e(record2.coverUrl) || text$e(record2.coverImage);
   if (explicit) return explicit;
   const images = record2.images;
   if (!Array.isArray(images)) return "";
   for (const image of images) {
     if (typeof image === "string" && image.trim()) return image.trim();
     if (image && typeof image === "object") {
-      const url = text$d(image.url) || text$d(image.thumbnailUrl);
+      const url = text$e(image.url) || text$e(image.thumbnailUrl);
       if (url) return url;
     }
   }
   return "";
 }
 function clientName(record2) {
-  const named = text$d(record2.clientName) || text$d(record2.customerName) || text$d(record2.agentName) || [text$d(record2.firstName), text$d(record2.lastName)].filter(Boolean).join(" ");
+  const named = text$e(record2.clientName) || text$e(record2.customerName) || text$e(record2.agentName) || [text$e(record2.firstName), text$e(record2.lastName)].filter(Boolean).join(" ");
   return named || "—";
 }
 function appointmentLabel(record2) {
   const raw = record2.appointmentDate ?? record2.apptDate ?? record2.scheduledDate ?? record2.requestedDate;
   const key = calendarDateKey(raw);
   const date = formatShootDateLabel(key, typeof raw === "string" ? raw : void 0);
-  const time = text$d(record2.scheduledTime || record2.appointmentTime || record2.requestedTime);
-  const photographer = text$d(record2.assignedPhotographerName || record2.photographerName || record2.photographerPreference);
+  const time = text$e(record2.scheduledTime || record2.appointmentTime || record2.requestedTime);
+  const photographer = text$e(record2.assignedPhotographerName || record2.photographerName || record2.photographerPreference);
   return [date, time, photographer].filter(Boolean).join(" · ") || "—";
 }
 function tilePrice(amount) {
@@ -5414,7 +5554,7 @@ function money$4(value) {
   }
   return 0;
 }
-function text$d(value) {
+function text$e(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const NOT_PROVIDED = "Not provided";
@@ -5435,7 +5575,7 @@ function officeNewOrderEmail(saved, options) {
   const notes = notesOf(saved);
   const fields = [
     ["Order number", orderNumber],
-    ["Admin link", text$c(options?.adminUrl) || NOT_PROVIDED],
+    ["Admin link", text$d(options?.adminUrl) || NOT_PROVIDED],
     ["Client name", clientName2],
     ["Client email", firstText$1(saved, ["clientEmail", "email"])],
     ["Client phone", firstText$1(saved, ["clientPhone", "phone"])],
@@ -5481,19 +5621,19 @@ ${notes}`.toUpperCase().includes("TEST ORDER");
 }
 function orderNumberOf(saved) {
   for (const key of ["orderNumber", "orderCode", "displayId"]) {
-    const value = text$c(saved[key]);
+    const value = text$d(saved[key]);
     if (value && value !== NOT_PROVIDED) return value;
   }
-  if (!text$c(saved.id)) return NOT_PROVIDED;
+  if (!text$d(saved.id)) return NOT_PROVIDED;
   return buildAdminOrderTile(saved).orderCode;
 }
 function explicitPackageName(saved) {
   for (const key of ["packageName", "serviceName"]) {
-    const value = text$c(saved[key]);
+    const value = text$d(saved[key]);
     if (value && value !== NOT_PROVIDED) return cleanPackageName(value) || value;
   }
-  const selected = text$c(saved.selectedService);
-  if (text$c(saved.id) || selected) {
+  const selected = text$d(saved.selectedService);
+  if (text$d(saved.id) || selected) {
     const tileName = buildAdminOrderTile(saved).packageName;
     if (tileName && tileName !== "Custom order") return tileName;
   }
@@ -5503,7 +5643,7 @@ function explicitPackageName(saved) {
 function clientNameOf(saved) {
   const named = firstText$1(saved, ["clientName", "customerName"]);
   if (named) return named;
-  const joined = [text$c(saved.firstName), text$c(saved.lastName)].filter(Boolean).join(" ");
+  const joined = [text$d(saved.firstName), text$d(saved.lastName)].filter(Boolean).join(" ");
   return joined || NOT_PROVIDED;
 }
 function agentContactOf(saved) {
@@ -5521,7 +5661,7 @@ function agentField(saved, keys, nestedKey) {
   if (direct !== NOT_PROVIDED) return direct;
   for (const holder of [saved.agent, saved.listingAgent, saved.realtor]) {
     const record2 = nested(holder);
-    const value = text$c(record2[nestedKey]);
+    const value = text$d(record2[nestedKey]);
     if (value) return value;
   }
   return "";
@@ -5530,7 +5670,7 @@ function digits(value) {
   return value === NOT_PROVIDED ? "" : value.replace(/\D/g, "");
 }
 function notesOf(saved) {
-  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$c(saved[key])).filter(Boolean);
+  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$d(saved[key])).filter(Boolean);
   return parts.length ? parts.join("\n") : NOT_PROVIDED;
 }
 function lockboxOf(saved) {
@@ -5538,12 +5678,12 @@ function lockboxOf(saved) {
   return code || NOT_PROVIDED;
 }
 function occupancyOf(saved) {
-  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$c(saved[key])).filter(Boolean);
+  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$d(saved[key])).filter(Boolean);
   return parts.length ? parts.join(", ") : NOT_PROVIDED;
 }
 function bookedVia(saved) {
-  const lead = text$c(saved.leadSource);
-  const source = text$c(saved.source);
+  const lead = text$d(saved.leadSource);
+  const source = text$d(saved.source);
   const blob = `${lead} ${source}`.toLowerCase();
   if (!blob.trim()) return NOT_PROVIDED;
   if (/admin/.test(blob)) return "Admin";
@@ -5553,7 +5693,7 @@ function bookedVia(saved) {
 }
 function paymentOf(saved, total) {
   const invoice = nested(saved.invoice);
-  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$c(value).toLowerCase()).find(Boolean) || "";
+  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$d(value).toLowerCase()).find(Boolean) || "";
   if (/partial/.test(explicit)) return "Partial";
   if (/\bpaid\b/.test(explicit) && !/unpaid/.test(explicit)) return "Paid";
   if (/unpaid/.test(explicit)) return "Unpaid";
@@ -5660,7 +5800,7 @@ function moneyOrNull(value) {
 function nested(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$c(value) {
+function text$d(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function escapeHtml$5(value) {
@@ -5732,11 +5872,11 @@ function exactQaEmail(value) {
   return mailboxAddress(typeof value === "string" ? value : "") === DELIVERY_QA_CLIENT_EMAIL;
 }
 const SETTLED = /* @__PURE__ */ new Set(["paid", "comped"]);
-function text$b(value) {
+function text$c(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function status(value) {
-  return text$b(value).toLowerCase();
+  return text$c(value).toLowerCase();
 }
 function settled(value) {
   return SETTLED.has(status(value));
@@ -5744,12 +5884,12 @@ function settled(value) {
 function isPlaytestDoc(doc) {
   if (!doc) return false;
   if (doc.playtest === true) return true;
-  return text$b(doc.id).toLowerCase().startsWith("playtest-");
+  return text$c(doc.id).toLowerCase().startsWith("playtest-");
 }
 function nestedInvoiceStatus(listing) {
   const nested2 = listing?.invoice;
   if (!nested2 || typeof nested2 !== "object") return "";
-  return text$b(nested2.status);
+  return text$c(nested2.status);
 }
 function releaseFlags(subject) {
   const listing = subject.listing;
@@ -6097,10 +6237,12 @@ router$o.post("/", async (req, res) => {
     clientEmailStatus = await sendEmail({
       to: email,
       template: "booking_received",
-      subject: clientOrderConfirmedSubject(displayAddress, orderNumber),
+      subject: clientOrderReceivedSubject(displayAddress, orderNumber),
       variables: {
         clientName: clientName2,
         address: displayAddress,
+        orderNumber,
+        processing: money$3(sale.processing ?? 0),
         total: money$3(total),
         requestId: docRef.id,
         scheduledDate: bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
@@ -6374,6 +6516,7 @@ router$o.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       clientName: requestClientName,
       clientEmail: requestEmail,
       clientPhone: requestPhone,
+      orderNumber: typeof request.orderNumber === "string" ? request.orderNumber : "",
       address: requestAddress,
       addressLabel: requestAddressLabel,
       ...storedPin,
@@ -6582,6 +6725,7 @@ router$o.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       variables: {
         clientName: requestClientName,
         address: requestAddressLabel,
+        orderNumber: typeof request.orderNumber === "string" ? request.orderNumber : "",
         scheduledDate: bookingDateLabel(confirmSource, "To be confirmed"),
         scheduledTime: confirmTime || "To be confirmed",
         photographerName: assignedPhotographerName || "Our team",
@@ -7274,36 +7418,36 @@ const VIDEO_FILE = /\.(mp4|m4v|mov|webm)(\?|#|$)/i;
 const BLOCKED_EXT = /\.(zip|pdf|dng|cr2|cr3|nef|nrw|arw|srf|sr2|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic|heif|mp4|m4v|mov|webm)(\?|#|$)/i;
 const FILE_KEYS = ["downloadUrl", "fileUrl", "originalUrl", "fullResUrl", "mlsUrl", "zipUrl", "printUrl", "reelUrl", "mp4Url", "rawUrl", "src"];
 const DISPLAY_KEYS = ["previewUrl", "displayUrl", "webUrl", "thumbnailUrl"];
-function text$a(value) {
+function text$b(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function rowOf$2(item) {
   return item && typeof item === "object" ? item : null;
 }
 function shareableUrl$1(value) {
-  const url = text$a(value);
+  const url = text$b(value);
   if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
   if (url.startsWith("/")) return url;
   if (url.startsWith("https://") || url.startsWith("http://")) return url;
   return "";
 }
 function mediaName$1(row, fallback) {
-  return text$a(row.name) || text$a(row.fileName) || text$a(row.title) || fallback;
+  return text$b(row.name) || text$b(row.fileName) || text$b(row.title) || fallback;
 }
 function labelOf(row) {
-  return `${text$a(row.fileName)} ${text$a(row.name)} ${text$a(row.title)} ${text$a(row.path)} ${text$a(row.storagePath)}`.toLowerCase();
+  return `${text$b(row.fileName)} ${text$b(row.name)} ${text$b(row.title)} ${text$b(row.path)} ${text$b(row.storagePath)}`.toLowerCase();
 }
 function isMls(row) {
-  const category = text$a(row.category).toLowerCase();
-  const type = text$a(row.type).toLowerCase();
+  const category = text$b(row.category).toLowerCase();
+  const type = text$b(row.type).toLowerCase();
   if (category === "mls" || type === "mls") return true;
   const label = labelOf(row);
   if (/(^|[^a-z0-9])mls([^a-z0-9]|$)/.test(label)) return true;
   return /\/mls\//.test(label);
 }
 function isFullRes(row) {
-  const category = text$a(row.category).toLowerCase();
-  const type = text$a(row.type).toLowerCase();
+  const category = text$b(row.category).toLowerCase();
+  const type = text$b(row.type).toLowerCase();
   if (category === "full-res" || category === "fullres" || type === "full-res" || type === "fullres") return true;
   const label = labelOf(row);
   if (/(^|[^a-z0-9])full[\s_-]?res([^a-z0-9]|$)/.test(label)) return true;
@@ -7312,7 +7456,7 @@ function isFullRes(row) {
 function isRasterUrl(url, row) {
   if (!url || BLOCKED_EXT.test(url.split("#")[0]) || VIDEO_FILE.test(url.split("#")[0])) return false;
   if (RASTER.test(url.split("#")[0])) return true;
-  const content = text$a(row.contentType).toLowerCase();
+  const content = text$b(row.contentType).toLowerCase();
   return /^image\/(jpeg|jpg|png|webp|gif)/.test(content);
 }
 function blockedFileUrls(row, includeOwnUrl) {
@@ -7341,11 +7485,11 @@ function separateDisplay(row) {
 }
 function rasterShareSource(row, legacyDropTagged = false) {
   if (legacyDropTagged && isMls(row)) return "";
-  const type = text$a(row.type).toLowerCase();
+  const type = text$b(row.type).toLowerCase();
   if (type === "video" || type === "reel" || type === "file" || type === "matterport") return "";
-  const content = text$a(row.contentType).toLowerCase();
+  const content = text$b(row.contentType).toLowerCase();
   if (content.startsWith("video/") || content === "application/pdf" || content === "application/zip") return "";
-  const path2 = `${text$a(row.path)} ${text$a(row.storagePath)}`.toLowerCase();
+  const path2 = `${text$b(row.path)} ${text$b(row.storagePath)}`.toLowerCase();
   if (/\/(raw|downloads?|print|zips?)\//.test(path2)) return "";
   const display = separateDisplay(row);
   if (legacyDropTagged && isFullRes(row)) return display;
@@ -7375,11 +7519,11 @@ function videoFileUrl(row) {
 function videoPlaceholderSource(row) {
   if (rasterPoster(row)) return "";
   const file = videoFileUrl(row);
-  const type = text$a(row.type).toLowerCase();
-  const content = text$a(row.contentType).toLowerCase();
+  const type = text$b(row.type).toLowerCase();
+  const content = text$b(row.contentType).toLowerCase();
   const named = type === "video" || type === "reel" || content.startsWith("video/");
   if (!file && !named) return "";
-  const id = text$a(row.id) || file || text$a(row.path) || text$a(row.storagePath) || text$a(row.name) || text$a(row.fileName);
+  const id = text$b(row.id) || file || text$b(row.path) || text$b(row.storagePath) || text$b(row.name) || text$b(row.fileName);
   if (!id) return "";
   return `${VIDEO_PLACEHOLDER_PREFIX}${encodeURIComponent(id)}`;
 }
@@ -7439,8 +7583,8 @@ function listingOwnerDisplayItems(listing) {
   return items;
 }
 function isGalleryFloor(row) {
-  const type = text$a(row.type).toLowerCase();
-  const category = text$a(row.category).toLowerCase();
+  const type = text$b(row.type).toLowerCase();
+  const category = text$b(row.category).toLowerCase();
   return type === "floorplan" || type === "floor-plan" || category === "floorplan" || category === "floor-plan";
 }
 function galleryOwnerDisplayItems(media) {
@@ -7448,7 +7592,7 @@ function galleryOwnerDisplayItems(media) {
   const seen = /* @__PURE__ */ new Set();
   const rows = media.map(rowOf$2).filter((row) => Boolean(row));
   for (const row of rows) {
-    const type = text$a(row.type).toLowerCase();
+    const type = text$b(row.type).toLowerCase();
     if (type === "video" || type === "reel" || type === "matterport" || type === "tour" || type === "file" || type === "pdf") continue;
     const source = rasterShareSource(row);
     if (!source) continue;
@@ -7456,7 +7600,7 @@ function galleryOwnerDisplayItems(media) {
     pushDisplay(items, seen, mediaName$1(row, floor ? "Floor plan" : "Photo"), source, floor ? "floorPlan" : "image");
   }
   for (const row of rows) {
-    const type = text$a(row.type).toLowerCase();
+    const type = text$b(row.type).toLowerCase();
     if (type !== "video" && type !== "reel") continue;
     const poster = rasterPoster(row) || videoPlaceholderSource(row);
     pushDisplay(items, seen, mediaName$1(row, "Video"), poster, "poster");
@@ -7473,24 +7617,24 @@ function posterIndex(row, items) {
   return items.findIndex((item) => item.sourceUrl === poster);
 }
 function isUnbranded(row) {
-  const category = text$a(row.category).toLowerCase();
-  const type = text$a(row.type).toLowerCase();
+  const category = text$b(row.category).toLowerCase();
+  const type = text$b(row.type).toLowerCase();
   if (category === "unbranded" || type === "unbranded") return true;
-  const name = `${text$a(row.name)} ${text$a(row.fileName)} ${text$a(row.title)}`.toLowerCase();
+  const name = `${text$b(row.name)} ${text$b(row.fileName)} ${text$b(row.title)}`.toLowerCase();
   return name.includes("unbranded");
 }
 function isBrandedPlayback(row) {
   if (isMls(row) || isUnbranded(row)) return false;
-  const category = text$a(row.category).toLowerCase();
-  const type = text$a(row.type).toLowerCase();
+  const category = text$b(row.category).toLowerCase();
+  const type = text$b(row.type).toLowerCase();
   if (category === "branded" || type === "branded") return true;
-  const name = `${text$a(row.name)} ${text$a(row.fileName)} ${text$a(row.title)}`.toLowerCase();
+  const name = `${text$b(row.name)} ${text$b(row.fileName)} ${text$b(row.title)}`.toLowerCase();
   return /(^|[^a-z])branded([^a-z]|$)/.test(name);
 }
 function isReelPlayback(row) {
   if (isMls(row) || isUnbranded(row)) return false;
-  const category = text$a(row.category).toLowerCase();
-  const type = text$a(row.type).toLowerCase();
+  const category = text$b(row.category).toLowerCase();
+  const type = text$b(row.type).toLowerCase();
   return category === "reel" || type === "reel";
 }
 function deliveredVideoUrl(row) {
@@ -7798,15 +7942,15 @@ function statusOf(doc) {
 function isReleased(doc) {
   return RELEASED_GALLERY_STATUSES.includes(statusOf(doc));
 }
-function text$9(value) {
+function text$a(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function httpUrl(value) {
-  const url = text$9(value);
+  const url = text$a(value);
   return url.startsWith("https://") || url.startsWith("http://") ? url : "";
 }
 function shareableUrl(value) {
-  const url = text$9(value);
+  const url = text$a(value);
   if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
   if (url.startsWith("/")) return url;
   return httpUrl(url);
@@ -7848,7 +7992,7 @@ function isPrivateMedia(path2, name, url) {
   return PRIVATE_FILE.test(name) || PRIVATE_FILE.test(url);
 }
 function mediaName(row, fallback) {
-  return text$9(row.name) || text$9(row.fileName) || text$9(row.title) || fallback;
+  return text$a(row.name) || text$a(row.fileName) || text$a(row.title) || fallback;
 }
 function publicImages(listing) {
   if (!Array.isArray(listing.images)) return [];
@@ -7870,7 +8014,7 @@ function publicVideos(listing) {
     if (!row) continue;
     const url = httpUrl(row.url);
     const name = mediaName(row, "Video");
-    if (!url || isPrivateMedia(text$9(row.path) || text$9(row.storagePath), name, url)) continue;
+    if (!url || isPrivateMedia(text$a(row.path) || text$a(row.storagePath), name, url)) continue;
     videos.push({ url, name });
   }
   return videos.slice(0, 40);
@@ -7883,10 +8027,10 @@ function publicTour(listing) {
   return "";
 }
 function agentNameOf$1(listing) {
-  const direct = text$9(listing.agentName) || text$9(listing.listingAgent);
+  const direct = text$a(listing.agentName) || text$a(listing.listingAgent);
   if (direct) return direct;
   const agent = listing.agent;
-  if (agent && typeof agent === "object") return text$9(agent.name);
+  if (agent && typeof agent === "object") return text$a(agent.name);
   if (typeof agent === "string") return agent.trim();
   return "";
 }
@@ -7900,7 +8044,7 @@ function publicFloorPlans(listing) {
       if (!row) continue;
       const url = httpUrl(row.url) || httpUrl(row.shareUrl);
       const name = mediaName(row, "Floor plan");
-      const path2 = text$9(row.path) || text$9(row.storagePath);
+      const path2 = text$a(row.path) || text$a(row.storagePath);
       if (!url || isPrivateMedia(path2, name, url)) continue;
       plans.push({ url, name });
     }
@@ -7930,7 +8074,7 @@ function ownerFiles(listing) {
       const row = rowOf(item);
       if (!row) return;
       const name = mediaName(row, `File ${index + 1}`);
-      const path2 = text$9(row.path) || text$9(row.storagePath);
+      const path2 = text$a(row.path) || text$a(row.storagePath);
       const display = httpUrl(row.url);
       const download = downloadUrlOf(row);
       if (download) push(download, name);
@@ -7961,12 +8105,12 @@ function ownerRevisions(listing) {
     const row = rowOf(item) || {};
     const photoIndex = typeof row.photoIndex === "number" ? row.photoIndex : null;
     return {
-      id: text$9(row.id) || `revision-${index + 1}`,
-      type: text$9(row.type) || "gallery",
+      id: text$a(row.id) || `revision-${index + 1}`,
+      type: text$a(row.type) || "gallery",
       photoIndex,
-      description: text$9(row.description),
-      status: text$9(row.status) || "pending",
-      createdAt: text$9(row.createdAt)
+      description: text$a(row.description),
+      status: text$a(row.status) || "pending",
+      createdAt: text$a(row.createdAt)
     };
   });
 }
@@ -7975,11 +8119,11 @@ function invoiceOf(listing) {
   if (nested2 && typeof nested2 === "object" && typeof nested2.status === "string") {
     return { status: nested2.status };
   }
-  const status2 = text$9(listing.invoiceStatus);
+  const status2 = text$a(listing.invoiceStatus);
   return status2 ? { status: status2 } : null;
 }
 function pickReleasedGallery(listing, related) {
-  const preferred = text$9(listing.galleryId) || text$9(listing.playtestGalleryId);
+  const preferred = text$a(listing.galleryId) || text$a(listing.playtestGalleryId);
   const released = related.filter((doc) => isReleased(doc));
   if (preferred) {
     const match = released.find((doc) => doc.id === preferred);
@@ -8070,24 +8214,24 @@ function isStreamUrl(url) {
   return /(youtube\.com|youtu\.be|vimeo\.com|player\.vimeo\.com|mux\.com|stream\.mux|cloudflarestream\.com)/i.test(url);
 }
 function isFullResOrMls(row) {
-  const category = text$9(row.category).toLowerCase();
-  const type = text$9(row.type).toLowerCase();
+  const category = text$a(row.category).toLowerCase();
+  const type = text$a(row.type).toLowerCase();
   if (category === "mls" || category === "full-res" || category === "fullres" || type === "mls") return true;
-  const label = `${text$9(row.fileName)} ${text$9(row.name)} ${text$9(row.title)} ${text$9(row.path)} ${text$9(row.storagePath)}`.toLowerCase();
+  const label = `${text$a(row.fileName)} ${text$a(row.name)} ${text$a(row.title)} ${text$a(row.path)} ${text$a(row.storagePath)}`.toLowerCase();
   if (/(^|[^a-z0-9])(full[\s_-]?res|mls)([^a-z0-9]|$)/.test(label)) return true;
   return /\/(mls|full)\//.test(label);
 }
 function rowIsDeliveryOriginal(row) {
   if (row.downloadable === true || isFullResOrMls(row)) return true;
-  const type = text$9(row.type).toLowerCase();
+  const type = text$a(row.type).toLowerCase();
   if (type === "video" || type === "reel" || type === "file") return true;
-  const content = text$9(row.contentType).toLowerCase();
+  const content = text$a(row.contentType).toLowerCase();
   if (content.startsWith("video/") || content === "application/zip" || content === "application/pdf") return true;
   const candidates = [row.url, row.shareUrl, row.embedUrl, ...FILE_URL_KEYS.map((key) => row[key])];
-  return candidates.some((value) => isOriginalFileUrl(httpUrl(value) || text$9(value)));
+  return candidates.some((value) => isOriginalFileUrl(httpUrl(value) || text$a(value)));
 }
 function pushNeedle(needles, value) {
-  const raw = text$9(value);
+  const raw = text$a(value);
   if (raw.length >= 12) needles.push(raw);
 }
 function walkOriginalNeedles(value, needles, inheritedOriginal = false) {
@@ -8102,7 +8246,7 @@ function walkOriginalNeedles(value, needles, inheritedOriginal = false) {
   if (original) {
     const fileUrls = new Set(FILE_URL_KEYS.map((key) => shareableUrl(row[key])).filter(Boolean));
     for (const key of ["url", "shareUrl", "embedUrl", "sourcePath", "storagePath", "path"]) {
-      const raw = text$9(row[key]);
+      const raw = text$a(row[key]);
       if (!raw) continue;
       const asUrl = shareableUrl(raw);
       if (asUrl && isStreamUrl(asUrl)) continue;
@@ -8209,7 +8353,7 @@ function embedTour(listing, needles) {
       for (const key of ["embedUrl", "url", "shareUrl"]) {
         const url = shareableUrl(row[key]);
         if (!url || isOriginalFileUrl(url) || containsOriginal(url, needles)) continue;
-        const type = text$9(row.type).toLowerCase();
+        const type = text$a(row.type).toLowerCase();
         if (type === "matterport" || type === "tour" || /matterport\.com/i.test(url)) return url;
       }
     }
@@ -8231,7 +8375,7 @@ function displaySafeShareMedia(listing) {
 function ownerStudioProject(listing, pub, gate2 = {}) {
   const authoritativeInvoice = Object.prototype.hasOwnProperty.call(gate2, "invoice");
   const invoiceDoc = authoritativeInvoice && gate2.invoice && typeof gate2.invoice === "object" ? gate2.invoice : null;
-  const invoiceStatus = authoritativeInvoice ? text$9(invoiceDoc?.status) : text$9(invoiceOf(listing)?.status);
+  const invoiceStatus = authoritativeInvoice ? text$a(invoiceDoc?.status) : text$a(invoiceOf(listing)?.status);
   const invoice = invoiceStatus ? { status: invoiceStatus } : null;
   const downloadsUnlocked = studioDownloadsUnlocked({
     listing: {
@@ -8250,9 +8394,9 @@ function ownerStudioProject(listing, pub, gate2 = {}) {
   const project = {
     ...source,
     view: "owner",
-    clientName: text$9(listing.clientName),
-    clientEmail: text$9(listing.clientEmail),
-    clientPhone: text$9(listing.clientPhone),
+    clientName: text$a(listing.clientName),
+    clientEmail: text$a(listing.clientEmail),
+    clientPhone: text$a(listing.clientPhone),
     revisions: ownerRevisions(listing),
     lockDownloads: lockDownloadsOn(listing.lockDownloads),
     requirePayment: requirePaymentOn(listing.requirePayment),
@@ -8298,8 +8442,8 @@ function decideClientGalleryLink(input) {
   }
   if (input.pointedListing) return listingResult(input.pointedListing, input.relatedGalleries);
   if (input.order) {
-    const galleryId = text$9(input.order.galleryId);
-    const listingId = text$9(input.order.listingId);
+    const galleryId = text$a(input.order.galleryId);
+    const listingId = text$a(input.order.listingId);
     if (galleryId || listingId) {
       return {
         ok: false,
@@ -8316,8 +8460,8 @@ function decideClientGalleryLink(input) {
     };
   }
   if (input.orderRequest) {
-    const galleryId = text$9(input.orderRequest.galleryId);
-    const listingId = text$9(input.orderRequest.listingId);
+    const galleryId = text$a(input.orderRequest.galleryId);
+    const listingId = text$a(input.orderRequest.listingId);
     if (galleryId || listingId) {
       return {
         ok: false,
@@ -8745,40 +8889,6 @@ function assessGalleryRelease(plan, evidence) {
     gaps,
     message: releaseMessage(complete, percent, gaps, required)
   };
-}
-function galleryDeliverySubject(address) {
-  const place = typeof address === "string" ? address.trim() : "";
-  if (!place || place.toLowerCase() === "the property") return "Your gallery is ready";
-  return `Your gallery is ready: ${place}`;
-}
-function galleryDeliveryUrl(galleryId, env) {
-  return publicClientUrl(`/gallery/${encodeURIComponent(galleryId)}`, env);
-}
-function galleryDeliveryPayUrl(invoice, env) {
-  return invoicePayLinkFor(invoice, env);
-}
-function galleryDeliveredHistoryEntry(input) {
-  const recipients = input.recipients.map((item) => item.trim()).filter(Boolean);
-  const who = recipients.length > 0 ? recipients.join(", ") : "none";
-  const outcome = input.email === "sent" ? "Email sent." : input.email === "allowlist" ? "Email sent via the test allowlist." : "Email suppressed by the notify gate.";
-  return {
-    action: "Gallery delivered",
-    by: staffLabel(input.actor),
-    at: input.at,
-    details: `Recipients: ${who}. ${outcome}`,
-    recipients,
-    email: input.email
-  };
-}
-function staffLabel(actor2) {
-  const email = clean(actor2?.email);
-  const name = clean(actor2?.name);
-  const uid = clean(actor2?.uid);
-  if (name && email) return `${name} (${email})`;
-  return email || name || uid || "staff";
-}
-function clean(value) {
-  return typeof value === "string" ? value.trim() : "";
 }
 const MEDIA_DELIVERY_STATUSES = ["pending", "undelivered", "delivered"];
 const MEDIA_DELIVERY_LABELS = {
@@ -10335,11 +10445,13 @@ async function deliverGalleryToClient(galleryId, options) {
   let emailDelivery = "suppressed";
   try {
     if (recipients.length > 0) {
+      const processingRaw = Number(invoice?.processing);
       const variables = {
         clientName: String(gallery.clientName || client?.name || ""),
         address,
         galleryUrl: deliveryUrl,
         invoiceAmount: invoice ? `$${Number(invoice.total || 0).toFixed(2)}` : "",
+        processing: Number.isFinite(processingRaw) && processingRaw > 0 ? `$${processingRaw.toFixed(2)}` : "",
         paymentUrl: payUrl || "",
         expiresAt: `${expiresInDays} days`
       };
@@ -10347,7 +10459,6 @@ async function deliverGalleryToClient(galleryId, options) {
         to: recipients.join(", "),
         template: "gallery_delivery",
         subject: galleryDeliverySubject(address),
-        html: builtinEmailHtml("gallery_delivery", variables),
         variables
       });
       emailDelivery = result.delivery;
@@ -10418,7 +10529,7 @@ async function orderIdForGallery(gallery) {
   return typeof orderId === "string" ? orderId.trim() : "";
 }
 const db$i = () => admin.firestore();
-function text$8(value) {
+function text$9(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function docRecord(snap) {
@@ -10440,7 +10551,7 @@ async function galleryById(id) {
 }
 async function relatedForListing(listing) {
   const related = await galleriesWhere("listingId", listing.id);
-  const extras = [text$8(listing.galleryId), text$8(listing.playtestGalleryId)];
+  const extras = [text$9(listing.galleryId), text$9(listing.playtestGalleryId)];
   for (const galleryId of extras) {
     if (!galleryId || related.some((doc) => doc.id === galleryId)) continue;
     const extra = await galleryById(galleryId);
@@ -10489,8 +10600,8 @@ async function resolveClientGalleryLink(id) {
   const order = docRecord(orderSnap);
   const orderRequest = docRecord(requestSnap);
   const galleriesByOrderId = order ? await galleriesWhere("orderId", id) : [];
-  const pointedGalleryId = text$8(orderRequest?.galleryId) || text$8(order?.galleryId);
-  const pointedListingId = text$8(orderRequest?.listingId) || text$8(order?.listingId);
+  const pointedGalleryId = text$9(orderRequest?.galleryId) || text$9(order?.galleryId);
+  const pointedListingId = text$9(orderRequest?.listingId) || text$9(order?.listingId);
   const pointedGallery = pointedGalleryId ? await galleryById(pointedGalleryId) : null;
   let pointedListing = null;
   let pointedRelated = relatedGalleries;
@@ -10512,7 +10623,7 @@ async function resolveClientGalleryLink(id) {
 }
 async function invoiceForListing(listing) {
   const load = (id) => db$i().collection("invoices").doc(id).get();
-  const invoiceId = text$8(listing.invoiceId);
+  const invoiceId = text$9(listing.invoiceId);
   if (invoiceId) {
     const doc = await readInvoiceDoc(load, invoiceId);
     if (doc && !invoiceRedirectTarget(doc.data)) return { id: doc.id, ...doc.data };
@@ -10524,7 +10635,7 @@ async function invoiceForListing(listing) {
     const doc = await readInvoiceDoc(load, legacyId);
     if (doc && !invoiceRedirectTarget(doc.data)) return { id: doc.id, ...doc.data };
   }
-  const orderId = text$8(listing.orderId);
+  const orderId = text$9(listing.orderId);
   if (!orderId) return null;
   try {
     const snap = await db$i().collection("invoices").where("orderId", "==", orderId).limit(1).get();
@@ -11044,6 +11155,55 @@ router$m.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to remove media item." });
   }
 });
+function presentationLinkForReceipt(listing) {
+  return null;
+}
+function buildPaymentReceipt(input) {
+  const lines = receiptLines(input.invoice.lineItems);
+  const subtotal = finite(input.invoice.subtotal) ?? lines.reduce((sum, line) => sum + line.total, 0);
+  const promotions = finite(input.invoice.promoDiscount) ?? finite(input.invoice.promotions) ?? 0;
+  const fees = finite(input.invoice.fees) ?? 0;
+  const totalPaid = input.amountPaid ?? finite(input.invoice.amountPaid) ?? finite(input.invoice.total) ?? 0;
+  const balance = input.balance ?? 0;
+  const processing = receiptProcessing({
+    invoice: input.invoice,
+    subtotal,
+    promotions,
+    fees,
+    totalPaid
+  });
+  const galleryId = text$8(input.galleryId) || text$8(input.invoice.galleryId);
+  const galleryUrl = galleryId ? publicClientUrl(`/gallery/${encodeURIComponent(galleryId)}`, input.env) : "";
+  const presentationUrl = input.presentationUrl === void 0 ? presentationLinkForReceipt(input.listing) || "" : input.presentationUrl || "";
+  return renderPaymentReceipt({
+    clientName: text$8(input.invoice.clientName) || "there",
+    invoiceNumber: receiptEmailNumber({
+      invoiceNumber: input.invoice.invoiceNumber,
+      id: input.invoiceId,
+      createdAt: input.invoice.createdAt
+    }, input.paidAt),
+    paidAtLabel: receiptPaidLabel(input.paidAt || /* @__PURE__ */ new Date()),
+    lines,
+    subtotal,
+    processing,
+    promotions,
+    fees,
+    totalPaid,
+    balance,
+    galleryUrl,
+    presentationUrl,
+    unlocked: input.unlocked,
+    logoUrl: receiptLogoUrl(input.env)
+  });
+}
+function finite(value) {
+  if (value == null || value === "") return null;
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : null;
+}
+function text$8(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
 const SQUARE_VERSION_FALLBACK = "2026-08-20";
 function squareApiBaseUrl(environment) {
   return environment === "sandbox" ? "https://connect.squareupsandbox.com" : "https://connect.squareup.com";
@@ -11855,6 +12015,16 @@ async function deliverPaymentReceipt(invoice, invoiceId, amountPaid, balance, un
   });
   const doorsOpen = doorsOpenReceiptEmailHtml(offer.url || "");
   const html = rendered.html.includes("</body>") ? rendered.html.replace("</body>", `${doorsOpen}</body>`) : `${rendered.html}${doorsOpen}`;
+  const subtotal = Number(invoice.subtotal) || 0;
+  const promotions = Number(invoice.promoDiscount) || Number(invoice.promotions) || 0;
+  const fees = Number(invoice.fees) || 0;
+  const processingAmount = receiptProcessing({
+    invoice,
+    subtotal,
+    promotions,
+    fees,
+    totalPaid: amountPaid
+  });
   const result = await sendEmail({
     to,
     template: "payment_receipt",
@@ -11870,6 +12040,13 @@ async function deliverPaymentReceipt(invoice, invoiceId, amountPaid, balance, un
         createdAt: invoice.createdAt
       }),
       balance: money$2(balance),
+      processing: money$2(processingAmount),
+      subtotal: money$2(subtotal),
+      promotions: money$2(promotions),
+      fees: money$2(fees),
+      totalPaid: money$2(amountPaid),
+      paidAt: "",
+      galleryUrl: typeof invoice.galleryId === "string" && invoice.galleryId ? publicClientUrl(`/gallery/${encodeURIComponent(invoice.galleryId)}`) : "",
       dotOptInUrl: offer.url || ""
     }
   });
@@ -12035,6 +12212,7 @@ router$l.post("/send-invoice", requireCoordinator, async (req, res) => {
           createdAt: invoice.createdAt
         }),
         amount: money$2(invoice.total),
+        processing: money$2(invoice.processing ?? 0),
         paymentUrl,
         dueDate: bookingDateLabel(invoice.dueDate, "Upon receipt")
       }
@@ -20704,8 +20882,8 @@ async function renderPresentationShell(token, origin) {
     if (!presentation) {
       return { status: 404, html: "<!doctype html><title>Presentation</title><p>This presentation link is not active.</p>" };
     }
-    const shell = await readSpaShell$2();
-    const html = shell ? injectPresentationMeta(shell, presentation.meta) : standalonePresentation(presentation);
+    const shell2 = await readSpaShell$2();
+    const html = shell2 ? injectPresentationMeta(shell2, presentation.meta) : standalonePresentation(presentation);
     return { status: 200, html };
   } catch (err) {
     console.error("[Presentation] Shell failed.", err);
@@ -20871,8 +21049,8 @@ async function renderListingSiteShell(slug) {
     if (!site) {
       return { status: 404, html: "<!doctype html><title>Listing</title><p>This listing site is not published.</p>" };
     }
-    const shell = readSpaShell$1();
-    if (shell) return { status: 200, html: shell };
+    const shell2 = readSpaShell$1();
+    if (shell2) return { status: 200, html: shell2 };
     return {
       status: 200,
       html: `<!doctype html><title>${escapeHtml(site.address)}</title><p>${escapeHtml(site.address)}</p>`
