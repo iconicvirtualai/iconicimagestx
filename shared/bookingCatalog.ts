@@ -921,6 +921,26 @@ export function resolvePublicPackageDeepLink(
   return { selectedId: item.id, hidden: false };
 }
 
+/**
+ * Where a `/book?package=` id belongs on the form.
+ * Photo-only and apprenticeship packages open The Basics and land in selectedBasics.
+ * Campaign tiers stay on selectedService.
+ */
+export function publicPackageDeepLinkSelection(
+  requestedId: string,
+  catalog: StaffCatalogPackage[] = packagesForStaffEditor([]),
+): { selectedService: string; selectedBasics: string[]; showBasics: boolean; hidden: boolean } {
+  const link = resolvePublicPackageDeepLink(requestedId, catalog);
+  if (!link.selectedId || link.hidden) {
+    return { selectedService: "", selectedBasics: [], showBasics: false, hidden: link.hidden };
+  }
+  const basic = bookingOffer(catalog).basics.find((item) => item.id === link.selectedId);
+  if (basic) {
+    return { selectedService: "", selectedBasics: [basic.id], showBasics: true, hidden: false };
+  }
+  return { selectedService: link.selectedId, selectedBasics: [], showBasics: false, hidden: false };
+}
+
 export interface CatalogPackageEdits {
   name: string;
   price: number;

@@ -42,6 +42,16 @@ describe("public booking catalog", () => {
     expect(priced).toContain("The Essentials");
     expect(priced).toContain("scale-[1.01]");
     expect(priced).not.toContain("Studio Noir");
+
+    const apprentice = renderBook("/book?package=apprentice-25");
+    expect(apprentice).toContain('data-testid="apprenticeship-program"');
+    expect(apprentice).toContain("The Apprenticeship Program — 25 Photos");
+    expect(apprentice).toContain("25 photos");
+    expect(apprentice).toMatch(/data-testid="apprentice-25"[^>]*aria-pressed="true"/);
+    expect(apprentice).toMatch(/data-testid="apprentice-50"[^>]*aria-pressed="false"/);
+    expect(apprentice).toContain("$<!-- -->75");
+    expect(apprentice).toContain('data-testid="booking-total"');
+    expect(apprentice).not.toContain("The Essentials");
   });
 
   it("omits an unpriced add-on from the public catalog response and keeps a priced one", () => {
