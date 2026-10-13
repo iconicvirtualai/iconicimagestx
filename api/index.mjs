@@ -151,6 +151,57 @@ function parseContactLine(line) {
   };
 }
 const BUSINESS_CONTACT = parseContactLine(BUSINESS_CONTACT_LINE);
+const DOORS_OPEN_TOUR_URL = "https://doorsopentour.com";
+const DOT_DELIVERY_LINE = "Check out our new interactive Open House Tour by zone - As an Iconic Client, you receive an automatic upgrade on DoorsOpenTour.com when it's your time to shine!";
+const DOT_RECEIPT_LINE = "Payment received - Thanks for that! Let us know if you want your Open House listed on DoorsOpenTour.com and we'll upgrade your door for free!";
+const DOT_OPT_IN_ACTION_LABEL = "Yes, list my open house";
+const DOORS_OPEN_TOUR_NAME = "DoorsOpenTour.com";
+function dotOptInSelected(value) {
+  return value === true;
+}
+function dotOptInPath(token) {
+  const params = new URLSearchParams();
+  params.set("t", token);
+  return `/api/orders/dot-opt-in?${params.toString()}`;
+}
+function escapeHtml$6(value) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function linkDoorsOpenTour(sentence) {
+  const at = sentence.indexOf(DOORS_OPEN_TOUR_NAME);
+  if (at < 0) return escapeHtml$6(sentence);
+  return escapeHtml$6(sentence.slice(0, at)) + `<a href="${DOORS_OPEN_TOUR_URL}" rel="noreferrer" style="color:#111111;font-weight:600;">${DOORS_OPEN_TOUR_NAME}</a>` + escapeHtml$6(sentence.slice(at + DOORS_OPEN_TOUR_NAME.length));
+}
+const noteStyle = "font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:15px;line-height:1.5;color:#333333;margin:16px 0;";
+function doorsOpenDeliveryEmailHtml() {
+  return `<p style="${noteStyle}">${linkDoorsOpenTour(DOT_DELIVERY_LINE)}</p>`;
+}
+function doorsOpenReceiptEmailHtml(optInUrl) {
+  const sentence = `<p style="${noteStyle}">${linkDoorsOpenTour(DOT_RECEIPT_LINE)}</p>`;
+  const url = optInUrl.trim();
+  if (!url.startsWith("https://") || url.includes(" ")) return sentence;
+  return sentence + `<p style="margin:16px 0;"><a href="${escapeHtml$6(url)}" style="font-family:Inter,ui-sans-serif,system-ui,sans-serif;background:#000000;color:#ffffff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">${DOT_OPT_IN_ACTION_LABEL}</a></p>`;
+}
+function dotOptInResultHtml(ok) {
+  const title = ok === true ? "Your open house is listed." : ok === "wait" ? "Please try that link again in a moment." : "This link is not valid.";
+  const body = ok === true ? `We'll upgrade your door on <a href="${DOORS_OPEN_TOUR_URL}" rel="noreferrer" style="color:#171717;font-weight:600;">${DOORS_OPEN_TOUR_NAME}</a>.` : ok === "wait" ? "Your open house listing was not changed." : "Reply to your Iconic email and we'll list your Open House.";
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Doors Open Tour</title>
+</head>
+<body style="margin:0;background:#ffffff;color:#171717;font-family:Inter,ui-sans-serif,system-ui,sans-serif;">
+  <main style="box-sizing:border-box;max-width:32rem;margin:0 auto;padding:2.5rem 1.25rem;">
+    <p style="margin:0;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#737373;">Iconic Images</p>
+    <h1 style="margin:0.75rem 0 0;font-size:1.5rem;line-height:1.25;font-weight:700;">${title}</h1>
+    <p style="margin:1rem 0 0;font-size:1rem;line-height:1.5;">${body}</p>
+  </main>
+</body>
+</html>`;
+}
 const ORDER_RECEIVED_EMAIL_TEMPLATE = "booking_received";
 const ORDER_RECEIVED_SMS_KIND = "booking_confirmation";
 const STAFF_INBOUND_EMAIL_TEMPLATE = "live_chat";
@@ -409,6 +460,7 @@ function getFallbackTemplate(type, vars) {
       ${vars.invoiceAmount ? `<p>Iconic Images invoices after the shoot. Downloads stay locked until the <strong>${vars.invoiceAmount}</strong> invoice is paid.</p>` : `<p>Downloads open from your gallery once that invoice is paid, or when our team releases the files.</p>`}
       <p><a href="${vars.galleryUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">View Gallery</a></p>
       ${vars.paymentUrl ? `<p><a href="${vars.paymentUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Pay invoice</a></p>` : ""}
+      ${doorsOpenDeliveryEmailHtml()}
       <p style="color:#999;font-size:12px;">Gallery available for ${vars.expiresAt}.</p>
     `),
     invoice: base(`
@@ -423,6 +475,7 @@ function getFallbackTemplate(type, vars) {
       <p>Hi ${vars.clientName},</p>
       <p>We've received your payment of <strong>${vars.amount}</strong> for invoice ${vars.invoiceNumber}.</p>
       ${vars.balance && vars.balance !== "$0.00" ? `<p>Remaining balance: <strong>${vars.balance}</strong></p>` : "<p>Your account is paid in full. Thank you!</p>"}
+      ${doorsOpenReceiptEmailHtml(vars.dotOptInUrl || "")}
     `),
     manual_message: base(`
       <h2>Message from Iconic Images</h2>
@@ -2304,15 +2357,15 @@ function isLegacyOpenAutoId(id) {
 }
 function legacyInvoiceDocIds(anchor) {
   const ids = [];
-  const orderRequestId = textId(anchor.orderRequestId);
-  const listingId = textId(anchor.listingId);
+  const orderRequestId = textId$1(anchor.orderRequestId);
+  const listingId = textId$1(anchor.listingId);
   if (orderRequestId) ids.push(`ordreq_${orderRequestId}`);
   if (listingId) ids.push(`listing_${listingId}`);
   return ids;
 }
 function invoiceRedirectTarget(data) {
   if (!data || typeof data !== "object") return null;
-  return textId(data.redirectInvoiceId) || textId(data._redirect);
+  return textId$1(data.redirectInvoiceId) || textId$1(data._redirect);
 }
 function createPayToken() {
   const bytes = new Uint8Array(32);
@@ -2325,8 +2378,8 @@ function createPayToken() {
 }
 function decideInvoiceView(input) {
   if (input.audience === "staff" || input.audience === "owner") return "full";
-  const stored = textId(input.payToken) || "";
-  const presented = textId(input.presentedToken) || "";
+  const stored = textId$1(input.payToken) || "";
+  const presented = textId$1(input.presentedToken) || "";
   if (stored) return input.matches(stored, presented) ? "public" : "deny";
   if (isLegacyOpenAutoId(input.invoiceId)) return "public";
   return "deny";
@@ -2352,7 +2405,7 @@ function publicInvoiceLines(lineItems) {
   }
   return lines;
 }
-function textId(value) {
+function textId$1(value) {
   if (typeof value !== "string") return null;
   const id = value.trim();
   return id || null;
@@ -5581,6 +5634,8 @@ router$o.post("/", async (req, res) => {
       investmentWilling: investmentWilling || null,
       // Draft add-on. Quote only — do not price it or mention it in client email/SMS.
       lifeOfTheListingCare: lifeOfTheListingCareSelected(lifeOfTheListingCare),
+      dotOptIn: dotOptInSelected(req.body.dotOptIn),
+      dotOptInToken: createPayToken(),
       status: "new",
       source: "booking_form",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -6003,6 +6058,8 @@ router$o.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       notes: request.vibeNote || "",
       internalNotes: internalNotes || "",
       lifeOfTheListingCare: lifeOfTheListingCareSelected(request.lifeOfTheListingCare),
+      dotOptIn: dotOptInSelected(request.dotOptIn),
+      dotOptInToken: typeof request.dotOptInToken === "string" && request.dotOptInToken.trim() ? request.dotOptInToken.trim() : createPayToken(),
       confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -6156,6 +6213,7 @@ router$o.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       clientId: clientId2,
       galleryId: galleryRef.id,
       invoiceId,
+      dotOptInToken: orderData.dotOptInToken,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
     try {
@@ -6311,8 +6369,140 @@ async function nextOrderNumber() {
   });
   return formatOrderNumber(n);
 }
+function textId(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+async function readDoc$1(collection, id) {
+  if (!id) return null;
+  const snap = await admin.firestore().collection(collection).doc(id).get();
+  if (!snap.exists) return null;
+  return { id: snap.id, ref: snap.ref, data: snap.data() || {} };
+}
+async function markDotOptIn(collection, id) {
+  const doc = await readDoc$1(collection, id);
+  if (!doc) return;
+  await doc.ref.update({
+    dotOptIn: true,
+    dotOptInAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+}
+async function applyDotOptIn(token) {
+  const trimmed = token.trim();
+  if (trimmed.length < 20 || trimmed.length > 200) return "missing";
+  const db2 = admin.firestore();
+  const [orders, requests] = await Promise.all([
+    db2.collection("orders").where("dotOptInToken", "==", trimmed).limit(5).get(),
+    db2.collection("orderRequests").where("dotOptInToken", "==", trimmed).limit(5).get()
+  ]);
+  if (orders.empty && requests.empty) return "missing";
+  const seen = /* @__PURE__ */ new Set();
+  const jobs = [];
+  const queue = (collection, id) => {
+    const key = `${collection}/${id}`;
+    if (!id || seen.has(key)) return;
+    seen.add(key);
+    jobs.push(markDotOptIn(collection, id));
+  };
+  for (const doc of orders.docs) {
+    queue("orders", doc.id);
+    const requestId = textId(doc.data()?.orderRequestId);
+    if (requestId) queue("orderRequests", requestId);
+  }
+  for (const doc of requests.docs) {
+    queue("orderRequests", doc.id);
+    const orderId = textId(doc.data()?.convertedToOrderId);
+    if (orderId) queue("orders", orderId);
+  }
+  await Promise.all(jobs);
+  return "ok";
+}
+async function ensureDotOptInLink(invoice) {
+  try {
+    const order = await readDoc$1("orders", textId(invoice.orderId));
+    const request = await readDoc$1("orderRequests", textId(invoice.orderRequestId));
+    const linkedOrderId = textId(request?.data.convertedToOrderId);
+    const linked = linkedOrderId && linkedOrderId !== order?.id ? await readDoc$1("orders", linkedOrderId) : null;
+    if (!order && !request && !linked) return { dotOptIn: false, url: null };
+    let token = textId(order?.data.dotOptInToken) || textId(request?.data.dotOptInToken) || textId(linked?.data.dotOptInToken);
+    if (!token) token = createPayToken();
+    const patch = {
+      dotOptInToken: token,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+    if (order && textId(order.data.dotOptInToken) !== token) await order.ref.update(patch);
+    if (request && textId(request.data.dotOptInToken) !== token) await request.ref.update(patch);
+    if (linked && textId(linked.data.dotOptInToken) !== token) await linked.ref.update(patch);
+    const dotOptIn = dotOptInSelected(order?.data.dotOptIn) || dotOptInSelected(request?.data.dotOptIn) || dotOptInSelected(linked?.data.dotOptIn);
+    return { dotOptIn, url: publicClientUrl(dotOptInPath(token)) };
+  } catch (err) {
+    console.error("[DoorsOpenTour] Link lookup failed:", err);
+    return { dotOptIn: false, url: null };
+  }
+}
+function createRateLimiter(options) {
+  const hits2 = /* @__PURE__ */ new Map();
+  return {
+    check(key) {
+      const now = options.now ? options.now() : Date.now();
+      const windowStart = now - options.windowMs;
+      const recent = (hits2.get(key) ?? []).filter((stamp2) => stamp2 > windowStart);
+      const max = typeof options.max === "function" ? options.max() : options.max;
+      if (recent.length >= max) {
+        const retryAfterSec = Math.max(1, Math.ceil((recent[0] + options.windowMs - now) / 1e3));
+        hits2.set(key, recent);
+        return { allowed: false, retryAfterSec };
+      }
+      recent.push(now);
+      hits2.set(key, recent);
+      if (hits2.size > 5e3) {
+        const oldest = hits2.keys().next().value;
+        if (oldest) hits2.delete(oldest);
+      }
+      return { allowed: true, retryAfterSec: 0 };
+    },
+    reset() {
+      hits2.clear();
+    }
+  };
+}
+function clientIp(req) {
+  const forwarded = req.headers["x-forwarded-for"];
+  const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+  if (typeof raw === "string" && raw.trim()) {
+    return raw.split(",")[0].trim().slice(0, 80);
+  }
+  return req.ip || req.socket?.remoteAddress || "unknown";
+}
 const router$n = Router();
 const db$n = () => admin.firestore();
+const dotOptInLimiter = createRateLimiter({ windowMs: 10 * 60 * 1e3, max: 30 });
+function sendDotOptInPage(res, status2, ok) {
+  res.status(status2);
+  res.set({
+    "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "no-store",
+    "Referrer-Policy": "no-referrer",
+    "X-Robots-Tag": "noindex"
+  });
+  res.send(dotOptInResultHtml(ok));
+}
+router$n.get("/dot-opt-in", async (req, res) => {
+  const limit = dotOptInLimiter.check(clientIp(req));
+  if (!limit.allowed) {
+    res.set("Retry-After", String(limit.retryAfterSec));
+    sendDotOptInPage(res, 429, "wait");
+    return;
+  }
+  const token = typeof req.query.t === "string" ? req.query.t : "";
+  try {
+    const result = await applyDotOptIn(token);
+    sendDotOptInPage(res, result === "ok" ? 200 : 404, result === "ok");
+  } catch (err) {
+    console.error("[Orders] Doors Open Tour opt-in failed:", err);
+    sendDotOptInPage(res, 500, false);
+  }
+});
 router$n.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, photographerId, limit = "50", startAfter } = req.query;
@@ -11210,21 +11400,30 @@ async function applySuccessfulPayment({
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   });
   if (invoice.clientEmail) {
-    await sendEmail({
-      to: invoice.clientEmail,
-      template: "payment_receipt",
-      variables: {
-        clientName: invoice.clientName,
-        amount: money$2(amount),
-        invoiceNumber: receiptEmailNumber({
-          invoiceNumber: invoice.invoiceNumber,
-          id: invoiceId,
-          createdAt: invoice.createdAt
-        }),
-        balance: money$2(newAmountDue)
-      }
-    }).catch(console.error);
+    await deliverPaymentReceipt(invoice, invoiceId, money$2(amount), money$2(newAmountDue)).catch(console.error);
   }
+}
+async function deliverPaymentReceipt(invoice, invoiceId, amount, balance) {
+  const to = typeof invoice.clientEmail === "string" ? invoice.clientEmail : "";
+  if (!to) return;
+  const offer = await ensureDotOptInLink(invoice);
+  const variables = {
+    clientName: String(invoice.clientName || ""),
+    amount,
+    invoiceNumber: receiptEmailNumber({
+      invoiceNumber: invoice.invoiceNumber,
+      id: invoiceId,
+      createdAt: invoice.createdAt
+    }),
+    balance,
+    dotOptInUrl: offer.url || ""
+  };
+  await sendEmail({
+    to,
+    template: "payment_receipt",
+    html: builtinEmailHtml("payment_receipt", variables),
+    variables
+  });
 }
 function roundMoney$1(amount) {
   return Math.round(amount * 100) / 100;
@@ -11413,20 +11612,12 @@ router$l.post("/send-receipt", requireCoordinator, async (req, res) => {
     if (!invoiceAllowsDownload(invoice)) {
       return res.status(409).json({ error: "Invoice is not paid. Send the pay link instead." });
     }
-    await sendEmail({
-      to: invoice.clientEmail,
-      template: "payment_receipt",
-      variables: {
-        clientName: invoice.clientName,
-        amount: money$2(invoice.amountPaid || invoice.total),
-        invoiceNumber: receiptEmailNumber({
-          invoiceNumber: invoice.invoiceNumber,
-          id: invoiceDoc.id,
-          createdAt: invoice.createdAt
-        }),
-        balance: money$2(amountStillDue(invoice))
-      }
-    });
+    await deliverPaymentReceipt(
+      invoice,
+      invoiceDoc.id,
+      money$2(invoice.amountPaid || invoice.total),
+      money$2(amountStillDue(invoice))
+    );
     return res.json({ success: true });
   } catch (err) {
     console.error("[Payments] Send receipt error:", err);
@@ -11449,6 +11640,7 @@ router$l.get("/invoice/:id", async (req, res) => {
     });
     if (view === "deny") return invoiceNotFound(res);
     const paid = invoiceAllowsDownload(invoice);
+    const doorsOpen = paid ? await ensureDotOptInLink(invoice) : null;
     const shared = {
       id: invoiceDoc.id,
       paid,
@@ -11469,6 +11661,10 @@ router$l.get("/invoice/:id", async (req, res) => {
       if (paid && typeof invoice.galleryId === "string" && invoice.galleryId.trim()) {
         body.galleryId = invoice.galleryId;
       }
+      if (doorsOpen) {
+        body.dotOptIn = doorsOpen.dotOptIn;
+        if (doorsOpen.url) body.dotOptInUrl = doorsOpen.url;
+      }
       return res.json(body);
     }
     return res.json({
@@ -11486,7 +11682,11 @@ router$l.get("/invoice/:id", async (req, res) => {
         payToken: invoice.payToken,
         status: invoice.status
       }) || "",
-      canPayOnline: provider === "stripe" ? stripeReady() : squareReady()
+      canPayOnline: provider === "stripe" ? stripeReady() : squareReady(),
+      ...doorsOpen ? {
+        dotOptIn: doorsOpen.dotOptIn,
+        ...doorsOpen.url ? { dotOptInUrl: doorsOpen.url } : {}
+      } : {}
     });
   } catch (err) {
     console.error("[Payments] Invoice fetch error:", err);
@@ -16078,40 +16278,6 @@ function parseTabularUpload(input) {
     return { headers, rows };
   }
   return parseCsv(input.text || "");
-}
-function clientIp(req) {
-  const forwarded = req.headers["x-forwarded-for"];
-  const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-  if (typeof raw === "string" && raw.trim()) {
-    return raw.split(",")[0].trim().slice(0, 80);
-  }
-  return req.ip || req.socket?.remoteAddress || "unknown";
-}
-function createRateLimiter(options) {
-  const hits2 = /* @__PURE__ */ new Map();
-  return {
-    check(key) {
-      const now = options.now ? options.now() : Date.now();
-      const windowStart = now - options.windowMs;
-      const recent = (hits2.get(key) ?? []).filter((stamp2) => stamp2 > windowStart);
-      const max = typeof options.max === "function" ? options.max() : options.max;
-      if (recent.length >= max) {
-        const retryAfterSec = Math.max(1, Math.ceil((recent[0] + options.windowMs - now) / 1e3));
-        hits2.set(key, recent);
-        return { allowed: false, retryAfterSec };
-      }
-      recent.push(now);
-      hits2.set(key, recent);
-      if (hits2.size > 5e3) {
-        const oldest = hits2.keys().next().value;
-        if (oldest) hits2.delete(oldest);
-      }
-      return { allowed: true, retryAfterSec: 0 };
-    },
-    reset() {
-      hits2.clear();
-    }
-  };
 }
 const router$e = Router();
 const MAX_ROWS = 1e4;
