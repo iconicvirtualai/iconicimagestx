@@ -97,9 +97,11 @@ export interface PortalMediaStore {
 }
 
 export interface PortalWebsiteSettings {
+  design: "index" | "two-up" | "premiere";
   font: "sans" | "serif" | "modern";
   color: "ink" | "teal" | "warm";
   style: "classic" | "editorial" | "minimal";
+  published: boolean;
   showPhotos: boolean;
   showVideo: boolean;
   showTours: boolean;
@@ -196,6 +198,7 @@ export const PORTAL_MARKETING_KIT: PortalMarketingCard[] = [
   },
 ];
 
+const WEBSITE_DESIGNS = new Set(["index", "two-up", "premiere"]);
 const WEBSITE_FONTS = new Set(["sans", "serif", "modern"]);
 const WEBSITE_COLORS = new Set(["ink", "teal", "warm"]);
 const WEBSITE_STYLES = new Set(["classic", "editorial", "minimal"]);
@@ -272,9 +275,11 @@ export function emptyPortalMediaStore(): PortalMediaStore {
 
 export function defaultPortalWebsite(): PortalWebsiteSettings {
   return {
+    design: "index",
     font: "sans",
     color: "ink",
     style: "classic",
+    published: false,
     showPhotos: true,
     showVideo: true,
     showTours: true,
@@ -514,13 +519,16 @@ export function applyPortalMediaChange(
 
 export function sanitizeWebsiteSettings(value: unknown, base = defaultPortalWebsite()): PortalWebsiteSettings {
   const row = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  const design = text(row.design);
   const font = text(row.font);
   const color = text(row.color);
   const style = text(row.style);
   return {
+    design: WEBSITE_DESIGNS.has(design) ? design as PortalWebsiteSettings["design"] : base.design,
     font: WEBSITE_FONTS.has(font) ? font as PortalWebsiteSettings["font"] : base.font,
     color: WEBSITE_COLORS.has(color) ? color as PortalWebsiteSettings["color"] : base.color,
     style: WEBSITE_STYLES.has(style) ? style as PortalWebsiteSettings["style"] : base.style,
+    published: boolOr(row.published, base.published),
     showPhotos: boolOr(row.showPhotos, base.showPhotos),
     showVideo: boolOr(row.showVideo, base.showVideo),
     showTours: boolOr(row.showTours, base.showTours),

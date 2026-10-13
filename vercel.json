@@ -103,6 +103,14 @@
       "destination": "/api/index"
     },
     {
+      "source": "/l/:slug",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/l/:slug/",
+      "destination": "/api/index"
+    },
+    {
       "source": "/admin/owners",
       "destination": "/api/index"
     },
