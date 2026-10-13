@@ -1,21 +1,14 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { google } from "googleapis";
+import {
+  CLIENT_CONFIRMATION_DOC_ID,
+  resolveClientConfirmation,
+} from "./clientConfirmationEmail";
 
 admin.initializeApp();
 
 const db = admin.firestore();
-
-function replaceTags(template: string, data: Record<string, string>): string {
-  let result = template;
-
-  Object.entries(data).forEach(([key, value]) => {
-    const regex = new RegExp(`\\{\\s*${key}\\s*\\}`, "gi");
-    result = result.replace(regex, value ?? "");
-  });
-
-  return result;
-}
 
 // ─── Set custom claims when a staff document is created or updated ────────────
 // This embeds the role directly into the Firebase Auth token so the server
@@ -77,66 +70,19 @@ export const onOrderCreated = functions.firestore
 
       const gmail = google.gmail({ version: "v1", auth });
 
-      // Fetch email templates
-      const clientTemplateDoc = await db.collection("emailTemplates").doc("clientConfirmation").get();
+      const clientTemplateDoc = await db.collection("emailTemplates").doc(CLIENT_CONFIRMATION_DOC_ID).get();
       const ownerTemplateDoc = await db.collection("emailTemplates").doc("ownerNotification").get();
+      const clientMessage = resolveClientConfirmation(order, clientTemplateDoc.exists ? clientTemplateDoc.data() : null);
 
-      const clientTemplate = clientTemplateDoc.data();
-      const ownerTemplate = ownerTemplateDoc.data();
-
-      if (!clientTemplate || !ownerTemplate) {
-        console.error("Email templates not found in Firestore");
-        return;
-      }
-
-      // BUILD LINE ITEMS STRING
-      const lineItemsText = (order.lineItems || [])
-        .map((item: any) => `- ${item.name} - $${item.price}`)
-        .join("\n");
-
-      console.log("RAW TEMPLATE:", JSON.stringify(clientTemplate.body));
-
-      // BUILD TAG DATA
-      const tagData: Record<string, string> = {
-        clientName: order.clientName || "",
-        clientEmail: order.clientEmail || "",
-        clientPhone: order.clientPhone || "",
-        propertyAddress: order.propertyAddress || "",
-        services: Array.isArray(order.services)
-          ? order.services.join(", ")
-          : order.services || "",
-        lineItems: lineItemsText,
-        total: String(order.total || order.pricing?.total || 0),
-        notes: order.notes || "",
-        orderId: orderId,
-        status: order.status || "",
-      };
-
-      console.log("TAG DATA:", tagData);
-
-      const replaceTagsFn = (template: string, data: Record<string, string>) => {
-        let result = template;
-        Object.entries(data).forEach(([key, value]) => {
-          const regex = new RegExp(`\\{\\s*${key}\\s*\\}`, "g");
-          result = result.replace(regex, value ?? "");
-        });
-        return result;
-      };
-
-      // Replace template tags
-      const clientSubject = replaceTagsFn(clientTemplate.subject, tagData);
-      const clientBody = replaceTagsFn(clientTemplate.body, tagData);
-      const ownerSubject = replaceTagsFn(ownerTemplate.subject, tagData);
-      const ownerBody = replaceTagsFn(ownerTemplate.body, tagData);
-
-      // Email encoding
-      const encodeEmail = (to: string, subject: string, body: string) => {
+      const encodeHtmlEmail = (to: string, subject: string, html: string) => {
         const message = [
           `To: ${to}`,
           `From: orders@iconicimagestx.com`,
-          `Subject: ${subject}`,
+          `Subject: ${subject.replace(/[\r\n]+/g, " ")}`,
+          `MIME-Version: 1.0`,
+          `Content-Type: text/html; charset=utf-8`,
           ``,
-          body,
+          html,
         ].join("\n");
         return Buffer.from(message)
           .toString("base64")
@@ -144,17 +90,45 @@ export const onOrderCreated = functions.firestore
           .replace(/\//g, "_");
       };
 
-      // Send client email
-      await gmail.users.messages.send({
-        userId: "me",
-        requestBody: { raw: encodeEmail(order.clientEmail, clientSubject, clientBody) },
-      });
+      if (order.clientEmail) {
+        await gmail.users.messages.send({
+          userId: "me",
+          requestBody: {
+            raw: encodeHtmlEmail(order.clientEmail, clientMessage.subject, clientMessage.html),
+          },
+        });
+      }
 
-      // Send owner email
-      await gmail.users.messages.send({
-        userId: "me",
-        requestBody: { raw: encodeEmail("orders@iconicimagestx.com", ownerSubject, ownerBody) },
-      });
+      const ownerTemplate = ownerTemplateDoc.data();
+      if (ownerTemplate && typeof ownerTemplate.subject === "string" && typeof ownerTemplate.body === "string") {
+        const ownerTags: Record<string, string> = {
+          clientName: typeof order.clientName === "string" ? order.clientName : "",
+          clientEmail: typeof order.clientEmail === "string" ? order.clientEmail : "",
+          clientPhone: typeof order.clientPhone === "string" ? order.clientPhone : "",
+          propertyAddress: typeof order.addressLabel === "string"
+            ? order.addressLabel
+            : typeof order.propertyAddress === "string"
+              ? order.propertyAddress
+              : "",
+          services: Array.isArray(order.services) ? order.services.join(", ") : String(order.services || ""),
+          notes: typeof order.notes === "string" ? order.notes : "",
+          orderId,
+          status: typeof order.status === "string" ? order.status : "",
+        };
+        const replaceOwnerTags = (template: string) => template.replace(/\{\s*(\w+)\s*\}/g, (_, key: string) => ownerTags[key] ?? "");
+        const ownerMessage = [
+          `To: orders@iconicimagestx.com`,
+          `From: orders@iconicimagestx.com`,
+          `Subject: ${replaceOwnerTags(ownerTemplate.subject).replace(/[\r\n]+/g, " ")}`,
+          ``,
+          replaceOwnerTags(ownerTemplate.body),
+        ].join("\n");
+        const raw = Buffer.from(ownerMessage).toString("base64").replace(/\+/g, "-").replace(/\//g, "_");
+        await gmail.users.messages.send({
+          userId: "me",
+          requestBody: { raw },
+        });
+      }
 
       console.log("Emails sent successfully");
     } catch (error) {

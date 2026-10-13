@@ -24,7 +24,7 @@ vi.mock("firebase-admin", () => ({
   },
 }));
 
-import { clientOrderConfirmedSubject, sendEmail } from "./email";
+import { clientOrderReceivedSubject, sendEmail } from "./email";
 
 const bookings = readFileSync(new URL("../routes/bookings.ts", import.meta.url), "utf8");
 const envExample = readFileSync(new URL("../../.env.example", import.meta.url), "utf8");
@@ -134,19 +134,22 @@ describe("client booking mail and the notify switch", () => {
     expect(message?.to).not.toContain("photos@iconicimagestx.com");
   });
 
-  it("uses the property address as the client confirmation subject", async () => {
+  it("uses the property address as the client received subject", async () => {
     useNotifyEnv({});
     const address = "100 Congress Ave, Austin, TX 78701";
-    expect(clientOrderConfirmedSubject(address)).toBe(`Your Iconic order is confirmed: ${address}`);
-    expect(bookings).toContain("subject: clientOrderConfirmedSubject(displayAddress, orderNumber)");
+    expect(clientOrderReceivedSubject(address)).toBe(`Your Iconic order was received: ${address}`);
+    expect(clientOrderReceivedSubject(address, "#104")).toBe(`Your Iconic order #104 was received: ${address}`);
+    expect(clientOrderReceivedSubject(address, "#104")).not.toMatch(/confirmed/i);
+    expect(bookings).toContain("subject: clientOrderReceivedSubject(displayAddress, orderNumber)");
     const received = await sendEmail({
       to: client,
       template: "booking_received",
-      subject: clientOrderConfirmedSubject(address),
-      variables: { clientName: "Ada", address, total: "$77.10" },
+      subject: clientOrderReceivedSubject(address, "#104"),
+      variables: { clientName: "Ada", address, total: "$77.10", orderNumber: "#104" },
     });
     expect(received).toEqual({ sent: true, delivery: "sent" });
-    expect(sendMail.mock.calls[0]?.[0].subject).toBe("Your Iconic order is confirmed: 100 Congress Ave, Austin, TX 78701");
+    expect(sendMail.mock.calls[0]?.[0].subject).toBe("Your Iconic order #104 was received: 100 Congress Ave, Austin, TX 78701");
     expect(sendMail.mock.calls[0]?.[0].subject).not.toBe("Message from Iconic Images");
+    expect(sendMail.mock.calls[0]?.[0].html).toContain("Processing (2.8%)");
   });
 });

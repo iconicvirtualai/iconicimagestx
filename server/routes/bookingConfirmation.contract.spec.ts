@@ -26,7 +26,7 @@ describe("live order confirmation emails", () => {
     expect(blocks[0]).not.toContain("photos@iconicimagestx.com");
     expect(blocks[0]).toContain("clientName");
     expect(blocks[0]).toContain("address: displayAddress");
-    expect(blocks[0]).toContain("subject: clientOrderConfirmedSubject(displayAddress, orderNumber)");
+    expect(blocks[0]).toContain("subject: clientOrderReceivedSubject(displayAddress, orderNumber)");
     expect(blocks[0]).toContain("total: money(total)");
     expect(blocks[0]).toContain("requestId: docRef.id");
     expect(blocks[0]).toContain("dashboardUrl: orderRequestAdminUrl(docRef.id)");
@@ -86,7 +86,7 @@ describe("live order confirmation emails", () => {
     expect(bookings).toContain('template: "account_password_setup"');
     expect(bookings).toContain("sendFirebasePasswordEmail");
     expect(bookings).toContain("SMS_TEMPLATES.bookingConfirmation");
-    expect(email).toContain("account_password_setup:");
+    expect(email).toContain('type === "account_password_setup"');
     const received = sendBlocks(bookings, "booking_received").join("\n");
     expect(received).not.toContain("account_password_setup");
     expect(received).not.toContain("setupUrl");
@@ -113,10 +113,11 @@ describe("live order confirmation emails", () => {
     expect(saved).not.toContain("setupUrl");
   });
 
-  it("still resolves those categories through the shared email sender", () => {
-    expect(email).toContain('.where("category", "==", template)');
-    expect(email).toContain('.where("isActive", "==", true)');
-    expect(email).toContain("getFallbackTemplate(template, variables)");
+  it("reads a saved override from emailTemplates/{template key}", () => {
+    expect(email).toContain(".collection(EMAIL_TEMPLATES_COLLECTION).doc(template)");
+    expect(email).toContain("readEmailTemplateOverride");
+    expect(email).toContain("fillEmailPlaceholders");
+    expect(email).toContain("builtinEmailHtml(template, variables)");
     expect(email).toContain("await transporter.sendMail");
     expect(email).toContain("from: `\"Iconic Images\" <${process.env.EMAIL_FROM || process.env.SMTP_USER}>`");
   });

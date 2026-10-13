@@ -17,7 +17,7 @@ import {
 import { readInvoiceDoc } from "../lib/invoiceDoc";
 import { clientGalleryDownloadsUnlocked, type GalleryDownloadGate } from "../../shared/paymentAccess";
 import { loadGalleryReleaseForGallery } from "./galleryReleaseGate";
-import { builtinEmailHtml, sendEmail } from "./email";
+import { sendEmail } from "./email";
 import { sendSMS, SMS_TEMPLATES } from "./sms";
 
 const db = () => admin.firestore();
@@ -134,11 +134,13 @@ export async function deliverGalleryToClient(
 
   try {
     if (recipients.length > 0) {
+      const processingRaw = Number((invoice as { processing?: unknown } | null)?.processing);
       const variables = {
         clientName: String(gallery.clientName || client?.name || ""),
         address,
         galleryUrl: deliveryUrl,
         invoiceAmount: invoice ? `$${Number((invoice as { total?: unknown }).total || 0).toFixed(2)}` : "",
+        processing: Number.isFinite(processingRaw) && processingRaw > 0 ? `$${processingRaw.toFixed(2)}` : "",
         paymentUrl: payUrl || "",
         expiresAt: `${expiresInDays} days`,
       };
@@ -146,7 +148,6 @@ export async function deliverGalleryToClient(
         to: recipients.join(", "),
         template: "gallery_delivery",
         subject: galleryDeliverySubject(address),
-        html: builtinEmailHtml("gallery_delivery", variables),
         variables,
       });
       emailDelivery = result.delivery;

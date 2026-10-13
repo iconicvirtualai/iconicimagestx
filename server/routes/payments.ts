@@ -11,7 +11,7 @@ import crypto from "crypto";
 import { requireCoordinator, requireAuth, type AuthenticatedRequest } from "../middleware/auth";
 import { appFirestore } from "../lib/appFirestore";
 import { sendEmail, type EmailDelivery } from "../services/email";
-import { buildPaymentReceipt } from "../services/paymentReceiptEmail";
+import { buildPaymentReceipt, receiptProcessing } from "../services/paymentReceiptEmail";
 import { ensureDotOptInLink } from "../services/doorsOpenTour";
 import { doorsOpenReceiptEmailHtml } from "../../shared/doorsOpenTour";
 import { clientNotifyLive } from "../../shared/clientNotify";
@@ -466,6 +466,16 @@ async function deliverPaymentReceipt(
   const html = rendered.html.includes("</body>")
     ? rendered.html.replace("</body>", `${doorsOpen}</body>`)
     : `${rendered.html}${doorsOpen}`;
+  const subtotal = Number(invoice.subtotal) || 0;
+  const promotions = Number(invoice.promoDiscount) || Number(invoice.promotions) || 0;
+  const fees = Number(invoice.fees) || 0;
+  const processingAmount = receiptProcessing({
+    invoice,
+    subtotal,
+    promotions,
+    fees,
+    totalPaid: amountPaid,
+  });
   const result = await sendEmail({
     to,
     template: "payment_receipt",
@@ -481,6 +491,15 @@ async function deliverPaymentReceipt(
         createdAt: invoice.createdAt,
       }),
       balance: money(balance),
+      processing: money(processingAmount),
+      subtotal: money(subtotal),
+      promotions: money(promotions),
+      fees: money(fees),
+      totalPaid: money(amountPaid),
+      paidAt: "",
+      galleryUrl: typeof invoice.galleryId === "string" && invoice.galleryId
+        ? publicClientUrl(`/gallery/${encodeURIComponent(invoice.galleryId)}`)
+        : "",
       dotOptInUrl: offer.url || "",
     },
   });
@@ -687,6 +706,7 @@ router.post("/send-invoice", requireCoordinator, async (req, res) => {
           createdAt: invoice.createdAt,
         }),
         amount: money(invoice.total),
+        processing: money(invoice.processing ?? 0),
         paymentUrl,
         dueDate: bookingDateLabel(invoice.dueDate, "Upon receipt"),
       },

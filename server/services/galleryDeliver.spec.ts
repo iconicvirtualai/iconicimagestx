@@ -248,4 +248,34 @@ describe("deliverGalleryToClient", () => {
     expect(guessHtml).not.toContain("/invoice/ordreq_");
     expect(guessHtml).not.toContain("Pay invoice");
   });
+
+  it("sends a saved gallery_delivery override and ignores an invalid one", async () => {
+    useEnv({
+      CLIENT_NOTIFY_LIVE: "true",
+      SMTP_USER: "smtp@example.com",
+      SMTP_PASS: "secret",
+    });
+    seed({ id: "inv-1", status: "sent", payToken: "tok-1" });
+    store.set("emailTemplates/gallery_delivery", {
+      subject: "Photos for {{address}}",
+      htmlBody: "<p>Custom gallery for {{clientName}} at {{address}}</p>",
+    });
+    await deliverGalleryToClient("gal-1", { actor: { uid: "staff-1" } });
+    const custom = sendMail.mock.calls[0]?.[0];
+    expect(custom?.subject).toBe("Photos for 123 Main St");
+    expect(custom?.html).toBe("<p>Custom gallery for Ada at 123 Main St</p>");
+    expect(custom?.text).toBeUndefined();
+
+    sendMail.mockClear();
+    seed({ id: "inv-1", status: "sent", payToken: "tok-1" });
+    store.set("emailTemplates/gallery_delivery", {
+      subject: "Old subject",
+      body: "Hi {clientName}",
+    });
+    await deliverGalleryToClient("gal-1", { actor: { uid: "staff-1" } });
+    const fallback = sendMail.mock.calls[0]?.[0];
+    expect(fallback?.subject).toBe("Your gallery is ready: 123 Main St");
+    expect(fallback?.html).toContain("View Gallery");
+    expect(fallback?.html).toContain("Pay invoice");
+  });
 });
