@@ -9,6 +9,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import ChatWidget from "@/components/ChatWidget";
 import { MoneyAmount } from "@/components/MoneyAmount";
 import { SmsConsentField } from "@/components/SmsConsentField";
+import { DoorsOpenTourCheckbox } from "@/components/DoorsOpenTour";
 import { BUSINESS_CONTACT } from "@shared/businessContact";
 import { db } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
@@ -200,6 +201,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     teaserSocialConsult: false,
     socialMarketingPermission: false,
     smsConsent: false,
+    dotOptIn: false,
     marketingDoing: "",
     resultsBothering: "",
     perfectBusiness: "",
@@ -1479,6 +1481,11 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                  onChange={(smsConsent) => updateFormData({ smsConsent })}
                />
 
+               <DoorsOpenTourCheckbox
+                 checked={formData.dotOptIn}
+                 onChange={(dotOptIn) => updateFormData({ dotOptIn })}
+               />
+
                {!isConsultationPath && (
                  <>
                    {/* Marketing Permission Toggle */}
@@ -1593,6 +1600,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
               premiumUpgrade: false,
               virtualStagingCredits: 0,
               smsConsent: false,
+              dotOptIn: false,
               socialMarketingPermission: false
             }));
           }}

@@ -14,6 +14,7 @@ import { attachBookingClient, createRequestedAppointment, sendFirebasePasswordEm
 import { ensureBookingListingForRequest } from "../services/bookingListing";
 import { clientNotifyBlockReason, clientNotifyLive, isNotifyTestAllowlisted } from "../../shared/clientNotify";
 import { lifeOfTheListingCareSelected } from "../../shared/lifeOfTheListingCare";
+import { dotOptInSelected } from "../../shared/doorsOpenTour";
 import { buildBookingInvoiceDraft, existingInvoiceId } from "../../shared/bookingInvoice";
 import { createPayToken } from "../../shared/invoicePay";
 import { processingEnabled } from "../../shared/invoiceProcessing";
@@ -193,6 +194,8 @@ router.post("/", async (req, res) => {
       investmentWilling: investmentWilling || null,
       // Draft add-on. Quote only — do not price it or mention it in client email/SMS.
       lifeOfTheListingCare: lifeOfTheListingCareSelected(lifeOfTheListingCare),
+      dotOptIn: dotOptInSelected(req.body.dotOptIn),
+      dotOptInToken: createPayToken(),
       status: "new",
       source: "booking_form",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -695,6 +698,10 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       notes: request.vibeNote || "",
       internalNotes: internalNotes || "",
       lifeOfTheListingCare: lifeOfTheListingCareSelected(request.lifeOfTheListingCare),
+      dotOptIn: dotOptInSelected(request.dotOptIn),
+      dotOptInToken: typeof request.dotOptInToken === "string" && request.dotOptInToken.trim()
+        ? request.dotOptInToken.trim()
+        : createPayToken(),
       confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -864,6 +871,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       clientId,
       galleryId: galleryRef.id,
       invoiceId,
+      dotOptInToken: orderData.dotOptInToken,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 

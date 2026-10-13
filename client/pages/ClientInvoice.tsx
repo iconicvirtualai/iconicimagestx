@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { invoiceFaceFromStored } from "@shared/invoiceFace";
 import { invoicePageInvoiceNumber } from "@shared/orderProjectInvoice";
 import { ICONIC_DOWNLOAD_LOCK } from "@shared/paymentAccess";
+import { DoorsOpenReceiptNote } from "@/components/DoorsOpenTour";
 
 function payQuery(token: string): string {
   if (!token) return "";
@@ -145,6 +146,7 @@ export default function ClientInvoice() {
                     <CheckCircle2 className="w-5 h-5" />
                     <p className="text-sm font-bold">Payment is recorded. Your downloads can be unlocked from the gallery link.</p>
                   </div>
+                  <DoorsOpenReceiptNote optInUrl={typeof invoice.dotOptInUrl === "string" ? invoice.dotOptInUrl : ""} />
                   {invoice.galleryId && (
                     <Button asChild className="w-full h-12 bg-black hover:bg-gray-900 text-white rounded-xl font-bold">
                       <Link to={`/gallery/${invoice.galleryId}`}>Open Gallery</Link>

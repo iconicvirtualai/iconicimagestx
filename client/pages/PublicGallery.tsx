@@ -8,6 +8,7 @@ import { addressText } from "@shared/addressText";
 import { isGuessableInvoiceId } from "@shared/invoicePayLink";
 import { ICONIC_DOWNLOAD_LOCK } from "@shared/paymentAccess";
 import { GalleryDownloadLockNotice } from "@/components/GalleryDownloadLock";
+import { DoorsOpenDeliveryNote } from "@/components/DoorsOpenTour";
 import { ClientGalleryBoard } from "@/components/gallery/ClientGalleryMedia";
 import type { ClientGalleryItem } from "@/components/gallery/clientGalleryMedia";
 
@@ -63,6 +64,9 @@ export function PublicGalleryView({
       </header>
 
       <main className="mx-auto min-w-0 max-w-6xl px-4 py-8">
+        <div className="mb-6">
+          <DoorsOpenDeliveryNote />
+        </div>
         {needsPayment && (
           <GalleryDownloadLockNotice
             title={gallery.lockTitle || ICONIC_DOWNLOAD_LOCK.title}

@@ -39,6 +39,7 @@ import {
   LIFE_OF_THE_LISTING_CARE_SUMMARY_LABEL,
 } from "@shared/lifeOfTheListingCare";
 import { filterAssignableStaff, qaStaffAssignmentError, recordAllowsQaStaff } from "@shared/qaStaff";
+import { DotOptInBadge } from "@/components/DoorsOpenTour";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtAddr(a: unknown): string {
@@ -425,6 +426,7 @@ export default function AdminOrderRequest() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${statusInfo.color}`}>{statusInfo.label}</span>
+              <DotOptInBadge value={order.dotOptIn} />
               {order.listingId && (
                 <button onClick={() => navigate(`/admin/listing/${order.listingId}`)} className="px-3 py-1 rounded-full bg-[#0d9488]/10 text-[#0d9488] text-[9px] font-black uppercase tracking-widest hover:bg-[#0d9488]/20">View Project →</button>
               )}

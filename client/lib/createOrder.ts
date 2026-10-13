@@ -7,6 +7,7 @@
 
 import { bookingDateLabel } from "@shared/clientHome";
 import { lifeOfTheListingCareSelected } from "@shared/lifeOfTheListingCare";
+import { dotOptInSelected } from "@shared/doorsOpenTour";
 import { orderAddressFromBooking } from "@shared/serviceLocation";
 
 export async function createOrder(formData: any) {
@@ -52,6 +53,7 @@ export async function createOrder(formData: any) {
     promoDiscount:          Number(formData.promoDiscount)  || 0,
     // Unpriced draft add-on. Kept off lineItems so it cannot change the total.
     lifeOfTheListingCare:   lifeOfTheListingCareSelected(formData.lifeOfTheListingCare),
+    dotOptIn:               dotOptInSelected(formData.dotOptIn),
   };
 
   console.log("POSTING ORDER TO /api/bookings:", payload);

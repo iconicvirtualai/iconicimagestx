@@ -9,7 +9,8 @@ import Stripe from "stripe";
 import admin from "firebase-admin";
 import crypto from "crypto";
 import { requireCoordinator, requireAuth, type AuthenticatedRequest } from "../middleware/auth";
-import { sendEmail } from "../services/email";
+import { builtinEmailHtml, sendEmail } from "../services/email";
+import { ensureDotOptInLink } from "../services/doorsOpenTour";
 import { clientNotifyLive } from "../../shared/clientNotify";
 import { addressText } from "../../shared/addressText";
 import { bookingDateLabel } from "../../shared/clientHome";
@@ -309,21 +310,36 @@ async function applySuccessfulPayment({
   });
 
   if (invoice.clientEmail) {
-    await sendEmail({
-      to: invoice.clientEmail,
-      template: "payment_receipt",
-      variables: {
-        clientName: invoice.clientName,
-        amount: money(amount),
-        invoiceNumber: receiptEmailNumber({
-          invoiceNumber: invoice.invoiceNumber,
-          id: invoiceId,
-          createdAt: invoice.createdAt,
-        }),
-        balance: money(newAmountDue),
-      },
-    }).catch(console.error);
+    await deliverPaymentReceipt(invoice, invoiceId, money(amount), money(newAmountDue)).catch(console.error);
   }
+}
+
+async function deliverPaymentReceipt(
+  invoice: Record<string, unknown>,
+  invoiceId: string,
+  amount: string,
+  balance: string,
+) {
+  const to = typeof invoice.clientEmail === "string" ? invoice.clientEmail : "";
+  if (!to) return;
+  const offer = await ensureDotOptInLink(invoice);
+  const variables: Record<string, string> = {
+    clientName: String(invoice.clientName || ""),
+    amount,
+    invoiceNumber: receiptEmailNumber({
+      invoiceNumber: invoice.invoiceNumber,
+      id: invoiceId,
+      createdAt: invoice.createdAt,
+    }),
+    balance,
+    dotOptInUrl: offer.url || "",
+  };
+  await sendEmail({
+    to,
+    template: "payment_receipt",
+    html: builtinEmailHtml("payment_receipt", variables),
+    variables,
+  });
 }
 
 function roundMoney(amount: number): number {
@@ -559,20 +575,12 @@ router.post("/send-receipt", requireCoordinator, async (req, res) => {
       return res.status(409).json({ error: "Invoice is not paid. Send the pay link instead." });
     }
 
-    await sendEmail({
-      to: invoice.clientEmail,
-      template: "payment_receipt",
-      variables: {
-        clientName: invoice.clientName,
-        amount: money(invoice.amountPaid || invoice.total),
-        invoiceNumber: receiptEmailNumber({
-          invoiceNumber: invoice.invoiceNumber,
-          id: invoiceDoc.id,
-          createdAt: invoice.createdAt,
-        }),
-        balance: money(amountStillDue(invoice)),
-      },
-    });
+    await deliverPaymentReceipt(
+      invoice,
+      invoiceDoc.id,
+      money(invoice.amountPaid || invoice.total),
+      money(amountStillDue(invoice)),
+    );
 
     return res.json({ success: true });
   } catch (err) {
@@ -599,6 +607,7 @@ router.get("/invoice/:id", async (req: Request, res: Response) => {
     if (view === "deny") return invoiceNotFound(res);
 
     const paid = invoiceAllowsDownload(invoice);
+    const doorsOpen = paid ? await ensureDotOptInLink(invoice) : null;
     const shared = {
       id: invoiceDoc.id,
       paid,
@@ -619,6 +628,10 @@ router.get("/invoice/:id", async (req: Request, res: Response) => {
       if (paid && typeof invoice.galleryId === "string" && invoice.galleryId.trim()) {
         body.galleryId = invoice.galleryId;
       }
+      if (doorsOpen) {
+        body.dotOptIn = doorsOpen.dotOptIn;
+        if (doorsOpen.url) body.dotOptInUrl = doorsOpen.url;
+      }
       return res.json(body);
     }
 
@@ -638,6 +651,12 @@ router.get("/invoice/:id", async (req: Request, res: Response) => {
         status: invoice.status,
       }) || "",
       canPayOnline: provider === "stripe" ? stripeReady() : squareReady(),
+      ...(doorsOpen
+        ? {
+            dotOptIn: doorsOpen.dotOptIn,
+            ...(doorsOpen.url ? { dotOptInUrl: doorsOpen.url } : {}),
+          }
+        : {}),
     });
   } catch (err) {
     console.error("[Payments] Invoice fetch error:", err);
