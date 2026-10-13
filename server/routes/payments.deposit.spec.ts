@@ -285,6 +285,48 @@ describe("deposit checkout", () => {
     expect(sent.quick_pay.price_money.amount).toBe(25000);
   });
 
+  it("charges the apprenticeship booking fee on the same Square deposit checkout", async () => {
+    seed("invoices", "inv-ap", {
+      status: "draft",
+      payToken: TOKEN,
+      invoiceNumber: "INV-2026-0003",
+      clientEmail: "ada@example.com",
+      clientName: "Ada",
+      total: 77.1,
+      amountDue: 77.1,
+      amountPaid: 0,
+      depositRequired: true,
+      depositAmount: 25,
+      depositPaid: 0,
+      orderId: "order-ap",
+      orderRequestId: "req-ap",
+      orderNumber: "#042",
+      source: "apprenticeship",
+    });
+    seed("orders", "order-ap", {
+      source: "apprenticeship",
+      total: 77.1,
+      balanceDue: 77.1,
+      orderNumber: "#042",
+    });
+    seed("orderRequests", "req-ap", { source: "apprenticeship", balanceDue: 77.1 });
+    const response = await fetch(`${baseUrl}/api/payments/invoice/inv-ap/deposit-checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ t: TOKEN }),
+    });
+    expect(response.status).toBe(200);
+    const squareCall = fetchMock.mock.calls.find((call) => String(call[0]).includes("squareup.com"));
+    const sent = JSON.parse(String(squareCall?.[1].body));
+    expect(sent.quick_pay.price_money.amount).toBe(2500);
+    expect(sent.quick_pay.name).toContain("booking fee");
+    expect(sent.quick_pay.name).toContain("#042");
+    expect(sent.checkout_options.redirect_url).toBe(
+      "https://deposit.test/apprenticeship?booking=received&order=%23042",
+    );
+    expect((store.collections.invoices.get("inv-ap") || {}).status).toBe("draft");
+  });
+
   it("returns the stored deposit link on a repeated click", async () => {
     const first = await fetch(`${baseUrl}/api/payments/invoice/inv-sl/deposit-checkout`, {
       method: "POST",
@@ -436,6 +478,42 @@ describe("Square webhook deposit payment", () => {
     expect((store.collections.orders.get("order-sl") || {}).balanceDue).toBe(128.5);
     expect((store.collections.orderRequests.get("req-sl") || {}).balanceDue).toBe(128.5);
     expect(store.collections.transactions?.get("square-pay-dep")?.squarePaymentId).toBe("pay-dep");
+  });
+
+  it("records an apprenticeship booking fee through the same deposit webhook", async () => {
+    seed("invoices", "inv-ap", {
+      status: "draft",
+      total: 77.1,
+      amountDue: 77.1,
+      amountPaid: 0,
+      depositRequired: true,
+      depositAmount: 25,
+      depositPaid: 0,
+      orderId: "order-ap",
+      orderRequestId: "req-ap",
+      orderNumber: "#042",
+      source: "apprenticeship",
+      squareDepositPaymentLinkId: "ap-link",
+      squareDepositOrderId: "ap-order",
+    });
+    seed("orders", "order-ap", { source: "apprenticeship", total: 77.1, balanceDue: 77.1 });
+    seed("orderRequests", "req-ap", { source: "apprenticeship", balanceDue: 77.1 });
+    const response = await depositWebhook({
+      id: "pay-ap",
+      status: "COMPLETED",
+      amount_money: { amount: 2500 },
+      payment_link_id: "ap-link",
+      order_id: "ap-order",
+      note: "invoiceId:inv-ap",
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ received: true, deposit: true });
+    const invoice = store.collections.invoices.get("inv-ap") || {};
+    expect(invoice.status).toBe("draft");
+    expect(invoice.depositPaid).toBe(25);
+    expect(invoice.amountDue).toBe(52.1);
+    expect((store.collections.orders.get("order-ap") || {}).balanceDue).toBe(52.1);
+    expect((store.collections.orderRequests.get("req-ap") || {}).balanceDue).toBe(52.1);
   });
 
   it("does not apply a stored deposit link twice or count it as payment in full", async () => {

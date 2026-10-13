@@ -203,6 +203,14 @@
       "destination": "/seo/book.html"
     },
     {
+      "source": "/apprenticeship",
+      "destination": "/seo/apprenticeship.html"
+    },
+    {
+      "source": "/apprenticeship/",
+      "destination": "/seo/apprenticeship.html"
+    },
+    {
       "source": "/senior-living",
       "destination": "/seo/senior-living.html"
     },

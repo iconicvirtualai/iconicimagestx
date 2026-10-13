@@ -29,6 +29,7 @@ import Studio105 from "./pages/Studio105";
 import Contact from "./pages/Contact";
 import Book from "./pages/Book";
 import SeniorLiving from "./pages/SeniorLiving";
+import Apprenticeship from "./pages/Apprenticeship";
 import Pricing from "./pages/Pricing";
 import AIPricingAssistant from "./pages/AIPricingAssistant";
 import Socials from "./pages/Socials";
@@ -124,6 +125,7 @@ const App = () => (
             <Route path="/contact" element={<Contact />} />
             <Route path="/book" element={<Book />} />
             <Route path="/senior-living" element={<SeniorLiving />} />
+            <Route path="/apprenticeship" element={<Apprenticeship />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/pricing/ai-assistant" element={<AIPricingAssistant />} />
             <Route path="/socials" element={<Socials />} />

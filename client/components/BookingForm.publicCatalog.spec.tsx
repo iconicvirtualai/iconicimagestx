@@ -54,6 +54,20 @@ describe("public booking catalog", () => {
     expect(apprentice).not.toContain("The Essentials");
   });
 
+  it("keeps apprentice package links selected", () => {
+    const twentyFive = renderBook("/book?package=apprentice-25");
+    expect(twentyFive).toContain("data-testid=\"apprentice-25\"");
+    expect(twentyFive).toContain("aria-pressed=\"true\"");
+    expect(twentyFive).toContain("20 Minute Appointment ONLY");
+    expect(twentyFive).toContain("apprenticeship-rules");
+    expect(twentyFive).toContain("We do not make additional trips.");
+
+    const fifty = renderBook("/book?package=apprentice-50");
+    expect(fifty).toContain("data-testid=\"apprentice-50\"");
+    expect(fifty).toContain("1 Hour Appointment ONLY");
+    expect(fifty).toContain("aria-pressed=\"true\"");
+  });
+
   it("omits an unpriced add-on from the public catalog response and keeps a priced one", () => {
     const catalog = packagesForStaffEditor([
       {

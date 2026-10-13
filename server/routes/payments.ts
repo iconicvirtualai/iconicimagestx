@@ -37,6 +37,7 @@ import { isTempAdminEnabled, liveServerEnv } from "../../shared/tempAdmin";
 import { payTokenMatches } from "../lib/payToken";
 import { resolveClientIdentity } from "../services/clientAccounts";
 import { matchSquarePaymentInvoice } from "../services/squarePaymentMatch";
+import { APPRENTICESHIP_ORDER_SOURCE, apprenticeshipBookingReturnPath } from "../../shared/apprenticeship";
 import { seniorDepositCheckoutLive, seniorLivingDepositReturnPath } from "../../shared/seniorLiving";
 
 const router = Router();
@@ -1032,7 +1033,8 @@ router.post("/invoice/:id/deposit-checkout", async (req: Request, res: Response)
     const orderId = typeof invoice.orderId === "string" ? invoice.orderId : "";
     const orderSnap = orderId ? await db().collection("orders").doc(orderId).get() : null;
     const order = orderSnap && orderSnap.exists ? orderSnap.data() || {} : null;
-    if (!order || order.source !== "senior-living") {
+    const orderSource = String(order?.source || "");
+    if (!order || (orderSource !== "senior-living" && orderSource !== APPRENTICESHIP_ORDER_SOURCE)) {
       return res.status(403).json({ error: "Deposits are only for senior living orders." });
     }
     const alreadyPaid = (Number(invoice.depositPaid) || 0) > 0 || Boolean(invoice.depositPaidAt);
@@ -1072,7 +1074,9 @@ router.post("/invoice/:id/deposit-checkout", async (req: Request, res: Response)
       body: JSON.stringify({
         idempotency_key: `${invoiceDoc.id}-deposit`,
         quick_pay: {
-          name: `Iconic Images deposit ${invoice.invoiceNumber || invoiceDoc.id}`,
+          name: orderSource === APPRENTICESHIP_ORDER_SOURCE
+            ? `Iconic Images booking fee ${orderNumber || invoice.invoiceNumber || invoiceDoc.id}`
+            : `Iconic Images deposit ${invoice.invoiceNumber || invoiceDoc.id}`,
           price_money: {
             amount: Math.round(depositAmount * 100),
             currency: "USD",
@@ -1080,7 +1084,11 @@ router.post("/invoice/:id/deposit-checkout", async (req: Request, res: Response)
           location_id: process.env.SQUARE_LOCATION_ID,
         },
         checkout_options: {
-          redirect_url: `${appUrl()}${seniorLivingDepositReturnPath(orderNumber)}`,
+          redirect_url: `${appUrl()}${
+            orderSource === APPRENTICESHIP_ORDER_SOURCE
+              ? apprenticeshipBookingReturnPath(orderNumber)
+              : seniorLivingDepositReturnPath(orderNumber)
+          }`,
         },
         pre_populated_data: {
           buyer_email: invoice.clientEmail || undefined,

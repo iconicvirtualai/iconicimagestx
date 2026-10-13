@@ -43,6 +43,7 @@ describe("public page meta", () => {
       "/contact",
       "/socials",
       "/book",
+      "/apprenticeship",
       "/senior-living",
       "/privacy",
       "/terms",
