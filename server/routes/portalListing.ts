@@ -21,6 +21,7 @@ import {
   type PortalMediaChange,
   type PortalMediaKind,
 } from "../../shared/portalListingDetail";
+import { listingSiteSlug } from "../../shared/listingSite";
 import { invoiceRedirectTarget, legacyInvoiceDocIds } from "../../shared/invoicePay";
 import { jsonSafe } from "../lib/firestoreJson";
 import { resolveClientIdentity } from "../services/clientAccounts";
@@ -174,7 +175,7 @@ function mediaChange(body: unknown): PortalMediaChange | null {
   return null;
 }
 
-async function appendPortalWrite(listingId: string, patch: { portalMedia?: unknown; portalWebsite?: unknown; portalData?: unknown; activity: { id: string; at: string; kind: string; summary: string } }) {
+async function appendPortalWrite(listingId: string, patch: { portalMedia?: unknown; portalWebsite?: unknown; portalData?: unknown; listingSiteSlug?: string; activity: { id: string; at: string; kind: string; summary: string } }) {
   const ref = db().collection("listings").doc(listingId);
   await db().runTransaction(async (tx) => {
     const snap = await tx.get(ref);
@@ -188,6 +189,7 @@ async function appendPortalWrite(listingId: string, patch: { portalMedia?: unkno
     if (patch.portalMedia) update.portalMedia = patch.portalMedia;
     if (patch.portalWebsite) update.portalWebsite = patch.portalWebsite;
     if (patch.portalData) update.portalData = patch.portalData;
+    if (patch.listingSiteSlug) update.listingSiteSlug = patch.listingSiteSlug;
     tx.update(ref, update);
   });
 }
@@ -254,7 +256,12 @@ export const handlePatchPortalData: RequestHandler = async (req: AuthenticatedRe
     const write = portalListingFactsWrite(detail, req.body, new Date().toISOString());
     if (write.ok === false) return res.status(400).json({ error: write.error });
     if (write.changed) {
-      await appendPortalWrite(listingId, { portalData: write.portalData, activity: write.activity });
+      const addressed = buildPortalListingDetail({ listing: { ...listing, portalData: write.portalData } });
+      await appendPortalWrite(listingId, {
+        portalData: write.portalData,
+        listingSiteSlug: listingSiteSlug({ line1: addressed.address.line1, city: addressed.address.city }),
+        activity: write.activity,
+      });
     }
     const refreshed = await authorizedListing(req, listingId);
     return res.json(buildPortalListingDetail(await loadSources(listingId, refreshed)));
@@ -304,8 +311,10 @@ export const handlePatchPortalWebsite: RequestHandler = async (req: Authenticate
     const next = sanitizeWebsiteSettings(req.body, current);
     const changed = JSON.stringify(next) !== JSON.stringify(current);
     if (changed) {
+      const detail = buildPortalListingDetail({ listing });
       await appendPortalWrite(listingId, {
         portalWebsite: next,
+        listingSiteSlug: listingSiteSlug({ line1: detail.address.line1, city: detail.address.city }),
         activity: {
           id: `portal-website-${new Date().toISOString()}`,
           at: new Date().toISOString(),

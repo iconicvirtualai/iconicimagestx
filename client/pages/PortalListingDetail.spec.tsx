@@ -200,6 +200,12 @@ describe("portal listing detail page", () => {
     expect(orders).not.toContain("Pay now");
     expect(render("activity")).toContain("Booking request received");
     expect(render("website")).toContain("Save site style");
+    expect(render("website")).toContain("View site");
+    expect(render("website")).toContain("/l/18-oak-hollow-spring");
+    expect(render("website")).toContain("Index");
+    expect(render("website")).toContain("Two-Up");
+    expect(render("website")).toContain("Premiere");
+    expect(render("website")).not.toContain("not generated");
   });
 
   it("gives a visitor the listing without edit, hide, site save, or a pay action", () => {

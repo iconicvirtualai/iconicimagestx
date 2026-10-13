@@ -103,6 +103,14 @@
       "destination": "/api/index"
     },
     {
+      "source": "/l/:slug",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/l/:slug/",
+      "destination": "/api/index"
+    },
+    {
       "source": "/admin/owners",
       "destination": "/api/index"
     },
@@ -331,6 +339,14 @@
       "destination": "/seo/app.html"
     },
     {
+      "source": "/dev/invoice-template",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/dev/invoice-template/",
+      "destination": "/seo/app.html"
+    },
+    {
       "source": "/studio/:listingId",
       "destination": "/seo/private.html"
     },
@@ -482,6 +498,24 @@
     },
     {
       "source": "/podcast-guest-prep/",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/dev/invoice-template",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/dev/invoice-template/",
       "headers": [
         {
           "key": "X-Robots-Tag",

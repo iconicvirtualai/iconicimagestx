@@ -37,8 +37,10 @@ import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import ClientStudio from "./pages/ClientStudio";
 import ClientInvoice from "./pages/ClientInvoice";
+import InvoiceTemplatePreview from "./pages/InvoiceTemplatePreview";
 import PublicGallery from "./pages/PublicGallery";
 import ListingPresentation from "./pages/ListingPresentation";
+import ListingSite from "./pages/ListingSite";
 import VirtualStaging from "./pages/VirtualStaging";
 import StockFootage from "./pages/StockFootage";
 import VirtualStagingSelection from "./pages/VirtualStagingSelection";
@@ -143,7 +145,9 @@ const App = () => (
             <Route path="/studio/:listingId" element={<ClientStudio />} />
             <Route path="/gallery/:galleryId" element={<PublicGallery />} />
             <Route path="/present/:token" element={<ListingPresentation />} />
+            <Route path="/l/:slug" element={<ListingSite />} />
             <Route path="/invoice/:invoiceId" element={<ClientInvoice />} />
+            <Route path="/dev/invoice-template" element={<InvoiceTemplatePreview />} />
             <Route path="/services/virtual-staging" element={<VirtualStaging />} />
             <Route path="/services/virtual-staging/select" element={<VirtualStagingSelection />} />
             <Route path="/services/virtual-staging/ai-tool" element={<VirtualStagingAITool />} />

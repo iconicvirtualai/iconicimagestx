@@ -34,6 +34,7 @@ const APP_SHELL_SOURCES = [
   "/services/virtual-staging/ai-tool",
   "/services/virtual-staging/pro-order",
   "/services/virtual-staging/checkout",
+  "/dev/invoice-template",
 ];
 
 /** Stays in APP_SHELL_SOURCES so rewrite order does not move. Served noindex. */
@@ -53,6 +54,7 @@ const RESERVED: Rewrite[] = [
   // Vercel does not chain rewrites. /present/:token arrives at the API
   // function on its original path, and that rule stays ahead of the SEO shells.
   { source: "/present/:token", destination: "/api/index" },
+  { source: "/l/:slug", destination: "/api/index" },
   { source: "/admin/owners", destination: "/api/index" },
   { source: "/owners", destination: "/api/index" },
   { source: "/podcast-guest-prep", destination: "/podcast-guest-prep.html" },
@@ -115,6 +117,8 @@ export const NOINDEX_HEADER_SOURCES = [
   "/invoice/(.*)",
   "/podcast-guest-prep",
   "/podcast-guest-prep/",
+  "/dev/invoice-template",
+  "/dev/invoice-template/",
 ];
 
 export function buildVercelHeaders(): HeaderRule[] {

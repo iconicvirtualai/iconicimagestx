@@ -8,7 +8,6 @@ import { Router } from "express";
 import admin from "firebase-admin";
 import { requireCoordinator, type AuthenticatedRequest } from "../middleware/auth";
 import { clientOrderConfirmedSubject, sendEmail } from "../services/email";
-import { processingEnabled } from "../../shared/invoiceProcessing";
 import { sendSMS, SMS_TEMPLATES } from "../services/sms";
 import { createCalendarBookingEvent } from "../services/calendar";
 import { attachBookingClient, createRequestedAppointment, sendFirebasePasswordEmail } from "../services/bookingClient";
@@ -17,6 +16,7 @@ import { clientNotifyBlockReason, clientNotifyLive, isNotifyTestAllowlisted } fr
 import { lifeOfTheListingCareSelected } from "../../shared/lifeOfTheListingCare";
 import { buildBookingInvoiceDraft, existingInvoiceId } from "../../shared/bookingInvoice";
 import { createPayToken } from "../../shared/invoicePay";
+import { processingEnabled } from "../../shared/invoiceProcessing";
 import { nextSequentialInvoiceNumber, planInvoiceLink } from "../../shared/orderProjectInvoice";
 import { clientInvoiceUrl } from "../../shared/invoicePayLink";
 import { publicClientUrl } from "../../shared/publicSiteUrl";
@@ -30,6 +30,7 @@ import { addressText } from "../../shared/addressText";
 import { bookingDateLabel } from "../../shared/clientHome";
 import { storedServiceLocationFields } from "../../shared/serviceLocation";
 import { buildAdminOrderTile } from "../../shared/adminOrderTile";
+import { formatOrderNumber } from "../../shared/orderNumber";
 import { refuseQaStaffAssignment } from "../services/qaStaffAssign";
 
 const router = Router();
@@ -124,12 +125,25 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: "No services selected." });
     }
     const traveled = applyServerTravel(keptLines, savedAddress);
-    const lineItems = traveled.lineItems;
-    const total = traveled.total;
     const travel = traveled.travel;
     const promoCode = resolved.promoCode;
     const promoDiscount = resolved.promoDiscount;
-    const pricing = { subtotal: total, tax: 0, total };
+    // New bookings store 2.8% once. The kill switch is server-only.
+    // Legacy invoices are not updated here.
+    const sale = buildBookingInvoiceDraft({
+      lineItems: traveled.lineItems,
+      total: traveled.total,
+      pricing: { subtotal: traveled.total, tax: 0 },
+      clientEmail: email,
+      clientName,
+      promoCode,
+      promoDiscount,
+      travel,
+      applyProcessing: processingEnabled(),
+    });
+    const lineItems = sale.lineItems;
+    const total = sale.total;
+    const pricing = { subtotal: sale.subtotal, tax: sale.tax, total: sale.total };
     const selectedService = resolved.selectedService;
     const selectedBasics = resolved.selectedBasics;
     const selectedAddOns = resolved.selectedAddOns;
@@ -151,6 +165,8 @@ router.post("/", async (req, res) => {
       vibeNote: vibeNote || "",
       promoCode: promoCode || null,
       promoDiscount: Number(promoDiscount) || 0,
+      processing: sale.processing ?? 0,
+      processingPolicy: sale.processingPolicy ?? (processingEnabled() ? "included" : "waived"),
       travelZone: travel.travelZone,
       travelMiles: travel.travelMiles,
       travelFeeCents: travel.travelFeeCents,
@@ -200,6 +216,8 @@ router.post("/", async (req, res) => {
         address: savedAddress,
       });
       orderNumber = tile.orderCode;
+      // Short sequential code (#003, #004, …) from an atomic Firestore counter.
+      orderNumber = await nextOrderNumber();
       packageName = tile.packageName === "Custom order" ? "" : tile.packageName;
     } catch (err) {
       console.error("[Bookings] Order number format failed:", err);
@@ -254,7 +272,7 @@ router.post("/", async (req, res) => {
           addressLabel: displayAddress,
           scheduledDate: typeof scheduledDate === "string" ? scheduledDate : null,
           scheduledTime: typeof scheduledTime === "string" ? scheduledTime : null,
-          services: lineItems,
+          services: traveled.lineItems,
           notes: typeof vibeNote === "string" ? vibeNote : "",
         });
       } catch (err) {
@@ -275,6 +293,7 @@ router.post("/", async (req, res) => {
         promoDiscount,
         travel,
         clientId: account.clientId,
+        prepared: sale,
       });
       invoiceId = created.invoiceId;
       try {
@@ -315,7 +334,7 @@ router.post("/", async (req, res) => {
     clientEmailStatus = await sendEmail({
       to: email,
       template: "booking_received",
-      subject: clientOrderConfirmedSubject(displayAddress),
+      subject: clientOrderConfirmedSubject(displayAddress, orderNumber),
       variables: {
         clientName,
         address: displayAddress,
@@ -815,6 +834,9 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
         promoCode: request.promoCode,
         promoDiscount: request.promoDiscount,
         travel,
+        // A request quoted with processing already has the fee on its lines.
+        // Older requests have no policy, so confirming them does not add one.
+        applyProcessing: request.processingPolicy === "included",
       });
       await invoiceRef.set({
         ...draft,
@@ -978,20 +1000,23 @@ async function createBookingInvoiceDraft(input: {
   promoDiscount?: unknown;
   travel?: TravelAssessment | null;
   clientId?: string | null;
+  prepared?: ReturnType<typeof buildBookingInvoiceDraft> | null;
 }): Promise<{ invoiceId: string; clientId: string | null }> {
   const clientId = input.clientId || await linkClientIdByEmail(input.email);
-  const draft = buildBookingInvoiceDraft({
-    lineItems: input.lineItems,
-    total: input.total,
-    pricing: input.pricing,
-    clientEmail: input.email,
-    clientId,
-    clientName: input.clientName,
-    orderRequestId: input.orderRequestId,
-    promoCode: input.promoCode,
-    promoDiscount: input.promoDiscount,
-    travel: input.travel,
-  });
+  const draft = input.prepared
+    ? { ...input.prepared, orderRequestId: input.orderRequestId, clientId: clientId || input.prepared.clientId }
+    : buildBookingInvoiceDraft({
+      lineItems: input.lineItems,
+      total: input.total,
+      pricing: input.pricing,
+      clientEmail: input.email,
+      clientId,
+      clientName: input.clientName,
+      orderRequestId: input.orderRequestId,
+      promoCode: input.promoCode,
+      promoDiscount: input.promoDiscount,
+      travel: input.travel,
+    });
   const invoiceRef = db().collection("invoices").doc();
   const payToken = createPayToken();
   const paymentUrl = clientInvoiceUrl({ id: invoiceRef.id, status: "draft", payToken });
@@ -1029,3 +1054,27 @@ async function generateInvoiceNumber(): Promise<string> {
 }
 
 export default router;
+
+/**
+ * Atomically issue the next order number. The counter lives at
+ * counters/orderNumbers {last}. If it does not exist yet it is seeded from the
+ * current orderRequests count, so the first number issued never collides with
+ * an existing order. Existing orders keep their stored codes.
+ */
+async function nextOrderNumber(): Promise<string> {
+  const ref = db().collection("counters").doc("orderNumbers");
+  let seed = 0;
+  const snap = await ref.get();
+  if (!snap.exists) {
+    const agg = await db().collection("orderRequests").count().get();
+    seed = agg.data().count;
+  }
+  const n = await db().runTransaction(async (tx) => {
+    const cur = await tx.get(ref);
+    const last = cur.exists ? Number(cur.data()?.last) || 0 : seed;
+    const next = last + 1;
+    tx.set(ref, { last: next, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    return next;
+  });
+  return formatOrderNumber(n);
+}

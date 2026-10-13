@@ -1,9 +1,12 @@
 /**
  * Square invoice sync for a Firestore invoice that already exists.
- * Charge cents are copied from the invoice total. This module never
- * changes that total. Invoices use delivery_method SHARE_MANUALLY so
- * Square does not email the buyer. Publish still notifies the seller,
- * so booking and confirm must not call this. Call it only after the shoot.
+ * Display mode copies charge cents from the invoice total and does not
+ * change that total. New invoices already store the 2.8% processing fee.
+ * This module does not add another one, and it does not rewrite legacy totals.
+ * This module does not write the invoice total. Invoices use
+ * delivery_method SHARE_MANUALLY so Square does not email the buyer.
+ * Publish still notifies the seller, so booking and confirm must not call
+ * this. Call it only after the shoot.
  */
 
 import { normalizeBookingLineItems } from "./bookingPricing.ts";
@@ -26,6 +29,8 @@ export interface SquareInvoiceSource {
   invoiceNumber?: unknown;
   lineItems?: unknown;
   total?: unknown;
+  subtotal?: unknown;
+  processing?: unknown;
   paymentProvider?: unknown;
   squareInvoiceId?: unknown;
 }
@@ -275,7 +280,7 @@ export async function syncSquareInvoice(invoice: SquareInvoiceSource, deps: Squa
     if (String(invoice.paymentProvider || "").toLowerCase() === "stripe") {
       return { ok: true, skipped: true, reason: "stripe" };
     }
-    const total = Number(invoice.total) || 0;
+    const total = Math.round((Number(invoice.total) || 0) * 100) / 100;
     if (total <= 0) return { ok: true, skipped: true, reason: "nothing-due" };
     if (!squareConfigured(deps.env)) return { ok: true, skipped: true, reason: "not-configured" };
 

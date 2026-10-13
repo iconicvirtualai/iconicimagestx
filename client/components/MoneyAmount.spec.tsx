@@ -60,10 +60,10 @@ describe("money amount layout", () => {
       <InvoiceLineTable lines={face.services} />,
     );
     const summary = renderToStaticMarkup(<InvoiceFaceSummary face={face} />);
-    expect(lines).toContain("$75.00");
+    expect(lines).toContain("$ 75");
     expect(lines).toContain('data-slot="money"');
     expect(lines).toContain("whitespace-nowrap");
-    expect(summary).toContain("$75.00");
+    expect(summary).toContain("$ 75");
     expect(summary.match(/data-slot="money"/g)?.length).toBeGreaterThan(1);
   });
 
