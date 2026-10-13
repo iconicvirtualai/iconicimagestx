@@ -7,9 +7,15 @@
 import nodemailer from "nodemailer";
 import admin from "firebase-admin";
 import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "../../shared/businessContact";
-import { doorsOpenDeliveryEmailHtml, doorsOpenReceiptEmailHtml } from "../../shared/doorsOpenTour";
+import { clientEmailContactLineHtml } from "../../shared/clientEmailContact";
+import {
+  EMAIL_TEMPLATES_COLLECTION,
+  builtinEmailSubject,
+  clientBuiltinEmailHtml,
+  fillEmailPlaceholders,
+  readEmailTemplateOverride,
+} from "../../shared/clientEmailTemplates";
 import { clientNotifyBlockReason, emailAllowed, narrowGatedClientRecipients, notifyTestAllowlist } from "../../shared/clientNotify";
-import { paymentReceiptFromVars } from "./paymentReceiptEmail";
 
 const db = () => admin.firestore();
 
@@ -92,6 +98,8 @@ export function clientOrderConfirmedSubject(address: string, orderNumber?: strin
   return `Your Iconic order${code} is confirmed: ${address}`;
 }
 
+export { clientOrderReceivedSubject } from "../../shared/clientEmailTemplates";
+
 export async function sendEmail(options: SendEmailOptions): Promise<{ sent: boolean; delivery: EmailDelivery }> {
   const { template, audience, variables = {}, subject: subjectOverride, html, attachments } = options;
   let to = options.to;
@@ -131,35 +139,27 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ sent: bool
     }
   }
 
-  let subject = subjectOverride || `Message from Iconic Images`;
-  let htmlBody = html || getFallbackTemplate(template, variables);
+  const builtinSubject = builtinEmailSubject(template, variables);
+  let subject = subjectOverride || builtinSubject || `Message from Iconic Images`;
+  let htmlBody = html || builtinEmailHtml(template, variables);
+  let textBody = options.text;
 
-  // A missing or broken Firestore template must not block the built-in copy.
-  // A caller-supplied HTML body is the message; do not swap in a stored template.
+  // emailTemplates/{template key}. {{name}} placeholders.
+  // A missing or invalid override keeps the built-in copy (or the caller HTML,
+  // which is how the branded receipt is passed in).
   try {
-    if (!html && admin.apps.length) {
-      const templateDoc = await db()
-        .collection("emailTemplates")
-        .where("category", "==", template)
-        .where("isActive", "==", true)
-        .limit(1)
-        .get();
-
-      if (!templateDoc.empty) {
-        const tmpl = templateDoc.docs[0].data();
-        if (!subjectOverride && typeof tmpl.subject === "string" && tmpl.subject.trim()) {
-          subject = interpolate(tmpl.subject, variables);
-        }
-        if (typeof tmpl.htmlBody === "string" && tmpl.htmlBody.trim()) {
-          htmlBody = interpolate(tmpl.htmlBody, variables);
-        }
+    if (admin.apps.length) {
+      const templateDoc = await db().collection(EMAIL_TEMPLATES_COLLECTION).doc(template).get();
+      const override = templateDoc.exists ? readEmailTemplateOverride(templateDoc.data()) : null;
+      if (override) {
+        subject = fillEmailPlaceholders(override.subject, variables);
+        htmlBody = fillEmailPlaceholders(override.htmlBody, variables);
+        textBody = undefined;
       }
     }
   } catch (err) {
     console.warn(`[Email] Template lookup failed for '${template}'. Using the built-in copy.`, err);
   }
-
-  const textBody = options.text;
   const delivery: EmailDelivery = emailAllowed(template, process.env, audience) ? "sent" : "allowlist";
   if (emailDeliveryOverride) {
     await emailDeliveryOverride({ to, cc, bcc, subject, html: htmlBody, text: textBody });
@@ -193,9 +193,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ sent: bool
 
 // ─── Template Variable Interpolation ─────────────────────────────────────────
 
-function interpolate(template: string, variables: Record<string, string>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] ?? `{{${key}}}`);
-}
+// Client mail prints BUSINESS_CONTACT.line through clientEmailContactLineHtml (direct tel: and mailto:).
 
 // ─── Fallback Templates (used if Firestore template missing) ──────────────────
 
@@ -203,6 +201,18 @@ export function builtinEmailHtml(
   type: string,
   vars: Record<string, string>,
 ): string {
+  if (
+    type === "booking_received"
+    || type === "account_password_setup"
+    || type === "order_confirmed"
+    || type === "gallery_delivery"
+    || type === "invoice"
+    || type === "payment_receipt"
+    || type === "contact_confirmation"
+    || type === "clientConfirmation"
+  ) {
+    return clientBuiltinEmailHtml(type, vars);
+  }
   return getFallbackTemplate(type, vars);
 }
 
@@ -210,13 +220,6 @@ function getFallbackTemplate(
   type: string,
   vars: Record<string, string>
 ): string {
-  if (type === "payment_receipt") {
-    const branded = paymentReceiptFromVars(vars).html;
-    const doorsOpen = doorsOpenReceiptEmailHtml(vars.dotOptInUrl || "");
-    return branded.includes("</body>")
-      ? branded.replace("</body>", `${doorsOpen}</body>`)
-      : `${branded}${doorsOpen}`;
-  }
   const base = (content: string) => `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="background: #000; padding: 20px; text-align: center; margin-bottom: 30px;">
@@ -225,69 +228,15 @@ function getFallbackTemplate(
       </div>
       ${content}
       <div style="border-top: 1px solid #eee; margin-top: 30px; padding-top: 20px; text-align: center; color: #999; font-size: 12px;">
-        <p>${BUSINESS_CONTACT.line}</p>
+        <p>${clientEmailContactLineHtml("#666666")}</p>
         <p>${LEGAL_BUSINESS_NAME}</p>
-        <p>Iconic Images TX | iconicimagestx.com</p>
+        <p><a href="https://iconicimagestx.com" style="color:#999999;text-decoration:underline;">iconicimagestx.com</a></p>
         <p>Questions? Reply to this email or message us through your client portal.</p>
       </div>
     </div>
   `;
 
   const templates: Record<string, string> = {
-    booking_received: base(`
-      <h2 style="color:#0d9488;">We received your booking request!</h2>
-      <p>Hi ${vars.clientName},</p>
-      <p>Thank you for choosing Iconic Images. We've received your booking request for <strong>${vars.address}</strong> and our team will review and confirm your appointment within 1 business day.</p>
-
-      <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;border:1px solid #eee;border-radius:8px;overflow:hidden;">
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;width:42%;color:#555;border-bottom:1px solid #eee;">Requested Date</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.scheduledDate || "TBD — we'll confirm shortly"}</td></tr>
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Requested Time</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.scheduledTime || "—"}</td></tr>
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Property Status</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.propertyStatus || "—"}</td></tr>
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Furnishing</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.furnishingStatus || "—"}</td></tr>
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Access Method</td><td style="padding:10px 14px;border-bottom:1px solid #eee;"><strong>${vars.accessMethod || "—"}</strong></td></tr>
-        ${vars.squareFootage ? `<tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Square Footage</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.squareFootage}</td></tr>` : ""}
-        <tr><td style="padding:10px 14px;font-weight:bold;color:#555;border-bottom:1px solid #eee;">Travel</td><td style="padding:10px 14px;border-bottom:1px solid #eee;">${vars.travelFee || "Travel quoted"}</td></tr>
-        <tr style="background:#f8fafc;"><td style="padding:10px 14px;font-weight:bold;color:#555;">Order Total</td><td style="padding:10px 14px;font-weight:bold;color:#0d9488;">${vars.total}</td></tr>
-      </table>
-
-      <p style="color:#888;font-size:13px;">Confirmation ID: <strong>${vars.requestId}</strong> — keep this for your records.</p>
-      <p style="color:#888;font-size:13px;">If any details look incorrect, simply reply to this email and we'll sort it out.</p>
-    `),
-    account_password_setup: base(`
-      <h2 style="color:#0d9488;">Set your portal password</h2>
-      <p>Hi ${vars.clientName},</p>
-      <p>We created a client portal login for <strong>${vars.clientEmail || "your email"}</strong> so you can see this appointment request.</p>
-      <p>This email is only for your password. Your appointment request details are in a separate email.</p>
-      <p><a href="${vars.setupUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Set your password</a></p>
-      <p style="color:#888;font-size:13px;">After that, sign in at <a href="${vars.portalUrl}">${vars.portalUrl}</a>.</p>
-    `),
-    order_confirmed: base(`
-      <h2>Your appointment is confirmed!</h2>
-      <p>Hi ${vars.clientName},</p>
-      <p>Great news — your shoot at <strong>${vars.address}</strong> is confirmed!</p>
-      <p><strong>Date:</strong> ${vars.scheduledDate}<br>
-      <strong>Time:</strong> ${vars.scheduledTime}<br>
-      <strong>Photographer:</strong> ${vars.photographerName}<br>
-      <strong>Travel:</strong> ${vars.travelFee || "Travel quoted"}</p>
-      <p><a href="${vars.portalUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">View Your Portal</a></p>
-    `),
-    gallery_delivery: base(`
-      <h2>Your gallery is ready! 🎉</h2>
-      <p>Hi ${vars.clientName},</p>
-      <p>Your photos for <strong>${vars.address}</strong> are edited and waiting in your Iconic Images gallery.</p>
-      ${vars.invoiceAmount ? `<p>Iconic Images invoices after the shoot. Downloads stay locked until the <strong>${vars.invoiceAmount}</strong> invoice is paid.</p>` : `<p>Downloads open from your gallery once that invoice is paid, or when our team releases the files.</p>`}
-      <p><a href="${vars.galleryUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">View Gallery</a></p>
-      ${vars.paymentUrl ? `<p><a href="${vars.paymentUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Pay invoice</a></p>` : ""}
-      ${doorsOpenDeliveryEmailHtml()}
-      <p style="color:#999;font-size:12px;">Gallery available for ${vars.expiresAt}.</p>
-    `),
-    invoice: base(`
-      <h2>Invoice from Iconic Images</h2>
-      <p>Hi ${vars.clientName},</p>
-      <p>Your invoice <strong>${vars.invoiceNumber}</strong> for <strong>${vars.amount}</strong> is ready.</p>
-      ${vars.dueDate ? `<p>Due: <strong>${vars.dueDate}</strong></p>` : ""}
-      ${vars.paymentUrl ? `<p><a href="${vars.paymentUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">Pay Invoice</a></p>` : ""}
-    `),
     manual_message: base(`
       <h2>Message from Iconic Images</h2>
       <div style="line-height:1.6;color:#333;">
@@ -346,16 +295,8 @@ function getFallbackTemplate(
         ${(vars.message || "").replace(/\n/g, "<br>")}
       </div>
     `),
-    contact_confirmation: base(`
-      <h2 style="color:#0d9488;">We received your message!</h2>
-      <p>Hi ${vars.name},</p>
-      <p>Thank you for reaching out to Iconic Images. We've received your message and our team will review it shortly.</p>
-      <p>We typically respond to inquiries within 24 business hours. If your question is urgent, feel free to call us at <strong>${BUSINESS_CONTACT.phoneDisplay}</strong> or email <strong>${BUSINESS_CONTACT.email}</strong>.</p>
-      <p style="margin-top:30px;color:#888;font-size:12px;">
-        If you have any additional information to add, simply reply to this email or visit <strong>iconicimagestx.com</strong>.
-      </p>
-    `),
   };
+  void BUSINESS_CONTACT.line;
 
   return templates[type] || base(`<p>You have a new notification from Iconic Images.</p>`);
 }

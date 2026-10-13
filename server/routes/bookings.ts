@@ -7,7 +7,7 @@
 import { Router } from "express";
 import admin from "firebase-admin";
 import { requireCoordinator, type AuthenticatedRequest } from "../middleware/auth";
-import { clientOrderConfirmedSubject, sendEmail } from "../services/email";
+import { clientOrderReceivedSubject, sendEmail } from "../services/email";
 import { sendSMS, SMS_TEMPLATES } from "../services/sms";
 import { createCalendarBookingEvent } from "../services/calendar";
 import { attachBookingClient, createRequestedAppointment, sendFirebasePasswordEmail } from "../services/bookingClient";
@@ -337,10 +337,12 @@ router.post("/", async (req, res) => {
     clientEmailStatus = await sendEmail({
       to: email,
       template: "booking_received",
-      subject: clientOrderConfirmedSubject(displayAddress, orderNumber),
+      subject: clientOrderReceivedSubject(displayAddress, orderNumber),
       variables: {
         clientName,
         address: displayAddress,
+        orderNumber,
+        processing: money(sale.processing ?? 0),
         total: money(total),
         requestId: docRef.id,
         scheduledDate: bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
@@ -670,6 +672,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       clientName: requestClientName,
       clientEmail: requestEmail,
       clientPhone: requestPhone,
+      orderNumber: typeof request.orderNumber === "string" ? request.orderNumber : "",
       address: requestAddress,
       addressLabel: requestAddressLabel,
       ...storedPin,
@@ -900,6 +903,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       variables: {
         clientName: requestClientName,
         address: requestAddressLabel,
+        orderNumber: typeof request.orderNumber === "string" ? request.orderNumber : "",
         scheduledDate: bookingDateLabel(confirmSource, "To be confirmed"),
         scheduledTime: confirmTime || "To be confirmed",
         photographerName: assignedPhotographerName || "Our team",
