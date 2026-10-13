@@ -5,6 +5,7 @@
  */
 
 import admin from "firebase-admin";
+import { appFirestore } from "../lib/appFirestore";
 import { createPayToken } from "../../shared/invoicePay";
 import { dotOptInPath, dotOptInSelected } from "../../shared/doorsOpenTour";
 import { publicClientUrl } from "../../shared/publicSiteUrl";
@@ -15,7 +16,7 @@ function textId(value: unknown): string {
 
 async function readDoc(collection: string, id: string) {
   if (!id) return null;
-  const snap = await admin.firestore().collection(collection).doc(id).get();
+  const snap = await appFirestore().collection(collection).doc(id).get();
   if (!snap.exists) return null;
   return { id: snap.id, ref: snap.ref, data: (snap.data() || {}) as Record<string, unknown> };
 }
@@ -38,7 +39,7 @@ export async function applyDotOptIn(token: string): Promise<"ok" | "missing"> {
   const trimmed = token.trim();
   if (trimmed.length < 20 || trimmed.length > 200) return "missing";
 
-  const db = admin.firestore();
+  const db = appFirestore();
   const [orders, requests] = await Promise.all([
     db.collection("orders").where("dotOptInToken", "==", trimmed).limit(5).get(),
     db.collection("orderRequests").where("dotOptInToken", "==", trimmed).limit(5).get(),

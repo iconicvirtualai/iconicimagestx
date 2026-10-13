@@ -4,33 +4,22 @@
  * TOTAL PAID is the amount collected. A legacy or comped invoice that was
  * not charged the fee shows PROCESSING $0.00.
  *
- * TODO: import processingFee from #132 shared/invoiceProcessing.ts once that
- * branch merges. Pass base = subtotal - promotions + fees. The math below
- * matches that helper: half-up cents of baseCents * 0.028.
+ * Processing uses the shared half-up helper: base = subtotal - promotions + fees.
  */
 
 import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "../../shared/businessContact";
+import { processingFee } from "../../shared/invoiceProcessing";
 import { receiptEmailNumber } from "../../shared/orderProjectInvoice";
 import { publicClientUrl, type PublicSiteEnv } from "../../shared/publicSiteUrl";
 import { presentationLinkForReceipt, type ReceiptListingRef } from "./clientLinks";
+
+export { processingFee };
 
 const FONT = "Arial, Helvetica, sans-serif";
 const YELLOW = "#FFE500";
 const TEAL = "#14B8C4";
 const GREEN = "#16A34A";
 const ROW = "#F3F4F6";
-
-/**
- * 2.8% of the sale base, half-up to the nearest cent.
- * base = subtotal - promotions + fees. Zero when the base is blank or negative.
- * Integer form of round(baseCents * 0.028), same as #132's processingFee.
- */
-export function processingFee(base: number): number {
-  const amount = Number(base);
-  if (!Number.isFinite(amount) || amount <= 0) return 0;
-  const baseCents = Math.round(amount * 100);
-  return Math.round((baseCents * 28) / 1000) / 100;
-}
 
 /**
  * Processing printed on the receipt.

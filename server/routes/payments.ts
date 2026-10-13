@@ -9,8 +9,11 @@ import Stripe from "stripe";
 import admin from "firebase-admin";
 import crypto from "crypto";
 import { requireCoordinator, requireAuth, type AuthenticatedRequest } from "../middleware/auth";
-import { builtinEmailHtml, sendEmail } from "../services/email";
+import { appFirestore } from "../lib/appFirestore";
+import { sendEmail, type EmailDelivery } from "../services/email";
+import { buildPaymentReceipt } from "../services/paymentReceiptEmail";
 import { ensureDotOptInLink } from "../services/doorsOpenTour";
+import { doorsOpenReceiptEmailHtml } from "../../shared/doorsOpenTour";
 import { clientNotifyLive } from "../../shared/clientNotify";
 import { addressText } from "../../shared/addressText";
 import { bookingDateLabel } from "../../shared/clientHome";
@@ -37,7 +40,7 @@ import { matchSquarePaymentInvoice } from "../services/squarePaymentMatch";
 import { seniorDepositCheckoutLive, seniorLivingDepositReturnPath } from "../../shared/seniorLiving";
 
 const router = Router();
-const db = () => admin.firestore();
+const db = () => appFirestore();
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20",
@@ -184,32 +187,138 @@ async function paymentAlreadyRecorded({
   return false;
 }
 
-async function unlockGalleriesForInvoice({
+interface AppliedPayment {
+  applied: boolean;
+  unlocked: boolean;
+  duplicate: boolean;
+  email: EmailDelivery | "failed";
+}
+
+async function refsForInvoice(
+  collection: "galleries" | "listings",
+  invoiceId: string,
+  orderId: string | undefined,
+  directId: string | undefined,
+) {
+  const refs = new Map<string, FirebaseFirestore.DocumentReference>();
+  if (directId) refs.set(directId, db().collection(collection).doc(directId));
+  const lookups: Promise<FirebaseFirestore.QuerySnapshot>[] = [
+    db().collection(collection).where("invoiceId", "==", invoiceId).get(),
+  ];
+  if (orderId) lookups.push(db().collection(collection).where("orderId", "==", orderId).get());
+  const snaps = await Promise.all(lookups);
+  snaps.forEach((snap) => snap.docs.forEach((doc) => refs.set(doc.id, doc.ref)));
+  return refs;
+}
+
+/** Full payment opens the listing and gallery. A partial payment only records the status. */
+async function syncDownloadAccess({
   invoiceId,
   orderId,
-  galleryId,
+  invoice,
+  unlocked,
+  auditEntry,
 }: {
   invoiceId: string;
   orderId?: string;
-  galleryId?: string;
+  invoice: Record<string, unknown>;
+  unlocked: boolean;
+  auditEntry?: Record<string, unknown>;
 }) {
-  const refs = new Map<string, FirebaseFirestore.DocumentReference>();
-  if (galleryId) refs.set(galleryId, db().collection("galleries").doc(galleryId));
+  const galleryId = typeof invoice.galleryId === "string" ? invoice.galleryId : undefined;
+  const listingId = typeof invoice.listingId === "string" ? invoice.listingId : undefined;
+  const galleries = await refsForInvoice("galleries", invoiceId, orderId, galleryId);
+  const listings = await refsForInvoice("listings", invoiceId, orderId, listingId);
+  for (const ref of galleries.values()) {
+    const snap = await ref.get().catch(() => null);
+    const linked = snap?.exists ? snap.data()?.listingId : undefined;
+    if (typeof linked === "string" && linked.trim()) {
+      listings.set(linked, db().collection("listings").doc(linked));
+    }
+  }
 
-  const lookups: Promise<FirebaseFirestore.QuerySnapshot>[] = [
-    db().collection("galleries").where("invoiceId", "==", invoiceId).get(),
-  ];
-  if (orderId) lookups.push(db().collection("galleries").where("orderId", "==", orderId).get());
+  const patch = unlocked
+    ? {
+        clientGalleryDownloadsUnlocked: true,
+        lockDownloads: false,
+        downloadsReleased: true,
+        downloadEnabled: true,
+        paymentStatus: "paid",
+        invoiceStatus: "paid",
+        unlockedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }
+    : {
+        paymentStatus: "partial",
+        invoiceStatus: "partial",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
 
-  const snaps = await Promise.all(lookups);
-  snaps.forEach((snap) => snap.docs.forEach((doc) => refs.set(doc.id, doc.ref)));
+  await Promise.all([...galleries.values()].map((ref) => ref.update(patch).catch((err) => {
+    console.error("[Payments] Gallery unlock failed:", err);
+  })));
+  await Promise.all([...listings.values()].map(async (ref) => {
+    try {
+      if (!auditEntry) {
+        await ref.update(patch);
+        return;
+      }
+      const snap = await ref.get();
+      if (!snap.exists) return;
+      const auditLog = Array.isArray(snap.data()?.auditLog) ? snap.data()?.auditLog : [];
+      await ref.update({ ...patch, auditLog: [...auditLog, auditEntry] });
+    } catch (err) {
+      console.error("[Payments] Listing unlock failed:", err);
+    }
+  }));
+}
 
-  await Promise.all([...refs.values()].map((ref) => ref.update({
-    downloadEnabled: true,
-    paymentStatus: "paid",
-    unlockedAt: admin.firestore.FieldValue.serverTimestamp(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  }).catch((err) => console.error("[Payments] Gallery unlock failed:", err))));
+function squarePaymentHistory({
+  amount,
+  unlocked,
+  balance,
+  email,
+  squarePaymentId,
+}: {
+  amount: number;
+  unlocked: boolean;
+  balance: number;
+  email: string;
+  squarePaymentId?: string;
+}) {
+  const paidLabel = money(amount);
+  const action = unlocked
+    ? `Payment received ${paidLabel} via Square; downloads unlocked`
+    : `Payment received ${paidLabel} via Square`;
+  const balanceNote = !unlocked && balance > 0 ? ` Balance due ${money(balance)}.` : "";
+  const mail = email === "allowlist"
+    ? " Email sent via the test allowlist."
+    : email === "sent"
+      ? " Email sent."
+      : email === "failed"
+        ? " Receipt email failed."
+        : " Email suppressed by the notify gate.";
+  return {
+    action,
+    by: "Square",
+    at: new Date().toISOString(),
+    details: `${action}.${balanceNote}${mail}`.replace(/\s+/g, " ").trim(),
+    email,
+    ...(squarePaymentId ? { squarePaymentId } : {}),
+  };
+}
+
+async function appendOrderHistory(orderId: string, entry: Record<string, unknown>) {
+  if (!orderId) return;
+  const ref = db().collection("orders").doc(orderId);
+  try {
+    const snap = await ref.get();
+    if (!snap.exists) return;
+    const history = Array.isArray(snap.data()?.history) ? snap.data()?.history : [];
+    await ref.update({ history: [...history, entry] });
+  } catch (err) {
+    console.error("[Payments] Order history update failed:", err);
+  }
 }
 
 async function applySuccessfulPayment({
@@ -230,7 +339,7 @@ async function applySuccessfulPayment({
   method: "square" | "stripe";
   squarePaymentId?: string;
   stripePaymentIntentId?: string;
-}) {
+}): Promise<AppliedPayment | undefined> {
   const invoiceRef = db().collection("invoices").doc(invoiceId);
   const invoiceDoc = await invoiceRef.get();
   if (!invoiceDoc.exists) return;
@@ -244,13 +353,14 @@ async function applySuccessfulPayment({
 
   if (duplicate) {
     if (invoiceAllowsDownload(invoice)) {
-      await unlockGalleriesForInvoice({
+      await syncDownloadAccess({
         invoiceId,
         orderId: resolvedOrderId,
-        galleryId: typeof invoice.galleryId === "string" ? invoice.galleryId : undefined,
+        invoice,
+        unlocked: true,
       });
     }
-    return;
+    return { applied: false, unlocked: false, duplicate: true, email: "suppressed" };
   }
 
   const currentPaid = Number(invoice.amountPaid) || 0;
@@ -285,14 +395,6 @@ async function applySuccessfulPayment({
     }).catch((err) => console.error("[Payments] Client spend update failed:", err));
   }
 
-  if (newAmountDue <= 0) {
-    await unlockGalleriesForInvoice({
-      invoiceId,
-      orderId: resolvedOrderId,
-      galleryId: typeof invoice.galleryId === "string" ? invoice.galleryId : undefined,
-    });
-  }
-
   await db().collection("transactions").add({
     type: "payment",
     orderId: resolvedOrderId,
@@ -309,37 +411,80 @@ async function applySuccessfulPayment({
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
+  const unlocked = newAmountDue <= 0;
+  let email: EmailDelivery | "failed" = "suppressed";
   if (invoice.clientEmail) {
-    await deliverPaymentReceipt(invoice, invoiceId, money(amount), money(newAmountDue)).catch(console.error);
+    try {
+      email = await deliverPaymentReceipt(invoice, invoiceId, newAmountPaid, newAmountDue, unlocked);
+    } catch (err) {
+      console.error("[Payments] Receipt email failed:", err);
+      email = "failed";
+    }
   }
+
+  const auditEntry = method === "square"
+    ? squarePaymentHistory({
+        amount,
+        unlocked,
+        balance: newAmountDue,
+        email,
+        squarePaymentId,
+      })
+    : undefined;
+  if (auditEntry) await appendOrderHistory(resolvedOrderId, auditEntry);
+  await syncDownloadAccess({
+    invoiceId,
+    orderId: resolvedOrderId,
+    invoice,
+    unlocked,
+    auditEntry,
+  });
+
+  return { applied: true, unlocked, duplicate: false, email };
 }
 
 async function deliverPaymentReceipt(
   invoice: Record<string, unknown>,
   invoiceId: string,
-  amount: string,
-  balance: string,
-) {
+  amountPaid: number,
+  balance: number,
+  unlocked: boolean,
+): Promise<EmailDelivery> {
   const to = typeof invoice.clientEmail === "string" ? invoice.clientEmail : "";
-  if (!to) return;
+  if (!to) return "suppressed";
   const offer = await ensureDotOptInLink(invoice);
-  const variables: Record<string, string> = {
-    clientName: String(invoice.clientName || ""),
-    amount,
-    invoiceNumber: receiptEmailNumber({
-      invoiceNumber: invoice.invoiceNumber,
-      id: invoiceId,
-      createdAt: invoice.createdAt,
-    }),
+  const rendered = buildPaymentReceipt({
+    invoice,
+    invoiceId,
+    unlocked,
+    amountPaid,
     balance,
-    dotOptInUrl: offer.url || "",
-  };
-  await sendEmail({
+    galleryId: invoice.galleryId,
+    listing: typeof invoice.listingId === "string" ? { id: invoice.listingId } : null,
+  });
+  const doorsOpen = doorsOpenReceiptEmailHtml(offer.url || "");
+  const html = rendered.html.includes("</body>")
+    ? rendered.html.replace("</body>", `${doorsOpen}</body>`)
+    : `${rendered.html}${doorsOpen}`;
+  const result = await sendEmail({
     to,
     template: "payment_receipt",
-    html: builtinEmailHtml("payment_receipt", variables),
-    variables,
+    subject: rendered.subject,
+    html,
+    text: rendered.text,
+    variables: {
+      clientName: String(invoice.clientName || ""),
+      amount: money(amountPaid),
+      invoiceNumber: receiptEmailNumber({
+        invoiceNumber: invoice.invoiceNumber,
+        id: invoiceId,
+        createdAt: invoice.createdAt,
+      }),
+      balance: money(balance),
+      dotOptInUrl: offer.url || "",
+    },
   });
+  return result.delivery;
 }
 
 function roundMoney(amount: number): number {
@@ -578,8 +723,9 @@ router.post("/send-receipt", requireCoordinator, async (req, res) => {
     await deliverPaymentReceipt(
       invoice,
       invoiceDoc.id,
-      money(invoice.amountPaid || invoice.total),
-      money(amountStillDue(invoice)),
+      Number(invoice.amountPaid || invoice.total) || 0,
+      amountStillDue(invoice),
+      true,
     );
 
     return res.json({ success: true });
@@ -1085,7 +1231,7 @@ router.post("/square-webhook", async (req: Request, res: Response) => {
       return res.json({ received: true, deposit: true });
     }
 
-    await applySuccessfulPayment({
+    const settled = await applySuccessfulPayment({
       invoiceId: invoiceDoc.id,
       orderId: invoice.orderId,
       clientId: invoice.clientId,
@@ -1095,7 +1241,7 @@ router.post("/square-webhook", async (req: Request, res: Response) => {
       squarePaymentId: payment.id,
     });
 
-    return res.json({ received: true });
+    return res.json({ received: true, ...(settled ?? {}) });
   } catch (err) {
     console.error("[Payments] Square webhook error:", err);
     return res.status(500).json({ error: "Square webhook handler failed." });

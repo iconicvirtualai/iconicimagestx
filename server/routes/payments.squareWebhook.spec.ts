@@ -16,6 +16,11 @@ vi.mock("firebase-admin", () => {
   const firestore = () => {
     throw new Error("Live Firestore is not used by the Square webhook tests.");
   };
+  firestore.FieldValue = {
+    serverTimestamp: () => "SERVER_TIME",
+    increment: (amount: number) => ({ increment: amount }),
+  };
+  firestore.Timestamp = { fromDate: (date: Date) => date };
   return { default: { firestore, apps: [] } };
 });
 
@@ -183,7 +188,7 @@ async function postEvent(body: unknown, signature?: string) {
 describe("Square webhook paid unlock", () => {
   it("rejects a missing key and a bad signature without changing the invoice", async () => {
     seedPaidWorld();
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
     useEnv({ SQUARE_WEBHOOK_SIGNATURE_KEY: undefined });
     const event = paymentEvent({
       eventId: "evt-missing-key",
@@ -193,18 +198,18 @@ describe("Square webhook paid unlock", () => {
     });
     const missing = await postEvent(event, "not-a-signature");
     expect(missing.status).toBe(401);
-    expect(warn.mock.calls.map((call) => call.join(" ")).join("\n")).toMatch(/webhook not configured/i);
+    expect(error.mock.calls.map((call) => call.join(" ")).join("\n")).toMatch(/SQUARE_WEBHOOK_SIGNATURE_KEY is not set/);
     expect(memory.get("invoices", "playtest-delivery-qa-invoice")?.status).toBe("sent");
     expect(memory.get("orders", "playtest-delivery-qa-order")?.history).toEqual([]);
 
     useEnv({});
     const bad = await postEvent(event, "bad-signature");
-    expect(bad.status).toBe(403);
+    expect(bad.status).toBe(400);
     expect(bad.json.error).toMatch(/signature/i);
     expect(memory.get("invoices", "playtest-delivery-qa-invoice")?.amountPaid).toBe(0);
     expect(memory.get("listings", "playtest-delivery-qa-listing")?.downloadEnabled).toBe(false);
     expect(sent).toHaveLength(0);
-    warn.mockRestore();
+    error.mockRestore();
   });
 
   it("unlocks a fully paid playtest invoice and treats a replay as a no-op", async () => {
@@ -225,10 +230,8 @@ describe("Square webhook paid unlock", () => {
       status: "paid",
       amountPaid: 1,
       amountDue: 0,
-      amountStillDue: 0,
       squarePaymentId: "pay-playtest-full",
       paymentMethod: "square",
-      squarePaymentMethod: "VISA",
       playtest: true,
     });
     expect(invoice?.paidAt).toBeTruthy();
@@ -293,7 +296,6 @@ describe("Square webhook paid unlock", () => {
       status: "partial",
       amountPaid: 40,
       amountDue: 60,
-      amountStillDue: 60,
     });
     const listing = memory.get("listings", "playtest-delivery-qa-listing");
     expect(listing?.lockDownloads).toBe(true);
@@ -334,7 +336,6 @@ describe("Square webhook paid unlock", () => {
 
   it("returns 200 and changes nothing when the invoice is unknown", async () => {
     seedPaidWorld();
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const event = paymentEvent({
       eventId: "evt-unknown",
       paymentId: "pay-unknown",
@@ -347,12 +348,12 @@ describe("Square webhook paid unlock", () => {
     expect(memory.get("invoices", "playtest-delivery-qa-invoice")?.status).toBe("sent");
     expect(memory.get("orders", "playtest-delivery-qa-order")?.history).toEqual([]);
     expect(memory.get("squareWebhookEvents", "evt-unknown")).toBeUndefined();
+    const logs = Object.keys(memory.dump()).filter((path) => path.startsWith("agentLogs/"));
+    expect(logs.length).toBe(1);
     expect(sent).toHaveLength(0);
-    expect(warn.mock.calls.map((call) => call.join(" ")).join("\n")).toMatch(/no invoice matched/i);
-    warn.mockRestore();
   });
 
-  it("levels an invoice.payment_made and does not double-count the later payment.updated", async () => {
+  it("leaves invoice.payment_made alone until a completed payment event arrives", async () => {
     seedPaidWorld({ squareOrderId: "sq-order-playtest", squareInvoiceId: "inv-square-1" });
     const made = {
       type: "invoice.payment_made",
@@ -373,20 +374,10 @@ describe("Square webhook paid unlock", () => {
       },
     };
     const first = await postEvent(made);
-    expect(first.json).toMatchObject({ applied: true, unlocked: true });
-    expect(memory.get("invoices", "playtest-delivery-qa-invoice")?.amountPaid).toBe(1);
-
-    const updated = paymentEvent({
-      eventId: "evt-after-invoice",
-      paymentId: "pay-after-invoice",
-      amountCents: 100,
-      invoiceId: "playtest-delivery-qa-invoice",
-    });
-    const second = await postEvent(updated);
-    expect(second.json.duplicate).toBe(true);
-    expect(memory.get("invoices", "playtest-delivery-qa-invoice")?.amountPaid).toBe(1);
-    expect(memory.get("invoices", "playtest-delivery-qa-invoice")?.squarePaymentId).toBe("pay-after-invoice");
-    const history = memory.get("orders", "playtest-delivery-qa-order")?.history as unknown[];
-    expect(history).toHaveLength(1);
+    expect(first.status).toBe(200);
+    expect(first.json.applied).toBeUndefined();
+    expect(memory.get("invoices", "playtest-delivery-qa-invoice")?.status).toBe("sent");
+    expect(memory.get("invoices", "playtest-delivery-qa-invoice")?.amountPaid).toBe(0);
+    expect(memory.get("listings", "playtest-delivery-qa-listing")?.downloadEnabled).toBe(false);
   });
 });
