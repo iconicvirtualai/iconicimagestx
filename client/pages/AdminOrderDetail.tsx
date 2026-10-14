@@ -19,6 +19,7 @@ import {
 import { addressText } from "@shared/addressText";
 import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "@shared/businessContact";
 import { formatChicagoDate } from "@shared/clientHome";
+import { orderScheduleTime, scheduleDateInputValue, scheduleTimeInputValue } from "@shared/listingWrite";
 import { staffInvoicePath } from "@shared/staffInvoice";
 import { orderChargeSummary, orderServiceLines } from "@shared/orderPackageLines";
 import type { GalleryReleaseReport } from "@shared/galleryRelease";
@@ -76,6 +77,7 @@ export default function AdminOrderDetail() {
   const [activeTab, setActiveTab] = React.useState<"details"|"invoice"|"gallery"|"history">("details");
   const [release, setRelease] = React.useState<GalleryReleaseReport | null>(null);
   const [linkedRequest, setLinkedRequest] = React.useState<Record<string, unknown> | null>(null);
+  const [sourceCollection, setSourceCollection] = React.useState<"orders" | "orderRequests">("orders");
 
   // Staff for assignment
   const [staff, setStaff] = React.useState<any[]>([]);
@@ -87,6 +89,7 @@ export default function AdminOrderDetail() {
     const unsub = onSnapshot(doc(db, "orders", id), snap => {
       if (snap.exists()) {
         const data = { id: snap.id, ...snap.data() };
+        setSourceCollection("orders");
         setOrder(data);
         setEditForm(data);
         setLoading(false);
@@ -106,8 +109,10 @@ export default function AdminOrderDetail() {
         // Fallback to orderRequests
         const unsub2 = onSnapshot(doc(db, "orderRequests", id), snap2 => {
           if (snap2.exists()) {
-            setOrder({ id: snap2.id, ...snap2.data() });
-            setEditForm({ id: snap2.id, ...snap2.data() });
+            const data = { id: snap2.id, ...snap2.data() };
+            setSourceCollection("orderRequests");
+            setOrder(data);
+            setEditForm(data);
           } else {
             toast.error("Order not found");
             navigate("/admin/orders");
@@ -144,7 +149,6 @@ export default function AdminOrderDetail() {
 
   const patch = async (data: Record<string, any>, historyAction?: string) => {
     if (!id || !order) return;
-    const col = order._collection || "orders";
     const updates: any = { ...data, updatedAt: serverTimestamp() };
     if (historyAction) {
       updates.history = [...(order.history || []), {
@@ -154,7 +158,7 @@ export default function AdminOrderDetail() {
         details: "",
       }];
     }
-    await updateDoc(doc(db, "orders", id), updates);
+    await updateDoc(doc(db, sourceCollection, id), updates);
     toast.success("Updated.");
   };
 
@@ -172,8 +176,18 @@ export default function AdminOrderDetail() {
         updates.address = editForm.address;
       }
       // Appointment
-      if (editForm.appointmentDate !== order.appointmentDate) updates.appointmentDate = editForm.appointmentDate;
-      if (editForm.appointmentTime !== order.appointmentTime) updates.appointmentTime = editForm.appointmentTime;
+      if (editForm.appointmentDate !== order.appointmentDate || editForm.scheduledDate !== order.scheduledDate) {
+        const day = scheduleDateInputValue(editForm);
+        if (day) {
+          updates.appointmentDate = day;
+          updates.scheduledDate = day;
+        }
+      }
+      const nextTime = scheduleTimeInputValue(orderScheduleTime(editForm)) || editForm.appointmentTime || editForm.scheduledTime;
+      if (nextTime && nextTime !== (order.scheduledTime || order.appointmentTime)) {
+        updates.appointmentTime = nextTime;
+        updates.scheduledTime = nextTime;
+      }
       if (editForm.appointmentNotes !== order.appointmentNotes) updates.appointmentNotes = editForm.appointmentNotes;
       if (editForm.accessInstructions !== order.accessInstructions) updates.accessInstructions = editForm.accessInstructions;
       if (editForm.internalNotes !== order.internalNotes) updates.internalNotes = editForm.internalNotes;
@@ -191,14 +205,18 @@ export default function AdminOrderDetail() {
   };
 
   const handleSchedule = async () => {
-    if (!editForm.appointmentDate) {
+    const day = scheduleDateInputValue(editForm);
+    if (!day) {
       toast.error("Set an appointment date first.");
       return;
     }
+    const time = scheduleTimeInputValue(orderScheduleTime(editForm)) || null;
     await patch({
       status: "scheduled",
-      appointmentDate: editForm.appointmentDate,
-      appointmentTime: editForm.appointmentTime || null,
+      appointmentDate: day,
+      scheduledDate: day,
+      appointmentTime: time,
+      scheduledTime: time,
     }, "Order scheduled");
   };
 
@@ -413,7 +431,7 @@ export default function AdminOrderDetail() {
           className={`rounded-xl text-xs font-bold ${editing ? "bg-[#0d9488] text-white" : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"}`}>
           {editing ? <><Save className="w-3.5 h-3.5 mr-1.5" /> Save Changes</> : <><Edit3 className="w-3.5 h-3.5 mr-1.5" /> Manage Order</>}
         </Button>
-        {order.status === "request" && (
+        {(order.status === "request" || order.status === "new") && (
           <Button onClick={handleSchedule} className="rounded-xl text-xs font-bold bg-green-600 hover:bg-green-700 text-white">
             <Calendar className="w-3.5 h-3.5 mr-1.5" /> Schedule
           </Button>
@@ -456,13 +474,13 @@ export default function AdminOrderDetail() {
                 </div>
                 <div>
                   <label className={labelCls}>Email</label>
-                  {editing ? <input value={editForm.clientEmail || ""} onChange={e => setEditForm((f: any) => ({...f, clientEmail: e.target.value}))} className={inputCls} />
-                    : <p className="text-sm font-bold">{order.clientEmail || "—"}</p>}
+                  {editing ? <input value={editForm.clientEmail || editForm.email || ""} onChange={e => setEditForm((f: any) => ({...f, clientEmail: e.target.value}))} className={inputCls} />
+                    : <p className="text-sm font-bold">{order.clientEmail || order.email || "—"}</p>}
                 </div>
                 <div>
                   <label className={labelCls}>Phone</label>
-                  {editing ? <input value={editForm.clientPhone || ""} onChange={e => setEditForm((f: any) => ({...f, clientPhone: e.target.value}))} className={inputCls} />
-                    : <p className="text-sm font-bold">{order.clientPhone || "—"}</p>}
+                  {editing ? <input value={editForm.clientPhone || editForm.phone || ""} onChange={e => setEditForm((f: any) => ({...f, clientPhone: e.target.value}))} className={inputCls} />
+                    : <p className="text-sm font-bold">{order.clientPhone || order.phone || "—"}</p>}
                 </div>
                 <div>
                   <label className={labelCls}>Type</label>
@@ -492,13 +510,13 @@ export default function AdminOrderDetail() {
                   <label className={labelCls}>Date & Time</label>
                   {editing ? (
                     <div className="grid grid-cols-2 gap-2">
-                      <input type="date" value={editForm.appointmentDate || editForm.requestedDate || ""} onChange={e => setEditForm((f: any) => ({...f, appointmentDate: e.target.value}))} className={inputCls} />
-                      <input type="time" value={editForm.appointmentTime || editForm.requestedTime || ""} onChange={e => setEditForm((f: any) => ({...f, appointmentTime: e.target.value}))} className={inputCls} />
+                      <input type="date" value={scheduleDateInputValue(editForm)} onChange={e => setEditForm((f: any) => ({...f, appointmentDate: e.target.value, scheduledDate: e.target.value}))} className={inputCls} />
+                      <input type="time" value={scheduleTimeInputValue(orderScheduleTime(editForm))} onChange={e => setEditForm((f: any) => ({...f, appointmentTime: e.target.value, scheduledTime: e.target.value}))} className={inputCls} />
                     </div>
                   ) : (
                     <p className="text-sm font-bold">
-                      {fmtDate(order.appointmentDate || order.requestedDate)}
-                      {(order.appointmentTime || order.requestedTime) && ` at ${order.appointmentTime || order.requestedTime}`}
+                      {fmtDate(order.scheduledDate || order.appointmentDate || order.requestedDate)}
+                      {(order.scheduledTime || order.appointmentTime || order.requestedTime) && ` at ${order.scheduledTime || order.appointmentTime || order.requestedTime}`}
                     </p>
                   )}
                 </div>
@@ -509,14 +527,14 @@ export default function AdminOrderDetail() {
                 <div>
                   <label className={labelCls}>Access Instructions</label>
                   {editing ? <input value={editForm.accessInstructions || ""} onChange={e => setEditForm((f: any) => ({...f, accessInstructions: e.target.value}))} className={inputCls} />
-                    : <p className="text-sm font-bold">{order.accessInstructions || "—"}</p>}
+                    : <p className="text-sm font-bold">{order.accessInstructions || [order.accessMethod, order.lockboxCode].filter(Boolean).join(" - ") || "—"}</p>}
                 </div>
               </div>
-              {(order.appointmentNotes || order.notes) && (
+              {(order.appointmentNotes || order.vibeNote || order.notes) && (
                 <div className="mt-4">
                   <label className={labelCls}>Notes</label>
-                  {editing ? <textarea value={editForm.appointmentNotes || editForm.notes || ""} onChange={e => setEditForm((f: any) => ({...f, appointmentNotes: e.target.value}))} rows={2} className={`${inputCls} resize-none`} />
-                    : <p className="text-sm text-gray-600">{order.appointmentNotes || order.notes}</p>}
+                  {editing ? <textarea value={editForm.appointmentNotes || editForm.vibeNote || editForm.notes || ""} onChange={e => setEditForm((f: any) => ({...f, vibeNote: e.target.value, notes: e.target.value}))} rows={2} className={`${inputCls} resize-none`} />
+                    : <p className="text-sm text-gray-600">{order.appointmentNotes || order.vibeNote || order.notes}</p>}
                 </div>
               )}
             </div>

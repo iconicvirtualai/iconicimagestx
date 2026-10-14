@@ -451,7 +451,7 @@ export default function AdminOrderRequest() {
                 <button onClick={() => navigate(`/admin/listing/${order.listingId}`)} className="px-3 py-1 rounded-full bg-[#0d9488]/10 text-[#0d9488] text-[9px] font-black uppercase tracking-widest hover:bg-[#0d9488]/20">View Project →</button>
               )}
             </div>
-            <span className="text-[10px] font-mono text-gray-400">#{(order.id || "").substring(0, 8)}</span>
+            <span className="text-[10px] font-mono text-gray-400">{order.orderNumber || `#${(order.id || "").substring(0, 8)}`}</span>
           </div>
 
           {/* ── CLIENT INFORMATION ── */}
@@ -486,6 +486,18 @@ export default function AdminOrderRequest() {
               <Field label={isScheduledState ? "Scheduled Time" : "Requested Time"} value={fmtTimeStandard(order.scheduledTime || order.appointmentTime || order.requestedTime)} editing={editing} editValue={f("appointmentTime")} onChange={setF("appointmentTime")} type="time" />
               <Field label="Access Method" value={order.accessMethod} editing={editing} editValue={f("accessMethod")} onChange={setF("accessMethod")} />
               <Field label="Lockbox Code" value={order.lockboxCode} editing={editing} editValue={f("lockboxCode")} onChange={setF("lockboxCode")} />
+              {order.assignedPhotographerName && <Field label="Assigned photographer" value={order.assignedPhotographerName} editing={false} />}
+              {order.packageName && <Field label="Package" value={order.packageName} editing={false} />}
+              {order.appointmentDuration ? <Field label="Duration" value={`${order.appointmentDuration} min`} editing={false} /> : null}
+              {typeof order.processing === "number" && (
+                <Field label="Processing (stored)" value={fmtCurrency(order.processing)} editing={false} />
+              )}
+              {typeof order.calendarHtmlLink === "string" && order.calendarHtmlLink.startsWith("https://") && !order.calendarHtmlLink.includes("@") && (
+                <div className="sm:col-span-2">
+                  <p className={labelCls}>Calendar</p>
+                  <a href={order.calendarHtmlLink} className="text-sm font-bold text-[#0d9488]" target="_blank" rel="noreferrer">Open calendar event</a>
+                </div>
+              )}
             </div>
           </div>
 
