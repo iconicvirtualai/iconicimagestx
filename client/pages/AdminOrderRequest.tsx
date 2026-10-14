@@ -35,6 +35,7 @@ import { separatePromoDiscount } from "@shared/bookingPricing";
 import { orderChargeSummary, orderServiceLines } from "@shared/orderPackageLines";
 import { linkOrderToListing, resolvePortalClientId } from "@/lib/listingClient";
 import { deliverInvoiceEmail } from "@/lib/deliverInvoice";
+import { assignBookingPhotographer } from "@/lib/assignBookingPhotographer";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   markScheduledAppointmentConfirmed,
@@ -238,6 +239,16 @@ export default function AdminOrderRequest() {
     }
   };
 
+  const rememberBookedPhotographer = async (orderRequestId: string, listingId: string) => {
+    if (!user) return;
+    try {
+      const token = await user.getIdToken();
+      await assignBookingPhotographer({ orderRequestId, listingId, token });
+    } catch (err) {
+      console.warn("[AdminOrderRequest] Photographer assign failed.", err);
+    }
+  };
+
   const handleCreateProject = async () => {
     if (!id || !order) return;
     if (order.listingId) { navigate(`/admin/listing/${order.listingId}`); return; }
@@ -277,6 +288,7 @@ export default function AdminOrderRequest() {
             orderId: links.orderId || null,
             invoiceId: links.invoiceId || null,
           });
+          await rememberBookedPhotographer(id, existing.id);
           toast.success("Project linked.");
           navigate(`/admin/listing/${existing.id}`);
           return;
@@ -312,6 +324,7 @@ export default function AdminOrderRequest() {
         orderId: links.orderId || null,
         invoiceId: links.invoiceId || null,
       });
+      await rememberBookedPhotographer(id, ref.id);
       toast.success("Project created!");
       navigate(`/admin/listing/${ref.id}`);
     } catch (err) {
