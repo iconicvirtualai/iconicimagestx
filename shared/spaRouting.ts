@@ -100,6 +100,10 @@ export function buildVercelRedirects(): Redirect[] {
     { source: "/studio/", destination: "/studio-105", permanent: false },
     { source: "/gallery", destination: "/portal", permanent: false },
     { source: "/gallery/", destination: "/portal", permanent: false },
+    { source: "/team", destination: "/crew", statusCode: 301 },
+    { source: "/team/", destination: "/crew", statusCode: 301 },
+    { source: "/iconic-crew", destination: "/crew", statusCode: 301 },
+    { source: "/iconic-crew/", destination: "/crew", statusCode: 301 },
   ];
 }
 

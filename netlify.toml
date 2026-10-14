@@ -56,3 +56,24 @@
   from = "/gallery/"
   status = 302
   to = "/portal"
+
+# Older crew URLs.
+[[redirects]]
+  from = "/team"
+  status = 301
+  to = "/crew"
+
+[[redirects]]
+  from = "/team/"
+  status = 301
+  to = "/crew"
+
+[[redirects]]
+  from = "/iconic-crew"
+  status = 301
+  to = "/crew"
+
+[[redirects]]
+  from = "/iconic-crew/"
+  status = 301
+  to = "/crew"

@@ -42,6 +42,10 @@ app.get(["/gallery", "/gallery/"], (_req, res) => {
   res.redirect(302, "/portal");
 });
 
+app.get(["/team", "/team/", "/iconic-crew", "/iconic-crew/"], (_req, res) => {
+  res.redirect(301, "/crew");
+});
+
 // Known SPA routes serve their shell. Anything else is a real 404.
 app.get("/{*splat}", async (req, res) => {
   if (req.path.startsWith("/api/") || req.path.startsWith("/health")) {
