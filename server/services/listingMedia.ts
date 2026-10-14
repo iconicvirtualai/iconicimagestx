@@ -134,6 +134,7 @@ export async function registerListingPhoto(options: {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
     await syncPlaytestGallery(listingId, listing, image);
+    await syncListingGallery(listing, image);
   }
 
   return { image: already || image, listingId };
@@ -148,6 +149,46 @@ export function studioImageExtra(extra: unknown): Record<string, unknown> {
   if (src.studioRole === "adjusted" || src.studioRole === "final") out.studioRole = src.studioRole;
   if (typeof src.sourcePath === "string" && src.sourcePath.length <= 500) out.sourcePath = src.sourcePath;
   return out;
+}
+
+export function galleryMediaItem(image: {
+  url: string;
+  name: string;
+  path: string;
+  contentType?: string;
+  uploadedAt: string;
+  uploadedBy: string;
+}) {
+  return {
+    id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    url: image.url,
+    shareUrl: image.url,
+    fileName: image.name,
+    title: image.name,
+    type: image.contentType?.startsWith("video/") ? "video" : "photo",
+    storagePath: image.path,
+    downloadable: true,
+    uploadedBy: image.uploadedBy,
+    uploadedAt: image.uploadedAt,
+  };
+}
+
+/** Copy an upload onto the gallery the delivery queue already lists. Leaves the pay lock alone. */
+async function syncListingGallery(
+  listing: FirebaseFirestore.DocumentData,
+  image: { url: string; name: string; path: string; contentType?: string; uploadedAt: string; uploadedBy: string },
+) {
+  const galleryId = typeof listing.galleryId === "string" ? listing.galleryId.trim() : "";
+  if (!galleryId) return;
+  const ref = db().collection("galleries").doc(galleryId);
+  const snap = await ref.get();
+  if (!snap.exists) return;
+  const items = Array.isArray(snap.data()?.mediaItems) ? snap.data()!.mediaItems : [];
+  if (items.some((item: { storagePath?: string }) => item?.storagePath === image.path)) return;
+  await ref.update({
+    mediaItems: admin.firestore.FieldValue.arrayUnion(galleryMediaItem(image)),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
 }
 
 async function syncPlaytestGallery(
@@ -167,18 +208,7 @@ async function syncPlaytestGallery(
   }
   if (galleryIds.size === 0) return;
 
-  const mediaItem = {
-    id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    url: image.url,
-    shareUrl: image.url,
-    fileName: image.name,
-    title: image.name,
-    type: image.contentType?.startsWith("video/") ? "video" : "photo",
-    storagePath: image.path,
-    downloadable: true,
-    uploadedBy: image.uploadedBy,
-    uploadedAt: image.uploadedAt,
-  };
+  const mediaItem = galleryMediaItem(image);
 
   for (const galleryId of galleryIds) {
     const ref = db().collection("galleries").doc(galleryId);
