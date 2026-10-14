@@ -489,6 +489,14 @@ export default function AdminOrderRequest() {
         <ChevronLeft className="w-4 h-4" /> Back to Orders
       </button>
 
+      {order.officeFlag === "calendar_hold_failed" ? (
+        <div role="alert" data-office-flag="calendar_hold_failed" className="mb-6 rounded-2xl border border-red-300 bg-red-50 px-4 py-3 text-sm font-bold text-red-800">
+          {typeof order.officeNote === "string" && order.officeNote.trim()
+            ? order.officeNote
+            : "Calendar hold failed. Add it to the calendar manually."}
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* ═══ LEFT: Full order view (read-only by default, editable on Manage Order) ═══ */}
         <div className="lg:col-span-2 space-y-6">

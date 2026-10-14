@@ -49,6 +49,7 @@ export interface AdminOrderTileModel {
   /** Business orders always select one studio. Listing orders omit the row. */
   studio: AdminStudioId | null;
   channel: string;
+  calendarHoldFailed: boolean;
 }
 
 export const LISTING_HERO = "/media/launch/hero_day_exterior_front.jpg";
@@ -99,6 +100,7 @@ export function buildAdminOrderTile(record: Record<string, unknown>): AdminOrder
     location: locationLabel(kind, record),
     studio,
     channel: channelFor(skin, kind),
+    calendarHoldFailed: record.officeFlag === "calendar_hold_failed",
   };
 }
 

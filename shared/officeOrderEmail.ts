@@ -117,6 +117,8 @@ export function officeNewOrderEmail(
     ["Notes", notes],
     ["Booked via", bookedVia(saved)],
   ];
+  const officeNote = text(saved.officeNote);
+  if (officeNote) fields.unshift(["Office note", officeNote]);
 
   const subjectCore = `New order ${orderNumber} — ${packageName} — ${address} — ${requestedDate}`;
   const subject = isTestOrder(clientName, notes) ? `[TEST] ${subjectCore}` : subjectCore;

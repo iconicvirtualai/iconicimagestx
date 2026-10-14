@@ -5606,7 +5606,8 @@ function buildAdminOrderTile(record2) {
     appointmentDate: appointmentLabel(record2),
     location: locationLabel(kind, record2),
     studio,
-    channel: channelFor(skin2, kind)
+    channel: channelFor(skin2, kind),
+    calendarHoldFailed: record2.officeFlag === "calendar_hold_failed"
   };
 }
 function orderKind(record2, skin2) {
@@ -5789,6 +5790,8 @@ function officeNewOrderEmail(saved, options) {
     ["Notes", notes],
     ["Booked via", bookedVia(saved)]
   ];
+  const officeNote = text$e(saved.officeNote);
+  if (officeNote) fields.unshift(["Office note", officeNote]);
   const subjectCore = `New order ${orderNumber} — ${packageName} — ${address} — ${requestedDate}`;
   const subject = isTestOrder(clientName2, notes) ? `[TEST] ${subjectCore}` : subjectCore;
   const plain = fields.map(([label, value]) => `${label}: ${value}`).join("\n");
@@ -7306,6 +7309,15 @@ function toDate$1(value) {
 function money$3(value) {
   return orderTotalLabel(value);
 }
+function calendarHoldFailureMessage(err) {
+  const message = err instanceof Error ? err.message : err && typeof err === "object" && "message" in err && typeof err.message === "string" ? err.message : "";
+  return (message || "Calendar hold failed.").slice(0, 300);
+}
+function failedCalendarHoldNote(slot) {
+  const photographer = slot.photographerName?.trim() || "the assigned photographer";
+  const when = slot.label?.trim() || [slot.date, slot.time].filter(Boolean).join(" ") || "the selected time";
+  return `Calendar hold failed for ${photographer} at ${when}. Add it to the calendar manually.`;
+}
 async function loadBookingCatalog() {
   try {
     const snap = await db$p().collection("packages").get();
@@ -7317,6 +7329,7 @@ async function loadBookingCatalog() {
 }
 router$p.post("/", async (req, res) => {
   let calendarHold = null;
+  let calendarHoldError = null;
   try {
     const {
       firstName,
@@ -7425,9 +7438,11 @@ router$p.post("/", async (req, res) => {
       } catch (err) {
         console.error("[Bookings] Calendar hold failed:", err);
         calendarHold = null;
+        calendarHoldError = calendarHoldFailureMessage(err);
       }
-      if (!calendarHold?.eventId) {
-        return res.status(503).json({ error: "That time could not be reserved. Pick another open time." });
+      if (!calendarHoldError && !calendarHold?.eventId) {
+        calendarHoldError = "Calendar returned no event id.";
+        console.error("[Bookings] Calendar hold failed:", calendarHoldError);
       }
     }
     const specializedPhotography = resolved.specializedPhotography;
@@ -7462,6 +7477,10 @@ router$p.post("/", async (req, res) => {
       calendarEventId: calendarHold?.eventId || null,
       calendarId: calendarHold?.calendarId || null,
       calendarHtmlLink: calendarHold?.htmlLink || null,
+      calendarHold: decision.slot ? calendarHold?.eventId ? "held" : "failed" : "none",
+      calendarHoldError,
+      officeFlag: calendarHoldError ? "calendar_hold_failed" : null,
+      officeNote: calendarHoldError && decision.slot ? failedCalendarHoldNote(decision.slot) : null,
       squareFootage: squareFootage || null,
       accessMethod: accessMethod || null,
       lockboxCode: lockboxCode || null,

@@ -71,6 +71,22 @@ function money(value: unknown): string {
   return orderTotalLabel(value);
 }
 
+/** Message only. A Calendar error also carries headers and credentials. */
+function calendarHoldFailureMessage(err: unknown): string {
+  const message = err instanceof Error
+    ? err.message
+    : err && typeof err === "object" && "message" in err && typeof (err as { message: unknown }).message === "string"
+      ? (err as { message: string }).message
+      : "";
+  return (message || "Calendar hold failed.").slice(0, 300);
+}
+
+function failedCalendarHoldNote(slot: { photographerName?: string; label?: string; date?: string; time?: string }): string {
+  const photographer = slot.photographerName?.trim() || "the assigned photographer";
+  const when = slot.label?.trim() || [slot.date, slot.time].filter(Boolean).join(" ") || "the selected time";
+  return `Calendar hold failed for ${photographer} at ${when}. Add it to the calendar manually.`;
+}
+
 async function loadBookingCatalog() {
   try {
     const snap = await db().collection("packages").get();
@@ -86,6 +102,7 @@ async function loadBookingCatalog() {
 
 router.post("/", async (req, res) => {
   let calendarHold: { calendarId: string; eventId: string | null; htmlLink: string | null } | null = null;
+  let calendarHoldError: string | null = null;
   try {
     const {
       firstName,
@@ -206,9 +223,11 @@ router.post("/", async (req, res) => {
       } catch (err) {
         console.error("[Bookings] Calendar hold failed:", err);
         calendarHold = null;
+        calendarHoldError = calendarHoldFailureMessage(err);
       }
-      if (!calendarHold?.eventId) {
-        return res.status(503).json({ error: "That time could not be reserved. Pick another open time." });
+      if (!calendarHoldError && !calendarHold?.eventId) {
+        calendarHoldError = "Calendar returned no event id.";
+        console.error("[Bookings] Calendar hold failed:", calendarHoldError);
       }
     }
     const specializedPhotography = resolved.specializedPhotography;
@@ -244,6 +263,10 @@ router.post("/", async (req, res) => {
       calendarEventId: calendarHold?.eventId || null,
       calendarId: calendarHold?.calendarId || null,
       calendarHtmlLink: calendarHold?.htmlLink || null,
+      calendarHold: decision.slot ? (calendarHold?.eventId ? "held" : "failed") : "none",
+      calendarHoldError,
+      officeFlag: calendarHoldError ? "calendar_hold_failed" : null,
+      officeNote: calendarHoldError && decision.slot ? failedCalendarHoldNote(decision.slot) : null,
       squareFootage: squareFootage || null,
       accessMethod: accessMethod || null,
       lockboxCode: lockboxCode || null,

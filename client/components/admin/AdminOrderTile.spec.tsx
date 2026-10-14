@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToString } from "react-dom/server";
 import { AdminOrderTile } from "./AdminOrderTile";
-import { sampleAdminOrderTiles } from "@shared/adminOrderTile";
+import { buildAdminOrderTile, sampleAdminOrderTiles } from "@shared/adminOrderTile";
 import { projectSurfaceStatus } from "@shared/projectSurfaceStatus";
 
 const [listing, business] = sampleAdminOrderTiles();
@@ -63,5 +63,19 @@ describe("admin order tile chrome", () => {
     expect(html).toContain('data-status="cancelled"');
     expect(html).toContain('data-paid="paid"');
     expect(html).not.toContain(">Delivered<");
+  });
+
+  it("shows a calendar hold failure badge", () => {
+    const order = buildAdminOrderTile({
+      id: "hold-fail",
+      projectType: "real_estate",
+      serviceIds: ["listing-showcase"],
+      officeFlag: "calendar_hold_failed",
+    });
+    expect(order.calendarHoldFailed).toBe(true);
+    const html = renderToString(<AdminOrderTile order={order} />);
+    expect(html).toContain("Calendar hold failed");
+    expect(html).toContain('data-slot="calendar-hold"');
+    expect(renderToString(<AdminOrderTile order={listing} />)).not.toContain("Calendar hold failed");
   });
 });
