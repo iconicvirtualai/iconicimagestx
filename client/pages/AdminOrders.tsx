@@ -6,6 +6,7 @@ import { collection, onSnapshot, writeBatch, doc, serverTimestamp, addDoc, getDo
 import { toast } from "sonner";
 import { listingAppointmentDate, projectCarryFromOrder, stableOrderRequestListingId } from "@shared/listingWrite";
 import { linkOrderToListing, resolvePortalClientId } from "@/lib/listingClient";
+import { assignBookingPhotographer } from "@/lib/assignBookingPhotographer";
 import { listingLinkFields } from "@shared/orderProjectInvoice";
 import { Button } from "@/components/ui/button";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
@@ -82,6 +83,15 @@ export default function AdminOrders() {
     setIsBulkProjecting(true);
     let count = 0;
     const failures: string[] = [];
+    const rememberBookedPhotographer = async (orderRequestId: string, listingId: string) => {
+      if (!user) return;
+      try {
+        const token = await user.getIdToken();
+        await assignBookingPhotographer({ orderRequestId, listingId, token });
+      } catch (err) {
+        console.warn("[AdminOrders] Photographer assign failed.", err);
+      }
+    };
     try {
       for (const id of Array.from(selection)) {
         const order = orders.find(o => o.id === id);
@@ -116,6 +126,7 @@ export default function AdminOrders() {
                 orderId: links.orderId || null,
                 invoiceId: links.invoiceId || null,
               });
+              await rememberBookedPhotographer(id, existing.id);
               count++;
               continue;
             }
@@ -144,6 +155,7 @@ export default function AdminOrders() {
             orderId: links.orderId || null,
             invoiceId: links.invoiceId || null,
           });
+          await rememberBookedPhotographer(id, ref.id);
           count++;
         } catch (err) {
           console.error(err);
