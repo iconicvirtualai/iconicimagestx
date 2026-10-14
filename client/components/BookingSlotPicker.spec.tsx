@@ -38,9 +38,15 @@ function render(selectedStart: string) {
 
 describe("Saturday delivery note", () => {
   it("shows the note only after a Saturday slot is picked", () => {
-    expect(render(saturday.start)).toContain(SATURDAY_DELIVERY_NOTE);
-    expect(render(saturday.start)).toContain("saturday-delivery-note");
-    expect(render(tuesday.start)).not.toContain(SATURDAY_DELIVERY_NOTE);
-    expect(render("")).not.toContain(SATURDAY_DELIVERY_NOTE);
+    expect(SATURDAY_DELIVERY_NOTE).toBe(
+      "Saturday's media content is delivered on Monday unless Same Day Delivery is added while booking.",
+    );
+    const html = render(saturday.start);
+    expect(html).toContain("saturday-delivery-note");
+    expect(html).toContain(
+      "Saturday&#x27;s media content is delivered on Monday unless Same Day Delivery is added while booking.",
+    );
+    expect(render(tuesday.start)).not.toContain("Same Day Delivery is added while booking.");
+    expect(render("")).not.toContain("saturday-delivery-note");
   });
 });

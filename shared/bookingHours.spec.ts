@@ -185,6 +185,9 @@ describe("booking weekly hours", () => {
     expect(isSaturdayCalendarDate("2026-10-17")).toBe(true);
     expect(isSaturdayCalendarDate("2026-10-18")).toBe(false);
     expect(isSaturdayCalendarDate("2026-10-13")).toBe(false);
+    expect(SATURDAY_DELIVERY_NOTE).toBe(
+      "Saturday's media content is delivered on Monday unless Same Day Delivery is added while booking.",
+    );
     expect(saturdayDeliveryNote("2026-10-17")).toBe(SATURDAY_DELIVERY_NOTE);
     expect(saturdayDeliveryNote("2026-10-13")).toBeNull();
     expect(saturdayDeliveryNote("")).toBeNull();

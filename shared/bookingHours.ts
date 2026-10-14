@@ -17,7 +17,7 @@ export const STEVEN_BANDA_ID = "steven-banda";
 export const SATURDAY_LATEST_START_MINUTES = 12 * 60;
 export const STEVEN_FINISH_MINUTES = 17 * 60;
 export const SATURDAY_DELIVERY_NOTE =
-  "Saturday shoots are delivered Monday unless you add same-day delivery.";
+  "Saturday's media content is delivered on Monday unless Same Day Delivery is added while booking.";
 
 export interface BookingDayHours {
   /** Minutes from midnight, inclusive. */
