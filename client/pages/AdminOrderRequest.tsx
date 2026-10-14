@@ -697,6 +697,16 @@ export default function AdminOrderRequest() {
                 disabled={saving} className="w-full rounded-xl text-xs font-bold justify-center bg-[#0d9488] hover:bg-[#0f766e] text-white">
                 <Layers className="w-3.5 h-3.5 mr-1.5" />{order.listingId ? "View Project" : "Create Project"}
               </Button>
+              {order.listingId && (
+                <Button type="button" onClick={() => navigate(`/admin/listing/${order.listingId}`)} variant="outline" className="w-full rounded-xl text-xs font-bold justify-center">
+                  <Camera className="w-3.5 h-3.5 mr-1.5" /> Media
+                </Button>
+              )}
+              {order.galleryId && (
+                <Button type="button" onClick={() => navigate("/admin/delivery")} variant="outline" className="w-full rounded-xl text-xs font-bold justify-center">
+                  Delivery
+                </Button>
+              )}
               <Button onClick={handleAcceptBooking}
                 disabled={saving || Boolean(order.convertedToOrderId)} className="w-full rounded-xl text-xs font-bold justify-center bg-black hover:bg-gray-800 text-white disabled:opacity-50">
                 <Check className="w-3.5 h-3.5 mr-1.5" />{order.convertedToOrderId ? "Accepted" : "Accept booking"}
