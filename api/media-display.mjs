@@ -550,6 +550,12 @@ const PUBLIC_PAGES = [
     description: "Schedule listing photography or video with Iconic Images in Spring, The Woodlands, or Houston."
   },
   {
+    path: "/apprenticeship",
+    file: "seo/apprenticeship.html",
+    title: "The Apprenticeship Program | Iconic Images",
+    description: "Apprentice listing photos in Spring, The Woodlands, and Houston. A short appointment, photos only, and the program rules."
+  },
+  {
     path: "/senior-living",
     file: "seo/senior-living.html",
     title: "Senior Living Virtual Tours & Photography | Iconic Images",
