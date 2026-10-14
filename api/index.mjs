@@ -249,16 +249,16 @@ const SETTLED$1 = /* @__PURE__ */ new Set(["paid", "comped"]);
 function isGuessableInvoiceId(id) {
   return id.startsWith("listing_") || id.startsWith("ordreq_") || id.startsWith("playtest-");
 }
-function text$m(value) {
+function text$n(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function settled$1(invoice) {
-  return SETTLED$1.has(text$m(invoice?.status).toLowerCase());
+  return SETTLED$1.has(text$n(invoice?.status).toLowerCase());
 }
 function invoicePayLinkFor(invoice, env, extra) {
   if (!invoice || settled$1(invoice)) return null;
-  const id = text$m(invoice.id);
-  const token = text$m(invoice.payToken);
+  const id = text$n(invoice.id);
+  const token = text$n(invoice.payToken);
   if (!id || !token) return null;
   const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
   url.searchParams.set("t", token);
@@ -269,7 +269,7 @@ function clientInvoiceUrl(invoice, env, extra) {
   const tokenized = invoicePayLinkFor(invoice, env, extra);
   if (tokenized) return tokenized;
   if (!invoice || settled$1(invoice)) return null;
-  const id = text$m(invoice.id);
+  const id = text$n(invoice.id);
   if (!id || isGuessableInvoiceId(id)) return null;
   const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
   applyQuery(url, extra);
@@ -278,7 +278,7 @@ function clientInvoiceUrl(invoice, env, extra) {
 function applyQuery(url, extra) {
   if (!extra) return;
   for (const [key, value] of Object.entries(extra)) {
-    const textValue = text$m(value);
+    const textValue = text$n(value);
     if (textValue && key !== "t") url.searchParams.set(key, textValue);
   }
 }
@@ -1623,8 +1623,8 @@ const TEAL = "#14B8C4";
 const GREEN = "#16A34A";
 const ROW = "#F3F4F6";
 function receiptProcessing(input) {
-  const status2 = text$l(input.invoice.status).toLowerCase();
-  const paymentStatus = text$l(input.invoice.paymentStatus).toLowerCase();
+  const status2 = text$m(input.invoice.status).toLowerCase();
+  const paymentStatus = text$m(input.invoice.paymentStatus).toLowerCase();
   if (status2 === "comped" || paymentStatus === "comped") return 0;
   const base = roundCents(input.subtotal - input.promotions + input.fees);
   const stored = finite$1(input.invoice.processing);
@@ -1913,7 +1913,7 @@ function dollars$1(value) {
   const amount = Number(String(value).replace(/[^0-9.-]/g, ""));
   return Number.isFinite(amount) ? amount : 0;
 }
-function text$l(value) {
+function text$m(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function escapeHtml$6(value) {
@@ -2226,7 +2226,7 @@ function narrowGatedClientRecipients(input, env = process.env) {
     held
   };
 }
-const db$t = () => admin.firestore();
+const db$u = () => admin.firestore();
 class EmailNotConfiguredError extends Error {
   code = "email_not_configured";
   constructor() {
@@ -2282,7 +2282,7 @@ async function sendEmail(options) {
   let textBody = options.text;
   try {
     if (admin.apps.length) {
-      const templateDoc = await db$t().collection(EMAIL_TEMPLATES_COLLECTION).doc(template).get();
+      const templateDoc = await db$u().collection(EMAIL_TEMPLATES_COLLECTION).doc(template).get();
       const override = templateDoc.exists ? readEmailTemplateOverride(templateDoc.data()) : null;
       if (override) {
         subject = fillEmailPlaceholders(override.subject, variables);
@@ -2556,7 +2556,7 @@ function addressText(value) {
   if (typeof value === "string") return value.trim();
   if (typeof value !== "object" || Array.isArray(value)) return "";
   const address = value;
-  const formatted = text$k(address.formatted) || text$k(address.label);
+  const formatted = text$l(address.formatted) || text$l(address.label);
   if (formatted) return formatted;
   return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
 }
@@ -2569,7 +2569,7 @@ function recordAddressText(record2) {
   }
   return "";
 }
-function text$k(value) {
+function text$l(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const PLAYTEST_ADDRESS = "100 Playtest Lane, Austin, TX 78701";
@@ -3863,7 +3863,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
       createdAt: data.createdAt
     }, now),
     status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
-    clientName: text$j(data.clientName),
+    clientName: text$k(data.clientName),
     address: addressText(data.billToAddress || data.address || data.propertyAddress),
     createdAt,
     issuedOn: formatPortalDate(data.createdAt) || formatPortalDate(data.sentAt) || formatPortalDate(data.paidAt),
@@ -3873,7 +3873,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
     fees: storedAmount(data.fees),
     travel: storedAmount(data.travel),
     promoDiscount: storedAmount(data.promoDiscount),
-    promoCode: text$j(data.promoCode),
+    promoCode: text$k(data.promoCode),
     tax: storedAmount(data.tax),
     total: storedAmount(data.total),
     amountPaid: storedAmount(data.amountPaid),
@@ -3925,15 +3925,15 @@ function storedLines(lineItems, services2) {
     if (typeof item === "string" && item.trim()) return [{ name: item.trim(), qty: null, amount: null }];
     if (!item || typeof item !== "object") return [];
     const record2 = item;
-    const named = text$j(record2.name) || text$j(record2.label);
-    const description = text$j(record2.description);
+    const named = text$k(record2.name) || text$k(record2.label);
+    const description = text$k(record2.description);
     const name = named || description;
     const qty = storedQty(record2.qty ?? record2.quantity);
     const amount = storedAmount(record2.price ?? record2.amount ?? record2.total);
     if (!name && amount == null && qty == null) return [];
     const line = { name: name || "Line item", qty, amount };
-    const id = text$j(record2.id);
-    const category = text$j(record2.category);
+    const id = text$k(record2.id);
+    const category = text$k(record2.category);
     if (id) line.id = id;
     if (category) line.category = category;
     if (named && description) line.description = description;
@@ -3969,7 +3969,7 @@ function isoStamp(value) {
   if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
   return null;
 }
-function text$j(value) {
+function text$k(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function roundMoney$5(value) {
@@ -4200,17 +4200,17 @@ async function listCalendarScheduleEvents({
   const readFailures = results.filter((result) => result.status === "rejected").length;
   return { configured: true, events, readFailures };
 }
-const db$s = () => admin.firestore();
+const db$t = () => admin.firestore();
 async function upsertPortalClient(input) {
   const email = normalizeEmail$1(input.email);
   const firstName = cleanPersonName(input.firstName);
   const lastName = cleanPersonName(input.lastName);
   const phone = String(input.phone || "").trim().slice(0, 40);
   const now = admin.firestore.FieldValue.serverTimestamp();
-  const existing = email ? await db$s().collection("clients").where("email", "==", email).limit(5).get() : null;
+  const existing = email ? await db$t().collection("clients").where("email", "==", email).limit(5).get() : null;
   const linked = existing?.docs.find((doc) => doc.id !== input.uid);
   const linkedData = linked?.data() || {};
-  const uidRef = db$s().collection("clients").doc(input.uid);
+  const uidRef = db$t().collection("clients").doc(input.uid);
   const uidSnap = await uidRef.get();
   const previous = uidSnap.exists ? uidSnap.data() || {} : {};
   await uidRef.set({
@@ -4242,7 +4242,7 @@ async function upsertPortalClient(input) {
 }
 async function resolveClientIdentity(uid, email) {
   const ids = /* @__PURE__ */ new Set([uid]);
-  const direct = await db$s().collection("clients").doc(uid).get();
+  const direct = await db$t().collection("clients").doc(uid).get();
   let profile = direct.exists ? { id: direct.id, ...direct.data() } : null;
   const redirectId = typeof profile?._redirect === "string" ? profile._redirect : "";
   if (redirectId) ids.add(redirectId);
@@ -4250,14 +4250,14 @@ async function resolveClientIdentity(uid, email) {
   if (linkedId) ids.add(linkedId);
   const normalized = normalizeEmail$1(email || profile?.email);
   if (normalized) {
-    const matches = await db$s().collection("clients").where("email", "==", normalized).limit(10).get();
+    const matches = await db$t().collection("clients").where("email", "==", normalized).limit(10).get();
     for (const doc of matches.docs) {
       ids.add(doc.id);
       if (!profile) profile = { id: doc.id, ...doc.data() };
     }
   }
   if (redirectId && profile && !profile.email) {
-    const real = await db$s().collection("clients").doc(redirectId).get();
+    const real = await db$t().collection("clients").doc(redirectId).get();
     if (real.exists) profile = { id: real.id, ...real.data(), portalDocId: uid };
   }
   return { ids: [...ids], profile, email: normalized };
@@ -4286,7 +4286,7 @@ function planBookingAccount(input) {
     skipReason: null
   };
 }
-const db$r = () => admin.firestore();
+const db$s = () => admin.firestore();
 async function attachBookingClient(input) {
   const email = normalizeEmail$1(input.email);
   if (!email || !email.includes("@")) {
@@ -4295,7 +4295,7 @@ async function attachBookingClient(input) {
   const firstName = cleanPersonName(input.firstName) || "Client";
   const lastName = cleanPersonName(input.lastName);
   const phone = String(input.phone || "").trim().slice(0, 40);
-  const staffHit = await db$r().collection("staff").where("email", "==", email).limit(1).get();
+  const staffHit = await db$s().collection("staff").where("email", "==", email).limit(1).get();
   let authUid = null;
   if (staffHit.empty) {
     try {
@@ -4377,7 +4377,7 @@ async function sendFirebasePasswordEmail(email) {
 }
 async function createRequestedAppointment(input) {
   const now = admin.firestore.FieldValue.serverTimestamp();
-  await db$r().collection("appointments").add({
+  await db$s().collection("appointments").add({
     orderRequestId: input.orderRequestId,
     clientId: input.clientId,
     clientName: input.clientName,
@@ -4396,13 +4396,6 @@ async function createRequestedAppointment(input) {
     createdAt: now,
     updatedAt: now
   });
-}
-function visibleToPortalClient(record2, identity) {
-  if (!record2) return false;
-  if (record2.clientId && identity.ids.includes(String(record2.clientId))) return true;
-  const email = normalizeEmail$1(identity.email);
-  if (!email) return false;
-  return [record2.email, record2.clientEmail].some((value) => normalizeEmail$1(value) === email);
 }
 const PORTAL_LISTING_ID$1 = /^[A-Za-z0-9_-]{4,128}$/;
 const NEVER_FILL = /* @__PURE__ */ new Set([
@@ -4439,40 +4432,40 @@ function bookingListingGroups(input) {
   for (const doc of requests) {
     const node = nodeId("orderRequests", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("listings", text$i(doc.data.listingId)));
-    uf.link(node, nodeId("orders", text$i(doc.data.orderId) || text$i(doc.data.convertedToOrderId)));
-    uf.link(node, nodeId("invoices", text$i(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$i(doc.data.galleryId)));
+    uf.link(node, nodeId("listings", text$j(doc.data.listingId)));
+    uf.link(node, nodeId("orders", text$j(doc.data.orderId) || text$j(doc.data.convertedToOrderId)));
+    uf.link(node, nodeId("invoices", text$j(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$j(doc.data.galleryId)));
   }
   for (const doc of orders) {
     const node = nodeId("orders", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$i(doc.data.orderRequestId)));
-    uf.link(node, nodeId("listings", text$i(doc.data.listingId)));
-    uf.link(node, nodeId("invoices", text$i(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$i(doc.data.galleryId)));
+    uf.link(node, nodeId("orderRequests", text$j(doc.data.orderRequestId)));
+    uf.link(node, nodeId("listings", text$j(doc.data.listingId)));
+    uf.link(node, nodeId("invoices", text$j(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$j(doc.data.galleryId)));
   }
   for (const doc of invoices) {
     const node = nodeId("invoices", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$i(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$i(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$i(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$j(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$j(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$j(doc.data.listingId)));
   }
   for (const doc of appointments) {
     const node = nodeId("appointments", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$i(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$i(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$i(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$j(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$j(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$j(doc.data.listingId)));
   }
   for (const doc of galleries) {
     const node = nodeId("galleries", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$i(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$i(doc.data.orderId)));
-    uf.link(node, nodeId("invoices", text$i(doc.data.invoiceId)));
-    uf.link(node, nodeId("listings", text$i(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$j(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$j(doc.data.orderId)));
+    uf.link(node, nodeId("invoices", text$j(doc.data.invoiceId)));
+    uf.link(node, nodeId("listings", text$j(doc.data.listingId)));
   }
   const groups = [];
   for (const nodes of uf.components()) {
@@ -4532,7 +4525,7 @@ function fillEmptyListingFields(existing, desired) {
   return patch;
 }
 function clientOwnsListing(listing, clients) {
-  const clientId2 = text$i(listing.clientId);
+  const clientId2 = text$j(listing.clientId);
   const email = normalizeEmail$1(listing.clientEmail || listing.email);
   if (!clientId2 && !email) return true;
   if (clientId2 && clients.ids.includes(clientId2)) return true;
@@ -4604,10 +4597,10 @@ function chooseListing(group, listings, clients) {
 }
 function listingMatches(doc, group) {
   if (doc.id === group.stableId || group.preferredListingIds.includes(doc.id)) return true;
-  const requestId = text$i(doc.data.orderRequestId);
-  const orderId = text$i(doc.data.orderId);
-  const invoiceId = text$i(doc.data.invoiceId);
-  const appointmentId = text$i(doc.data.appointmentId);
+  const requestId = text$j(doc.data.orderRequestId);
+  const orderId = text$j(doc.data.orderId);
+  const invoiceId = text$j(doc.data.invoiceId);
+  const appointmentId = text$j(doc.data.appointmentId);
   return Boolean(
     requestId && group.orderRequestIds.includes(requestId) || orderId && group.orderIds.includes(orderId) || invoiceId && group.invoiceIds.includes(invoiceId) || appointmentId && group.appointmentIds.includes(appointmentId)
   );
@@ -4617,7 +4610,7 @@ function linksFor(group, listingId, listings, clients) {
   const links = [];
   const push = (collection, docs) => {
     for (const doc of docs) {
-      const current = text$i(doc.data.listingId);
+      const current = text$j(doc.data.listingId);
       if (current === listingId) continue;
       if (current && isPortalListingId(current) && ownedIds.has(current)) continue;
       links.push({ collection, id: doc.id });
@@ -4634,7 +4627,7 @@ function clientsFor(group, identity) {
   const ids = /* @__PURE__ */ new Set();
   const emails = /* @__PURE__ */ new Set();
   const addId = (value) => {
-    const id = text$i(value);
+    const id = text$j(value);
     if (id) ids.add(id);
   };
   const addEmail = (value) => {
@@ -4653,7 +4646,7 @@ function clientsFor(group, identity) {
 function preferredListingIds(group) {
   const ids = [];
   const push = (value) => {
-    const id = text$i(value);
+    const id = text$j(value);
     if (id && isPortalListingId(id) && !ids.includes(id)) ids.push(id);
   };
   for (const doc of [...group.orderRequests, ...group.orders, ...group.invoices, ...group.appointments, ...group.galleries]) {
@@ -4688,9 +4681,9 @@ function bestAddress(group) {
   }
   for (const doc of propertyDocs(group)) {
     for (const key of ["address", "propertyAddress", "shootLocation"]) {
-      if (typeof doc.data[key] === "string" && text$i(doc.data[key])) return text$i(doc.data[key]);
+      if (typeof doc.data[key] === "string" && text$j(doc.data[key])) return text$j(doc.data[key]);
     }
-    if (text$i(doc.data.addressLabel)) return text$i(doc.data.addressLabel);
+    if (text$j(doc.data.addressLabel)) return text$j(doc.data.addressLabel);
   }
   return null;
 }
@@ -4706,7 +4699,7 @@ function firstScheduleDate(group) {
 function firstScheduleTime(group) {
   for (const doc of [...group.appointments, ...group.orders, ...group.orderRequests]) {
     for (const key of ["scheduledTime", "appointmentTime", "apptTime", "requestedTime"]) {
-      const value = text$i(doc.data[key]);
+      const value = text$j(doc.data[key]);
       if (value && !/^tbd$/i.test(value)) return value;
     }
   }
@@ -4723,7 +4716,7 @@ function projectType(group) {
     if (doc.data.projectType === "real_estate") return "real_estate";
     const service = doc.data.selectedService;
     if (service && typeof service === "object") {
-      const category = text$i(service.category);
+      const category = text$j(service.category);
       if (category === "business" || category === "branding") return "business";
       if (category === "listings") return "real_estate";
     }
@@ -4749,7 +4742,7 @@ function namesFrom(value) {
   for (const item of value) {
     if (typeof item === "string" && item.trim()) names.push(item.trim());
     else if (item && typeof item === "object") {
-      const name = text$i(item.name);
+      const name = text$j(item.name);
       if (name) names.push(name);
     }
     if (names.length >= 40) break;
@@ -4774,8 +4767,8 @@ function accessInfo(group) {
   return [firstText$2(group, ["accessMethod"]), firstText$2(group, ["lockboxCode"])].filter(Boolean).join(" - ");
 }
 function clientId(group, identity) {
-  const bookingIds = propertyDocs(group).map((doc) => text$i(doc.data.clientId)).filter(Boolean);
-  const identityIds = (identity?.ids || []).map((id) => text$i(id)).filter(Boolean);
+  const bookingIds = propertyDocs(group).map((doc) => text$j(doc.data.clientId)).filter(Boolean);
+  const identityIds = (identity?.ids || []).map((id) => text$j(id)).filter(Boolean);
   return bookingIds.find((id) => identityIds.includes(id)) || bookingIds[0] || identityIds[0] || "";
 }
 function clientEmail(group, identity) {
@@ -4789,8 +4782,8 @@ function clientEmail(group, identity) {
 }
 function clientName$1(group) {
   for (const doc of propertyDocs(group)) {
-    if (text$i(doc.data.clientName)) return text$i(doc.data.clientName);
-    const joined = `${text$i(doc.data.firstName)} ${text$i(doc.data.lastName)}`.trim();
+    if (text$j(doc.data.clientName)) return text$j(doc.data.clientName);
+    const joined = `${text$j(doc.data.firstName)} ${text$j(doc.data.lastName)}`.trim();
     if (joined) return joined;
   }
   return "";
@@ -4798,7 +4791,7 @@ function clientName$1(group) {
 function chosenInvoiceId(group) {
   const known = new Set(group.invoiceIds);
   for (const doc of [...group.orderRequests, ...group.orders]) {
-    const id = text$i(doc.data.invoiceId);
+    const id = text$j(doc.data.invoiceId);
     if (id && known.has(id)) return id;
   }
   return newestDoc(group.invoices)?.id || group.invoiceIds[0] || "";
@@ -4807,7 +4800,7 @@ function chosenId(docs, ids, pointers = [], keys = []) {
   const known = new Set(ids);
   for (const doc of pointers) {
     for (const key of keys) {
-      const id = text$i(doc.data[key]);
+      const id = text$j(doc.data[key]);
       if (id && known.has(id)) return id;
     }
   }
@@ -4819,7 +4812,7 @@ function propertyDocs(group) {
 function firstText$2(group, keys) {
   for (const doc of propertyDocs(group)) {
     for (const key of keys) {
-      const value = text$i(doc.data[key]);
+      const value = text$j(doc.data[key]);
       if (value) return value;
     }
   }
@@ -4887,7 +4880,7 @@ function hasAddress(value) {
   if (typeof value === "string") return value.trim().length > 0;
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record2 = value;
-  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$i(record2[key]).length > 0);
+  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$j(record2[key]).length > 0);
 }
 function statusKey(value) {
   return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
@@ -4919,14 +4912,14 @@ function isEmpty(value) {
 function isSentinel$1(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$i(value) {
+function text$j(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function cleanDocs(docs) {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
   for (const doc of docs || []) {
-    const id = text$i(doc?.id);
+    const id = text$j(doc?.id);
     if (!id || seen.has(id)) continue;
     seen.add(id);
     out.push({ id, data: doc.data && typeof doc.data === "object" ? doc.data : {} });
@@ -4973,7 +4966,14 @@ class UnionFind {
     return root;
   }
 }
-const db$q = () => admin.firestore();
+function visibleToPortalClient(record2, identity) {
+  if (!record2) return false;
+  if (record2.clientId && identity.ids.includes(String(record2.clientId))) return true;
+  const email = normalizeEmail$1(identity.email);
+  if (!email) return false;
+  return [record2.email, record2.clientEmail].some((value) => normalizeEmail$1(value) === email);
+}
+const db$r = () => admin.firestore();
 const LINK_COLLECTIONS = /* @__PURE__ */ new Set([
   "orderRequests",
   "orders",
@@ -4994,7 +4994,7 @@ const LOCK_FIELDS = /* @__PURE__ */ new Set(["lockDownloads", "requirePayment", 
 async function ensureBookingListingForRequest(orderRequestId) {
   const id = orderRequestId.trim();
   if (!id) return null;
-  const snap = await db$q().collection("orderRequests").doc(id).get();
+  const snap = await db$r().collection("orderRequests").doc(id).get();
   if (!snap.exists) return null;
   const request = asDoc(snap.id, snap.data());
   const bundle = await hydrateBundle({
@@ -5005,7 +5005,7 @@ async function ensureBookingListingForRequest(orderRequestId) {
     galleries: []
   });
   const identity = {
-    ids: text$h(request.data.clientId) ? [text$h(request.data.clientId)] : [],
+    ids: text$i(request.data.clientId) ? [text$i(request.data.clientId)] : [],
     email: normalizeEmail$1(request.data.clientEmail || request.data.email)
   };
   const plans = await plansFor(bundle, identity);
@@ -5048,7 +5048,7 @@ async function plansFor(bundle, identity) {
 }
 async function applyBookingListingPlan(plan) {
   if (!isPortalListingId(plan.listingId)) throw new Error("Listing id is not valid.");
-  const ref = db$q().collection("listings").doc(plan.listingId);
+  const ref = db$r().collection("listings").doc(plan.listingId);
   let created = false;
   if (plan.create) {
     try {
@@ -5058,7 +5058,7 @@ async function applyBookingListingPlan(plan) {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
       created = true;
-      console.info(`[Listings] Created ${plan.listingId} for booking ${text$h(plan.createFields.orderRequestId) || text$h(plan.createFields.orderId) || text$h(plan.createFields.invoiceId)}`);
+      console.info(`[Listings] Created ${plan.listingId} for booking ${text$i(plan.createFields.orderRequestId) || text$i(plan.createFields.orderId) || text$i(plan.createFields.invoiceId)}`);
     } catch (err) {
       if (!alreadyExists(err)) throw err;
       await fillListing(ref, plan.createFields);
@@ -5084,10 +5084,10 @@ async function fillListing(ref, desired) {
 }
 async function linkRecord(collectionName, id, listingId) {
   if (!LINK_COLLECTIONS.has(collectionName) || !id) return;
-  const ref = db$q().collection(collectionName).doc(id);
+  const ref = db$r().collection(collectionName).doc(id);
   const snap = await ref.get();
   if (!snap.exists) return;
-  if (text$h(snap.data()?.listingId) === listingId) return;
+  if (text$i(snap.data()?.listingId) === listingId) return;
   await ref.update({
     listingId,
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -5101,9 +5101,9 @@ async function loadVisibleSeeds(identity) {
   const keep = (map, docs) => {
     for (const doc of docs) {
       if (!visibleToPortalClient({
-        clientId: text$h(doc.data.clientId),
-        email: text$h(doc.data.email),
-        clientEmail: text$h(doc.data.clientEmail)
+        clientId: text$i(doc.data.clientId),
+        email: text$i(doc.data.email),
+        clientEmail: text$i(doc.data.clientEmail)
       }, identity)) continue;
       if (!map.has(doc.id)) map.set(doc.id, doc);
     }
@@ -5142,36 +5142,36 @@ async function hydrateBundle(seed) {
   const galleries = mapDocs(seed.galleries);
   const requestIds = new Set(requests.keys());
   for (const doc of [...orders.values(), ...invoices.values(), ...appointments.values()]) {
-    const id = text$h(doc.data.orderRequestId);
+    const id = text$i(doc.data.orderRequestId);
     if (id) requestIds.add(id);
   }
   await readMissing("orderRequests", requestIds, requests);
   const orderIds = new Set(orders.keys());
   for (const doc of requests.values()) {
-    const id = text$h(doc.data.convertedToOrderId) || text$h(doc.data.orderId);
+    const id = text$i(doc.data.convertedToOrderId) || text$i(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   for (const doc of [...invoices.values(), ...appointments.values()]) {
-    const id = text$h(doc.data.orderId);
+    const id = text$i(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   await readMissing("orders", orderIds, orders);
   const invoiceIds = new Set(invoices.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$h(doc.data.invoiceId);
+    const id = text$i(doc.data.invoiceId);
     if (id) invoiceIds.add(id);
   }
   await readMissing("invoices", invoiceIds, invoices);
   const legacyIds = /* @__PURE__ */ new Set();
   for (const doc of requests.values()) {
-    for (const id of legacyInvoiceDocIds({ orderRequestId: doc.id, listingId: text$h(doc.data.listingId) })) {
+    for (const id of legacyInvoiceDocIds({ orderRequestId: doc.id, listingId: text$i(doc.data.listingId) })) {
       legacyIds.add(id);
     }
   }
   for (const doc of orders.values()) {
     for (const id of legacyInvoiceDocIds({
-      orderRequestId: text$h(doc.data.orderRequestId),
-      listingId: text$h(doc.data.listingId)
+      orderRequestId: text$i(doc.data.orderRequestId),
+      listingId: text$i(doc.data.listingId)
     })) {
       legacyIds.add(id);
     }
@@ -5184,7 +5184,7 @@ async function hydrateBundle(seed) {
   mergeDocs(appointments, await queryIn("appointments", "orderId", [...orders.keys()]));
   const galleryIds = new Set(galleries.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$h(doc.data.galleryId);
+    const id = text$i(doc.data.galleryId);
     if (id) galleryIds.add(id);
   }
   await readMissing("galleries", galleryIds, galleries);
@@ -5236,7 +5236,7 @@ async function followInvoiceRedirects(invoices) {
 async function readMissing(collectionName, ids, into) {
   const missing = [...ids].filter((id) => id && !into.has(id)).slice(0, 100);
   if (missing.length === 0) return;
-  const snaps = await db$q().getAll(...missing.map((id) => db$q().collection(collectionName).doc(id)));
+  const snaps = await db$r().getAll(...missing.map((id) => db$r().collection(collectionName).doc(id)));
   snaps.forEach((snap) => {
     if (!snap.exists || into.has(snap.id)) return;
     into.set(snap.id, asDoc(snap.id, snap.data()));
@@ -5246,14 +5246,14 @@ async function queryIn(collectionName, field, values) {
   const unique2 = [...new Set(values.map((value) => value.trim()).filter(Boolean))];
   const docs = [];
   for (const part of chunk$1(unique2, 30)) {
-    const snap = await db$q().collection(collectionName).where(field, "in", part).limit(100).get();
+    const snap = await db$r().collection(collectionName).where(field, "in", part).limit(100).get();
     snap.docs.forEach((doc) => docs.push(asDoc(doc.id, doc.data())));
   }
   return docs;
 }
 async function queryEqual(collectionName, field, value) {
   if (!value) return [];
-  const snap = await db$q().collection(collectionName).where(field, "==", value).limit(100).get();
+  const snap = await db$r().collection(collectionName).where(field, "==", value).limit(100).get();
   return snap.docs.map((doc) => asDoc(doc.id, doc.data()));
 }
 function mergeDocs(into, docs) {
@@ -5313,13 +5313,109 @@ function alreadyExists(err) {
 function isSentinel(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$h(value) {
+function text$i(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function chunk$1(items, size) {
   const out = [];
   for (let index = 0; index < items.length; index += size) out.push(items.slice(index, index + size));
   return out;
+}
+const BOOKING_PHOTOGRAPHER_STAFF_UIDS = {
+  "mike-luna": "",
+  "armando-martinez": "",
+  "daniel-adaclog": "",
+  "steven-banda": "",
+  "pedro-hernandez": "",
+  "david-gonzalez": "",
+  "cadi-torres": ""
+};
+function text$h(value) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+function resolveBookingPhotographerStaff(input) {
+  const publicId = input.publicId.trim();
+  const configured = String(BOOKING_PHOTOGRAPHER_STAFF_UIDS[publicId] || "").trim();
+  const calendar = text$h(input.calendarId);
+  const match = calendar ? (input.staff || []).find((member) => text$h(member.email) === calendar || text$h(member.googleCalendarId) === calendar) : void 0;
+  const candidate = String(match?.id || configured || "").trim();
+  const uid = candidate && candidate !== publicId ? candidate : null;
+  const matchedName = typeof match?.name === "string" ? match.name.trim() : "";
+  return {
+    uid,
+    name: (input.name || "").trim() || matchedName || null,
+    publicId
+  };
+}
+function listingPhotographerAssignment(resolved) {
+  if (!resolved.uid) return null;
+  return {
+    photographerUid: resolved.uid,
+    photographerIds: [resolved.uid],
+    photographerNames: resolved.name ? [resolved.name] : [],
+    bookingPhotographerId: resolved.publicId,
+    assignedPhotographerName: resolved.name
+  };
+}
+const NO_PREFERENCE_ID = "no-preference";
+const NO_PREFERENCE_NAME = "No preference";
+const BOOKING_PHOTOGRAPHERS = [
+  { id: "mike-luna", name: "Mike Luna", calendarId: "mike@iconicimagestx.com" },
+  { id: "armando-martinez", name: "Armando Martinez", calendarId: "armando@iconicimagestx.com" },
+  { id: "daniel-adaclog", name: "Daniel Adaclog", calendarId: "daniel@iconicimagestx.com" },
+  { id: "steven-banda", name: "Steven Banda", calendarId: "steven@iconicimagestx.com" },
+  { id: "pedro-hernandez", name: "Pedro Hernandez", calendarId: "phernandez1833@gmail.com" },
+  { id: "david-gonzalez", name: "David Gonzalez", calendarId: "david@iconicimagestx.com" },
+  { id: "cadi-torres", name: "Cadi Torres", calendarId: "cadi@iconicimagestx.com" }
+];
+function publicBookingPhotographers() {
+  return BOOKING_PHOTOGRAPHERS.map((person) => ({ id: person.id, name: person.name }));
+}
+function bookingPhotographerById(id) {
+  const key = id.trim();
+  return BOOKING_PHOTOGRAPHERS.find((person) => person.id === key) || null;
+}
+function preferenceFromRequest(id, name) {
+  const rawId = typeof id === "string" ? id.trim() : "";
+  if (rawId === NO_PREFERENCE_ID) return NO_PREFERENCE_ID;
+  if (bookingPhotographerById(rawId)) return rawId;
+  const rawName = typeof name === "string" ? name.trim().toLowerCase() : "";
+  const byName = BOOKING_PHOTOGRAPHERS.find((person) => person.name.toLowerCase() === rawName);
+  return byName?.id || NO_PREFERENCE_ID;
+}
+function preferenceName(id) {
+  if (id === NO_PREFERENCE_ID) return NO_PREFERENCE_NAME;
+  return bookingPhotographerById(id)?.name || NO_PREFERENCE_NAME;
+}
+const db$q = () => admin.firestore();
+async function assignBookingPhotographerToListing(listingId, request) {
+  const id = listingId.trim();
+  const publicId = typeof request.bookingPhotographerId === "string" ? request.bookingPhotographerId.trim() : "";
+  if (!id || !publicId) return { uid: null, publicId };
+  const person = bookingPhotographerById(publicId);
+  const staffSnap = await db$q().collection("staff").limit(200).get();
+  const staff = staffSnap.docs.map((doc) => {
+    const data = doc.data() || {};
+    return {
+      id: doc.id,
+      email: data.email,
+      googleCalendarId: data.googleCalendarId,
+      name: data.name
+    };
+  });
+  const resolved = resolveBookingPhotographerStaff({
+    publicId,
+    calendarId: person?.calendarId || null,
+    name: person?.name || (typeof request.assignedPhotographerName === "string" ? request.assignedPhotographerName : null),
+    staff
+  });
+  const patch = listingPhotographerAssignment(resolved);
+  if (!patch) return { uid: null, publicId };
+  await db$q().collection("listings").doc(id).set({
+    ...patch,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  }, { merge: true });
+  return { uid: patch.photographerUid, publicId };
 }
 function lifeOfTheListingCareSelected(value) {
   return value === true;
@@ -6076,36 +6172,6 @@ function refuseQaStaffPhone(input) {
   const match = qaStaffMatchingPhone(input.staff, input.photographerPhone);
   if (!match) return null;
   return refusal(qaStaffAssignmentError([match], input.record));
-}
-const NO_PREFERENCE_ID = "no-preference";
-const NO_PREFERENCE_NAME = "No preference";
-const BOOKING_PHOTOGRAPHERS = [
-  { id: "mike-luna", name: "Mike Luna", calendarId: "mike@iconicimagestx.com" },
-  { id: "armando-martinez", name: "Armando Martinez", calendarId: "armando@iconicimagestx.com" },
-  { id: "daniel-adaclog", name: "Daniel Adaclog", calendarId: "daniel@iconicimagestx.com" },
-  { id: "steven-banda", name: "Steven Banda", calendarId: "steven@iconicimagestx.com" },
-  { id: "pedro-hernandez", name: "Pedro Hernandez", calendarId: "phernandez1833@gmail.com" },
-  { id: "david-gonzalez", name: "David Gonzalez", calendarId: "david@iconicimagestx.com" },
-  { id: "cadi-torres", name: "Cadi Torres", calendarId: "cadi@iconicimagestx.com" }
-];
-function publicBookingPhotographers() {
-  return BOOKING_PHOTOGRAPHERS.map((person) => ({ id: person.id, name: person.name }));
-}
-function bookingPhotographerById(id) {
-  const key = id.trim();
-  return BOOKING_PHOTOGRAPHERS.find((person) => person.id === key) || null;
-}
-function preferenceFromRequest(id, name) {
-  const rawId = typeof id === "string" ? id.trim() : "";
-  if (rawId === NO_PREFERENCE_ID) return NO_PREFERENCE_ID;
-  if (bookingPhotographerById(rawId)) return rawId;
-  const rawName = typeof name === "string" ? name.trim().toLowerCase() : "";
-  const byName = BOOKING_PHOTOGRAPHERS.find((person) => person.name.toLowerCase() === rawName);
-  return byName?.id || NO_PREFERENCE_ID;
-}
-function preferenceName(id) {
-  if (id === NO_PREFERENCE_ID) return NO_PREFERENCE_NAME;
-  return bookingPhotographerById(id)?.name || NO_PREFERENCE_NAME;
 }
 const APPRENTICESHIP_ORDER_SOURCE = "apprenticeship";
 const APPRENTICESHIP_CALENDAR_ID = "steven@iconicimagestx.com";
@@ -7732,6 +7798,21 @@ router$p.get("/:id", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking request." });
   }
 });
+router$p.post("/:id/assign-photographer", requireCoordinator, async (req, res) => {
+  try {
+    const requestDoc = await db$p().collection("orderRequests").doc(req.params.id).get();
+    if (!requestDoc.exists) return res.status(404).json({ error: "Booking request not found." });
+    const request = requestDoc.data() || {};
+    const posted = typeof req.body?.listingId === "string" ? req.body.listingId.trim() : "";
+    const listingId = posted || (typeof request.listingId === "string" ? request.listingId.trim() : "");
+    if (!listingId) return res.status(400).json({ error: "Listing is missing." });
+    const assigned = await assignBookingPhotographerToListing(listingId, request);
+    return res.json({ success: true, photographerUid: assigned.uid, publicId: assigned.publicId });
+  } catch (err) {
+    console.error("[Bookings] Photographer assign failed:", err);
+    return res.status(500).json({ error: "Could not assign the photographer." });
+  }
+});
 router$p.patch("/:id/confirm", requireCoordinator, async (req, res) => {
   try {
     const { assignedPhotographerId, assignedPhotographerName: postedPhotographerName, scheduledDate, scheduledTime, internalNotes } = req.body;
@@ -7758,6 +7839,20 @@ router$p.patch("/:id/confirm", requireCoordinator, async (req, res) => {
         });
       } catch (err) {
         console.error("[Bookings] Order/project/invoice link failed:", err);
+      }
+      const existingGalleryId = existingInvoiceId(request.galleryId);
+      if (existingGalleryId && listingId2) {
+        await db$p().collection("galleries").doc(existingGalleryId).set({
+          listingId: listingId2,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      }
+      if (listingId2) {
+        try {
+          await assignBookingPhotographerToListing(listingId2, request);
+        } catch (err) {
+          console.error("[Bookings] Photographer assign failed:", err);
+        }
       }
       return res.json({
         success: true,
@@ -7857,7 +7952,9 @@ router$p.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       services: requestLineItems,
       lineItems: requestLineItems,
       selectedService: request.selectedService || null,
-      addOns: [],
+      addOns: Array.isArray(request.selectedAddOns) ? [...request.selectedAddOns] : [],
+      selectedAddOns: Array.isArray(request.selectedAddOns) ? [...request.selectedAddOns] : [],
+      ...typeof request.processing === "number" ? { processing: request.processing } : {},
       subtotal: requestSubtotal,
       pricing: { ...request.pricing || {}, subtotal: requestSubtotal, tax: Number(request.pricing?.tax) || 0, total: requestTotal },
       total: requestTotal,
@@ -7874,6 +7971,7 @@ router$p.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       scheduledTime: confirmTime,
       squareFootage: request.squareFootage || null,
       accessMethod: request.accessMethod || null,
+      lockboxCode: request.lockboxCode || null,
       propertyStatus: request.propertyStatus || null,
       furnishingStatus: request.furnishingStatus || null,
       notes: request.vibeNote || "",
@@ -7915,6 +8013,13 @@ router$p.patch("/:id/confirm", requireCoordinator, async (req, res) => {
     } else {
       await appointmentRef.update(confirmedAppointment);
     }
+    let listingIdForGallery = existingInvoiceId(request.listingId);
+    try {
+      const ensuredEarly = await ensureBookingListingForRequest(req.params.id);
+      if (ensuredEarly?.listingId) listingIdForGallery = ensuredEarly.listingId;
+    } catch (err) {
+      console.error("[Bookings] Listing ensure failed:", err);
+    }
     const galleryRef = await db$p().collection("galleries").add({
       orderId: orderRef.id,
       clientId: clientId2,
@@ -7925,6 +8030,7 @@ router$p.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       status: "pending_upload",
       mediaItems: [],
       downloadEnabled: false,
+      ...listingIdForGallery ? { listingId: listingIdForGallery } : {},
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -7980,7 +8086,7 @@ router$p.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       ]);
     }
     const linkedInvoiceId = existingInvoiceId(request.invoiceId);
-    let listingId = existingInvoiceId(request.listingId);
+    let listingId = listingIdForGallery;
     let invoiceId = linkedInvoiceId;
     if (linkedInvoiceId) {
       const existingInvoice = await db$p().collection("invoices").doc(linkedInvoiceId).get();
@@ -8057,6 +8163,17 @@ router$p.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       });
     } catch (err) {
       console.error("[Bookings] Order/project/invoice link failed:", err);
+    }
+    if (listingId) {
+      await galleryRef.update({
+        listingId,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      try {
+        await assignBookingPhotographerToListing(listingId, request);
+      } catch (err) {
+        console.error("[Bookings] Photographer assign failed:", err);
+      }
     }
     await sendEmail({
       to: requestEmail,
@@ -10547,6 +10664,7 @@ async function registerListingPhoto(options) {
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
     await syncPlaytestGallery(listingId, listing, image);
+    await syncListingGallery(listing, image);
   }
   return { image: already || image, listingId };
 }
@@ -10558,6 +10676,33 @@ function studioImageExtra(extra) {
   if (src.studioRole === "adjusted" || src.studioRole === "final") out.studioRole = src.studioRole;
   if (typeof src.sourcePath === "string" && src.sourcePath.length <= 500) out.sourcePath = src.sourcePath;
   return out;
+}
+function galleryMediaItem(image) {
+  return {
+    id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    url: image.url,
+    shareUrl: image.url,
+    fileName: image.name,
+    title: image.name,
+    type: image.contentType?.startsWith("video/") ? "video" : "photo",
+    storagePath: image.path,
+    downloadable: true,
+    uploadedBy: image.uploadedBy,
+    uploadedAt: image.uploadedAt
+  };
+}
+async function syncListingGallery(listing, image) {
+  const galleryId = typeof listing.galleryId === "string" ? listing.galleryId.trim() : "";
+  if (!galleryId) return;
+  const ref = db$n().collection("galleries").doc(galleryId);
+  const snap = await ref.get();
+  if (!snap.exists) return;
+  const items = Array.isArray(snap.data()?.mediaItems) ? snap.data().mediaItems : [];
+  if (items.some((item) => item?.storagePath === image.path)) return;
+  await ref.update({
+    mediaItems: admin.firestore.FieldValue.arrayUnion(galleryMediaItem(image)),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
 }
 async function syncPlaytestGallery(listingId, listing, image) {
   const galleryIds = /* @__PURE__ */ new Set();
@@ -10571,18 +10716,7 @@ async function syncPlaytestGallery(listingId, listing, image) {
     });
   }
   if (galleryIds.size === 0) return;
-  const mediaItem = {
-    id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    url: image.url,
-    shareUrl: image.url,
-    fileName: image.name,
-    title: image.name,
-    type: image.contentType?.startsWith("video/") ? "video" : "photo",
-    storagePath: image.path,
-    downloadable: true,
-    uploadedBy: image.uploadedBy,
-    uploadedAt: image.uploadedAt
-  };
+  const mediaItem = galleryMediaItem(image);
   for (const galleryId of galleryIds) {
     const ref = db$n().collection("galleries").doc(galleryId);
     const snap = await ref.get();
