@@ -1,8 +1,14 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { calendarDateKey } from "./clientHome";
 import {
   choosePortalClient,
   listingAppointmentDate,
+  orderScheduleTime,
+  projectCarryFromOrder,
+  scheduleDateInputValue,
+  scheduleTimeInputValue,
+  stableOrderRequestListingId,
   visibleToPortalClient,
 } from "./listingWrite";
 
@@ -37,6 +43,68 @@ describe("listingAppointmentDate", () => {
     expect(listingAppointmentDate(null)).toBeNull();
     expect(listingAppointmentDate("")).toBeNull();
     expect(listingAppointmentDate({})).toBeNull();
+  });
+});
+
+describe("projectCarryFromOrder", () => {
+  it("keeps a /book slot that was stored as scheduledDate, not appointmentDate", () => {
+    const carry = projectCarryFromOrder({
+      scheduledDate: "2026-10-20",
+      scheduledTime: "11:00 AM",
+      bookingPhotographerId: "steven-banda",
+      assignedPhotographerName: "Steven Banda",
+      vibeNote: "Gate code is on the lockbox.",
+      orderNumber: "#012",
+      lineItems: [{ name: "The Showcase", price: 549 }, { name: "Twilight", price: 75 }],
+      lockboxCode: "1234",
+      accessMethod: "Lockbox",
+      packageName: "The Showcase",
+      selectedAddOns: ["twilight"],
+      lat: 29.76,
+      lng: -95.36,
+      calendarId: "photographer-calendar-id",
+    });
+
+    expect(calendarDateKey(carry.apptDate)).toBe("2026-10-20");
+    expect(carry.appointmentDate).toBe("2026-10-20");
+    expect(carry.scheduledDate).toBe("2026-10-20");
+    expect(carry.apptTime).toBe("11:00 AM");
+    expect(carry.status).toBe("scheduled");
+    expect(carry.bookingPhotographerId).toBe("steven-banda");
+    expect(carry.assignedPhotographerName).toBe("Steven Banda");
+    expect(carry.notes).toBe("Gate code is on the lockbox.");
+    expect(carry.orderNumber).toBe("#012");
+    expect(carry.lineItems).toEqual([{ name: "The Showcase", price: 549 }, { name: "Twilight", price: 75 }]);
+    expect(carry.services).toEqual(["The Showcase", "Twilight"]);
+    expect(carry.accessInfo).toBe("Lockbox - 1234");
+    expect(carry.packageName).toBe("The Showcase");
+    expect(carry.selectedAddOns).toEqual(["twilight"]);
+    expect(carry.lat).toBe(29.76);
+    expect(carry.lng).toBe(-95.36);
+    expect(JSON.stringify(carry)).not.toContain("photographer-calendar-id");
+    expect(JSON.stringify(carry)).not.toMatch(/@/);
+    expect(scheduleDateInputValue({ scheduledDate: "2026-10-20" })).toBe("2026-10-20");
+    expect(scheduleTimeInputValue(orderScheduleTime({ scheduledTime: "11:00 AM" }))).toBe("11:00");
+    expect(stableOrderRequestListingId("req-1")).toBe("bklist_req_req-1");
+  });
+
+  it("falls back to appointmentDate when that is the only day on the order", () => {
+    const carry = projectCarryFromOrder({ appointmentDate: "2026-11-02", appointmentTime: "14:30" });
+    expect(carry.appointmentDate).toBe("2026-11-02");
+    expect(carry.apptTime).toBe("14:30");
+    expect(scheduleTimeInputValue(carry.apptTime)).toBe("14:30");
+  });
+});
+
+describe("project create reads the booking slot", () => {
+  it("order request and bulk create both use projectCarryFromOrder", () => {
+    const request = readFileSync(new URL("../client/pages/AdminOrderRequest.tsx", import.meta.url), "utf8");
+    const orders = readFileSync(new URL("../client/pages/AdminOrders.tsx", import.meta.url), "utf8");
+    expect(request).toContain("projectCarryFromOrder");
+    expect(request).toContain("scheduleDateInputValue");
+    expect(request).not.toContain("listingAppointmentDate(order.appointmentDate)");
+    expect(orders).toContain("projectCarryFromOrder");
+    expect(orders).not.toContain("listingAppointmentDate(order.appointmentDate)");
   });
 });
 

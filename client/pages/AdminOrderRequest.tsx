@@ -10,10 +10,17 @@ import {
 import { db } from "@/lib/firebase";
 import {
   doc, onSnapshot, updateDoc, serverTimestamp,
-  collection, addDoc, getDocs,
+  collection, addDoc, getDoc, getDocs,
 } from "firebase/firestore";
 import { toast } from "sonner";
-import { listingAppointmentDate } from "@shared/listingWrite";
+import {
+  listingAppointmentDate,
+  projectCarryFromOrder,
+  scheduleDateInputValue,
+  scheduleTimeInputValue,
+  stableOrderRequestListingId,
+  orderScheduleTime,
+} from "@shared/listingWrite";
 import { formatChicagoDate } from "@shared/clientHome";
 import {
   invoiceDraftFromOrder,
@@ -150,8 +157,10 @@ export default function AdminOrderRequest() {
           const hasBusinessSignal = Boolean(data.specializedPhotography && data.specializedPhotography !== "mls") || (lineItems.length > 0 && !inferredRealEstate);
           setProjectTypeChoice(hasBusinessSignal ? "business" : "real_estate");
         }
-        if (data.appointmentDate) setSchedDate(data.appointmentDate);
-        if (data.appointmentTime) setSchedTime(data.appointmentTime);
+        const bookedDay = scheduleDateInputValue(data);
+        const bookedTime = scheduleTimeInputValue(orderScheduleTime(data));
+        if (bookedDay) setSchedDate((current) => current || bookedDay);
+        if (bookedTime) setSchedTime((current) => current || bookedTime);
       } else { toast.error("Order not found"); navigate("/admin/orders"); }
       setLoading(false);
     });
@@ -247,34 +256,45 @@ export default function AdminOrderRequest() {
       } catch (lookupErr) {
         console.warn("[AdminOrderRequest] Client lookup failed.", lookupErr);
       }
-      const apptDate = listingAppointmentDate(order.appointmentDate);
+      const carry = projectCarryFromOrder(order);
       const links = listingLinkFields({
         orderRequestId: id,
         orderId: order.convertedToOrderId || order.orderId,
         invoiceId: linkedInvoiceId || order.invoiceId,
       });
+      const reservedId = stableOrderRequestListingId(id);
+      if (reservedId) {
+        const existing = await getDoc(doc(db, "listings", reservedId));
+        if (existing.exists()) {
+          if (!listingAppointmentDate(existing.data()?.apptDate) && carry.apptDate) {
+            await updateDoc(existing.ref, { ...carry, updatedAt: serverTimestamp() });
+          }
+          await linkOrderToListing({
+            orderRequestId: id,
+            listingId: existing.id,
+            clientId,
+            clientEmail,
+            orderId: links.orderId || null,
+            invoiceId: links.invoiceId || null,
+          });
+          toast.success("Project linked.");
+          navigate(`/admin/listing/${existing.id}`);
+          return;
+        }
+      }
       const listingData: any = {
         projectType: projectTypeChoice,
         ...links,
+        ...carry,
         clientId,
         clientName: order.clientName || `${order.firstName || ""} ${order.lastName || ""}`.trim(),
         clientEmail,
         clientPhone: order.phone || "",
         address: fmtAddr(order.address),
         shootLocation: projectTypeChoice === "business" ? fmtAddr(order.address) : null,
-        apptDate,
-        apptTime: order.scheduledTime || order.appointmentTime || null,
-        services: (order.lineItems || []).map((li: any) => li.name || String(li)),
-        status: apptDate ? "scheduled" : "unscheduled",
         total: Number(order.total) || Number(order.pricing?.total) || 0,
         images: [], studioEnabled: true, studioToken: crypto.randomUUID(),
         lockDownloads: true, requirePayment: true, lockStudio: false, socialPermission: false,
-        accessInfo: [order.accessMethod, order.lockboxCode].filter(Boolean).join(" - ") || "",
-        photographerPreference: order.photographerPreference || null,
-        squareFootage: order.squareFootage || null,
-        furnishingStatus: order.furnishingStatus || null,
-        propertyStatus: order.propertyStatus || null,
-        notes: order.vibeNote || order.notes || "",
         assignedProviders: selectedProviders.map(pid => {
           const s = staff.find(st => st.id === pid);
           return { providerId: pid, name: s?.name || pid, role: s?.role || "photographer" };
