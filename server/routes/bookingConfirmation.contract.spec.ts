@@ -70,6 +70,25 @@ describe("live order confirmation emails", () => {
     expect(officeNotify).not.toContain("booking_received");
   });
 
+  it("accepts the stored slot without dropping lockbox, add-ons, or the gallery link", () => {
+    const confirm = handlerSlice(bookings, 'router.patch("/:id/confirm"', 'router.patch("/:id/decline"');
+    const requestPage = readFileSync(new URL("../../client/pages/AdminOrderRequest.tsx", import.meta.url), "utf8");
+    expect(confirm).toContain("lockboxCode: request.lockboxCode || null");
+    expect(confirm).toContain("selectedAddOns: Array.isArray(request.selectedAddOns)");
+    expect(confirm).not.toContain("addOns: []");
+    expect(confirm).toContain("...(listingIdForGallery ? { listingId: listingIdForGallery } : {})");
+    expect(confirm).toContain('typeof request.processing === "number" ? { processing: request.processing }');
+    expect(confirm).not.toContain("0.028");
+    expect(confirm).not.toContain("CLIENT_NOTIFY_LIVE");
+    expect(sendBlocks(confirm, "order_confirmed")).toHaveLength(1);
+    expect(requestPage).toContain('fetch(`/api/bookings/${encodeURIComponent(id)}/confirm`');
+    expect(requestPage).toContain("Accept booking");
+    expect(requestPage).toContain("Mark Client Confirmed");
+    expect(requestPage).toContain("scheduledDate: scheduleDateInputValue(order)");
+    expect(requestPage).toContain("assignedPhotographerName:");
+    expect(requestPage).not.toContain("CLIENT_NOTIFY_LIVE");
+  });
+
   it("still sends order_confirmed to the client on booking confirm", () => {
     const blocks = sendBlocks(bookings, "order_confirmed");
     expect(blocks).toHaveLength(1);

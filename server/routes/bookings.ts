@@ -12,6 +12,7 @@ import { sendSMS, SMS_TEMPLATES } from "../services/sms";
 import { createCalendarBookingEvent } from "../services/calendar";
 import { attachBookingClient, createRequestedAppointment, sendFirebasePasswordEmail } from "../services/bookingClient";
 import { ensureBookingListingForRequest } from "../services/bookingListing";
+import { assignBookingPhotographerToListing } from "../services/bookingPhotographerAssign";
 import { clientNotifyBlockReason, clientNotifyLive, isNotifyTestAllowlisted } from "../../shared/clientNotify";
 import { lifeOfTheListingCareSelected } from "../../shared/lifeOfTheListingCare";
 import { dotOptInSelected } from "../../shared/doorsOpenTour";
@@ -642,6 +643,24 @@ router.get("/:id", requireCoordinator, async (req, res) => {
   }
 });
 
+// ─── POST /api/bookings/:id/assign-photographer — staff uid on the listing ───
+
+router.post("/:id/assign-photographer", requireCoordinator, async (req: AuthenticatedRequest, res) => {
+  try {
+    const requestDoc = await db().collection("orderRequests").doc(req.params.id).get();
+    if (!requestDoc.exists) return res.status(404).json({ error: "Booking request not found." });
+    const request = requestDoc.data() || {};
+    const posted = typeof req.body?.listingId === "string" ? req.body.listingId.trim() : "";
+    const listingId = posted || (typeof request.listingId === "string" ? request.listingId.trim() : "");
+    if (!listingId) return res.status(400).json({ error: "Listing is missing." });
+    const assigned = await assignBookingPhotographerToListing(listingId, request);
+    return res.json({ success: true, photographerUid: assigned.uid, publicId: assigned.publicId });
+  } catch (err) {
+    console.error("[Bookings] Photographer assign failed:", err);
+    return res.status(500).json({ error: "Could not assign the photographer." });
+  }
+});
+
 // ─── PATCH /api/bookings/:id/confirm — Confirm and convert to Order ──────────
 
 router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedRequest, res) => {
@@ -674,6 +693,20 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
         });
       } catch (err) {
         console.error("[Bookings] Order/project/invoice link failed:", err);
+      }
+      const existingGalleryId = existingInvoiceId(request.galleryId);
+      if (existingGalleryId && listingId) {
+        await db().collection("galleries").doc(existingGalleryId).set({
+          listingId,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
+      if (listingId) {
+        try {
+          await assignBookingPhotographerToListing(listingId, request);
+        } catch (err) {
+          console.error("[Bookings] Photographer assign failed:", err);
+        }
       }
       return res.json({
         success: true,
@@ -790,7 +823,9 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       services: requestLineItems,
       lineItems: requestLineItems,
       selectedService: request.selectedService || null,
-      addOns: [],
+      addOns: Array.isArray(request.selectedAddOns) ? [...request.selectedAddOns] : [],
+      selectedAddOns: Array.isArray(request.selectedAddOns) ? [...request.selectedAddOns] : [],
+      ...(typeof request.processing === "number" ? { processing: request.processing } : {}),
       subtotal: requestSubtotal,
       pricing: { ...(request.pricing || {}), subtotal: requestSubtotal, tax: Number(request.pricing?.tax) || 0, total: requestTotal },
       total: requestTotal,
@@ -807,6 +842,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       scheduledTime: confirmTime,
       squareFootage: request.squareFootage || null,
       accessMethod: request.accessMethod || null,
+      lockboxCode: request.lockboxCode || null,
       propertyStatus: request.propertyStatus || null,
       furnishingStatus: request.furnishingStatus || null,
       notes: request.vibeNote || "",
@@ -859,6 +895,14 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       await appointmentRef.update(confirmedAppointment);
     }
 
+    let listingIdForGallery = existingInvoiceId(request.listingId);
+    try {
+      const ensuredEarly = await ensureBookingListingForRequest(req.params.id);
+      if (ensuredEarly?.listingId) listingIdForGallery = ensuredEarly.listingId;
+    } catch (err) {
+      console.error("[Bookings] Listing ensure failed:", err);
+    }
+
     // Create Gallery placeholder
     const galleryRef = await db().collection("galleries").add({
       orderId: orderRef.id,
@@ -870,6 +914,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       status: "pending_upload",
       mediaItems: [],
       downloadEnabled: false,
+      ...(listingIdForGallery ? { listingId: listingIdForGallery } : {}),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -930,7 +975,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
     }
 
     const linkedInvoiceId = existingInvoiceId(request.invoiceId);
-    let listingId = existingInvoiceId(request.listingId);
+    let listingId = listingIdForGallery;
     let invoiceId = linkedInvoiceId;
     if (linkedInvoiceId) {
       const existingInvoice = await db().collection("invoices").doc(linkedInvoiceId).get();
@@ -1012,6 +1057,18 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       });
     } catch (err) {
       console.error("[Bookings] Order/project/invoice link failed:", err);
+    }
+
+    if (listingId) {
+      await galleryRef.update({
+        listingId,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      try {
+        await assignBookingPhotographerToListing(listingId, request);
+      } catch (err) {
+        console.error("[Bookings] Photographer assign failed:", err);
+      }
     }
 
     // Send confirmation email to client

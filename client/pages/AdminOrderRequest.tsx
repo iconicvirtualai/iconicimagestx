@@ -35,6 +35,7 @@ import { separatePromoDiscount } from "@shared/bookingPricing";
 import { orderChargeSummary, orderServiceLines } from "@shared/orderPackageLines";
 import { linkOrderToListing, resolvePortalClientId } from "@/lib/listingClient";
 import { deliverInvoiceEmail } from "@/lib/deliverInvoice";
+import { assignBookingPhotographer } from "@/lib/assignBookingPhotographer";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   markScheduledAppointmentConfirmed,
@@ -238,6 +239,16 @@ export default function AdminOrderRequest() {
     }
   };
 
+  const rememberBookedPhotographer = async (orderRequestId: string, listingId: string) => {
+    if (!user) return;
+    try {
+      const token = await user.getIdToken();
+      await assignBookingPhotographer({ orderRequestId, listingId, token });
+    } catch (err) {
+      console.warn("[AdminOrderRequest] Photographer assign failed.", err);
+    }
+  };
+
   const handleCreateProject = async () => {
     if (!id || !order) return;
     if (order.listingId) { navigate(`/admin/listing/${order.listingId}`); return; }
@@ -277,6 +288,7 @@ export default function AdminOrderRequest() {
             orderId: links.orderId || null,
             invoiceId: links.invoiceId || null,
           });
+          await rememberBookedPhotographer(id, existing.id);
           toast.success("Project linked.");
           navigate(`/admin/listing/${existing.id}`);
           return;
@@ -312,6 +324,7 @@ export default function AdminOrderRequest() {
         orderId: links.orderId || null,
         invoiceId: links.invoiceId || null,
       });
+      await rememberBookedPhotographer(id, ref.id);
       toast.success("Project created!");
       navigate(`/admin/listing/${ref.id}`);
     } catch (err) {
@@ -336,6 +349,44 @@ export default function AdminOrderRequest() {
       toast.success("Scheduled."); setShowSchedule(false);
     } catch (err) { console.error(err); toast.error(err instanceof Error ? err.message : "Failed."); }
     finally { setSaving(false); }
+  };
+
+  const handleAcceptBooking = async () => {
+    if (!id || !order) return;
+    if (!user) {
+      toast.error("Please sign in again.");
+      return;
+    }
+    if (order.convertedToOrderId) {
+      toast.success("This booking is already accepted.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch(`/api/bookings/${encodeURIComponent(id)}/confirm`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          scheduledDate: scheduleDateInputValue(order) || null,
+          scheduledTime: orderScheduleTime(order) || null,
+          assignedPhotographerName: String(order.assignedPhotographerName || order.photographerName || "").trim() || null,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : "Could not accept this booking.");
+      }
+      toast.success(typeof data.message === "string" ? data.message : "Appointment, project, and invoice linked.");
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Could not accept this booking.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleConfirmBooking = async () => {
@@ -451,7 +502,7 @@ export default function AdminOrderRequest() {
                 <button onClick={() => navigate(`/admin/listing/${order.listingId}`)} className="px-3 py-1 rounded-full bg-[#0d9488]/10 text-[#0d9488] text-[9px] font-black uppercase tracking-widest hover:bg-[#0d9488]/20">View Project →</button>
               )}
             </div>
-            <span className="text-[10px] font-mono text-gray-400">#{(order.id || "").substring(0, 8)}</span>
+            <span className="text-[10px] font-mono text-gray-400">{order.orderNumber || `#${(order.id || "").substring(0, 8)}`}</span>
           </div>
 
           {/* ── CLIENT INFORMATION ── */}
@@ -486,6 +537,18 @@ export default function AdminOrderRequest() {
               <Field label={isScheduledState ? "Scheduled Time" : "Requested Time"} value={fmtTimeStandard(order.scheduledTime || order.appointmentTime || order.requestedTime)} editing={editing} editValue={f("appointmentTime")} onChange={setF("appointmentTime")} type="time" />
               <Field label="Access Method" value={order.accessMethod} editing={editing} editValue={f("accessMethod")} onChange={setF("accessMethod")} />
               <Field label="Lockbox Code" value={order.lockboxCode} editing={editing} editValue={f("lockboxCode")} onChange={setF("lockboxCode")} />
+              {order.assignedPhotographerName && <Field label="Assigned photographer" value={order.assignedPhotographerName} editing={false} />}
+              {order.packageName && <Field label="Package" value={order.packageName} editing={false} />}
+              {order.appointmentDuration ? <Field label="Duration" value={`${order.appointmentDuration} min`} editing={false} /> : null}
+              {typeof order.processing === "number" && (
+                <Field label="Processing (stored)" value={fmtCurrency(order.processing)} editing={false} />
+              )}
+              {typeof order.calendarHtmlLink === "string" && order.calendarHtmlLink.startsWith("https://") && !order.calendarHtmlLink.includes("@") && (
+                <div className="sm:col-span-2">
+                  <p className={labelCls}>Calendar</p>
+                  <a href={order.calendarHtmlLink} className="text-sm font-bold text-[#0d9488]" target="_blank" rel="noreferrer">Open calendar event</a>
+                </div>
+              )}
             </div>
           </div>
 
@@ -633,6 +696,20 @@ export default function AdminOrderRequest() {
               <Button onClick={order.listingId ? () => navigate(`/admin/listing/${order.listingId}`) : handleCreateProject}
                 disabled={saving} className="w-full rounded-xl text-xs font-bold justify-center bg-[#0d9488] hover:bg-[#0f766e] text-white">
                 <Layers className="w-3.5 h-3.5 mr-1.5" />{order.listingId ? "View Project" : "Create Project"}
+              </Button>
+              {order.listingId && (
+                <Button type="button" onClick={() => navigate(`/admin/listing/${order.listingId}`)} variant="outline" className="w-full rounded-xl text-xs font-bold justify-center">
+                  <Camera className="w-3.5 h-3.5 mr-1.5" /> Media
+                </Button>
+              )}
+              {order.galleryId && (
+                <Button type="button" onClick={() => navigate("/admin/delivery")} variant="outline" className="w-full rounded-xl text-xs font-bold justify-center">
+                  Delivery
+                </Button>
+              )}
+              <Button onClick={handleAcceptBooking}
+                disabled={saving || Boolean(order.convertedToOrderId)} className="w-full rounded-xl text-xs font-bold justify-center bg-black hover:bg-gray-800 text-white disabled:opacity-50">
+                <Check className="w-3.5 h-3.5 mr-1.5" />{order.convertedToOrderId ? "Accepted" : "Accept booking"}
               </Button>
               <Button onClick={handleConfirmBooking}
                 disabled={saving || statusKey === "confirmed"} className="w-full rounded-xl text-xs font-bold justify-center bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50">

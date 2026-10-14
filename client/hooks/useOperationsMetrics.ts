@@ -20,6 +20,7 @@ import {
   chicagoDateKey,
   getAssignedNames,
   isScheduledRecord,
+  isUnscheduledRequest,
   scheduleRecordDate,
   toDate,
 } from "@/lib/scheduleRecords";
@@ -222,10 +223,7 @@ export function useOperationsMetrics() {
       });
     });
 
-    const notScheduledCount = orderRequests.filter(or => {
-      const s = (or.status || "").toLowerCase();
-      return ["new", "needs_scheduled", "unscheduled", "request"].includes(s) && !or.appointmentDate;
-    }).length;
+    const notScheduledCount = orderRequests.filter((or) => isUnscheduledRequest(or)).length;
 
     const urgentRequestsCount = orderRequests.filter(or => {
       const status = String(or.status || "").toLowerCase();

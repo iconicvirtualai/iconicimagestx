@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { resolveListingPriceLabel } from "./listingPrice.ts";
 import {
@@ -88,8 +89,8 @@ describe("admin order list rows", () => {
     expect(adminOrderNumberLabel({ orderCode: "ORD - L - 10482" })).toBe("ORD - L - 10482");
     expect(adminOrderNumberLabel({ orderNumber: "#004", orderCode: "ORD - L - 10482" })).toBe("#004");
     expect(adminOrderNumberLabel({ orderNumber: 42 })).toBe("#042");
-    expect(maple.href).toBe("/admin/orders/fixture-maple");
-    expect(adminOrderDetailHref("fixture maple")).toBe("/admin/orders/fixture%20maple");
+    expect(maple.href).toBe("/admin/order-request/fixture-maple");
+    expect(adminOrderDetailHref("fixture maple")).toBe("/admin/order-request/fixture%20maple");
     expect(maple.clientName).toBe("Sample Client Avery North");
     expect(maple.address).toBe("100 Sample Maple Lane, Conroe, TX 77301");
     expect(maple.shootLabel).toBe("Apr 12, 2026, 10:30 AM");
@@ -242,5 +243,18 @@ describe("admin order list filters", () => {
     expect(matched.map((order) => order.id)).toEqual(["fixture-maple"]);
     expect(filterAdminOrderRecords(records, "SHOWCASE").map((order) => order.id)).toEqual(["fixture-maple"]);
     expect(filterAdminOrderRecords(records, "blair").map((order) => order.id)).toEqual(["fixture-oak"]);
+  });
+});
+
+describe("one order page writes", () => {
+  it("opens the request page and saves into the collection that was loaded", () => {
+    const detail = readFileSync(new URL("../client/pages/AdminOrderDetail.tsx", import.meta.url), "utf8");
+    const request = readFileSync(new URL("../client/pages/AdminOrderRequest.tsx", import.meta.url), "utf8");
+    expect(detail).toContain('updateDoc(doc(db, sourceCollection, id), updates)');
+    expect(detail).not.toContain('updateDoc(doc(db, "orders", id)');
+    expect(detail).toContain("fmtDate(order.scheduledDate || order.appointmentDate || order.requestedDate)");
+    expect(request).toContain("Processing (stored)");
+    expect(request).toContain('updateDoc(doc(db, "orderRequests", id), updates)');
+    expect(request).not.toContain("0.028");
   });
 });

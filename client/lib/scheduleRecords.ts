@@ -74,10 +74,35 @@ export function scheduleStatusKey(status: any) {
   return String(status || "").toLowerCase().replace(/\s+/g, "_").replace(/-/g, "_");
 }
 
+/** A booked slot is scheduledDate, appointmentDate, or apptDate. requestedDate is not a slot. */
+export function hasBookedSlot(record: any) {
+  return Boolean(toDate(record?.scheduledDate) || toDate(record?.appointmentDate) || toDate(record?.apptDate));
+}
+
+export function hasAssignedBookingPhotographer(record: any) {
+  const name = cleanName(record?.assignedPhotographerName) || cleanName(record?.photographerName);
+  const publicId = typeof record?.bookingPhotographerId === "string" ? record.bookingPhotographerId.trim() : "";
+  const staffId = typeof record?.assignedPhotographerId === "string" ? record.assignedPhotographerId.trim() : "";
+  const photographerUid = typeof record?.photographerUid === "string" ? record.photographerUid.trim() : "";
+  if (name) return true;
+  if (publicId && publicId !== "no-preference") return true;
+  return Boolean(staffId || photographerUid);
+}
+
+export function isUnscheduledRequest(record: any) {
+  const status = scheduleStatusKey(record?.status);
+  if (!["new", "needs_scheduled", "unscheduled", "request"].includes(status)) return false;
+  return !hasBookedSlot(record);
+}
+
 export function isScheduledRecord(record: any) {
   if (!hasScheduleDate(record)) return false;
   const status = scheduleStatusKey(record?.status);
-  if (["archived", "cancelled", "canceled", "declined", "new", "request", "needs_scheduled", "unscheduled"].includes(status)) return false;
+  if (["archived", "cancelled", "canceled", "declined"].includes(status)) return false;
+  if (status === "new" || status === "request") {
+    return hasBookedSlot(record) && hasAssignedBookingPhotographer(record);
+  }
+  if (["needs_scheduled", "unscheduled"].includes(status)) return false;
   return true;
 }
 
