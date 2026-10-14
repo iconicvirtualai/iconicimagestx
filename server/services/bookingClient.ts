@@ -139,6 +139,8 @@ export async function createRequestedAppointment(input: {
   addressLabel: string;
   scheduledDate: string | null;
   scheduledTime: string | null;
+  photographerName?: string | null;
+  bookingPhotographerId?: string | null;
   services: unknown[];
   notes: string;
 }) {
@@ -153,6 +155,8 @@ export async function createRequestedAppointment(input: {
     addressLabel: input.addressLabel,
     scheduledDate: input.scheduledDate,
     scheduledTime: input.scheduledTime,
+    photographerName: input.photographerName || null,
+    bookingPhotographerId: input.bookingPhotographerId || null,
     services: input.services,
     status: "requested",
     source: "booking_form",
