@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { saturdayDeliveryNote } from "@shared/bookingHours";
 
 export interface BookingSlotChoice {
   start: string;
@@ -41,6 +42,8 @@ export function BookingSlotPicker({
   }, [days, day]);
 
   const daySlots = days.find(([date]) => date === day)?.[1] || [];
+  const selected = slots.find((slot) => slot.start === selectedStart);
+  const saturdayNote = saturdayDeliveryNote(selected?.date);
 
   return (
     <div data-testid="booking-slot-picker" className="space-y-4">
@@ -89,6 +92,11 @@ export function BookingSlotPicker({
               );
             })}
           </div>
+          {saturdayNote && (
+            <p data-testid="saturday-delivery-note" className="text-sm font-semibold leading-relaxed text-neutral-800">
+              {saturdayNote}
+            </p>
+          )}
         </div>
       )}
     </div>

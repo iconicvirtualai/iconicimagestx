@@ -1,18 +1,24 @@
 /**
  * Open times for /book.
- * Business hours match the apprenticeship calendar.
- * A slot survives only when the photographer is free and can drive
- * from the previous shoot to this address, then on to the next shoot.
+ * Weekly hours come from the booking hours config (company default, with
+ * a per-photographer override). A slot survives only when the photographer
+ * is free and can drive from the previous shoot to this address, then on
+ * to the next shoot.
  */
 
 import {
   apprenticeshipDurationMinutes,
-  apprenticeshipHoursFromEnv,
-  openApprenticeshipSlots,
   zonedTimeToUtc,
   type ApprenticeshipHours,
   type ApprenticeshipSlot,
 } from "./apprenticeship.ts";
+import {
+  bookingHoursFromEnv,
+  bookingHoursFromWindow,
+  openBookingSlots,
+  weekForPhotographer,
+  type BookingHoursConfig,
+} from "./bookingHours.ts";
 import { packagesForStaffEditor, type StaffCatalogPackage } from "./bookingCatalog.ts";
 
 export const DEFAULT_TRAVEL_BUFFER_MINUTES = 30;
@@ -194,17 +200,53 @@ export function slotsWithTravel(input: {
   }
 }
 
+export function bookingScheduleFor(input: {
+  hours?: ApprenticeshipHours;
+  schedule?: BookingHoursConfig;
+  env?: Record<string, string | undefined>;
+}): BookingHoursConfig {
+  if (input.schedule) return input.schedule;
+  if (input.hours) {
+    return bookingHoursFromWindow({
+      timeZone: input.hours.timeZone,
+      horizonDays: input.hours.horizonDays,
+      startMinutes: input.hours.startMinutes,
+      endMinutes: input.hours.endMinutes,
+    });
+  }
+  return bookingHoursFromEnv(input.env);
+}
+
+export function openSlotsForPhotographer(input: {
+  now: Date;
+  durationMinutes: number;
+  photographerId: string;
+  events: { startMs: number; endMs: number }[];
+  schedule: BookingHoursConfig;
+}): ApprenticeshipSlot[] {
+  return openBookingSlots({
+    now: input.now,
+    durationMinutes: input.durationMinutes,
+    busy: input.events.map((event) => ({
+      start: new Date(event.startMs).toISOString(),
+      end: new Date(event.endMs).toISOString(),
+    })),
+    week: weekForPhotographer(input.schedule, input.photographerId),
+  });
+}
+
 export function assignPhotographerSlots(input: {
   now: Date;
   durationMinutes: number;
   hours?: ApprenticeshipHours;
+  schedule?: BookingHoursConfig;
   bufferMinutes: number;
   bookingAddress: string;
   preferenceId: string;
   photographers: PhotographerDay[];
   driveMinutes: (from: string, to: string, departAtMs: number) => number | null;
 }): { live: boolean; slots: AssignedSlot[] } {
-  const hours = input.hours ?? apprenticeshipHoursFromEnv();
+  const schedule = bookingScheduleFor(input);
   const readable = input.photographers.filter((person) => person.events);
   if (!readable.length) return { live: false, slots: [] };
 
@@ -217,14 +259,12 @@ export function assignPhotographerSlots(input: {
   const byStart = new Map<string, AssignedSlot>();
   for (const person of people) {
     const events = person.events || [];
-    const open = openApprenticeshipSlots({
+    const open = openSlotsForPhotographer({
       now: input.now,
-      busy: events.map((event) => ({
-        start: new Date(event.startMs).toISOString(),
-        end: new Date(event.endMs).toISOString(),
-      })),
       durationMinutes: input.durationMinutes,
-      hours,
+      photographerId: person.id,
+      events,
+      schedule,
     });
     const fitted = slotsWithTravel({
       slots: open,

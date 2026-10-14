@@ -11,7 +11,9 @@ import { addressText } from "../../shared/addressText";
 import {
   assignPhotographerSlots,
   bookingDurationMinutes,
+  bookingScheduleFor,
   driveCacheKey,
+  openSlotsForPhotographer,
   parseRouteMatrixBody,
   travelBufferMinutes,
   travelEventsFromBlocks,
@@ -21,7 +23,7 @@ import {
   type DriveQuery,
   type PhotographerDay,
 } from "../../shared/bookingAvailability";
-import { apprenticeshipHoursFromEnv, openApprenticeshipSlots } from "../../shared/apprenticeship";
+import { bookingHoursFromEnv } from "../../shared/bookingHours";
 import type { StaffCatalogPackage } from "../../shared/bookingCatalog";
 import { calendarAuthFromAccount, firebaseServiceAccount } from "./apprenticeshipCalendar";
 import {
@@ -281,7 +283,8 @@ export async function readBookingAvailability(input: {
 }): Promise<BookingAvailabilityResult> {
   const env = input.env ?? process.env;
   const now = input.now ?? new Date();
-  const hours = apprenticeshipHoursFromEnv(env);
+  const schedule = bookingHoursFromEnv(env);
+  const hours = schedule.company;
   const bufferMinutes = travelBufferMinutes(env);
   const durationMinutes = bookingDurationMinutes({
     selectedService: input.selectedService,
@@ -322,14 +325,12 @@ export async function readBookingAvailability(input: {
   const considered = preferred ? (preferred.events ? [preferred] : []) : readable;
   const queries = considered.flatMap((person) => {
     const events = person.events || [];
-    const open = openApprenticeshipSlots({
+    const open = openSlotsForPhotographer({
       now,
-      busy: events.map((event) => ({
-        start: new Date(event.startMs).toISOString(),
-        end: new Date(event.endMs).toISOString(),
-      })),
       durationMinutes,
-      hours,
+      photographerId: person.id,
+      events,
+      schedule,
     });
     return travelQueriesForSlots({ slots: open, events, bookingAddress: address });
   });
@@ -343,7 +344,7 @@ export async function readBookingAvailability(input: {
   const assigned = assignPhotographerSlots({
     now,
     durationMinutes,
-    hours,
+    schedule,
     bufferMinutes,
     bookingAddress: address,
     preferenceId,
@@ -378,7 +379,7 @@ export async function createBookingCalendarHold(input: {
   const person = bookingPhotographerById(input.photographerId);
   if (!person) return null;
   const env = input.env ?? process.env;
-  const hours = apprenticeshipHoursFromEnv(env);
+  const hours = bookingScheduleFor({ env }).company;
   const body = {
     summary: `Iconic Images: ${input.clientName}`,
     location: input.address,
