@@ -1,4 +1,6 @@
 import fs from "fs";
+import os from "os";
+import path from "path";
 import type { Server } from "node:http";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { INTENDED_OWNER_EMAIL } from "../../shared/ownerAccess";
@@ -9,6 +11,7 @@ import {
   ownerSessionSecret,
   signOwnerSession,
 } from "../services/ownerGate";
+import { resetOwnerEditorJobsForTests } from "../services/ownerEditorJobs";
 import { clearOwnerSuiteCacheForTests } from "../services/ownerSheets";
 import { OWNER_WHY } from "../services/ownerWhy";
 
@@ -274,7 +277,20 @@ describe("owners suite access", () => {
     expect(page).toContain("Montserrat");
     expect(page).toContain("Inter, system-ui, sans-serif");
     expect(page).toContain("No action log yet");
+    expect(page).toContain("My Projects");
+    expect(page).not.toContain("AbortSignal");
     expect(page).not.toContain("Coming soon");
+    const projects = fs.readFileSync("client/components/owners/MyProjects.tsx", "utf8");
+    expect(projects).not.toContain("Cormorant");
+    expect(projects).not.toContain("font-serif");
+    expect(projects).not.toContain("italic");
+    expect(projects).not.toContain("AbortSignal");
+    expect(projects).not.toContain("CLIENT_NOTIFY_LIVE");
+    expect(projects).toContain("Inter, ui-sans-serif, system-ui, sans-serif");
+    expect(projects).toContain("My Projects");
+    expect(projects).toContain("aICON");
+    const editorRoute = fs.readFileSync("server/routes/owners.ts", "utf8");
+    expect(editorRoute).not.toContain("CLIENT_NOTIFY_LIVE");
     const plan = fs.readFileSync("client/components/owners/PlanBoard.tsx", "utf8");
     expect(plan).not.toContain("Cormorant");
     expect(plan).not.toContain("font-serif");
@@ -288,5 +304,75 @@ describe("owners suite access", () => {
     const owners = vercel.rewrites.findIndex((rule) => rule.source === "/admin/owners");
     expect(owners).toBeGreaterThanOrEqual(0);
     expect(owners).toBeLessThan(spa);
+  });
+
+  it("keeps an aICON editor job running after the create request ends", async () => {
+    allowOwnerFixtures();
+    const file = path.join(os.tmpdir(), `owner-editor-route-${process.pid}-${Date.now()}.json`);
+    fs.rmSync(file, { force: true });
+    const store = resetOwnerEditorJobsForTests({ file, stepMs: 30, followUp: false });
+    const secret = "private-lake-render";
+    try {
+      const denied = await fetch(`${baseUrl}/api/owners/editor/jobs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: secret, mode: "render", note: "" }),
+      });
+      const deniedText = await denied.text();
+      expect(denied.status).toBe(404);
+      expect(deniedText).not.toContain(secret);
+      expect(store.list("cadi@iconicimagestx.com")).toEqual([]);
+
+      __setOwnerIdTokenVerifierForTests(async () => ({
+        email: "Cadi@IconicImagesTX.com",
+        uid: "cadi-uid",
+      }));
+      const headers = { Authorization: "Bearer cadi-id-token", "Content-Type": "application/json" };
+      const empty = await fetch(`${baseUrl}/api/owners/editor/jobs`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ name: "   ", mode: "render" }),
+      });
+      expect(empty.status).toBe(400);
+      expect(await empty.json()).toEqual({ error: "Enter a project name." });
+
+      const created = await fetch(`${baseUrl}/api/owners/editor/jobs`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ name: "Lake house twilight", mode: "render", note: "Wide frame" }),
+      });
+      expect(created.status).toBe(201);
+      expect(created.headers.get("cache-control")).toContain("no-store");
+      const createdBody = (await created.json()) as { job: { id: string; status: string; progress: number } };
+      expect(createdBody.job.status).toBe("queued");
+      expect(createdBody.job.progress).toBe(0);
+
+      let latest: { status: string; progress: number; result: { summary: string; detail: string; imageDataUrl: string } | null } | null = null;
+      const startedAt = Date.now();
+      while (Date.now() - startedAt < 4000) {
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        const read = await fetch(`${baseUrl}/api/owners/editor/jobs/${createdBody.job.id}`, {
+          headers: { Authorization: "Bearer cadi-id-token" },
+        });
+        expect(read.status).toBe(200);
+        latest = ((await read.json()) as { job: NonNullable<typeof latest> }).job;
+        if (latest.status === "ready" || latest.status === "failed") break;
+      }
+      expect(latest?.status).toBe("ready");
+      expect(latest?.progress).toBe(100);
+      expect(latest?.result?.summary).toBe("Lake house twilight is ready.");
+      expect(latest?.result?.detail).toBe("Rendered on the server.");
+      expect(latest?.result?.imageDataUrl).toMatch(/^data:image\//);
+
+      const listed = await fetch(`${baseUrl}/api/owners/editor/jobs`, {
+        headers: { Authorization: "Bearer cadi-id-token" },
+      });
+      const listBody = (await listed.json()) as { jobs: Array<{ id: string; status: string }> };
+      expect(listBody.jobs.map((job) => job.id)).toContain(createdBody.job.id);
+      expect(listBody.jobs[0]?.status).toBe("ready");
+    } finally {
+      store.closeForTests();
+      fs.rmSync(file, { force: true });
+    }
   });
 });

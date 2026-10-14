@@ -1,9 +1,11 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { BOT_ROUTINES } from "@shared/botRoutines";
 import { formatApprovalWhen, ORDER_APPROVAL_STATUSES, type OrderApproval, type OrderApprovalStatus } from "@shared/orderApproval";
+import { ownerEditorActive, type OwnerEditorJob, type OwnerEditorJobsResponse, type OwnerEditorStart } from "@shared/ownerEditor";
 import { OWNER_ORDER_TEXT_MAX, type OwnerOrder, type OwnerOrdersResponse } from "@shared/ownerOrders";
 import type { OwnerSuiteData } from "@shared/ownerSuite";
+import { AiconEditor, OwnerProjectsPanel } from "@/components/owners/MyProjects";
 import PlanBoard from "@/components/owners/PlanBoard";
 import { setOrderApproval } from "@/lib/orderApproval";
 import NotFound from "@/pages/NotFound";
@@ -35,6 +37,10 @@ export default function OwnersSuite() {
   const [ordersNotice, setOrdersNotice] = useState<string | null>(null);
   const [orderError, setOrderError] = useState<string | null>(null);
   const [ordersSubmitting, setOrdersSubmitting] = useState(false);
+  const [projects, setProjects] = useState<OwnerEditorJob[]>([]);
+  const [projectError, setProjectError] = useState<string | null>(null);
+  const [projectsSubmitting, setProjectsSubmitting] = useState(false);
+  const mounted = useRef(true);
 
   useEffect(() => {
     const meta = document.querySelector('meta[name="robots"]') || document.createElement("meta");
@@ -68,6 +74,55 @@ export default function OwnersSuite() {
     setOrdersNotice(payload.notice);
   }
 
+  async function loadProjects(isCancelled = () => false) {
+    try {
+      const response = await fetch("/api/owners/editor/jobs", {
+        headers: await ownerHeaders(),
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (isCancelled()) return;
+      if (!response.ok) {
+        setProjectError("Projects could not be read.");
+        return;
+      }
+      const payload = (await response.json()) as OwnerEditorJobsResponse;
+      if (isCancelled()) return;
+      setProjects(payload.jobs);
+      setProjectError((current) => (current === "Projects could not be read." ? null : current));
+    } catch {
+      if (!isCancelled()) setProjectError("Projects could not be read.");
+    }
+  }
+
+  async function startProject(input: OwnerEditorStart): Promise<boolean> {
+    setProjectsSubmitting(true);
+    setProjectError(null);
+    try {
+      const response = await fetch("/api/owners/editor/jobs", {
+        method: "POST",
+        headers: { ...(await ownerHeaders()), "Content-Type": "application/json" },
+        credentials: "include",
+        cache: "no-store",
+        body: JSON.stringify(input),
+      });
+      const body = (await response.json().catch(() => null)) as { error?: string; job?: OwnerEditorJob } | null;
+      if (!mounted.current) return response.ok;
+      if (!response.ok || !body?.job) {
+        setProjectError(body?.error || "The job could not be started.");
+        return false;
+      }
+      setProjects((current) => [body.job as OwnerEditorJob, ...current.filter((job) => job.id !== body.job?.id)]);
+      setProjectError(null);
+      return true;
+    } catch {
+      if (mounted.current) setProjectError("The job could not be started.");
+      return false;
+    } finally {
+      if (mounted.current) setProjectsSubmitting(false);
+    }
+  }
+
   async function load(fresh = false, isCancelled = () => false) {
     const response = await fetch(fresh ? "/api/owners/suite?fresh=1" : "/api/owners/suite", {
       headers: await ownerHeaders(),
@@ -92,6 +147,7 @@ export default function OwnersSuite() {
     } catch {
       if (!isCancelled()) setOrdersNotice("Orders could not be read.");
     }
+    await loadProjects(isCancelled);
     if (!isCancelled()) {
       const sample = demoOrders();
       if (sample) setOrders(sample);
@@ -133,14 +189,28 @@ export default function OwnersSuite() {
   }
 
   useEffect(() => {
+    mounted.current = true;
     let cancelled = false;
     void load(false, () => cancelled).catch(() => {
       if (!cancelled) setState({ status: "error" });
     });
     return () => {
       cancelled = true;
+      mounted.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!projects.some((job) => ownerEditorActive(job.status))) return;
+    let cancelled = false;
+    const timer = window.setInterval(() => {
+      void loadProjects(() => cancelled);
+    }, 500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [projects]);
 
   async function refresh() {
     setRefreshing(true);
@@ -191,6 +261,10 @@ export default function OwnersSuite() {
       ordersSubmitting={ordersSubmitting}
       onSubmitOrder={submitOrder}
       onApproveOrder={approveOrder}
+      projects={projects}
+      projectError={projectError}
+      projectsSubmitting={projectsSubmitting}
+      onStartProject={startProject}
       onRefresh={() => void refresh()}
       onSignOut={() => void signOut()}
     />
@@ -248,6 +322,10 @@ export function OwnersSuiteView({
   ordersSubmitting = false,
   onSubmitOrder,
   onApproveOrder,
+  projects = [],
+  projectError = null,
+  projectsSubmitting = false,
+  onStartProject,
   onRefresh,
   onSignOut,
 }: {
@@ -260,12 +338,16 @@ export function OwnersSuiteView({
   ordersSubmitting?: boolean;
   onSubmitOrder?: (text: string) => Promise<boolean>;
   onApproveOrder?: (orderId: string, status: OrderApprovalStatus, note: string) => Promise<OrderApproval>;
+  projects?: OwnerEditorJob[];
+  projectError?: string | null;
+  projectsSubmitting?: boolean;
+  onStartProject?: (input: OwnerEditorStart) => Promise<boolean>;
   onRefresh: () => void;
   onSignOut: () => void;
 }) {
   const data = payload.data;
   const stamp = suiteStamp(data.generatedAt);
-  const [tab, setTab] = useState<"scorecard" | "plan">("scorecard");
+  const [tab, setTab] = useState<"scorecard" | "plan" | "projects">("scorecard");
 
   return (
     <div className="owners-suite min-h-screen bg-[#071422] text-[#f7f1e4]" style={suiteFont}>
@@ -295,8 +377,9 @@ export function OwnersSuiteView({
             </button>
           </div>
         </div>
-        <div role="tablist" aria-label="Owners Suite" className="mx-auto flex max-w-6xl gap-1 px-4 md:px-8">
+        <div role="tablist" aria-label="Owners Suite" className="mx-auto flex max-w-6xl flex-wrap gap-1 px-4 md:px-8">
           <SuiteTab active={tab === "scorecard"} onSelect={() => setTab("scorecard")}>Scorecard</SuiteTab>
+          <SuiteTab active={tab === "projects"} onSelect={() => setTab("projects")}>My Projects</SuiteTab>
           <SuiteTab active={tab === "plan"} onSelect={() => setTab("plan")}>Plan Board</SuiteTab>
         </div>
         <div className="h-px bg-gradient-to-r from-transparent via-[#e8c872] to-transparent" />
@@ -304,6 +387,13 @@ export function OwnersSuiteView({
 
       {tab === "plan" ? (
         <PlanBoard columns={data.planBoard?.columns} stamp={stamp} preview={payload.source === "fixture"} />
+      ) : tab === "projects" ? (
+        <OwnerProjectsPanel
+          projects={projects}
+          error={projectError}
+          submitting={projectsSubmitting}
+          onStart={onStartProject}
+        />
       ) : (
       <main className="relative mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 md:px-8 md:py-8">
         {payload.why ? <WhyHero quote={payload.why} /> : null}
@@ -334,6 +424,14 @@ export function OwnersSuiteView({
           submitting={ordersSubmitting}
           onSubmit={onSubmitOrder}
           onApprove={onApproveOrder}
+        />
+
+        <AiconEditor
+          projects={projects}
+          error={projectError}
+          submitting={projectsSubmitting}
+          showLatest
+          onStart={onStartProject}
         />
 
         <BotRoutines />
