@@ -4387,6 +4387,8 @@ async function createRequestedAppointment(input) {
     addressLabel: input.addressLabel,
     scheduledDate: input.scheduledDate,
     scheduledTime: input.scheduledTime,
+    photographerName: input.photographerName || null,
+    bookingPhotographerId: input.bookingPhotographerId || null,
     services: input.services,
     status: "requested",
     source: "booking_form",
@@ -5243,7 +5245,7 @@ async function readMissing(collectionName, ids, into) {
 async function queryIn(collectionName, field, values) {
   const unique2 = [...new Set(values.map((value) => value.trim()).filter(Boolean))];
   const docs = [];
-  for (const part of chunk(unique2, 30)) {
+  for (const part of chunk$1(unique2, 30)) {
     const snap = await db$q().collection(collectionName).where(field, "in", part).limit(100).get();
     snap.docs.forEach((doc) => docs.push(asDoc(doc.id, doc.data())));
   }
@@ -5314,7 +5316,7 @@ function isSentinel(value) {
 function text$h(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function chunk(items, size) {
+function chunk$1(items, size) {
   const out = [];
   for (let index = 0; index < items.length; index += size) out.push(items.slice(index, index + size));
   return out;
@@ -6075,6 +6077,989 @@ function refuseQaStaffPhone(input) {
   if (!match) return null;
   return refusal(qaStaffAssignmentError([match], input.record));
 }
+const NO_PREFERENCE_ID = "no-preference";
+const NO_PREFERENCE_NAME = "No preference";
+const BOOKING_PHOTOGRAPHERS = [
+  { id: "mike-luna", name: "Mike Luna", calendarId: "mike@iconicimagestx.com" },
+  { id: "armando-martinez", name: "Armando Martinez", calendarId: "armando@iconicimagestx.com" },
+  { id: "daniel-adaclog", name: "Daniel Adaclog", calendarId: "daniel@iconicimagestx.com" },
+  { id: "steven-banda", name: "Steven Banda", calendarId: "steven@iconicimagestx.com" },
+  { id: "pedro-hernandez", name: "Pedro Hernandez", calendarId: "phernandez1833@gmail.com" },
+  { id: "david-gonzalez", name: "David Gonzalez", calendarId: "david@iconicimagestx.com" },
+  { id: "cadi-torres", name: "Cadi Torres", calendarId: "cadi@iconicimagestx.com" }
+];
+function publicBookingPhotographers() {
+  return BOOKING_PHOTOGRAPHERS.map((person) => ({ id: person.id, name: person.name }));
+}
+function bookingPhotographerById(id) {
+  const key = id.trim();
+  return BOOKING_PHOTOGRAPHERS.find((person) => person.id === key) || null;
+}
+function preferenceFromRequest(id, name) {
+  const rawId = typeof id === "string" ? id.trim() : "";
+  if (rawId === NO_PREFERENCE_ID) return NO_PREFERENCE_ID;
+  if (bookingPhotographerById(rawId)) return rawId;
+  const rawName = typeof name === "string" ? name.trim().toLowerCase() : "";
+  const byName = BOOKING_PHOTOGRAPHERS.find((person) => person.name.toLowerCase() === rawName);
+  return byName?.id || NO_PREFERENCE_ID;
+}
+function preferenceName(id) {
+  if (id === NO_PREFERENCE_ID) return NO_PREFERENCE_NAME;
+  return bookingPhotographerById(id)?.name || NO_PREFERENCE_NAME;
+}
+const APPRENTICESHIP_ORDER_SOURCE = "apprenticeship";
+const APPRENTICESHIP_CALENDAR_ID = "steven@iconicimagestx.com";
+const APPRENTICESHIP_TIME_ZONE = "America/Chicago";
+const APPRENTICESHIP_BOOKING_FEE = 25;
+const APPRENTICESHIP_BOOKING_FEE_LINE = "Booking fee $25, credited toward your package";
+const APPRENTICESHIP_BALANCE_LINE = "The balance is invoiced after the shoot.";
+const APPRENTICESHIP_CALENDAR_FALLBACK = "Open times are not listed right now. Call or email and we will set the appointment with you.";
+const APPRENTICESHIP_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar";
+const WEEKDAY = {
+  Sun: 0,
+  Mon: 1,
+  Tue: 2,
+  Wed: 3,
+  Thu: 4,
+  Fri: 5,
+  Sat: 6
+};
+function apprenticeshipDurationMinutes(appointmentLimit, packageId) {
+  const text2 = (appointmentLimit || "").toLowerCase();
+  const minutes = text2.match(/(\d+)\s*minute/);
+  if (minutes) {
+    const value = Number(minutes[1]);
+    if (value > 0 && value <= 24 * 60) return value;
+  }
+  const hours = text2.match(/(\d+)\s*hour/);
+  if (hours) {
+    const value = Number(hours[1]) * 60;
+    if (value > 0 && value <= 24 * 60) return value;
+  }
+  return packageId === "apprentice-50" ? 60 : 20;
+}
+function apprenticeshipPackageViews(catalog = packagesForStaffEditor([])) {
+  const offer = bookingOffer(catalog);
+  return offer.apprenticeshipPackages.map((item) => {
+    const staff = catalog.find((entry2) => entry2.id === item.id);
+    const rules = item.rules?.length ? item.rules : [...APPRENTICESHIP_RULES];
+    return {
+      ...item,
+      rules,
+      overage: staff?.overage || APPRENTICESHIP_OVERAGE_LABEL,
+      durationMinutes: apprenticeshipDurationMinutes(item.appointmentLimit, item.id)
+    };
+  });
+}
+function findApprenticeshipPackage(packageId, catalog = packagesForStaffEditor([])) {
+  const id = packageId.trim();
+  if (!isApprenticeshipPackage(id)) return null;
+  return apprenticeshipPackageViews(catalog).find((item) => item.id === id) || null;
+}
+function parseClock(value, fallback) {
+  const match = String(value || "").trim().match(/^(\d{1,2})(?::(\d{2}))?$/);
+  if (!match) return fallback;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2] || 0);
+  if (hours < 0 || hours > 24 || minutes < 0 || minutes > 59) return fallback;
+  return hours * 60 + minutes;
+}
+function parseDays(value, fallback) {
+  if (!value || !value.trim()) return fallback;
+  const days = value.split(/[^0-9]+/).map((part) => Number(part)).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6);
+  return days.length ? [...new Set(days)] : fallback;
+}
+function parseHorizon(value, fallback) {
+  const days = Number(value);
+  if (!Number.isInteger(days) || days < 1 || days > 60) return fallback;
+  return days;
+}
+function apprenticeshipHoursFromEnv(env = typeof process !== "undefined" ? process.env : {}) {
+  const startMinutes = parseClock(env.APPRENTICESHIP_DAY_START, 9 * 60);
+  const endMinutes = parseClock(env.APPRENTICESHIP_DAY_END, 18 * 60);
+  const days = parseDays(env.APPRENTICESHIP_WORK_DAYS, [1, 2, 3, 4, 5, 6]);
+  const calendarId = (env.APPRENTICESHIP_CALENDAR_ID || APPRENTICESHIP_CALENDAR_ID).trim() || APPRENTICESHIP_CALENDAR_ID;
+  const requestedZone = (env.APPRENTICESHIP_TIME_ZONE || APPRENTICESHIP_TIME_ZONE).trim() || APPRENTICESHIP_TIME_ZONE;
+  let timeZone = APPRENTICESHIP_TIME_ZONE;
+  try {
+    Intl.DateTimeFormat("en-US", { timeZone: requestedZone }).format(/* @__PURE__ */ new Date());
+    timeZone = requestedZone;
+  } catch {
+    timeZone = APPRENTICESHIP_TIME_ZONE;
+  }
+  return {
+    timeZone,
+    startMinutes,
+    endMinutes: endMinutes > startMinutes ? endMinutes : 18 * 60,
+    days,
+    horizonDays: parseHorizon(env.APPRENTICESHIP_HORIZON_DAYS, 14),
+    calendarId
+  };
+}
+function apprenticeshipCalendarSetupNote(input) {
+  const email = input.serviceAccountEmail || "the service account email in FIREBASE_SERVICE_ACCOUNT";
+  const share = `Steven needs to share ${input.calendarId} with ${email} and allow Make changes to events, or set up domain-wide delegation for ${email} with the Google Calendar scope ${APPRENTICESHIP_CALENDAR_SCOPE}.`;
+  if (!input.missingCredentials) return share;
+  return `Set FIREBASE_SERVICE_ACCOUNT to the Firebase service account JSON. ${share}`;
+}
+function zonedParts(date, timeZone) {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    weekday: "short",
+    hourCycle: "h23"
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(date).map((part) => [part.type, part.value]));
+  return {
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
+    hour: Number(parts.hour) % 24,
+    minute: Number(parts.minute),
+    weekday: WEEKDAY[parts.weekday] ?? 0
+  };
+}
+function zonedTimeToUtc(year, month, day, hour, minute, timeZone) {
+  let utc = Date.UTC(year, month - 1, day, hour, minute, 0);
+  for (let pass = 0; pass < 3; pass += 1) {
+    const parts = zonedParts(new Date(utc), timeZone);
+    const got = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, 0);
+    const wanted = Date.UTC(year, month - 1, day, hour, minute, 0);
+    const delta = wanted - got;
+    if (delta === 0) return new Date(utc);
+    utc += delta;
+  }
+  return new Date(utc);
+}
+function addCalendarDays(year, month, day, add) {
+  const next = new Date(Date.UTC(year, month - 1, day + add));
+  return {
+    year: next.getUTCFullYear(),
+    month: next.getUTCMonth() + 1,
+    day: next.getUTCDate(),
+    weekday: next.getUTCDay()
+  };
+}
+function clockLabel(minutes) {
+  const hour24 = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  const suffix = hour24 >= 12 ? "PM" : "AM";
+  const hour12 = hour24 % 12 || 12;
+  return `${hour12}:${String(minute).padStart(2, "0")} ${suffix}`;
+}
+function dayLabel(year, month, day, timeZone) {
+  const instant = zonedTimeToUtc(year, month, day, 12, 0, timeZone);
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+    month: "short",
+    day: "numeric"
+  }).format(instant);
+}
+function overlaps(start, end, busy) {
+  return busy.some((block2) => start < block2.end && end > block2.start);
+}
+function openApprenticeshipSlots(input) {
+  const duration = input.durationMinutes;
+  if (!Number.isFinite(duration) || duration <= 0) return [];
+  const busy = input.busy.map((block2) => ({ start: Date.parse(block2.start), end: Date.parse(block2.end) })).filter((block2) => Number.isFinite(block2.start) && Number.isFinite(block2.end) && block2.end > block2.start);
+  const today = zonedParts(input.now, input.hours.timeZone);
+  const slots = [];
+  for (let offset = 0; offset < input.hours.horizonDays; offset += 1) {
+    const date = addCalendarDays(today.year, today.month, today.day, offset);
+    if (!input.hours.days.includes(date.weekday)) continue;
+    for (let minute = input.hours.startMinutes; minute + duration <= input.hours.endMinutes; minute += duration) {
+      const start = zonedTimeToUtc(date.year, date.month, date.day, Math.floor(minute / 60), minute % 60, input.hours.timeZone);
+      const end = new Date(start.getTime() + duration * 60 * 1e3);
+      if (start.getTime() <= input.now.getTime()) continue;
+      if (overlaps(start.getTime(), end.getTime(), busy)) continue;
+      const dateKey2 = `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
+      const time = clockLabel(minute);
+      slots.push({
+        start: start.toISOString(),
+        end: end.toISOString(),
+        date: dateKey2,
+        time,
+        label: `${dayLabel(date.year, date.month, date.day, input.hours.timeZone)} · ${time}`
+      });
+    }
+  }
+  return slots;
+}
+function roundMoney$2(value) {
+  return Math.round(value * 100) / 100;
+}
+function quoteApprenticeship(input) {
+  const catalog = input.catalog ?? packagesForStaffEditor([]);
+  const pkg = findApprenticeshipPackage(input.packageId, catalog);
+  if (!pkg) return { ok: false, error: "Choose an apprenticeship package." };
+  const traveled = applyServerTravel(
+    buildSubmittedLineItems({ selectedBasics: [pkg.id], catalog }),
+    input.address
+  );
+  const draft = buildBookingInvoiceDraft({
+    lineItems: traveled.lineItems,
+    total: traveled.total,
+    pricing: { subtotal: traveled.total, tax: 0 },
+    clientEmail: "quote@iconicimagestx.com",
+    clientName: "Quote",
+    travel: traveled.travel,
+    applyProcessing: input.applyProcessing !== false
+  });
+  const travelLine = travelCustomerLine(traveled.travel);
+  return {
+    ok: true,
+    quote: {
+      packageId: pkg.id,
+      packageName: pkg.appointmentLimit ? `${pkg.name} (${pkg.appointmentLimit})` : pkg.name,
+      durationMinutes: pkg.durationMinutes,
+      subtotal: draft.subtotal,
+      processing: draft.processing ?? 0,
+      processingLabel: BOOKING_PROCESSING_LABEL,
+      travel: traveled.travel,
+      travelLabel: travelLine.label,
+      travelAmount: travelLine.amount,
+      total: draft.total,
+      bookingFee: APPRENTICESHIP_BOOKING_FEE,
+      bookingFeeLine: APPRENTICESHIP_BOOKING_FEE_LINE,
+      balanceDue: roundMoney$2(Math.max(0, draft.total - APPRENTICESHIP_BOOKING_FEE)),
+      balanceLine: APPRENTICESHIP_BALANCE_LINE,
+      lineItems: draft.lineItems
+    }
+  };
+}
+const EMAIL_RE$3 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function text$c(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function parseApprenticeshipOrder(body) {
+  const raw = body && typeof body === "object" ? body : {};
+  if (text$c(raw.website) || text$c(raw.companyWebsite)) {
+    return { ok: false, error: "Received.", honeypot: true };
+  }
+  const name = text$c(raw.name);
+  const explicitFirst = text$c(raw.firstName);
+  const explicitLast = text$c(raw.lastName);
+  const parts = name.split(/\s+/).filter(Boolean);
+  const firstName = explicitFirst || parts[0] || "";
+  const lastName = explicitLast || parts.slice(1).join(" ") || (explicitFirst ? "" : "");
+  const email = text$c(raw.email).toLowerCase();
+  const phone = text$c(raw.phone);
+  const address = text$c(raw.address);
+  const packageId = text$c(raw.packageId);
+  const slotStart = text$c(raw.slotStart);
+  const preferredTime = text$c(raw.preferredTime);
+  if (!isApprenticeshipPackage(packageId) || !findApprenticeshipPackage(packageId)) {
+    return { ok: false, error: "Choose an apprenticeship package." };
+  }
+  if (firstName.length < 2) return { ok: false, error: "Enter your name." };
+  if (`${firstName} ${lastName}`.trim().length > 80) return { ok: false, error: "Name is too long." };
+  if (!EMAIL_RE$3.test(email)) return { ok: false, error: "Enter a valid email." };
+  const digits2 = phone.replace(/\D/g, "");
+  if (digits2.length < 10 || digits2.length > 15) return { ok: false, error: "Enter a phone number." };
+  if (address.length < 5) return { ok: false, error: "Enter the property address." };
+  if (address.length > 200) return { ok: false, error: "Address is too long." };
+  if (slotStart && Number.isNaN(Date.parse(slotStart))) return { ok: false, error: "Choose an open time." };
+  if (preferredTime.length > 160) return { ok: false, error: "Preferred time is too long." };
+  return {
+    ok: true,
+    value: {
+      packageId,
+      firstName,
+      lastName: lastName || firstName,
+      email,
+      phone,
+      address,
+      slotStart: slotStart || null,
+      preferredTime
+    }
+  };
+}
+function apprenticeshipBookingReturnPath(orderNumber) {
+  const params = new URLSearchParams({
+    booking: "received",
+    order: orderNumber
+  });
+  return `/apprenticeship?${params.toString()}`;
+}
+const DEFAULT_TRAVEL_BUFFER_MINUTES = 30;
+const DEFAULT_BOOKING_DURATION_MINUTES = 90;
+const CONSULTATION_CATEGORIES = /* @__PURE__ */ new Set(["branding", "business", "growth"]);
+function travelBufferMinutes(env = typeof process !== "undefined" ? process.env : {}) {
+  const value = Number(env.BOOKING_TRAVEL_BUFFER_MINUTES);
+  if (!Number.isInteger(value) || value < 0 || value > 240) return DEFAULT_TRAVEL_BUFFER_MINUTES;
+  return value;
+}
+function explicitDurationMinutes(text2) {
+  const source = text2.replace(/\d+\s*-?\s*seconds?\b/gi, " ");
+  const found = [];
+  for (const match of source.matchAll(/(\d+)\s*(?:-|–|to)\s*(\d+)\s*hours?\b/gi)) {
+    const hours = Math.max(Number(match[1]), Number(match[2]));
+    if (hours > 0 && hours <= 24) found.push(hours * 60);
+  }
+  const singles = source.replace(/(\d+)\s*(?:-|–|to)\s*(\d+)\s*hours?\b/gi, " ");
+  for (const match of singles.matchAll(/(\d+(?:\.\d+)?)\s*hours?\b/gi)) {
+    const hours = Number(match[1]);
+    if (hours > 0 && hours <= 24) found.push(Math.round(hours * 60));
+  }
+  for (const match of singles.matchAll(/(\d+)\s*-?\s*minutes?\b/gi)) {
+    const minutes = Number(match[1]);
+    if (minutes > 0 && minutes <= 24 * 60) found.push(minutes);
+  }
+  return found;
+}
+function bookingDurationMinutes(input) {
+  const catalog = input.catalog ?? packagesForStaffEditor([]);
+  const ids = [input.selectedService, ...input.selectedBasics || []].map((id) => typeof id === "string" ? id.trim() : "").filter(Boolean);
+  const found = [];
+  let consultation = false;
+  for (const id of ids) {
+    const pkg = catalog.find((entry2) => entry2.id === id || entry2.bookingId === id);
+    if (!pkg) continue;
+    if (pkg.appointmentLimit) found.push(apprenticeshipDurationMinutes(pkg.appointmentLimit, pkg.id));
+    found.push(...explicitDurationMinutes([pkg.name, pkg.description, ...pkg.includedServices].join("\n")));
+    if (pkg.serviceCategory && CONSULTATION_CATEGORIES.has(pkg.serviceCategory)) consultation = true;
+  }
+  if (found.length) return Math.max(...found);
+  if (consultation) return 30;
+  const env = input.env ?? (typeof process !== "undefined" ? process.env : {});
+  const fallback = Number(env.DEFAULT_APPOINTMENT_DURATION_MINUTES || DEFAULT_BOOKING_DURATION_MINUTES);
+  if (!Number.isInteger(fallback) || fallback < 15 || fallback > 24 * 60) return DEFAULT_BOOKING_DURATION_MINUTES;
+  return fallback;
+}
+function travelEventsFromBlocks(blocks, timeZone) {
+  const events = [];
+  for (const block2 of blocks) {
+    const dateOnly = block2.allDay || /^\d{4}-\d{2}-\d{2}$/.test(block2.start);
+    if (dateOnly) {
+      const start = dateParts(block2.start);
+      const end = dateParts(block2.end);
+      if (!start || !end) continue;
+      const startMs2 = zonedTimeToUtc(start.year, start.month, start.day, 0, 0, timeZone).getTime();
+      const endMs2 = zonedTimeToUtc(end.year, end.month, end.day, 0, 0, timeZone).getTime();
+      if (endMs2 > startMs2) events.push({ startMs: startMs2, endMs: endMs2, location: block2.location.trim() });
+      continue;
+    }
+    const startMs = Date.parse(block2.start);
+    const endMs = Date.parse(block2.end);
+    if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs) {
+      events.push({ startMs, endMs, location: block2.location.trim() });
+    }
+  }
+  events.sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs);
+  return events;
+}
+function dateParts(value) {
+  const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  return { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) };
+}
+function adjacentEvents(events, startMs, endMs) {
+  let previous = null;
+  let next = null;
+  for (const event of events) {
+    if (event.endMs <= startMs && (!previous || event.endMs > previous.endMs)) previous = event;
+    if (event.startMs >= endMs && (!next || event.startMs < next.startMs)) next = event;
+  }
+  return { previous, next };
+}
+function travelQueriesForSlots(input) {
+  const address = input.bookingAddress.trim();
+  if (!address) return [];
+  const queries = [];
+  for (const slot of input.slots) {
+    const startMs = Date.parse(slot.start);
+    const endMs = Date.parse(slot.end);
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) continue;
+    const { previous, next } = adjacentEvents(input.events, startMs, endMs);
+    if (previous?.location) queries.push({ from: previous.location, to: address, departAtMs: previous.endMs });
+    if (next?.location) queries.push({ from: address, to: next.location, departAtMs: endMs });
+  }
+  return queries;
+}
+function slotsWithTravel(input) {
+  const address = input.bookingAddress.trim();
+  const bufferMs = input.bufferMinutes * 60 * 1e3;
+  return input.slots.filter((slot) => {
+    const startMs = Date.parse(slot.start);
+    const endMs = Date.parse(slot.end);
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return false;
+    if (input.events.some((event) => startMs < event.endMs && endMs > event.startMs)) return false;
+    const { previous, next } = adjacentEvents(input.events, startMs, endMs);
+    if (previous && startMs - previous.endMs < gapMs(previous.location, previous.location, address, previous.endMs)) return false;
+    if (next && next.startMs - endMs < gapMs(next.location, address, next.location, endMs)) return false;
+    return true;
+  });
+  function gapMs(location, from, to, departAtMs) {
+    if (!location.trim() || !address) return bufferMs;
+    const drive = input.driveMinutes(from, to, departAtMs);
+    if (drive == null || !Number.isFinite(drive) || drive < 0) return bufferMs;
+    return drive * 60 * 1e3;
+  }
+}
+function assignPhotographerSlots(input) {
+  const hours = input.hours ?? apprenticeshipHoursFromEnv();
+  const readable = input.photographers.filter((person) => person.events);
+  if (!readable.length) return { live: false, slots: [] };
+  const preferred = input.preferenceId !== "no-preference" ? input.photographers.find((person) => person.id === input.preferenceId) || null : null;
+  if (preferred && !preferred.events) return { live: true, slots: [] };
+  const people = preferred ? [preferred] : readable;
+  const byStart = /* @__PURE__ */ new Map();
+  for (const person of people) {
+    const events = person.events || [];
+    const open = openApprenticeshipSlots({
+      now: input.now,
+      busy: events.map((event) => ({
+        start: new Date(event.startMs).toISOString(),
+        end: new Date(event.endMs).toISOString()
+      })),
+      durationMinutes: input.durationMinutes,
+      hours
+    });
+    const fitted = slotsWithTravel({
+      slots: open,
+      events,
+      bookingAddress: input.bookingAddress,
+      bufferMinutes: input.bufferMinutes,
+      driveMinutes: input.driveMinutes
+    });
+    for (const slot of fitted) {
+      if (!byStart.has(slot.start)) {
+        byStart.set(slot.start, {
+          ...slot,
+          photographerId: person.id,
+          photographerName: person.name
+        });
+      }
+    }
+  }
+  return {
+    live: true,
+    slots: [...byStart.values()].sort((a, b) => a.start.localeCompare(b.start))
+  };
+}
+function resolveBookingAssignment(input) {
+  if (!input.live) return { ok: true, slot: null };
+  const slotStart = input.slotStart.trim();
+  if (!slotStart) return { ok: false, status: 400, error: "Choose an open time." };
+  const slot = input.slots.find((item) => item.start === slotStart) || null;
+  if (!slot) return { ok: false, status: 409, error: "That time was just taken. Pick another open time." };
+  return { ok: true, slot };
+}
+function normalizePlace(value) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+function departureBucket(ms, bucketMinutes = 30) {
+  const size = bucketMinutes * 60 * 1e3;
+  return new Date(Math.floor(ms / size) * size).toISOString();
+}
+function driveCacheKey(from, to, departAtMs) {
+  return `${normalizePlace(from)}>${normalizePlace(to)}@${departureBucket(departAtMs)}`;
+}
+function parseRouteDuration(value) {
+  if (typeof value !== "string") return null;
+  const match = value.trim().match(/^(\d+(?:\.\d+)?)s$/);
+  if (!match) return null;
+  const seconds = Number(match[1]);
+  if (!Number.isFinite(seconds) || seconds < 0) return null;
+  return Math.ceil(seconds / 60);
+}
+function parseRouteMatrixBody(body) {
+  const trimmed = body.trim();
+  if (!trimmed) return [];
+  const rows = trimmed.startsWith("[") ? JSON.parse(trimmed) : trimmed.split("\n").map((line) => line.trim()).filter(Boolean).map((line) => JSON.parse(line));
+  if (!Array.isArray(rows)) return [];
+  return rows.flatMap((row) => {
+    if (!row || typeof row !== "object") return [];
+    const record2 = row;
+    const originIndex = record2.originIndex == null ? 0 : Number(record2.originIndex);
+    const destinationIndex = record2.destinationIndex == null ? 0 : Number(record2.destinationIndex);
+    if (!Number.isInteger(originIndex) || !Number.isInteger(destinationIndex)) return [];
+    const condition = typeof record2.condition === "string" ? record2.condition : "ROUTE_EXISTS";
+    const minutes = condition === "ROUTE_EXISTS" ? parseRouteDuration(record2.duration) : null;
+    return [{ originIndex, destinationIndex, minutes }];
+  });
+}
+function firebaseServiceAccount(env = process.env) {
+  const raw = env.FIREBASE_SERVICE_ACCOUNT;
+  if (!raw || !raw.trim()) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    const client_email = typeof parsed.client_email === "string" ? parsed.client_email.trim() : "";
+    const private_key = typeof parsed.private_key === "string" ? parsed.private_key.replace(/\\n/g, "\n") : "";
+    if (!client_email || !private_key.includes("PRIVATE KEY")) return null;
+    return { client_email, private_key };
+  } catch {
+    return null;
+  }
+}
+function calendarAuthFromAccount(account, env = process.env) {
+  if (!account) return null;
+  const subject = env.APPRENTICESHIP_CALENDAR_SUBJECT?.trim();
+  return new google.auth.JWT({
+    email: account.client_email,
+    key: account.private_key,
+    scopes: [APPRENTICESHIP_CALENDAR_SCOPE],
+    subject: subject || void 0
+  });
+}
+async function availabilityFromFreeBusy(input) {
+  const hours = input.hours ?? apprenticeshipHoursFromEnv();
+  const pkg = findApprenticeshipPackage(input.packageId);
+  const durationMinutes = pkg?.durationMinutes ?? 20;
+  const setup = (missingCredentials) => apprenticeshipCalendarSetupNote({
+    calendarId: hours.calendarId,
+    serviceAccountEmail: input.accountEmail,
+    missingCredentials
+  });
+  if (!input.accountEmail) {
+    return {
+      available: false,
+      slots: [],
+      durationMinutes,
+      calendarId: hours.calendarId,
+      serviceAccountEmail: null,
+      missingCredentials: true,
+      setupNote: setup(true)
+    };
+  }
+  try {
+    const read = await input.query();
+    if (read.error) {
+      return {
+        available: false,
+        slots: [],
+        durationMinutes,
+        calendarId: hours.calendarId,
+        serviceAccountEmail: input.accountEmail,
+        missingCredentials: false,
+        setupNote: setup(false)
+      };
+    }
+    return {
+      available: true,
+      slots: openApprenticeshipSlots({
+        now: input.now,
+        busy: read.busy,
+        durationMinutes,
+        hours
+      }),
+      durationMinutes,
+      calendarId: hours.calendarId,
+      serviceAccountEmail: input.accountEmail,
+      missingCredentials: false,
+      setupNote: null
+    };
+  } catch (error) {
+    console.error("[Apprenticeship] Calendar freeBusy failed:", error);
+    return {
+      available: false,
+      slots: [],
+      durationMinutes,
+      calendarId: hours.calendarId,
+      serviceAccountEmail: input.accountEmail,
+      missingCredentials: false,
+      setupNote: setup(false)
+    };
+  }
+}
+async function queryStevenFreeBusy(input) {
+  const env = input.env ?? process.env;
+  const account = firebaseServiceAccount(env);
+  const auth = calendarAuthFromAccount(account, env);
+  const hours = input.hours ?? apprenticeshipHoursFromEnv(env);
+  if (!auth || !account) return { busy: [], error: true, email: null };
+  const calendar = google.calendar({ version: "v3", auth });
+  const response = await calendar.freebusy.query({
+    requestBody: {
+      timeMin: input.timeMin,
+      timeMax: input.timeMax,
+      timeZone: hours.timeZone,
+      items: [{ id: hours.calendarId }]
+    }
+  });
+  const entry2 = response.data.calendars?.[hours.calendarId];
+  const errors = entry2?.errors || [];
+  const busy = (entry2?.busy || []).map((block2) => ({ start: block2.start || "", end: block2.end || "" })).filter((block2) => block2.start && block2.end);
+  return { busy, error: errors.length > 0, email: account.client_email };
+}
+async function readApprenticeshipAvailability(input) {
+  const env = input.env ?? process.env;
+  const hours = apprenticeshipHoursFromEnv(env);
+  const now = input.now ?? /* @__PURE__ */ new Date();
+  const account = firebaseServiceAccount(env);
+  const timeMax = new Date(now.getTime() + (hours.horizonDays + 1) * 24 * 60 * 60 * 1e3);
+  return availabilityFromFreeBusy({
+    now,
+    packageId: input.packageId,
+    hours,
+    accountEmail: account?.client_email ?? null,
+    query: async () => {
+      const read = await queryStevenFreeBusy({
+        timeMin: now.toISOString(),
+        timeMax: timeMax.toISOString(),
+        hours,
+        env
+      });
+      return { busy: read.busy, error: read.error };
+    }
+  });
+}
+async function createApprenticeshipEvent(booking, env = process.env) {
+  const account = firebaseServiceAccount(env);
+  const auth = calendarAuthFromAccount(account, env);
+  if (!auth) return null;
+  const hours = apprenticeshipHoursFromEnv(env);
+  const calendar = google.calendar({ version: "v3", auth });
+  const response = await calendar.events.insert({
+    calendarId: hours.calendarId,
+    sendUpdates: "none",
+    requestBody: {
+      summary: `Apprenticeship: ${booking.clientName}`,
+      location: booking.address,
+      description: [
+        `Order: ${booking.orderNumber}`,
+        `Package: ${booking.packageName}`,
+        `Client: ${booking.clientName}`,
+        `Email: ${booking.clientEmail}`,
+        `Phone: ${booking.clientPhone}`,
+        "Booking fee: $25, credited toward the package",
+        "Balance invoiced after the shoot",
+        booking.notes ? `Notes: ${booking.notes}` : ""
+      ].filter(Boolean).join("\n"),
+      start: { dateTime: booking.slot.start, timeZone: hours.timeZone },
+      end: { dateTime: booking.slot.end, timeZone: hours.timeZone },
+      extendedProperties: {
+        private: {
+          orderNumber: booking.orderNumber,
+          source: "apprenticeship"
+        }
+      }
+    }
+  });
+  return {
+    calendarId: hours.calendarId,
+    eventId: response.data.id || null,
+    htmlLink: response.data.htmlLink || null
+  };
+}
+const ROUTES_ENDPOINT = "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix";
+const DRIVE_CACHE_TTL_MS = 15 * 60 * 1e3;
+const loggedUnreadable = /* @__PURE__ */ new Set();
+function createDriveTimeCache(ttlMs = DRIVE_CACHE_TTL_MS) {
+  const store = /* @__PURE__ */ new Map();
+  return {
+    get(key, now) {
+      const hit = store.get(key);
+      if (!hit) return void 0;
+      if (now - hit.storedAt > ttlMs) {
+        store.delete(key);
+        return void 0;
+      }
+      return hit.minutes;
+    },
+    set(key, minutes, now) {
+      if (store.size > 500) {
+        const oldest = store.keys().next().value;
+        if (oldest) store.delete(oldest);
+      }
+      store.set(key, { minutes, storedAt: now });
+    }
+  };
+}
+const driveCache = createDriveTimeCache();
+function calendarBlockFromEvent(event) {
+  if (event.status === "cancelled") return null;
+  if (event.transparency === "transparent") return null;
+  if (event.eventType === "workingLocation" || event.eventType === "birthday") return null;
+  const start = event.start?.dateTime || event.start?.date || "";
+  const end = event.end?.dateTime || event.end?.date || "";
+  if (!start || !end) return null;
+  return {
+    start,
+    end,
+    location: (event.location || "").trim(),
+    allDay: Boolean(event.start?.date && !event.start?.dateTime)
+  };
+}
+async function listCalendarBlocks(calendarId, timeMin, timeMax, env) {
+  const auth = calendarAuthFromAccount(firebaseServiceAccount(env), env);
+  if (!auth) throw new Error("Calendar credentials are missing.");
+  const calendar = google.calendar({ version: "v3", auth });
+  const blocks = [];
+  let pageToken;
+  for (let page2 = 0; page2 < 3; page2 += 1) {
+    const response = await calendar.events.list({
+      calendarId,
+      timeMin,
+      timeMax,
+      singleEvents: true,
+      orderBy: "startTime",
+      maxResults: 250,
+      pageToken
+    });
+    for (const event of response.data.items || []) {
+      const block2 = calendarBlockFromEvent(event);
+      if (block2) blocks.push(block2);
+    }
+    pageToken = response.data.nextPageToken || void 0;
+    if (!pageToken) break;
+  }
+  return blocks;
+}
+function logUnreadable(person, error) {
+  if (loggedUnreadable.has(person.id)) return;
+  loggedUnreadable.add(person.id);
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`[Booking] ${person.name}'s calendar is not available for online slots (${person.calendarId}). ${message}`);
+}
+async function resolveDriveMinutes(input) {
+  const now = input.now ?? Date.now();
+  const cache2 = input.cache ?? driveCache;
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const resolved = /* @__PURE__ */ new Map();
+  const pending = [];
+  for (const query of input.queries) {
+    const key = driveCacheKey(query.from, query.to, query.departAtMs);
+    if (resolved.has(key)) continue;
+    const cached = cache2.get(key, now);
+    if (cached !== void 0) {
+      resolved.set(key, cached);
+      continue;
+    }
+    pending.push(query);
+    resolved.set(key, null);
+  }
+  if (!input.apiKey.trim() || !pending.length) return resolved;
+  const buckets = /* @__PURE__ */ new Map();
+  for (const query of pending) {
+    const key = driveCacheKey(query.from, query.to, query.departAtMs);
+    const bucket2 = key.slice(key.lastIndexOf("@") + 1);
+    const group = buckets.get(bucket2) || [];
+    group.push(query);
+    buckets.set(bucket2, group);
+  }
+  await Promise.all([...buckets.entries()].map(async ([bucket2, queries]) => {
+    const origins = uniquePlaces(queries.map((query) => query.from));
+    const destinations = uniquePlaces(queries.map((query) => query.to));
+    try {
+      const legs = await computeRouteMatrix({
+        origins,
+        destinations,
+        departureTime: bucket2,
+        apiKey: input.apiKey,
+        fetchImpl
+      });
+      const byIndex = /* @__PURE__ */ new Map();
+      for (const leg of legs) byIndex.set(`${leg.originIndex}:${leg.destinationIndex}`, leg.minutes);
+      for (const query of queries) {
+        const key = driveCacheKey(query.from, query.to, query.departAtMs);
+        const minutes = byIndex.get(`${origins.indexOf(normalizeKey(query.from))}:${destinations.indexOf(normalizeKey(query.to))}`);
+        if (minutes == null) continue;
+        resolved.set(key, minutes);
+        cache2.set(key, minutes, now);
+      }
+    } catch (error) {
+      console.error("[Booking] Drive time lookup failed. Using the travel buffer.", error);
+    }
+  }));
+  return resolved;
+}
+function normalizeKey(value) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+function uniquePlaces(values) {
+  const seen = /* @__PURE__ */ new Map();
+  for (const value of values) {
+    const key = normalizeKey(value);
+    if (key && !seen.has(key)) seen.set(key, key);
+  }
+  return [...seen.keys()];
+}
+async function computeRouteMatrix(input) {
+  const legs = [];
+  const originChunks = chunk(input.origins, 25);
+  const destinationChunks = chunk(input.destinations, 25);
+  for (const originChunk of originChunks) {
+    for (const destinationChunk of destinationChunks) {
+      if (!originChunk.length || !destinationChunk.length) continue;
+      const requestedDeparture = Date.parse(input.departureTime);
+      const departureTime = Number.isFinite(requestedDeparture) && requestedDeparture > Date.now() + 3e4 ? new Date(requestedDeparture).toISOString() : new Date(Date.now() + 6e4).toISOString();
+      const response = await input.fetchImpl(ROUTES_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": input.apiKey,
+          "X-Goog-FieldMask": "originIndex,destinationIndex,duration,status,condition"
+        },
+        body: JSON.stringify({
+          origins: originChunk.map((address) => ({ waypoint: { address } })),
+          destinations: destinationChunk.map((address) => ({ waypoint: { address } })),
+          travelMode: "DRIVE",
+          routingPreference: "TRAFFIC_AWARE",
+          departureTime
+        })
+      });
+      if (!response.ok) {
+        throw new Error(`Routes computeRouteMatrix responded ${response.status}.`);
+      }
+      const parsed = parseRouteMatrixBody(await response.text());
+      const originOffset = input.origins.indexOf(originChunk[0] || "");
+      const destinationOffset = input.destinations.indexOf(destinationChunk[0] || "");
+      for (const leg of parsed) {
+        legs.push({
+          ...leg,
+          originIndex: originOffset + leg.originIndex,
+          destinationIndex: destinationOffset + leg.destinationIndex
+        });
+      }
+    }
+  }
+  return legs;
+}
+function chunk(values, size) {
+  const groups = [];
+  for (let index = 0; index < values.length; index += size) groups.push(values.slice(index, index + size));
+  return groups.length ? groups : [[]];
+}
+async function readBookingAvailability(input) {
+  const env = input.env ?? process.env;
+  const now = input.now ?? /* @__PURE__ */ new Date();
+  const hours = apprenticeshipHoursFromEnv(env);
+  const bufferMinutes = travelBufferMinutes(env);
+  const durationMinutes = bookingDurationMinutes({
+    selectedService: input.selectedService,
+    selectedBasics: input.selectedBasics,
+    catalog: input.catalog,
+    env
+  });
+  const apiKey = (env.GOOGLE_MAPS_API_KEY || "").trim();
+  const address = addressText(input.address);
+  const preferenceId = (input.preferenceId || "no-preference").trim() || "no-preference";
+  const account = firebaseServiceAccount(env);
+  const auth = calendarAuthFromAccount(account, env);
+  if (!auth || !account) {
+    return { live: false, slots: [], durationMinutes, bufferMinutes, driveMode: apiKey ? "routes" : "buffer" };
+  }
+  const timeMin = new Date(now.getTime() - 18 * 60 * 60 * 1e3).toISOString();
+  const timeMax = new Date(now.getTime() + (hours.horizonDays + 1) * 24 * 60 * 60 * 1e3).toISOString();
+  const listEvents = input.listEvents ?? ((person, min, max) => listCalendarBlocks(person.calendarId, min, max, env));
+  const days = await Promise.all(BOOKING_PHOTOGRAPHERS.map(async (person) => {
+    try {
+      const blocks = await listEvents(person, timeMin, timeMax);
+      return { id: person.id, name: person.name, events: travelEventsFromBlocks(blocks, hours.timeZone) };
+    } catch (error) {
+      logUnreadable(person, error);
+      return { id: person.id, name: person.name, events: null };
+    }
+  }));
+  const readable = days.filter((person) => person.events);
+  if (!readable.length) {
+    return { live: false, slots: [], durationMinutes, bufferMinutes, driveMode: apiKey ? "routes" : "buffer" };
+  }
+  const preferred = preferenceId !== "no-preference" ? days.find((person) => person.id === preferenceId) || null : null;
+  const considered = preferred ? preferred.events ? [preferred] : [] : readable;
+  const queries = considered.flatMap((person) => {
+    const events = person.events || [];
+    const open = openApprenticeshipSlots({
+      now,
+      busy: events.map((event) => ({
+        start: new Date(event.startMs).toISOString(),
+        end: new Date(event.endMs).toISOString()
+      })),
+      durationMinutes,
+      hours
+    });
+    return travelQueriesForSlots({ slots: open, events, bookingAddress: address });
+  });
+  const driveMap = await resolveDriveMinutes({
+    queries,
+    apiKey,
+    cache: input.cache,
+    now: now.getTime(),
+    fetchImpl: input.fetchImpl
+  });
+  const assigned = assignPhotographerSlots({
+    now,
+    durationMinutes,
+    hours,
+    bufferMinutes,
+    bookingAddress: address,
+    preferenceId,
+    photographers: days,
+    driveMinutes: (from, to, departAtMs) => {
+      const value = driveMap.get(driveCacheKey(from, to, departAtMs));
+      return value === void 0 ? null : value;
+    }
+  });
+  return {
+    live: assigned.live,
+    slots: assigned.slots,
+    durationMinutes,
+    bufferMinutes,
+    driveMode: apiKey ? "routes" : "buffer"
+  };
+}
+async function createBookingCalendarHold(input) {
+  const person = bookingPhotographerById(input.photographerId);
+  if (!person) return null;
+  const env = input.env ?? process.env;
+  const hours = apprenticeshipHoursFromEnv(env);
+  const body = {
+    summary: `Iconic Images: ${input.clientName}`,
+    location: input.address,
+    description: [
+      `Order: ${input.orderNumber}`,
+      `Photographer: ${person.name}`,
+      input.serviceSummary ? `Services: ${input.serviceSummary}` : "",
+      `Client: ${input.clientName}`,
+      input.clientEmail ? `Email: ${input.clientEmail}` : "",
+      input.clientPhone ? `Phone: ${input.clientPhone}` : "",
+      input.notes ? `Notes: ${input.notes}` : ""
+    ].filter(Boolean).join("\n"),
+    start: { dateTime: input.slot.start, timeZone: hours.timeZone },
+    end: { dateTime: input.slot.end, timeZone: hours.timeZone },
+    extendedProperties: {
+      private: {
+        orderNumber: input.orderNumber,
+        source: "booking_form",
+        photographerId: person.id
+      }
+    }
+  };
+  if (input.insert) {
+    const created = await input.insert(person.calendarId, body);
+    return { calendarId: person.calendarId, eventId: created.id, htmlLink: created.htmlLink };
+  }
+  const auth = calendarAuthFromAccount(firebaseServiceAccount(env), env);
+  if (!auth) return null;
+  const calendar = google.calendar({ version: "v3", auth });
+  const response = await calendar.events.insert({
+    calendarId: person.calendarId,
+    sendUpdates: "none",
+    requestBody: body
+  });
+  return {
+    calendarId: person.calendarId,
+    eventId: response.data.id || null,
+    htmlLink: response.data.htmlLink || null
+  };
+}
+async function deleteBookingCalendarHold(input) {
+  const env = input.env ?? process.env;
+  const auth = calendarAuthFromAccount(firebaseServiceAccount(env), env);
+  if (!auth || !input.eventId) return;
+  const calendar = google.calendar({ version: "v3", auth });
+  await calendar.events.delete({
+    calendarId: input.calendarId,
+    eventId: input.eventId,
+    sendUpdates: "none"
+  });
+}
 const router$p = Router();
 const db$p = () => admin.firestore();
 function orderRequestAdminUrl(id) {
@@ -6109,6 +7094,7 @@ async function loadBookingCatalog() {
   }
 }
 router$p.post("/", async (req, res) => {
+  let calendarHold = null;
   try {
     const {
       firstName,
@@ -6173,6 +7159,55 @@ router$p.post("/", async (req, res) => {
     const selectedService = resolved.selectedService;
     const selectedBasics = resolved.selectedBasics;
     const selectedAddOns = resolved.selectedAddOns;
+    const preferenceId = preferenceFromRequest(req.body.photographerId, photographerPreference);
+    let availability = {
+      live: false,
+      slots: [],
+      durationMinutes: 90,
+      bufferMinutes: 30,
+      driveMode: "buffer"
+    };
+    try {
+      availability = await readBookingAvailability({
+        address: displayAddress,
+        preferenceId,
+        selectedService: typeof selectedService === "string" ? selectedService : null,
+        selectedBasics: Array.isArray(selectedBasics) ? selectedBasics.map((id) => String(id)) : [],
+        catalog
+      });
+    } catch (err) {
+      console.error("[Bookings] Availability check failed — keeping the standard time list:", err);
+    }
+    const decision = resolveBookingAssignment({
+      live: availability.live,
+      slotStart: typeof req.body.slotStart === "string" ? req.body.slotStart : "",
+      slots: availability.slots
+    });
+    if (decision.ok === false) return res.status(decision.status).json({ error: decision.error });
+    let reservedOrderNumber = null;
+    if (decision.slot) {
+      try {
+        reservedOrderNumber = await nextOrderNumber();
+        const serviceSummary = traveled.lineItems.filter((item) => !isTravelFeeLine(item)).map((item) => item.name).filter(Boolean).join(", ");
+        calendarHold = await createBookingCalendarHold({
+          photographerId: decision.slot.photographerId,
+          orderNumber: reservedOrderNumber,
+          clientName: clientName2,
+          clientEmail: String(email || ""),
+          clientPhone: String(phone || ""),
+          address: displayAddress,
+          serviceSummary,
+          slot: decision.slot,
+          notes: typeof vibeNote === "string" ? vibeNote : ""
+        });
+      } catch (err) {
+        console.error("[Bookings] Calendar hold failed:", err);
+        calendarHold = null;
+      }
+      if (!calendarHold?.eventId) {
+        return res.status(503).json({ error: "That time could not be reserved. Pick another open time." });
+      }
+    }
     const specializedPhotography = resolved.specializedPhotography;
     const virtualStagingCredits = resolved.virtualStagingCredits;
     const { address: _savedAddress, ...storedPin } = locationFields;
@@ -6196,9 +7231,15 @@ router$p.post("/", async (req, res) => {
       travelMiles: travel.travelMiles,
       travelFeeCents: travel.travelFeeCents,
       travelQuoted: travel.travelQuoted,
-      scheduledDate: scheduledDate || null,
-      scheduledTime: scheduledTime || null,
-      photographerPreference: photographerPreference || null,
+      scheduledDate: decision.slot?.date || scheduledDate || null,
+      scheduledTime: decision.slot?.time || scheduledTime || null,
+      photographerPreference: preferenceName(preferenceId),
+      assignedPhotographerName: decision.slot?.photographerName || null,
+      bookingPhotographerId: decision.slot?.photographerId || null,
+      appointmentDuration: decision.slot ? availability.durationMinutes : null,
+      calendarEventId: calendarHold?.eventId || null,
+      calendarId: calendarHold?.calendarId || null,
+      calendarHtmlLink: calendarHold?.htmlLink || null,
       squareFootage: squareFootage || null,
       accessMethod: accessMethod || null,
       lockboxCode: lockboxCode || null,
@@ -6239,7 +7280,7 @@ router$p.post("/", async (req, res) => {
         address: savedAddress
       });
       orderNumber = tile.orderCode;
-      orderNumber = await nextOrderNumber();
+      orderNumber = reservedOrderNumber || await nextOrderNumber();
       packageName = tile.packageName === "Custom order" ? "" : tile.packageName;
     } catch (err) {
       console.error("[Bookings] Order number format failed:", err);
@@ -6288,8 +7329,10 @@ router$p.post("/", async (req, res) => {
           clientPhone: String(phone || ""),
           address: savedAddress,
           addressLabel: displayAddress,
-          scheduledDate: typeof scheduledDate === "string" ? scheduledDate : null,
-          scheduledTime: typeof scheduledTime === "string" ? scheduledTime : null,
+          scheduledDate: decision.slot?.date || (typeof scheduledDate === "string" ? scheduledDate : null),
+          scheduledTime: decision.slot?.time || (typeof scheduledTime === "string" ? scheduledTime : null),
+          photographerName: decision.slot?.photographerName || null,
+          bookingPhotographerId: decision.slot?.photographerId || null,
           services: traveled.lineItems,
           notes: typeof vibeNote === "string" ? vibeNote : ""
         });
@@ -6464,7 +7507,41 @@ router$p.post("/", async (req, res) => {
     });
   } catch (err) {
     console.error("[Bookings] Submission error:", err);
+    if (calendarHold?.eventId) {
+      await deleteBookingCalendarHold({
+        calendarId: calendarHold.calendarId,
+        eventId: calendarHold.eventId
+      }).catch((deleteErr) => console.error("[Bookings] Calendar hold cleanup failed:", deleteErr));
+    }
     return res.status(500).json({ error: "Failed to submit booking request." });
+  }
+});
+router$p.get("/photographers", (_req, res) => {
+  return res.json({
+    noPreference: { id: NO_PREFERENCE_ID, name: NO_PREFERENCE_NAME },
+    photographers: publicBookingPhotographers()
+  });
+});
+router$p.get("/slots", async (req, res) => {
+  const basics = typeof req.query.basics === "string" ? req.query.basics.split(",").map((id) => id.trim()).filter(Boolean) : [];
+  const preferenceId = preferenceFromRequest(req.query.photographer, "");
+  try {
+    const catalog = await loadBookingCatalog();
+    const availability = await readBookingAvailability({
+      address: typeof req.query.address === "string" ? req.query.address : "",
+      preferenceId,
+      selectedService: typeof req.query.service === "string" ? req.query.service : null,
+      selectedBasics: basics,
+      catalog
+    });
+    return res.json({
+      live: availability.live,
+      durationMinutes: availability.durationMinutes,
+      slots: availability.live ? availability.slots : []
+    });
+  } catch (err) {
+    console.error("[Bookings] Slot lookup failed — keeping the standard time list:", err);
+    return res.json({ live: false, durationMinutes: 90, slots: [] });
   }
 });
 router$p.get("/catalog", async (_req, res) => {
@@ -6501,12 +7578,13 @@ router$p.get("/:id", requireCoordinator, async (req, res) => {
 });
 router$p.patch("/:id/confirm", requireCoordinator, async (req, res) => {
   try {
-    const { assignedPhotographerId, assignedPhotographerName, scheduledDate, scheduledTime, internalNotes } = req.body;
+    const { assignedPhotographerId, assignedPhotographerName: postedPhotographerName, scheduledDate, scheduledTime, internalNotes } = req.body;
     const requestDoc = await db$p().collection("orderRequests").doc(req.params.id).get();
     if (!requestDoc.exists) {
       return res.status(404).json({ error: "Booking request not found." });
     }
     const request = requestDoc.data();
+    const assignedPhotographerName = typeof postedPhotographerName === "string" && postedPhotographerName.trim() ? postedPhotographerName.trim() : typeof request.assignedPhotographerName === "string" ? request.assignedPhotographerName : null;
     if (request.convertedToOrderId) {
       let listingId2 = existingInvoiceId(request.listingId);
       try {
@@ -6694,7 +7772,12 @@ router$p.patch("/:id/confirm", requireCoordinator, async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    const calendarResult = await createCalendarBookingEvent({
+    const existingEventId = typeof request.calendarEventId === "string" ? request.calendarEventId : "";
+    const calendarResult = existingEventId ? {
+      calendarId: typeof request.calendarId === "string" ? request.calendarId : "",
+      eventId: existingEventId,
+      htmlLink: typeof request.calendarHtmlLink === "string" ? request.calendarHtmlLink : null
+    } : await createCalendarBookingEvent({
       orderId: orderRef.id,
       clientName: requestClientName,
       clientEmail: requestEmail,
@@ -7501,36 +8584,36 @@ const VIDEO_FILE = /\.(mp4|m4v|mov|webm)(\?|#|$)/i;
 const BLOCKED_EXT = /\.(zip|pdf|dng|cr2|cr3|nef|nrw|arw|srf|sr2|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic|heif|mp4|m4v|mov|webm)(\?|#|$)/i;
 const FILE_KEYS = ["downloadUrl", "fileUrl", "originalUrl", "fullResUrl", "mlsUrl", "zipUrl", "printUrl", "reelUrl", "mp4Url", "rawUrl", "src"];
 const DISPLAY_KEYS = ["previewUrl", "displayUrl", "webUrl", "thumbnailUrl"];
-function text$c(value) {
+function text$b(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function rowOf$2(item) {
   return item && typeof item === "object" ? item : null;
 }
 function shareableUrl$1(value) {
-  const url = text$c(value);
+  const url = text$b(value);
   if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
   if (url.startsWith("/")) return url;
   if (url.startsWith("https://") || url.startsWith("http://")) return url;
   return "";
 }
 function mediaName$1(row, fallback) {
-  return text$c(row.name) || text$c(row.fileName) || text$c(row.title) || fallback;
+  return text$b(row.name) || text$b(row.fileName) || text$b(row.title) || fallback;
 }
 function labelOf(row) {
-  return `${text$c(row.fileName)} ${text$c(row.name)} ${text$c(row.title)} ${text$c(row.path)} ${text$c(row.storagePath)}`.toLowerCase();
+  return `${text$b(row.fileName)} ${text$b(row.name)} ${text$b(row.title)} ${text$b(row.path)} ${text$b(row.storagePath)}`.toLowerCase();
 }
 function isMls(row) {
-  const category = text$c(row.category).toLowerCase();
-  const type = text$c(row.type).toLowerCase();
+  const category = text$b(row.category).toLowerCase();
+  const type = text$b(row.type).toLowerCase();
   if (category === "mls" || type === "mls") return true;
   const label = labelOf(row);
   if (/(^|[^a-z0-9])mls([^a-z0-9]|$)/.test(label)) return true;
   return /\/mls\//.test(label);
 }
 function isFullRes(row) {
-  const category = text$c(row.category).toLowerCase();
-  const type = text$c(row.type).toLowerCase();
+  const category = text$b(row.category).toLowerCase();
+  const type = text$b(row.type).toLowerCase();
   if (category === "full-res" || category === "fullres" || type === "full-res" || type === "fullres") return true;
   const label = labelOf(row);
   if (/(^|[^a-z0-9])full[\s_-]?res([^a-z0-9]|$)/.test(label)) return true;
@@ -7539,7 +8622,7 @@ function isFullRes(row) {
 function isRasterUrl(url, row) {
   if (!url || BLOCKED_EXT.test(url.split("#")[0]) || VIDEO_FILE.test(url.split("#")[0])) return false;
   if (RASTER.test(url.split("#")[0])) return true;
-  const content = text$c(row.contentType).toLowerCase();
+  const content = text$b(row.contentType).toLowerCase();
   return /^image\/(jpeg|jpg|png|webp|gif)/.test(content);
 }
 function blockedFileUrls(row, includeOwnUrl) {
@@ -7568,11 +8651,11 @@ function separateDisplay(row) {
 }
 function rasterShareSource(row, legacyDropTagged = false) {
   if (legacyDropTagged && isMls(row)) return "";
-  const type = text$c(row.type).toLowerCase();
+  const type = text$b(row.type).toLowerCase();
   if (type === "video" || type === "reel" || type === "file" || type === "matterport") return "";
-  const content = text$c(row.contentType).toLowerCase();
+  const content = text$b(row.contentType).toLowerCase();
   if (content.startsWith("video/") || content === "application/pdf" || content === "application/zip") return "";
-  const path2 = `${text$c(row.path)} ${text$c(row.storagePath)}`.toLowerCase();
+  const path2 = `${text$b(row.path)} ${text$b(row.storagePath)}`.toLowerCase();
   if (/\/(raw|downloads?|print|zips?)\//.test(path2)) return "";
   const display = separateDisplay(row);
   if (legacyDropTagged && isFullRes(row)) return display;
@@ -7602,11 +8685,11 @@ function videoFileUrl(row) {
 function videoPlaceholderSource(row) {
   if (rasterPoster(row)) return "";
   const file = videoFileUrl(row);
-  const type = text$c(row.type).toLowerCase();
-  const content = text$c(row.contentType).toLowerCase();
+  const type = text$b(row.type).toLowerCase();
+  const content = text$b(row.contentType).toLowerCase();
   const named = type === "video" || type === "reel" || content.startsWith("video/");
   if (!file && !named) return "";
-  const id = text$c(row.id) || file || text$c(row.path) || text$c(row.storagePath) || text$c(row.name) || text$c(row.fileName);
+  const id = text$b(row.id) || file || text$b(row.path) || text$b(row.storagePath) || text$b(row.name) || text$b(row.fileName);
   if (!id) return "";
   return `${VIDEO_PLACEHOLDER_PREFIX}${encodeURIComponent(id)}`;
 }
@@ -7666,8 +8749,8 @@ function listingOwnerDisplayItems(listing) {
   return items;
 }
 function isGalleryFloor(row) {
-  const type = text$c(row.type).toLowerCase();
-  const category = text$c(row.category).toLowerCase();
+  const type = text$b(row.type).toLowerCase();
+  const category = text$b(row.category).toLowerCase();
   return type === "floorplan" || type === "floor-plan" || category === "floorplan" || category === "floor-plan";
 }
 function galleryOwnerDisplayItems(media) {
@@ -7675,7 +8758,7 @@ function galleryOwnerDisplayItems(media) {
   const seen = /* @__PURE__ */ new Set();
   const rows = media.map(rowOf$2).filter((row) => Boolean(row));
   for (const row of rows) {
-    const type = text$c(row.type).toLowerCase();
+    const type = text$b(row.type).toLowerCase();
     if (type === "video" || type === "reel" || type === "matterport" || type === "tour" || type === "file" || type === "pdf") continue;
     const source = rasterShareSource(row);
     if (!source) continue;
@@ -7683,7 +8766,7 @@ function galleryOwnerDisplayItems(media) {
     pushDisplay(items, seen, mediaName$1(row, floor ? "Floor plan" : "Photo"), source, floor ? "floorPlan" : "image");
   }
   for (const row of rows) {
-    const type = text$c(row.type).toLowerCase();
+    const type = text$b(row.type).toLowerCase();
     if (type !== "video" && type !== "reel") continue;
     const poster = rasterPoster(row) || videoPlaceholderSource(row);
     pushDisplay(items, seen, mediaName$1(row, "Video"), poster, "poster");
@@ -7700,24 +8783,24 @@ function posterIndex(row, items) {
   return items.findIndex((item) => item.sourceUrl === poster);
 }
 function isUnbranded(row) {
-  const category = text$c(row.category).toLowerCase();
-  const type = text$c(row.type).toLowerCase();
+  const category = text$b(row.category).toLowerCase();
+  const type = text$b(row.type).toLowerCase();
   if (category === "unbranded" || type === "unbranded") return true;
-  const name = `${text$c(row.name)} ${text$c(row.fileName)} ${text$c(row.title)}`.toLowerCase();
+  const name = `${text$b(row.name)} ${text$b(row.fileName)} ${text$b(row.title)}`.toLowerCase();
   return name.includes("unbranded");
 }
 function isBrandedPlayback(row) {
   if (isMls(row) || isUnbranded(row)) return false;
-  const category = text$c(row.category).toLowerCase();
-  const type = text$c(row.type).toLowerCase();
+  const category = text$b(row.category).toLowerCase();
+  const type = text$b(row.type).toLowerCase();
   if (category === "branded" || type === "branded") return true;
-  const name = `${text$c(row.name)} ${text$c(row.fileName)} ${text$c(row.title)}`.toLowerCase();
+  const name = `${text$b(row.name)} ${text$b(row.fileName)} ${text$b(row.title)}`.toLowerCase();
   return /(^|[^a-z])branded([^a-z]|$)/.test(name);
 }
 function isReelPlayback(row) {
   if (isMls(row) || isUnbranded(row)) return false;
-  const category = text$c(row.category).toLowerCase();
-  const type = text$c(row.type).toLowerCase();
+  const category = text$b(row.category).toLowerCase();
+  const type = text$b(row.type).toLowerCase();
   return category === "reel" || type === "reel";
 }
 function deliveredVideoUrl(row) {
@@ -8025,15 +9108,15 @@ function statusOf(doc) {
 function isReleased(doc) {
   return RELEASED_GALLERY_STATUSES.includes(statusOf(doc));
 }
-function text$b(value) {
+function text$a(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function httpUrl(value) {
-  const url = text$b(value);
+  const url = text$a(value);
   return url.startsWith("https://") || url.startsWith("http://") ? url : "";
 }
 function shareableUrl(value) {
-  const url = text$b(value);
+  const url = text$a(value);
   if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
   if (url.startsWith("/")) return url;
   return httpUrl(url);
@@ -8075,7 +9158,7 @@ function isPrivateMedia(path2, name, url) {
   return PRIVATE_FILE.test(name) || PRIVATE_FILE.test(url);
 }
 function mediaName(row, fallback) {
-  return text$b(row.name) || text$b(row.fileName) || text$b(row.title) || fallback;
+  return text$a(row.name) || text$a(row.fileName) || text$a(row.title) || fallback;
 }
 function publicImages(listing) {
   if (!Array.isArray(listing.images)) return [];
@@ -8097,7 +9180,7 @@ function publicVideos(listing) {
     if (!row) continue;
     const url = httpUrl(row.url);
     const name = mediaName(row, "Video");
-    if (!url || isPrivateMedia(text$b(row.path) || text$b(row.storagePath), name, url)) continue;
+    if (!url || isPrivateMedia(text$a(row.path) || text$a(row.storagePath), name, url)) continue;
     videos.push({ url, name });
   }
   return videos.slice(0, 40);
@@ -8110,10 +9193,10 @@ function publicTour(listing) {
   return "";
 }
 function agentNameOf$1(listing) {
-  const direct = text$b(listing.agentName) || text$b(listing.listingAgent);
+  const direct = text$a(listing.agentName) || text$a(listing.listingAgent);
   if (direct) return direct;
   const agent = listing.agent;
-  if (agent && typeof agent === "object") return text$b(agent.name);
+  if (agent && typeof agent === "object") return text$a(agent.name);
   if (typeof agent === "string") return agent.trim();
   return "";
 }
@@ -8127,7 +9210,7 @@ function publicFloorPlans(listing) {
       if (!row) continue;
       const url = httpUrl(row.url) || httpUrl(row.shareUrl);
       const name = mediaName(row, "Floor plan");
-      const path2 = text$b(row.path) || text$b(row.storagePath);
+      const path2 = text$a(row.path) || text$a(row.storagePath);
       if (!url || isPrivateMedia(path2, name, url)) continue;
       plans.push({ url, name });
     }
@@ -8157,7 +9240,7 @@ function ownerFiles(listing) {
       const row = rowOf(item);
       if (!row) return;
       const name = mediaName(row, `File ${index + 1}`);
-      const path2 = text$b(row.path) || text$b(row.storagePath);
+      const path2 = text$a(row.path) || text$a(row.storagePath);
       const display = httpUrl(row.url);
       const download = downloadUrlOf(row);
       if (download) push(download, name);
@@ -8188,12 +9271,12 @@ function ownerRevisions(listing) {
     const row = rowOf(item) || {};
     const photoIndex = typeof row.photoIndex === "number" ? row.photoIndex : null;
     return {
-      id: text$b(row.id) || `revision-${index + 1}`,
-      type: text$b(row.type) || "gallery",
+      id: text$a(row.id) || `revision-${index + 1}`,
+      type: text$a(row.type) || "gallery",
       photoIndex,
-      description: text$b(row.description),
-      status: text$b(row.status) || "pending",
-      createdAt: text$b(row.createdAt)
+      description: text$a(row.description),
+      status: text$a(row.status) || "pending",
+      createdAt: text$a(row.createdAt)
     };
   });
 }
@@ -8202,11 +9285,11 @@ function invoiceOf(listing) {
   if (nested2 && typeof nested2 === "object" && typeof nested2.status === "string") {
     return { status: nested2.status };
   }
-  const status2 = text$b(listing.invoiceStatus);
+  const status2 = text$a(listing.invoiceStatus);
   return status2 ? { status: status2 } : null;
 }
 function pickReleasedGallery(listing, related) {
-  const preferred = text$b(listing.galleryId) || text$b(listing.playtestGalleryId);
+  const preferred = text$a(listing.galleryId) || text$a(listing.playtestGalleryId);
   const released = related.filter((doc) => isReleased(doc));
   if (preferred) {
     const match = released.find((doc) => doc.id === preferred);
@@ -8297,24 +9380,24 @@ function isStreamUrl(url) {
   return /(youtube\.com|youtu\.be|vimeo\.com|player\.vimeo\.com|mux\.com|stream\.mux|cloudflarestream\.com)/i.test(url);
 }
 function isFullResOrMls(row) {
-  const category = text$b(row.category).toLowerCase();
-  const type = text$b(row.type).toLowerCase();
+  const category = text$a(row.category).toLowerCase();
+  const type = text$a(row.type).toLowerCase();
   if (category === "mls" || category === "full-res" || category === "fullres" || type === "mls") return true;
-  const label = `${text$b(row.fileName)} ${text$b(row.name)} ${text$b(row.title)} ${text$b(row.path)} ${text$b(row.storagePath)}`.toLowerCase();
+  const label = `${text$a(row.fileName)} ${text$a(row.name)} ${text$a(row.title)} ${text$a(row.path)} ${text$a(row.storagePath)}`.toLowerCase();
   if (/(^|[^a-z0-9])(full[\s_-]?res|mls)([^a-z0-9]|$)/.test(label)) return true;
   return /\/(mls|full)\//.test(label);
 }
 function rowIsDeliveryOriginal(row) {
   if (row.downloadable === true || isFullResOrMls(row)) return true;
-  const type = text$b(row.type).toLowerCase();
+  const type = text$a(row.type).toLowerCase();
   if (type === "video" || type === "reel" || type === "file") return true;
-  const content = text$b(row.contentType).toLowerCase();
+  const content = text$a(row.contentType).toLowerCase();
   if (content.startsWith("video/") || content === "application/zip" || content === "application/pdf") return true;
   const candidates = [row.url, row.shareUrl, row.embedUrl, ...FILE_URL_KEYS.map((key) => row[key])];
-  return candidates.some((value) => isOriginalFileUrl(httpUrl(value) || text$b(value)));
+  return candidates.some((value) => isOriginalFileUrl(httpUrl(value) || text$a(value)));
 }
 function pushNeedle(needles, value) {
-  const raw = text$b(value);
+  const raw = text$a(value);
   if (raw.length >= 12) needles.push(raw);
 }
 function walkOriginalNeedles(value, needles, inheritedOriginal = false) {
@@ -8329,7 +9412,7 @@ function walkOriginalNeedles(value, needles, inheritedOriginal = false) {
   if (original) {
     const fileUrls = new Set(FILE_URL_KEYS.map((key) => shareableUrl(row[key])).filter(Boolean));
     for (const key of ["url", "shareUrl", "embedUrl", "sourcePath", "storagePath", "path"]) {
-      const raw = text$b(row[key]);
+      const raw = text$a(row[key]);
       if (!raw) continue;
       const asUrl = shareableUrl(raw);
       if (asUrl && isStreamUrl(asUrl)) continue;
@@ -8436,7 +9519,7 @@ function embedTour(listing, needles) {
       for (const key of ["embedUrl", "url", "shareUrl"]) {
         const url = shareableUrl(row[key]);
         if (!url || isOriginalFileUrl(url) || containsOriginal(url, needles)) continue;
-        const type = text$b(row.type).toLowerCase();
+        const type = text$a(row.type).toLowerCase();
         if (type === "matterport" || type === "tour" || /matterport\.com/i.test(url)) return url;
       }
     }
@@ -8458,7 +9541,7 @@ function displaySafeShareMedia(listing) {
 function ownerStudioProject(listing, pub, gate2 = {}) {
   const authoritativeInvoice = Object.prototype.hasOwnProperty.call(gate2, "invoice");
   const invoiceDoc = authoritativeInvoice && gate2.invoice && typeof gate2.invoice === "object" ? gate2.invoice : null;
-  const invoiceStatus = authoritativeInvoice ? text$b(invoiceDoc?.status) : text$b(invoiceOf(listing)?.status);
+  const invoiceStatus = authoritativeInvoice ? text$a(invoiceDoc?.status) : text$a(invoiceOf(listing)?.status);
   const invoice = invoiceStatus ? { status: invoiceStatus } : null;
   const downloadsUnlocked = studioDownloadsUnlocked({
     listing: {
@@ -8477,9 +9560,9 @@ function ownerStudioProject(listing, pub, gate2 = {}) {
   const project = {
     ...source,
     view: "owner",
-    clientName: text$b(listing.clientName),
-    clientEmail: text$b(listing.clientEmail),
-    clientPhone: text$b(listing.clientPhone),
+    clientName: text$a(listing.clientName),
+    clientEmail: text$a(listing.clientEmail),
+    clientPhone: text$a(listing.clientPhone),
     revisions: ownerRevisions(listing),
     lockDownloads: lockDownloadsOn(listing.lockDownloads),
     requirePayment: requirePaymentOn(listing.requirePayment),
@@ -8525,8 +9608,8 @@ function decideClientGalleryLink(input) {
   }
   if (input.pointedListing) return listingResult(input.pointedListing, input.relatedGalleries);
   if (input.order) {
-    const galleryId = text$b(input.order.galleryId);
-    const listingId = text$b(input.order.listingId);
+    const galleryId = text$a(input.order.galleryId);
+    const listingId = text$a(input.order.listingId);
     if (galleryId || listingId) {
       return {
         ok: false,
@@ -8543,8 +9626,8 @@ function decideClientGalleryLink(input) {
     };
   }
   if (input.orderRequest) {
-    const galleryId = text$b(input.orderRequest.galleryId);
-    const listingId = text$b(input.orderRequest.listingId);
+    const galleryId = text$a(input.orderRequest.galleryId);
+    const listingId = text$a(input.orderRequest.listingId);
     if (galleryId || listingId) {
       return {
         ok: false,
@@ -10612,7 +11695,7 @@ async function orderIdForGallery(gallery) {
   return typeof orderId === "string" ? orderId.trim() : "";
 }
 const db$j = () => admin.firestore();
-function text$a(value) {
+function text$9(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function docRecord(snap) {
@@ -10634,7 +11717,7 @@ async function galleryById(id) {
 }
 async function relatedForListing(listing) {
   const related = await galleriesWhere("listingId", listing.id);
-  const extras = [text$a(listing.galleryId), text$a(listing.playtestGalleryId)];
+  const extras = [text$9(listing.galleryId), text$9(listing.playtestGalleryId)];
   for (const galleryId of extras) {
     if (!galleryId || related.some((doc) => doc.id === galleryId)) continue;
     const extra = await galleryById(galleryId);
@@ -10683,8 +11766,8 @@ async function resolveClientGalleryLink(id) {
   const order = docRecord(orderSnap);
   const orderRequest = docRecord(requestSnap);
   const galleriesByOrderId = order ? await galleriesWhere("orderId", id) : [];
-  const pointedGalleryId = text$a(orderRequest?.galleryId) || text$a(order?.galleryId);
-  const pointedListingId = text$a(orderRequest?.listingId) || text$a(order?.listingId);
+  const pointedGalleryId = text$9(orderRequest?.galleryId) || text$9(order?.galleryId);
+  const pointedListingId = text$9(orderRequest?.listingId) || text$9(order?.listingId);
   const pointedGallery = pointedGalleryId ? await galleryById(pointedGalleryId) : null;
   let pointedListing = null;
   let pointedRelated = relatedGalleries;
@@ -10706,7 +11789,7 @@ async function resolveClientGalleryLink(id) {
 }
 async function invoiceForListing(listing) {
   const load = (id) => db$j().collection("invoices").doc(id).get();
-  const invoiceId = text$a(listing.invoiceId);
+  const invoiceId = text$9(listing.invoiceId);
   if (invoiceId) {
     const doc = await readInvoiceDoc(load, invoiceId);
     if (doc && !invoiceRedirectTarget(doc.data)) return { id: doc.id, ...doc.data };
@@ -10718,7 +11801,7 @@ async function invoiceForListing(listing) {
     const doc = await readInvoiceDoc(load, legacyId);
     if (doc && !invoiceRedirectTarget(doc.data)) return { id: doc.id, ...doc.data };
   }
-  const orderId = text$a(listing.orderId);
+  const orderId = text$9(listing.orderId);
   if (!orderId) return null;
   try {
     const snap = await db$j().collection("invoices").where("orderId", "==", orderId).limit(1).get();
@@ -11255,11 +12338,11 @@ function buildPaymentReceipt(input) {
     fees,
     totalPaid
   });
-  const galleryId = text$9(input.galleryId) || text$9(input.invoice.galleryId);
+  const galleryId = text$8(input.galleryId) || text$8(input.invoice.galleryId);
   const galleryUrl = galleryId ? publicClientUrl(`/gallery/${encodeURIComponent(galleryId)}`, input.env) : "";
   const presentationUrl = input.presentationUrl === void 0 ? presentationLinkForReceipt(input.listing) || "" : input.presentationUrl || "";
   return renderPaymentReceipt({
-    clientName: text$9(input.invoice.clientName) || "there",
+    clientName: text$8(input.invoice.clientName) || "there",
     invoiceNumber: receiptEmailNumber({
       invoiceNumber: input.invoice.invoiceNumber,
       id: input.invoiceId,
@@ -11284,7 +12367,7 @@ function finite(value) {
   const amount = Number(value);
   return Number.isFinite(amount) ? amount : null;
 }
-function text$9(value) {
+function text$8(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const SQUARE_VERSION_FALLBACK = "2026-08-20";
@@ -11394,285 +12477,6 @@ async function followInvoiceRedirect(hit, byId) {
     current = followed;
   }
   return current;
-}
-const APPRENTICESHIP_ORDER_SOURCE = "apprenticeship";
-const APPRENTICESHIP_CALENDAR_ID = "steven@iconicimagestx.com";
-const APPRENTICESHIP_TIME_ZONE = "America/Chicago";
-const APPRENTICESHIP_BOOKING_FEE = 25;
-const APPRENTICESHIP_BOOKING_FEE_LINE = "Booking fee $25, credited toward your package";
-const APPRENTICESHIP_BALANCE_LINE = "The balance is invoiced after the shoot.";
-const APPRENTICESHIP_CALENDAR_FALLBACK = "Open times are not listed right now. Call or email and we will set the appointment with you.";
-const APPRENTICESHIP_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar";
-const WEEKDAY = {
-  Sun: 0,
-  Mon: 1,
-  Tue: 2,
-  Wed: 3,
-  Thu: 4,
-  Fri: 5,
-  Sat: 6
-};
-function apprenticeshipDurationMinutes(appointmentLimit, packageId) {
-  const text2 = (appointmentLimit || "").toLowerCase();
-  const minutes = text2.match(/(\d+)\s*minute/);
-  if (minutes) {
-    const value = Number(minutes[1]);
-    if (value > 0 && value <= 24 * 60) return value;
-  }
-  const hours = text2.match(/(\d+)\s*hour/);
-  if (hours) {
-    const value = Number(hours[1]) * 60;
-    if (value > 0 && value <= 24 * 60) return value;
-  }
-  return packageId === "apprentice-50" ? 60 : 20;
-}
-function apprenticeshipPackageViews(catalog = packagesForStaffEditor([])) {
-  const offer = bookingOffer(catalog);
-  return offer.apprenticeshipPackages.map((item) => {
-    const staff = catalog.find((entry2) => entry2.id === item.id);
-    const rules = item.rules?.length ? item.rules : [...APPRENTICESHIP_RULES];
-    return {
-      ...item,
-      rules,
-      overage: staff?.overage || APPRENTICESHIP_OVERAGE_LABEL,
-      durationMinutes: apprenticeshipDurationMinutes(item.appointmentLimit, item.id)
-    };
-  });
-}
-function findApprenticeshipPackage(packageId, catalog = packagesForStaffEditor([])) {
-  const id = packageId.trim();
-  if (!isApprenticeshipPackage(id)) return null;
-  return apprenticeshipPackageViews(catalog).find((item) => item.id === id) || null;
-}
-function parseClock(value, fallback) {
-  const match = String(value || "").trim().match(/^(\d{1,2})(?::(\d{2}))?$/);
-  if (!match) return fallback;
-  const hours = Number(match[1]);
-  const minutes = Number(match[2] || 0);
-  if (hours < 0 || hours > 24 || minutes < 0 || minutes > 59) return fallback;
-  return hours * 60 + minutes;
-}
-function parseDays(value, fallback) {
-  if (!value || !value.trim()) return fallback;
-  const days = value.split(/[^0-9]+/).map((part) => Number(part)).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6);
-  return days.length ? [...new Set(days)] : fallback;
-}
-function parseHorizon(value, fallback) {
-  const days = Number(value);
-  if (!Number.isInteger(days) || days < 1 || days > 60) return fallback;
-  return days;
-}
-function apprenticeshipHoursFromEnv(env = typeof process !== "undefined" ? process.env : {}) {
-  const startMinutes = parseClock(env.APPRENTICESHIP_DAY_START, 9 * 60);
-  const endMinutes = parseClock(env.APPRENTICESHIP_DAY_END, 18 * 60);
-  const days = parseDays(env.APPRENTICESHIP_WORK_DAYS, [1, 2, 3, 4, 5, 6]);
-  const calendarId = (env.APPRENTICESHIP_CALENDAR_ID || APPRENTICESHIP_CALENDAR_ID).trim() || APPRENTICESHIP_CALENDAR_ID;
-  const requestedZone = (env.APPRENTICESHIP_TIME_ZONE || APPRENTICESHIP_TIME_ZONE).trim() || APPRENTICESHIP_TIME_ZONE;
-  let timeZone = APPRENTICESHIP_TIME_ZONE;
-  try {
-    Intl.DateTimeFormat("en-US", { timeZone: requestedZone }).format(/* @__PURE__ */ new Date());
-    timeZone = requestedZone;
-  } catch {
-    timeZone = APPRENTICESHIP_TIME_ZONE;
-  }
-  return {
-    timeZone,
-    startMinutes,
-    endMinutes: endMinutes > startMinutes ? endMinutes : 18 * 60,
-    days,
-    horizonDays: parseHorizon(env.APPRENTICESHIP_HORIZON_DAYS, 14),
-    calendarId
-  };
-}
-function apprenticeshipCalendarSetupNote(input) {
-  const email = input.serviceAccountEmail || "the service account email in FIREBASE_SERVICE_ACCOUNT";
-  const share = `Steven needs to share ${input.calendarId} with ${email} and allow Make changes to events, or set up domain-wide delegation for ${email} with the Google Calendar scope ${APPRENTICESHIP_CALENDAR_SCOPE}.`;
-  if (!input.missingCredentials) return share;
-  return `Set FIREBASE_SERVICE_ACCOUNT to the Firebase service account JSON. ${share}`;
-}
-function zonedParts(date, timeZone) {
-  const fmt = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    weekday: "short",
-    hourCycle: "h23"
-  });
-  const parts = Object.fromEntries(fmt.formatToParts(date).map((part) => [part.type, part.value]));
-  return {
-    year: Number(parts.year),
-    month: Number(parts.month),
-    day: Number(parts.day),
-    hour: Number(parts.hour) % 24,
-    minute: Number(parts.minute),
-    weekday: WEEKDAY[parts.weekday] ?? 0
-  };
-}
-function zonedTimeToUtc(year, month, day, hour, minute, timeZone) {
-  let utc = Date.UTC(year, month - 1, day, hour, minute, 0);
-  for (let pass = 0; pass < 3; pass += 1) {
-    const parts = zonedParts(new Date(utc), timeZone);
-    const got = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, 0);
-    const wanted = Date.UTC(year, month - 1, day, hour, minute, 0);
-    const delta = wanted - got;
-    if (delta === 0) return new Date(utc);
-    utc += delta;
-  }
-  return new Date(utc);
-}
-function addCalendarDays(year, month, day, add) {
-  const next = new Date(Date.UTC(year, month - 1, day + add));
-  return {
-    year: next.getUTCFullYear(),
-    month: next.getUTCMonth() + 1,
-    day: next.getUTCDate(),
-    weekday: next.getUTCDay()
-  };
-}
-function clockLabel(minutes) {
-  const hour24 = Math.floor(minutes / 60);
-  const minute = minutes % 60;
-  const suffix = hour24 >= 12 ? "PM" : "AM";
-  const hour12 = hour24 % 12 || 12;
-  return `${hour12}:${String(minute).padStart(2, "0")} ${suffix}`;
-}
-function dayLabel(year, month, day, timeZone) {
-  const instant = zonedTimeToUtc(year, month, day, 12, 0, timeZone);
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    weekday: "short",
-    month: "short",
-    day: "numeric"
-  }).format(instant);
-}
-function overlaps(start, end, busy) {
-  return busy.some((block2) => start < block2.end && end > block2.start);
-}
-function openApprenticeshipSlots(input) {
-  const duration = input.durationMinutes;
-  if (!Number.isFinite(duration) || duration <= 0) return [];
-  const busy = input.busy.map((block2) => ({ start: Date.parse(block2.start), end: Date.parse(block2.end) })).filter((block2) => Number.isFinite(block2.start) && Number.isFinite(block2.end) && block2.end > block2.start);
-  const today = zonedParts(input.now, input.hours.timeZone);
-  const slots = [];
-  for (let offset = 0; offset < input.hours.horizonDays; offset += 1) {
-    const date = addCalendarDays(today.year, today.month, today.day, offset);
-    if (!input.hours.days.includes(date.weekday)) continue;
-    for (let minute = input.hours.startMinutes; minute + duration <= input.hours.endMinutes; minute += duration) {
-      const start = zonedTimeToUtc(date.year, date.month, date.day, Math.floor(minute / 60), minute % 60, input.hours.timeZone);
-      const end = new Date(start.getTime() + duration * 60 * 1e3);
-      if (start.getTime() <= input.now.getTime()) continue;
-      if (overlaps(start.getTime(), end.getTime(), busy)) continue;
-      const dateKey2 = `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
-      const time = clockLabel(minute);
-      slots.push({
-        start: start.toISOString(),
-        end: end.toISOString(),
-        date: dateKey2,
-        time,
-        label: `${dayLabel(date.year, date.month, date.day, input.hours.timeZone)} · ${time}`
-      });
-    }
-  }
-  return slots;
-}
-function roundMoney$2(value) {
-  return Math.round(value * 100) / 100;
-}
-function quoteApprenticeship(input) {
-  const catalog = input.catalog ?? packagesForStaffEditor([]);
-  const pkg = findApprenticeshipPackage(input.packageId, catalog);
-  if (!pkg) return { ok: false, error: "Choose an apprenticeship package." };
-  const traveled = applyServerTravel(
-    buildSubmittedLineItems({ selectedBasics: [pkg.id], catalog }),
-    input.address
-  );
-  const draft = buildBookingInvoiceDraft({
-    lineItems: traveled.lineItems,
-    total: traveled.total,
-    pricing: { subtotal: traveled.total, tax: 0 },
-    clientEmail: "quote@iconicimagestx.com",
-    clientName: "Quote",
-    travel: traveled.travel,
-    applyProcessing: input.applyProcessing !== false
-  });
-  const travelLine = travelCustomerLine(traveled.travel);
-  return {
-    ok: true,
-    quote: {
-      packageId: pkg.id,
-      packageName: pkg.appointmentLimit ? `${pkg.name} (${pkg.appointmentLimit})` : pkg.name,
-      durationMinutes: pkg.durationMinutes,
-      subtotal: draft.subtotal,
-      processing: draft.processing ?? 0,
-      processingLabel: BOOKING_PROCESSING_LABEL,
-      travel: traveled.travel,
-      travelLabel: travelLine.label,
-      travelAmount: travelLine.amount,
-      total: draft.total,
-      bookingFee: APPRENTICESHIP_BOOKING_FEE,
-      bookingFeeLine: APPRENTICESHIP_BOOKING_FEE_LINE,
-      balanceDue: roundMoney$2(Math.max(0, draft.total - APPRENTICESHIP_BOOKING_FEE)),
-      balanceLine: APPRENTICESHIP_BALANCE_LINE,
-      lineItems: draft.lineItems
-    }
-  };
-}
-const EMAIL_RE$3 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-function text$8(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-function parseApprenticeshipOrder(body) {
-  const raw = body && typeof body === "object" ? body : {};
-  if (text$8(raw.website) || text$8(raw.companyWebsite)) {
-    return { ok: false, error: "Received.", honeypot: true };
-  }
-  const name = text$8(raw.name);
-  const explicitFirst = text$8(raw.firstName);
-  const explicitLast = text$8(raw.lastName);
-  const parts = name.split(/\s+/).filter(Boolean);
-  const firstName = explicitFirst || parts[0] || "";
-  const lastName = explicitLast || parts.slice(1).join(" ") || (explicitFirst ? "" : "");
-  const email = text$8(raw.email).toLowerCase();
-  const phone = text$8(raw.phone);
-  const address = text$8(raw.address);
-  const packageId = text$8(raw.packageId);
-  const slotStart = text$8(raw.slotStart);
-  const preferredTime = text$8(raw.preferredTime);
-  if (!isApprenticeshipPackage(packageId) || !findApprenticeshipPackage(packageId)) {
-    return { ok: false, error: "Choose an apprenticeship package." };
-  }
-  if (firstName.length < 2) return { ok: false, error: "Enter your name." };
-  if (`${firstName} ${lastName}`.trim().length > 80) return { ok: false, error: "Name is too long." };
-  if (!EMAIL_RE$3.test(email)) return { ok: false, error: "Enter a valid email." };
-  const digits2 = phone.replace(/\D/g, "");
-  if (digits2.length < 10 || digits2.length > 15) return { ok: false, error: "Enter a phone number." };
-  if (address.length < 5) return { ok: false, error: "Enter the property address." };
-  if (address.length > 200) return { ok: false, error: "Address is too long." };
-  if (slotStart && Number.isNaN(Date.parse(slotStart))) return { ok: false, error: "Choose an open time." };
-  if (preferredTime.length > 160) return { ok: false, error: "Preferred time is too long." };
-  return {
-    ok: true,
-    value: {
-      packageId,
-      firstName,
-      lastName: lastName || firstName,
-      email,
-      phone,
-      address,
-      slotStart: slotStart || null,
-      preferredTime
-    }
-  };
-}
-function apprenticeshipBookingReturnPath(orderNumber) {
-  const params = new URLSearchParams({
-    booking: "received",
-    order: orderNumber
-  });
-  return `/apprenticeship?${params.toString()}`;
 }
 const SENIOR_FACILITY_RATE_PER_SQFT = 0.1;
 const SENIOR_TOUR_PRICE = 250;
@@ -20225,169 +21029,6 @@ router$6.post("/", async (req, res) => {
     });
   }
 });
-function firebaseServiceAccount(env = process.env) {
-  const raw = env.FIREBASE_SERVICE_ACCOUNT;
-  if (!raw || !raw.trim()) return null;
-  try {
-    const parsed = JSON.parse(raw);
-    const client_email = typeof parsed.client_email === "string" ? parsed.client_email.trim() : "";
-    const private_key = typeof parsed.private_key === "string" ? parsed.private_key.replace(/\\n/g, "\n") : "";
-    if (!client_email || !private_key.includes("PRIVATE KEY")) return null;
-    return { client_email, private_key };
-  } catch {
-    return null;
-  }
-}
-function calendarAuthFromAccount(account, env = process.env) {
-  if (!account) return null;
-  const subject = env.APPRENTICESHIP_CALENDAR_SUBJECT?.trim();
-  return new google.auth.JWT({
-    email: account.client_email,
-    key: account.private_key,
-    scopes: [APPRENTICESHIP_CALENDAR_SCOPE],
-    subject: subject || void 0
-  });
-}
-async function availabilityFromFreeBusy(input) {
-  const hours = input.hours ?? apprenticeshipHoursFromEnv();
-  const pkg = findApprenticeshipPackage(input.packageId);
-  const durationMinutes = pkg?.durationMinutes ?? 20;
-  const setup = (missingCredentials) => apprenticeshipCalendarSetupNote({
-    calendarId: hours.calendarId,
-    serviceAccountEmail: input.accountEmail,
-    missingCredentials
-  });
-  if (!input.accountEmail) {
-    return {
-      available: false,
-      slots: [],
-      durationMinutes,
-      calendarId: hours.calendarId,
-      serviceAccountEmail: null,
-      missingCredentials: true,
-      setupNote: setup(true)
-    };
-  }
-  try {
-    const read = await input.query();
-    if (read.error) {
-      return {
-        available: false,
-        slots: [],
-        durationMinutes,
-        calendarId: hours.calendarId,
-        serviceAccountEmail: input.accountEmail,
-        missingCredentials: false,
-        setupNote: setup(false)
-      };
-    }
-    return {
-      available: true,
-      slots: openApprenticeshipSlots({
-        now: input.now,
-        busy: read.busy,
-        durationMinutes,
-        hours
-      }),
-      durationMinutes,
-      calendarId: hours.calendarId,
-      serviceAccountEmail: input.accountEmail,
-      missingCredentials: false,
-      setupNote: null
-    };
-  } catch (error) {
-    console.error("[Apprenticeship] Calendar freeBusy failed:", error);
-    return {
-      available: false,
-      slots: [],
-      durationMinutes,
-      calendarId: hours.calendarId,
-      serviceAccountEmail: input.accountEmail,
-      missingCredentials: false,
-      setupNote: setup(false)
-    };
-  }
-}
-async function queryStevenFreeBusy(input) {
-  const env = input.env ?? process.env;
-  const account = firebaseServiceAccount(env);
-  const auth = calendarAuthFromAccount(account, env);
-  const hours = input.hours ?? apprenticeshipHoursFromEnv(env);
-  if (!auth || !account) return { busy: [], error: true, email: null };
-  const calendar = google.calendar({ version: "v3", auth });
-  const response = await calendar.freebusy.query({
-    requestBody: {
-      timeMin: input.timeMin,
-      timeMax: input.timeMax,
-      timeZone: hours.timeZone,
-      items: [{ id: hours.calendarId }]
-    }
-  });
-  const entry2 = response.data.calendars?.[hours.calendarId];
-  const errors = entry2?.errors || [];
-  const busy = (entry2?.busy || []).map((block2) => ({ start: block2.start || "", end: block2.end || "" })).filter((block2) => block2.start && block2.end);
-  return { busy, error: errors.length > 0, email: account.client_email };
-}
-async function readApprenticeshipAvailability(input) {
-  const env = input.env ?? process.env;
-  const hours = apprenticeshipHoursFromEnv(env);
-  const now = input.now ?? /* @__PURE__ */ new Date();
-  const account = firebaseServiceAccount(env);
-  const timeMax = new Date(now.getTime() + (hours.horizonDays + 1) * 24 * 60 * 60 * 1e3);
-  return availabilityFromFreeBusy({
-    now,
-    packageId: input.packageId,
-    hours,
-    accountEmail: account?.client_email ?? null,
-    query: async () => {
-      const read = await queryStevenFreeBusy({
-        timeMin: now.toISOString(),
-        timeMax: timeMax.toISOString(),
-        hours,
-        env
-      });
-      return { busy: read.busy, error: read.error };
-    }
-  });
-}
-async function createApprenticeshipEvent(booking, env = process.env) {
-  const account = firebaseServiceAccount(env);
-  const auth = calendarAuthFromAccount(account, env);
-  if (!auth) return null;
-  const hours = apprenticeshipHoursFromEnv(env);
-  const calendar = google.calendar({ version: "v3", auth });
-  const response = await calendar.events.insert({
-    calendarId: hours.calendarId,
-    sendUpdates: "none",
-    requestBody: {
-      summary: `Apprenticeship: ${booking.clientName}`,
-      location: booking.address,
-      description: [
-        `Order: ${booking.orderNumber}`,
-        `Package: ${booking.packageName}`,
-        `Client: ${booking.clientName}`,
-        `Email: ${booking.clientEmail}`,
-        `Phone: ${booking.clientPhone}`,
-        "Booking fee: $25, credited toward the package",
-        "Balance invoiced after the shoot",
-        booking.notes ? `Notes: ${booking.notes}` : ""
-      ].filter(Boolean).join("\n"),
-      start: { dateTime: booking.slot.start, timeZone: hours.timeZone },
-      end: { dateTime: booking.slot.end, timeZone: hours.timeZone },
-      extendedProperties: {
-        private: {
-          orderNumber: booking.orderNumber,
-          source: "apprenticeship"
-        }
-      }
-    }
-  });
-  return {
-    calendarId: hours.calendarId,
-    eventId: response.data.id || null,
-    htmlLink: response.data.htmlLink || null
-  };
-}
 const router$5 = Router();
 const limiter = createRateLimiter({
   windowMs: 15 * 60 * 1e3,
