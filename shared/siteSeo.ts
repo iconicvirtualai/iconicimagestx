@@ -38,6 +38,13 @@ export const PUBLIC_PAGES: readonly PublicPage[] = [
       "Iconic Images is a Spring, Texas studio for real estate media, serving The Woodlands, Houston, and nearby communities since 2016.",
   },
   {
+    path: "/crew",
+    file: "seo/crew.html",
+    title: "Iconic Crew | Iconic Images",
+    description:
+      "Meet the Iconic Images crew of photographers, videographers, and producers in Spring, The Woodlands, and Houston.",
+  },
+  {
     path: "/pricing",
     file: "seo/pricing.html",
     title: "Pricing | Iconic Images",

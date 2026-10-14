@@ -48,6 +48,12 @@ function expressPlugin(): Plugin {
           res.end();
           return;
         }
+        if (pathOnly === "/team" || pathOnly === "/team/" || pathOnly === "/iconic-crew" || pathOnly === "/iconic-crew/") {
+          res.statusCode = 301;
+          res.setHeader("Location", "/crew");
+          res.end();
+          return;
+        }
         if (pathOnly === "/podcast-guest-prep" || pathOnly === "/podcast-guest-prep/") {
           const search = queryAt === -1 ? "" : raw.slice(queryAt);
           req.url = `/podcast-guest-prep.html${search}`;

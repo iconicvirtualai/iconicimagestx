@@ -4,6 +4,7 @@ import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { itemLink, itemText, useSiteHref, useSiteItems, useSiteText } from "@/content/siteContent";
+import { ensureCrewLink } from "@/lib/publicNav";
 
 export default function Header() {
   const settings = useSiteSettings();
@@ -25,16 +26,19 @@ export default function Header() {
   };
 
   const navItems = useSiteItems("chrome", "nav");
-  const menuItems = navItems
-    ? navItems.map((item) => ({ label: itemText(item, "link"), href: itemLink(item, "link") || "/" }))
-    : [
-        { label: "About", href: "/about" },
-        { label: "Pricing", href: "/pricing" },
-        { label: "Studio 105", href: "/studio-105" },
-        { label: "Portfolio", href: "/portfolio" },
-        { label: "Stock Footage", href: "/stock-footage" },
-        { label: "Contact Us", href: "/contact" },
-      ];
+  const menuItems = ensureCrewLink(
+    navItems
+      ? navItems.map((item) => ({ label: itemText(item, "link"), href: itemLink(item, "link") || "/" }))
+      : [
+          { label: "About", href: "/about" },
+          { label: "Pricing", href: "/pricing" },
+          { label: "Studio 105", href: "/studio-105" },
+          { label: "Portfolio", href: "/portfolio" },
+          { label: "Stock Footage", href: "/stock-footage" },
+          { label: "Contact Us", href: "/contact" },
+        ],
+    "/about",
+  );
   const loginLabel = useSiteText("chrome", "headerCtas", "login", "Log in");
   const loginHref = useSiteHref("chrome", "headerCtas", "login", "/login");
   const bookLabel = useSiteText("chrome", "headerCtas", "book", "Book Now");
@@ -65,12 +69,12 @@ export default function Header() {
         </Link>
 
         {/* Desktop Navigation (Left Aligned) */}
-        <nav className="hidden lg:flex items-center gap-8 ml-8 flex-1">
+        <nav className="hidden lg:flex items-center gap-4 xl:gap-6 ml-4 xl:ml-8 flex-1">
           {menuItems.map((item) => (
             <Link
               key={item.href}
               to={item.href}
-              className="text-white/70 hover:text-white transition-colors text-[13px] font-semibold"
+              className="text-white/70 hover:text-white transition-colors text-[12px] xl:text-[13px] font-semibold whitespace-nowrap"
             >
               {item.label}
             </Link>

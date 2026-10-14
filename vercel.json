@@ -51,6 +51,26 @@
       "source": "/gallery/",
       "destination": "/portal",
       "permanent": false
+    },
+    {
+      "source": "/team",
+      "destination": "/crew",
+      "statusCode": 301
+    },
+    {
+      "source": "/team/",
+      "destination": "/crew",
+      "statusCode": 301
+    },
+    {
+      "source": "/iconic-crew",
+      "destination": "/crew",
+      "statusCode": 301
+    },
+    {
+      "source": "/iconic-crew/",
+      "destination": "/crew",
+      "statusCode": 301
     }
   ],
   "rewrites": [
@@ -145,6 +165,14 @@
     {
       "source": "/about/",
       "destination": "/seo/about.html"
+    },
+    {
+      "source": "/crew",
+      "destination": "/seo/crew.html"
+    },
+    {
+      "source": "/crew/",
+      "destination": "/seo/crew.html"
     },
     {
       "source": "/pricing",

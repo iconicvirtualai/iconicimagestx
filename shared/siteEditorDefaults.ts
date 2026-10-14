@@ -73,6 +73,7 @@ const PAGES: ContentPage[] = [
     ]),
     block("nav", "Navigation", [], [
       linkItem("about", "About", "/about"),
+      linkItem("crew", "Crew", "/crew"),
       linkItem("pricing", "Pricing", "/pricing"),
       linkItem("studio", "Studio 105", "/studio-105"),
       linkItem("portfolio", "Portfolio", "/portfolio"),
@@ -90,6 +91,7 @@ const PAGES: ContentPage[] = [
       linkItem("pricing", "Pricing", "/pricing"),
       linkItem("socials", "Socials", "/socials"),
       linkItem("portfolio", "Portfolio", "/portfolio"),
+      linkItem("crew", "Crew", "/crew"),
       linkItem("studio", "Studio 105", "/studio-105"),
       linkItem("contact", "Contact Us", "/contact"),
       linkItem("login", "Client Login", "/login"),
@@ -303,6 +305,17 @@ const PAGES: ContentPage[] = [
       areaField("body", "Body", "Have a question or feedback? We'd love to hear from you. Send us a message and we'll respond as soon as possible."),
       textField("chatKicker", "Chat kicker", "LIVE CHAT"),
       textField("chatLabel", "Chat label", "Start Chat"),
+    ]),
+  ]),
+
+  page("crew", "/crew", "Iconic Crew", [
+    block("hero", "Hero", [
+      textField("kicker", "Kicker", "Our Crew"),
+      textField("title", "Headline", "Iconic Crew"),
+      areaField("body", "Body", "We Pride Ourselves In The Talent & Training Of Our People"),
+    ]),
+    block("join", "Join", [
+      linkField("label", "Join button", "Join our crew", "/apprenticeship"),
     ]),
   ]),
 
