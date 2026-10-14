@@ -2,9 +2,9 @@ import * as React from "react";
 import AdminLayout from "@/components/AdminLayout";
 import { X, Archive, Calendar, Layers, RefreshCw } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, writeBatch, doc, serverTimestamp, addDoc, getDocs, updateDoc } from "firebase/firestore";
+import { collection, onSnapshot, writeBatch, doc, serverTimestamp, addDoc, getDoc, getDocs, updateDoc } from "firebase/firestore";
 import { toast } from "sonner";
-import { listingAppointmentDate } from "@shared/listingWrite";
+import { listingAppointmentDate, projectCarryFromOrder, stableOrderRequestListingId } from "@shared/listingWrite";
 import { linkOrderToListing, resolvePortalClientId } from "@/lib/listingClient";
 import { listingLinkFields } from "@shared/orderProjectInvoice";
 import { Button } from "@/components/ui/button";
@@ -95,29 +95,44 @@ export default function AdminOrders() {
           } catch (lookupErr) {
             console.warn("[AdminOrders] Client lookup failed.", lookupErr);
           }
-          const apptDate = listingAppointmentDate(order.appointmentDate);
+          const carry = projectCarryFromOrder(order);
           const links = listingLinkFields({
             orderRequestId: id,
             orderId: order.convertedToOrderId || order.orderId,
             invoiceId: order.invoiceId,
           });
+          const reservedId = stableOrderRequestListingId(id);
+          if (reservedId) {
+            const existing = await getDoc(doc(db, "listings", reservedId));
+            if (existing.exists()) {
+              if (!listingAppointmentDate(existing.data()?.apptDate) && carry.apptDate) {
+                await updateDoc(existing.ref, { ...carry, updatedAt: serverTimestamp() });
+              }
+              await linkOrderToListing({
+                orderRequestId: id,
+                listingId: existing.id,
+                clientId,
+                clientEmail,
+                orderId: links.orderId || null,
+                invoiceId: links.invoiceId || null,
+              });
+              count++;
+              continue;
+            }
+          }
           const listingData: any = {
             projectType: bulkProjectType,
             ...links,
+            ...carry,
             clientId,
             clientName: getName(order),
             clientEmail,
             clientPhone: order.phone || "",
             address: getAddr(order),
             shootLocation: bulkProjectType === "business" ? getAddr(order) : null,
-            apptDate,
-            apptTime: order.scheduledTime || order.appointmentTime || null,
-            services: (order.lineItems || []).map((li: any) => li.name || String(li)),
-            status: apptDate ? "scheduled" : "unscheduled",
             total: getTotal(order),
             images: [], studioEnabled: true, studioToken: crypto.randomUUID(),
             lockDownloads: true, requirePayment: true, lockStudio: false, socialPermission: false,
-            accessInfo: [order.accessMethod, order.lockboxCode].filter(Boolean).join(" - ") || "",
             createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
           };
           const ref = await addDoc(collection(db, "listings"), listingData);
