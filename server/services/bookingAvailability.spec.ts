@@ -82,6 +82,37 @@ describe("booking calendar availability", () => {
     expect(JSON.stringify(result)).not.toContain("@");
   });
 
+  it("offers Sunday only for Steven and keeps Saturday company starts before noon", async () => {
+    const result = await readBookingAvailability({
+      env: { ...accountEnv, BOOKING_TRAVEL_BUFFER_MINUTES: "0" },
+      now: new Date("2026-10-13T12:00:00.000Z"),
+      address: "200 Oak Ave, Houston, TX",
+      preferenceId: "no-preference",
+      selectedBasics: ["apprentice-50"],
+      listEvents: async (person) => {
+        if (person.id !== "steven-banda") return [];
+        return [{
+          start: "2026-10-18T14:00:00-05:00",
+          end: "2026-10-18T15:00:00-05:00",
+          location: "10 Oak St",
+        }];
+      },
+    });
+    expect(result.live).toBe(true);
+    expect(result.bufferMinutes).toBe(0);
+    expect(result.durationMinutes).toBe(60);
+    const saturday = result.slots.filter((slot) => slot.date === "2026-10-17");
+    expect(saturday.some((slot) => slot.time === "11:00 AM" && slot.photographerId !== "steven-banda")).toBe(true);
+    expect(saturday.some((slot) => slot.time === "12:00 PM" && slot.photographerId !== "steven-banda")).toBe(false);
+    expect(saturday.some((slot) => slot.time === "12:00 PM" && slot.photographerId === "steven-banda")).toBe(true);
+    const sunday = result.slots.filter((slot) => slot.date === "2026-10-18");
+    expect(sunday.length).toBeGreaterThan(0);
+    expect(sunday.every((slot) => slot.photographerId === "steven-banda")).toBe(true);
+    expect(sunday.some((slot) => slot.time === "2:00 PM")).toBe(false);
+    expect(sunday.some((slot) => slot.time === "1:00 PM")).toBe(true);
+    expect(sunday.some((slot) => slot.time === "3:00 PM")).toBe(true);
+  });
+
   it("asks Routes once per uncached pair and falls back when the key is missing", async () => {
     const departAtMs = Date.now() + 2 * 60 * 60 * 1000;
     const queries = [
