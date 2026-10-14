@@ -204,8 +204,9 @@ export function adminOrderStatusLabel(order: Record<string, unknown>): string {
   return STATUS_LABEL[key] || humanize(key);
 }
 
+/** List, tile, and dashboard open the same order request page. */
 export function adminOrderDetailHref(id: string): string {
-  return `/admin/orders/${encodeURIComponent(id)}`;
+  return `/admin/order-request/${encodeURIComponent(id)}`;
 }
 
 /**

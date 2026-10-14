@@ -138,7 +138,7 @@ describe("admin orders list", () => {
 
     const link = section.querySelector("a[data-order-link='fixture-maple']") as HTMLAnchorElement | null;
     expect(link?.tagName).toBe("A");
-    expect(link?.getAttribute("href")).toBe("/admin/orders/fixture-maple");
+    expect(link?.getAttribute("href")).toBe("/admin/order-request/fixture-maple");
     expect(link?.className).toContain("focus-visible:ring-2");
     expect(link?.tabIndex).toBe(0);
     link?.focus();
