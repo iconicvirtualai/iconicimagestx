@@ -338,6 +338,44 @@ export default function AdminOrderRequest() {
     finally { setSaving(false); }
   };
 
+  const handleAcceptBooking = async () => {
+    if (!id || !order) return;
+    if (!user) {
+      toast.error("Please sign in again.");
+      return;
+    }
+    if (order.convertedToOrderId) {
+      toast.success("This booking is already accepted.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch(`/api/bookings/${encodeURIComponent(id)}/confirm`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          scheduledDate: scheduleDateInputValue(order) || null,
+          scheduledTime: orderScheduleTime(order) || null,
+          assignedPhotographerName: String(order.assignedPhotographerName || order.photographerName || "").trim() || null,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : "Could not accept this booking.");
+      }
+      toast.success(typeof data.message === "string" ? data.message : "Appointment, project, and invoice linked.");
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Could not accept this booking.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleConfirmBooking = async () => {
     if (!id || !order) return;
     const status = String(order.status || "").toLowerCase();
@@ -645,6 +683,10 @@ export default function AdminOrderRequest() {
               <Button onClick={order.listingId ? () => navigate(`/admin/listing/${order.listingId}`) : handleCreateProject}
                 disabled={saving} className="w-full rounded-xl text-xs font-bold justify-center bg-[#0d9488] hover:bg-[#0f766e] text-white">
                 <Layers className="w-3.5 h-3.5 mr-1.5" />{order.listingId ? "View Project" : "Create Project"}
+              </Button>
+              <Button onClick={handleAcceptBooking}
+                disabled={saving || Boolean(order.convertedToOrderId)} className="w-full rounded-xl text-xs font-bold justify-center bg-black hover:bg-gray-800 text-white disabled:opacity-50">
+                <Check className="w-3.5 h-3.5 mr-1.5" />{order.convertedToOrderId ? "Accepted" : "Accept booking"}
               </Button>
               <Button onClick={handleConfirmBooking}
                 disabled={saving || statusKey === "confirmed"} className="w-full rounded-xl text-xs font-bold justify-center bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50">

@@ -675,6 +675,13 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       } catch (err) {
         console.error("[Bookings] Order/project/invoice link failed:", err);
       }
+      const existingGalleryId = existingInvoiceId(request.galleryId);
+      if (existingGalleryId && listingId) {
+        await db().collection("galleries").doc(existingGalleryId).set({
+          listingId,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
       return res.json({
         success: true,
         orderId: request.convertedToOrderId,
@@ -790,7 +797,9 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       services: requestLineItems,
       lineItems: requestLineItems,
       selectedService: request.selectedService || null,
-      addOns: [],
+      addOns: Array.isArray(request.selectedAddOns) ? [...request.selectedAddOns] : [],
+      selectedAddOns: Array.isArray(request.selectedAddOns) ? [...request.selectedAddOns] : [],
+      ...(typeof request.processing === "number" ? { processing: request.processing } : {}),
       subtotal: requestSubtotal,
       pricing: { ...(request.pricing || {}), subtotal: requestSubtotal, tax: Number(request.pricing?.tax) || 0, total: requestTotal },
       total: requestTotal,
@@ -807,6 +816,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       scheduledTime: confirmTime,
       squareFootage: request.squareFootage || null,
       accessMethod: request.accessMethod || null,
+      lockboxCode: request.lockboxCode || null,
       propertyStatus: request.propertyStatus || null,
       furnishingStatus: request.furnishingStatus || null,
       notes: request.vibeNote || "",
@@ -859,6 +869,14 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       await appointmentRef.update(confirmedAppointment);
     }
 
+    let listingIdForGallery = existingInvoiceId(request.listingId);
+    try {
+      const ensuredEarly = await ensureBookingListingForRequest(req.params.id);
+      if (ensuredEarly?.listingId) listingIdForGallery = ensuredEarly.listingId;
+    } catch (err) {
+      console.error("[Bookings] Listing ensure failed:", err);
+    }
+
     // Create Gallery placeholder
     const galleryRef = await db().collection("galleries").add({
       orderId: orderRef.id,
@@ -870,6 +888,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       status: "pending_upload",
       mediaItems: [],
       downloadEnabled: false,
+      ...(listingIdForGallery ? { listingId: listingIdForGallery } : {}),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -930,7 +949,7 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
     }
 
     const linkedInvoiceId = existingInvoiceId(request.invoiceId);
-    let listingId = existingInvoiceId(request.listingId);
+    let listingId = listingIdForGallery;
     let invoiceId = linkedInvoiceId;
     if (linkedInvoiceId) {
       const existingInvoice = await db().collection("invoices").doc(linkedInvoiceId).get();
@@ -1012,6 +1031,13 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       });
     } catch (err) {
       console.error("[Bookings] Order/project/invoice link failed:", err);
+    }
+
+    if (listingId) {
+      await galleryRef.update({
+        listingId,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
     }
 
     // Send confirmation email to client
