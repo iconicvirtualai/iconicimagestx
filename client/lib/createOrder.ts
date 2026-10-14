@@ -31,6 +31,8 @@ export async function createOrder(formData: any) {
     squareFootage:          formData.sqft                   || formData.squareFootage || "",
     scheduledDate:          bookingDateLabel(formData.serviceDate) || null,
     scheduledTime:          formData.serviceTime            || null,
+    slotStart:              formData.slotStart              || null,
+    photographerId:         formData.photographerId         || null,
     photographerPreference: formData.preferredPhotographer  || null,
 
     // Access / property details — were being silently dropped before

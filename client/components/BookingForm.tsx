@@ -48,6 +48,7 @@ import {
   LIFE_OF_THE_LISTING_CARE_SUMMARY_LABEL,
 } from "@shared/lifeOfTheListingCare";
 import ServiceLocationField from "@/components/ServiceLocationField";
+import { BookingSlotPicker, type BookingSlotChoice } from "@/components/BookingSlotPicker";
 import type { PickedServiceLocation } from "@shared/serviceLocation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -89,12 +90,7 @@ type Step = 1 | 2 | 3 | 4 | 5 | 6 | "success";
  */
 const lightControlText = "text-neutral-950 placeholder:text-neutral-500 caret-neutral-950";
 
-const photographers = [
-  "Marcus Johnson",
-  "Sarah Chen",
-  "Devon Torres",
-  "Available (Auto-Assign)",
-];
+const NO_PREFERENCE = { id: "no-preference", name: "No preference" };
 
 const consultQuestions = [
   {
@@ -183,7 +179,9 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     sqft: "",
     serviceDate: undefined as Date | undefined,
     serviceTime: "9:00 AM",
-    preferredPhotographer: "Available (Auto-Assign)",
+    slotStart: "",
+    photographerId: NO_PREFERENCE.id,
+    preferredPhotographer: NO_PREFERENCE.name,
     selectedService: seededSelection.selectedService,
     selectedBasics: seededSelection.selectedBasics,
     selectedAddOns: [] as string[],
@@ -212,6 +210,11 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   });
 
   const [catalog, setCatalog] = useState<StaffCatalogPackage[]>(() => packagesForStaffEditor([]));
+  const [photographerChoices, setPhotographerChoices] = useState<Array<{ id: string; name: string }>>([]);
+  const [slotChoices, setSlotChoices] = useState<BookingSlotChoice[]>([]);
+  const [slotsLive, setSlotsLive] = useState(false);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsChecked, setSlotsChecked] = useState(false);
   const [processingOn, setProcessingOn] = useState(true);
   const offer = useMemo(() => bookingOffer(catalog), [catalog]);
   const services = offer.services;
@@ -257,6 +260,66 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/bookings/photographers")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        const people = Array.isArray(data.photographers) ? data.photographers : [];
+        setPhotographerChoices(people.flatMap((person: { id?: unknown; name?: unknown }) => {
+          const id = typeof person?.id === "string" ? person.id.trim() : "";
+          const name = typeof person?.name === "string" ? person.name.trim() : "";
+          if (!id || !name || name.includes("@")) return [];
+          return [{ id, name }];
+        }));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const bookingAddress = formData.servicePlace?.formatted || formData.address;
+  useEffect(() => {
+    if (step !== 4) return;
+    let cancelled = false;
+    const params = new URLSearchParams({
+      address: bookingAddress,
+      photographer: formData.photographerId,
+      service: formData.selectedService || "",
+      basics: formData.selectedBasics.join(","),
+    });
+    setSlotsLoading(true);
+    fetch(`/api/bookings/slots?${params.toString()}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        const live = Boolean(data?.live);
+        const slots = live && Array.isArray(data?.slots) ? data.slots as BookingSlotChoice[] : [];
+        setSlotsLive(live);
+        setSlotChoices(slots.filter((slot) => slot?.start && slot?.time && !String(slot.photographerName || "").includes("@")));
+        setSlotsChecked(true);
+        setFormData((prev) => (
+          prev.slotStart && slots.some((slot) => slot.start === prev.slotStart)
+            ? prev
+            : { ...prev, slotStart: "" }
+        ));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSlotsLive(false);
+        setSlotChoices([]);
+        setSlotsChecked(true);
+      })
+      .finally(() => {
+        if (!cancelled) setSlotsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [step, bookingAddress, formData.photographerId, formData.selectedService, formData.selectedBasics]);
 
   // Check for pre-filled service from pricing page or props
   useEffect(() => {
@@ -477,6 +540,10 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     }
 
     if (step === 4) {
+      if (slotsLive && !formData.slotStart) {
+        toast.error("Choose an open time.");
+        return;
+      }
       if (isStudioPath) {
         setStep(6);
         return;
@@ -1270,6 +1337,56 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
             </div>
 
             <div className="max-w-xl mx-auto space-y-8">
+               {!isConsultationPath && (
+                 <div className="space-y-4" data-testid="booking-photographer">
+                   <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2 px-1">
+                     <Users className="w-3.5 h-3.5" /> Photographer
+                   </label>
+                   <Select
+                     value={formData.photographerId}
+                     onValueChange={(val) => {
+                       const choice = [NO_PREFERENCE, ...photographerChoices].find((person) => person.id === val) || NO_PREFERENCE;
+                       updateFormData({
+                         photographerId: choice.id,
+                         preferredPhotographer: choice.name,
+                         slotStart: "",
+                       });
+                     }}
+                   >
+                     <SelectTrigger className={`h-16 rounded-[1.25rem] border-2 px-6 font-black border-black bg-white focus:ring-0 ${lightControlText}`}>
+                       <SelectValue placeholder="Select Photographer" />
+                     </SelectTrigger>
+                     <SelectContent className="rounded-2xl border-none shadow-2xl p-2 bg-white text-neutral-950">
+                       {[NO_PREFERENCE, ...photographerChoices.filter((person) => person.id !== NO_PREFERENCE.id)].map((person) => (
+                         <SelectItem key={person.id} value={person.id} className="rounded-xl py-3 font-bold cursor-pointer text-neutral-950 focus:bg-gray-50 focus:text-neutral-950">
+                           {person.name}
+                         </SelectItem>
+                       ))}
+                     </SelectContent>
+                   </Select>
+                 </div>
+               )}
+
+               {(slotsLive || !slotsChecked || slotsLoading) ? (
+                 <BookingSlotPicker
+                   slots={slotsLive ? slotChoices : []}
+                   selectedStart={formData.slotStart}
+                   loading={slotsLoading || !slotsChecked}
+                   showPhotographer={formData.photographerId === NO_PREFERENCE.id}
+                   emptyMessage={formData.photographerId === NO_PREFERENCE.id
+                     ? `No open times in the current window. Call ${BUSINESS_CONTACT.phoneDisplay}.`
+                     : `That photographer has no open times in the current window. Choose No preference, or call ${BUSINESS_CONTACT.phoneDisplay}.`}
+                   onSelect={(slot) => {
+                     const [year, month, day] = slot.date.split("-").map(Number);
+                     updateFormData({
+                       slotStart: slot.start,
+                       serviceTime: slot.time,
+                       serviceDate: new Date(year, (month || 1) - 1, day || 1),
+                     });
+                   }}
+                 />
+               ) : (
+               <>
                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   {/* Month Selection */}
                   <div className="space-y-4">
@@ -1327,7 +1444,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                   </div>
                </div>
 
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+               <div className="grid grid-cols-1 gap-8">
                   {/* Time Picker Dropdown */}
                   <div className="space-y-4">
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2 px-1">
@@ -1349,30 +1466,9 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                       </SelectContent>
                     </Select>
                   </div>
-
-                  {!isConsultationPath && (
-                    <div className="space-y-4">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2 px-1">
-                        <Users className="w-3.5 h-3.5" /> 4. Photographer
-                      </label>
-                      <Select
-                        value={formData.preferredPhotographer}
-                        onValueChange={(val) => updateFormData({ preferredPhotographer: val })}
-                      >
-                        <SelectTrigger className={`h-16 rounded-[1.25rem] border-2 px-6 font-black border-black bg-white focus:ring-0 ${lightControlText}`}>
-                          <SelectValue placeholder="Select Photographer" />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-2xl border-none shadow-2xl p-2 bg-white text-neutral-950">
-                          {photographers.map((p) => (
-                            <SelectItem key={p} value={p} className="rounded-xl py-3 font-bold cursor-pointer text-neutral-950 focus:bg-gray-50 focus:text-neutral-950">
-                              {p}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
                </div>
+               </>
+               )}
             </div>
           </motion.div>
         );
@@ -1601,6 +1697,9 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
           onBookAnother={() => {
             setStep(1);
             setExpandedCategories(["listings"]);
+            setSlotsLive(false);
+            setSlotsChecked(false);
+            setSlotChoices([]);
             setFormData(prev => ({
               ...prev,
               address: "",
@@ -1613,7 +1712,12 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
               virtualStagingCredits: 0,
               smsConsent: false,
               dotOptIn: false,
-              socialMarketingPermission: false
+              socialMarketingPermission: false,
+              slotStart: "",
+              photographerId: NO_PREFERENCE.id,
+              preferredPhotographer: NO_PREFERENCE.name,
+              serviceDate: undefined,
+              serviceTime: "9:00 AM",
             }));
           }}
         />

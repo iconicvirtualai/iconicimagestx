@@ -33,6 +33,13 @@ import { storedServiceLocationFields } from "../../shared/serviceLocation";
 import { buildAdminOrderTile } from "../../shared/adminOrderTile";
 import { nextOrderNumber } from "../services/orderNumbers";
 import { refuseQaStaffAssignment } from "../services/qaStaffAssign";
+import { preferenceFromRequest, preferenceName, publicBookingPhotographers, NO_PREFERENCE_ID, NO_PREFERENCE_NAME } from "../services/bookingPhotographers";
+import {
+  createBookingCalendarHold,
+  deleteBookingCalendarHold,
+  readBookingAvailability,
+} from "../services/bookingAvailability";
+import { resolveBookingAssignment } from "../../shared/bookingAvailability";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -77,6 +84,7 @@ async function loadBookingCatalog() {
 // No auth required — this is the public-facing booking form
 
 router.post("/", async (req, res) => {
+  let calendarHold: { calendarId: string; eventId: string | null; htmlLink: string | null } | null = null;
   try {
     const {
       firstName,
@@ -148,6 +156,60 @@ router.post("/", async (req, res) => {
     const selectedService = resolved.selectedService;
     const selectedBasics = resolved.selectedBasics;
     const selectedAddOns = resolved.selectedAddOns;
+    const preferenceId = preferenceFromRequest(req.body.photographerId, photographerPreference);
+    let availability: Awaited<ReturnType<typeof readBookingAvailability>> = {
+      live: false,
+      slots: [],
+      durationMinutes: 90,
+      bufferMinutes: 30,
+      driveMode: "buffer",
+    };
+    try {
+      availability = await readBookingAvailability({
+        address: displayAddress,
+        preferenceId,
+        selectedService: typeof selectedService === "string" ? selectedService : null,
+        selectedBasics: Array.isArray(selectedBasics) ? selectedBasics.map((id) => String(id)) : [],
+        catalog,
+      });
+    } catch (err) {
+      console.error("[Bookings] Availability check failed — keeping the standard time list:", err);
+    }
+    const decision = resolveBookingAssignment({
+      live: availability.live,
+      slotStart: typeof req.body.slotStart === "string" ? req.body.slotStart : "",
+      slots: availability.slots,
+    });
+    if (decision.ok === false) return res.status(decision.status).json({ error: decision.error });
+
+    let reservedOrderNumber: string | null = null;
+    if (decision.slot) {
+      try {
+        reservedOrderNumber = await nextOrderNumber();
+        const serviceSummary = traveled.lineItems
+          .filter((item) => !isTravelFeeLine(item))
+          .map((item) => item.name)
+          .filter(Boolean)
+          .join(", ");
+        calendarHold = await createBookingCalendarHold({
+          photographerId: decision.slot.photographerId,
+          orderNumber: reservedOrderNumber,
+          clientName,
+          clientEmail: String(email || ""),
+          clientPhone: String(phone || ""),
+          address: displayAddress,
+          serviceSummary,
+          slot: decision.slot,
+          notes: typeof vibeNote === "string" ? vibeNote : "",
+        });
+      } catch (err) {
+        console.error("[Bookings] Calendar hold failed:", err);
+        calendarHold = null;
+      }
+      if (!calendarHold?.eventId) {
+        return res.status(503).json({ error: "That time could not be reserved. Pick another open time." });
+      }
+    }
     const specializedPhotography = resolved.specializedPhotography;
     const virtualStagingCredits = resolved.virtualStagingCredits;
     const { address: _savedAddress, ...storedPin } = locationFields;
@@ -172,9 +234,15 @@ router.post("/", async (req, res) => {
       travelMiles: travel.travelMiles,
       travelFeeCents: travel.travelFeeCents,
       travelQuoted: travel.travelQuoted,
-      scheduledDate: scheduledDate || null,
-      scheduledTime: scheduledTime || null,
-      photographerPreference: photographerPreference || null,
+      scheduledDate: decision.slot?.date || scheduledDate || null,
+      scheduledTime: decision.slot?.time || scheduledTime || null,
+      photographerPreference: preferenceName(preferenceId),
+      assignedPhotographerName: decision.slot?.photographerName || null,
+      bookingPhotographerId: decision.slot?.photographerId || null,
+      appointmentDuration: decision.slot ? availability.durationMinutes : null,
+      calendarEventId: calendarHold?.eventId || null,
+      calendarId: calendarHold?.calendarId || null,
+      calendarHtmlLink: calendarHold?.htmlLink || null,
       squareFootage: squareFootage || null,
       accessMethod: accessMethod || null,
       lockboxCode: lockboxCode || null,
@@ -220,7 +288,7 @@ router.post("/", async (req, res) => {
       });
       orderNumber = tile.orderCode;
       // Short sequential code (#003, #004, …) from an atomic Firestore counter.
-      orderNumber = await nextOrderNumber();
+      orderNumber = reservedOrderNumber || await nextOrderNumber();
       packageName = tile.packageName === "Custom order" ? "" : tile.packageName;
     } catch (err) {
       console.error("[Bookings] Order number format failed:", err);
@@ -273,8 +341,10 @@ router.post("/", async (req, res) => {
           clientPhone: String(phone || ""),
           address: savedAddress,
           addressLabel: displayAddress,
-          scheduledDate: typeof scheduledDate === "string" ? scheduledDate : null,
-          scheduledTime: typeof scheduledTime === "string" ? scheduledTime : null,
+          scheduledDate: decision.slot?.date || (typeof scheduledDate === "string" ? scheduledDate : null),
+          scheduledTime: decision.slot?.time || (typeof scheduledTime === "string" ? scheduledTime : null),
+          photographerName: decision.slot?.photographerName || null,
+          bookingPhotographerId: decision.slot?.photographerId || null,
           services: traveled.lineItems,
           notes: typeof vibeNote === "string" ? vibeNote : "",
         });
@@ -482,12 +552,50 @@ router.post("/", async (req, res) => {
     });
   } catch (err) {
     console.error("[Bookings] Submission error:", err);
+    if (calendarHold?.eventId) {
+      await deleteBookingCalendarHold({
+        calendarId: calendarHold.calendarId,
+        eventId: calendarHold.eventId,
+      }).catch((deleteErr) => console.error("[Bookings] Calendar hold cleanup failed:", deleteErr));
+    }
     return res.status(500).json({ error: "Failed to submit booking request." });
   }
 });
 
 // ─── GET /api/bookings/catalog — Public packages /book can sell ───────────────
 // Registered before /:id so "catalog" is not read as a booking request id.
+
+router.get("/photographers", (_req, res) => {
+  return res.json({
+    noPreference: { id: NO_PREFERENCE_ID, name: NO_PREFERENCE_NAME },
+    photographers: publicBookingPhotographers(),
+  });
+});
+
+router.get("/slots", async (req, res) => {
+  const basics = typeof req.query.basics === "string"
+    ? req.query.basics.split(",").map((id) => id.trim()).filter(Boolean)
+    : [];
+  const preferenceId = preferenceFromRequest(req.query.photographer, "");
+  try {
+    const catalog = await loadBookingCatalog();
+    const availability = await readBookingAvailability({
+      address: typeof req.query.address === "string" ? req.query.address : "",
+      preferenceId,
+      selectedService: typeof req.query.service === "string" ? req.query.service : null,
+      selectedBasics: basics,
+      catalog,
+    });
+    return res.json({
+      live: availability.live,
+      durationMinutes: availability.durationMinutes,
+      slots: availability.live ? availability.slots : [],
+    });
+  } catch (err) {
+    console.error("[Bookings] Slot lookup failed — keeping the standard time list:", err);
+    return res.json({ live: false, durationMinutes: 90, slots: [] });
+  }
+});
 
 router.get("/catalog", async (_req, res) => {
   const catalog = await loadBookingCatalog();
@@ -538,7 +646,7 @@ router.get("/:id", requireCoordinator, async (req, res) => {
 
 router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedRequest, res) => {
   try {
-    const { assignedPhotographerId, assignedPhotographerName, scheduledDate, scheduledTime, internalNotes } = req.body;
+    const { assignedPhotographerId, assignedPhotographerName: postedPhotographerName, scheduledDate, scheduledTime, internalNotes } = req.body;
     const requestDoc = await db().collection("orderRequests").doc(req.params.id).get();
 
     if (!requestDoc.exists) {
@@ -546,6 +654,9 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
     }
 
     const request = requestDoc.data()!;
+    const assignedPhotographerName = (typeof postedPhotographerName === "string" && postedPhotographerName.trim())
+      ? postedPhotographerName.trim()
+      : (typeof request.assignedPhotographerName === "string" ? request.assignedPhotographerName : null);
     if (request.convertedToOrderId) {
       let listingId = existingInvoiceId(request.listingId);
       try {
@@ -763,7 +874,14 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    const calendarResult = await createCalendarBookingEvent({
+    const existingEventId = typeof request.calendarEventId === "string" ? request.calendarEventId : "";
+    const calendarResult = existingEventId
+      ? {
+          calendarId: typeof request.calendarId === "string" ? request.calendarId : "",
+          eventId: existingEventId,
+          htmlLink: typeof request.calendarHtmlLink === "string" ? request.calendarHtmlLink : null,
+        }
+      : await createCalendarBookingEvent({
       orderId: orderRef.id,
       clientName: requestClientName,
       clientEmail: requestEmail,
