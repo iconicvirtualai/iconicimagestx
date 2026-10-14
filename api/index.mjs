@@ -6115,7 +6115,7 @@ const APPRENTICESHIP_BOOKING_FEE_LINE = "Booking fee $25, credited toward your p
 const APPRENTICESHIP_BALANCE_LINE = "The balance is invoiced after the shoot.";
 const APPRENTICESHIP_CALENDAR_FALLBACK = "Open times are not listed right now. Call or email and we will set the appointment with you.";
 const APPRENTICESHIP_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar";
-const WEEKDAY = {
+const WEEKDAY$1 = {
   Sun: 0,
   Mon: 1,
   Tue: 2,
@@ -6202,7 +6202,7 @@ function apprenticeshipCalendarSetupNote(input) {
   if (!input.missingCredentials) return share;
   return `Set FIREBASE_SERVICE_ACCOUNT to the Firebase service account JSON. ${share}`;
 }
-function zonedParts(date, timeZone) {
+function zonedParts$1(date, timeZone) {
   const fmt = new Intl.DateTimeFormat("en-US", {
     timeZone,
     year: "numeric",
@@ -6220,13 +6220,13 @@ function zonedParts(date, timeZone) {
     day: Number(parts.day),
     hour: Number(parts.hour) % 24,
     minute: Number(parts.minute),
-    weekday: WEEKDAY[parts.weekday] ?? 0
+    weekday: WEEKDAY$1[parts.weekday] ?? 0
   };
 }
 function zonedTimeToUtc(year, month, day, hour, minute, timeZone) {
   let utc = Date.UTC(year, month - 1, day, hour, minute, 0);
   for (let pass = 0; pass < 3; pass += 1) {
-    const parts = zonedParts(new Date(utc), timeZone);
+    const parts = zonedParts$1(new Date(utc), timeZone);
     const got = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, 0);
     const wanted = Date.UTC(year, month - 1, day, hour, minute, 0);
     const delta = wanted - got;
@@ -6235,7 +6235,7 @@ function zonedTimeToUtc(year, month, day, hour, minute, timeZone) {
   }
   return new Date(utc);
 }
-function addCalendarDays(year, month, day, add) {
+function addCalendarDays$1(year, month, day, add) {
   const next = new Date(Date.UTC(year, month - 1, day + add));
   return {
     year: next.getUTCFullYear(),
@@ -6244,14 +6244,14 @@ function addCalendarDays(year, month, day, add) {
     weekday: next.getUTCDay()
   };
 }
-function clockLabel(minutes) {
+function clockLabel$1(minutes) {
   const hour24 = Math.floor(minutes / 60);
   const minute = minutes % 60;
   const suffix = hour24 >= 12 ? "PM" : "AM";
   const hour12 = hour24 % 12 || 12;
   return `${hour12}:${String(minute).padStart(2, "0")} ${suffix}`;
 }
-function dayLabel(year, month, day, timeZone) {
+function dayLabel$1(year, month, day, timeZone) {
   const instant = zonedTimeToUtc(year, month, day, 12, 0, timeZone);
   return new Intl.DateTimeFormat("en-US", {
     timeZone,
@@ -6260,31 +6260,31 @@ function dayLabel(year, month, day, timeZone) {
     day: "numeric"
   }).format(instant);
 }
-function overlaps(start, end, busy) {
+function overlaps$1(start, end, busy) {
   return busy.some((block2) => start < block2.end && end > block2.start);
 }
 function openApprenticeshipSlots(input) {
   const duration = input.durationMinutes;
   if (!Number.isFinite(duration) || duration <= 0) return [];
   const busy = input.busy.map((block2) => ({ start: Date.parse(block2.start), end: Date.parse(block2.end) })).filter((block2) => Number.isFinite(block2.start) && Number.isFinite(block2.end) && block2.end > block2.start);
-  const today = zonedParts(input.now, input.hours.timeZone);
+  const today = zonedParts$1(input.now, input.hours.timeZone);
   const slots = [];
   for (let offset = 0; offset < input.hours.horizonDays; offset += 1) {
-    const date = addCalendarDays(today.year, today.month, today.day, offset);
+    const date = addCalendarDays$1(today.year, today.month, today.day, offset);
     if (!input.hours.days.includes(date.weekday)) continue;
     for (let minute = input.hours.startMinutes; minute + duration <= input.hours.endMinutes; minute += duration) {
       const start = zonedTimeToUtc(date.year, date.month, date.day, Math.floor(minute / 60), minute % 60, input.hours.timeZone);
       const end = new Date(start.getTime() + duration * 60 * 1e3);
       if (start.getTime() <= input.now.getTime()) continue;
-      if (overlaps(start.getTime(), end.getTime(), busy)) continue;
+      if (overlaps$1(start.getTime(), end.getTime(), busy)) continue;
       const dateKey2 = `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
-      const time = clockLabel(minute);
+      const time = clockLabel$1(minute);
       slots.push({
         start: start.toISOString(),
         end: end.toISOString(),
         date: dateKey2,
         time,
-        label: `${dayLabel(date.year, date.month, date.day, input.hours.timeZone)} · ${time}`
+        label: `${dayLabel$1(date.year, date.month, date.day, input.hours.timeZone)} · ${time}`
       });
     }
   }
@@ -6385,6 +6385,142 @@ function apprenticeshipBookingReturnPath(orderNumber) {
     order: orderNumber
   });
   return `/apprenticeship?${params.toString()}`;
+}
+const STEVEN_BANDA_ID = "steven-banda";
+const SATURDAY_LATEST_START_MINUTES = 12 * 60;
+const STEVEN_FINISH_MINUTES = 17 * 60;
+function bookingHoursFromEnv(env = typeof process !== "undefined" ? process.env : {}) {
+  const base = apprenticeshipHoursFromEnv(env);
+  return bookingHoursFromWindow({
+    timeZone: base.timeZone,
+    horizonDays: base.horizonDays,
+    startMinutes: base.startMinutes,
+    endMinutes: base.endMinutes
+  });
+}
+function bookingHoursFromWindow(window) {
+  const weekday = {
+    startMinutes: window.startMinutes,
+    endMinutes: window.endMinutes
+  };
+  const saturday = {
+    ...weekday,
+    latestStartMinutes: SATURDAY_LATEST_START_MINUTES
+  };
+  const company = {
+    timeZone: window.timeZone,
+    horizonDays: window.horizonDays,
+    days: [null, weekday, weekday, weekday, weekday, weekday, saturday]
+  };
+  const stevenDay = STEVEN_FINISH_MINUTES > window.startMinutes ? { startMinutes: window.startMinutes, endMinutes: STEVEN_FINISH_MINUTES } : null;
+  return {
+    company,
+    photographers: {
+      [STEVEN_BANDA_ID]: {
+        timeZone: window.timeZone,
+        horizonDays: window.horizonDays,
+        days: [stevenDay, stevenDay, stevenDay, stevenDay, stevenDay, stevenDay, stevenDay]
+      }
+    }
+  };
+}
+function weekForPhotographer(config, photographerId) {
+  return config.photographers[photographerId] ?? config.company;
+}
+const WEEKDAY = {
+  Sun: 0,
+  Mon: 1,
+  Tue: 2,
+  Wed: 3,
+  Thu: 4,
+  Fri: 5,
+  Sat: 6
+};
+function zonedParts(date, timeZone) {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    weekday: "short",
+    hourCycle: "h23"
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(date).map((part) => [part.type, part.value]));
+  return {
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
+    hour: Number(parts.hour) % 24,
+    minute: Number(parts.minute),
+    weekday: WEEKDAY[parts.weekday] ?? 0
+  };
+}
+function addCalendarDays(year, month, day, add) {
+  const next = new Date(Date.UTC(year, month - 1, day + add));
+  return {
+    year: next.getUTCFullYear(),
+    month: next.getUTCMonth() + 1,
+    day: next.getUTCDate(),
+    weekday: next.getUTCDay()
+  };
+}
+function clockLabel(minutes) {
+  const hour24 = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  const suffix = hour24 >= 12 ? "PM" : "AM";
+  const hour12 = hour24 % 12 || 12;
+  return `${hour12}:${String(minute).padStart(2, "0")} ${suffix}`;
+}
+function dayLabel(year, month, day, timeZone) {
+  const instant = zonedTimeToUtc(year, month, day, 12, 0, timeZone);
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+    month: "short",
+    day: "numeric"
+  }).format(instant);
+}
+function overlaps(start, end, busy) {
+  return busy.some((block2) => start < block2.end && end > block2.start);
+}
+function openBookingSlots(input) {
+  const duration = input.durationMinutes;
+  if (!Number.isFinite(duration) || duration <= 0) return [];
+  const busy = input.busy.map((block2) => ({ start: Date.parse(block2.start), end: Date.parse(block2.end) })).filter((block2) => Number.isFinite(block2.start) && Number.isFinite(block2.end) && block2.end > block2.start);
+  const today = zonedParts(input.now, input.week.timeZone);
+  const slots = [];
+  for (let offset = 0; offset < input.week.horizonDays; offset += 1) {
+    const date = addCalendarDays(today.year, today.month, today.day, offset);
+    const day = input.week.days[date.weekday] ?? null;
+    if (!day) continue;
+    const latestStart = day.latestStartMinutes ?? Number.POSITIVE_INFINITY;
+    for (let minute = day.startMinutes; minute + duration <= day.endMinutes; minute += duration) {
+      if (minute >= latestStart) continue;
+      const start = zonedTimeToUtc(
+        date.year,
+        date.month,
+        date.day,
+        Math.floor(minute / 60),
+        minute % 60,
+        input.week.timeZone
+      );
+      const end = new Date(start.getTime() + duration * 60 * 1e3);
+      if (start.getTime() <= input.now.getTime()) continue;
+      if (overlaps(start.getTime(), end.getTime(), busy)) continue;
+      const dateKey2 = `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
+      const time = clockLabel(minute);
+      slots.push({
+        start: start.toISOString(),
+        end: end.toISOString(),
+        date: dateKey2,
+        time,
+        label: `${dayLabel(date.year, date.month, date.day, input.week.timeZone)} · ${time}`
+      });
+    }
+  }
+  return slots;
 }
 const DEFAULT_TRAVEL_BUFFER_MINUTES = 30;
 const DEFAULT_BOOKING_DURATION_MINUTES = 90;
@@ -6501,8 +6637,31 @@ function slotsWithTravel(input) {
     return drive * 60 * 1e3;
   }
 }
+function bookingScheduleFor(input) {
+  if (input.schedule) return input.schedule;
+  if (input.hours) {
+    return bookingHoursFromWindow({
+      timeZone: input.hours.timeZone,
+      horizonDays: input.hours.horizonDays,
+      startMinutes: input.hours.startMinutes,
+      endMinutes: input.hours.endMinutes
+    });
+  }
+  return bookingHoursFromEnv(input.env);
+}
+function openSlotsForPhotographer(input) {
+  return openBookingSlots({
+    now: input.now,
+    durationMinutes: input.durationMinutes,
+    busy: input.events.map((event) => ({
+      start: new Date(event.startMs).toISOString(),
+      end: new Date(event.endMs).toISOString()
+    })),
+    week: weekForPhotographer(input.schedule, input.photographerId)
+  });
+}
 function assignPhotographerSlots(input) {
-  const hours = input.hours ?? apprenticeshipHoursFromEnv();
+  const schedule = bookingScheduleFor(input);
   const readable = input.photographers.filter((person) => person.events);
   if (!readable.length) return { live: false, slots: [] };
   const preferred = input.preferenceId !== "no-preference" ? input.photographers.find((person) => person.id === input.preferenceId) || null : null;
@@ -6511,14 +6670,12 @@ function assignPhotographerSlots(input) {
   const byStart = /* @__PURE__ */ new Map();
   for (const person of people) {
     const events = person.events || [];
-    const open = openApprenticeshipSlots({
+    const open = openSlotsForPhotographer({
       now: input.now,
-      busy: events.map((event) => ({
-        start: new Date(event.startMs).toISOString(),
-        end: new Date(event.endMs).toISOString()
-      })),
       durationMinutes: input.durationMinutes,
-      hours
+      photographerId: person.id,
+      events,
+      schedule
     });
     const fitted = slotsWithTravel({
       slots: open,
@@ -6929,7 +7086,8 @@ function chunk(values, size) {
 async function readBookingAvailability(input) {
   const env = input.env ?? process.env;
   const now = input.now ?? /* @__PURE__ */ new Date();
-  const hours = apprenticeshipHoursFromEnv(env);
+  const schedule = bookingHoursFromEnv(env);
+  const hours = schedule.company;
   const bufferMinutes = travelBufferMinutes(env);
   const durationMinutes = bookingDurationMinutes({
     selectedService: input.selectedService,
@@ -6965,14 +7123,12 @@ async function readBookingAvailability(input) {
   const considered = preferred ? preferred.events ? [preferred] : [] : readable;
   const queries = considered.flatMap((person) => {
     const events = person.events || [];
-    const open = openApprenticeshipSlots({
+    const open = openSlotsForPhotographer({
       now,
-      busy: events.map((event) => ({
-        start: new Date(event.startMs).toISOString(),
-        end: new Date(event.endMs).toISOString()
-      })),
       durationMinutes,
-      hours
+      photographerId: person.id,
+      events,
+      schedule
     });
     return travelQueriesForSlots({ slots: open, events, bookingAddress: address });
   });
@@ -6986,7 +7142,7 @@ async function readBookingAvailability(input) {
   const assigned = assignPhotographerSlots({
     now,
     durationMinutes,
-    hours,
+    schedule,
     bufferMinutes,
     bookingAddress: address,
     preferenceId,
@@ -7008,7 +7164,7 @@ async function createBookingCalendarHold(input) {
   const person = bookingPhotographerById(input.photographerId);
   if (!person) return null;
   const env = input.env ?? process.env;
-  const hours = apprenticeshipHoursFromEnv(env);
+  const hours = bookingScheduleFor({ env }).company;
   const body = {
     summary: `Iconic Images: ${input.clientName}`,
     location: input.address,
