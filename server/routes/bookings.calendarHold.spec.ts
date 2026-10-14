@@ -1,0 +1,309 @@
+import type { Server } from "node:http";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import express from "express";
+import { setEmailDeliveryOverride } from "../services/email";
+
+const store = vi.hoisted(() => ({
+  collections: {} as Record<string, Map<string, Record<string, unknown>>>,
+  seq: 0,
+}));
+
+const availability = vi.hoisted(() => vi.fn());
+const createHold = vi.hoisted(() => vi.fn());
+const deleteHold = vi.hoisted(() => vi.fn(async () => undefined));
+
+function docs(name: string) {
+  if (!store.collections[name]) store.collections[name] = new Map();
+  return store.collections[name];
+}
+
+vi.mock("firebase-admin", () => {
+  function ref(name: string, id: string) {
+    return {
+      id,
+      async get() {
+        const data = docs(name).get(id);
+        return { id, exists: data !== undefined, data: () => (data ? { ...data } : undefined), ref: this };
+      },
+      async set(data: Record<string, unknown>, options?: { merge?: boolean }) {
+        docs(name).set(id, options?.merge ? { ...(docs(name).get(id) || {}), ...data } : { ...data });
+      },
+      async update(patch: Record<string, unknown>) {
+        docs(name).set(id, { ...(docs(name).get(id) || {}), ...patch });
+      },
+    };
+  }
+  function query(name: string) {
+    return {
+      where() {
+        return query(name);
+      },
+      limit() {
+        return query(name);
+      },
+      orderBy() {
+        return query(name);
+      },
+      async get() {
+        const entries = [...docs(name).entries()];
+        return {
+          empty: entries.length === 0,
+          docs: entries.map(([id, data]) => ({
+            id,
+            data: () => ({ ...data }),
+            ref: ref(name, id),
+          })),
+        };
+      },
+    };
+  }
+  function firestore() {
+    return {
+      collection(name: string) {
+        return {
+          doc(id?: string) {
+            return ref(name, id || `auto-${++store.seq}`);
+          },
+          async add(data: Record<string, unknown>) {
+            const id = `auto-${++store.seq}`;
+            docs(name).set(id, { ...data });
+            return ref(name, id);
+          },
+          where() {
+            return query(name);
+          },
+          async get() {
+            return query(name).get();
+          },
+          count() {
+            return { get: async () => ({ data: () => ({ count: docs(name).size }) }) };
+          },
+        };
+      },
+      async runTransaction(fn: (tx: {
+        get: (target: { get: () => Promise<unknown> }) => Promise<unknown>;
+        set: (target: { set: (data: Record<string, unknown>, options?: { merge?: boolean }) => Promise<void> }, data: Record<string, unknown>, options?: { merge?: boolean }) => void;
+      }) => Promise<unknown>) {
+        const writes: Array<() => Promise<void>> = [];
+        const tx = {
+          get(target: { get: () => Promise<unknown> }) {
+            return target.get();
+          },
+          set(target: { set: (data: Record<string, unknown>, options?: { merge?: boolean }) => Promise<void> }, data: Record<string, unknown>, options?: { merge?: boolean }) {
+            writes.push(() => target.set(data, options));
+          },
+        };
+        const result = await fn(tx);
+        for (const write of writes) await write();
+        return result;
+      },
+    };
+  }
+  firestore.FieldValue = { serverTimestamp: () => "SERVER_TIME" };
+  return { default: { apps: [], firestore } };
+});
+
+vi.mock("../services/bookingAvailability", () => ({
+  readBookingAvailability: availability,
+  createBookingCalendarHold: createHold,
+  deleteBookingCalendarHold: deleteHold,
+}));
+
+vi.mock("../services/bookingClient", () => ({
+  attachBookingClient: vi.fn(async () => ({
+    clientId: null,
+    createdAccount: false,
+    passwordSetupLink: null,
+    skipReason: null,
+  })),
+  createRequestedAppointment: vi.fn(async () => undefined),
+  sendFirebasePasswordEmail: vi.fn(async () => undefined),
+}));
+
+vi.mock("../services/bookingListing", () => ({
+  ensureBookingListingForRequest: vi.fn(async () => null),
+}));
+
+import bookingsRouter from "./bookings";
+
+const SLOT = {
+  start: "2026-10-14T14:00:00.000Z",
+  end: "2026-10-14T15:30:00.000Z",
+  date: "2026-10-14",
+  time: "9:00 AM",
+  label: "Wed, Oct 14 · 9:00 AM",
+  photographerId: "mike-luna",
+  photographerName: "Mike Luna",
+};
+
+const SECRET = "hold-secret-DO-NOT-STORE";
+const HEADER = "Bearer hold-header-DO-NOT-STORE";
+
+let server: Server;
+let baseUrl = "";
+const sent: Array<{ to: string; subject: string; html: string; text?: string }> = [];
+const previousAdmin = process.env.ADMIN_EMAIL;
+const previousLive = process.env.CLIENT_NOTIFY_LIVE;
+
+beforeAll(async () => {
+  const app = express();
+  app.use(express.json());
+  app.use("/api/bookings", bookingsRouter);
+  server = await new Promise<Server>((resolve) => {
+    const listening = app.listen(0, "127.0.0.1", () => resolve(listening));
+  });
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("Test server did not bind a port.");
+  baseUrl = `http://127.0.0.1:${address.port}`;
+});
+
+afterAll(async () => {
+  setEmailDeliveryOverride(null);
+  if (previousAdmin === undefined) delete process.env.ADMIN_EMAIL;
+  else process.env.ADMIN_EMAIL = previousAdmin;
+  if (previousLive === undefined) delete process.env.CLIENT_NOTIFY_LIVE;
+  else process.env.CLIENT_NOTIFY_LIVE = previousLive;
+  if (!server) return;
+  await new Promise<void>((resolve, reject) => {
+    server.close((err) => (err ? reject(err) : resolve()));
+  });
+});
+
+beforeEach(() => {
+  store.collections = {};
+  store.seq = 0;
+  docs("counters").set("orderNumbers", { last: 41 });
+  sent.length = 0;
+  createHold.mockReset();
+  deleteHold.mockClear();
+  availability.mockReset();
+  availability.mockResolvedValue({
+    live: true,
+    slots: [SLOT],
+    durationMinutes: 90,
+    bufferMinutes: 30,
+    driveMode: "buffer",
+  });
+  process.env.ADMIN_EMAIL = "office@iconicimagestx.com";
+  delete process.env.CLIENT_NOTIFY_LIVE;
+  setEmailDeliveryOverride(async (message) => {
+    sent.push(message);
+  });
+  vi.spyOn(console, "error").mockImplementation(() => undefined);
+  vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  vi.spyOn(console, "info").mockImplementation(() => undefined);
+  vi.spyOn(console, "log").mockImplementation(() => undefined);
+});
+
+afterEach(() => {
+  setEmailDeliveryOverride(null);
+  vi.restoreAllMocks();
+});
+
+function savedOrder(): Record<string, unknown> {
+  const orders = docs("orderRequests");
+  expect(orders.size).toBe(1);
+  return [...orders.values()][0];
+}
+
+async function postBooking() {
+  const response = await fetch(`${baseUrl}/api/bookings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      firstName: "Ada",
+      lastName: "Lovelace",
+      email: "ada@example.com",
+      phone: "281-555-0199",
+      address: "100 Oak St, Spring, TX 77380",
+      selectedBasics: ["photos-20"],
+      slotStart: SLOT.start,
+      photographerId: "mike-luna",
+    }),
+  });
+  const body = await response.json();
+  return { response, body };
+}
+
+describe("public booking calendar hold", () => {
+  it("saves the order when the calendar insert throws and stores no secrets or headers", async () => {
+    expect(process.env.CLIENT_NOTIFY_LIVE).not.toBe("true");
+    const message = `Calendar insert failed ${"x".repeat(400)}`;
+    const err = new Error(message);
+    Object.assign(err, {
+      secret: SECRET,
+      headers: { Authorization: HEADER },
+      config: { headers: { Authorization: HEADER }, private_key: SECRET },
+      response: { headers: { Authorization: HEADER }, data: { private_key: SECRET } },
+    });
+    createHold.mockRejectedValue(err);
+
+    const { response, body } = await postBooking();
+    const saved = savedOrder();
+    const stored = JSON.stringify(saved);
+
+    expect(response.status).toBe(201);
+    expect(body.success).toBe(true);
+    expect(body.error).toBeUndefined();
+    expect(saved.calendarHold).toBe("failed");
+    expect(saved.officeFlag).toBe("calendar_hold_failed");
+    expect(saved.calendarHoldError).toBe(message.slice(0, 300));
+    expect(String(saved.calendarHoldError).length).toBeLessThanOrEqual(300);
+    expect(saved.officeNote).toBe("Calendar hold failed for Mike Luna at Wed, Oct 14 · 9:00 AM. Add it to the calendar manually.");
+    expect(stored).not.toContain(SECRET);
+    expect(stored).not.toContain(HEADER);
+    expect(stored).not.toContain("Authorization");
+    expect(stored).not.toContain("private_key");
+    expect(stored).not.toContain("headers");
+    expect(JSON.stringify(body)).not.toContain(SECRET);
+    expect(JSON.stringify(body)).not.toContain(HEADER);
+    expect(console.error).toHaveBeenCalledWith("[Bookings] Calendar hold failed:", err);
+    expect(sent.some((message) => message.html.includes("Add it to the calendar manually.") && message.html.includes("Mike Luna"))).toBe(true);
+    expect(sent.some((message) => `${message.html} ${message.text || ""}`.includes(SECRET))).toBe(false);
+  });
+
+  it("saves the order when the calendar insert returns no event id", async () => {
+    createHold.mockResolvedValue({
+      calendarId: "mike@iconicimagestx.com",
+      eventId: null,
+      htmlLink: null,
+    });
+
+    const { response, body } = await postBooking();
+    const saved = savedOrder();
+
+    expect(response.status).toBe(201);
+    expect(body.success).toBe(true);
+    expect(saved.calendarHold).toBe("failed");
+    expect(saved.officeFlag).toBe("calendar_hold_failed");
+    expect(saved.calendarHoldError).toBe("Calendar returned no event id.");
+    expect(saved.officeNote).toContain("Mike Luna");
+    expect(saved.officeNote).toContain("Wed, Oct 14 · 9:00 AM");
+    expect(saved.officeNote).toContain("Add it to the calendar manually.");
+    expect(saved.calendarEventId).toBeNull();
+    expect(console.error).toHaveBeenCalledWith("[Bookings] Calendar hold failed:", "Calendar returned no event id.");
+    expect(JSON.stringify(saved)).not.toContain("Authorization");
+  });
+
+  it("saves a good calendar hold as held", async () => {
+    createHold.mockResolvedValue({
+      calendarId: "mike@iconicimagestx.com",
+      eventId: "evt-1",
+      htmlLink: "https://calendar.google.com/calendar/event?eid=evt-1",
+    });
+
+    const { response, body } = await postBooking();
+    const saved = savedOrder();
+
+    expect(response.status).toBe(201);
+    expect(body.success).toBe(true);
+    expect(saved.calendarHold).toBe("held");
+    expect(saved.calendarHoldError).toBeNull();
+    expect(saved.officeFlag).toBeNull();
+    expect(saved.officeNote).toBeNull();
+    expect(saved.calendarEventId).toBe("evt-1");
+    expect(saved.calendarId).toBe("mike@iconicimagestx.com");
+    expect(body).not.toHaveProperty("error");
+    expect(sent.some((message) => message.text?.includes("Office note:") || message.html.includes("Calendar hold failed"))).toBe(false);
+  });
+});

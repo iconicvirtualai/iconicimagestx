@@ -97,7 +97,14 @@ export function AdminOrderList({
                 "[overflow-wrap:break-word] [word-break:normal] [&_*]:[overflow-wrap:break-word] [&_*]:[word-break:normal]",
               )}
             >
-              <Field label="Order #">{row.orderCode}</Field>
+              <Field label="Order #">
+                <div>{row.orderCode}</div>
+                {row.calendarHoldFailed ? (
+                  <span data-slot="calendar-hold" className="mt-1 inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-red-700">
+                    Calendar hold failed
+                  </span>
+                ) : null}
+              </Field>
               <Field label="Placed">{row.placedLabel}</Field>
               <Field label="Client name">
                 <div>{row.clientName}</div>

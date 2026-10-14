@@ -204,6 +204,14 @@ describe("office new order email", () => {
     expect(email.orderNumber).toBe("ORD - L - 74499");
   });
 
+  it("leads the office email with a failed calendar hold note", () => {
+    const note = "Calendar hold failed for Mike Luna at Wed, Oct 14 · 9:00 AM. Add it to the calendar manually.";
+    const email = officeNewOrderEmail({ ...saved, officeNote: note }, { catalog });
+    expect(email.text.startsWith(`Office note: ${note}`)).toBe(true);
+    expect(email.html).toContain("Add it to the calendar manually.");
+    expect(email.html).toContain("Mike Luna");
+  });
+
   it("shows Not provided for every missing field and does not throw", () => {
     const email = officeNewOrderEmail({});
     expect(email.subject).toBe(`New order ${NOT_PROVIDED} — ${NOT_PROVIDED} — ${NOT_PROVIDED} — ${NOT_PROVIDED}`);

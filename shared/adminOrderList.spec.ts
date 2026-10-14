@@ -125,6 +125,8 @@ describe("admin order list rows", () => {
       lineItems: [],
       services: ["Ignored"],
     }).itemsCount).toBe(0);
+    expect(buildAdminOrderListRow({ id: "hold-fail", officeFlag: "calendar_hold_failed" }).calendarHoldFailed).toBe(true);
+    expect(buildAdminOrderListRow({ id: "hold-ok", calendarHold: "held" }).calendarHoldFailed).toBe(false);
     expect(row("fixture-pine").photographer).toBe("Sample Photographer Riley Moss");
     expect(adminOrderPhotographer(byId("fixture-oak"), staff)).toBe("—");
     expect(row("fixture-cedar").photographer).toBe("Sample Photographer Alex Kim");

@@ -84,6 +84,45 @@ afterEach(async () => {
   localStorage.clear();
 });
 
+describe("calendar hold failure badge", () => {
+  it("shows Calendar hold failed on the tile and the list", async () => {
+    const failed = {
+      id: "hold-fail",
+      orderNumber: "#099",
+      projectType: "real_estate",
+      status: "scheduled",
+      clientName: "Sample Client Hold",
+      address: "9 Sample Hold Lane",
+      appointmentDate: "2026-04-12",
+      appointmentTime: "10:00 AM",
+      officeFlag: "calendar_hold_failed",
+      officeNote: "Calendar hold failed for Mike Luna. Add it to the calendar manually.",
+      createdAt: { toDate: () => new Date("2026-04-02T15:00:00Z"), seconds: 0 },
+    };
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await act(async () => {
+      root?.render(
+        <MemoryRouter>
+          <AdminOrdersBrowser
+            orders={[failed]}
+            staff={staff}
+            selection={new Set()}
+            storageKey="adminOrdersView:hold"
+            onToggleSelect={() => undefined}
+            onSelectIds={() => undefined}
+            onStudioChange={() => undefined}
+          />
+        </MemoryRouter>,
+      );
+    });
+    expect(container?.querySelector("[data-admin-order-tile] [data-slot='calendar-hold']")?.textContent).toContain("Calendar hold failed");
+    await chooseList();
+    expect(container?.querySelector("[data-order-list] [data-slot='calendar-hold']")?.textContent).toContain("Calendar hold failed");
+  });
+});
+
 describe("admin orders tile and list toggle", () => {
   it("remembers the view per user and leaves the other user on tiles", async () => {
     await renderAt("adminOrdersView:uid-a");

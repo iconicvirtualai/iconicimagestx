@@ -105,6 +105,7 @@ export interface AdminOrderListRow {
   notes: string;
   deliveryLabel: string;
   docIdLabel: string;
+  calendarHoldFailed: boolean;
 }
 
 /**
@@ -381,6 +382,7 @@ export function buildAdminOrderListRow(
     notes: adminOrderNotes(record),
     deliveryLabel: adminOrderGalleryLabel(record),
     docIdLabel: adminOrderDocIdLabel(id),
+    calendarHoldFailed: record.officeFlag === "calendar_hold_failed",
   };
 }
 

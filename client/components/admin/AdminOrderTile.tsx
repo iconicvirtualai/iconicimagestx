@@ -131,6 +131,11 @@ export function AdminOrderTile({
               <Status className={DELIVERY_CLASS[order.delivery]} dot={DELIVERY_DOT[order.delivery]} slot="delivery" label={order.deliveryLabel} />
             </>
           )}
+          {order.calendarHoldFailed ? (
+            <span data-slot="calendar-hold" className="inline-flex items-center rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11px] font-bold tracking-[0.02em] text-red-700">
+              Calendar hold failed
+            </span>
+          ) : null}
         </div>
 
         <div className="grid grid-cols-2 gap-x-3.5 gap-y-2.5 rounded-[10px] border border-[#e2e8f0] bg-[#f8fafc] p-3">

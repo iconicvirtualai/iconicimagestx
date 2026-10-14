@@ -94,6 +94,18 @@ describe("office new order delivery", () => {
     expect(sendEmailMock.mock.calls[0][0].subject?.startsWith("[TEST] ")).toBe(true);
   });
 
+  it("includes a saved calendar-hold office note", async () => {
+    const note = "Calendar hold failed for Mike Luna at Wed, Oct 14 · 9:00 AM. Add it to the calendar manually.";
+    await notifyOfficeOfOrder({
+      isNewOrder: true,
+      saved: { ...saved, officeNote: note },
+      env: { ADMIN_EMAIL: "office@iconicimagestx.com" },
+    });
+    const message = sendEmailMock.mock.calls[0][0];
+    expect(message.html).toContain(note);
+    expect(message.variables?.body).toContain(`Office note: ${note}`);
+  });
+
   it("does not send when the order is not new", async () => {
     const result = await notifyOfficeOfOrder({
       isNewOrder: false,
