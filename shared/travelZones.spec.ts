@@ -19,6 +19,7 @@ import {
 const bookings = readFileSync(new URL("../server/routes/bookings.ts", import.meta.url), "utf8");
 const bookingForm = readFileSync(new URL("../client/components/BookingForm.tsx", import.meta.url), "utf8");
 const email = readFileSync(new URL("../server/services/email.ts", import.meta.url), "utf8");
+const emailTemplates = readFileSync(new URL("./clientEmailTemplates.ts", import.meta.url), "utf8");
 const notify = readFileSync(new URL("./clientNotify.ts", import.meta.url), "utf8");
 
 function place(miles: number) {
@@ -283,7 +284,8 @@ describe("booking pipeline wiring", () => {
     expect(bookingForm).toContain('data-testid="travel-fee-line"');
     expect(bookingForm).toContain('data-testid="order-summary-before-submit"');
 
-    expect(email).toContain("${vars.travelFee");
+    expect(email).toContain("clientBuiltinEmailHtml");
+    expect(emailTemplates).toContain("{{travelFee}}");
     expect(notify).toContain('return env.CLIENT_NOTIFY_LIVE === "true"');
     expect(notify).toContain('if (template === ORDER_RECEIVED_EMAIL_TEMPLATE) return true;');
 

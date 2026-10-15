@@ -12,7 +12,7 @@ import {
   publicInvoiceLines,
 } from "./invoicePay";
 
-const email = readFileSync(new URL("../server/services/email.ts", import.meta.url), "utf8");
+const email = readFileSync(new URL("./clientEmailTemplates.ts", import.meta.url), "utf8");
 const payments = readFileSync(new URL("../server/routes/payments.ts", import.meta.url), "utf8");
 const bookings = readFileSync(new URL("../server/routes/bookings.ts", import.meta.url), "utf8");
 const delivery = readFileSync(new URL("../server/services/galleryDeliver.ts", import.meta.url), "utf8");

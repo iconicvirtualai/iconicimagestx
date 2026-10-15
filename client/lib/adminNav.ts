@@ -4,6 +4,7 @@ import {
   CalendarDays,
   Camera,
   CreditCard,
+  FolderOpen,
   DollarSign,
   Home,
   Images,
@@ -52,6 +53,7 @@ export const navGroups: { label: string; items: AdminNavItem[] }[] = [
     items: [
       { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard, roles: COORD_UP },
       { label: "Studio", href: "/admin/studio", icon: Camera, roles: ALL_STAFF },
+      { label: "My Projects", href: "/admin/my-projects", icon: FolderOpen, roles: ALL_STAFF },
       { label: "Orders", href: "/admin/orders", icon: ShoppingBag, roles: COORD_UP },
       { label: "Booking catalog", href: "/admin/booking-catalog", icon: Package, roles: COORD_UP },
       { label: "Schedule", href: "/admin/schedule", icon: CalendarDays, roles: COORD_UP },
