@@ -169,6 +169,16 @@ export function metaPlan(pathname: string, origin = SITE_ORIGIN): MetaPlan {
   const path = normalizePath(pathname);
   if (path === "/present" || path.startsWith("/present/")) return { kind: "hands-off" };
   if (path === "/go") return { kind: "preserve-title" };
+  if (path === "/thankful") {
+    return {
+      kind: "public",
+      title: "Thankful for You Always | Iconic Images",
+      description:
+        "Saturday, Nov 14, 2026 at Studio 105 in Spring. Bring family, friends, and pets for headshots, a free content day, and Santa.",
+      canonical: "https://iconicimagestx.com/thankful",
+      image: "https://iconicimagestx.com/events/thankful-hero.svg",
+    };
+  }
   if (isNoIndexPath(path)) return { kind: "noindex", title: GENERIC_TITLE };
   const page = PUBLIC_PAGES.find((item) => item.path === path);
   if (!page) return { kind: "generic", title: GENERIC_TITLE };

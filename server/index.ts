@@ -34,6 +34,7 @@ import smsRouter from "./routes/sms";
 import contactRouter from "./routes/contact";
 import seniorLivingRouter from "./routes/seniorLiving";
 import apprenticeshipRouter from "./routes/apprenticeship";
+import thankfulRouter from "./routes/thankful";
 import liveChatRouter from "./routes/liveChat";
 import contactThreadsRouter from "./routes/contactThreads";
 import { listCalendarScheduleEvents, verifyCalendarWriteAccess } from "./services/calendar";
@@ -265,6 +266,7 @@ export function createServer() {
   app.use("/api/contact", contactRouter);
   app.use("/api/senior-living", seniorLivingRouter);
   app.use("/api/apprenticeship", apprenticeshipRouter);
+  app.use("/api/thankful", thankfulRouter);
 
   // ─── Error handler ─────────────────────────────────────────────────
   app.use(

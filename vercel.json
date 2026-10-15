@@ -51,6 +51,26 @@
       "source": "/gallery/",
       "destination": "/portal",
       "permanent": false
+    },
+    {
+      "source": "/events/thankful-for-you-always",
+      "destination": "/thankful",
+      "permanent": false
+    },
+    {
+      "source": "/events/thankful-for-you-always/",
+      "destination": "/thankful",
+      "permanent": false
+    },
+    {
+      "source": "/holiday-event",
+      "destination": "/thankful",
+      "permanent": false
+    },
+    {
+      "source": "/holiday-event/",
+      "destination": "/thankful",
+      "permanent": false
     }
   ],
   "rewrites": [
@@ -288,6 +308,14 @@
     },
     {
       "source": "/go/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/thankful",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/thankful/",
       "destination": "/seo/app.html"
     },
     {

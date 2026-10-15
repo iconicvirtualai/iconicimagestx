@@ -56,3 +56,23 @@
   from = "/gallery/"
   status = 302
   to = "/portal"
+
+[[redirects]]
+  from = "/events/thankful-for-you-always"
+  status = 302
+  to = "/thankful"
+
+[[redirects]]
+  from = "/events/thankful-for-you-always/"
+  status = 302
+  to = "/thankful"
+
+[[redirects]]
+  from = "/holiday-event"
+  status = 302
+  to = "/thankful"
+
+[[redirects]]
+  from = "/holiday-event/"
+  status = 302
+  to = "/thankful"
