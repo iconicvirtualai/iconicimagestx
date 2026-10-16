@@ -8,8 +8,13 @@ import {
   openThankfulSlots,
   parseThankfulRsvp,
   thankfulBusyIntervals,
+  quoteThankfulSocial,
+  thankfulMoney,
+  thankfulRsvpOpen,
+  thankfulSocialOfferOpen,
   thankfulZonedTimeToUtc,
 } from "./thankfulEvent";
+import { processingFeeCents } from "./invoiceProcessing";
 
 const NOW = new Date("2026-10-15T15:00:00.000Z");
 
@@ -64,6 +69,15 @@ describe("thankful photo slots", () => {
   });
 });
 
+describe("thankful RSVP deadline", () => {
+  it("stays open through Monday, Nov 9, 2026 and closes at midnight Central", () => {
+    expect(thankfulRsvpOpen(thankfulZonedTimeToUtc(2026, 11, 9, 23, 59))).toBe(true);
+    expect(thankfulRsvpOpen(new Date(thankfulZonedTimeToUtc(2026, 11, 10, 0, 0).getTime() - 1))).toBe(true);
+    expect(thankfulRsvpOpen(thankfulZonedTimeToUtc(2026, 11, 10, 0, 0))).toBe(false);
+    expect(thankfulRsvpOpen(thankfulZonedTimeToUtc(2026, 11, 14, 11, 0))).toBe(false);
+  });
+});
+
 describe("thankful RSVP parse", () => {
   const body = {
     name: "Ada Lovelace",
@@ -91,6 +105,37 @@ describe("thankful RSVP parse", () => {
     expect(parseThankfulRsvp({ ...body, menuVote: "" }).ok).toBe(false);
     expect(parseThankfulRsvp({ ...body, partySize: 0 }).ok).toBe(false);
     expect(parseThankfulRsvp({ ...body, santa: "maybe" }).ok).toBe(false);
+  });
+});
+
+describe("thankful social packages", () => {
+  it("closes the pre-event price at the start of Nov 14 Central", () => {
+    expect(thankfulSocialOfferOpen(thankfulZonedTimeToUtc(2026, 11, 13, 23, 59))).toBe(true);
+    expect(thankfulSocialOfferOpen(thankfulZonedTimeToUtc(2026, 11, 14, 0, 0))).toBe(false);
+  });
+
+  it("prices half off, then the term extra, from the Social Monopoly monthly rates", () => {
+    const baselineYear = quoteThankfulSocial("baseline", "12");
+    const growthSix = quoteThankfulSocial("growth-engine", "6");
+    const suiteThree = quoteThankfulSocial("professional-suite", "3");
+    const connectedYear = quoteThankfulSocial("connected-core", "12");
+    const signatureSix = quoteThankfulSocial("signature-tier", "6");
+    const authorityMonth = quoteThankfulSocial("authority-stack", "month");
+    expect(baselineYear?.regularMonthlyCents).toBe(50_000);
+    expect(baselineYear?.saleMonthlyCents).toBe(22_500);
+    expect(baselineYear?.subtotalCents).toBe(270_000);
+    expect(thankfulMoney(baselineYear?.subtotalCents || 0)).toBe("$2,700");
+    expect(growthSix?.subtotalCents).toBe(242_250);
+    expect(suiteThree?.regularMonthlyCents).toBe(150_000);
+    expect(suiteThree?.subtotalCents).toBe(215_000);
+    expect(connectedYear?.subtotalCents).toBe(1_080_000);
+    expect(signatureSix?.subtotalCents).toBe(798_000);
+    expect(authorityMonth?.saleMonthlyCents).toBe(160_000);
+    expect(authorityMonth?.subtotalCents).toBe(160_000);
+    for (const quote of [baselineYear, growthSix, suiteThree, connectedYear, signatureSix, authorityMonth]) {
+      expect(quote?.processingCents).toBe(processingFeeCents(quote?.subtotalCents || 0));
+      expect(quote?.totalCents).toBe((quote?.subtotalCents || 0) + (quote?.processingCents || 0));
+    }
   });
 });
 

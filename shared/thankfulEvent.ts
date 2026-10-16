@@ -31,8 +31,67 @@ export const THANKFUL_EMAIL_HREF = "mailto:photos@iconicimagestx.com";
 export const THANKFUL_DRINKS_NOTE =
   "Wine for adults, and non-alcoholic drinks for kids and anyone who prefers them. Drinks are served either way.";
 
-export const THANKFUL_CLIENT_NOTE =
-  "Iconic clients are welcome to ask about 50% off 2027 social packages.";
+/** Last moment an RSVP is accepted: the end of Monday, Nov 9, 2026, Central Time. */
+export const THANKFUL_RSVP_CLOSES_LABEL = "Monday, Nov 9, 2026";
+export const THANKFUL_RSVP_CLOSED_ERROR = "RSVP and menu vote closed Monday, Nov 9, 2026.";
+export const THANKFUL_VOTE_RULE = "One vote per email. Pick one menu.";
+export const THANKFUL_ALREADY_VOTED_ERROR = "You already voted. One menu vote per email.";
+
+export const THANKFUL_OFFER_LINES = [
+  "Clients: 50% off 2027 social packages.",
+  "12 months, extra 10% off. 6 months, extra 5% off. 3 months, extra $100 off.",
+  "Month-to-month is 50% off only if you buy now, through the end of the promo.",
+] as const;
+
+export const THANKFUL_SOCIAL_SOURCE = "thankful_social";
+export const THANKFUL_SOCIAL_LOCK_LABEL =
+  "Lock in before the event — extra discount before they go live to the public.";
+export const THANKFUL_SOCIAL_CLOSED_ERROR = "Pre-event Social Package pricing ended before Nov 14, 2026.";
+export const THANKFUL_PROCESSING_NOTE = "Processing (2.8%) is added at checkout.";
+
+/**
+ * Monthly prices from /pricing#social (Social Monopoly, Oct 12 plan).
+ * Professional Suite is $1,500/mo on that page. Half of each monthly price is the 50% rate.
+ */
+export const THANKFUL_SOCIAL_PACKAGES = [
+  { id: "baseline", name: "The Baseline", regularMonthlyCents: 50_000 },
+  { id: "growth-engine", name: "The Growth Engine", regularMonthlyCents: 85_000 },
+  { id: "professional-suite", name: "The Professional Suite", regularMonthlyCents: 150_000 },
+  { id: "connected-core", name: "The Connected Core", regularMonthlyCents: 200_000 },
+  { id: "signature-tier", name: "The Signature Tier", regularMonthlyCents: 280_000 },
+  { id: "authority-stack", name: "The Authority Stack", regularMonthlyCents: 320_000 },
+] as const;
+
+export type ThankfulSocialPackageId = (typeof THANKFUL_SOCIAL_PACKAGES)[number]["id"];
+
+export const THANKFUL_SOCIAL_TERMS = [
+  { id: "12", months: 12, label: "12 months", detail: "Extra 10% off the half-price rate" },
+  { id: "6", months: 6, label: "6 months", detail: "Extra 5% off the half-price rate" },
+  { id: "3", months: 3, label: "3 months", detail: "Extra $100 off" },
+  { id: "month", months: 1, label: "Month to month", detail: "50% off only" },
+] as const;
+
+export type ThankfulSocialTermId = (typeof THANKFUL_SOCIAL_TERMS)[number]["id"];
+
+export interface ThankfulSocialQuote {
+  packageId: ThankfulSocialPackageId;
+  packageName: string;
+  termId: ThankfulSocialTermId;
+  termLabel: string;
+  months: number;
+  regularMonthlyCents: number;
+  saleMonthlyCents: number;
+  subtotalCents: number;
+  processingCents: number;
+  totalCents: number;
+}
+
+export interface ThankfulCheckoutInput {
+  name: string;
+  email: string;
+  phone: string;
+  quote: ThankfulSocialQuote;
+}
 
 export interface ThankfulMenu {
   id: "menu-1" | "menu-2" | "menu-3";
@@ -143,6 +202,16 @@ export function thankfulZonedTimeToUtc(year: number, month: number, day: number,
     utc += delta;
   }
   return new Date(utc);
+}
+
+/** True through the end of Monday, Nov 9, 2026, Central Time. */
+export function thankfulRsvpOpen(now: Date): boolean {
+  return now.getTime() < thankfulZonedTimeToUtc(2026, 11, 10, 0, 0).getTime();
+}
+
+/** Pre-event Social Package price. Open before Saturday, Nov 14, 2026, Central Time. */
+export function thankfulSocialOfferOpen(now: Date): boolean {
+  return now.getTime() < thankfulZonedTimeToUtc(2026, 11, 14, 0, 0).getTime();
 }
 
 function clockLabel(minutes: number): string {
@@ -276,4 +345,90 @@ function santaOf(value: unknown): boolean | null {
   if (value === true || value === "yes") return true;
   if (value === false || value === "no") return false;
   return null;
+}
+
+/** 2.8% of a cent amount, half-up, matching invoice processing. */
+function thankfulProcessingCents(baseCents: number): number {
+  const cents = Math.round(Number(baseCents));
+  if (!Number.isFinite(cents) || cents <= 0) return 0;
+  return Math.floor((cents * 28 + 500) / 1000);
+}
+
+function keepPercent(cents: number, percent: number): number {
+  return Math.round((cents * percent) / 100);
+}
+
+export function thankfulMoney(cents: number): string {
+  const abs = Math.abs(Math.round(cents));
+  const dollars = Math.floor(abs / 100);
+  const remainder = abs % 100;
+  const body = dollars.toLocaleString("en-US");
+  const sign = cents < 0 ? "-" : "";
+  if (remainder === 0) return `${sign}$${body}`;
+  return `${sign}$${body}.${String(remainder).padStart(2, "0")}`;
+}
+
+export function findThankfulSocialPackage(id: string) {
+  return THANKFUL_SOCIAL_PACKAGES.find((item) => item.id === id) || null;
+}
+
+export function findThankfulSocialTerm(id: string) {
+  return THANKFUL_SOCIAL_TERMS.find((item) => item.id === id) || null;
+}
+
+/**
+ * 50% off the public monthly price, then the term extra.
+ * 12 months takes another 10% off that half-price rate.
+ * 6 months takes another 5% off.
+ * 3 months takes $100 off the 3-month half-price total.
+ * Month-to-month is one month at 50% off.
+ */
+export function quoteThankfulSocial(packageId: string, termId: string): ThankfulSocialQuote | null {
+  const pkg = findThankfulSocialPackage(packageId);
+  const term = findThankfulSocialTerm(termId);
+  if (!pkg || !term) return null;
+  const half = Math.round(pkg.regularMonthlyCents / 2);
+  let saleMonthlyCents = half;
+  let subtotalCents = half * term.months;
+  if (term.id === "12") {
+    saleMonthlyCents = keepPercent(half, 90);
+    subtotalCents = saleMonthlyCents * term.months;
+  } else if (term.id === "6") {
+    saleMonthlyCents = keepPercent(half, 95);
+    subtotalCents = saleMonthlyCents * term.months;
+  } else if (term.id === "3") {
+    subtotalCents = Math.max(0, half * term.months - 10_000);
+  }
+  const processingCents = thankfulProcessingCents(subtotalCents);
+  return {
+    packageId: pkg.id,
+    packageName: pkg.name,
+    termId: term.id,
+    termLabel: term.label,
+    months: term.months,
+    regularMonthlyCents: pkg.regularMonthlyCents,
+    saleMonthlyCents,
+    subtotalCents,
+    processingCents,
+    totalCents: subtotalCents + processingCents,
+  };
+}
+
+export function parseThankfulCheckout(
+  body: unknown,
+): { ok: true; value: ThankfulCheckoutInput } | { ok: false; error: string; honeypot?: boolean } {
+  const raw = body && typeof body === "object" ? body as Record<string, unknown> : {};
+  if (text(raw.website) || text(raw.companyWebsite)) {
+    return { ok: false, error: "Received.", honeypot: true };
+  }
+  const name = text(raw.name);
+  const email = text(raw.email).toLowerCase();
+  const phone = text(raw.phone);
+  if (!name || name.length > 120) return { ok: false, error: "Enter your name." };
+  if (!EMAIL_RE.test(email) || email.length > 200) return { ok: false, error: "Enter a valid email." };
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 10 || digits.length > 15) return { ok: false, error: "Enter a phone number." };
+  const quote = quoteThankfulSocial(text(raw.packageId), text(raw.termId));
+  if (!quote) return { ok: false, error: "Choose a Social Package." };
+  return { ok: true, value: { name, email, phone, quote } };
 }

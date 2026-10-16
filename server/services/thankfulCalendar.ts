@@ -1,7 +1,9 @@
 /**
  * Photo times for Thankful for You Always.
- * Reads and holds events on photos@iconicimagestx.com with the same
- * Firebase service account the main booking calendar uses.
+ * Slots and holds use photos@iconicimagestx.com.
+ * firebase-adminsdk-fbsvc@iconic-images-aicon.iam.gserviceaccount.com
+ * already has access through FIREBASE_SERVICE_ACCOUNT.
+ * Do not show that service-account address on the public page.
  */
 
 import { google } from "googleapis";

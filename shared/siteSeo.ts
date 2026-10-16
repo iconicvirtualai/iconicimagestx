@@ -174,7 +174,7 @@ export function metaPlan(pathname: string, origin = SITE_ORIGIN): MetaPlan {
       kind: "public",
       title: "Thankful for You Always | Iconic Images",
       description:
-        "Saturday, Nov 14, 2026 at Studio 105 in Spring. Bring family, friends, and pets for headshots, a free content day, and Santa.",
+        "Saturday, Nov 14, 2026 at Studio 105 in Spring. RSVP and menu vote close Monday, Nov 9.",
       canonical: "https://iconicimagestx.com/thankful",
       image: "https://iconicimagestx.com/events/thankful-hero.svg",
     };
