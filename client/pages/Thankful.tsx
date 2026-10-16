@@ -254,33 +254,24 @@ export default function Thankful() {
         <header className="bg-[radial-gradient(circle_at_top,#5a3028_0%,#1b332b_46%,#12241c_100%)] pt-28 text-[#f6f1e7]">
           <div
             data-testid="thankful-video-hero"
-            className="relative aspect-video w-full overflow-hidden bg-[#10241c] ring-1 ring-[#e7c56a]/50"
+            className="relative aspect-video w-full overflow-hidden bg-[#10241c]"
             aria-label="Client holiday video. The studio will add it here."
           >
-            <div data-testid="thankful-lights" className="thankful-lights absolute inset-x-0 top-3 h-3" aria-hidden="true" />
-            <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-              <span className="flex h-16 w-16 items-center justify-center rounded-full border border-[#e7c56a] text-2xl text-[#e7c56a]" aria-hidden="true">▶</span>
-              <p className="text-xs uppercase tracking-[0.28em] text-[#e7c56a]">Client holiday video</p>
-              <p className="text-sm text-[#f6f1e7]/80">Video goes here</p>
-            </div>
+            <div data-testid="thankful-lights" className="thankful-lights absolute inset-x-6 top-5 h-3 sm:inset-x-10" aria-hidden="true" />
+            <p className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-xs uppercase tracking-[0.32em] text-[#e7c56a]">Client holiday video</p>
             <div className="thankful-garland absolute inset-x-0 bottom-0 h-3" aria-hidden="true" />
           </div>
-          <div className="mx-auto max-w-xl px-6 py-16 text-center sm:py-20">
-            <p className="text-sm uppercase tracking-[0.28em] text-[#e7c56a]" aria-hidden="true">♥</p>
-            <h1 className="mt-4 font-serif text-5xl leading-tight tracking-tight sm:text-6xl">
+          <div className="mx-auto max-w-xl px-6 py-14 text-center sm:py-16">
+            <h1 className="font-serif text-5xl leading-tight tracking-tight sm:text-6xl">
               {THANKFUL_HEADLINE}
             </h1>
-            <p className="mt-6 text-lg">{THANKFUL_WHEN_LABEL}</p>
-            <p className="mt-2 text-base text-[#f6f1e7]/80">Studio 105</p>
-            <p className="mt-8 text-sm tracking-wide text-[#e7c56a]" data-testid="thankful-deadline">
-              RSVP and menu vote close {THANKFUL_RSVP_CLOSES_LABEL}.
-            </p>
+            <p className="mt-5 text-lg">{THANKFUL_WHEN_LABEL}</p>
             {closed ? (
               <p className="mt-8 text-base" data-testid="thankful-closed">RSVPs are closed.</p>
             ) : (
               <a
                 href="#rsvp"
-                className="mt-8 inline-flex min-h-12 items-center justify-center rounded-full bg-[#f6f1e7] px-8 text-base font-semibold text-[#1b332b]"
+                className="mt-8 inline-flex min-h-12 items-center justify-center rounded-full bg-[#c45a42] px-8 text-base font-semibold text-white"
               >
                 RSVP
               </a>
@@ -288,7 +279,11 @@ export default function Thankful() {
           </div>
         </header>
 
-        <section className="mx-auto max-w-xl px-6 pt-12" data-testid="thankful-photo-strip" aria-label="Event photos">
+        <p className="mx-auto max-w-xl px-6 pt-14 text-center text-sm tracking-wide text-[#8f3d32]" data-testid="thankful-deadline">
+          RSVP and menu vote close {THANKFUL_RSVP_CLOSES_LABEL}.
+        </p>
+
+        <section className="mx-auto max-w-xl px-6 pt-14" data-testid="thankful-photo-strip" aria-label="Event photos">
           <p className="text-center text-xs uppercase tracking-[0.28em] text-[#8f3d32]">Event photos</p>
           <p className="mt-2 text-center text-sm text-[#1c1612]/70">Photos go here.</p>
           <div className="mt-5 grid grid-cols-4 gap-3">
@@ -312,11 +307,9 @@ export default function Thankful() {
             <a className="underline decoration-[#8f3d32]/40 underline-offset-4" href={THANKFUL_EMAIL_HREF}>{THANKFUL_EMAIL}</a>
           </p>
 
-          <section className="mt-16" data-testid="thankful-social" aria-label="Social Packages">
-            <div className="thankful-lights mb-6 h-3" aria-hidden="true" />
+          <section className="mt-24" data-testid="thankful-social" aria-label="Social Packages">
             <h2 className="font-serif text-3xl leading-tight">Social Packages</h2>
             <p className="mt-4 text-base leading-relaxed" data-testid="thankful-lock">{THANKFUL_SOCIAL_LOCK_LABEL}</p>
-            <p className="mt-3 text-sm leading-relaxed text-[#1c1612]/70">Half off the public monthly price, then a little more off when you prepay.</p>
             {socialOpen ? (
               <>
                 <div className="mt-8 flex flex-wrap gap-3" data-testid="thankful-terms">
@@ -356,16 +349,18 @@ export default function Thankful() {
                       ? `${thankfulMoney(quote.saleMonthlyCents)}/mo`
                       : thankfulMoney(quote.subtotalCents);
                     return (
-                      <article key={pkg.id} data-testid={`social-${pkg.id}`} className="rounded-3xl border border-[#eadcc8] bg-white px-5 py-5">
-                        <h3 className="font-serif text-2xl">{pkg.name}</h3>
-                        <p className="mt-3 text-sm text-[#1c1612]/55 line-through">{thankfulMoney(quote.regularMonthlyCents)}/mo</p>
-                        <p className="mt-1 text-3xl font-semibold text-[#8f3d32]">{sale}</p>
+                      <article key={pkg.id} data-testid={`social-${pkg.id}`} className="flex items-center justify-between gap-4 rounded-3xl border border-[#eadcc8] bg-white px-5 py-4">
+                        <div>
+                          <h3 className="font-serif text-xl">{pkg.name}</h3>
+                          <p className="mt-1 text-sm text-[#1c1612]/50 line-through">{thankfulMoney(quote.regularMonthlyCents)}/mo</p>
+                          <p className="text-2xl font-semibold text-[#8f3d32]">{sale}</p>
+                        </div>
                         <button
                           type="button"
                           data-testid={`buy-${pkg.id}`}
                           disabled={Boolean(buying)}
                           onClick={() => buyPackage(pkg.id)}
-                          className="mt-4 inline-flex min-h-12 items-center justify-center rounded-full bg-[#1b332b] px-6 text-sm font-semibold text-[#f6f1e7] disabled:opacity-60"
+                          className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-full bg-[#1b332b] px-5 text-sm font-semibold text-[#f6f1e7] disabled:opacity-60"
                         >
                           {buying === pkg.id ? "Starting checkout" : "Buy now"}
                         </button>

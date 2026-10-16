@@ -78,7 +78,8 @@ describe("thankful event page", () => {
     expect(text).toContain(THANKFUL_DRINKS_NOTE);
     expect(text).toContain(THANKFUL_VOTE_RULE);
     expect(text).toContain("Client holiday video");
-    expect(text).toContain("Video goes here");
+    expect(container?.querySelector("[data-testid='thankful-video-hero']")?.nextElementSibling?.textContent).toContain("Thankful for You Always");
+    expect(container?.querySelector("[data-testid='thankful-video-hero']")?.nextElementSibling?.querySelector("a")?.textContent).toBe("RSVP");
     expect(text).toContain("Event photos");
     expect(text).toContain("Photo 1");
     expect(text).toContain(THANKFUL_SOCIAL_LOCK_LABEL);
