@@ -289,6 +289,22 @@ export function assignPhotographerSlots(input: {
   };
 }
 
+/** Coarse windows on the temporary order page. Not calendar slot times. */
+const PREFERRED_TIME_WINDOWS = new Set(["morning", "midday", "afternoon"]);
+
+/**
+ * ordericonic.html asks for Morning, Midday, or Afternoon and does not send
+ * slotStart. /book sends a real slot when the calendar is live, or a clock
+ * time such as "9:00 AM" when it is not. A window with no slot is a request
+ * for the office to confirm, not a hold.
+ */
+export function isPreferredWindowBooking(body: { slotStart?: unknown; scheduledTime?: unknown }): boolean {
+  const slotStart = typeof body.slotStart === "string" ? body.slotStart.trim() : "";
+  if (slotStart) return false;
+  const time = typeof body.scheduledTime === "string" ? body.scheduledTime.trim().toLowerCase() : "";
+  return PREFERRED_TIME_WINDOWS.has(time);
+}
+
 export function resolveBookingAssignment(input: {
   live: boolean;
   slotStart: string;

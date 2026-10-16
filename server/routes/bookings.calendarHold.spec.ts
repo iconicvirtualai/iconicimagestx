@@ -124,7 +124,7 @@ vi.mock("../services/bookingListing", () => ({
   ensureBookingListingForRequest: vi.fn(async () => null),
 }));
 
-import bookingsRouter from "./bookings";
+import bookingsRouter, { resetPublicBookingRateLimit } from "./bookings";
 
 const SLOT = {
   start: "2026-10-14T14:00:00.000Z",
@@ -170,6 +170,7 @@ afterAll(async () => {
 });
 
 beforeEach(() => {
+  resetPublicBookingRateLimit();
   store.collections = {};
   store.seq = 0;
   docs("counters").set("orderNumbers", { last: 41 });
@@ -305,5 +306,116 @@ describe("public booking calendar hold", () => {
     expect(saved.calendarId).toBe("mike@iconicimagestx.com");
     expect(body).not.toHaveProperty("error");
     expect(sent.some((message) => message.text?.includes("Office note:") || message.html.includes("Calendar hold failed"))).toBe(false);
+  });
+
+  it("saves the Wix order page without a calendar slot and keeps the booking list private", async () => {
+    expect(process.env.CLIENT_NOTIFY_LIVE).not.toBe("true");
+    expect(process.env.BOOKING_NOTIFY_LIVE).toBeUndefined();
+
+    const response = await fetch(`${baseUrl}/api/bookings`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "https://www-iconicimagestx-com.filesusr.com",
+      },
+      body: JSON.stringify({
+        firstName: "TEST",
+        lastName: "Cody - ignore",
+        email: "ops+deliveryqa@iconicimagestx.com",
+        phone: "281-356-0965",
+        address: "26410 Oakridge Dr, Spring, TX 77380",
+        lineItems: [{ name: "The Essentials — $249", price: 249 }],
+        total: 249,
+        pricing: { subtotal: 249, total: 249 },
+        vibeNote: "COMPLETE BOOKING DETAILS\nQA reproduction. Please ignore.",
+        scheduledDate: "2026-10-22",
+        scheduledTime: "Morning",
+        photographerPreference: "No preference",
+        accessMethod: "QA test — do not visit",
+        propertyStatus: "Not specified",
+        furnishingStatus: "Not specified",
+        selectedAddOns: [],
+        selectedService: "The Essentials — $249",
+        leadSource: "Iconic temporary booking page",
+      }),
+    });
+    const body = await response.json();
+    const saved = savedOrder();
+    const listed = await fetch(`${baseUrl}/api/bookings`);
+    const listedBody = await listed.json();
+
+    expect(response.status).toBe(201);
+    expect(body.success).toBe(true);
+    expect(body.error).toBeUndefined();
+    expect(availability).not.toHaveBeenCalled();
+    expect(createHold).not.toHaveBeenCalled();
+    expect(saved.firstName).toBe("TEST");
+    expect(saved.lastName).toBe("Cody - ignore");
+    expect(saved.email).toBe("ops+deliveryqa@iconicimagestx.com");
+    expect(saved.scheduledDate).toBe("2026-10-22");
+    expect(saved.scheduledTime).toBe("Morning");
+    expect(saved.calendarHold).toBe("none");
+    expect(saved.calendarEventId).toBeNull();
+    expect(saved.leadSource).toBe("Iconic temporary booking page");
+    expect(listed.status).toBe(401);
+    expect(listedBody).toEqual({ error: "No authentication token provided." });
+    expect(sent.some((message) => message.subject?.includes("password") || message.html.includes("setup"))).toBe(false);
+  });
+
+  it("still requires an open time on /book when the calendar is live", async () => {
+    const response = await fetch(`${baseUrl}/api/bookings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        firstName: "Ada",
+        lastName: "Lovelace",
+        email: "ada@example.com",
+        phone: "281-555-0199",
+        address: "100 Oak St, Spring, TX 77380",
+        selectedBasics: ["photos-20"],
+        scheduledDate: "2026-10-22",
+        scheduledTime: "9:00 AM",
+      }),
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe("Choose an open time.");
+    expect(docs("orderRequests").size).toBe(0);
+    expect(createHold).not.toHaveBeenCalled();
+  });
+
+  it("rate-limits repeated public booking posts", async () => {
+    const payload = {
+      firstName: "TEST",
+      lastName: "Cody - ignore",
+      email: "ops+deliveryqa@iconicimagestx.com",
+      phone: "281-356-0965",
+      address: "26410 Oakridge Dr, Spring, TX 77380",
+      lineItems: [{ name: "The Essentials — $249", price: 249 }],
+      total: 249,
+      scheduledDate: "2026-10-22",
+      scheduledTime: "Afternoon",
+      selectedService: "The Essentials — $249",
+      leadSource: "Iconic temporary booking page",
+    };
+    const statuses: number[] = [];
+    for (let attempt = 0; attempt < 11; attempt += 1) {
+      const response = await fetch(`${baseUrl}/api/bookings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      statuses.push(response.status);
+      if (response.status === 429) {
+        expect(response.headers.get("retry-after")).toBeTruthy();
+        const body = await response.json();
+        expect(body.error).toContain("281.356.0965");
+      }
+    }
+
+    expect(statuses.slice(0, 10).every((status) => status === 201)).toBe(true);
+    expect(statuses[10]).toBe(429);
+    expect(docs("orderRequests").size).toBe(10);
   });
 });

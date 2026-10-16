@@ -40,10 +40,24 @@ import {
   deleteBookingCalendarHold,
   readBookingAvailability,
 } from "../services/bookingAvailability";
-import { resolveBookingAssignment } from "../../shared/bookingAvailability";
+import { isPreferredWindowBooking, resolveBookingAssignment } from "../../shared/bookingAvailability";
+import { BUSINESS_CONTACT } from "../../shared/businessContact";
+import { clientIp } from "../lib/clientIp";
+import { createRateLimiter } from "../lib/rateLimit";
 
 const router = Router();
 const db = () => admin.firestore();
+
+const BOOKING_SUBMIT_WINDOW_MS = 15 * 60 * 1000;
+const BOOKING_SUBMIT_MAX = 10;
+const bookingSubmitLimiter = createRateLimiter({
+  windowMs: BOOKING_SUBMIT_WINDOW_MS,
+  max: BOOKING_SUBMIT_MAX,
+});
+
+export function resetPublicBookingRateLimit() {
+  bookingSubmitLimiter.reset();
+}
 
 function orderRequestAdminUrl(id: string): string {
   return publicClientUrl(`/admin/order-request/${encodeURIComponent(id)}`);
@@ -101,6 +115,14 @@ async function loadBookingCatalog() {
 // No auth required — this is the public-facing booking form
 
 router.post("/", async (req, res) => {
+  const limit = bookingSubmitLimiter.check(clientIp(req));
+  if (!limit.allowed) {
+    res.setHeader("Retry-After", String(limit.retryAfterSec));
+    return res.status(429).json({
+      error: `Too many booking requests. Please wait and try again, or call ${BUSINESS_CONTACT.phoneDisplay}.`,
+    });
+  }
+
   let calendarHold: { calendarId: string; eventId: string | null; htmlLink: string | null } | null = null;
   let calendarHoldError: string | null = null;
   try {
@@ -175,6 +197,10 @@ router.post("/", async (req, res) => {
     const selectedBasics = resolved.selectedBasics;
     const selectedAddOns = resolved.selectedAddOns;
     const preferenceId = preferenceFromRequest(req.body.photographerId, photographerPreference);
+    // The Wix order page sends a preferred date plus Morning / Midday / Afternoon.
+    // That is not a calendar slot. Save it for the office to confirm, and do not
+    // ask Google Calendar first. /book still has to pick an open time when live.
+    const preferredWindow = isPreferredWindowBooking(req.body);
     let availability: Awaited<ReturnType<typeof readBookingAvailability>> = {
       live: false,
       slots: [],
@@ -182,19 +208,21 @@ router.post("/", async (req, res) => {
       bufferMinutes: 30,
       driveMode: "buffer",
     };
-    try {
-      availability = await readBookingAvailability({
-        address: displayAddress,
-        preferenceId,
-        selectedService: typeof selectedService === "string" ? selectedService : null,
-        selectedBasics: Array.isArray(selectedBasics) ? selectedBasics.map((id) => String(id)) : [],
-        catalog,
-      });
-    } catch (err) {
-      console.error("[Bookings] Availability check failed — keeping the standard time list:", err);
+    if (!preferredWindow) {
+      try {
+        availability = await readBookingAvailability({
+          address: displayAddress,
+          preferenceId,
+          selectedService: typeof selectedService === "string" ? selectedService : null,
+          selectedBasics: Array.isArray(selectedBasics) ? selectedBasics.map((id) => String(id)) : [],
+          catalog,
+        });
+      } catch (err) {
+        console.error("[Bookings] Availability check failed — keeping the standard time list:", err);
+      }
     }
     const decision = resolveBookingAssignment({
-      live: availability.live,
+      live: preferredWindow ? false : availability.live,
       slotStart: typeof req.body.slotStart === "string" ? req.body.slotStart : "",
       slots: availability.slots,
     });
