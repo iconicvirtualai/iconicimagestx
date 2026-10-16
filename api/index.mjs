@@ -6768,6 +6768,13 @@ function assignPhotographerSlots(input) {
     slots: [...byStart.values()].sort((a, b) => a.start.localeCompare(b.start))
   };
 }
+const PREFERRED_TIME_WINDOWS = /* @__PURE__ */ new Set(["morning", "midday", "afternoon"]);
+function isPreferredWindowBooking(body) {
+  const slotStart = typeof body.slotStart === "string" ? body.slotStart.trim() : "";
+  if (slotStart) return false;
+  const time = typeof body.scheduledTime === "string" ? body.scheduledTime.trim().toLowerCase() : "";
+  return PREFERRED_TIME_WINDOWS.has(time);
+}
 function resolveBookingAssignment(input) {
   if (!input.live) return { ok: true, slot: null };
   const slotStart = input.slotStart.trim();
@@ -7285,8 +7292,48 @@ async function deleteBookingCalendarHold(input) {
     sendUpdates: "none"
   });
 }
+function clientIp(req) {
+  const forwarded = req.headers["x-forwarded-for"];
+  const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+  if (typeof raw === "string" && raw.trim()) {
+    return raw.split(",")[0].trim().slice(0, 80);
+  }
+  return req.ip || req.socket?.remoteAddress || "unknown";
+}
+function createRateLimiter(options) {
+  const hits2 = /* @__PURE__ */ new Map();
+  return {
+    check(key) {
+      const now = options.now ? options.now() : Date.now();
+      const windowStart = now - options.windowMs;
+      const recent = (hits2.get(key) ?? []).filter((stamp2) => stamp2 > windowStart);
+      const max = typeof options.max === "function" ? options.max() : options.max;
+      if (recent.length >= max) {
+        const retryAfterSec = Math.max(1, Math.ceil((recent[0] + options.windowMs - now) / 1e3));
+        hits2.set(key, recent);
+        return { allowed: false, retryAfterSec };
+      }
+      recent.push(now);
+      hits2.set(key, recent);
+      if (hits2.size > 5e3) {
+        const oldest = hits2.keys().next().value;
+        if (oldest) hits2.delete(oldest);
+      }
+      return { allowed: true, retryAfterSec: 0 };
+    },
+    reset() {
+      hits2.clear();
+    }
+  };
+}
 const router$p = Router();
 const db$p = () => admin.firestore();
+const BOOKING_SUBMIT_WINDOW_MS = 15 * 60 * 1e3;
+const BOOKING_SUBMIT_MAX = 10;
+const bookingSubmitLimiter = createRateLimiter({
+  windowMs: BOOKING_SUBMIT_WINDOW_MS,
+  max: BOOKING_SUBMIT_MAX
+});
 function orderRequestAdminUrl(id) {
   return publicClientUrl(`/admin/order-request/${encodeURIComponent(id)}`);
 }
@@ -7328,6 +7375,13 @@ async function loadBookingCatalog() {
   }
 }
 router$p.post("/", async (req, res) => {
+  const limit = bookingSubmitLimiter.check(clientIp(req));
+  if (!limit.allowed) {
+    res.setHeader("Retry-After", String(limit.retryAfterSec));
+    return res.status(429).json({
+      error: `Too many booking requests. Please wait and try again, or call ${BUSINESS_CONTACT.phoneDisplay}.`
+    });
+  }
   let calendarHold = null;
   let calendarHoldError = null;
   try {
@@ -7395,6 +7449,7 @@ router$p.post("/", async (req, res) => {
     const selectedBasics = resolved.selectedBasics;
     const selectedAddOns = resolved.selectedAddOns;
     const preferenceId = preferenceFromRequest(req.body.photographerId, photographerPreference);
+    const preferredWindow = isPreferredWindowBooking(req.body);
     let availability = {
       live: false,
       slots: [],
@@ -7402,19 +7457,21 @@ router$p.post("/", async (req, res) => {
       bufferMinutes: 30,
       driveMode: "buffer"
     };
-    try {
-      availability = await readBookingAvailability({
-        address: displayAddress,
-        preferenceId,
-        selectedService: typeof selectedService === "string" ? selectedService : null,
-        selectedBasics: Array.isArray(selectedBasics) ? selectedBasics.map((id) => String(id)) : [],
-        catalog
-      });
-    } catch (err) {
-      console.error("[Bookings] Availability check failed — keeping the standard time list:", err);
+    if (!preferredWindow) {
+      try {
+        availability = await readBookingAvailability({
+          address: displayAddress,
+          preferenceId,
+          selectedService: typeof selectedService === "string" ? selectedService : null,
+          selectedBasics: Array.isArray(selectedBasics) ? selectedBasics.map((id) => String(id)) : [],
+          catalog
+        });
+      } catch (err) {
+        console.error("[Bookings] Availability check failed — keeping the standard time list:", err);
+      }
     }
     const decision = resolveBookingAssignment({
-      live: availability.live,
+      live: preferredWindow ? false : availability.live,
       slotStart: typeof req.body.slotStart === "string" ? req.body.slotStart : "",
       slots: availability.slots
     });
@@ -8388,40 +8445,6 @@ async function ensureDotOptInLink(invoice) {
     console.error("[DoorsOpenTour] Link lookup failed:", err);
     return { dotOptIn: false, url: null };
   }
-}
-function createRateLimiter(options) {
-  const hits2 = /* @__PURE__ */ new Map();
-  return {
-    check(key) {
-      const now = options.now ? options.now() : Date.now();
-      const windowStart = now - options.windowMs;
-      const recent = (hits2.get(key) ?? []).filter((stamp2) => stamp2 > windowStart);
-      const max = typeof options.max === "function" ? options.max() : options.max;
-      if (recent.length >= max) {
-        const retryAfterSec = Math.max(1, Math.ceil((recent[0] + options.windowMs - now) / 1e3));
-        hits2.set(key, recent);
-        return { allowed: false, retryAfterSec };
-      }
-      recent.push(now);
-      hits2.set(key, recent);
-      if (hits2.size > 5e3) {
-        const oldest = hits2.keys().next().value;
-        if (oldest) hits2.delete(oldest);
-      }
-      return { allowed: true, retryAfterSec: 0 };
-    },
-    reset() {
-      hits2.clear();
-    }
-  };
-}
-function clientIp(req) {
-  const forwarded = req.headers["x-forwarded-for"];
-  const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-  if (typeof raw === "string" && raw.trim()) {
-    return raw.split(",")[0].trim().slice(0, 80);
-  }
-  return req.ip || req.socket?.remoteAddress || "unknown";
 }
 const router$o = Router();
 const db$o = () => admin.firestore();
@@ -22123,6 +22146,30 @@ const PHOTOGRAPHER_CALENDAR_ROSTER = [
 function photographerCalendarRoster() {
   return PHOTOGRAPHER_CALENDAR_ROSTER.map((person) => ({ ...person }));
 }
+const SITE_ORIGINS = [
+  "https://iconicimagestx.com",
+  "https://www.iconicimagestx.com",
+  "https://iconic-booking-test.cadi0224.chatgpt.site"
+];
+const WIX_IFRAME_HOSTS = /* @__PURE__ */ new Set([
+  "www-iconicimagestx-com.filesusr.com",
+  "iconicimagestx-com.filesusr.com",
+  "iconicimagestx.wixsite.com"
+]);
+function isPublicApiOrigin(origin, configuredOrigin) {
+  if (!origin) return true;
+  if (SITE_ORIGINS.includes(origin)) return true;
+  if (configuredOrigin && origin === configuredOrigin) return true;
+  let url;
+  try {
+    url = new URL(origin);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:") return false;
+  if (url.origin !== origin) return false;
+  return WIX_IFRAME_HOSTS.has(url.hostname.toLowerCase());
+}
 const BUCKET = process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET || "iconic-images-aicon.firebasestorage.app";
 const CONFIG_ERROR = "Gallery upload is not configured on this server. In the Vercel project, set FIREBASE_SERVICE_ACCOUNT to the iconic-images-aicon service account JSON (Preview environment is enough) and FIREBASE_STORAGE_BUCKET to iconic-images-aicon.firebasestorage.app. Redeploy the preview. Do not change Storage rules to public write.";
 function safeFileName(raw) {
@@ -25511,15 +25558,9 @@ if (!admin.apps.length) {
 function createServer() {
   const app = express();
   const configuredOrigin = process.env.APP_URL;
-  const allowedOrigins = /* @__PURE__ */ new Set([
-    "https://iconicimagestx.com",
-    "https://www.iconicimagestx.com",
-    "https://iconic-booking-test.cadi0224.chatgpt.site",
-    ...configuredOrigin ? [configuredOrigin] : []
-  ]);
   app.use(cors({
     origin(origin, callback) {
-      callback(null, !origin || allowedOrigins.has(origin));
+      callback(null, isPublicApiOrigin(origin, configuredOrigin));
     },
     credentials: true
   }));
