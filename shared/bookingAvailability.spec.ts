@@ -7,6 +7,7 @@ import {
   explicitDurationMinutes,
   parseRouteDuration,
   parseRouteMatrixBody,
+  isPreferredWindowBooking,
   resolveBookingAssignment,
   travelBufferMinutes,
   travelEventsFromBlocks,
@@ -198,6 +199,15 @@ describe("photographer choice", () => {
       slot,
     });
     expect(resolveBookingAssignment({ live: false, slotStart: "", slots: [] })).toEqual({ ok: true, slot: null });
+  });
+
+  it("treats Morning, Midday, and Afternoon with no slot as a preferred window", () => {
+    expect(isPreferredWindowBooking({ scheduledTime: "Morning" })).toBe(true);
+    expect(isPreferredWindowBooking({ scheduledTime: " Midday " })).toBe(true);
+    expect(isPreferredWindowBooking({ scheduledTime: "Afternoon", slotStart: null })).toBe(true);
+    expect(isPreferredWindowBooking({ scheduledTime: "9:00 AM" })).toBe(false);
+    expect(isPreferredWindowBooking({ scheduledTime: "Morning", slotStart: "2026-10-14T14:00:00.000Z" })).toBe(false);
+    expect(isPreferredWindowBooking({})).toBe(false);
   });
 });
 

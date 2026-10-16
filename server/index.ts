@@ -39,6 +39,7 @@ import contactThreadsRouter from "./routes/contactThreads";
 import { listCalendarScheduleEvents, verifyCalendarWriteAccess } from "./services/calendar";
 import { photographerCalendarRoster } from "./services/photographerRoster";
 import { clientNotifyLive } from "../shared/clientNotify";
+import { isPublicApiOrigin } from "./lib/publicCors";
 import { requireAdmin, requireStaff } from "./middleware/auth";
 import { handleListingPhotoUpload } from "./routes/listingPhotos";
 import { handleGetPublicPortalListing } from "./routes/portalListing";
@@ -88,18 +89,13 @@ export function createServer() {
   const app = express();
 
   // CORS
+  // Requests without an Origin header are server-to-server or same-origin.
+  // The Wix order page runs inside a filesusr.com iframe, so that origin
+  // has to be allowed or the browser hides the booking response.
   const configuredOrigin = process.env.APP_URL;
-  const allowedOrigins = new Set([
-    "https://iconicimagestx.com",
-    "https://www.iconicimagestx.com",
-    "https://iconic-booking-test.cadi0224.chatgpt.site",
-    ...(configuredOrigin ? [configuredOrigin] : []),
-  ]);
-
   app.use(cors({
     origin(origin, callback) {
-      // Requests without an Origin header are server-to-server or same-origin.
-      callback(null, !origin || allowedOrigins.has(origin));
+      callback(null, isPublicApiOrigin(origin, configuredOrigin));
     },
     credentials: true,
   }));
