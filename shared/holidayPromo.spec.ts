@@ -6,6 +6,7 @@ import {
   HOLIDAY_PROMO_NAME,
   holidayEarliestDate,
   holidayMinimumQuote,
+  openHolidaySlots,
   parseHolidayBooking,
   quoteHolidayPackage,
 } from "./holidayPromo";
@@ -58,6 +59,31 @@ describe("holiday package math", () => {
   });
 });
 
+describe("holiday session slots", () => {
+  const now = new Date("2026-10-16T15:00:00.000Z");
+
+  it("offers a calendar of studio times and drops a busy hour", () => {
+    const single = openHolidaySlots({ now, packageId: "single", today: "2026-11-01" });
+    expect(single.some((slot) => slot.date === "2026-11-27" && slot.clock === "10:00" && slot.time === "10:00 AM")).toBe(true);
+    expect(single.some((slot) => slot.date < "2026-11-27" || slot.date > "2026-12-14")).toBe(false);
+    const blocked = openHolidaySlots({
+      now,
+      packageId: "single",
+      today: "2026-11-01",
+      busy: [{ start: single.find((slot) => slot.clock === "10:00")!.start, end: single.find((slot) => slot.clock === "10:00")!.end }],
+    });
+    expect(blocked.some((slot) => slot.date === "2026-11-27" && slot.clock === "10:00")).toBe(false);
+
+    const party = openHolidaySlots({ now, packageId: "party", today: "2026-12-01" });
+    expect(party.some((slot) => slot.date === "2026-12-05")).toBe(false);
+    expect(party.some((slot) => slot.date === "2026-12-08" && slot.clock === "10:00")).toBe(true);
+
+    const celebration = openHolidaySlots({ now, packageId: "celebration", today: "2026-11-01" });
+    const firstDay = celebration.filter((slot) => slot.date === "2026-11-27").map((slot) => slot.clock);
+    expect(firstDay).toEqual(["10:00", "13:00"]);
+  });
+});
+
 describe("holiday booking validation", () => {
   it("rejects a date outside the book window and a short party", () => {
     expect(parseHolidayBooking({ ...contact, packageId: "single", preferredDate: "2026-12-15" })).toMatchObject({
@@ -89,6 +115,10 @@ describe("holiday booking validation", () => {
       error: "Choose a session at least 7 days ahead.",
     });
     expect(parseHolidayBooking({ ...party, preferredDate: "2026-12-08" }, { today }).ok).toBe(true);
+    expect(parseHolidayBooking({ ...contact, packageId: "single", preferredTime: "03:00" }, { today: "2026-11-01" })).toMatchObject({
+      ok: false,
+      error: "Choose a session time.",
+    });
 
     const withChef = { ...contact, packageId: "single", preferredDate: "2026-12-04", addons: ["chef-dessert"] };
     expect(parseHolidayBooking(withChef, { today })).toMatchObject({
@@ -110,6 +140,9 @@ describe("holiday booking validation", () => {
     expect(parsed.record.promoCode).toBe(HOLIDAY_PROMO_CODE);
     expect(parsed.record.addonIds).toEqual(["chef-full"]);
     expect(parsed.record.leadDaysRequired).toBe(true);
+    expect(parsed.record.scheduledDate).toBe("2026-12-01");
+    expect(parsed.record.scheduledTime).toBe("10:00 AM");
+    expect(parsed.record.slotStart).toContain("2026-12-01");
     expect(parsed.record.source).toBe("tis-the-season");
     expect(HOLIDAY_PROMO_NAME).toContain("Show Off a Little!");
     expect(PUBLIC_PROCESSING_NOTE).toContain("2.8%");

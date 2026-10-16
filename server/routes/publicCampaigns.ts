@@ -7,7 +7,8 @@
 import { Router, type Request, type Response } from "express";
 import admin from "firebase-admin";
 import { BUSINESS_CONTACT } from "../../shared/businessContact";
-import { parseHolidayBooking } from "../../shared/holidayPromo";
+import { HOLIDAY_CALENDAR_NOTE, parseHolidayBooking } from "../../shared/holidayPromo";
+import { readHolidaySlots } from "../services/holidayCalendar";
 import { parseStudiosRequest } from "../../shared/iconicStudiosPublic";
 import { HOLIDAY_PAY_LINK_ENV, PUBLIC_PROCESSING_NOTE, readSquarePayLink, STUDIOS_PAY_LINK_ENV } from "../../shared/publicRequests";
 import { clientIp } from "../lib/clientIp";
@@ -93,9 +94,28 @@ router.get("/holiday", (_req, res) => {
   });
 });
 
+router.get("/holiday/slots", async (req, res) => {
+  const packageId = typeof req.query.packageId === "string" ? req.query.packageId : "single";
+  const addonIds = typeof req.query.addons === "string"
+    ? req.query.addons.split(",").map((id) => id.trim()).filter(Boolean)
+    : [];
+  const read = await readHolidaySlots({ packageId, addonIds });
+  res.json({
+    live: read.live,
+    slots: read.slots,
+    confirmNote: HOLIDAY_CALENDAR_NOTE,
+  });
+});
+
 router.post("/holiday", async (req, res) => {
   if (limited(req, res)) return;
-  const parsed = parseHolidayBooking(req.body);
+  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const addonIds = Array.isArray(body.addons) ? body.addons.filter((id): id is string => typeof id === "string") : [];
+  const read = await readHolidaySlots({
+    packageId: typeof body.packageId === "string" ? body.packageId : "",
+    addonIds,
+  });
+  const parsed = parseHolidayBooking(req.body, { slots: read.slots });
   if (parsed.ok === false) {
     if (parsed.honeypot) return res.json({ success: true, message: "Request received." });
     return res.status(400).json({ error: parsed.error });

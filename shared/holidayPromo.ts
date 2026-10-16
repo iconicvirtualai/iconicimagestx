@@ -11,6 +11,8 @@
  * Add-on menus are listed without prices.
  */
 
+import { zonedTimeToUtc } from "./apprenticeship.ts";
+import { BUSINESS_CONTACT } from "./businessContact.ts";
 import {
   cleanText,
   formatUsd,
@@ -20,7 +22,6 @@ import {
   validEmail,
   validIsoDate,
   validPhone,
-  validTime,
   withProcessing,
 } from "./publicRequests.ts";
 
@@ -37,6 +38,10 @@ export const HOLIDAY_PROMO_CODE = "#ClientJingle2026";
 export const HOLIDAY_LEAD_DAYS = 7;
 export const HOLIDAY_LEAD_RULE =
   "Package B, Package C, and any Chef menu must be booked at least 7 days ahead.";
+export const HOLIDAY_CALENDAR_NOTE = `We'll confirm this time. Call ${BUSINESS_CONTACT.phoneDisplay} if you need another hour.`;
+export const HOLIDAY_DAY_START_MINUTES = 10 * 60;
+export const HOLIDAY_DAY_END_MINUTES = 17 * 60;
+export const HOLIDAY_SLOT_BUFFER_MINUTES = 5;
 export const HOLIDAY_SOURCE = "tis-the-season";
 export const HOLIDAY_LEAD = "’Tis the Season";
 
@@ -214,6 +219,120 @@ export function holidayEarliestDate(input: { packageId: string; addonIds: readon
   return notice > HOLIDAY_BOOK_START ? notice : HOLIDAY_BOOK_START;
 }
 
+export interface HolidaySlot {
+  start: string;
+  end: string;
+  date: string;
+  /** 24-hour clock, HH:MM, America/Chicago. */
+  clock: string;
+  time: string;
+  label: string;
+}
+
+export interface HolidayBusyInterval {
+  start: string;
+  end: string;
+}
+
+function holidaySessionPlan(packageId: string): { duration: number; step: number } | null {
+  if (packageId === "celebration") return { duration: 4 * 60, step: 3 * 60 };
+  if (packageId === "party") return { duration: 60, step: 60 };
+  if (packageId === "single") return { duration: 15, step: 30 };
+  return null;
+}
+
+function holidayDates(): string[] {
+  const dates: string[] = [];
+  let cursor = HOLIDAY_BOOK_START;
+  while (cursor <= HOLIDAY_BOOK_END) {
+    dates.push(cursor);
+    cursor = addIsoDays(cursor, 1);
+  }
+  return dates;
+}
+
+function clockOf(value: string): string | null {
+  const match = value.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour > 23 || minute > 59) return null;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function clockLabel(minutes: number): string {
+  const hour24 = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  const suffix = hour24 >= 12 ? "PM" : "AM";
+  const hour12 = hour24 % 12 || 12;
+  return `${hour12}:${String(minute).padStart(2, "0")} ${suffix}`;
+}
+
+function holidayDayLabel(date: string): string {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: CHICAGO,
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).format(zonedTimeToUtc(year, month, day, 12, 0, CHICAGO));
+}
+
+function overlapsBuffered(start: number, end: number, busy: { start: number; end: number }[], bufferMs: number): boolean {
+  return busy.some((block) => start < block.end + bufferMs && end > block.start - bufferMs);
+}
+
+/** Open studio times inside the book window. Package length sets the slot. */
+export function openHolidaySlots(input: {
+  now: Date;
+  packageId: string;
+  addonIds?: readonly string[];
+  today?: string;
+  busy?: readonly HolidayBusyInterval[];
+}): HolidaySlot[] {
+  const plan = holidaySessionPlan(input.packageId);
+  if (!plan) return [];
+  const today = input.today && validIsoDate(input.today) ? input.today : holidayToday(input.now);
+  const earliest = holidayEarliestDate({
+    packageId: input.packageId,
+    addonIds: input.addonIds || [],
+    today,
+  });
+  if (earliest > HOLIDAY_BOOK_END) return [];
+  const bufferMs = HOLIDAY_SLOT_BUFFER_MINUTES * 60 * 1000;
+  const durationMs = plan.duration * 60 * 1000;
+  const busy = (input.busy || [])
+    .map((block) => ({ start: Date.parse(block.start), end: Date.parse(block.end) }))
+    .filter((block) => Number.isFinite(block.start) && Number.isFinite(block.end) && block.end > block.start);
+  const slots: HolidaySlot[] = [];
+  for (const date of holidayDates()) {
+    if (date < earliest) continue;
+    const [year, month, day] = date.split("-").map(Number);
+    const labelDay = holidayDayLabel(date);
+    for (
+      let minute = HOLIDAY_DAY_START_MINUTES;
+      minute + plan.duration <= HOLIDAY_DAY_END_MINUTES;
+      minute += plan.step
+    ) {
+      const start = zonedTimeToUtc(year, month, day, Math.floor(minute / 60), minute % 60, CHICAGO);
+      const endMs = start.getTime() + durationMs;
+      if (start.getTime() <= input.now.getTime()) continue;
+      if (overlapsBuffered(start.getTime(), endMs, busy, bufferMs)) continue;
+      const clock = `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
+      const time = clockLabel(minute);
+      slots.push({
+        start: start.toISOString(),
+        end: new Date(endMs).toISOString(),
+        date,
+        clock,
+        time,
+        label: `${labelDay} · ${time}`,
+      });
+    }
+  }
+  return slots;
+}
+
 export function holidayMinimumQuote(packageId: HolidayPackageId): HolidayQuote {
   const pkg = holidayPackage(packageId);
   if (!pkg) throw new Error(`Unknown holiday package ${packageId}`);
@@ -245,6 +364,8 @@ export type HolidayBookingRecord = {
   pricing: { subtotal: number; tax: number; processing: number; total: number };
   scheduledDate: string;
   scheduledTime: string;
+  slotStart: string;
+  slotEnd: string;
   requestedDate: string;
   address: string;
   propertyAddress: string;
@@ -275,7 +396,7 @@ function addonIdsFrom(value: unknown): { ok: true; ids: HolidayAddonId[] } | { o
   return { ok: true, ids };
 }
 
-export function parseHolidayBooking(input: unknown, options?: { today?: string }): HolidayParseResult {
+export function parseHolidayBooking(input: unknown, options?: { today?: string; slots?: readonly HolidaySlot[] }): HolidayParseResult {
   const body = input && typeof input === "object" ? (input as Record<string, unknown>) : {};
   if (isHoneypot(body.website)) return { ok: false, error: "Request received.", honeypot: true };
   const today = options?.today && validIsoDate(options.today) ? options.today : holidayToday();
@@ -297,15 +418,23 @@ export function parseHolidayBooking(input: unknown, options?: { today?: string }
   const earliest = holidayEarliestDate({ packageId: pkg.id, addonIds: addons.ids, today });
 
   const preferredDate = cleanText(body.preferredDate, 10);
-  if (!validIsoDate(preferredDate) || preferredDate < HOLIDAY_BOOK_START || preferredDate > HOLIDAY_BOOK_END) {
+  const preferredTime = cleanText(body.preferredTime, 8);
+  const slotStart = cleanText(body.slotStart, 40);
+  if (preferredDate && (!validIsoDate(preferredDate) || preferredDate < HOLIDAY_BOOK_START || preferredDate > HOLIDAY_BOOK_END)) {
     return { ok: false, error: "Choose a date between November 27 and December 14, 2026." };
   }
-  if (needsLead && (earliest > HOLIDAY_BOOK_END || preferredDate < earliest)) {
+  if (preferredDate && needsLead && (earliest > HOLIDAY_BOOK_END || preferredDate < earliest)) {
     return { ok: false, error: "Choose a session at least 7 days ahead." };
   }
 
-  const preferredTime = cleanText(body.preferredTime, 5);
-  if (preferredTime && !validTime(preferredTime)) return { ok: false, error: "Choose a start time." };
+  const slots = options?.slots ?? openHolidaySlots({ now: new Date(), packageId: pkg.id, addonIds: addons.ids, today });
+  const clock = clockOf(preferredTime);
+  const slot = (slotStart ? slots.find((item) => item.start === slotStart) : undefined)
+    || (preferredDate && clock ? slots.find((item) => item.date === preferredDate && item.clock === clock) : undefined);
+  if (!slot) return { ok: false, error: "Choose a session time." };
+  if (needsLead && (earliest > HOLIDAY_BOOK_END || slot.date < earliest)) {
+    return { ok: false, error: "Choose a session at least 7 days ahead." };
+  }
 
   const rawFamilies = Number(body.families);
   const families = pkg.pricing === "flat" ? 1 : rawFamilies;
@@ -369,9 +498,11 @@ export function parseHolidayBooking(input: unknown, options?: { today?: string }
     processing: quote.processing,
     total: quote.total,
     pricing: { subtotal: quote.subtotal, tax: 0, processing: quote.processing, total: quote.total },
-    scheduledDate: preferredDate,
-    scheduledTime: preferredTime,
-    requestedDate: preferredDate,
+    scheduledDate: slot.date,
+    scheduledTime: slot.time,
+    slotStart: slot.start,
+    slotEnd: slot.end,
+    requestedDate: slot.date,
     address: HOLIDAY_SESSION_PLACE,
     propertyAddress: HOLIDAY_SESSION_PLACE,
     notes,
@@ -387,6 +518,7 @@ export function parseHolidayBooking(input: unknown, options?: { today?: string }
       `Add-ons: ${selectedHolidayAddons(addons.ids).map((item) => item.name).join(", ") || "None"}`,
       needsLead ? HOLIDAY_LEAD_RULE : "No 7-day notice on this request.",
       `Book window: ${HOLIDAY_BOOK_WINDOW}`,
+      `Time: ${slot.label}`,
       `Place: ${HOLIDAY_SESSION_PLACE}`,
       "Office flag: review this request.",
       "Client email was not sent.",

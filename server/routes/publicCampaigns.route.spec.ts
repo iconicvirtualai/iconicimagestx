@@ -149,6 +149,16 @@ describe("public campaign requests", () => {
     expect(source).not.toContain("cadi@");
   });
 
+  it("lists holiday session slots without a live studio calendar", async () => {
+    const res = await fetch(`${baseUrl}/api/public-campaigns/holiday/slots?packageId=single`);
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.live).toBe(false);
+    expect(body.confirmNote).toContain("confirm this time");
+    expect(body.slots.some((slot: { date: string; clock: string }) => slot.date === "2026-11-27" && slot.clock === "10:00")).toBe(true);
+    expect(store.added).toHaveLength(0);
+  });
+
   it("drops a honeypot without a Firestore write", async () => {
     const res = await post("/api/public-campaigns/holiday", { ...holiday, website: "spam" });
     expect(res.status).toBe(200);

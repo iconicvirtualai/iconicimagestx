@@ -81,9 +81,11 @@ describe("tis the season page", () => {
     expect(text).toContain("Half Chef menu");
     expect(text).toContain("Balloon arch");
     expect(container?.querySelector("[data-testid=\"holiday-video\"]")?.className).toContain("aspect-video");
-    const date = container?.querySelector<HTMLInputElement>("#holiday-date");
-    expect(date?.getAttribute("max")).toBe("2026-12-14");
-    expect(date?.min >= "2026-11-27").toBe(true);
+    expect(container?.querySelector("[data-testid=\"holiday-calendar\"]")).toBeTruthy();
+    expect(container?.querySelector("[data-testid=\"holiday-day-2026-11-27\"]")).toBeTruthy();
+    expect(container?.querySelector("[data-testid^=\"holiday-slot-\"]")).toBeTruthy();
+    expect(container?.querySelector("input[type=\"date\"]")).toBeNull();
+    expect(container?.querySelector("[data-testid=\"holiday-calendar-note\"]")?.textContent).toContain("confirm this time");
     expect(text).toContain("Chef dessert menu");
     expect(text).toContain(PUBLIC_PROCESSING_NOTE);
     expect(text).toContain(LEGAL_BUSINESS_NAME);
@@ -100,22 +102,23 @@ describe("tis the season page", () => {
       form?.requestSubmit();
     });
     expect(container?.querySelector("[data-testid=\"holiday-error\"]")?.textContent).toBe("Enter your name.");
-    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes("/api/public-campaigns"))).toBe(false);
+    expect(fetchMock.mock.calls.some((call) => String(call[0]) === "/api/public-campaigns/holiday")).toBe(false);
   });
 
   it("requests a booking and shows the office confirmation", async () => {
     await renderPage();
+    const slot = container?.querySelector<HTMLButtonElement>("[data-testid^=\"holiday-slot-\"]");
     await act(async () => {
       setValue("holiday-name", "Ada Lovelace");
       setValue("holiday-email", "ada@example.com");
       setValue("holiday-phone", "281-555-0100");
-      setValue("holiday-date", "2026-12-01");
+      slot?.click();
     });
     const form = container?.querySelector<HTMLFormElement>("[data-testid=\"holiday-booking-form\"]");
     await act(async () => {
       form?.requestSubmit();
     });
-    const call = fetchMock.mock.calls.find((entry) => String(entry[0]).includes("/api/public-campaigns/holiday"));
+    const call = fetchMock.mock.calls.find((entry) => String(entry[0]) === "/api/public-campaigns/holiday" && (entry[1] as RequestInit | undefined)?.method === "POST");
     expect(call?.[0]).toBe("/api/public-campaigns/holiday");
     expect(container?.querySelector("[data-testid=\"holiday-received\"]")?.textContent).toContain("Request received");
     expect(container?.textContent).not.toContain("cadi@");
