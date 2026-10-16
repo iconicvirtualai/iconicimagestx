@@ -50,6 +50,10 @@ export default function Studio105() {
             <p className="mt-6 max-w-2xl text-lg text-gray-300 leading-relaxed">
               Two rooms. One standard. Book Studio Noir when the frame should feel dramatic, or Studio Blanc when it should feel clean and bright.
             </p>
+            <p className="mt-4 text-sm text-gray-300">
+              <Link to="/studios" className="font-bold text-teal-300 underline underline-offset-4">Iconic Studios</Link>
+              {" "}is part of Iconic Images Photography, LLC and lives at Studio 105.
+            </p>
           </div>
         </section>
 

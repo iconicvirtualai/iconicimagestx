@@ -52,6 +52,20 @@ export const PUBLIC_PAGES: readonly PublicPage[] = [
       "Studio 105 in Spring has two portrait rooms, Studio Noir and Studio Blanc, for headshots, brand films, and product photos.",
   },
   {
+    path: "/studios",
+    file: "seo/studios.html",
+    title: "Iconic Studios | Iconic Images",
+    description:
+      "Iconic Studios at Studio 105 in Spring. Studio Noir and Studio Blanc for portraits, brand films, and holiday sessions.",
+  },
+  {
+    path: "/tis-the-season",
+    file: "seo/tis-the-season.html",
+    title: "'Tis the Season to be Iconic | Iconic Images",
+    description:
+      "Holiday sessions at Studio 105 in Spring. Book a family shoot, a studio party, or a studio celebration with Iconic Images.",
+  },
+  {
     path: "/portfolio",
     file: "seo/portfolio.html",
     title: "Portfolio | Iconic Images",

@@ -38,6 +38,8 @@ describe("public page meta", () => {
       "/about",
       "/pricing",
       "/studio-105",
+      "/studios",
+      "/tis-the-season",
       "/portfolio",
       "/stock-footage",
       "/contact",

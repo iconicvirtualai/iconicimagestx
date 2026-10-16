@@ -5,6 +5,7 @@ import { LegalLinks } from "@/components/LegalLinks";
 import { PublicContactLine } from "@/components/PublicContactLine";
 import { LEGAL_BUSINESS_NAME } from "@shared/businessContact";
 import { itemLink, itemText, useSiteItems, useSiteText } from "@/content/siteContent";
+import { STUDIOS_NAV_ITEM, withStudiosNav } from "@/lib/publicNav";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -12,17 +13,20 @@ export default function Footer() {
   const footerItems = useSiteItems("chrome", "footer");
   const socialItems = useSiteItems("chrome", "socials");
   const copyright = useSiteText("chrome", "footer", "copyright", LEGAL_BUSINESS_NAME);
-  const footerLinks = footerItems
-    ? footerItems.map((item) => ({ label: itemText(item, "link"), href: itemLink(item, "link") || "/" }))
-    : [
-        { label: "Home", href: "/" },
-        { label: "Pricing", href: "/pricing" },
-        { label: "Socials", href: "/socials" },
-        { label: "Portfolio", href: "/portfolio" },
-        { label: "Studio 105", href: "/studio-105" },
-        { label: "Contact Us", href: "/contact" },
-        { label: "Client Login", href: "/login" },
-      ];
+  const footerLinks = withStudiosNav(
+    footerItems
+      ? footerItems.map((item) => ({ label: itemText(item, "link"), href: itemLink(item, "link") || "/" }))
+      : [
+          { label: "Home", href: "/" },
+          { label: "Pricing", href: "/pricing" },
+          { label: "Socials", href: "/socials" },
+          { label: "Portfolio", href: "/portfolio" },
+          { label: "Studio 105", href: "/studio-105" },
+          { label: "Contact Us", href: "/contact" },
+          { label: "Client Login", href: "/login" },
+        ],
+    STUDIOS_NAV_ITEM,
+  );
   const socials = socialItems
     ? socialItems.map((item) => ({ label: itemText(item, "link"), href: itemLink(item, "link") }))
     : [
