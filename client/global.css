@@ -138,10 +138,25 @@
     background-position: 0 0, 16px 1px, 32px 0;
     background-repeat: repeat-x;
     filter: drop-shadow(0 0 8px rgba(255, 206, 120, 0.9));
+    animation: thankful-glow 2.2s ease-in-out infinite;
+  }
+
+  .thankful-float {
+    animation: thankful-float 4.5s ease-in-out infinite;
   }
 
   .thankful-garland {
-    background: radial-gradient(circle at 10px 12px, #246b3e 0 7px, transparent 8px) 0 0 / 20px 12px repeat-x;
+    background: radial-gradient(circle at 10px 12px, #2f8a4e 0 7px, transparent 8px) 0 0 / 20px 12px repeat-x;
+  }
+
+  @keyframes thankful-glow {
+    0%, 100% { opacity: 0.72; }
+    50% { opacity: 1; }
+  }
+
+  @keyframes thankful-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
   }
 
   .accent-text-bordered {

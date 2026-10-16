@@ -100,6 +100,12 @@ describe("thankful event page", () => {
     expect(container?.querySelector("[data-testid='thankful-photo-strip']")).toBeTruthy();
     expect(container?.querySelector("table")).toBeNull();
     expect(container?.querySelector("[data-testid='thankful-submit']")).toBeTruthy();
+    expect(container?.querySelector("[data-testid='thankful-logo']")?.getAttribute("src")).toBe("/media/logos/logo-white-large.png");
+    expect(container?.querySelector("[data-testid='thankful-sticky']")?.textContent).toContain("RSVP");
+    expect(container?.querySelector("[data-testid='thankful-countdown']")).toBeTruthy();
+    const form = container?.querySelector("#rsvp");
+    const social = container?.querySelector("[data-testid='thankful-social']");
+    expect(form && social && (form.compareDocumentPosition(social) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy();
     for (const menu of THANKFUL_MENUS) {
       expect(text).toContain(menu.label);
       for (const dish of menu.dishes) expect(text).toContain(dish);

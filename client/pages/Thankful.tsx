@@ -22,6 +22,7 @@ import {
   openThankfulSlots,
   quoteThankfulSocial,
   thankfulMoney,
+  thankfulZonedTimeToUtc,
   type ThankfulMenu,
   type ThankfulSocialTermId,
   type ThankfulSlot,
@@ -38,6 +39,29 @@ type CastVote = { menuName: string; orderNumber: string };
 
 const VOTE_KEY = "thankful-menu-vote";
 const PHOTO_PLACES = ["Photo 1", "Photo 2", "Photo 3", "Photo 4"] as const;
+const RSVP_CLOSE_AT = thankfulZonedTimeToUtc(2026, 11, 10, 0, 0);
+const EVENT_START_AT = thankfulZonedTimeToUtc(2026, 11, 14, 11, 0);
+
+function pad(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function useCountdown(target: Date) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  const diff = Math.max(0, target.getTime() - now);
+  const totalSeconds = Math.floor(diff / 1000);
+  return {
+    days: Math.floor(totalSeconds / 86400),
+    hours: Math.floor((totalSeconds % 86400) / 3600),
+    minutes: Math.floor((totalSeconds % 3600) / 60),
+    seconds: totalSeconds % 60,
+    done: diff <= 0,
+  };
+}
 
 const fieldClass =
   "mt-2 w-full min-h-12 rounded-2xl border border-[#e4d9c8] bg-white px-4 text-base text-[#1c1612] outline-none focus:border-[#8f3d32]";
@@ -91,6 +115,8 @@ export default function Thankful() {
   const [buyerPhone, setBuyerPhone] = useState("");
   const [socialError, setSocialError] = useState("");
   const [buying, setBuying] = useState("");
+  const rsvpClock = useCountdown(RSVP_CLOSE_AT);
+  const eventClock = useCountdown(EVENT_START_AT);
 
   useEffect(() => {
     let cancelled = false;
@@ -248,30 +274,52 @@ export default function Thankful() {
   const chosen = slots.find((slot) => slot.start === slotStart);
   const term = THANKFUL_SOCIAL_TERMS.find((item) => item.id === termId) || THANKFUL_SOCIAL_TERMS[0];
 
+  const steps = [
+    { label: "Menu", done: Boolean(menuVote) },
+    { label: "Time", done: Boolean(slotStart) },
+    { label: "Santa", done: santa != null },
+  ];
+  const stepDone = steps.filter((step) => step.done).length;
+
   return (
     <Layout>
-      <article className="bg-[#f8f1e6] text-[#1c1612]">
-        <header className="bg-[radial-gradient(circle_at_top,#5a3028_0%,#1b332b_46%,#12241c_100%)] pt-28 text-[#f6f1e7]">
+      <article className="bg-[#f8f1e6] pb-28 text-[#1c1612]">
+        <header className="relative overflow-hidden bg-[radial-gradient(circle_at_top,#a34a38_0%,#3d221c_32%,#16352b_72%)] pt-28 text-[#f6f1e7]">
+          <div className="thankful-lights absolute inset-x-0 top-24 h-4" aria-hidden="true" />
           <div
             data-testid="thankful-video-hero"
-            className="relative aspect-video w-full overflow-hidden bg-[#10241c]"
+            className="relative mx-auto aspect-video w-full max-w-[min(100%,calc(42vh*16/9))] overflow-hidden bg-[#10241c] shadow-[0_0_80px_rgba(231,197,106,0.35)] ring-2 ring-[#e7c56a]"
             aria-label="Client holiday video. The studio will add it here."
           >
             <div data-testid="thankful-lights" className="thankful-lights absolute inset-x-6 top-5 h-3 sm:inset-x-10" aria-hidden="true" />
             <p className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-xs uppercase tracking-[0.32em] text-[#e7c56a]">Client holiday video</p>
             <div className="thankful-garland absolute inset-x-0 bottom-0 h-3" aria-hidden="true" />
           </div>
-          <div className="mx-auto max-w-xl px-6 py-14 text-center sm:py-16">
-            <h1 className="font-serif text-5xl leading-tight tracking-tight sm:text-6xl">
+          <div className="relative mx-auto max-w-xl px-6 pb-12 pt-8 text-center">
+            <span className="thankful-float absolute left-6 top-6 text-2xl text-[#e7c56a]" aria-hidden="true">♥</span>
+            <span className="thankful-float absolute right-8 top-16 text-xl text-[#f0c14d]" style={{ animationDelay: "1.2s" }} aria-hidden="true">✦</span>
+            <img data-testid="thankful-logo" src="/media/logos/logo-white-large.png" alt="Iconic Images" className="mx-auto h-10 w-auto sm:h-12" />
+            <h1 className="mt-6 font-serif text-5xl leading-[0.95] tracking-tight sm:text-7xl">
               {THANKFUL_HEADLINE}
             </h1>
-            <p className="mt-5 text-lg">{THANKFUL_WHEN_LABEL}</p>
+            <p className="mt-5 text-lg text-[#f6f1e7]/90">Bring the people you love. We’ll bring Santa.</p>
+            <p className="mt-3 text-base text-[#e7c56a]">{THANKFUL_WHEN_LABEL}</p>
+            {!closed && !rsvpClock.done && (
+              <div className="mt-8 flex flex-wrap justify-center gap-3" data-testid="thankful-countdown">
+                <p className="rounded-full bg-black/30 px-4 py-2 text-sm">
+                  RSVP closes in {rsvpClock.days}d {pad(rsvpClock.hours)}h {pad(rsvpClock.minutes)}m {pad(rsvpClock.seconds)}s
+                </p>
+                <p className="rounded-full bg-black/30 px-4 py-2 text-sm">
+                  Doors {eventClock.days}d {pad(eventClock.hours)}h
+                </p>
+              </div>
+            )}
             {closed ? (
               <p className="mt-8 text-base" data-testid="thankful-closed">RSVPs are closed.</p>
             ) : (
               <a
                 href="#rsvp"
-                className="mt-8 inline-flex min-h-12 items-center justify-center rounded-full bg-[#c45a42] px-8 text-base font-semibold text-white"
+                className="mt-8 inline-flex min-h-12 items-center justify-center rounded-full bg-[#c45a42] px-8 text-base font-semibold text-white shadow-[0_0_28px_rgba(196,90,66,0.55)] transition hover:scale-105"
               >
                 RSVP
               </a>
@@ -296,7 +344,8 @@ export default function Thankful() {
         </section>
 
         <div className="mx-auto max-w-xl px-6 py-16">
-          <p className="text-lg leading-relaxed">
+          <p className="font-serif text-4xl leading-tight">Your people. Our studio. One Saturday.</p>
+          <p className="mt-4 text-lg leading-relaxed">
             Bring family, friends, and pets. Headshots, a free content day, and Santa.
           </p>
           <p className="mt-4 text-base leading-relaxed text-[#1c1612]/75" data-testid="thankful-location">
@@ -307,9 +356,154 @@ export default function Thankful() {
             <a className="underline decoration-[#8f3d32]/40 underline-offset-4" href={THANKFUL_EMAIL_HREF}>{THANKFUL_EMAIL}</a>
           </p>
 
+          {voted ? (
+            <section data-testid="thankful-voted" className="mt-20">
+              <h2 className="font-serif text-4xl">You already voted</h2>
+              <p className="mt-4 text-lg leading-relaxed">
+                {voted.menuName ? `${voted.menuName} is your one vote.` : THANKFUL_ALREADY_VOTED_ERROR}
+              </p>
+              {voted.orderNumber ? (
+                <p className="mt-4 text-lg leading-relaxed">
+                  {voted.orderNumber} is saved.{chosen ? ` ${chosen.label}.` : ""} We’ll see you Saturday.
+                </p>
+              ) : null}
+              <p className="mt-4 text-base text-[#1c1612]/75">One menu vote per email. That vote stays as it is.</p>
+              <p className="mt-8 text-sm text-[#1c1612]/70">{LEGAL_BUSINESS_NAME}</p>
+            </section>
+          ) : closed ? (
+            <p className="mt-20 text-lg">{THANKFUL_RSVP_CLOSED_ERROR}</p>
+          ) : (
+            <form id="rsvp" className="mt-16 scroll-mt-28 space-y-14" onSubmit={onSubmit} data-testid="thankful-form">
+              <div data-testid="thankful-progress">
+                <p className="text-xs uppercase tracking-[0.22em] text-[#8f3d32]">Step {Math.min(stepDone + 1, 3)} of 3</p>
+                <div className="mt-3 flex gap-2">
+                  {steps.map((step) => (
+                    <div key={step.label} className="flex-1">
+                      <div className={`h-1.5 rounded-full ${step.done ? "bg-[#c45a42]" : "bg-[#eadcc8]"}`} />
+                      <p className={`mt-2 text-xs font-semibold ${step.done ? "text-[#8f3d32]" : "text-[#1c1612]/50"}`}>{step.label}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <fieldset className="space-y-6" data-testid="thankful-slots">
+                <legend className="font-serif text-4xl">Grab a photo time</legend>
+                <p className="text-sm leading-relaxed text-[#1c1612]/70">15 minutes, between 11 AM and 3 PM.</p>
+                {!live && slotsReady && (
+                  <p className="text-sm leading-relaxed text-[#1c1612]/70" data-testid="thankful-calendar-note">
+                    We’ll confirm this time. Call {THANKFUL_PHONE_DISPLAY} if you need another hour.
+                  </p>
+                )}
+                {!slotsReady && <p className="text-sm">Checking open times.</p>}
+                {slotsReady && slots.length === 0 && (
+                  <p className="text-sm">No open photo times. Call {THANKFUL_PHONE_DISPLAY}.</p>
+                )}
+                {chosen && (
+                  <p className="rounded-2xl bg-[#1b332b] px-4 py-3 text-sm font-semibold text-[#f6f1e7]" data-testid="thankful-chosen">
+                    {chosen.label} is yours.
+                  </p>
+                )}
+                {slots.length > 0 && (
+                  <div className="flex flex-wrap gap-3">
+                    {slots.map((slot) => (
+                      <button
+                        key={slot.start}
+                        type="button"
+                        data-testid={`slot-${slot.start}`}
+                        aria-pressed={slot.start === slotStart}
+                        onClick={() => setSlotStart(slot.start)}
+                        className={`min-h-14 min-w-28 rounded-2xl border px-4 text-sm font-semibold transition hover:-translate-y-0.5 hover:shadow-md ${slot.start === slotStart ? "scale-105 border-[#c45a42] bg-[#c45a42] text-white shadow-lg" : "border-[#e4d9c8] bg-white"}`}
+                      >
+                        {slot.time}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </fieldset>
+
+              <div className="space-y-6">
+                <div>
+                  <label htmlFor="thankful-name" className="text-sm font-semibold">Name</label>
+                  <input id="thankful-name" className={fieldClass} value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" required />
+                </div>
+                <div>
+                  <label htmlFor="thankful-email" className="text-sm font-semibold">Email</label>
+                  <input id="thankful-email" type="email" className={fieldClass} value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required />
+                </div>
+                <div>
+                  <label htmlFor="thankful-phone" className="text-sm font-semibold">Phone</label>
+                  <input id="thankful-phone" className={fieldClass} value={phone} onChange={(event) => setPhone(event.target.value)} autoComplete="tel" required />
+                </div>
+                <div>
+                  <label htmlFor="thankful-party" className="text-sm font-semibold">Number in party</label>
+                  <input id="thankful-party" type="number" min={1} max={50} step={1} className={fieldClass} value={partySize} onChange={(event) => setPartySize(event.target.value)} required />
+                </div>
+              </div>
+
+              <fieldset className="space-y-4" data-testid="thankful-menus">
+                <legend className="font-serif text-4xl">Vote your menu</legend>
+                <p className="text-sm leading-relaxed text-[#1c1612]/70" data-testid="thankful-vote-rule">{THANKFUL_VOTE_RULE}</p>
+                <p className="text-sm leading-relaxed text-[#1c1612]/70">{THANKFUL_DRINKS_NOTE}</p>
+                {THANKFUL_MENUS.map((menu) => {
+                  const selected = menuVote === menu.id;
+                  return (
+                    <label key={menu.id} className={`block cursor-pointer rounded-3xl border px-4 py-4 transition hover:-translate-y-0.5 hover:shadow-md ${selected ? "border-[#c45a42] bg-[#fff4ef] shadow-md" : "border-[#eadcc8] bg-white"}`}>
+                      <input
+                        className="sr-only"
+                        type="radio"
+                        name="menuVote"
+                        value={menu.id}
+                        checked={selected}
+                        onChange={() => setMenuVote(menu.id)}
+                      />
+                      <span className={`text-base font-semibold ${selected ? "text-[#8f3d32]" : ""}`}>{selected ? "✓ " : ""}{menu.label}</span>
+                      <span className="mt-2 block text-sm leading-7 text-[#1c1612]/80">{menu.dishes.join(" · ")}</span>
+                    </label>
+                  );
+                })}
+              </fieldset>
+
+              <fieldset>
+                <legend className="font-serif text-4xl">Santa?</legend>
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <button type="button" aria-pressed={santa === true} onClick={() => setSanta(true)} className={`min-h-14 rounded-full border px-6 text-sm font-semibold transition hover:-translate-y-0.5 ${santa === true ? "scale-105 border-[#c45a42] bg-[#c45a42] text-white shadow-lg" : "border-[#e4d9c8] bg-white"}`}>Santa</button>
+                  <button type="button" aria-pressed={santa === false} onClick={() => setSanta(false)} className={`min-h-14 rounded-full border px-6 text-sm font-semibold transition hover:-translate-y-0.5 ${santa === false ? "scale-105 border-[#1b332b] bg-[#1b332b] text-[#f6f1e7] shadow-lg" : "border-[#e4d9c8] bg-white"}`}>No Santa</button>
+                </div>
+              </fieldset>
+
+              <div>
+                <label htmlFor="thankful-notes" className="text-sm font-semibold">Notes <span className="font-normal text-[#1c1612]/60">(optional)</span></label>
+                <textarea id="thankful-notes" className={`${fieldClass} min-h-28 py-3`} value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={1000} />
+              </div>
+
+              <input
+                name="website"
+                value={website}
+                onChange={(event) => setWebsite(event.target.value)}
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+                className="absolute -left-[9999px] h-0 w-0"
+              />
+
+              {error && <p className="text-sm font-medium text-red-800" role="alert">{error}</p>}
+
+              <button
+                type="submit"
+                data-testid="thankful-submit"
+                disabled={pending || closed || Boolean(voted)}
+                className="inline-flex min-h-14 items-center justify-center rounded-full bg-[#c45a42] px-8 text-base font-semibold text-white shadow-[0_10px_30px_rgba(196,90,66,0.35)] transition hover:scale-105 disabled:opacity-60"
+              >
+                {pending ? "Saving" : "Save my RSVP"}
+              </button>
+              <p className="text-sm text-[#1c1612]/60">{LEGAL_BUSINESS_NAME}</p>
+            </form>
+          )}
+
           <section className="mt-24" data-testid="thankful-social" aria-label="Social Packages">
-            <h2 className="font-serif text-3xl leading-tight">Social Packages</h2>
+            <p className="text-xs uppercase tracking-[0.22em] text-[#8f3d32]">Last call</p>
+            <h2 className="mt-3 font-serif text-4xl leading-tight">Half off, before the public sees it.</h2>
             <p className="mt-4 text-base leading-relaxed" data-testid="thankful-lock">{THANKFUL_SOCIAL_LOCK_LABEL}</p>
+            <p className="mt-3 text-sm leading-relaxed text-[#1c1612]/70">This price ends before the doors open. After that, it’s the public rate.</p>
             {socialOpen ? (
               <>
                 <div className="mt-8 flex flex-wrap gap-3" data-testid="thankful-terms">
@@ -320,7 +514,7 @@ export default function Thankful() {
                       data-testid={`term-${item.id}`}
                       aria-pressed={item.id === termId}
                       onClick={() => setTermId(item.id)}
-                      className={`min-h-12 rounded-full border px-4 text-sm font-semibold ${item.id === termId ? "border-[#8f3d32] bg-[#8f3d32] text-white" : "border-[#e4d9c8] bg-white"}`}
+                      className={`min-h-12 rounded-full border px-4 text-sm font-semibold transition hover:-translate-y-0.5 ${item.id === termId ? "scale-105 border-[#c45a42] bg-[#c45a42] text-white shadow-md" : "border-[#e4d9c8] bg-white"}`}
                     >
                       {item.label}
                     </button>
@@ -349,7 +543,7 @@ export default function Thankful() {
                       ? `${thankfulMoney(quote.saleMonthlyCents)}/mo`
                       : thankfulMoney(quote.subtotalCents);
                     return (
-                      <article key={pkg.id} data-testid={`social-${pkg.id}`} className="flex items-center justify-between gap-4 rounded-3xl border border-[#eadcc8] bg-white px-5 py-4">
+                      <article key={pkg.id} data-testid={`social-${pkg.id}`} className="flex items-center justify-between gap-4 rounded-3xl border border-[#eadcc8] bg-white px-5 py-4 transition hover:-translate-y-1 hover:shadow-lg">
                         <div>
                           <h3 className="font-serif text-xl">{pkg.name}</h3>
                           <p className="mt-1 text-sm text-[#1c1612]/50 line-through">{thankfulMoney(quote.regularMonthlyCents)}/mo</p>
@@ -360,7 +554,7 @@ export default function Thankful() {
                           data-testid={`buy-${pkg.id}`}
                           disabled={Boolean(buying)}
                           onClick={() => buyPackage(pkg.id)}
-                          className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-full bg-[#1b332b] px-5 text-sm font-semibold text-[#f6f1e7] disabled:opacity-60"
+                          className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-full bg-[#1b332b] px-5 text-sm font-semibold text-[#f6f1e7] transition hover:scale-105 disabled:opacity-60"
                         >
                           {buying === pkg.id ? "Starting checkout" : "Buy now"}
                         </button>
@@ -375,134 +569,16 @@ export default function Thankful() {
               <p className="mt-6 text-base" data-testid="thankful-social-closed">Pre-event pricing has ended.</p>
             )}
           </section>
-
-          {voted ? (
-            <section data-testid="thankful-voted" className="mt-20">
-              <h2 className="font-serif text-4xl">You already voted</h2>
-              <p className="mt-4 text-lg leading-relaxed">
-                {voted.menuName ? `${voted.menuName} is your one vote.` : THANKFUL_ALREADY_VOTED_ERROR}
-              </p>
-              {voted.orderNumber ? (
-                <p className="mt-4 text-lg leading-relaxed">
-                  {voted.orderNumber} is saved.{chosen ? ` ${chosen.label}.` : ""} We’ll see you Saturday.
-                </p>
-              ) : null}
-              <p className="mt-4 text-base text-[#1c1612]/75">One menu vote per email. That vote stays as it is.</p>
-              <p className="mt-8 text-sm text-[#1c1612]/70">{LEGAL_BUSINESS_NAME}</p>
-            </section>
-          ) : closed ? (
-            <p className="mt-20 text-lg">{THANKFUL_RSVP_CLOSED_ERROR}</p>
-          ) : (
-            <form id="rsvp" className="mt-20 scroll-mt-28 space-y-14" onSubmit={onSubmit} data-testid="thankful-form">
-              <fieldset className="space-y-6" data-testid="thankful-slots">
-                <legend className="font-serif text-3xl">Photo time</legend>
-                <p className="text-sm leading-relaxed text-[#1c1612]/70">15 minutes, between 11 AM and 3 PM.</p>
-                {!live && slotsReady && (
-                  <p className="text-sm leading-relaxed text-[#1c1612]/70" data-testid="thankful-calendar-note">
-                    We’ll confirm this time. Call {THANKFUL_PHONE_DISPLAY} if you need another hour.
-                  </p>
-                )}
-                {!slotsReady && <p className="text-sm">Checking open times.</p>}
-                {slotsReady && slots.length === 0 && (
-                  <p className="text-sm">No open photo times. Call {THANKFUL_PHONE_DISPLAY}.</p>
-                )}
-                {slots.length > 0 && (
-                  <div className="flex flex-wrap gap-3">
-                    {slots.map((slot) => (
-                      <button
-                        key={slot.start}
-                        type="button"
-                        data-testid={`slot-${slot.start}`}
-                        aria-pressed={slot.start === slotStart}
-                        onClick={() => setSlotStart(slot.start)}
-                        className={`min-h-12 min-w-28 rounded-full border px-4 text-sm font-semibold ${slot.start === slotStart ? "border-[#1b332b] bg-[#1b332b] text-[#f6f1e7]" : "border-[#e4d9c8] bg-white"}`}
-                      >
-                        {slot.time}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </fieldset>
-
-              <div className="space-y-6">
-                <div>
-                  <label htmlFor="thankful-name" className="text-sm font-semibold">Name</label>
-                  <input id="thankful-name" className={fieldClass} value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" required />
-                </div>
-                <div>
-                  <label htmlFor="thankful-email" className="text-sm font-semibold">Email</label>
-                  <input id="thankful-email" type="email" className={fieldClass} value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required />
-                </div>
-                <div>
-                  <label htmlFor="thankful-phone" className="text-sm font-semibold">Phone</label>
-                  <input id="thankful-phone" className={fieldClass} value={phone} onChange={(event) => setPhone(event.target.value)} autoComplete="tel" required />
-                </div>
-                <div>
-                  <label htmlFor="thankful-party" className="text-sm font-semibold">Number in party</label>
-                  <input id="thankful-party" type="number" min={1} max={50} step={1} className={fieldClass} value={partySize} onChange={(event) => setPartySize(event.target.value)} required />
-                </div>
-              </div>
-
-              <fieldset className="space-y-8" data-testid="thankful-menus">
-                <legend className="font-serif text-3xl">Menu</legend>
-                <p className="text-sm leading-relaxed text-[#1c1612]/70" data-testid="thankful-vote-rule">{THANKFUL_VOTE_RULE}</p>
-                <p className="text-sm leading-relaxed text-[#1c1612]/70">{THANKFUL_DRINKS_NOTE}</p>
-                {THANKFUL_MENUS.map((menu) => {
-                  const selected = menuVote === menu.id;
-                  return (
-                    <label key={menu.id} className="block cursor-pointer">
-                      <input
-                        className="sr-only"
-                        type="radio"
-                        name="menuVote"
-                        value={menu.id}
-                        checked={selected}
-                        onChange={() => setMenuVote(menu.id)}
-                      />
-                      <span className={`text-base font-semibold ${selected ? "text-[#8f3d32]" : ""}`}>{menu.label}</span>
-                      <span className="mt-2 block text-sm leading-7 text-[#1c1612]/80">{menu.dishes.join(" · ")}</span>
-                    </label>
-                  );
-                })}
-              </fieldset>
-
-              <fieldset>
-                <legend className="font-serif text-3xl">Santa</legend>
-                <div className="mt-6 flex flex-wrap gap-3">
-                  <button type="button" aria-pressed={santa === true} onClick={() => setSanta(true)} className={`min-h-12 rounded-full border px-6 text-sm font-semibold ${santa === true ? "border-[#1b332b] bg-[#1b332b] text-[#f6f1e7]" : "border-[#e4d9c8] bg-white"}`}>Santa</button>
-                  <button type="button" aria-pressed={santa === false} onClick={() => setSanta(false)} className={`min-h-12 rounded-full border px-6 text-sm font-semibold ${santa === false ? "border-[#1b332b] bg-[#1b332b] text-[#f6f1e7]" : "border-[#e4d9c8] bg-white"}`}>No Santa</button>
-                </div>
-              </fieldset>
-
-              <div>
-                <label htmlFor="thankful-notes" className="text-sm font-semibold">Notes <span className="font-normal text-[#1c1612]/60">(optional)</span></label>
-                <textarea id="thankful-notes" className={`${fieldClass} min-h-28 py-3`} value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={1000} />
-              </div>
-
-              <input
-                name="website"
-                value={website}
-                onChange={(event) => setWebsite(event.target.value)}
-                tabIndex={-1}
-                autoComplete="off"
-                aria-hidden="true"
-                className="absolute -left-[9999px] h-0 w-0"
-              />
-
-              {error && <p className="text-sm font-medium text-red-800" role="alert">{error}</p>}
-
-              <button
-                type="submit"
-                data-testid="thankful-submit"
-                disabled={pending || closed || Boolean(voted)}
-                className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#8f3d32] px-8 text-base font-semibold text-white disabled:opacity-60"
-              >
-                Save my RSVP
-              </button>
-              <p className="text-sm text-[#1c1612]/60">{LEGAL_BUSINESS_NAME}</p>
-            </form>
-          )}
         </div>
+        {!closed && !voted && (
+          <a
+            href="#rsvp"
+            data-testid="thankful-sticky"
+            className="fixed bottom-4 left-1/2 z-40 inline-flex min-h-12 -translate-x-1/2 items-center justify-center rounded-full bg-[#c45a42] px-6 text-sm font-semibold text-white shadow-[0_12px_40px_rgba(196,90,66,0.45)]"
+          >
+            RSVP · closes Nov 9
+          </a>
+        )}
       </article>
     </Layout>
   );
