@@ -26,6 +26,8 @@ import { chargedServiceLines, normalizeBookingLineItems, orderTotalLabel, resolv
 import { applyServerTravel, isTravelFeeLine, travelSummaryText, type TravelAssessment } from "../../shared/travelZones";
 import { planOrderPackageRepair } from "../../shared/orderPackageRepair";
 import { notifyOfficeOfOrder } from "../services/officeOrderNotify";
+import { holidayCheckoutKind } from "../../shared/holidayCheckout";
+import { createHolidaySquareCheckout } from "../services/holidaySquareCheckout";
 import { packagesForStaffEditor, publicBookingCatalogResponse } from "../../shared/bookingCatalog";
 import { normalizeEmail } from "../../shared/listingAccess";
 import { addressText } from "../../shared/addressText";
@@ -591,7 +593,57 @@ router.post("/", async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }).catch((err) => console.error("[Bookings] Notification status was not saved:", err));
 
-    // Firestore draft stays for staff. Square billing waits until after the shoot.
+    // Firestore draft stays for staff. Square invoices still wait until after the shoot.
+    // Holiday Buy Now is the exception: a payment link for this order's total.
+    // A free RSVP does not get one. Missing Square env vars keep the text-a-link fallback.
+    let holidayCheckout: {
+      payment: "square" | "free" | "fallback";
+      checkoutUrl?: string;
+      missingEnv?: string[];
+    } | null = null;
+    const holidayKind = holidayCheckoutKind(leadSource, total);
+    if (holidayKind === "free") {
+      holidayCheckout = { payment: "free" };
+    } else if (holidayKind === "paid") {
+      if (!invoiceId) {
+        holidayCheckout = { payment: "fallback" };
+      } else {
+        try {
+          const invoiceSnap = await db().collection("invoices").doc(invoiceId).get();
+          const invoiceData = invoiceSnap.data() || {};
+          const invoiceNumber = typeof invoiceData.invoiceNumber === "string" ? invoiceData.invoiceNumber : undefined;
+          const linked = await createHolidaySquareCheckout({
+            invoiceId,
+            invoiceNumber,
+            amount: Number(total) || 0,
+            email: normalizedEmail,
+            itemName: typeof selectedService === "string" && selectedService.trim()
+              ? selectedService
+              : "Holiday order",
+            leadSource: typeof leadSource === "string" ? leadSource : "",
+            orderNumber,
+          });
+          if (linked.payment === "square" && linked.checkoutUrl) {
+            await db().collection("invoices").doc(invoiceId).update({
+              paymentProvider: "square",
+              paymentUrl: linked.checkoutUrl,
+              squarePaymentLinkId: linked.linkId || null,
+              squareOrderId: linked.squareOrderId || null,
+              status: "sent",
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }).catch((err) => console.error("[Bookings] Holiday payment link was not saved:", err));
+          }
+          holidayCheckout = {
+            payment: linked.payment,
+            ...(linked.checkoutUrl ? { checkoutUrl: linked.checkoutUrl } : {}),
+            ...(linked.missingEnv?.length ? { missingEnv: linked.missingEnv } : {}),
+          };
+        } catch (err) {
+          console.error("[Bookings] Holiday checkout failed:", err);
+          holidayCheckout = { payment: "fallback" };
+        }
+      }
+    }
 
     return res.status(201).json({
       success: true,
@@ -600,6 +652,9 @@ router.post("/", async (req, res) => {
       invoiceId,
       accountCreated: account.createdAccount,
       notifications,
+      ...(holidayCheckout ? { payment: holidayCheckout.payment } : {}),
+      ...(holidayCheckout?.checkoutUrl ? { checkoutUrl: holidayCheckout.checkoutUrl } : {}),
+      ...(holidayCheckout?.missingEnv ? { missingEnv: holidayCheckout.missingEnv } : {}),
       message: "Booking request received. We'll confirm shortly!",
     });
   } catch (err) {
