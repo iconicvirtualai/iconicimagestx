@@ -6036,6 +6036,168 @@ async function notifyOfficeOfOrder(input) {
   });
   return { sent: result.sent };
 }
+const HOLIDAY_SOCIAL_SAVES_LEAD = "Thankful social saves";
+const HOLIDAY_SEASON_LEAD = "Tis the season client shoots";
+const HOLIDAY_RSVP_LEAD = "Thankful client holiday event RSVP";
+const PAID_LEADS = /* @__PURE__ */ new Set([HOLIDAY_SOCIAL_SAVES_LEAD, HOLIDAY_SEASON_LEAD]);
+function holidayCheckoutKind(leadSource, total) {
+  const lead = typeof leadSource === "string" ? leadSource.trim() : "";
+  if (lead === HOLIDAY_RSVP_LEAD) return "free";
+  if (!PAID_LEADS.has(lead)) return "none";
+  const amount = Number(total);
+  if (!Number.isFinite(amount) || amount <= 0) return "free";
+  return "paid";
+}
+function squareCheckoutMissingEnv(env = process.env) {
+  const missing = [];
+  if (!env.SQUARE_ACCESS_TOKEN) missing.push("SQUARE_ACCESS_TOKEN");
+  if (!env.SQUARE_LOCATION_ID) missing.push("SQUARE_LOCATION_ID");
+  return missing;
+}
+function holidayReturnPath(leadSource, orderNumber) {
+  const params = new URLSearchParams({
+    paid: "1",
+    order: orderNumber
+  });
+  const query = params.toString();
+  if (leadSource === HOLIDAY_SEASON_LEAD) return `/tis-the-season?${query}#book`;
+  return `/thankful?${query}#social-saves`;
+}
+function holidayPaymentLinkBody(input) {
+  const cents2 = Math.round(input.amount * 100);
+  const key = `holiday-${input.invoiceId}`;
+  return {
+    idempotency_key: key.length <= 45 ? key : key.slice(0, 45),
+    quick_pay: {
+      name: `Iconic Images ${input.itemName}`.slice(0, 255),
+      price_money: {
+        amount: cents2,
+        currency: "USD"
+      },
+      location_id: input.locationId
+    },
+    checkout_options: {
+      redirect_url: input.redirectUrl
+    },
+    ...input.email ? { pre_populated_data: { buyer_email: input.email } } : {},
+    payment_note: squarePaymentNote(input.invoiceId, input.invoiceNumber)
+  };
+}
+const SQUARE_VERSION_FALLBACK = "2026-08-20";
+function squareApiBaseUrl(environment) {
+  return environment === "sandbox" ? "https://connect.squareupsandbox.com" : "https://connect.squareup.com";
+}
+function squareConfigured(env) {
+  return Boolean(env.SQUARE_ACCESS_TOKEN && env.SQUARE_LOCATION_ID);
+}
+function preferredSquareCheckoutUrl(invoice) {
+  if (typeof invoice.squareInvoiceUrl !== "string") return null;
+  const url = invoice.squareInvoiceUrl.trim();
+  if (!url.startsWith("https://")) return null;
+  return url;
+}
+function resolveSquareCheckoutUrl(input) {
+  const fresh = preferredSquareCheckoutUrl({ squareInvoiceUrl: input.freshUrl });
+  if (fresh) return fresh;
+  return preferredSquareCheckoutUrl({ squareInvoiceUrl: input.storedUrl });
+}
+async function squareRequest(deps, path2, init, deadline) {
+  const token = deps.env.SQUARE_ACCESS_TOKEN;
+  if (!token) return { ok: false, status: 0, body: { error: "Square is not configured" } };
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) return { ok: false, status: 0, body: { error: "Square invoice sync timed out" } };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), remaining);
+  try {
+    const response = await deps.fetchImpl(`${squareApiBaseUrl(deps.env.SQUARE_ENVIRONMENT)}${path2}`, {
+      method: init.method,
+      headers: {
+        "Content-Type": "application/json",
+        "Square-Version": deps.env.SQUARE_VERSION || SQUARE_VERSION_FALLBACK,
+        Authorization: `Bearer ${token}`
+      },
+      body: init.body === void 0 ? void 0 : JSON.stringify(init.body),
+      signal: controller.signal
+    });
+    const body = await response.json().catch(() => ({}));
+    return { ok: response.ok, status: response.status, body };
+  } catch (err) {
+    const aborted = err instanceof Error && (err.name === "AbortError" || /abort/i.test(err.message));
+    return {
+      ok: false,
+      status: 0,
+      body: { error: aborted ? "Square invoice sync timed out" : err instanceof Error ? err.message : "Square request failed" }
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+function publicUrlOf(body) {
+  return preferredSquareCheckoutUrl({ squareInvoiceUrl: body?.invoice?.public_url });
+}
+async function fetchPublishedSquareInvoiceUrl(squareInvoiceId, deps) {
+  const id = squareInvoiceId.trim();
+  if (!id || !squareConfigured(deps.env)) return null;
+  const result = await squareRequest(
+    deps,
+    `/v2/invoices/${encodeURIComponent(id)}`,
+    { method: "GET" },
+    Date.now() + (deps.timeoutMs ?? 5e3)
+  );
+  if (!result.ok) return null;
+  return publicUrlOf(result.body);
+}
+async function createHolidaySquareCheckout(input) {
+  const env = input.env ?? process.env;
+  const missingEnv = squareCheckoutMissingEnv(env);
+  if (missingEnv.length > 0) {
+    return { payment: "fallback", missingEnv };
+  }
+  const amount = Math.round(input.amount * 100) / 100;
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { payment: "fallback" };
+  }
+  let origin = "https://iconicimagestx.vercel.app";
+  try {
+    origin = publicSiteUrl({
+      PUBLIC_SITE_URL: env.PUBLIC_SITE_URL,
+      VITE_PUBLIC_SITE_URL: env.VITE_PUBLIC_SITE_URL
+    });
+  } catch (err) {
+    console.error("[Holiday] Public site URL is not https. Using the Vercel app.", err);
+  }
+  const redirectUrl = `${origin}${holidayReturnPath(input.leadSource, input.orderNumber)}`;
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const response = await fetchImpl(`${squareApiBaseUrl(env.SQUARE_ENVIRONMENT)}/v2/online-checkout/payment-links`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Square-Version": env.SQUARE_VERSION || "2026-08-20",
+      Authorization: `Bearer ${env.SQUARE_ACCESS_TOKEN}`
+    },
+    body: JSON.stringify(holidayPaymentLinkBody({
+      invoiceId: input.invoiceId,
+      invoiceNumber: input.invoiceNumber,
+      amount,
+      itemName: input.itemName || "Holiday order",
+      email: input.email,
+      locationId: env.SQUARE_LOCATION_ID || "",
+      redirectUrl
+    }))
+  });
+  const result = await response.json().catch(() => ({}));
+  const checkoutUrl = typeof result.payment_link?.url === "string" ? result.payment_link.url : "";
+  if (!response.ok || !checkoutUrl.startsWith("https://")) {
+    console.error("[Holiday] Square payment link was not created.");
+    return { payment: "fallback" };
+  }
+  return {
+    payment: "square",
+    checkoutUrl,
+    linkId: result.payment_link?.id,
+    squareOrderId: result.payment_link?.order_id
+  };
+}
 function formatOrderNumber(n) {
   if (!Number.isInteger(n) || n < 1) throw new Error(`Invalid order number ${n}`);
   return `#${String(n).padStart(3, "0")}`;
@@ -7794,6 +7956,48 @@ router$p.post("/", async (req, res) => {
       notifications,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     }).catch((err) => console.error("[Bookings] Notification status was not saved:", err));
+    let holidayCheckout = null;
+    const holidayKind = holidayCheckoutKind(leadSource, total);
+    if (holidayKind === "free") {
+      holidayCheckout = { payment: "free" };
+    } else if (holidayKind === "paid") {
+      if (!invoiceId) {
+        holidayCheckout = { payment: "fallback" };
+      } else {
+        try {
+          const invoiceSnap = await db$p().collection("invoices").doc(invoiceId).get();
+          const invoiceData = invoiceSnap.data() || {};
+          const invoiceNumber = typeof invoiceData.invoiceNumber === "string" ? invoiceData.invoiceNumber : void 0;
+          const linked = await createHolidaySquareCheckout({
+            invoiceId,
+            invoiceNumber,
+            amount: Number(total) || 0,
+            email: normalizedEmail,
+            itemName: typeof selectedService === "string" && selectedService.trim() ? selectedService : "Holiday order",
+            leadSource: typeof leadSource === "string" ? leadSource : "",
+            orderNumber
+          });
+          if (linked.payment === "square" && linked.checkoutUrl) {
+            await db$p().collection("invoices").doc(invoiceId).update({
+              paymentProvider: "square",
+              paymentUrl: linked.checkoutUrl,
+              squarePaymentLinkId: linked.linkId || null,
+              squareOrderId: linked.squareOrderId || null,
+              status: "sent",
+              updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            }).catch((err) => console.error("[Bookings] Holiday payment link was not saved:", err));
+          }
+          holidayCheckout = {
+            payment: linked.payment,
+            ...linked.checkoutUrl ? { checkoutUrl: linked.checkoutUrl } : {},
+            ...linked.missingEnv?.length ? { missingEnv: linked.missingEnv } : {}
+          };
+        } catch (err) {
+          console.error("[Bookings] Holiday checkout failed:", err);
+          holidayCheckout = { payment: "fallback" };
+        }
+      }
+    }
     return res.status(201).json({
       success: true,
       requestId: docRef.id,
@@ -7801,6 +8005,9 @@ router$p.post("/", async (req, res) => {
       invoiceId,
       accountCreated: account.createdAccount,
       notifications,
+      ...holidayCheckout ? { payment: holidayCheckout.payment } : {},
+      ...holidayCheckout?.checkoutUrl ? { checkoutUrl: holidayCheckout.checkoutUrl } : {},
+      ...holidayCheckout?.missingEnv ? { missingEnv: holidayCheckout.missingEnv } : {},
       message: "Booking request received. We'll confirm shortly!"
     });
   } catch (err) {
@@ -12701,70 +12908,6 @@ function finite(value) {
 }
 function text$8(value) {
   return typeof value === "string" ? value.trim() : "";
-}
-const SQUARE_VERSION_FALLBACK = "2026-08-20";
-function squareApiBaseUrl(environment) {
-  return environment === "sandbox" ? "https://connect.squareupsandbox.com" : "https://connect.squareup.com";
-}
-function squareConfigured(env) {
-  return Boolean(env.SQUARE_ACCESS_TOKEN && env.SQUARE_LOCATION_ID);
-}
-function preferredSquareCheckoutUrl(invoice) {
-  if (typeof invoice.squareInvoiceUrl !== "string") return null;
-  const url = invoice.squareInvoiceUrl.trim();
-  if (!url.startsWith("https://")) return null;
-  return url;
-}
-function resolveSquareCheckoutUrl(input) {
-  const fresh = preferredSquareCheckoutUrl({ squareInvoiceUrl: input.freshUrl });
-  if (fresh) return fresh;
-  return preferredSquareCheckoutUrl({ squareInvoiceUrl: input.storedUrl });
-}
-async function squareRequest(deps, path2, init, deadline) {
-  const token = deps.env.SQUARE_ACCESS_TOKEN;
-  if (!token) return { ok: false, status: 0, body: { error: "Square is not configured" } };
-  const remaining = deadline - Date.now();
-  if (remaining <= 0) return { ok: false, status: 0, body: { error: "Square invoice sync timed out" } };
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), remaining);
-  try {
-    const response = await deps.fetchImpl(`${squareApiBaseUrl(deps.env.SQUARE_ENVIRONMENT)}${path2}`, {
-      method: init.method,
-      headers: {
-        "Content-Type": "application/json",
-        "Square-Version": deps.env.SQUARE_VERSION || SQUARE_VERSION_FALLBACK,
-        Authorization: `Bearer ${token}`
-      },
-      body: init.body === void 0 ? void 0 : JSON.stringify(init.body),
-      signal: controller.signal
-    });
-    const body = await response.json().catch(() => ({}));
-    return { ok: response.ok, status: response.status, body };
-  } catch (err) {
-    const aborted = err instanceof Error && (err.name === "AbortError" || /abort/i.test(err.message));
-    return {
-      ok: false,
-      status: 0,
-      body: { error: aborted ? "Square invoice sync timed out" : err instanceof Error ? err.message : "Square request failed" }
-    };
-  } finally {
-    clearTimeout(timer);
-  }
-}
-function publicUrlOf(body) {
-  return preferredSquareCheckoutUrl({ squareInvoiceUrl: body?.invoice?.public_url });
-}
-async function fetchPublishedSquareInvoiceUrl(squareInvoiceId, deps) {
-  const id = squareInvoiceId.trim();
-  if (!id || !squareConfigured(deps.env)) return null;
-  const result = await squareRequest(
-    deps,
-    `/v2/invoices/${encodeURIComponent(id)}`,
-    { method: "GET" },
-    Date.now() + (deps.timeoutMs ?? 5e3)
-  );
-  if (!result.ok) return null;
-  return publicUrlOf(result.body);
 }
 function payTokenMatches(stored, presented, equal = timingSafeEqual$1) {
   const left = Buffer.from(typeof stored === "string" ? stored : "");
