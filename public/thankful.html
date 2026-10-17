@@ -82,7 +82,7 @@
       <h3><span class="no">1</span>Choose your photo time</h3>
       <p class="sub">Saturday, Nov 14, 2026 · 15-minute slots from 11:00 AM to 2:45 PM CT</p>
       <div class="slots" id="slots"></div>
-      <p class="slotnote">Slots sync live with the Studio 105 calendar, so taken times disappear automatically.</p>
+      <p class="slotnote">Taken times are removed automatically.</p>
       <div class="divider"></div>
       <h3><span class="no">2</span>Who's coming</h3>
       <p class="sub">We'll confirm by email. Need a different time? Call 281.356.0965.</p>
@@ -181,9 +181,29 @@ if(QS.get('paid')==='1'){const form=document.getElementById('buyform');const ok=
 // headcount/menu cutoff: Fri Nov 6, 2026
 const DL=new Date(2026,10,6,23,59);const ms=Math.max(0,DL-now),d=Math.floor(ms/864e5),h=Math.floor(ms%864e5/36e5);
 document.getElementById('cd').innerHTML=`<span>${d} days</span><span>${h} hrs</span><span>left</span>`;document.getElementById('left').textContent=`${d} days left`;
-const TAKEN=['11:30 AM','1:15 PM'];const sl=document.getElementById('slots');
-for(let m=11*60;m<15*60;m+=15){const hh=Math.floor(m/60),mm=m%60,t=`${(hh-1)%12+1}:${String(mm).padStart(2,'0')} ${hh<12?'AM':'PM'}`,tk=TAKEN.includes(t);
- sl.insertAdjacentHTML('beforeend',`<label><input type="radio" name="slot" ${tk?'disabled':''} ${t==='12:00 PM'?'checked':''}><span class="${tk?'taken':''}">${t}</span></label>`)}
+let takenSlots=[];
+function renderSlots(){
+  const sl=document.getElementById('slots');
+  const previous=sl.querySelector('input[name="slot"]:checked');
+  const previousLabel=previous?previous.parentElement.querySelector('span').textContent:'';
+  sl.innerHTML='';
+  for(let m=11*60;m<15*60;m+=15){
+    const hh=Math.floor(m/60),mm=m%60,t=`${(hh-1)%12+1}:${String(mm).padStart(2,'0')} ${hh<12?'AM':'PM'}`,tk=takenSlots.includes(t);
+    const checked=!tk&&(previousLabel?t===previousLabel:t==='12:00 PM');
+    sl.insertAdjacentHTML('beforeend',`<label><input type="radio" name="slot" ${tk?'disabled':''} ${checked?'checked':''}><span class="${tk?'taken':''}">${t}</span></label>`);
+  }
+}
+async function loadTaken(){
+  try{
+    const res=await fetch('/api/bookings/holiday-slots',{cache:'no-store'});
+    if(!res.ok)throw new Error('slots');
+    const data=await res.json();
+    takenSlots=Array.isArray(data?.thankful?.taken)?data.thankful.taken:[];
+  }catch(e){takenSlots=[];}
+  renderSlots();
+}
+renderSlots();
+loadTaken();
 // SOCIAL SAVES: Oct 16 = 50%, -1/day, Nov 14 (event) = 20%
 const START=new Date(2026,9,16),EVENT=new Date(2026,10,14);
 function pctFor(x){x=new Date(x.getFullYear(),x.getMonth(),x.getDate());if(x<START)return 50;if(x>EVENT)return null;if(+x===+EVENT)return 20;return 50-Math.round((x-START)/864e5)}
@@ -268,6 +288,12 @@ document.getElementById("rsvpform").addEventListener("submit", async (event) => 
     ok.innerHTML = 'You are on the list. We will confirm by text or email. Call <a href="tel:+12813560965">281.356.0965</a>.';
   } catch (err) {
     ok.hidden = false;
+    if (/just taken/i.test(err.message || "")) {
+      ok.textContent = "That time was just taken. Pick another.";
+      button.disabled = false;
+      await loadTaken();
+      return;
+    }
     ok.textContent = (err.message || "We could not send that.") + " Call 281.356.0965.";
     button.disabled = false;
   }
