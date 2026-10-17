@@ -26,7 +26,7 @@ import { chargedServiceLines, normalizeBookingLineItems, orderTotalLabel, resolv
 import { applyServerTravel, isTravelFeeLine, travelSummaryText, type TravelAssessment } from "../../shared/travelZones";
 import { planOrderPackageRepair } from "../../shared/orderPackageRepair";
 import { notifyOfficeOfOrder } from "../services/officeOrderNotify";
-import { holidayCheckoutKind } from "../../shared/holidayCheckout";
+import { HOLIDAY_SEASON_LEAD, holidayCheckoutKind, holidayOrderReceivedHtml } from "../../shared/holidayCheckout";
 import { createHolidaySquareCheckout } from "../services/holidaySquareCheckout";
 import { packagesForStaffEditor, publicBookingCatalogResponse } from "../../shared/bookingCatalog";
 import { normalizeEmail } from "../../shared/listingAccess";
@@ -145,6 +145,7 @@ router.post("/", async (req, res) => {
       furnishingStatus,
       // Additional fields from booking form (previously dropped)
       leadSource,
+      requestedTimeLabel: postedTimeLabel,
       marketingDoing,
       resultsBothering,
       perfectBusiness,
@@ -455,13 +456,29 @@ router.post("/", async (req, res) => {
     let clientEmailStatus: "sent" | "failed" = "failed";
     let passwordSetupStatus: "sent" | "failed" | "not_needed" | "gated" = account.createdAccount ? "gated" : "not_needed";
     let smsStatus: "sent" | "failed" | "skipped" | "not_configured" = phone ? "failed" : "skipped";
+    const requestedTimeLabel = typeof postedTimeLabel === "string" ? postedTimeLabel.trim().slice(0, 80) : "";
+    const shownTime = requestedTimeLabel || (typeof scheduledTime === "string" ? scheduledTime : "");
+    const holidayMailKind = holidayCheckoutKind(leadSource, total);
+    const holidayHtml = holidayMailKind === "none" ? "" : holidayOrderReceivedHtml({
+      clientName,
+      serviceName: typeof selectedService === "string" && selectedService.trim() ? selectedService : "Holiday order",
+      whenDate: bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
+      whenTime: shownTime,
+      total: money(total),
+      requestId: docRef.id,
+      pagePath: leadSource === HOLIDAY_SEASON_LEAD ? "/tis-the-season" : "/thankful",
+      complimentary: holidayMailKind === "free",
+    });
 
     // Order-received confirmation to the client. booking_received is excluded from the
     // RED blast kill and sends even when CLIENT_NOTIFY_LIVE is unset.
+    // Holiday orders send their own HTML so a stored real-estate template cannot replace it.
     clientEmailStatus = await sendEmail({
       to: email,
       template: "booking_received",
       subject: clientOrderReceivedSubject(displayAddress, orderNumber),
+      html: holidayHtml || undefined,
+      lockHtml: Boolean(holidayHtml),
       variables: {
         clientName,
         address: displayAddress,
@@ -470,7 +487,7 @@ router.post("/", async (req, res) => {
         total: money(total),
         requestId: docRef.id,
         scheduledDate: bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
-        scheduledTime: scheduledTime || "",
+        scheduledTime: shownTime,
         propertyStatus: propertyStatus || "Not specified",
         furnishingStatus: furnishingStatus || "Not specified",
         accessMethod: accessLine,

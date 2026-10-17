@@ -38,13 +38,13 @@
 
 <section class="pad char" id="packages">
   <div class="wrap">
-    <div class="head c"><div class="eyebrow">Packages</div><h2>Gifting made <em>effortless.</em></h2><p class="lead">All packages are paid in advance, refunds available<a href="#refunds" style="color:var(--gold2);text-decoration:none">*</a></p></div>
+    <div class="head c"><div class="eyebrow">Packages</div><h2>Gifting made <em>effortless.</em></h2><p class="lead">All packages are paid in advance. Refunds are available. <a href="#refunds">See the cancellation and refund policy</a>.</p></div>
     <div class="pkgs" style="color:var(--ink)">
       <label class="pkg"><input type="radio" name="pkg" value="A" checked><span class="b"><span class="l">Package A</span><h3>The Single Session</h3><div class="price">$99</div><ul><li>15-minute session</li><li>2 holiday sets</li><li>10 edited photos</li><li>Perfect for one family or a single client gift</li></ul><span class="fv">+ 1 FREE client testimonial video</span><span class="note">Book any open slot. No advance notice needed.</span></span></label>
       <label class="pkg"><span class="pop">Best for teams</span><input type="radio" name="pkg" value="B"><span class="b"><span class="l">Package B</span><h3>The Client Hour</h3><div class="price">$400<small>+</small></div><ul><li>1 hour of studio time</li><li>4-family minimum</li><li>$89 per family</li><li>Studio 105 rental: $60/hr</li></ul><span class="fv">+ 1 FREE testimonial video per client family</span><span class="note">Requires 7 days' notice.</span></span></label>
       <label class="pkg"><input type="radio" name="pkg" value="C"><span class="b"><span class="l">Package C</span><h3>The Holiday Takeover</h3><div class="price">$650<small>+</small></div><ul><li>4 hours of studio time</li><li>6-family minimum</li><li>$79 per family, our best rate</li><li>Studio 105 rental: $55/hr</li></ul><span class="fv">+ 1 FREE testimonial video per client family</span><span class="note">Requires 7 days' notice.</span></span></label>
     </div>
-    <p class="refund-note">Refunds available<a href="#refunds">*</a>, see the <a href="#refunds">cancellation &amp; refund policy</a>.</p>
+    <p class="refund-note"><a href="#refunds">See the cancellation and refund policy</a>.</p>
   </div>
 </section>
 
@@ -118,7 +118,7 @@
         <small>Paid in advance, refunds available (<a href="#refunds" style="color:var(--gold2)">policy</a>). The 2.8% processing fee is included in the total above.</small>
         <div class="warn" id="warn" hidden></div>
         <button class="btn btn-gold" id="pay">Pay now <span class="arr">→</span></button>
-        <small style="text-align:center;margin-top:10px" id="payok">We'll text your secure payment link. Call <a href="tel:+12813560965">281.356.0965</a>.</small>
+        <small style="text-align:center;margin-top:10px" id="payok" hidden>We'll text your secure payment link. Call <a href="tel:+12813560965">281.356.0965</a>.</small>
       </aside>
     </form>
   </div>
@@ -127,8 +127,7 @@
 <section class="pad" id="refunds" style="padding-top:0">
   <div class="wrap">
     <div class="policy">
-      <span class="draft">Draft · pending Cadi's approval</span>
-      <h3>Cancellation &amp; refund policy<span style="color:var(--gold)">*</span></h3>
+      <h3>Cancellation &amp; refund policy</h3>
       <p style="color:var(--mute);font-size:14px">All ’Tis the Season packages are paid in advance to hold your date. Here's how changes work.</p>
       <div class="cols">
         <div><h4>Individual sessions (Package A)</h4><ul>
@@ -153,12 +152,12 @@
   </div>
 </section>
 
-<footer><div class="wrap"><img src="/holiday-2026/logo.png" alt="Iconic Images"><div>Studio 105 · 26410 Oakridge Dr. Ste 105, Spring, TX 77380 · <a href="tel:2813560965">281.356.0965</a> · <a href="mailto:photos@iconicimagestx.com">photos@iconicimagestx.com</a></div><div>Mon–Fri 8–5 · Sat 9–1 · Closed Sun</div></div></footer>
+<footer><div class="wrap"><img src="/holiday-2026/logo.png" alt="Iconic Images"><div>Studio 105 · 26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380 · <a href="tel:2813560965">281.356.0965</a> · <a href="mailto:photos@iconicimagestx.com">photos@iconicimagestx.com</a></div><div>Mon–Fri 8–5 · Sat 9–1 · Closed Sun</div></div></footer>
 
 <script>
 document.querySelectorAll('[data-snow]').forEach(s=>{for(let i=0;i<+s.dataset.snow;i++){const f=document.createElement('i');const z=1.5+Math.random()*3.5;f.style.cssText=`left:${Math.random()*92}%;width:${z}px;height:${z}px;animation-duration:${9+Math.random()*10}s;animation-delay:-${Math.random()*18}s;opacity:${.25+Math.random()*.5}`;s.appendChild(f)}});
 const QS=new URLSearchParams(location.search);const TODAY=QS.get('date')?new Date(QS.get('date')+'T12:00'):new Date();
-if(QS.get('paid')==='1'){const ok=document.getElementById('payok');if(ok)ok.textContent='Payment received. We will email your receipt.';}
+if(QS.get('paid')==='1'){const ok=document.getElementById('payok');if(ok){ok.hidden=false;ok.textContent='Payment received. We will email your receipt.';}}
 const START=new Date(2026,10,27),END=new Date(2026,11,14);
 // Studio 105 rental rates from plan.md (Dec packages table): $60/hr (Package B), $55/hr (Package C, 4 hr)
 const PK={A:{name:'Single Session',min:1,per:null,base:99,hrs:0,rate:0,notice:false},B:{name:'Client Hour',min:4,per:89,hrs:1,rate:60,notice:true},C:{name:'Holiday Takeover',min:6,per:79,hrs:4,rate:55,notice:true}};
@@ -214,7 +213,8 @@ $('pay').onclick=async()=>{
   const chef=$('menu').checked?(+$('mt').value)*guests:0;
   const price=Math.round((photos+rental+decor+chef)*100)/100;
   const ok=$('payok');
-  if(!name.firstName||!email.includes('@')||phone.replace(/\D/g,'').length<7||!(price>=0)||!sel||!slot){ok.textContent='Add your name, email, phone, date, and time. Call 281.356.0965.';return;}
+  ok.hidden=true;
+  if(!name.firstName||!email.includes('@')||phone.replace(/\D/g,'').length<7||!(price>=0)||!sel||!slot){ok.hidden=false;ok.textContent='Add your name, email, phone, date, and time. Call 281.356.0965.';return;}
   $('pay').disabled=true;
   const logo=$('plogo').files&&$('plogo').files[0]?$('plogo').files[0].name:'';
   const bits=[
@@ -247,10 +247,12 @@ $('pay').onclick=async()=>{
   ];
   const note=bits.join('\n');
   try{
-    const saved=await sendOrder(orderBody({firstName:name.firstName,lastName:name.lastName,email:email,phone:phone,lineName:'Tis the Season Package '+k+' '+p.name,price:price,date:iso(sel),window:windowFor(slot),note:note,lead:'Tis the season client shoots'}));
+    const saved=await sendOrder(orderBody({firstName:name.firstName,lastName:name.lastName,email:email,phone:phone,lineName:'Tis the Season Package '+k+' '+p.name,price:price,date:iso(sel),window:windowFor(slot),timeLabel:slot,note:note,lead:'Tis the season client shoots'}));
     if(openCheckout(saved.checkoutUrl))return;
+    ok.hidden=false;
     ok.innerHTML='We\'ll text your secure payment link. Call <a href="tel:+12813560965">281.356.0965</a>.';
   }catch(err){
+    ok.hidden=false;
     ok.textContent=(err.message||'We could not send that.')+' Call 281.356.0965.';
     $('pay').disabled=false;
   }
@@ -259,12 +261,12 @@ partyStarts();sel=new Date(2026,11,4);slot='11:00 AM';
 if(QS.get('party')){document.querySelector('input[name=pkg][value=B]').checked=true;$('pk').value='B';$('fam').value=4;['party','menu','decor'].forEach(i=>$(i).checked=true);$('partyform').hidden=false}
 renderCal();renderSlots();sum();
 
-const STUDIO="26410 Oakridge Dr. Ste 105, Spring, TX 77380";
+const STUDIO="26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380";
 function splitName(raw){const p=String(raw||"").trim().split(/\s+/).filter(Boolean);return {firstName:p[0]||"",lastName:p.slice(1).join(" ")||"-"};}
 function windowFor(label){const m=/(\d{1,2}):(\d{2})\s*(AM|PM)/i.exec(label||"");if(!m)return "Afternoon";let h=+m[1]%12;if(/pm/i.test(m[3]))h+=12;return h<12?"Morning":"Afternoon";}
 function openCheckout(url){if(!url)return false;try{const target=window.top&&window.top!==window?window.top:window;target.location.assign(url);}catch(e){window.location.assign(url);}return true;}
 async function sendOrder(body){const response=await fetch("/api/bookings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});if(!response.ok){let message="";try{message=(await response.json()).error||"";}catch(e){}throw new Error(message||"Request could not be sent");}return response.json();}
-function orderBody(opts){return {firstName:opts.firstName,lastName:opts.lastName,email:opts.email,phone:opts.phone,address:STUDIO,lineItems:[{name:opts.lineName,price:opts.price}],total:opts.price,pricing:{subtotal:opts.price,total:opts.price},vibeNote:"COMPLETE BOOKING DETAILS\nSite booking form\n"+opts.note,scheduledDate:opts.date,scheduledTime:opts.window,photographerPreference:"No preference",accessMethod:"Studio 105 client event",propertyStatus:"Not specified",furnishingStatus:"Not specified",selectedService:opts.lineName,selectedAddOns:[],leadSource:opts.lead};}
+function orderBody(opts){return {firstName:opts.firstName,lastName:opts.lastName,email:opts.email,phone:opts.phone,address:STUDIO,lineItems:[{name:opts.lineName,price:opts.price}],total:opts.price,pricing:{subtotal:opts.price,total:opts.price},vibeNote:"COMPLETE BOOKING DETAILS\nSite booking form\n"+opts.note,scheduledDate:opts.date,scheduledTime:opts.window,requestedTimeLabel:opts.timeLabel||"",photographerPreference:"No preference",accessMethod:"Studio 105 client event",propertyStatus:"Not specified",furnishingStatus:"Not specified",selectedService:opts.lineName,selectedAddOns:[],leadSource:opts.lead};}
 document.querySelectorAll("img").forEach(img=>img.addEventListener("error",()=>{if(img.classList.contains("title"))return;if((img.getAttribute("src")||"").includes("logo")){const s=document.createElement("span");s.className="missing";s.textContent=img.alt||"Iconic Images";img.replaceWith(s);return;}img.remove();}));
 
 </script>

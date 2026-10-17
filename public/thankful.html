@@ -68,7 +68,7 @@
     <div class="head c"><div class="eyebrow">Mark your calendar</div><h2>Dates to <em>remember.</em></h2></div>
     <div class="dl">
       <div class="hot"><div class="k">Headcount &amp; menu vote close</div><div class="d">Fri, Nov 6</div><p>Pick your photo time and cast your menu vote so Chef Steven can plan.</p><span class="left" id="left"></span></div>
-      <div><div class="k">Event 1 · Client Holiday Event</div><div class="d">Sat, Nov 14</div><p>11 AM to 3 PM CT at Studio 105, 26410 Oakridge Dr. Ste 105, Spring, TX 77380.</p></div>
+      <div><div class="k">Event 1 · Client Holiday Event</div><div class="d">Sat, Nov 14</div><p>11 AM to 3 PM CT at Studio 105, 26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380.</p></div>
       <div><div class="k">Event 2 · client shoots</div><div class="d">Nov 27 – Dec 14</div><p>Book your clients' holiday shoots early. Each one comes with a free testimonial video.</p></div>
     </div>
   </div>
@@ -115,6 +115,7 @@
       <div><div class="eyebrow">Social Saves · 2027</div><h2>Jump into 2027 with a <em>FRESH</em> plan: 50% off Social Media Packages.</h2><p class="lead">The count drops daily; still save up to 20% at the event.</p><span class="only">Iconic Client Deal ONLY</span></div>
       <div class="dial"><div class="s">Today's discount</div><div class="p" id="pct">50%</div><div class="s" id="pctnote"></div></div>
     </div>
+    <p class="drop-line">Price drops tomorrow... and the day after... and the day after...</p>
     <div class="terms3" id="terms">
       <button type="button" data-t="12">12 months<small>+10% off</small></button>
       <button type="button" data-t="6">6 months<small>+5% off</small></button>
@@ -171,7 +172,7 @@
   </div>
 </section>
 
-<footer><div class="wrap"><img src="/holiday-2026/logo.png" alt="Iconic Images"><div>Studio 105 · 26410 Oakridge Dr. Ste 105, Spring, TX 77380 · <a href="tel:2813560965">281.356.0965</a> · <a href="mailto:photos@iconicimagestx.com">photos@iconicimagestx.com</a></div><div><a href="/tis-the-season">Book your clients' holiday shoots →</a></div></div></footer>
+<footer><div class="wrap"><img src="/holiday-2026/logo.png" alt="Iconic Images"><div>Studio 105 · 26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380 · <a href="tel:2813560965">281.356.0965</a> · <a href="mailto:photos@iconicimagestx.com">photos@iconicimagestx.com</a></div><div><a href="/tis-the-season">Book your clients' holiday shoots →</a></div></div></footer>
 
 <script>
 document.querySelectorAll('[data-snow]').forEach(s=>{for(let i=0;i<+s.dataset.snow;i++){const f=document.createElement('i');const z=1.5+Math.random()*3.5;f.style.cssText=`left:${Math.random()*92}%;width:${z}px;height:${z}px;animation-duration:${9+Math.random()*10}s;animation-delay:-${Math.random()*18}s;opacity:${.25+Math.random()*.5}`;s.appendChild(f)}});
@@ -209,14 +210,14 @@ function render(){
 }
 document.querySelectorAll('#terms button').forEach(b=>b.onclick=()=>{T=+b.dataset.t;render()});render();
 
-const STUDIO="26410 Oakridge Dr. Ste 105, Spring, TX 77380";
+const STUDIO="26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380";
 function splitName(raw){const p=String(raw||"").trim().split(/\s+/).filter(Boolean);return {firstName:p[0]||"",lastName:p.slice(1).join(" ")||"-"};}
 function windowFor(label){const m=/(\d{1,2}):(\d{2})\s*(AM|PM)/i.exec(label||"");if(!m)return "Afternoon";let h=+m[1]%12;if(/pm/i.test(m[3]))h+=12;return h<12?"Morning":"Afternoon";}
 function revealHolidayTitle(){var t=document.getElementById('titlelock');if(t)t.hidden=false;}
 setTimeout(revealHolidayTitle,1600);
 function openCheckout(url){if(!url)return false;try{const target=window.top&&window.top!==window?window.top:window;target.location.assign(url);}catch(e){window.location.assign(url);}return true;}
 async function sendOrder(body){const response=await fetch("/api/bookings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});if(!response.ok){let message="";try{message=(await response.json()).error||"";}catch(e){}throw new Error(message||"Request could not be sent");}return response.json();}
-function orderBody(opts){return {firstName:opts.firstName,lastName:opts.lastName,email:opts.email,phone:opts.phone,address:STUDIO,lineItems:[{name:opts.lineName,price:opts.price}],total:opts.price,pricing:{subtotal:opts.price,total:opts.price},vibeNote:"COMPLETE BOOKING DETAILS\nSite booking form\n"+opts.note,scheduledDate:opts.date,scheduledTime:opts.window,photographerPreference:"No preference",accessMethod:"Studio 105 client event",propertyStatus:"Not specified",furnishingStatus:"Not specified",selectedService:opts.lineName,selectedAddOns:[],leadSource:opts.lead};}
+function orderBody(opts){return {firstName:opts.firstName,lastName:opts.lastName,email:opts.email,phone:opts.phone,address:STUDIO,lineItems:[{name:opts.lineName,price:opts.price}],total:opts.price,pricing:{subtotal:opts.price,total:opts.price},vibeNote:"COMPLETE BOOKING DETAILS\nSite booking form\n"+opts.note,scheduledDate:opts.date,scheduledTime:opts.window,requestedTimeLabel:opts.timeLabel||"",photographerPreference:"No preference",accessMethod:"Studio 105 client event",propertyStatus:"Not specified",furnishingStatus:"Not specified",selectedService:opts.lineName,selectedAddOns:[],leadSource:opts.lead};}
 document.querySelectorAll("img").forEach(img=>img.addEventListener("error",()=>{if(img.classList.contains("title"))return;if((img.getAttribute("src")||"").includes("logo")){const s=document.createElement("span");s.className="missing";s.textContent=img.alt||"Iconic Images";img.replaceWith(s);return;}img.remove();}));
 
 document.getElementById("rsvpform").addEventListener("submit", async (event) => {
@@ -259,6 +260,7 @@ document.getElementById("rsvpform").addEventListener("submit", async (event) => 
       price: 0,
       date: "2026-11-14",
       window: windowFor(slotLabel),
+      timeLabel: slotLabel,
       note: note,
       lead: "Thankful client holiday event RSVP"
     }));
