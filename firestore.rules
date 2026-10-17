@@ -274,6 +274,26 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Studio editor projects. The owner reads and writes their own jobs.
+    // Server renders update the same documents with the Admin SDK.
+    match /projects/{projectId} {
+      allow read: if isAuthenticated() && resource.data.ownerUid == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if isAuthenticated()
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow delete: if isAdmin();
+
+      match /jobs/{jobId} {
+        allow read: if isAuthenticated() && resource.data.ownerUid == request.auth.uid;
+        allow create: if isAuthenticated() && request.resource.data.ownerUid == request.auth.uid;
+        allow update: if isAuthenticated()
+          && resource.data.ownerUid == request.auth.uid
+          && request.resource.data.ownerUid == request.auth.uid;
+        allow delete: if isAdmin();
+      }
+    }
+
     // ─── Listings / projects ─────────────────────────────────────────────────
     // Admin Create Project and New Project write this collection from the
     // browser. Without this match the catch-all denies every staff write.

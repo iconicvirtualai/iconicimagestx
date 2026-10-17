@@ -10,8 +10,9 @@ import StudioScratchPad, {
 import { stagingApi, stagingGuidance } from "@/components/studio-scratch/scratchDesk";
 import { recordAddressText } from "@shared/addressText";
 import { useAuth } from "@/contexts/AuthContext";
-import { auth, storage } from "@/lib/firebase";
-import { fetchScratchStatus, postScratchEdit } from "@/lib/scratchApi";
+import { fetchScratchStatus } from "@/lib/scratchApi";
+import { reconcileScratchItems } from "@/lib/scratchJobBridge";
+import { getStudioJobManager } from "@/lib/studioJobRuntime";
 import {
   drainOrderEditQueue,
   fetchStudioWorkspace,
@@ -19,7 +20,6 @@ import {
   postStudioOrderEdits,
   postStudioReject,
 } from "@/lib/studioApi";
-import { pollVsaiJob } from "@/lib/scratchStaging";
 import { compressScratchJpeg, readJpegShotTime } from "@/lib/scratchPhoto";
 import {
   SCRATCH_SORT_DEFAULT,
@@ -34,6 +34,12 @@ import {
 } from "@shared/iconicStudio";
 import { studioEditorListingId } from "@shared/studioEditorHref";
 import {
+  isActiveJobStatus,
+  STUDIO_PROJECT_QUERY,
+  studioJobProgressLabel,
+  studioProjectIdFromSearch,
+} from "@shared/studioProjects";
+import {
   listingOrderQueuePending,
   studioOrderTrayJobs,
   type StudioOrderTrayJob,
@@ -44,7 +50,6 @@ import {
   scratchDownloadName,
   scratchSelection,
 } from "@shared/studioScratch";
-import { getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage";
 import { toast } from "sonner";
 
 interface FinetuneSnapshot {
@@ -146,7 +151,7 @@ function fileCard(name: string) {
 }
 
 export default function AdminStudioScratch() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const listingId = studioEditorListingId(searchParams.toString());
   const { user } = useAuth();
   const getToken = useCallback(() => {
@@ -178,6 +183,7 @@ export default function AdminStudioScratch() {
   const loadedListing = useRef("");
   const draining = useRef(false);
   const drainFailed = useRef(false);
+  const projectIdRef = useRef("");
 
   const refreshOrderJobs = useCallback(async () => {
     if (!listingId) {
@@ -188,7 +194,60 @@ export default function AdminStudioScratch() {
     setOrderJobs(studioOrderTrayJobs(data.jobs, listingId));
   }, [getToken, listingId]);
 
+  const ensureStudioProject = useCallback(() => {
+    if (!user) return "";
+    const fromQuery = studioProjectIdFromSearch(searchParams.toString());
+    const existing = fromQuery || projectIdRef.current || getStudioJobManager().getState().activeProjectId || "";
+    if (existing) {
+      projectIdRef.current = existing;
+      getStudioJobManager().setActiveProject(existing);
+      return existing;
+    }
+    const project = getStudioJobManager().ensureProject(user.uid, listingLabel || "Scratch pad", listingId);
+    projectIdRef.current = project.id;
+    const params = new URLSearchParams(searchParams);
+    params.set(STUDIO_PROJECT_QUERY, project.id);
+    setSearchParams(params, { replace: true });
+    return project.id;
+  }, [listingId, listingLabel, searchParams, setSearchParams, user]);
+
   useEffect(() => {
+    return () => {
+      getStudioJobManager().notePageDetached();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const manager = getStudioJobManager();
+    const requested = studioProjectIdFromSearch(searchParams.toString());
+    if (requested) {
+      projectIdRef.current = requested;
+      manager.setActiveProject(requested);
+    }
+    const sync = () => {
+      const projectId = requested || projectIdRef.current || manager.getState().activeProjectId || "";
+      if (!projectId) return;
+      if (!requested && listingId) return;
+      const jobs = manager.jobsFor(projectId, user.uid);
+      if (!jobs.length) return;
+      setItems((current) => reconcileScratchItems(
+        current,
+        jobs,
+        (id) => manager.outputBytes(id),
+        (bytes) => URL.createObjectURL(bytesBlob(bytes, "image/jpeg")),
+        fileCard,
+      ));
+      const label = studioJobProgressLabel(jobs);
+      setProgress(label);
+      setBusy(jobs.some((job) => isActiveJobStatus(job.status)));
+    };
+    sync();
+    return manager.subscribe(sync);
+  }, [listingId, searchParams, user]);
+
+  useEffect(() => {
+    if (studioProjectIdFromSearch(searchParams.toString())) return;
     if (!listingId) {
       loadedListing.current = "";
       setListingLabel("");
@@ -285,7 +344,7 @@ export default function AdminStudioScratch() {
     return () => {
       cancel = true;
     };
-  }, [getToken, listingId]);
+  }, [getToken, listingId, searchParams]);
 
   useEffect(() => {
     drainFailed.current = false;
@@ -356,12 +415,6 @@ export default function AdminStudioScratch() {
     };
   }, [getToken]);
 
-  const patch = (id: string, update: Partial<ScratchItem>) => {
-    setItems((current) =>
-      current.map((item) => (item.id === id ? { ...item, ...update } : item)),
-    );
-  };
-
   const addFiles = async (files: File[]) => {
     const room = SCRATCH_MAX_FILES - items.length;
     if (room <= 0) {
@@ -421,6 +474,23 @@ export default function AdminStudioScratch() {
       }
     }
     if (!added.length) return;
+    if (user) {
+      const projectId = ensureStudioProject();
+      for (const item of added) {
+        const bytes = new Uint8Array(await item.source.arrayBuffer());
+        getStudioJobManager().enqueue({
+          id: item.id,
+          projectId,
+          ownerUid: user.uid,
+          fileName: item.name,
+          kind: "upload",
+          label: "Upload",
+          listingId,
+          data: bytes,
+          thumbnailDataUrl: item.beforeUrl.startsWith("data:") ? item.beforeUrl.slice(0, 12000) : "",
+        });
+      }
+    }
     const next = sortScratchItems(sortMode, [...items, ...added]);
     setItems(next);
     if (!items.length) {
@@ -507,97 +577,39 @@ export default function AdminStudioScratch() {
         return;
       }
     }
+    const projectId = ensureStudioProject();
+    if (!user || !projectId) {
+      toast.error("Sign in again before rendering.");
+      return;
+    }
     setBusy(true);
-    let index = 0;
+    let started = 0;
     for (const job of targets) {
-      index += 1;
-      setProgress(`${index} of ${targets.length}`);
       if (!job.editable) {
         toast.message(`${job.name} is waiting on a JPEG before Process.`);
         continue;
       }
-      if (
-        runnable.some((step) => step.action === "revise") &&
-        !job.afterBytes
-      ) {
-        continue;
-      }
-      patch(job.id, { status: "editing", error: undefined });
-      let working = options.fromOriginal ? undefined : job.afterBytes;
-      let produced = false;
-      let error: string | undefined;
-      let downloadName = job.downloadName;
-      let lastAction = options.label || runnable[runnable.length - 1].action;
-      for (const step of runnable) {
-        if (step.action === "revise" && !working) break;
-        try {
-          const result = await postScratchEdit(getToken, {
-            body: working ? bytesBlob(working, "image/jpeg") : job.source,
-            action: step.action,
-            prompt: step.prompt,
-            fileName: job.name,
-          });
-          working = result.bytes;
-          produced = true;
-          downloadName = result.downloadName;
-          lastAction = options.label || step.action;
-        } catch (err) {
-          error = err instanceof Error ? err.message : "The edit failed.";
-          toast.error(`${job.name}: ${error}`);
-          break;
-        }
-      }
-      if (!produced || !working) continue;
-      const afterUrl = URL.createObjectURL(bytesBlob(working, "image/jpeg"));
-      const bytes = working;
-      setItems((current) =>
-        current.map((item) => {
-          if (item.id !== job.id) return item;
-          revokeUrl(item.afterUrl);
-          if (
-            item.preFinetune?.afterUrl &&
-            item.preFinetune.afterUrl !== item.afterUrl
-          ) {
-            revokeUrl(item.preFinetune.afterUrl);
-          }
-          return {
-            ...item,
-            status: error ? "failed" : "done",
-            error,
-            afterUrl,
-            afterBytes: bytes,
-            downloadName,
-            lastAction,
-            preFinetune: undefined,
-          };
-        }),
-      );
+      if (runnable.some((step) => step.action === "revise") && !job.afterBytes) continue;
+      const data = options.fromOriginal || !job.afterBytes
+        ? new Uint8Array(await job.source.arrayBuffer())
+        : job.afterBytes;
+      started += 1;
+      getStudioJobManager().enqueue({
+        id: job.id,
+        projectId,
+        ownerUid: user.uid,
+        fileName: job.name,
+        kind: "edit",
+        label: options.label || runnable[runnable.length - 1].action,
+        action: runnable[0].action,
+        prompt: runnable.map((step) => step.prompt).filter(Boolean).join("\n"),
+        steps: runnable.map((step) => ({ action: step.action, prompt: step.prompt })),
+        listingId,
+        data,
+        thumbnailDataUrl: job.beforeUrl.startsWith("data:") ? job.beforeUrl.slice(0, 12000) : "",
+      });
     }
-    setProgress("");
-    setBusy(false);
-  };
-
-  const commitStaged = (job: ScratchItem, bytes: Uint8Array, downloadName: string, error?: string) => {
-    const afterUrl = URL.createObjectURL(bytesBlob(bytes, "image/jpeg"));
-    setItems((current) =>
-      current.map((item) => {
-        if (item.id !== job.id) return item;
-        revokeUrl(item.afterUrl);
-        if (item.preFinetune?.afterUrl && item.preFinetune.afterUrl !== item.afterUrl) {
-          revokeUrl(item.preFinetune.afterUrl);
-        }
-        return {
-          ...item,
-          status: error ? "failed" : "done",
-          error,
-          afterUrl,
-          afterBytes: bytes,
-          downloadName,
-          lastAction: "staging",
-          preFinetune: undefined,
-        };
-      }),
-    );
+    if (!started) setBusy(false);
   };
 
   const runStaging = async (request: StagingRequest) => {
@@ -606,77 +618,40 @@ export default function AdminStudioScratch() {
       toast.error("Check a photo in the filmstrip.");
       return;
     }
-    const user = auth.currentUser;
     if (!user) {
       toast.error("Sign in again before virtual staging.");
       return;
     }
+    const projectId = ensureStudioProject();
+    if (!projectId) return;
     const api = stagingApi(request);
     const guidance = stagingGuidance(request);
     setBusy(true);
-    let index = 0;
+    let started = 0;
     for (const job of targets) {
-      index += 1;
-      setProgress(`Staging ${index} of ${targets.length}`);
       if (!job.editable) {
         toast.message(`${job.name} needs a JPEG, PNG, or WEBP before staging.`);
         continue;
       }
-      patch(job.id, { status: "editing", error: undefined });
-      try {
-        const blob = job.afterBytes ? bytesBlob(job.afterBytes, "image/jpeg") : job.source;
-        const stored = storageRef(storage, `vsai-uploads/${user.uid}/${Date.now()}-${job.id}.jpg`);
-        await uploadBytes(stored, blob);
-        const imageUrl = await getDownloadURL(stored);
-        const token = await getToken();
-        const created = await fetch("/api/vsai/create", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ imageUrl, roomType: api.roomType, style: api.style }),
-        });
-        const createdData = await created.json().catch(() => ({}));
-        if (!created.ok) throw new Error(createdData.error || "Virtual staging did not start.");
-        await pollVsaiJob(async () => {
-          const res = await fetch(`/api/vsai/result/${createdData.jobId}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(data.error || "Could not check the staging job.");
-          return data;
-        }, (ms) => new Promise((resolve) => setTimeout(resolve, ms)));
-        const fileRes = await fetch(`/api/vsai/result/${createdData.jobId}/file`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!fileRes.ok) {
-          const data = await fileRes.json().catch(() => ({}));
-          throw new Error(data.error || "The staged photo could not be saved on this pad.");
-        }
-        const downloaded = new Uint8Array(await fileRes.arrayBuffer());
-        const stagedFile = new File([downloaded], `${job.id}.jpg`, {
-          type: fileRes.headers.get("content-type") || "image/jpeg",
-        });
-        const jpeg = await compressScratchJpeg(stagedFile);
-        let bytes = new Uint8Array(await jpeg.arrayBuffer());
-        let downloadName = scratchDownloadName(job.name);
-        if (guidance) {
-          const revised = await postScratchEdit(getToken, {
-            body: bytesBlob(bytes, "image/jpeg"),
-            action: "revise",
-            prompt: guidance,
-            fileName: job.name,
-          });
-          bytes = new Uint8Array(revised.bytes);
-          downloadName = revised.downloadName;
-        }
-        commitStaged(job, bytes, downloadName);
-      } catch (err) {
-        const error = err instanceof Error ? err.message : "Virtual staging failed.";
-        toast.error(`${job.name}: ${error}`);
-        patch(job.id, { status: "failed", error });
-      }
+      const data = job.afterBytes ? job.afterBytes : new Uint8Array(await job.source.arrayBuffer());
+      started += 1;
+      getStudioJobManager().enqueue({
+        id: job.id,
+        projectId,
+        ownerUid: user.uid,
+        fileName: job.name,
+        kind: "staging",
+        label: "Virtual Staging",
+        action: "staging",
+        prompt: guidance || "",
+        roomType: api.roomType,
+        style: api.style,
+        listingId,
+        data,
+        thumbnailDataUrl: job.beforeUrl.startsWith("data:") ? job.beforeUrl.slice(0, 12000) : "",
+      });
     }
-    setProgress("");
-    setBusy(false);
+    if (!started) setBusy(false);
   };
 
   const onDownload = () => {
@@ -732,6 +707,24 @@ export default function AdminStudioScratch() {
   const commitJpeg = (dataUrl: string, frameId: string, label: string) => {
     const bytes = dataUrlBytes(dataUrl);
     const afterUrl = URL.createObjectURL(bytesBlob(bytes, "image/jpeg"));
+    const named = items.find((item) => item.id === frameId);
+    if (user) {
+      const projectId = ensureStudioProject();
+      if (projectId) {
+        getStudioJobManager().enqueue({
+          id: frameId,
+          projectId,
+          ownerUid: user.uid,
+          fileName: named?.name || "edit.jpg",
+          kind: "upload",
+          label,
+          listingId,
+          data: bytes,
+          storeAsOutput: true,
+          thumbnailDataUrl: named?.beforeUrl.startsWith("data:") ? named.beforeUrl.slice(0, 12000) : "",
+        });
+      }
+    }
     setItems((current) =>
       current.map((item) => {
         if (item.id !== frameId) return item;

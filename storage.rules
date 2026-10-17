@@ -27,6 +27,11 @@ service firebase.storage {
       allow read, write: if isActiveStaff();
     }
 
+    // Resumable editor uploads. Each person writes only their own project files.
+    match /studio-projects/{uid}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
     // Default deny
     match /{allPaths=**} {
       allow read, write: if false;

@@ -89,6 +89,8 @@ import AdminStudioHome from "./pages/AdminStudioHome";
 import AdminStudioProjects from "./pages/AdminStudioProjects";
 import AdminStudioMarketing from "./pages/AdminStudioMarketing";
 import AdminStudioScratch from "./pages/AdminStudioScratch";
+import AdminMyProjects from "./pages/AdminMyProjects";
+import StudioJobRoot from "./components/studio-jobs/StudioJobRoot";
 import LegacyStudioRedirect from "./components/studio/LegacyStudioRedirect";
 import AdminDeliveryQueue from "./pages/AdminDeliveryQueue";
 import Login from "./pages/Login";
@@ -116,6 +118,7 @@ const App = () => (
         <ScrollToTop />
         <SiteMeta />
         <AuthProvider>
+          <StudioJobRoot>
           <Routes>
             {/* ─── Public Routes ─────────────────────────────────────────── */}
             <Route path="/" element={<Index />} />
@@ -171,6 +174,7 @@ const App = () => (
             <Route path="/admin/studio" element={<ProtectedRoute requiredRole="staff"><AdminStudioHome /></ProtectedRoute>} />
             <Route path="/admin/studio/editing" element={<ProtectedRoute requiredRole="staff"><AdminStudioScratch /></ProtectedRoute>} />
             <Route path="/admin/studio/scratch" element={<ProtectedRoute requiredRole="staff"><AdminStudioScratch /></ProtectedRoute>} />
+            <Route path="/admin/my-projects" element={<ProtectedRoute requiredRole="staff"><AdminMyProjects /></ProtectedRoute>} />
             <Route path="/admin/studio/projects" element={<ProtectedRoute requiredRole="staff"><AdminStudioProjects /></ProtectedRoute>} />
             <Route path="/admin/studio/marketing" element={<ProtectedRoute requiredRole="staff"><AdminStudioMarketing /></ProtectedRoute>} />
             <Route path="/admin/studio/operations" element={<LegacyStudioRedirect />} />
@@ -221,6 +225,7 @@ const App = () => (
             {/* ─── Catch-all ──────────────────────────────────────────────── */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </StudioJobRoot>
         </AuthProvider>
         </SiteContentProvider>
       </BrowserRouter>
