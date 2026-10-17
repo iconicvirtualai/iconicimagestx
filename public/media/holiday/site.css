@@ -98,7 +98,10 @@ p { margin: 0; }
 .top { position: absolute; top: 0; left: 0; right: 0; z-index: 4; padding: 18px 0; }
 .top .wrap, .links, .ctas, .when, .row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .top .wrap { justify-content: space-between; }
-.top img, .footer img { height: 42px; width: auto; }
+.top img, footer img { height: 42px; width: auto; object-fit: contain; }
+.initial { display: grid; place-items: center; width: 100%; height: 240px; border-radius: 18px; background: #2a211c; color: var(--gold2); font-family: "Cormorant Garamond", Georgia, serif; font-size: 72px; }
+.pic .initial { height: 320px; }
+.logo-fit { object-fit: contain; background: #fff; padding: 28px; }
 .links a { color: #fff; text-decoration: none; font-size: 14px; font-weight: 500; }
 .title {
   position: absolute;
@@ -136,6 +139,7 @@ p { margin: 0; }
 .pic, .ph, .vidcard, .perk, .c .ph { position: relative; }
 .pic img, .vidcard img, .perk img, .photo-feature img { width: 100%; height: 280px; object-fit: cover; border-radius: 18px; background: #2a211c; }
 .c .ph img { width: 100%; height: 240px; object-fit: cover; border-radius: 18px; background: #2a211c; }
+.c .ph img.logo-fit { object-fit: contain; background: #fff; padding: 28px; }
 .bubble, .x2, .tag, .pop, .free {
   position: absolute;
   background: var(--gold);
