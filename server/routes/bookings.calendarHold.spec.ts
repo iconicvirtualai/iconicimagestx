@@ -418,4 +418,61 @@ describe("public booking calendar hold", () => {
     expect(statuses[10]).toBe(429);
     expect(docs("orderRequests").size).toBe(10);
   });
+
+  it("publishes taken holiday times only and rejects a second RSVP for that slot", async () => {
+    docs("orderRequests").set("real", {
+      leadSource: "Thankful client holiday event RSVP",
+      scheduledDate: "2026-11-14",
+      requestedTimeLabel: "11:30 AM",
+      email: "ada@example.com",
+      clientName: "Ada Client",
+      status: "new",
+    });
+    docs("orderRequests").set("qa", {
+      leadSource: "Thankful client holiday event RSVP",
+      scheduledDate: "2026-11-14",
+      requestedTimeLabel: "1:15 PM",
+      email: "ops+deliveryqa@iconicimagestx.com",
+      clientName: "TEST Quinn",
+      status: "new",
+    });
+
+    const listed = await fetch(`${baseUrl}/api/bookings/holiday-slots`);
+    const slots = await listed.json();
+    expect(listed.status).toBe(200);
+    expect(slots.thankful.taken).toEqual(["11:30 AM"]);
+    expect(JSON.stringify(slots)).not.toContain("ada@example.com");
+    expect(JSON.stringify(slots)).not.toContain("Ada");
+    expect(JSON.stringify(slots)).not.toContain("Quinn");
+
+    const payload = {
+      firstName: "Bea",
+      lastName: "Client",
+      email: "bea@example.com",
+      phone: "281-555-0199",
+      address: "26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380",
+      lineItems: [{ name: "Client Holiday Event RSVP", price: 0 }],
+      total: 0,
+      scheduledDate: "2026-11-14",
+      scheduledTime: "Afternoon",
+      requestedTimeLabel: "11:30 AM",
+      selectedService: "Client Holiday Event RSVP",
+      leadSource: "Thankful client holiday event RSVP",
+    };
+    const taken = await fetch(`${baseUrl}/api/bookings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const takenBody = await taken.json();
+    expect(taken.status).toBe(409);
+    expect(takenBody.error).toBe("That time was just taken. Pick another.");
+
+    const open = await fetch(`${baseUrl}/api/bookings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...payload, requestedTimeLabel: "1:15 PM", scheduledTime: "Afternoon" }),
+    });
+    expect(open.status).toBe(201);
+  });
 });

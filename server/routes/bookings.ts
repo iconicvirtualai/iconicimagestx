@@ -27,7 +27,9 @@ import { applyServerTravel, isTravelFeeLine, travelSummaryText, type TravelAsses
 import { planOrderPackageRepair } from "../../shared/orderPackageRepair";
 import { notifyOfficeOfOrder } from "../services/officeOrderNotify";
 import { HOLIDAY_SEASON_LEAD, holidayCheckoutKind, holidayOrderReceivedHtml } from "../../shared/holidayCheckout";
+import { HOLIDAY_SLOT_TAKEN_MESSAGE, holidaySlotClaim, holidaySlotIsFull, holidayTakenFromOrders } from "../../shared/holidaySlots";
 import { createHolidaySquareCheckout } from "../services/holidaySquareCheckout";
+import { loadHolidaySlotOrders } from "../services/holidaySlots";
 import { packagesForStaffEditor, publicBookingCatalogResponse } from "../../shared/bookingCatalog";
 import { normalizeEmail } from "../../shared/listingAccess";
 import { addressText } from "../../shared/addressText";
@@ -159,6 +161,12 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: "Missing required fields." });
     }
 
+    const requestedTimeLabel = typeof postedTimeLabel === "string" ? postedTimeLabel.trim().slice(0, 80) : "";
+    const slotClaim = holidaySlotClaim(leadSource, scheduledDate, requestedTimeLabel);
+    if (slotClaim && holidaySlotIsFull(await loadHolidaySlotOrders(), slotClaim)) {
+      return res.status(409).json({ error: HOLIDAY_SLOT_TAKEN_MESSAGE });
+    }
+
     const clientName = `${firstName} ${lastName}`.trim();
     const locationFields = storedServiceLocationFields(address);
     const savedAddress = locationFields.address;
@@ -287,6 +295,7 @@ router.post("/", async (req, res) => {
       travelQuoted: travel.travelQuoted,
       scheduledDate: decision.slot?.date || scheduledDate || null,
       scheduledTime: decision.slot?.time || scheduledTime || null,
+      requestedTimeLabel: requestedTimeLabel || null,
       photographerPreference: preferenceName(preferenceId),
       assignedPhotographerName: decision.slot?.photographerName || null,
       bookingPhotographerId: decision.slot?.photographerId || null,
@@ -456,7 +465,6 @@ router.post("/", async (req, res) => {
     let clientEmailStatus: "sent" | "failed" = "failed";
     let passwordSetupStatus: "sent" | "failed" | "not_needed" | "gated" = account.createdAccount ? "gated" : "not_needed";
     let smsStatus: "sent" | "failed" | "skipped" | "not_configured" = phone ? "failed" : "skipped";
-    const requestedTimeLabel = typeof postedTimeLabel === "string" ? postedTimeLabel.trim().slice(0, 80) : "";
     const shownTime = requestedTimeLabel || (typeof scheduledTime === "string" ? scheduledTime : "");
     const holidayMailKind = holidayCheckoutKind(leadSource, total);
     const holidayHtml = holidayMailKind === "none" ? "" : holidayOrderReceivedHtml({
@@ -683,6 +691,17 @@ router.post("/", async (req, res) => {
       }).catch((deleteErr) => console.error("[Bookings] Calendar hold cleanup failed:", deleteErr));
     }
     return res.status(500).json({ error: "Failed to submit booking request." });
+  }
+});
+
+// Public times only. Names and emails stay on the order.
+router.get("/holiday-slots", async (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    return res.json(holidayTakenFromOrders(await loadHolidaySlotOrders()));
+  } catch (err) {
+    console.error("[Bookings] Holiday slot list failed:", err);
+    return res.status(500).json({ error: "Holiday slots are unavailable." });
   }
 });
 

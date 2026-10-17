@@ -69,6 +69,7 @@
         <h3><span class="no">3</span>Pick a start time</h3>
         <p class="sub" id="slotsub">15-minute slots from 10:00 AM. Last weekday start is 2:45 PM.</p>
         <div class="slots" id="slots"></div>
+        <p class="slotnote">Taken times are removed automatically.</p>
         <div class="divider"></div>
         <h3><span class="no">4</span>Add-ons</h3>
         <p class="sub">Make it feel like your brand. Add-ons need 7 days' notice.</p>
@@ -162,8 +163,7 @@ const START=new Date(2026,10,27),END=new Date(2026,11,14);
 // Studio 105 rental rates from plan.md (Dec packages table): $60/hr (Package B), $55/hr (Package C, 4 hr)
 const PK={A:{name:'Single Session',min:1,per:null,base:99,hrs:0,rate:0,notice:false},B:{name:'Client Hour',min:4,per:89,hrs:1,rate:60,notice:true},C:{name:'Holiday Takeover',min:6,per:79,hrs:4,rate:55,notice:true}};
 const partyRate=h=>h>=4?55:60; // assumption: party hours billed at the B rate, 4-hr parties at the C rate
-const TAKEN={'2026-11-27':['10:00 AM','10:15 AM','1:30 PM'],'2026-12-05':['10:30 AM']};
-const $=id=>document.getElementById(id);let sel=null,slot=null;
+const $=id=>document.getElementById(id);let sel=null,slot=null,takenSeason={};
 const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 const fmt=m=>{const h=Math.floor(m/60),mm=m%60;return `${(h-1)%12+1}:${String(mm).padStart(2,'0')} ${h<12?'AM':'PM'}`};
 function slotsFor(d){if(!d)return[];const end=d.getDay()===6?12*60:15*60;const a=[];for(let m=600;m<end;m+=15)a.push(fmt(m));return a}
@@ -177,7 +177,7 @@ function renderCal(){const g=$('cal');g.innerHTML=['Sun','Mon','Tue','Wed','Thu'
  g.querySelectorAll('button[data-d]').forEach(b=>b.onclick=()=>{sel=new Date(b.dataset.d+'T00:00');slot=null;renderCal();renderSlots();sum()})}
 function renderSlots(){const s=$('slots');if(!sel){s.innerHTML='<p class="slotnote">Pick a date to see open times.</p>';return}
  const sat=sel.getDay()===6;$('slotsub').textContent=sat?'Saturday: morning slots only, 10:00 to 11:45 AM (no shoots after noon).':'15-minute slots from 10:00 AM. Last start is 2:45 PM (sessions wrap by 3:00).';
- const tk=TAKEN[iso(sel)]||[];s.innerHTML=slotsFor(sel).map(t=>`<label><input type="radio" name="slot" value="${t}" ${tk.includes(t)?'disabled':''} ${t===slot?'checked':''}><span class="${tk.includes(t)?'taken':''}">${t}</span></label>`).join('');
+ const tk=takenSeason[iso(sel)]||[];if(slot&&tk.includes(slot))slot=null;s.innerHTML=slotsFor(sel).map(t=>`<label><input type="radio" name="slot" value="${t}" ${tk.includes(t)?'disabled':''} ${t===slot?'checked':''}><span class="${tk.includes(t)?'taken':''}">${t}</span></label>`).join('');
  s.querySelectorAll('input').forEach(i=>i.onchange=()=>{slot=i.value;sum()})}
 function partyStarts(){const d=$('pd').value?new Date($('pd').value+'T00:00'):null;const end=d&&d.getDay()===6?12*60:15*60;$('pst').innerHTML='';for(let m=600;m<end;m+=15)$('pst').insertAdjacentHTML('beforeend',`<option>${fmt(m)}</option>`)}
 const money=n=>'$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -253,13 +253,30 @@ $('pay').onclick=async()=>{
     ok.innerHTML='We\'ll text your secure payment link. Call <a href="tel:+12813560965">281.356.0965</a>.';
   }catch(err){
     ok.hidden=false;
+    if(/just taken/i.test(err.message||'')){
+      ok.textContent='That time was just taken. Pick another.';
+      $('pay').disabled=false;
+      await loadTaken();
+      renderSlots();
+      sum();
+      return;
+    }
     ok.textContent=(err.message||'We could not send that.')+' Call 281.356.0965.';
     $('pay').disabled=false;
   }
 };
 partyStarts();sel=new Date(2026,11,4);slot='11:00 AM';
 if(QS.get('party')){document.querySelector('input[name=pkg][value=B]').checked=true;$('pk').value='B';$('fam').value=4;['party','menu','decor'].forEach(i=>$(i).checked=true);$('partyform').hidden=false}
+async function loadTaken(){
+  try{
+    const res=await fetch('/api/bookings/holiday-slots',{cache:'no-store'});
+    if(!res.ok)throw new Error('slots');
+    const data=await res.json();
+    takenSeason=data&&data.season&&typeof data.season==='object'?data.season:{};
+  }catch(e){takenSeason={};}
+}
 renderCal();renderSlots();sum();
+loadTaken().then(()=>{renderSlots();sum();});
 
 const STUDIO="26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380";
 function splitName(raw){const p=String(raw||"").trim().split(/\s+/).filter(Boolean);return {firstName:p[0]||"",lastName:p.slice(1).join(" ")||"-"};}
