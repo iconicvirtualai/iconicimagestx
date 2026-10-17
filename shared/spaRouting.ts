@@ -58,6 +58,8 @@ const RESERVED: Rewrite[] = [
   { source: "/admin/owners", destination: "/api/index" },
   { source: "/owners", destination: "/api/index" },
   { source: "/podcast-guest-prep", destination: "/podcast-guest-prep.html" },
+  { source: "/thankful", destination: "/thankful.html" },
+  { source: "/tis-the-season", destination: "/tis-the-season.html" },
 ];
 
 function withSlashVariants(rules: Rewrite[]): Rewrite[] {
