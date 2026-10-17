@@ -4,11 +4,12 @@
  */
 
 import { HOLIDAY_RSVP_LEAD, HOLIDAY_SEASON_LEAD } from "./holidayCheckout.ts";
+import { THANKFUL_EVENT_DATE as THANKFUL_SLOT_DATE } from "./thankfulEvent.ts";
 
 /** How many real bookings one 15-minute start time can hold. */
 export const HOLIDAY_SLOT_LIMIT = 1;
 
-export const THANKFUL_SLOT_DATE = "2026-11-14";
+export { THANKFUL_SLOT_DATE };
 export const SEASON_SLOT_START = "2026-11-27";
 export const SEASON_SLOT_END = "2026-12-14";
 

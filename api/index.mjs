@@ -6107,8 +6107,118 @@ function holidayOrderReceivedHtml(input) {
     </div>
   </div>`;
 }
+const THANKFUL_EVENT_DATE = "2026-11-07";
+const THANKFUL_RSVP_CLOSE_UTC = "2026-11-01T04:59:00.000Z";
+const THANKFUL_RSVP_CLOSED = "Headcount and menu votes closed Sat, Oct 31 at 11:59 PM CT.";
+const SOCIAL_RATE_BY_DATE = {
+  "2026-10-16": 50,
+  "2026-10-17": 49,
+  "2026-10-18": 47,
+  "2026-10-19": 45,
+  "2026-10-20": 43,
+  "2026-10-21": 41,
+  "2026-10-22": 39,
+  "2026-10-23": 37,
+  "2026-10-24": 35,
+  "2026-10-25": 33,
+  "2026-10-26": 31.5,
+  "2026-10-27": 30,
+  "2026-10-28": 28.5,
+  "2026-10-29": 27,
+  "2026-10-30": 25.5,
+  "2026-10-31": 24,
+  "2026-11-01": 23.5,
+  "2026-11-02": 23,
+  "2026-11-03": 22.5,
+  "2026-11-04": 22,
+  "2026-11-05": 21.5,
+  "2026-11-06": 21,
+  "2026-11-07": 20
+};
+const SOCIAL_PACKAGES = [
+  { name: "The Baseline", monthlyDollars: 500 },
+  { name: "The Growth Engine", monthlyDollars: 850 },
+  { name: "The Professional Suite", monthlyDollars: 1500 },
+  { name: "The Connected Core", monthlyDollars: 2e3 },
+  { name: "The Signature Tier", monthlyDollars: 2800 },
+  { name: "The Authority Stack", monthlyDollars: 3200 },
+  { name: "The Iconic Partnership", monthlyDollars: 4500 }
+];
+const SOCIAL_PRICING_ENDED = "Social pricing ended after Sat, Nov 7. Call 281.356.0965.";
+function chicagoDateKey$1(now) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(now);
+}
+function thankfulRsvpOpen(now) {
+  return now.getTime() <= Date.parse(THANKFUL_RSVP_CLOSE_UTC);
+}
+function socialRateForInstant(now) {
+  const key = chicagoDateKey$1(now);
+  return Object.prototype.hasOwnProperty.call(SOCIAL_RATE_BY_DATE, key) ? SOCIAL_RATE_BY_DATE[key] : null;
+}
+function socialTermPercent(dayRate, months) {
+  if (months === 12) return dayRate + 10;
+  if (months === 6) return dayRate + 5;
+  if (months === 3 || months === 1) return dayRate;
+  return null;
+}
+function discountedCents(listCents, percent) {
+  const tenths = Math.round(percent * 10);
+  return Math.round(listCents * (1e3 - tenths) / 1e3);
+}
+function quoteSocialTerm(monthlyDollars, months, dayRate) {
+  const percent = socialTermPercent(dayRate, months);
+  if (percent == null) return null;
+  const monthlyCents = discountedCents(Math.round(monthlyDollars * 100), percent);
+  const termCents = Math.max(0, monthlyCents * months - (months === 3 ? 1e4 : 0));
+  const processingCents = processingFeeCents(termCents);
+  return {
+    percent,
+    monthlyCents,
+    termCents,
+    processingCents,
+    squareCents: termCents + processingCents
+  };
+}
+function quoteThankfulSocialSave(input) {
+  const rate2 = socialRateForInstant(input.now);
+  if (rate2 == null) return { ok: false, error: SOCIAL_PRICING_ENDED };
+  const parsed = parseSocialSave(input.label, input.packageName, input.months);
+  if (!parsed) return { ok: false, error: "Choose a social package and a 12, 6, 3, or 1 month term." };
+  const pack = SOCIAL_PACKAGES.find((item) => item.name === parsed.name);
+  if (!pack) return { ok: false, error: "Choose a social package and a 12, 6, 3, or 1 month term." };
+  const quote = quoteSocialTerm(pack.monthlyDollars, parsed.months, rate2);
+  if (!quote) return { ok: false, error: "Choose a social package and a 12, 6, 3, or 1 month term." };
+  return {
+    ok: true,
+    packageName: pack.name,
+    months: parsed.months,
+    termDollars: quote.termCents / 100,
+    squareDollars: quote.squareCents / 100,
+    quote
+  };
+}
+function parseSocialSave(label, packageName, months) {
+  const named = typeof packageName === "string" ? packageName.trim() : "";
+  const monthCount = Number(months);
+  if (named && SOCIAL_PACKAGES.some((item) => item.name === named) && validMonths(monthCount)) {
+    return { name: named, months: monthCount };
+  }
+  const text2 = typeof label === "string" ? label : "";
+  const match = /Social Saves 2027:\s*(.+?),\s*(\d+)\s+months/i.exec(text2);
+  if (!match || !validMonths(Number(match[2]))) return null;
+  const name = match[1].trim();
+  if (!SOCIAL_PACKAGES.some((item) => item.name === name)) return null;
+  return { name, months: Number(match[2]) };
+}
+function validMonths(months) {
+  return months === 1 || months === 3 || months === 6 || months === 12;
+}
 const HOLIDAY_SLOT_LIMIT = 1;
-const THANKFUL_SLOT_DATE = "2026-11-14";
 const SEASON_SLOT_START = "2026-11-27";
 const SEASON_SLOT_END = "2026-12-14";
 const HOLIDAY_SLOT_TAKEN_MESSAGE = "That time was just taken. Pick another.";
@@ -6177,7 +6287,7 @@ function orderDate(order) {
   }
   const fromNote = /^Date:\s*(\d{4}-\d{2}-\d{2})/im.exec(text$e(order.vibeNote));
   if (fromNote) return fromNote[1];
-  if (text$e(order.leadSource).trim() === HOLIDAY_RSVP_LEAD) return THANKFUL_SLOT_DATE;
+  if (text$e(order.leadSource).trim() === HOLIDAY_RSVP_LEAD) return THANKFUL_EVENT_DATE;
   return null;
 }
 function orderTime(order) {
@@ -6196,8 +6306,8 @@ function holidaySlotClaim(leadSource, date, time) {
   const lead = text$e(leadSource).trim();
   const day = text$e(date).trim().slice(0, 10);
   if (lead === HOLIDAY_RSVP_LEAD) {
-    const thankfulDay = day || THANKFUL_SLOT_DATE;
-    if (thankfulDay !== THANKFUL_SLOT_DATE || !thankfulSlotTimes().includes(clock)) return null;
+    const thankfulDay = day || THANKFUL_EVENT_DATE;
+    if (thankfulDay !== THANKFUL_EVENT_DATE || !thankfulSlotTimes().includes(clock)) return null;
     return { kind: "thankful", date: thankfulDay, time: clock };
   }
   if (lead === HOLIDAY_SEASON_LEAD) {
@@ -6239,7 +6349,7 @@ function holidayTakenFromOrders(orders, limit = HOLIDAY_SLOT_LIMIT) {
   for (const date of Object.keys(season)) season[date].sort(timeSort);
   return {
     limit,
-    thankful: { date: THANKFUL_SLOT_DATE, taken: thankful },
+    thankful: { date: THANKFUL_EVENT_DATE, taken: thankful },
     season
   };
 }
@@ -7749,6 +7859,9 @@ router$p.post("/", async (req, res) => {
       return res.status(400).json({ error: "Missing required fields." });
     }
     const requestedTimeLabel = typeof postedTimeLabel === "string" ? postedTimeLabel.trim().slice(0, 80) : "";
+    if (leadSource === HOLIDAY_RSVP_LEAD && !thankfulRsvpOpen(/* @__PURE__ */ new Date())) {
+      return res.status(400).json({ error: THANKFUL_RSVP_CLOSED });
+    }
     const slotClaim = holidaySlotClaim(leadSource, scheduledDate, requestedTimeLabel);
     if (slotClaim && holidaySlotIsFull(await loadHolidaySlotOrders(), slotClaim)) {
       return res.status(409).json({ error: HOLIDAY_SLOT_TAKEN_MESSAGE });
@@ -7768,7 +7881,18 @@ router$p.post("/", async (req, res) => {
     if (chargedServiceLines(keptLines).length === 0) {
       return res.status(400).json({ error: "No services selected." });
     }
-    const traveled = applyServerTravel(keptLines, savedAddress);
+    let serviceLines = keptLines;
+    if (leadSource === HOLIDAY_SOCIAL_SAVES_LEAD) {
+      const quoted = quoteThankfulSocialSave({
+        label: serviceLines.map((item) => item.name).join("\n"),
+        packageName: req.body.socialPackage,
+        months: req.body.socialMonths,
+        now: /* @__PURE__ */ new Date()
+      });
+      if (!quoted.ok) return res.status(400).json({ error: quoted.error });
+      serviceLines = serviceLines.map((item, index) => index === 0 ? { ...item, unitPrice: quoted.termDollars, price: quoted.termDollars } : item);
+    }
+    const traveled = applyServerTravel(serviceLines, savedAddress);
     const travel = traveled.travel;
     const promoCode = resolved.promoCode;
     const promoDiscount = resolved.promoDiscount;
