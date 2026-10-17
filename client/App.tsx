@@ -30,6 +30,7 @@ import Contact from "./pages/Contact";
 import Book from "./pages/Book";
 import SeniorLiving from "./pages/SeniorLiving";
 import Apprenticeship from "./pages/Apprenticeship";
+import Thankful from "./pages/Thankful";
 import Pricing from "./pages/Pricing";
 import AIPricingAssistant from "./pages/AIPricingAssistant";
 import Socials from "./pages/Socials";
@@ -126,6 +127,9 @@ const App = () => (
             <Route path="/book" element={<Book />} />
             <Route path="/senior-living" element={<SeniorLiving />} />
             <Route path="/apprenticeship" element={<Apprenticeship />} />
+            <Route path="/thankful" element={<Thankful />} />
+            <Route path="/events/thankful-for-you-always" element={<Navigate to="/thankful" replace />} />
+            <Route path="/holiday-event" element={<Navigate to="/thankful" replace />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/pricing/ai-assistant" element={<AIPricingAssistant />} />
             <Route path="/socials" element={<Socials />} />

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" role="img" aria-label="Menu vote">
+  <rect width="1080" height="1080" fill="#f3eee4"/>
+  <rect x="48" y="48" width="984" height="984" fill="none" stroke="#1c2e27" stroke-width="3"/>
+  <text x="540" y="150" text-anchor="middle" fill="#1c2e27" font-family="Georgia, serif" font-size="28" letter-spacing="8">VOTE FOR ONE MENU</text>
+  <text x="200" y="250" fill="#8f3d32" font-family="Georgia, serif" font-size="36">Menu 1</text>
+  <text x="200" y="310" fill="#221811" font-family="Georgia, serif" font-size="26">Smoked Turkey Sliders</text>
+  <text x="200" y="350" fill="#221811" font-family="Georgia, serif" font-size="26">Three-Cheese Mac</text>
+  <text x="200" y="390" fill="#221811" font-family="Georgia, serif" font-size="26">Caesar Salad Deviled Eggs</text>
+  <text x="200" y="430" fill="#221811" font-family="Georgia, serif" font-size="26">Prosciutto Turnovers</text>
+  <text x="200" y="470" fill="#221811" font-family="Georgia, serif" font-size="26">Caramel Apple Crisp Cheesecake</text>
+  <text x="200" y="560" fill="#8f3d32" font-family="Georgia, serif" font-size="36">Menu 2</text>
+  <text x="200" y="620" fill="#221811" font-family="Georgia, serif" font-size="26">Thanksgiving Stack</text>
+  <text x="200" y="660" fill="#221811" font-family="Georgia, serif" font-size="26">Spinach &amp; Artichoke Stuffed Mushrooms</text>
+  <text x="200" y="700" fill="#221811" font-family="Georgia, serif" font-size="26">Ham &amp; Cheese Pinwheels</text>
+  <text x="200" y="740" fill="#221811" font-family="Georgia, serif" font-size="26">Creamed Corn</text>
+  <text x="200" y="780" fill="#221811" font-family="Georgia, serif" font-size="26">Valrhona Chocolate Pecan Pie</text>
+  <text x="200" y="870" fill="#8f3d32" font-family="Georgia, serif" font-size="36">Menu 3</text>
+  <text x="200" y="930" fill="#221811" font-family="Georgia, serif" font-size="26">Holiday Charcuterie · Deviled Eggs · Crostini</text>
+  <text x="200" y="980" fill="#221811" font-family="Georgia, serif" font-size="26">Caprese Skewers · Pumpkin Cheesecake</text>
+</svg>

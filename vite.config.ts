@@ -48,6 +48,17 @@ function expressPlugin(): Plugin {
           res.end();
           return;
         }
+        if (
+          pathOnly === "/events/thankful-for-you-always"
+          || pathOnly === "/events/thankful-for-you-always/"
+          || pathOnly === "/holiday-event"
+          || pathOnly === "/holiday-event/"
+        ) {
+          res.statusCode = 302;
+          res.setHeader("Location", "/thankful");
+          res.end();
+          return;
+        }
         if (pathOnly === "/podcast-guest-prep" || pathOnly === "/podcast-guest-prep/") {
           const search = queryAt === -1 ? "" : raw.slice(queryAt);
           req.url = `/podcast-guest-prep.html${search}`;

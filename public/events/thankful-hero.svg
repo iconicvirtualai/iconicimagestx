@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" role="img" aria-label="Thankful for You Always">
+  <rect width="1080" height="1080" fill="#1c2e27"/>
+  <rect x="48" y="48" width="984" height="984" fill="none" stroke="#d7c4a3" stroke-width="3"/>
+  <rect x="68" y="68" width="944" height="944" fill="none" stroke="#d7c4a3" stroke-width="1" opacity="0.7"/>
+  <text x="540" y="220" text-anchor="middle" fill="#d7c4a3" font-family="Georgia, serif" font-size="28" letter-spacing="10">ICONIC IMAGES</text>
+  <text x="540" y="430" text-anchor="middle" fill="#f6f1e7" font-family="Georgia, serif" font-size="92">Thankful</text>
+  <text x="540" y="530" text-anchor="middle" fill="#f6f1e7" font-family="Georgia, serif" font-size="78">for You Always</text>
+  <text x="540" y="620" text-anchor="middle" fill="#c45c4a" font-family="Georgia, serif" font-size="54">e</text>
+  <text x="540" y="740" text-anchor="middle" fill="#f6f1e7" font-family="Georgia, serif" font-size="36">Saturday, Nov 14, 2026</text>
+  <text x="540" y="800" text-anchor="middle" fill="#d7c4a3" font-family="Georgia, serif" font-size="32">11 AM  3 PM CT</text>
+  <text x="540" y="900" text-anchor="middle" fill="#f6f1e7" font-family="Georgia, serif" font-size="28">Studio 105 · Spring, Texas</text>
+</svg>

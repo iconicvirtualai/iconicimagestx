@@ -27,6 +27,7 @@ const APP_SHELL_SOURCES = [
   "/insights/prep",
   "/unsubscribe",
   "/go",
+  "/thankful",
   "/listing-cards",
   "/invoice/:invoiceId",
   "/services/virtual-staging",
@@ -102,6 +103,10 @@ export function buildVercelRedirects(): Redirect[] {
     { source: "/studio/", destination: "/studio-105", permanent: false },
     { source: "/gallery", destination: "/portal", permanent: false },
     { source: "/gallery/", destination: "/portal", permanent: false },
+    { source: "/events/thankful-for-you-always", destination: "/thankful", permanent: false },
+    { source: "/events/thankful-for-you-always/", destination: "/thankful", permanent: false },
+    { source: "/holiday-event", destination: "/thankful", permanent: false },
+    { source: "/holiday-event/", destination: "/thankful", permanent: false },
   ];
 }
 
