@@ -27,6 +27,16 @@ app.get(["/podcast-guest-prep", "/podcast-guest-prep/"], (_req, res) => {
   res.sendFile(podcastGuestPrep);
 });
 
+const thankfulPage = path.join(distPath, "thankful.html");
+app.get(["/thankful", "/thankful/"], (_req, res) => {
+  res.sendFile(thankfulPage);
+});
+
+const tisTheSeasonPage = path.join(distPath, "tis-the-season.html");
+app.get(["/tis-the-season", "/tis-the-season/"], (_req, res) => {
+  res.sendFile(tisTheSeasonPage);
+});
+
 // Retired pricing page. Must stay ahead of the SPA catch-all so crawlers get a real 301.
 app.get(["/pricing-v1", "/pricing-v1/"], (_req, res) => {
   res.redirect(301, "/pricing");

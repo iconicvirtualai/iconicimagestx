@@ -52,6 +52,14 @@ function expressPlugin(): Plugin {
           const search = queryAt === -1 ? "" : raw.slice(queryAt);
           req.url = `/podcast-guest-prep.html${search}`;
         }
+        if (pathOnly === "/thankful" || pathOnly === "/thankful/") {
+          const search = queryAt === -1 ? "" : raw.slice(queryAt);
+          req.url = `/thankful.html${search}`;
+        }
+        if (pathOnly === "/tis-the-season" || pathOnly === "/tis-the-season/") {
+          const search = queryAt === -1 ? "" : raw.slice(queryAt);
+          req.url = `/tis-the-season.html${search}`;
+        }
         next();
       });
 

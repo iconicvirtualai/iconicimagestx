@@ -25,6 +25,27 @@
   status = 200
   to = "/podcast-guest-prep.html"
 
+# Holiday campaign pages. Must stay ahead of any SPA fallback.
+[[redirects]]
+  from = "/thankful"
+  status = 200
+  to = "/thankful.html"
+
+[[redirects]]
+  from = "/thankful/"
+  status = 200
+  to = "/thankful.html"
+
+[[redirects]]
+  from = "/tis-the-season"
+  status = 200
+  to = "/tis-the-season.html"
+
+[[redirects]]
+  from = "/tis-the-season/"
+  status = 200
+  to = "/tis-the-season.html"
+
 # Retired pricing page. Current prices live on /pricing.
 [[redirects]]
   from = "/pricing-v1"
