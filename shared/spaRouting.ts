@@ -102,6 +102,12 @@ export function buildVercelRedirects(): Redirect[] {
     { source: "/studio/", destination: "/studio-105", permanent: false },
     { source: "/gallery", destination: "/portal", permanent: false },
     { source: "/gallery/", destination: "/portal", permanent: false },
+    { source: "/december", destination: "/tis-the-season", permanent: false },
+    { source: "/december/", destination: "/tis-the-season", permanent: false },
+    { source: "/holiday-packages", destination: "/tis-the-season", permanent: false },
+    { source: "/holiday-packages/", destination: "/tis-the-season", permanent: false },
+    { source: "/iconic-studios", destination: "/studios", permanent: false },
+    { source: "/iconic-studios/", destination: "/studios", permanent: false },
   ];
 }
 

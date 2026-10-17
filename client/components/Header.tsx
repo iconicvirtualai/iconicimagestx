@@ -4,6 +4,7 @@ import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { itemLink, itemText, useSiteHref, useSiteItems, useSiteText } from "@/content/siteContent";
+import { STUDIOS_NAV_ITEM, withStudiosNav } from "@/lib/publicNav";
 
 export default function Header() {
   const settings = useSiteSettings();
@@ -25,16 +26,19 @@ export default function Header() {
   };
 
   const navItems = useSiteItems("chrome", "nav");
-  const menuItems = navItems
-    ? navItems.map((item) => ({ label: itemText(item, "link"), href: itemLink(item, "link") || "/" }))
-    : [
-        { label: "About", href: "/about" },
-        { label: "Pricing", href: "/pricing" },
-        { label: "Studio 105", href: "/studio-105" },
-        { label: "Portfolio", href: "/portfolio" },
-        { label: "Stock Footage", href: "/stock-footage" },
-        { label: "Contact Us", href: "/contact" },
-      ];
+  const menuItems = withStudiosNav(
+    navItems
+      ? navItems.map((item) => ({ label: itemText(item, "link"), href: itemLink(item, "link") || "/" }))
+      : [
+          { label: "About", href: "/about" },
+          { label: "Pricing", href: "/pricing" },
+          { label: "Studio 105", href: "/studio-105" },
+          { label: "Portfolio", href: "/portfolio" },
+          { label: "Stock Footage", href: "/stock-footage" },
+          { label: "Contact Us", href: "/contact" },
+        ],
+    STUDIOS_NAV_ITEM,
+  );
   const loginLabel = useSiteText("chrome", "headerCtas", "login", "Log in");
   const loginHref = useSiteHref("chrome", "headerCtas", "login", "/login");
   const bookLabel = useSiteText("chrome", "headerCtas", "book", "Book Now");

@@ -77,3 +77,33 @@
   from = "/gallery/"
   status = 302
   to = "/portal"
+
+[[redirects]]
+  from = "/december"
+  status = 302
+  to = "/tis-the-season"
+
+[[redirects]]
+  from = "/december/"
+  status = 302
+  to = "/tis-the-season"
+
+[[redirects]]
+  from = "/holiday-packages"
+  status = 302
+  to = "/tis-the-season"
+
+[[redirects]]
+  from = "/holiday-packages/"
+  status = 302
+  to = "/tis-the-season"
+
+[[redirects]]
+  from = "/iconic-studios"
+  status = 302
+  to = "/studios"
+
+[[redirects]]
+  from = "/iconic-studios/"
+  status = 302
+  to = "/studios"

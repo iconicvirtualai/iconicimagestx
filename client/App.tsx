@@ -26,6 +26,8 @@ import Index from "./pages/Index";
 import About from "./pages/About";
 import Portfolio from "./pages/Portfolio";
 import Studio105 from "./pages/Studio105";
+import TisTheSeason from "./pages/TisTheSeason";
+import IconicStudios from "./pages/IconicStudios";
 import Contact from "./pages/Contact";
 import Book from "./pages/Book";
 import SeniorLiving from "./pages/SeniorLiving";
@@ -122,6 +124,11 @@ const App = () => (
             <Route path="/about" element={<About />} />
             <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/studio-105" element={<Studio105 />} />
+            <Route path="/studios" element={<IconicStudios />} />
+            <Route path="/iconic-studios" element={<Navigate to="/studios" replace />} />
+            <Route path="/tis-the-season" element={<TisTheSeason />} />
+            <Route path="/december" element={<Navigate to="/tis-the-season" replace />} />
+            <Route path="/holiday-packages" element={<Navigate to="/tis-the-season" replace />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/book" element={<Book />} />
             <Route path="/senior-living" element={<SeniorLiving />} />

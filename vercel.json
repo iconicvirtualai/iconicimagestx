@@ -51,6 +51,36 @@
       "source": "/gallery/",
       "destination": "/portal",
       "permanent": false
+    },
+    {
+      "source": "/december",
+      "destination": "/tis-the-season",
+      "permanent": false
+    },
+    {
+      "source": "/december/",
+      "destination": "/tis-the-season",
+      "permanent": false
+    },
+    {
+      "source": "/holiday-packages",
+      "destination": "/tis-the-season",
+      "permanent": false
+    },
+    {
+      "source": "/holiday-packages/",
+      "destination": "/tis-the-season",
+      "permanent": false
+    },
+    {
+      "source": "/iconic-studios",
+      "destination": "/studios",
+      "permanent": false
+    },
+    {
+      "source": "/iconic-studios/",
+      "destination": "/studios",
+      "permanent": false
     }
   ],
   "rewrites": [
@@ -177,6 +207,22 @@
     {
       "source": "/studio-105/",
       "destination": "/seo/studio-105.html"
+    },
+    {
+      "source": "/studios",
+      "destination": "/seo/studios.html"
+    },
+    {
+      "source": "/studios/",
+      "destination": "/seo/studios.html"
+    },
+    {
+      "source": "/tis-the-season",
+      "destination": "/seo/tis-the-season.html"
+    },
+    {
+      "source": "/tis-the-season/",
+      "destination": "/seo/tis-the-season.html"
     },
     {
       "source": "/portfolio",
