@@ -26,7 +26,8 @@ import { chargedServiceLines, normalizeBookingLineItems, orderTotalLabel, resolv
 import { applyServerTravel, isTravelFeeLine, travelSummaryText, type TravelAssessment } from "../../shared/travelZones";
 import { planOrderPackageRepair } from "../../shared/orderPackageRepair";
 import { notifyOfficeOfOrder } from "../services/officeOrderNotify";
-import { HOLIDAY_SEASON_LEAD, holidayCheckoutKind, holidayOrderReceivedHtml } from "../../shared/holidayCheckout";
+import { HOLIDAY_RSVP_LEAD, HOLIDAY_SEASON_LEAD, HOLIDAY_SOCIAL_SAVES_LEAD, holidayCheckoutKind, holidayOrderReceivedHtml } from "../../shared/holidayCheckout";
+import { THANKFUL_RSVP_CLOSED, quoteThankfulSocialSave, thankfulRsvpOpen } from "../../shared/thankfulEvent";
 import { HOLIDAY_SLOT_TAKEN_MESSAGE, holidaySlotClaim, holidaySlotIsFull, holidayTakenFromOrders } from "../../shared/holidaySlots";
 import { createHolidaySquareCheckout } from "../services/holidaySquareCheckout";
 import { loadHolidaySlotOrders } from "../services/holidaySlots";
@@ -162,6 +163,9 @@ router.post("/", async (req, res) => {
     }
 
     const requestedTimeLabel = typeof postedTimeLabel === "string" ? postedTimeLabel.trim().slice(0, 80) : "";
+    if (leadSource === HOLIDAY_RSVP_LEAD && !thankfulRsvpOpen(new Date())) {
+      return res.status(400).json({ error: THANKFUL_RSVP_CLOSED });
+    }
     const slotClaim = holidaySlotClaim(leadSource, scheduledDate, requestedTimeLabel);
     if (slotClaim && holidaySlotIsFull(await loadHolidaySlotOrders(), slotClaim)) {
       return res.status(409).json({ error: HOLIDAY_SLOT_TAKEN_MESSAGE });
@@ -184,7 +188,22 @@ router.post("/", async (req, res) => {
     if (chargedServiceLines(keptLines).length === 0) {
       return res.status(400).json({ error: "No services selected." });
     }
-    const traveled = applyServerTravel(keptLines, savedAddress);
+    let serviceLines = keptLines;
+    if (leadSource === HOLIDAY_SOCIAL_SAVES_LEAD) {
+      const quoted = quoteThankfulSocialSave({
+        label: serviceLines.map((item) => item.name).join("\n"),
+        packageName: req.body.socialPackage,
+        months: req.body.socialMonths,
+        now: new Date(),
+      });
+      if (!quoted.ok) return res.status(400).json({ error: quoted.error });
+      serviceLines = serviceLines.map((item, index) => (
+        index === 0
+          ? { ...item, unitPrice: quoted.termDollars, price: quoted.termDollars }
+          : item
+      ));
+    }
+    const traveled = applyServerTravel(serviceLines, savedAddress);
     const travel = traveled.travel;
     const promoCode = resolved.promoCode;
     const promoDiscount = resolved.promoDiscount;

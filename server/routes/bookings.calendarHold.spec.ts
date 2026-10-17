@@ -422,7 +422,7 @@ describe("public booking calendar hold", () => {
   it("publishes taken holiday times only and rejects a second RSVP for that slot", async () => {
     docs("orderRequests").set("real", {
       leadSource: "Thankful client holiday event RSVP",
-      scheduledDate: "2026-11-14",
+      scheduledDate: "2026-11-07",
       requestedTimeLabel: "11:30 AM",
       email: "ada@example.com",
       clientName: "Ada Client",
@@ -430,7 +430,7 @@ describe("public booking calendar hold", () => {
     });
     docs("orderRequests").set("qa", {
       leadSource: "Thankful client holiday event RSVP",
-      scheduledDate: "2026-11-14",
+      scheduledDate: "2026-11-07",
       requestedTimeLabel: "1:15 PM",
       email: "ops+deliveryqa@iconicimagestx.com",
       clientName: "TEST Quinn",
@@ -453,7 +453,7 @@ describe("public booking calendar hold", () => {
       address: "26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380",
       lineItems: [{ name: "Client Holiday Event RSVP", price: 0 }],
       total: 0,
-      scheduledDate: "2026-11-14",
+      scheduledDate: "2026-11-07",
       scheduledTime: "Afternoon",
       requestedTimeLabel: "11:30 AM",
       selectedService: "Client Holiday Event RSVP",
@@ -474,5 +474,63 @@ describe("public booking calendar hold", () => {
       body: JSON.stringify({ ...payload, requestedTimeLabel: "1:15 PM", scheduledTime: "Afternoon" }),
     });
     expect(open.status).toBe(201);
+  });
+
+  it("quotes the Oct 17 social total and rejects an RSVP after the cutoff", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+    vi.setSystemTime(new Date("2026-10-17T21:16:00.000Z"));
+    const social = await fetch(`${baseUrl}/api/bookings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        firstName: "Ada",
+        lastName: "Client",
+        email: "ada@example.com",
+        phone: "281-555-0199",
+        address: "26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380",
+        lineItems: [{ name: "Social Saves 2027: The Baseline, 3 months", price: 1 }],
+        total: 1,
+        scheduledDate: "2026-11-07",
+        scheduledTime: "Afternoon",
+        selectedService: "Social Saves 2027: The Baseline, 3 months",
+        socialPackage: "The Baseline",
+        socialMonths: 3,
+        leadSource: "Thankful social saves",
+      }),
+    });
+    const socialBody = await social.json();
+    const saved = savedOrder();
+    expect(social.status).toBe(201);
+    expect(socialBody.success).toBe(true);
+    const line = (saved.lineItems as Array<{ price?: number }>).find((item) => (item.price || 0) > 0);
+    expect(line?.price).toBe(665);
+    expect(saved.total).toBe(683.62);
+
+    vi.setSystemTime(new Date("2026-11-01T05:00:00.000Z"));
+    const closed = await fetch(`${baseUrl}/api/bookings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        firstName: "Bea",
+        lastName: "Client",
+        email: "bea@example.com",
+        phone: "281-555-0199",
+        address: "26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380",
+        lineItems: [{ name: "Client Holiday Event RSVP", price: 0 }],
+        total: 0,
+        scheduledDate: "2026-11-07",
+        scheduledTime: "Afternoon",
+        requestedTimeLabel: "12:00 PM",
+        selectedService: "Client Holiday Event RSVP",
+        leadSource: "Thankful client holiday event RSVP",
+      }),
+    });
+    const closedBody = await closed.json();
+    expect(closed.status).toBe(400);
+    expect(closedBody.error).toBe("Headcount and menu votes closed Sat, Oct 31 at 11:59 PM CT.");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

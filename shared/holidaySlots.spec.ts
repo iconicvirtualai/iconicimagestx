@@ -10,7 +10,7 @@ import {
 
 const rsvp = (time: string, extra: Record<string, unknown> = {}) => ({
   leadSource: HOLIDAY_RSVP_LEAD,
-  scheduledDate: "2026-11-14",
+  scheduledDate: "2026-11-07",
   scheduledTime: "Afternoon",
   requestedTimeLabel: time,
   email: "ada@example.com",
@@ -30,7 +30,7 @@ describe("holiday slots", () => {
       rsvp("12:30 PM", { status: "declined" }),
       {
         leadSource: HOLIDAY_SOCIAL_SAVES_LEAD,
-        scheduledDate: "2026-11-14",
+        scheduledDate: "2026-11-07",
         requestedTimeLabel: "1:00 PM",
         email: "buyer@example.com",
       },
@@ -46,7 +46,7 @@ describe("holiday slots", () => {
     const taken = holidayTakenFromOrders([
       {
         leadSource: HOLIDAY_RSVP_LEAD,
-        scheduledDate: "2026-11-14",
+        scheduledDate: "2026-11-07",
         scheduledTime: "Morning",
         email: "sam@example.com",
         vibeNote: "Requested photo time: 11:00 AM",

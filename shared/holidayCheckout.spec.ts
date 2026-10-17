@@ -58,7 +58,7 @@ describe("holiday checkout", () => {
     const html = holidayOrderReceivedHtml({
       clientName: "Ada <Client>",
       serviceName: "Client Holiday Event RSVP",
-      whenDate: "Sat, Nov 14",
+      whenDate: "Sat, Nov 7",
       whenTime: "12:00 PM",
       total: "$0.00",
       requestId: "req-1",
@@ -66,7 +66,7 @@ describe("holiday checkout", () => {
       complimentary: true,
     });
     expect(html).toContain("12:00 PM");
-    expect(html).toContain("Sat, Nov 14");
+    expect(html).toContain("Sat, Nov 7");
     expect(html).toContain("complimentary");
     expect(html).toContain(BUSINESS_CONTACT_LINE.split("|")[0].trim());
     expect(html).toContain("https://iconicimagestx.vercel.app/thankful");

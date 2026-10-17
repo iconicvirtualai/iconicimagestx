@@ -15,6 +15,10 @@ export const OG_IMAGE_PATH = "/media/photos/drone-hero.jpg";
 
 export const GENERIC_TITLE = "Iconic Images - Creative Media Partners";
 
+/** Static /thankful page. The HTML meta description must match this sentence. */
+export const THANKFUL_META_DESCRIPTION =
+  "Two events to say THANKS: our Iconic Client Holiday Event on Sat Nov 7 (11–3, Studio 105) and early December client shoots with a free testimonial video for every client shoot.";
+
 export type PublicPage = {
   path: string;
   file: string;
