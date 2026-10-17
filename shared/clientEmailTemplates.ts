@@ -6,6 +6,7 @@
  */
 
 import { LEGAL_BUSINESS_NAME } from "./businessContact.ts";
+import { DEFAULT_PUBLIC_SITE_URL } from "./publicSiteUrl.ts";
 import { clientEmailContactLineHtml } from "./clientEmailContact.ts";
 import { doorsOpenDeliveryEmailHtml, doorsOpenReceiptEmailHtml } from "./doorsOpenTour.ts";
 import { galleryDeliverySubject } from "./galleryDelivery.ts";
@@ -199,7 +200,7 @@ function shell(content: string): string {
       <div style="border-top: 1px solid #eee; margin-top: 30px; padding-top: 20px; text-align: center; color: #999; font-size: 12px;">
         <p>${clientEmailContactLineHtml("#666666")}</p>
         <p>${LEGAL_BUSINESS_NAME}</p>
-        <p><a href="https://iconicimagestx.com" style="color:#999999;text-decoration:underline;">iconicimagestx.com</a></p>
+        <p><a href="${DEFAULT_PUBLIC_SITE_URL}" style="color:#999999;text-decoration:underline;">iconicimagestx.vercel.app</a></p>
         <p>Questions? Reply to this email or message us through your client portal.</p>
       </div>
     </div>
@@ -286,7 +287,7 @@ const HTML_SOURCE: Record<ClientEmailTemplateKey, string> = {
       <p>Thank you for reaching out to Iconic Images. We've received your message and our team will review it shortly.</p>
       <p>We typically respond to inquiries within 24 business hours. If your question is urgent, call or email us using the contact line below.</p>
       <p style="margin-top:30px;color:#888;font-size:12px;">
-        If you have any additional information to add, simply reply to this email or visit <a href="https://iconicimagestx.com" style="color:#888888;text-decoration:underline;">iconicimagestx.com</a>.
+        If you have any additional information to add, simply reply to this email or visit <a href="${DEFAULT_PUBLIC_SITE_URL}" style="color:#888888;text-decoration:underline;">iconicimagestx.vercel.app</a>.
       </p>
     `),
   clientConfirmation: shell(`

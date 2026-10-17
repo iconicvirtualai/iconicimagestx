@@ -83,6 +83,28 @@ describe("sendEmail template overrides", () => {
     expect(message?.text).toBe(branded.text);
   });
 
+  it("keeps locked caller HTML when a stored override would replace it", async () => {
+    process.env.CLIENT_NOTIFY_LIVE = "true";
+    process.env.SMTP_USER = "smtp@example.com";
+    process.env.SMTP_PASS = "secret";
+    store.set("emailTemplates/booking_received", {
+      subject: "Property {{address}}",
+      htmlBody: "<p>REAL ESTATE MEDIA {{scheduledTime}}</p>",
+    });
+    await sendEmail({
+      to: "ada@example.com",
+      template: "booking_received",
+      subject: "Your Iconic order was received",
+      html: "<p>Holiday RSVP at 12:00 PM</p>",
+      lockHtml: true,
+      variables: { scheduledTime: "12:00 PM", address: "Studio" },
+    });
+    const message = sendMail.mock.calls[0]?.[0];
+    expect(message?.subject).toBe("Your Iconic order was received");
+    expect(message?.html).toBe("<p>Holiday RSVP at 12:00 PM</p>");
+    expect(message?.html).not.toContain("REAL ESTATE MEDIA");
+  });
+
   it("replaces the branded receipt when a valid payment_receipt override is stored", async () => {
     process.env.CLIENT_NOTIFY_LIVE = "true";
     process.env.SMTP_USER = "smtp@example.com";

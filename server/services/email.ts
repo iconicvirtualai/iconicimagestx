@@ -16,6 +16,7 @@ import {
   readEmailTemplateOverride,
 } from "../../shared/clientEmailTemplates";
 import { clientNotifyBlockReason, emailAllowed, narrowGatedClientRecipients, notifyTestAllowlist } from "../../shared/clientNotify";
+import { DEFAULT_PUBLIC_SITE_URL } from "../../shared/publicSiteUrl";
 
 const db = () => admin.firestore();
 
@@ -67,8 +68,10 @@ interface SendEmailOptions {
   audience?: "client" | "staff";
   variables?: Record<string, string>;
   subject?: string; // override template subject
-  /** When set, this HTML is the message. A stored template cannot replace it. */
+  /** When set, this HTML is the message unless a stored template override replaces it. */
   html?: string;
+  /** Keep caller html even when emailTemplates/{template} has an override. */
+  lockHtml?: boolean;
   /** Plain-text part. Receipts always send one. */
   text?: string;
   attachments?: Array<{ filename: string; path: string }>;
@@ -101,7 +104,7 @@ export function clientOrderConfirmedSubject(address: string, orderNumber?: strin
 export { clientOrderReceivedSubject } from "../../shared/clientEmailTemplates";
 
 export async function sendEmail(options: SendEmailOptions): Promise<{ sent: boolean; delivery: EmailDelivery }> {
-  const { template, audience, variables = {}, subject: subjectOverride, html, attachments } = options;
+  const { template, audience, variables = {}, subject: subjectOverride, html, attachments, lockHtml } = options;
   let to = options.to;
   let bcc = options.bcc;
   let cc = options.cc;
@@ -151,7 +154,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ sent: bool
     if (admin.apps.length) {
       const templateDoc = await db().collection(EMAIL_TEMPLATES_COLLECTION).doc(template).get();
       const override = templateDoc.exists ? readEmailTemplateOverride(templateDoc.data()) : null;
-      if (override) {
+      if (override && !(lockHtml && html)) {
         subject = fillEmailPlaceholders(override.subject, variables);
         htmlBody = fillEmailPlaceholders(override.htmlBody, variables);
         textBody = undefined;
@@ -230,7 +233,7 @@ function getFallbackTemplate(
       <div style="border-top: 1px solid #eee; margin-top: 30px; padding-top: 20px; text-align: center; color: #999; font-size: 12px;">
         <p>${clientEmailContactLineHtml("#666666")}</p>
         <p>${LEGAL_BUSINESS_NAME}</p>
-        <p><a href="https://iconicimagestx.com" style="color:#999999;text-decoration:underline;">iconicimagestx.com</a></p>
+        <p><a href="${DEFAULT_PUBLIC_SITE_URL}" style="color:#999999;text-decoration:underline;">iconicimagestx.vercel.app</a></p>
         <p>Questions? Reply to this email or message us through your client portal.</p>
       </div>
     </div>

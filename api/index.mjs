@@ -162,6 +162,38 @@ function clientEmailContactLineHtml(color = "#666666") {
     `<a href="${BUSINESS_CONTACT.emailHref}" style="${style}">${escapeHtml$8(BUSINESS_CONTACT.email)}</a>`
   ].join(" | ");
 }
+const __vite_import_meta_env__ = {};
+const DEFAULT_PUBLIC_SITE_URL = "https://iconicimagestx.vercel.app";
+function livePublicSiteEnv() {
+  const nodePublic = typeof process !== "undefined" ? process.env?.PUBLIC_SITE_URL : void 0;
+  const nodeVite = typeof process !== "undefined" ? process.env?.VITE_PUBLIC_SITE_URL : void 0;
+  const vitePublic = typeof import.meta !== "undefined" && __vite_import_meta_env__ ? void 0 : void 0;
+  return {
+    PUBLIC_SITE_URL: typeof nodePublic === "string" ? nodePublic : void 0,
+    VITE_PUBLIC_SITE_URL: typeof nodeVite === "string" && nodeVite.trim() ? nodeVite : typeof vitePublic === "string" ? vitePublic : void 0
+  };
+}
+function publicSiteUrl(env = livePublicSiteEnv()) {
+  const configured = String(env.PUBLIC_SITE_URL || env.VITE_PUBLIC_SITE_URL || "").trim();
+  const candidate = (configured || DEFAULT_PUBLIC_SITE_URL).replace(/\/+$/, "");
+  let parsed;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    throw new Error("PUBLIC_SITE_URL must be an https URL.");
+  }
+  if (parsed.protocol !== "https:") {
+    throw new Error("PUBLIC_SITE_URL must use https.");
+  }
+  if (!parsed.hostname) {
+    throw new Error("PUBLIC_SITE_URL must be an https URL.");
+  }
+  return candidate;
+}
+function publicClientUrl(path2, env) {
+  const suffix = path2.startsWith("/") ? path2 : `/${path2}`;
+  return `${publicSiteUrl(env)}${suffix}`;
+}
 const DOORS_OPEN_TOUR_URL = "https://doorsopentour.com";
 const DOT_DELIVERY_LINE = "Check out our new interactive Open House Tour by zone - As an Iconic Client, you receive an automatic upgrade on DoorsOpenTour.com when it's your time to shine!";
 const DOT_RECEIPT_LINE = "Payment received - Thanks for that! Let us know if you want your Open House listed on DoorsOpenTour.com and we'll upgrade your door for free!";
@@ -212,38 +244,6 @@ function dotOptInResultHtml(ok) {
   </main>
 </body>
 </html>`;
-}
-const __vite_import_meta_env__ = {};
-const DEFAULT_PUBLIC_SITE_URL = "https://iconicimagestx.vercel.app";
-function livePublicSiteEnv() {
-  const nodePublic = typeof process !== "undefined" ? process.env?.PUBLIC_SITE_URL : void 0;
-  const nodeVite = typeof process !== "undefined" ? process.env?.VITE_PUBLIC_SITE_URL : void 0;
-  const vitePublic = typeof import.meta !== "undefined" && __vite_import_meta_env__ ? void 0 : void 0;
-  return {
-    PUBLIC_SITE_URL: typeof nodePublic === "string" ? nodePublic : void 0,
-    VITE_PUBLIC_SITE_URL: typeof nodeVite === "string" && nodeVite.trim() ? nodeVite : typeof vitePublic === "string" ? vitePublic : void 0
-  };
-}
-function publicSiteUrl(env = livePublicSiteEnv()) {
-  const configured = String(env.PUBLIC_SITE_URL || env.VITE_PUBLIC_SITE_URL || "").trim();
-  const candidate = (configured || DEFAULT_PUBLIC_SITE_URL).replace(/\/+$/, "");
-  let parsed;
-  try {
-    parsed = new URL(candidate);
-  } catch {
-    throw new Error("PUBLIC_SITE_URL must be an https URL.");
-  }
-  if (parsed.protocol !== "https:") {
-    throw new Error("PUBLIC_SITE_URL must use https.");
-  }
-  if (!parsed.hostname) {
-    throw new Error("PUBLIC_SITE_URL must be an https URL.");
-  }
-  return candidate;
-}
-function publicClientUrl(path2, env) {
-  const suffix = path2.startsWith("/") ? path2 : `/${path2}`;
-  return `${publicSiteUrl(env)}${suffix}`;
 }
 const SETTLED$1 = /* @__PURE__ */ new Set(["paid", "comped"]);
 function isGuessableInvoiceId(id) {
@@ -1995,7 +1995,7 @@ function shell(content) {
       <div style="border-top: 1px solid #eee; margin-top: 30px; padding-top: 20px; text-align: center; color: #999; font-size: 12px;">
         <p>${clientEmailContactLineHtml("#666666")}</p>
         <p>${LEGAL_BUSINESS_NAME}</p>
-        <p><a href="https://iconicimagestx.com" style="color:#999999;text-decoration:underline;">iconicimagestx.com</a></p>
+        <p><a href="${DEFAULT_PUBLIC_SITE_URL}" style="color:#999999;text-decoration:underline;">iconicimagestx.vercel.app</a></p>
         <p>Questions? Reply to this email or message us through your client portal.</p>
       </div>
     </div>
@@ -2080,7 +2080,7 @@ const HTML_SOURCE = {
       <p>Thank you for reaching out to Iconic Images. We've received your message and our team will review it shortly.</p>
       <p>We typically respond to inquiries within 24 business hours. If your question is urgent, call or email us using the contact line below.</p>
       <p style="margin-top:30px;color:#888;font-size:12px;">
-        If you have any additional information to add, simply reply to this email or visit <a href="https://iconicimagestx.com" style="color:#888888;text-decoration:underline;">iconicimagestx.com</a>.
+        If you have any additional information to add, simply reply to this email or visit <a href="${DEFAULT_PUBLIC_SITE_URL}" style="color:#888888;text-decoration:underline;">iconicimagestx.vercel.app</a>.
       </p>
     `),
   clientConfirmation: shell(`
@@ -2248,7 +2248,7 @@ function createTransport() {
   });
 }
 async function sendEmail(options) {
-  const { template, audience, variables = {}, subject: subjectOverride, html, attachments } = options;
+  const { template, audience, variables = {}, subject: subjectOverride, html, attachments, lockHtml } = options;
   let to = options.to;
   let bcc = options.bcc;
   let cc = options.cc;
@@ -2284,7 +2284,7 @@ async function sendEmail(options) {
     if (admin.apps.length) {
       const templateDoc = await db$u().collection(EMAIL_TEMPLATES_COLLECTION).doc(template).get();
       const override = templateDoc.exists ? readEmailTemplateOverride(templateDoc.data()) : null;
-      if (override) {
+      if (override && !(lockHtml && html)) {
         subject = fillEmailPlaceholders(override.subject, variables);
         htmlBody = fillEmailPlaceholders(override.htmlBody, variables);
         textBody = void 0;
@@ -2333,7 +2333,7 @@ function getFallbackTemplate(type, vars) {
       <div style="border-top: 1px solid #eee; margin-top: 30px; padding-top: 20px; text-align: center; color: #999; font-size: 12px;">
         <p>${clientEmailContactLineHtml("#666666")}</p>
         <p>${LEGAL_BUSINESS_NAME}</p>
-        <p><a href="https://iconicimagestx.com" style="color:#999999;text-decoration:underline;">iconicimagestx.com</a></p>
+        <p><a href="${DEFAULT_PUBLIC_SITE_URL}" style="color:#999999;text-decoration:underline;">iconicimagestx.vercel.app</a></p>
         <p>Questions? Reply to this email or message us through your client portal.</p>
       </div>
     </div>
@@ -6083,6 +6083,30 @@ function holidayPaymentLinkBody(input) {
     payment_note: squarePaymentNote(input.invoiceId, input.invoiceNumber)
   };
 }
+function escapeHolidayHtml(value) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function holidayOrderReceivedHtml(input) {
+  const pageUrl = publicClientUrl(input.pagePath);
+  const whenTime = input.whenTime.trim() || "We'll confirm the time";
+  const payLine = input.complimentary ? "This RSVP is complimentary. No payment is due." : `Amount due: <strong>${escapeHolidayHtml(input.total)}</strong>. If checkout did not open, we will text a secure payment link.`;
+  return `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+    <div style="background:#1a120e;padding:20px;text-align:center;margin-bottom:24px;">
+      <h1 style="color:#f6efe4;margin:0;font-size:24px;font-weight:500;">Iconic Images</h1>
+      <p style="color:#e7d3a1;margin:6px 0 0;font-size:12px;letter-spacing:0.14em;">HOLIDAY 2026</p>
+    </div>
+    <h2 style="color:#1a120e;font-weight:500;">We received your request</h2>
+    <p>Hi ${escapeHolidayHtml(input.clientName)},</p>
+    <p>Thank you. We have <strong>${escapeHolidayHtml(input.serviceName)}</strong> for <strong>${escapeHolidayHtml(input.whenDate)}</strong> at <strong>${escapeHolidayHtml(whenTime)}</strong>.</p>
+    <p>${payLine}</p>
+    <p style="color:#666666;font-size:13px;">Confirmation ID: <strong>${escapeHolidayHtml(input.requestId)}</strong></p>
+    <p><a href="${escapeHolidayHtml(pageUrl)}" style="color:#9b2c3a;">View the holiday page</a></p>
+    <div style="border-top:1px solid #eeeeee;margin-top:28px;padding-top:16px;text-align:center;color:#666666;font-size:12px;">
+      <p>${clientEmailContactLineHtml("#666666")}</p>
+      <p><a href="${escapeHolidayHtml(pageUrl)}" style="color:#666666;text-decoration:underline;">iconicimagestx.vercel.app</a></p>
+    </div>
+  </div>`;
+}
 const SQUARE_VERSION_FALLBACK = "2026-08-20";
 function squareApiBaseUrl(environment) {
   return environment === "sandbox" ? "https://connect.squareupsandbox.com" : "https://connect.squareup.com";
@@ -7564,6 +7588,7 @@ router$p.post("/", async (req, res) => {
       furnishingStatus,
       // Additional fields from booking form (previously dropped)
       leadSource,
+      requestedTimeLabel: postedTimeLabel,
       marketingDoing,
       resultsBothering,
       perfectBusiness,
@@ -7837,10 +7862,25 @@ router$p.post("/", async (req, res) => {
     let clientEmailStatus = "failed";
     let passwordSetupStatus = account.createdAccount ? "gated" : "not_needed";
     let smsStatus = phone ? "failed" : "skipped";
+    const requestedTimeLabel = typeof postedTimeLabel === "string" ? postedTimeLabel.trim().slice(0, 80) : "";
+    const shownTime = requestedTimeLabel || (typeof scheduledTime === "string" ? scheduledTime : "");
+    const holidayMailKind = holidayCheckoutKind(leadSource, total);
+    const holidayHtml = holidayMailKind === "none" ? "" : holidayOrderReceivedHtml({
+      clientName: clientName2,
+      serviceName: typeof selectedService === "string" && selectedService.trim() ? selectedService : "Holiday order",
+      whenDate: bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
+      whenTime: shownTime,
+      total: money$3(total),
+      requestId: docRef.id,
+      pagePath: leadSource === HOLIDAY_SEASON_LEAD ? "/tis-the-season" : "/thankful",
+      complimentary: holidayMailKind === "free"
+    });
     clientEmailStatus = await sendEmail({
       to: email,
       template: "booking_received",
       subject: clientOrderReceivedSubject(displayAddress, orderNumber),
+      html: holidayHtml || void 0,
+      lockHtml: Boolean(holidayHtml),
       variables: {
         clientName: clientName2,
         address: displayAddress,
@@ -7849,7 +7889,7 @@ router$p.post("/", async (req, res) => {
         total: money$3(total),
         requestId: docRef.id,
         scheduledDate: bookingDateLabel(scheduledDate, "TBD — we'll confirm shortly"),
-        scheduledTime: scheduledTime || "",
+        scheduledTime: shownTime,
         propertyStatus: propertyStatus || "Not specified",
         furnishingStatus: furnishingStatus || "Not specified",
         accessMethod: accessLine,
