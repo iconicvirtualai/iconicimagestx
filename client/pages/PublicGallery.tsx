@@ -46,7 +46,7 @@ export function PublicGalleryView({
     gallery.status === "delivered" || gallery.status === "approved";
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-white">
+    <div className="iframe-safe-page overflow-x-hidden bg-white">
       <header className="bg-black text-white">
         <div className="mx-auto max-w-6xl px-4 py-10">
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">
@@ -115,7 +115,7 @@ export const PUBLIC_GALLERY_MISSING_COPY = "We couldn't find this gallery. Check
 
 export function PublicGalleryMissing() {
   return (
-    <div className="min-h-screen bg-white flex flex-col" data-gallery-state="missing">
+    <div className="iframe-safe-page bg-white flex flex-col" data-gallery-state="missing">
       <header className="bg-black text-white">
         <div className="max-w-6xl mx-auto px-4 py-10">
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Iconic Images</p>
@@ -202,7 +202,7 @@ export default function PublicGallery() {
     toast.success("Share link copied.");
   };
 
-  if (loading) return <div className="min-h-screen bg-white flex items-center justify-center"><div className="w-8 h-8 border-4 border-[#0d9488] border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return <div className="iframe-safe-page bg-white flex items-center justify-center"><div className="w-8 h-8 border-4 border-[#0d9488] border-t-transparent rounded-full animate-spin" /></div>;
 
   if (unavailable || !gallery) return <PublicGalleryMissing />;
 

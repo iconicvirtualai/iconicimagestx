@@ -446,7 +446,7 @@ export default function VirtualStagingAITool() {
     const selectedCount = allRenders.filter((r) => reviewSelected.has(r.render.jobId)).length;
 
     return (
-      <div className="flex flex-col min-h-screen bg-white">
+      <div className="iframe-safe-page flex flex-col bg-white">
         <Header />
 
         {/* ── Lightbox overlay ─────────────────────────────────────────── */}

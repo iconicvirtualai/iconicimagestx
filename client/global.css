@@ -142,3 +142,53 @@
        1px  0px 0 #000;
   }
 }
+
+/*
+  Width-based stand-in for vh/svh/dvh. A Wix iframe is often ~9000px tall,
+  so viewport units stretch a hero to the frame. These clamps do not.
+  Desktop: clamp(560px, 50vw, 820px). Phone (≤900px): clamp(560px, 178vw, 700px).
+*/
+:root {
+  --iframe-hero: clamp(560px, 50vw, 820px);
+  --iframe-hero-max: 820px;
+  --iframe-preview: clamp(240px, 28vw, 480px);
+}
+
+@media (max-width: 900px) {
+  :root {
+    --iframe-hero: clamp(560px, 178vw, 700px);
+    --iframe-hero-max: 700px;
+    --iframe-preview: clamp(200px, 86vw, 420px);
+  }
+}
+
+.iframe-safe-hero {
+  height: var(--iframe-hero);
+  min-height: 0;
+  max-height: var(--iframe-hero-max);
+}
+
+.iframe-safe-page {
+  min-height: var(--iframe-hero);
+}
+
+.iframe-safe-media {
+  max-height: var(--iframe-hero);
+}
+
+.iframe-safe-preview {
+  max-height: var(--iframe-preview);
+}
+
+body:has(.iframe-safe-page.bg-black),
+body:has(.iframe-safe-hero.bg-black) {
+  background-color: #000;
+}
+
+body:has(.iframe-safe-page.bg-gray-100) {
+  background-color: #f3f4f6;
+}
+
+body:has(.iframe-safe-page.bg-\[\#f4f7f8\]) {
+  background-color: #f4f7f8;
+}

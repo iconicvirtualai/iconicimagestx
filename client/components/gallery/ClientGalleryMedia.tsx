@@ -296,7 +296,7 @@ function FloorPlanPdfFrame({
         <img
           src={preview}
           alt=""
-          className="max-h-[40dvh] w-full object-contain bg-gray-100"
+          className="iframe-safe-preview w-full object-contain bg-gray-100"
         />
       )}
       <div className="p-4">

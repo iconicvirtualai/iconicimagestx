@@ -162,14 +162,14 @@ export default function OwnersSuite() {
   if (state.status === "denied") return <NotFound />;
   if (state.status === "loading") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-100">
+      <div className="flex iframe-safe-page items-center justify-center bg-gray-100">
         <div className="h-10 w-10 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
       </div>
     );
   }
   if (state.status === "error") {
     return (
-      <div className="owners-suite flex min-h-screen items-center justify-center bg-[#071422] px-6 text-center" style={suiteFont}>
+      <div className="owners-suite flex iframe-safe-page items-center justify-center bg-[#071422] px-6 text-center" style={suiteFont}>
         <div>
           <p className="text-sm text-[#d5deea]">This page could not be opened.</p>
           <button type="button" onClick={() => void refresh()} className="mt-4 text-xs font-black uppercase tracking-[0.18em] text-[#e8c872]">
@@ -268,7 +268,7 @@ export function OwnersSuiteView({
   const [tab, setTab] = useState<"scorecard" | "plan">("scorecard");
 
   return (
-    <div className="owners-suite min-h-screen bg-[#071422] text-[#f7f1e4]" style={suiteFont}>
+    <div className="owners-suite iframe-safe-page bg-[#071422] text-[#f7f1e4]" style={suiteFont}>
       <OwnersFonts />
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <img src="/media/decor/arc.svg" alt="" className="absolute -right-24 -top-16 w-[420px] opacity-30" />
