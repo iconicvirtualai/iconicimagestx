@@ -75,7 +75,10 @@ p { margin: 0; }
 
 .hero {
   position: relative;
-  min-height: max(640px, 100svh);
+  /* Width-based, not svh. A Wix iframe is ~9000px tall, so 100svh fills the frame. */
+  height: clamp(560px, 50vw, 820px);
+  min-height: 0;
+  max-height: 820px;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -106,7 +109,7 @@ p { margin: 0; }
   border-radius: 50%;
   animation: snow linear infinite;
 }
-@keyframes snow { to { transform: translateY(110vh); } }
+@keyframes snow { to { transform: translateY(900px); } }
 .top { position: absolute; top: 0; left: 0; right: 0; z-index: 4; padding: 18px 0; }
 .top .wrap, .links, .ctas, .when, .row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .top .wrap { justify-content: space-between; align-items: center; }
@@ -122,7 +125,7 @@ p { margin: 0; }
   top: auto;
   transform: none;
   width: min(680px, 100%);
-  max-height: 32vh;
+  max-height: clamp(180px, 20vw, 280px);
   height: auto;
   object-fit: contain;
   margin: 0 auto;
@@ -139,7 +142,7 @@ p { margin: 0; }
 }
 #titlelock { margin: 0; padding-bottom: 20px; text-align: center; }
 .hero .when { margin-top: auto; }
-.hero.p2 .inner { padding-top: max(112px, 16vh); justify-content: flex-end; }
+.hero.p2 .inner { padding-top: clamp(96px, 8vw, 140px); justify-content: flex-end; }
 .hero.p2 h1 { margin-bottom: 12px; }
 .pill, .evtag, .only, .codebox, .draft {
   display: inline-flex;
