@@ -6107,6 +6107,20 @@ function holidayOrderReceivedHtml(input) {
     </div>
   </div>`;
 }
+const DELIVERY_QA_CLIENT_EMAIL = "ops+deliveryqa@iconicimagestx.com";
+const DELIVERY_QA_CLIENT_ID = "playtest-delivery-qa-client";
+const DELIVERY_QA_GALLERY_ID = "playtest-delivery-qa-gallery";
+function isDeliveryQaClient(record2) {
+  if (!record2) return false;
+  if (record2.playtest === true) return true;
+  return record2.linkedClientId === DELIVERY_QA_CLIENT_ID && exactQaEmail(record2.email);
+}
+function isPlaytestDeliveryQaGallery(record2) {
+  return !!record2 && record2.id === DELIVERY_QA_GALLERY_ID && record2.playtest === true;
+}
+function exactQaEmail(value) {
+  return mailboxAddress(typeof value === "string" ? value : "") === DELIVERY_QA_CLIENT_EMAIL;
+}
 const THANKFUL_EVENT_DATE = "2026-11-07";
 const THANKFUL_RSVP_CLOSE_UTC = "2026-11-01T04:59:00.000Z";
 const THANKFUL_RSVP_CLOSED = "Headcount and menu votes closed Sat, Oct 31 at 11:59 PM CT.";
@@ -6156,9 +6170,31 @@ function chicagoDateKey$1(now) {
 function thankfulRsvpOpen(now) {
   return now.getTime() <= Date.parse(THANKFUL_RSVP_CLOSE_UTC);
 }
-function socialRateForInstant(now) {
-  const key = chicagoDateKey$1(now);
+const SOCIAL_DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
+function socialRateForDateKey(key) {
+  if (!SOCIAL_DATE_KEY.test(key)) return null;
   return Object.prototype.hasOwnProperty.call(SOCIAL_RATE_BY_DATE, key) ? SOCIAL_RATE_BY_DATE[key] : null;
+}
+function socialRateForInstant(now) {
+  return socialRateForDateKey(chicagoDateKey$1(now));
+}
+function socialRateView(now, requestedDate, previewAllowed) {
+  const today = chicagoDateKey$1(now);
+  const asked = requestedDate && SOCIAL_DATE_KEY.test(requestedDate.trim()) ? requestedDate.trim() : null;
+  const preview = Boolean(asked && asked !== today && previewAllowed);
+  const date = preview && asked ? asked : today;
+  const percent = socialRateForDateKey(date);
+  return {
+    date,
+    percent,
+    ended: percent == null,
+    dropsTomorrow: percent != null && percent !== SOCIAL_RATE_BY_DATE[THANKFUL_EVENT_DATE],
+    preview
+  };
+}
+function socialRatePreviewAllowed(input) {
+  if (input.role === "admin") return true;
+  return mailboxAddress(input.email || "") === DELIVERY_QA_CLIENT_EMAIL;
 }
 function socialTermPercent(dayRate, months) {
   if (months === 12) return dayRate + 10;
@@ -6536,20 +6572,6 @@ async function nextOrderNumber() {
     return next;
   });
   return formatOrderNumber(n);
-}
-const DELIVERY_QA_CLIENT_EMAIL = "ops+deliveryqa@iconicimagestx.com";
-const DELIVERY_QA_CLIENT_ID = "playtest-delivery-qa-client";
-const DELIVERY_QA_GALLERY_ID = "playtest-delivery-qa-gallery";
-function isDeliveryQaClient(record2) {
-  if (!record2) return false;
-  if (record2.playtest === true) return true;
-  return record2.linkedClientId === DELIVERY_QA_CLIENT_ID && exactQaEmail(record2.email);
-}
-function isPlaytestDeliveryQaGallery(record2) {
-  return !!record2 && record2.id === DELIVERY_QA_GALLERY_ID && record2.playtest === true;
-}
-function exactQaEmail(value) {
-  return mailboxAddress(typeof value === "string" ? value : "") === DELIVERY_QA_CLIENT_EMAIL;
 }
 const SETTLED = /* @__PURE__ */ new Set(["paid", "comped"]);
 function text$d(value) {
@@ -8372,6 +8394,30 @@ router$p.post("/", async (req, res) => {
     }
     return res.status(500).json({ error: "Failed to submit booking request." });
   }
+});
+async function socialRateCaller(req) {
+  const header = req.headers.authorization;
+  const raw = Array.isArray(header) ? header[0] : header;
+  if (!raw?.startsWith("Bearer ")) return { role: null, email: null };
+  const token = raw.slice("Bearer ".length).trim();
+  if (!token) return { role: null, email: null };
+  if (isTempAdminEnabled() && token === "temp-admin-token") return { role: "admin", email: null };
+  try {
+    const decoded = await admin.auth().verifyIdToken(token);
+    const email = typeof decoded.email === "string" ? decoded.email : null;
+    let role = null;
+    const staff = await admin.firestore().collection("staff").doc(decoded.uid).get();
+    if (staff.exists && isActiveStaffRecord(staff.data())) role = String(staff.data()?.role || "");
+    return { role, email };
+  } catch {
+    return { role: null, email: null };
+  }
+}
+router$p.get("/social-rate", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const requested = typeof req.query.date === "string" ? req.query.date : "";
+  const previewAllowed = requested ? socialRatePreviewAllowed(await socialRateCaller(req)) : false;
+  return res.json(socialRateView(/* @__PURE__ */ new Date(), requested || null, previewAllowed));
 });
 router$p.get("/holiday-slots", async (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
@@ -23310,9 +23356,9 @@ function standalonePresentation(presentation) {
   const hero = presentation.photos[0];
   const title = presentation.address || (presentation.seeded ? "Sample presentation" : "Private presentation");
   const figures = presentation.photos.map((photo, index) => `
-    <figure style="margin:0;min-height:100svh;position:relative;background:#070708">
-      <img src="${escapeAttr(photo.url)}" alt="${escapeAttr(photo.alt)}" style="width:100%;height:100svh;object-fit:cover;display:block" />
-      <figcaption style="position:absolute;left:1.25rem;bottom:1.5rem;color:#fff;font-family:Georgia,serif;font-size:2rem">${escapeHtml$1(photo.room || String(index + 1))}</figcaption>
+    <figure class="pres-hero">
+      <img src="${escapeAttr(photo.url)}" alt="${escapeAttr(photo.alt)}" />
+      <figcaption>${escapeHtml$1(photo.room || String(index + 1))}</figcaption>
     </figure>`).join("");
   const html = `<!doctype html>
 <html lang="en">
@@ -23320,9 +23366,19 @@ function standalonePresentation(presentation) {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${escapeHtml$1(presentation.meta.title)}</title>
+    <style>
+      body{margin:0;background:#070708;color:#fff}
+      .pres-hero{margin:0;position:relative;height:clamp(560px,50vw,820px);min-height:0;max-height:820px;background:#070708;overflow:hidden}
+      .pres-hero img{width:100%;height:100%;object-fit:cover;display:block}
+      .pres-hero figcaption{position:absolute;left:1.25rem;bottom:1.5rem;color:#fff;font-family:Georgia,serif;font-size:2rem}
+      .pres-head{height:clamp(560px,50vw,820px);min-height:0;max-height:820px;display:flex;align-items:flex-end;padding:2rem;background:#111 center/cover;overflow:hidden}
+      @media (max-width:900px){
+        .pres-hero,.pres-head{height:clamp(560px,178vw,700px);max-height:700px}
+      }
+    </style>
   </head>
-  <body style="margin:0;background:#070708;color:#fff">
-    <header style="min-height:100svh;display:flex;align-items:flex-end;padding:2rem;background:#111 url('${escapeAttr(hero?.url || "")}') center/cover">
+  <body>
+    <header class="pres-head" style="background-image:url('${escapeAttr(hero?.url || "")}')">
       <div>
         <p style="letter-spacing:.28em;text-transform:uppercase;font:600 11px/1 sans-serif">Iconic Images</p>
         <h1 style="font:500 4rem/0.95 Georgia,serif;margin:.4rem 0">${escapeHtml$1(title)}</h1>
@@ -25129,7 +25185,7 @@ const NOT_FOUND_HTML = `<!doctype html>
     <meta name="robots" content="noindex, nofollow" />
     <title>Page not found</title>
   </head>
-  <body style="margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f3f4f6;font-family:Inter,system-ui,sans-serif;color:#111827">
+  <body style="margin:0;min-height:clamp(560px,50vw,820px);display:flex;align-items:center;justify-content:center;background:#f3f4f6;font-family:Inter,system-ui,sans-serif;color:#111827">
     <div style="text-align:center">
       <h1 style="font-size:2.25rem;margin:0 0 .75rem">404</h1>
       <p style="margin:0 0 1rem;color:#4b5563">Page not found</p>
