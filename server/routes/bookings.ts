@@ -1388,6 +1388,7 @@ router.patch("/:id/cancel", requireCoordinator, async (req: AuthenticatedRequest
     if (!doc.exists) return res.status(404).json({ error: "Not found." });
     const data = doc.data() || {};
     const calendarError = await releaseOrderCalendar(data);
+    const hadEvent = typeof data.calendarEventId === "string" && data.calendarEventId.length > 0;
     const history = Array.isArray(data.history) ? data.history : [];
     await doc.ref.update({
       status: "cancelled",
@@ -1403,7 +1404,7 @@ router.patch("/:id/cancel", requireCoordinator, async (req: AuthenticatedRequest
           calendarHoldError: calendarError,
           officeFlag: "calendar_hold_failed",
         }
-        : {}),
+        : hadEvent ? { calendarHold: "none" } : {}),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
     return res.json({ success: true, calendarDeleted: !calendarError });
@@ -1420,6 +1421,7 @@ router.patch("/:id/decline", requireCoordinator, async (req, res) => {
     if (!doc.exists) return res.status(404).json({ error: "Not found." });
     const data = doc.data() || {};
     const calendarError = await releaseOrderCalendar(data);
+    const hadEvent = typeof data.calendarEventId === "string" && data.calendarEventId.length > 0;
 
     await doc.ref.update({
       status: "declined",
@@ -1430,7 +1432,7 @@ router.patch("/:id/decline", requireCoordinator, async (req, res) => {
           calendarHoldError: calendarError,
           officeFlag: "calendar_hold_failed",
         }
-        : {}),
+        : hadEvent ? { calendarHold: "none" } : {}),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 

@@ -699,6 +699,8 @@ describe("public booking calendar hold", () => {
       eventId: "evt-9",
     });
     expect(docs("orderRequests").get("rsvp-9")?.status).toBe("cancelled");
+    expect(docs("orderRequests").get("rsvp-9")?.calendarEventId).toBe("evt-9");
+    expect(docs("orderRequests").get("rsvp-9")?.calendarHold).toBe("none");
     expect(sent.length).toBe(before);
   });
 

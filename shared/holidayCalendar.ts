@@ -60,6 +60,8 @@ export interface HolidayBackfillPatch {
   patch: Record<string, unknown>;
 }
 
+export type HolidayCalendarStatus = "on calendar" | "failed" | "none";
+
 export interface HolidayRsvpRow {
   id: string;
   name: string;
@@ -69,6 +71,7 @@ export interface HolidayRsvpRow {
   menuVote: string;
   status: string;
   orderNumber: string;
+  calendarStatus: HolidayCalendarStatus;
   test: boolean;
   countsTowardTotal: boolean;
   sortMinutes: number;
@@ -349,6 +352,13 @@ export async function runHolidayBackfill(input: {
   return { report, patches };
 }
 
+/** Held events are on the calendar. A failed hold stays failed. Anything else is none. */
+export function holidayCalendarStatus(order: Record<string, unknown>): HolidayCalendarStatus {
+  if (text(order.calendarHold) === "failed" || order.officeFlag === "calendar_hold_failed") return "failed";
+  if (text(order.calendarEventId) && text(order.calendarHold) !== "none") return "on calendar";
+  return "none";
+}
+
 export function holidayRsvpBoard(orders: Array<Record<string, unknown> & { id: string }>): {
   rows: HolidayRsvpRow[];
   totalHeadcount: number;
@@ -373,6 +383,7 @@ export function holidayRsvpBoard(orders: Array<Record<string, unknown> & { id: s
         menuVote: holidayMenuVote(order) || "—",
         status: text(order.status) || "new",
         orderNumber: text(order.orderNumber),
+        calendarStatus: holidayCalendarStatus(order),
         test,
         countsTowardTotal: !test && !closed && headcountNumber != null,
       };

@@ -222,8 +222,21 @@ describe("holiday RSVP board", () => {
       },
     ]);
     expect(board.rows.map((row) => row.name)).toEqual(["Ada Client", "TEST Quinn", "Bea Client"]);
-    expect(board.rows[0]).toMatchObject({ time: "11:15 AM", headcount: "4", menuVote: "Herb turkey", status: "new" });
+    expect(board.rows[0]).toMatchObject({ time: "11:15 AM", headcount: "4", menuVote: "Herb turkey", status: "new", calendarStatus: "none" });
     expect(board.rows[2]).toMatchObject({ time: "1:00 PM", headcount: "2", menuVote: "Ham", status: "cancelled", countsTowardTotal: false });
     expect(board.totalHeadcount).toBe(4);
+  });
+
+  it("marks held events on calendar, failed holds as failed, and a cleared hold as none", () => {
+    const board = holidayRsvpBoard([
+      { ...thankful, id: "held", calendarEventId: "evt-1", calendarHold: "held" },
+      { ...thankful, id: "bad", clientName: "Bea Client", requestedTimeLabel: "12:00 PM", calendarHold: "failed", officeFlag: "calendar_hold_failed" },
+      { ...thankful, id: "cleared", clientName: "Cara Client", requestedTimeLabel: "12:15 PM", calendarEventId: "evt-old", calendarHold: "none" },
+    ]);
+    expect(board.rows.map((row) => [row.name, row.calendarStatus])).toEqual([
+      ["Ada Client", "on calendar"],
+      ["Bea Client", "failed"],
+      ["Cara Client", "none"],
+    ]);
   });
 });
