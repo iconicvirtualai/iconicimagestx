@@ -45,7 +45,7 @@ export default function Go() {
   }, [documentTitle]);
 
   return (
-    <div className="flex min-h-dvh flex-col bg-black text-white">
+    <div className="iframe-safe-page flex flex-col bg-black text-white">
       <header className="px-6 pt-6">
         <Link
           to="/"

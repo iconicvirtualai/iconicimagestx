@@ -39,7 +39,7 @@ export default function ListingSite() {
   }, [slug, preview]);
 
   if (site === undefined) {
-    return <div className="grid min-h-screen place-items-center bg-[#f7f7f5] text-sm">Opening this listing…</div>;
+    return <div className="iframe-safe-page grid place-items-center bg-[#f7f7f5] text-sm">Opening this listing…</div>;
   }
   if (!site) return <NotFound />;
   return <ListingSiteView site={site} />;
@@ -359,7 +359,7 @@ function previewListing(design: ListingSiteDesign): PublicListingSite {
 }
 
 const LISTING_CSS = `
-.ls-index,.ls-two,.ls-premiere{min-height:100vh}
+.ls-index,.ls-two,.ls-premiere{min-height:var(--iframe-hero)}
 .ls-index{background:#F7F7F5;color:#0E0E0E}
 .ls-two{background:#F2EFEA;color:#1E2124}
 .ls-premiere{background:#0B0B0C;color:#E8DCC4}
@@ -398,7 +398,7 @@ const LISTING_CSS = `
 .ls-powered a{display:inline-flex;align-items:center;gap:8px;color:inherit;text-decoration:none;font-size:13px}
 .ls-powered img{width:28px;height:28px;object-fit:contain}
 .ls-two{display:block}
-.ls-stage{position:sticky;top:0;height:40vh;background:#1E2124;color:#F2EFEA;overflow:hidden}
+.ls-stage{position:sticky;top:0;height:clamp(220px,86vw,420px);max-height:420px;background:#1E2124;color:#F2EFEA;overflow:hidden}
 .ls-stage img{width:100%;height:100%;object-fit:cover}
 .ls-story{padding:20px 16px}
 .ls-story h1{font-size:clamp(2.4rem,10vw,4.5rem);line-height:.9;text-transform:uppercase}
@@ -408,7 +408,7 @@ const LISTING_CSS = `
 .ls-caption.is-on{box-shadow:inset 3px 0 0 var(--accent,#1F6F6B)}
 .ls-block{margin-top:24px}
 .ls-block h2,.ls-set h2{font-family:var(--display);font-size:1.6rem;margin-bottom:8px}
-.ls-premiere .ls-letterbox{position:relative;min-height:52vh;display:grid;place-items:end start;overflow:hidden}
+.ls-premiere .ls-letterbox{position:relative;min-height:clamp(280px,112vw,460px);max-height:460px;display:grid;place-items:end start;overflow:hidden}
 .ls-premiere .ls-letterbox img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.72}
 .ls-premiere .ls-letterbox h1{position:relative;padding:24px 16px;font-size:clamp(1.4rem,6vw,3rem);letter-spacing:.28em;text-transform:uppercase}
 .ls-strip{display:flex;gap:8px;overflow-x:auto;padding:12px 16px}
@@ -423,7 +423,8 @@ const LISTING_CSS = `
 .ls-walk iframe{min-height:240px;border:0}
 @media (min-width:900px){
   .ls-two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}
-  .ls-stage{height:100vh}
+  .ls-stage{height:var(--iframe-hero);max-height:var(--iframe-hero-max)}
+  .ls-premiere .ls-letterbox{min-height:clamp(320px,32vw,480px);max-height:480px}
   .ls-agent{grid-column:1 / -1}
   .ls-index-hero dl{grid-template-columns:repeat(4,minmax(0,1fr))}
   .ls-room{grid-template-columns:4rem 1fr 180px}

@@ -73,10 +73,10 @@ export default function ClientPortal() {
   const today = calendarDateKey(new Date()) || "1970-01-01";
 
   return (
-    <div className="min-h-screen bg-[#f6f7f8] flex flex-col">
+    <div className="iframe-safe-page bg-[#f6f7f8] flex flex-col">
       <div className="flex-1">
         {error && !home ? (
-          <div className="min-h-screen bg-[#f6f7f8] text-black">
+          <div className="iframe-safe-page bg-[#f6f7f8] text-black">
             <div className="max-w-xl mx-auto px-4 py-24 text-center">
               <p className="font-bold">{error}</p>
               <Button asChild className="mt-4 bg-black text-white">
@@ -112,7 +112,7 @@ export default function ClientPortal() {
 
 function PortalPending() {
   return (
-    <div className="min-h-screen bg-[#f6f7f8] flex items-center justify-center">
+    <div className="iframe-safe-page bg-[#f6f7f8] flex items-center justify-center">
       <div className="w-8 h-8 border-4 border-[#0d9488] border-t-transparent rounded-full animate-spin" />
     </div>
   );

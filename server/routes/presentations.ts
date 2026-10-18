@@ -184,9 +184,9 @@ function standalonePresentation(presentation: PublicPresentation): string {
   const hero = presentation.photos[0];
   const title = presentation.address || (presentation.seeded ? "Sample presentation" : "Private presentation");
   const figures = presentation.photos.map((photo, index) => `
-    <figure style="margin:0;min-height:100svh;position:relative;background:#070708">
-      <img src="${escapeAttr(photo.url)}" alt="${escapeAttr(photo.alt)}" style="width:100%;height:100svh;object-fit:cover;display:block" />
-      <figcaption style="position:absolute;left:1.25rem;bottom:1.5rem;color:#fff;font-family:Georgia,serif;font-size:2rem">${escapeHtml(photo.room || String(index + 1))}</figcaption>
+    <figure class="pres-hero">
+      <img src="${escapeAttr(photo.url)}" alt="${escapeAttr(photo.alt)}" />
+      <figcaption>${escapeHtml(photo.room || String(index + 1))}</figcaption>
     </figure>`).join("");
   const html = `<!doctype html>
 <html lang="en">
@@ -194,9 +194,19 @@ function standalonePresentation(presentation: PublicPresentation): string {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${escapeHtml(presentation.meta.title)}</title>
+    <style>
+      body{margin:0;background:#070708;color:#fff}
+      .pres-hero{margin:0;position:relative;height:clamp(560px,50vw,820px);min-height:0;max-height:820px;background:#070708;overflow:hidden}
+      .pres-hero img{width:100%;height:100%;object-fit:cover;display:block}
+      .pres-hero figcaption{position:absolute;left:1.25rem;bottom:1.5rem;color:#fff;font-family:Georgia,serif;font-size:2rem}
+      .pres-head{height:clamp(560px,50vw,820px);min-height:0;max-height:820px;display:flex;align-items:flex-end;padding:2rem;background:#111 center/cover;overflow:hidden}
+      @media (max-width:900px){
+        .pres-hero,.pres-head{height:clamp(560px,178vw,700px);max-height:700px}
+      }
+    </style>
   </head>
-  <body style="margin:0;background:#070708;color:#fff">
-    <header style="min-height:100svh;display:flex;align-items:flex-end;padding:2rem;background:#111 url('${escapeAttr(hero?.url || "")}') center/cover">
+  <body>
+    <header class="pres-head" style="background-image:url('${escapeAttr(hero?.url || "")}')">
       <div>
         <p style="letter-spacing:.28em;text-transform:uppercase;font:600 11px/1 sans-serif">Iconic Images</p>
         <h1 style="font:500 4rem/0.95 Georgia,serif;margin:.4rem 0">${escapeHtml(title)}</h1>

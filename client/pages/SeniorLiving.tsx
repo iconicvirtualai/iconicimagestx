@@ -37,7 +37,7 @@ import { useSiteHref, useSiteText } from "@/content/siteContent";
 export const SENIOR_LIVING_CTA = "Schedule when you're ready for us to come!";
 
 const pageType =
-  "min-h-screen overflow-x-clip bg-[#F6F3EE] font-[Inter,ui-sans-serif,system-ui,sans-serif] text-neutral-950 [overflow-wrap:normal] [word-break:normal] [hyphens:manual] [&_*]:[overflow-wrap:normal] [&_*]:[word-break:normal] [&_*]:[hyphens:manual]";
+  "iframe-safe-page overflow-x-clip bg-[#F6F3EE] font-[Inter,ui-sans-serif,system-ui,sans-serif] text-neutral-950 [overflow-wrap:normal] [word-break:normal] [hyphens:manual] [&_*]:[overflow-wrap:normal] [&_*]:[word-break:normal] [&_*]:[hyphens:manual]";
 
 const bodyText = "text-lg leading-relaxed text-neutral-900 sm:text-xl";
 

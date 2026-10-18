@@ -122,7 +122,7 @@ describe("client gallery media render paths", () => {
     });
     expect(html).toContain('data-gallery-kind="fullres-photo"');
     expect(html).toContain("Full resolution");
-    expect(html).toContain("80dvh");
+    expect(html).toContain("var(--iframe-hero)");
     expect(tag(html, "img")).toContain("object-contain");
     expect(tag(html, "img")).not.toContain("object-cover");
   });
@@ -190,7 +190,7 @@ describe("client gallery media render paths", () => {
     expect(video).toContain('preload="metadata"');
     expect(video).toContain('poster="https://cdn.example/snap-reel.jpg"');
     expect(video).toContain("1080 / 1920");
-    expect(video).toContain("78dvh");
+    expect(video).toContain("var(--iframe-hero)");
     expect(video).toContain("9 / 16");
     expect(video).toContain("object-contain");
     expect(video).not.toContain("object-cover");

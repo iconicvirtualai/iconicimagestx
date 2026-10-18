@@ -75,7 +75,7 @@ export function PortalListingDetailView({
   const mediaEditing = canEdit ? editing : null;
   const shown = canEdit ? detail : visitorPortalListingDetail(detail);
   return (
-    <div className="min-h-screen bg-[#f6f7f8] text-black" data-testid="portal-listing-detail" data-can-edit={canEdit ? "true" : "false"}>
+    <div className="iframe-safe-page bg-[#f6f7f8] text-black" data-testid="portal-listing-detail" data-can-edit={canEdit ? "true" : "false"}>
       <header className="bg-black text-white">
         <div className="max-w-5xl mx-auto px-4 py-8">
           {canEdit ? (
@@ -297,7 +297,7 @@ export default function PortalListingDetail() {
   return (
     <div>
       {error || !detail || !website ? (
-        <div className="min-h-screen bg-[#f6f7f8] flex items-center justify-center px-4">
+        <div className="iframe-safe-page bg-[#f6f7f8] flex items-center justify-center px-4">
           <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center max-w-md">
             <p className="font-bold">{error || "Could not load this listing."}</p>
             {canEdit ? (
@@ -362,7 +362,7 @@ export default function PortalListingDetail() {
 
 function Pending() {
   return (
-    <div className="min-h-screen bg-[#f6f7f8] flex items-center justify-center">
+    <div className="iframe-safe-page bg-[#f6f7f8] flex items-center justify-center">
       <div className="w-8 h-8 border-4 border-[#0d9488] border-t-transparent rounded-full animate-spin" />
     </div>
   );

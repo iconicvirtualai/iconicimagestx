@@ -141,7 +141,7 @@ export function ClientStudioView({
   ];
 
   return (
-    <div className="min-h-screen bg-white" data-studio-view={owner ? "owner" : "public"}>
+    <div className="iframe-safe-page bg-white" data-studio-view={owner ? "owner" : "public"}>
       {/* Header */}
       <header className="bg-black text-white">
         <div className="max-w-6xl mx-auto px-4 py-8 sm:py-12">
@@ -379,7 +379,7 @@ export function ClientStudioView({
           <button onClick={() => setSelectedPhoto(null)} className="absolute top-4 right-4 p-2 text-white hover:text-gray-300"><X className="w-6 h-6" /></button>
           {selectedPhoto > 0 && <button onClick={() => setSelectedPhoto(selectedPhoto - 1)} className="absolute left-4 p-2 text-white hover:text-gray-300"><ChevronLeft className="w-8 h-8" /></button>}
           {selectedPhoto < images.length - 1 && <button onClick={() => setSelectedPhoto(selectedPhoto + 1)} className="absolute right-4 p-2 text-white hover:text-gray-300"><ChevronRight className="w-8 h-8" /></button>}
-          <img src={images[selectedPhoto]?.url} alt="" className="max-w-[90vw] max-h-[90vh] object-contain" />
+          <img src={images[selectedPhoto]?.url} alt="" className="iframe-safe-media max-w-[90vw] object-contain" />
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3">
             <span className="text-white text-xs font-bold">{selectedPhoto + 1} / {images.length}</span>
             {canDownloadFiles && <a href={images[selectedPhoto]?.downloadUrl || images[selectedPhoto]?.url} download className="px-3 py-1.5 bg-white text-black rounded-lg text-[10px] font-bold">Download</a>}
