@@ -27,6 +27,7 @@
     "qa:square-webhook": "tsx scripts/qa-square-webhook.ts",
     "migrate:invoice-ids": "tsx scripts/migrate-invoice-ids.ts",
     "backfill:video-posters": "tsx scripts/backfill-video-posters.ts",
+    "backfill:holiday-calendar": "tsx scripts/backfill-holiday-calendar.ts",
     "format.fix": "prettier --write .",
     "typecheck": "tsc",
     "optimize:senior-living": "tsx scripts/optimize-senior-living.ts"

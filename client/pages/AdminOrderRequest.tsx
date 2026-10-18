@@ -37,6 +37,7 @@ import { linkOrderToListing, resolvePortalClientId } from "@/lib/listingClient";
 import { deliverInvoiceEmail } from "@/lib/deliverInvoice";
 import { assignBookingPhotographer } from "@/lib/assignBookingPhotographer";
 import { useAuth } from "@/contexts/AuthContext";
+import { cancelOrderRequest } from "@/lib/cancelOrderRequest";
 import {
   markScheduledAppointmentConfirmed,
   upsertScheduledAppointment,
@@ -420,9 +421,15 @@ export default function AdminOrderRequest() {
   };
 
   const handleCancel = async () => {
-    if (!id) return;
-    await updateDoc(doc(db, "orderRequests", id), { status: "cancelled", updatedAt: serverTimestamp() });
-    toast.success("Cancelled."); setShowCancel(false); navigate("/admin/orders");
+    if (!id || !user) return;
+    try {
+      await cancelOrderRequest(id, await user.getIdToken());
+      toast.success("Cancelled.");
+      setShowCancel(false);
+      navigate("/admin/orders");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not cancel.");
+    }
   };
 
   const handleInvoice = async () => {

@@ -29,7 +29,10 @@ describe("studio nav", () => {
       "Booking catalog",
       "Invoice Presets",
       "Projects",
+      "Holiday RSVPs",
     ]));
+    expect(hrefs).toContain("/admin/holiday-rsvps");
+    expect(mostSpecificNavHref("/admin/holiday-rsvps", hrefs)).toBe("/admin/holiday-rsvps");
   });
 
   it("highlights Studio on photo editing, projects, and marketing kits", () => {

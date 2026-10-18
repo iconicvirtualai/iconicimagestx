@@ -26,6 +26,7 @@ import type { GalleryReleaseReport } from "@shared/galleryRelease";
 import { publicClientUrl } from "@shared/publicSiteUrl";
 import { filterAssignableStaff, recordAllowsQaStaff } from "@shared/qaStaff";
 import { DotOptInBadge } from "@/components/DoorsOpenTour";
+import { cancelOrderRequest } from "@/lib/cancelOrderRequest";
 
 // ─── Status system ────────────────────────────────────────────────────────────
 const ORDER_STATUSES = [
@@ -221,6 +222,16 @@ export default function AdminOrderDetail() {
   };
 
   const handleCancel = async () => {
+    if (sourceCollection === "orderRequests" && id && user) {
+      try {
+        await cancelOrderRequest(id, await user.getIdToken());
+        setShowCancel(false);
+        toast.success("Order cancelled.");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Could not cancel.");
+      }
+      return;
+    }
     await patch({ status: "cancelled" }, "Order cancelled by admin");
     setShowCancel(false);
     toast.success("Order cancelled.");

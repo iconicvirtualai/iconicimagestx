@@ -17,6 +17,7 @@ import { type AdminStudioId } from "@shared/adminOrderTile";
 import { adminOrdersViewStorageKey } from "@shared/adminOrderList";
 import { AdminOrdersBrowser } from "@/components/admin/AdminOrdersBrowser";
 import { useAuth } from "@/contexts/AuthContext";
+import { cancelOrderRequest } from "@/lib/cancelOrderRequest";
 
 function safe(v: any): string {
   if (v === null || v === undefined) return "—";
@@ -71,6 +72,28 @@ export default function AdminOrders() {
 
   const handleBulkStatus = async (status: string) => {
     if (selection.size === 0) return;
+    if (status === "cancelled") {
+      if (!user) {
+        toast.error("Please sign in again.");
+        return;
+      }
+      const token = await user.getIdToken();
+      let cancelled = 0;
+      const failures: string[] = [];
+      for (const id of selection) {
+        try {
+          await cancelOrderRequest(id, token);
+          cancelled += 1;
+        } catch (err) {
+          console.warn("[AdminOrders] Cancel failed.", err);
+          failures.push(id);
+        }
+      }
+      if (cancelled) toast.success(`Cancelled ${cancelled} orders.`);
+      if (failures.length) toast.error(`Could not cancel ${failures.length} orders.`);
+      setSelection(new Set());
+      return;
+    }
     const batch = writeBatch(db);
     selection.forEach(id => batch.update(doc(db, "orderRequests", id), { status, updatedAt: serverTimestamp() }));
     await batch.commit();
