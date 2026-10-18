@@ -442,9 +442,61 @@ footer a { color: var(--gold2); }
   .pic img, .vidcard img { height: 220px; }
   .mike3 .pic img { height: auto; }
   .photo-feature img { height: 420px; }
-  .hero { min-height: max(560px, 100svh); }
+  /* Phone hero height is a fraction of the column width, not the viewport.
+     A Wix iframe is ~9000px tall, so svh/vh/innerHeight would stretch this full height. */
+  .hero {
+    height: clamp(560px, 178vw, 700px);
+    min-height: 0;
+    max-height: 700px;
+  }
+  .hero .bgv {
+    object-fit: cover;
+    /* 16:9 video in a tall phone hero crops the sides. Center keeps faces in frame. */
+    object-position: center center;
+  }
+  .hero::after {
+    background: linear-gradient(180deg, rgba(18, 10, 8, 0.62) 0%, rgba(18, 10, 8, 0.18) 36%, rgba(18, 10, 8, 0.55) 62%, rgba(18, 10, 8, 0.9) 100%);
+  }
+  .hero .top { padding: 10px 0 8px; }
+  .hero .top .wrap { align-items: center; gap: 8px; }
+  .hero .inner,
+  .hero.p2 .inner {
+    padding: 76px 0 22px;
+    justify-content: flex-end;
+    gap: 10px;
+    min-height: 0;
+  }
+  .hero .when { margin-top: 0; }
+  .hero h1 { font-size: clamp(34px, 8.6vw, 46px); }
+  .hero.p2 h1 { margin-bottom: 4px; }
+  .hero .lead { font-size: 15px; line-height: 1.35; padding: 10px 12px; }
+  .hero .sub { margin-top: 2px; font-size: 13px; line-height: 1.35; }
+  /* The title PNG is a 16:9 plate with the lettering in the middle.
+     Crop to that lettering so the words read as a hero title, not a thin line in a tall empty box. */
+  #titlelock {
+    width: min(100%, 340px);
+    margin: 0 auto 4px;
+    padding: 0;
+  }
+  #titlelock img.title {
+    width: 100%;
+    max-width: none !important;
+    height: auto !important;
+    max-height: 146px;
+    aspect-ratio: 2.34;
+    object-fit: cover;
+    object-position: center;
+    object-view-box: inset(31.5% 28% 35% 28%);
+    margin: 0 auto;
+  }
+  .hero .when,
+  .hero .ctas { width: 100%; gap: 8px; }
+  .hero .pill { max-width: 100%; white-space: normal; line-height: 1.25; text-align: center; }
+  .hero .ctas .btn { max-width: 100%; }
+  .snowfx i { animation-name: snow-phone; }
   .quote { font-size: 26px; }
 }
+@keyframes snow-phone { to { transform: translateY(720px); } }
 @media (max-width: 640px) {
   .perks, .crew3, .sg, .pkgs { grid-template-columns: 1fr; }
   .terms3 { grid-template-columns: 1fr 1fr; }
