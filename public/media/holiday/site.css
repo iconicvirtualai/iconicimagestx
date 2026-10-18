@@ -274,6 +274,18 @@ p { margin: 0; }
 .menu ul, .pkg ul, .driver ul, .win ol { margin: 8px 0 0; padding-left: 18px; }
 .submit { margin-top: 18px; }
 .ok { color: #1d6b3a; font-weight: 650; }
+#buyok, #payok { flex-basis: 100%; }
+.checkout-continue {
+  width: 100%;
+  margin-top: 12px;
+  padding: 14px 18px;
+  font-size: 16px;
+}
+.summary a.checkout-continue,
+a.checkout-continue {
+  color: var(--dark);
+  background: var(--gold);
+}
 .no {
   display: inline-flex;
   width: 28px;

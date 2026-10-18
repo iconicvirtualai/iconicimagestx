@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createHolidaySquareCheckout } from "./holidaySquareCheckout";
 
 describe("holiday Square payment link", () => {
@@ -53,5 +53,41 @@ describe("holiday Square payment link", () => {
     const quick = posted?.body.quick_pay as { price_money: { amount: number } };
     expect(quick.price_money.amount).toBe(25000);
     expect(String(posted?.body.payment_note)).toContain("invoiceId:inv-2");
+  });
+
+  it("logs the Square status and error code when the link is refused", async () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const result = await createHolidaySquareCheckout({
+      invoiceId: "inv-3",
+      amount: 40,
+      itemName: "Social Saves",
+      leadSource: "Thankful social saves",
+      orderNumber: "#012",
+      env: {
+        SQUARE_ACCESS_TOKEN: "sq-test",
+        SQUARE_LOCATION_ID: "LOC",
+      },
+      fetchImpl: (async () => ({
+        ok: false,
+        status: 401,
+        json: async () => ({
+          errors: [{ category: "AUTHENTICATION_ERROR", code: "UNAUTHORIZED", detail: "This request could not be authorized." }],
+        }),
+      })) as unknown as typeof fetch,
+    });
+    expect(result).toEqual({ payment: "fallback" });
+    expect(errors).toHaveBeenCalledWith(
+      "[Holiday] Square payment link was not created.",
+      expect.objectContaining({
+        reason: "no_url",
+        status: 401,
+        invoiceId: "inv-3",
+        orderNumber: "#012",
+        errors: [expect.objectContaining({ code: "UNAUTHORIZED" })],
+      }),
+    );
+    const logged = JSON.stringify(errors.mock.calls);
+    expect(logged).not.toContain("sq-test");
+    errors.mockRestore();
   });
 });

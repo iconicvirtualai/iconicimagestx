@@ -174,6 +174,7 @@
 
 <footer><div class="wrap"><img src="/holiday-2026/logo.png" alt="Iconic Images"><div>Studio 105 · 26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380 · <a href="tel:2813560965">281.356.0965</a> · <a href="mailto:photos@iconicimagestx.com">photos@iconicimagestx.com</a></div><div><a href="/tis-the-season">Book your clients' holiday shoots →</a></div></div></footer>
 
+<script src="/media/holiday/checkout.js"></script>
 <script>
 document.querySelectorAll('[data-snow]').forEach(s=>{for(let i=0;i<+s.dataset.snow;i++){const f=document.createElement('i');const z=1.5+Math.random()*3.5;f.style.cssText=`left:${Math.random()*92}%;width:${z}px;height:${z}px;animation-duration:${9+Math.random()*10}s;animation-delay:-${Math.random()*18}s;opacity:${.25+Math.random()*.5}`;s.appendChild(f)}});
 const QS=new URLSearchParams(location.search);const now=QS.get('date')?new Date(QS.get('date')+'T12:00'):new Date();
@@ -241,7 +242,8 @@ function splitName(raw){const p=String(raw||"").trim().split(/\s+/).filter(Boole
 function windowFor(label){const m=/(\d{1,2}):(\d{2})\s*(AM|PM)/i.exec(label||"");if(!m)return "Afternoon";let h=+m[1]%12;if(/pm/i.test(m[3]))h+=12;return h<12?"Morning":"Afternoon";}
 function revealHolidayTitle(){var t=document.getElementById('titlelock');if(t)t.hidden=false;}
 setTimeout(revealHolidayTitle,1600);
-function openCheckout(url){if(!url)return false;try{const target=window.top&&window.top!==window?window.top:window;target.location.assign(url);}catch(e){window.location.assign(url);}return true;}
+const paidCheckouts=new Map();
+let buyBusy=false;
 async function sendOrder(body){const response=await fetch("/api/bookings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});if(!response.ok){let message="";try{message=(await response.json()).error||"";}catch(e){}throw new Error(message||"Request could not be sent");}return response.json();}
 function orderBody(opts){return {firstName:opts.firstName,lastName:opts.lastName,email:opts.email,phone:opts.phone,address:STUDIO,lineItems:[{name:opts.lineName,price:opts.price}],total:opts.price,pricing:{subtotal:opts.price,total:opts.price},vibeNote:"COMPLETE BOOKING DETAILS\nSite booking form\n"+opts.note,scheduledDate:opts.date,scheduledTime:opts.window,requestedTimeLabel:opts.timeLabel||"",photographerPreference:"No preference",accessMethod:"Studio 105 client event",propertyStatus:"Not specified",furnishingStatus:"Not specified",selectedService:opts.lineName,selectedAddOns:[],leadSource:opts.lead,...(opts.socialPackage?{socialPackage:opts.socialPackage,socialMonths:Number(opts.socialMonths)}:{})};}
 document.querySelectorAll("img").forEach(img=>img.addEventListener("error",()=>{if(img.classList.contains("title"))return;if((img.getAttribute("src")||"").includes("logo")){const s=document.createElement("span");s.className="missing";s.textContent=img.alt||"Iconic Images";img.replaceWith(s);return;}img.remove();}));
@@ -317,6 +319,8 @@ document.getElementById("sg").addEventListener("click", (event) => {
   };
   const form = document.getElementById("buyform");
   form.hidden = false;
+  const payButton = form.querySelector("button");
+  if (payButton) payButton.disabled = false;
   document.getElementById("buyok").hidden = true;
   const months = buyPick.months;
   document.getElementById("buywhat").textContent = buyPick.name + " · " + months + " month" + (months === "1" ? "" : "s") + " · $" + Number(buyPick.price).toLocaleString("en-US");
@@ -337,8 +341,21 @@ document.getElementById("buyform").addEventListener("submit", async (event) => {
     ok.textContent = "Add your name, email, and phone. Call 281.356.0965.";
     return;
   }
-  button.disabled = true;
   const lineName = "Social Saves 2027: " + buyPick.name + ", " + buyPick.months + " months";
+  const checkoutKey = [email.toLowerCase(), lineName, price.toFixed(2)].join("|");
+  const tab = HolidayCheckout.openTab();
+  const remembered = paidCheckouts.get(checkoutKey);
+  if (remembered) {
+    HolidayCheckout.follow(tab, remembered.checkoutUrl);
+    HolidayCheckout.showResult(ok, remembered.checkoutUrl);
+    return;
+  }
+  if (buyBusy) {
+    HolidayCheckout.closeTab(tab);
+    return;
+  }
+  buyBusy = true;
+  button.disabled = true;
   const note = [
     "Social Saves order",
     "Tier: " + buyPick.tier,
@@ -363,13 +380,17 @@ document.getElementById("buyform").addEventListener("submit", async (event) => {
       socialPackage: buyPick.name,
       socialMonths: buyPick.months
     }));
-    if (openCheckout(saved.checkoutUrl)) return;
-    ok.hidden = false;
-    ok.innerHTML = 'We\'ll text your secure payment link. Call <a href="tel:+12813560965">281.356.0965</a>.';
+    const checkoutUrl = HolidayCheckout.httpsUrl(saved.checkoutUrl);
+    paidCheckouts.set(checkoutKey, { checkoutUrl: checkoutUrl });
+    HolidayCheckout.follow(tab, checkoutUrl);
+    HolidayCheckout.showResult(ok, checkoutUrl);
   } catch (err) {
+    HolidayCheckout.closeTab(tab);
     ok.hidden = false;
     ok.textContent = (err.message || "We could not send that.") + " Call 281.356.0965.";
     button.disabled = false;
+  } finally {
+    buyBusy = false;
   }
 });
 </script>
