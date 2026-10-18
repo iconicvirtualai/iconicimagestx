@@ -63,7 +63,7 @@ export function PresentationView({
   }, [open, presentation.photos.length]);
 
   return (
-    <div className="min-h-screen bg-[#070708] text-[#f6f3ee]" data-testid="listing-presentation">
+    <div className="iframe-safe-page bg-[#070708] text-[#f6f3ee]" data-testid="listing-presentation">
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap" />
       <style>{`
         @keyframes iconic-ken { from { transform: scale(1.08); } to { transform: scale(1); } }
@@ -97,7 +97,7 @@ export function PresentationView({
       </header>
 
       {presentation.photos.length === 0 ? (
-        <section className="flex min-h-[100svh] flex-col justify-end px-6 pb-16 pt-28 sm:px-12">
+        <section className="iframe-safe-page flex flex-col justify-end px-6 pb-16 pt-28 sm:px-12">
           <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-white/60">Iconic Images</p>
           <h1 className="mt-4 max-w-4xl text-balance font-medium leading-[0.92] [overflow-wrap:normal] [word-break:normal]" style={{ fontFamily: SERIF, fontSize: "clamp(3.2rem, 9vw, 7rem)" }}>
             {title}
@@ -112,18 +112,18 @@ export function PresentationView({
               <section
                 key={photo.id}
                 data-frame={index}
-                className="relative min-h-[100svh] snap-start"
+                className="iframe-safe-hero relative snap-start"
               >
                 <button
                   type="button"
                   aria-label={photo.alt}
                   onClick={() => setOpen(index)}
-                  className="block h-[100svh] w-full overflow-hidden"
+                  className="iframe-safe-hero block w-full overflow-hidden"
                 >
                   <img
                     src={photo.url}
                     alt={photo.alt}
-                    className={`h-[100svh] w-full object-cover ${index === 0 ? "iconic-ken" : ""}`}
+                    className={`iframe-safe-hero w-full object-cover ${index === 0 ? "iconic-ken" : ""}`}
                     style={index === 0 ? { animation: "iconic-ken 22s ease-out both" } : undefined}
                   />
                 </button>
@@ -171,7 +171,7 @@ export function PresentationView({
         </main>
       )}
 
-      <section className="flex min-h-[100svh] flex-col items-start justify-end px-6 pb-16 pt-28 sm:px-12" data-frame={presentation.photos.length}>
+      <section className="iframe-safe-page flex flex-col items-start justify-end px-6 pb-16 pt-28 sm:px-12" data-frame={presentation.photos.length}>
         <img src="/media/logos/logo-white-large.png" alt="" className="mb-8 h-8 w-auto" />
         <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-white/55">Iconic Images</p>
         <h2 className="mt-4 max-w-3xl font-medium leading-[0.92] [overflow-wrap:normal] [word-break:normal]" style={{ fontFamily: SERIF, fontSize: "clamp(3rem, 7vw, 6rem)" }}>
@@ -214,7 +214,7 @@ export function PresentationView({
           <button type="button" onClick={() => setOpen((current) => Math.max(0, (current || 0) - 1))} className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full border border-white/20 p-2" aria-label="Previous photograph">
             <ChevronLeft className="h-5 w-5" />
           </button>
-          <img src={presentation.photos[open].url} alt={presentation.photos[open].alt} className="max-h-[100svh] w-full object-contain" />
+          <img src={presentation.photos[open].url} alt={presentation.photos[open].alt} className="iframe-safe-media w-full object-contain" />
           <button type="button" onClick={() => setOpen((current) => Math.min(presentation.photos.length - 1, (current || 0) + 1))} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full border border-white/20 p-2" aria-label="Next photograph">
             <ChevronRight className="h-5 w-5" />
           </button>
@@ -298,7 +298,7 @@ export default function ListingPresentation() {
 
   if (error) {
     return (
-      <div className="flex min-h-screen flex-col items-start justify-end bg-[#070708] px-6 pb-16 text-[#f6f3ee]">
+      <div className="flex iframe-safe-page flex-col items-start justify-end bg-[#070708] px-6 pb-16 text-[#f6f3ee]">
         <img src="/media/logos/logo-white-large.png" alt="Iconic Images" className="mb-8 h-8 w-auto" />
         <h1 className="max-w-xl font-medium leading-none" style={{ fontFamily: SERIF, fontSize: "clamp(3rem, 8vw, 5.5rem)" }}>This link is quiet.</h1>
         <p className="mt-4 max-w-md text-sm text-white/70">{error}</p>
@@ -307,7 +307,7 @@ export default function ListingPresentation() {
   }
 
   if (!presentation) {
-    return <div className="min-h-screen bg-[#070708]" aria-busy="true" />;
+    return <div className="iframe-safe-page bg-[#070708]" aria-busy="true" />;
   }
 
   return (

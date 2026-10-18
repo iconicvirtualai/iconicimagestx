@@ -111,13 +111,13 @@ export default function ClientStudio() {
   }, [listingId, navigate, user, authLoading]);
 
   if (loading || leaving) return (
-    <div className="min-h-screen bg-[#fafafa] flex items-center justify-center">
+    <div className="iframe-safe-page bg-[#fafafa] flex items-center justify-center">
       <div className="w-8 h-8 border-4 border-[#0d9488] border-t-transparent rounded-full animate-spin" />
     </div>
   );
 
   if (!project) return (
-    <div className="min-h-screen bg-[#fafafa] flex items-center justify-center px-4">
+    <div className="iframe-safe-page bg-[#fafafa] flex items-center justify-center px-4">
       <div className="max-w-lg text-center">
         <Lock className="w-12 h-12 text-gray-300 mx-auto mb-4" />
         <h2 className="text-xl font-black mb-2">{failure?.title || "Gallery link not found"}</h2>

@@ -32,7 +32,7 @@ export default function HeroSection() {
   }, [capabilities.length]);
 
   return (
-    <section className="relative min-h-[60vh] flex items-center overflow-hidden bg-black pt-32 pb-12">
+    <section className="iframe-safe-hero relative flex items-center overflow-hidden bg-black pt-32 pb-12">
       {/* Background Image with Overlay */}
       <div className="absolute inset-0 z-0">
         <img

@@ -6,9 +6,9 @@
     <title>Page not found | Iconic Images</title>
     <meta name="robots" content="noindex, nofollow" />
     <style>
-      html, body { margin: 0; height: 100%; }
+      html, body { margin: 0; background: #f3f4f6; }
       body {
-        min-height: 100vh;
+        min-height: clamp(560px, 50vw, 820px);
         display: flex;
         flex-direction: column;
         background: #f3f4f6;
@@ -36,6 +36,9 @@
       .legal a { font-weight: 600; text-decoration: underline; text-underline-offset: 4px; }
       .contact { margin-top: 2rem; font-size: 0.875rem; line-height: 1.6; }
       .contact a { text-decoration: underline; text-underline-offset: 4px; }
+      @media (max-width: 900px) {
+        body { min-height: clamp(560px, 178vw, 700px); }
+      }
     </style>
   </head>
   <body>

@@ -314,7 +314,7 @@ describe("portal listing detail page", () => {
     );
     const reel = view("video");
     expect(reel).toContain('data-gallery-kind="reel"');
-    expect(reel).toContain("78dvh");
+    expect(reel).toContain("var(--iframe-hero)");
     expect(reel).not.toContain("aspect-video");
     expect(reel).not.toContain("Download");
 

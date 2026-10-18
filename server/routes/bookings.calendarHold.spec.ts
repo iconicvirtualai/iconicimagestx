@@ -100,7 +100,17 @@ vi.mock("firebase-admin", () => {
     };
   }
   firestore.FieldValue = { serverTimestamp: () => "SERVER_TIME" };
-  return { default: { apps: [], firestore } };
+  function auth() {
+    return {
+      async verifyIdToken(token: string) {
+        if (token === "admin-token") return { uid: "admin-1", email: "owner@iconicimagestx.com" };
+        if (token === "qa-token") return { uid: "qa-1", email: "ops+deliveryqa@iconicimagestx.com" };
+        if (token === "photo-token") return { uid: "photo-1", email: "photo@iconicimagestx.com" };
+        throw new Error("invalid");
+      },
+    };
+  }
+  return { default: { apps: [], firestore, auth } };
 });
 
 vi.mock("../services/bookingAvailability", () => ({
@@ -124,6 +134,7 @@ vi.mock("../services/bookingListing", () => ({
   ensureBookingListingForRequest: vi.fn(async () => null),
 }));
 
+import { chicagoDateKey, SOCIAL_RATE_BY_DATE } from "../../shared/thankfulEvent";
 import bookingsRouter, { resetPublicBookingRateLimit } from "./bookings";
 
 const SLOT = {
@@ -444,6 +455,44 @@ describe("public booking calendar hold", () => {
     expect(JSON.stringify(slots)).not.toContain("ada@example.com");
     expect(JSON.stringify(slots)).not.toContain("Ada");
     expect(JSON.stringify(slots)).not.toContain("Quinn");
+
+    const today = chicagoDateKey(new Date());
+    const publicRate = await fetch(`${baseUrl}/api/bookings/social-rate?date=2026-11-07`);
+    const publicBody = await publicRate.json();
+    expect(publicRate.status).toBe(200);
+    expect(publicRate.headers.get("cache-control")).toBe("no-store");
+    expect(publicBody).toEqual({
+      date: today,
+      percent: Object.prototype.hasOwnProperty.call(SOCIAL_RATE_BY_DATE, today) ? SOCIAL_RATE_BY_DATE[today] : null,
+      ended: !Object.prototype.hasOwnProperty.call(SOCIAL_RATE_BY_DATE, today),
+      dropsTomorrow: Object.prototype.hasOwnProperty.call(SOCIAL_RATE_BY_DATE, today) && SOCIAL_RATE_BY_DATE[today] !== 20,
+      preview: false,
+    });
+    expect(JSON.stringify(publicBody)).not.toContain("2026-11-06");
+    expect(Object.keys(publicBody).sort()).toEqual(["date", "dropsTomorrow", "ended", "percent", "preview"]);
+
+    docs("staff").set("admin-1", { role: "admin", isActive: true });
+    const adminRate = await fetch(`${baseUrl}/api/bookings/social-rate?date=2026-11-07`, {
+      headers: { Authorization: "Bearer admin-token" },
+    });
+    expect(await adminRate.json()).toMatchObject({ date: "2026-11-07", percent: 20, preview: true, dropsTomorrow: false });
+
+    const qaRate = await fetch(`${baseUrl}/api/bookings/social-rate?date=2026-11-06`, {
+      headers: { Authorization: "Bearer qa-token" },
+    });
+    expect(await qaRate.json()).toMatchObject({ date: "2026-11-06", percent: 21, preview: true });
+
+    docs("staff").set("photo-1", { role: "photographer", isActive: true });
+    const photoRate = await fetch(`${baseUrl}/api/bookings/social-rate?date=2026-11-07`, {
+      headers: { Authorization: "Bearer photo-token" },
+    });
+    expect(await photoRate.json()).toMatchObject({ date: today, preview: false });
+
+    docs("staff").set("admin-1", { role: "admin", isActive: false });
+    const inactive = await fetch(`${baseUrl}/api/bookings/social-rate?date=2026-11-07`, {
+      headers: { Authorization: "Bearer admin-token" },
+    });
+    expect(await inactive.json()).toMatchObject({ date: today, preview: false });
 
     const payload = {
       firstName: "Bea",

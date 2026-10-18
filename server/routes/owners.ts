@@ -178,7 +178,7 @@ const NOT_FOUND_HTML = `<!doctype html>
     <meta name="robots" content="noindex, nofollow" />
     <title>Page not found</title>
   </head>
-  <body style="margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f3f4f6;font-family:Inter,system-ui,sans-serif;color:#111827">
+  <body style="margin:0;min-height:clamp(560px,50vw,820px);display:flex;align-items:center;justify-content:center;background:#f3f4f6;font-family:Inter,system-ui,sans-serif;color:#111827">
     <div style="text-align:center">
       <h1 style="font-size:2.25rem;margin:0 0 .75rem">404</h1>
       <p style="margin:0 0 1rem;color:#4b5563">Page not found</p>

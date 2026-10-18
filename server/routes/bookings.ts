@@ -27,7 +27,9 @@ import { applyServerTravel, isTravelFeeLine, travelSummaryText, type TravelAsses
 import { planOrderPackageRepair } from "../../shared/orderPackageRepair";
 import { notifyOfficeOfOrder } from "../services/officeOrderNotify";
 import { HOLIDAY_RSVP_LEAD, HOLIDAY_SEASON_LEAD, HOLIDAY_SOCIAL_SAVES_LEAD, holidayCheckoutKind, holidayOrderReceivedHtml } from "../../shared/holidayCheckout";
-import { THANKFUL_RSVP_CLOSED, quoteThankfulSocialSave, thankfulRsvpOpen } from "../../shared/thankfulEvent";
+import { THANKFUL_RSVP_CLOSED, quoteThankfulSocialSave, socialRatePreviewAllowed, socialRateView, thankfulRsvpOpen } from "../../shared/thankfulEvent";
+import { isActiveStaffRecord } from "../../shared/staffAccess";
+import { isTempAdminEnabled } from "../../shared/tempAdmin";
 import { HOLIDAY_SLOT_TAKEN_MESSAGE, holidaySlotClaim, holidaySlotIsFull, holidayTakenFromOrders } from "../../shared/holidaySlots";
 import { createHolidaySquareCheckout } from "../services/holidaySquareCheckout";
 import { loadHolidaySlotOrders } from "../services/holidaySlots";
@@ -711,6 +713,36 @@ router.post("/", async (req, res) => {
     }
     return res.status(500).json({ error: "Failed to submit booking request." });
   }
+});
+
+async function socialRateCaller(req: { headers: { authorization?: string | string[] } }): Promise<{ role: string | null; email: string | null }> {
+  const header = req.headers.authorization;
+  const raw = Array.isArray(header) ? header[0] : header;
+  if (!raw?.startsWith("Bearer ")) return { role: null, email: null };
+  const token = raw.slice("Bearer ".length).trim();
+  if (!token) return { role: null, email: null };
+  if (isTempAdminEnabled() && token === "temp-admin-token") return { role: "admin", email: null };
+  try {
+    const decoded = await admin.auth().verifyIdToken(token);
+    const email = typeof decoded.email === "string" ? decoded.email : null;
+    let role: string | null = null;
+    const staff = await admin.firestore().collection("staff").doc(decoded.uid).get();
+    if (staff.exists && isActiveStaffRecord(staff.data())) role = String(staff.data()?.role || "");
+    return { role, email };
+  } catch {
+    return { role: null, email: null };
+  }
+}
+
+// Today's social rate only. The full table stays on the server.
+// ?date= is a preview for an active admin or the delivery-QA test mailbox.
+router.get("/social-rate", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const requested = typeof req.query.date === "string" ? req.query.date : "";
+  const previewAllowed = requested
+    ? socialRatePreviewAllowed(await socialRateCaller(req))
+    : false;
+  return res.json(socialRateView(new Date(), requested || null, previewAllowed));
 });
 
 // Public times only. Names and emails stay on the order.

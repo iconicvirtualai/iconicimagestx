@@ -311,15 +311,15 @@ export function galleryFrameStyle(
     return vertical
       ? {
           aspectRatio: ratio,
-          maxHeight: "78dvh",
-          width: "min(100%, calc(78dvh * 9 / 16))",
+          maxHeight: "var(--iframe-hero)",
+          width: "min(100%, calc(var(--iframe-hero) * 9 / 16))",
           maxWidth: "100%",
         }
       : {
           aspectRatio: ratio,
           width: "100%",
           maxWidth: "100%",
-          maxHeight: "78dvh",
+          maxHeight: "var(--iframe-hero)",
         };
   }
   if (
@@ -339,7 +339,7 @@ export function galleryFrameStyle(
     kind === "floorplan-image" ||
     kind === "aerial-photo"
   ) {
-    return { maxHeight: "80dvh" };
+    return { maxHeight: "var(--iframe-hero)" };
   }
   return undefined;
 }

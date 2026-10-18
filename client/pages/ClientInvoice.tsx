@@ -54,10 +54,10 @@ export default function ClientInvoice() {
     };
   }, [invoiceId, payToken, user, authLoading]);
 
-  if (loading) return <div className="min-h-screen bg-white flex items-center justify-center"><div className="w-8 h-8 border-4 border-[#1d4ed8] border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return <div className="iframe-safe-page bg-white flex items-center justify-center"><div className="w-8 h-8 border-4 border-[#1d4ed8] border-t-transparent rounded-full animate-spin" /></div>;
 
   if (error || !invoice) return (
-    <div className="min-h-screen bg-white flex flex-col">
+    <div className="iframe-safe-page bg-white flex flex-col">
       <div className="flex flex-1 items-center justify-center px-4">
         <div className="max-w-md text-center">
           <AlertCircle className="w-12 h-12 mx-auto mb-4 text-red-500" />
@@ -120,7 +120,7 @@ export default function ClientInvoice() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f4f7f8]">
+    <div className="iframe-safe-page bg-[#f4f7f8]">
       <main className="max-w-3xl mx-auto px-4 py-8">
         <BrandedInvoiceShell
           invoiceNumber={invoiceNumber}

@@ -12,6 +12,8 @@ import {
   quoteSocialTerm,
   quoteThankfulSocialSave,
   socialRateForInstant,
+  socialRatePreviewAllowed,
+  socialRateView,
   thankfulRsvpOpen,
 } from "./thankfulEvent";
 
@@ -101,9 +103,61 @@ describe("thankful event on Nov 7", () => {
     expect(season).toContain("Sat, Oct 31");
     expect(season).not.toContain("Nov 14");
     expect(season).not.toContain("Nov 6");
-    const rates = thankful.match(/const RATES=(\{.*?\});/);
-    expect(rates).not.toBeNull();
-    expect(JSON.parse(rates?.[1] || "{}")).toEqual(SOCIAL_RATE_BY_DATE);
     expect(thankful).toContain("Math.floor((cents*28+500)/1000)");
+    expect(thankful).toContain("/api/bookings/social-rate");
+    expect(thankful).not.toContain("const RATES=");
+  });
+
+  it("keeps today's dial and does not publish a future social rate", () => {
+    const thankful = readFileSync("public/thankful.html", "utf8");
+    const season = readFileSync("public/tis-the-season.html", "utf8");
+    expect(thankful).toContain("plan: save on Social Media Packages.");
+    expect(thankful).toContain("Today's savings are on the dial, and they drop every single day. Lock it in now.");
+    expect(thankful).toContain('<div class="p" id="pct"></div>');
+    expect(thankful).toContain("Today's discount");
+    expect(thankful).toContain("Price drops tomorrow... and the day after... and the day after...");
+    expect(thankful).toContain("Or buy at the event");
+    expect(thankful).toContain("Want to talk it through? Sit down with us on Sat, Nov 7 and lock in that day's savings, plus your term bonus. The sooner you buy, the more you save.");
+    expect(thankful).toContain("+10% off");
+    expect(thankful).toContain("+5% off");
+    expect(thankful).toContain("$100 off");
+    expect(thankful).not.toContain("50%");
+    expect(thankful).not.toContain("49%");
+    expect(thankful).not.toContain("20%");
+    expect(thankful).not.toContain("up to 49%");
+    expect(thankful).not.toContain("still save up to");
+    expect(THANKFUL_META_DESCRIPTION).not.toMatch(/20%|49%|50%/);
+    expect(season).toContain("50% refund");
+    expect(season).not.toMatch(/20% off|49%|50% off/);
+  });
+
+  it("serves one day from the server table and keeps ?date= for admin or the QA mailbox", () => {
+    const today = new Date("2026-10-18T15:00:00.000Z");
+    expect(socialRateView(today, null, false)).toEqual({
+      date: "2026-10-18",
+      percent: 47,
+      ended: false,
+      dropsTomorrow: true,
+      preview: false,
+    });
+    expect(socialRateView(today, "2026-11-07", false)).toMatchObject({
+      date: "2026-10-18",
+      percent: 47,
+      preview: false,
+    });
+    expect(socialRateView(today, "2026-11-07", true)).toEqual({
+      date: "2026-11-07",
+      percent: 20,
+      ended: false,
+      dropsTomorrow: false,
+      preview: true,
+    });
+    expect(socialRateView(today, "not-a-day", true).preview).toBe(false);
+    expect(socialRateView(new Date("2026-11-08T06:00:00.000Z"), null, false).ended).toBe(true);
+    expect(socialRatePreviewAllowed({ role: "admin", email: "owner@iconicimagestx.com" })).toBe(true);
+    expect(socialRatePreviewAllowed({ role: null, email: "Ops QA <ops+deliveryqa@iconicimagestx.com>" })).toBe(true);
+    expect(socialRatePreviewAllowed({ role: "coordinator", email: "office@iconicimagestx.com" })).toBe(false);
+    expect(socialRatePreviewAllowed({ role: "photographer", email: "photo@iconicimagestx.com" })).toBe(false);
+    expect(socialRatePreviewAllowed({ role: null, email: "guest@example.com" })).toBe(false);
   });
 });

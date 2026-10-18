@@ -261,7 +261,7 @@ export default function Portfolio() {
           <img
             src={active.src}
             alt={active.alt}
-            className="max-h-[88vh] max-w-full object-contain rounded-2xl"
+            className="iframe-safe-media max-w-full object-contain rounded-2xl"
             onClick={(event) => event.stopPropagation()}
           />
         </div>
