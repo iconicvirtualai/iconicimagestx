@@ -6426,10 +6426,22 @@ async function createHolidaySquareCheckout(input) {
   const env = input.env ?? process.env;
   const missingEnv = squareCheckoutMissingEnv(env);
   if (missingEnv.length > 0) {
+    console.error("[Holiday] Square payment link was not created.", {
+      reason: "missing_env",
+      missingEnv,
+      invoiceId: input.invoiceId,
+      orderNumber: input.orderNumber
+    });
     return { payment: "fallback", missingEnv };
   }
   const amount = Math.round(input.amount * 100) / 100;
   if (!Number.isFinite(amount) || amount <= 0) {
+    console.error("[Holiday] Square payment link was not created.", {
+      reason: "invalid_amount",
+      amount: input.amount,
+      invoiceId: input.invoiceId,
+      orderNumber: input.orderNumber
+    });
     return { payment: "fallback" };
   }
   let origin = "https://iconicimagestx.vercel.app";
@@ -6443,27 +6455,49 @@ async function createHolidaySquareCheckout(input) {
   }
   const redirectUrl = `${origin}${holidayReturnPath(input.leadSource, input.orderNumber)}`;
   const fetchImpl = input.fetchImpl ?? fetch;
-  const response = await fetchImpl(`${squareApiBaseUrl(env.SQUARE_ENVIRONMENT)}/v2/online-checkout/payment-links`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Square-Version": env.SQUARE_VERSION || "2026-08-20",
-      Authorization: `Bearer ${env.SQUARE_ACCESS_TOKEN}`
-    },
-    body: JSON.stringify(holidayPaymentLinkBody({
+  let response;
+  try {
+    response = await fetchImpl(`${squareApiBaseUrl(env.SQUARE_ENVIRONMENT)}/v2/online-checkout/payment-links`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Square-Version": env.SQUARE_VERSION || "2026-08-20",
+        Authorization: `Bearer ${env.SQUARE_ACCESS_TOKEN}`
+      },
+      body: JSON.stringify(holidayPaymentLinkBody({
+        invoiceId: input.invoiceId,
+        invoiceNumber: input.invoiceNumber,
+        amount,
+        itemName: input.itemName || "Holiday order",
+        email: input.email,
+        locationId: env.SQUARE_LOCATION_ID || "",
+        redirectUrl
+      }))
+    });
+  } catch (err) {
+    console.error("[Holiday] Square payment link was not created.", {
+      reason: "request_failed",
       invoiceId: input.invoiceId,
-      invoiceNumber: input.invoiceNumber,
-      amount,
-      itemName: input.itemName || "Holiday order",
-      email: input.email,
-      locationId: env.SQUARE_LOCATION_ID || "",
-      redirectUrl
-    }))
-  });
+      orderNumber: input.orderNumber,
+      message: err instanceof Error ? err.message : "request failed"
+    });
+    return { payment: "fallback" };
+  }
   const result = await response.json().catch(() => ({}));
   const checkoutUrl = typeof result.payment_link?.url === "string" ? result.payment_link.url : "";
   if (!response.ok || !checkoutUrl.startsWith("https://")) {
-    console.error("[Holiday] Square payment link was not created.");
+    const errors = Array.isArray(result.errors) ? result.errors.slice(0, 5).map((error) => ({
+      category: typeof error?.category === "string" ? error.category : void 0,
+      code: typeof error?.code === "string" ? error.code : void 0,
+      detail: typeof error?.detail === "string" ? error.detail.slice(0, 300) : void 0
+    })) : [];
+    console.error("[Holiday] Square payment link was not created.", {
+      reason: checkoutUrl ? "not_https" : "no_url",
+      status: response.status,
+      invoiceId: input.invoiceId,
+      orderNumber: input.orderNumber,
+      errors
+    });
     return { payment: "fallback" };
   }
   return {
