@@ -114,7 +114,7 @@
 <section class="saves" id="social-saves">
   <div class="wrap" style="position:relative">
     <div class="top">
-      <div><div class="eyebrow">Social Saves · 2027</div><h2>Jump into 2027 with a <em>FRESH</em> plan: up to 49% off Social Media Packages.</h2><p class="lead">The count drops daily; still save up to 20% at the event.</p><span class="only">Iconic Client Deal ONLY</span></div>
+      <div><div class="eyebrow">Social Saves · 2027</div><h2>Jump into 2027 with a <em>FRESH</em> plan: save on Social Media Packages.</h2><p class="lead">Today's savings are on the dial, and they drop every single day. Lock it in now.</p><span class="only">Iconic Client Deal ONLY</span></div>
       <div class="dial"><div class="s">Today's discount</div><div class="p" id="pct"></div><div class="s" id="pctnote"></div></div>
     </div>
     <p class="drop-line">Price drops tomorrow... and the day after... and the day after...</p>
@@ -179,11 +179,12 @@
 <script src="/media/holiday/checkout.js"></script>
 <script>
 document.querySelectorAll('[data-snow]').forEach(s=>{for(let i=0;i<+s.dataset.snow;i++){const f=document.createElement('i');const z=1.5+Math.random()*3.5;f.style.cssText=`left:${Math.random()*92}%;width:${z}px;height:${z}px;animation-duration:${9+Math.random()*10}s;animation-delay:-${Math.random()*18}s;opacity:${.25+Math.random()*.5}`;s.appendChild(f)}});
-const QS=new URLSearchParams(location.search);const now=QS.get('date')?new Date(QS.get('date')+'T12:00'):new Date();
+const QS=new URLSearchParams(location.search);const now=new Date();
 if(QS.get('paid')==='1'){const form=document.getElementById('buyform');const ok=document.getElementById('buyok');if(form)form.hidden=false;if(ok){ok.hidden=false;ok.textContent='Payment received. We will email your receipt.';}}
 // headcount/menu cutoff: Sat Oct 31, 2026, 11:59:00 PM CT
-const DL=new Date("2026-11-01T04:59:00.000Z");const ms=Math.max(0,DL-now),d=Math.floor(ms/864e5),h=Math.floor(ms%864e5/36e5);
-document.getElementById('cd').innerHTML=`<span>${d} days</span><span>${h} hrs</span><span>left</span>`;document.getElementById('left').textContent=`${d} days left`;
+const DL=new Date("2026-11-01T04:59:00.000Z");
+function paintCountdown(clock){const ms=Math.max(0,DL-clock),d=Math.floor(ms/864e5),h=Math.floor(ms%864e5/36e5);document.getElementById('cd').innerHTML=`<span>${d} days</span><span>${h} hrs</span><span>left</span>`;const left=document.getElementById('left');if(left)left.textContent=`${d} days left`;}
+paintCountdown(now);
 let takenSlots=[];
 function renderSlots(){
   const sl=document.getElementById('slots');
@@ -207,14 +208,80 @@ async function loadTaken(){
 }
 renderSlots();
 loadTaken();
-// Social rates by America/Chicago day. Keep this table equal to SOCIAL_RATE_BY_DATE.
-const RATES={"2026-10-16":50,"2026-10-17":49,"2026-10-18":47,"2026-10-19":45,"2026-10-20":43,"2026-10-21":41,"2026-10-22":39,"2026-10-23":37,"2026-10-24":35,"2026-10-25":33,"2026-10-26":31.5,"2026-10-27":30,"2026-10-28":28.5,"2026-10-29":27,"2026-10-30":25.5,"2026-10-31":24,"2026-11-01":23.5,"2026-11-02":23,"2026-11-03":22.5,"2026-11-04":22,"2026-11-05":21.5,"2026-11-06":21,"2026-11-07":20};
-function chicagoKey(date){return new Intl.DateTimeFormat("en-CA",{timeZone:"America/Chicago",year:"numeric",month:"2-digit",day:"2-digit"}).format(date)}
-const dayKey=QS.get('date')||chicagoKey(now);
-const P=Object.prototype.hasOwnProperty.call(RATES,dayKey)?RATES[dayKey]:null;
+let P=null,dropsTomorrow=false,rateReady=false,rateError=false,rateKey='';
 function pctLabel(n){return Number.isInteger(n)?String(n):String(n)}
-document.getElementById('pct').textContent=P===null?'Ended':pctLabel(P)+'% off';
-document.getElementById('pctnote').textContent=(QS.get('date')?new Date(dayKey+'T12:00:00-05:00'):now).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',timeZone:'America/Chicago'})+(P===null||P===20?'':' · drops tomorrow');
+function paintDial(){
+  const dial=document.getElementById('pct');
+  const note=document.getElementById('pctnote');
+  if(!rateReady||rateError){dial.textContent='';note.textContent=rateError?'Refresh to load today\'s discount.':'';return;}
+  dial.textContent=P===null?'Ended':pctLabel(P)+'% off';
+  const when=rateKey?new Date(rateKey+'T18:00:00Z'):now;
+  note.textContent=when.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',timeZone:'America/Chicago'})+(P===null||!dropsTomorrow?'':' · drops tomorrow');
+}
+function localFirebaseToken(){
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const key=localStorage.key(i)||'';
+      if(!key.startsWith('firebase:authUser:')) continue;
+      const parsed=JSON.parse(localStorage.getItem(key)||'');
+      const manager=parsed&&parsed.stsTokenManager;
+      if(manager&&typeof manager.accessToken==='string'&&Number(manager.expirationTime)>Date.now()) return manager.accessToken;
+    }
+  }catch(e){}
+  return '';
+}
+function firebaseAccessToken(){
+  const local=localFirebaseToken();
+  if(local) return Promise.resolve(local);
+  return new Promise((resolve)=>{
+    let done=false;
+    const finish=(token)=>{ if(!done){ done=true; resolve(token||''); } };
+    let open;
+    try{ open=indexedDB.open('firebaseLocalStorageDb'); }catch(e){ finish(''); return; }
+    open.onerror=()=>finish('');
+    open.onsuccess=()=>{
+      try{
+        const db=open.result;
+        if(!db.objectStoreNames.contains('firebaseLocalStorage')){ db.close(); finish(''); return; }
+        const req=db.transaction('firebaseLocalStorage','readonly').objectStore('firebaseLocalStorage').getAll();
+        req.onsuccess=()=>{
+          let token='';
+          for(const row of req.result||[]){
+            const user=row&&row.value&&row.value.stsTokenManager?row.value:(row&&row.stsTokenManager?row:null);
+            const manager=user&&user.stsTokenManager;
+            if(manager&&typeof manager.accessToken==='string'&&Number(manager.expirationTime)>Date.now()){ token=manager.accessToken; break; }
+          }
+          db.close();
+          finish(token);
+        };
+        req.onerror=()=>{ db.close(); finish(''); };
+      }catch(e){ finish(''); }
+    };
+  });
+}
+async function loadSocialRate(){
+  try{
+    const preview=QS.get('date');
+    const headers={};
+    if(preview){
+      const token=await firebaseAccessToken();
+      if(token) headers.Authorization='Bearer '+token;
+    }
+    const res=await fetch('/api/bookings/social-rate'+(preview?'?date='+encodeURIComponent(preview):''),{cache:'no-store',headers});
+    if(!res.ok) throw new Error('rate');
+    const data=await res.json();
+    P=typeof data.percent==='number'?data.percent:null;
+    dropsTomorrow=data.dropsTomorrow===true;
+    rateKey=typeof data.date==='string'?data.date:'';
+    rateError=false;
+    if(data.preview===true&&rateKey) paintCountdown(new Date(rateKey+'T18:00:00Z'));
+  }catch(e){
+    P=null; dropsTomorrow=false; rateKey=''; rateError=true;
+  }
+  rateReady=true;
+  paintDial();
+  render();
+}
 function discountedCents(listCents,percent){const tenths=Math.round(percent*10);return Math.round(listCents*(1000-tenths)/1000)}
 function feeCents(baseCents){const cents=Math.round(Number(baseCents));if(!Number.isFinite(cents)||cents<=0)return 0;return Math.floor((cents*28+500)/1000)}
 const PK=[
@@ -228,16 +295,19 @@ const PK=[
 const money=n=>'$'+n.toLocaleString('en-US',{minimumFractionDigits:n%1?2:0,maximumFractionDigits:2});
 let T=+(QS.get('term')||3);
 function render(){
+ if(!rateReady) return;
  document.querySelectorAll('#terms button').forEach(b=>b.classList.toggle('on',+b.dataset.t===T));
  const base=P===null?0:P;const extra=T===12?10:T===6?5:0;const pct=base+extra;
  const shown=pctLabel(base);
- document.getElementById('termnote').textContent=P===null?'Social pricing ended after Sat, Nov 7.':T===12?`12-month term: today's ${shown}% + 10% term bonus = ${pctLabel(pct)}% off every month.`:T===6?`6-month term: today's ${shown}% + 5% term bonus = ${pctLabel(pct)}% off every month.`:T===3?`3-month term: today's ${shown}% off, plus $100 off your 3-month total.`:`Month to month: today's ${shown}% applies only during the promo, then regular pricing.`;
+ document.getElementById('termnote').textContent=rateError?'Today\'s discount didn\'t load. Refresh the page, or call 281.356.0965.':P===null?'Social pricing ended after Sat, Nov 7.':T===12?`12-month term: today's ${shown}% + 10% term bonus = ${pctLabel(pct)}% off every month.`:T===6?`6-month term: today's ${shown}% + 5% term bonus = ${pctLabel(pct)}% off every month.`:T===3?`3-month term: today's ${shown}% off, plus $100 off your 3-month total.`:`Month to month: today's ${shown}% applies only during the promo, then regular pricing.`;
  document.getElementById('sg').innerHTML=PK.map(([tier,n,tag,r,inc],i)=>{const months=T===1?1:T;const monthlyCents=P===null?r*100:discountedCents(r*100,pct);const termCents=Math.max(0,monthlyCents*months-(T===3?10000:0));const processing=feeCents(termCents);const mo=monthlyCents/100;const tot=termCents/100;const fee=processing/100;const pay=(termCents+processing)/100;const save=r*months-tot;
-  const closed=P===null;
-  return `<div>${i===1?'<span class="pop">Most popular</span>':''}<div class="tier">${tier}</div><h4>${n}</h4><div class="tag">${tag}</div><ul>${inc.map(x=>`<li>${x}</li>`).join('')}</ul><div class="was">${money(r)}/mo</div><div class="now">${money(mo)}<small>/mo</small></div><div class="tot">${closed?'Social pricing has ended.':T===1?`Promo month ${money(tot)} · Processing (2.8%) ${money(fee)}`:`${money(tot)} for ${months} months · <b>save ${money(save)}</b><br>Processing (2.8%) ${money(fee)} · Square ${money(pay)}`}</div>${closed?'':`<button type="button" class="btn btn-dark" id="buy-${n.toLowerCase().replace(/^the /,'').replace(/\s+/g,'-')}-${T}m" data-buy="1" data-tier="${tier}" data-name="${n}" data-price="${tot}" data-months="${months}" data-pct="${pct}">Buy now</button>`}</div>`}).join('')+
- `<div style="background:var(--cran);color:#fff;justify-content:center"><div class="tier" style="color:#ffd9b0">At the event</div><h4 style="font-size:22px;margin:6px 0">Still save up to 20%</h4><p style="font-size:14px;opacity:.9">Missed today's price? Buy on Sat, Nov 7 and lock in 20% off, plus your term bonus.</p><a class="btn btn-gold" href="#rsvp" style="margin-top:18px">RSVP to the event</a></div>`;
+  const closed=P===null||rateError;
+  const statusLine=rateError?'Today\'s discount didn\'t load. Refresh, or call 281.356.0965.':P===null?'Social pricing has ended.':T===1?`Promo month ${money(tot)} · Processing (2.8%) ${money(fee)}`:`${money(tot)} for ${months} months · <b>save ${money(save)}</b><br>Processing (2.8%) ${money(fee)} · Square ${money(pay)}`;
+  return `<div>${i===1?'<span class="pop">Most popular</span>':''}<div class="tier">${tier}</div><h4>${n}</h4><div class="tag">${tag}</div><ul>${inc.map(x=>`<li>${x}</li>`).join('')}</ul><div class="was">${money(r)}/mo</div><div class="now">${money(mo)}<small>/mo</small></div><div class="tot">${statusLine}</div>${closed?'':`<button type="button" class="btn btn-dark" id="buy-${n.toLowerCase().replace(/^the /,'').replace(/\s+/g,'-')}-${T}m" data-buy="1" data-tier="${tier}" data-name="${n}" data-price="${tot}" data-months="${months}" data-pct="${pct}">Buy now</button>`}</div>`}).join('')+
+ `<div style="background:var(--cran);color:#fff;justify-content:center"><div class="tier" style="color:#ffd9b0">At the event</div><h4 style="font-size:22px;margin:6px 0">Or buy at the event</h4><p style="font-size:14px;opacity:.9">Want to talk it through? Sit down with us on Sat, Nov 7 and lock in that day's savings, plus your term bonus. The sooner you buy, the more you save.</p><a class="btn btn-gold" href="#rsvp" style="margin-top:18px">RSVP to the event</a></div>`;
 }
-document.querySelectorAll('#terms button').forEach(b=>b.onclick=()=>{T=+b.dataset.t;render()});render();
+document.querySelectorAll('#terms button').forEach(b=>b.onclick=()=>{T=+b.dataset.t;render()});
+loadSocialRate();
 
 const STUDIO="26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380";
 function splitName(raw){const p=String(raw||"").trim().split(/\s+/).filter(Boolean);return {firstName:p[0]||"",lastName:p.slice(1).join(" ")||"-"};}

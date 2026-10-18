@@ -4,6 +4,8 @@
  * The server quotes the Square amount from this file.
  */
 
+import { mailboxAddress } from "./clientNotify.ts";
+import { DELIVERY_QA_CLIENT_EMAIL } from "./deliveryQaClient.ts";
 import { processingFeeCents } from "./invoiceProcessing.ts";
 
 export const THANKFUL_EVENT_DATE = "2026-11-07";
@@ -81,12 +83,51 @@ export function thankfulRsvpOpen(now: Date): boolean {
   return now.getTime() <= Date.parse(THANKFUL_RSVP_CLOSE_UTC);
 }
 
+const SOCIAL_DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
+
 /** Null before Oct 16 and after Sat Nov 7 CT. Nov 7 itself stays at 20% through 11:59:59 PM. */
-export function socialRateForInstant(now: Date): number | null {
-  const key = chicagoDateKey(now);
+export function socialRateForDateKey(key: string): number | null {
+  if (!SOCIAL_DATE_KEY.test(key)) return null;
   return Object.prototype.hasOwnProperty.call(SOCIAL_RATE_BY_DATE, key)
     ? SOCIAL_RATE_BY_DATE[key]
     : null;
+}
+
+export function socialRateForInstant(now: Date): number | null {
+  return socialRateForDateKey(chicagoDateKey(now));
+}
+
+export interface SocialRateView {
+  date: string;
+  percent: number | null;
+  ended: boolean;
+  dropsTomorrow: boolean;
+  preview: boolean;
+}
+
+/**
+ * One Chicago day. A requested date is used only when preview is allowed.
+ * Otherwise the view is today, and the requested day is not echoed back.
+ */
+export function socialRateView(now: Date, requestedDate: string | null, previewAllowed: boolean): SocialRateView {
+  const today = chicagoDateKey(now);
+  const asked = requestedDate && SOCIAL_DATE_KEY.test(requestedDate.trim()) ? requestedDate.trim() : null;
+  const preview = Boolean(asked && asked !== today && previewAllowed);
+  const date = preview && asked ? asked : today;
+  const percent = socialRateForDateKey(date);
+  return {
+    date,
+    percent,
+    ended: percent == null,
+    dropsTomorrow: percent != null && percent !== SOCIAL_RATE_BY_DATE[THANKFUL_EVENT_DATE],
+    preview,
+  };
+}
+
+/** Admin staff, or the delivery-QA test mailbox. Coordinators and other staff are not enough. */
+export function socialRatePreviewAllowed(input: { role?: string | null; email?: string | null }): boolean {
+  if (input.role === "admin") return true;
+  return mailboxAddress(input.email || "") === DELIVERY_QA_CLIENT_EMAIL;
 }
 
 export function socialTermPercent(dayRate: number, months: number): number | null {
