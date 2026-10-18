@@ -82,7 +82,7 @@ export function isHolidayTestBooking(order: Record<string, unknown>): boolean {
   return `${name}\n${notes}`.toUpperCase().includes("TEST ORDER");
 }
 
-function orderDate(order: Record<string, unknown>): string | null {
+export function holidayStoredDate(order: Record<string, unknown>): string | null {
   const scheduled = order.scheduledDate;
   if (typeof scheduled === "string") {
     const match = /^(\d{4}-\d{2}-\d{2})/.exec(scheduled.trim());
@@ -105,7 +105,7 @@ function orderDate(order: Record<string, unknown>): string | null {
   return null;
 }
 
-function orderTime(order: Record<string, unknown>): string | null {
+export function holidayStoredTime(order: Record<string, unknown>): string | null {
   const labeled = canonicalSlotTime(order.requestedTimeLabel);
   if (labeled) return labeled;
   const note = text(order.vibeNote);
@@ -153,7 +153,7 @@ export function holidayTakenFromOrders(
     if (isHolidayTestBooking(order)) continue;
     const status = text(order.status).trim().toLowerCase();
     if (CLOSED_STATUSES.has(status)) continue;
-    const claim = holidaySlotClaim(order.leadSource, orderDate(order), orderTime(order));
+    const claim = holidaySlotClaim(order.leadSource, holidayStoredDate(order), holidayStoredTime(order));
     if (!claim) continue;
     const key = `${claim.kind}|${claim.date}|${claim.time}`;
     counts.set(key, (counts.get(key) || 0) + 1);

@@ -6,7 +6,7 @@
 
 import { Router } from "express";
 import admin from "firebase-admin";
-import { requireCoordinator, type AuthenticatedRequest } from "../middleware/auth";
+import { requireAdmin, requireCoordinator, type AuthenticatedRequest } from "../middleware/auth";
 import { clientOrderReceivedSubject, sendEmail } from "../services/email";
 import { sendSMS, SMS_TEMPLATES } from "../services/sms";
 import { createCalendarBookingEvent } from "../services/calendar";
@@ -31,6 +31,7 @@ import { THANKFUL_RSVP_CLOSED, quoteThankfulSocialSave, socialRatePreviewAllowed
 import { isActiveStaffRecord } from "../../shared/staffAccess";
 import { isTempAdminEnabled } from "../../shared/tempAdmin";
 import { HOLIDAY_SLOT_TAKEN_MESSAGE, holidaySlotClaim, holidaySlotIsFull, holidayTakenFromOrders } from "../../shared/holidaySlots";
+import { HOLIDAY_OFFICE_CALENDAR_ID, classifyHolidayCalendarOrder } from "../../shared/holidayCalendar";
 import { createHolidaySquareCheckout } from "../services/holidaySquareCheckout";
 import { loadHolidaySlotOrders } from "../services/holidaySlots";
 import { packagesForStaffEditor, publicBookingCatalogResponse } from "../../shared/bookingCatalog";
@@ -47,6 +48,8 @@ import {
   deleteBookingCalendarHold,
   readBookingAvailability,
 } from "../services/bookingAvailability";
+import { createHolidayCalendarEvent, deleteHolidayCalendarEvent } from "../services/holidayCalendar";
+import { backfillHolidayCalendarEvents } from "../services/holidayCalendarBackfill";
 import { isPreferredWindowBooking, resolveBookingAssignment } from "../../shared/bookingAvailability";
 import { BUSINESS_CONTACT } from "../../shared/businessContact";
 import { clientIp } from "../lib/clientIp";
@@ -131,6 +134,8 @@ router.post("/", async (req, res) => {
   }
 
   let calendarHold: { calendarId: string; eventId: string | null; htmlLink: string | null } | null = null;
+  let holidayHold: { calendarId: string; eventId: string | null; htmlLink: string | null } | null = null;
+  let holidayEventSaved = false;
   let calendarHoldError: string | null = null;
   try {
     const {
@@ -378,14 +383,63 @@ router.post("/", async (req, res) => {
     } catch (err) {
       console.error("[Bookings] Order number format failed:", err);
     }
+    let holidayPatch: Record<string, unknown> = {};
+    const holidayDecision = classifyHolidayCalendarOrder({
+      ...orderRequest,
+      id: docRef.id,
+      orderNumber,
+      ...(packageName ? { packageName } : {}),
+    }, orderRequestAdminUrl(docRef.id));
+    if (holidayDecision.action === "create") {
+      let holidayError: string | null = null;
+      try {
+        const created = await createHolidayCalendarEvent(holidayDecision.plan);
+        if (!created?.eventId) holidayError = "Calendar returned no event id.";
+        else holidayHold = created;
+      } catch (err) {
+        console.error("[Bookings] Holiday calendar event failed:", err);
+        holidayError = calendarHoldFailureMessage(err);
+        holidayHold = null;
+      }
+      if (holidayError) console.error("[Bookings] Holiday calendar event failed:", holidayError);
+      holidayPatch = holidayHold?.eventId
+        ? {
+          calendarEventId: holidayHold.eventId,
+          calendarId: holidayHold.calendarId,
+          calendarHtmlLink: holidayHold.htmlLink,
+          calendarHold: "held",
+          calendarHoldError: null,
+          officeFlag: null,
+          officeNote: null,
+          ...(holidayDecision.plan.movedFrom ? { scheduledDate: holidayDecision.plan.date } : {}),
+        }
+        : {
+          calendarEventId: null,
+          calendarId: HOLIDAY_OFFICE_CALENDAR_ID,
+          calendarHtmlLink: null,
+          calendarHold: "failed",
+          calendarHoldError: holidayError,
+          officeFlag: "calendar_hold_failed",
+          officeNote: "Holiday calendar event was not created. Add it to the photos calendar manually.",
+        };
+    }
     try {
       await docRef.update({
         orderNumber,
         ...(packageName ? { packageName } : {}),
+        ...holidayPatch,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
+      holidayEventSaved = Boolean(holidayHold?.eventId);
     } catch (err) {
       console.error("[Bookings] Order number was not saved:", err);
+      if (holidayHold?.eventId) {
+        await deleteHolidayCalendarEvent({
+          calendarId: holidayHold.calendarId,
+          eventId: holidayHold.eventId,
+        }).catch((deleteErr) => console.error("[Bookings] Holiday calendar cleanup failed:", deleteErr));
+        holidayHold = null;
+      }
     }
 
     const normalizedEmail = orderRequest.email;
@@ -711,6 +765,12 @@ router.post("/", async (req, res) => {
         eventId: calendarHold.eventId,
       }).catch((deleteErr) => console.error("[Bookings] Calendar hold cleanup failed:", deleteErr));
     }
+    if (holidayHold?.eventId && !holidayEventSaved) {
+      await deleteHolidayCalendarEvent({
+        calendarId: holidayHold.calendarId,
+        eventId: holidayHold.eventId,
+      }).catch((deleteErr) => console.error("[Bookings] Holiday calendar cleanup failed:", deleteErr));
+    }
     return res.status(500).json({ error: "Failed to submit booking request." });
   }
 });
@@ -746,6 +806,15 @@ router.get("/social-rate", async (req, res) => {
 });
 
 // Public times only. Names and emails stay on the order.
+router.post("/holiday-calendar-backfill", requireAdmin, async (_req, res) => {
+  try {
+    return res.json(await backfillHolidayCalendarEvents());
+  } catch (err) {
+    console.error("[Bookings] Holiday calendar backfill failed:", err);
+    return res.status(500).json({ error: "Holiday calendar backfill failed." });
+  }
+});
+
 router.get("/holiday-slots", async (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {
@@ -1298,19 +1367,76 @@ router.patch("/:id/confirm", requireCoordinator, async (req: AuthenticatedReques
 
 // ─── PATCH /api/bookings/:id/decline ─────────────────────────────────────────────
 
+async function releaseOrderCalendar(data: Record<string, unknown>): Promise<string | null> {
+  const eventId = typeof data.calendarEventId === "string" ? data.calendarEventId : "";
+  if (!eventId) return null;
+  const calendarId = typeof data.calendarId === "string" && data.calendarId
+    ? data.calendarId
+    : HOLIDAY_OFFICE_CALENDAR_ID;
+  try {
+    await deleteHolidayCalendarEvent({ calendarId, eventId });
+    return null;
+  } catch (err) {
+    console.error("[Bookings] Holiday calendar delete failed:", err);
+    return calendarHoldFailureMessage(err);
+  }
+}
+
+router.patch("/:id/cancel", requireCoordinator, async (req: AuthenticatedRequest, res) => {
+  try {
+    const doc = await db().collection("orderRequests").doc(req.params.id).get();
+    if (!doc.exists) return res.status(404).json({ error: "Not found." });
+    const data = doc.data() || {};
+    const calendarError = await releaseOrderCalendar(data);
+    const hadEvent = typeof data.calendarEventId === "string" && data.calendarEventId.length > 0;
+    const history = Array.isArray(data.history) ? data.history : [];
+    await doc.ref.update({
+      status: "cancelled",
+      history: [...history, {
+        action: "Order cancelled by admin",
+        by: req.user?.email || "admin",
+        at: new Date().toISOString(),
+        details: "",
+      }],
+      ...(calendarError
+        ? {
+          calendarHold: "failed",
+          calendarHoldError: calendarError,
+          officeFlag: "calendar_hold_failed",
+        }
+        : hadEvent ? { calendarHold: "none" } : {}),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return res.json({ success: true, calendarDeleted: !calendarError });
+  } catch (err) {
+    console.error("[Bookings] Cancel error:", err);
+    return res.status(500).json({ error: "Failed to cancel booking." });
+  }
+});
+
 router.patch("/:id/decline", requireCoordinator, async (req, res) => {
   try {
     const { reason } = req.body;
     const doc = await db().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Not found." });
+    const data = doc.data() || {};
+    const calendarError = await releaseOrderCalendar(data);
+    const hadEvent = typeof data.calendarEventId === "string" && data.calendarEventId.length > 0;
 
     await doc.ref.update({
       status: "declined",
       declineReason: reason || "",
+      ...(calendarError
+        ? {
+          calendarHold: "failed",
+          calendarHoldError: calendarError,
+          officeFlag: "calendar_hold_failed",
+        }
+        : hadEvent ? { calendarHold: "none" } : {}),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    return res.json({ success: true });
+    return res.json({ success: true, calendarDeleted: !calendarError });
   } catch (err) {
     return res.status(500).json({ error: "Failed to decline booking." });
   }
