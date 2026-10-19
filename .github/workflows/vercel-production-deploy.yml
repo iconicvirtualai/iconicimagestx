@@ -1,19 +1,11 @@
+# Retired and manual-only. Vercel's git integration is the real production
+# deploy path. This workflow failed on all 160 runs at the typecheck step and
+# sent failure emails, so it no longer runs on pushes to main. Run it only
+# with workflow_dispatch if a manual production deploy is still needed.
 name: Vercel Production Deploy
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "api/**"
-      - "client/**"
-      - "server/**"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "vercel.json"
-      - "vite.config*.ts"
-      - ".vercel/project.json"
-      - ".github/workflows/vercel-production-deploy.yml"
 
 concurrency:
   group: vercel-production-deploy
