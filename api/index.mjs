@@ -8,7 +8,7 @@ import nodemailer from "nodemailer";
 import twilio from "twilio";
 import { google } from "googleapis";
 import crypto, { randomBytes, createHmac, timingSafeEqual, randomUUID } from "crypto";
-import { createHmac as createHmac$1, timingSafeEqual as timingSafeEqual$1, randomBytes as randomBytes$1, randomUUID as randomUUID$1 } from "node:crypto";
+import crypto$1, { createHmac as createHmac$1, timingSafeEqual as timingSafeEqual$1, randomBytes as randomBytes$1, randomUUID as randomUUID$1 } from "node:crypto";
 import Stripe from "stripe";
 import * as XLSX from "xlsx";
 import fs$1 from "node:fs";
@@ -249,16 +249,16 @@ const SETTLED$1 = /* @__PURE__ */ new Set(["paid", "comped"]);
 function isGuessableInvoiceId(id) {
   return id.startsWith("listing_") || id.startsWith("ordreq_") || id.startsWith("playtest-");
 }
-function text$p(value) {
+function text$q(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function settled$1(invoice) {
-  return SETTLED$1.has(text$p(invoice?.status).toLowerCase());
+  return SETTLED$1.has(text$q(invoice?.status).toLowerCase());
 }
 function invoicePayLinkFor(invoice, env, extra) {
   if (!invoice || settled$1(invoice)) return null;
-  const id = text$p(invoice.id);
-  const token = text$p(invoice.payToken);
+  const id = text$q(invoice.id);
+  const token = text$q(invoice.payToken);
   if (!id || !token) return null;
   const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
   url.searchParams.set("t", token);
@@ -269,7 +269,7 @@ function clientInvoiceUrl(invoice, env, extra) {
   const tokenized = invoicePayLinkFor(invoice, env, extra);
   if (tokenized) return tokenized;
   if (!invoice || settled$1(invoice)) return null;
-  const id = text$p(invoice.id);
+  const id = text$q(invoice.id);
   if (!id || isGuessableInvoiceId(id)) return null;
   const url = new URL(`${publicSiteUrl(env)}/invoice/${encodeURIComponent(id)}`);
   applyQuery(url, extra);
@@ -278,7 +278,7 @@ function clientInvoiceUrl(invoice, env, extra) {
 function applyQuery(url, extra) {
   if (!extra) return;
   for (const [key, value] of Object.entries(extra)) {
-    const textValue = text$p(value);
+    const textValue = text$q(value);
     if (textValue && key !== "t") url.searchParams.set(key, textValue);
   }
 }
@@ -1623,8 +1623,8 @@ const TEAL = "#14B8C4";
 const GREEN = "#16A34A";
 const ROW = "#F3F4F6";
 function receiptProcessing(input) {
-  const status2 = text$o(input.invoice.status).toLowerCase();
-  const paymentStatus = text$o(input.invoice.paymentStatus).toLowerCase();
+  const status2 = text$p(input.invoice.status).toLowerCase();
+  const paymentStatus = text$p(input.invoice.paymentStatus).toLowerCase();
   if (status2 === "comped" || paymentStatus === "comped") return 0;
   const base = roundCents(input.subtotal - input.promotions + input.fees);
   const stored = finite$1(input.invoice.processing);
@@ -1913,7 +1913,7 @@ function dollars$1(value) {
   const amount = Number(String(value).replace(/[^0-9.-]/g, ""));
   return Number.isFinite(amount) ? amount : 0;
 }
-function text$o(value) {
+function text$p(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function escapeHtml$7(value) {
@@ -2556,7 +2556,7 @@ function addressText(value) {
   if (typeof value === "string") return value.trim();
   if (typeof value !== "object" || Array.isArray(value)) return "";
   const address = value;
-  const formatted = text$n(address.formatted) || text$n(address.label);
+  const formatted = text$o(address.formatted) || text$o(address.label);
   if (formatted) return formatted;
   return [address.street, address.city, address.state, address.zip].filter((part) => typeof part === "string" && part.trim()).join(", ");
 }
@@ -2569,7 +2569,7 @@ function recordAddressText(record2) {
   }
   return "";
 }
-function text$n(value) {
+function text$o(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const PLAYTEST_ADDRESS = "100 Playtest Lane, Austin, TX 78701";
@@ -3863,7 +3863,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
       createdAt: data.createdAt
     }, now),
     status: typeof data.status === "string" && data.status.trim() ? data.status.trim() : "",
-    clientName: text$m(data.clientName),
+    clientName: text$n(data.clientName),
     address: addressText(data.billToAddress || data.address || data.propertyAddress),
     createdAt,
     issuedOn: formatPortalDate(data.createdAt) || formatPortalDate(data.sentAt) || formatPortalDate(data.paidAt),
@@ -3873,7 +3873,7 @@ function buildClientInvoice(id, data, now = /* @__PURE__ */ new Date()) {
     fees: storedAmount(data.fees),
     travel: storedAmount(data.travel),
     promoDiscount: storedAmount(data.promoDiscount),
-    promoCode: text$m(data.promoCode),
+    promoCode: text$n(data.promoCode),
     tax: storedAmount(data.tax),
     total: storedAmount(data.total),
     amountPaid: storedAmount(data.amountPaid),
@@ -3925,15 +3925,15 @@ function storedLines(lineItems, services2) {
     if (typeof item === "string" && item.trim()) return [{ name: item.trim(), qty: null, amount: null }];
     if (!item || typeof item !== "object") return [];
     const record2 = item;
-    const named = text$m(record2.name) || text$m(record2.label);
-    const description = text$m(record2.description);
+    const named = text$n(record2.name) || text$n(record2.label);
+    const description = text$n(record2.description);
     const name = named || description;
     const qty = storedQty(record2.qty ?? record2.quantity);
     const amount = storedAmount(record2.price ?? record2.amount ?? record2.total);
     if (!name && amount == null && qty == null) return [];
     const line = { name: name || "Line item", qty, amount };
-    const id = text$m(record2.id);
-    const category = text$m(record2.category);
+    const id = text$n(record2.id);
+    const category = text$n(record2.category);
     if (id) line.id = id;
     if (category) line.category = category;
     if (named && description) line.description = description;
@@ -3969,7 +3969,7 @@ function isoStamp(value) {
   if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
   return null;
 }
-function text$m(value) {
+function text$n(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function roundMoney$5(value) {
@@ -4432,40 +4432,40 @@ function bookingListingGroups(input) {
   for (const doc of requests) {
     const node = nodeId("orderRequests", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("listings", text$l(doc.data.listingId)));
-    uf.link(node, nodeId("orders", text$l(doc.data.orderId) || text$l(doc.data.convertedToOrderId)));
-    uf.link(node, nodeId("invoices", text$l(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$l(doc.data.galleryId)));
+    uf.link(node, nodeId("listings", text$m(doc.data.listingId)));
+    uf.link(node, nodeId("orders", text$m(doc.data.orderId) || text$m(doc.data.convertedToOrderId)));
+    uf.link(node, nodeId("invoices", text$m(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$m(doc.data.galleryId)));
   }
   for (const doc of orders) {
     const node = nodeId("orders", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$l(doc.data.orderRequestId)));
-    uf.link(node, nodeId("listings", text$l(doc.data.listingId)));
-    uf.link(node, nodeId("invoices", text$l(doc.data.invoiceId)));
-    uf.link(node, nodeId("galleries", text$l(doc.data.galleryId)));
+    uf.link(node, nodeId("orderRequests", text$m(doc.data.orderRequestId)));
+    uf.link(node, nodeId("listings", text$m(doc.data.listingId)));
+    uf.link(node, nodeId("invoices", text$m(doc.data.invoiceId)));
+    uf.link(node, nodeId("galleries", text$m(doc.data.galleryId)));
   }
   for (const doc of invoices) {
     const node = nodeId("invoices", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$l(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$l(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$l(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$m(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$m(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$m(doc.data.listingId)));
   }
   for (const doc of appointments) {
     const node = nodeId("appointments", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$l(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$l(doc.data.orderId)));
-    uf.link(node, nodeId("listings", text$l(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$m(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$m(doc.data.orderId)));
+    uf.link(node, nodeId("listings", text$m(doc.data.listingId)));
   }
   for (const doc of galleries) {
     const node = nodeId("galleries", doc.id);
     uf.touch(node);
-    uf.link(node, nodeId("orderRequests", text$l(doc.data.orderRequestId)));
-    uf.link(node, nodeId("orders", text$l(doc.data.orderId)));
-    uf.link(node, nodeId("invoices", text$l(doc.data.invoiceId)));
-    uf.link(node, nodeId("listings", text$l(doc.data.listingId)));
+    uf.link(node, nodeId("orderRequests", text$m(doc.data.orderRequestId)));
+    uf.link(node, nodeId("orders", text$m(doc.data.orderId)));
+    uf.link(node, nodeId("invoices", text$m(doc.data.invoiceId)));
+    uf.link(node, nodeId("listings", text$m(doc.data.listingId)));
   }
   const groups = [];
   for (const nodes of uf.components()) {
@@ -4525,7 +4525,7 @@ function fillEmptyListingFields(existing, desired) {
   return patch;
 }
 function clientOwnsListing(listing, clients) {
-  const clientId2 = text$l(listing.clientId);
+  const clientId2 = text$m(listing.clientId);
   const email = normalizeEmail$1(listing.clientEmail || listing.email);
   if (!clientId2 && !email) return true;
   if (clientId2 && clients.ids.includes(clientId2)) return true;
@@ -4597,10 +4597,10 @@ function chooseListing(group, listings, clients) {
 }
 function listingMatches(doc, group) {
   if (doc.id === group.stableId || group.preferredListingIds.includes(doc.id)) return true;
-  const requestId = text$l(doc.data.orderRequestId);
-  const orderId = text$l(doc.data.orderId);
-  const invoiceId = text$l(doc.data.invoiceId);
-  const appointmentId = text$l(doc.data.appointmentId);
+  const requestId = text$m(doc.data.orderRequestId);
+  const orderId = text$m(doc.data.orderId);
+  const invoiceId = text$m(doc.data.invoiceId);
+  const appointmentId = text$m(doc.data.appointmentId);
   return Boolean(
     requestId && group.orderRequestIds.includes(requestId) || orderId && group.orderIds.includes(orderId) || invoiceId && group.invoiceIds.includes(invoiceId) || appointmentId && group.appointmentIds.includes(appointmentId)
   );
@@ -4610,7 +4610,7 @@ function linksFor(group, listingId, listings, clients) {
   const links = [];
   const push = (collection, docs) => {
     for (const doc of docs) {
-      const current = text$l(doc.data.listingId);
+      const current = text$m(doc.data.listingId);
       if (current === listingId) continue;
       if (current && isPortalListingId(current) && ownedIds.has(current)) continue;
       links.push({ collection, id: doc.id });
@@ -4627,7 +4627,7 @@ function clientsFor(group, identity) {
   const ids = /* @__PURE__ */ new Set();
   const emails = /* @__PURE__ */ new Set();
   const addId = (value) => {
-    const id = text$l(value);
+    const id = text$m(value);
     if (id) ids.add(id);
   };
   const addEmail = (value) => {
@@ -4646,7 +4646,7 @@ function clientsFor(group, identity) {
 function preferredListingIds(group) {
   const ids = [];
   const push = (value) => {
-    const id = text$l(value);
+    const id = text$m(value);
     if (id && isPortalListingId(id) && !ids.includes(id)) ids.push(id);
   };
   for (const doc of [...group.orderRequests, ...group.orders, ...group.invoices, ...group.appointments, ...group.galleries]) {
@@ -4681,9 +4681,9 @@ function bestAddress(group) {
   }
   for (const doc of propertyDocs(group)) {
     for (const key of ["address", "propertyAddress", "shootLocation"]) {
-      if (typeof doc.data[key] === "string" && text$l(doc.data[key])) return text$l(doc.data[key]);
+      if (typeof doc.data[key] === "string" && text$m(doc.data[key])) return text$m(doc.data[key]);
     }
-    if (text$l(doc.data.addressLabel)) return text$l(doc.data.addressLabel);
+    if (text$m(doc.data.addressLabel)) return text$m(doc.data.addressLabel);
   }
   return null;
 }
@@ -4699,7 +4699,7 @@ function firstScheduleDate(group) {
 function firstScheduleTime(group) {
   for (const doc of [...group.appointments, ...group.orders, ...group.orderRequests]) {
     for (const key of ["scheduledTime", "appointmentTime", "apptTime", "requestedTime"]) {
-      const value = text$l(doc.data[key]);
+      const value = text$m(doc.data[key]);
       if (value && !/^tbd$/i.test(value)) return value;
     }
   }
@@ -4716,7 +4716,7 @@ function projectType(group) {
     if (doc.data.projectType === "real_estate") return "real_estate";
     const service = doc.data.selectedService;
     if (service && typeof service === "object") {
-      const category = text$l(service.category);
+      const category = text$m(service.category);
       if (category === "business" || category === "branding") return "business";
       if (category === "listings") return "real_estate";
     }
@@ -4742,7 +4742,7 @@ function namesFrom(value) {
   for (const item of value) {
     if (typeof item === "string" && item.trim()) names.push(item.trim());
     else if (item && typeof item === "object") {
-      const name = text$l(item.name);
+      const name = text$m(item.name);
       if (name) names.push(name);
     }
     if (names.length >= 40) break;
@@ -4767,8 +4767,8 @@ function accessInfo(group) {
   return [firstText$2(group, ["accessMethod"]), firstText$2(group, ["lockboxCode"])].filter(Boolean).join(" - ");
 }
 function clientId(group, identity) {
-  const bookingIds = propertyDocs(group).map((doc) => text$l(doc.data.clientId)).filter(Boolean);
-  const identityIds = (identity?.ids || []).map((id) => text$l(id)).filter(Boolean);
+  const bookingIds = propertyDocs(group).map((doc) => text$m(doc.data.clientId)).filter(Boolean);
+  const identityIds = (identity?.ids || []).map((id) => text$m(id)).filter(Boolean);
   return bookingIds.find((id) => identityIds.includes(id)) || bookingIds[0] || identityIds[0] || "";
 }
 function clientEmail(group, identity) {
@@ -4782,8 +4782,8 @@ function clientEmail(group, identity) {
 }
 function clientName$1(group) {
   for (const doc of propertyDocs(group)) {
-    if (text$l(doc.data.clientName)) return text$l(doc.data.clientName);
-    const joined = `${text$l(doc.data.firstName)} ${text$l(doc.data.lastName)}`.trim();
+    if (text$m(doc.data.clientName)) return text$m(doc.data.clientName);
+    const joined = `${text$m(doc.data.firstName)} ${text$m(doc.data.lastName)}`.trim();
     if (joined) return joined;
   }
   return "";
@@ -4791,7 +4791,7 @@ function clientName$1(group) {
 function chosenInvoiceId(group) {
   const known = new Set(group.invoiceIds);
   for (const doc of [...group.orderRequests, ...group.orders]) {
-    const id = text$l(doc.data.invoiceId);
+    const id = text$m(doc.data.invoiceId);
     if (id && known.has(id)) return id;
   }
   return newestDoc(group.invoices)?.id || group.invoiceIds[0] || "";
@@ -4800,7 +4800,7 @@ function chosenId(docs, ids, pointers = [], keys = []) {
   const known = new Set(ids);
   for (const doc of pointers) {
     for (const key of keys) {
-      const id = text$l(doc.data[key]);
+      const id = text$m(doc.data[key]);
       if (id && known.has(id)) return id;
     }
   }
@@ -4812,7 +4812,7 @@ function propertyDocs(group) {
 function firstText$2(group, keys) {
   for (const doc of propertyDocs(group)) {
     for (const key of keys) {
-      const value = text$l(doc.data[key]);
+      const value = text$m(doc.data[key]);
       if (value) return value;
     }
   }
@@ -4880,7 +4880,7 @@ function hasAddress(value) {
   if (typeof value === "string") return value.trim().length > 0;
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record2 = value;
-  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$l(record2[key]).length > 0);
+  return ["formatted", "label", "street", "line1", "addressLine1", "city", "state", "zip"].some((key) => text$m(record2[key]).length > 0);
 }
 function statusKey(value) {
   return String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
@@ -4912,14 +4912,14 @@ function isEmpty(value) {
 function isSentinel$1(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$l(value) {
+function text$m(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function cleanDocs(docs) {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
   for (const doc of docs || []) {
-    const id = text$l(doc?.id);
+    const id = text$m(doc?.id);
     if (!id || seen.has(id)) continue;
     seen.add(id);
     out.push({ id, data: doc.data && typeof doc.data === "object" ? doc.data : {} });
@@ -5005,7 +5005,7 @@ async function ensureBookingListingForRequest(orderRequestId) {
     galleries: []
   });
   const identity = {
-    ids: text$k(request.data.clientId) ? [text$k(request.data.clientId)] : [],
+    ids: text$l(request.data.clientId) ? [text$l(request.data.clientId)] : [],
     email: normalizeEmail$1(request.data.clientEmail || request.data.email)
   };
   const plans = await plansFor(bundle, identity);
@@ -5058,7 +5058,7 @@ async function applyBookingListingPlan(plan) {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
       created = true;
-      console.info(`[Listings] Created ${plan.listingId} for booking ${text$k(plan.createFields.orderRequestId) || text$k(plan.createFields.orderId) || text$k(plan.createFields.invoiceId)}`);
+      console.info(`[Listings] Created ${plan.listingId} for booking ${text$l(plan.createFields.orderRequestId) || text$l(plan.createFields.orderId) || text$l(plan.createFields.invoiceId)}`);
     } catch (err) {
       if (!alreadyExists(err)) throw err;
       await fillListing(ref, plan.createFields);
@@ -5087,7 +5087,7 @@ async function linkRecord(collectionName, id, listingId) {
   const ref = db$t().collection(collectionName).doc(id);
   const snap = await ref.get();
   if (!snap.exists) return;
-  if (text$k(snap.data()?.listingId) === listingId) return;
+  if (text$l(snap.data()?.listingId) === listingId) return;
   await ref.update({
     listingId,
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -5101,9 +5101,9 @@ async function loadVisibleSeeds(identity) {
   const keep = (map, docs) => {
     for (const doc of docs) {
       if (!visibleToPortalClient({
-        clientId: text$k(doc.data.clientId),
-        email: text$k(doc.data.email),
-        clientEmail: text$k(doc.data.clientEmail)
+        clientId: text$l(doc.data.clientId),
+        email: text$l(doc.data.email),
+        clientEmail: text$l(doc.data.clientEmail)
       }, identity)) continue;
       if (!map.has(doc.id)) map.set(doc.id, doc);
     }
@@ -5142,36 +5142,36 @@ async function hydrateBundle(seed) {
   const galleries = mapDocs(seed.galleries);
   const requestIds = new Set(requests.keys());
   for (const doc of [...orders.values(), ...invoices.values(), ...appointments.values()]) {
-    const id = text$k(doc.data.orderRequestId);
+    const id = text$l(doc.data.orderRequestId);
     if (id) requestIds.add(id);
   }
   await readMissing("orderRequests", requestIds, requests);
   const orderIds = new Set(orders.keys());
   for (const doc of requests.values()) {
-    const id = text$k(doc.data.convertedToOrderId) || text$k(doc.data.orderId);
+    const id = text$l(doc.data.convertedToOrderId) || text$l(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   for (const doc of [...invoices.values(), ...appointments.values()]) {
-    const id = text$k(doc.data.orderId);
+    const id = text$l(doc.data.orderId);
     if (id) orderIds.add(id);
   }
   await readMissing("orders", orderIds, orders);
   const invoiceIds = new Set(invoices.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$k(doc.data.invoiceId);
+    const id = text$l(doc.data.invoiceId);
     if (id) invoiceIds.add(id);
   }
   await readMissing("invoices", invoiceIds, invoices);
   const legacyIds = /* @__PURE__ */ new Set();
   for (const doc of requests.values()) {
-    for (const id of legacyInvoiceDocIds({ orderRequestId: doc.id, listingId: text$k(doc.data.listingId) })) {
+    for (const id of legacyInvoiceDocIds({ orderRequestId: doc.id, listingId: text$l(doc.data.listingId) })) {
       legacyIds.add(id);
     }
   }
   for (const doc of orders.values()) {
     for (const id of legacyInvoiceDocIds({
-      orderRequestId: text$k(doc.data.orderRequestId),
-      listingId: text$k(doc.data.listingId)
+      orderRequestId: text$l(doc.data.orderRequestId),
+      listingId: text$l(doc.data.listingId)
     })) {
       legacyIds.add(id);
     }
@@ -5184,7 +5184,7 @@ async function hydrateBundle(seed) {
   mergeDocs(appointments, await queryIn("appointments", "orderId", [...orders.keys()]));
   const galleryIds = new Set(galleries.keys());
   for (const doc of [...requests.values(), ...orders.values()]) {
-    const id = text$k(doc.data.galleryId);
+    const id = text$l(doc.data.galleryId);
     if (id) galleryIds.add(id);
   }
   await readMissing("galleries", galleryIds, galleries);
@@ -5313,7 +5313,7 @@ function alreadyExists(err) {
 function isSentinel(value) {
   return Boolean(value && typeof value === "object" && "_methodName" in value);
 }
-function text$k(value) {
+function text$l(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function chunk$1(items, size) {
@@ -5330,14 +5330,14 @@ const BOOKING_PHOTOGRAPHER_STAFF_UIDS = {
   "david-gonzalez": "",
   "cadi-torres": ""
 };
-function text$j(value) {
+function text$k(value) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 function resolveBookingPhotographerStaff(input) {
   const publicId = input.publicId.trim();
   const configured = String(BOOKING_PHOTOGRAPHER_STAFF_UIDS[publicId] || "").trim();
-  const calendar = text$j(input.calendarId);
-  const match = calendar ? (input.staff || []).find((member) => text$j(member.email) === calendar || text$j(member.googleCalendarId) === calendar) : void 0;
+  const calendar = text$k(input.calendarId);
+  const match = calendar ? (input.staff || []).find((member) => text$k(member.email) === calendar || text$k(member.googleCalendarId) === calendar) : void 0;
   const candidate = String(match?.id || configured || "").trim();
   const uid = candidate && candidate !== publicId ? candidate : null;
   const matchedName = typeof match?.name === "string" ? match.name.trim() : "";
@@ -5520,7 +5520,7 @@ function synthesizePackageLine(record2) {
 }
 function packageLabel(record2) {
   for (const key of PACKAGE_LABEL_KEYS) {
-    const value = text$i(record2[key]);
+    const value = text$j(record2[key]);
     if (value) return value;
   }
   return "";
@@ -5556,7 +5556,7 @@ function moneyOrNull$1(value) {
 function nested$2(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$i(value) {
+function text$j(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function roundMoney$3(value) {
@@ -5588,7 +5588,7 @@ function buildAdminOrderTile(record2) {
   const packageName = skin2?.title || named || "Custom order";
   const charges = orderChargeSummary(record2, lines);
   return {
-    id: text$h(record2.id) || packageName,
+    id: text$i(record2.id) || packageName,
     orderCode: orderCode(kind, record2),
     kind,
     typeLabel: kind === "business" ? "Business" : "Listing",
@@ -5611,7 +5611,7 @@ function buildAdminOrderTile(record2) {
   };
 }
 function orderKind(record2, skin2) {
-  const raw = text$h(record2.projectType || record2.orderType || record2.type).toLowerCase();
+  const raw = text$i(record2.projectType || record2.orderType || record2.type).toLowerCase();
   if (raw === "business" || raw === "brand" || raw === "social") return "business";
   if (raw === "real_estate" || raw === "listing" || raw === "property") return "listing";
   if (skin2?.category === "listing") return "listing";
@@ -5625,9 +5625,9 @@ function channelFor(skin2, kind) {
   return kind === "business" ? "Human Brand" : "Listings & Spaces";
 }
 function orderCode(kind, record2) {
-  const explicit = text$h(record2.orderCode || record2.orderNumber || record2.displayId);
+  const explicit = text$i(record2.orderCode || record2.orderNumber || record2.displayId);
   if (explicit) return explicit.toUpperCase();
-  const id = text$h(record2.id);
+  const id = text$i(record2.id);
   const prefix = kind === "listing" ? "L" : "B";
   return `ORD - ${prefix} - ${orderCodeTail(id)}`;
 }
@@ -5645,29 +5645,29 @@ function orderCodeTail(id, salt = 0) {
   return String(1e4 + (h >>> 0) % 9e4);
 }
 function heroFromRecord(record2) {
-  const explicit = text$h(record2.heroUrl) || text$h(record2.coverUrl) || text$h(record2.coverImage);
+  const explicit = text$i(record2.heroUrl) || text$i(record2.coverUrl) || text$i(record2.coverImage);
   if (explicit) return explicit;
   const images = record2.images;
   if (!Array.isArray(images)) return "";
   for (const image of images) {
     if (typeof image === "string" && image.trim()) return image.trim();
     if (image && typeof image === "object") {
-      const url = text$h(image.url) || text$h(image.thumbnailUrl);
+      const url = text$i(image.url) || text$i(image.thumbnailUrl);
       if (url) return url;
     }
   }
   return "";
 }
 function clientName(record2) {
-  const named = text$h(record2.clientName) || text$h(record2.customerName) || text$h(record2.agentName) || [text$h(record2.firstName), text$h(record2.lastName)].filter(Boolean).join(" ");
+  const named = text$i(record2.clientName) || text$i(record2.customerName) || text$i(record2.agentName) || [text$i(record2.firstName), text$i(record2.lastName)].filter(Boolean).join(" ");
   return named || "—";
 }
 function appointmentLabel(record2) {
   const raw = record2.appointmentDate ?? record2.apptDate ?? record2.scheduledDate ?? record2.requestedDate;
   const key = calendarDateKey(raw);
   const date = formatShootDateLabel(key, typeof raw === "string" ? raw : void 0);
-  const time = text$h(record2.scheduledTime || record2.appointmentTime || record2.requestedTime);
-  const photographer = text$h(record2.assignedPhotographerName || record2.photographerName || record2.photographerPreference);
+  const time = text$i(record2.scheduledTime || record2.appointmentTime || record2.requestedTime);
+  const photographer = text$i(record2.assignedPhotographerName || record2.photographerName || record2.photographerPreference);
   return [date, time, photographer].filter(Boolean).join(" · ") || "—";
 }
 function tilePrice(amount) {
@@ -5735,7 +5735,7 @@ function money$4(value) {
   }
   return 0;
 }
-function text$h(value) {
+function text$i(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 const NOT_PROVIDED = "Not provided";
@@ -5756,7 +5756,7 @@ function officeNewOrderEmail(saved, options) {
   const notes = notesOf(saved);
   const fields = [
     ["Order number", orderNumber],
-    ["Admin link", text$g(options?.adminUrl) || NOT_PROVIDED],
+    ["Admin link", text$h(options?.adminUrl) || NOT_PROVIDED],
     ["Client name", clientName2],
     ["Client email", firstText$1(saved, ["clientEmail", "email"])],
     ["Client phone", firstText$1(saved, ["clientPhone", "phone"])],
@@ -5790,7 +5790,7 @@ function officeNewOrderEmail(saved, options) {
     ["Notes", notes],
     ["Booked via", bookedVia(saved)]
   ];
-  const officeNote = text$g(saved.officeNote);
+  const officeNote = text$h(saved.officeNote);
   if (officeNote) fields.unshift(["Office note", officeNote]);
   const subjectCore = `New order ${orderNumber} — ${packageName} — ${address} — ${requestedDate}`;
   const subject = isTestOrder(clientName2, notes) ? `[TEST] ${subjectCore}` : subjectCore;
@@ -5804,19 +5804,19 @@ ${notes}`.toUpperCase().includes("TEST ORDER");
 }
 function orderNumberOf(saved) {
   for (const key of ["orderNumber", "orderCode", "displayId"]) {
-    const value = text$g(saved[key]);
+    const value = text$h(saved[key]);
     if (value && value !== NOT_PROVIDED) return value;
   }
-  if (!text$g(saved.id)) return NOT_PROVIDED;
+  if (!text$h(saved.id)) return NOT_PROVIDED;
   return buildAdminOrderTile(saved).orderCode;
 }
 function explicitPackageName(saved) {
   for (const key of ["packageName", "serviceName"]) {
-    const value = text$g(saved[key]);
+    const value = text$h(saved[key]);
     if (value && value !== NOT_PROVIDED) return cleanPackageName(value) || value;
   }
-  const selected = text$g(saved.selectedService);
-  if (text$g(saved.id) || selected) {
+  const selected = text$h(saved.selectedService);
+  if (text$h(saved.id) || selected) {
     const tileName = buildAdminOrderTile(saved).packageName;
     if (tileName && tileName !== "Custom order") return tileName;
   }
@@ -5826,17 +5826,17 @@ function explicitPackageName(saved) {
 function clientNameOf(saved) {
   const named = firstText$1(saved, ["clientName", "customerName"]);
   if (named) return named;
-  const joined = [text$g(saved.firstName), text$g(saved.lastName)].filter(Boolean).join(" ");
+  const joined = [text$h(saved.firstName), text$h(saved.lastName)].filter(Boolean).join(" ");
   return joined || NOT_PROVIDED;
 }
 function agentContactOf(saved) {
   const clientEmail2 = firstText$1(saved, ["clientEmail", "email"]).toLowerCase();
-  const clientPhone = digits(firstText$1(saved, ["clientPhone", "phone"]));
+  const clientPhone = digits$1(firstText$1(saved, ["clientPhone", "phone"]));
   const email = agentField(saved, ["agentEmail", "realtorEmail", "listingAgentEmail", "brokerEmail"], "email");
   const phone = agentField(saved, ["agentPhone", "realtorPhone", "listingAgentPhone", "brokerPhone"], "phone");
   const parts = [];
   if (email && email.toLowerCase() !== clientEmail2) parts.push(email);
-  if (phone && digits(phone) !== clientPhone) parts.push(phone);
+  if (phone && digits$1(phone) !== clientPhone) parts.push(phone);
   return parts.length ? parts.join(" / ") : NOT_PROVIDED;
 }
 function agentField(saved, keys, nestedKey) {
@@ -5844,16 +5844,16 @@ function agentField(saved, keys, nestedKey) {
   if (direct !== NOT_PROVIDED) return direct;
   for (const holder of [saved.agent, saved.listingAgent, saved.realtor]) {
     const record2 = nested(holder);
-    const value = text$g(record2[nestedKey]);
+    const value = text$h(record2[nestedKey]);
     if (value) return value;
   }
   return "";
 }
-function digits(value) {
+function digits$1(value) {
   return value === NOT_PROVIDED ? "" : value.replace(/\D/g, "");
 }
 function notesOf(saved) {
-  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$g(saved[key])).filter(Boolean);
+  const parts = ["vibeNote", "notes", "specialInstructions", "internalNotes"].map((key) => text$h(saved[key])).filter(Boolean);
   return parts.length ? parts.join("\n") : NOT_PROVIDED;
 }
 function lockboxOf(saved) {
@@ -5861,12 +5861,12 @@ function lockboxOf(saved) {
   return code || NOT_PROVIDED;
 }
 function occupancyOf(saved) {
-  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$g(saved[key])).filter(Boolean);
+  const parts = ["occupancy", "propertyStatus", "furnishingStatus"].map((key) => text$h(saved[key])).filter(Boolean);
   return parts.length ? parts.join(", ") : NOT_PROVIDED;
 }
 function bookedVia(saved) {
-  const lead = text$g(saved.leadSource);
-  const source = text$g(saved.source);
+  const lead = text$h(saved.leadSource);
+  const source = text$h(saved.source);
   const blob = `${lead} ${source}`.toLowerCase();
   if (!blob.trim()) return NOT_PROVIDED;
   if (/admin/.test(blob)) return "Admin";
@@ -5876,7 +5876,7 @@ function bookedVia(saved) {
 }
 function paymentOf(saved, total) {
   const invoice = nested(saved.invoice);
-  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$g(value).toLowerCase()).find(Boolean) || "";
+  const explicit = [saved.paymentStatus, saved.invoiceStatus, invoice.status].map((value) => text$h(value).toLowerCase()).find(Boolean) || "";
   if (/partial/.test(explicit)) return "Partial";
   if (/\bpaid\b/.test(explicit) && !/unpaid/.test(explicit)) return "Paid";
   if (/unpaid/.test(explicit)) return "Unpaid";
@@ -5983,7 +5983,7 @@ function moneyOrNull(value) {
 function nested(value) {
   return value && typeof value === "object" ? value : {};
 }
-function text$g(value) {
+function text$h(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function escapeHtml$6(value) {
@@ -6292,15 +6292,15 @@ function canonicalSlotTime(value) {
   if (hour < 1 || hour > 12) return null;
   return `${hour}:${match[2]} ${match[3].toUpperCase()}`;
 }
-function text$f(value) {
+function text$g(value) {
   return typeof value === "string" ? value : "";
 }
 function isHolidayTestBooking(order) {
-  const email = `${text$f(order.email)} ${text$f(order.clientEmail)}`.toLowerCase();
+  const email = `${text$g(order.email)} ${text$g(order.clientEmail)}`.toLowerCase();
   if (email.includes("ops+deliveryqa@")) return true;
   if (order.playtest === true || order.test === true || order.isTest === true) return true;
-  const name = text$f(order.clientName) || `${text$f(order.firstName)} ${text$f(order.lastName)}`.trim();
-  const notes = text$f(order.vibeNote) || text$f(order.notes);
+  const name = text$g(order.clientName) || `${text$g(order.firstName)} ${text$g(order.lastName)}`.trim();
+  const notes = text$g(order.vibeNote) || text$g(order.notes);
   return `${name}
 ${notes}`.toUpperCase().includes("TEST ORDER");
 }
@@ -6321,15 +6321,15 @@ function holidayStoredDate(order) {
       }).format(date);
     }
   }
-  const fromNote = /^Date:\s*(\d{4}-\d{2}-\d{2})/im.exec(text$f(order.vibeNote));
+  const fromNote = /^Date:\s*(\d{4}-\d{2}-\d{2})/im.exec(text$g(order.vibeNote));
   if (fromNote) return fromNote[1];
-  if (text$f(order.leadSource).trim() === HOLIDAY_RSVP_LEAD) return THANKFUL_EVENT_DATE;
+  if (text$g(order.leadSource).trim() === HOLIDAY_RSVP_LEAD) return THANKFUL_EVENT_DATE;
   return null;
 }
 function holidayStoredTime(order) {
   const labeled = canonicalSlotTime(order.requestedTimeLabel);
   if (labeled) return labeled;
-  const note = text$f(order.vibeNote);
+  const note = text$g(order.vibeNote);
   const requested = /Requested photo time:\s*(\d{1,2}:\d{2}\s*[AP]M)/i.exec(note);
   if (requested) return canonicalSlotTime(requested[1]);
   const line = /^Time:\s*(\d{1,2}:\d{2}\s*[AP]M)/im.exec(note);
@@ -6339,8 +6339,8 @@ function holidayStoredTime(order) {
 function holidaySlotClaim(leadSource, date, time) {
   const clock = canonicalSlotTime(time);
   if (!clock) return null;
-  const lead = text$f(leadSource).trim();
-  const day = text$f(date).trim().slice(0, 10);
+  const lead = text$g(leadSource).trim();
+  const day = text$g(date).trim().slice(0, 10);
   if (lead === HOLIDAY_RSVP_LEAD) {
     const thankfulDay = day || THANKFUL_EVENT_DATE;
     if (thankfulDay !== THANKFUL_EVENT_DATE || !thankfulSlotTimes().includes(clock)) return null;
@@ -6366,7 +6366,7 @@ function holidayTakenFromOrders(orders, limit = HOLIDAY_SLOT_LIMIT) {
   const counts = /* @__PURE__ */ new Map();
   for (const order of orders) {
     if (isHolidayTestBooking(order)) continue;
-    const status2 = text$f(order.status).trim().toLowerCase();
+    const status2 = text$g(order.status).trim().toLowerCase();
     if (CLOSED_STATUSES$1.has(status2)) continue;
     const claim = holidaySlotClaim(order.leadSource, holidayStoredDate(order), holidayStoredTime(order));
     if (!claim) continue;
@@ -6399,18 +6399,18 @@ const HOLIDAY_SLOT_MINUTES = 15;
 const LEGACY_THANKFUL_DATE = "2026-11-14";
 const LEGACY_THANKFUL_TIME = "11:00 AM";
 const CLOSED_STATUSES = /* @__PURE__ */ new Set(["declined", "cancelled", "canceled"]);
-function text$e(value) {
+function text$f(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function noteOf(order) {
-  return text$e(order.vibeNote) || text$e(order.notes);
+  return text$f(order.vibeNote) || text$f(order.notes);
 }
 function lineValue(note, label) {
   const match = new RegExp(`^${label}:\\s*(.*)$`, "im").exec(note);
   return match ? match[1].trim() : "";
 }
 function holidayGuestName(order) {
-  const named = text$e(order.clientName) || `${text$e(order.firstName)} ${text$e(order.lastName)}`.trim();
+  const named = text$f(order.clientName) || `${text$f(order.firstName)} ${text$f(order.lastName)}`.trim();
   return named || "Guest";
 }
 function holidayHeadcountLabel(order) {
@@ -6444,18 +6444,18 @@ function holidayNotesLabel(order) {
   return lineValue(noteOf(order), "Notes");
 }
 function holidayPackageLabel(order) {
-  const selected = text$e(order.selectedService);
+  const selected = text$f(order.selectedService);
   if (selected) return selected;
-  const named = text$e(order.packageName);
+  const named = text$f(order.packageName);
   if (named) return named;
   const fromNote = lineValue(noteOf(order), "Package");
   return fromNote || "Holiday shoot";
 }
 function closedStatus(order) {
-  return CLOSED_STATUSES.has(text$e(order.status).toLowerCase());
+  return CLOSED_STATUSES.has(text$f(order.status).toLowerCase());
 }
 function holidayLead(order) {
-  const lead = text$e(order.leadSource);
+  const lead = text$f(order.leadSource);
   if (lead === HOLIDAY_RSVP_LEAD) return "thankful";
   if (lead === HOLIDAY_SEASON_LEAD) return "season";
   return null;
@@ -6511,11 +6511,11 @@ function buildPlan(order, adminUrl) {
   const name = holidayGuestName(order);
   const headcount = holidayHeadcountLabel(order);
   const headcountTitle = holidayHeadcountNumber(headcount) ?? (headcount || "—");
-  const orderNumber = text$e(order.orderNumber);
+  const orderNumber = text$f(order.orderNumber);
   const summary = kind === "thankful" ? `Thankful RSVP — ${name} (${headcountTitle})` : `'Tis shoot — ${name} — ${holidayPackageLabel(order)}`;
   const description = [
-    `Email: ${text$e(order.email) || text$e(order.clientEmail) || "—"}`,
-    `Phone: ${text$e(order.phone) || text$e(order.clientPhone) || "—"}`,
+    `Email: ${text$f(order.email) || text$f(order.clientEmail) || "—"}`,
+    `Phone: ${text$f(order.phone) || text$f(order.clientPhone) || "—"}`,
     `Headcount: ${headcount || "—"}`,
     `Kids/Santa: ${holidaySantaLabel(order) || "—"}`,
     `Menu vote: ${holidayMenuVote(order) || "—"}`,
@@ -6524,7 +6524,7 @@ function buildPlan(order, adminUrl) {
     `Admin: ${adminUrl}`
   ].join("\n");
   return {
-    orderId: text$e(order.id),
+    orderId: text$f(order.id),
     orderNumber,
     kind,
     name,
@@ -6541,7 +6541,7 @@ function classifyHolidayCalendarOrder(order, adminUrl) {
   if (!holidayLead(order)) return { action: "skip", reason: "notASlot" };
   if (isHolidayTestBooking(order)) return { action: "skip", reason: "test" };
   if (closedStatus(order)) return { action: "skip", reason: "cancelled" };
-  if (text$e(order.calendarEventId)) return { action: "skip", reason: "already" };
+  if (text$f(order.calendarEventId)) return { action: "skip", reason: "already" };
   const plan = buildPlan(order, adminUrl);
   if (!plan) return { action: "skip", reason: "notASlot" };
   return { action: "create", plan };
@@ -6822,11 +6822,11 @@ async function nextOrderNumber() {
   return formatOrderNumber(n);
 }
 const SETTLED = /* @__PURE__ */ new Set(["paid", "comped"]);
-function text$d(value) {
+function text$e(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function status(value) {
-  return text$d(value).toLowerCase();
+  return text$e(value).toLowerCase();
 }
 function settled(value) {
   return SETTLED.has(status(value));
@@ -6834,12 +6834,12 @@ function settled(value) {
 function isPlaytestDoc(doc) {
   if (!doc) return false;
   if (doc.playtest === true) return true;
-  return text$d(doc.id).toLowerCase().startsWith("playtest-");
+  return text$e(doc.id).toLowerCase().startsWith("playtest-");
 }
 function nestedInvoiceStatus(listing) {
   const nested2 = listing?.invoice;
   if (!nested2 || typeof nested2 !== "object") return "";
-  return text$d(nested2.status);
+  return text$e(nested2.status);
 }
 function releaseFlags(subject) {
   const listing = subject.listing;
@@ -7151,26 +7151,26 @@ function quoteApprenticeship(input) {
   };
 }
 const EMAIL_RE$3 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-function text$c(value) {
+function text$d(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function parseApprenticeshipOrder(body) {
   const raw = body && typeof body === "object" ? body : {};
-  if (text$c(raw.website) || text$c(raw.companyWebsite)) {
+  if (text$d(raw.website) || text$d(raw.companyWebsite)) {
     return { ok: false, error: "Received.", honeypot: true };
   }
-  const name = text$c(raw.name);
-  const explicitFirst = text$c(raw.firstName);
-  const explicitLast = text$c(raw.lastName);
+  const name = text$d(raw.name);
+  const explicitFirst = text$d(raw.firstName);
+  const explicitLast = text$d(raw.lastName);
   const parts = name.split(/\s+/).filter(Boolean);
   const firstName = explicitFirst || parts[0] || "";
   const lastName = explicitLast || parts.slice(1).join(" ") || (explicitFirst ? "" : "");
-  const email = text$c(raw.email).toLowerCase();
-  const phone = text$c(raw.phone);
-  const address = text$c(raw.address);
-  const packageId = text$c(raw.packageId);
-  const slotStart = text$c(raw.slotStart);
-  const preferredTime = text$c(raw.preferredTime);
+  const email = text$d(raw.email).toLowerCase();
+  const phone = text$d(raw.phone);
+  const address = text$d(raw.address);
+  const packageId = text$d(raw.packageId);
+  const slotStart = text$d(raw.slotStart);
+  const preferredTime = text$d(raw.preferredTime);
   if (!isApprenticeshipPackage(packageId) || !findApprenticeshipPackage(packageId)) {
     return { ok: false, error: "Choose an apprenticeship package." };
   }
@@ -8132,7 +8132,7 @@ function createRateLimiter(options) {
     }
   };
 }
-const router$q = Router();
+const router$r = Router();
 const db$p = () => admin.firestore();
 const BOOKING_SUBMIT_WINDOW_MS = 15 * 60 * 1e3;
 const BOOKING_SUBMIT_MAX = 10;
@@ -8180,7 +8180,7 @@ async function loadBookingCatalog() {
     return packagesForStaffEditor([]);
   }
 }
-router$q.post("/", async (req, res) => {
+router$r.post("/", async (req, res) => {
   const limit = bookingSubmitLimiter.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
@@ -8773,13 +8773,13 @@ async function socialRateCaller(req) {
     return { role: null, email: null };
   }
 }
-router$q.get("/social-rate", async (req, res) => {
+router$r.get("/social-rate", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const requested = typeof req.query.date === "string" ? req.query.date : "";
   const previewAllowed = requested ? socialRatePreviewAllowed(await socialRateCaller(req)) : false;
   return res.json(socialRateView(/* @__PURE__ */ new Date(), requested || null, previewAllowed));
 });
-router$q.post("/holiday-calendar-backfill", requireAdmin, async (_req, res) => {
+router$r.post("/holiday-calendar-backfill", requireAdmin, async (_req, res) => {
   try {
     return res.json(await backfillHolidayCalendarEvents());
   } catch (err) {
@@ -8787,7 +8787,7 @@ router$q.post("/holiday-calendar-backfill", requireAdmin, async (_req, res) => {
     return res.status(500).json({ error: "Holiday calendar backfill failed." });
   }
 });
-router$q.get("/holiday-slots", async (_req, res) => {
+router$r.get("/holiday-slots", async (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {
     return res.json(holidayTakenFromOrders(await loadHolidaySlotOrders()));
@@ -8796,13 +8796,13 @@ router$q.get("/holiday-slots", async (_req, res) => {
     return res.status(500).json({ error: "Holiday slots are unavailable." });
   }
 });
-router$q.get("/photographers", (_req, res) => {
+router$r.get("/photographers", (_req, res) => {
   return res.json({
     noPreference: { id: NO_PREFERENCE_ID, name: NO_PREFERENCE_NAME },
     photographers: publicBookingPhotographers()
   });
 });
-router$q.get("/slots", async (req, res) => {
+router$r.get("/slots", async (req, res) => {
   const basics = typeof req.query.basics === "string" ? req.query.basics.split(",").map((id) => id.trim()).filter(Boolean) : [];
   const preferenceId = preferenceFromRequest(req.query.photographer, "");
   try {
@@ -8824,14 +8824,14 @@ router$q.get("/slots", async (req, res) => {
     return res.json({ live: false, durationMinutes: 90, slots: [] });
   }
 });
-router$q.get("/catalog", async (_req, res) => {
+router$r.get("/catalog", async (_req, res) => {
   const catalog = await loadBookingCatalog();
   return res.json({
     ...publicBookingCatalogResponse(catalog),
     processingEnabled: processingEnabled()
   });
 });
-router$q.get("/", requireCoordinator, async (_req, res) => {
+router$r.get("/", requireCoordinator, async (_req, res) => {
   try {
     const snapshot = await db$p().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
     const requests = snapshot.docs.map((doc) => ({
@@ -8844,7 +8844,7 @@ router$q.get("/", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking requests." });
   }
 });
-router$q.get("/:id", requireCoordinator, async (req, res) => {
+router$r.get("/:id", requireCoordinator, async (req, res) => {
   try {
     const doc = await db$p().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) {
@@ -8856,7 +8856,7 @@ router$q.get("/:id", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking request." });
   }
 });
-router$q.post("/:id/assign-photographer", requireCoordinator, async (req, res) => {
+router$r.post("/:id/assign-photographer", requireCoordinator, async (req, res) => {
   try {
     const requestDoc = await db$p().collection("orderRequests").doc(req.params.id).get();
     if (!requestDoc.exists) return res.status(404).json({ error: "Booking request not found." });
@@ -8871,7 +8871,7 @@ router$q.post("/:id/assign-photographer", requireCoordinator, async (req, res) =
     return res.status(500).json({ error: "Could not assign the photographer." });
   }
 });
-router$q.patch("/:id/confirm", requireCoordinator, async (req, res) => {
+router$r.patch("/:id/confirm", requireCoordinator, async (req, res) => {
   try {
     const { assignedPhotographerId, assignedPhotographerName: postedPhotographerName, scheduledDate, scheduledTime, internalNotes } = req.body;
     const requestDoc = await db$p().collection("orderRequests").doc(req.params.id).get();
@@ -9272,7 +9272,7 @@ async function releaseOrderCalendar(data) {
     return calendarHoldFailureMessage(err);
   }
 }
-router$q.patch("/:id/cancel", requireCoordinator, async (req, res) => {
+router$r.patch("/:id/cancel", requireCoordinator, async (req, res) => {
   try {
     const doc = await db$p().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Not found." });
@@ -9301,7 +9301,7 @@ router$q.patch("/:id/cancel", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to cancel booking." });
   }
 });
-router$q.patch("/:id/decline", requireCoordinator, async (req, res) => {
+router$r.patch("/:id/decline", requireCoordinator, async (req, res) => {
   try {
     const { reason } = req.body;
     const doc = await db$p().collection("orderRequests").doc(req.params.id).get();
@@ -9477,7 +9477,7 @@ async function ensureDotOptInLink(invoice) {
     return { dotOptIn: false, url: null };
   }
 }
-const router$p = Router();
+const router$q = Router();
 const db$o = () => admin.firestore();
 const dotOptInLimiter = createRateLimiter({ windowMs: 10 * 60 * 1e3, max: 30 });
 function sendDotOptInPage(res, status2, ok) {
@@ -9490,7 +9490,7 @@ function sendDotOptInPage(res, status2, ok) {
   });
   res.send(dotOptInResultHtml(ok));
 }
-router$p.get("/dot-opt-in", async (req, res) => {
+router$q.get("/dot-opt-in", async (req, res) => {
   const limit = dotOptInLimiter.check(clientIp(req));
   if (!limit.allowed) {
     res.set("Retry-After", String(limit.retryAfterSec));
@@ -9506,7 +9506,7 @@ router$p.get("/dot-opt-in", async (req, res) => {
     sendDotOptInPage(res, 500, false);
   }
 });
-router$p.get("/", requireStaff, async (req, res) => {
+router$q.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, photographerId, limit = "50", startAfter } = req.query;
     let query = db$o().collection("orders").orderBy("createdAt", "desc");
@@ -9534,7 +9534,7 @@ router$p.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch orders." });
   }
 });
-router$p.get("/dashboard", requireStaff, async (_req, res) => {
+router$q.get("/dashboard", requireStaff, async (_req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -9567,7 +9567,7 @@ router$p.get("/dashboard", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch dashboard stats." });
   }
 });
-router$p.get("/:id", requireStaff, async (req, res) => {
+router$q.get("/:id", requireStaff, async (req, res) => {
   try {
     const orderDoc = await db$o().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
@@ -9602,7 +9602,7 @@ router$p.get("/:id", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch order." });
   }
 });
-router$p.patch("/:id", requireCoordinator, async (req, res) => {
+router$q.patch("/:id", requireCoordinator, async (req, res) => {
   try {
     const allowed = [
       "status",
@@ -9653,7 +9653,7 @@ const VALID_TRANSITIONS = {
   completed: [],
   cancelled: []
 };
-router$p.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$q.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2, note } = req.body;
     const orderDoc = await db$o().collection("orders").doc(req.params.id).get();
@@ -9699,7 +9699,7 @@ router$p.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update order status." });
   }
 });
-router$p.get("/:id/timeline", requireStaff, async (req, res) => {
+router$q.get("/:id/timeline", requireStaff, async (req, res) => {
   try {
     const [messages, editRequests, agentLogs] = await Promise.all([
       db$o().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
@@ -9930,36 +9930,36 @@ const VIDEO_FILE = /\.(mp4|m4v|mov|webm)(\?|#|$)/i;
 const BLOCKED_EXT = /\.(zip|pdf|dng|cr2|cr3|nef|nrw|arw|srf|sr2|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic|heif|mp4|m4v|mov|webm)(\?|#|$)/i;
 const FILE_KEYS = ["downloadUrl", "fileUrl", "originalUrl", "fullResUrl", "mlsUrl", "zipUrl", "printUrl", "reelUrl", "mp4Url", "rawUrl", "src"];
 const DISPLAY_KEYS = ["previewUrl", "displayUrl", "webUrl", "thumbnailUrl"];
-function text$b(value) {
+function text$c(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function rowOf$2(item) {
   return item && typeof item === "object" ? item : null;
 }
 function shareableUrl$1(value) {
-  const url = text$b(value);
+  const url = text$c(value);
   if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
   if (url.startsWith("/")) return url;
   if (url.startsWith("https://") || url.startsWith("http://")) return url;
   return "";
 }
 function mediaName$1(row, fallback) {
-  return text$b(row.name) || text$b(row.fileName) || text$b(row.title) || fallback;
+  return text$c(row.name) || text$c(row.fileName) || text$c(row.title) || fallback;
 }
 function labelOf(row) {
-  return `${text$b(row.fileName)} ${text$b(row.name)} ${text$b(row.title)} ${text$b(row.path)} ${text$b(row.storagePath)}`.toLowerCase();
+  return `${text$c(row.fileName)} ${text$c(row.name)} ${text$c(row.title)} ${text$c(row.path)} ${text$c(row.storagePath)}`.toLowerCase();
 }
 function isMls(row) {
-  const category = text$b(row.category).toLowerCase();
-  const type = text$b(row.type).toLowerCase();
+  const category = text$c(row.category).toLowerCase();
+  const type = text$c(row.type).toLowerCase();
   if (category === "mls" || type === "mls") return true;
   const label = labelOf(row);
   if (/(^|[^a-z0-9])mls([^a-z0-9]|$)/.test(label)) return true;
   return /\/mls\//.test(label);
 }
 function isFullRes(row) {
-  const category = text$b(row.category).toLowerCase();
-  const type = text$b(row.type).toLowerCase();
+  const category = text$c(row.category).toLowerCase();
+  const type = text$c(row.type).toLowerCase();
   if (category === "full-res" || category === "fullres" || type === "full-res" || type === "fullres") return true;
   const label = labelOf(row);
   if (/(^|[^a-z0-9])full[\s_-]?res([^a-z0-9]|$)/.test(label)) return true;
@@ -9968,7 +9968,7 @@ function isFullRes(row) {
 function isRasterUrl(url, row) {
   if (!url || BLOCKED_EXT.test(url.split("#")[0]) || VIDEO_FILE.test(url.split("#")[0])) return false;
   if (RASTER.test(url.split("#")[0])) return true;
-  const content = text$b(row.contentType).toLowerCase();
+  const content = text$c(row.contentType).toLowerCase();
   return /^image\/(jpeg|jpg|png|webp|gif)/.test(content);
 }
 function blockedFileUrls(row, includeOwnUrl) {
@@ -9997,11 +9997,11 @@ function separateDisplay(row) {
 }
 function rasterShareSource(row, legacyDropTagged = false) {
   if (legacyDropTagged && isMls(row)) return "";
-  const type = text$b(row.type).toLowerCase();
+  const type = text$c(row.type).toLowerCase();
   if (type === "video" || type === "reel" || type === "file" || type === "matterport") return "";
-  const content = text$b(row.contentType).toLowerCase();
+  const content = text$c(row.contentType).toLowerCase();
   if (content.startsWith("video/") || content === "application/pdf" || content === "application/zip") return "";
-  const path2 = `${text$b(row.path)} ${text$b(row.storagePath)}`.toLowerCase();
+  const path2 = `${text$c(row.path)} ${text$c(row.storagePath)}`.toLowerCase();
   if (/\/(raw|downloads?|print|zips?)\//.test(path2)) return "";
   const display = separateDisplay(row);
   if (legacyDropTagged && isFullRes(row)) return display;
@@ -10031,11 +10031,11 @@ function videoFileUrl(row) {
 function videoPlaceholderSource(row) {
   if (rasterPoster(row)) return "";
   const file = videoFileUrl(row);
-  const type = text$b(row.type).toLowerCase();
-  const content = text$b(row.contentType).toLowerCase();
+  const type = text$c(row.type).toLowerCase();
+  const content = text$c(row.contentType).toLowerCase();
   const named = type === "video" || type === "reel" || content.startsWith("video/");
   if (!file && !named) return "";
-  const id = text$b(row.id) || file || text$b(row.path) || text$b(row.storagePath) || text$b(row.name) || text$b(row.fileName);
+  const id = text$c(row.id) || file || text$c(row.path) || text$c(row.storagePath) || text$c(row.name) || text$c(row.fileName);
   if (!id) return "";
   return `${VIDEO_PLACEHOLDER_PREFIX}${encodeURIComponent(id)}`;
 }
@@ -10095,8 +10095,8 @@ function listingOwnerDisplayItems(listing) {
   return items;
 }
 function isGalleryFloor(row) {
-  const type = text$b(row.type).toLowerCase();
-  const category = text$b(row.category).toLowerCase();
+  const type = text$c(row.type).toLowerCase();
+  const category = text$c(row.category).toLowerCase();
   return type === "floorplan" || type === "floor-plan" || category === "floorplan" || category === "floor-plan";
 }
 function galleryOwnerDisplayItems(media) {
@@ -10104,7 +10104,7 @@ function galleryOwnerDisplayItems(media) {
   const seen = /* @__PURE__ */ new Set();
   const rows = media.map(rowOf$2).filter((row) => Boolean(row));
   for (const row of rows) {
-    const type = text$b(row.type).toLowerCase();
+    const type = text$c(row.type).toLowerCase();
     if (type === "video" || type === "reel" || type === "matterport" || type === "tour" || type === "file" || type === "pdf") continue;
     const source = rasterShareSource(row);
     if (!source) continue;
@@ -10112,7 +10112,7 @@ function galleryOwnerDisplayItems(media) {
     pushDisplay(items, seen, mediaName$1(row, floor ? "Floor plan" : "Photo"), source, floor ? "floorPlan" : "image");
   }
   for (const row of rows) {
-    const type = text$b(row.type).toLowerCase();
+    const type = text$c(row.type).toLowerCase();
     if (type !== "video" && type !== "reel") continue;
     const poster = rasterPoster(row) || videoPlaceholderSource(row);
     pushDisplay(items, seen, mediaName$1(row, "Video"), poster, "poster");
@@ -10129,24 +10129,24 @@ function posterIndex(row, items) {
   return items.findIndex((item) => item.sourceUrl === poster);
 }
 function isUnbranded(row) {
-  const category = text$b(row.category).toLowerCase();
-  const type = text$b(row.type).toLowerCase();
+  const category = text$c(row.category).toLowerCase();
+  const type = text$c(row.type).toLowerCase();
   if (category === "unbranded" || type === "unbranded") return true;
-  const name = `${text$b(row.name)} ${text$b(row.fileName)} ${text$b(row.title)}`.toLowerCase();
+  const name = `${text$c(row.name)} ${text$c(row.fileName)} ${text$c(row.title)}`.toLowerCase();
   return name.includes("unbranded");
 }
 function isBrandedPlayback(row) {
   if (isMls(row) || isUnbranded(row)) return false;
-  const category = text$b(row.category).toLowerCase();
-  const type = text$b(row.type).toLowerCase();
+  const category = text$c(row.category).toLowerCase();
+  const type = text$c(row.type).toLowerCase();
   if (category === "branded" || type === "branded") return true;
-  const name = `${text$b(row.name)} ${text$b(row.fileName)} ${text$b(row.title)}`.toLowerCase();
+  const name = `${text$c(row.name)} ${text$c(row.fileName)} ${text$c(row.title)}`.toLowerCase();
   return /(^|[^a-z])branded([^a-z]|$)/.test(name);
 }
 function isReelPlayback(row) {
   if (isMls(row) || isUnbranded(row)) return false;
-  const category = text$b(row.category).toLowerCase();
-  const type = text$b(row.type).toLowerCase();
+  const category = text$c(row.category).toLowerCase();
+  const type = text$c(row.type).toLowerCase();
   return category === "reel" || type === "reel";
 }
 function deliveredVideoUrl(row) {
@@ -10454,15 +10454,15 @@ function statusOf(doc) {
 function isReleased(doc) {
   return RELEASED_GALLERY_STATUSES.includes(statusOf(doc));
 }
-function text$a(value) {
+function text$b(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function httpUrl(value) {
-  const url = text$a(value);
+  const url = text$b(value);
   return url.startsWith("https://") || url.startsWith("http://") ? url : "";
 }
 function shareableUrl(value) {
-  const url = text$a(value);
+  const url = text$b(value);
   if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
   if (url.startsWith("/")) return url;
   return httpUrl(url);
@@ -10504,7 +10504,7 @@ function isPrivateMedia(path2, name, url) {
   return PRIVATE_FILE.test(name) || PRIVATE_FILE.test(url);
 }
 function mediaName(row, fallback) {
-  return text$a(row.name) || text$a(row.fileName) || text$a(row.title) || fallback;
+  return text$b(row.name) || text$b(row.fileName) || text$b(row.title) || fallback;
 }
 function publicImages(listing) {
   if (!Array.isArray(listing.images)) return [];
@@ -10526,7 +10526,7 @@ function publicVideos(listing) {
     if (!row) continue;
     const url = httpUrl(row.url);
     const name = mediaName(row, "Video");
-    if (!url || isPrivateMedia(text$a(row.path) || text$a(row.storagePath), name, url)) continue;
+    if (!url || isPrivateMedia(text$b(row.path) || text$b(row.storagePath), name, url)) continue;
     videos.push({ url, name });
   }
   return videos.slice(0, 40);
@@ -10539,10 +10539,10 @@ function publicTour(listing) {
   return "";
 }
 function agentNameOf$1(listing) {
-  const direct = text$a(listing.agentName) || text$a(listing.listingAgent);
+  const direct = text$b(listing.agentName) || text$b(listing.listingAgent);
   if (direct) return direct;
   const agent = listing.agent;
-  if (agent && typeof agent === "object") return text$a(agent.name);
+  if (agent && typeof agent === "object") return text$b(agent.name);
   if (typeof agent === "string") return agent.trim();
   return "";
 }
@@ -10556,7 +10556,7 @@ function publicFloorPlans(listing) {
       if (!row) continue;
       const url = httpUrl(row.url) || httpUrl(row.shareUrl);
       const name = mediaName(row, "Floor plan");
-      const path2 = text$a(row.path) || text$a(row.storagePath);
+      const path2 = text$b(row.path) || text$b(row.storagePath);
       if (!url || isPrivateMedia(path2, name, url)) continue;
       plans.push({ url, name });
     }
@@ -10586,7 +10586,7 @@ function ownerFiles(listing) {
       const row = rowOf(item);
       if (!row) return;
       const name = mediaName(row, `File ${index + 1}`);
-      const path2 = text$a(row.path) || text$a(row.storagePath);
+      const path2 = text$b(row.path) || text$b(row.storagePath);
       const display = httpUrl(row.url);
       const download = downloadUrlOf(row);
       if (download) push(download, name);
@@ -10617,12 +10617,12 @@ function ownerRevisions(listing) {
     const row = rowOf(item) || {};
     const photoIndex = typeof row.photoIndex === "number" ? row.photoIndex : null;
     return {
-      id: text$a(row.id) || `revision-${index + 1}`,
-      type: text$a(row.type) || "gallery",
+      id: text$b(row.id) || `revision-${index + 1}`,
+      type: text$b(row.type) || "gallery",
       photoIndex,
-      description: text$a(row.description),
-      status: text$a(row.status) || "pending",
-      createdAt: text$a(row.createdAt)
+      description: text$b(row.description),
+      status: text$b(row.status) || "pending",
+      createdAt: text$b(row.createdAt)
     };
   });
 }
@@ -10631,11 +10631,11 @@ function invoiceOf(listing) {
   if (nested2 && typeof nested2 === "object" && typeof nested2.status === "string") {
     return { status: nested2.status };
   }
-  const status2 = text$a(listing.invoiceStatus);
+  const status2 = text$b(listing.invoiceStatus);
   return status2 ? { status: status2 } : null;
 }
 function pickReleasedGallery(listing, related) {
-  const preferred = text$a(listing.galleryId) || text$a(listing.playtestGalleryId);
+  const preferred = text$b(listing.galleryId) || text$b(listing.playtestGalleryId);
   const released = related.filter((doc) => isReleased(doc));
   if (preferred) {
     const match = released.find((doc) => doc.id === preferred);
@@ -10726,24 +10726,24 @@ function isStreamUrl(url) {
   return /(youtube\.com|youtu\.be|vimeo\.com|player\.vimeo\.com|mux\.com|stream\.mux|cloudflarestream\.com)/i.test(url);
 }
 function isFullResOrMls(row) {
-  const category = text$a(row.category).toLowerCase();
-  const type = text$a(row.type).toLowerCase();
+  const category = text$b(row.category).toLowerCase();
+  const type = text$b(row.type).toLowerCase();
   if (category === "mls" || category === "full-res" || category === "fullres" || type === "mls") return true;
-  const label = `${text$a(row.fileName)} ${text$a(row.name)} ${text$a(row.title)} ${text$a(row.path)} ${text$a(row.storagePath)}`.toLowerCase();
+  const label = `${text$b(row.fileName)} ${text$b(row.name)} ${text$b(row.title)} ${text$b(row.path)} ${text$b(row.storagePath)}`.toLowerCase();
   if (/(^|[^a-z0-9])(full[\s_-]?res|mls)([^a-z0-9]|$)/.test(label)) return true;
   return /\/(mls|full)\//.test(label);
 }
 function rowIsDeliveryOriginal(row) {
   if (row.downloadable === true || isFullResOrMls(row)) return true;
-  const type = text$a(row.type).toLowerCase();
+  const type = text$b(row.type).toLowerCase();
   if (type === "video" || type === "reel" || type === "file") return true;
-  const content = text$a(row.contentType).toLowerCase();
+  const content = text$b(row.contentType).toLowerCase();
   if (content.startsWith("video/") || content === "application/zip" || content === "application/pdf") return true;
   const candidates = [row.url, row.shareUrl, row.embedUrl, ...FILE_URL_KEYS.map((key) => row[key])];
-  return candidates.some((value) => isOriginalFileUrl(httpUrl(value) || text$a(value)));
+  return candidates.some((value) => isOriginalFileUrl(httpUrl(value) || text$b(value)));
 }
 function pushNeedle(needles, value) {
-  const raw = text$a(value);
+  const raw = text$b(value);
   if (raw.length >= 12) needles.push(raw);
 }
 function walkOriginalNeedles(value, needles, inheritedOriginal = false) {
@@ -10758,7 +10758,7 @@ function walkOriginalNeedles(value, needles, inheritedOriginal = false) {
   if (original) {
     const fileUrls = new Set(FILE_URL_KEYS.map((key) => shareableUrl(row[key])).filter(Boolean));
     for (const key of ["url", "shareUrl", "embedUrl", "sourcePath", "storagePath", "path"]) {
-      const raw = text$a(row[key]);
+      const raw = text$b(row[key]);
       if (!raw) continue;
       const asUrl = shareableUrl(raw);
       if (asUrl && isStreamUrl(asUrl)) continue;
@@ -10865,7 +10865,7 @@ function embedTour(listing, needles) {
       for (const key of ["embedUrl", "url", "shareUrl"]) {
         const url = shareableUrl(row[key]);
         if (!url || isOriginalFileUrl(url) || containsOriginal(url, needles)) continue;
-        const type = text$a(row.type).toLowerCase();
+        const type = text$b(row.type).toLowerCase();
         if (type === "matterport" || type === "tour" || /matterport\.com/i.test(url)) return url;
       }
     }
@@ -10887,7 +10887,7 @@ function displaySafeShareMedia(listing) {
 function ownerStudioProject(listing, pub, gate2 = {}) {
   const authoritativeInvoice = Object.prototype.hasOwnProperty.call(gate2, "invoice");
   const invoiceDoc = authoritativeInvoice && gate2.invoice && typeof gate2.invoice === "object" ? gate2.invoice : null;
-  const invoiceStatus = authoritativeInvoice ? text$a(invoiceDoc?.status) : text$a(invoiceOf(listing)?.status);
+  const invoiceStatus = authoritativeInvoice ? text$b(invoiceDoc?.status) : text$b(invoiceOf(listing)?.status);
   const invoice = invoiceStatus ? { status: invoiceStatus } : null;
   const downloadsUnlocked = studioDownloadsUnlocked({
     listing: {
@@ -10906,9 +10906,9 @@ function ownerStudioProject(listing, pub, gate2 = {}) {
   const project = {
     ...source,
     view: "owner",
-    clientName: text$a(listing.clientName),
-    clientEmail: text$a(listing.clientEmail),
-    clientPhone: text$a(listing.clientPhone),
+    clientName: text$b(listing.clientName),
+    clientEmail: text$b(listing.clientEmail),
+    clientPhone: text$b(listing.clientPhone),
     revisions: ownerRevisions(listing),
     lockDownloads: lockDownloadsOn(listing.lockDownloads),
     requirePayment: requirePaymentOn(listing.requirePayment),
@@ -10954,8 +10954,8 @@ function decideClientGalleryLink(input) {
   }
   if (input.pointedListing) return listingResult(input.pointedListing, input.relatedGalleries);
   if (input.order) {
-    const galleryId = text$a(input.order.galleryId);
-    const listingId = text$a(input.order.listingId);
+    const galleryId = text$b(input.order.galleryId);
+    const listingId = text$b(input.order.listingId);
     if (galleryId || listingId) {
       return {
         ok: false,
@@ -10972,8 +10972,8 @@ function decideClientGalleryLink(input) {
     };
   }
   if (input.orderRequest) {
-    const galleryId = text$a(input.orderRequest.galleryId);
-    const listingId = text$a(input.orderRequest.listingId);
+    const galleryId = text$b(input.orderRequest.galleryId);
+    const listingId = text$b(input.orderRequest.listingId);
     if (galleryId || listingId) {
       return {
         ok: false,
@@ -13058,7 +13058,7 @@ async function orderIdForGallery(gallery) {
   return typeof orderId === "string" ? orderId.trim() : "";
 }
 const db$j = () => admin.firestore();
-function text$9(value) {
+function text$a(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function docRecord(snap) {
@@ -13080,7 +13080,7 @@ async function galleryById(id) {
 }
 async function relatedForListing(listing) {
   const related = await galleriesWhere("listingId", listing.id);
-  const extras = [text$9(listing.galleryId), text$9(listing.playtestGalleryId)];
+  const extras = [text$a(listing.galleryId), text$a(listing.playtestGalleryId)];
   for (const galleryId of extras) {
     if (!galleryId || related.some((doc) => doc.id === galleryId)) continue;
     const extra = await galleryById(galleryId);
@@ -13129,8 +13129,8 @@ async function resolveClientGalleryLink(id) {
   const order = docRecord(orderSnap);
   const orderRequest = docRecord(requestSnap);
   const galleriesByOrderId = order ? await galleriesWhere("orderId", id) : [];
-  const pointedGalleryId = text$9(orderRequest?.galleryId) || text$9(order?.galleryId);
-  const pointedListingId = text$9(orderRequest?.listingId) || text$9(order?.listingId);
+  const pointedGalleryId = text$a(orderRequest?.galleryId) || text$a(order?.galleryId);
+  const pointedListingId = text$a(orderRequest?.listingId) || text$a(order?.listingId);
   const pointedGallery = pointedGalleryId ? await galleryById(pointedGalleryId) : null;
   let pointedListing = null;
   let pointedRelated = relatedGalleries;
@@ -13152,7 +13152,7 @@ async function resolveClientGalleryLink(id) {
 }
 async function invoiceForListing(listing) {
   const load = (id) => db$j().collection("invoices").doc(id).get();
-  const invoiceId = text$9(listing.invoiceId);
+  const invoiceId = text$a(listing.invoiceId);
   if (invoiceId) {
     const doc = await readInvoiceDoc(load, invoiceId);
     if (doc && !invoiceRedirectTarget(doc.data)) return { id: doc.id, ...doc.data };
@@ -13164,7 +13164,7 @@ async function invoiceForListing(listing) {
     const doc = await readInvoiceDoc(load, legacyId);
     if (doc && !invoiceRedirectTarget(doc.data)) return { id: doc.id, ...doc.data };
   }
-  const orderId = text$9(listing.orderId);
+  const orderId = text$a(listing.orderId);
   if (!orderId) return null;
   try {
     const snap = await db$j().collection("invoices").where("orderId", "==", orderId).limit(1).get();
@@ -13280,7 +13280,7 @@ const handlePublicGalleryLink = async (req, res) => {
     return res.status(500).json({ code: "lookup_failed", error: message, message });
   }
 };
-const router$o = Router();
+const router$p = Router();
 const db$i = () => admin.firestore();
 const storage = () => admin.storage().bucket();
 function cleanPosterUrl(value) {
@@ -13376,7 +13376,7 @@ function clientGalleryPayload(id, gallery, gate2) {
     mediaItems: showMedia ? lockedClientGalleryMedia(id, media, unlocked) : []
   };
 }
-router$o.get("/", requireStaff, async (req, res) => {
+router$p.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, orderId } = req.query;
     let query = db$i().collection("galleries").orderBy("createdAt", "desc");
@@ -13399,7 +13399,7 @@ function malformedPublicGalleryId(id) {
   if (/^__.*__$/.test(id)) return true;
   return /[\u0000-\u001F\u007F]/.test(id);
 }
-router$o.get("/public/:id", async (req, res) => {
+router$p.get("/public/:id", async (req, res) => {
   const id = typeof req.params.id === "string" ? req.params.id : "";
   if (malformedPublicGalleryId(id)) {
     console.warn("[Galleries] Public gallery id rejected.");
@@ -13427,8 +13427,8 @@ router$o.get("/public/:id", async (req, res) => {
     return res.status(500).json({ error: "We couldn't open this gallery." });
   }
 });
-router$o.get("/link/:id", handlePublicGalleryLink);
-router$o.get("/:id", requireAuth, async (req, res) => {
+router$p.get("/link/:id", handlePublicGalleryLink);
+router$p.get("/:id", requireAuth, async (req, res) => {
   try {
     const doc = await db$i().collection("galleries").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Gallery not found." });
@@ -13452,7 +13452,7 @@ router$o.get("/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch gallery." });
   }
 });
-router$o.post("/:id/upload-url", requirePhotographer, async (req, res) => {
+router$p.post("/:id/upload-url", requirePhotographer, async (req, res) => {
   try {
     const { fileName: fileName2, fileType, isRaw: isRaw2 = false } = req.body;
     if (!fileName2 || !fileType) {
@@ -13477,7 +13477,7 @@ router$o.post("/:id/upload-url", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to generate upload URL." });
   }
 });
-router$o.post("/:id/media", requirePhotographer, async (req, res) => {
+router$p.post("/:id/media", requirePhotographer, async (req, res) => {
   try {
     const {
       storagePath,
@@ -13531,7 +13531,7 @@ router$o.post("/:id/media", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to register media." });
   }
 });
-router$o.post("/:id/media-link", requireCoordinator, async (req, res) => {
+router$p.post("/:id/media-link", requireCoordinator, async (req, res) => {
   try {
     const { url, title, type = "video", embedUrl, thumbnailUrl, downloadable = false, poster, posterUrl } = req.body;
     if (!url) return res.status(400).json({ error: "url required." });
@@ -13567,7 +13567,7 @@ router$o.post("/:id/media-link", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to register media link." });
   }
 });
-router$o.get("/:id/release", requireCoordinator, async (req, res) => {
+router$p.get("/:id/release", requireCoordinator, async (req, res) => {
   if (!adminReady$5(res)) return;
   try {
     const report = await loadGalleryReleaseForGallery(req.params.id);
@@ -13579,7 +13579,7 @@ router$o.get("/:id/release", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to check gallery release." });
   }
 });
-router$o.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$p.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2 } = req.body;
     const validStatuses = ["pending_upload", "raw_uploaded", "editing", "ready_for_review", "approved", "delivered"];
@@ -13601,7 +13601,7 @@ router$o.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update gallery status." });
   }
 });
-router$o.post("/:id/deliver", requireCoordinator, async (req, res) => {
+router$p.post("/:id/deliver", requireCoordinator, async (req, res) => {
   try {
     if (!adminReady$5(res)) return;
     const result = await deliverGalleryToClient(req.params.id, {
@@ -13630,7 +13630,7 @@ router$o.post("/:id/deliver", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to deliver gallery." });
   }
 });
-router$o.patch("/:id/downloads", requireCoordinator, async (req, res) => {
+router$p.patch("/:id/downloads", requireCoordinator, async (req, res) => {
   if (!adminReady$5(res)) return;
   try {
     if (typeof req.body?.released !== "boolean") {
@@ -13667,7 +13667,7 @@ router$o.patch("/:id/downloads", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update gallery downloads." });
   }
 });
-router$o.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
+router$p.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
   try {
     const galleryDoc = await db$i().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
@@ -13701,11 +13701,11 @@ function buildPaymentReceipt(input) {
     fees,
     totalPaid
   });
-  const galleryId = text$8(input.galleryId) || text$8(input.invoice.galleryId);
+  const galleryId = text$9(input.galleryId) || text$9(input.invoice.galleryId);
   const galleryUrl = galleryId ? publicClientUrl(`/gallery/${encodeURIComponent(galleryId)}`, input.env) : "";
   const presentationUrl = input.presentationUrl === void 0 ? presentationLinkForReceipt(input.listing) || "" : input.presentationUrl || "";
   return renderPaymentReceipt({
-    clientName: text$8(input.invoice.clientName) || "there",
+    clientName: text$9(input.invoice.clientName) || "there",
     invoiceNumber: receiptEmailNumber({
       invoiceNumber: input.invoice.invoiceNumber,
       id: input.invoiceId,
@@ -13730,7 +13730,7 @@ function finite(value) {
   const amount = Number(value);
   return Number.isFinite(amount) ? amount : null;
 }
-function text$8(value) {
+function text$9(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function payTokenMatches(stored, presented, equal = timingSafeEqual$1) {
@@ -13831,7 +13831,7 @@ const SENIOR_LIVING_SERVICE_LABELS = {
 };
 const SERVICE_ID_SET = new Set(SENIOR_LIVING_SERVICE_IDS);
 const EMAIL_RE$2 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-function text$7(value) {
+function text$8(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function oneLine$1(value, max) {
@@ -13851,21 +13851,21 @@ function parseSeniorLivingRequest(body) {
     return { ok: false, honeypot: false, error: "That request could not be read." };
   }
   const raw = body;
-  const trap = text$7(raw.companyWebsite);
+  const trap = text$8(raw.companyWebsite);
   if (trap) return { ok: false, honeypot: true };
-  const name = oneLine$1(text$7(raw.name), 80);
-  const community = oneLine$1(text$7(raw.community), 120);
-  const email = oneLine$1(text$7(raw.email), 120);
-  const phone = oneLine$1(text$7(raw.phone), 30);
-  const address = oneLine$1(text$7(raw.address), 200);
-  const preferredDates = oneLine$1(text$7(raw.preferredDates), 160);
-  const notes = text$7(raw.notes).replace(/\u0000/g, "").trim().slice(0, 2e3);
+  const name = oneLine$1(text$8(raw.name), 80);
+  const community = oneLine$1(text$8(raw.community), 120);
+  const email = oneLine$1(text$8(raw.email), 120);
+  const phone = oneLine$1(text$8(raw.phone), 30);
+  const address = oneLine$1(text$8(raw.address), 200);
+  const preferredDates = oneLine$1(text$8(raw.preferredDates), 160);
+  const notes = text$8(raw.notes).replace(/\u0000/g, "").trim().slice(0, 2e3);
   if (name.length < 2) return { ok: false, honeypot: false, error: "Enter your name." };
-  if (text$7(raw.name).trim().length > 80)
+  if (text$8(raw.name).trim().length > 80)
     return { ok: false, honeypot: false, error: "Name is too long." };
   if (community.length < 2)
     return { ok: false, honeypot: false, error: "Enter the community name." };
-  if (text$7(raw.community).trim().length > 120)
+  if (text$8(raw.community).trim().length > 120)
     return { ok: false, honeypot: false, error: "Community name is too long." };
   if (!EMAIL_RE$2.test(email))
     return { ok: false, honeypot: false, error: "Enter a valid email." };
@@ -13874,18 +13874,18 @@ function parseSeniorLivingRequest(body) {
     return { ok: false, honeypot: false, error: "Enter a phone number." };
   if (address.length < 5)
     return { ok: false, honeypot: false, error: "Enter the community address." };
-  if (text$7(raw.address).trim().length > 200)
+  if (text$8(raw.address).trim().length > 200)
     return { ok: false, honeypot: false, error: "Address is too long." };
   if (preferredDates.length < 2)
     return { ok: false, honeypot: false, error: "Enter preferred dates." };
-  if (text$7(raw.preferredDates).trim().length > 160)
+  if (text$8(raw.preferredDates).trim().length > 160)
     return { ok: false, honeypot: false, error: "Preferred dates are too long." };
-  if (text$7(raw.notes).trim().length > 2e3)
+  if (text$8(raw.notes).trim().length > 2e3)
     return { ok: false, honeypot: false, error: "Notes are too long." };
   const servicesRaw = Array.isArray(raw.services) ? raw.services : [];
   const services2 = [];
   for (const entry2 of servicesRaw) {
-    const id = text$7(entry2);
+    const id = text$8(entry2);
     if (!id) continue;
     if (!SERVICE_ID_SET.has(id))
       return { ok: false, honeypot: false, error: "Choose a listed service." };
@@ -14066,14 +14066,14 @@ function parseSeniorLivingOrder(body) {
     return { ok: false, honeypot: false, error: "That order could not be read." };
   }
   const raw = body;
-  if (text$7(raw.companyWebsite)) return { ok: false, honeypot: true };
+  if (text$8(raw.companyWebsite)) return { ok: false, honeypot: true };
   const roomCount = raw.roomCount == null || raw.roomCount === "" ? 0 : Number(raw.roomCount);
   const facilitySqft = raw.facilitySqft == null || raw.facilitySqft === "" ? 0 : Number(raw.facilitySqft);
   const quoted = quoteSeniorLivingOrder({
     tour: raw.tour === true,
     roomCount,
     facilitySqft,
-    address: text$7(raw.address)
+    address: text$8(raw.address)
   });
   if (quoted.ok === false) return { ok: false, honeypot: false, error: quoted.error };
   if (quoted.quote.travel.travelQuoted) {
@@ -14083,16 +14083,16 @@ function parseSeniorLivingOrder(body) {
       error: "We could not price travel for that address. Call us and we will quote the trip."
     };
   }
-  const name = oneLine$1(text$7(raw.name), 80);
-  const community = oneLine$1(text$7(raw.community), 120);
-  const title = oneLine$1(text$7(raw.title), 80);
-  const email = oneLine$1(text$7(raw.email), 120);
-  const phone = oneLine$1(text$7(raw.phone), 30);
-  const address = oneLine$1(text$7(raw.address), 200);
-  const onsiteContact = oneLine$1(text$7(raw.onsiteContact), 120);
-  const notes = text$7(raw.notes).replace(/\u0000/g, "").trim().slice(0, 2e3);
-  const scheduledDate = oneLine$1(text$7(raw.scheduledDate), 10);
-  const scheduledTime = oneLine$1(text$7(raw.scheduledTime), 20);
+  const name = oneLine$1(text$8(raw.name), 80);
+  const community = oneLine$1(text$8(raw.community), 120);
+  const title = oneLine$1(text$8(raw.title), 80);
+  const email = oneLine$1(text$8(raw.email), 120);
+  const phone = oneLine$1(text$8(raw.phone), 30);
+  const address = oneLine$1(text$8(raw.address), 200);
+  const onsiteContact = oneLine$1(text$8(raw.onsiteContact), 120);
+  const notes = text$8(raw.notes).replace(/\u0000/g, "").trim().slice(0, 2e3);
+  const scheduledDate = oneLine$1(text$8(raw.scheduledDate), 10);
+  const scheduledTime = oneLine$1(text$8(raw.scheduledTime), 20);
   if (name.length < 2) return { ok: false, honeypot: false, error: "Enter your name." };
   if (community.length < 2) return { ok: false, honeypot: false, error: "Enter the community name." };
   if (title.length < 2) return { ok: false, honeypot: false, error: "Enter your title." };
@@ -14123,7 +14123,7 @@ function parseSeniorLivingOrder(body) {
       error: "Choose monthly hosting or a transfer of ownership."
     };
   }
-  const hosting = text$7(raw.hosting);
+  const hosting = text$8(raw.hosting);
   return {
     ok: true,
     value: {
@@ -14145,7 +14145,7 @@ function parseSeniorLivingOrder(body) {
     quote: quoted.quote
   };
 }
-const router$n = Router();
+const router$o = Router();
 const db$h = () => appFirestore();
 const stripe$1 = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
@@ -14614,7 +14614,7 @@ async function applyDepositPayment({
     });
   });
 }
-router$n.post("/create-intent", requireAuth, async (req, res) => {
+router$o.post("/create-intent", requireAuth, async (req, res) => {
   try {
     if (!stripeReady()) {
       return res.status(503).json({ error: "Studio Noir Stripe payments are not configured yet." });
@@ -14652,7 +14652,7 @@ router$n.post("/create-intent", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to create payment intent." });
   }
 });
-router$n.post("/send-invoice", requireCoordinator, async (req, res) => {
+router$o.post("/send-invoice", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
@@ -14695,7 +14695,7 @@ router$n.post("/send-invoice", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send invoice." });
   }
 });
-router$n.post("/send-receipt", requireCoordinator, async (req, res) => {
+router$o.post("/send-receipt", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
@@ -14718,7 +14718,7 @@ router$n.post("/send-receipt", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send receipt." });
   }
 });
-router$n.get("/invoice/:id", async (req, res) => {
+router$o.get("/invoice/:id", async (req, res) => {
   try {
     const invoiceDoc = await loadInvoice(req.params.id);
     if (!invoiceDoc) return invoiceNotFound(res);
@@ -14787,7 +14787,7 @@ router$n.get("/invoice/:id", async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch invoice." });
   }
 });
-router$n.post("/invoice/:id/checkout", async (req, res) => {
+router$o.post("/invoice/:id/checkout", async (req, res) => {
   try {
     const invoiceDoc = await loadInvoice(req.params.id);
     if (!invoiceDoc) return invoiceNotFound(res);
@@ -14944,7 +14944,7 @@ router$n.post("/invoice/:id/checkout", async (req, res) => {
     return res.status(500).json({ error: "Failed to start checkout." });
   }
 });
-router$n.post("/invoice/:id/deposit-checkout", async (req, res) => {
+router$o.post("/invoice/:id/deposit-checkout", async (req, res) => {
   try {
     if (!seniorDepositCheckoutLive()) return invoiceNotFound(res);
     const invoiceDoc = await loadInvoice(req.params.id);
@@ -15035,7 +15035,7 @@ router$n.post("/invoice/:id/deposit-checkout", async (req, res) => {
     return res.status(500).json({ error: "Failed to start the deposit checkout." });
   }
 });
-router$n.post("/webhook", async (req, res) => {
+router$o.post("/webhook", async (req, res) => {
   const sig = req.headers["stripe-signature"];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
   let event;
@@ -15110,7 +15110,7 @@ async function findInvoiceForSquarePayment(payment) {
   const snap = await db$h().collection("invoices").doc(hit.id).get();
   return snap.exists ? snap : null;
 }
-router$n.post("/square-webhook", async (req, res) => {
+router$o.post("/square-webhook", async (req, res) => {
   try {
     const rawBody = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : JSON.stringify(req.body || {});
     const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
@@ -15170,7 +15170,7 @@ router$n.post("/square-webhook", async (req, res) => {
     return res.status(500).json({ error: "Square webhook handler failed." });
   }
 });
-router$n.get("/transactions", requireCoordinator, async (req, res) => {
+router$o.get("/transactions", requireCoordinator, async (req, res) => {
   try {
     const { startDate, endDate, limit = "50" } = req.query;
     let query = db$h().collection("transactions").orderBy("createdAt", "desc");
@@ -15253,7 +15253,7 @@ async function handleStripeRefund(charge) {
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   });
 }
-const router$m = Router();
+const router$n = Router();
 const db$g = () => admin.firestore();
 const VSAI_API_BASE = "https://api.virtualstagingai.app/v1";
 const VSAI_API_KEY = process.env.VSAI_API_KEY || process.env.VIRTUAL_STAGING_AI_API_KEY || "";
@@ -15261,7 +15261,7 @@ const VSAI_PRICE_CENTS = parseInt(process.env.VSAI_PRICE_CENTS || "1500", 10);
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
 });
-router$m.post("/create", requireAuth, async (req, res) => {
+router$n.post("/create", requireAuth, async (req, res) => {
   try {
     if (!VSAI_API_KEY) {
       console.error("[VSAI] VSAI_API_KEY is not set");
@@ -15336,7 +15336,7 @@ router$m.post("/create", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$m.get("/result/:jobId", requireAuth, async (req, res) => {
+router$n.get("/result/:jobId", requireAuth, async (req, res) => {
   try {
     const jobDoc = await db$g().collection("vsaiJobs").doc(req.params.jobId).get();
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
@@ -15411,7 +15411,7 @@ router$m.get("/result/:jobId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$m.get("/result/:jobId/file", requireAuth, async (req, res) => {
+router$n.get("/result/:jobId/file", requireAuth, async (req, res) => {
   try {
     const jobDoc = await db$g().collection("vsaiJobs").doc(req.params.jobId).get();
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
@@ -15433,7 +15433,7 @@ router$m.get("/result/:jobId/file", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$m.post("/variation", requireAuth, async (req, res) => {
+router$n.post("/variation", requireAuth, async (req, res) => {
   try {
     const { jobId, style: newStyle, roomType: newRoomType } = req.body;
     if (!jobId) {
@@ -15517,7 +15517,7 @@ router$m.post("/variation", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$m.post("/checkout", requireAuth, async (req, res) => {
+router$n.post("/checkout", requireAuth, async (req, res) => {
   try {
     const { jobIds, successUrl, cancelUrl } = req.body;
     if (!jobIds || !Array.isArray(jobIds) || jobIds.length === 0) {
@@ -15586,7 +15586,7 @@ router$m.post("/checkout", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$m.post(
+router$n.post(
   "/webhook/stripe",
   // Raw body needed — mount before express.json() parses it
   async (req, res) => {
@@ -15624,7 +15624,7 @@ router$m.post(
     res.json({ received: true });
   }
 );
-router$m.get("/options", (_req, res) => {
+router$n.get("/options", (_req, res) => {
   return res.json({
     roomTypes: [
       { value: "living", label: "Living Room" },
@@ -15654,15 +15654,15 @@ router$m.get("/options", (_req, res) => {
 function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
 }
-const router$l = Router();
+const router$m = Router();
 const db$f = () => admin.firestore();
-router$l.post("/email", requireStaff, async (req, res) => {
+router$m.post("/email", requireStaff, async (req, res) => {
   try {
     const { to, subject, body, orderId, clientId: clientId2 } = req.body;
     if (!to || !body?.trim()) {
       return res.status(400).json({ error: "Email recipient and body required." });
     }
-    await sendEmail({
+    const result = await sendEmail({
       to,
       template: "manual_message",
       subject: subject || "Message from Iconic Images",
@@ -15670,25 +15670,33 @@ router$l.post("/email", requireStaff, async (req, res) => {
         message: body.trim()
       }
     });
-    await db$f().collection("messages").add({
-      orderId: orderId || null,
-      clientId: clientId2 || null,
-      senderId: req.user.uid,
-      senderType: "staff",
-      senderName: req.user.email || "Iconic Images",
-      recipient: to,
-      content: body.trim(),
-      channel: "email",
-      isRead: true,
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-    return res.status(201).json({ success: true });
+    const delivery = result.sent ? result.delivery : "suppressed";
+    if (admin.apps.length) {
+      await db$f().collection("messages").add({
+        orderId: orderId || null,
+        clientId: clientId2 || null,
+        senderId: req.user.uid,
+        senderType: "staff",
+        senderName: req.user.email || "Iconic Images",
+        recipient: to,
+        content: body.trim(),
+        channel: "email",
+        direction: "outbound",
+        delivery,
+        isRead: true,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    }
+    if (!result.sent) {
+      return res.status(503).json({ error: "Client notifications are off.", suppressed: true });
+    }
+    return res.status(201).json({ success: true, delivery });
   } catch (err) {
     console.error("[Messages] Email send error:", err);
     return res.status(500).json({ error: "Failed to send email." });
   }
 });
-router$l.get("/:orderId", requireAuth, async (req, res) => {
+router$m.get("/:orderId", requireAuth, async (req, res) => {
   try {
     const orderDoc = await db$f().collection("orders").doc(req.params.orderId).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
@@ -15717,7 +15725,7 @@ router$l.get("/:orderId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch messages." });
   }
 });
-router$l.post("/:orderId", requireAuth, async (req, res) => {
+router$m.post("/:orderId", requireAuth, async (req, res) => {
   try {
     const { content, attachments } = req.body;
     if (!content?.trim()) {
@@ -15772,7 +15780,7 @@ router$l.post("/:orderId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to send message." });
   }
 });
-router$l.get("/unread/count", requireStaff, async (_req, res) => {
+router$m.get("/unread/count", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$f().collection("messages").where("isRead", "==", false).where("senderType", "==", "client").get();
     return res.json({ unreadCount: snapshot.size });
@@ -15785,7 +15793,7 @@ const PHOTO_EDIT_REQUEST_LIMIT = 100;
 const PHOTO_EDIT_REPLACEMENT_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const STATUSES = /* @__PURE__ */ new Set(["requested", "sent_out", "received_back"]);
 const REPLACEMENT_TYPES$1 = new Set(PHOTO_EDIT_REPLACEMENT_TYPES);
-function text$6(value, limit) {
+function text$7(value, limit) {
   if (typeof value !== "string") return "";
   return value.replace(/\s+/g, " ").trim().slice(0, limit);
 }
@@ -15801,7 +15809,7 @@ function stamp(value) {
   return Number.isFinite(parsed) ? new Date(parsed).toISOString() : "";
 }
 function idText(value, limit = 80) {
-  const id = text$6(value, limit);
+  const id = text$7(value, limit);
   return /^[A-Za-z0-9_-]{8,80}$/.test(id) ? id : "";
 }
 function photoIdText(value) {
@@ -15817,7 +15825,7 @@ function timelineEntry(value) {
   const row = value && typeof value === "object" ? value : null;
   if (!row || !STATUSES.has(row.status)) return null;
   const at = stamp(row.at);
-  const actorId = text$6(row.actorId, 128);
+  const actorId = text$7(row.actorId, 128);
   if (!at || !actorId) return null;
   if (row.actor !== "client" && row.actor !== "staff") return null;
   return { status: row.status, at, actor: row.actor, actorId };
@@ -15825,11 +15833,11 @@ function timelineEntry(value) {
 function replacementEntry(value, listingId) {
   if (!value || typeof value !== "object") return null;
   const row = value;
-  const name = text$6(row.name, 180);
+  const name = text$7(row.name, 180);
   const path2 = typeof row.path === "string" ? row.path.trim() : "";
   const contentType = typeof row.contentType === "string" ? row.contentType.trim().toLowerCase() : "";
   const attachedAt = stamp(row.attachedAt);
-  const attachedBy = text$6(row.attachedBy, 128);
+  const attachedBy = text$7(row.attachedBy, 128);
   const url = httpsUrl(row.url);
   if (!name || !attachedAt || !attachedBy || !url || !REPLACEMENT_TYPES$1.has(contentType)) return null;
   if (!replacementPath(listingId, path2)) return null;
@@ -15863,10 +15871,10 @@ function parseRequest(value) {
   const row = value && typeof value === "object" ? value : null;
   if (!row) return null;
   const id = idText(row.id);
-  const listingId = idText(row.listingId, 128) || text$6(row.listingId, 128);
+  const listingId = idText(row.listingId, 128) || text$7(row.listingId, 128);
   const photoId = photoIdText(row.photoId);
   const note = noteText(row.note);
-  const clientId2 = text$6(row.clientId, 128);
+  const clientId2 = text$7(row.clientId, 128);
   const createdAt = stamp(row.createdAt);
   const updatedAt = stamp(row.updatedAt);
   if (!id || !listingId || !photoId || !note || !clientId2 || !createdAt || !updatedAt) return null;
@@ -15878,7 +15886,7 @@ function parseRequest(value) {
     id,
     listingId,
     photoId,
-    photoName: text$6(row.photoName, 180) || "Photo",
+    photoName: text$7(row.photoName, 180) || "Photo",
     photoUrl: httpsUrl(row.photoUrl),
     note,
     status: row.status,
@@ -15906,10 +15914,10 @@ function openPhotoEditForPhoto(requests, photoId) {
 }
 function createPhotoEditRequest(input) {
   const id = idText(input.id);
-  const listingId = text$6(input.listingId, 128);
+  const listingId = text$7(input.listingId, 128);
   const photoId = photoIdText(input.photoId);
   const note = noteText(input.note);
-  const clientId2 = text$6(input.clientId, 128);
+  const clientId2 = text$7(input.clientId, 128);
   const at = stamp(input.at);
   if (!id) return { ok: false, status: 400, error: "Could not save that edit request." };
   if (!/^[A-Za-z0-9_-]{4,128}$/.test(listingId)) return { ok: false, status: 400, error: "Listing id is not valid." };
@@ -15929,7 +15937,7 @@ function createPhotoEditRequest(input) {
     id,
     listingId,
     photoId,
-    photoName: text$6(input.photoName, 180) || "Photo",
+    photoName: text$7(input.photoName, 180) || "Photo",
     photoUrl: httpsUrl(input.photoUrl),
     note,
     status: "requested",
@@ -15943,7 +15951,7 @@ function createPhotoEditRequest(input) {
 }
 function advancePhotoEditRequest(input) {
   const requestId = idText(input.requestId);
-  const actorId = text$6(input.actorId, 128);
+  const actorId = text$7(input.actorId, 128);
   const at = stamp(input.at);
   if (!requestId || !actorId || !at) return { ok: false, status: 400, error: "Could not update that edit request." };
   const current = input.requests.find((request2) => request2.id === requestId);
@@ -16041,7 +16049,7 @@ const WEBSITE_COLORS = /* @__PURE__ */ new Set(["ink", "teal", "warm"]);
 const WEBSITE_STYLES = /* @__PURE__ */ new Set(["classic", "editorial", "minimal"]);
 const PORTAL_LISTING_ID = /^[A-Za-z0-9_-]{4,128}$/;
 function portalListingId(value) {
-  const id = text$5(value);
+  const id = text$6(value);
   return PORTAL_LISTING_ID.test(id) ? id : "";
 }
 function isInvoiceOrPaymentActivity(event) {
@@ -16083,14 +16091,14 @@ function hiddenPresentationKeys(listing) {
 }
 function rowHiddenFromPresentation(row, hiddenKeys) {
   if (row.hiddenFromPresentation === true || row.portalHidden === true) return true;
-  const id = text$5(row.id);
-  const path2 = text$5(row.path) || text$5(row.storagePath);
-  const url = text$5(row.url) || text$5(row.shareUrl);
+  const id = text$6(row.id);
+  const path2 = text$6(row.path) || text$6(row.storagePath);
+  const url = text$6(row.url) || text$6(row.shareUrl);
   return [id, path2, url].some((key) => Boolean(key) && hiddenKeys.has(key));
 }
 function buildPortalListingDetail(sources) {
   const listing = sources.listing || {};
-  const id = text$5(listing.id);
+  const id = text$6(listing.id);
   const records = [listing, sources.order, sources.orderRequest].filter(Boolean);
   const address = readAddress(records);
   const store = readMediaStore(listing.portalMedia);
@@ -16102,7 +16110,7 @@ function buildPortalListingDetail(sources) {
   const website = readWebsite(listing.portalWebsite);
   const invoices = readInvoices(sources.invoices || []);
   const activity = buildActivity(sources, photos, videos, floorplans, tours);
-  const status2 = text$5(listing.status) || text$5(sources.order?.status) || text$5(sources.orderRequest?.status) || "open";
+  const status2 = text$6(listing.status) || text$6(sources.order?.status) || text$6(sources.orderRequest?.status) || "open";
   return applyStoredPortalData({
     id,
     title: address.formatted || "Listing",
@@ -16263,10 +16271,10 @@ function applyPortalMediaChange(store, items, change, nowIso) {
 }
 function sanitizeWebsiteSettings(value, base = defaultPortalWebsite()) {
   const row = value && typeof value === "object" ? value : {};
-  const design = text$5(row.design);
-  const font = text$5(row.font);
-  const color = text$5(row.color);
-  const style = text$5(row.style);
+  const design = text$6(row.design);
+  const font = text$6(row.font);
+  const color = text$6(row.color);
+  const style = text$6(row.style);
   return {
     design: WEBSITE_DESIGNS.has(design) ? design : base.design,
     font: WEBSITE_FONTS.has(font) ? font : base.font,
@@ -16310,7 +16318,7 @@ function readPrefs(value) {
 function readWebsite(value) {
   return sanitizeWebsiteSettings(value, defaultPortalWebsite());
 }
-function text$5(value) {
+function text$6(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function boolOr(value, fallback) {
@@ -16378,17 +16386,17 @@ function fillAddress(target, source) {
 function addressFromRecord(record2) {
   const structured = asRecord$3(record2.address) || asRecord$3(record2.shootLocation) || asRecord$3(record2.propertyAddress);
   const parsed = parseAddressText(
-    text$5(record2.addressLine1) ? "" : addressString(record2.address) || addressString(record2.propertyAddress) || addressString(record2.shootLocation) || text$5(structured?.formatted)
+    text$6(record2.addressLine1) ? "" : addressString(record2.address) || addressString(record2.propertyAddress) || addressString(record2.shootLocation) || text$6(structured?.formatted)
   );
-  const line1 = firstText(record2, ["addressLine1", "line1", "street", "streetAddress"]) || text$5(structured?.street) || text$5(structured?.line1) || text$5(structured?.addressLine1) || parsed.line1;
-  const line2 = firstText(record2, ["addressLine2", "line2", "unit", "street2"]) || text$5(structured?.line2) || text$5(structured?.unit) || parsed.line2;
+  const line1 = firstText(record2, ["addressLine1", "line1", "street", "streetAddress"]) || text$6(structured?.street) || text$6(structured?.line1) || text$6(structured?.addressLine1) || parsed.line1;
+  const line2 = firstText(record2, ["addressLine2", "line2", "unit", "street2"]) || text$6(structured?.line2) || text$6(structured?.unit) || parsed.line2;
   const split = splitUnit(line1);
   return {
     line1: split.line1,
     line2: line2 || split.line2,
-    city: firstText(record2, ["city"]) || text$5(structured?.city) || parsed.city,
-    state: firstText(record2, ["state"]) || text$5(structured?.state) || parsed.state,
-    zip: firstText(record2, ["zip", "postalCode"]) || text$5(structured?.zip) || text$5(structured?.postalCode) || parsed.zip,
+    city: firstText(record2, ["city"]) || text$6(structured?.city) || parsed.city,
+    state: firstText(record2, ["state"]) || text$6(structured?.state) || parsed.state,
+    zip: firstText(record2, ["zip", "postalCode"]) || text$6(structured?.zip) || text$6(structured?.postalCode) || parsed.zip,
     formatted: "",
     lat: readCoord(record2.lat ?? record2.latitude ?? structured?.lat ?? structured?.latitude ?? nestedCoord(record2, "lat"), "lat"),
     lng: readCoord(record2.lng ?? record2.longitude ?? structured?.lng ?? structured?.longitude ?? nestedCoord(record2, "lng"), "lng"),
@@ -16400,7 +16408,7 @@ function addressString(value) {
 }
 function firstText(record2, keys) {
   for (const key of keys) {
-    const value = text$5(record2[key]);
+    const value = text$6(record2[key]);
     if (value) return value;
   }
   return "";
@@ -16480,7 +16488,7 @@ function collectTours(listing, galleries, store) {
     const url = safeHttpUrl(row.url) || safeHttpUrl(row.shareUrl) || safeHttpUrl(row.href);
     if (!url || seen.has(url)) return;
     const provider = providerFor(url, row);
-    const typed = /^(tour|matterport)$/i.test(text$5(row.type)) || provider != null || isTourField(text$5(row.id));
+    const typed = /^(tour|matterport)$/i.test(text$6(row.type)) || provider != null || isTourField(text$6(row.id));
     if (!typed) return;
     seen.add(url);
     const id = mediaId("tour", row, index);
@@ -16488,9 +16496,9 @@ function collectTours(listing, galleries, store) {
     drafts.push({
       id,
       kind: "tour",
-      name: text$5(row.name) || text$5(row.title) || provider || "Virtual tour",
+      name: text$6(row.name) || text$6(row.title) || provider || "Virtual tour",
       url,
-      contentType: text$5(row.contentType),
+      contentType: text$6(row.contentType),
       hidden: prefs?.hidden === true || row.hiddenFromPresentation === true,
       order: prefs?.order ?? index,
       uploadedAt: portalTimestamp(row.uploadedAt || row.createdAt),
@@ -16511,7 +16519,7 @@ function finishMedia(kind, rows, prefs, include) {
     const url = safeHttpUrl(row.url) || safeHttpUrl(row.shareUrl);
     if (!url) return;
     const id = mediaId(kind, row, index);
-    const key = text$5(row.path) || text$5(row.storagePath) || url;
+    const key = text$6(row.path) || text$6(row.storagePath) || url;
     if (seen.has(id) || seen.has(key) || seen.has(url)) return;
     seen.add(id);
     seen.add(key);
@@ -16520,9 +16528,9 @@ function finishMedia(kind, rows, prefs, include) {
     items.push({
       id,
       kind,
-      name: text$5(row.name) || text$5(row.fileName) || text$5(row.title) || `${kind} ${items.length + 1}`,
+      name: text$6(row.name) || text$6(row.fileName) || text$6(row.title) || `${kind} ${items.length + 1}`,
       url,
-      contentType: text$5(row.contentType).toLowerCase(),
+      contentType: text$6(row.contentType).toLowerCase(),
       hidden: pref?.hidden === true || row.hiddenFromPresentation === true || row.portalHidden === true,
       order: pref?.order ?? index,
       uploadedAt: portalTimestamp(row.uploadedAt || row.createdAt)
@@ -16542,7 +16550,7 @@ function galleryRows(galleries) {
   return rows;
 }
 function mediaId(kind, row, index) {
-  const raw = text$5(row.id) || text$5(row.path) || text$5(row.storagePath) || text$5(row.url) || text$5(row.shareUrl) || `${kind}-${index}`;
+  const raw = text$6(row.id) || text$6(row.path) || text$6(row.storagePath) || text$6(row.url) || text$6(row.shareUrl) || `${kind}-${index}`;
   return raw.slice(0, 180);
 }
 const RAW_EXT$1 = /\.(cr2|cr3|nef|nrw|arw|srf|sr2|dng|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic)$/i;
@@ -16550,46 +16558,46 @@ const IMAGE_EXT$1 = /\.(jpe?g|png|webp|gif)$/i;
 const FLOOR_IMAGE = /\.(jpe?g|png)$/i;
 const VIDEO_EXT = /\.(mp4|mov)$/i;
 function fileName(row) {
-  return text$5(row.name) || text$5(row.fileName) || text$5(row.title) || text$5(row.path) || text$5(row.url);
+  return text$6(row.name) || text$6(row.fileName) || text$6(row.title) || text$6(row.path) || text$6(row.url);
 }
 function isRaw(row) {
-  const path2 = text$5(row.path) || text$5(row.storagePath);
+  const path2 = text$6(row.path) || text$6(row.storagePath);
   const name = fileName(row);
   return RAW_EXT$1.test(name) || RAW_EXT$1.test(path2) || path2.includes("/raw/");
 }
 function isFloorplan(row) {
   if (!isRasterFloorplan(row)) return false;
-  const type = text$5(row.type).toLowerCase();
-  const asset = text$5(row.assetType).toLowerCase();
+  const type = text$6(row.type).toLowerCase();
+  const asset = text$6(row.assetType).toLowerCase();
   const name = fileName(row);
   return type === "floorplan" || asset === "floorplan" || /floor\s*plan|floorplan/i.test(name) || type === "image" && asset === "floorplan";
 }
 function isRasterFloorplan(row) {
-  const content = text$5(row.contentType).toLowerCase();
-  const declared = text$5(row.type).toLowerCase();
+  const content = text$6(row.contentType).toLowerCase();
+  const declared = text$6(row.type).toLowerCase();
   const name = fileName(row);
-  const url = text$5(row.url) || text$5(row.shareUrl);
+  const url = text$6(row.url) || text$6(row.shareUrl);
   if (content === "image/jpeg" || content === "image/png" || declared === "image/jpeg" || declared === "image/png") return true;
   return FLOOR_IMAGE.test(name) || FLOOR_IMAGE.test(url.split("?")[0]);
 }
 function isVideo(row) {
-  const type = text$5(row.type).toLowerCase();
+  const type = text$6(row.type).toLowerCase();
   if (type === "tour" || type === "matterport" || type === "floorplan") return false;
-  const content = text$5(row.contentType).toLowerCase();
+  const content = text$6(row.contentType).toLowerCase();
   const name = fileName(row);
-  const url = (text$5(row.url) || text$5(row.shareUrl)).split("?")[0];
+  const url = (text$6(row.url) || text$6(row.shareUrl)).split("?")[0];
   if (content === "video/mp4" || content === "video/quicktime") return true;
   return VIDEO_EXT.test(name) || VIDEO_EXT.test(url);
 }
 function isPhoto(row) {
-  const declared = text$5(row.type).toLowerCase();
-  const asset = text$5(row.assetType).toLowerCase();
+  const declared = text$6(row.type).toLowerCase();
+  const asset = text$6(row.assetType).toLowerCase();
   if (isVideo(row) || declared === "floorplan" || asset === "floorplan" || isRaw(row)) return false;
-  const type = text$5(row.type).toLowerCase();
+  const type = text$6(row.type).toLowerCase();
   if (type === "tour" || type === "matterport" || type === "video" || type === "reel" || type === "file" || type === "document") return false;
-  const content = text$5(row.contentType).toLowerCase();
+  const content = text$6(row.contentType).toLowerCase();
   const name = fileName(row);
-  const path2 = text$5(row.path) || text$5(row.storagePath);
+  const path2 = text$6(row.path) || text$6(row.storagePath);
   if (content.startsWith("video/")) return false;
   if (content && !content.startsWith("image/") && !IMAGE_EXT$1.test(name)) return false;
   return !content || content.startsWith("image/") || IMAGE_EXT$1.test(name) || IMAGE_EXT$1.test(path2);
@@ -16601,14 +16609,14 @@ function providerFor(url, row) {
   } catch {
     return null;
   }
-  if (host.includes("matterport.com") || /matterport/i.test(text$5(row.type)) || /matterport/i.test(text$5(row.name))) return "Matterport";
+  if (host.includes("matterport.com") || /matterport/i.test(text$6(row.type)) || /matterport/i.test(text$6(row.name))) return "Matterport";
   if (host.includes("cloudpano.com")) return "CloudPano";
   if (host.includes("iguide")) return "iGUIDE";
   if (host.includes("kuula.co")) return "Kuula";
   if (host.includes("eyespy360.com")) return "EyeSpy360";
   if (host.includes("asteroom.com")) return "Asteroom";
   if (host.includes("zillow.com") && /3d|tour/i.test(url)) return "Zillow 3D";
-  if (/^(tour|matterport)$/i.test(text$5(row.type))) return "Virtual tour";
+  if (/^(tour|matterport)$/i.test(text$6(row.type))) return "Virtual tour";
   return null;
 }
 function safeHttpUrl(value) {
@@ -16627,7 +16635,7 @@ function readInvoices(invoices) {
   const seen = /* @__PURE__ */ new Set();
   const summaries = [];
   for (const invoice of invoices) {
-    const id = text$5(invoice.id);
+    const id = text$6(invoice.id);
     if (!id || seen.has(id)) continue;
     seen.add(id);
     const total = money$1(invoice.total);
@@ -16638,7 +16646,7 @@ function readInvoices(invoices) {
         id,
         createdAt: invoice.createdAt
       }),
-      status: text$5(invoice.status) || "draft",
+      status: text$6(invoice.status) || "draft",
       total,
       amountDue: invoice.amountDue == null ? total : money$1(invoice.amountDue)
     });
@@ -16659,7 +16667,7 @@ function buildActivity(sources, photos, videos, floorplans, tours, invoices) {
   const request = sources.orderRequest;
   if (request) {
     push(eventOf(
-      `booking-${text$5(request.id) || "request"}`,
+      `booking-${text$6(request.id) || "request"}`,
       request.submittedAt || request.createdAt,
       "booking",
       "Booking request received"
@@ -16667,9 +16675,9 @@ function buildActivity(sources, photos, videos, floorplans, tours, invoices) {
   }
   for (const appointment of sources.appointments || []) {
     const when = appointment.createdAt || appointment.scheduledDate;
-    const status2 = text$5(appointment.status);
+    const status2 = text$6(appointment.status);
     push(eventOf(
-      `appointment-${text$5(appointment.id) || events.length}`,
+      `appointment-${text$6(appointment.id) || events.length}`,
       when,
       "appointment",
       status2 === "confirmed" ? "Appointment confirmed" : "Appointment requested"
@@ -16678,14 +16686,14 @@ function buildActivity(sources, photos, videos, floorplans, tours, invoices) {
   const order = sources.order;
   if (order) {
     push(eventOf(
-      `order-${text$5(order.id) || "order"}`,
+      `order-${text$6(order.id) || "order"}`,
       order.confirmedAt || order.createdAt,
       "booking",
       "Booking confirmed"
     ));
   }
   push(eventOf(
-    `listing-${text$5(sources.listing.id) || "listing"}`,
+    `listing-${text$6(sources.listing.id) || "listing"}`,
     sources.listing.createdAt,
     "listing",
     "Listing file created"
@@ -16703,30 +16711,30 @@ function buildActivity(sources, photos, videos, floorplans, tours, invoices) {
     push(eventOf(`tour-${tour.id}`, tour.uploadedAt, "tour", `${tour.provider} tour added`));
   }
   for (const gallery of sources.galleries || []) {
-    const status2 = text$5(gallery.status).replace(/_/g, " ") || "opened";
+    const status2 = text$6(gallery.status).replace(/_/g, " ") || "opened";
     push(eventOf(
-      `gallery-${text$5(gallery.id) || events.length}`,
+      `gallery-${text$6(gallery.id) || events.length}`,
       gallery.updatedAt || gallery.createdAt,
       "gallery",
       `Gallery ${status2}`
     ));
   }
   for (const invoice of sources.invoices || []) {
-    const id = text$5(invoice.id);
+    const id = text$6(invoice.id);
     const number = orderHistoryInvoiceNumber({
       invoiceNumber: invoice.invoiceNumber,
       id,
       createdAt: invoice.createdAt
     });
-    const status2 = text$5(invoice.status) || "draft";
+    const status2 = text$6(invoice.status) || "draft";
     const summary = status2 === "paid" ? `Payment recorded on ${number}` : `Invoice ${number} is ${status2.replace(/_/g, " ")}`;
     push(eventOf(`invoice-${id || number}`, invoice.paidAt || invoice.updatedAt || invoice.createdAt, "invoice", summary));
   }
   for (const entry2 of rowsFrom(sources.listing.auditLog)) {
-    const action = text$5(entry2.action);
+    const action = text$6(entry2.action);
     if (!action || /lockbox|internal|password|secret/i.test(action)) continue;
     push(eventOf(
-      `audit-${text$5(entry2.id) || action}-${text$5(entry2.at)}`,
+      `audit-${text$6(entry2.id) || action}-${text$6(entry2.at)}`,
       entry2.at || entry2.createdAt,
       "audit",
       action
@@ -16734,10 +16742,10 @@ function buildActivity(sources, photos, videos, floorplans, tours, invoices) {
   }
   for (const entry2 of rowsFrom(sources.listing.portalActivity)) {
     push({
-      id: text$5(entry2.id) || `portal-activity-${events.length}`,
+      id: text$6(entry2.id) || `portal-activity-${events.length}`,
       at: portalTimestamp(entry2.at),
-      kind: text$5(entry2.kind) || "listing",
-      summary: text$5(entry2.summary)
+      kind: text$6(entry2.kind) || "listing",
+      summary: text$6(entry2.summary)
     });
   }
   return events.filter((event) => event.summary).sort((a, b) => {
@@ -16793,7 +16801,7 @@ function listingSiteSlug(input) {
 function isListingSiteSlug(value) {
   return typeof value === "string" && value.length <= 80 && SLUG$1.test(value);
 }
-function text$4(value) {
+function text$5(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function record(value) {
@@ -16803,12 +16811,12 @@ function addressParts$1(listing) {
   const portal = record(listing.portalData);
   const saved = record(portal?.address);
   const structured = record(listing.address) || record(listing.shootLocation) || record(listing.propertyAddress);
-  const line1 = text$4(saved?.line1) || text$4(structured?.street) || text$4(structured?.line1) || text$4(listing.addressLine1);
-  const city = text$4(saved?.city) || text$4(structured?.city) || text$4(listing.city);
-  const state = text$4(saved?.state) || text$4(structured?.state) || text$4(listing.state);
-  const zip = text$4(saved?.zip) || text$4(structured?.zip) || text$4(listing.zip);
+  const line1 = text$5(saved?.line1) || text$5(structured?.street) || text$5(structured?.line1) || text$5(listing.addressLine1);
+  const city = text$5(saved?.city) || text$5(structured?.city) || text$5(listing.city);
+  const state = text$5(saved?.state) || text$5(structured?.state) || text$5(listing.state);
+  const zip = text$5(saved?.zip) || text$5(structured?.zip) || text$5(listing.zip);
   if (!line1 && typeof listing.address === "string") {
-    const raw = text$4(listing.address);
+    const raw = text$5(listing.address);
     const parts = raw.split(",").map((part) => part.trim()).filter(Boolean);
     return { line1: parts[0] || raw, city: parts.length >= 3 ? parts[parts.length - 2] : "", formatted: raw };
   }
@@ -16819,7 +16827,7 @@ function money(value) {
   if (typeof value === "number" && Number.isFinite(value) && value > 0) {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
   }
-  const raw = text$4(value);
+  const raw = text$5(value);
   if (!raw || raw === "0") return "";
   if (raw.startsWith("$")) return raw;
   const numeric2 = Number(raw.replace(/[$,]/g, ""));
@@ -16830,7 +16838,7 @@ function money(value) {
 }
 function count(value) {
   if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  return text$4(value);
+  return text$5(value);
 }
 function factValue(listing, keys) {
   const portal = record(listing.portalData);
@@ -16845,13 +16853,13 @@ function factValue(listing, keys) {
 }
 function agentOf(listing) {
   const agent = record(listing.agent);
-  const name = text$4(listing.agentName) || text$4(listing.listingAgent) || text$4(agent?.name);
+  const name = text$5(listing.agentName) || text$5(listing.listingAgent) || text$5(agent?.name);
   return {
     name,
-    brokerage: text$4(listing.brokerage) || text$4(listing.brokerageName) || text$4(agent?.brokerage),
-    license: text$4(listing.licenseNumber) || text$4(listing.agentLicense) || text$4(agent?.license),
-    phone: text$4(listing.agentPhone) || text$4(agent?.phone),
-    email: text$4(listing.agentEmail) || text$4(agent?.email)
+    brokerage: text$5(listing.brokerage) || text$5(listing.brokerageName) || text$5(agent?.brokerage),
+    license: text$5(listing.licenseNumber) || text$5(listing.agentLicense) || text$5(agent?.license),
+    phone: text$5(listing.agentPhone) || text$5(agent?.phone),
+    email: text$5(listing.agentEmail) || text$5(agent?.email)
   };
 }
 function matterportEmbed(value) {
@@ -16869,15 +16877,15 @@ function matterportEmbed(value) {
 }
 function tourUrl(listing) {
   const direct = [
-    text$4(listing.matterportUrl),
-    text$4(listing.virtualTourUrl),
-    text$4(listing.tourUrl)
+    text$5(listing.matterportUrl),
+    text$5(listing.virtualTourUrl),
+    text$5(listing.tourUrl)
   ];
   const tours = Array.isArray(listing.tours) ? listing.tours : [];
   for (const tour of tours) {
     const row = record(tour);
     if (!row) continue;
-    direct.push(text$4(row.embedUrl), text$4(row.url));
+    direct.push(text$5(row.embedUrl), text$5(row.url));
   }
   const hidden = readMediaStore(listing.portalMedia).tours;
   for (const candidate of direct) {
@@ -16903,7 +16911,7 @@ function hiddenSources(listing) {
     for (const item of items) {
       const row = record(item);
       if (!row) continue;
-      const id = text$4(row.id);
+      const id = text$5(row.id);
       if (!id || !prefs[id]?.hidden) continue;
       const source = rasterShareSource(row);
       if (source) hidden.add(source);
@@ -16915,7 +16923,7 @@ function buildPublicListingSite(listing) {
   if (!listing) return null;
   const website = sanitizeWebsiteSettings(listing.portalWebsite);
   if (!website.published) return null;
-  const id = text$4(listing.id);
+  const id = text$5(listing.id);
   if (!/^[A-Za-z0-9_-]{4,128}$/.test(id)) return null;
   const address = addressParts$1(listing);
   const slug = listingSiteSlug({ line1: address.line1, city: address.city });
@@ -17075,7 +17083,7 @@ function adminReady$4(res) {
 function listingIdFrom(value) {
   return portalListingId(value);
 }
-function text$3(value) {
+function text$4(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function sendKnownError$3(res, err, fallback) {
@@ -17126,7 +17134,7 @@ function unique(records) {
   const out = [];
   for (const record2 of records) {
     if (!record2) continue;
-    const id = text$3(record2.id);
+    const id = text$4(record2.id);
     if (id && seen.has(id)) continue;
     if (id) seen.add(id);
     out.push(record2);
@@ -17134,35 +17142,35 @@ function unique(records) {
   return out;
 }
 async function loadSources(listingId, listing) {
-  const requestId = text$3(listing.orderRequestId);
+  const requestId = text$4(listing.orderRequestId);
   const requests = unique([
     await readDoc("orderRequests", requestId),
     ...await readWhere("orderRequests", "listingId", listingId)
   ]);
   const orderRequest = requests.find((record2) => record2.id === requestId) || requests[0] || null;
-  const orderId = text$3(listing.orderId) || text$3(orderRequest?.convertedToOrderId) || text$3(orderRequest?.orderId);
+  const orderId = text$4(listing.orderId) || text$4(orderRequest?.convertedToOrderId) || text$4(orderRequest?.orderId);
   const orders = unique([
     await readDoc("orders", orderId),
     ...await readWhere("orders", "listingId", listingId)
   ]);
   const order = orders.find((record2) => record2.id === orderId) || orders[0] || null;
-  const invoiceIds = [text$3(listing.invoiceId), text$3(order?.invoiceId), text$3(orderRequest?.invoiceId)].filter(Boolean);
+  const invoiceIds = [text$4(listing.invoiceId), text$4(order?.invoiceId), text$4(orderRequest?.invoiceId)].filter(Boolean);
   const legacyIds = [
-    ...legacyInvoiceDocIds({ orderRequestId: text$3(orderRequest?.id), listingId }),
-    ...legacyInvoiceDocIds({ orderRequestId: text$3(order?.orderRequestId), listingId: text$3(order?.listingId) || listingId })
+    ...legacyInvoiceDocIds({ orderRequestId: text$4(orderRequest?.id), listingId }),
+    ...legacyInvoiceDocIds({ orderRequestId: text$4(order?.orderRequestId), listingId: text$4(order?.listingId) || listingId })
   ].filter((id) => !invoiceIds.includes(id));
-  const galleryId = text$3(listing.galleryId) || text$3(orderRequest?.galleryId) || text$3(order?.galleryId);
+  const galleryId = text$4(listing.galleryId) || text$4(orderRequest?.galleryId) || text$4(order?.galleryId);
   const [invoiceDocs, legacyDocs, invoicesByListing, invoicesByOrder, invoicesByRequest, galleryDoc, galleriesByListing, galleriesByOrder, appointmentsByRequest, appointmentsByOrder, appointmentsByListing] = await Promise.all([
     Promise.all(invoiceIds.map((id) => readLiveInvoice(id))),
     Promise.all(legacyIds.map((id) => readLiveInvoice(id))),
     readWhere("invoices", "listingId", listingId),
-    readWhere("invoices", "orderId", text$3(order?.id)),
-    readWhere("invoices", "orderRequestId", text$3(orderRequest?.id)),
+    readWhere("invoices", "orderId", text$4(order?.id)),
+    readWhere("invoices", "orderRequestId", text$4(orderRequest?.id)),
     readDoc("galleries", galleryId),
     readWhere("galleries", "listingId", listingId),
-    readWhere("galleries", "orderId", text$3(order?.id)),
-    readWhere("appointments", "orderRequestId", text$3(orderRequest?.id)),
-    readWhere("appointments", "orderId", text$3(order?.id)),
+    readWhere("galleries", "orderId", text$4(order?.id)),
+    readWhere("appointments", "orderRequestId", text$4(orderRequest?.id)),
+    readWhere("appointments", "orderId", text$4(order?.id)),
     readWhere("appointments", "listingId", listingId)
   ]);
   return {
@@ -17192,8 +17200,8 @@ async function authorizedListing(req, listingId) {
 }
 function mediaChange(body) {
   const row = body && typeof body === "object" ? body : {};
-  const kind = text$3(row.kind);
-  const id = text$3(row.id);
+  const kind = text$4(row.kind);
+  const id = text$4(row.id);
   if (!KINDS.has(kind) || !id) return null;
   if (typeof row.hidden === "boolean") return { kind, id, hidden: row.hidden };
   if (row.move === "earlier" || row.move === "later") return { kind, id, move: row.move };
@@ -17293,7 +17301,7 @@ const handleCreatePhotoEditRequest = async (req, res) => {
   const listingId = listingIdFrom(req.params.id);
   if (!listingId) return res.status(400).json({ error: "Listing id is not valid." });
   const body = req.body && typeof req.body === "object" ? req.body : {};
-  const photoId = text$3(body.photoId);
+  const photoId = text$4(body.photoId);
   const note = typeof body.note === "string" ? body.note : "";
   if (!photoId) return res.status(400).json({ error: "Choose one photo." });
   try {
@@ -17345,13 +17353,13 @@ const handlePatchPortalWebsite = async (req, res) => {
     return sendKnownError$3(res, err, "Could not save the listing site.");
   }
 };
-const router$k = Router();
+const router$l = Router();
 const db$c = () => admin.firestore();
 const HOME_LIMIT = 100;
 function asRecord$2(value) {
   return value && typeof value === "object" ? value : {};
 }
-router$k.get("/", requireStaff, async (req, res) => {
+router$l.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, search, limit = "50" } = req.query;
     let query = db$c().collection("clients").orderBy("createdAt", "desc");
@@ -17378,7 +17386,7 @@ function adminReady$3(res) {
   });
   return false;
 }
-router$k.post("/register", async (req, res) => {
+router$l.post("/register", async (req, res) => {
   if (!adminReady$3(res)) return;
   const firstName = cleanPersonName(req.body?.firstName);
   const lastName = cleanPersonName(req.body?.lastName);
@@ -17440,7 +17448,7 @@ router$k.post("/register", async (req, res) => {
     return res.status(500).json({ error: "Could not create the client account." });
   }
 });
-router$k.get("/me/home", requireAuth, async (req, res) => {
+router$l.get("/me/home", requireAuth, async (req, res) => {
   if (!adminReady$3(res)) return;
   try {
     const identity = await resolveClientIdentity(req.user.uid, req.user.email);
@@ -17589,12 +17597,12 @@ router$k.get("/me/home", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to load your portal." });
   }
 });
-router$k.get("/me/listings/:id", requireAuth, handleGetPortalListing);
-router$k.patch("/me/listings/:id/data", requireAuth, handlePatchPortalData);
-router$k.patch("/me/listings/:id/media", requireAuth, handlePatchPortalMedia);
-router$k.patch("/me/listings/:id/website", requireAuth, handlePatchPortalWebsite);
-router$k.post("/me/listings/:id/photo-edit-requests", requireAuth, handleCreatePhotoEditRequest);
-router$k.get("/me", requireAuth, async (req, res) => {
+router$l.get("/me/listings/:id", requireAuth, handleGetPortalListing);
+router$l.patch("/me/listings/:id/data", requireAuth, handlePatchPortalData);
+router$l.patch("/me/listings/:id/media", requireAuth, handlePatchPortalMedia);
+router$l.patch("/me/listings/:id/website", requireAuth, handlePatchPortalWebsite);
+router$l.post("/me/listings/:id/photo-edit-requests", requireAuth, handleCreatePhotoEditRequest);
+router$l.get("/me", requireAuth, async (req, res) => {
   try {
     const directDoc = await db$c().collection("clients").doc(req.user.uid).get();
     if (directDoc.exists) {
@@ -17610,7 +17618,7 @@ router$k.get("/me", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch profile." });
   }
 });
-router$k.get("/:id", requireStaff, async (req, res) => {
+router$l.get("/:id", requireStaff, async (req, res) => {
   try {
     const doc = await db$c().collection("clients").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Client not found." });
@@ -17627,7 +17635,7 @@ router$k.get("/:id", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch client." });
   }
 });
-router$k.post("/", requireCoordinator, async (req, res) => {
+router$l.post("/", requireCoordinator, async (req, res) => {
   try {
     const { firstName, lastName, email, phone, address, notes, tags } = req.body;
     if (!firstName || !lastName || !email) {
@@ -17657,7 +17665,7 @@ router$k.post("/", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to create client." });
   }
 });
-router$k.patch("/:id", requireCoordinator, async (req, res) => {
+router$l.patch("/:id", requireCoordinator, async (req, res) => {
   try {
     const allowed = ["firstName", "lastName", "phone", "address", "status", "notes", "tags", "company"];
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
@@ -18089,9 +18097,9 @@ async function playtestInvoiceRecord(id) {
   }
   return null;
 }
-const router$j = Router();
+const router$k = Router();
 const db$a = () => admin.firestore();
-router$j.get("/", requireStaff, async (_req, res) => {
+router$k.get("/", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$a().collection("staff").where("isActive", "==", true).orderBy("firstName").get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -18099,7 +18107,7 @@ router$j.get("/", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch staff." });
   }
 });
-router$j.post("/", requireAdmin, async (req, res) => {
+router$k.post("/", requireAdmin, async (req, res) => {
   try {
     const { firstName, lastName, email, phone, role, tempPassword } = req.body;
     if (!firstName || !lastName || !email || !role || !tempPassword) {
@@ -18135,7 +18143,7 @@ router$j.post("/", requireAdmin, async (req, res) => {
     return res.status(500).json({ error: "Failed to create staff member." });
   }
 });
-router$j.patch("/:id", requireAdmin, async (req, res) => {
+router$k.patch("/:id", requireAdmin, async (req, res) => {
   try {
     const allowed = ["firstName", "lastName", "phone", "role", "isActive"];
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
@@ -18175,7 +18183,7 @@ function requireSetupSecret(req, res) {
   }
   return true;
 }
-router$j.post("/playtest", async (req, res) => {
+router$k.post("/playtest", async (req, res) => {
   if (!requireSetupSecret(req, res)) return;
   if (!admin.apps.length) {
     return res.status(503).json({
@@ -18194,7 +18202,7 @@ router$j.post("/playtest", async (req, res) => {
     return res.status(500).json({ error: "Playtest setup failed." });
   }
 });
-router$j.post("/setup", async (req, res) => {
+router$k.post("/setup", async (req, res) => {
   try {
     if (isHostedDeployment(liveServerEnv())) {
       const secret = process.env.STAFF_SETUP_SECRET;
@@ -18265,7 +18273,7 @@ function kickStudioQueue(listingId, env = process.env) {
   });
   return { dispatched: true };
 }
-const router$i = Router();
+const router$j = Router();
 const db$9 = () => admin.firestore();
 const DIRECT_UPLOAD_LIMIT = 3e6;
 function adminReady$2(res) {
@@ -18333,7 +18341,7 @@ function sendKnownError$2(res, err, fallback) {
   console.error("[Listings]", err);
   return res.status(500).json({ error: fallback });
 }
-router$i.get("/assigned", requirePhotographer, async (req, res) => {
+router$j.get("/assigned", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const uid = req.user.uid;
@@ -18362,7 +18370,7 @@ router$i.get("/assigned", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to load assigned jobs." });
   }
 });
-router$i.get("/:id", requireAuth, async (req, res) => {
+router$j.get("/:id", requireAuth, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const listing = await assertListingAccess(req, req.params.id);
@@ -18377,7 +18385,7 @@ router$i.get("/:id", requireAuth, async (req, res) => {
     return sendKnownError$2(res, err, "Failed to load listing.");
   }
 });
-router$i.post("/:id/photos/upload-url", requirePhotographer, async (req, res) => {
+router$j.post("/:id/photos/upload-url", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const fileName2 = safeStorageFileName(req.body?.fileName);
@@ -18395,7 +18403,7 @@ router$i.post("/:id/photos/upload-url", requirePhotographer, async (req, res) =>
     return sendKnownError$2(res, err, "Failed to prepare the upload. Check FIREBASE_STORAGE_BUCKET.");
   }
 });
-router$i.post("/:id/photos", requirePhotographer, async (req, res) => {
+router$j.post("/:id/photos", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const listingId = req.params.id;
@@ -18441,7 +18449,7 @@ router$i.post("/:id/photos", requirePhotographer, async (req, res) => {
     return sendKnownError$2(res, err, "Failed to save the uploaded photo.");
   }
 });
-const router$h = Router();
+const router$i = Router();
 const db$8 = () => admin.firestore();
 function mailchimpConfig() {
   const apiKey = process.env.MAILCHIMP_API_KEY || "";
@@ -18469,7 +18477,7 @@ async function mailchimpRequest(path2, init = {}) {
   }
   return data;
 }
-router$h.get("/", requireCoordinator, async (_req, res) => {
+router$i.get("/", requireCoordinator, async (_req, res) => {
   try {
     const snapshot = await db$8().collection("campaigns").orderBy("createdAt", "desc").limit(50).get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -18477,7 +18485,7 @@ router$h.get("/", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch campaigns." });
   }
 });
-router$h.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
+router$i.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
   try {
     const { apiKey, serverPrefix } = mailchimpConfig();
     if (!apiKey || !serverPrefix) {
@@ -18508,7 +18516,7 @@ router$h.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
     });
   }
 });
-router$h.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
+router$i.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
   try {
     const { listId, audience = "all" } = req.body;
     if (!listId) return res.status(400).json({ error: "listId required." });
@@ -18571,7 +18579,7 @@ router$h.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: err instanceof Error ? err.message : "Failed to sync Mailchimp." });
   }
 });
-router$h.post("/", requireCoordinator, async (req, res) => {
+router$i.post("/", requireCoordinator, async (req, res) => {
   try {
     const { name, type, subject, body, audience, audienceIds, scheduledAt } = req.body;
     if (!name || !body || !audience) {
@@ -18596,7 +18604,7 @@ router$h.post("/", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to create campaign." });
   }
 });
-router$h.post("/:id/send", requireCoordinator, async (req, res) => {
+router$i.post("/:id/send", requireCoordinator, async (req, res) => {
   try {
     const campaignDoc = await db$8().collection("campaigns").doc(req.params.id).get();
     if (!campaignDoc.exists) return res.status(404).json({ error: "Campaign not found." });
@@ -18662,13 +18670,6 @@ router$h.post("/:id/send", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send campaign." });
   }
 });
-function marketingPermissionsForRole(role) {
-  if (role === "admin") return ["view", "manage", "send"];
-  return [];
-}
-function hasMarketingPermission(role, permission) {
-  return marketingPermissionsForRole(role).includes(permission);
-}
 const EMAIL_RE$1 = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i;
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, "");
@@ -18803,6 +18804,29 @@ function syncClientsIntoContacts(contacts, clients, now) {
     relinked,
     refreshed
   };
+}
+function signUnsubscribeEmail(email, secret) {
+  return crypto$1.createHmac("sha256", secret).update(normalizeEmail(email)).digest("hex");
+}
+function unsubscribeTokenMatches(email, token, secret) {
+  const expected = signUnsubscribeEmail(email, secret);
+  const left = Buffer.from(expected);
+  const right = Buffer.from(token);
+  return left.length === right.length && crypto$1.timingSafeEqual(left, right);
+}
+function signedUnsubscribeUrl(origin, email, secret) {
+  const url = new URL("/unsubscribe", origin);
+  const normalized = normalizeEmail(email);
+  url.searchParams.set("email", normalized);
+  if (secret) url.searchParams.set("token", signUnsubscribeEmail(normalized, secret));
+  return url.toString();
+}
+function marketingPermissionsForRole(role) {
+  if (role === "admin") return ["view", "manage", "send"];
+  return [];
+}
+function hasMarketingPermission(role, permission) {
+  return marketingPermissionsForRole(role).includes(permission);
 }
 const HEADER_HINTS = [
   { field: "email", hints: ["email", "e-mail", "email address", "e mail"] },
@@ -19038,6 +19062,7 @@ function reasonLabel(reason, hold) {
   if (reason === "complained") return "Complained";
   return "Do not email";
 }
+const HELLO_SENDING_ACCOUNT = "hello@iconicimagestx.com";
 const PHOTOS_SENDING_ACCOUNT = "photos@iconicimagestx.com";
 function normalizeSendingAccounts(raw) {
   const list2 = [];
@@ -19056,7 +19081,13 @@ function normalizeSendingAccounts(raw) {
       add(row.email, row.label);
     }
   }
-  if (!list2.length) add(PHOTOS_SENDING_ACCOUNT, "Photos");
+  if (!list2.length) {
+    add(HELLO_SENDING_ACCOUNT, "Hello");
+    add(PHOTOS_SENDING_ACCOUNT, "Photos");
+  }
+  if (!seen.has(HELLO_SENDING_ACCOUNT)) {
+    list2.unshift({ email: HELLO_SENDING_ACCOUNT, label: "Hello" });
+  }
   return list2;
 }
 function matchSendingAccount(email, accounts) {
@@ -19080,9 +19111,12 @@ const DEFAULT_MARKETING_SETTINGS = {
   bounceWarnRate: 0.05,
   bouncePauseRate: 0.08,
   fromName: "Iconic Images",
-  fromEmail: "photos@iconicimagestx.com",
-  replyTo: "photos@iconicimagestx.com",
-  sendingAccounts: [{ email: "photos@iconicimagestx.com", label: "Photos" }],
+  fromEmail: "hello@iconicimagestx.com",
+  replyTo: "hello@iconicimagestx.com",
+  sendingAccounts: [
+    { email: "hello@iconicimagestx.com", label: "Hello" },
+    { email: "photos@iconicimagestx.com", label: "Photos" }
+  ],
   suppressionSeededAt: ""
 };
 function settingsFrom(raw) {
@@ -19090,8 +19124,14 @@ function settingsFrom(raw) {
   const sendingAccounts = normalizeSendingAccounts(
     raw && Array.isArray(raw.sendingAccounts) ? raw.sendingAccounts : DEFAULT_MARKETING_SETTINGS.sendingAccounts
   );
-  const fromEmail = matchSendingAccount(merged.fromEmail, sendingAccounts) || sendingAccounts[0]?.email || PHOTOS_SENDING_ACCOUNT;
-  return { ...merged, sendingAccounts, fromEmail };
+  let fromEmail = matchSendingAccount(merged.fromEmail, sendingAccounts) || HELLO_SENDING_ACCOUNT;
+  let replyTo = normalizeEmail(merged.replyTo) || fromEmail;
+  const stored = raw && Array.isArray(raw.sendingAccounts) ? raw.sendingAccounts : null;
+  const legacyPhotosOnly = !stored || stored.length === 1 && normalizeEmail(stored[0]?.email) === PHOTOS_SENDING_ACCOUNT;
+  if (legacyPhotosOnly && fromEmail === PHOTOS_SENDING_ACCOUNT) fromEmail = HELLO_SENDING_ACCOUNT;
+  if (legacyPhotosOnly && replyTo === PHOTOS_SENDING_ACCOUNT) replyTo = HELLO_SENDING_ACCOUNT;
+  if (!matchSendingAccount(replyTo, sendingAccounts)) replyTo = fromEmail;
+  return { ...merged, sendingAccounts, fromEmail, replyTo };
 }
 function createMemoryMarketingStore() {
   const contacts = /* @__PURE__ */ new Map();
@@ -19374,7 +19414,7 @@ function parseTabularUpload(input) {
   }
   return parseCsv(input.text || "");
 }
-const router$g = Router();
+const router$h = Router();
 const MAX_ROWS = 1e4;
 const unsubscribeLimit = createRateLimiter({ windowMs: 60 * 60 * 1e3, max: 20 });
 function requireMarketing$1(permission) {
@@ -19411,7 +19451,7 @@ function publicContact(contact, suppression) {
     suppressed: blocked ? reasonLabel(blocked.reason, blocked.hold) : ""
   };
 }
-router$g.get("/overview", requireMarketing$1("view"), async (_req, res) => {
+router$h.get("/overview", requireMarketing$1("view"), async (_req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const [contacts, suppression, segments] = await Promise.all([
@@ -19427,7 +19467,7 @@ router$g.get("/overview", requireMarketing$1("view"), async (_req, res) => {
     segments: segments.length
   });
 });
-router$g.get("/contacts", requireMarketing$1("view"), async (req, res) => {
+router$h.get("/contacts", requireMarketing$1("view"), async (req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const [contacts, suppression] = await Promise.all([store.listContacts(), store.listSuppression()]);
@@ -19443,7 +19483,7 @@ router$g.get("/contacts", requireMarketing$1("view"), async (req, res) => {
   const tags = [...new Set(contacts.flatMap((contact) => contact.tags))].sort((a, b) => a.localeCompare(b));
   res.json({ contacts: filtered, tags, total: contacts.length });
 });
-router$g.get("/contacts/detail", requireMarketing$1("view"), async (req, res) => {
+router$h.get("/contacts/detail", requireMarketing$1("view"), async (req, res) => {
   const email = normalizeEmail(req.query.email);
   if (!isValidEmail(email)) return res.status(400).json({ error: "A valid email is required." });
   const store = getMarketingStore();
@@ -19460,7 +19500,7 @@ router$g.get("/contacts/detail", requireMarketing$1("view"), async (req, res) =>
     activity: events.sort((a, b) => b.at.localeCompare(a.at))
   });
 });
-router$g.post("/contacts", requireMarketing$1("manage"), async (req, res) => {
+router$h.post("/contacts", requireMarketing$1("manage"), async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   if (!isValidEmail(email)) return res.status(400).json({ error: "A valid email is required." });
   const store = getMarketingStore();
@@ -19485,7 +19525,7 @@ router$g.post("/contacts", requireMarketing$1("manage"), async (req, res) => {
   await store.saveContacts([contact]);
   res.json({ contact });
 });
-router$g.post("/contacts/tags", requireMarketing$1("manage"), async (req, res) => {
+router$h.post("/contacts/tags", requireMarketing$1("manage"), async (req, res) => {
   const emails = Array.isArray(req.body?.emails) ? req.body.emails.map((email) => normalizeEmail(email)) : [];
   const add = Array.isArray(req.body?.add) ? req.body.add.map(String) : [];
   const remove = Array.isArray(req.body?.remove) ? req.body.remove.map(String) : [];
@@ -19498,11 +19538,11 @@ router$g.post("/contacts/tags", requireMarketing$1("manage"), async (req, res) =
   await store.saveContacts(next);
   res.json({ updated: next.length });
 });
-router$g.post("/contacts/sync", requireMarketing$1("manage"), async (_req, res) => {
+router$h.post("/contacts/sync", requireMarketing$1("manage"), async (_req, res) => {
   const result = await syncCustomerContacts();
   res.json(result);
 });
-router$g.post("/imports/parse", requireMarketing$1("manage"), async (req, res) => {
+router$h.post("/imports/parse", requireMarketing$1("manage"), async (req, res) => {
   try {
     const table = parseTabularUpload({
       text: typeof req.body?.text === "string" ? req.body.text : "",
@@ -19522,7 +19562,7 @@ router$g.post("/imports/parse", requireMarketing$1("manage"), async (req, res) =
     res.status(400).json({ error: err instanceof Error ? err.message : "Could not read that file." });
   }
 });
-router$g.post("/imports/commit", requireMarketing$1("manage"), async (req, res) => {
+router$h.post("/imports/commit", requireMarketing$1("manage"), async (req, res) => {
   const headers = Array.isArray(req.body?.headers) ? req.body.headers.map(String) : [];
   const rows = Array.isArray(req.body?.rows) ? req.body.rows.map((row) => Array.isArray(row) ? row.map(String) : []) : [];
   const mapping = req.body?.mapping && typeof req.body.mapping === "object" ? req.body.mapping : {};
@@ -19540,7 +19580,7 @@ router$g.post("/imports/commit", requireMarketing$1("manage"), async (req, res) 
   await store.saveContacts(plan.upserts);
   res.json({ summary: plan.summary });
 });
-router$g.get("/segments", requireMarketing$1("view"), async (_req, res) => {
+router$h.get("/segments", requireMarketing$1("view"), async (_req, res) => {
   const store = getMarketingStore();
   const [segments, contacts] = await Promise.all([store.listSegments(), store.listContacts()]);
   res.json({
@@ -19550,7 +19590,7 @@ router$g.get("/segments", requireMarketing$1("view"), async (_req, res) => {
     }))
   });
 });
-router$g.post("/segments", requireMarketing$1("manage"), async (req, res) => {
+router$h.post("/segments", requireMarketing$1("manage"), async (req, res) => {
   const name = String(req.body?.name || "").trim();
   if (!name) return res.status(400).json({ error: "Name the segment." });
   const store = getMarketingStore();
@@ -19567,11 +19607,11 @@ router$g.post("/segments", requireMarketing$1("manage"), async (req, res) => {
   await store.saveSegment(segment);
   res.json({ segment });
 });
-router$g.delete("/segments/:id", requireMarketing$1("manage"), async (req, res) => {
+router$h.delete("/segments/:id", requireMarketing$1("manage"), async (req, res) => {
   await getMarketingStore().deleteSegment(req.params.id);
   res.json({ ok: true });
 });
-router$g.get("/suppression", requireMarketing$1("view"), async (_req, res) => {
+router$h.get("/suppression", requireMarketing$1("view"), async (_req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const entries = await store.listSuppression();
@@ -19579,7 +19619,7 @@ router$g.get("/suppression", requireMarketing$1("view"), async (_req, res) => {
     entries: entries.sort((a, b) => a.value.localeCompare(b.value))
   });
 });
-router$g.post("/suppression", requireMarketing$1("manage"), async (req, res) => {
+router$h.post("/suppression", requireMarketing$1("manage"), async (req, res) => {
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const entry2 = buildSuppression(now, {
     kind: req.body?.kind === "domain" || req.body?.kind === "name" ? req.body.kind : "email",
@@ -19598,11 +19638,11 @@ router$g.post("/suppression", requireMarketing$1("manage"), async (req, res) => 
   await store.saveSuppression({ ...entry2, createdAt: existing?.createdAt || now, source: existing?.source || "manual" });
   res.json({ entry: entry2 });
 });
-router$g.delete("/suppression/:id", requireMarketing$1("manage"), async (req, res) => {
+router$h.delete("/suppression/:id", requireMarketing$1("manage"), async (req, res) => {
   await getMarketingStore().deleteSuppression(decodeURIComponent(req.params.id));
   res.json({ ok: true });
 });
-router$g.post("/unsubscribe", async (req, res) => {
+router$h.post("/unsubscribe", async (req, res) => {
   const limit = unsubscribeLimit.check(clientIp(req));
   if (!limit.allowed) return res.status(429).json({ error: "Too many attempts. Try again later." });
   const email = normalizeEmail(req.body?.email);
@@ -19641,15 +19681,6 @@ router$g.post("/unsubscribe", async (req, res) => {
   }
   res.json({ ok: true, message: `${email} will not receive Iconic marketing email.` });
 });
-function signUnsubscribeEmail(email, secret) {
-  return crypto.createHmac("sha256", secret).update(normalizeEmail(email)).digest("hex");
-}
-function unsubscribeTokenMatches(email, token, secret) {
-  const expected = signUnsubscribeEmail(email, secret);
-  const left = Buffer.from(expected);
-  const right = Buffer.from(token);
-  return left.length === right.length && crypto.timingSafeEqual(left, right);
-}
 function hoursBetween(laterIso, earlierIso) {
   const later = Date.parse(laterIso);
   const earlier = Date.parse(earlierIso);
@@ -19810,9 +19841,13 @@ function mergeValues(contact, unsubscribeUrl) {
     UnsubscribeUrl: unsubscribeUrl
   };
 }
+const MARKETING_POSTAL_ADDRESS = "Iconic Images, 26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380";
 function withUnsubscribeFooter(html, url) {
-  const merged = html.includes("{UnsubscribeUrl}") ? html : `${html}
-<p style="margin-top:24px;font-size:12px;color:#667085;">Iconic Images marketing email. <a href="{UnsubscribeUrl}">Unsubscribe</a>.</p>`;
+  const link = `<p style="margin-top:24px;font-size:12px;color:#667085;">${MARKETING_POSTAL_ADDRESS}. <a href="{UnsubscribeUrl}" clicktracking="off">Unsubscribe</a>.</p>`;
+  let merged = html.includes("{UnsubscribeUrl}") ? html : `${html}
+${link}`;
+  if (!merged.includes("26410 Oakridge Dr")) merged = `${merged}
+${link}`;
   return applyMerge(merged, { UnsubscribeUrl: url });
 }
 function list(value) {
@@ -19822,7 +19857,7 @@ function list(value) {
   }
   return [];
 }
-function text$2(row, key) {
+function text$3(row, key) {
   const value = row[key] ?? row[key[0].toUpperCase() + key.slice(1)];
   return value == null ? "" : String(value);
 }
@@ -19839,12 +19874,12 @@ function summarizeGmassReport(input) {
   const unsubscribes = list(input.unsubscribes);
   const replies = list(input.replies);
   const sent = recipients.length || Number(input.aggregate?.recipients || 0);
-  const bounceEmails = new Set(bounces.map((row) => text$2(row, "emailAddress").toLowerCase()).filter(Boolean));
-  const blockEmails = new Set(blocks.map((row) => text$2(row, "emailAddress").toLowerCase()).filter(Boolean));
+  const bounceEmails = new Set(bounces.map((row) => text$3(row, "emailAddress").toLowerCase()).filter(Boolean));
+  const blockEmails = new Set(blocks.map((row) => text$3(row, "emailAddress").toLowerCase()).filter(Boolean));
   const delivered = Math.max(0, sent - (/* @__PURE__ */ new Set([...bounceEmails, ...blockEmails])).size);
-  const uniqueOpens = new Set(opens.map((row) => text$2(row, "emailAddress").toLowerCase()).filter(Boolean)).size || (recipients.length ? 0 : Number(input.aggregate?.opens || 0));
+  const uniqueOpens = new Set(opens.map((row) => text$3(row, "emailAddress").toLowerCase()).filter(Boolean)).size || (recipients.length ? 0 : Number(input.aggregate?.opens || 0));
   const openTotal = opens.reduce((sum, row) => sum + Number(row.openCount || row.OpenCount || 1), 0) || uniqueOpens;
-  const clickEmails = new Set(clicks.map((row) => text$2(row, "emailAddress").toLowerCase()).filter(Boolean));
+  const clickEmails = new Set(clicks.map((row) => text$3(row, "emailAddress").toLowerCase()).filter(Boolean));
   const uniqueClicks = clickEmails.size || (recipients.length ? 0 : Number(input.aggregate?.clicks || 0));
   const replyCount = replies.length || Number(input.aggregate?.replies || 0);
   const bounceCount = bounces.length || Number(input.aggregate?.bounces || 0);
@@ -19852,10 +19887,10 @@ function summarizeGmassReport(input) {
   const unsubCount = unsubscribes.length || Number(input.aggregate?.unsubscribes || 0);
   const linkMap = /* @__PURE__ */ new Map();
   for (const row of clicks) {
-    const url = text$2(row, "url") || "(unknown link)";
+    const url = text$3(row, "url") || "(unknown link)";
     const current = linkMap.get(url) || { clicks: 0, emails: /* @__PURE__ */ new Set() };
     current.clicks += 1;
-    const email = text$2(row, "emailAddress").toLowerCase();
+    const email = text$3(row, "emailAddress").toLowerCase();
     if (email) current.emails.add(email);
     linkMap.set(url, current);
   }
@@ -19869,41 +19904,41 @@ function summarizeGmassReport(input) {
     return byEmail.get(key);
   };
   for (const row of recipients) {
-    const item = ensure(text$2(row, "emailAddress"));
-    if (item) item.sentAt = text$2(row, "sentTime");
+    const item = ensure(text$3(row, "emailAddress"));
+    if (item) item.sentAt = text$3(row, "sentTime");
   }
   for (const row of opens) {
-    const item = ensure(text$2(row, "emailAddress"));
+    const item = ensure(text$3(row, "emailAddress"));
     if (item) item.opens = Number(row.openCount || row.OpenCount || 1);
   }
   for (const row of clicks) {
-    const item = ensure(text$2(row, "emailAddress"));
+    const item = ensure(text$3(row, "emailAddress"));
     if (item) item.clicks += 1;
   }
   for (const row of replies) {
-    const item = ensure(text$2(row, "emailAddress"));
+    const item = ensure(text$3(row, "emailAddress"));
     if (item) item.replied = true;
   }
   for (const row of bounces) {
-    const item = ensure(text$2(row, "emailAddress"));
+    const item = ensure(text$3(row, "emailAddress"));
     if (item) item.bounced = true;
   }
   for (const row of blocks) {
-    const item = ensure(text$2(row, "emailAddress"));
+    const item = ensure(text$3(row, "emailAddress"));
     if (item) item.blocked = true;
   }
   for (const row of unsubscribes) {
-    const item = ensure(text$2(row, "emailAddress"));
+    const item = ensure(text$3(row, "emailAddress"));
     if (item) item.unsubscribed = true;
   }
   const timeline = [
-    ...recipients.map((row) => ({ at: text$2(row, "sentTime"), type: "sent", email: text$2(row, "emailAddress"), detail: "Sent" })),
-    ...opens.map((row) => ({ at: text$2(row, "lastOpenTime"), type: "open", email: text$2(row, "emailAddress"), detail: `${row.openCount || 1} opens` })),
-    ...clicks.map((row) => ({ at: text$2(row, "clickTime"), type: "click", email: text$2(row, "emailAddress"), detail: text$2(row, "url") })),
-    ...replies.map((row) => ({ at: text$2(row, "replyTime"), type: "reply", email: text$2(row, "emailAddress"), detail: "Replied" })),
-    ...bounces.map((row) => ({ at: text$2(row, "bounceTime"), type: "bounce", email: text$2(row, "emailAddress"), detail: text$2(row, "bounceReason") || "Bounced" })),
-    ...blocks.map((row) => ({ at: text$2(row, "blockTime"), type: "block", email: text$2(row, "emailAddress"), detail: text$2(row, "blockReason") || "Blocked" })),
-    ...unsubscribes.map((row) => ({ at: text$2(row, "unsubscribeTime"), type: "unsubscribe", email: text$2(row, "emailAddress"), detail: "Unsubscribed" }))
+    ...recipients.map((row) => ({ at: text$3(row, "sentTime"), type: "sent", email: text$3(row, "emailAddress"), detail: "Sent" })),
+    ...opens.map((row) => ({ at: text$3(row, "lastOpenTime"), type: "open", email: text$3(row, "emailAddress"), detail: `${row.openCount || 1} opens` })),
+    ...clicks.map((row) => ({ at: text$3(row, "clickTime"), type: "click", email: text$3(row, "emailAddress"), detail: text$3(row, "url") })),
+    ...replies.map((row) => ({ at: text$3(row, "replyTime"), type: "reply", email: text$3(row, "emailAddress"), detail: "Replied" })),
+    ...bounces.map((row) => ({ at: text$3(row, "bounceTime"), type: "bounce", email: text$3(row, "emailAddress"), detail: text$3(row, "bounceReason") || "Bounced" })),
+    ...blocks.map((row) => ({ at: text$3(row, "blockTime"), type: "block", email: text$3(row, "emailAddress"), detail: text$3(row, "blockReason") || "Blocked" })),
+    ...unsubscribes.map((row) => ({ at: text$3(row, "unsubscribeTime"), type: "unsubscribe", email: text$3(row, "emailAddress"), detail: "Unsubscribed" }))
   ].filter((item) => item.at).sort((a, b) => b.at.localeCompare(a.at));
   const bounceRate = sent ? bounceCount / sent : 0;
   return {
@@ -20046,7 +20081,7 @@ function createGmassClient(env = process.env, fetchImpl = fetch) {
 function getGmassClient() {
   return createGmassClient();
 }
-const router$f = Router();
+const router$g = Router();
 function requireMarketing(permission) {
   return async (req, res, next) => {
     await requireStaff(req, res, () => {
@@ -20168,7 +20203,7 @@ function readCampaign(body, current, now) {
     updatedAt: now
   };
 }
-const UNKNOWN_FROM = "Choose a saved sending account. photos@iconicimagestx.com is ready today. Add a future address such as news@ on the GMass page before a campaign can use it.";
+const UNKNOWN_FROM = "Choose a saved sending account. hello@iconicimagestx.com is the marketing default. photos@iconicimagestx.com stays available. Add a future address such as news@ on the GMass page before a campaign can use it.";
 function knownFrom(settings, email, res) {
   const match = matchSendingAccount(email, settings.sendingAccounts);
   if (!match) res.status(400).json({ error: UNKNOWN_FROM });
@@ -20192,7 +20227,7 @@ function sendBlocked(res, gmass) {
   }
   return false;
 }
-router$f.get("/dashboard", requireMarketing("view"), async (_req, res) => {
+router$g.get("/dashboard", requireMarketing("view"), async (_req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const [contacts, suppression, segments, campaigns, reports] = await Promise.all([
@@ -20227,11 +20262,11 @@ router$f.get("/dashboard", requireMarketing("view"), async (_req, res) => {
     alerts: rows.filter((row) => row.stats?.pauseRecommended)
   });
 });
-router$f.get("/campaigns", requireMarketing("view"), async (_req, res) => {
+router$g.get("/campaigns", requireMarketing("view"), async (_req, res) => {
   const campaigns = await getMarketingStore().listCampaigns();
   res.json({ campaigns: campaigns.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) });
 });
-router$f.post("/campaigns", requireMarketing("manage"), async (req, res) => {
+router$g.post("/campaigns", requireMarketing("manage"), async (req, res) => {
   const store = getMarketingStore();
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const settings = await store.getSettings();
@@ -20244,12 +20279,12 @@ router$f.post("/campaigns", requireMarketing("manage"), async (req, res) => {
   await store.saveCampaign(campaign);
   res.status(201).json({ campaign });
 });
-router$f.get("/campaigns/:id", requireMarketing("view"), async (req, res) => {
+router$g.get("/campaigns/:id", requireMarketing("view"), async (req, res) => {
   const campaign = await getMarketingStore().getCampaign(req.params.id);
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
   res.json({ campaign });
 });
-router$f.post("/campaigns/:id", requireMarketing("manage"), async (req, res) => {
+router$g.post("/campaigns/:id", requireMarketing("manage"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -20264,7 +20299,7 @@ router$f.post("/campaigns/:id", requireMarketing("manage"), async (req, res) => 
   await store.saveCampaign(campaign);
   res.json({ campaign });
 });
-router$f.post("/campaigns/:id/duplicate", requireMarketing("manage"), async (req, res) => {
+router$g.post("/campaigns/:id/duplicate", requireMarketing("manage"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -20286,7 +20321,7 @@ router$f.post("/campaigns/:id/duplicate", requireMarketing("manage"), async (req
   await store.saveCampaign(copy);
   res.status(201).json({ campaign: copy });
 });
-router$f.post("/campaigns/:id/preview", requireMarketing("send"), async (req, res) => {
+router$g.post("/campaigns/:id/preview", requireMarketing("send"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -20305,7 +20340,7 @@ router$f.post("/campaigns/:id/preview", requireMarketing("send"), async (req, re
   await store.saveCampaign(campaign);
   res.json({ confirmation });
 });
-router$f.post("/campaigns/:id/test", requireMarketing("send"), async (req, res) => {
+router$g.post("/campaigns/:id/test", requireMarketing("send"), async (req, res) => {
   const to = normalizeEmail(req.body?.to);
   if (!isValidEmail(to)) return res.status(400).json({ error: "Enter a test email address." });
   const gmass = getGmassClient();
@@ -20317,11 +20352,8 @@ router$f.post("/campaigns/:id/test", requireMarketing("send"), async (req, res) 
   if (!fromEmail) return;
   const contacts = await store.listContacts();
   const contact = contacts.find((item) => item.email === to) || { firstName: "there", lastName: "", email: to, company: "" };
-  const secret = process.env.MARKETING_UNSUBSCRIBE_SECRET || "";
-  const url = new URL("/unsubscribe", originOf$1(req));
-  url.searchParams.set("email", to);
-  if (secret) url.searchParams.set("token", crypto.createHmac("sha256", secret).update(to).digest("hex"));
-  const html = withUnsubscribeFooter(applyMerge(campaign.html, mergeValues(contact, url.toString())), url.toString());
+  const url = signedUnsubscribeUrl(originOf$1(req), to, process.env.MARKETING_UNSUBSCRIBE_SECRET || "");
+  const html = withUnsubscribeFooter(applyMerge(campaign.html, mergeValues(contact, url)), url);
   try {
     await gmass.sendTransactional({
       fromEmail,
@@ -20329,7 +20361,7 @@ router$f.post("/campaigns/:id/test", requireMarketing("send"), async (req, res) 
       to,
       subject: campaign.subject || campaign.name,
       message: html,
-      settings: { openTrack: true, clickTrack: true, messageType: "html" }
+      settings: { openTrack: false, clickTrack: false, messageType: "html" }
     });
   } catch (err) {
     const message = err instanceof GmassSendBlocked ? err.message : err instanceof Error ? err.message : "Test send failed.";
@@ -20337,7 +20369,7 @@ router$f.post("/campaigns/:id/test", requireMarketing("send"), async (req, res) 
   }
   res.json({ ok: true, to });
 });
-router$f.post("/campaigns/:id/send", requireMarketing("send"), async (req, res) => {
+router$g.post("/campaigns/:id/send", requireMarketing("send"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -20371,37 +20403,51 @@ router$f.post("/campaigns/:id/send", requireMarketing("send"), async (req, res) 
   if (!fromEmail) return;
   const gmass = getGmassClient();
   if (sendBlocked(res, gmass)) return;
-  const page2 = `${originOf$1(req)}/unsubscribe`;
-  const html = withUnsubscribeFooter(applyMerge(current.html, mergeValues({}, page2)), page2);
+  const origin = originOf$1(req);
+  const secret = process.env.MARKETING_UNSUBSCRIBE_SECRET || "";
+  const contacts = await store.listContacts();
+  const rendered = confirmation.recipientEmails.map((email) => {
+    const contact = contacts.find((item) => item.email === email) || { email, firstName: "", lastName: "", company: "" };
+    const unsubscribeUrl = signedUnsubscribeUrl(origin, email, secret);
+    return {
+      email,
+      html: withUnsubscribeFooter(applyMerge(current.html, mergeValues(contact, unsubscribeUrl)), unsubscribeUrl)
+    };
+  });
   try {
-    const draft = await gmass.createDraft({
-      subject: current.subject,
-      message: html,
-      messageType: "html",
-      fromEmail,
-      emailAddresses: confirmation.recipientEmails.join(",")
-    });
-    const draftId = String(draft?.campaignDraftId || "");
-    if (!draftId) return res.status(502).json({ error: "GMass did not return a draft id. Nothing was marked sent." });
-    const sent = await gmass.sendCampaign(draftId, {
-      openTracking: true,
-      clickTracking: true,
-      fromName: current.fromName,
-      replyTo: current.replyTo,
-      previewText: current.preheader,
-      friendlyName: current.name,
-      ...sendTime ? { sendTime } : {},
-      emailsPerDay: settings.gmailDailyLimit,
-      suppressionDays: settings.frequencyDays
-    });
-    const gmassCampaignId = String(sent?.campaignId || "");
+    let gmassDraftId = "";
+    let gmassCampaignId = "";
+    for (const row of rendered) {
+      const draft = await gmass.createDraft({
+        subject: current.subject,
+        message: row.html,
+        messageType: "html",
+        fromEmail,
+        emailAddresses: row.email
+      });
+      const draftId = String(draft?.campaignDraftId || "");
+      if (!draftId) return res.status(502).json({ error: "GMass did not return a draft id. Nothing was marked sent." });
+      const sent = await gmass.sendCampaign(draftId, {
+        openTracking: false,
+        clickTracking: false,
+        fromName: current.fromName,
+        replyTo: current.replyTo,
+        previewText: current.preheader,
+        friendlyName: current.name,
+        ...sendTime ? { sendTime } : {},
+        emailsPerDay: settings.gmailDailyLimit,
+        suppressionDays: settings.frequencyDays
+      });
+      if (!gmassDraftId) gmassDraftId = draftId;
+      if (!gmassCampaignId) gmassCampaignId = String(sent?.campaignId || "");
+    }
     const now = (/* @__PURE__ */ new Date()).toISOString();
     const campaign = {
       ...current,
       status: sendTime ? "scheduled" : "sent",
       scheduledAt: sendTime ? sendAt : "",
       sentAt: sendTime ? "" : now,
-      gmassDraftId: draftId,
+      gmassDraftId,
       gmassCampaignId,
       recipientEmails: confirmation.recipientEmails,
       confirmation,
@@ -20427,7 +20473,7 @@ router$f.post("/campaigns/:id/send", requireMarketing("send"), async (req, res) 
     return res.status(502).json({ error: message });
   }
 });
-router$f.get("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
+router$g.get("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
   const store = getMarketingStore();
   const [campaign, report] = await Promise.all([
     store.getCampaign(req.params.id),
@@ -20436,7 +20482,7 @@ router$f.get("/campaigns/:id/report", requireMarketing("view"), async (req, res)
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
   res.json({ campaign, report });
 });
-router$f.post("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
+router$g.post("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
   const store = getMarketingStore();
   const campaign = await store.getCampaign(req.params.id);
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
@@ -20511,11 +20557,11 @@ router$f.post("/campaigns/:id/report", requireMarketing("view"), async (req, res
     res.status(502).json({ error: err instanceof Error ? err.message : "Could not refresh the GMass report." });
   }
 });
-router$f.get("/templates", requireMarketing("view"), async (_req, res) => {
+router$g.get("/templates", requireMarketing("view"), async (_req, res) => {
   const templates = await getMarketingStore().listTemplates();
   res.json({ templates });
 });
-router$f.post("/templates", requireMarketing("manage"), async (req, res) => {
+router$g.post("/templates", requireMarketing("manage"), async (req, res) => {
   const name = String(req.body?.name || "").trim();
   const html = String(req.body?.html || "");
   if (!name || !html) return res.status(400).json({ error: "A template needs a name and HTML." });
@@ -20530,15 +20576,15 @@ router$f.post("/templates", requireMarketing("manage"), async (req, res) => {
   await getMarketingStore().saveTemplate(template);
   res.json({ template });
 });
-router$f.delete("/templates/:id", requireMarketing("manage"), async (req, res) => {
+router$g.delete("/templates/:id", requireMarketing("manage"), async (req, res) => {
   await getMarketingStore().deleteTemplate(req.params.id);
   res.json({ ok: true });
 });
-router$f.get("/settings", requireMarketing("view"), async (_req, res) => {
+router$g.get("/settings", requireMarketing("view"), async (_req, res) => {
   const settings = await getMarketingStore().getSettings();
   res.json({ settings });
 });
-router$f.get("/account", requireMarketing("view"), async (_req, res) => {
+router$g.get("/account", requireMarketing("view"), async (_req, res) => {
   const settings = await getMarketingStore().getSettings();
   const gmass = getGmassClient();
   const base = {
@@ -20560,7 +20606,7 @@ router$f.get("/account", requireMarketing("view"), async (_req, res) => {
   ]);
   res.json({ ...base, user, warmup, domains });
 });
-router$f.post("/settings", requireMarketing("send"), async (req, res) => {
+router$g.post("/settings", requireMarketing("send"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getSettings();
   const next = {
@@ -20583,7 +20629,7 @@ router$f.post("/settings", requireMarketing("send"), async (req, res) => {
   await store.saveSettings(next);
   res.json({ settings: next });
 });
-router$f.post("/account/unsubscribes", requireMarketing("send"), async (req, res) => {
+router$g.post("/account/unsubscribes", requireMarketing("send"), async (req, res) => {
   const gmass = getGmassClient();
   if (!gmass.configured) return res.status(503).json({ error: "Set GMASS_API_KEY before syncing a suppression to GMass." });
   const email = normalizeEmail(req.body?.email);
@@ -20603,7 +20649,7 @@ router$f.post("/account/unsubscribes", requireMarketing("send"), async (req, res
   }
   res.json({ ok: true });
 });
-router$f.post("/demo/sample-report", requireMarketing("send"), async (req, res) => {
+router$g.post("/demo/sample-report", requireMarketing("send"), async (req, res) => {
   if (process.env.MARKETING_DEMO !== "true" || isHostedDeployment(liveServerEnv())) {
     return res.status(404).json({ error: "Not found." });
   }
@@ -20641,7 +20687,7 @@ router$f.post("/demo/sample-report", requireMarketing("send"), async (req, res) 
   await store.saveReport(report);
   res.json({ campaign, report });
 });
-const router$e = Router();
+const router$f = Router();
 const db$6 = () => admin.firestore();
 function isAgentAuthorized(req) {
   const serviceKey = req.headers["x-agent-key"];
@@ -20683,7 +20729,7 @@ async function loadOrderForAppointment(appointment) {
   const orderDoc = await db$6().collection("orders").doc(String(appointment.orderId)).get();
   return orderDoc.exists ? { id: orderDoc.id, ref: orderDoc.ref, data: orderDoc.data() || {} } : null;
 }
-router$e.get("/briefing", requireStaff, async (_req, res) => {
+router$f.get("/briefing", requireStaff, async (_req, res) => {
   try {
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
@@ -20882,9 +20928,9 @@ async function runReminderSweep(req, res) {
     return res.status(500).json({ error: "Failed to run reminder sweep." });
   }
 }
-router$e.get("/run-reminders", runReminderSweep);
-router$e.post("/run-reminders", runReminderSweep);
-router$e.get("/logs", requireStaff, async (req, res) => {
+router$f.get("/run-reminders", runReminderSweep);
+router$f.post("/run-reminders", runReminderSweep);
+router$f.get("/logs", requireStaff, async (req, res) => {
   try {
     const { agent, status: status2, requiresReview, limit = "50" } = req.query;
     let query = db$6().collection("agentLogs").orderBy("createdAt", "desc");
@@ -20899,7 +20945,7 @@ router$e.get("/logs", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch agent logs." });
   }
 });
-router$e.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
+router$f.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
   try {
     const { notes } = req.body;
     await db$6().collection("agentLogs").doc(req.params.id).update({
@@ -20914,7 +20960,7 @@ router$e.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to resolve flag." });
   }
 });
-router$e.post("/log", async (req, res) => {
+router$f.post("/log", async (req, res) => {
   try {
     if (!isAgentAuthorized(req)) {
       return res.status(401).json({ error: "Invalid agent key." });
@@ -20952,9 +20998,9 @@ router$e.post("/log", async (req, res) => {
     return res.status(500).json({ error: "Failed to log agent action." });
   }
 });
-const router$d = Router();
+const router$e = Router();
 const db$5 = () => admin.firestore();
-router$d.get("/", requireStaff, async (req, res) => {
+router$e.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, listingId, orderId, limit = "100" } = req.query;
     let q = db$5().collection("mediaJobs").orderBy("createdAt", "desc");
@@ -20968,7 +21014,7 @@ router$d.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch media jobs." });
   }
 });
-router$d.post("/", requireStaff, async (req, res) => {
+router$e.post("/", requireStaff, async (req, res) => {
   try {
     const {
       listingId,
@@ -21027,7 +21073,7 @@ router$d.post("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to create media job." });
   }
 });
-router$d.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$e.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2, resultItems = [], error = "", requiresHumanReview } = req.body;
     const valid = ["queued", "processing", "ready_for_review", "completed", "failed", "cancelled"];
@@ -21161,7 +21207,7 @@ async function moveMediaDelivery(input) {
     label: MEDIA_DELIVERY_LABELS[input.status]
   };
 }
-const router$c = Router();
+const router$d = Router();
 function adminReady$1(res) {
   if (admin.apps.length) return true;
   res.status(503).json({
@@ -21189,7 +21235,7 @@ function sendKnownError$1(res, err, fallback) {
   console.error("[Studio]", err);
   return res.status(500).json({ error: fallback });
 }
-router$c.get("/workspace", requireStaff, async (req, res) => {
+router$d.get("/workspace", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = typeof req.query.listingId === "string" ? req.query.listingId : "";
@@ -21211,7 +21257,7 @@ router$c.get("/workspace", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to load Studio.");
   }
 });
-router$c.get("/delivery-queue", requireStaff, async (req, res) => {
+router$d.get("/delivery-queue", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const rows = await listMediaDeliveryQueue({
@@ -21223,7 +21269,7 @@ router$c.get("/delivery-queue", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to load the delivery queue.");
   }
 });
-router$c.post("/delivery-queue/move", requireCoordinator, async (req, res) => {
+router$d.post("/delivery-queue/move", requireCoordinator, async (req, res) => {
   const galleryId = String(req.body?.galleryId || "").trim();
   const status2 = String(req.body?.status || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(galleryId)) {
@@ -21260,7 +21306,7 @@ router$c.post("/delivery-queue/move", requireCoordinator, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to update delivery.");
   }
 });
-router$c.post("/order-edits", requireStaff, async (req, res) => {
+router$d.post("/order-edits", requireStaff, async (req, res) => {
   const listingId = String(req.body?.listingId || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -21274,7 +21320,7 @@ router$c.post("/order-edits", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to queue the order edits.");
   }
 });
-router$c.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => {
+router$d.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => {
   let listingId = String(req.body?.listingId || "").trim();
   if (listingId && !/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -21304,7 +21350,7 @@ router$c.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => 
     return sendKnownError$1(res, err, "Failed to advance the order edit queue.");
   }
 });
-router$c.post("/iconic-polish", requireStaff, async (req, res) => {
+router$d.post("/iconic-polish", requireStaff, async (req, res) => {
   const listingId = String(req.body?.listingId || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -21321,7 +21367,7 @@ router$c.post("/iconic-polish", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to save Iconic Polish.");
   }
 });
-router$c.post("/ai-edit", requireStaff, async (req, res) => {
+router$d.post("/ai-edit", requireStaff, async (req, res) => {
   const parsed = parseAiEditRequest(req.body);
   if (parsed.ok === false) return res.status(400).json({ error: parsed.error });
   if (!adminReady$1(res)) return;
@@ -21341,7 +21387,7 @@ router$c.post("/ai-edit", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to enqueue the AI edit.");
   }
 });
-router$c.post("/adjust", requireStaff, async (req, res) => {
+router$d.post("/adjust", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
@@ -21364,7 +21410,7 @@ router$c.post("/adjust", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to save the adjustment.");
   }
 });
-router$c.post("/reject", requireStaff, async (req, res) => {
+router$d.post("/reject", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
@@ -21381,7 +21427,7 @@ router$c.post("/reject", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to reject the edit.");
   }
 });
-router$c.post("/approve", requireStaff, async (req, res) => {
+router$d.post("/approve", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
@@ -21522,16 +21568,16 @@ async function editScratchPhoto(input) {
     downloadName: scratchDownloadName(input.fileName || "scratch.jpg")
   };
 }
-const router$b = Router();
+const router$c = Router();
 function headerValue(value) {
   if (Array.isArray(value)) return value[0] || "";
   return value || "";
 }
-router$b.get("/", requireCoordinator, async (_req, res) => {
+router$c.get("/", requireCoordinator, async (_req, res) => {
   const grass = await grassReferenceStatus();
   return res.json({ grass, twilightPrompt: orderExteriorTwilightPrompt() });
 });
-router$b.post(
+router$c.post(
   "/",
   requireCoordinator,
   express.raw({ type: "image/jpeg", limit: "4mb" }),
@@ -21557,13 +21603,13 @@ router$b.post(
     }
   }
 );
-router$b.use((err, _req, res, next) => {
+router$c.use((err, _req, res, next) => {
   if (err?.type === "entity.too.large" || err?.status === 413) {
     return res.status(413).json({ error: "That photo is too large for the scratch pad. Export a smaller JPEG." });
   }
   return next(err);
 });
-const router$a = Router();
+const router$b = Router();
 const GOOGLE_KEY = process.env.GOOGLE_MAPS_API_KEY || "";
 function fromGoogle(p) {
   return {
@@ -21590,7 +21636,7 @@ function fromNominatim(r, idx) {
     secondary: parts.slice(1).join(", ")
   };
 }
-router$a.get("/autocomplete", async (req, res) => {
+router$b.get("/autocomplete", async (req, res) => {
   const input = (req.query.input || "").trim();
   if (!input || input.length < 2) {
     return res.json({ suggestions: [] });
@@ -21626,7 +21672,7 @@ router$a.get("/autocomplete", async (req, res) => {
     return res.json({ suggestions: [] });
   }
 });
-router$a.get("/distance", async (req, res) => {
+router$b.get("/distance", async (req, res) => {
   const destination = (req.query.destination || "").trim();
   const origin = (req.query.origin || process.env.STUDIO_ADDRESS || "The Woodlands, TX 77380").trim();
   if (!destination) {
@@ -21653,7 +21699,7 @@ router$a.get("/distance", async (req, res) => {
     return res.status(500).json({ error: "Failed to calculate distance." });
   }
 });
-const router$9 = Router();
+const router$a = Router();
 const db$3 = () => admin.firestore();
 async function findOrderLikeDocument(id) {
   const orderRequestDoc = await db$3().collection("orderRequests").doc(id).get();
@@ -21662,13 +21708,37 @@ async function findOrderLikeDocument(id) {
   if (orderDoc.exists) return orderDoc;
   return null;
 }
-router$9.post("/send", requireStaff, async (req, res) => {
+router$a.post("/send", requireStaff, async (req, res) => {
   try {
     const { to, body, orderId } = req.body;
     if (!to || !body) return res.status(400).json({ error: "to and body required." });
     const result = await sendSMS({ to, body });
     if (result.suppressed) {
       console.warn(`[SMS] Suppressed staff send to ${to} — ${clientNotifyBlockReason()}.`);
+      if (admin.apps.length) {
+        await db$3().collection("smsLogs").add({
+          direction: "outbound",
+          to: normalisePhone(to),
+          body,
+          status: "suppressed",
+          orderId: orderId || null,
+          sentBy: req.user.uid,
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        await db$3().collection("messages").add({
+          orderId: orderId || null,
+          senderId: req.user.uid,
+          senderType: "staff",
+          senderName: "Iconic Images",
+          content: body,
+          channel: "sms",
+          direction: "outbound",
+          delivery: "suppressed",
+          phone: normalisePhone(to),
+          isRead: true,
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      }
       return res.status(503).json({ error: "Client notifications are off.", suppressed: true });
     }
     await db$3().collection("smsLogs").add({
@@ -21700,7 +21770,7 @@ router$9.post("/send", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$9.post("/remind/:orderId", requireStaff, async (req, res) => {
+router$a.post("/remind/:orderId", requireStaff, async (req, res) => {
   try {
     const { type = "24h" } = req.body;
     const orderDoc = await findOrderLikeDocument(req.params.orderId);
@@ -21742,7 +21812,7 @@ router$9.post("/remind/:orderId", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$9.post("/conversation", requireStaff, async (req, res) => {
+router$a.post("/conversation", requireStaff, async (req, res) => {
   try {
     const { orderId, photographerPhone, photographerName, clientPhone, clientName: clientName2 } = req.body;
     if (!orderId || !photographerPhone || !clientPhone) {
@@ -21794,7 +21864,7 @@ router$9.post("/conversation", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$9.get("/conversations", requireStaff, async (_req, res) => {
+router$a.get("/conversations", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$3().collection("conversations").orderBy("createdAt", "desc").limit(50).get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -21802,7 +21872,7 @@ router$9.get("/conversations", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch conversations." });
   }
 });
-router$9.post("/conversation/:id/close", requireStaff, async (req, res) => {
+router$a.post("/conversation/:id/close", requireStaff, async (req, res) => {
   try {
     const convoDoc = await db$3().collection("conversations").doc(req.params.id).get();
     if (!convoDoc.exists) return res.status(404).json({ error: "Conversation not found." });
@@ -21814,7 +21884,7 @@ router$9.post("/conversation/:id/close", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$9.post("/webhook", express_raw_or_json, async (req, res) => {
+router$a.post("/webhook", express_raw_or_json, async (req, res) => {
   try {
     const authToken = process.env.TWILIO_AUTH_TOKEN;
     if (authToken && process.env.NODE_ENV === "production") {
@@ -21875,7 +21945,7 @@ router$9.post("/webhook", express_raw_or_json, async (req, res) => {
     return res.status(200).send("");
   }
 });
-router$9.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
+router$a.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
   try {
     const campaignDoc = await db$3().collection("campaigns").doc(req.params.id).get();
     if (!campaignDoc.exists) return res.status(404).json({ error: "Campaign not found." });
@@ -21918,7 +21988,7 @@ router$9.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$9.post("/opt-out", async (req, res) => {
+router$a.post("/opt-out", async (req, res) => {
   try {
     const { From, Body } = req.body;
     if (!From) return res.status(200).send("");
@@ -21937,8 +22007,8 @@ router$9.post("/opt-out", async (req, res) => {
 function express_raw_or_json(req, _res, next) {
   next();
 }
-const router$8 = Router();
-router$8.post("/", async (req, res) => {
+const router$9 = Router();
+router$9.post("/", async (req, res) => {
   try {
     const { name, email, subject, message, phone } = req.body;
     if (!name || !email || !subject || !message) {
@@ -21982,7 +22052,7 @@ router$8.post("/", async (req, res) => {
     });
   }
 });
-const router$7 = Router();
+const router$8 = Router();
 const SENIOR_LIVING_RATE_WINDOW_MS = 15 * 60 * 1e3;
 const SENIOR_LIVING_RATE_MAX = 5;
 const limiter$1 = createRateLimiter({
@@ -22006,10 +22076,10 @@ async function nextInvoiceNumber$1() {
     return `INV-${year}-${String(Date.now()).slice(-6)}`;
   }
 }
-router$7.get("/config", (_req, res) => {
+router$8.get("/config", (_req, res) => {
   res.json({ depositCheckoutLive: seniorDepositCheckoutLive() });
 });
-router$7.post("/order", async (req, res) => {
+router$8.post("/order", async (req, res) => {
   const limit = limiter$1.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
@@ -22282,7 +22352,7 @@ router$7.post("/order", async (req, res) => {
     });
   }
 });
-router$7.post("/", async (req, res) => {
+router$8.post("/", async (req, res) => {
   const limit = limiter$1.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
@@ -22328,7 +22398,7 @@ router$7.post("/", async (req, res) => {
     });
   }
 });
-const router$6 = Router();
+const router$7 = Router();
 const limiter = createRateLimiter({
   windowMs: 15 * 60 * 1e3,
   max: 5
@@ -22368,10 +22438,10 @@ function publicAvailability(result, packageId) {
     fallback: result.available ? null : APPRENTICESHIP_CALENDAR_FALLBACK
   };
 }
-router$6.get("/config", (_req, res) => {
+router$7.get("/config", (_req, res) => {
   res.json({ depositCheckoutLive: seniorDepositCheckoutLive() });
 });
-router$6.get("/slots", async (req, res) => {
+router$7.get("/slots", async (req, res) => {
   const packageId = typeof req.query.package === "string" ? req.query.package : "apprentice-25";
   if (!findApprenticeshipPackage(packageId)) {
     return res.status(400).json({ error: "Choose an apprenticeship package." });
@@ -22379,7 +22449,7 @@ router$6.get("/slots", async (req, res) => {
   const result = await readApprenticeshipAvailability({ packageId });
   return res.json(publicAvailability(result, packageId));
 });
-router$6.get("/setup", requireStaff, async (_req, res) => {
+router$7.get("/setup", requireStaff, async (_req, res) => {
   const hours = apprenticeshipHoursFromEnv();
   const result = await readApprenticeshipAvailability({ packageId: "apprentice-25" });
   return res.json({
@@ -22395,7 +22465,7 @@ router$6.get("/setup", requireStaff, async (_req, res) => {
     }
   });
 });
-router$6.post("/order", async (req, res) => {
+router$7.post("/order", async (req, res) => {
   const limit = limiter.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
@@ -22773,12 +22843,12 @@ async function deliverLiveChat(input) {
     notConfigured ? "not_configured" : "failed"
   );
 }
-const router$5 = Router();
+const router$6 = Router();
 const liveChatLimiter = createRateLimiter({
   windowMs: LIVE_CHAT_WINDOW_MS,
   max: LIVE_CHAT_MAX_PER_WINDOW
 });
-router$5.post("/live-chat", async (req, res) => {
+router$6.post("/live-chat", async (req, res) => {
   const parsed = parseLiveChatBody(req.body);
   if (parsed.ok === false) {
     return res.status(400).json({ error: parsed.error });
@@ -23008,7 +23078,7 @@ async function appendStaffReply(id, text2, senderName = "Iconic Images") {
   }));
   return updated ? toContactThreadView(updated) : null;
 }
-const router$4 = Router();
+const router$5 = Router();
 const THREAD_ID_RE = /^[a-f0-9]{32}$/;
 const postLimiter = createRateLimiter({
   windowMs: LIVE_CHAT_WINDOW_MS,
@@ -23022,7 +23092,7 @@ function threadToken(req) {
   const header = req.header("x-contact-thread-token");
   return typeof header === "string" ? header.trim() : "";
 }
-router$4.get("/staff/threads", requireCoordinator, async (_req, res) => {
+router$5.get("/staff/threads", requireCoordinator, async (_req, res) => {
   try {
     const threads = await listContactThreads();
     return res.json({ threads });
@@ -23031,7 +23101,7 @@ router$4.get("/staff/threads", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Couldn't load contact chats." });
   }
 });
-router$4.post("/staff/threads/:id/reply", requireCoordinator, async (req, res) => {
+router$5.post("/staff/threads/:id/reply", requireCoordinator, async (req, res) => {
   const id = routeParam(req.params.id);
   if (!THREAD_ID_RE.test(id)) {
     return res.status(404).json({ error: "Conversation not found." });
@@ -23052,7 +23122,7 @@ router$4.post("/staff/threads/:id/reply", requireCoordinator, async (req, res) =
     return res.status(500).json({ error: "Couldn't save the reply." });
   }
 });
-router$4.get("/threads/:id", async (req, res) => {
+router$5.get("/threads/:id", async (req, res) => {
   const id = routeParam(req.params.id);
   const token = threadToken(req);
   if (!THREAD_ID_RE.test(id) || !token) {
@@ -23067,7 +23137,7 @@ router$4.get("/threads/:id", async (req, res) => {
     return res.status(500).json({ error: "Couldn't load this chat." });
   }
 });
-router$4.post("/threads", async (req, res) => {
+router$5.post("/threads", async (req, res) => {
   const parsed = parseLiveChatBody(req.body);
   if (parsed.ok === false) {
     return res.status(400).json({ error: parsed.error });
@@ -23101,6 +23171,661 @@ router$4.post("/threads", async (req, res) => {
       error: `We couldn't save your message. Please try again, or call ${BUSINESS_CONTACT.phoneDisplay}.`
     });
   }
+});
+function canUseAssistants(input) {
+  if (input.role === "admin") return true;
+  return isOwnerEmail(input.email, input.ownerEmails);
+}
+const SOCIALS = [
+  { id: "social-instagram", title: "Instagram", detail: "Instagram DMs and comments" },
+  { id: "social-facebook", title: "Facebook", detail: "Facebook DMs and comments" },
+  { id: "social-tiktok", title: "TikTok", detail: "TikTok DMs and comments" },
+  { id: "social-google-business", title: "Google Business", detail: "Google Business DMs and comments" }
+];
+function text$2(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function emailOf(value) {
+  return value.includes("@") ? value : "";
+}
+function timeOf(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "object" && value && "seconds" in value) {
+    const seconds = Number(value.seconds);
+    if (Number.isFinite(seconds) && seconds > 0) return new Date(seconds * 1e3).toISOString();
+  }
+  return "";
+}
+function digits(value) {
+  return value.replace(/\D/g, "");
+}
+function phonesMatch(left, right) {
+  const a = digits(left);
+  const b = digits(right);
+  if (a.length < 10 || b.length < 10) return false;
+  return a.endsWith(b.slice(-10)) || b.endsWith(a.slice(-10));
+}
+function byTimeDesc(left, right) {
+  return (Date.parse(right.updatedAt) || 0) - (Date.parse(left.updatedAt) || 0);
+}
+function messageFrom(raw, index) {
+  const senderType = text$2(raw.senderType) || "client";
+  const direction = text$2(raw.direction) === "outbound" || senderType === "staff" ? "outbound" : "inbound";
+  return {
+    id: text$2(raw.id) || `msg-${index}`,
+    direction: text$2(raw.direction) === "inbound" || text$2(raw.direction) === "outbound" ? text$2(raw.direction) : direction,
+    senderId: text$2(raw.senderId),
+    senderName: text$2(raw.senderName) || (senderType === "staff" ? "Iconic Images" : "Client"),
+    senderType,
+    body: text$2(raw.content) || text$2(raw.body) || text$2(raw.text),
+    channel: text$2(raw.channel) || "in-app",
+    createdAt: timeOf(raw.createdAt),
+    delivery: text$2(raw.delivery)
+  };
+}
+function socialThreads() {
+  return SOCIALS.map((item) => ({
+    id: item.id,
+    audiences: ["socials"],
+    source: "social",
+    title: item.title,
+    subtitle: "Connector needed",
+    preview: `${item.detail}. Connector needed — no integration is connected yet.`,
+    updatedAt: "",
+    email: "",
+    phone: "",
+    orderId: "",
+    clientId: "",
+    photographerId: "",
+    photographerPhone: "",
+    participantIds: [],
+    unread: 0,
+    connectorNeeded: true,
+    messages: []
+  }));
+}
+function threadShell(partial) {
+  return {
+    subtitle: "",
+    preview: "",
+    updatedAt: "",
+    email: "",
+    phone: "",
+    orderId: "",
+    clientId: "",
+    photographerId: "",
+    photographerPhone: "",
+    participantIds: [],
+    unread: 0,
+    connectorNeeded: false,
+    messages: [],
+    ...partial
+  };
+}
+function buildUnifiedThreads(snapshot) {
+  const threads = /* @__PURE__ */ new Map();
+  const ensure = (thread) => {
+    const current = threads.get(thread.id);
+    if (!current) {
+      threads.set(thread.id, thread);
+      return thread;
+    }
+    const audiences = /* @__PURE__ */ new Set([...current.audiences, ...thread.audiences]);
+    current.audiences = [...audiences];
+    if (!current.email && thread.email) current.email = thread.email;
+    if (!current.phone && thread.phone) current.phone = thread.phone;
+    if (!current.clientId && thread.clientId) current.clientId = thread.clientId;
+    if (!current.photographerId && thread.photographerId) current.photographerId = thread.photographerId;
+    if (!current.orderId && thread.orderId) current.orderId = thread.orderId;
+    for (const id of thread.participantIds) {
+      if (id && !current.participantIds.includes(id)) current.participantIds.push(id);
+    }
+    return current;
+  };
+  for (const [index, raw] of (snapshot.messages || []).entries()) {
+    const message = messageFrom(raw, index);
+    if (!message.body && !message.senderName) continue;
+    const orderId = text$2(raw.orderId);
+    const explicit = text$2(raw.threadId);
+    const id = explicit || (orderId ? `order:${orderId}` : `message:${message.id}`);
+    const senderType = message.senderType;
+    const clientId2 = text$2(raw.clientId) || (senderType === "client" && !explicit.startsWith("contact:") && !explicit.startsWith("lead:") ? message.senderId : "");
+    const photographerId = text$2(raw.photographerId) || (senderType === "photographer" ? message.senderId : "");
+    const audiences = [];
+    if (explicit.startsWith("contact:") || explicit.startsWith("lead:")) {
+      audiences.push("leads");
+    } else {
+      if (photographerId || senderType === "photographer") audiences.push("photographers");
+      if (!audiences.includes("photographers") || clientId2 || senderType === "client" || orderId) {
+        if (senderType !== "photographer" || clientId2 || orderId) audiences.push("clients");
+      }
+      if (!audiences.length) audiences.push("clients");
+    }
+    const thread = ensure(threadShell({
+      id,
+      audiences,
+      source: "messages",
+      title: text$2(raw.clientName) || message.senderName || "Conversation",
+      subtitle: orderId ? `Order ${orderId.slice(0, 8)}` : text$2(raw.channel) || "Message",
+      email: emailOf(text$2(raw.email) || text$2(raw.recipient)),
+      phone: text$2(raw.phone),
+      orderId,
+      clientId: clientId2,
+      photographerId,
+      participantIds: [clientId2, photographerId, message.senderId].filter(Boolean),
+      updatedAt: message.createdAt
+    }));
+    thread.messages.push(message);
+    if (message.createdAt > thread.updatedAt) thread.updatedAt = message.createdAt;
+    if (senderType === "client" && !thread.title) thread.title = message.senderName;
+    if ((senderType === "client" || senderType === "photographer") && message.senderName) {
+      if (thread.title === "Conversation" || thread.title === "Iconic Images") thread.title = message.senderName;
+    }
+  }
+  for (const raw of snapshot.conversations || []) {
+    const id = `conversation:${text$2(raw.id) || text$2(raw.conversationSid)}`;
+    const clientId2 = text$2(raw.clientId);
+    const photographerId = text$2(raw.photographerId);
+    ensure(threadShell({
+      id,
+      audiences: ["clients", "photographers"],
+      source: "conversations",
+      title: `${text$2(raw.photographerName) || "Photographer"} ↔ ${text$2(raw.clientName) || "Client"}`,
+      subtitle: "Masked SMS",
+      preview: text$2(raw.status) === "closed" ? "Closed bridge" : "Twilio masked number",
+      updatedAt: timeOf(raw.createdAt),
+      email: text$2(raw.clientEmail),
+      phone: text$2(raw.clientPhone),
+      orderId: text$2(raw.orderId),
+      clientId: clientId2,
+      photographerId,
+      photographerPhone: text$2(raw.photographerPhone),
+      participantIds: [clientId2, photographerId].filter(Boolean)
+    }));
+  }
+  const mirrored = new Set(
+    (snapshot.messages || []).map((raw) => `${text$2(raw.orderId)}|${text$2(raw.content) || text$2(raw.body)}`)
+  );
+  for (const [index, raw] of (snapshot.smsLogs || []).entries()) {
+    const body = text$2(raw.body) || text$2(raw.content);
+    const orderId = text$2(raw.orderId);
+    if (orderId && mirrored.has(`${orderId}|${body}`)) continue;
+    const message = messageFrom({ ...raw, content: body, channel: "sms", senderType: text$2(raw.senderType) || (text$2(raw.direction) === "outbound" ? "staff" : "client") }, index);
+    const senderType = text$2(raw.senderType);
+    const id = orderId ? `order:${orderId}` : `sms:${text$2(raw.id) || message.id}`;
+    const audiences = senderType === "photographer" ? ["photographers"] : orderId ? ["clients"] : ["leads"];
+    const thread = ensure(threadShell({
+      id,
+      audiences,
+      source: orderId ? "messages" : "sms",
+      title: text$2(raw.clientName) || text$2(raw.from) || text$2(raw.to) || "Text message",
+      subtitle: "SMS",
+      phone: text$2(raw.to) || text$2(raw.from) || text$2(raw.phone),
+      orderId,
+      clientId: text$2(raw.clientId),
+      photographerId: text$2(raw.photographerId) || (senderType === "photographer" ? text$2(raw.senderId) : ""),
+      updatedAt: message.createdAt
+    }));
+    if (body) thread.messages.push(message);
+    if (message.createdAt > thread.updatedAt) thread.updatedAt = message.createdAt;
+  }
+  for (const contact of snapshot.contactThreads || []) {
+    const messages = contact.messages.map((message) => ({
+      id: message.id,
+      direction: message.sender === "staff" ? "outbound" : "inbound",
+      senderId: "",
+      senderName: message.senderName,
+      senderType: message.sender,
+      body: message.text,
+      channel: "contact",
+      createdAt: message.createdAt,
+      delivery: "logged"
+    }));
+    const last = messages[messages.length - 1];
+    ensure(threadShell({
+      id: `contact:${contact.id}`,
+      audiences: ["leads"],
+      source: "contact",
+      title: contact.name || "Website chat",
+      subtitle: "Contact chat",
+      preview: last?.body || "",
+      updatedAt: contact.updatedAt || last?.createdAt || contact.createdAt,
+      email: contact.email || "",
+      phone: contact.phone || "",
+      messages,
+      unread: messages.filter((message) => message.direction === "inbound").length ? 1 : 0
+    }));
+  }
+  for (const raw of snapshot.orderRequests || []) {
+    const id = `lead:${text$2(raw.id)}`;
+    const name = text$2(raw.clientName) || [text$2(raw.firstName), text$2(raw.lastName)].filter(Boolean).join(" ") || text$2(raw.name) || "Order request";
+    const body = text$2(raw.message) || text$2(raw.notes) || text$2(raw.services) || text$2(raw.address) || text$2(raw.propertyAddress) || "New order request";
+    const createdAt = timeOf(raw.createdAt) || timeOf(raw.submittedAt);
+    ensure(threadShell({
+      id,
+      audiences: ["leads"],
+      source: "orderRequest",
+      title: name,
+      subtitle: "Order request",
+      preview: body,
+      updatedAt: createdAt,
+      email: text$2(raw.email) || text$2(raw.clientEmail),
+      phone: text$2(raw.phone) || text$2(raw.clientPhone),
+      orderId: text$2(raw.id),
+      clientId: text$2(raw.clientId),
+      messages: [{
+        id: `${id}-note`,
+        direction: "inbound",
+        senderId: text$2(raw.clientId),
+        senderName: name,
+        senderType: "lead",
+        body,
+        channel: "orderRequest",
+        createdAt,
+        delivery: "logged"
+      }]
+    }));
+  }
+  for (const thread of threads.values()) {
+    thread.messages.sort((left, right) => (Date.parse(left.createdAt) || 0) - (Date.parse(right.createdAt) || 0));
+    const last = thread.messages[thread.messages.length - 1];
+    if (last && !thread.preview) thread.preview = last.body;
+    thread.unread = thread.messages.filter((message) => message.direction === "inbound" && message.delivery !== "read").length;
+    thread.participantIds = [...new Set(thread.participantIds.filter(Boolean))];
+  }
+  const list2 = [...threads.values()].sort(byTimeDesc);
+  return [...list2, ...socialThreads()];
+}
+function filterThreads(threads, audience, query = "") {
+  const needle = query.trim().toLowerCase();
+  return threads.filter((thread) => {
+    if (!thread.audiences.includes(audience)) return false;
+    if (!needle) return true;
+    const haystack = [thread.title, thread.subtitle, thread.preview, thread.email, thread.phone, thread.orderId].join(" ").toLowerCase();
+    return haystack.includes(needle);
+  });
+}
+function threadVisibleTo(thread, scope) {
+  if (thread.connectorNeeded || thread.audiences.includes("socials")) return false;
+  const ids = new Set(
+    [thread.clientId, thread.photographerId, ...thread.participantIds, ...thread.messages.map((message) => message.senderId)].filter(Boolean)
+  );
+  if (scope.kind === "client") {
+    if (scope.uid && ids.has(scope.uid)) return true;
+    return Boolean(scope.email && thread.email && thread.email.toLowerCase() === scope.email.toLowerCase());
+  }
+  if (scope.uid && (thread.photographerId === scope.uid || thread.participantIds.includes(scope.uid))) return true;
+  if (scope.uid && ids.has(scope.uid) && thread.audiences.includes("photographers")) return true;
+  return Boolean(scope.phone && thread.photographerPhone && phonesMatch(scope.phone, thread.photographerPhone));
+}
+const GROK_API_URL = "https://api.x.ai/v1/chat/completions";
+const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
+const GROK_MISSING_MESSAGE = "Add XAI_API_KEY to enable Grok";
+const OPENAI_MISSING_MESSAGE = "Add OPENAI_API_KEY to enable OpenAI";
+let fetchOverride = null;
+function assistantStatus(env = process.env) {
+  const openai = Boolean(env.OPENAI_API_KEY?.trim());
+  const grok = Boolean(env.XAI_API_KEY?.trim());
+  return {
+    openai,
+    grok,
+    grokNotice: grok ? "" : GROK_MISSING_MESSAGE,
+    openaiNotice: openai ? "" : OPENAI_MISSING_MESSAGE
+  };
+}
+function redact(text2, secrets) {
+  let out = text2;
+  for (const secret of secrets) {
+    if (secret) out = out.split(secret).join("[redacted]");
+  }
+  return out;
+}
+function parseAssistantTurns(body) {
+  if (!body || typeof body !== "object") return null;
+  const messages = body.messages;
+  if (!Array.isArray(messages) || messages.length === 0 || messages.length > 20) return null;
+  const turns = [];
+  for (const item of messages) {
+    if (!item || typeof item !== "object") return null;
+    const role = item.role;
+    const content = item.content;
+    if (role !== "user" && role !== "assistant" || typeof content !== "string") return null;
+    const text2 = content.trim();
+    if (!text2 || text2.length > 4e3) return null;
+    turns.push({ role, content: text2 });
+  }
+  if (turns[turns.length - 1]?.role !== "user") return null;
+  return turns;
+}
+async function completeAssistant(input) {
+  const env = input.env || process.env;
+  const status2 = assistantStatus(env);
+  if (input.provider === "grok" && !status2.grok) {
+    return { ok: false, status: 409, message: GROK_MISSING_MESSAGE };
+  }
+  if (input.provider === "openai" && !status2.openai) {
+    return { ok: false, status: 409, message: OPENAI_MISSING_MESSAGE };
+  }
+  const key = (input.provider === "grok" ? env.XAI_API_KEY : env.OPENAI_API_KEY || "").trim();
+  const url = input.provider === "grok" ? GROK_API_URL : OPENAI_API_URL;
+  const model = input.provider === "grok" ? env.XAI_CHAT_MODEL || "grok-3" : env.OPENAI_CHAT_MODEL || "gpt-4o-mini";
+  const fetchImpl = input.fetchImpl || fetchOverride || fetch;
+  let response;
+  try {
+    response = await fetchImpl(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: "You are an assistant for Iconic Images staff. Keep replies short and practical. Never ask for or repeat API keys." },
+          ...input.messages
+        ]
+      })
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Assistant request failed.";
+    return { ok: false, status: 502, message: redact(message, [key]) };
+  }
+  const data = await response.json().catch(() => ({}));
+  const reply = data.choices?.[0]?.message?.content;
+  if (!response.ok || typeof reply !== "string" || !reply.trim()) {
+    const upstream = typeof data.error?.message === "string" ? data.error.message : "The assistant did not return a reply.";
+    return { ok: false, status: 502, message: redact(upstream, [key]) };
+  }
+  return { ok: true, reply: redact(reply.trim(), [key]) };
+}
+const remembered = [];
+function rememberedCommunications() {
+  return remembered.map((row) => ({ ...row }));
+}
+async function logCommunicationMessage(entry2) {
+  const row = {
+    id: entry2.id || randomBytes$1(8).toString("hex"),
+    threadId: entry2.threadId,
+    orderId: entry2.orderId || null,
+    clientId: entry2.clientId || null,
+    photographerId: entry2.photographerId || null,
+    participantIds: entry2.participantIds || [],
+    senderId: entry2.senderId,
+    senderType: entry2.senderType,
+    senderName: entry2.senderName,
+    recipient: entry2.recipient || null,
+    email: entry2.email || null,
+    phone: entry2.phone || null,
+    content: entry2.content,
+    channel: entry2.channel,
+    direction: entry2.direction,
+    delivery: entry2.delivery,
+    isRead: entry2.isRead ?? entry2.direction === "outbound",
+    createdAt: entry2.createdAt || (/* @__PURE__ */ new Date()).toISOString()
+  };
+  if (!admin.apps.length) {
+    remembered.push(row);
+    return row;
+  }
+  const firestore = admin.firestore();
+  const stored = {
+    ...row,
+    createdAt: admin.firestore.FieldValue.serverTimestamp()
+  };
+  const ref = await firestore.collection("messages").add(stored);
+  if (entry2.channel === "sms") {
+    await firestore.collection("smsLogs").add({
+      direction: entry2.direction,
+      to: entry2.phone || entry2.recipient || null,
+      body: entry2.content,
+      status: entry2.delivery,
+      orderId: entry2.orderId || null,
+      threadId: entry2.threadId,
+      sentBy: entry2.senderId,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+  }
+  return { ...row, id: ref.id };
+}
+async function readCollection(name) {
+  if (!admin.apps.length) return [];
+  const collection = admin.firestore().collection(name);
+  try {
+    const snap = await collection.orderBy("createdAt", "desc").limit(200).get();
+    return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  } catch (error) {
+    console.warn(`[Communications] ${name} ordered read failed.`, error);
+    try {
+      const snap = await collection.limit(200).get();
+      return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    } catch (fallback) {
+      console.warn(`[Communications] ${name} read failed.`, fallback);
+      return [];
+    }
+  }
+}
+async function loadCommunicationsSnapshot() {
+  const [messages, conversations, smsLogs, orderRequests, contactThreads] = await Promise.all([
+    readCollection("messages"),
+    readCollection("conversations"),
+    readCollection("smsLogs"),
+    readCollection("orderRequests"),
+    listContactThreads().catch((error) => {
+      console.warn("[Communications] Contact threads failed.", error);
+      return [];
+    })
+  ]);
+  return {
+    messages: [...messages, ...rememberedCommunications()],
+    conversations,
+    smsLogs,
+    orderRequests,
+    contactThreads
+  };
+}
+async function listUnifiedThreads() {
+  return buildUnifiedThreads(await loadCommunicationsSnapshot());
+}
+async function findUnifiedThread(id) {
+  const threads = await listUnifiedThreads();
+  return threads.find((thread) => thread.id === id) || null;
+}
+function threadsForPortal(threads, scope) {
+  return threads.filter((thread) => threadVisibleTo(thread, scope));
+}
+const router$4 = Router();
+const AUDIENCES = /* @__PURE__ */ new Set(["clients", "leads", "photographers", "socials"]);
+function ownerEmails() {
+  return ownerAllowlist(process.env.OWNER_EMAILS);
+}
+async function requireOwnerOrAdmin(req, res, next) {
+  await requireStaff(req, res, () => {
+    if (!canUseAssistants({ role: req.staffRole, email: req.user?.email, ownerEmails: ownerEmails() })) {
+      res.status(403).json({ error: "Owner or admin access required." });
+      return;
+    }
+    next();
+  });
+}
+async function portalScope(req) {
+  const uid = req.user?.uid || "";
+  const email = (req.user?.email || "").trim().toLowerCase();
+  if (!admin.apps.length) {
+    if (uid === "temp-admin-uid" || req.staffRole) {
+      return { kind: "photographer", uid, email, phone: "" };
+    }
+    return { kind: "client", uid, email, phone: "" };
+  }
+  try {
+    const staffDoc = await admin.firestore().collection("staff").doc(uid).get();
+    if (staffDoc.exists) {
+      const data = staffDoc.data() || {};
+      return {
+        kind: "photographer",
+        uid,
+        email,
+        phone: typeof data.phone === "string" ? data.phone : ""
+      };
+    }
+    const clientDoc = await admin.firestore().collection("clients").doc(uid).get();
+    const client = clientDoc.exists ? clientDoc.data() || {} : {};
+    return {
+      kind: "client",
+      uid,
+      email: email || (typeof client.email === "string" ? client.email.trim().toLowerCase() : ""),
+      phone: typeof client.phone === "string" ? client.phone : ""
+    };
+  } catch (error) {
+    console.warn("[Communications] Portal scope lookup failed.", error);
+    return { kind: "client", uid, email, phone: "" };
+  }
+}
+router$4.get("/threads", requireCoordinator, async (req, res) => {
+  const audience = typeof req.query.audience === "string" ? req.query.audience : "";
+  const q = typeof req.query.q === "string" ? req.query.q : "";
+  try {
+    const threads = await listUnifiedThreads();
+    const filtered = AUDIENCES.has(audience) ? filterThreads(threads, audience, q) : threads;
+    return res.json({ threads: filtered });
+  } catch (error) {
+    console.error("[Communications] Thread list failed.", error);
+    return res.status(500).json({ error: "Couldn't load conversations." });
+  }
+});
+router$4.get("/mine", requireAuth, async (req, res) => {
+  try {
+    const scope = await portalScope(req);
+    const threads = threadsForPortal(await listUnifiedThreads(), scope);
+    return res.json({ threads });
+  } catch (error) {
+    console.error("[Communications] Portal threads failed.", error);
+    return res.status(500).json({ error: "Couldn't load your messages." });
+  }
+});
+router$4.post("/mine/reply", requireAuth, async (req, res) => {
+  const threadId = typeof req.body?.threadId === "string" ? req.body.threadId.trim() : "";
+  const content = typeof req.body?.body === "string" ? req.body.body.trim() : "";
+  if (!threadId || !content) return res.status(400).json({ error: "Choose a thread and enter a reply." });
+  if (content.length > 2e3) return res.status(400).json({ error: "Reply is too long. Please keep it under 2,000 characters." });
+  try {
+    const scope = await portalScope(req);
+    const thread = await findUnifiedThread(threadId);
+    if (!thread || !threadVisibleTo(thread, scope)) {
+      return res.status(404).json({ error: "Conversation not found." });
+    }
+    const senderType = scope.kind === "photographer" ? "photographer" : "client";
+    await logCommunicationMessage({
+      threadId: thread.id,
+      orderId: thread.orderId,
+      clientId: scope.kind === "client" ? scope.uid : thread.clientId,
+      photographerId: scope.kind === "photographer" ? scope.uid : thread.photographerId,
+      participantIds: [.../* @__PURE__ */ new Set([...thread.participantIds, scope.uid])],
+      senderId: scope.uid,
+      senderType,
+      senderName: req.user?.email || (scope.kind === "photographer" ? "Photographer" : "Client"),
+      email: thread.email,
+      phone: thread.phone,
+      content,
+      channel: "in-app",
+      direction: "inbound",
+      delivery: "logged",
+      isRead: false
+    });
+    return res.status(201).json({ ok: true });
+  } catch (error) {
+    console.error("[Communications] Portal reply failed.", error);
+    return res.status(500).json({ error: "Couldn't save the reply." });
+  }
+});
+router$4.post("/reply", requireCoordinator, async (req, res) => {
+  const threadId = typeof req.body?.threadId === "string" ? req.body.threadId.trim() : "";
+  const channel = req.body?.channel === "sms" ? "sms" : req.body?.channel === "email" ? "email" : "";
+  const content = typeof req.body?.body === "string" ? req.body.body.trim() : "";
+  const subject = typeof req.body?.subject === "string" && req.body.subject.trim() ? req.body.subject.trim() : "Message from Iconic Images";
+  if (!threadId || !channel || !content) {
+    return res.status(400).json({ error: "Choose a thread, a channel, and a message." });
+  }
+  if (content.length > 2e3) return res.status(400).json({ error: "Reply is too long. Please keep it under 2,000 characters." });
+  try {
+    const thread = await findUnifiedThread(threadId);
+    if (!thread) return res.status(404).json({ error: "Conversation not found." });
+    if (thread.connectorNeeded) {
+      return res.status(400).json({ error: "Connector needed. Instagram, Facebook, TikTok, and Google Business are not connected." });
+    }
+    const baseLog = {
+      threadId: thread.id,
+      orderId: thread.orderId,
+      clientId: thread.clientId,
+      photographerId: thread.photographerId,
+      participantIds: thread.participantIds,
+      senderId: req.user.uid,
+      senderType: "staff",
+      senderName: req.user?.email || "Iconic Images",
+      email: thread.email,
+      phone: thread.phone,
+      content
+    };
+    if (channel === "email") {
+      if (!thread.email) return res.status(400).json({ error: "This thread has no email address." });
+      const result2 = await sendEmail({
+        to: thread.email,
+        template: "manual_message",
+        subject,
+        variables: { message: content }
+      });
+      const delivery2 = result2.sent ? result2.delivery === "allowlist" ? "allowlist" : "sent" : "suppressed";
+      await logCommunicationMessage({
+        ...baseLog,
+        recipient: thread.email,
+        channel: "email",
+        direction: "outbound",
+        delivery: delivery2,
+        isRead: true
+      });
+      if (!result2.sent) {
+        return res.status(503).json({ error: "Client notifications are off.", suppressed: true });
+      }
+      return res.status(201).json({ ok: true, delivery: delivery2 });
+    }
+    if (!thread.phone) return res.status(400).json({ error: "This thread has no phone number." });
+    const result = await sendSMS({ to: thread.phone, body: content });
+    const delivery = result.suppressed ? "suppressed" : "sent";
+    await logCommunicationMessage({
+      ...baseLog,
+      recipient: thread.phone,
+      channel: "sms",
+      direction: "outbound",
+      delivery,
+      isRead: true
+    });
+    if (result.suppressed) {
+      return res.status(503).json({ error: "Client notifications are off.", suppressed: true });
+    }
+    return res.status(201).json({ ok: true, sid: result.sid, delivery });
+  } catch (error) {
+    console.error("[Communications] Reply failed.", error);
+    return res.status(500).json({ error: "Couldn't send the reply." });
+  }
+});
+router$4.get("/assist/status", requireOwnerOrAdmin, (_req, res) => {
+  const status2 = assistantStatus();
+  return res.json({
+    openai: status2.openai,
+    grok: status2.grok,
+    grokNotice: status2.grokNotice,
+    openaiNotice: status2.openaiNotice
+  });
+});
+router$4.post("/assist", requireOwnerOrAdmin, async (req, res) => {
+  const provider = req.body?.provider === "grok" ? "grok" : req.body?.provider === "openai" ? "openai" : "";
+  if (!provider) return res.status(400).json({ error: "Choose Grok or OpenAI." });
+  const messages = parseAssistantTurns(req.body);
+  if (!messages) return res.status(400).json({ error: "Enter a message to send." });
+  const result = await completeAssistant({ provider, messages });
+  if (result.ok === false) return res.status(result.status).json({ error: result.message, enabled: false });
+  return res.json({ reply: result.reply });
 });
 const PHOTOGRAPHER_CALENDAR_ROSTER = [
   { id: "mike@iconicimagestx.com", name: "Mike Luna" },
@@ -26342,13 +27067,13 @@ function actor$1(req) {
   return { uid: req.user?.uid || "staff", name };
 }
 async function accessFor(req) {
-  const ownerEmails = ownerAllowlist(process.env.OWNER_EMAILS);
+  const ownerEmails2 = ownerAllowlist(process.env.OWNER_EMAILS);
   if (process.env.NODE_ENV === "test" && req.testFlags !== void 0) {
     return siteEditorAccess({
       role: req.staffRole,
       email: req.user?.email,
       flags: req.testFlags,
-      ownerEmails
+      ownerEmails: ownerEmails2
     });
   }
   let flags = null;
@@ -26370,7 +27095,7 @@ async function accessFor(req) {
       console.error("[Site editor] staff lookup failed:", err);
     }
   }
-  return siteEditorAccess({ role, email, flags, ownerEmails });
+  return siteEditorAccess({ role, email, flags, ownerEmails: ownerEmails2 });
 }
 function gate(level) {
   return async (req, res, next) => {
@@ -27343,18 +28068,19 @@ function createServer() {
     res.json({ live: clientNotifyLive() });
   });
   mountOwners(app);
-  app.use("/api/bookings", router$q);
-  app.use("/api/orders", router$p);
+  app.use("/api/bookings", router$r);
+  app.use("/api/orders", router$q);
   app.patch("/api/admin/orders/:id/approval", handleOrderApproval);
-  app.use("/api/galleries", router$o);
-  app.use("/api/payments", router$n);
-  app.use("/api/vsai", router$m);
-  app.use("/api/messages", router$l);
-  app.use("/api/clients", router$k);
+  app.use("/api/galleries", router$p);
+  app.use("/api/payments", router$o);
+  app.use("/api/vsai", router$n);
+  app.use("/api/messages", router$m);
+  app.use("/api/communications", router$4);
+  app.use("/api/clients", router$l);
   app.get("/api/portal/listings/:id", handleGetPublicPortalListing);
   app.get("/api/listing-sites/:slug", handleGetListingSite);
   app.post("/api/listing-sites/:slug/inquiry", handleListingSiteInquiry);
-  app.use("/api/staff", router$j);
+  app.use("/api/staff", router$k);
   app.use("/api/site-content", router$1);
   app.use("/api/insights", router);
   app.get("/present/:token", (req, res, next) => {
@@ -27371,22 +28097,22 @@ function createServer() {
     return handleInsightShell(req, res);
   });
   app.use("/api", router$3);
-  app.use("/api/listings", router$i);
+  app.use("/api/listings", router$j);
   app.use("/api", router$2);
-  app.use("/api/campaigns", router$h);
+  app.use("/api/campaigns", router$i);
+  app.use("/api/marketing", router$h);
   app.use("/api/marketing", router$g);
-  app.use("/api/marketing", router$f);
-  app.use("/api/agents", router$e);
-  app.use("/api/media-jobs", router$d);
-  app.use("/api/studio", router$c);
-  app.use("/api/studio/scratch", router$b);
-  app.use("/api/places", router$a);
-  app.use("/api/sms", router$9);
-  app.use("/api/contact", router$4);
+  app.use("/api/agents", router$f);
+  app.use("/api/media-jobs", router$e);
+  app.use("/api/studio", router$d);
+  app.use("/api/studio/scratch", router$c);
+  app.use("/api/places", router$b);
+  app.use("/api/sms", router$a);
   app.use("/api/contact", router$5);
-  app.use("/api/contact", router$8);
-  app.use("/api/senior-living", router$7);
-  app.use("/api/apprenticeship", router$6);
+  app.use("/api/contact", router$6);
+  app.use("/api/contact", router$9);
+  app.use("/api/senior-living", router$8);
+  app.use("/api/apprenticeship", router$7);
   app.use(
     (err, _req, res, _next) => {
       console.error("[Server] Unhandled error:", err);
