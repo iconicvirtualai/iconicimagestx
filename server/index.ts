@@ -48,6 +48,7 @@ import { handleGetListingSite, handleListingSiteInquiry, handleListingSiteShell 
 import photoEditRequestsRouter from "./routes/photoEditRequests";
 import { mountOwners } from "./routes/owners";
 import siteContentRouter from "./routes/siteContent";
+import insightsRouter, { handleInsightShell } from "./routes/insights";
 
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
 const API_BUILD_MARKER = "auth-square-2026-09-28";
@@ -232,6 +233,7 @@ export function createServer() {
   app.post("/api/listing-sites/:slug/inquiry", handleListingSiteInquiry);
   app.use("/api/staff", staffRouter);
   app.use("/api/site-content", siteContentRouter);
+  app.use("/api/insights", insightsRouter);
   // Vercel does not chain rewrites. /present/:token is rewritten to this
   // function and the original path is what arrives here. Vite dev leaves the
   // request to the SPA so ListingPresentation still boots from the client.
@@ -242,6 +244,11 @@ export function createServer() {
   app.get("/l/:slug", (req, res, next) => {
     if (process.env.ICONIC_VITE_DEV === "1") return next();
     return handleListingSiteShell(req, res, next);
+  });
+  app.get("/insights/:slug", (req, res, next) => {
+    if (process.env.ICONIC_VITE_DEV === "1") return next();
+    if (req.params.slug === "prep") return next();
+    return handleInsightShell(req, res, next);
   });
   app.use("/api", presentationsRouter);
   app.use("/api/listings", listingsRouter);

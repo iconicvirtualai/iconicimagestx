@@ -42,6 +42,7 @@ describe("public page meta", () => {
       "/stock-footage",
       "/contact",
       "/socials",
+      "/insights",
       "/book",
       "/apprenticeship",
       "/senior-living",
@@ -120,6 +121,9 @@ describe("public page meta", () => {
     expect(metaPlan("/about").kind).toBe("public");
     expect(metaPlan("/go").kind).toBe("preserve-title");
     expect(metaPlan("/present/abcdefghijklmnopqrstuv").kind).toBe("hands-off");
+    expect(metaPlan("/insights").kind).toBe("public");
+    expect(metaPlan("/insights/prep").kind).toBe("generic");
+    expect(metaPlan("/insights/twilight-porch").kind).toBe("hands-off");
     expect(metaPlan("/agents").kind).toBe("generic");
   });
 

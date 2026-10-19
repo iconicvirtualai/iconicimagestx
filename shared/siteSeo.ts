@@ -84,6 +84,13 @@ export const PUBLIC_PAGES: readonly PublicPage[] = [
       "Instagram, Facebook, and TikTok from Iconic Images, a real estate media studio in Spring, The Woodlands, and Houston.",
   },
   {
+    path: "/insights",
+    file: "seo/insights.html",
+    title: "Iconic Insights | Iconic Images",
+    description:
+      "Field notes from Iconic Images on listing photography, video, and marketing in Spring, The Woodlands, and Houston.",
+  },
+  {
     path: "/book",
     file: "seo/book.html",
     title: "Book a Shoot | Iconic Images",
@@ -172,6 +179,7 @@ export type MetaPlan =
 export function metaPlan(pathname: string, origin = SITE_ORIGIN): MetaPlan {
   const path = normalizePath(pathname);
   if (path === "/present" || path.startsWith("/present/")) return { kind: "hands-off" };
+  if (path.startsWith("/insights/") && path !== "/insights/prep") return { kind: "hands-off" };
   if (path === "/go") return { kind: "preserve-title" };
   if (isNoIndexPath(path)) return { kind: "noindex", title: GENERIC_TITLE };
   const page = PUBLIC_PAGES.find((item) => item.path === path);

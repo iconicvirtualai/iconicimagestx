@@ -223,14 +223,22 @@ router.post("/:id/revert", gate("publish"), async (req, res) => {
   return res.json({ page: stripPage(source) });
 });
 
+function mediaFolder(pageIdRaw: unknown): string | null {
+  const pageId = String(pageIdRaw || "page");
+  if (pageId === "insights") return "insights";
+  if (pageId === "page") return "page";
+  if (defaultPage(pageId)) return pageId;
+  return null;
+}
+
 router.post("/media", gate("edit"), async (req, res) => {
   try {
-    const pageId = String(req.body?.pageId || "page");
-    if (!defaultPage(pageId) && pageId !== "page") return res.status(404).json({ error: "Unknown page." });
+    const folder = mediaFolder(req.body?.pageId);
+    if (!folder) return res.status(404).json({ error: "Unknown page." });
     const raw = String(req.body?.dataBase64 || "");
     const bytes = Buffer.from(raw, "base64");
     if (!bytes.length) return res.status(400).json({ error: "No file was received." });
-    const stored = await storeSiteUpload(defaultPage(pageId) ? pageId : "page", bytes);
+    const stored = await storeSiteUpload(folder, bytes);
     return res.json(stored);
   } catch (err) {
     const status = (err as { status?: number }).status || 400;
@@ -240,9 +248,10 @@ router.post("/media", gate("edit"), async (req, res) => {
 
 router.post("/dropbox", gate("edit"), async (req, res) => {
   try {
-    const pageId = String(req.body?.pageId || "page");
+    const folder = mediaFolder(req.body?.pageId);
+    if (!folder) return res.status(404).json({ error: "Unknown page." });
     const imported = await importDropboxFile(String(req.body?.url || ""));
-    const stored = await storeSiteUpload(defaultPage(pageId) ? pageId : "page", imported.bytes);
+    const stored = await storeSiteUpload(folder, imported.bytes);
     return res.json(stored);
   } catch (err) {
     const status = (err as { status?: number }).status || 400;

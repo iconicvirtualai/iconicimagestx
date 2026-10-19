@@ -32,6 +32,7 @@ export default function Header() {
         { label: "Pricing", href: "/pricing" },
         { label: "Studio 105", href: "/studio-105" },
         { label: "Portfolio", href: "/portfolio" },
+        { label: "Insights", href: "/insights" },
         { label: "Stock Footage", href: "/stock-footage" },
         { label: "Contact Us", href: "/contact" },
       ];

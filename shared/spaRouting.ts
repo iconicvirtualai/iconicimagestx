@@ -23,8 +23,6 @@ const NOINDEX = "noindex, nofollow";
 const APP_SHELL_SOURCES = [
   "/pricing/ai-assistant",
   "/agents",
-  "/insights",
-  "/insights/prep",
   "/unsubscribe",
   "/go",
   "/listing-cards",
@@ -60,6 +58,10 @@ const RESERVED: Rewrite[] = [
   { source: "/podcast-guest-prep", destination: "/podcast-guest-prep.html" },
   { source: "/thankful", destination: "/thankful.html" },
   { source: "/tis-the-season", destination: "/tis-the-season.html" },
+  // Prep stays on the app shell. A post slug is rendered by the API so the
+  // first HTML response can carry the cover image and the SEO title.
+  { source: "/insights/prep", destination: APP_SHELL },
+  { source: "/insights/:slug", destination: "/api/index" },
 ];
 
 function withSlashVariants(rules: Rewrite[]): Rewrite[] {
