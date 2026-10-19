@@ -6,6 +6,7 @@ import { isValidEmail, normalizeEmail } from "../../shared/emailMarketing/contac
 import { resolveAudience, type OverlapCampaign } from "../../shared/emailMarketing/audience";
 import { deliverabilityWarnings, GMASS_IN_PORTAL, GMASS_LINK_OUT, GMASS_LINKS } from "../../shared/emailMarketing/deliverability";
 import { applyMerge, mergeValues, withUnsubscribeFooter } from "../../shared/emailMarketing/merge";
+import { signedUnsubscribeUrl } from "../services/unsubscribeToken";
 import { complaintLike, summarizeGmassReport } from "../../shared/emailMarketing/reports";
 import { chicagoLocalToIso, gmassSendTime } from "../../shared/emailMarketing/schedule";
 import { matchSendingAccount, normalizeSendingAccounts } from "../../shared/emailMarketing/sendingAccounts";
@@ -157,7 +158,7 @@ function readCampaign(body: Partial<MarketingCampaign>, current: MarketingCampai
   };
 }
 
-const UNKNOWN_FROM = "Choose a saved sending account. photos@iconicimagestx.com is ready today. Add a future address such as news@ on the GMass page before a campaign can use it.";
+const UNKNOWN_FROM = "Choose a saved sending account. hello@iconicimagestx.com is the marketing default. photos@iconicimagestx.com stays available. Add a future address such as news@ on the GMass page before a campaign can use it.";
 
 function knownFrom(settings: MarketingSettings, email: string, res: { status: (code: number) => { json: (body: unknown) => void } }): string {
   const match = matchSendingAccount(email, settings.sendingAccounts);
@@ -316,11 +317,8 @@ router.post("/campaigns/:id/test", requireMarketing("send"), async (req: Authent
   if (!fromEmail) return;
   const contacts = await store.listContacts();
   const contact = contacts.find((item) => item.email === to) || { firstName: "there", lastName: "", email: to, company: "" };
-  const secret = process.env.MARKETING_UNSUBSCRIBE_SECRET || "";
-  const url = new URL("/unsubscribe", originOf(req));
-  url.searchParams.set("email", to);
-  if (secret) url.searchParams.set("token", crypto.createHmac("sha256", secret).update(to).digest("hex"));
-  const html = withUnsubscribeFooter(applyMerge(campaign.html, mergeValues(contact, url.toString())), url.toString());
+  const url = signedUnsubscribeUrl(originOf(req), to, process.env.MARKETING_UNSUBSCRIBE_SECRET || "");
+  const html = withUnsubscribeFooter(applyMerge(campaign.html, mergeValues(contact, url)), url);
   try {
     await gmass.sendTransactional({
       fromEmail,
@@ -328,7 +326,7 @@ router.post("/campaigns/:id/test", requireMarketing("send"), async (req: Authent
       to,
       subject: campaign.subject || campaign.name,
       message: html,
-      settings: { openTrack: true, clickTrack: true, messageType: "html" },
+      settings: { openTrack: false, clickTrack: false, messageType: "html" },
     });
   } catch (err) {
     const message = err instanceof GmassSendBlocked ? err.message : err instanceof Error ? err.message : "Test send failed.";
@@ -372,37 +370,51 @@ router.post("/campaigns/:id/send", requireMarketing("send"), async (req: Authent
   const gmass = getGmassClient();
   if (sendBlocked(res, gmass)) return;
 
-  const page = `${originOf(req)}/unsubscribe`;
-  const html = withUnsubscribeFooter(applyMerge(current.html, mergeValues({}, page)), page);
+  const origin = originOf(req);
+  const secret = process.env.MARKETING_UNSUBSCRIBE_SECRET || "";
+  const contacts = await store.listContacts();
+  const rendered = confirmation.recipientEmails.map((email) => {
+    const contact = contacts.find((item) => item.email === email) || { email, firstName: "", lastName: "", company: "" };
+    const unsubscribeUrl = signedUnsubscribeUrl(origin, email, secret);
+    return {
+      email,
+      html: withUnsubscribeFooter(applyMerge(current.html, mergeValues(contact, unsubscribeUrl)), unsubscribeUrl),
+    };
+  });
   try {
-    const draft = await gmass.createDraft({
-      subject: current.subject,
-      message: html,
-      messageType: "html",
-      fromEmail,
-      emailAddresses: confirmation.recipientEmails.join(","),
-    });
-    const draftId = String((draft as { campaignDraftId?: string })?.campaignDraftId || "");
-    if (!draftId) return res.status(502).json({ error: "GMass did not return a draft id. Nothing was marked sent." });
-    const sent = await gmass.sendCampaign(draftId, {
-      openTracking: true,
-      clickTracking: true,
-      fromName: current.fromName,
-      replyTo: current.replyTo,
-      previewText: current.preheader,
-      friendlyName: current.name,
-      ...(sendTime ? { sendTime } : {}),
-      emailsPerDay: settings.gmailDailyLimit,
-      suppressionDays: settings.frequencyDays,
-    });
-    const gmassCampaignId = String((sent as { campaignId?: unknown })?.campaignId || "");
+    let gmassDraftId = "";
+    let gmassCampaignId = "";
+    for (const row of rendered) {
+      const draft = await gmass.createDraft({
+        subject: current.subject,
+        message: row.html,
+        messageType: "html",
+        fromEmail,
+        emailAddresses: row.email,
+      });
+      const draftId = String((draft as { campaignDraftId?: string })?.campaignDraftId || "");
+      if (!draftId) return res.status(502).json({ error: "GMass did not return a draft id. Nothing was marked sent." });
+      const sent = await gmass.sendCampaign(draftId, {
+        openTracking: false,
+        clickTracking: false,
+        fromName: current.fromName,
+        replyTo: current.replyTo,
+        previewText: current.preheader,
+        friendlyName: current.name,
+        ...(sendTime ? { sendTime } : {}),
+        emailsPerDay: settings.gmailDailyLimit,
+        suppressionDays: settings.frequencyDays,
+      });
+      if (!gmassDraftId) gmassDraftId = draftId;
+      if (!gmassCampaignId) gmassCampaignId = String((sent as { campaignId?: unknown })?.campaignId || "");
+    }
     const now = new Date().toISOString();
     const campaign: MarketingCampaign = {
       ...current,
       status: sendTime ? "scheduled" : "sent",
       scheduledAt: sendTime ? sendAt : "",
       sentAt: sendTime ? "" : now,
-      gmassDraftId: draftId,
+      gmassDraftId,
       gmassCampaignId,
       recipientEmails: confirmation.recipientEmails,
       confirmation,

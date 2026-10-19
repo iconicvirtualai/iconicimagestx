@@ -22,7 +22,7 @@ router.post("/email", requireStaff, async (req: AuthenticatedRequest, res) => {
       return res.status(400).json({ error: "Email recipient and body required." });
     }
 
-    await sendEmail({
+    const result = await sendEmail({
       to,
       template: "manual_message",
       subject: subject || "Message from Iconic Images",
@@ -31,20 +31,28 @@ router.post("/email", requireStaff, async (req: AuthenticatedRequest, res) => {
       },
     });
 
-    await db().collection("messages").add({
-      orderId: orderId || null,
-      clientId: clientId || null,
-      senderId: req.user!.uid,
-      senderType: "staff",
-      senderName: req.user!.email || "Iconic Images",
-      recipient: to,
-      content: body.trim(),
-      channel: "email",
-      isRead: true,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    const delivery = result.sent ? result.delivery : "suppressed";
+    if (admin.apps.length) {
+      await db().collection("messages").add({
+        orderId: orderId || null,
+        clientId: clientId || null,
+        senderId: req.user!.uid,
+        senderType: "staff",
+        senderName: req.user!.email || "Iconic Images",
+        recipient: to,
+        content: body.trim(),
+        channel: "email",
+        direction: "outbound",
+        delivery,
+        isRead: true,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
 
-    return res.status(201).json({ success: true });
+    if (!result.sent) {
+      return res.status(503).json({ error: "Client notifications are off.", suppressed: true });
+    }
+    return res.status(201).json({ success: true, delivery });
   } catch (err) {
     console.error("[Messages] Email send error:", err);
     return res.status(500).json({ error: "Failed to send email." });

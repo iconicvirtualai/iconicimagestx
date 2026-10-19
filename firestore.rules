@@ -129,13 +129,25 @@ service cloud.firestore {
     // ─── Messages ────────────────────────────────────────────────────────────
 
     match /messages/{messageId} {
-      // Client can read/write messages on their own orders
+      // Staff read the hub. A client or photographer reads only threads they are on.
+      // Publish this file in the Firebase console. Vercel does not deploy rules.
       allow read: if isStaff() ||
-        (isAuthenticated() &&
-          get(/databases/$(database)/documents/messages/$(messageId)).data.senderId == request.auth.uid);
-      allow create: if isAuthenticated();
+        (isAuthenticated() && resource.data.senderId == request.auth.uid) ||
+        (isAuthenticated() && resource.data.clientId == request.auth.uid) ||
+        (isAuthenticated() && resource.data.photographerId == request.auth.uid) ||
+        (isAuthenticated() && resource.data.participantIds is list && request.auth.uid in resource.data.participantIds);
+      allow create: if isAuthenticated() && request.resource.data.senderId == request.auth.uid && (
+        isStaff() ||
+        request.resource.data.clientId == request.auth.uid ||
+        request.resource.data.photographerId == request.auth.uid
+      );
       allow update: if isStaff(); // mark as read
       allow delete: if isAdmin();
+    }
+
+    // Contact chat tokens stay on the server. The portal uses /api/communications/mine.
+    match /contactThreads/{threadId} {
+      allow read, write: if false;
     }
 
     // ─── Edit Requests ───────────────────────────────────────────────────────

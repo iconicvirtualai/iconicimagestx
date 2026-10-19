@@ -36,6 +36,7 @@ import seniorLivingRouter from "./routes/seniorLiving";
 import apprenticeshipRouter from "./routes/apprenticeship";
 import liveChatRouter from "./routes/liveChat";
 import contactThreadsRouter from "./routes/contactThreads";
+import communicationsRouter from "./routes/communications";
 import { listCalendarScheduleEvents, verifyCalendarWriteAccess } from "./services/calendar";
 import { photographerCalendarRoster } from "./services/photographerRoster";
 import { clientNotifyLive } from "../shared/clientNotify";
@@ -227,6 +228,7 @@ export function createServer() {
   app.use("/api/payments", paymentsRouter);
   app.use("/api/vsai", vsaiRouter);
   app.use("/api/messages", messagingRouter);
+  app.use("/api/communications", communicationsRouter);
   app.use("/api/clients", clientsRouter);
   app.get("/api/portal/listings/:id", handleGetPublicPortalListing);
   app.get("/api/listing-sites/:slug", handleGetListingSite);

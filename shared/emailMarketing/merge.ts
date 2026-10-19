@@ -32,7 +32,11 @@ export function mergeValues(contact: {
   };
 }
 
+export const MARKETING_POSTAL_ADDRESS = "Iconic Images, 26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380";
+
 export function withUnsubscribeFooter(html: string, url: string): string {
-  const merged = html.includes("{UnsubscribeUrl}") ? html : `${html}\n<p style="margin-top:24px;font-size:12px;color:#667085;">Iconic Images marketing email. <a href="{UnsubscribeUrl}">Unsubscribe</a>.</p>`;
+  const link = `<p style="margin-top:24px;font-size:12px;color:#667085;">${MARKETING_POSTAL_ADDRESS}. <a href="{UnsubscribeUrl}" clicktracking="off">Unsubscribe</a>.</p>`;
+  let merged = html.includes("{UnsubscribeUrl}") ? html : `${html}\n${link}`;
+  if (!merged.includes("26410 Oakridge Dr")) merged = `${merged}\n${link}`;
   return applyMerge(merged, { UnsubscribeUrl: url });
 }

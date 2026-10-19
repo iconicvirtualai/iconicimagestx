@@ -17,6 +17,7 @@ const saved = {
   MARKETING_SEND_LIVE: process.env.MARKETING_SEND_LIVE,
   MARKETING_PUBLIC_URL: process.env.MARKETING_PUBLIC_URL,
   APP_URL: process.env.APP_URL,
+  MARKETING_UNSUBSCRIBE_SECRET: process.env.MARKETING_UNSUBSCRIBE_SECRET,
 };
 
 let server: Server;
@@ -54,6 +55,7 @@ beforeEach(() => {
   delete process.env.MARKETING_SEND_LIVE;
   delete process.env.MARKETING_PUBLIC_URL;
   delete process.env.APP_URL;
+  process.env.MARKETING_UNSUBSCRIBE_SECRET = "test-unsubscribe-secret";
 });
 
 async function api(path: string, init: RequestInit = {}) {
@@ -118,7 +120,7 @@ describe("campaign send guard", () => {
     expect(preview.data.confirmation.warnings[0]).toMatch(/never verified/);
     expect(preview.data.confirmation.removedPreview.some((item: { email: string }) => item.email === "bruce@anywhere.com")).toBe(true);
 
-    const calls: { draft?: { emailAddresses?: string; fromEmail?: string; message?: string } }[] = [];
+    const calls: { draft?: { emailAddresses?: string; fromEmail?: string; message?: string }; send?: { openTracking?: boolean; clickTracking?: boolean; replyTo?: string } }[] = [];
     delete process.env.CLIENT_NOTIFY_LIVE;
     process.env.MARKETING_SEND_LIVE = "true";
     setGmassClientForTests(gmassMock(false, calls));
@@ -136,8 +138,15 @@ describe("campaign send guard", () => {
     });
     expect(sent.response.status).toBe(200);
     expect(sent.data.campaign.gmassCampaignId).toBe("4242");
-    expect(calls[0].draft?.emailAddresses?.split(",").sort()).toEqual(["fresh@example.com", "ready@example.com"]);
-    expect(calls[0].draft?.fromEmail).toBe("photos@iconicimagestx.com");
+    const drafts = calls.flatMap((call) => (call.draft ? [call.draft] : []));
+    expect(drafts.map((draft) => draft.emailAddresses).sort()).toEqual(["fresh@example.com", "ready@example.com"]);
+    expect(drafts.every((draft) => draft.fromEmail === "hello@iconicimagestx.com")).toBe(true);
+    expect(drafts.every((draft) => draft.message?.includes("26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380"))).toBe(true);
+    expect(drafts.find((draft) => draft.emailAddresses === "ready@example.com")?.message).not.toContain("fresh@example.com");
+    expect(drafts.find((draft) => draft.emailAddresses === "fresh@example.com")?.message).toContain("email=fresh%40example.com");
+    expect(drafts.every((draft) => draft.message && !/gmass\.co|google\.com\/url|utm_source/i.test(draft.message))).toBe(true);
+    expect(calls.flatMap((call) => (call.send ? [call.send] : [])).every((send) => send.openTracking === false && send.clickTracking === false)).toBe(true);
+    expect(calls.find((call) => call.send)?.send?.replyTo).toBe("hello@iconicimagestx.com");
 
     const second = await api("/api/marketing/campaigns", {
       method: "POST",
@@ -166,6 +175,7 @@ describe("campaign send guard", () => {
     });
     expect(added.response.status).toBe(200);
     expect(added.data.settings.sendingAccounts.map((account: { email: string }) => account.email)).toEqual([
+      "hello@iconicimagestx.com",
       "photos@iconicimagestx.com",
       "news@iconicimagestx.com",
     ]);
@@ -229,7 +239,7 @@ describe("campaign send guard", () => {
     });
     const id = created.data.campaign.id;
     const preview = await api(`/api/marketing/campaigns/${id}/preview`, { method: "POST", body: "{}" });
-    const calls: { draft?: { message?: string }; test?: { message?: string } }[] = [];
+    const calls: { draft?: { message?: string }; send?: { openTracking?: boolean; clickTracking?: boolean }; test?: { message?: string; settings?: { openTrack?: boolean; clickTrack?: boolean } } }[] = [];
     delete process.env.CLIENT_NOTIFY_LIVE;
     delete process.env.MARKETING_SEND_LIVE;
     process.env.APP_URL = "https://www.iconicimagestx.com";
@@ -266,15 +276,23 @@ describe("campaign send guard", () => {
     });
     expect(testSend.response.status).toBe(200);
     expect(calls[0].test?.message).toContain("https://iconicimagestx.vercel.app/unsubscribe");
+    expect(calls[0].test?.message).toContain("email=you%40iconicimagestx.com");
+    expect(calls[0].test?.message).toContain("26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380");
     expect(calls[0].test?.message).not.toContain("iconicimagestx.com/unsubscribe");
+    expect(calls[0].test?.message).not.toMatch(/gmass\.co|google\.com\/url|utm_source/i);
+    expect(calls[0].test?.settings).toMatchObject({ openTrack: false, clickTrack: false });
 
     const sent = await api(`/api/marketing/campaigns/${id}/send`, {
       method: "POST",
       body: JSON.stringify({ token: preview.data.confirmation.token, overlapOverride: false }),
     });
     expect(sent.response.status).toBe(200);
-    expect(calls[1].draft?.message).toContain("https://iconicimagestx.vercel.app/unsubscribe");
+    expect(calls[1].draft?.message).toContain("https://iconicimagestx.vercel.app/unsubscribe?email=ready%40example.com");
+    expect(calls[1].draft?.message).toContain("token=");
+    expect(calls[1].draft?.message).toContain("26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380");
     expect(calls[1].draft?.message).not.toContain("www.iconicimagestx.com");
+    const tracked = calls.find((call) => call.send);
+    expect(tracked?.send).toMatchObject({ openTracking: false, clickTracking: false });
 
     const gallery = await sendEmail({ to: "ada@example.com", template: "gallery_delivery" });
     const invoice = await sendEmail({ to: "ada@example.com", template: "invoice" });

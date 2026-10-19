@@ -1,5 +1,6 @@
 import { Router } from "express";
 import crypto from "crypto";
+import { unsubscribeTokenMatches } from "../services/unsubscribeToken";
 import { requireStaff, type AuthenticatedRequest } from "../middleware/auth";
 import { hasMarketingPermission, type MarketingPermission } from "../../shared/emailMarketing/permissions";
 import { applyTagChange, contactMatchesFilter, contactName, isValidEmail, normalizeEmail } from "../../shared/emailMarketing/contacts";
@@ -305,15 +306,6 @@ router.post("/unsubscribe", async (req, res) => {
   res.json({ ok: true, message: `${email} will not receive Iconic marketing email.` });
 });
 
-export function signUnsubscribeEmail(email: string, secret: string): string {
-  return crypto.createHmac("sha256", secret).update(normalizeEmail(email)).digest("hex");
-}
-
-function unsubscribeTokenMatches(email: string, token: string, secret: string): boolean {
-  const expected = signUnsubscribeEmail(email, secret);
-  const left = Buffer.from(expected);
-  const right = Buffer.from(token);
-  return left.length === right.length && crypto.timingSafeEqual(left, right);
-}
+export { signUnsubscribeEmail } from "../services/unsubscribeToken";
 
 export default router;

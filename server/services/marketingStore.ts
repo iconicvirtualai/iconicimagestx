@@ -1,7 +1,7 @@
 import admin from "firebase-admin";
-import { syncClientsIntoContacts } from "../../shared/emailMarketing/contacts";
+import { normalizeEmail, syncClientsIntoContacts } from "../../shared/emailMarketing/contacts";
 import { seedSuppression } from "../../shared/emailMarketing/suppression";
-import { normalizeSendingAccounts, matchSendingAccount, PHOTOS_SENDING_ACCOUNT } from "../../shared/emailMarketing/sendingAccounts";
+import { normalizeSendingAccounts, matchSendingAccount, HELLO_SENDING_ACCOUNT, PHOTOS_SENDING_ACCOUNT } from "../../shared/emailMarketing/sendingAccounts";
 import {
   DEFAULT_MARKETING_SETTINGS,
   type ActivityEvent,
@@ -61,8 +61,14 @@ function settingsFrom(raw: Partial<MarketingSettings> | undefined): MarketingSet
   const sendingAccounts = normalizeSendingAccounts(
     raw && Array.isArray(raw.sendingAccounts) ? raw.sendingAccounts : DEFAULT_MARKETING_SETTINGS.sendingAccounts,
   );
-  const fromEmail = matchSendingAccount(merged.fromEmail, sendingAccounts) || sendingAccounts[0]?.email || PHOTOS_SENDING_ACCOUNT;
-  return { ...merged, sendingAccounts, fromEmail };
+  let fromEmail = matchSendingAccount(merged.fromEmail, sendingAccounts) || HELLO_SENDING_ACCOUNT;
+  let replyTo = normalizeEmail(merged.replyTo) || fromEmail;
+  const stored = raw && Array.isArray(raw.sendingAccounts) ? raw.sendingAccounts : null;
+  const legacyPhotosOnly = !stored || (stored.length === 1 && normalizeEmail((stored[0] as { email?: string })?.email) === PHOTOS_SENDING_ACCOUNT);
+  if (legacyPhotosOnly && fromEmail === PHOTOS_SENDING_ACCOUNT) fromEmail = HELLO_SENDING_ACCOUNT;
+  if (legacyPhotosOnly && replyTo === PHOTOS_SENDING_ACCOUNT) replyTo = HELLO_SENDING_ACCOUNT;
+  if (!matchSendingAccount(replyTo, sendingAccounts)) replyTo = fromEmail;
+  return { ...merged, sendingAccounts, fromEmail, replyTo };
 }
 
 export function createMemoryMarketingStore(): MarketingStore {

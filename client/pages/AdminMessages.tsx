@@ -4,7 +4,7 @@
  * Route: /admin/messages
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { onSnapshot, collection, query, orderBy, limit, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import AdminLayout from "@/components/AdminLayout";
@@ -19,22 +19,21 @@ import {
   MessageSquare,
   Phone,
   Send,
-  Search,
   Plus,
   AlertCircle,
-  ChevronRight,
   X,
   Smartphone,
   Megaphone,
-  Clock,
-  CheckCheck,
   RefreshCw,
+  Sparkles,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 import ContactLiveChat from "@/components/ContactLiveChat";
 import { useAuth } from "@/contexts/AuthContext";
+import { UnifiedThreads } from "@/components/communications/UnifiedThreads";
+import { AssistantPanes } from "@/components/communications/AssistantPanes";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -78,7 +77,7 @@ interface MailchimpList {
   unsubscribeCount: number;
 }
 
-type Tab = "sweep" | "contact" | "inbox" | "sms" | "compose" | "campaigns";
+type Tab = "sweep" | "contact" | "inbox" | "sms" | "compose" | "campaigns" | "assistants";
 
 const sweepChannels = [
   {
@@ -144,12 +143,8 @@ export default function AdminMessages() {
   const [tab, setTab] = useState<Tab>("sweep");
   const [threads, setThreads] = useState<OrderThread[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [selectedThread, setSelectedThread] = useState<OrderThread | null>(null);
   const [selectedConvo, setSelectedConvo] = useState<Conversation | null>(null);
-  const [search, setSearch] = useState("");
-  const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Compose state
   const [composeTo, setComposeTo] = useState("");
@@ -230,12 +225,6 @@ export default function AdminMessages() {
       );
 
       setThreads(built);
-
-      // Keep selected thread synced
-      if (selectedThread) {
-        const updated = built.find((t) => t.orderId === selectedThread.orderId);
-        if (updated) setSelectedThread(updated);
-      }
     });
 
     return () => unsub();
@@ -262,32 +251,6 @@ export default function AdminMessages() {
       checkMailchimp();
     }
   }, [tab]);
-
-  // Auto-scroll messages
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [selectedThread?.messages]);
-
-  // ─── Send in-app reply ────────────────────────────────────────────────────
-
-  async function sendReply() {
-    if (!replyText.trim() || !selectedThread) return;
-    setSending(true);
-    try {
-      const res = await fetch(`/api/messages/${selectedThread.orderId}`, {
-        method: "POST",
-        headers: await authHeaders({ "Content-Type": "application/json" }),
-        credentials: "include",
-        body: JSON.stringify({ content: replyText.trim() }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      setReplyText("");
-    } catch (err) {
-      toast({ title: "Send failed", description: String(err), variant: "destructive" });
-    } finally {
-      setSending(false);
-    }
-  }
 
   // ─── Send one-off SMS ─────────────────────────────────────────────────────
 
@@ -437,15 +400,6 @@ export default function AdminMessages() {
     }
   }
 
-  // ─── Filtered threads ─────────────────────────────────────────────────────
-
-  const filteredThreads = threads.filter(
-    (t) =>
-      !search ||
-      t.clientName.toLowerCase().includes(search.toLowerCase()) ||
-      t.orderId.toLowerCase().includes(search.toLowerCase())
-  );
-
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
@@ -453,12 +407,12 @@ export default function AdminMessages() {
       <div className="pb-8">
         <OperationsStatsGrid />
       </div>
-      <div className="flex h-full" style={{ height: "calc(100vh - 64px)" }}>
+      <div className="flex min-h-[32rem] flex-col overflow-hidden rounded-2xl border border-gray-800 lg:min-h-[calc(100vh-16rem)] lg:flex-row">
 
         {/* ─── Left sidebar: tabs + thread list ─────────────────────────── */}
-        <div className="w-80 flex flex-col border-r border-gray-700 bg-gray-900">
+        <div className="flex w-full min-w-0 flex-col border-b border-gray-700 bg-gray-900 lg:w-80 lg:shrink-0 lg:border-b-0 lg:border-r">
           {/* Tabs */}
-          <div className="flex border-b border-gray-700 overflow-x-auto">
+          <div className="flex flex-wrap border-b border-gray-700">
             {[
               { id: "sweep" as Tab, icon: Bot, label: "Sweep" },
               { id: "contact" as Tab, icon: MessageCircle, label: "Chat" },
@@ -466,11 +420,12 @@ export default function AdminMessages() {
               { id: "sms" as Tab, icon: Smartphone, label: "SMS" },
               { id: "compose" as Tab, icon: Send, label: "Compose" },
               { id: "campaigns" as Tab, icon: Megaphone, label: "Campaigns" },
+              { id: "assistants" as Tab, icon: Sparkles, label: "Assistants" },
             ].map(({ id, icon: Icon, label }) => (
               <button
                 key={id}
                 onClick={() => setTab(id)}
-                className={`flex-1 min-w-[52px] py-3 flex flex-col items-center gap-1 text-[10px] transition-colors ${
+                className={`flex min-w-[4.5rem] flex-1 flex-col items-center gap-1 px-1 py-3 text-[10px] transition-colors ${
                   tab === id
                     ? "text-teal-400 border-b-2 border-teal-400"
                     : "text-gray-400 hover:text-gray-200"
@@ -482,60 +437,16 @@ export default function AdminMessages() {
             ))}
           </div>
 
-          {/* Search (inbox only) */}
           {tab === "inbox" && (
-            <div className="p-3 border-b border-gray-700">
-              <div className="relative">
-                <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-500" />
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search conversations..."
-                  className="w-full pl-9 pr-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-teal-500"
-                />
-              </div>
-            </div>
+            <p className="hidden p-4 text-sm leading-relaxed text-gray-400 lg:block">
+              Clients, leads, photographers, and socials are in the combined list.
+            </p>
           )}
 
-          {/* Thread list (inbox) */}
-          {tab === "inbox" && (
-            <div className="flex-1 overflow-y-auto">
-              {filteredThreads.length === 0 ? (
-                <div className="p-6 text-center text-gray-500 text-sm">
-                  No messages yet
-                </div>
-              ) : (
-                filteredThreads.map((thread) => (
-                  <button
-                    key={thread.orderId}
-                    onClick={() => setSelectedThread(thread)}
-                    className={`w-full text-left px-4 py-3 border-b border-gray-800 hover:bg-gray-800 transition-colors ${
-                      selectedThread?.orderId === thread.orderId ? "bg-gray-800" : ""
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-white truncate">
-                        {thread.clientName}
-                      </span>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {thread.unreadCount > 0 && (
-                          <span className="bg-teal-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                            {thread.unreadCount}
-                          </span>
-                        )}
-                        <span className="text-xs text-gray-500">
-                          {timeAgo(thread.lastMessage?.createdAt ?? null)}
-                        </span>
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-400 truncate">
-                      {thread.lastMessage?.content || "No messages"}
-                    </p>
-                    <p className="text-xs text-gray-600 mt-0.5">#{thread.orderId.slice(0, 8)}</p>
-                  </button>
-                ))
-              )}
-            </div>
+          {tab === "assistants" && (
+            <p className="p-4 text-sm leading-relaxed text-gray-400">
+              Grok and OpenAI stay on the server. Owner and admin only.
+            </p>
           )}
 
           {/* SMS conversations list */}
@@ -692,100 +603,9 @@ export default function AdminMessages() {
             </div>
           )}
 
-          {/* ── Inbox thread view ── */}
-          {tab === "inbox" && (
-            <>
-              {selectedThread ? (
-                <>
-                  {/* Header */}
-                  <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
-                    <div>
-                      <h2 className="text-white font-semibold">{selectedThread.clientName}</h2>
-                      <p className="text-gray-400 text-xs">Order #{selectedThread.orderId.slice(0, 8)}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          // Quick SMS from thread
-                          setTab("compose");
-                        }}
-                        className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm flex items-center gap-1.5"
-                      >
-                        <Smartphone className="w-3.5 h-3.5" /> Send SMS
-                      </button>
-                    </div>
-                  </div>
+          {tab === "inbox" && <UnifiedThreads />}
 
-                  {/* Messages */}
-                  <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                    {selectedThread.messages.map((msg) => (
-                      <div
-                        key={msg.id}
-                        className={`flex ${msg.senderType === "client" ? "justify-start" : "justify-end"}`}
-                      >
-                        <div
-                          className={`max-w-md rounded-2xl px-4 py-3 ${
-                            msg.senderType === "client"
-                              ? "bg-gray-800 text-white"
-                              : "bg-teal-600 text-white"
-                          }`}
-                        >
-                          <p className="text-xs font-medium mb-1 opacity-70">
-                            {msg.senderName}
-                            {msg.channel === "sms" && (
-                              <span className="ml-1.5 text-xs opacity-60">(SMS)</span>
-                            )}
-                          </p>
-                          <p className="text-sm leading-relaxed">{msg.content}</p>
-                          <div className="flex items-center gap-1 mt-1 opacity-50 justify-end">
-                            <span className="text-xs">{timeAgo(msg.createdAt)}</span>
-                            {msg.isRead && msg.senderType !== "client" && (
-                              <CheckCheck className="w-3 h-3" />
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    <div ref={messagesEndRef} />
-                  </div>
-
-                  {/* Reply box */}
-                  <div className="p-4 border-t border-gray-800">
-                    <div className="flex gap-3">
-                      <textarea
-                        value={replyText}
-                        onChange={(e) => setReplyText(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            sendReply();
-                          }
-                        }}
-                        placeholder="Reply to client... (Enter to send)"
-                        rows={2}
-                        className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-teal-500 resize-none"
-                      />
-                      <button
-                        onClick={sendReply}
-                        disabled={sending || !replyText.trim()}
-                        className="px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 text-white rounded-xl flex items-center gap-2 text-sm self-end"
-                      >
-                        <Send className="w-4 h-4" />
-                        {sending ? "Sending…" : "Send"}
-                      </button>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="flex-1 flex items-center justify-center text-gray-600">
-                  <div className="text-center">
-                    <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                    <p>Select a conversation to view messages</p>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
+          {tab === "assistants" && <AssistantPanes />}
 
           {/* ── SMS tab ── */}
           {tab === "sms" && (

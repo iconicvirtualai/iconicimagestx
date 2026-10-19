@@ -10,6 +10,7 @@ import {
   Home,
   LayoutGrid,
   LogOut,
+  MessageSquare,
   Receipt,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -29,8 +30,9 @@ import {
   type ClientListingCard,
 } from "@shared/clientHome";
 import { ListingPackageCard } from "@/components/listing-card/ListingPackageCard";
+import { PortalMessages } from "@/components/communications/PortalMessages";
 
-export type ClientHomeSection = "listings" | "orders" | "schedule";
+export type ClientHomeSection = "listings" | "orders" | "schedule" | "messages";
 
 const TONE_CLASS: Record<AppointmentTone, string> = {
   past: "bg-gray-200 text-gray-600 border-gray-200",
@@ -60,6 +62,7 @@ const PANELS: { id: ClientHomeSection; label: string; icon: typeof LayoutGrid }[
   { id: "listings", label: "Listings", icon: LayoutGrid },
   { id: "orders", label: "Order history", icon: Receipt },
   { id: "schedule", label: "Schedule", icon: CalendarClock },
+  { id: "messages", label: "Messages", icon: MessageSquare },
 ];
 
 export function ClientHomeView({
@@ -118,7 +121,7 @@ export function ClientHomeView({
             {PANELS.map((panel) => {
               const Icon = panel.icon;
               const active = section === panel.id;
-              const count = panel.id === "listings" ? orderedListings.length : panel.id === "orders" ? orderedInvoices.length : appointments.length;
+              const count = panel.id === "listings" ? orderedListings.length : panel.id === "orders" ? orderedInvoices.length : panel.id === "schedule" ? appointments.length : "";
               return (
                 <button
                   key={panel.id}
@@ -151,6 +154,8 @@ export function ClientHomeView({
             <ListingGrid listings={orderedListings} truncated={listingsTruncated} />
           ) : section === "orders" ? (
             <OrderHistory invoices={orderedInvoices} truncated={invoicesTruncated} />
+          ) : section === "messages" ? (
+            <PortalMessages />
           ) : (
             <ScheduleCalendar appointments={appointments} today={today} truncated={appointmentsTruncated} />
           )}
