@@ -10,6 +10,8 @@ import {
   LayoutDashboard,
   Mail,
   MessageSquare,
+  Newspaper,
+  Share2,
   Package,
   Palette,
   Settings,
@@ -60,6 +62,8 @@ export const navGroups: { label: string; items: AdminNavItem[] }[] = [
       { label: "Clients", href: "/admin/customers", icon: Users, roles: COORD_UP },
       { label: "Communications", href: "/admin/communications", icon: MessageSquare, roles: COORD_UP },
       { label: "Email", href: "/admin/communications/email", icon: Mail, roles: ADMIN_ONLY },
+      { label: "Insights", href: "/admin/insights", icon: Newspaper, roles: ADMIN_ONLY },
+      { label: "Social queue", href: "/admin/insights/social", icon: Share2, roles: ADMIN_ONLY },
     ],
   },
   {

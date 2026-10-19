@@ -19,6 +19,7 @@ export default function Footer() {
         { label: "Pricing", href: "/pricing" },
         { label: "Socials", href: "/socials" },
         { label: "Portfolio", href: "/portfolio" },
+        { label: "Insights", href: "/insights" },
         { label: "Studio 105", href: "/studio-105" },
         { label: "Contact Us", href: "/contact" },
         { label: "Client Login", href: "/login" },

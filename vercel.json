@@ -151,6 +151,22 @@
       "destination": "/tis-the-season.html"
     },
     {
+      "source": "/insights/prep",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/insights/prep/",
+      "destination": "/seo/app.html"
+    },
+    {
+      "source": "/insights/:slug",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/insights/:slug/",
+      "destination": "/api/index"
+    },
+    {
       "source": "/",
       "destination": "/index.html"
     },
@@ -209,6 +225,14 @@
     {
       "source": "/socials/",
       "destination": "/seo/socials.html"
+    },
+    {
+      "source": "/insights",
+      "destination": "/seo/insights.html"
+    },
+    {
+      "source": "/insights/",
+      "destination": "/seo/insights.html"
     },
     {
       "source": "/book",
@@ -272,22 +296,6 @@
     },
     {
       "source": "/agents/",
-      "destination": "/seo/app.html"
-    },
-    {
-      "source": "/insights",
-      "destination": "/seo/app.html"
-    },
-    {
-      "source": "/insights/",
-      "destination": "/seo/app.html"
-    },
-    {
-      "source": "/insights/prep",
-      "destination": "/seo/app.html"
-    },
-    {
-      "source": "/insights/prep/",
       "destination": "/seo/app.html"
     },
     {

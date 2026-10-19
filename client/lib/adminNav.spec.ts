@@ -43,3 +43,17 @@ describe("studio nav", () => {
     expect(mostSpecificNavHref("/admin/iconic-studio/listing1", hrefs)).toBeNull();
   });
 });
+
+describe("insights nav", () => {
+  it("keeps the creator and social queue under Operations for admins", () => {
+    const operations = navGroups.find((group) => group.label === "Operations");
+    const insights = operations?.items.find((item) => item.href === "/admin/insights");
+    const queue = operations?.items.find((item) => item.href === "/admin/insights/social");
+    expect(insights?.label).toBe("Insights");
+    expect(insights?.roles).toEqual(["admin"]);
+    expect(queue?.label).toBe("Social queue");
+    expect(queue?.roles).toEqual(["admin"]);
+    expect(mostSpecificNavHref("/admin/insights", hrefs)).toBe("/admin/insights");
+    expect(mostSpecificNavHref("/admin/insights/social", hrefs)).toBe("/admin/insights/social");
+  });
+});

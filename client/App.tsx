@@ -34,6 +34,8 @@ import Apprenticeship from "./pages/Apprenticeship";
 import Pricing from "./pages/Pricing";
 import AIPricingAssistant from "./pages/AIPricingAssistant";
 import Socials from "./pages/Socials";
+import Insights from "./pages/Insights";
+import InsightPost from "./pages/InsightPost";
 import AgentLandingPage from "./pages/AgentLandingPage";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
@@ -92,6 +94,7 @@ import AdminStudioMarketing from "./pages/AdminStudioMarketing";
 import AdminStudioScratch from "./pages/AdminStudioScratch";
 import LegacyStudioRedirect from "./components/studio/LegacyStudioRedirect";
 import AdminDeliveryQueue from "./pages/AdminDeliveryQueue";
+import AdminInsights from "./pages/AdminInsights";
 import Login from "./pages/Login";
 import ClientPortal from "./pages/ClientPortal";
 import PortalListingDetail from "./pages/PortalListingDetail";
@@ -132,8 +135,9 @@ const App = () => (
             <Route path="/socials" element={<Socials />} />
             <Route path="/agents" element={<AgentLandingPage />} />
             {/* Resources stays off the public site. Stock Footage library is public again. */}
-            <Route path="/insights" element={<Navigate to="/" replace />} />
+            <Route path="/insights" element={<Insights />} />
             <Route path="/insights/prep" element={<Navigate to="/" replace />} />
+            <Route path="/insights/:slug" element={<InsightPost />} />
             <Route path="/stock-footage" element={<StockFootage />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
@@ -174,6 +178,8 @@ const App = () => (
             <Route path="/admin/studio/scratch" element={<ProtectedRoute requiredRole="staff"><AdminStudioScratch /></ProtectedRoute>} />
             <Route path="/admin/studio/projects" element={<ProtectedRoute requiredRole="staff"><AdminStudioProjects /></ProtectedRoute>} />
             <Route path="/admin/studio/marketing" element={<ProtectedRoute requiredRole="staff"><AdminStudioMarketing /></ProtectedRoute>} />
+            <Route path="/admin/insights" element={<ProtectedRoute requiredRole="admin"><AdminInsights /></ProtectedRoute>} />
+            <Route path="/admin/insights/social" element={<ProtectedRoute requiredRole="admin"><AdminInsights /></ProtectedRoute>} />
             <Route path="/admin/studio/operations" element={<LegacyStudioRedirect />} />
             <Route path="/admin/iconic-studio" element={<LegacyStudioRedirect />} />
             <Route path="/admin/iconic-studio/:listingId" element={<LegacyStudioRedirect />} />

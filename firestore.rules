@@ -292,6 +292,16 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ─── Iconic Insights ────────────────────────────────────────────────────
+    // Published posts are public. Drafts and writes stay with the admin role,
+    // which is the owner seat in this app. Owner emails are also allowed on
+    // the API. Publish this file in the Firebase console.
+    // Vercel does not deploy firestore.rules.
+    match /insightPosts/{postId} {
+      allow read: if resource.data.status == 'published' || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
     // ─── Catch-all: deny everything else ─────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;
