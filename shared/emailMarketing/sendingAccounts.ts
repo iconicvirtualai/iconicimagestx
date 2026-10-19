@@ -1,6 +1,7 @@
 import { isValidEmail, normalizeEmail } from "./contacts";
 import type { SendingAccount } from "./types";
 
+export const HELLO_SENDING_ACCOUNT = "hello@iconicimagestx.com";
 export const PHOTOS_SENDING_ACCOUNT = "photos@iconicimagestx.com";
 
 export function normalizeSendingAccounts(raw: unknown): SendingAccount[] {
@@ -20,7 +21,13 @@ export function normalizeSendingAccounts(raw: unknown): SendingAccount[] {
       add(row.email, row.label);
     }
   }
-  if (!list.length) add(PHOTOS_SENDING_ACCOUNT, "Photos");
+  if (!list.length) {
+    add(HELLO_SENDING_ACCOUNT, "Hello");
+    add(PHOTOS_SENDING_ACCOUNT, "Photos");
+  }
+  if (!seen.has(HELLO_SENDING_ACCOUNT)) {
+    list.unshift({ email: HELLO_SENDING_ACCOUNT, label: "Hello" });
+  }
   return list;
 }
 

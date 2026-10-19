@@ -268,7 +268,7 @@ export default function CampaignBuilder() {
             <label><span className={labelCls}>Email</span><input className={inputCls} value={newFromEmail} placeholder="news@iconicimagestx.com" onChange={(event) => setNewFromEmail(event.target.value)} /></label>
             <button type="button" className={ghostCls} onClick={() => addSendingAccount().catch((err: unknown) => setError(err instanceof Error ? err.message : "Could not add that address."))}>Add</button>
           </div>
-          <p className="md:col-span-2 text-xs text-gray-500">photos@iconicimagestx.com sends today. A future mailbox such as news@ can be chosen per campaign after it is a Send mail as alias on the Gmail connected to GMass. Adding it here does not change that connected Gmail.</p>
+          <p className="md:col-span-2 text-xs text-gray-500">hello@iconicimagestx.com is the marketing default. photos@ stays available. A future mailbox such as news@ can be chosen per campaign after it is a Send mail as alias on the Gmail connected to GMass. Adding it here does not change that connected Gmail.</p>
           <button type="button" className={buttonCls} onClick={() => save().then(() => setStep(2)).catch((err: unknown) => setError(err instanceof Error ? err.message : "Could not save."))}>Continue</button>
         </section>
       ) : null}

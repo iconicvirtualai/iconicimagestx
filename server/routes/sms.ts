@@ -48,6 +48,30 @@ router.post("/send", requireStaff, async (req: AuthenticatedRequest, res: Respon
     const result = await sendSMS({ to, body });
     if (result.suppressed) {
       console.warn(`[SMS] Suppressed staff send to ${to} — ${clientNotifyBlockReason()}.`);
+      if (admin.apps.length) {
+        await db().collection("smsLogs").add({
+          direction: "outbound",
+          to: normalisePhone(to),
+          body,
+          status: "suppressed",
+          orderId: orderId || null,
+          sentBy: req.user!.uid,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        await db().collection("messages").add({
+          orderId: orderId || null,
+          senderId: req.user!.uid,
+          senderType: "staff",
+          senderName: "Iconic Images",
+          content: body,
+          channel: "sms",
+          direction: "outbound",
+          delivery: "suppressed",
+          phone: normalisePhone(to),
+          isRead: true,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
       return res.status(503).json({ error: "Client notifications are off.", suppressed: true });
     }
 

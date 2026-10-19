@@ -12,6 +12,7 @@ import {
   type PhotographerTone,
 } from "@shared/photographerPortal";
 import { ICONIC_POLISH_TREATMENTS } from "@shared/orderEditPlan";
+import { PortalMessages } from "@/components/communications/PortalMessages";
 
 const TONE_CLASS: Record<PhotographerTone, string> = {
   action: "bg-yellow-100 text-yellow-800",
@@ -28,6 +29,7 @@ const TABS: { id: PhotographerTab; label: string }[] = [
   { id: "upcoming", label: "Upcoming" },
   { id: "all", label: "All jobs" },
   { id: "pay", label: "Pay estimate" },
+  { id: "messages", label: "Messages" },
 ];
 
 const labelCls = "text-[10px] font-black uppercase tracking-widest text-gray-400";
@@ -158,7 +160,7 @@ export function PhotographerPortal({
         </div>
       )}
 
-      {tab !== "pay" && (
+      {tab !== "pay" && tab !== "messages" && (
         <label className="mb-4 flex items-start gap-3 rounded-2xl border border-gray-100 bg-white p-4">
           <input
             type="checkbox"
@@ -181,6 +183,8 @@ export function PhotographerPortal({
         <div className="flex items-center justify-center py-24">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#0d9488] border-t-transparent" />
         </div>
+      ) : tab === "messages" ? (
+        <PortalMessages />
       ) : tab === "pay" ? (
         <PayEstimate
           jobs={visible}

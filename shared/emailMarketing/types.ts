@@ -64,7 +64,7 @@ export interface Segment {
   updatedAt: string;
 }
 
-/** A From address on the Gmail account connected to GMass. photos@ today; news@ can be added later. */
+/** A From address on the Gmail account connected to GMass. hello@ is the marketing default. photos@ stays available. */
 export interface SendingAccount {
   email: string;
   label: string;
@@ -167,8 +167,11 @@ export const DEFAULT_MARKETING_SETTINGS: MarketingSettings = {
   bounceWarnRate: 0.05,
   bouncePauseRate: 0.08,
   fromName: "Iconic Images",
-  fromEmail: "photos@iconicimagestx.com",
-  replyTo: "photos@iconicimagestx.com",
-  sendingAccounts: [{ email: "photos@iconicimagestx.com", label: "Photos" }],
+  fromEmail: "hello@iconicimagestx.com",
+  replyTo: "hello@iconicimagestx.com",
+  sendingAccounts: [
+    { email: "hello@iconicimagestx.com", label: "Hello" },
+    { email: "photos@iconicimagestx.com", label: "Photos" },
+  ],
   suppressionSeededAt: "",
 };

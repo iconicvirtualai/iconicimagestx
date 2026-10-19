@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyMerge, withUnsubscribeFooter } from "./merge";
+import { applyMerge, MARKETING_POSTAL_ADDRESS, withUnsubscribeFooter } from "./merge";
 import { summarizeGmassReport } from "./reports";
 import { chicagoLocalToIso, gmassSendTime } from "./schedule";
 import { normalizeSendingAccounts, matchSendingAccount } from "./sendingAccounts";
@@ -12,10 +12,11 @@ describe("sending accounts", () => {
       { email: "not-an-email", label: "Bad" },
     ]);
     expect(accounts.map((account) => account.email)).toEqual([
+      "hello@iconicimagestx.com",
       "photos@iconicimagestx.com",
       "news@iconicimagestx.com",
     ]);
-    expect(accounts[1].label).toBe("news@iconicimagestx.com");
+    expect(accounts[2].label).toBe("news@iconicimagestx.com");
     expect(matchSendingAccount("news@iconicimagestx.com", accounts)).toBe("news@iconicimagestx.com");
     expect(matchSendingAccount("stranger@example.com", accounts)).toBe("");
   });
@@ -31,8 +32,10 @@ describe("merge tags", () => {
   });
 
   it("adds an unsubscribe link when the draft does not have one", () => {
-    const html = withUnsubscribeFooter("<p>Hello</p>", "https://iconicimagestx.vercel.app/unsubscribe");
-    expect(html).toContain('href="https://iconicimagestx.vercel.app/unsubscribe"');
+    const html = withUnsubscribeFooter("<p>Hello</p>", "https://iconicimagestx.vercel.app/unsubscribe?email=ada%40example.com&token=abc");
+    expect(html).toContain('href="https://iconicimagestx.vercel.app/unsubscribe?email=ada%40example.com&token=abc"');
+    expect(html).toContain(MARKETING_POSTAL_ADDRESS);
+    expect(html).toContain("clicktracking=\"off\"");
   });
 });
 

@@ -1,8 +1,8 @@
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { staffHomePath } from "@shared/staffAccess";
-import { LogOut } from "lucide-react";
+import { LogOut, Menu, X } from "lucide-react";
 import { mostSpecificNavHref, navGroups } from "@/lib/adminNav";
 
 interface AdminLayoutProps {
@@ -23,6 +23,7 @@ export default function AdminLayout({ children, title, mainClassName }: AdminLay
   const { user, staffProfile, loading, isStaff, signOutUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [navOpen, setNavOpen] = useState(false);
 
   if (loading) {
     return (
@@ -70,15 +71,15 @@ export default function AdminLayout({ children, title, mainClassName }: AdminLay
   return (
     <div className="flex h-screen bg-[#f4f7f8]">
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 z-20 flex h-screen w-60 flex-col overflow-hidden border-r border-gray-800 bg-[#0a0a0a]">
+      <aside className={`${navOpen ? "fixed inset-0 z-30 flex h-screen w-full" : "hidden"} lg:fixed lg:inset-y-0 lg:left-0 lg:right-auto lg:z-20 lg:flex lg:h-screen lg:w-60 flex-col overflow-hidden border-r border-gray-800 bg-[#0a0a0a]`}>
         <div aria-hidden="true" className="pointer-events-none absolute inset-0">
           <img src="/media/decor/glow-teal.svg" alt="" className="absolute -top-24 -left-16 w-72 opacity-80" />
           <img src="/media/decor/arc.svg" alt="" className="absolute -bottom-16 -right-16 w-56 opacity-60" />
         </div>
 
         {/* Logo */}
-        <div className="relative p-5 border-b border-gray-800">
-          <Link to={staffHomePath(role)} className="flex items-center gap-3">
+        <div className="relative flex items-center justify-between gap-3 border-b border-gray-800 p-5">
+          <Link to={staffHomePath(role)} className="flex min-w-0 items-center gap-3" onClick={() => setNavOpen(false)}>
             <div className="w-9 h-9 rounded-lg bg-[#0d9488] flex items-center justify-center flex-shrink-0">
               <span className="font-black text-white text-base">I</span>
             </div>
@@ -87,6 +88,9 @@ export default function AdminLayout({ children, title, mainClassName }: AdminLay
               <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Ops Portal</span>
             </div>
           </Link>
+          <button type="button" className="rounded-lg p-2 text-white lg:hidden" aria-label="Close menu" onClick={() => setNavOpen(false)}>
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         {/* Navigation */}
@@ -104,6 +108,7 @@ export default function AdminLayout({ children, title, mainClassName }: AdminLay
                     <Link
                       key={item.label}
                       to={item.href}
+                      onClick={() => setNavOpen(false)}
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
                         active
                           ? "bg-[#0d9488]/10 text-[#0d9488] border-l-2 border-[#0d9488] pl-[10px]"
@@ -146,7 +151,7 @@ export default function AdminLayout({ children, title, mainClassName }: AdminLay
       </aside>
 
       {/* Main Content */}
-      <main className={`relative ml-60 min-w-0 flex-1 overflow-y-auto overflow-x-hidden ${mainClassName || ""}`}>
+      <main className={`${navOpen ? "hidden" : "block"} relative ml-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden lg:ml-60 lg:block ${mainClassName || ""}`}>
         <AdminDecor />
         <div className="relative z-[1] min-h-full w-full">
           {title && (
@@ -155,20 +160,25 @@ export default function AdminLayout({ children, title, mainClassName }: AdminLay
                 src="/media/decor/arc.svg"
                 alt=""
                 aria-hidden="true"
-                className="pointer-events-none absolute right-6 top-1/2 h-24 w-24 -translate-y-1/2 opacity-70"
+                className="pointer-events-none absolute right-6 top-1/2 hidden h-24 w-24 -translate-y-1/2 opacity-70 lg:block"
               />
               <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-teal-500/70 to-transparent" />
-              <div className="flex w-full items-center justify-between gap-4 px-6 py-5">
-                <h1 className="text-xl font-black text-black uppercase tracking-tight">
-                  {title}
-                </h1>
+              <div className="flex w-full min-w-0 items-center justify-between gap-3 px-4 py-4 sm:px-6 sm:py-5">
+                <div className="flex min-w-0 items-center gap-3">
+                  <button type="button" className="shrink-0 rounded-lg border border-slate-200 p-2 lg:hidden" aria-label="Open menu" onClick={() => setNavOpen(true)}>
+                    <Menu className="h-4 w-4" />
+                  </button>
+                  <h1 className="min-w-0 truncate text-xl font-black text-black uppercase tracking-tight">
+                    {title}
+                  </h1>
+                </div>
                 <span className={`relative shrink-0 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${badge.color}`}>
                   {badge.label}
                 </span>
               </div>
             </div>
           )}
-          <div className="w-full min-w-0 px-6 py-6">
+          <div className="w-full min-w-0 px-3 py-4 sm:px-6 sm:py-6">
             {children}
           </div>
         </div>
@@ -179,7 +189,7 @@ export default function AdminLayout({ children, title, mainClassName }: AdminLay
 
 function AdminDecor({ full = false }: { full?: boolean }) {
   return (
-    <div aria-hidden="true" className={`pointer-events-none fixed inset-y-0 right-0 z-0 overflow-hidden ${full ? "left-0" : "left-60"}`}>
+    <div aria-hidden="true" className={`pointer-events-none fixed inset-y-0 right-0 z-0 overflow-hidden ${full ? "left-0" : "left-0 lg:left-60"}`}>
       <div className="absolute inset-0 admin-decor-wash" />
       <div className="absolute inset-0 shadow-[inset_0_0_140px_rgba(15,23,42,0.05)]" />
       <img src="/media/decor/arc.svg" alt="" className="absolute -top-8 -right-28 w-[380px] opacity-60" />

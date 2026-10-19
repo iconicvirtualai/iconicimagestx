@@ -94,7 +94,7 @@ export default function AccountPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <section className={`${cardCls} p-5`}>
           <h2 className="text-sm font-black uppercase tracking-widest">Connection</h2>
-          <p className="mt-2 text-sm text-gray-600">Default from <strong>{account?.sendingAccount || "photos@iconicimagestx.com"}</strong>. Each campaign picks its own from address.</p>
+          <p className="mt-2 text-sm text-gray-600">Default from <strong>{account?.sendingAccount || "hello@iconicimagestx.com"}</strong>. Each campaign picks its own from address.</p>
           <p className="mt-1 text-sm font-semibold">{account?.configured ? "API key is set." : "GMASS_API_KEY is not set on the server."}</p>
           <p className="text-sm text-gray-600">{account?.sendLive && account?.writesEnabled ? "Live marketing sends are enabled." : "Marketing sends stay off until MARKETING_SEND_LIVE=true and GMASS_SEND_ENABLED=true. Client booking and invoice mail still use CLIENT_NOTIFY_LIVE."}</p>
           {userFields.length ? (
@@ -137,7 +137,7 @@ export default function AccountPage() {
       {settings ? (
         <section className={`${cardCls} mt-4 p-5`}>
           <h2 className="text-sm font-black uppercase tracking-widest">Sending accounts</h2>
-          <p className="mt-1 text-xs text-gray-500">photos@iconicimagestx.com is ready. Add news@ (or any other Send-as alias) here, then choose it on a campaign. This does not switch the Gmail account connected to GMass.</p>
+          <p className="mt-1 text-xs text-gray-500">hello@iconicimagestx.com is the marketing default. photos@ stays available. Add news@ (or any other Send-as alias) here, then choose it on a campaign. This does not switch the Gmail account connected to GMass.</p>
           <ul className="mt-3 space-y-2">
             {settings.sendingAccounts.map((accountRow) => (
               <li key={accountRow.email} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2 text-sm">

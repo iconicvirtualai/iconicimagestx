@@ -22,7 +22,7 @@ export const PHOTOGRAPHER_UPLOAD_ACCEPT =
 export type PhotographerWhen = "today" | "upcoming" | "past" | "unscheduled";
 export type PhotographerActionKind = "upload" | "review" | "wait" | "shoot" | "done" | "closed";
 export type PhotographerTone = "action" | "review" | "wait" | "shoot" | "done" | "closed";
-export type PhotographerTab = "next" | "today" | "upcoming" | "all" | "pay";
+export type PhotographerTab = "next" | "today" | "upcoming" | "all" | "pay" | "messages";
 
 export interface PhotographerListingInput {
   id?: unknown;
@@ -145,6 +145,7 @@ export function photographerSummary(jobs: PhotographerJobCard[]): PhotographerSu
 }
 
 export function filterPhotographerJobs(jobs: PhotographerJobCard[], tab: PhotographerTab): PhotographerJobCard[] {
+  if (tab === "messages") return [];
   if (tab === "next") return jobs.filter(jobNeedsPhotographer);
   if (tab === "today") return jobs.filter((job) => job.when === "today");
   if (tab === "upcoming") return jobs.filter((job) => job.when === "upcoming");
@@ -160,6 +161,7 @@ export function photographerEmptyCopy(tab: PhotographerTab, hasAnyJobs: boolean)
   if (tab === "today") return "No shoot is booked for today.";
   if (tab === "upcoming") return "No upcoming shoots are on this login.";
   if (tab === "pay") return "No past shoots to estimate yet.";
+  if (tab === "messages") return "Messages for this login show in the Messages tab.";
   return "No jobs are on this login.";
 }
 
