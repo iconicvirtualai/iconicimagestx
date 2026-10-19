@@ -151,15 +151,15 @@ function parseContactLine(line) {
   };
 }
 const BUSINESS_CONTACT = parseContactLine(BUSINESS_CONTACT_LINE);
-function escapeHtml$8(value) {
+function escapeHtml$9(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function clientEmailContactLineHtml(color = "#666666") {
   const style = `color:${color};text-decoration:underline;`;
   return [
-    escapeHtml$8(BUSINESS_CONTACT.address),
-    `<a href="${BUSINESS_CONTACT.phoneHref}" style="${style}">${escapeHtml$8(BUSINESS_CONTACT.phoneDisplay)}</a>`,
-    `<a href="${BUSINESS_CONTACT.emailHref}" style="${style}">${escapeHtml$8(BUSINESS_CONTACT.email)}</a>`
+    escapeHtml$9(BUSINESS_CONTACT.address),
+    `<a href="${BUSINESS_CONTACT.phoneHref}" style="${style}">${escapeHtml$9(BUSINESS_CONTACT.phoneDisplay)}</a>`,
+    `<a href="${BUSINESS_CONTACT.emailHref}" style="${style}">${escapeHtml$9(BUSINESS_CONTACT.email)}</a>`
   ].join(" | ");
 }
 const __vite_import_meta_env__ = {};
@@ -207,13 +207,13 @@ function dotOptInPath(token) {
   params.set("t", token);
   return `/api/orders/dot-opt-in?${params.toString()}`;
 }
-function escapeHtml$7(value) {
+function escapeHtml$8(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function linkDoorsOpenTour(sentence) {
   const at = sentence.indexOf(DOORS_OPEN_TOUR_NAME);
-  if (at < 0) return escapeHtml$7(sentence);
-  return escapeHtml$7(sentence.slice(0, at)) + `<a href="${DOORS_OPEN_TOUR_URL}" rel="noreferrer" style="color:#111111;font-weight:600;">${DOORS_OPEN_TOUR_NAME}</a>` + escapeHtml$7(sentence.slice(at + DOORS_OPEN_TOUR_NAME.length));
+  if (at < 0) return escapeHtml$8(sentence);
+  return escapeHtml$8(sentence.slice(0, at)) + `<a href="${DOORS_OPEN_TOUR_URL}" rel="noreferrer" style="color:#111111;font-weight:600;">${DOORS_OPEN_TOUR_NAME}</a>` + escapeHtml$8(sentence.slice(at + DOORS_OPEN_TOUR_NAME.length));
 }
 const noteStyle = "font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:15px;line-height:1.5;color:#333333;margin:16px 0;";
 function doorsOpenDeliveryEmailHtml() {
@@ -223,7 +223,7 @@ function doorsOpenReceiptEmailHtml(optInUrl) {
   const sentence = `<p style="${noteStyle}">${linkDoorsOpenTour(DOT_RECEIPT_LINE)}</p>`;
   const url = optInUrl.trim();
   if (!url.startsWith("https://") || url.includes(" ")) return sentence;
-  return sentence + `<p style="margin:16px 0;"><a href="${escapeHtml$7(url)}" style="font-family:Inter,ui-sans-serif,system-ui,sans-serif;background:#000000;color:#ffffff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">${DOT_OPT_IN_ACTION_LABEL}</a></p>`;
+  return sentence + `<p style="margin:16px 0;"><a href="${escapeHtml$8(url)}" style="font-family:Inter,ui-sans-serif,system-ui,sans-serif;background:#000000;color:#ffffff;padding:12px 24px;text-decoration:none;display:inline-block;border-radius:4px;">${DOT_OPT_IN_ACTION_LABEL}</a></p>`;
 }
 function dotOptInResultHtml(ok) {
   const title = ok === true ? "Your open house is listed." : ok === "wait" ? "Please try that link again in a moment." : "This link is not valid.";
@@ -1713,7 +1713,7 @@ function receiptHtml(content) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml$6(content.invoiceNumber)} receipt</title>
+<title>${escapeHtml$7(content.invoiceNumber)} receipt</title>
 <style>
 @media only screen and (max-width: 480px) {
   .totals-desktop { display: none !important; }
@@ -1727,7 +1727,7 @@ function receiptHtml(content) {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:700px;font-family:${FONT};color:#111111;">
 ${headerBlock(content)}
 <tr><td style="padding:28px 28px 8px;font-family:${FONT};font-size:14px;line-height:1.5;color:#222222;">
-Hi ${escapeHtml$6(content.clientName)}, we received your payment for invoice ${escapeHtml$6(content.invoiceNumber)}.
+Hi ${escapeHtml$7(content.clientName)}, we received your payment for invoice ${escapeHtml$7(content.invoiceNumber)}.
 </td></tr>
 <tr><td style="padding:0 28px 4px;font-family:${FONT};font-size:14px;line-height:1.5;color:#111111;">${BOOKING_PROCESSING_LABEL}</td></tr>
 <tr><td style="padding:12px 20px 0;">
@@ -1774,11 +1774,11 @@ function headerBlock(content) {
 <td valign="top" style="font-family:${FONT};">
 <div style="font-family:${FONT};font-size:32px;line-height:1;font-weight:bold;letter-spacing:6px;color:${YELLOW};">RECEIPT</div>
 <div style="font-family:${FONT};font-size:12px;line-height:1.4;font-weight:bold;letter-spacing:3px;color:${YELLOW};padding-top:10px;">PAYMENT RECEIVED</div>
-<div style="font-family:${FONT};font-size:13px;line-height:1.5;color:#ffffff;padding-top:16px;">INVOICE NO : ${escapeHtml$6(content.invoiceNumber)}</div>
-<div style="font-family:${FONT};font-size:13px;line-height:1.5;color:#ffffff;padding-top:4px;">${escapeHtml$6(content.paidAtLabel)}</div>
+<div style="font-family:${FONT};font-size:13px;line-height:1.5;color:#ffffff;padding-top:16px;">INVOICE NO : ${escapeHtml$7(content.invoiceNumber)}</div>
+<div style="font-family:${FONT};font-size:13px;line-height:1.5;color:#ffffff;padding-top:4px;">${escapeHtml$7(content.paidAtLabel)}</div>
 </td>
 <td valign="top" align="right" width="160" style="padding-left:12px;">
-<img src="${escapeHtml$6(content.logoUrl)}" alt="Iconic Images" width="140" style="display:block;border:0;outline:none;text-decoration:none;width:140px;max-width:140px;height:auto;">
+<img src="${escapeHtml$7(content.logoUrl)}" alt="Iconic Images" width="140" style="display:block;border:0;outline:none;text-decoration:none;width:140px;max-width:140px;height:auto;">
 </td>
 </tr>
 </table>
@@ -1787,10 +1787,10 @@ function headerBlock(content) {
 function lineRow(line, index) {
   const bg = index % 2 === 0 ? ROW : "#ffffff";
   return `<tr>
-<td bgcolor="${bg}" style="background:${bg};font-family:${FONT};font-size:13px;font-weight:bold;letter-spacing:0.5px;color:${TEAL};padding:14px;border-bottom:1px solid #e5e7eb;">${escapeHtml$6(line.name.toUpperCase())}</td>
-<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#374151;padding:14px 10px;border-bottom:1px solid #e5e7eb;">${escapeHtml$6(String(line.qty))}</td>
-<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#374151;padding:14px 10px;border-bottom:1px solid #e5e7eb;">${escapeHtml$6(money$7(line.unit))}</td>
-<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#111111;padding:14px;border-bottom:1px solid #e5e7eb;">${escapeHtml$6(money$7(line.total))}</td>
+<td bgcolor="${bg}" style="background:${bg};font-family:${FONT};font-size:13px;font-weight:bold;letter-spacing:0.5px;color:${TEAL};padding:14px;border-bottom:1px solid #e5e7eb;">${escapeHtml$7(line.name.toUpperCase())}</td>
+<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#374151;padding:14px 10px;border-bottom:1px solid #e5e7eb;">${escapeHtml$7(String(line.qty))}</td>
+<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#374151;padding:14px 10px;border-bottom:1px solid #e5e7eb;">${escapeHtml$7(money$7(line.unit))}</td>
+<td bgcolor="${bg}" align="right" style="background:${bg};font-family:${FONT};font-size:13px;color:#111111;padding:14px;border-bottom:1px solid #e5e7eb;">${escapeHtml$7(money$7(line.total))}</td>
 </tr>`;
 }
 function totalRow(label, value, emphasis, note) {
@@ -1798,7 +1798,7 @@ function totalRow(label, value, emphasis, note) {
   const noteHtml = "";
   return `<tr>
 <td style="padding:12px 16px;font-family:${FONT};font-size:11px;font-weight:bold;letter-spacing:0.8px;color:#111111;border-bottom:1px solid #e5e7eb;">${label}</td>
-<td align="right" style="padding:12px 16px;font-family:${FONT};${valueStyle}border-bottom:1px solid #e5e7eb;">${escapeHtml$6(value)}${noteHtml}</td>
+<td align="right" style="padding:12px 16px;font-family:${FONT};${valueStyle}border-bottom:1px solid #e5e7eb;">${escapeHtml$7(value)}${noteHtml}</td>
 </tr>`;
 }
 function totalCell(label, value, emphasis, note) {
@@ -1806,7 +1806,7 @@ function totalCell(label, value, emphasis, note) {
   const noteHtml = "";
   return `<td valign="top" align="center" style="padding:14px 6px;font-family:${FONT};">
 <div style="font-family:${FONT};font-size:10px;font-weight:bold;letter-spacing:0.8px;color:#111111;">${label}</div>
-<div style="font-family:${FONT};${valueStyle}padding-top:6px;">${escapeHtml$6(value)}</div>
+<div style="font-family:${FONT};${valueStyle}padding-top:6px;">${escapeHtml$7(value)}</div>
 ${noteHtml}
 </td>`;
 }
@@ -1817,13 +1817,13 @@ function downloadsBlock(content) {
   const primaryHref = presentation || gallery;
   const primaryLabel = presentation ? "View your listing presentation" : "Your downloads &amp; invoice";
   const secondary = presentation && gallery ? `<tr><td align="center" style="padding-top:12px;font-family:${FONT};font-size:14px;">
-<a href="${escapeHtml$6(gallery)}" style="color:${TEAL};font-family:${FONT};font-weight:bold;text-decoration:underline;">Your downloads &amp; invoice</a>
+<a href="${escapeHtml$7(gallery)}" style="color:${TEAL};font-family:${FONT};font-weight:bold;text-decoration:underline;">Your downloads &amp; invoice</a>
 </td></tr>` : "";
   return `<tr><td style="padding:28px 24px 12px;">
 <div style="font-family:${FONT};font-size:22px;line-height:1.3;font-weight:bold;color:#111111;">Your downloads are ready</div>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:16px;">
 <tr><td bgcolor="#000000" style="background:#000000;border-radius:4px;">
-<a href="${escapeHtml$6(primaryHref)}" style="display:inline-block;padding:14px 22px;font-family:${FONT};font-size:15px;font-weight:bold;color:${YELLOW};text-decoration:none;">${primaryLabel}</a>
+<a href="${escapeHtml$7(primaryHref)}" style="display:inline-block;padding:14px 22px;font-family:${FONT};font-size:15px;font-weight:bold;color:${YELLOW};text-decoration:none;">${primaryLabel}</a>
 </td></tr>
 ${secondary}
 </table>
@@ -1832,7 +1832,7 @@ ${secondary}
 function balanceBlock(content) {
   if (content.balance <= 0) return "";
   return `<tr><td style="padding:20px 24px 8px;font-family:${FONT};font-size:14px;color:#111111;">
-Balance due: <strong>${escapeHtml$6(money$7(content.balance))}</strong>. Downloads stay locked until the invoice is paid in full.
+Balance due: <strong>${escapeHtml$7(money$7(content.balance))}</strong>. Downloads stay locked until the invoice is paid in full.
 </td></tr>`;
 }
 function footerBlock() {
@@ -1841,12 +1841,12 @@ function footerBlock() {
 <tr>
 <td valign="top" style="font-family:${FONT};font-size:13px;line-height:1.55;color:#ffffff;">
 <div style="font-family:${FONT};font-size:12px;font-weight:bold;letter-spacing:0.6px;color:${GREEN};padding-bottom:8px;">PAYMENT INFORMATION:</div>
-${escapeHtml$6(LEGAL_BUSINESS_NAME)}<br>
+${escapeHtml$7(LEGAL_BUSINESS_NAME)}<br>
 <div style="font-family:${FONT};font-size:13px;line-height:1.55;color:#ffffff;padding-top:8px;">${clientEmailContactLineHtml("#ffffff")}</div>
 </td>
 <td valign="top" align="right" style="font-family:${FONT};font-size:13px;line-height:1.55;color:#ffffff;">
-${escapeHtml$6(BUSINESS_CONTACT.streetAddress)}<br>
-${escapeHtml$6(BUSINESS_CONTACT.addressLine2)}
+${escapeHtml$7(BUSINESS_CONTACT.streetAddress)}<br>
+${escapeHtml$7(BUSINESS_CONTACT.addressLine2)}
 </td>
 </tr>
 </table>
@@ -1916,7 +1916,7 @@ function dollars$1(value) {
 function text$o(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function escapeHtml$6(value) {
+function escapeHtml$7(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 const EMAIL_TEMPLATES_COLLECTION = "emailTemplates";
@@ -2636,13 +2636,13 @@ const ADDRESS_LIMIT = 300;
 const PLACE_ID_LIMIT = 300;
 function serviceLocationFromInput(value) {
   if (typeof value === "string") {
-    const formatted2 = clip(value, ADDRESS_LIMIT);
+    const formatted2 = clip$1(value, ADDRESS_LIMIT);
     return formatted2 ? { kind: "text", formatted: formatted2 } : null;
   }
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const row = value;
-  const formatted = clip(firstString(row, ["formatted", "description", "label"]), ADDRESS_LIMIT);
-  const placeId = clip(firstString(row, ["placeId", "place_id"]), PLACE_ID_LIMIT);
+  const formatted = clip$1(firstString(row, ["formatted", "description", "label"]), ADDRESS_LIMIT);
+  const placeId = clip$1(firstString(row, ["placeId", "place_id"]), PLACE_ID_LIMIT);
   const lat = readCoord$1(row.lat ?? row.latitude, "lat");
   const lng = readCoord$1(row.lng ?? row.longitude, "lng");
   if (formatted && placeId && lat != null && lng != null) {
@@ -2683,7 +2683,7 @@ function firstString(row, keys) {
   }
   return "";
 }
-function clip(value, limit) {
+function clip$1(value, limit) {
   if (typeof value !== "string") return "";
   return value.trim().slice(0, limit);
 }
@@ -3613,7 +3613,7 @@ function formatShootDateLabel(isoDay, raw) {
 function addressRecords(data) {
   const records = [data];
   for (const key of ["address", "propertyAddress", "shootLocation"]) {
-    const nested2 = asRecord$3(data[key]);
+    const nested2 = asRecord$4(data[key]);
     if (nested2) records.push(nested2);
   }
   return records;
@@ -3672,13 +3672,13 @@ function readRaw(data, keys) {
 function factRecords(data) {
   const records = [data];
   for (const key of ["property", "details", "facts", "propertyFacts", "homeFacts"]) {
-    const nested2 = asRecord$3(data[key]);
+    const nested2 = asRecord$4(data[key]);
     if (nested2) records.push(nested2);
   }
-  const portal = asRecord$3(data.portalData);
+  const portal = asRecord$4(data.portalData);
   if (portal) {
     records.push(portal);
-    const facts = asRecord$3(portal.facts);
+    const facts = asRecord$4(portal.facts);
     if (facts) records.push(facts);
   }
   return records;
@@ -3711,7 +3711,7 @@ function firstText$3(record2, keys) {
   }
   return "";
 }
-function asRecord$3(value) {
+function asRecord$4(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   return value;
 }
@@ -5795,7 +5795,7 @@ function officeNewOrderEmail(saved, options) {
   const subjectCore = `New order ${orderNumber} — ${packageName} — ${address} — ${requestedDate}`;
   const subject = isTestOrder(clientName2, notes) ? `[TEST] ${subjectCore}` : subjectCore;
   const plain = fields.map(([label, value]) => `${label}: ${value}`).join("\n");
-  const html = `<div style="font-family:Arial,sans-serif;max-width:640px;color:#111"><h1 style="font-size:18px">${escapeHtml$5(subject)}</h1><table style="width:100%;border-collapse:collapse">${fields.map(([label, value]) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:bold;vertical-align:top">${escapeHtml$5(label)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:pre-wrap">${escapeHtml$5(value)}</td></tr>`).join("")}</table></div>`;
+  const html = `<div style="font-family:Arial,sans-serif;max-width:640px;color:#111"><h1 style="font-size:18px">${escapeHtml$6(subject)}</h1><table style="width:100%;border-collapse:collapse">${fields.map(([label, value]) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:bold;vertical-align:top">${escapeHtml$6(label)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:pre-wrap">${escapeHtml$6(value)}</td></tr>`).join("")}</table></div>`;
   return { subject, text: plain, html, orderNumber, packageName };
 }
 function isTestOrder(clientName2, notes) {
@@ -5986,7 +5986,7 @@ function nested(value) {
 function text$g(value) {
   return typeof value === "string" ? value.trim() : "";
 }
-function escapeHtml$5(value) {
+function escapeHtml$6(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 const OFFICE_NEW_ORDER_EMAIL_TEMPLATE = "office_new_order";
@@ -8132,7 +8132,7 @@ function createRateLimiter(options) {
     }
   };
 }
-const router$p = Router();
+const router$q = Router();
 const db$p = () => admin.firestore();
 const BOOKING_SUBMIT_WINDOW_MS = 15 * 60 * 1e3;
 const BOOKING_SUBMIT_MAX = 10;
@@ -8180,7 +8180,7 @@ async function loadBookingCatalog() {
     return packagesForStaffEditor([]);
   }
 }
-router$p.post("/", async (req, res) => {
+router$q.post("/", async (req, res) => {
   const limit = bookingSubmitLimiter.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
@@ -8773,13 +8773,13 @@ async function socialRateCaller(req) {
     return { role: null, email: null };
   }
 }
-router$p.get("/social-rate", async (req, res) => {
+router$q.get("/social-rate", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const requested = typeof req.query.date === "string" ? req.query.date : "";
   const previewAllowed = requested ? socialRatePreviewAllowed(await socialRateCaller(req)) : false;
   return res.json(socialRateView(/* @__PURE__ */ new Date(), requested || null, previewAllowed));
 });
-router$p.post("/holiday-calendar-backfill", requireAdmin, async (_req, res) => {
+router$q.post("/holiday-calendar-backfill", requireAdmin, async (_req, res) => {
   try {
     return res.json(await backfillHolidayCalendarEvents());
   } catch (err) {
@@ -8787,7 +8787,7 @@ router$p.post("/holiday-calendar-backfill", requireAdmin, async (_req, res) => {
     return res.status(500).json({ error: "Holiday calendar backfill failed." });
   }
 });
-router$p.get("/holiday-slots", async (_req, res) => {
+router$q.get("/holiday-slots", async (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
   try {
     return res.json(holidayTakenFromOrders(await loadHolidaySlotOrders()));
@@ -8796,13 +8796,13 @@ router$p.get("/holiday-slots", async (_req, res) => {
     return res.status(500).json({ error: "Holiday slots are unavailable." });
   }
 });
-router$p.get("/photographers", (_req, res) => {
+router$q.get("/photographers", (_req, res) => {
   return res.json({
     noPreference: { id: NO_PREFERENCE_ID, name: NO_PREFERENCE_NAME },
     photographers: publicBookingPhotographers()
   });
 });
-router$p.get("/slots", async (req, res) => {
+router$q.get("/slots", async (req, res) => {
   const basics = typeof req.query.basics === "string" ? req.query.basics.split(",").map((id) => id.trim()).filter(Boolean) : [];
   const preferenceId = preferenceFromRequest(req.query.photographer, "");
   try {
@@ -8824,14 +8824,14 @@ router$p.get("/slots", async (req, res) => {
     return res.json({ live: false, durationMinutes: 90, slots: [] });
   }
 });
-router$p.get("/catalog", async (_req, res) => {
+router$q.get("/catalog", async (_req, res) => {
   const catalog = await loadBookingCatalog();
   return res.json({
     ...publicBookingCatalogResponse(catalog),
     processingEnabled: processingEnabled()
   });
 });
-router$p.get("/", requireCoordinator, async (_req, res) => {
+router$q.get("/", requireCoordinator, async (_req, res) => {
   try {
     const snapshot = await db$p().collection("orderRequests").orderBy("createdAt", "desc").limit(100).get();
     const requests = snapshot.docs.map((doc) => ({
@@ -8844,7 +8844,7 @@ router$p.get("/", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking requests." });
   }
 });
-router$p.get("/:id", requireCoordinator, async (req, res) => {
+router$q.get("/:id", requireCoordinator, async (req, res) => {
   try {
     const doc = await db$p().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) {
@@ -8856,7 +8856,7 @@ router$p.get("/:id", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch booking request." });
   }
 });
-router$p.post("/:id/assign-photographer", requireCoordinator, async (req, res) => {
+router$q.post("/:id/assign-photographer", requireCoordinator, async (req, res) => {
   try {
     const requestDoc = await db$p().collection("orderRequests").doc(req.params.id).get();
     if (!requestDoc.exists) return res.status(404).json({ error: "Booking request not found." });
@@ -8871,7 +8871,7 @@ router$p.post("/:id/assign-photographer", requireCoordinator, async (req, res) =
     return res.status(500).json({ error: "Could not assign the photographer." });
   }
 });
-router$p.patch("/:id/confirm", requireCoordinator, async (req, res) => {
+router$q.patch("/:id/confirm", requireCoordinator, async (req, res) => {
   try {
     const { assignedPhotographerId, assignedPhotographerName: postedPhotographerName, scheduledDate, scheduledTime, internalNotes } = req.body;
     const requestDoc = await db$p().collection("orderRequests").doc(req.params.id).get();
@@ -9272,7 +9272,7 @@ async function releaseOrderCalendar(data) {
     return calendarHoldFailureMessage(err);
   }
 }
-router$p.patch("/:id/cancel", requireCoordinator, async (req, res) => {
+router$q.patch("/:id/cancel", requireCoordinator, async (req, res) => {
   try {
     const doc = await db$p().collection("orderRequests").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Not found." });
@@ -9301,7 +9301,7 @@ router$p.patch("/:id/cancel", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to cancel booking." });
   }
 });
-router$p.patch("/:id/decline", requireCoordinator, async (req, res) => {
+router$q.patch("/:id/decline", requireCoordinator, async (req, res) => {
   try {
     const { reason } = req.body;
     const doc = await db$p().collection("orderRequests").doc(req.params.id).get();
@@ -9477,7 +9477,7 @@ async function ensureDotOptInLink(invoice) {
     return { dotOptIn: false, url: null };
   }
 }
-const router$o = Router();
+const router$p = Router();
 const db$o = () => admin.firestore();
 const dotOptInLimiter = createRateLimiter({ windowMs: 10 * 60 * 1e3, max: 30 });
 function sendDotOptInPage(res, status2, ok) {
@@ -9490,7 +9490,7 @@ function sendDotOptInPage(res, status2, ok) {
   });
   res.send(dotOptInResultHtml(ok));
 }
-router$o.get("/dot-opt-in", async (req, res) => {
+router$p.get("/dot-opt-in", async (req, res) => {
   const limit = dotOptInLimiter.check(clientIp(req));
   if (!limit.allowed) {
     res.set("Retry-After", String(limit.retryAfterSec));
@@ -9506,7 +9506,7 @@ router$o.get("/dot-opt-in", async (req, res) => {
     sendDotOptInPage(res, 500, false);
   }
 });
-router$o.get("/", requireStaff, async (req, res) => {
+router$p.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, photographerId, limit = "50", startAfter } = req.query;
     let query = db$o().collection("orders").orderBy("createdAt", "desc");
@@ -9534,7 +9534,7 @@ router$o.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch orders." });
   }
 });
-router$o.get("/dashboard", requireStaff, async (_req, res) => {
+router$p.get("/dashboard", requireStaff, async (_req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -9567,7 +9567,7 @@ router$o.get("/dashboard", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch dashboard stats." });
   }
 });
-router$o.get("/:id", requireStaff, async (req, res) => {
+router$p.get("/:id", requireStaff, async (req, res) => {
   try {
     const orderDoc = await db$o().collection("orders").doc(req.params.id).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
@@ -9602,7 +9602,7 @@ router$o.get("/:id", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch order." });
   }
 });
-router$o.patch("/:id", requireCoordinator, async (req, res) => {
+router$p.patch("/:id", requireCoordinator, async (req, res) => {
   try {
     const allowed = [
       "status",
@@ -9653,7 +9653,7 @@ const VALID_TRANSITIONS = {
   completed: [],
   cancelled: []
 };
-router$o.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$p.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2, note } = req.body;
     const orderDoc = await db$o().collection("orders").doc(req.params.id).get();
@@ -9699,7 +9699,7 @@ router$o.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update order status." });
   }
 });
-router$o.get("/:id/timeline", requireStaff, async (req, res) => {
+router$p.get("/:id/timeline", requireStaff, async (req, res) => {
   try {
     const [messages, editRequests, agentLogs] = await Promise.all([
       db$o().collection("messages").where("orderId", "==", req.params.id).orderBy("createdAt", "asc").get(),
@@ -9855,14 +9855,14 @@ function readCookie(header, name) {
   }
   return null;
 }
-const memory$2 = /* @__PURE__ */ new Map();
+const memory$3 = /* @__PURE__ */ new Map();
 function useMemoryStore() {
   return !admin.apps.length || process.env.NODE_ENV === "test" || process.env.ORDER_APPROVAL_STORE === "memory";
 }
 async function writeOrderApproval(id, approval) {
   if (useMemoryStore()) {
-    if (!memory$2.has(id)) return null;
-    memory$2.set(id, { approval });
+    if (!memory$3.has(id)) return null;
+    memory$3.set(id, { approval });
     return approval;
   }
   const ref = admin.firestore().collection("orders").doc(id);
@@ -13280,7 +13280,7 @@ const handlePublicGalleryLink = async (req, res) => {
     return res.status(500).json({ code: "lookup_failed", error: message, message });
   }
 };
-const router$n = Router();
+const router$o = Router();
 const db$i = () => admin.firestore();
 const storage = () => admin.storage().bucket();
 function cleanPosterUrl(value) {
@@ -13376,7 +13376,7 @@ function clientGalleryPayload(id, gallery, gate2) {
     mediaItems: showMedia ? lockedClientGalleryMedia(id, media, unlocked) : []
   };
 }
-router$n.get("/", requireStaff, async (req, res) => {
+router$o.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, orderId } = req.query;
     let query = db$i().collection("galleries").orderBy("createdAt", "desc");
@@ -13399,7 +13399,7 @@ function malformedPublicGalleryId(id) {
   if (/^__.*__$/.test(id)) return true;
   return /[\u0000-\u001F\u007F]/.test(id);
 }
-router$n.get("/public/:id", async (req, res) => {
+router$o.get("/public/:id", async (req, res) => {
   const id = typeof req.params.id === "string" ? req.params.id : "";
   if (malformedPublicGalleryId(id)) {
     console.warn("[Galleries] Public gallery id rejected.");
@@ -13427,8 +13427,8 @@ router$n.get("/public/:id", async (req, res) => {
     return res.status(500).json({ error: "We couldn't open this gallery." });
   }
 });
-router$n.get("/link/:id", handlePublicGalleryLink);
-router$n.get("/:id", requireAuth, async (req, res) => {
+router$o.get("/link/:id", handlePublicGalleryLink);
+router$o.get("/:id", requireAuth, async (req, res) => {
   try {
     const doc = await db$i().collection("galleries").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Gallery not found." });
@@ -13452,7 +13452,7 @@ router$n.get("/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch gallery." });
   }
 });
-router$n.post("/:id/upload-url", requirePhotographer, async (req, res) => {
+router$o.post("/:id/upload-url", requirePhotographer, async (req, res) => {
   try {
     const { fileName: fileName2, fileType, isRaw: isRaw2 = false } = req.body;
     if (!fileName2 || !fileType) {
@@ -13477,7 +13477,7 @@ router$n.post("/:id/upload-url", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to generate upload URL." });
   }
 });
-router$n.post("/:id/media", requirePhotographer, async (req, res) => {
+router$o.post("/:id/media", requirePhotographer, async (req, res) => {
   try {
     const {
       storagePath,
@@ -13531,7 +13531,7 @@ router$n.post("/:id/media", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to register media." });
   }
 });
-router$n.post("/:id/media-link", requireCoordinator, async (req, res) => {
+router$o.post("/:id/media-link", requireCoordinator, async (req, res) => {
   try {
     const { url, title, type = "video", embedUrl, thumbnailUrl, downloadable = false, poster, posterUrl } = req.body;
     if (!url) return res.status(400).json({ error: "url required." });
@@ -13567,7 +13567,7 @@ router$n.post("/:id/media-link", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to register media link." });
   }
 });
-router$n.get("/:id/release", requireCoordinator, async (req, res) => {
+router$o.get("/:id/release", requireCoordinator, async (req, res) => {
   if (!adminReady$5(res)) return;
   try {
     const report = await loadGalleryReleaseForGallery(req.params.id);
@@ -13579,7 +13579,7 @@ router$n.get("/:id/release", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to check gallery release." });
   }
 });
-router$n.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$o.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2 } = req.body;
     const validStatuses = ["pending_upload", "raw_uploaded", "editing", "ready_for_review", "approved", "delivered"];
@@ -13601,7 +13601,7 @@ router$n.patch("/:id/status", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update gallery status." });
   }
 });
-router$n.post("/:id/deliver", requireCoordinator, async (req, res) => {
+router$o.post("/:id/deliver", requireCoordinator, async (req, res) => {
   try {
     if (!adminReady$5(res)) return;
     const result = await deliverGalleryToClient(req.params.id, {
@@ -13630,7 +13630,7 @@ router$n.post("/:id/deliver", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to deliver gallery." });
   }
 });
-router$n.patch("/:id/downloads", requireCoordinator, async (req, res) => {
+router$o.patch("/:id/downloads", requireCoordinator, async (req, res) => {
   if (!adminReady$5(res)) return;
   try {
     if (typeof req.body?.released !== "boolean") {
@@ -13667,7 +13667,7 @@ router$n.patch("/:id/downloads", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to update gallery downloads." });
   }
 });
-router$n.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
+router$o.delete("/:id/media/:mediaId", requireCoordinator, async (req, res) => {
   try {
     const galleryDoc = await db$i().collection("galleries").doc(req.params.id).get();
     if (!galleryDoc.exists) return res.status(404).json({ error: "Gallery not found." });
@@ -14145,7 +14145,7 @@ function parseSeniorLivingOrder(body) {
     quote: quoted.quote
   };
 }
-const router$m = Router();
+const router$n = Router();
 const db$h = () => appFirestore();
 const stripe$1 = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
@@ -14614,7 +14614,7 @@ async function applyDepositPayment({
     });
   });
 }
-router$m.post("/create-intent", requireAuth, async (req, res) => {
+router$n.post("/create-intent", requireAuth, async (req, res) => {
   try {
     if (!stripeReady()) {
       return res.status(503).json({ error: "Studio Noir Stripe payments are not configured yet." });
@@ -14652,7 +14652,7 @@ router$m.post("/create-intent", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to create payment intent." });
   }
 });
-router$m.post("/send-invoice", requireCoordinator, async (req, res) => {
+router$n.post("/send-invoice", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
@@ -14695,7 +14695,7 @@ router$m.post("/send-invoice", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send invoice." });
   }
 });
-router$m.post("/send-receipt", requireCoordinator, async (req, res) => {
+router$n.post("/send-receipt", requireCoordinator, async (req, res) => {
   try {
     const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: "invoiceId required." });
@@ -14718,7 +14718,7 @@ router$m.post("/send-receipt", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to send receipt." });
   }
 });
-router$m.get("/invoice/:id", async (req, res) => {
+router$n.get("/invoice/:id", async (req, res) => {
   try {
     const invoiceDoc = await loadInvoice(req.params.id);
     if (!invoiceDoc) return invoiceNotFound(res);
@@ -14787,7 +14787,7 @@ router$m.get("/invoice/:id", async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch invoice." });
   }
 });
-router$m.post("/invoice/:id/checkout", async (req, res) => {
+router$n.post("/invoice/:id/checkout", async (req, res) => {
   try {
     const invoiceDoc = await loadInvoice(req.params.id);
     if (!invoiceDoc) return invoiceNotFound(res);
@@ -14944,7 +14944,7 @@ router$m.post("/invoice/:id/checkout", async (req, res) => {
     return res.status(500).json({ error: "Failed to start checkout." });
   }
 });
-router$m.post("/invoice/:id/deposit-checkout", async (req, res) => {
+router$n.post("/invoice/:id/deposit-checkout", async (req, res) => {
   try {
     if (!seniorDepositCheckoutLive()) return invoiceNotFound(res);
     const invoiceDoc = await loadInvoice(req.params.id);
@@ -15035,7 +15035,7 @@ router$m.post("/invoice/:id/deposit-checkout", async (req, res) => {
     return res.status(500).json({ error: "Failed to start the deposit checkout." });
   }
 });
-router$m.post("/webhook", async (req, res) => {
+router$n.post("/webhook", async (req, res) => {
   const sig = req.headers["stripe-signature"];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
   let event;
@@ -15110,7 +15110,7 @@ async function findInvoiceForSquarePayment(payment) {
   const snap = await db$h().collection("invoices").doc(hit.id).get();
   return snap.exists ? snap : null;
 }
-router$m.post("/square-webhook", async (req, res) => {
+router$n.post("/square-webhook", async (req, res) => {
   try {
     const rawBody = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : JSON.stringify(req.body || {});
     const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
@@ -15170,7 +15170,7 @@ router$m.post("/square-webhook", async (req, res) => {
     return res.status(500).json({ error: "Square webhook handler failed." });
   }
 });
-router$m.get("/transactions", requireCoordinator, async (req, res) => {
+router$n.get("/transactions", requireCoordinator, async (req, res) => {
   try {
     const { startDate, endDate, limit = "50" } = req.query;
     let query = db$h().collection("transactions").orderBy("createdAt", "desc");
@@ -15253,7 +15253,7 @@ async function handleStripeRefund(charge) {
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   });
 }
-const router$l = Router();
+const router$m = Router();
 const db$g = () => admin.firestore();
 const VSAI_API_BASE = "https://api.virtualstagingai.app/v1";
 const VSAI_API_KEY = process.env.VSAI_API_KEY || process.env.VIRTUAL_STAGING_AI_API_KEY || "";
@@ -15261,7 +15261,7 @@ const VSAI_PRICE_CENTS = parseInt(process.env.VSAI_PRICE_CENTS || "1500", 10);
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2024-06-20"
 });
-router$l.post("/create", requireAuth, async (req, res) => {
+router$m.post("/create", requireAuth, async (req, res) => {
   try {
     if (!VSAI_API_KEY) {
       console.error("[VSAI] VSAI_API_KEY is not set");
@@ -15336,7 +15336,7 @@ router$l.post("/create", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$l.get("/result/:jobId", requireAuth, async (req, res) => {
+router$m.get("/result/:jobId", requireAuth, async (req, res) => {
   try {
     const jobDoc = await db$g().collection("vsaiJobs").doc(req.params.jobId).get();
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
@@ -15411,7 +15411,7 @@ router$l.get("/result/:jobId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$l.get("/result/:jobId/file", requireAuth, async (req, res) => {
+router$m.get("/result/:jobId/file", requireAuth, async (req, res) => {
   try {
     const jobDoc = await db$g().collection("vsaiJobs").doc(req.params.jobId).get();
     if (!jobDoc.exists) return res.status(404).json({ error: "Job not found." });
@@ -15433,7 +15433,7 @@ router$l.get("/result/:jobId/file", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$l.post("/variation", requireAuth, async (req, res) => {
+router$m.post("/variation", requireAuth, async (req, res) => {
   try {
     const { jobId, style: newStyle, roomType: newRoomType } = req.body;
     if (!jobId) {
@@ -15517,7 +15517,7 @@ router$l.post("/variation", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$l.post("/checkout", requireAuth, async (req, res) => {
+router$m.post("/checkout", requireAuth, async (req, res) => {
   try {
     const { jobIds, successUrl, cancelUrl } = req.body;
     if (!jobIds || !Array.isArray(jobIds) || jobIds.length === 0) {
@@ -15586,7 +15586,7 @@ router$l.post("/checkout", requireAuth, async (req, res) => {
     return res.status(500).json({ error: String(err) });
   }
 });
-router$l.post(
+router$m.post(
   "/webhook/stripe",
   // Raw body needed — mount before express.json() parses it
   async (req, res) => {
@@ -15624,7 +15624,7 @@ router$l.post(
     res.json({ received: true });
   }
 );
-router$l.get("/options", (_req, res) => {
+router$m.get("/options", (_req, res) => {
   return res.json({
     roomTypes: [
       { value: "living", label: "Living Room" },
@@ -15654,9 +15654,9 @@ router$l.get("/options", (_req, res) => {
 function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
 }
-const router$k = Router();
+const router$l = Router();
 const db$f = () => admin.firestore();
-router$k.post("/email", requireStaff, async (req, res) => {
+router$l.post("/email", requireStaff, async (req, res) => {
   try {
     const { to, subject, body, orderId, clientId: clientId2 } = req.body;
     if (!to || !body?.trim()) {
@@ -15688,7 +15688,7 @@ router$k.post("/email", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to send email." });
   }
 });
-router$k.get("/:orderId", requireAuth, async (req, res) => {
+router$l.get("/:orderId", requireAuth, async (req, res) => {
   try {
     const orderDoc = await db$f().collection("orders").doc(req.params.orderId).get();
     if (!orderDoc.exists) return res.status(404).json({ error: "Order not found." });
@@ -15717,7 +15717,7 @@ router$k.get("/:orderId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch messages." });
   }
 });
-router$k.post("/:orderId", requireAuth, async (req, res) => {
+router$l.post("/:orderId", requireAuth, async (req, res) => {
   try {
     const { content, attachments } = req.body;
     if (!content?.trim()) {
@@ -15772,7 +15772,7 @@ router$k.post("/:orderId", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to send message." });
   }
 });
-router$k.get("/unread/count", requireStaff, async (_req, res) => {
+router$l.get("/unread/count", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$f().collection("messages").where("isRead", "==", false).where("senderType", "==", "client").get();
     return res.json({ unreadCount: snapshot.size });
@@ -16141,10 +16141,10 @@ function portalFactsDraftFromDetail(detail) {
   };
 }
 function sanitizePortalListingFacts(value) {
-  const row = asRecord$2(value);
+  const row = asRecord$3(value);
   if (!row) return null;
-  const addressRow = asRecord$2(row.address);
-  const factsRow = asRecord$2(row.facts);
+  const addressRow = asRecord$3(row.address);
+  const factsRow = asRecord$3(row.facts);
   if (!addressRow || !factsRow) return null;
   const facts = {};
   for (const fact of FACT_DEFS) {
@@ -16190,10 +16190,10 @@ function applyStoredPortalData(detail, stored) {
   };
 }
 function readStoredPortalData(value) {
-  const row = asRecord$2(value);
+  const row = asRecord$3(value);
   if (!row) return null;
-  const addressRow = asRecord$2(row.address);
-  const factsRow = asRecord$2(row.facts);
+  const addressRow = asRecord$3(row.address);
+  const factsRow = asRecord$3(row.facts);
   if (!addressRow && !factsRow) return null;
   const facts = {};
   if (factsRow) {
@@ -16316,12 +16316,12 @@ function text$5(value) {
 function boolOr(value, fallback) {
   return typeof value === "boolean" ? value : fallback;
 }
-function asRecord$2(value) {
+function asRecord$3(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : null;
 }
 function readFact(records, keys) {
   for (const record2 of records) {
-    const bags = [record2, asRecord$2(record2.property), asRecord$2(record2.propertyDetails), asRecord$2(record2.listingInfo), asRecord$2(record2.details)];
+    const bags = [record2, asRecord$3(record2.property), asRecord$3(record2.propertyDetails), asRecord$3(record2.listingInfo), asRecord$3(record2.details)];
     for (const bag of bags) {
       if (!bag) continue;
       for (const key of keys) {
@@ -16376,7 +16376,7 @@ function fillAddress(target, source) {
   if (target.lng == null && source.lng != null) target.lng = source.lng;
 }
 function addressFromRecord(record2) {
-  const structured = asRecord$2(record2.address) || asRecord$2(record2.shootLocation) || asRecord$2(record2.propertyAddress);
+  const structured = asRecord$3(record2.address) || asRecord$3(record2.shootLocation) || asRecord$3(record2.propertyAddress);
   const parsed = parseAddressText(
     text$5(record2.addressLine1) ? "" : addressString(record2.address) || addressString(record2.propertyAddress) || addressString(record2.shootLocation) || text$5(structured?.formatted)
   );
@@ -16433,9 +16433,9 @@ function splitUnit(line1) {
   return { line1: match[1].trim(), line2: match[2].trim() };
 }
 function nestedCoord(record2, axis) {
-  const geo = asRecord$2(record2.geo) || asRecord$2(record2.location) || asRecord$2(record2.geometry);
+  const geo = asRecord$3(record2.geo) || asRecord$3(record2.location) || asRecord$3(record2.geometry);
   if (!geo) return void 0;
-  const location = asRecord$2(geo.location) || geo;
+  const location = asRecord$3(geo.location) || geo;
   if (axis === "lat") return location.lat ?? location.latitude;
   return location.lng ?? location.longitude;
 }
@@ -17345,13 +17345,13 @@ const handlePatchPortalWebsite = async (req, res) => {
     return sendKnownError$3(res, err, "Could not save the listing site.");
   }
 };
-const router$j = Router();
+const router$k = Router();
 const db$c = () => admin.firestore();
 const HOME_LIMIT = 100;
-function asRecord$1(value) {
+function asRecord$2(value) {
   return value && typeof value === "object" ? value : {};
 }
-router$j.get("/", requireStaff, async (req, res) => {
+router$k.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, search, limit = "50" } = req.query;
     let query = db$c().collection("clients").orderBy("createdAt", "desc");
@@ -17378,7 +17378,7 @@ function adminReady$3(res) {
   });
   return false;
 }
-router$j.post("/register", async (req, res) => {
+router$k.post("/register", async (req, res) => {
   if (!adminReady$3(res)) return;
   const firstName = cleanPersonName(req.body?.firstName);
   const lastName = cleanPersonName(req.body?.lastName);
@@ -17440,7 +17440,7 @@ router$j.post("/register", async (req, res) => {
     return res.status(500).json({ error: "Could not create the client account." });
   }
 });
-router$j.get("/me/home", requireAuth, async (req, res) => {
+router$k.get("/me/home", requireAuth, async (req, res) => {
   if (!adminReady$3(res)) return;
   try {
     const identity = await resolveClientIdentity(req.user.uid, req.user.email);
@@ -17471,12 +17471,12 @@ router$j.get("/me/home", requireAuth, async (req, res) => {
     const pushInvoice = (entry2) => {
       if (seenInvoice.has(entry2.id)) return;
       seenInvoice.add(entry2.id);
-      invoices.push(buildClientInvoice(entry2.id, asRecord$1(jsonSafe(entry2.data()))));
+      invoices.push(buildClientInvoice(entry2.id, asRecord$2(jsonSafe(entry2.data()))));
     };
     const pushListing = (entry2) => {
       if (seenProject.has(entry2.id)) return;
       seenProject.add(entry2.id);
-      projects.push(buildClientListing(entry2.id, asRecord$1(jsonSafe(entry2.data()))));
+      projects.push(buildClientListing(entry2.id, asRecord$2(jsonSafe(entry2.data()))));
     };
     for (const clientId2 of identity.ids) {
       const [gallerySnap, invoiceSnap, projectSnap] = await Promise.all([
@@ -17566,7 +17566,7 @@ router$j.get("/me/home", requireAuth, async (req, res) => {
     const requestIds = appointmentDocs.map((entry2) => entry2.data().orderRequestId).filter((id) => typeof id === "string" && id.trim().length > 0);
     const orderRequests = await orderRequestsById(requestIds);
     const appointments = appointmentDocs.map((entry2) => {
-      const data = asRecord$1(jsonSafe(entry2.data()));
+      const data = asRecord$2(jsonSafe(entry2.data()));
       const orderRequestId = typeof data.orderRequestId === "string" ? data.orderRequestId : "";
       return buildClientAppointment(entry2.id, data, orderRequests.get(orderRequestId) || null);
     });
@@ -17589,12 +17589,12 @@ router$j.get("/me/home", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to load your portal." });
   }
 });
-router$j.get("/me/listings/:id", requireAuth, handleGetPortalListing);
-router$j.patch("/me/listings/:id/data", requireAuth, handlePatchPortalData);
-router$j.patch("/me/listings/:id/media", requireAuth, handlePatchPortalMedia);
-router$j.patch("/me/listings/:id/website", requireAuth, handlePatchPortalWebsite);
-router$j.post("/me/listings/:id/photo-edit-requests", requireAuth, handleCreatePhotoEditRequest);
-router$j.get("/me", requireAuth, async (req, res) => {
+router$k.get("/me/listings/:id", requireAuth, handleGetPortalListing);
+router$k.patch("/me/listings/:id/data", requireAuth, handlePatchPortalData);
+router$k.patch("/me/listings/:id/media", requireAuth, handlePatchPortalMedia);
+router$k.patch("/me/listings/:id/website", requireAuth, handlePatchPortalWebsite);
+router$k.post("/me/listings/:id/photo-edit-requests", requireAuth, handleCreatePhotoEditRequest);
+router$k.get("/me", requireAuth, async (req, res) => {
   try {
     const directDoc = await db$c().collection("clients").doc(req.user.uid).get();
     if (directDoc.exists) {
@@ -17610,7 +17610,7 @@ router$j.get("/me", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch profile." });
   }
 });
-router$j.get("/:id", requireStaff, async (req, res) => {
+router$k.get("/:id", requireStaff, async (req, res) => {
   try {
     const doc = await db$c().collection("clients").doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: "Client not found." });
@@ -17627,7 +17627,7 @@ router$j.get("/:id", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch client." });
   }
 });
-router$j.post("/", requireCoordinator, async (req, res) => {
+router$k.post("/", requireCoordinator, async (req, res) => {
   try {
     const { firstName, lastName, email, phone, address, notes, tags } = req.body;
     if (!firstName || !lastName || !email) {
@@ -17657,7 +17657,7 @@ router$j.post("/", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to create client." });
   }
 });
-router$j.patch("/:id", requireCoordinator, async (req, res) => {
+router$k.patch("/:id", requireCoordinator, async (req, res) => {
   try {
     const allowed = ["firstName", "lastName", "phone", "address", "status", "notes", "tags", "company"];
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
@@ -17678,7 +17678,7 @@ async function orderRequestsById(ids) {
     const snaps = await db$c().getAll(...unique2.map((id) => db$c().collection("orderRequests").doc(id)));
     snaps.forEach((snap) => {
       if (!snap.exists) return;
-      map.set(snap.id, asRecord$1(jsonSafe(snap.data() || {})));
+      map.set(snap.id, asRecord$2(jsonSafe(snap.data() || {})));
     });
   } catch (err) {
     console.error("[Clients] Order request schedule lookup failed:", err);
@@ -18089,9 +18089,9 @@ async function playtestInvoiceRecord(id) {
   }
   return null;
 }
-const router$i = Router();
+const router$j = Router();
 const db$a = () => admin.firestore();
-router$i.get("/", requireStaff, async (_req, res) => {
+router$j.get("/", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$a().collection("staff").where("isActive", "==", true).orderBy("firstName").get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -18099,7 +18099,7 @@ router$i.get("/", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch staff." });
   }
 });
-router$i.post("/", requireAdmin, async (req, res) => {
+router$j.post("/", requireAdmin, async (req, res) => {
   try {
     const { firstName, lastName, email, phone, role, tempPassword } = req.body;
     if (!firstName || !lastName || !email || !role || !tempPassword) {
@@ -18135,7 +18135,7 @@ router$i.post("/", requireAdmin, async (req, res) => {
     return res.status(500).json({ error: "Failed to create staff member." });
   }
 });
-router$i.patch("/:id", requireAdmin, async (req, res) => {
+router$j.patch("/:id", requireAdmin, async (req, res) => {
   try {
     const allowed = ["firstName", "lastName", "phone", "role", "isActive"];
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
@@ -18175,7 +18175,7 @@ function requireSetupSecret(req, res) {
   }
   return true;
 }
-router$i.post("/playtest", async (req, res) => {
+router$j.post("/playtest", async (req, res) => {
   if (!requireSetupSecret(req, res)) return;
   if (!admin.apps.length) {
     return res.status(503).json({
@@ -18194,7 +18194,7 @@ router$i.post("/playtest", async (req, res) => {
     return res.status(500).json({ error: "Playtest setup failed." });
   }
 });
-router$i.post("/setup", async (req, res) => {
+router$j.post("/setup", async (req, res) => {
   try {
     if (isHostedDeployment(liveServerEnv())) {
       const secret = process.env.STAFF_SETUP_SECRET;
@@ -18265,7 +18265,7 @@ function kickStudioQueue(listingId, env = process.env) {
   });
   return { dispatched: true };
 }
-const router$h = Router();
+const router$i = Router();
 const db$9 = () => admin.firestore();
 const DIRECT_UPLOAD_LIMIT = 3e6;
 function adminReady$2(res) {
@@ -18333,7 +18333,7 @@ function sendKnownError$2(res, err, fallback) {
   console.error("[Listings]", err);
   return res.status(500).json({ error: fallback });
 }
-router$h.get("/assigned", requirePhotographer, async (req, res) => {
+router$i.get("/assigned", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const uid = req.user.uid;
@@ -18362,7 +18362,7 @@ router$h.get("/assigned", requirePhotographer, async (req, res) => {
     return res.status(500).json({ error: "Failed to load assigned jobs." });
   }
 });
-router$h.get("/:id", requireAuth, async (req, res) => {
+router$i.get("/:id", requireAuth, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const listing = await assertListingAccess(req, req.params.id);
@@ -18377,7 +18377,7 @@ router$h.get("/:id", requireAuth, async (req, res) => {
     return sendKnownError$2(res, err, "Failed to load listing.");
   }
 });
-router$h.post("/:id/photos/upload-url", requirePhotographer, async (req, res) => {
+router$i.post("/:id/photos/upload-url", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const fileName2 = safeStorageFileName(req.body?.fileName);
@@ -18395,7 +18395,7 @@ router$h.post("/:id/photos/upload-url", requirePhotographer, async (req, res) =>
     return sendKnownError$2(res, err, "Failed to prepare the upload. Check FIREBASE_STORAGE_BUCKET.");
   }
 });
-router$h.post("/:id/photos", requirePhotographer, async (req, res) => {
+router$i.post("/:id/photos", requirePhotographer, async (req, res) => {
   if (!adminReady$2(res)) return;
   try {
     const listingId = req.params.id;
@@ -18441,7 +18441,7 @@ router$h.post("/:id/photos", requirePhotographer, async (req, res) => {
     return sendKnownError$2(res, err, "Failed to save the uploaded photo.");
   }
 });
-const router$g = Router();
+const router$h = Router();
 const db$8 = () => admin.firestore();
 function mailchimpConfig() {
   const apiKey = process.env.MAILCHIMP_API_KEY || "";
@@ -18469,7 +18469,7 @@ async function mailchimpRequest(path2, init = {}) {
   }
   return data;
 }
-router$g.get("/", requireCoordinator, async (_req, res) => {
+router$h.get("/", requireCoordinator, async (_req, res) => {
   try {
     const snapshot = await db$8().collection("campaigns").orderBy("createdAt", "desc").limit(50).get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -18477,7 +18477,7 @@ router$g.get("/", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch campaigns." });
   }
 });
-router$g.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
+router$h.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
   try {
     const { apiKey, serverPrefix } = mailchimpConfig();
     if (!apiKey || !serverPrefix) {
@@ -18508,7 +18508,7 @@ router$g.get("/mailchimp/status", requireCoordinator, async (_req, res) => {
     });
   }
 });
-router$g.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
+router$h.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
   try {
     const { listId, audience = "all" } = req.body;
     if (!listId) return res.status(400).json({ error: "listId required." });
@@ -18571,7 +18571,7 @@ router$g.post("/mailchimp/sync", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: err instanceof Error ? err.message : "Failed to sync Mailchimp." });
   }
 });
-router$g.post("/", requireCoordinator, async (req, res) => {
+router$h.post("/", requireCoordinator, async (req, res) => {
   try {
     const { name, type, subject, body, audience, audienceIds, scheduledAt } = req.body;
     if (!name || !body || !audience) {
@@ -18596,7 +18596,7 @@ router$g.post("/", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to create campaign." });
   }
 });
-router$g.post("/:id/send", requireCoordinator, async (req, res) => {
+router$h.post("/:id/send", requireCoordinator, async (req, res) => {
   try {
     const campaignDoc = await db$8().collection("campaigns").doc(req.params.id).get();
     if (!campaignDoc.exists) return res.status(404).json({ error: "Campaign not found." });
@@ -19374,7 +19374,7 @@ function parseTabularUpload(input) {
   }
   return parseCsv(input.text || "");
 }
-const router$f = Router();
+const router$g = Router();
 const MAX_ROWS = 1e4;
 const unsubscribeLimit = createRateLimiter({ windowMs: 60 * 60 * 1e3, max: 20 });
 function requireMarketing$1(permission) {
@@ -19411,7 +19411,7 @@ function publicContact(contact, suppression) {
     suppressed: blocked ? reasonLabel(blocked.reason, blocked.hold) : ""
   };
 }
-router$f.get("/overview", requireMarketing$1("view"), async (_req, res) => {
+router$g.get("/overview", requireMarketing$1("view"), async (_req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const [contacts, suppression, segments] = await Promise.all([
@@ -19427,7 +19427,7 @@ router$f.get("/overview", requireMarketing$1("view"), async (_req, res) => {
     segments: segments.length
   });
 });
-router$f.get("/contacts", requireMarketing$1("view"), async (req, res) => {
+router$g.get("/contacts", requireMarketing$1("view"), async (req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const [contacts, suppression] = await Promise.all([store.listContacts(), store.listSuppression()]);
@@ -19443,7 +19443,7 @@ router$f.get("/contacts", requireMarketing$1("view"), async (req, res) => {
   const tags = [...new Set(contacts.flatMap((contact) => contact.tags))].sort((a, b) => a.localeCompare(b));
   res.json({ contacts: filtered, tags, total: contacts.length });
 });
-router$f.get("/contacts/detail", requireMarketing$1("view"), async (req, res) => {
+router$g.get("/contacts/detail", requireMarketing$1("view"), async (req, res) => {
   const email = normalizeEmail(req.query.email);
   if (!isValidEmail(email)) return res.status(400).json({ error: "A valid email is required." });
   const store = getMarketingStore();
@@ -19460,7 +19460,7 @@ router$f.get("/contacts/detail", requireMarketing$1("view"), async (req, res) =>
     activity: events.sort((a, b) => b.at.localeCompare(a.at))
   });
 });
-router$f.post("/contacts", requireMarketing$1("manage"), async (req, res) => {
+router$g.post("/contacts", requireMarketing$1("manage"), async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   if (!isValidEmail(email)) return res.status(400).json({ error: "A valid email is required." });
   const store = getMarketingStore();
@@ -19485,7 +19485,7 @@ router$f.post("/contacts", requireMarketing$1("manage"), async (req, res) => {
   await store.saveContacts([contact]);
   res.json({ contact });
 });
-router$f.post("/contacts/tags", requireMarketing$1("manage"), async (req, res) => {
+router$g.post("/contacts/tags", requireMarketing$1("manage"), async (req, res) => {
   const emails = Array.isArray(req.body?.emails) ? req.body.emails.map((email) => normalizeEmail(email)) : [];
   const add = Array.isArray(req.body?.add) ? req.body.add.map(String) : [];
   const remove = Array.isArray(req.body?.remove) ? req.body.remove.map(String) : [];
@@ -19498,11 +19498,11 @@ router$f.post("/contacts/tags", requireMarketing$1("manage"), async (req, res) =
   await store.saveContacts(next);
   res.json({ updated: next.length });
 });
-router$f.post("/contacts/sync", requireMarketing$1("manage"), async (_req, res) => {
+router$g.post("/contacts/sync", requireMarketing$1("manage"), async (_req, res) => {
   const result = await syncCustomerContacts();
   res.json(result);
 });
-router$f.post("/imports/parse", requireMarketing$1("manage"), async (req, res) => {
+router$g.post("/imports/parse", requireMarketing$1("manage"), async (req, res) => {
   try {
     const table = parseTabularUpload({
       text: typeof req.body?.text === "string" ? req.body.text : "",
@@ -19522,7 +19522,7 @@ router$f.post("/imports/parse", requireMarketing$1("manage"), async (req, res) =
     res.status(400).json({ error: err instanceof Error ? err.message : "Could not read that file." });
   }
 });
-router$f.post("/imports/commit", requireMarketing$1("manage"), async (req, res) => {
+router$g.post("/imports/commit", requireMarketing$1("manage"), async (req, res) => {
   const headers = Array.isArray(req.body?.headers) ? req.body.headers.map(String) : [];
   const rows = Array.isArray(req.body?.rows) ? req.body.rows.map((row) => Array.isArray(row) ? row.map(String) : []) : [];
   const mapping = req.body?.mapping && typeof req.body.mapping === "object" ? req.body.mapping : {};
@@ -19540,7 +19540,7 @@ router$f.post("/imports/commit", requireMarketing$1("manage"), async (req, res) 
   await store.saveContacts(plan.upserts);
   res.json({ summary: plan.summary });
 });
-router$f.get("/segments", requireMarketing$1("view"), async (_req, res) => {
+router$g.get("/segments", requireMarketing$1("view"), async (_req, res) => {
   const store = getMarketingStore();
   const [segments, contacts] = await Promise.all([store.listSegments(), store.listContacts()]);
   res.json({
@@ -19550,7 +19550,7 @@ router$f.get("/segments", requireMarketing$1("view"), async (_req, res) => {
     }))
   });
 });
-router$f.post("/segments", requireMarketing$1("manage"), async (req, res) => {
+router$g.post("/segments", requireMarketing$1("manage"), async (req, res) => {
   const name = String(req.body?.name || "").trim();
   if (!name) return res.status(400).json({ error: "Name the segment." });
   const store = getMarketingStore();
@@ -19567,11 +19567,11 @@ router$f.post("/segments", requireMarketing$1("manage"), async (req, res) => {
   await store.saveSegment(segment);
   res.json({ segment });
 });
-router$f.delete("/segments/:id", requireMarketing$1("manage"), async (req, res) => {
+router$g.delete("/segments/:id", requireMarketing$1("manage"), async (req, res) => {
   await getMarketingStore().deleteSegment(req.params.id);
   res.json({ ok: true });
 });
-router$f.get("/suppression", requireMarketing$1("view"), async (_req, res) => {
+router$g.get("/suppression", requireMarketing$1("view"), async (_req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const entries = await store.listSuppression();
@@ -19579,7 +19579,7 @@ router$f.get("/suppression", requireMarketing$1("view"), async (_req, res) => {
     entries: entries.sort((a, b) => a.value.localeCompare(b.value))
   });
 });
-router$f.post("/suppression", requireMarketing$1("manage"), async (req, res) => {
+router$g.post("/suppression", requireMarketing$1("manage"), async (req, res) => {
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const entry2 = buildSuppression(now, {
     kind: req.body?.kind === "domain" || req.body?.kind === "name" ? req.body.kind : "email",
@@ -19598,11 +19598,11 @@ router$f.post("/suppression", requireMarketing$1("manage"), async (req, res) => 
   await store.saveSuppression({ ...entry2, createdAt: existing?.createdAt || now, source: existing?.source || "manual" });
   res.json({ entry: entry2 });
 });
-router$f.delete("/suppression/:id", requireMarketing$1("manage"), async (req, res) => {
+router$g.delete("/suppression/:id", requireMarketing$1("manage"), async (req, res) => {
   await getMarketingStore().deleteSuppression(decodeURIComponent(req.params.id));
   res.json({ ok: true });
 });
-router$f.post("/unsubscribe", async (req, res) => {
+router$g.post("/unsubscribe", async (req, res) => {
   const limit = unsubscribeLimit.check(clientIp(req));
   if (!limit.allowed) return res.status(429).json({ error: "Too many attempts. Try again later." });
   const email = normalizeEmail(req.body?.email);
@@ -19790,14 +19790,14 @@ const GMASS_LINK_OUT = [
   "Webhooks. The webhook route is for Zapier, and end users manage webhooks in the dashboard."
 ];
 const MERGE = /\{([A-Za-z]+)(?:\|([^}]*))?\}/g;
-function escapeHtml$4(value) {
+function escapeHtml$5(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function applyMerge(template, values) {
   return template.replace(MERGE, (full, key, fallback) => {
     const value = values[key];
-    if (value) return key === "UnsubscribeUrl" ? value : escapeHtml$4(value);
-    if (fallback !== void 0) return escapeHtml$4(fallback);
+    if (value) return key === "UnsubscribeUrl" ? value : escapeHtml$5(value);
+    if (fallback !== void 0) return escapeHtml$5(fallback);
     return full;
   });
 }
@@ -20046,7 +20046,7 @@ function createGmassClient(env = process.env, fetchImpl = fetch) {
 function getGmassClient() {
   return createGmassClient();
 }
-const router$e = Router();
+const router$f = Router();
 function requireMarketing(permission) {
   return async (req, res, next) => {
     await requireStaff(req, res, () => {
@@ -20192,7 +20192,7 @@ function sendBlocked(res, gmass) {
   }
   return false;
 }
-router$e.get("/dashboard", requireMarketing("view"), async (_req, res) => {
+router$f.get("/dashboard", requireMarketing("view"), async (_req, res) => {
   const store = getMarketingStore();
   await store.ensureSeed();
   const [contacts, suppression, segments, campaigns, reports] = await Promise.all([
@@ -20227,11 +20227,11 @@ router$e.get("/dashboard", requireMarketing("view"), async (_req, res) => {
     alerts: rows.filter((row) => row.stats?.pauseRecommended)
   });
 });
-router$e.get("/campaigns", requireMarketing("view"), async (_req, res) => {
+router$f.get("/campaigns", requireMarketing("view"), async (_req, res) => {
   const campaigns = await getMarketingStore().listCampaigns();
   res.json({ campaigns: campaigns.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) });
 });
-router$e.post("/campaigns", requireMarketing("manage"), async (req, res) => {
+router$f.post("/campaigns", requireMarketing("manage"), async (req, res) => {
   const store = getMarketingStore();
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const settings = await store.getSettings();
@@ -20244,12 +20244,12 @@ router$e.post("/campaigns", requireMarketing("manage"), async (req, res) => {
   await store.saveCampaign(campaign);
   res.status(201).json({ campaign });
 });
-router$e.get("/campaigns/:id", requireMarketing("view"), async (req, res) => {
+router$f.get("/campaigns/:id", requireMarketing("view"), async (req, res) => {
   const campaign = await getMarketingStore().getCampaign(req.params.id);
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
   res.json({ campaign });
 });
-router$e.post("/campaigns/:id", requireMarketing("manage"), async (req, res) => {
+router$f.post("/campaigns/:id", requireMarketing("manage"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -20264,7 +20264,7 @@ router$e.post("/campaigns/:id", requireMarketing("manage"), async (req, res) => 
   await store.saveCampaign(campaign);
   res.json({ campaign });
 });
-router$e.post("/campaigns/:id/duplicate", requireMarketing("manage"), async (req, res) => {
+router$f.post("/campaigns/:id/duplicate", requireMarketing("manage"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -20286,7 +20286,7 @@ router$e.post("/campaigns/:id/duplicate", requireMarketing("manage"), async (req
   await store.saveCampaign(copy);
   res.status(201).json({ campaign: copy });
 });
-router$e.post("/campaigns/:id/preview", requireMarketing("send"), async (req, res) => {
+router$f.post("/campaigns/:id/preview", requireMarketing("send"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -20305,7 +20305,7 @@ router$e.post("/campaigns/:id/preview", requireMarketing("send"), async (req, re
   await store.saveCampaign(campaign);
   res.json({ confirmation });
 });
-router$e.post("/campaigns/:id/test", requireMarketing("send"), async (req, res) => {
+router$f.post("/campaigns/:id/test", requireMarketing("send"), async (req, res) => {
   const to = normalizeEmail(req.body?.to);
   if (!isValidEmail(to)) return res.status(400).json({ error: "Enter a test email address." });
   const gmass = getGmassClient();
@@ -20337,7 +20337,7 @@ router$e.post("/campaigns/:id/test", requireMarketing("send"), async (req, res) 
   }
   res.json({ ok: true, to });
 });
-router$e.post("/campaigns/:id/send", requireMarketing("send"), async (req, res) => {
+router$f.post("/campaigns/:id/send", requireMarketing("send"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getCampaign(req.params.id);
   if (!current) return res.status(404).json({ error: "Campaign not found." });
@@ -20427,7 +20427,7 @@ router$e.post("/campaigns/:id/send", requireMarketing("send"), async (req, res) 
     return res.status(502).json({ error: message });
   }
 });
-router$e.get("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
+router$f.get("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
   const store = getMarketingStore();
   const [campaign, report] = await Promise.all([
     store.getCampaign(req.params.id),
@@ -20436,7 +20436,7 @@ router$e.get("/campaigns/:id/report", requireMarketing("view"), async (req, res)
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
   res.json({ campaign, report });
 });
-router$e.post("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
+router$f.post("/campaigns/:id/report", requireMarketing("view"), async (req, res) => {
   const store = getMarketingStore();
   const campaign = await store.getCampaign(req.params.id);
   if (!campaign) return res.status(404).json({ error: "Campaign not found." });
@@ -20511,11 +20511,11 @@ router$e.post("/campaigns/:id/report", requireMarketing("view"), async (req, res
     res.status(502).json({ error: err instanceof Error ? err.message : "Could not refresh the GMass report." });
   }
 });
-router$e.get("/templates", requireMarketing("view"), async (_req, res) => {
+router$f.get("/templates", requireMarketing("view"), async (_req, res) => {
   const templates = await getMarketingStore().listTemplates();
   res.json({ templates });
 });
-router$e.post("/templates", requireMarketing("manage"), async (req, res) => {
+router$f.post("/templates", requireMarketing("manage"), async (req, res) => {
   const name = String(req.body?.name || "").trim();
   const html = String(req.body?.html || "");
   if (!name || !html) return res.status(400).json({ error: "A template needs a name and HTML." });
@@ -20530,15 +20530,15 @@ router$e.post("/templates", requireMarketing("manage"), async (req, res) => {
   await getMarketingStore().saveTemplate(template);
   res.json({ template });
 });
-router$e.delete("/templates/:id", requireMarketing("manage"), async (req, res) => {
+router$f.delete("/templates/:id", requireMarketing("manage"), async (req, res) => {
   await getMarketingStore().deleteTemplate(req.params.id);
   res.json({ ok: true });
 });
-router$e.get("/settings", requireMarketing("view"), async (_req, res) => {
+router$f.get("/settings", requireMarketing("view"), async (_req, res) => {
   const settings = await getMarketingStore().getSettings();
   res.json({ settings });
 });
-router$e.get("/account", requireMarketing("view"), async (_req, res) => {
+router$f.get("/account", requireMarketing("view"), async (_req, res) => {
   const settings = await getMarketingStore().getSettings();
   const gmass = getGmassClient();
   const base = {
@@ -20560,7 +20560,7 @@ router$e.get("/account", requireMarketing("view"), async (_req, res) => {
   ]);
   res.json({ ...base, user, warmup, domains });
 });
-router$e.post("/settings", requireMarketing("send"), async (req, res) => {
+router$f.post("/settings", requireMarketing("send"), async (req, res) => {
   const store = getMarketingStore();
   const current = await store.getSettings();
   const next = {
@@ -20583,7 +20583,7 @@ router$e.post("/settings", requireMarketing("send"), async (req, res) => {
   await store.saveSettings(next);
   res.json({ settings: next });
 });
-router$e.post("/account/unsubscribes", requireMarketing("send"), async (req, res) => {
+router$f.post("/account/unsubscribes", requireMarketing("send"), async (req, res) => {
   const gmass = getGmassClient();
   if (!gmass.configured) return res.status(503).json({ error: "Set GMASS_API_KEY before syncing a suppression to GMass." });
   const email = normalizeEmail(req.body?.email);
@@ -20603,7 +20603,7 @@ router$e.post("/account/unsubscribes", requireMarketing("send"), async (req, res
   }
   res.json({ ok: true });
 });
-router$e.post("/demo/sample-report", requireMarketing("send"), async (req, res) => {
+router$f.post("/demo/sample-report", requireMarketing("send"), async (req, res) => {
   if (process.env.MARKETING_DEMO !== "true" || isHostedDeployment(liveServerEnv())) {
     return res.status(404).json({ error: "Not found." });
   }
@@ -20641,7 +20641,7 @@ router$e.post("/demo/sample-report", requireMarketing("send"), async (req, res) 
   await store.saveReport(report);
   res.json({ campaign, report });
 });
-const router$d = Router();
+const router$e = Router();
 const db$6 = () => admin.firestore();
 function isAgentAuthorized(req) {
   const serviceKey = req.headers["x-agent-key"];
@@ -20683,7 +20683,7 @@ async function loadOrderForAppointment(appointment) {
   const orderDoc = await db$6().collection("orders").doc(String(appointment.orderId)).get();
   return orderDoc.exists ? { id: orderDoc.id, ref: orderDoc.ref, data: orderDoc.data() || {} } : null;
 }
-router$d.get("/briefing", requireStaff, async (_req, res) => {
+router$e.get("/briefing", requireStaff, async (_req, res) => {
   try {
     const today = /* @__PURE__ */ new Date();
     today.setHours(0, 0, 0, 0);
@@ -20882,9 +20882,9 @@ async function runReminderSweep(req, res) {
     return res.status(500).json({ error: "Failed to run reminder sweep." });
   }
 }
-router$d.get("/run-reminders", runReminderSweep);
-router$d.post("/run-reminders", runReminderSweep);
-router$d.get("/logs", requireStaff, async (req, res) => {
+router$e.get("/run-reminders", runReminderSweep);
+router$e.post("/run-reminders", runReminderSweep);
+router$e.get("/logs", requireStaff, async (req, res) => {
   try {
     const { agent, status: status2, requiresReview, limit = "50" } = req.query;
     let query = db$6().collection("agentLogs").orderBy("createdAt", "desc");
@@ -20899,7 +20899,7 @@ router$d.get("/logs", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch agent logs." });
   }
 });
-router$d.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
+router$e.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
   try {
     const { notes } = req.body;
     await db$6().collection("agentLogs").doc(req.params.id).update({
@@ -20914,7 +20914,7 @@ router$d.patch("/logs/:id/resolve", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: "Failed to resolve flag." });
   }
 });
-router$d.post("/log", async (req, res) => {
+router$e.post("/log", async (req, res) => {
   try {
     if (!isAgentAuthorized(req)) {
       return res.status(401).json({ error: "Invalid agent key." });
@@ -20952,9 +20952,9 @@ router$d.post("/log", async (req, res) => {
     return res.status(500).json({ error: "Failed to log agent action." });
   }
 });
-const router$c = Router();
+const router$d = Router();
 const db$5 = () => admin.firestore();
-router$c.get("/", requireStaff, async (req, res) => {
+router$d.get("/", requireStaff, async (req, res) => {
   try {
     const { status: status2, listingId, orderId, limit = "100" } = req.query;
     let q = db$5().collection("mediaJobs").orderBy("createdAt", "desc");
@@ -20968,7 +20968,7 @@ router$c.get("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch media jobs." });
   }
 });
-router$c.post("/", requireStaff, async (req, res) => {
+router$d.post("/", requireStaff, async (req, res) => {
   try {
     const {
       listingId,
@@ -21027,7 +21027,7 @@ router$c.post("/", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "Failed to create media job." });
   }
 });
-router$c.patch("/:id/status", requireCoordinator, async (req, res) => {
+router$d.patch("/:id/status", requireCoordinator, async (req, res) => {
   try {
     const { status: status2, resultItems = [], error = "", requiresHumanReview } = req.body;
     const valid = ["queued", "processing", "ready_for_review", "completed", "failed", "cancelled"];
@@ -21161,7 +21161,7 @@ async function moveMediaDelivery(input) {
     label: MEDIA_DELIVERY_LABELS[input.status]
   };
 }
-const router$b = Router();
+const router$c = Router();
 function adminReady$1(res) {
   if (admin.apps.length) return true;
   res.status(503).json({
@@ -21189,7 +21189,7 @@ function sendKnownError$1(res, err, fallback) {
   console.error("[Studio]", err);
   return res.status(500).json({ error: fallback });
 }
-router$b.get("/workspace", requireStaff, async (req, res) => {
+router$c.get("/workspace", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = typeof req.query.listingId === "string" ? req.query.listingId : "";
@@ -21211,7 +21211,7 @@ router$b.get("/workspace", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to load Studio.");
   }
 });
-router$b.get("/delivery-queue", requireStaff, async (req, res) => {
+router$c.get("/delivery-queue", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const rows = await listMediaDeliveryQueue({
@@ -21223,7 +21223,7 @@ router$b.get("/delivery-queue", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to load the delivery queue.");
   }
 });
-router$b.post("/delivery-queue/move", requireCoordinator, async (req, res) => {
+router$c.post("/delivery-queue/move", requireCoordinator, async (req, res) => {
   const galleryId = String(req.body?.galleryId || "").trim();
   const status2 = String(req.body?.status || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(galleryId)) {
@@ -21260,7 +21260,7 @@ router$b.post("/delivery-queue/move", requireCoordinator, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to update delivery.");
   }
 });
-router$b.post("/order-edits", requireStaff, async (req, res) => {
+router$c.post("/order-edits", requireStaff, async (req, res) => {
   const listingId = String(req.body?.listingId || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -21274,7 +21274,7 @@ router$b.post("/order-edits", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to queue the order edits.");
   }
 });
-router$b.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => {
+router$c.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => {
   let listingId = String(req.body?.listingId || "").trim();
   if (listingId && !/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -21304,7 +21304,7 @@ router$b.post("/order-queue/tick", requireStaffOrQueueCron, async (req, res) => 
     return sendKnownError$1(res, err, "Failed to advance the order edit queue.");
   }
 });
-router$b.post("/iconic-polish", requireStaff, async (req, res) => {
+router$c.post("/iconic-polish", requireStaff, async (req, res) => {
   const listingId = String(req.body?.listingId || "").trim();
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -21321,7 +21321,7 @@ router$b.post("/iconic-polish", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to save Iconic Polish.");
   }
 });
-router$b.post("/ai-edit", requireStaff, async (req, res) => {
+router$c.post("/ai-edit", requireStaff, async (req, res) => {
   const parsed = parseAiEditRequest(req.body);
   if (parsed.ok === false) return res.status(400).json({ error: parsed.error });
   if (!adminReady$1(res)) return;
@@ -21341,7 +21341,7 @@ router$b.post("/ai-edit", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to enqueue the AI edit.");
   }
 });
-router$b.post("/adjust", requireStaff, async (req, res) => {
+router$c.post("/adjust", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
@@ -21364,7 +21364,7 @@ router$b.post("/adjust", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to save the adjustment.");
   }
 });
-router$b.post("/reject", requireStaff, async (req, res) => {
+router$c.post("/reject", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
@@ -21381,7 +21381,7 @@ router$b.post("/reject", requireStaff, async (req, res) => {
     return sendKnownError$1(res, err, "Failed to reject the edit.");
   }
 });
-router$b.post("/approve", requireStaff, async (req, res) => {
+router$c.post("/approve", requireStaff, async (req, res) => {
   if (!adminReady$1(res)) return;
   try {
     const listingId = String(req.body?.listingId || "");
@@ -21522,16 +21522,16 @@ async function editScratchPhoto(input) {
     downloadName: scratchDownloadName(input.fileName || "scratch.jpg")
   };
 }
-const router$a = Router();
+const router$b = Router();
 function headerValue(value) {
   if (Array.isArray(value)) return value[0] || "";
   return value || "";
 }
-router$a.get("/", requireCoordinator, async (_req, res) => {
+router$b.get("/", requireCoordinator, async (_req, res) => {
   const grass = await grassReferenceStatus();
   return res.json({ grass, twilightPrompt: orderExteriorTwilightPrompt() });
 });
-router$a.post(
+router$b.post(
   "/",
   requireCoordinator,
   express.raw({ type: "image/jpeg", limit: "4mb" }),
@@ -21557,13 +21557,13 @@ router$a.post(
     }
   }
 );
-router$a.use((err, _req, res, next) => {
+router$b.use((err, _req, res, next) => {
   if (err?.type === "entity.too.large" || err?.status === 413) {
     return res.status(413).json({ error: "That photo is too large for the scratch pad. Export a smaller JPEG." });
   }
   return next(err);
 });
-const router$9 = Router();
+const router$a = Router();
 const GOOGLE_KEY = process.env.GOOGLE_MAPS_API_KEY || "";
 function fromGoogle(p) {
   return {
@@ -21590,7 +21590,7 @@ function fromNominatim(r, idx) {
     secondary: parts.slice(1).join(", ")
   };
 }
-router$9.get("/autocomplete", async (req, res) => {
+router$a.get("/autocomplete", async (req, res) => {
   const input = (req.query.input || "").trim();
   if (!input || input.length < 2) {
     return res.json({ suggestions: [] });
@@ -21626,7 +21626,7 @@ router$9.get("/autocomplete", async (req, res) => {
     return res.json({ suggestions: [] });
   }
 });
-router$9.get("/distance", async (req, res) => {
+router$a.get("/distance", async (req, res) => {
   const destination = (req.query.destination || "").trim();
   const origin = (req.query.origin || process.env.STUDIO_ADDRESS || "The Woodlands, TX 77380").trim();
   if (!destination) {
@@ -21653,7 +21653,7 @@ router$9.get("/distance", async (req, res) => {
     return res.status(500).json({ error: "Failed to calculate distance." });
   }
 });
-const router$8 = Router();
+const router$9 = Router();
 const db$3 = () => admin.firestore();
 async function findOrderLikeDocument(id) {
   const orderRequestDoc = await db$3().collection("orderRequests").doc(id).get();
@@ -21662,7 +21662,7 @@ async function findOrderLikeDocument(id) {
   if (orderDoc.exists) return orderDoc;
   return null;
 }
-router$8.post("/send", requireStaff, async (req, res) => {
+router$9.post("/send", requireStaff, async (req, res) => {
   try {
     const { to, body, orderId } = req.body;
     if (!to || !body) return res.status(400).json({ error: "to and body required." });
@@ -21700,7 +21700,7 @@ router$8.post("/send", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$8.post("/remind/:orderId", requireStaff, async (req, res) => {
+router$9.post("/remind/:orderId", requireStaff, async (req, res) => {
   try {
     const { type = "24h" } = req.body;
     const orderDoc = await findOrderLikeDocument(req.params.orderId);
@@ -21742,7 +21742,7 @@ router$8.post("/remind/:orderId", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$8.post("/conversation", requireStaff, async (req, res) => {
+router$9.post("/conversation", requireStaff, async (req, res) => {
   try {
     const { orderId, photographerPhone, photographerName, clientPhone, clientName: clientName2 } = req.body;
     if (!orderId || !photographerPhone || !clientPhone) {
@@ -21794,7 +21794,7 @@ router$8.post("/conversation", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$8.get("/conversations", requireStaff, async (_req, res) => {
+router$9.get("/conversations", requireStaff, async (_req, res) => {
   try {
     const snapshot = await db$3().collection("conversations").orderBy("createdAt", "desc").limit(50).get();
     return res.json(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -21802,7 +21802,7 @@ router$8.get("/conversations", requireStaff, async (_req, res) => {
     return res.status(500).json({ error: "Failed to fetch conversations." });
   }
 });
-router$8.post("/conversation/:id/close", requireStaff, async (req, res) => {
+router$9.post("/conversation/:id/close", requireStaff, async (req, res) => {
   try {
     const convoDoc = await db$3().collection("conversations").doc(req.params.id).get();
     if (!convoDoc.exists) return res.status(404).json({ error: "Conversation not found." });
@@ -21814,7 +21814,7 @@ router$8.post("/conversation/:id/close", requireStaff, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$8.post("/webhook", express_raw_or_json, async (req, res) => {
+router$9.post("/webhook", express_raw_or_json, async (req, res) => {
   try {
     const authToken = process.env.TWILIO_AUTH_TOKEN;
     if (authToken && process.env.NODE_ENV === "production") {
@@ -21875,7 +21875,7 @@ router$8.post("/webhook", express_raw_or_json, async (req, res) => {
     return res.status(200).send("");
   }
 });
-router$8.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
+router$9.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
   try {
     const campaignDoc = await db$3().collection("campaigns").doc(req.params.id).get();
     if (!campaignDoc.exists) return res.status(404).json({ error: "Campaign not found." });
@@ -21918,7 +21918,7 @@ router$8.post("/campaign/:id/send", requireCoordinator, async (req, res) => {
     return res.status(500).json({ error: errorMessage });
   }
 });
-router$8.post("/opt-out", async (req, res) => {
+router$9.post("/opt-out", async (req, res) => {
   try {
     const { From, Body } = req.body;
     if (!From) return res.status(200).send("");
@@ -21937,8 +21937,8 @@ router$8.post("/opt-out", async (req, res) => {
 function express_raw_or_json(req, _res, next) {
   next();
 }
-const router$7 = Router();
-router$7.post("/", async (req, res) => {
+const router$8 = Router();
+router$8.post("/", async (req, res) => {
   try {
     const { name, email, subject, message, phone } = req.body;
     if (!name || !email || !subject || !message) {
@@ -21982,7 +21982,7 @@ router$7.post("/", async (req, res) => {
     });
   }
 });
-const router$6 = Router();
+const router$7 = Router();
 const SENIOR_LIVING_RATE_WINDOW_MS = 15 * 60 * 1e3;
 const SENIOR_LIVING_RATE_MAX = 5;
 const limiter$1 = createRateLimiter({
@@ -22006,10 +22006,10 @@ async function nextInvoiceNumber$1() {
     return `INV-${year}-${String(Date.now()).slice(-6)}`;
   }
 }
-router$6.get("/config", (_req, res) => {
+router$7.get("/config", (_req, res) => {
   res.json({ depositCheckoutLive: seniorDepositCheckoutLive() });
 });
-router$6.post("/order", async (req, res) => {
+router$7.post("/order", async (req, res) => {
   const limit = limiter$1.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
@@ -22282,7 +22282,7 @@ router$6.post("/order", async (req, res) => {
     });
   }
 });
-router$6.post("/", async (req, res) => {
+router$7.post("/", async (req, res) => {
   const limit = limiter$1.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
@@ -22328,7 +22328,7 @@ router$6.post("/", async (req, res) => {
     });
   }
 });
-const router$5 = Router();
+const router$6 = Router();
 const limiter = createRateLimiter({
   windowMs: 15 * 60 * 1e3,
   max: 5
@@ -22368,10 +22368,10 @@ function publicAvailability(result, packageId) {
     fallback: result.available ? null : APPRENTICESHIP_CALENDAR_FALLBACK
   };
 }
-router$5.get("/config", (_req, res) => {
+router$6.get("/config", (_req, res) => {
   res.json({ depositCheckoutLive: seniorDepositCheckoutLive() });
 });
-router$5.get("/slots", async (req, res) => {
+router$6.get("/slots", async (req, res) => {
   const packageId = typeof req.query.package === "string" ? req.query.package : "apprentice-25";
   if (!findApprenticeshipPackage(packageId)) {
     return res.status(400).json({ error: "Choose an apprenticeship package." });
@@ -22379,7 +22379,7 @@ router$5.get("/slots", async (req, res) => {
   const result = await readApprenticeshipAvailability({ packageId });
   return res.json(publicAvailability(result, packageId));
 });
-router$5.get("/setup", requireStaff, async (_req, res) => {
+router$6.get("/setup", requireStaff, async (_req, res) => {
   const hours = apprenticeshipHoursFromEnv();
   const result = await readApprenticeshipAvailability({ packageId: "apprentice-25" });
   return res.json({
@@ -22395,7 +22395,7 @@ router$5.get("/setup", requireStaff, async (_req, res) => {
     }
   });
 });
-router$5.post("/order", async (req, res) => {
+router$6.post("/order", async (req, res) => {
   const limit = limiter.check(clientIp(req));
   if (!limit.allowed) {
     res.setHeader("Retry-After", String(limit.retryAfterSec));
@@ -22697,7 +22697,7 @@ function parseLiveChatBody(body) {
 function oneLine(value) {
   return value.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
 }
-function escapeHtml$3(value) {
+function escapeHtml$4(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function liveChatSmsBody(input) {
@@ -22733,10 +22733,10 @@ async function deliverLiveChat(input) {
       audience: "staff",
       subject: `Live chat from ${oneLine(input.name).slice(0, 80)}`,
       variables: {
-        senderName: escapeHtml$3(input.name),
-        senderEmail: escapeHtml$3(input.email || "Not provided"),
-        senderPhone: escapeHtml$3(input.phone || "Not provided"),
-        message: escapeHtml$3(input.message)
+        senderName: escapeHtml$4(input.name),
+        senderEmail: escapeHtml$4(input.email || "Not provided"),
+        senderPhone: escapeHtml$4(input.phone || "Not provided"),
+        message: escapeHtml$4(input.message)
       }
     });
     emailDelivered = emailResult.sent;
@@ -22773,12 +22773,12 @@ async function deliverLiveChat(input) {
     notConfigured ? "not_configured" : "failed"
   );
 }
-const router$4 = Router();
+const router$5 = Router();
 const liveChatLimiter = createRateLimiter({
   windowMs: LIVE_CHAT_WINDOW_MS,
   max: LIVE_CHAT_MAX_PER_WINDOW
 });
-router$4.post("/live-chat", async (req, res) => {
+router$5.post("/live-chat", async (req, res) => {
   const parsed = parseLiveChatBody(req.body);
   if (parsed.ok === false) {
     return res.status(400).json({ error: parsed.error });
@@ -22844,7 +22844,7 @@ function toContactThreadView(thread) {
     }))
   };
 }
-function asRecord(data) {
+function asRecord$1(data) {
   if (!data || typeof data !== "object") return null;
   const raw = data;
   if (typeof raw.id !== "string" || typeof raw.accessToken !== "string") return null;
@@ -22904,7 +22904,7 @@ function createFirestoreStore() {
     async get(id) {
       const snap = await col().doc(id).get();
       if (!snap.exists) return null;
-      return asRecord(snap.data());
+      return asRecord$1(snap.data());
     },
     async insert(thread) {
       await col().doc(thread.id).set(thread);
@@ -22914,7 +22914,7 @@ function createFirestoreStore() {
       return db2().runTransaction(async (tx) => {
         const snap = await tx.get(ref);
         if (!snap.exists) return null;
-        const current = asRecord(snap.data());
+        const current = asRecord$1(snap.data());
         if (!current) return null;
         const next = change(current);
         if (!next) return null;
@@ -22924,7 +22924,7 @@ function createFirestoreStore() {
     },
     async listRecent(limit) {
       const snap = await col().orderBy("updatedAt", "desc").limit(limit).get();
-      return snap.docs.map((doc) => asRecord(doc.data())).filter((row) => Boolean(row));
+      return snap.docs.map((doc) => asRecord$1(doc.data())).filter((row) => Boolean(row));
     },
     clear() {
     }
@@ -23008,7 +23008,7 @@ async function appendStaffReply(id, text2, senderName = "Iconic Images") {
   }));
   return updated ? toContactThreadView(updated) : null;
 }
-const router$3 = Router();
+const router$4 = Router();
 const THREAD_ID_RE = /^[a-f0-9]{32}$/;
 const postLimiter = createRateLimiter({
   windowMs: LIVE_CHAT_WINDOW_MS,
@@ -23022,7 +23022,7 @@ function threadToken(req) {
   const header = req.header("x-contact-thread-token");
   return typeof header === "string" ? header.trim() : "";
 }
-router$3.get("/staff/threads", requireCoordinator, async (_req, res) => {
+router$4.get("/staff/threads", requireCoordinator, async (_req, res) => {
   try {
     const threads = await listContactThreads();
     return res.json({ threads });
@@ -23031,7 +23031,7 @@ router$3.get("/staff/threads", requireCoordinator, async (_req, res) => {
     return res.status(500).json({ error: "Couldn't load contact chats." });
   }
 });
-router$3.post("/staff/threads/:id/reply", requireCoordinator, async (req, res) => {
+router$4.post("/staff/threads/:id/reply", requireCoordinator, async (req, res) => {
   const id = routeParam(req.params.id);
   if (!THREAD_ID_RE.test(id)) {
     return res.status(404).json({ error: "Conversation not found." });
@@ -23052,7 +23052,7 @@ router$3.post("/staff/threads/:id/reply", requireCoordinator, async (req, res) =
     return res.status(500).json({ error: "Couldn't save the reply." });
   }
 });
-router$3.get("/threads/:id", async (req, res) => {
+router$4.get("/threads/:id", async (req, res) => {
   const id = routeParam(req.params.id);
   const token = threadToken(req);
   if (!THREAD_ID_RE.test(id) || !token) {
@@ -23067,7 +23067,7 @@ router$3.get("/threads/:id", async (req, res) => {
     return res.status(500).json({ error: "Couldn't load this chat." });
   }
 });
-router$3.post("/threads", async (req, res) => {
+router$4.post("/threads", async (req, res) => {
   const parsed = parseLiveChatBody(req.body);
   if (parsed.ok === false) {
     return res.status(400).json({ error: parsed.error });
@@ -23202,6 +23202,7 @@ const handleListingPhotoUpload = async (req, res) => {
   }
 };
 const DEFAULT_SITE_ORIGIN = "https://iconicimagestx.vercel.app";
+const OG_IMAGE_PATH = "/media/photos/drone-hero.jpg";
 const GENERIC_TITLE = "Iconic Images - Creative Media Partners";
 const PUBLIC_PAGES = [
   {
@@ -23253,6 +23254,12 @@ const PUBLIC_PAGES = [
     description: "Instagram, Facebook, and TikTok from Iconic Images, a real estate media studio in Spring, The Woodlands, and Houston."
   },
   {
+    path: "/insights",
+    file: "seo/insights.html",
+    title: "Iconic Insights | Iconic Images",
+    description: "Field notes from Iconic Images on listing photography, video, and marketing in Spring, The Woodlands, and Houston."
+  },
+  {
     path: "/book",
     file: "seo/book.html",
     title: "Book a Shoot | Iconic Images",
@@ -23293,12 +23300,30 @@ function readConfiguredOrigin() {
   const nodeOrigin = typeof process !== "undefined" ? process.env?.VITE_SITE_ORIGIN : "";
   return String(nodeOrigin || "").trim().replace(/\/$/, "");
 }
-readConfiguredOrigin() || DEFAULT_SITE_ORIGIN;
+const SITE_ORIGIN = readConfiguredOrigin() || DEFAULT_SITE_ORIGIN;
+function canonicalUrl(path2, origin = SITE_ORIGIN) {
+  return path2 === "/" ? `${origin}/` : `${origin}${path2}`;
+}
+function ogImageUrl(origin = SITE_ORIGIN) {
+  return `${origin}${OG_IMAGE_PATH}`;
+}
+function escapeHtml$3(value) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
 function isPublicMetaTag(tag) {
   return /(?:\bname|\bproperty)\s*=\s*["'](?:description|robots|og:[^"']*|twitter:[^"']*)["']/i.test(tag);
 }
 function stripPublicMeta(html) {
   return html.replace(/<link\b[^>]*rel=["']canonical["'][^>]*\/?>\s*/gi, "").replace(/<meta\b[^>]*\/?>\s*/gi, (tag) => isPublicMetaTag(tag) ? "" : tag);
+}
+function injectHead(html, tags) {
+  let next = stripPublicMeta(html).replace(/<title\b[^>]*>[\s\S]*?<\/title>\s*/gi, "");
+  if (next.includes("</head>")) {
+    return next.replace("</head>", `    ${tags}
+  </head>`);
+  }
+  return `${tags}
+${next}`;
 }
 const PRESENTATION_PREVIEW_TOKEN = "preview";
 const PRESENTATION_PATH = "/present";
@@ -23625,7 +23650,7 @@ ${next}`;
 function escapeHtml$2(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
-const router$2 = Router();
+const router$3 = Router();
 const db = () => admin.firestore();
 function originOf(req) {
   const configured = process.env.APP_URL;
@@ -23669,7 +23694,7 @@ async function loadPresentation(token, origin) {
   const galleries = await galleriesForListing(listing.id, listing);
   return buildPresentation({ token, listing, galleries, origin });
 }
-router$2.get("/presentations/:token", async (req, res) => {
+router$3.get("/presentations/:token", async (req, res) => {
   const token = String(req.params.token || "");
   if (!isPresentationToken(token)) {
     return res.status(400).json({ error: "That presentation link is not valid." });
@@ -23694,7 +23719,7 @@ async function renderPresentationShell(token, origin) {
     if (!presentation) {
       return { status: 404, html: "<!doctype html><title>Presentation</title><p>This presentation link is not active.</p>" };
     }
-    const shell2 = await readSpaShell$2();
+    const shell2 = await readSpaShell$3();
     const html = shell2 ? injectPresentationMeta(shell2, presentation.meta) : standalonePresentation(presentation);
     return { status: 200, html };
   } catch (err) {
@@ -23706,8 +23731,8 @@ const handlePresentationShell = async (req, res) => {
   const rendered = await renderPresentationShell(String(req.params.token || ""), originOf(req));
   res.status(rendered.status).type("html").send(rendered.html);
 };
-router$2.get("/presentations/shell/:token", handlePresentationShell);
-router$2.post("/listings/:id/presentation", requireStaff, async (req, res) => {
+router$3.get("/presentations/shell/:token", handlePresentationShell);
+router$3.post("/listings/:id/presentation", requireStaff, async (req, res) => {
   const listingId = String(req.params.id || "");
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(listingId)) {
     return res.status(400).json({ error: "A valid listing id is required." });
@@ -23756,7 +23781,7 @@ router$2.post("/listings/:id/presentation", requireStaff, async (req, res) => {
     return res.status(500).json({ error: "The presentation link could not be saved." });
   }
 });
-async function readSpaShell$2() {
+async function readSpaShell$3() {
   const candidates = [
     path.join(process.cwd(), "dist/spa/index.html")
   ];
@@ -23812,14 +23837,14 @@ function escapeHtml$1(value) {
 function escapeAttr(value) {
   return escapeHtml$1(value).replace(/"/g, "&quot;");
 }
-const memory$1 = /* @__PURE__ */ new Map();
+const memory$2 = /* @__PURE__ */ new Map();
 function useMemory() {
   return !admin.apps.length || process.env.NODE_ENV === "test" || process.env.LISTING_SITE_STORE === "memory";
 }
 async function readPublishedListingSite(slug) {
   if (!isListingSiteSlug(slug)) return null;
   if (useMemory()) {
-    for (const listing of memory$1.values()) {
+    for (const listing of memory$2.values()) {
       const site = buildPublicListingSite(listing);
       if (site?.slug === slug) return site;
     }
@@ -23836,7 +23861,7 @@ async function readPublishedListingSite(slug) {
 async function saveListingSiteInquiry(slug, inquiry) {
   if (!isListingSiteSlug(slug)) return false;
   if (useMemory()) {
-    for (const listing of memory$1.values()) {
+    for (const listing of memory$2.values()) {
       const site = buildPublicListingSite(listing);
       if (site?.slug !== slug) continue;
       const existing = Array.isArray(listing.listingSiteInquiries) ? listing.listingSiteInquiries : [];
@@ -23871,7 +23896,7 @@ async function renderListingSiteShell(slug) {
     if (!site) {
       return { status: 404, html: "<!doctype html><title>Listing</title><p>This listing site is not published.</p>" };
     }
-    const shell2 = readSpaShell$1();
+    const shell2 = readSpaShell$2();
     if (shell2) return { status: 200, html: shell2 };
     return {
       status: 200,
@@ -23917,7 +23942,7 @@ const handleListingSiteInquiry = async (req, res) => {
     return res.status(500).json({ error: "The request could not be saved." });
   }
 };
-function readSpaShell$1() {
+function readSpaShell$2() {
   const candidates = [
     path$1.resolve(process.cwd(), "dist/spa/index.html"),
     path$1.resolve(process.cwd(), "dist/index.html")
@@ -23930,7 +23955,7 @@ function readSpaShell$1() {
 function escapeHtml(value) {
   return value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch] || ch);
 }
-const router$1 = Router();
+const router$2 = Router();
 function adminReady(res) {
   if (admin.apps.length) return true;
   res.status(503).json({ error: "Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT." });
@@ -23962,13 +23987,13 @@ async function advance(req, res, to) {
     return sendKnownError(res, err, "Could not update that edit request.");
   }
 }
-router$1.post("/listings/:id/photo-edit-requests/:requestId/sent", requireStaff, async (req, res) => {
+router$2.post("/listings/:id/photo-edit-requests/:requestId/sent", requireStaff, async (req, res) => {
   return advance(req, res, "sent_out");
 });
-router$1.post("/listings/:id/photo-edit-requests/:requestId/received", requireStaff, async (req, res) => {
+router$2.post("/listings/:id/photo-edit-requests/:requestId/received", requireStaff, async (req, res) => {
   return advance(req, res, "received_back");
 });
-router$1.post("/listings/:id/photo-edit-requests/:requestId/replacement", requireStaff, async (req, res) => {
+router$2.post("/listings/:id/photo-edit-requests/:requestId/replacement", requireStaff, async (req, res) => {
   if (!adminReady(res)) return;
   const listingId = portalListingId(req.params.id);
   const requestId = typeof req.params.requestId === "string" ? req.params.requestId.trim() : "";
@@ -25540,7 +25565,7 @@ async function handleOwnersPage(req, res) {
     }
     return res.status(404).type("html").send(NOT_FOUND_HTML);
   }
-  const html = injectDevPreamble(injectRobots(await readSpaShell() || FALLBACK_SHELL));
+  const html = injectDevPreamble(injectRobots(await readSpaShell$1() || FALLBACK_SHELL));
   return res.status(200).type("html").send(html);
 }
 function hasBearer(req) {
@@ -25581,7 +25606,7 @@ function injectRobots(html) {
   }
   return `<!doctype html>${robots}${next}`;
 }
-async function readSpaShell() {
+async function readSpaShell$1() {
   const source = path.join(process.cwd(), "index.html");
   const dist = path.join(process.cwd(), "dist/spa/index.html");
   const preferred = process.env.ICONIC_VITE_DEV === "1" ? [source, dist] : [dist, source];
@@ -25676,6 +25701,7 @@ const PAGES = [
       linkItem("pricing", "Pricing", "/pricing"),
       linkItem("studio", "Studio 105", "/studio-105"),
       linkItem("portfolio", "Portfolio", "/portfolio"),
+      linkItem("insights", "Insights", "/insights"),
       linkItem("stock", "Stock Footage", "/stock-footage"),
       linkItem("contact", "Contact Us", "/contact")
     ]),
@@ -25690,6 +25716,7 @@ const PAGES = [
       linkItem("pricing", "Pricing", "/pricing"),
       linkItem("socials", "Socials", "/socials"),
       linkItem("portfolio", "Portfolio", "/portfolio"),
+      linkItem("insights", "Insights", "/insights"),
       linkItem("studio", "Studio 105", "/studio-105"),
       linkItem("contact", "Contact Us", "/contact"),
       linkItem("login", "Client Login", "/login")
@@ -26088,12 +26115,12 @@ function mergeContent(overlay) {
     blocks
   });
 }
-const memory = { published: {}, drafts: {} };
+const memory$1 = { published: {}, drafts: {} };
 const filePath = path.join(os.tmpdir(), "iconic-site-content.json");
 function siteContentUsesMemory() {
   return process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory" || !admin.apps.length;
 }
-function clone(value) {
+function clone$1(value) {
   return JSON.parse(JSON.stringify(value));
 }
 async function readFileStore() {
@@ -26111,7 +26138,7 @@ async function writeFileStore(next) {
 async function listPublished() {
   if (siteContentUsesMemory()) {
     if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") {
-      return Object.values(memory.published).map((page2) => stripPage(page2));
+      return Object.values(memory$1.published).map((page2) => stripPage(page2));
     }
     const stored = await readFileStore();
     return Object.values(stored.published).map((page2) => stripPage(page2));
@@ -26122,10 +26149,10 @@ async function listPublished() {
 async function readPublished(id) {
   if (siteContentUsesMemory()) {
     if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") {
-      return memory.published[id] ? clone(memory.published[id]) : null;
+      return memory$1.published[id] ? clone$1(memory$1.published[id]) : null;
     }
     const stored = await readFileStore();
-    return stored.published[id] ? clone(stored.published[id]) : null;
+    return stored.published[id] ? clone$1(stored.published[id]) : null;
   }
   const doc = await admin.firestore().collection("siteContent").doc(id).get();
   return doc.exists ? doc.data() : null;
@@ -26133,7 +26160,7 @@ async function readPublished(id) {
 async function writePublished(page2) {
   if (siteContentUsesMemory()) {
     if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") {
-      memory.published[page2.id] = clone(page2);
+      memory$1.published[page2.id] = clone$1(page2);
       return;
     }
     const stored = await readFileStore();
@@ -26146,10 +26173,10 @@ async function writePublished(page2) {
 async function readDraft(id) {
   if (siteContentUsesMemory()) {
     if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") {
-      return memory.drafts[id] ? clone(memory.drafts[id]) : null;
+      return memory$1.drafts[id] ? clone$1(memory$1.drafts[id]) : null;
     }
     const stored = await readFileStore();
-    return stored.drafts[id] ? clone(stored.drafts[id]) : null;
+    return stored.drafts[id] ? clone$1(stored.drafts[id]) : null;
   }
   const doc = await admin.firestore().collection("siteContentDrafts").doc(id).get();
   return doc.exists ? stripPage(doc.data()) : null;
@@ -26158,7 +26185,7 @@ async function writeDraft(page2, meta) {
   const stored = { ...stripPage(page2), savedAt: meta.at, savedByUid: meta.byUid, savedByName: meta.byName };
   if (siteContentUsesMemory()) {
     if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") {
-      memory.drafts[page2.id] = clone(stripPage(page2));
+      memory$1.drafts[page2.id] = clone$1(stripPage(page2));
       return;
     }
     const file = await readFileStore();
@@ -26171,7 +26198,7 @@ async function writeDraft(page2, meta) {
 async function deleteDraft(id) {
   if (siteContentUsesMemory()) {
     if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") {
-      delete memory.drafts[id];
+      delete memory$1.drafts[id];
       return;
     }
     const stored = await readFileStore();
@@ -26183,7 +26210,7 @@ async function deleteDraft(id) {
 }
 async function listDraftIds() {
   if (siteContentUsesMemory()) {
-    if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") return Object.keys(memory.drafts);
+    if (process.env.NODE_ENV === "test" || process.env.SITE_CONTENT_STORE === "memory") return Object.keys(memory$1.drafts);
     const stored = await readFileStore();
     return Object.keys(stored.drafts);
   }
@@ -26308,8 +26335,8 @@ async function importDropboxFile(rawUrl) {
   }
   throw new Error("Dropbox redirected too many times.");
 }
-const router = Router();
-function actor(req) {
+const router$1 = Router();
+function actor$1(req) {
   const email = req.user?.email || "";
   const name = email === "temp-admin@iconicimagestx.com" ? "Temporary Admin" : email || req.user?.uid || "Staff";
   return { uid: req.user?.uid || "staff", name };
@@ -26375,18 +26402,18 @@ async function workspacePage(id) {
   const draft = await readDraft(id);
   return mergeContent(draft || (published ? stripPage(published) : base));
 }
-router.get("/", async (_req, res) => {
+router$1.get("/", async (_req, res) => {
   const pages = await listPublished();
   return res.json({ pages });
 });
-router.get("/blob/:id", (req, res) => {
+router$1.get("/blob/:id", (req, res) => {
   const blob = siteMediaBlob(req.params.id);
   if (!blob) return res.status(404).json({ error: "File not found." });
   res.setHeader("Content-Type", blob.type);
   res.setHeader("Cache-Control", "public, max-age=3600");
   return res.send(blob.body);
 });
-router.get("/workspace", gate("view"), async (req, res) => {
+router$1.get("/workspace", gate("view"), async (req, res) => {
   const editorReq = req;
   const ids = knownPageIds();
   const pages = [];
@@ -26408,23 +26435,23 @@ router.get("/workspace", gate("view"), async (req, res) => {
     draftIds
   });
 });
-router.put("/:id", gate("edit"), async (req, res) => {
+router$1.put("/:id", gate("edit"), async (req, res) => {
   const id = req.params.id;
   if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
   const merged = mergeContent({ ...req.body, id });
   if (!merged) return res.status(400).json({ error: "Page could not be saved." });
-  const who = actor(req);
+  const who = actor$1(req);
   await writeDraft(merged, { at: (/* @__PURE__ */ new Date()).toISOString(), byUid: who.uid, byName: who.name });
   return res.json({ page: merged });
 });
-router.post("/:id/discard", gate("edit"), async (req, res) => {
+router$1.post("/:id/discard", gate("edit"), async (req, res) => {
   const id = req.params.id;
   if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
   await deleteDraft(id);
   const page2 = await workspacePage(id);
   return res.json({ page: page2 });
 });
-router.post("/:id/release", gate("publish"), async (req, res) => {
+router$1.post("/:id/release", gate("publish"), async (req, res) => {
   const id = req.params.id;
   if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
   const draft = await readDraft(id);
@@ -26432,7 +26459,7 @@ router.post("/:id/release", gate("publish"), async (req, res) => {
   const raw = draft || (req.body?.page ? { ...req.body.page, id } : null) || (current ? stripPage(current) : defaultPage(id));
   const source = mergeContent(raw);
   if (!source) return res.status(400).json({ error: "Nothing to publish." });
-  const who = actor(req);
+  const who = actor$1(req);
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const revisions = pushRevision(current, source, who, now);
   await writePublished({
@@ -26445,8 +26472,8 @@ router.post("/:id/release", gate("publish"), async (req, res) => {
   await deleteDraft(id);
   return res.json({ page: stripPage(source), publishedAt: now, publishedByName: who.name });
 });
-router.post("/release-all", gate("publish"), async (req, res) => {
-  const who = actor(req);
+router$1.post("/release-all", gate("publish"), async (req, res) => {
+  const who = actor$1(req);
   const publishedIds = [];
   for (const id of await listDraftIds()) {
     const draft = await readDraft(id);
@@ -26466,12 +26493,12 @@ router.post("/release-all", gate("publish"), async (req, res) => {
   }
   return res.json({ publishedIds });
 });
-router.post("/:id/revert", gate("publish"), async (req, res) => {
+router$1.post("/:id/revert", gate("publish"), async (req, res) => {
   const id = req.params.id;
   if (!defaultPage(id)) return res.status(404).json({ error: "Unknown page." });
   const current = await readPublished(id);
   if (!current) return res.status(404).json({ error: "That page has no published history." });
-  const who = actor(req);
+  const who = actor$1(req);
   const restored = revertTo(current, String(req.body?.revisionId || ""), who);
   const source = restored ? mergeContent(restored) : null;
   if (!restored || !source) return res.status(404).json({ error: "That version was not found." });
@@ -26484,31 +26511,721 @@ router.post("/:id/revert", gate("publish"), async (req, res) => {
   });
   return res.json({ page: stripPage(source) });
 });
-router.post("/media", gate("edit"), async (req, res) => {
+function mediaFolder(pageIdRaw) {
+  const pageId = String(pageIdRaw || "page");
+  if (pageId === "insights") return "insights";
+  if (pageId === "page") return "page";
+  if (defaultPage(pageId)) return pageId;
+  return null;
+}
+router$1.post("/media", gate("edit"), async (req, res) => {
   try {
-    const pageId = String(req.body?.pageId || "page");
-    if (!defaultPage(pageId) && pageId !== "page") return res.status(404).json({ error: "Unknown page." });
+    const folder = mediaFolder(req.body?.pageId);
+    if (!folder) return res.status(404).json({ error: "Unknown page." });
     const raw = String(req.body?.dataBase64 || "");
     const bytes = Buffer.from(raw, "base64");
     if (!bytes.length) return res.status(400).json({ error: "No file was received." });
-    const stored = await storeSiteUpload(defaultPage(pageId) ? pageId : "page", bytes);
+    const stored = await storeSiteUpload(folder, bytes);
     return res.json(stored);
   } catch (err) {
     const status2 = err.status || 400;
     return res.status(status2).json({ error: err instanceof Error ? err.message : "Upload failed." });
   }
 });
-router.post("/dropbox", gate("edit"), async (req, res) => {
+router$1.post("/dropbox", gate("edit"), async (req, res) => {
   try {
-    const pageId = String(req.body?.pageId || "page");
+    const folder = mediaFolder(req.body?.pageId);
+    if (!folder) return res.status(404).json({ error: "Unknown page." });
     const imported = await importDropboxFile(String(req.body?.url || ""));
-    const stored = await storeSiteUpload(defaultPage(pageId) ? pageId : "page", imported.bytes);
+    const stored = await storeSiteUpload(folder, imported.bytes);
     return res.json(stored);
   } catch (err) {
     const status2 = err.status || 400;
     return res.status(status2).json({ error: err instanceof Error ? err.message : "Dropbox import failed." });
   }
 });
+const INSIGHT_COLLECTION = "insightPosts";
+const INSIGHT_BYLINE = "Iconic Images";
+const SOCIAL_PLATFORMS = [
+  { id: "instagram", label: "Instagram" },
+  { id: "facebook", label: "Facebook" },
+  { id: "tiktok", label: "TikTok" },
+  { id: "x", label: "X" },
+  { id: "pinterest", label: "Pinterest" },
+  { id: "youtube", label: "YouTube" }
+];
+const INSIGHT_TEMPLATES = [
+  { id: "journal", label: "Journal thought", detail: "A note from the shoot, then why it matters." },
+  { id: "value", label: "Value tip", detail: "What the frame is worth to the listing." },
+  { id: "stat", label: "Stat spotlight", detail: "One number, then the story behind it." },
+  { id: "social", label: "Social pack", detail: "Caption, assets, and the platforms for Sasha." }
+];
+const BLOCK_TYPES = [
+  { id: "text", label: "Text" },
+  { id: "heading", label: "Heading" },
+  { id: "image", label: "Image" },
+  { id: "video", label: "Video" },
+  { id: "carousel", label: "Carousel" },
+  { id: "quote", label: "Quote / stat" },
+  { id: "embed", label: "Embed" }
+];
+const BLOCK_TYPE_SET = new Set(BLOCK_TYPES.map((item) => item.id));
+const PLATFORM_SET = new Set(SOCIAL_PLATFORMS.map((item) => item.id));
+const RESERVED_SLUGS = /* @__PURE__ */ new Set(["prep", "admin"]);
+function insightId(prefix) {
+  const rand = globalThis.crypto?.randomUUID?.() || `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+  return `${prefix}_${rand}`;
+}
+function slugify(value) {
+  const slug = value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+  return slug || "insight";
+}
+function isInsightSlug(value) {
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) && !RESERVED_SLUGS.has(value);
+}
+function clip(value, max) {
+  return typeof value === "string" ? value.replace(/\u0000/g, "").trim().slice(0, max) : "";
+}
+function asRecord(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+function safeMediaUrl(value) {
+  const url = value.trim();
+  if (!url) return "";
+  if (url.startsWith("/") && !url.startsWith("//") && !url.includes("\\")) return url.slice(0, 500);
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === "https:" || parsed.protocol === "http:") return parsed.toString().slice(0, 800);
+  } catch {
+    return "";
+  }
+  return "";
+}
+function emptyBlock(type = "text") {
+  return { id: insightId("block"), type, text: "", url: "", alt: "", urls: [], stat: "" };
+}
+function parseBlocks(value) {
+  if (!Array.isArray(value)) return [];
+  const blocks = [];
+  for (const item of value.slice(0, 40)) {
+    const raw = asRecord(item);
+    const type = BLOCK_TYPE_SET.has(raw.type) ? raw.type : null;
+    if (!type) continue;
+    const urls = Array.isArray(raw.urls) ? raw.urls.map((url) => safeMediaUrl(clip(url, 800))).filter(Boolean).slice(0, 12) : [];
+    blocks.push({
+      id: clip(raw.id, 80) || insightId("block"),
+      type,
+      text: clip(raw.text, 8e3),
+      url: safeMediaUrl(clip(raw.url, 800)),
+      alt: clip(raw.alt, 180),
+      urls,
+      stat: clip(raw.stat, 40)
+    });
+  }
+  return blocks;
+}
+function parsePlatforms(value) {
+  if (!Array.isArray(value)) return [];
+  const found = [];
+  for (const item of value) {
+    const id = clip(item, 20);
+    if (PLATFORM_SET.has(id) && !found.includes(id)) found.push(id);
+  }
+  return found;
+}
+function parseAssets(value) {
+  if (!Array.isArray(value)) return [];
+  const assets = [];
+  for (const item of value.slice(0, 24)) {
+    const raw = asRecord(item);
+    const url = safeMediaUrl(clip(raw.url, 800));
+    if (!url) continue;
+    const kind = raw.kind === "video" || raw.kind === "graphic" ? raw.kind : "image";
+    assets.push({
+      id: clip(raw.id, 80) || insightId("asset"),
+      url,
+      name: clip(raw.name, 120) || "asset",
+      kind
+    });
+  }
+  return assets;
+}
+function parseSocialPack(value, fallback) {
+  const raw = asRecord(value);
+  const base = fallback || { caption: "", hashtags: "", platforms: [], assets: [] };
+  if (!value || typeof value !== "object") return base;
+  return {
+    caption: clip(raw.caption, 2200),
+    hashtags: clip(raw.hashtags, 500),
+    platforms: raw.platforms ? parsePlatforms(raw.platforms) : base.platforms,
+    assets: raw.assets ? parseAssets(raw.assets) : base.assets
+  };
+}
+function parseCategories(value, fallback) {
+  const source = Array.isArray(value) ? value : fallback;
+  const categories = [];
+  for (const item of source) {
+    const label = clip(item, 40);
+    if (!label || categories.some((existing) => existing.toLowerCase() === label.toLowerCase())) continue;
+    categories.push(label);
+    if (categories.length >= 8) break;
+  }
+  return categories.length ? categories : ["FEATURES"];
+}
+function templateSeed(template) {
+  if (template === "journal") {
+    return {
+      title: "From the shoot",
+      categories: ["FROM THE SHOOT"],
+      readyForSocial: false,
+      socialPack: { caption: "", hashtags: "", platforms: [], assets: [] },
+      blocks: [
+        { ...emptyBlock("heading"), text: "From the shoot" },
+        { ...emptyBlock("text"), text: "What stood out on this shoot, and what an agent can do with it." }
+      ]
+    };
+  }
+  if (template === "value") {
+    return {
+      title: "A listing tip",
+      categories: ["REAL ESTATE MARKETING"],
+      readyForSocial: false,
+      socialPack: { caption: "", hashtags: "", platforms: [], assets: [] },
+      blocks: [
+        { ...emptyBlock("heading"), text: "Use this on the next listing" },
+        { ...emptyBlock("text"), text: "The practical step, and who it helps." },
+        { ...emptyBlock("quote"), text: "The takeaway in one line." }
+      ]
+    };
+  }
+  if (template === "stat") {
+    return {
+      title: "Stat spotlight",
+      categories: ["FEATURES"],
+      readyForSocial: false,
+      socialPack: { caption: "", hashtags: "", platforms: [], assets: [] },
+      blocks: [
+        { ...emptyBlock("quote"), stat: "", text: "Add the number, then one sentence on what it measures." },
+        { ...emptyBlock("text"), text: "Where the number comes from." }
+      ]
+    };
+  }
+  return {
+    title: "Social pack",
+    categories: ["VIDEO"],
+    readyForSocial: true,
+    socialPack: {
+      caption: "",
+      hashtags: "#IconicImages #RealEstateMedia",
+      platforms: [],
+      assets: []
+    },
+    blocks: [
+      { ...emptyBlock("text"), text: "Write the post for Insights here. The caption and files for Sasha live in the social pack." }
+    ]
+  };
+}
+function isTemplate(value) {
+  return INSIGHT_TEMPLATES.some((item) => item.id === value);
+}
+function deriveExcerpt(excerpt, blocks) {
+  if (excerpt.trim()) return excerpt.trim().slice(0, 300);
+  const text2 = blocks.find((block2) => block2.type === "text" && block2.text.trim())?.text || "";
+  return text2.replace(/\s+/g, " ").trim().slice(0, 220);
+}
+function createInsightPost(input, actor2, now = (/* @__PURE__ */ new Date()).toISOString()) {
+  const raw = asRecord(input);
+  const template = isTemplate(raw.template) ? raw.template : "";
+  const starter = template ? templateSeed(template) : null;
+  const title = clip(raw.title, 140) || starter?.title || "Untitled insight";
+  const blocks = Array.isArray(raw.blocks) ? parseBlocks(raw.blocks) : starter?.blocks || [emptyBlock("text")];
+  const excerpt = deriveExcerpt(clip(raw.excerpt, 300), blocks);
+  const slugSource = clip(raw.slug, 80) || title;
+  let slug = slugify(slugSource);
+  if (RESERVED_SLUGS.has(slug)) slug = `${slug}-note`;
+  const categories = parseCategories(raw.categories, starter?.categories || ["FEATURES"]);
+  const readyForSocial = typeof raw.readyForSocial === "boolean" ? raw.readyForSocial : Boolean(starter?.readyForSocial);
+  const socialPack = parseSocialPack(raw.socialPack, starter?.socialPack);
+  const seoTitle = clip(raw.seoTitle, 70) || `${title} | Iconic Insights`.slice(0, 70);
+  const seoDescription = clip(raw.seoDescription, 160) || excerpt.slice(0, 160);
+  return {
+    id: clip(raw.id, 80) || insightId("post"),
+    title,
+    slug,
+    status: "draft",
+    excerpt,
+    seoTitle,
+    seoDescription,
+    coverUrl: safeMediaUrl(clip(raw.coverUrl, 800)),
+    coverAlt: clip(raw.coverAlt, 180) || title,
+    categories,
+    blocks: blocks.length ? blocks : [emptyBlock("text")],
+    publishedAt: null,
+    updatedAt: now,
+    createdAt: clip(raw.createdAt, 40) || now,
+    author: { uid: clip(actor2.uid, 80) || "staff", name: clip(actor2.name, 80) || INSIGHT_BYLINE },
+    readyForSocial,
+    socialPack,
+    template
+  };
+}
+function updateInsightPost(current, input, now = (/* @__PURE__ */ new Date()).toISOString()) {
+  const raw = asRecord(input);
+  const merged = createInsightPost(
+    {
+      ...current,
+      ...raw,
+      blocks: raw.blocks ?? current.blocks,
+      socialPack: raw.socialPack ?? current.socialPack,
+      categories: raw.categories ?? current.categories,
+      template: raw.template ?? current.template
+    },
+    current.author,
+    current.createdAt
+  );
+  return {
+    ...merged,
+    id: current.id,
+    status: current.status,
+    publishedAt: current.publishedAt,
+    createdAt: current.createdAt,
+    updatedAt: now,
+    author: current.author
+  };
+}
+function normalizeStoredInsight(id, data) {
+  const raw = asRecord(data);
+  if (!raw.title && !raw.slug && !raw.blocks) return null;
+  const author = asRecord(raw.author);
+  const post = createInsightPost(raw, {
+    uid: clip(author.uid, 80) || "staff",
+    name: clip(author.name, 80) || INSIGHT_BYLINE
+  }, clip(raw.updatedAt, 40) || (/* @__PURE__ */ new Date()).toISOString());
+  post.id = id || post.id;
+  post.status = raw.status === "published" ? "published" : "draft";
+  post.publishedAt = clip(raw.publishedAt, 40) || null;
+  post.createdAt = clip(raw.createdAt, 40) || post.createdAt;
+  post.updatedAt = clip(raw.updatedAt, 40) || post.updatedAt;
+  post.author = {
+    uid: clip(author.uid, 80) || "staff",
+    name: clip(author.name, 80) || INSIGHT_BYLINE
+  };
+  return post;
+}
+function insightReadyToPublish(post) {
+  if (post.title.trim().length < 2 || post.title.trim().toLowerCase() === "untitled insight") {
+    return "Add a title before publishing.";
+  }
+  const hasBody = Boolean(post.coverUrl) || post.blocks.some((block2) => block2.text.trim() || block2.url || block2.urls.length || block2.stat.trim());
+  if (!hasBody) return "Add a cover or a block before publishing.";
+  return null;
+}
+function toPublicInsight(post) {
+  return {
+    id: post.id,
+    title: post.title,
+    slug: post.slug,
+    excerpt: post.excerpt,
+    seoTitle: post.seoTitle,
+    seoDescription: post.seoDescription,
+    coverUrl: post.coverUrl,
+    coverAlt: post.coverAlt,
+    categories: post.categories,
+    blocks: post.blocks,
+    publishedAt: post.publishedAt,
+    authorName: INSIGHT_BYLINE
+  };
+}
+function coverOf(post) {
+  if (post.coverUrl) return post.coverUrl;
+  for (const block2 of post.blocks) {
+    if ((block2.type === "image" || block2.type === "video") && block2.url) return block2.url;
+    if (block2.type === "carousel" && block2.urls[0]) return block2.urls[0];
+  }
+  return "";
+}
+function absoluteInsightImage(url, origin = SITE_ORIGIN) {
+  if (!url) return ogImageUrl(origin);
+  if (url.startsWith("https://") || url.startsWith("http://")) return url;
+  if (url.startsWith("/")) return `${origin}${url}`;
+  return ogImageUrl(origin);
+}
+function insightHeadTags(post, origin = SITE_ORIGIN) {
+  const title = escapeHtml$3(post.seoTitle || `${post.title} | Iconic Insights`);
+  const description = escapeHtml$3(post.seoDescription || post.excerpt);
+  const url = escapeHtml$3(canonicalUrl(`/insights/${post.slug}`, origin));
+  const image = escapeHtml$3(absoluteInsightImage(coverOf(post), origin));
+  return [
+    `<title>${title}</title>`,
+    `<meta name="description" content="${description}" />`,
+    `<link rel="canonical" href="${url}" />`,
+    `<meta property="og:type" content="article" />`,
+    `<meta property="og:title" content="${title}" />`,
+    `<meta property="og:description" content="${description}" />`,
+    `<meta property="og:url" content="${url}" />`,
+    `<meta property="og:image" content="${image}" />`,
+    `<meta name="twitter:card" content="summary_large_image" />`,
+    `<meta name="twitter:title" content="${title}" />`,
+    `<meta name="twitter:description" content="${description}" />`,
+    `<meta name="twitter:image" content="${image}" />`
+  ].join("\n    ");
+}
+function socialAssetFilename(asset, index, contentType) {
+  const type = contentType.toLowerCase();
+  const ext = type.includes("png") ? "png" : type.includes("web") ? "webp" : type.includes("jpeg") || type.includes("jpg") ? "jpg" : type.includes("quicktime") ? "mov" : type.includes("mp4") || type.includes("video") ? "mp4" : "";
+  const cleaned = (asset.name || `asset-${index + 1}`).split(/[/\\]/).pop() || "";
+  const named = cleaned.replace(/[^a-z0-9._-]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 80) || `asset-${index + 1}`;
+  if (!ext || named.toLowerCase().endsWith(`.${ext}`)) return named;
+  return `${named}.${ext}`;
+}
+function claimSlug(desired, selfId, posts) {
+  let slug = slugify(desired);
+  if (RESERVED_SLUGS.has(slug)) slug = `${slug}-note`;
+  const taken = (candidate) => posts.some((post) => post.slug === candidate && post.id !== selfId);
+  if (!taken(slug)) return slug;
+  const stem = slug.slice(0, 70).replace(/-+$/g, "");
+  for (let n = 2; n < 50; n += 1) {
+    const next = `${stem}-${n}`;
+    if (!taken(next)) return next;
+  }
+  return `${stem}-${Date.now().toString(36)}`;
+}
+function crc32(data) {
+  let crc = 4294967295;
+  for (let i = 0; i < data.length; i += 1) {
+    crc ^= data[i];
+    for (let bit = 0; bit < 8; bit += 1) {
+      const mask = -(crc & 1);
+      crc = crc >>> 1 ^ 3988292384 & mask;
+    }
+  }
+  return (crc ^ 4294967295) >>> 0;
+}
+function dosStamp(date) {
+  const time = date.getHours() << 11 | date.getMinutes() << 5 | Math.floor(date.getSeconds() / 2);
+  const day = date.getFullYear() - 1980 << 9 | date.getMonth() + 1 << 5 | date.getDate();
+  return { time, day };
+}
+function zipName(name) {
+  const base = (name.split(/[/\\]/).pop() || "edit.jpg").replace(/[^\w.\- ]+/g, "").trim().slice(0, 80);
+  return base || "edit.jpg";
+}
+function uniqueName(name, used) {
+  const clean2 = zipName(name);
+  if (!used.has(clean2)) {
+    used.add(clean2);
+    return clean2;
+  }
+  const dot = clean2.lastIndexOf(".");
+  const stem = dot > 0 ? clean2.slice(0, dot) : clean2;
+  const ext = dot > 0 ? clean2.slice(dot) : "";
+  let index = 2;
+  while (used.has(`${stem}-${index}${ext}`)) index += 1;
+  const next = `${stem}-${index}${ext}`;
+  used.add(next);
+  return next;
+}
+function zipStored(entries, now = /* @__PURE__ */ new Date()) {
+  const { time, day } = dosStamp(now);
+  const used = /* @__PURE__ */ new Set();
+  const locals = [];
+  const centrals = [];
+  let offset = 0;
+  for (const entry2 of entries) {
+    const name = uniqueName(entry2.name, used);
+    const nameBytes = new TextEncoder().encode(name);
+    const crc = crc32(entry2.data);
+    const local = new Uint8Array(30 + nameBytes.length);
+    const view = new DataView(local.buffer);
+    view.setUint32(0, 67324752, true);
+    view.setUint16(4, 20, true);
+    view.setUint16(8, 0, true);
+    view.setUint16(10, time, true);
+    view.setUint16(12, day, true);
+    view.setUint32(14, crc, true);
+    view.setUint32(18, entry2.data.length, true);
+    view.setUint32(22, entry2.data.length, true);
+    view.setUint16(26, nameBytes.length, true);
+    local.set(nameBytes, 30);
+    const central = new Uint8Array(46 + nameBytes.length);
+    const centralView = new DataView(central.buffer);
+    centralView.setUint32(0, 33639248, true);
+    centralView.setUint16(4, 20, true);
+    centralView.setUint16(6, 20, true);
+    centralView.setUint16(12, time, true);
+    centralView.setUint16(14, day, true);
+    centralView.setUint32(16, crc, true);
+    centralView.setUint32(20, entry2.data.length, true);
+    centralView.setUint32(24, entry2.data.length, true);
+    centralView.setUint16(28, nameBytes.length, true);
+    centralView.setUint32(42, offset, true);
+    central.set(nameBytes, 46);
+    locals.push(local, entry2.data);
+    centrals.push(central);
+    offset += local.length + entry2.data.length;
+  }
+  const centralSize = centrals.reduce((sum, part) => sum + part.length, 0);
+  const end = new Uint8Array(22);
+  const endView = new DataView(end.buffer);
+  endView.setUint32(0, 101010256, true);
+  endView.setUint16(8, entries.length, true);
+  endView.setUint16(10, entries.length, true);
+  endView.setUint32(12, centralSize, true);
+  endView.setUint32(16, offset, true);
+  const out = new Uint8Array(offset + centralSize + end.length);
+  let cursor = 0;
+  for (const part of [...locals, ...centrals, end]) {
+    out.set(part, cursor);
+    cursor += part.length;
+  }
+  return out;
+}
+const memory = /* @__PURE__ */ new Map();
+function insightsUseMemory() {
+  return process.env.NODE_ENV === "test" || process.env.INSIGHTS_STORE === "memory" || !admin.apps.length;
+}
+function clone(post) {
+  return JSON.parse(JSON.stringify(post));
+}
+function byUpdated(posts) {
+  return posts.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+async function listInsights() {
+  if (insightsUseMemory()) return byUpdated([...memory.values()].map(clone));
+  const snap = await admin.firestore().collection(INSIGHT_COLLECTION).get();
+  const posts = [];
+  for (const doc of snap.docs) {
+    const post = normalizeStoredInsight(doc.id, doc.data());
+    if (post) posts.push(post);
+  }
+  return byUpdated(posts);
+}
+async function listPublishedInsights() {
+  if (insightsUseMemory()) {
+    return [...memory.values()].filter((post) => post.status === "published").sort((a, b) => (b.publishedAt || "").localeCompare(a.publishedAt || "")).map(clone);
+  }
+  const snap = await admin.firestore().collection(INSIGHT_COLLECTION).where("status", "==", "published").get();
+  const posts = [];
+  for (const doc of snap.docs) {
+    const post = normalizeStoredInsight(doc.id, doc.data());
+    if (post?.status === "published") posts.push(post);
+  }
+  return posts.sort((a, b) => (b.publishedAt || "").localeCompare(a.publishedAt || ""));
+}
+async function getInsight(id) {
+  if (insightsUseMemory()) {
+    const post = memory.get(id);
+    return post ? clone(post) : null;
+  }
+  const doc = await admin.firestore().collection(INSIGHT_COLLECTION).doc(id).get();
+  if (!doc.exists) return null;
+  return normalizeStoredInsight(doc.id, doc.data());
+}
+async function getPublishedInsightBySlug(slug) {
+  if (insightsUseMemory()) {
+    const post = [...memory.values()].find((item) => item.status === "published" && item.slug === slug);
+    return post ? clone(post) : null;
+  }
+  const snap = await admin.firestore().collection(INSIGHT_COLLECTION).where("slug", "==", slug).limit(5).get();
+  for (const doc of snap.docs) {
+    const post = normalizeStoredInsight(doc.id, doc.data());
+    if (post?.status === "published") return post;
+  }
+  return null;
+}
+async function saveInsight(post) {
+  const stored = clone(post);
+  if (insightsUseMemory()) {
+    memory.set(stored.id, stored);
+    return;
+  }
+  await admin.firestore().collection(INSIGHT_COLLECTION).doc(stored.id).set(stored);
+}
+async function deleteInsight(id) {
+  if (insightsUseMemory()) {
+    memory.delete(id);
+    return;
+  }
+  await admin.firestore().collection(INSIGHT_COLLECTION).doc(id).delete();
+}
+const router = Router();
+const BLOB_URL = /^\/api\/site-content\/blob\/([A-Za-z0-9-]+)$/;
+const ALLOWED_ASSET_HOSTS = /* @__PURE__ */ new Set(["firebasestorage.googleapis.com", "storage.googleapis.com"]);
+function writerAllowed(req) {
+  if (req.isAdmin || req.staffRole === "admin") return true;
+  return isOwnerEmail(req.user?.email, ownerAllowlist(process.env.OWNER_EMAILS));
+}
+const requireInsightsWriter = async (req, res, next) => {
+  const editorReq = req;
+  if (process.env.NODE_ENV === "test" && req.header("x-test-staff")) {
+    try {
+      const parsed = JSON.parse(req.header("x-test-staff") || "{}");
+      editorReq.user = { uid: parsed.uid || "test", email: parsed.email || "" };
+      editorReq.staffRole = parsed.role;
+      editorReq.isAdmin = parsed.role === "admin";
+    } catch {
+      return res.status(401).json({ error: "No authentication token provided." });
+    }
+    if (!writerAllowed(editorReq)) return res.status(403).json({ error: "Admin access required." });
+    return next();
+  }
+  return requireStaff(editorReq, res, () => {
+    if (!writerAllowed(editorReq)) return res.status(403).json({ error: "Admin access required." });
+    return next();
+  });
+};
+function actor(req) {
+  const email = req.user?.email || "";
+  const name = email === "temp-admin@iconicimagestx.com" ? "Temporary Admin" : email || "Iconic Images";
+  return { uid: req.user?.uid || "staff", name };
+}
+async function withSlug(post) {
+  const posts = await listInsights();
+  return { ...post, slug: claimSlug(post.slug, post.id, posts) };
+}
+router.get("/", async (_req, res) => {
+  const posts = await listPublishedInsights();
+  res.setHeader("Cache-Control", "no-store");
+  return res.json({ posts: posts.map(toPublicInsight) });
+});
+router.get("/admin/posts", requireInsightsWriter, async (_req, res) => {
+  const posts = await listInsights();
+  return res.json({ posts });
+});
+router.post("/admin/posts", requireInsightsWriter, async (req, res) => {
+  const created = await withSlug(createInsightPost(req.body, actor(req)));
+  await saveInsight(created);
+  return res.status(201).json({ post: created });
+});
+router.put("/admin/posts/:id", requireInsightsWriter, async (req, res) => {
+  const current = await getInsight(String(req.params.id || ""));
+  if (!current) return res.status(404).json({ error: "That insight was not found." });
+  const next = await withSlug(updateInsightPost(current, req.body));
+  await saveInsight(next);
+  return res.json({ post: next });
+});
+router.post("/admin/posts/:id/publish", requireInsightsWriter, async (req, res) => {
+  const current = await getInsight(String(req.params.id || ""));
+  if (!current) return res.status(404).json({ error: "That insight was not found." });
+  const edited = req.body && Object.keys(req.body).length ? updateInsightPost(current, req.body) : current;
+  const reason = insightReadyToPublish(edited);
+  if (reason) return res.status(400).json({ error: reason });
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const next = await withSlug({ ...edited, status: "published", publishedAt: now, updatedAt: now });
+  await saveInsight(next);
+  return res.json({ post: next });
+});
+router.post("/admin/posts/:id/unpublish", requireInsightsWriter, async (req, res) => {
+  const current = await getInsight(String(req.params.id || ""));
+  if (!current) return res.status(404).json({ error: "That insight was not found." });
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const next = { ...current, status: "draft", updatedAt: now };
+  await saveInsight(next);
+  return res.json({ post: next });
+});
+router.delete("/admin/posts/:id", requireInsightsWriter, async (req, res) => {
+  const current = await getInsight(String(req.params.id || ""));
+  if (!current) return res.status(404).json({ error: "That insight was not found." });
+  await deleteInsight(current.id);
+  return res.json({ ok: true });
+});
+router.get("/admin/posts/:id/social.zip", requireInsightsWriter, async (req, res) => {
+  const current = await getInsight(String(req.params.id || ""));
+  if (!current) return res.status(404).json({ error: "That insight was not found." });
+  if (!current.socialPack.assets.length) {
+    return res.status(404).json({ error: "Add a photo, video, or graphic before downloading the pack." });
+  }
+  const entries = [];
+  const used = /* @__PURE__ */ new Set();
+  for (let index = 0; index < current.socialPack.assets.length; index += 1) {
+    const asset = current.socialPack.assets[index];
+    const file = await readSocialAsset(asset.url);
+    if (!file) continue;
+    let name = socialAssetFilename(asset, index, file.type);
+    if (used.has(name.toLowerCase())) name = `${index + 1}-${name}`;
+    used.add(name.toLowerCase());
+    entries.push({ name, data: new Uint8Array(file.body) });
+  }
+  if (!entries.length) return res.status(404).json({ error: "Those files could not be packed." });
+  const filename = `${current.slug.replace(/[^a-z0-9-]/g, "") || "insight"}-social.zip`;
+  res.setHeader("Content-Type", "application/zip");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.setHeader("Cache-Control", "no-store");
+  return res.send(Buffer.from(zipStored(entries)));
+});
+router.get("/:slug", async (req, res) => {
+  const slug = String(req.params.slug || "");
+  if (!isInsightSlug(slug)) return res.status(404).json({ error: "This insight is not published." });
+  const post = await getPublishedInsightBySlug(slug);
+  if (!post) return res.status(404).json({ error: "This insight is not published." });
+  res.setHeader("Cache-Control", "no-store");
+  return res.json({ post: toPublicInsight(post) });
+});
+async function readSocialAsset(url) {
+  const blob = BLOB_URL.exec(url);
+  if (blob) {
+    const stored = siteMediaBlob(blob[1]);
+    return stored ? { body: stored.body, type: stored.type } : null;
+  }
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== "https:" || !ALLOWED_ASSET_HOSTS.has(parsed.hostname)) return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15e3);
+  try {
+    const response = await fetch(parsed, { redirect: "manual", signal: controller.signal });
+    if (!response.ok || !response.body) return null;
+    const reader = response.body.getReader();
+    const chunks = [];
+    let total = 0;
+    while (true) {
+      const step = await reader.read();
+      if (step.done) break;
+      total += step.value.byteLength;
+      if (total > 80 * 1024 * 1024) return null;
+      chunks.push(Buffer.from(step.value));
+    }
+    return { body: Buffer.concat(chunks), type: response.headers.get("content-type") || "application/octet-stream" };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+function readSpaShell() {
+  const candidates = [
+    path$1.resolve(process.cwd(), "dist/spa/index.html"),
+    path$1.resolve(process.cwd(), "dist/index.html")
+  ];
+  for (const file of candidates) {
+    if (fs$1.existsSync(file)) return fs$1.readFileSync(file, "utf8");
+  }
+  return "";
+}
+async function renderInsightShell(slug) {
+  if (!isInsightSlug(slug)) {
+    return { status: 404, html: "<!doctype html><title>Insight</title><p>This insight is not published.</p>" };
+  }
+  const post = await getPublishedInsightBySlug(slug);
+  const shell2 = readSpaShell();
+  if (!post) {
+    const tags2 = '<title>Insight | Iconic Images</title>\n    <meta name="robots" content="noindex, nofollow" />';
+    const html2 = shell2 ? injectHead(shell2, tags2) : `<!doctype html><html><head>${tags2}</head><body><p>This insight is not published.</p></body></html>`;
+    return { status: 404, html: html2 };
+  }
+  const tags = insightHeadTags(toPublicInsight(post));
+  const html = shell2 ? injectHead(shell2, tags) : `<!doctype html><html><head>${tags}</head><body><div id="root"></div></body></html>`;
+  return { status: 200, html };
+}
+const handleInsightShell = async (req, res) => {
+  const rendered = await renderInsightShell(String(req.params.slug || ""));
+  res.setHeader("Cache-Control", "no-store");
+  res.status(rendered.status).type("html").send(rendered.html);
+};
 const SETTINGS_FILE = path.join(process.cwd(), "site_settings.json");
 const API_BUILD_MARKER = "auth-square-2026-09-28";
 if (!admin.apps.length) {
@@ -26626,19 +27343,20 @@ function createServer() {
     res.json({ live: clientNotifyLive() });
   });
   mountOwners(app);
-  app.use("/api/bookings", router$p);
-  app.use("/api/orders", router$o);
+  app.use("/api/bookings", router$q);
+  app.use("/api/orders", router$p);
   app.patch("/api/admin/orders/:id/approval", handleOrderApproval);
-  app.use("/api/galleries", router$n);
-  app.use("/api/payments", router$m);
-  app.use("/api/vsai", router$l);
-  app.use("/api/messages", router$k);
-  app.use("/api/clients", router$j);
+  app.use("/api/galleries", router$o);
+  app.use("/api/payments", router$n);
+  app.use("/api/vsai", router$m);
+  app.use("/api/messages", router$l);
+  app.use("/api/clients", router$k);
   app.get("/api/portal/listings/:id", handleGetPublicPortalListing);
   app.get("/api/listing-sites/:slug", handleGetListingSite);
   app.post("/api/listing-sites/:slug/inquiry", handleListingSiteInquiry);
-  app.use("/api/staff", router$i);
-  app.use("/api/site-content", router);
+  app.use("/api/staff", router$j);
+  app.use("/api/site-content", router$1);
+  app.use("/api/insights", router);
   app.get("/present/:token", (req, res, next) => {
     if (process.env.ICONIC_VITE_DEV === "1") return next();
     return handlePresentationShell(req, res);
@@ -26647,23 +27365,28 @@ function createServer() {
     if (process.env.ICONIC_VITE_DEV === "1") return next();
     return handleListingSiteShell(req, res);
   });
+  app.get("/insights/:slug", (req, res, next) => {
+    if (process.env.ICONIC_VITE_DEV === "1") return next();
+    if (req.params.slug === "prep") return next();
+    return handleInsightShell(req, res);
+  });
+  app.use("/api", router$3);
+  app.use("/api/listings", router$i);
   app.use("/api", router$2);
-  app.use("/api/listings", router$h);
-  app.use("/api", router$1);
-  app.use("/api/campaigns", router$g);
+  app.use("/api/campaigns", router$h);
+  app.use("/api/marketing", router$g);
   app.use("/api/marketing", router$f);
-  app.use("/api/marketing", router$e);
-  app.use("/api/agents", router$d);
-  app.use("/api/media-jobs", router$c);
-  app.use("/api/studio", router$b);
-  app.use("/api/studio/scratch", router$a);
-  app.use("/api/places", router$9);
-  app.use("/api/sms", router$8);
-  app.use("/api/contact", router$3);
+  app.use("/api/agents", router$e);
+  app.use("/api/media-jobs", router$d);
+  app.use("/api/studio", router$c);
+  app.use("/api/studio/scratch", router$b);
+  app.use("/api/places", router$a);
+  app.use("/api/sms", router$9);
   app.use("/api/contact", router$4);
-  app.use("/api/contact", router$7);
-  app.use("/api/senior-living", router$6);
-  app.use("/api/apprenticeship", router$5);
+  app.use("/api/contact", router$5);
+  app.use("/api/contact", router$8);
+  app.use("/api/senior-living", router$7);
+  app.use("/api/apprenticeship", router$6);
   app.use(
     (err, _req, res, _next) => {
       console.error("[Server] Unhandled error:", err);
