@@ -379,6 +379,38 @@
       "destination": "/seo/app.html"
     },
     {
+      "source": "/realestate-75",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/realestate-75/",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/realestate-75/schedule",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/realestate-75/schedule/",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/realestate-75/samples",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/realestate-75/samples/",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/realestate-75/how-it-works",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/realestate-75/how-it-works/",
+      "destination": "/seo/private.html"
+    },
+    {
       "source": "/studio/:listingId",
       "destination": "/seo/private.html"
     },
@@ -548,6 +580,78 @@
     },
     {
       "source": "/dev/invoice-template/",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/realestate-75",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/realestate-75/",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/realestate-75/schedule",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/realestate-75/schedule/",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/realestate-75/samples",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/realestate-75/samples/",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/realestate-75/how-it-works",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/realestate-75/how-it-works/",
       "headers": [
         {
           "key": "X-Robots-Tag",

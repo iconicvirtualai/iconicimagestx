@@ -125,6 +125,13 @@ describe("public page meta", () => {
     expect(metaPlan("/insights/prep").kind).toBe("generic");
     expect(metaPlan("/insights/twilight-porch").kind).toBe("hands-off");
     expect(metaPlan("/agents").kind).toBe("generic");
+    expect(isNoIndexPath("/realestate-75")).toBe(true);
+    expect(isNoIndexPath("/realestate-75/schedule")).toBe(true);
+    expect(metaPlan("/realestate-75")).toEqual({
+      kind: "noindex",
+      title: "25 Listing Photos for $75 | Iconic Images",
+    });
+    expect(metaPlan("/pricing").kind).toBe("public");
   });
 
   it("matches the committed sitemap and robots files", () => {

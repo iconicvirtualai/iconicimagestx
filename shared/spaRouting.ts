@@ -5,6 +5,7 @@
  */
 
 import { PUBLIC_PAGES } from "./siteSeo";
+import { RE75_PREVIEW_SOURCES } from "./realestate75";
 
 export type Rewrite = { source: string; destination: string };
 export type Redirect = {
@@ -85,6 +86,9 @@ export function buildVercelRewrites(): Rewrite[] {
       destination: PRIVATE_EXACT_SOURCES.has(source) ? PRIVATE_SHELL : APP_SHELL,
     });
   }
+  for (const source of RE75_PREVIEW_SOURCES) {
+    spa.push({ source, destination: PRIVATE_SHELL });
+  }
   spa.push(
     { source: "/studio/:listingId", destination: PRIVATE_SHELL },
     { source: "/gallery/:galleryId", destination: PRIVATE_SHELL },
@@ -123,6 +127,7 @@ export const NOINDEX_HEADER_SOURCES = [
   "/podcast-guest-prep/",
   "/dev/invoice-template",
   "/dev/invoice-template/",
+  ...RE75_PREVIEW_SOURCES.flatMap((source) => [source, `${source}/`]),
 ];
 
 export function buildVercelHeaders(): HeaderRule[] {

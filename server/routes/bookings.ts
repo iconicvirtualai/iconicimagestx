@@ -23,7 +23,7 @@ import { nextSequentialInvoiceNumber, planInvoiceLink } from "../../shared/order
 import { clientInvoiceUrl } from "../../shared/invoicePayLink";
 import { publicClientUrl } from "../../shared/publicSiteUrl";
 import { chargedServiceLines, normalizeBookingLineItems, orderTotalLabel, resolveSubmittedBooking, sumLineItemPrices, unpricedCatalogBookingError } from "../../shared/bookingPricing";
-import { applyServerTravel, isTravelFeeLine, travelSummaryText, type TravelAssessment } from "../../shared/travelZones";
+import { applyServerTravel, isTravelFeeLine, travelInvoiceLine, travelSummaryText, type TravelAssessment } from "../../shared/travelZones";
 import { planOrderPackageRepair } from "../../shared/orderPackageRepair";
 import { notifyOfficeOfOrder } from "../services/officeOrderNotify";
 import { HOLIDAY_RSVP_LEAD, HOLIDAY_SEASON_LEAD, HOLIDAY_SOCIAL_SAVES_LEAD, holidayCheckoutKind, holidayOrderReceivedHtml } from "../../shared/holidayCheckout";
@@ -47,7 +47,17 @@ import {
   createBookingCalendarHold,
   deleteBookingCalendarHold,
   readBookingAvailability,
+  readRealEstate75Availability,
 } from "../services/bookingAvailability";
+import {
+  RE75_LEAD_SOURCE,
+  RE75_OUTSIDE_MESSAGE,
+  RE75_PACKAGE_ID,
+  RE75_PACKAGE_NAME,
+  classifyRealEstate75Area,
+  quoteRealEstate75Travel,
+  sanitizeGclid,
+} from "../../shared/realestate75";
 import { createHolidayCalendarEvent, deleteHolidayCalendarEvent } from "../services/holidayCalendar";
 import { backfillHolidayCalendarEvents } from "../services/holidayCalendarBackfill";
 import { isPreferredWindowBooking, resolveBookingAssignment } from "../../shared/bookingAvailability";
@@ -196,6 +206,25 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: "No services selected." });
     }
     let serviceLines = keptLines;
+    const realEstate75Lead = leadSource === RE75_LEAD_SOURCE;
+    const realEstate75Area = realEstate75Lead ? classifyRealEstate75Area(displayAddress) : null;
+    if (realEstate75Lead) {
+      if (!realEstate75Area || realEstate75Area.status !== "inside") {
+        return res.status(400).json({ error: RE75_OUTSIDE_MESSAGE });
+      }
+      const onlyApprentice = !resolved.selectedService
+        && resolved.selectedBasics.length === 1
+        && resolved.selectedBasics[0] === RE75_PACKAGE_ID
+        && resolved.selectedAddOns.length === 0
+        && !resolved.premiumUpgrade
+        && !(Number(resolved.virtualStagingCredits) > 0);
+      if (!onlyApprentice) {
+        return res.status(400).json({ error: "This page books Apprentice 25 / $75 only." });
+      }
+      serviceLines = serviceLines.map((item) => (
+        item.id === RE75_PACKAGE_ID ? { ...item, name: RE75_PACKAGE_NAME } : item
+      ));
+    }
     if (leadSource === HOLIDAY_SOCIAL_SAVES_LEAD) {
       const quoted = quoteThankfulSocialSave({
         label: serviceLines.map((item) => item.name).join("\n"),
@@ -210,7 +239,17 @@ router.post("/", async (req, res) => {
           : item
       ));
     }
-    const traveled = applyServerTravel(serviceLines, savedAddress);
+    let traveled = applyServerTravel(serviceLines, savedAddress);
+    if (realEstate75Lead && realEstate75Area?.status === "inside" && realEstate75Area.travelFee === "tbd") {
+      const travel = quoteRealEstate75Travel(traveled.travel);
+      const kept = traveled.lineItems.filter((item) => !isTravelFeeLine(item));
+      const line = travelInvoiceLine(travel);
+      traveled = {
+        lineItems: [...kept, line],
+        total: sumLineItemPrices([...kept, line]),
+        travel,
+      };
+    }
     const travel = traveled.travel;
     const promoCode = resolved.promoCode;
     const promoDiscount = resolved.promoDiscount;
@@ -247,13 +286,15 @@ router.post("/", async (req, res) => {
     };
     if (!preferredWindow) {
       try {
-        availability = await readBookingAvailability({
-          address: displayAddress,
-          preferenceId,
-          selectedService: typeof selectedService === "string" ? selectedService : null,
-          selectedBasics: Array.isArray(selectedBasics) ? selectedBasics.map((id) => String(id)) : [],
-          catalog,
-        });
+        availability = realEstate75Lead
+          ? await readRealEstate75Availability({ address: displayAddress })
+          : await readBookingAvailability({
+            address: displayAddress,
+            preferenceId,
+            selectedService: typeof selectedService === "string" ? selectedService : null,
+            selectedBasics: Array.isArray(selectedBasics) ? selectedBasics.map((id) => String(id)) : [],
+            catalog,
+          });
       } catch (err) {
         console.error("[Bookings] Availability check failed — keeping the standard time list:", err);
       }
@@ -345,6 +386,8 @@ router.post("/", async (req, res) => {
       selectedBasics: Array.isArray(selectedBasics) ? selectedBasics : [],
       selectedAddOns: Array.isArray(selectedAddOns) ? selectedAddOns : [],
       leadSource: leadSource || null,
+      gclid: sanitizeGclid(req.body.gclid) || null,
+      brokerage: typeof req.body.brokerage === "string" ? req.body.brokerage.trim().slice(0, 160) : null,
       marketingDoing: marketingDoing || null,
       resultsBothering: resultsBothering || null,
       perfectBusiness: perfectBusiness || null,
@@ -833,6 +876,23 @@ router.get("/photographers", (_req, res) => {
     noPreference: { id: NO_PREFERENCE_ID, name: NO_PREFERENCE_NAME },
     photographers: publicBookingPhotographers(),
   });
+});
+
+router.get("/realestate-75/slots", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const availability = await readRealEstate75Availability({
+      address: typeof req.query.address === "string" ? req.query.address : "",
+    });
+    return res.json({
+      live: availability.live,
+      durationMinutes: availability.durationMinutes,
+      slots: availability.live ? availability.slots : [],
+    });
+  } catch (err) {
+    console.error("[Bookings] $75 slot lookup failed:", err);
+    return res.json({ live: false, durationMinutes: 20, slots: [] });
+  }
 });
 
 router.get("/slots", async (req, res) => {

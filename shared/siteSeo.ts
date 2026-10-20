@@ -160,6 +160,7 @@ export function ogImageUrl(origin = SITE_ORIGIN): string {
 /** Private trees. /studio-105 is public and must not match /studio/. */
 export function isNoIndexPath(pathname: string): boolean {
   const path = normalizePath(pathname);
+  if (path === "/realestate-75" || path.startsWith("/realestate-75/")) return true;
   if (path === "/admin" || path.startsWith("/admin/")) return true;
   if (path === "/portal" || path.startsWith("/portal/")) return true;
   if (path === "/owners" || path.startsWith("/owners/")) return true;
@@ -178,6 +179,9 @@ export type MetaPlan =
 
 export function metaPlan(pathname: string, origin = SITE_ORIGIN): MetaPlan {
   const path = normalizePath(pathname);
+  if (path === "/realestate-75" || path.startsWith("/realestate-75/")) {
+    return { kind: "noindex", title: "25 Listing Photos for $75 | Iconic Images" };
+  }
   if (path === "/present" || path.startsWith("/present/")) return { kind: "hands-off" };
   if (path.startsWith("/insights/") && path !== "/insights/prep") return { kind: "hands-off" };
   if (path === "/go") return { kind: "preserve-title" };
