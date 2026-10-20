@@ -4,9 +4,10 @@
  * Two catalog packages: Apprentice 25 ($75, 20 minutes) and Apprentice 50
  * ($125, 1 hour). Hours are America/Chicago and differ from the company /book
  * week: weekdays 8:00–5:00, Saturday 9:00–12:00, Sunday closed. A slot must
- * finish inside the window and start strictly before Saturday noon. Open times
- * still come from the /book calendars. The card total is the catalog price
- * plus the site 2.8% processing line.
+ * finish inside the window and start strictly before Saturday noon. The order
+ * form asks for a date and time inside that week. It does not hold a live
+ * calendar opening. The card total is the catalog price plus the site 2.8%
+ * processing line.
  */
 
 import type { ApprenticeshipSlot } from "./apprenticeship.ts";
@@ -55,6 +56,9 @@ export const RE75_DURATION_MINUTES = 20;
 export const RE75_TIME_ZONE = "America/Chicago";
 export const RE75_HORIZON_DAYS = 14;
 export const RE75_OUTSIDE_MESSAGE = "Call us 281.356.0965";
+/** Shown when a requested apprentice time is Sunday, after Saturday noon, or outside the weekday window. */
+export const RE75_TIME_MESSAGE =
+  "Choose a weekday or Saturday morning. Sunday is closed, and Saturday shoots start before noon.";
 export const RE75_TRAVEL_TBD_NOTE =
   "Travel fees for Cypress and Willis are still being confirmed (TBD). We will tell you before any travel fee is added.";
 export const RE75_GALLERY_CAPTION = "Recent Iconic Images listing photos";
@@ -289,6 +293,97 @@ export function openRealEstate75Slots(input: {
     durationMinutes,
     week,
   }).filter((slot) => !isRealEstate75Holiday(slot.date));
+}
+
+export interface RealEstate75OpenDay {
+  date: string;
+  times: string[];
+}
+
+/**
+ * Requested apprentice times. Not live calendar openings.
+ * Weekdays 8:00–5:00, Saturday before noon, Sunday closed, holidays closed.
+ */
+export function realEstate75OpenSchedule(input: {
+  now?: Date;
+  durationMinutes: number;
+  horizonDays?: number;
+}): RealEstate75OpenDay[] {
+  const slots = openRealEstate75Slots({
+    now: input.now ?? new Date(),
+    durationMinutes: input.durationMinutes,
+    horizonDays: input.horizonDays ?? RE75_HORIZON_DAYS,
+  });
+  const groups = new Map<string, string[]>();
+  for (const slot of slots) {
+    const times = groups.get(slot.date) || [];
+    if (!times.includes(slot.time)) times.push(slot.time);
+    groups.set(slot.date, times);
+  }
+  return [...groups.entries()].map(([date, times]) => ({ date, times }));
+}
+
+const DATE_MONTHS: Record<string, number> = {
+  jan: 1,
+  january: 1,
+  feb: 2,
+  february: 2,
+  mar: 3,
+  march: 3,
+  apr: 4,
+  april: 4,
+  may: 5,
+  jun: 6,
+  june: 6,
+  jul: 7,
+  july: 7,
+  aug: 8,
+  august: 8,
+  sep: 9,
+  sept: 9,
+  september: 9,
+  oct: 10,
+  october: 10,
+  nov: 11,
+  november: 11,
+  dec: 12,
+  december: 12,
+};
+
+/** ISO day, or the short label createOrder stores ("Oct 21, 2026"). */
+export function realEstate75DateKey(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  const match = trimmed.match(/^(?:[A-Za-z]+,\s+)?([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})$/);
+  if (!match) return null;
+  const month = DATE_MONTHS[match[1].toLowerCase()];
+  const day = Number(match[2]);
+  const year = Number(match[3]);
+  if (!month || day < 1 || day > 31 || year < 2000 || year > 2100) return null;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/**
+ * A requested date and clock time that still fits the apprentice week.
+ * Returns the canonical slot label so the order stores "9:00 AM", not a hold.
+ */
+export function realEstate75AppointmentChoice(input: {
+  date: unknown;
+  time: unknown;
+  durationMinutes: number;
+  now?: Date;
+}): { date: string; time: string } | null {
+  const date = realEstate75DateKey(input.date);
+  if (!date || typeof input.time !== "string") return null;
+  const wanted = input.time.trim().toLowerCase().replace(/\s+/g, " ");
+  if (!wanted) return null;
+  const day = realEstate75OpenSchedule({
+    now: input.now,
+    durationMinutes: input.durationMinutes,
+  }).find((entry) => entry.date === date);
+  const time = day?.times.find((choice) => choice.toLowerCase() === wanted) || null;
+  return time ? { date, time } : null;
 }
 
 export function sanitizeGclid(value: unknown): string {
