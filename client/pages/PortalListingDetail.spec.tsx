@@ -241,6 +241,10 @@ describe("portal listing detail page", () => {
     expect(html).toContain("gallery-revisions");
     expect(html).toContain("Revisions");
     expect(html).toContain('alt="front-revised.jpg"');
+    expect(html).toContain("Revised");
+    expect(html).toContain("Send back for revisions");
+    expect(html).toContain("photo-slide-next-front");
+    expect(html).toContain("photo-size-slider");
     expect(html).toContain("<img");
     expect(html).not.toContain(">https://cdn.example/front-revised.jpg<");
   });
