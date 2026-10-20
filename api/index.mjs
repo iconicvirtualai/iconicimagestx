@@ -2697,8 +2697,29 @@ function readCoord$1(value, axis) {
 const TX_ZIP_CENTROIDS = {
   // Spring / The Woodlands — studio ZIP
   "77380": { lat: 30.1441, lng: -95.4703 },
+  // The Woodlands — $75 apprentice service area. Zippopotam place points.
+  "77381": { lat: 30.1716, lng: -95.4985 },
+  "77382": { lat: 30.2106, lng: -95.5257 },
+  "77384": { lat: 30.2257, lng: -95.4924 },
+  "77385": { lat: 30.1877, lng: -95.4288 },
   // Spring
   "77373": { lat: 30.0532, lng: -95.3773 },
+  "77379": { lat: 30.0377, lng: -95.5326 },
+  "77386": { lat: 30.1288, lng: -95.4239 },
+  "77388": { lat: 30.0505, lng: -95.4695 },
+  "77389": { lat: 30.1044, lng: -95.5066 },
+  // Conroe
+  "77301": { lat: 30.3125, lng: -95.4527 },
+  "77302": { lat: 30.2238, lng: -95.3577 },
+  "77303": { lat: 30.3814, lng: -95.3749 },
+  "77304": { lat: 30.3217, lng: -95.5285 },
+  "77306": { lat: 30.2277, lng: -95.2851 },
+  // Willis and Cypress. The $75 page does not charge these until travel is decided.
+  "77318": { lat: 30.4416, lng: -95.5394 },
+  "77378": { lat: 30.4441, lng: -95.4506 },
+  "77410": { lat: 29.834, lng: -95.4342 },
+  "77429": { lat: 29.9766, lng: -95.6358 },
+  "77433": { lat: 29.8836, lng: -95.7025 },
   // Downtown Houston
   "77002": { lat: 29.7594, lng: -95.3594 },
   // Katy
@@ -7566,6 +7587,153 @@ function parseRouteMatrixBody(body) {
     return [{ originIndex, destinationIndex, minutes }];
   });
 }
+const RE75_LEAD_SOURCE = "Real Estate $75 apprentice (Google Ads)";
+const RE75_PACKAGES = [
+  {
+    id: "apprentice-25",
+    name: "Apprentice 25 / $75",
+    photos: 25,
+    durationMinutes: 20,
+    subtotal: 75,
+    nudge: null
+  },
+  {
+    id: "apprentice-50",
+    name: "Apprentice 50 / $125",
+    photos: 50,
+    durationMinutes: 60,
+    subtotal: 125,
+    nudge: "More rooms? Go 50."
+  }
+];
+const RE75_TIME_ZONE = "America/Chicago";
+const RE75_HORIZON_DAYS = 14;
+const RE75_OUTSIDE_MESSAGE = "Call us 281.356.0965";
+function isRealEstate75PackageId(value) {
+  return value === "apprentice-25" || value === "apprentice-50";
+}
+function realEstate75Package(value) {
+  return RE75_PACKAGES.find((item) => item.id === value) ?? RE75_PACKAGES[0];
+}
+const WEEKDAY_START = 8 * 60;
+const WEEKDAY_END = 17 * 60;
+const SATURDAY_START = 9 * 60;
+const SATURDAY_END = 12 * 60;
+const SATURDAY_LATEST_START = 12 * 60;
+const PLACES = [
+  { city: "The Woodlands", travelFee: "standard", zips: ["77380", "77381", "77382", "77384", "77385"] },
+  { city: "Spring", travelFee: "standard", zips: ["77373", "77379", "77386", "77388", "77389"] },
+  { city: "Conroe", travelFee: "standard", zips: ["77301", "77302", "77303", "77304", "77306"] },
+  { city: "Willis", travelFee: "tbd", zips: ["77318", "77378"] },
+  { city: "Cypress", travelFee: "tbd", zips: ["77410", "77429", "77433"] }
+];
+const ZIP_PLACES = /* @__PURE__ */ new Map();
+for (const place of PLACES) {
+  for (const zip of place.zips) ZIP_PLACES.set(zip, { city: place.city, travelFee: place.travelFee });
+}
+const CITY_PATTERNS = [
+  { pattern: /\bthe\s+woodlands\b/i, place: { city: "The Woodlands", travelFee: "standard" } },
+  { pattern: /\bcypress\b/i, place: { city: "Cypress", travelFee: "tbd" } },
+  { pattern: /\bwillis\b/i, place: { city: "Willis", travelFee: "tbd" } },
+  { pattern: /\bconroe\b/i, place: { city: "Conroe", travelFee: "standard" } },
+  { pattern: /\bspring\b/i, place: { city: "Spring", travelFee: "standard" } }
+];
+function extractZipCodes(value) {
+  return [...value.matchAll(/\b(\d{5})(?:-\d{4})?\b/g)].map((match) => match[1]);
+}
+function classifyRealEstate75Area(value) {
+  const text2 = value.trim();
+  const zips = extractZipCodes(text2);
+  if (zips.length) {
+    const zip = zips[zips.length - 1];
+    const place = ZIP_PLACES.get(zip);
+    if (!place) return { status: "outside", message: RE75_OUTSIDE_MESSAGE };
+    return { status: "inside", zip, city: place.city, travelFee: place.travelFee };
+  }
+  for (const candidate of CITY_PATTERNS) {
+    if (candidate.pattern.test(text2)) {
+      return { status: "inside", zip: null, city: candidate.place.city, travelFee: candidate.place.travelFee };
+    }
+  }
+  return { status: "outside", message: RE75_OUTSIDE_MESSAGE };
+}
+function quoteRealEstate75Travel(travel) {
+  return {
+    travelZone: null,
+    travelMiles: travel.travelMiles,
+    travelFeeCents: null,
+    travelQuoted: true
+  };
+}
+function realEstate75Week(horizonDays = RE75_HORIZON_DAYS) {
+  const weekday = { startMinutes: WEEKDAY_START, endMinutes: WEEKDAY_END };
+  const saturday = {
+    startMinutes: SATURDAY_START,
+    endMinutes: SATURDAY_END,
+    latestStartMinutes: SATURDAY_LATEST_START
+  };
+  return {
+    timeZone: RE75_TIME_ZONE,
+    horizonDays,
+    days: [null, weekday, weekday, weekday, weekday, weekday, saturday]
+  };
+}
+function isoDate(year, month, day) {
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+function shiftIso(year, month, day, delta) {
+  const next = new Date(Date.UTC(year, month - 1, day + delta));
+  return isoDate(next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate());
+}
+function observedFixed(year, month, day) {
+  const dow = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  const actual = isoDate(year, month, day);
+  if (dow === 6) return [actual, shiftIso(year, month, day, -1)];
+  if (dow === 0) return [actual, shiftIso(year, month, day, 1)];
+  return [actual];
+}
+function nthWeekday(year, month, weekday, n) {
+  const firstDow = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+  const day = 1 + (weekday - firstDow + 7) % 7 + (n - 1) * 7;
+  return isoDate(year, month, day);
+}
+function lastWeekday(year, month, weekday) {
+  const last = new Date(Date.UTC(year, month, 0));
+  const day = last.getUTCDate() - (last.getUTCDay() - weekday + 7) % 7;
+  return isoDate(year, month, day);
+}
+const holidayYears = /* @__PURE__ */ new Map();
+function realEstate75HolidayDates(year) {
+  const cached = holidayYears.get(year);
+  if (cached) return cached;
+  const thanksgiving = nthWeekday(year, 11, 4, 4);
+  const [y, m, d] = thanksgiving.split("-").map(Number);
+  const dates = [
+    ...observedFixed(year, 1, 1),
+    nthWeekday(year, 1, 1, 3),
+    lastWeekday(year, 5, 1),
+    ...observedFixed(year, 6, 19),
+    ...observedFixed(year, 7, 4),
+    nthWeekday(year, 9, 1, 1),
+    thanksgiving,
+    shiftIso(y, m, d, 1),
+    ...observedFixed(year, 12, 25)
+  ];
+  const set = new Set(dates);
+  holidayYears.set(year, set);
+  return set;
+}
+function isRealEstate75Holiday(date) {
+  const match = date.match(/^(\d{4})-\d{2}-\d{2}$/);
+  if (!match) return false;
+  return realEstate75HolidayDates(Number(match[1])).has(date);
+}
+function sanitizeGclid(value) {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (!/^[A-Za-z0-9._-]{1,200}$/.test(trimmed)) return "";
+  return trimmed;
+}
 function firebaseServiceAccount(env = process.env) {
   const raw = env.FIREBASE_SERVICE_ACCOUNT;
   if (!raw || !raw.trim()) return null;
@@ -7911,10 +8079,10 @@ function chunk(values, size) {
 async function readBookingAvailability(input) {
   const env = input.env ?? process.env;
   const now = input.now ?? /* @__PURE__ */ new Date();
-  const schedule = bookingHoursFromEnv(env);
+  const schedule = input.schedule ?? bookingHoursFromEnv(env);
   const hours = schedule.company;
   const bufferMinutes = travelBufferMinutes(env);
-  const durationMinutes = bookingDurationMinutes({
+  const durationMinutes = input.durationMinutes && input.durationMinutes > 0 ? input.durationMinutes : bookingDurationMinutes({
     selectedService: input.selectedService,
     selectedBasics: input.selectedBasics,
     catalog: input.catalog,
@@ -7977,13 +8145,33 @@ async function readBookingAvailability(input) {
       return value === void 0 ? null : value;
     }
   });
+  const slots = input.slotFilter ? assigned.slots.filter(input.slotFilter) : assigned.slots;
   return {
     live: assigned.live,
-    slots: assigned.slots,
+    slots,
     durationMinutes,
     bufferMinutes,
     driveMode: apiKey ? "routes" : "buffer"
   };
+}
+async function readRealEstate75Availability(input) {
+  const env = input.env ?? process.env;
+  const horizonDays = apprenticeshipHoursFromEnv(env).horizonDays;
+  const week = realEstate75Week(horizonDays);
+  const pkg = realEstate75Package(input.packageId);
+  return readBookingAvailability({
+    address: input.address,
+    preferenceId: "no-preference",
+    selectedBasics: [pkg.id],
+    now: input.now,
+    env,
+    durationMinutes: pkg.durationMinutes,
+    schedule: { company: week, photographers: {} },
+    slotFilter: (slot) => !isRealEstate75Holiday(slot.date),
+    listEvents: input.listEvents,
+    fetchImpl: input.fetchImpl,
+    cache: input.cache
+  });
 }
 async function createBookingCalendarHold(input) {
   const person = bookingPhotographerById(input.photographerId);
@@ -8245,6 +8433,20 @@ router$r.post("/", async (req, res) => {
       return res.status(400).json({ error: "No services selected." });
     }
     let serviceLines = keptLines;
+    const realEstate75Lead = leadSource === RE75_LEAD_SOURCE;
+    const realEstate75Area = realEstate75Lead ? classifyRealEstate75Area(displayAddress) : null;
+    if (realEstate75Lead) {
+      if (!realEstate75Area || realEstate75Area.status !== "inside") {
+        return res.status(400).json({ error: RE75_OUTSIDE_MESSAGE });
+      }
+      const packageId = resolved.selectedBasics[0];
+      const onlyApprentice = !resolved.selectedService && resolved.selectedBasics.length === 1 && isRealEstate75PackageId(packageId) && resolved.selectedAddOns.length === 0 && !resolved.premiumUpgrade && !(Number(resolved.virtualStagingCredits) > 0);
+      if (!onlyApprentice) {
+        return res.status(400).json({ error: "This page books Apprentice 25 / $75 or Apprentice 50 / $125 only." });
+      }
+      const pkg = realEstate75Package(packageId);
+      serviceLines = serviceLines.map((item) => item.id === pkg.id ? { ...item, name: pkg.name } : item);
+    }
     if (leadSource === HOLIDAY_SOCIAL_SAVES_LEAD) {
       const quoted = quoteThankfulSocialSave({
         label: serviceLines.map((item) => item.name).join("\n"),
@@ -8255,7 +8457,17 @@ router$r.post("/", async (req, res) => {
       if (!quoted.ok) return res.status(400).json({ error: quoted.error });
       serviceLines = serviceLines.map((item, index) => index === 0 ? { ...item, unitPrice: quoted.termDollars, price: quoted.termDollars } : item);
     }
-    const traveled = applyServerTravel(serviceLines, savedAddress);
+    let traveled = applyServerTravel(serviceLines, savedAddress);
+    if (realEstate75Lead && realEstate75Area?.status === "inside" && realEstate75Area.travelFee === "tbd") {
+      const travel2 = quoteRealEstate75Travel(traveled.travel);
+      const kept = traveled.lineItems.filter((item) => !isTravelFeeLine(item));
+      const line = travelInvoiceLine(travel2);
+      traveled = {
+        lineItems: [...kept, line],
+        total: sumLineItemPrices([...kept, line]),
+        travel: travel2
+      };
+    }
     const travel = traveled.travel;
     const promoCode = resolved.promoCode;
     const promoDiscount = resolved.promoDiscount;
@@ -8287,7 +8499,10 @@ router$r.post("/", async (req, res) => {
     };
     if (!preferredWindow) {
       try {
-        availability = await readBookingAvailability({
+        availability = realEstate75Lead ? await readRealEstate75Availability({
+          address: displayAddress,
+          packageId: resolved.selectedBasics[0]
+        }) : await readBookingAvailability({
           address: displayAddress,
           preferenceId,
           selectedService: typeof selectedService === "string" ? selectedService : null,
@@ -8379,6 +8594,8 @@ router$r.post("/", async (req, res) => {
       selectedBasics: Array.isArray(selectedBasics) ? selectedBasics : [],
       selectedAddOns: Array.isArray(selectedAddOns) ? selectedAddOns : [],
       leadSource: leadSource || null,
+      gclid: sanitizeGclid(req.body.gclid) || null,
+      brokerage: typeof req.body.brokerage === "string" ? req.body.brokerage.trim().slice(0, 160) : null,
       marketingDoing: marketingDoing || null,
       resultsBothering: resultsBothering || null,
       perfectBusiness: perfectBusiness || null,
@@ -8801,6 +9018,25 @@ router$r.get("/photographers", (_req, res) => {
     noPreference: { id: NO_PREFERENCE_ID, name: NO_PREFERENCE_NAME },
     photographers: publicBookingPhotographers()
   });
+});
+router$r.get("/realestate-75/slots", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const pkg = realEstate75Package(typeof req.query.package === "string" ? req.query.package : "");
+  try {
+    const availability = await readRealEstate75Availability({
+      address: typeof req.query.address === "string" ? req.query.address : "",
+      packageId: pkg.id
+    });
+    return res.json({
+      live: availability.live,
+      durationMinutes: availability.durationMinutes,
+      packageId: pkg.id,
+      slots: availability.live ? availability.slots : []
+    });
+  } catch (err) {
+    console.error("[Bookings] Apprentice slot lookup failed:", err);
+    return res.json({ live: false, durationMinutes: pkg.durationMinutes, packageId: pkg.id, slots: [] });
+  }
 });
 router$r.get("/slots", async (req, res) => {
   const basics = typeof req.query.basics === "string" ? req.query.basics.split(",").map((id) => id.trim()).filter(Boolean) : [];
