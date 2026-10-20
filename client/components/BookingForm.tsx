@@ -325,6 +325,19 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
     };
   }, [step, bookingAddress, formData.photographerId, formData.selectedService, formData.selectedBasics]);
 
+  // The site header is fixed. Keep the active step below it, or the scheduling
+  // row stays under the nav (desktop) or above the viewport (phone) after Next.
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const card = document.querySelector<HTMLElement>("[data-testid='booking-step']");
+      if (!card || typeof window.scrollTo !== "function") return;
+      const chrome = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
+      const top = card.getBoundingClientRect().top + window.scrollY - chrome - 16;
+      window.scrollTo({ top: Math.max(0, top) });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [step]);
+
   // Check for pre-filled service from pricing page or props
   useEffect(() => {
     const itemsParam = searchParams.get("items");
@@ -1757,7 +1770,7 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
               })}
            </div>
 
-           <div className="min-h-[550px] bg-white text-neutral-950 rounded-[3rem] border border-gray-50 p-10 shadow-sm relative overflow-hidden">
+           <div data-testid="booking-step" className="min-h-[550px] bg-white text-neutral-950 rounded-[3rem] border border-gray-50 p-10 shadow-sm relative overflow-hidden">
               <div className="absolute top-0 right-0 p-10 opacity-[0.01] pointer-events-none">
                  <Sparkles className="w-80 h-80" />
               </div>
