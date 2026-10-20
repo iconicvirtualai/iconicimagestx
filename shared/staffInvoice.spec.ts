@@ -156,6 +156,19 @@ describe("order service save syncs the linked invoice", () => {
     expect(patch.total).toBe(150);
   });
 
+  it("reprices an included processing policy with the shared 2.8% fee", () => {
+    const patch = orderServiceInvoicePatch({
+      lineItems: [{ id: "listing-showcase", name: "The Showcase", price: 549 }],
+      processingPolicy: "included",
+      pricing: { tax: 0 },
+    }, { amountPaid: 0, tax: 0 });
+    expect(patch.subtotal).toBe(549);
+    expect(patch.processing).toBe(15.37);
+    expect(patch.total).toBe(564.37);
+    expect(patch.amountDue).toBe(564.37);
+    expect(patch.lineItems?.some((item) => item.name === "Processing" && item.price === 15.37)).toBe(true);
+  });
+
   it("leaves line items alone when the order save has no service list", () => {
     const patch = orderServiceInvoicePatch({
       clientName: "Grace Hopper",

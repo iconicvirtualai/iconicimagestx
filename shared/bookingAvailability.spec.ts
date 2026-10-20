@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { packagesForStaffEditor } from "./bookingCatalog";
-import { apprenticeshipHoursFromEnv } from "./apprenticeship";
+import { apprenticeshipHoursFromEnv, zonedTimeToUtc } from "./apprenticeship";
 import {
   assignPhotographerSlots,
   bookingDurationMinutes,
   explicitDurationMinutes,
   parseRouteDuration,
   parseRouteMatrixBody,
+  adminAppointmentWarnings,
   isPreferredWindowBooking,
   resolveBookingAssignment,
   travelBufferMinutes,
@@ -223,5 +224,79 @@ describe("route matrix durations", () => {
       { originIndex: 0, destinationIndex: 1, minutes: 10 },
       { originIndex: 0, destinationIndex: 0, minutes: null },
     ]);
+  });
+});
+
+describe("admin appointment warnings", () => {
+  const env = {};
+
+  it("warns when Cadi is booked on a closed Sunday and still allows the save", () => {
+    const warnings = adminAppointmentWarnings({
+      photographerId: "cadi-torres",
+      photographerName: "Cadi Torres",
+      date: "2026-10-18",
+      time: "10:00",
+      env,
+    });
+    expect(warnings.join(" ")).toMatch(/not scheduled/i);
+    expect(warnings.join(" ")).toMatch(/still save/i);
+  });
+
+  it("does not warn for Steven on Sunday inside his hours", () => {
+    expect(adminAppointmentWarnings({
+      photographerId: "steven-banda",
+      photographerName: "Steven Banda",
+      date: "2026-10-18",
+      time: "10:00",
+      env,
+    })).toEqual([]);
+  });
+
+  it("warns when a Saturday start is after noon", () => {
+    const warnings = adminAppointmentWarnings({
+      photographerId: "cadi-torres",
+      photographerName: "Cadi Torres",
+      date: "2026-10-17",
+      time: "13:00",
+      env,
+    });
+    expect(warnings.join(" ")).toMatch(/booking hours/i);
+  });
+
+  it("warns inside the travel buffer and accepts a start after the buffer", () => {
+    const end = zonedTimeToUtc(2026, 10, 19, 10, 0, "America/Chicago");
+    const start = zonedTimeToUtc(2026, 10, 19, 8, 0, "America/Chicago");
+    const events = [{ startMs: start.getTime(), endMs: end.getTime(), location: "" }];
+    const tight = adminAppointmentWarnings({
+      photographerId: "cadi-torres",
+      photographerName: "Cadi Torres",
+      date: "2026-10-19",
+      time: "10:20",
+      bufferMinutes: 25,
+      events,
+      env,
+    });
+    expect(tight.join(" ")).toMatch(/25-minute travel buffer/i);
+    expect(adminAppointmentWarnings({
+      photographerId: "cadi-torres",
+      photographerName: "Cadi Torres",
+      date: "2026-10-19",
+      time: "10:30",
+      bufferMinutes: 25,
+      events,
+      env,
+    })).toEqual([]);
+  });
+
+  it("uses apprenticeship days for an apprentice who is not on the booking roster", () => {
+    const warnings = adminAppointmentWarnings({
+      photographerId: "apprentice-1",
+      photographerName: "Jamie Cole",
+      role: "apprentice",
+      date: "2026-10-18",
+      time: "10:00",
+      env,
+    });
+    expect(warnings.join(" ")).toMatch(/apprenticeship/i);
   });
 });

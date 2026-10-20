@@ -7,6 +7,7 @@ import { addressText } from "./addressText.ts";
 import { clientPayPath } from "./invoicePay.ts";
 import { normalizeBookingLineItems, type BookingLineItem } from "./bookingPricing.ts";
 import { computeInvoiceTotals } from "./invoiceProcessing.ts";
+import { priceManagedOrder, type ManagedOrderInput } from "./managedOrderPricing.ts";
 import { cleanPersonName, normalizeEmail } from "./listingAccess.ts";
 import { draftInvoiceNumber } from "./orderProjectInvoice.ts";
 import type { StaffCatalogPackage } from "./bookingCatalog.ts";
@@ -86,6 +87,12 @@ export interface InvoiceBillingPatch {
   travelOverridden?: boolean;
   taxOverridden?: boolean;
   promoOverridden?: boolean;
+  depositRequired?: boolean;
+  depositPercent?: number;
+  depositAmount?: number;
+  depositPaid?: number;
+  balanceDue?: number;
+  processingPolicy?: string;
 }
 
 export function staffInvoicePath(invoiceId: string): string {
@@ -441,7 +448,13 @@ function withAdjustmentLines(
  * A promo that is already a line stays one subtraction. A promo stored only as a field is kept
  * on the invoice and is not subtracted a second time.
  * The invoice document id is the caller's argument and is never part of this patch.
+ * An order whose processing policy is "included" is repriced with the shared
+ * 2.8% fee instead of keeping the previous processing dollars.
  */
+function textPolicy(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 export function orderServiceInvoicePatch(
   order: {
     lineItems?: unknown;
@@ -454,7 +467,7 @@ export function orderServiceInvoicePatch(
     email?: unknown;
     clientEmail?: unknown;
     address?: unknown;
-  },
+  } & ManagedOrderInput,
   existing: {
     amountPaid?: unknown;
     tax?: unknown;
@@ -475,6 +488,37 @@ export function orderServiceInvoicePatch(
   if (address) patch.billToAddress = address;
 
   if (!Array.isArray(order.lineItems)) return patch;
+
+  if (textPolicy(order.processingPolicy) === "included" && order.processingOverridden !== true) {
+    const priced = priceManagedOrder({
+      ...order,
+      applyProcessing: true,
+      processingPolicy: "included",
+      amountPaid: existing.amountPaid,
+      tax: order.pricing && order.pricing.tax != null && order.pricing.tax !== ""
+        ? order.pricing.tax
+        : order.tax != null ? order.tax : existing.tax,
+      fees: order.fees != null ? order.fees : existing.fees,
+      travel: order.travel != null ? order.travel : existing.travel,
+    });
+    patch.lineItems = priced.invoiceLines;
+    patch.subtotal = priced.subtotal;
+    patch.tax = priced.tax;
+    patch.promoCode = priced.promoCode || null;
+    patch.promoDiscount = priced.promotions;
+    patch.processing = priced.processing;
+    patch.fees = priced.fees;
+    patch.travel = priced.travel;
+    patch.processingPolicy = priced.processingPolicy;
+    patch.total = priced.total;
+    patch.amountDue = priced.amountDue;
+    patch.balanceDue = priced.balanceDue;
+    patch.depositRequired = priced.depositRequired;
+    patch.depositPercent = priced.depositPercent;
+    patch.depositAmount = priced.depositAmount;
+    patch.depositPaid = priced.depositPaid;
+    return patch;
+  }
 
   const lineItems = withAdjustmentLines(
     normalizeBookingLineItems(order.lineItems).filter((item) => (item.name.trim() || item.price !== 0) && !adjustmentKind(item)),

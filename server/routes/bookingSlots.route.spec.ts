@@ -1,5 +1,6 @@
 import type { Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { travelBufferMinutes } from "../../shared/bookingAvailability";
 import { createServer } from "../index";
 
 let server: Server;
@@ -38,6 +39,7 @@ describe("public booking availability", () => {
       "David Gonzalez",
       "Cadi Torres",
     ]);
+    expect(body.bufferMinutes).toBe(travelBufferMinutes());
     expect(JSON.stringify(body)).not.toContain("@");
   });
 

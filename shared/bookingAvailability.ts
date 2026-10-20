@@ -8,6 +8,7 @@
 
 import {
   apprenticeshipDurationMinutes,
+  apprenticeshipHoursFromEnv,
   zonedTimeToUtc,
   type ApprenticeshipHours,
   type ApprenticeshipSlot,
@@ -303,6 +304,110 @@ export function isPreferredWindowBooking(body: { slotStart?: unknown; scheduledT
   if (slotStart) return false;
   const time = typeof body.scheduledTime === "string" ? body.scheduledTime.trim().toLowerCase() : "";
   return PREFERRED_TIME_WINDOWS.has(time);
+}
+
+function calendarWeekday(date: string): number | null {
+  const match = date.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  return new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]))).getUTCDay();
+}
+
+function clockMinutes(value: string): number | null {
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?$/);
+  if (!match) return null;
+  let hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const suffix = match[3]?.toLowerCase();
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes) || minutes > 59) return null;
+  if (suffix === "pm" && hours < 12) hours += 12;
+  if (suffix === "am" && hours === 12) hours = 0;
+  if (hours > 23) return null;
+  return hours * 60 + minutes;
+}
+
+/**
+ * Admin may book outside the public rules. These warnings name the rule
+ * (closed day, hours, or the travel buffer) and do not block the save.
+ * The buffer is BOOKING_TRAVEL_BUFFER_MINUTES, via travelBufferMinutes.
+ */
+export function adminAppointmentWarnings(input: {
+  photographerId: string;
+  photographerName?: string;
+  role?: string;
+  date: string;
+  time: string;
+  durationMinutes?: number;
+  bufferMinutes?: number;
+  address?: string;
+  events?: TravelEvent[];
+  schedule?: BookingHoursConfig;
+  env?: Record<string, string | undefined>;
+}): string[] {
+  const warnings: string[] = [];
+  const date = input.date.trim();
+  const time = input.time.trim();
+  const photographerId = input.photographerId.trim();
+  if (!date || !time || !photographerId) return warnings;
+
+  const name = input.photographerName?.trim() || "This photographer";
+  const duration = input.durationMinutes && input.durationMinutes > 0
+    ? input.durationMinutes
+    : DEFAULT_BOOKING_DURATION_MINUTES;
+  const buffer = input.bufferMinutes != null && Number.isFinite(input.bufferMinutes) && input.bufferMinutes >= 0
+    ? input.bufferMinutes
+    : travelBufferMinutes(input.env);
+  const schedule = input.schedule ?? bookingScheduleFor({ env: input.env });
+  const weekday = calendarWeekday(date);
+  const minutes = clockMinutes(time);
+  if (weekday == null || minutes == null) {
+    warnings.push("That date or time could not be read. You can still save it.");
+    return warnings;
+  }
+
+  const week = weekForPhotographer(schedule, photographerId);
+  const apprentice = input.role === "apprentice" && !schedule.photographers[photographerId];
+  const apprenticeHours = apprentice ? apprenticeshipHoursFromEnv(input.env) : null;
+  if (apprenticeHours) {
+    if (!apprenticeHours.days.includes(weekday)) {
+      warnings.push(`${name} is not on the apprenticeship schedule that day. You can still save this time.`);
+    } else if (minutes < apprenticeHours.startMinutes || minutes + duration > apprenticeHours.endMinutes) {
+      warnings.push(`${name}'s apprenticeship hours don't cover this time. You can still save it.`);
+    }
+  } else {
+    const day = week.days[weekday];
+    if (!day) {
+      warnings.push(`${name} is not scheduled that day. You can still save this time.`);
+    } else {
+      const latest = day.latestStartMinutes ?? Number.POSITIVE_INFINITY;
+      if (minutes < day.startMinutes || minutes >= latest || minutes + duration > day.endMinutes) {
+        warnings.push(`${name}'s booking hours don't cover this time. You can still save it.`);
+      }
+    }
+  }
+
+  const parts = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!parts) return warnings;
+  const zone = apprenticeHours?.timeZone || week.timeZone;
+  const start = zonedTimeToUtc(
+    Number(parts[1]),
+    Number(parts[2]),
+    Number(parts[3]),
+    Math.floor(minutes / 60),
+    minutes % 60,
+    zone,
+  );
+  const end = new Date(start.getTime() + duration * 60 * 1000);
+  const fitted = slotsWithTravel({
+    slots: [{ start: start.toISOString(), end: end.toISOString(), date, time, label: time }],
+    events: input.events || [],
+    bookingAddress: input.address || "",
+    bufferMinutes: buffer,
+    driveMinutes: () => null,
+  });
+  if ((input.events || []).length > 0 && fitted.length === 0) {
+    warnings.push(`This sits inside the ${buffer}-minute travel buffer or overlaps another shoot. You can still save it.`);
+  }
+  return warnings;
 }
 
 export function resolveBookingAssignment(input: {

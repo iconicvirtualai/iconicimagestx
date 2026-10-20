@@ -29,6 +29,15 @@ import {
   orderInvoiceButtonLabel,
 } from "@shared/orderProjectInvoice";
 import { staffInvoicePath } from "@shared/staffInvoice";
+import { packagesForStaffEditor, type StaffCatalogPackage } from "@shared/bookingCatalog";
+import {
+  editorLinesFromOrder,
+  managedOrderEditorPatch,
+  managedOrderWrite,
+  orderFeePreview,
+} from "@shared/managedOrderPricing";
+import { OrderFeeSummary } from "@/components/OrderFeeSummary";
+import { OrderServiceEditor } from "@/components/OrderServiceEditor";
 import { ensureLinkedInvoice, resolveLinkedInvoice } from "@/lib/orderProjectInvoice";
 import { syncOrderBillingToInvoice } from "@/lib/staffInvoice";
 import { separatePromoDiscount } from "@shared/bookingPricing";
@@ -137,6 +146,8 @@ export default function AdminOrderRequest() {
   const [linkedInvoiceId, setLinkedInvoiceId] = React.useState<string | null>(null);
   const [invoiceBusy, setInvoiceBusy] = React.useState(false);
   const [staff, setStaff] = React.useState<any[]>([]);
+  const [catalog, setCatalog] = React.useState<StaffCatalogPackage[]>(() => packagesForStaffEditor([]));
+  const [editBaseline, setEditBaseline] = React.useState<unknown[] | null>(null);
   const [selectedProviders, setSelectedProviders] = React.useState<string[]>([]);
   const [projectTypeChoice, setProjectTypeChoice] = React.useState<"real_estate" | "business">("real_estate");
   const projectTypeTouched = React.useRef(false);
@@ -200,15 +211,38 @@ export default function AdminOrderRequest() {
     }).catch(() => {});
   }, []);
 
+  React.useEffect(() => {
+    let cancelled = false;
+    getDocs(collection(db, "packages"))
+      .then((snap) => {
+        if (!cancelled) setCatalog(packagesForStaffEditor(snap.docs.map((entry) => ({ id: entry.id, ...entry.data() }))));
+      })
+      .catch(() => {
+        if (!cancelled) setCatalog(packagesForStaffEditor([]));
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const beginEdit = () => {
+    if (!order) return;
+    const lines = editorLinesFromOrder(order);
+    setEditBaseline(lines);
+    setForm({ ...order, lineItems: lines });
+    setEditing(true);
+  };
+
   // ─── Actions ──────────────────────────────────────────────────────────────
 
   const handleSave = async () => {
-    if (!id) return;
+    if (!id || !order) return;
     setSaving(true);
+    const decision = managedOrderEditorPatch(order, form.lineItems, editBaseline ?? undefined);
+    const pricedWrite = decision.price ? managedOrderWrite(decision.price) : null;
     try {
-      const updates: any = { ...form, updatedAt: serverTimestamp() };
+      const updates: any = { ...form, ...(pricedWrite || {}), updatedAt: serverTimestamp() };
       delete updates.id;
       await updateDoc(doc(db, "orderRequests", id), updates);
+      if (pricedWrite) setForm((prev: any) => ({ ...prev, ...pricedWrite }));
       setEditing(false);
     } catch (err) {
       console.error(err);
@@ -227,7 +261,8 @@ export default function AdminOrderRequest() {
         });
       }
       if (invoiceId) {
-        const synced = await syncOrderBillingToInvoice(invoiceId, form);
+        const invoiceOrder = pricedWrite ? { ...form, ...pricedWrite } : form;
+        const synced = await syncOrderBillingToInvoice(invoiceId, invoiceOrder);
         toast.success(synced ? "Order updated. Invoice updated." : "Order updated.");
       } else {
         toast.success("Order updated.");
@@ -295,6 +330,10 @@ export default function AdminOrderRequest() {
           return;
         }
       }
+      const chosenIds = selectedProviders.length > 0 ? selectedProviders : carry.photographerIds;
+      const chosenNames = selectedProviders.length > 0
+        ? selectedProviders.map((pid) => staff.find((person) => person.id === pid)?.name || pid)
+        : carry.photographerNames;
       const listingData: any = {
         projectType: projectTypeChoice,
         ...links,
@@ -308,12 +347,19 @@ export default function AdminOrderRequest() {
         total: Number(order.total) || Number(order.pricing?.total) || 0,
         images: [], studioEnabled: true, studioToken: crypto.randomUUID(),
         lockDownloads: true, requirePayment: true, lockStudio: false, socialPermission: false,
-        assignedProviders: selectedProviders.map(pid => {
-          const s = staff.find(st => st.id === pid);
-          return { providerId: pid, name: s?.name || pid, role: s?.role || "photographer" };
-        }),
-        photographerIds: selectedProviders,
-        photographerNames: selectedProviders.map(pid => staff.find(st => st.id === pid)?.name || pid),
+        photographerUid: carry.photographerUid,
+        assignedProviders: selectedProviders.length > 0
+          ? selectedProviders.map((pid) => {
+            const person = staff.find((member) => member.id === pid);
+            return { providerId: pid, name: person?.name || pid, role: person?.role || "photographer" };
+          })
+          : chosenIds.map((pid, index) => ({
+            providerId: pid,
+            name: chosenNames[index] || carry.assignedPhotographerName || pid,
+            role: "photographer",
+          })),
+        photographerIds: chosenIds,
+        photographerNames: chosenNames,
         createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       };
       const ref = await addDoc(collection(db, "listings"), listingData);
@@ -480,6 +526,7 @@ export default function AdminOrderRequest() {
   const lineItems = orderServiceLines(order);
   const charges = orderChargeSummary(order, lineItems);
   const orderTotal = charges.total;
+  const feePreview = orderFeePreview(order, editing, form.lineItems, editBaseline ?? undefined);
   const promoDiscount = Number(order.promoDiscount) || 0;
   const extraPromo = separatePromoDiscount(lineItems, promoDiscount);
   const clientName = order.clientName || `${order.firstName || ""} ${order.lastName || ""}`.trim() || "—";
@@ -581,18 +628,21 @@ export default function AdminOrderRequest() {
             <h3 className={`${labelCls} mb-4`}>Services</h3>
             {editing ? (
               <div>
-                {(form.lineItems || []).map((li, i) => (
-                  <div key={i} className="flex gap-2 mb-2 items-center">
-                    <input value={li.name || ""} onChange={e => { var items = [...(form.lineItems || [])]; items[i] = {...items[i], name: e.target.value}; setForm(function(f){ return {...f, lineItems: items}; }); }} placeholder="Service name" className="flex-1 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-sm font-bold text-black focus:outline-none" />
-                    <input type="number" value={li.price || ""} onChange={e => { var items = [...(form.lineItems || [])]; items[i] = {...items[i], price: Number(e.target.value)}; setForm(function(f){ return {...f, lineItems: items, total: items.reduce(function(s,x){return s+(Number(x.price)||0)},0)}; }); }} placeholder="Price" className="w-28 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-sm font-bold text-black focus:outline-none" />
-                    <button onClick={() => { var items = (form.lineItems || []).filter(function(_,idx){return idx!==i}); setForm(function(f){ return {...f, lineItems: items, total: items.reduce(function(s,x){return s+(Number(x.price)||0)},0)}; }); }} className="text-red-400 hover:text-red-300 text-xs font-bold px-2">X</button>
+                <OrderServiceEditor
+                  catalog={catalog}
+                  lines={form.lineItems || []}
+                  onChange={(items) => setForm((prev: any) => ({ ...prev, lineItems: items }))}
+                />
+                {feePreview ? (
+                  <div className="mt-4">
+                    <OrderFeeSummary price={feePreview} />
                   </div>
-                ))}
-                <button onClick={() => setForm(function(f){ return {...f, lineItems: [...(f.lineItems||[]), {name:"",price:0}]}; })} className="text-[#0d9488] text-xs font-bold mt-2">+ Add Service</button>
-                <div className="border-t border-white/20 pt-3 mt-3 flex items-baseline justify-between gap-3">
-                  <span className="min-w-0 text-lg font-black text-white">Total</span>
-                  <MoneyAmount className="text-lg font-black text-[#0d9488]">{fmtCurrency((form.lineItems||[]).reduce(function(s,x){return s+(Number(x.price)||0)},0))}</MoneyAmount>
-                </div>
+                ) : (
+                  <div className="border-t border-gray-200 pt-3 mt-3 flex items-baseline justify-between gap-3">
+                    <span className="min-w-0 text-lg font-black text-black">Total</span>
+                    <MoneyAmount className="text-lg font-black text-[#0d9488]">{fmtCurrency(orderTotal)}</MoneyAmount>
+                  </div>
+                )}
               </div>
             ) : lineItems.length > 0 ? (
               <div className="mt-1 bg-gray-50 border border-gray-100 rounded-2xl overflow-hidden">
@@ -608,16 +658,22 @@ export default function AdminOrderRequest() {
                     <span className="text-sm font-black text-gray-500 shrink-0">{LIFE_OF_THE_LISTING_CARE_PRICE_LABEL}</span>
                   </div>
                 )}
-                {extraPromo > 0 && (
+                {extraPromo > 0 && !feePreview && (
                   <div className="flex items-baseline justify-between gap-3 px-4 py-3 border-t border-gray-200/50 bg-green-50/50">
                     <span className="min-w-0 text-sm font-bold text-gray-500 italic">Promo ({order.promoCode})</span>
                     <MoneyAmount className="text-sm font-bold text-green-600">-{fmtCurrency(extraPromo)}</MoneyAmount>
                   </div>
                 )}
-                <div className="bg-white border-t border-gray-200 px-4 py-4 flex items-baseline justify-between gap-3">
-                  <span className="min-w-0 text-base font-black uppercase tracking-tight">Total Amount</span>
-                  <MoneyAmount className="text-xl font-black text-black">{fmtCurrency(orderTotal)}</MoneyAmount>
-                </div>
+                {feePreview ? (
+                  <div className="bg-white border-t border-gray-200 px-4 py-4">
+                    <OrderFeeSummary price={feePreview} />
+                  </div>
+                ) : (
+                  <div className="bg-white border-t border-gray-200 px-4 py-4 flex items-baseline justify-between gap-3">
+                    <span className="min-w-0 text-base font-black uppercase tracking-tight">Total Amount</span>
+                    <MoneyAmount className="text-xl font-black text-black">{fmtCurrency(orderTotal)}</MoneyAmount>
+                  </div>
+                )}
               </div>
             ) : (
               <p className="text-sm text-gray-500">No services listed.</p>
@@ -663,18 +719,22 @@ export default function AdminOrderRequest() {
                 )}
               </div>
             )}
-            {extraPromo > 0 && (
+            {extraPromo > 0 && !feePreview && (
               <div className="flex items-baseline justify-between gap-3 text-sm mb-2">
                 <span className="min-w-0 text-gray-400">Promo</span>
                 <MoneyAmount className="text-green-600 font-bold">-{fmtCurrency(extraPromo)}</MoneyAmount>
               </div>
             )}
-            <div className="border-t border-gray-100 pt-3 mt-2">
-              <div className="flex items-baseline justify-between gap-3 text-lg">
-                <span className="min-w-0 font-black text-white">Total</span>
-                <MoneyAmount className="font-black text-[#0d9488]">{fmtCurrency(orderTotal)}</MoneyAmount>
+            {feePreview ? (
+              <OrderFeeSummary price={feePreview} tone="dark" />
+            ) : (
+              <div className="border-t border-gray-100 pt-3 mt-2">
+                <div className="flex items-baseline justify-between gap-3 text-lg">
+                  <span className="min-w-0 font-black text-white">Total</span>
+                  <MoneyAmount className="font-black text-[#0d9488]">{fmtCurrency(orderTotal)}</MoneyAmount>
+                </div>
               </div>
-            </div>
+            )}
             <div className="mt-4 pt-4 border-t border-gray-100 space-y-2 text-xs">
               <div className="flex justify-between"><span className={`${labelCls}`}>Status</span><span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${statusInfo.color}`}>{statusInfo.label}</span></div>
               <div className="flex justify-between"><span className={`${labelCls}`}>{isScheduledState ? "Scheduled" : "Requested"}</span><span className="font-bold text-white">{fmtDate(order.scheduledDate || order.appointmentDate) || "—"}</span></div>
@@ -731,7 +791,7 @@ export default function AdminOrderRequest() {
                 <Check className="w-3.5 h-3.5 mr-1.5" />{statusKey === "confirmed" ? "Confirmed" : "Mark Client Confirmed"}
               </Button>
               {!editing ? (
-                <Button onClick={() => setEditing(true)} variant="outline" className="w-full rounded-xl text-xs font-bold justify-center">
+                <Button onClick={beginEdit} variant="outline" className="w-full rounded-xl text-xs font-bold justify-center">
                   <Edit3 className="w-3.5 h-3.5 mr-1.5" /> Manage Order
                 </Button>
               ) : null}

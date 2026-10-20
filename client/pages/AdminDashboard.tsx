@@ -4,8 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Plus,
-  X,
-  Check,
   Mail,
   Users,
   Clock,
@@ -16,6 +14,13 @@ import {
 } from "lucide-react";
 import { recordAddressText } from "@shared/addressText";
 import { formatChicagoDate } from "@shared/clientHome";
+import {
+  appointmentTravelEvents,
+  assignablePhotographers,
+  orderAssignmentPatch,
+  type AssignablePhotographer,
+} from "@shared/adminOrderSchedule";
+import { adminAppointmentWarnings, DEFAULT_BOOKING_DURATION_MINUTES } from "@shared/bookingAvailability";
 import { db } from "@/lib/firebase";
 import {
   collection,
@@ -26,6 +31,8 @@ import {
 } from "firebase/firestore";
 import { toast } from "sonner";
 import { resolvePortalClientId } from "@/lib/listingClient";
+import { upsertScheduledAppointment } from "@/lib/scheduleRecords";
+import { BLANK_NEW_ORDER, NewOrderDialog, type NewOrderClient } from "@/components/NewOrderDialog";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 import OperationsOverview from "@/components/OperationsOverview";
 
@@ -50,12 +57,6 @@ export function StatusBadge({ status }: { status: string }) {
     </span>
   );
 }
-
-// ─── Blank new order form ──────────────────────────────────────────────────────
-const BLANK = {
-  firstName: "", lastName: "", email: "", phone: "", address: "", serviceNote: "", scheduledDate: "",
-  clientId: "", clientSearch: "",
-};
 
 // ─── Hook for Recently Visited ─────────────────────────────────────────────────
 function useRecentlyVisited() {
@@ -111,10 +112,13 @@ export default function AdminDashboard() {
   const [loading, setLoading] = React.useState(true);
 
   const [showNewOrder, setShowNewOrder] = React.useState(false);
-  const [form, setForm] = React.useState(BLANK);
+  const [form, setForm] = React.useState(BLANK_NEW_ORDER);
   const [saving, setSaving] = React.useState(false);
-  const [clients, setClients] = React.useState<Array<{ id: string; firstName?: string; lastName?: string; email?: string; phone?: string }>>([]);
-  const [showClientMatches, setShowClientMatches] = React.useState(false);
+  const [clients, setClients] = React.useState<NewOrderClient[]>([]);
+  const [staff, setStaff] = React.useState<Array<Record<string, unknown>>>([]);
+  const [bookingPeople, setBookingPeople] = React.useState<Array<{ id: string; name: string }>>([]);
+  const [appointments, setAppointments] = React.useState<Array<Record<string, unknown>>>([]);
+  const [bufferMinutes, setBufferMinutes] = React.useState<number | undefined>(undefined);
 
   React.useEffect(() => {
     const unsub = onSnapshot(collection(db, "orderRequests"), (snap) => {
@@ -129,31 +133,66 @@ export default function AdminDashboard() {
 
   React.useEffect(() => {
     if (!showNewOrder) return;
+    let cancel = false;
     getDocs(collection(db, "clients"))
       .then((snap) => {
-        setClients(snap.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
+        if (!cancel) setClients(snap.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
       })
       .catch((err) => console.warn("[AdminDashboard] Client list failed.", err));
+    getDocs(collection(db, "staff"))
+      .then((snap) => {
+        if (cancel) return;
+        setStaff(snap.docs.map((entry) => {
+          const data = entry.data();
+          return {
+            id: entry.id,
+            name: data.name || `${data.firstName || ""} ${data.lastName || ""}`.trim(),
+            ...data,
+          };
+        }));
+      })
+      .catch((err) => console.warn("[AdminDashboard] Staff list failed.", err));
+    getDocs(collection(db, "appointments"))
+      .then((snap) => {
+        if (!cancel) setAppointments(snap.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
+      })
+      .catch((err) => console.warn("[AdminDashboard] Appointment list failed.", err));
+    fetch("/api/bookings/photographers")
+      .then((response) => response.json())
+      .then((body) => {
+        if (cancel) return;
+        const people = Array.isArray(body?.photographers) ? body.photographers : [];
+        setBookingPeople(people.filter((person: { id?: unknown; name?: unknown }) => person?.id && person?.name));
+        if (typeof body?.bufferMinutes === "number") setBufferMinutes(body.bufferMinutes);
+      })
+      .catch((err) => console.warn("[AdminDashboard] Photographer list failed.", err));
+    return () => { cancel = true; };
   }, [showNewOrder]);
 
-  const clientMatches = form.clientSearch.trim().length > 1
-    ? clients.filter((client) => {
-        const haystack = `${client.firstName || ""} ${client.lastName || ""} ${client.email || ""}`.toLowerCase();
-        return haystack.includes(form.clientSearch.trim().toLowerCase());
-      }).slice(0, 6)
+  const photographers = assignablePhotographers({
+    booking: bookingPeople,
+    staff: staff as never,
+  });
+  const selectedPhotographer = photographers.find((person) => person.key === form.photographerKey) || null;
+  const scheduleWarnings = selectedPhotographer && form.scheduledDate && form.scheduledTime
+    ? adminAppointmentWarnings({
+      photographerId: selectedPhotographer.bookingPhotographerId || selectedPhotographer.staffId || selectedPhotographer.key,
+      photographerName: selectedPhotographer.name,
+      role: selectedPhotographer.role,
+      date: form.scheduledDate,
+      time: form.scheduledTime,
+      bufferMinutes,
+      events: appointmentTravelEvents({
+        records: [...orderRequests, ...appointments],
+        photographer: selectedPhotographer,
+        date: form.scheduledDate,
+      }),
+    })
     : [];
 
-  const selectClient = (client: { id: string; firstName?: string; lastName?: string; email?: string; phone?: string }) => {
-    setForm((prev) => ({
-      ...prev,
-      clientId: client.id,
-      clientSearch: `${client.firstName || ""} ${client.lastName || ""}`.trim(),
-      firstName: client.firstName || "",
-      lastName: client.lastName || "",
-      email: client.email || "",
-      phone: client.phone || "",
-    }));
-    setShowClientMatches(false);
+  const closeNewOrder = () => {
+    setShowNewOrder(false);
+    setForm(BLANK_NEW_ORDER);
   };
 
   const handleCreate = async () => {
@@ -170,6 +209,15 @@ export default function AdminDashboard() {
       } catch (lookupErr) {
         console.warn("[AdminDashboard] Client lookup failed.", lookupErr);
       }
+      const photographer: AssignablePhotographer | null = photographers.find((person) => person.key === form.photographerKey) || null;
+      const assignment = orderAssignmentPatch({
+        photographer,
+        date: form.scheduledDate,
+        time: form.scheduledTime,
+        durationMinutes: form.scheduledDate ? DEFAULT_BOOKING_DURATION_MINUTES : null,
+        overrideNotes: scheduleWarnings,
+      });
+      const lineItems = form.serviceNote ? [{ name: form.serviceNote, price: 0 }] : [];
       const ref = await addDoc(collection(db, "orderRequests"), {
         firstName: form.firstName,
         lastName: form.lastName,
@@ -179,19 +227,49 @@ export default function AdminDashboard() {
         clientId,
         phone: form.phone,
         address: form.address,
-        lineItems: form.serviceNote ? [{ name: form.serviceNote, price: 0 }] : [],
+        lineItems,
         pricing: {},
         total: 0,
-        scheduledDate: form.scheduledDate || null,
         status: "new",
         source: "admin",
+        ...assignment,
         createdAt: serverTimestamp(),
         submittedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+      if (form.scheduledDate) {
+        const providerId = photographer?.staffId || photographer?.bookingPhotographerId || "";
+        try {
+          await upsertScheduledAppointment({
+            orderRequestId: ref.id,
+            order: {
+              firstName: form.firstName,
+              lastName: form.lastName,
+              clientName: `${form.firstName} ${form.lastName}`.trim(),
+              email,
+              phone: form.phone,
+              address: form.address,
+              clientId,
+              lineItems,
+            },
+            date: form.scheduledDate,
+            time: form.scheduledTime || null,
+            providerIds: providerId ? [providerId] : [],
+            staff: providerId && photographer ? [{
+              id: providerId,
+              name: photographer.name,
+              role: photographer.role,
+            }] : [],
+          });
+        } catch (scheduleErr) {
+          console.error(scheduleErr);
+          toast.error(scheduleErr instanceof Error ? scheduleErr.message : "Order saved. The schedule could not be updated.");
+        }
+      }
       toast.success(clientId ? "Order created and linked to that client." : "Order created. No client account uses that email yet.");
+      if (scheduleWarnings.length > 0) toast.warning(scheduleWarnings[0]);
       setShowNewOrder(false);
-      setForm(BLANK);
+      setForm(BLANK_NEW_ORDER);
       navigate(`/admin/order-request/${ref.id}`);
     } catch (err) {
       console.error(err);
@@ -216,121 +294,16 @@ export default function AdminDashboard() {
 
       {/* ── New Order Modal ─────────────────────────────────────────────────── */}
       {showNewOrder && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-[2rem] shadow-2xl p-8 w-full max-w-lg">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-sm font-black text-black uppercase tracking-widest">Create Order</h3>
-              <button onClick={() => { setShowNewOrder(false); setForm(BLANK); }}>
-                <X className="w-5 h-5 text-gray-400 hover:text-black" />
-              </button>
-            </div>
-
-            <div className="relative mb-3">
-              <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Existing client</label>
-              <input
-                value={form.clientSearch}
-                onChange={(e) => {
-                  setForm((prev) => ({ ...prev, clientSearch: e.target.value, clientId: "" }));
-                  setShowClientMatches(true);
-                }}
-                onFocus={() => setShowClientMatches(true)}
-                placeholder="Search Marty or an email to attach this order"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30"
-              />
-              {showClientMatches && clientMatches.length > 0 && (
-                <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
-                  {clientMatches.map((client) => (
-                    <button
-                      key={client.id}
-                      type="button"
-                      onClick={() => selectClient(client)}
-                      className="w-full text-left px-4 py-3 hover:bg-gray-50 text-sm font-bold border-b border-gray-100 last:border-0"
-                    >
-                      {`${client.firstName || ""} ${client.lastName || ""}`.trim() || "Client"}
-                      <span className="text-gray-400 font-normal ml-2 text-xs">{client.email}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              {(["firstName", "lastName"] as const).map((k) => (
-                <div key={k}>
-                  <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">
-                    {k === "firstName" ? "First Name *" : "Last Name"}
-                  </label>
-                  <input
-                    value={form[k]}
-                    onChange={(e) => setForm((p) => ({ ...p, [k]: e.target.value }))}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30"
-                  />
-                </div>
-              ))}
-              <div>
-                <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Email *</label>
-                <input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm((p) => ({ ...p, email: e.target.value, clientId: "" }))}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Phone</label>
-                <input
-                  type="tel"
-                  value={form.phone}
-                  onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-3 mb-6">
-              <div>
-                <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Property Address</label>
-                <input
-                  value={form.address}
-                  onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
-                  placeholder="123 Main St, Houston TX"
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Service / Notes</label>
-                <input
-                  value={form.serviceNote}                  onChange={(e) => setForm((p) => ({ ...p, serviceNote: e.target.value }))}
-                  placeholder="e.g. Listing Showcase + Aerial"
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Appointment Date (optional)</label>
-                <input
-                  type="date"
-                  value={form.scheduledDate}
-                  onChange={(e) => setForm((p) => ({ ...p, scheduledDate: e.target.value }))}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#0d9488]/30"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <Button
-                onClick={handleCreate}
-                disabled={saving}
-                className="flex-1 bg-[#0d9488] hover:bg-[#0f766e] text-white font-bold rounded-xl"
-              >
-                <Check className="w-4 h-4 mr-2" />
-                {saving ? "Creating…" : "Create Order"}
-              </Button>
-              <Button variant="outline" onClick={() => { setShowNewOrder(false); setForm(BLANK); }} className="rounded-xl font-bold">
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </div>
+        <NewOrderDialog
+          form={form}
+          setForm={setForm}
+          clients={clients}
+          photographers={photographers}
+          warnings={scheduleWarnings}
+          saving={saving}
+          onClose={closeNewOrder}
+          onCreate={handleCreate}
+        />
       )}
 
       {/* ── Stats Grid ─────────────────────────────────────────────────────── */}

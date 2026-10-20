@@ -154,6 +154,31 @@ export function stableOrderRequestListingId(orderRequestId: string): string | nu
   return bookingListingDocId("req", id);
 }
 
+function stringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => text(item)).filter(Boolean);
+}
+
+/**
+ * The photographer portal looks up listings by staff uid.
+ * A public booking slug such as steven-banda is not that uid.
+ */
+function carriedPhotographer(order: Record<string, unknown>): {
+  uid: string | null;
+  ids: string[];
+  names: string[];
+} {
+  const bookingId = text(order.bookingPhotographerId);
+  const uidCandidate = text(order.photographerUid) || text(order.assignedPhotographerId);
+  const uid = uidCandidate && uidCandidate !== bookingId ? uidCandidate : null;
+  const ids = stringList(order.photographerIds).filter((id) => id !== bookingId);
+  if (uid && !ids.includes(uid)) ids.unshift(uid);
+  const names = stringList(order.photographerNames);
+  const assigned = text(order.assignedPhotographerName) || text(order.photographerName);
+  if (assigned && !names.includes(assigned)) names.unshift(assigned);
+  return { uid, ids, names };
+}
+
 function serviceNames(record: Record<string, unknown>): string[] {
   const source = Array.isArray(record.lineItems) && record.lineItems.length > 0
     ? record.lineItems
@@ -184,6 +209,9 @@ export interface ProjectCarryFields {
   orderNumber: string | null;
   assignedPhotographerName: string | null;
   bookingPhotographerId: string | null;
+  photographerUid: string | null;
+  photographerIds: string[];
+  photographerNames: string[];
   photographerPreference: string | null;
   accessMethod: string | null;
   lockboxCode: string | null;
@@ -220,6 +248,7 @@ export function projectCarryFromOrder(order: Record<string, unknown>): ProjectCa
   const duration = typeof order.appointmentDuration === "number" && Number.isFinite(order.appointmentDuration)
     ? order.appointmentDuration
     : null;
+  const photographer = carriedPhotographer(order);
   return {
     apptDate,
     appointmentDate: day,
@@ -233,6 +262,9 @@ export function projectCarryFromOrder(order: Record<string, unknown>): ProjectCa
     orderNumber: text(order.orderNumber) || null,
     assignedPhotographerName: text(order.assignedPhotographerName) || text(order.photographerName) || null,
     bookingPhotographerId: text(order.bookingPhotographerId) || null,
+    photographerUid: photographer.uid,
+    photographerIds: photographer.ids,
+    photographerNames: photographer.names,
     photographerPreference: text(order.photographerPreference) || null,
     accessMethod: accessMethod || null,
     lockboxCode: lockboxCode || null,

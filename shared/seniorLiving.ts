@@ -366,6 +366,20 @@ function dollars(amountCents: number): number {
   return amountCents / 100;
 }
 
+/** Half of the charged total, in cents, using the senior living 50% deposit. */
+export function seniorLivingDepositFromTotal(total: number): {
+  depositAmount: number;
+  balanceAfterDeposit: number;
+} {
+  const totalCents = cents(total);
+  const depositCents = Math.round(totalCents * (SENIOR_LIVING_DEPOSIT_PERCENT / 100));
+  const depositAmount = dollars(depositCents);
+  return {
+    depositAmount,
+    balanceAfterDeposit: dollars(totalCents - cents(depositAmount)),
+  };
+}
+
 export function seniorRoomUnitPrice(count: number): number | null {
   if (!Number.isInteger(count) || count < 1) return null;
   const tier = SENIOR_ROOM_RATES.find(
@@ -446,10 +460,9 @@ export function quoteSeniorLivingOrder(input: {
   const priced = cents(serviceSubtotal) + cents(travelLine.price);
   const processing = dollars(Math.round(priced * SENIOR_LIVING_PROCESSING_RATE));
   const total = dollars(priced + cents(processing));
-  const depositAmount = dollars(
-    Math.round(cents(total) * (SENIOR_LIVING_DEPOSIT_PERCENT / 100)),
-  );
-  const balanceDue = dollars(cents(total) - cents(depositAmount));
+  const deposit = seniorLivingDepositFromTotal(total);
+  const depositAmount = deposit.depositAmount;
+  const balanceDue = deposit.balanceAfterDeposit;
   return {
     ok: true,
     quote: {
