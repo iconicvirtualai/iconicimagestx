@@ -15,6 +15,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Routes, Route, useLocation } from "react-router-dom";
+import { PublicSiteTracking } from "./lib/tracking";
 import { useEffect } from "react";
 import { AuthProvider } from "./contexts/AuthContext";
 import { SiteContentProvider } from "./content/siteContent";
@@ -31,6 +32,7 @@ import Contact from "./pages/Contact";
 import Book from "./pages/Book";
 import SeniorLiving from "./pages/SeniorLiving";
 import Apprenticeship from "./pages/Apprenticeship";
+import RealEstate75 from "./pages/RealEstate75";
 import Pricing from "./pages/Pricing";
 import AIPricingAssistant from "./pages/AIPricingAssistant";
 import Socials from "./pages/Socials";
@@ -115,6 +117,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <PublicSiteTracking />
         <SiteContentProvider>
         <LocalBusinessJsonLd />
         <ScrollToTop />
@@ -130,6 +133,11 @@ const App = () => (
             <Route path="/book" element={<Book />} />
             <Route path="/senior-living" element={<SeniorLiving />} />
             <Route path="/apprenticeship" element={<Apprenticeship />} />
+            {/* Preview only. Not linked from the public menu. noindex until Cadi approves. */}
+            <Route path="/realestate-75" element={<RealEstate75 />} />
+            <Route path="/realestate-75/schedule" element={<RealEstate75 />} />
+            <Route path="/realestate-75/samples" element={<RealEstate75 />} />
+            <Route path="/realestate-75/how-it-works" element={<RealEstate75 />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/pricing/ai-assistant" element={<AIPricingAssistant />} />
             <Route path="/socials" element={<Socials />} />

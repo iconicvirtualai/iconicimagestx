@@ -45,6 +45,8 @@ export async function createOrder(formData: any) {
     specializedPhotography: formData.specializedPhotography || "",
     virtualStagingCredits:  formData.virtualStagingCredits  || 0,
     leadSource:             formData.leadSource             || "",
+    gclid:                  formData.gclid                  || "",
+    brokerage:              formData.brokerage              || "",
     selectedService:        formData.selectedService        || null,
     selectedBasics:         Array.isArray(formData.selectedBasics) ? formData.selectedBasics : [],
     selectedAddOns:         Array.isArray(formData.selectedAddOns) ? formData.selectedAddOns : [],

@@ -125,6 +125,14 @@ describe("public page meta", () => {
     expect(metaPlan("/insights/prep").kind).toBe("generic");
     expect(metaPlan("/insights/twilight-porch").kind).toBe("hands-off");
     expect(metaPlan("/agents").kind).toBe("generic");
+    expect(isNoIndexPath("/realestate-75")).toBe(true);
+    expect(isNoIndexPath("/realestate-75/schedule")).toBe(true);
+    expect(metaPlan("/realestate-75")).toEqual({
+      kind: "noindex",
+      title: "Listing Photos From $75 | Iconic Images",
+      description: "Apprentice listing photos from $75. 25 photos in 20 minutes, or 50 photos in 1 hour.",
+    });
+    expect(metaPlan("/pricing").kind).toBe("public");
   });
 
   it("matches the committed sitemap and robots files", () => {

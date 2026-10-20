@@ -160,6 +160,7 @@ export function ogImageUrl(origin = SITE_ORIGIN): string {
 /** Private trees. /studio-105 is public and must not match /studio/. */
 export function isNoIndexPath(pathname: string): boolean {
   const path = normalizePath(pathname);
+  if (path === "/realestate-75" || path.startsWith("/realestate-75/")) return true;
   if (path === "/admin" || path.startsWith("/admin/")) return true;
   if (path === "/portal" || path.startsWith("/portal/")) return true;
   if (path === "/owners" || path.startsWith("/owners/")) return true;
@@ -171,13 +172,20 @@ export function isNoIndexPath(pathname: string): boolean {
 
 export type MetaPlan =
   | { kind: "public"; title: string; description: string; canonical: string; image: string }
-  | { kind: "noindex"; title: string }
+  | { kind: "noindex"; title: string; description?: string }
   | { kind: "generic"; title: string }
   | { kind: "preserve-title" }
   | { kind: "hands-off" };
 
 export function metaPlan(pathname: string, origin = SITE_ORIGIN): MetaPlan {
   const path = normalizePath(pathname);
+  if (path === "/realestate-75" || path.startsWith("/realestate-75/")) {
+    return {
+      kind: "noindex",
+      title: "Listing Photos From $75 | Iconic Images",
+      description: "Apprentice listing photos from $75. 25 photos in 20 minutes, or 50 photos in 1 hour.",
+    };
+  }
   if (path === "/present" || path.startsWith("/present/")) return { kind: "hands-off" };
   if (path.startsWith("/insights/") && path !== "/insights/prep") return { kind: "hands-off" };
   if (path === "/go") return { kind: "preserve-title" };

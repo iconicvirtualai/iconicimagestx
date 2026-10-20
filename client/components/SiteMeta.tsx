@@ -33,6 +33,7 @@ export function applyMetaPlan(doc: Document, plan: MetaPlan) {
   doc.title = plan.title;
   if (plan.kind === "noindex") {
     upsertMeta(doc, "name", "robots", "noindex, nofollow");
+    if (plan.description) upsertMeta(doc, "name", "description", plan.description);
     return;
   }
   if (plan.kind === "generic") return;

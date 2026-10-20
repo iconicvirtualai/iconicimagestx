@@ -23,8 +23,14 @@ import {
   type DriveQuery,
   type PhotographerDay,
 } from "../../shared/bookingAvailability";
-import { bookingHoursFromEnv } from "../../shared/bookingHours";
+import { bookingHoursFromEnv, type BookingHoursConfig } from "../../shared/bookingHours";
 import type { StaffCatalogPackage } from "../../shared/bookingCatalog";
+import {
+  isRealEstate75Holiday,
+  realEstate75Package,
+  realEstate75Week,
+} from "../../shared/realestate75";
+import { apprenticeshipHoursFromEnv } from "../../shared/apprenticeship";
 import { calendarAuthFromAccount, firebaseServiceAccount } from "./apprenticeshipCalendar";
 import {
   BOOKING_PHOTOGRAPHERS,
@@ -277,21 +283,28 @@ export async function readBookingAvailability(input: {
   catalog?: StaffCatalogPackage[];
   now?: Date;
   env?: Record<string, string | undefined>;
+  /** Overrides the company week. /book leaves this unset. */
+  schedule?: BookingHoursConfig;
+  /** Overrides the catalog duration. /book leaves this unset. */
+  durationMinutes?: number;
+  slotFilter?: (slot: AssignedSlot) => boolean;
   listEvents?: (person: BookingPhotographer, timeMin: string, timeMax: string) => Promise<CalendarBlock[]>;
   fetchImpl?: typeof fetch;
   cache?: DriveTimeCache;
 }): Promise<BookingAvailabilityResult> {
   const env = input.env ?? process.env;
   const now = input.now ?? new Date();
-  const schedule = bookingHoursFromEnv(env);
+  const schedule = input.schedule ?? bookingHoursFromEnv(env);
   const hours = schedule.company;
   const bufferMinutes = travelBufferMinutes(env);
-  const durationMinutes = bookingDurationMinutes({
-    selectedService: input.selectedService,
-    selectedBasics: input.selectedBasics,
-    catalog: input.catalog,
-    env,
-  });
+  const durationMinutes = input.durationMinutes && input.durationMinutes > 0
+    ? input.durationMinutes
+    : bookingDurationMinutes({
+      selectedService: input.selectedService,
+      selectedBasics: input.selectedBasics,
+      catalog: input.catalog,
+      env,
+    });
   const apiKey = (env.GOOGLE_MAPS_API_KEY || "").trim();
   const address = addressText(input.address);
   const preferenceId = (input.preferenceId || "no-preference").trim() || "no-preference";
@@ -354,13 +367,43 @@ export async function readBookingAvailability(input: {
       return value === undefined ? null : value;
     },
   });
+  const slots = input.slotFilter ? assigned.slots.filter(input.slotFilter) : assigned.slots;
   return {
     live: assigned.live,
-    slots: assigned.slots,
+    slots,
     durationMinutes,
     bufferMinutes,
     driveMode: apiKey ? "routes" : "buffer",
   };
+}
+
+/** Same photographer calendars as /book, on the apprentice clock for the chosen package. */
+export async function readRealEstate75Availability(input: {
+  address?: unknown;
+  packageId?: unknown;
+  now?: Date;
+  env?: Record<string, string | undefined>;
+  listEvents?: (person: BookingPhotographer, timeMin: string, timeMax: string) => Promise<CalendarBlock[]>;
+  fetchImpl?: typeof fetch;
+  cache?: DriveTimeCache;
+}): Promise<BookingAvailabilityResult> {
+  const env = input.env ?? process.env;
+  const horizonDays = apprenticeshipHoursFromEnv(env).horizonDays;
+  const week = realEstate75Week(horizonDays);
+  const pkg = realEstate75Package(input.packageId);
+  return readBookingAvailability({
+    address: input.address,
+    preferenceId: "no-preference",
+    selectedBasics: [pkg.id],
+    now: input.now,
+    env,
+    durationMinutes: pkg.durationMinutes,
+    schedule: { company: week, photographers: {} },
+    slotFilter: (slot) => !isRealEstate75Holiday(slot.date),
+    listEvents: input.listEvents,
+    fetchImpl: input.fetchImpl,
+    cache: input.cache,
+  });
 }
 
 export async function createBookingCalendarHold(input: {
