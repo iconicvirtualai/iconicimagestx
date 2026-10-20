@@ -63,6 +63,7 @@ import {
 import { createHolidayCalendarEvent, deleteHolidayCalendarEvent } from "../services/holidayCalendar";
 import { backfillHolidayCalendarEvents } from "../services/holidayCalendarBackfill";
 import { isPreferredWindowBooking, resolveBookingAssignment } from "../../shared/bookingAvailability";
+import { suggestedAppointmentsAreEnabled } from "../services/suggestedAppointmentsFlag";
 import { BUSINESS_CONTACT } from "../../shared/businessContact";
 import { clientIp } from "../lib/clientIp";
 import { createRateLimiter } from "../lib/rateLimit";
@@ -296,6 +297,7 @@ router.post("/", async (req, res) => {
     let availability: Awaited<ReturnType<typeof readBookingAvailability>> = {
       live: false,
       slots: [],
+      suggestions: [],
       durationMinutes: 90,
       bufferMinutes: 30,
       driveMode: "buffer",
@@ -919,6 +921,12 @@ router.get("/realestate-75/slots", async (req, res) => {
   }
 });
 
+function postedDurationMinutes(value: unknown): number | undefined {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 15 || parsed > 24 * 60) return undefined;
+  return parsed;
+}
+
 router.get("/slots", async (req, res) => {
   const basics = typeof req.query.basics === "string"
     ? req.query.basics.split(",").map((id) => id.trim()).filter(Boolean)
@@ -932,15 +940,18 @@ router.get("/slots", async (req, res) => {
       selectedService: typeof req.query.service === "string" ? req.query.service : null,
       selectedBasics: basics,
       catalog,
+      durationMinutes: postedDurationMinutes(req.query.duration),
     });
+    const enabled = await suggestedAppointmentsAreEnabled();
     return res.json({
       live: availability.live,
       durationMinutes: availability.durationMinutes,
       slots: availability.live ? availability.slots : [],
+      suggestions: enabled && availability.live ? availability.suggestions : [],
     });
   } catch (err) {
     console.error("[Bookings] Slot lookup failed — keeping the standard time list:", err);
-    return res.json({ live: false, durationMinutes: 90, slots: [] });
+    return res.json({ live: false, durationMinutes: 90, slots: [], suggestions: [] });
   }
 });
 

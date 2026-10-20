@@ -16,7 +16,9 @@ import {
   LIFE_OF_THE_LISTING_CARE_PRICE_LABEL,
   LIFE_OF_THE_LISTING_CARE_SUMMARY_LABEL,
 } from "@shared/lifeOfTheListingCare";
-import { addressText } from "@shared/addressText";
+import { addressText, recordAddressText } from "@shared/addressText";
+import { StaffSuggestedTimes } from "@/components/SuggestedAppointments";
+import type { BookingSlotChoice } from "@/components/BookingSlotPicker";
 import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "@shared/businessContact";
 import { formatChicagoDate } from "@shared/clientHome";
 import { orderScheduleTime, scheduleDateInputValue, scheduleTimeInputValue } from "@shared/listingWrite";
@@ -520,9 +522,35 @@ export default function AdminOrderDetail() {
                 <div>
                   <label className={labelCls}>Date & Time</label>
                   {editing ? (
-                    <div className="grid grid-cols-2 gap-2">
-                      <input type="date" value={scheduleDateInputValue(editForm)} onChange={e => setEditForm((f: any) => ({...f, appointmentDate: e.target.value, scheduledDate: e.target.value}))} className={inputCls} />
-                      <input type="time" value={scheduleTimeInputValue(orderScheduleTime(editForm))} onChange={e => setEditForm((f: any) => ({...f, appointmentTime: e.target.value, scheduledTime: e.target.value}))} className={inputCls} />
+                    <div className="space-y-3">
+                      <StaffSuggestedTimes
+                        active={editing}
+                        address={recordAddressText(editForm)}
+                        photographerNames={(editForm.assignedProviders || []).map((provider: { name?: string }) => provider.name || "")}
+                        service={typeof editForm.selectedService === "string" ? editForm.selectedService : ""}
+                        basics={Array.isArray(editForm.selectedBasics) ? editForm.selectedBasics.filter((item: unknown) => typeof item === "string").join(",") : ""}
+                        durationMinutes={Number.isInteger(Number(editForm.appointmentDuration)) ? Number(editForm.appointmentDuration) : null}
+                        selectedStart={typeof editForm.slotStart === "string" ? editForm.slotStart : ""}
+                        onSelect={(slot: BookingSlotChoice) => {
+                          const time = scheduleTimeInputValue(slot.time);
+                          const match = staff.find((person) => String(person.name || "").trim().toLowerCase() === slot.photographerName.trim().toLowerCase());
+                          setEditForm((current: any) => ({
+                            ...current,
+                            appointmentDate: slot.date,
+                            scheduledDate: slot.date,
+                            appointmentTime: time,
+                            scheduledTime: time,
+                            slotStart: slot.start,
+                            ...(match ? {
+                              assignedProviders: [{ providerId: match.id, name: match.name, role: match.role || "photographer" }],
+                            } : {}),
+                          }));
+                        }}
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input type="date" value={scheduleDateInputValue(editForm)} onChange={e => setEditForm((f: any) => ({...f, appointmentDate: e.target.value, scheduledDate: e.target.value, slotStart: ""}))} className={inputCls} />
+                        <input type="time" value={scheduleTimeInputValue(orderScheduleTime(editForm))} onChange={e => setEditForm((f: any) => ({...f, appointmentTime: e.target.value, scheduledTime: e.target.value, slotStart: ""}))} className={inputCls} />
+                      </div>
                     </div>
                   ) : (
                     <p className="text-sm font-bold">

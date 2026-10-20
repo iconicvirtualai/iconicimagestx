@@ -22,6 +22,14 @@ import {
   orderScheduleTime,
 } from "@shared/listingWrite";
 import { formatChicagoDate } from "@shared/clientHome";
+import { recordAddressText } from "@shared/addressText";
+import { photographerPreferenceForNames } from "@shared/suggestedAppointments";
+import {
+  SuggestedAppointmentPills,
+  useBookingPhotographers,
+  useSuggestedAppointments,
+} from "@/components/SuggestedAppointments";
+import type { BookingSlotChoice } from "@/components/BookingSlotPicker";
 import {
   invoiceDraftFromOrder,
   listingLinkFields,
@@ -131,6 +139,7 @@ export default function AdminOrderRequest() {
   const [showSchedule, setShowSchedule] = React.useState(false);
   const [schedDate, setSchedDate] = React.useState("");
   const [schedTime, setSchedTime] = React.useState("");
+  const [schedSlotStart, setSchedSlotStart] = React.useState("");
   const [showCancel, setShowCancel] = React.useState(false);
   const [sendingReceipt, setSendingReceipt] = React.useState(false);
   const [invoicePhase, setInvoicePhase] = React.useState<"loading" | "missing" | "linked">("loading");
@@ -138,6 +147,18 @@ export default function AdminOrderRequest() {
   const [invoiceBusy, setInvoiceBusy] = React.useState(false);
   const [staff, setStaff] = React.useState<any[]>([]);
   const [selectedProviders, setSelectedProviders] = React.useState<string[]>([]);
+  const bookingPhotographers = useBookingPhotographers(showSchedule);
+  const scheduleAddress = recordAddressText(order) || "";
+  const scheduleNames = selectedProviders.map((id) => String(staff.find((person) => person.id === id)?.name || ""));
+  const scheduleDuration = Number(order?.appointmentDuration);
+  const suggestedTimes = useSuggestedAppointments({
+    active: showSchedule && Boolean(order),
+    address: scheduleAddress,
+    photographerId: photographerPreferenceForNames(scheduleNames, bookingPhotographers),
+    service: typeof order?.selectedService === "string" ? order.selectedService : "",
+    basics: Array.isArray(order?.selectedBasics) ? order.selectedBasics.filter((item: unknown) => typeof item === "string").join(",") : "",
+    durationMinutes: Number.isInteger(scheduleDuration) ? scheduleDuration : null,
+  });
   const [projectTypeChoice, setProjectTypeChoice] = React.useState<"real_estate" | "business">("real_estate");
   const projectTypeTouched = React.useRef(false);
   const editingRef = React.useRef(false);
@@ -760,9 +781,24 @@ export default function AdminOrderRequest() {
             <h3 className="text-lg font-black mb-2">Schedule Appointment</h3>
             <p className="text-xs text-gray-500 mb-6">Set a date and time. This does not create a project.</p>
             <div className="space-y-4 mb-6">
+              <SuggestedAppointmentPills
+                suggestions={suggestedTimes.suggestions}
+                selectedStart={schedSlotStart}
+                showPhotographer
+                onSelect={(slot: BookingSlotChoice) => {
+                  setSchedDate(slot.date);
+                  setSchedTime(scheduleTimeInputValue(slot.time));
+                  setSchedSlotStart(slot.start);
+                  const match = staff.find((person) => String(person.name || "").trim().toLowerCase() === slot.photographerName.trim().toLowerCase());
+                  if (match) setSelectedProviders([match.id]);
+                }}
+              />
+              {suggestedTimes.loading && suggestedTimes.suggestions.length === 0 && (
+                <p className="text-sm font-semibold text-gray-500">Checking suggested times.</p>
+              )}
               <div className="grid grid-cols-2 gap-3">
-                <div><p className={`${labelCls}`}>Date *</p><input type="date" value={schedDate} onChange={e => setSchedDate(e.target.value)} className={`${editInputCls}`} /></div>
-                <div><p className={`${labelCls}`}>Time</p><input type="time" value={schedTime} onChange={e => setSchedTime(e.target.value)} className={`${editInputCls}`} /></div>
+                <div><p className={`${labelCls}`}>Date *</p><input type="date" value={schedDate} onChange={e => { setSchedDate(e.target.value); setSchedSlotStart(""); }} className={`${editInputCls}`} /></div>
+                <div><p className={`${labelCls}`}>Time (CT)</p><input type="time" value={schedTime} onChange={e => { setSchedTime(e.target.value); setSchedSlotStart(""); }} className={`${editInputCls}`} /></div>
               </div>
               {filterAssignableStaff(staff.filter(s => ["photographer", "admin", "coordinator"].includes(s.role)), { forPlaytest: recordAllowsQaStaff(order) }).length > 0 && (
                 <div>

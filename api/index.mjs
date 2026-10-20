@@ -7503,7 +7503,7 @@ function assignPhotographerSlots(input) {
   const schedule = bookingScheduleFor(input);
   const readable = input.photographers.filter((person) => person.events);
   if (!readable.length) return { live: false, slots: [] };
-  const preferred = input.preferenceId !== "no-preference" ? input.photographers.find((person) => person.id === input.preferenceId) || null : null;
+  const preferred = input.preferenceId && input.preferenceId !== "no-preference" ? input.photographers.find((person) => person.id === input.preferenceId) || null : null;
   if (preferred && !preferred.events) return { live: true, slots: [] };
   const people = preferred ? [preferred] : readable;
   const byStart = /* @__PURE__ */ new Map();
@@ -7586,6 +7586,133 @@ function parseRouteMatrixBody(body) {
     const minutes = condition === "ROUTE_EXISTS" ? parseRouteDuration(record2.duration) : null;
     return [{ originIndex, destinationIndex, minutes }];
   });
+}
+const SUGGESTED_APPOINTMENT_LIMIT = 3;
+const SUGGESTED_IDLE_LIMIT_MINUTES = 90;
+const GROUPING_ANCHOR_MAX_MS = 8 * 60 * 60 * 1e3;
+const NEAR_DRIVE_MINUTES = 20;
+function suggestedAppointmentsEnvOverride(env = typeof process !== "undefined" ? process.env : {}) {
+  return explicitFlag(env.SUGGESTED_APPOINTMENTS_ENABLED) ?? explicitFlag(env.SUGGESTED_APPOINTMENTS);
+}
+function suggestedAppointmentsEnabled(env = typeof process !== "undefined" ? process.env : {}, stored) {
+  const explicit = suggestedAppointmentsEnvOverride(env);
+  if (explicit !== void 0) return explicit;
+  if (typeof stored === "boolean") return stored;
+  return true;
+}
+function explicitFlag(raw) {
+  if (typeof raw !== "string" || !raw.trim()) return void 0;
+  const value = raw.trim().toLowerCase();
+  if (["0", "false", "off", "no"].includes(value)) return false;
+  if (["1", "true", "on", "yes"].includes(value)) return true;
+  return void 0;
+}
+function suggestAppointmentTimes(input) {
+  const limit = input.limit ?? SUGGESTED_APPOINTMENT_LIMIT;
+  if (limit <= 0) return [];
+  const assigned = assignPhotographerSlots({
+    now: input.now,
+    durationMinutes: input.durationMinutes,
+    hours: input.hours,
+    schedule: input.schedule,
+    bufferMinutes: input.bufferMinutes,
+    bookingAddress: input.bookingAddress,
+    preferenceId: input.preferenceId,
+    photographers: input.photographers,
+    driveMinutes: input.driveMinutes
+  });
+  if (!assigned.live) return [];
+  const allowed = new Set(assigned.slots.map((slot) => slot.start));
+  const poolSource = input.slots === void 0 ? assigned.slots : input.slots;
+  const pool = uniqueByStart(poolSource.filter((slot) => allowed.has(slot.start)));
+  if (!pool.length) return [];
+  const booking = normalizePlace(input.bookingAddress);
+  const grouped = [];
+  for (const slot of pool) {
+    const startMs = Date.parse(slot.start);
+    const endMs = Date.parse(slot.end);
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) continue;
+    const person = input.photographers.find((item) => item.id === slot.photographerId);
+    const events = person?.events || [];
+    let best = null;
+    for (const event of events) {
+      if (event.endMs - event.startMs >= GROUPING_ANCHOR_MAX_MS) continue;
+      if (event.endMs <= event.startMs) continue;
+      if (chicagoDate(event.startMs) !== slot.date) continue;
+      const after = startMs - event.endMs;
+      const before = event.startMs - endMs;
+      const gap = after >= 0 ? after : before >= 0 ? before : -1;
+      if (gap < 0) continue;
+      const required = requiredGapMs({
+        event,
+        bookingAddress: input.bookingAddress,
+        bufferMinutes: input.bufferMinutes,
+        driveMinutes: input.driveMinutes,
+        slotIsAfter: after >= 0,
+        departAtMs: after >= 0 ? event.endMs : endMs
+      });
+      if (gap + 1e3 < required) continue;
+      const idle = (gap - required) / 6e4;
+      if (idle > SUGGESTED_IDLE_LIMIT_MINUTES) continue;
+      const near = nearRank(booking, event.location, driveToBooking(event.location, input.bookingAddress, event.endMs, input.driveMinutes));
+      if (!best || near < best.near || near === best.near && idle < best.idle) best = { near, idle };
+    }
+    if (best) grouped.push({ slot, near: best.near, idle: best.idle });
+  }
+  if (grouped.length) {
+    grouped.sort((a, b) => a.near - b.near || a.slot.start.localeCompare(b.slot.start) || a.idle - b.idle);
+    return grouped.slice(0, limit).map((item) => item.slot);
+  }
+  return [...pool].sort((a, b) => a.start.localeCompare(b.start)).slice(0, limit);
+}
+function uniqueByStart(slots) {
+  const seen = /* @__PURE__ */ new Set();
+  const unique2 = [];
+  for (const slot of slots) {
+    if (!slot.start || seen.has(slot.start)) continue;
+    seen.add(slot.start);
+    unique2.push(slot);
+  }
+  return unique2;
+}
+function chicagoDate(ms) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(new Date(ms));
+}
+function requiredGapMs(input) {
+  const bufferMs = input.bufferMinutes * 60 * 1e3;
+  const location = input.event.location.trim();
+  const address = input.bookingAddress.trim();
+  if (!location || !address) return bufferMs;
+  const from = input.slotIsAfter ? location : address;
+  const to = input.slotIsAfter ? address : location;
+  const drive = input.driveMinutes(from, to, input.departAtMs);
+  if (drive == null || !Number.isFinite(drive) || drive < 0) return bufferMs;
+  return drive * 60 * 1e3;
+}
+function driveToBooking(location, bookingAddress, departAtMs, driveMinutes) {
+  if (!location.trim() || !bookingAddress.trim()) return null;
+  const drive = driveMinutes(location, bookingAddress, departAtMs);
+  if (drive == null || !Number.isFinite(drive) || drive < 0) return null;
+  return drive;
+}
+function nearRank(booking, location, drive) {
+  const place = normalizePlace(location);
+  if (!booking || !place) return 2;
+  if (samePlace(booking, place)) return 0;
+  if (drive != null && drive <= NEAR_DRIVE_MINUTES) return 1;
+  if (drive != null && drive > NEAR_DRIVE_MINUTES) return 3;
+  return 2;
+}
+function samePlace(booking, location) {
+  if (booking === location) return true;
+  const left = booking.split(",")[0]?.trim() || "";
+  const right = location.split(",")[0]?.trim() || "";
+  return left.length >= 8 && left === right;
 }
 const RE75_LEAD_SOURCE = "Real Estate $75 apprentice (Google Ads)";
 const RE75_PACKAGES = [
@@ -8170,7 +8297,7 @@ async function readBookingAvailability(input) {
   const account = firebaseServiceAccount(env);
   const auth = calendarAuthFromAccount(account, env);
   if (!auth || !account) {
-    return { live: false, slots: [], durationMinutes, bufferMinutes, driveMode: apiKey ? "routes" : "buffer" };
+    return { live: false, slots: [], suggestions: [], durationMinutes, bufferMinutes, driveMode: apiKey ? "routes" : "buffer" };
   }
   const timeMin = new Date(now.getTime() - 18 * 60 * 60 * 1e3).toISOString();
   const timeMax = new Date(now.getTime() + (hours.horizonDays + 1) * 24 * 60 * 60 * 1e3).toISOString();
@@ -8186,7 +8313,7 @@ async function readBookingAvailability(input) {
   }));
   const readable = days.filter((person) => person.events);
   if (!readable.length) {
-    return { live: false, slots: [], durationMinutes, bufferMinutes, driveMode: apiKey ? "routes" : "buffer" };
+    return { live: false, slots: [], suggestions: [], durationMinutes, bufferMinutes, driveMode: apiKey ? "routes" : "buffer" };
   }
   const preferred = preferenceId !== "no-preference" ? days.find((person) => person.id === preferenceId) || null : null;
   const considered = preferred ? preferred.events ? [preferred] : [] : readable;
@@ -8208,6 +8335,10 @@ async function readBookingAvailability(input) {
     now: now.getTime(),
     fetchImpl: input.fetchImpl
   });
+  const driveMinutes = (from, to, departAtMs) => {
+    const value = driveMap.get(driveCacheKey(from, to, departAtMs));
+    return value === void 0 ? null : value;
+  };
   const assigned = assignPhotographerSlots({
     now,
     durationMinutes,
@@ -8216,15 +8347,24 @@ async function readBookingAvailability(input) {
     bookingAddress: address,
     preferenceId,
     photographers: days,
-    driveMinutes: (from, to, departAtMs) => {
-      const value = driveMap.get(driveCacheKey(from, to, departAtMs));
-      return value === void 0 ? null : value;
-    }
+    driveMinutes
   });
   const slots = input.slotFilter ? assigned.slots.filter(input.slotFilter) : assigned.slots;
+  const suggestions = assigned.live ? suggestAppointmentTimes({
+    now,
+    durationMinutes,
+    schedule,
+    bufferMinutes,
+    bookingAddress: address,
+    preferenceId,
+    photographers: days,
+    driveMinutes,
+    slots
+  }) : [];
   return {
     live: assigned.live,
     slots,
+    suggestions,
     durationMinutes,
     bufferMinutes,
     driveMode: apiKey ? "routes" : "buffer"
@@ -8361,6 +8501,32 @@ async function backfillHolidayCalendarEvents() {
     });
   }
   return report;
+}
+const CACHE_MS$1 = 15e3;
+let cache$1 = null;
+let loggedReadFailure = false;
+async function suggestedAppointmentsAreEnabled(env = process.env, readStored = readStoredFlag, now = Date.now()) {
+  const override = suggestedAppointmentsEnvOverride(env);
+  if (override !== void 0) return override;
+  if (!cache$1 || now - cache$1.at > CACHE_MS$1) {
+    cache$1 = { at: now, stored: await readStored() };
+  }
+  return suggestedAppointmentsEnabled(env, cache$1.stored);
+}
+async function readStoredFlag() {
+  try {
+    if (!admin.apps.length) return void 0;
+    const snap = await admin.firestore().collection("settings").doc("global").get();
+    const value = snap.data()?.suggestedAppointments;
+    return typeof value === "boolean" ? value : void 0;
+  } catch (error) {
+    if (!loggedReadFailure) {
+      loggedReadFailure = true;
+      const message = error instanceof Error ? error.message : "unavailable";
+      console.error(`[Booking] Suggested appointments setting could not be read. Leaving the feature on. ${message}`);
+    }
+    return void 0;
+  }
 }
 function clientIp(req) {
   const forwarded = req.headers["x-forwarded-for"];
@@ -8579,6 +8745,7 @@ router$r.post("/", async (req, res) => {
     let availability = {
       live: false,
       slots: [],
+      suggestions: [],
       durationMinutes: 90,
       bufferMinutes: 30,
       driveMode: "buffer"
@@ -9124,6 +9291,11 @@ router$r.get("/realestate-75/slots", async (req, res) => {
     return res.json({ live: false, durationMinutes: pkg.durationMinutes, packageId: pkg.id, slots: [] });
   }
 });
+function postedDurationMinutes(value) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 15 || parsed > 24 * 60) return void 0;
+  return parsed;
+}
 router$r.get("/slots", async (req, res) => {
   const basics = typeof req.query.basics === "string" ? req.query.basics.split(",").map((id) => id.trim()).filter(Boolean) : [];
   const preferenceId = preferenceFromRequest(req.query.photographer, "");
@@ -9134,16 +9306,19 @@ router$r.get("/slots", async (req, res) => {
       preferenceId,
       selectedService: typeof req.query.service === "string" ? req.query.service : null,
       selectedBasics: basics,
-      catalog
+      catalog,
+      durationMinutes: postedDurationMinutes(req.query.duration)
     });
+    const enabled = await suggestedAppointmentsAreEnabled();
     return res.json({
       live: availability.live,
       durationMinutes: availability.durationMinutes,
-      slots: availability.live ? availability.slots : []
+      slots: availability.live ? availability.slots : [],
+      suggestions: enabled && availability.live ? availability.suggestions : []
     });
   } catch (err) {
     console.error("[Bookings] Slot lookup failed — keeping the standard time list:", err);
-    return res.json({ live: false, durationMinutes: 90, slots: [] });
+    return res.json({ live: false, durationMinutes: 90, slots: [], suggestions: [] });
   }
 });
 router$r.get("/catalog", async (_req, res) => {

@@ -47,6 +47,7 @@ describe("public booking availability", () => {
     const body = await response.json();
     expect(body.live).toBe(false);
     expect(body.slots).toEqual([]);
+    expect(body.suggestions).toEqual([]);
     expect(body.durationMinutes).toBe(90);
     expect(JSON.stringify(body)).not.toContain("@");
   });
