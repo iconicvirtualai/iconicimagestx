@@ -26,9 +26,8 @@ import {
 import { bookingHoursFromEnv, type BookingHoursConfig } from "../../shared/bookingHours";
 import type { StaffCatalogPackage } from "../../shared/bookingCatalog";
 import {
-  RE75_DURATION_MINUTES,
-  RE75_PACKAGE_ID,
   isRealEstate75Holiday,
+  realEstate75Package,
   realEstate75Week,
 } from "../../shared/realestate75";
 import { apprenticeshipHoursFromEnv } from "../../shared/apprenticeship";
@@ -378,9 +377,10 @@ export async function readBookingAvailability(input: {
   };
 }
 
-/** Same photographer calendars as /book, on the $75 apprentice clock. */
+/** Same photographer calendars as /book, on the apprentice clock for the chosen package. */
 export async function readRealEstate75Availability(input: {
   address?: unknown;
+  packageId?: unknown;
   now?: Date;
   env?: Record<string, string | undefined>;
   listEvents?: (person: BookingPhotographer, timeMin: string, timeMax: string) => Promise<CalendarBlock[]>;
@@ -390,13 +390,14 @@ export async function readRealEstate75Availability(input: {
   const env = input.env ?? process.env;
   const horizonDays = apprenticeshipHoursFromEnv(env).horizonDays;
   const week = realEstate75Week(horizonDays);
+  const pkg = realEstate75Package(input.packageId);
   return readBookingAvailability({
     address: input.address,
     preferenceId: "no-preference",
-    selectedBasics: [RE75_PACKAGE_ID],
+    selectedBasics: [pkg.id],
     now: input.now,
     env,
-    durationMinutes: RE75_DURATION_MINUTES,
+    durationMinutes: pkg.durationMinutes,
     schedule: { company: week, photographers: {} },
     slotFilter: (slot) => !isRealEstate75Holiday(slot.date),
     listEvents: input.listEvents,

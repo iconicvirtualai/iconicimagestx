@@ -6,15 +6,22 @@ import {
   RE75_SUBTOTAL,
   classifyRealEstate75Area,
   isRealEstate75Holiday,
+  isRealEstate75PackageId,
   openRealEstate75Slots,
+  realEstate75Package,
   realEstate75Quote,
   realEstate75Week,
+  withGclid,
 } from "./realestate75";
 
 const fridayMorning = new Date("2026-10-16T12:00:00.000Z");
 
-function timesOn(date: string, busy: { start: string; end: string }[] = []) {
-  return openRealEstate75Slots({ now: fridayMorning, busy })
+function timesOn(
+  date: string,
+  busy: { start: string; end: string }[] = [],
+  durationMinutes?: number,
+) {
+  return openRealEstate75Slots({ now: fridayMorning, busy, durationMinutes })
     .filter((slot) => slot.date === date)
     .map((slot) => slot.time);
 }
@@ -86,6 +93,26 @@ describe("real estate $75 fee", () => {
     expect(quote.total).toBe(75);
     expect(quote.priceLine).toBe("$75.00");
   });
+
+  it("prices Apprentice 50 at $125 plus 2.8% ($128.50)", () => {
+    expect(processingFeeCents(125 * 100)).toBe(350);
+    const quote = realEstate75Quote(true, "apprentice-50");
+    expect(quote.packageId).toBe("apprentice-50");
+    expect(quote.packageName).toBe("Apprentice 50 / $125");
+    expect(quote.subtotal).toBe(125);
+    expect(quote.processing).toBe(3.5);
+    expect(quote.total).toBe(128.5);
+    expect(quote.priceLine).toBe("$125 + 2.8% processing fee ($128.50 total by card).");
+    expect(realEstate75Package("apprentice-50").durationMinutes).toBe(60);
+    expect(isRealEstate75PackageId("photos-25")).toBe(false);
+    expect(realEstate75Quote(false, "apprentice-50").priceLine).toBe("$125.00");
+  });
+
+  it("keeps the package query when a gclid is added", () => {
+    expect(withGclid("/realestate-75/schedule?package=apprentice-50", "AbC.123")).toBe(
+      "/realestate-75/schedule?package=apprentice-50&gclid=AbC.123",
+    );
+  });
 });
 
 describe("real estate $75 slots", () => {
@@ -121,6 +148,23 @@ describe("real estate $75 slots", () => {
 
   it("closes Sunday", () => {
     expect(timesOn("2026-10-18")).toEqual([]);
+    expect(timesOn("2026-10-18", [], 60)).toEqual([]);
+  });
+
+  it("books Apprentice 50 in 1-hour blocks that still end by 5:00 and Saturday noon", () => {
+    const monday = timesOn("2026-10-19", [], 60);
+    expect(monday[0]).toBe("8:00 AM");
+    expect(monday).toContain("4:00 PM");
+    expect(monday).not.toContain("4:20 PM");
+    expect(monday).not.toContain("4:40 PM");
+    expect(monday).not.toContain("5:00 PM");
+    expect(monday[monday.length - 1]).toBe("4:00 PM");
+    expect(monday).toHaveLength(9);
+
+    const saturday = timesOn("2026-10-17", [], 60);
+    expect(saturday).toEqual(["9:00 AM", "10:00 AM", "11:00 AM"]);
+    expect(saturday).not.toContain("11:40 AM");
+    expect(saturday).not.toContain("12:00 PM");
   });
 
   it("drops a Saturday start that overlaps a busy block", () => {

@@ -52,10 +52,10 @@ import {
 import {
   RE75_LEAD_SOURCE,
   RE75_OUTSIDE_MESSAGE,
-  RE75_PACKAGE_ID,
-  RE75_PACKAGE_NAME,
   classifyRealEstate75Area,
+  isRealEstate75PackageId,
   quoteRealEstate75Travel,
+  realEstate75Package,
   sanitizeGclid,
 } from "../../shared/realestate75";
 import { createHolidayCalendarEvent, deleteHolidayCalendarEvent } from "../services/holidayCalendar";
@@ -212,17 +212,19 @@ router.post("/", async (req, res) => {
       if (!realEstate75Area || realEstate75Area.status !== "inside") {
         return res.status(400).json({ error: RE75_OUTSIDE_MESSAGE });
       }
+      const packageId = resolved.selectedBasics[0];
       const onlyApprentice = !resolved.selectedService
         && resolved.selectedBasics.length === 1
-        && resolved.selectedBasics[0] === RE75_PACKAGE_ID
+        && isRealEstate75PackageId(packageId)
         && resolved.selectedAddOns.length === 0
         && !resolved.premiumUpgrade
         && !(Number(resolved.virtualStagingCredits) > 0);
       if (!onlyApprentice) {
-        return res.status(400).json({ error: "This page books Apprentice 25 / $75 only." });
+        return res.status(400).json({ error: "This page books Apprentice 25 / $75 or Apprentice 50 / $125 only." });
       }
+      const pkg = realEstate75Package(packageId);
       serviceLines = serviceLines.map((item) => (
-        item.id === RE75_PACKAGE_ID ? { ...item, name: RE75_PACKAGE_NAME } : item
+        item.id === pkg.id ? { ...item, name: pkg.name } : item
       ));
     }
     if (leadSource === HOLIDAY_SOCIAL_SAVES_LEAD) {
@@ -287,7 +289,10 @@ router.post("/", async (req, res) => {
     if (!preferredWindow) {
       try {
         availability = realEstate75Lead
-          ? await readRealEstate75Availability({ address: displayAddress })
+          ? await readRealEstate75Availability({
+            address: displayAddress,
+            packageId: resolved.selectedBasics[0],
+          })
           : await readBookingAvailability({
             address: displayAddress,
             preferenceId,
@@ -880,18 +885,21 @@ router.get("/photographers", (_req, res) => {
 
 router.get("/realestate-75/slots", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
+  const pkg = realEstate75Package(typeof req.query.package === "string" ? req.query.package : "");
   try {
     const availability = await readRealEstate75Availability({
       address: typeof req.query.address === "string" ? req.query.address : "",
+      packageId: pkg.id,
     });
     return res.json({
       live: availability.live,
       durationMinutes: availability.durationMinutes,
+      packageId: pkg.id,
       slots: availability.live ? availability.slots : [],
     });
   } catch (err) {
-    console.error("[Bookings] $75 slot lookup failed:", err);
-    return res.json({ live: false, durationMinutes: 20, slots: [] });
+    console.error("[Bookings] Apprentice slot lookup failed:", err);
+    return res.json({ live: false, durationMinutes: pkg.durationMinutes, packageId: pkg.id, slots: [] });
   }
 });
 

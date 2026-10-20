@@ -9,20 +9,23 @@ import { trackConversion } from "@/lib/tracking";
 import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "@shared/businessContact";
 import { APPRENTICESHIP_OVERAGE_LABEL } from "@shared/bookingCatalog";
 import {
-  RE75_DURATION_MINUTES,
   RE75_LEAD_SOURCE,
   RE75_OUTSIDE_MESSAGE,
-  RE75_PACKAGE_ID,
-  RE75_PACKAGE_NAME,
+  RE75_PACKAGES,
   RE75_PATHS,
-  RE75_SAMPLES_CAPTION,
+  RE75_GALLERY_CAPTION,
+  RE75_GALLERY_DISCLAIMER,
   RE75_TRAVEL_TBD_NOTE,
   classifyRealEstate75Area,
+  isRealEstate75PackageId,
   openRealEstate75Slots,
+  realEstate75Package,
   realEstate75Quote,
   sanitizeGclid,
   withGclid,
   type RealEstate75Area,
+  type RealEstate75Package,
+  type RealEstate75PackageId,
 } from "@shared/realestate75";
 import type { ApprenticeshipSlot } from "@shared/apprenticeship";
 
@@ -31,38 +34,39 @@ const DRAFT_KEY = "re75-booking-draft";
 const CONVERSION_PREFIX = "re75-conversion-";
 const HERO_ALT = "25 listing photos for $75, 20-minute shoot by Iconic apprentices";
 
-const SAMPLES = [
+/** Recent listing photos. Append more files here, up to about 12. */
+const LISTING_GALLERY = [
   {
-    src: "/realestate-75/pool-backyard.jpg",
-    webp: "/realestate-75/pool-backyard.webp",
+    src: "/realestate-75/gallery/pool-backyard.jpg",
+    webp: "/realestate-75/gallery/pool-backyard.webp",
     alt: "Pool and backyard at a Spring listing",
     width: 1200,
     height: 801,
   },
   {
-    src: "/realestate-75/kitchen.jpg",
-    webp: "/realestate-75/kitchen.webp",
+    src: "/realestate-75/gallery/kitchen.jpg",
+    webp: "/realestate-75/gallery/kitchen.webp",
     alt: "Kitchen at a Spring listing",
     width: 1200,
     height: 801,
   },
   {
-    src: "/realestate-75/living-room.jpg",
-    webp: "/realestate-75/living-room.webp",
+    src: "/realestate-75/gallery/living-room.jpg",
+    webp: "/realestate-75/gallery/living-room.webp",
     alt: "Living room at a Spring listing",
     width: 1200,
     height: 801,
   },
   {
-    src: "/realestate-75/lake-view.jpg",
-    webp: "/realestate-75/lake-view.webp",
+    src: "/realestate-75/gallery/lake-view.jpg",
+    webp: "/realestate-75/gallery/lake-view.webp",
     alt: "Living room with a lake view at a Conroe listing",
     width: 1200,
     height: 801,
   },
   {
-    src: "/realestate-75/outdoor-living.jpg",
-    webp: "/realestate-75/outdoor-living.webp",
+    src: "/realestate-75/gallery/outdoor-living.jpg",
+    webp: "/realestate-75/gallery/outdoor-living.webp",
     alt: "Covered outdoor living area at a Spring listing",
     width: 1200,
     height: 801,
@@ -72,6 +76,7 @@ const SAMPLES = [
 type LiveSlot = ApprenticeshipSlot & { photographerId?: string; photographerName?: string };
 
 interface Draft {
+  packageId: RealEstate75PackageId;
   address: string;
   sqft: string;
   occupancy: string;
@@ -86,6 +91,7 @@ interface Draft {
 }
 
 const EMPTY_DRAFT: Draft = {
+  packageId: "apprentice-25",
   address: "",
   sqft: "",
   occupancy: "",
@@ -103,10 +109,15 @@ function readDraft(): Draft {
   if (typeof sessionStorage === "undefined") return EMPTY_DRAFT;
   try {
     const parsed = JSON.parse(sessionStorage.getItem(DRAFT_KEY) || "") as Partial<Draft>;
-    return { ...EMPTY_DRAFT, ...parsed };
+    const packageId = isRealEstate75PackageId(parsed.packageId) ? parsed.packageId : EMPTY_DRAFT.packageId;
+    return { ...EMPTY_DRAFT, ...parsed, packageId };
   } catch {
     return EMPTY_DRAFT;
   }
+}
+
+function appointmentLabel(pkg: RealEstate75Package): string {
+  return pkg.durationMinutes === 60 ? "1 hour" : `${pkg.durationMinutes} minutes`;
 }
 
 function sectionId(pathname: string): string {
@@ -135,7 +146,8 @@ export default function RealEstate75() {
   const [barHidden, setBarHidden] = useState(false);
   const [scheduleVisible, setScheduleVisible] = useState(false);
   const formStarted = useRef(false);
-  const quote = useMemo(() => realEstate75Quote(processingOn), [processingOn]);
+  const pkg = realEstate75Package(draft.packageId);
+  const quote = useMemo(() => realEstate75Quote(processingOn, pkg.id), [processingOn, pkg.id]);
   const area = useMemo(() => classifyRealEstate75Area(draft.address), [draft.address]);
 
   useEffect(() => {
@@ -150,6 +162,17 @@ export default function RealEstate75() {
     setDraft(readDraft());
     setHydrated(true);
   }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const fromUrl = new URLSearchParams(location.search).get("package");
+    if (!isRealEstate75PackageId(fromUrl)) return;
+    setDraft((current) => (
+      current.packageId === fromUrl
+        ? current
+        : { ...current, packageId: fromUrl, slotStart: "", slotTime: "" }
+    ));
+  }, [hydrated, location.search]);
 
   useEffect(() => {
     if (!hydrated || confirmation) return;
@@ -188,27 +211,37 @@ export default function RealEstate75() {
     if (!formStarted.current && !sessionStorage.getItem("re75-form-start")) {
       formStarted.current = true;
       sessionStorage.setItem("re75-form-start", "1");
-      trackConversion({ name: "re75_form_start", packageId: RE75_PACKAGE_ID });
+      trackConversion({ name: "re75_form_start", packageId: draft.packageId });
     }
+    setSlots([]);
+    setSlotsLive(false);
+    setSlotsReady(false);
     const address = draft.address;
+    const packageId = draft.packageId;
+    let cancelled = false;
     const timer = window.setTimeout(() => {
-      const params = new URLSearchParams({ address });
+      const params = new URLSearchParams({ address, package: packageId });
       fetch(`/api/bookings/realestate-75/slots?${params.toString()}`)
         .then((response) => (response.ok ? response.json() : null))
         .then((data: { live?: boolean; slots?: LiveSlot[] } | null) => {
+          if (cancelled) return;
           const live = data?.live === true;
           setSlotsLive(live);
           setSlots(live && Array.isArray(data?.slots) ? data.slots : []);
           setSlotsReady(true);
         })
         .catch(() => {
+          if (cancelled) return;
           setSlotsLive(false);
           setSlots([]);
           setSlotsReady(true);
         });
     }, 350);
-    return () => window.clearTimeout(timer);
-  }, [area.status, draft.address]);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [area.status, draft.address, draft.packageId]);
 
   useEffect(() => {
     if (!confirmation) return;
@@ -217,16 +250,17 @@ export default function RealEstate75() {
     const key = `${CONVERSION_PREFIX}${bookingId}`;
     if (sessionStorage.getItem(key)) return;
     sessionStorage.setItem(key, "1");
+    const booked = realEstate75Package(draft.packageId);
     trackConversion({
       name: "re75_booking",
-      packageId: RE75_PACKAGE_ID,
-      value: 75,
+      packageId: booked.id,
+      value: booked.subtotal,
       currency: "USD",
       transactionId: bookingId,
       email: draft.email,
       phone: draft.phone,
     });
-  }, [confirmation, draft.email, draft.phone]);
+  }, [confirmation, draft.email, draft.packageId, draft.phone]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -285,12 +319,18 @@ export default function RealEstate75() {
     return withGclid(path, gclid);
   }
 
+  function scheduleHref(packageId: RealEstate75PackageId) {
+    return href(`${RE75_PATHS.schedule}?package=${packageId}`);
+  }
+
   function patch(partial: Partial<Draft>) {
     setDraft((current) => ({ ...current, ...partial }));
   }
 
   const days = useMemo(() => {
-    const source = slotsLive || !slotsReady ? slots : openRealEstate75Slots({ now: new Date() });
+    const source = slotsLive || !slotsReady
+      ? slots
+      : openRealEstate75Slots({ now: new Date(), durationMinutes: pkg.durationMinutes });
     const groups = new Map<string, LiveSlot[]>();
     for (const slot of source) {
       const list = groups.get(slot.date) || [];
@@ -298,7 +338,7 @@ export default function RealEstate75() {
       groups.set(slot.date, list);
     }
     return [...groups.entries()];
-  }, [slots, slotsLive, slotsReady]);
+  }, [slots, slotsLive, slotsReady, pkg.durationMinutes]);
 
   const daySlots = days.find(([date]) => date === draft.slotDate)?.[1] || [];
 
@@ -370,18 +410,19 @@ export default function RealEstate75() {
           leadSource: RE75_LEAD_SOURCE,
           gclid,
           brokerage: draft.brokerage.trim(),
-          selectedBasics: [RE75_PACKAGE_ID],
+          selectedBasics: [pkg.id],
           selectedAddOns: [],
           selectedService: "",
           lineItems: [{
-            id: RE75_PACKAGE_ID,
-            name: RE75_PACKAGE_NAME,
+            id: pkg.id,
+            name: pkg.name,
             unitPrice: quote.subtotal,
             qty: 1,
             price: quote.subtotal,
           }],
           total: quote.subtotal,
           vibeNote: [
+            `Package: ${pkg.name}`,
             `Brokerage: ${draft.brokerage.trim()}`,
             `Home: ${draft.occupancy}`,
             `Approx sq ft: ${draft.sqft.trim()}`,
@@ -392,7 +433,7 @@ export default function RealEstate75() {
       ]);
       setConfirmation({
         ...result,
-        selectedService: RE75_PACKAGE_ID,
+        selectedService: pkg.id,
         clientNotificationsLive,
       });
       sessionStorage.removeItem(DRAFT_KEY);
@@ -406,21 +447,22 @@ export default function RealEstate75() {
   return (
     <Layout>
       <div className="overflow-x-clip bg-white text-neutral-950">
-        <Hero href={href} quote={quote} processingOn={processingOn} />
+        <Hero scheduleHref={scheduleHref} processingOn={processingOn} />
+        <OfferCards scheduleHref={scheduleHref} processingOn={processingOn} />
+        <NeedMore />
+        <OfferCta scheduleHref={scheduleHref} />
         <Benefits />
-        <OfferCta href={href} />
-        <WhatYouGet quoteLine={quote.priceLine} />
-        <OfferCta href={href} />
-        <Comparison />
-        <OfferCta href={href} />
+        <WhatYouGet processingOn={processingOn} />
+        <OfferCta scheduleHref={scheduleHref} />
         <HowItWorks />
-        <OfferCta href={href} />
-        <Samples />
-        <OfferCta href={href} />
-        <Faq />
-        <OfferCta href={href} />
+        <OfferCta scheduleHref={scheduleHref} />
+        <ListingGallery />
+        <OfferCta scheduleHref={scheduleHref} />
+        <Faq processingOn={processingOn} />
+        <NeedMore />
         <Schedule
           draft={draft}
+          pkg={pkg}
           area={area}
           formError={formError}
           quote={quote}
@@ -433,24 +475,24 @@ export default function RealEstate75() {
           onSubmit={submitBooking}
           onPatch={patch}
         />
-        <FinalCta href={href} quoteLine={quote.priceLine} />
+        <FinalCta scheduleHref={scheduleHref} processingOn={processingOn} />
         <ReviewsSlot />
         <PageContact />
-        <MobileBar href={href} hidden={barHidden || scheduleVisible} />
+        <MobileBar to={scheduleHref(draft.packageId)} hidden={barHidden || scheduleVisible} />
       </div>
     </Layout>
   );
 }
 
-function OfferCta({ href }: { href: (path: string) => string }) {
+function OfferCta({ scheduleHref }: { scheduleHref: (packageId: RealEstate75PackageId) => string }) {
   return (
     <div className="px-4 md:px-8">
       <div className="mx-auto flex max-w-3xl flex-col gap-3 border-t border-neutral-200 py-8 sm:flex-row">
         <Link
-          to={href(RE75_PATHS.schedule)}
+          to={scheduleHref("apprentice-25")}
           className="inline-flex min-h-12 flex-1 items-center justify-center rounded-xl bg-black px-5 text-base font-semibold text-white hover:bg-neutral-800"
         >
-          Schedule My $75 Shoot
+          Schedule from $75
         </Link>
         <a
           href={BUSINESS_CONTACT.phoneHref}
@@ -464,18 +506,18 @@ function OfferCta({ href }: { href: (path: string) => string }) {
 }
 
 function Hero({
-  href,
-  quote,
+  scheduleHref,
   processingOn,
 }: {
-  href: (path: string) => string;
-  quote: ReturnType<typeof realEstate75Quote>;
+  scheduleHref: (packageId: RealEstate75PackageId) => string;
   processingOn: boolean;
 }) {
+  const starter = realEstate75Quote(processingOn, "apprentice-25");
+  const upgrade = realEstate75Quote(processingOn, "apprentice-50");
   return (
     <section className="pt-28 md:pt-36">
       <div className="mx-auto w-full max-w-[1200px]">
-        <Link to={href(RE75_PATHS.schedule)} className="block" aria-label="Schedule the $75 shoot">
+        <Link to={scheduleHref("apprentice-25")} className="block" aria-label="Schedule the $75 shoot">
           <img
             src="/realestate-75-hero.png"
             alt={HERO_ALT}
@@ -489,10 +531,10 @@ function Hero({
       <div className="mx-auto max-w-3xl px-4 pt-4 md:px-8">
         <div className="flex flex-col gap-3 sm:flex-row">
           <Link
-            to={href(RE75_PATHS.schedule)}
+            to={scheduleHref("apprentice-25")}
             className="inline-flex min-h-14 flex-1 items-center justify-center rounded-xl bg-black px-6 text-lg font-semibold text-white hover:bg-neutral-800"
           >
-            Schedule My $75 Shoot
+            Schedule from $75
           </Link>
           <a
             href={BUSINESS_CONTACT.phoneHref}
@@ -502,24 +544,91 @@ function Hero({
           </a>
         </div>
         <h1 className="mt-8 text-4xl font-black leading-[1.05] tracking-tight text-neutral-950 sm:text-5xl">
-          25 Listing Photos for $75
+          Listing Photos From $75
         </h1>
         <p className="mt-4 text-lg leading-relaxed text-neutral-700">
-          A {RE75_DURATION_MINUTES}-minute shoot by Iconic Images apprentices. Made for listing refreshes, relists and lease listings in The Woodlands, Spring, Conroe, Willis and Cypress.
+          Two apprentice options. 25 photos in 20 minutes, or 50 photos in 1 hour. Made for listing refreshes, relists and lease listings in The Woodlands, Spring, Conroe, Willis and Cypress.
         </p>
-        <p className="mt-4 text-base font-semibold text-neutral-950">{quote.priceLine}</p>
-        <p className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-neutral-800">
-          <span>{RE75_PACKAGE_NAME}</span>
-          <MoneyAmount>${quote.total.toFixed(2)}</MoneyAmount>
-          {processingOn ? <span className="text-sm text-neutral-600">includes ${quote.processing.toFixed(2)} processing</span> : null}
-        </p>
+        <p className="mt-4 text-base font-semibold text-neutral-950">From $75. {starter.priceLine} Or {upgrade.priceLine}</p>
         <ul className="mt-5 flex flex-wrap gap-2">
-          {["25 photos", "20-minute appointment", "$75", "Shot by Iconic apprentices", "Photos only"].map((item) => (
+          {["From $75", "25 or 50 photos", "20 minutes or 1 hour", "Shot by Iconic apprentices", "Photos only"].map((item) => (
             <li key={item} className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-sm font-semibold text-neutral-800">
               {item}
             </li>
           ))}
         </ul>
+      </div>
+    </section>
+  );
+}
+
+function OfferCards({
+  scheduleHref,
+  processingOn,
+}: {
+  scheduleHref: (packageId: RealEstate75PackageId) => string;
+  processingOn: boolean;
+}) {
+  return (
+    <section id="offers" className="px-4 py-14 md:px-8">
+      <div className="mx-auto max-w-6xl">
+        <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Pick a package</h2>
+        <p className="mt-3 max-w-2xl text-lg leading-relaxed text-neutral-700">
+          From $75. Same apprentices and the same photos-only rules. Choose the option that fits the house.
+        </p>
+        <div className="mt-8 grid gap-4 md:grid-cols-2">
+          {RE75_PACKAGES.map((item) => {
+            const quote = realEstate75Quote(processingOn, item.id);
+            return (
+              <article
+                key={item.id}
+                data-testid={`offer-${item.id}`}
+                className={`flex flex-col rounded-2xl p-6 ${item.nudge ? "border border-neutral-300 bg-neutral-50" : "border-2 border-black bg-white"}`}
+              >
+                <p className="min-h-6 text-sm font-bold uppercase tracking-[0.14em] text-[#0d9488]">
+                  {item.nudge ?? "25 photos"}
+                </p>
+                <h3 className="mt-3 text-5xl font-black tracking-tight">${item.subtotal}</h3>
+                <p className="mt-2 text-xl font-semibold">{item.photos} photos · {appointmentLabel(item)}</p>
+                <p className="mt-3 text-neutral-800">{item.name}</p>
+                <p className="mt-2 text-sm leading-relaxed text-neutral-700">{quote.priceLine}</p>
+                <Link
+                  to={scheduleHref(item.id)}
+                  className="mt-6 inline-flex min-h-12 items-center justify-center rounded-xl bg-black px-5 text-base font-semibold text-white hover:bg-neutral-800"
+                >
+                  Schedule · ${item.subtotal}
+                </Link>
+              </article>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function NeedMore() {
+  return (
+    <section className="px-4 pb-4 md:px-8">
+      <div className="mx-auto max-w-6xl rounded-2xl border border-neutral-200 bg-neutral-50 p-6 md:p-8">
+        <h2 className="text-3xl font-black tracking-tight">Need more?</h2>
+        <p className="mt-3 max-w-2xl text-lg leading-relaxed text-neutral-700">
+          Aerials, video, twilight, and full-service packages are the regular Iconic services. These apprentice options are photos only.
+        </p>
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          <Link
+            to="/pricing"
+            className="inline-flex min-h-12 items-center justify-center rounded-xl bg-black px-5 text-base font-semibold text-white hover:bg-neutral-800"
+          >
+            See pricing
+          </Link>
+          <Link
+            to="/book"
+            className="inline-flex min-h-12 items-center justify-center rounded-xl border border-neutral-300 bg-white px-5 text-base font-semibold text-neutral-950 hover:bg-neutral-50"
+          >
+            Book full service
+          </Link>
+        </div>
       </div>
     </section>
   );
@@ -536,12 +645,12 @@ function Benefits() {
       body: "Listing photos are what a buyer looks at before they ask for a showing.",
     },
     {
-      title: "Twenty minutes at the house",
-      body: "The appointment is 20 minutes. Have the home ready when we arrive.",
+      title: "Twenty minutes, or one hour",
+      body: "25 photos is a 20-minute appointment. 50 photos is 1 hour. Have the home ready when we arrive.",
     },
     {
-      title: "25 edited photos",
-      body: "You get 25 edited photos. We confirm the requested time within 1 business day.",
+      title: "25 or 50 edited photos",
+      body: "You get the edited photos in the option you schedule. We confirm the requested time within 1 business day.",
     },
   ];
   return (
@@ -561,12 +670,14 @@ function Benefits() {
   );
 }
 
-function WhatYouGet({ quoteLine }: { quoteLine: string }) {
+function WhatYouGet({ processingOn }: { processingOn: boolean }) {
+  const starter = realEstate75Quote(processingOn, "apprentice-25");
+  const upgrade = realEstate75Quote(processingOn, "apprentice-50");
   const items = [
-    ["25 photos", "Edited listing photos. Photos only."],
-    ["20-minute shoot", "The appointment is 20 minutes. Overages are " + APPRENTICESHIP_OVERAGE_LABEL + "."],
+    ["From $75", "25 photos for $75, or 50 photos for $125. Photos only."],
+    ["Two appointment lengths", `20 minutes for 25 photos. 1 hour for 50 photos. Overages are ${APPRENTICESHIP_OVERAGE_LABEL}.`],
     ["Service area", "The Woodlands, Spring, Conroe, Willis, and Cypress."],
-    ["Price", quoteLine],
+    ["Price", `${starter.priceLine} ${upgrade.priceLine}`],
   ];
   return (
     <section className="border-t border-neutral-200 px-4 py-14 md:px-8">
@@ -585,43 +696,11 @@ function WhatYouGet({ quoteLine }: { quoteLine: string }) {
   );
 }
 
-function Comparison() {
-  return (
-    <section className="border-t border-neutral-200 px-4 py-14 md:px-8">
-      <div className="mx-auto max-w-6xl">
-        <h2 className="text-3xl font-black tracking-tight sm:text-4xl">$75 shoot or full service</h2>
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
-          <article className="rounded-2xl border-2 border-black p-5">
-            <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#0d9488]">This page</p>
-            <h3 className="mt-2 text-2xl font-black">Apprentice 25 / $75</h3>
-            <ul className="mt-4 space-y-2 leading-relaxed text-neutral-800">
-              <li>25 photos in a 20-minute appointment</li>
-              <li>Shot by Iconic apprentices</li>
-              <li>Photos only. No aerials, video, or twilight</li>
-              <li>$75 + 2.8% processing fee ($77.10 total by card)</li>
-            </ul>
-          </article>
-          <article className="rounded-2xl border border-neutral-200 p-5">
-            <p className="text-sm font-bold uppercase tracking-[0.16em] text-neutral-500">When you need more</p>
-            <h3 className="mt-2 text-2xl font-black">Full-service packages</h3>
-            <p className="mt-4 leading-relaxed text-neutral-700">
-              Aerials, video, and twilight are on the full-service packages. This $75 shoot does not include them.
-            </p>
-            <Link to="/pricing" className="mt-4 inline-flex font-semibold underline underline-offset-4">
-              See full-service packages
-            </Link>
-          </article>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function HowItWorks() {
   const steps = [
-    "Pick a time.",
+    "Pick 25 photos or 50 photos, then pick a time.",
     "Have the home prepped. Lights on, clutter put away, ready when we arrive.",
-    "The apprentice shoots for 20 minutes. You get 25 edited photos.",
+    "The apprentice shoots for 20 minutes (25 photos) or 1 hour (50 photos). You get the edited photos for that option.",
   ];
   return (
     <section id="how-it-works" className="scroll-mt-28 border-t border-neutral-200 px-4 py-14 md:scroll-mt-32 md:px-8">
@@ -646,35 +725,84 @@ function HowItWorks() {
   );
 }
 
-function Samples() {
+function ListingGallery() {
+  const [index, setIndex] = useState<number | null>(null);
+  const count = LISTING_GALLERY.length;
+  const photo = index == null ? null : LISTING_GALLERY[index];
+
+  useEffect(() => {
+    if (index == null) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIndex(null);
+      if (event.key === "ArrowRight") setIndex((current) => (current == null ? current : (current + 1) % count));
+      if (event.key === "ArrowLeft") setIndex((current) => (current == null ? current : (current - 1 + count) % count));
+    };
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previous;
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [index, count]);
+
   return (
     <section id="samples" className="scroll-mt-28 border-t border-neutral-200 bg-neutral-50 px-4 py-14 md:scroll-mt-32 md:px-8">
       <div className="mx-auto max-w-6xl">
-        <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Samples</h2>
-        <p className="mt-3 text-lg text-neutral-700">{RE75_SAMPLES_CAPTION}</p>
-        <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {SAMPLES.map((photo) => (
-            <li key={photo.src} className="overflow-hidden rounded-2xl bg-white">
-              <picture>
-                <source type="image/webp" srcSet={photo.webp} />
-                <img
-                  src={photo.src}
-                  alt={photo.alt}
-                  width={photo.width}
-                  height={photo.height}
-                  loading="lazy"
-                  className="aspect-[3/2] h-auto w-full object-cover"
-                />
-              </picture>
+        <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Listing photos</h2>
+        <p className="mt-3 text-lg text-neutral-700">{RE75_GALLERY_CAPTION}</p>
+        <ul className="mt-8 columns-1 gap-4 sm:columns-2 lg:columns-3">
+          {LISTING_GALLERY.map((item, photoIndex) => (
+            <li key={item.src} className="mb-4 break-inside-avoid">
+              <button
+                type="button"
+                className="block w-full overflow-hidden rounded-2xl bg-white text-left"
+                onClick={() => setIndex(photoIndex)}
+                aria-label={`Open photo: ${item.alt}`}
+              >
+                <picture>
+                  <source type="image/webp" srcSet={item.webp} />
+                  <img
+                    src={item.src}
+                    alt={item.alt}
+                    width={item.width}
+                    height={item.height}
+                    loading="lazy"
+                    className="h-auto w-full"
+                  />
+                </picture>
+              </button>
             </li>
           ))}
         </ul>
+        <p className="mt-6 max-w-3xl text-base leading-relaxed text-neutral-800">{RE75_GALLERY_DISCLAIMER}</p>
       </div>
+      {photo && index != null ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label={RE75_GALLERY_CAPTION}
+        >
+          <button type="button" className="absolute inset-0 cursor-default" aria-label="Close photo" onClick={() => setIndex(null)} />
+          <div className="relative z-10 w-full max-w-5xl">
+            <img src={photo.src} alt={photo.alt} className="max-h-[78vh] w-full object-contain" />
+            <p className="mt-3 text-center text-sm text-white">{RE75_GALLERY_CAPTION}</p>
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              <button type="button" className="min-h-11 rounded-xl bg-white px-4 text-sm font-semibold text-black" onClick={() => setIndex((index - 1 + count) % count)}>Previous</button>
+              <button type="button" className="min-h-11 rounded-xl border border-white/50 px-4 text-sm font-semibold text-white" onClick={() => setIndex(null)}>Close</button>
+              <button type="button" className="min-h-11 rounded-xl bg-white px-4 text-sm font-semibold text-black" onClick={() => setIndex((index + 1) % count)}>Next</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
 
-function Faq() {
+function Faq({ processingOn }: { processingOn: boolean }) {
+  const starter = realEstate75Quote(processingOn, "apprentice-25");
+  const upgrade = realEstate75Quote(processingOn, "apprentice-50");
   const items = [
     {
       q: "Who takes the photos?",
@@ -682,7 +810,7 @@ function Faq() {
     },
     {
       q: "What is included, and what is not?",
-      a: `25 edited photos from a 20-minute appointment. Photos only. No extra trips, no extra edits, and no Iconic Polish. Overages are ${APPRENTICESHIP_OVERAGE_LABEL}. Aerials, video, and twilight are on the full-service packages.`,
+      a: `25 edited photos from a 20-minute appointment, or 50 edited photos from a 1-hour appointment. Photos only. No extra trips, no extra edits, and no Iconic Polish. Overages are ${APPRENTICESHIP_OVERAGE_LABEL}. Aerials, video, twilight, and full-service packages are on the regular Iconic services.`,
     },
     {
       q: "How should the home be prepped?",
@@ -694,7 +822,7 @@ function Faq() {
     },
     {
       q: "When do I pay?",
-      a: "The card total is on this page before you schedule: $75 plus a 2.8% processing fee, $77.10. This form saves the booking. Iconic Images invoices after the shoot, the same way our other bookings work. We confirm the requested time within 1 business day.",
+      a: `The card total is on this page before you schedule. ${starter.priceLine} ${upgrade.priceLine} This form saves the booking. Iconic Images invoices after the shoot, the same way our other bookings work. We confirm the requested time within 1 business day.`,
     },
     {
       q: "Can I reschedule?",
@@ -726,6 +854,7 @@ function Faq() {
 
 function Schedule(props: {
   draft: Draft;
+  pkg: RealEstate75Package;
   area: RealEstate75Area;
   formError: string;
   quote: ReturnType<typeof realEstate75Quote>;
@@ -738,12 +867,12 @@ function Schedule(props: {
   onSubmit: (event: FormEvent) => void;
   onPatch: (partial: Partial<Draft>) => void;
 }) {
-  const { draft, confirmation, area } = props;
+  const { draft, confirmation, area, pkg } = props;
   return (
     <section id="schedule" className="scroll-mt-28 border-t border-neutral-200 px-4 py-14 md:scroll-mt-32 md:px-8">
       <div className="mx-auto max-w-3xl">
-        <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Schedule My $75 Shoot</h2>
-        <p className="mt-3 text-lg text-neutral-700">One package: {RE75_PACKAGE_NAME}. {props.quote.priceLine}</p>
+        <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Schedule your shoot</h2>
+        <p className="mt-3 text-lg text-neutral-700">{pkg.name}. {pkg.photos} photos · {appointmentLabel(pkg)}. {props.quote.priceLine}</p>
         {confirmation ? (
           <div className="mt-8">
             <p className="mb-4 leading-relaxed text-neutral-800">
@@ -753,6 +882,34 @@ function Schedule(props: {
           </div>
         ) : (
           <form className="mt-8 space-y-6" onSubmit={props.onSubmit}>
+            <fieldset>
+              <legend className="text-sm font-semibold">Package</legend>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {RE75_PACKAGES.map((item) => (
+                  <label
+                    key={item.id}
+                    className={`flex min-h-14 cursor-pointer flex-col justify-center rounded-xl border px-4 py-3 ${draft.packageId === item.id ? "border-black bg-black text-white" : "border-neutral-300"}`}
+                  >
+                    <input
+                      type="radio"
+                      name="package"
+                      value={item.id}
+                      checked={draft.packageId === item.id}
+                      onChange={() => props.onPatch({
+                        packageId: item.id,
+                        slotStart: "",
+                        slotTime: "",
+                      })}
+                      className="sr-only"
+                    />
+                    <span className="font-semibold">${item.subtotal} · {item.photos} photos</span>
+                    <span className={`text-sm ${draft.packageId === item.id ? "text-white/80" : "text-neutral-600"}`}>
+                      {appointmentLabel(item)}{item.nudge ? ` · ${item.nudge}` : ""}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
             <div>
               <label className="block text-sm font-semibold" htmlFor="re75-address">Property address</label>
               <textarea
@@ -804,7 +961,16 @@ function Schedule(props: {
                 </div>
               </fieldset>
             </div>
-            <TimePicker {...props} />
+            <TimePicker
+              draft={draft}
+              pkg={pkg}
+              days={props.days}
+              daySlots={props.daySlots}
+              slotsLive={props.slotsLive}
+              slotsReady={props.slotsReady}
+              checking={area.status === "inside" && !props.slotsReady}
+              onPatch={props.onPatch}
+            />
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block text-sm font-semibold">
                 First name
@@ -827,8 +993,9 @@ function Schedule(props: {
                 <input value={draft.brokerage} onChange={(event) => props.onPatch({ brokerage: event.target.value })} className={`${fieldClass()} scroll-mb-28`} />
               </label>
             </div>
-            <div className="space-y-3 rounded-2xl border border-neutral-200 p-5">
-              <h3 className="text-xl font-black">{RE75_PACKAGE_NAME}</h3>
+            <div className="space-y-3 rounded-2xl border border-neutral-200 p-5" data-testid="re75-summary">
+              <h3 className="text-xl font-black">{pkg.name}</h3>
+              <p className="text-sm text-neutral-700">{pkg.photos} photos · {appointmentLabel(pkg)}</p>
               <p className="flex items-center justify-between gap-4">
                 <span>Package</span>
                 <MoneyAmount>${props.quote.subtotal.toFixed(2)}</MoneyAmount>
@@ -852,7 +1019,7 @@ function Schedule(props: {
             </div>
             {props.formError ? <p className="text-sm font-semibold text-red-700">{props.formError}</p> : null}
             <button type="submit" disabled={props.pending} className="min-h-14 w-full rounded-xl bg-black px-5 text-lg font-semibold text-white disabled:opacity-60">
-              {props.pending ? "Saving…" : "Schedule My $75 Shoot"}
+              {props.pending ? "Saving…" : `Schedule · $${pkg.subtotal}`}
             </button>
           </form>
         )}
@@ -863,28 +1030,37 @@ function Schedule(props: {
 
 function TimePicker({
   draft,
+  pkg,
   days,
   daySlots,
   slotsLive,
   slotsReady,
+  checking,
   onPatch,
 }: {
   draft: Draft;
+  pkg: RealEstate75Package;
   days: Array<[string, LiveSlot[]]>;
   daySlots: LiveSlot[];
   slotsLive: boolean;
   slotsReady: boolean;
+  checking: boolean;
   onPatch: (partial: Partial<Draft>) => void;
 }) {
+  const lastWeekday = pkg.durationMinutes === 60 ? "4:00" : "4:40";
+  const lastSaturday = pkg.durationMinutes === 60 ? "11:00" : "11:40";
+  const length = pkg.durationMinutes === 60 ? "1-hour" : "20-minute";
   return (
     <div>
       <p className="text-sm font-semibold">Date and time</p>
       <p className="mt-1 text-sm leading-relaxed text-neutral-700">
         {slotsLive
-          ? "20-minute openings. Weekdays 8:00–5:00, Saturday 9:00–12:00, Sunday closed."
+          ? `${length} openings. Weekdays 8:00–5:00 (last start ${lastWeekday}), Saturday 9:00–12:00 (last start ${lastSaturday}), Sunday closed.`
           : slotsReady
-            ? "The calendar is not listing openings right now. Pick a requested time and we will confirm it."
-            : "Add an address in the service area to see times."}
+            ? `The calendar is not listing openings right now. Pick a requested ${length} time and we will confirm it.`
+            : checking
+              ? "Checking open times."
+              : "Add an address in the service area to see times."}
       </p>
       {slotsReady ? (
         <>
@@ -918,18 +1094,33 @@ function TimePicker({
   );
 }
 
-function FinalCta({ href, quoteLine }: { href: (path: string) => string; quoteLine: string }) {
+function FinalCta({
+  scheduleHref,
+  processingOn,
+}: {
+  scheduleHref: (packageId: RealEstate75PackageId) => string;
+  processingOn: boolean;
+}) {
+  const starter = realEstate75Quote(processingOn, "apprentice-25");
+  const upgrade = realEstate75Quote(processingOn, "apprentice-50");
   return (
     <section className="border-t border-neutral-200 bg-neutral-950 px-4 py-16 text-white md:px-8">
       <div className="mx-auto max-w-3xl text-center">
-        <h2 className="text-3xl font-black tracking-tight sm:text-5xl">Schedule the $75 shoot</h2>
-        <p className="mt-4 text-lg text-neutral-200">{quoteLine}</p>
+        <h2 className="text-3xl font-black tracking-tight sm:text-5xl">Schedule from $75</h2>
+        <p className="mt-4 text-lg text-neutral-200">{starter.priceLine}</p>
+        <p className="mt-2 text-lg text-neutral-200">{upgrade.priceLine}</p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <Link
-            to={href(RE75_PATHS.schedule)}
+            to={scheduleHref("apprentice-25")}
             className="inline-flex min-h-14 items-center justify-center rounded-xl bg-white px-8 text-lg font-semibold text-black hover:bg-neutral-200"
           >
-            Schedule My $75 Shoot
+            Schedule · $75
+          </Link>
+          <Link
+            to={scheduleHref("apprentice-50")}
+            className="inline-flex min-h-14 items-center justify-center rounded-xl border border-white/40 px-8 text-lg font-semibold text-white hover:bg-white/10"
+          >
+            Schedule · $125
           </Link>
           <a
             href={BUSINESS_CONTACT.phoneHref}
@@ -968,13 +1159,13 @@ function PageContact() {
   );
 }
 
-function MobileBar({ href, hidden }: { href: (path: string) => string; hidden: boolean }) {
+function MobileBar({ to, hidden }: { to: string; hidden: boolean }) {
   if (hidden) return null;
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-200 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(0,0,0,0.06)] md:hidden">
       <div className="mx-auto flex max-w-lg gap-2">
         <Link
-          to={href(RE75_PATHS.schedule)}
+          to={to}
           className="inline-flex min-h-12 flex-1 items-center justify-center rounded-xl bg-black px-3 text-sm font-semibold text-white"
         >
           Schedule

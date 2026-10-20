@@ -129,7 +129,8 @@ describe("public page meta", () => {
     expect(isNoIndexPath("/realestate-75/schedule")).toBe(true);
     expect(metaPlan("/realestate-75")).toEqual({
       kind: "noindex",
-      title: "25 Listing Photos for $75 | Iconic Images",
+      title: "Listing Photos From $75 | Iconic Images",
+      description: "Apprentice listing photos from $75. 25 photos in 20 minutes, or 50 photos in 1 hour.",
     });
     expect(metaPlan("/pricing").kind).toBe("public");
   });

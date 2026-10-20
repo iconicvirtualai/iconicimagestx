@@ -1,10 +1,12 @@
 /**
- * $75 apprentice listing shoot (/realestate-75).
+ * Apprentice listing shoots (/realestate-75).
  *
- * One package. Hours are America/Chicago and differ from the company /book
- * week: weekdays 8:00–5:00 (last start 4:40), Saturday 9:00–12:00 (last start
- * 11:40), Sunday closed. Open times still come from the /book calendars.
- * The card total is the catalog $75 plus the site 2.8% processing line.
+ * Two catalog packages: Apprentice 25 ($75, 20 minutes) and Apprentice 50
+ * ($125, 1 hour). Hours are America/Chicago and differ from the company /book
+ * week: weekdays 8:00–5:00, Saturday 9:00–12:00, Sunday closed. A slot must
+ * finish inside the window and start strictly before Saturday noon. Open times
+ * still come from the /book calendars. The card total is the catalog price
+ * plus the site 2.8% processing line.
  */
 
 import type { ApprenticeshipSlot } from "./apprenticeship.ts";
@@ -13,7 +15,40 @@ import { computeInvoiceTotals } from "./invoiceProcessing.ts";
 import type { TravelAssessment } from "./travelZones.ts";
 
 export const RE75_LEAD_SOURCE = "Real Estate $75 apprentice (Google Ads)";
-export const RE75_PACKAGE_ID = "apprentice-25";
+
+export interface RealEstate75Package {
+  id: "apprentice-25" | "apprentice-50";
+  /** Line name stored on the order. Catalog ids stay apprentice-25 / apprentice-50. */
+  name: string;
+  photos: number;
+  durationMinutes: number;
+  subtotal: number;
+  /** Honest upgrade line on the $125 card. The $75 card has none. */
+  nudge: string | null;
+}
+
+export const RE75_PACKAGES: readonly RealEstate75Package[] = [
+  {
+    id: "apprentice-25",
+    name: "Apprentice 25 / $75",
+    photos: 25,
+    durationMinutes: 20,
+    subtotal: 75,
+    nudge: null,
+  },
+  {
+    id: "apprentice-50",
+    name: "Apprentice 50 / $125",
+    photos: 50,
+    durationMinutes: 60,
+    subtotal: 125,
+    nudge: "More rooms? Go 50.",
+  },
+];
+
+export type RealEstate75PackageId = RealEstate75Package["id"];
+
+export const RE75_PACKAGE_ID: RealEstate75PackageId = "apprentice-25";
 export const RE75_PACKAGE_NAME = "Apprentice 25 / $75";
 export const RE75_SUBTOTAL = 75;
 export const RE75_DURATION_MINUTES = 20;
@@ -22,7 +57,18 @@ export const RE75_HORIZON_DAYS = 14;
 export const RE75_OUTSIDE_MESSAGE = "Call us 281.356.0965";
 export const RE75_TRAVEL_TBD_NOTE =
   "Travel fees for Cypress and Willis are still being confirmed (TBD). We will tell you before any travel fee is added.";
-export const RE75_SAMPLES_CAPTION = "Recent Iconic Images listing photos";
+export const RE75_GALLERY_CAPTION = "Recent Iconic Images listing photos";
+export const RE75_GALLERY_DISCLAIMER =
+  "$75 and $125 shoots are photographed by an Iconic Images apprentice. Gallery shows recent Iconic Images listing work.";
+
+export function isRealEstate75PackageId(value: unknown): value is RealEstate75PackageId {
+  return value === "apprentice-25" || value === "apprentice-50";
+}
+
+/** Unknown ids fall back to the $75 package. Callers that must reject them check the id first. */
+export function realEstate75Package(value: unknown): RealEstate75Package {
+  return RE75_PACKAGES.find((item) => item.id === value) ?? RE75_PACKAGES[0];
+}
 
 export const RE75_PATHS = {
   home: "/realestate-75",
@@ -121,17 +167,18 @@ function money(value: number): string {
 }
 
 /** Same 2.8% line a /book invoice stores. Travel is not part of this quote. */
-export function realEstate75Quote(applyProcessing = true): RealEstate75Quote {
+export function realEstate75Quote(applyProcessing = true, packageId?: unknown): RealEstate75Quote {
+  const pkg = realEstate75Package(packageId);
   const totals = computeInvoiceTotals({
-    subtotal: RE75_SUBTOTAL,
+    subtotal: pkg.subtotal,
     applyProcessing,
   });
   const priceLine = applyProcessing
-    ? `$75 + 2.8% processing fee (${money(totals.total)} total by card).`
+    ? `$${pkg.subtotal} + 2.8% processing fee (${money(totals.total)} total by card).`
     : money(totals.total);
   return {
-    packageId: RE75_PACKAGE_ID,
-    packageName: RE75_PACKAGE_NAME,
+    packageId: pkg.id,
+    packageName: pkg.name,
     subtotal: totals.subtotal,
     processing: totals.processing,
     total: totals.total,
@@ -229,12 +276,17 @@ export function openRealEstate75Slots(input: {
   now: Date;
   busy?: { start: string; end: string }[];
   horizonDays?: number;
+  /** 20 for Apprentice 25. 60 for Apprentice 50. The grid steps by this length. */
+  durationMinutes?: number;
 }): ApprenticeshipSlot[] {
   const week = realEstate75Week(input.horizonDays ?? RE75_HORIZON_DAYS);
+  const durationMinutes = input.durationMinutes && input.durationMinutes > 0
+    ? input.durationMinutes
+    : RE75_DURATION_MINUTES;
   return openBookingSlots({
     now: input.now,
     busy: input.busy ?? [],
-    durationMinutes: RE75_DURATION_MINUTES,
+    durationMinutes,
     week,
   }).filter((slot) => !isRealEstate75Holiday(slot.date));
 }

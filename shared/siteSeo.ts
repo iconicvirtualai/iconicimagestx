@@ -172,7 +172,7 @@ export function isNoIndexPath(pathname: string): boolean {
 
 export type MetaPlan =
   | { kind: "public"; title: string; description: string; canonical: string; image: string }
-  | { kind: "noindex"; title: string }
+  | { kind: "noindex"; title: string; description?: string }
   | { kind: "generic"; title: string }
   | { kind: "preserve-title" }
   | { kind: "hands-off" };
@@ -180,7 +180,11 @@ export type MetaPlan =
 export function metaPlan(pathname: string, origin = SITE_ORIGIN): MetaPlan {
   const path = normalizePath(pathname);
   if (path === "/realestate-75" || path.startsWith("/realestate-75/")) {
-    return { kind: "noindex", title: "25 Listing Photos for $75 | Iconic Images" };
+    return {
+      kind: "noindex",
+      title: "Listing Photos From $75 | Iconic Images",
+      description: "Apprentice listing photos from $75. 25 photos in 20 minutes, or 50 photos in 1 hour.",
+    };
   }
   if (path === "/present" || path.startsWith("/present/")) return { kind: "hands-off" };
   if (path.startsWith("/insights/") && path !== "/insights/prep") return { kind: "hands-off" };
