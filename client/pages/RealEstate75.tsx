@@ -49,9 +49,9 @@ const LISTING_GALLERY = [
   { file: "11-covered-patio-stetson-heights", alt: "Covered patio at a listing home", height: 1068 },
   { file: "12-backyard-patio-jessica-rose", alt: "Backyard patio at a Spring listing", height: 1067 },
 ].map((item) => ({
-  src: `/realestate-75/steven/${item.file}.jpg`,
-  webp: `/realestate-75/steven/${item.file}.webp`,
-  avif: `/realestate-75/steven/${item.file}.avif`,
+  src: `/realestate-75/gallery/${item.file}.jpg`,
+  webp: `/realestate-75/gallery/${item.file}.webp`,
+  avif: `/realestate-75/gallery/${item.file}.avif`,
   alt: item.alt,
   width: 1600,
   height: item.height,

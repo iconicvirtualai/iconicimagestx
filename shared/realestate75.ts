@@ -57,7 +57,7 @@ export const RE75_HORIZON_DAYS = 14;
 export const RE75_OUTSIDE_MESSAGE = "Call us 281.356.0965";
 export const RE75_TRAVEL_TBD_NOTE =
   "Travel fees for Cypress and Willis are still being confirmed (TBD). We will tell you before any travel fee is added.";
-export const RE75_GALLERY_CAPTION = "Recent listing photos by Iconic photographer Steven Banda";
+export const RE75_GALLERY_CAPTION = "Recent Iconic Images listing photos";
 export const RE75_GALLERY_DISCLAIMER =
   "$75 and $125 shoots are photographed by an Iconic Images apprentice. Gallery shows recent Iconic Images listing work.";
 
