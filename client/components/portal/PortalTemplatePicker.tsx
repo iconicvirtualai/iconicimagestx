@@ -8,10 +8,18 @@ import { packageSkinsInDisplayOrder } from "@shared/packageSkins";
 import { listingSitePath, listingSiteSlug, type PublicListingSite } from "@shared/listingSite";
 import type { PortalListingDetail, PortalWebsiteSettings } from "@shared/portalListingDetail";
 
-const DESIGNS: Array<{ id: PortalWebsiteSettings["design"]; name: string; note: string }> = [
-  { id: "index", name: "Index", note: "Numbered rows" },
-  { id: "two-up", name: "Two-Up", note: "Media and story" },
-  { id: "premiere", name: "Premiere", note: "Film first" },
+/** The only listing-site style set in the product: classic, editorial, minimal. */
+const SITE_STYLES: Array<{
+  id: PortalWebsiteSettings["style"];
+  name: string;
+  note: string;
+  design: PortalWebsiteSettings["design"];
+  font: PortalWebsiteSettings["font"];
+  color: PortalWebsiteSettings["color"];
+}> = [
+  { id: "classic", name: "Classic", note: "Numbered index", design: "index", font: "sans", color: "ink" },
+  { id: "editorial", name: "Editorial", note: "Film-first serif", design: "premiere", font: "serif", color: "ink" },
+  { id: "minimal", name: "Minimal", note: "Open two-up", design: "two-up", font: "modern", color: "teal" },
 ];
 
 export function PortalTemplatePicker({
@@ -36,44 +44,41 @@ export function PortalTemplatePicker({
   return (
     <section className="space-y-6" data-testid="portal-templates">
       <div className="rounded-2xl border border-gray-100 bg-white p-5">
-        <h2 className="text-xs font-black uppercase tracking-widest text-[#0d9488]">Listing site templates</h2>
+        <h2 className="text-xs font-black uppercase tracking-widest text-[#0d9488]">Listing site styles</h2>
         <p className="mt-1 text-xs text-gray-500">
-          Index, Two-Up, and Premiere. Pick one for this listing, then preview it here. Publishing is still the switch below.
+          Classic, Editorial, and Minimal. Each card is that style on this listing’s photos. Pick one, open the full preview, then save.
         </p>
         {slug ? (
           <a href={listingSitePath(slug)} className="mt-3 inline-flex min-h-12 items-center text-sm font-black underline">View site</a>
         ) : (
           <p className="mt-3 text-xs text-gray-500">Add a street and city on the Data tab to open the public site. The preview below still works.</p>
         )}
-        <p className="mt-2 text-xs text-gray-500">{fontLabel(website.font)} · {website.published ? "Published" : "Not published yet. Preview stays on this page until you publish."}</p>
+        <p className="mt-2 text-xs text-gray-500">{styleLabel(website.style)} · {fontLabel(website.font)} · {website.published ? "Published" : "Not published yet. Preview stays on this page until you publish."}</p>
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {DESIGNS.map((design) => {
-            const selected = website.design === design.id;
+          {SITE_STYLES.map((style) => {
+            const selected = website.style === style.id && website.design === style.design;
+            const preset = { ...website, design: style.design, font: style.font, color: style.color, style: style.id };
             return (
               <div
-                key={design.id}
+                key={style.id}
                 className={`min-w-0 overflow-hidden rounded-2xl border bg-white ${selected ? "border-black" : "border-gray-200"}`}
+                data-testid={`listing-style-${style.id}`}
               >
-                <div className="h-40 overflow-hidden bg-gray-50" aria-hidden="true">
+                <div className="h-44 overflow-hidden bg-gray-50" aria-hidden="true">
                   <div className="pointer-events-none">
-                    <ListingSiteView inquiry={false} site={previewSite(detail, { ...website, design: design.id })} />
+                    <ListingSiteView inquiry={false} site={previewSite(detail, preset)} />
                   </div>
                 </div>
                 <button
                   type="button"
                   disabled={!canEdit}
                   aria-pressed={selected}
-                  data-testid={`listing-template-${design.id}`}
-                  onClick={() => onWebsite({
-                    ...website,
-                    design: design.id,
-                    font: design.id === "premiere" ? "serif" : design.id === "two-up" ? "modern" : "sans",
-                    style: design.id === "premiere" ? "editorial" : "classic",
-                  })}
+                  data-testid={`listing-style-pick-${style.id}`}
+                  onClick={() => onWebsite(preset)}
                   className="block min-h-11 w-full px-3 py-3 text-left"
                 >
-                  <span className="block text-sm font-black">{design.name}</span>
-                  <span className="block text-xs text-gray-500">{design.note}</span>
+                  <span className="block text-sm font-black">{style.name}</span>
+                  <span className="block text-xs text-gray-500">{style.note}</span>
                 </button>
               </div>
             );
@@ -93,9 +98,9 @@ export function PortalTemplatePicker({
       </div>
 
       {canEdit && (
-        <div className="rounded-2xl border border-gray-100 bg-white p-5" data-testid="portal-tile-skins">
-          <h2 className="text-xs font-black uppercase tracking-widest text-[#0d9488]">Project tile skins</h2>
-          <p className="mt-1 text-xs text-gray-500">Sixteen listing-card skins. The one you pick is the tile for this listing in the portal.</p>
+        <details className="rounded-2xl border border-gray-100 bg-white p-5" data-testid="portal-tile-skins">
+          <summary className="cursor-pointer text-xs font-black uppercase tracking-widest text-gray-400">Portal tile</summary>
+          <p className="mt-3 text-xs text-gray-500">Optional. This only changes the project tile in the portal, not the public listing site.</p>
           <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
             {packageSkinsInDisplayOrder().map((skin) => {
               const selected = website.tileLook === skin.look;
@@ -116,7 +121,7 @@ export function PortalTemplatePicker({
               );
             })}
           </div>
-        </div>
+        </details>
       )}
 
       {canEdit && (
@@ -196,6 +201,12 @@ function skinCard(detail: PortalListingDetail, look: ListingCardLook): ClientLis
     garage: "",
     pool: pool && !pool.empty ? pool.value : "",
   };
+}
+
+function styleLabel(style: PortalWebsiteSettings["style"]): string {
+  if (style === "editorial") return "Editorial";
+  if (style === "minimal") return "Minimal";
+  return "Classic";
 }
 
 function fontLabel(font: PortalWebsiteSettings["font"]): string {

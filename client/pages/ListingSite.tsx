@@ -359,14 +359,14 @@ function previewListing(design: ListingSiteDesign): PublicListingSite {
 }
 
 const LISTING_CSS = `
-.ls-frame{container-type:inline-size;max-width:100%;min-width:0}
+.ls-frame{container-type:inline-size;width:100%;max-width:100%;min-width:0}
 .ls-index,.ls-two,.ls-premiere{min-height:var(--iframe-hero);max-width:100%}
 .ls-index{background:#F7F7F5;color:#0E0E0E}
 .ls-two{background:#F2EFEA;color:#1E2124}
 .ls-premiere{background:#0B0B0C;color:#E8DCC4}
 .ls-kicker{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;letter-spacing:var(--track);text-transform:uppercase}
 .ls-index h1,.ls-two h1,.ls-premiere h1,.ls-index-hero h1,.ls-agent h2,.ls-lead h2,.ls-madlib{
-  font-family:var(--display);font-weight:700;letter-spacing:var(--track)
+  font-family:var(--display);font-weight:700;letter-spacing:var(--track);max-width:100%
 }
 .ls-index-bar{display:flex;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid #0E0E0E;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px}
 .ls-index-bar a{color:inherit}

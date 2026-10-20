@@ -100,8 +100,11 @@ describe("portal listing detail page", () => {
 
   it("lets the owner request an edit on one visible photo", () => {
     const html = render("photos");
-    expect(html).toContain("photo-edit-open-front");
-    expect(html).toContain("Request edit");
+    expect(html).toContain("photo-select-front");
+    expect(html).toContain('aria-pressed="false"');
+    expect(html).not.toContain("Earlier");
+    expect(html).not.toContain("Later");
+    expect(html).not.toContain('type="checkbox"');
     expect(html).not.toContain("Pay now");
 
     const requested = buildPortalListingDetail({
@@ -149,9 +152,9 @@ describe("portal listing detail page", () => {
     expect(owner).toContain("Warm the sky on the left.");
     expect(owner).toContain("Requested");
     expect(owner).not.toContain("photo-edit-open-front");
-    expect(owner).toContain("photo-select-all");
-    expect(owner).toContain("photo-clear-selection");
-    expect(owner).toContain("photo-group-name");
+    expect(owner).toContain("photo-select-front");
+    expect(owner).not.toContain("photo-select-all");
+    expect(owner).not.toContain("photo-group-name");
 
     const visitor = renderToString(
       <MemoryRouter>
@@ -242,12 +245,13 @@ describe("portal listing detail page", () => {
     expect(html).not.toContain(">https://cdn.example/front-revised.jpg<");
   });
 
-  it("shows a hidden photo only while editing", () => {
-    expect(render("photos")).not.toContain("back.jpg");
-    const editing = render("photos", "photo");
-    expect(editing).toContain("back.jpg");
-    expect(editing).toContain("Hidden");
-    expect(editing).toContain("Hide");
+  it("shows a hidden photo to the owner so it can be selected again", () => {
+    const owner = render("photos");
+    expect(owner).toContain("back.jpg");
+    expect(owner).toContain("Hidden");
+    expect(owner).not.toContain("Earlier");
+    expect(owner).not.toContain("Later");
+    expect(render("photos", null, false)).not.toContain("back.jpg");
   });
 
   it("scaffolds marketing, invoices, and activity without a pay action", () => {
@@ -266,15 +270,19 @@ describe("portal listing detail page", () => {
     expect(render("website")).toContain("Save site style");
     expect(render("website")).toContain("View site");
     expect(render("website")).toContain("listing-site-preview");
+    expect(render("website")).toContain("listing-style-classic");
+    expect(render("website")).toContain("listing-style-editorial");
+    expect(render("website")).toContain("listing-style-minimal");
+    expect(render("website")).toContain("Portal tile");
     expect(render("website")).toContain("portal-tile-skins");
     expect(render("website")).toContain("tile-skin-showcase");
     expect(render("marketing")).toContain("portal-upload-social");
     expect(render("marketing")).toContain("portal-upload-file");
     expect(render("video")).toContain("portal-upload-input-video");
     expect(render("website")).toContain("/l/18-oak-hollow-spring");
-    expect(render("website")).toContain("Index");
-    expect(render("website")).toContain("Two-Up");
-    expect(render("website")).toContain("Premiere");
+    expect(render("website")).toContain("Classic");
+    expect(render("website")).toContain("Editorial");
+    expect(render("website")).toContain("Minimal");
     expect(render("website")).not.toContain("not generated");
   });
 

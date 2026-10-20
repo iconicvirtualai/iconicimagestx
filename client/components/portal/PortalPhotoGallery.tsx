@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { Download, GripVertical } from "lucide-react";
+import { useRef, useState, type PointerEvent } from "react";
+import { Check, Download, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ClientGalleryMediaFrame } from "@/components/gallery/ClientGalleryMedia";
 import type { ClientGalleryItem } from "@/components/gallery/clientGalleryMedia";
@@ -9,16 +9,18 @@ import {
   type PhotoEditRequest,
 } from "@shared/photoEditRequest";
 import type { PortalMediaItem, PortalMediaKind, PortalPhotoGroup, PortalTourItem } from "@shared/portalListingDetail";
-import { Eye, EyeOff } from "lucide-react";
+
+type MediaChange =
+  | { kind: PortalMediaKind; id: string; hidden?: boolean; move?: "earlier" | "later" }
+  | { kind: "photo"; layout: Array<{ id: string; groupId: string }> }
+  | { kind: "photo"; group: { action: "create"; name: string; photoIds: string[] } | { action: "rename"; id: string; name: string } | { action: "remove"; id: string } };
 
 export function PortalPhotoGallery({
   items,
   groups,
   canEdit,
-  editing,
   saving,
   photoEditRequests,
-  onToggleEditing,
   onMedia,
   onRequestPhotoEdit,
 }: {
@@ -29,18 +31,19 @@ export function PortalPhotoGallery({
   saving: boolean;
   photoEditRequests: PhotoEditRequest[];
   onToggleEditing: () => void;
-  onMedia: (change: { kind: PortalMediaKind; id: string; hidden?: boolean; move?: "earlier" | "later" } | { kind: "photo"; layout: Array<{ id: string; groupId: string }> } | { kind: "photo"; group: { action: "create"; name: string; photoIds: string[] } | { action: "rename"; id: string; name: string } | { action: "remove"; id: string } }) => void;
+  onMedia: (change: MediaChange) => void | Promise<void>;
   onRequestPhotoEdit?: (photoId: string, note: string) => Promise<boolean>;
 }) {
-  const showEditor = canEdit && editing;
-  const visible = showEditor ? items : items.filter((item) => !item.hidden);
+  const visible = canEdit ? items : items.filter((item) => !item.hidden);
   const hiddenCount = items.filter((item) => item.hidden).length;
   const [selected, setSelected] = useState<string[]>([]);
   const [groupName, setGroupName] = useState("");
   const [rename, setRename] = useState<{ id: string; name: string } | null>(null);
   const [lightbox, setLightbox] = useState<PhotoEditRequest | null>(null);
-  const dragId = useRef("");
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [note, setNote] = useState("");
   const [dropId, setDropId] = useState("");
+  const suppressClick = useRef(false);
 
   const orderedGroups = [...groups].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
   const sections = [
@@ -51,60 +54,119 @@ export function PortalPhotoGallery({
       items: visible.filter((item) => item.groupId === group.id),
     })),
   ];
+  const flat = sections.flatMap((section) => section.items);
+  const selectedItems = flat.filter((item) => selected.includes(item.id));
+  const selectedId = selectedItems.length === 1 ? selectedItems[0].id : "";
+  const selectedPending = selectedId
+    ? photoEditRequests.some((request) => request.photoId === selectedId && request.status !== "received_back")
+    : false;
 
   function toggle(id: string) {
     setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+    setNoteOpen(false);
   }
 
-  function finishDrag(targetId: string) {
-    const fromId = dragId.current;
-    dragId.current = "";
+  function finishDrag(fromId: string, targetId: string) {
     setDropId("");
     if (!fromId || !targetId || fromId === targetId) return;
-    const flat = sections.flatMap((section) => section.items);
-    const from = flat.findIndex((item) => item.id === fromId);
-    const to = flat.findIndex((item) => item.id === targetId);
-    if (from < 0 || to < 0) return;
-    const next = flat.slice();
-    const [moved] = next.splice(from, 1);
-    const target = flat[to];
-    next.splice(to, 0, { ...moved, groupId: target.groupId || "" });
-    const hidden = items.filter((item) => !next.some((photo) => photo.id === item.id));
-    onMedia({
+    const movingIds = selected.includes(fromId) && selected.length > 1 ? selected : [fromId];
+    if (movingIds.includes(targetId) && movingIds.length > 1) return;
+    const moving = flat.filter((item) => movingIds.includes(item.id));
+    const rest = flat.filter((item) => !movingIds.includes(item.id));
+    const insertAt = rest.findIndex((item) => item.id === targetId);
+    if (moving.length === 0 || insertAt < 0) return;
+    const target = flat.find((item) => item.id === targetId);
+    const placed = moving.map((item) => ({ ...item, groupId: target?.groupId || "" }));
+    rest.splice(insertAt, 0, ...placed);
+    const hidden = items.filter((item) => !rest.some((photo) => photo.id === item.id) && !moving.some((photo) => photo.id === item.id));
+    void onMedia({
       kind: "photo",
-      layout: [...next, ...hidden].map((item) => ({ id: item.id, groupId: item.groupId || "" })),
+      layout: [...rest, ...hidden].map((item) => ({ id: item.id, groupId: item.groupId || "" })),
     });
+  }
+
+  function pointerDown(event: PointerEvent<HTMLButtonElement>, id: string) {
+    if (!canEdit || event.button !== 0) return;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const pointerId = event.pointerId;
+    const touch = event.pointerType === "touch";
+    let dragging = false;
+    let moved = false;
+    let lastX = startX;
+    let lastY = startY;
+    const timer = window.setTimeout(() => {
+      if (!moved) dragging = true;
+    }, 420);
+
+    function move(ev: globalThis.PointerEvent) {
+      if (ev.pointerId !== pointerId) return;
+      lastX = ev.clientX;
+      lastY = ev.clientY;
+      const distance = Math.hypot(ev.clientX - startX, ev.clientY - startY);
+      if (!dragging && distance > 8) {
+        window.clearTimeout(timer);
+        if (touch) {
+          moved = true;
+          return;
+        }
+        dragging = true;
+      }
+      if (!dragging) return;
+      const hit = document.elementFromPoint(ev.clientX, ev.clientY);
+      const card = hit instanceof Element ? hit.closest("[data-photo-id]") : null;
+      setDropId(card?.getAttribute("data-photo-id") || "");
+    }
+
+    function up(ev: globalThis.PointerEvent) {
+      if (ev.pointerId !== pointerId) return;
+      window.clearTimeout(timer);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      if (!dragging) return;
+      const x = ev.clientX || lastX;
+      const y = ev.clientY || lastY;
+      const hit = document.elementFromPoint(x, y);
+      const card = hit instanceof Element ? hit.closest("[data-photo-id]") : null;
+      suppressClick.current = true;
+      finishDrag(id, card?.getAttribute("data-photo-id") || "");
+    }
+
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  }
+
+  async function hideSelected() {
+    const hide = selectedItems.some((item) => !item.hidden);
+    for (const item of selectedItems) {
+      if (item.hidden === hide) continue;
+      await onMedia({ kind: "photo", id: item.id, hidden: hide });
+    }
   }
 
   const revisions = photoEditRequests.filter((request) => request.replacement);
 
   return (
     <section>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-xs font-black uppercase tracking-widest text-[#0d9488]">Photos</h2>
-          <p className="mt-1 text-xs text-gray-500">
-            {showEditor
-              ? "Hidden files stay on the listing. Drag the handle to change the order."
-              : canEdit && hiddenCount > 0 ? `${hiddenCount} hidden from the presentation.` : "Shown in presentation order."}
-          </p>
-        </div>
-        {canEdit && (
-          <Button type="button" variant="outline" onClick={onToggleEditing} disabled={items.length === 0}>
-            {editing ? "Done" : "Edit"}
-          </Button>
-        )}
+      <div className="mb-4">
+        <h2 className="text-xs font-black uppercase tracking-widest text-[#0d9488]">Photos</h2>
+        <p className="mt-1 text-xs text-gray-500">
+          {canEdit
+            ? "Tap a photo to select it. Tap more to add them. Drag a photo, or the selected set, to change the order."
+            : "Shown in presentation order."}
+          {canEdit && hiddenCount > 0 ? ` ${hiddenCount} hidden from the presentation.` : ""}
+        </p>
       </div>
 
-      {canEdit && visible.length > 0 && (
-        <div className="mb-4 flex flex-wrap items-end gap-2" data-testid="photo-select-tools">
-          <Button type="button" size="sm" variant="outline" data-testid="photo-select-all" onClick={() => setSelected(visible.map((item) => item.id))}>
-            Select all
-          </Button>
-          <Button type="button" size="sm" variant="outline" data-testid="photo-clear-selection" onClick={() => setSelected([])}>
+      {canEdit && selectedItems.length > 0 && (
+        <div className="sticky top-14 z-20 mb-4 flex flex-wrap items-end gap-2 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm" data-testid="photo-selection-toolbar">
+          <p className="mr-1 pb-2 text-xs font-black uppercase tracking-widest text-[#0d9488]">{selectedItems.length} selected</p>
+          <Button type="button" size="sm" variant="outline" data-testid="photo-clear-selection" onClick={() => { setSelected([]); setNoteOpen(false); }}>
             Clear
           </Button>
-          <label className="min-w-0 flex-1 basis-40">
+          <label className="min-w-0 flex-1 basis-36">
             <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Group name</span>
             <input
               value={groupName}
@@ -119,15 +181,60 @@ export function PortalPhotoGallery({
             type="button"
             size="sm"
             data-testid="photo-group-create"
-            disabled={saving || !groupName.trim() || selected.length === 0}
+            disabled={saving || !groupName.trim()}
             onClick={() => {
-              onMedia({ kind: "photo", group: { action: "create", name: groupName.trim(), photoIds: selected } });
+              void onMedia({ kind: "photo", group: { action: "create", name: groupName.trim(), photoIds: selectedItems.map((item) => item.id) } });
               setGroupName("");
               setSelected([]);
             }}
           >
-            Group selected
+            Group
           </Button>
+          <Button type="button" size="sm" variant="outline" data-testid="photo-hide-selected" disabled={saving} onClick={() => void hideSelected()}>
+            {selectedItems.every((item) => item.hidden) ? <Eye className="mr-1 h-3.5 w-3.5" /> : <EyeOff className="mr-1 h-3.5 w-3.5" />}
+            {selectedItems.every((item) => item.hidden) ? "Show" : "Hide"}
+          </Button>
+          {onRequestPhotoEdit && selectedId && !selectedPending && (
+            <Button type="button" size="sm" variant="outline" data-testid={`photo-edit-open-${selectedId}`} onClick={() => setNoteOpen(true)}>
+              Request edit
+            </Button>
+          )}
+          {noteOpen && selectedId && onRequestPhotoEdit && (
+            <div className="basis-full">
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400" htmlFor={`photo-edit-note-${selectedId}`}>
+                Note
+              </label>
+              <textarea
+                id={`photo-edit-note-${selectedId}`}
+                data-testid={`photo-edit-note-${selectedId}`}
+                value={note}
+                maxLength={PHOTO_EDIT_NOTE_LIMIT}
+                rows={3}
+                placeholder="What should change on this photo?"
+                onChange={(event) => setNote(event.target.value)}
+                className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
+              />
+              <p className="mt-1 text-[10px] text-gray-400">The note is saved on this photo. It does not send a message or create a charge.</p>
+              <div className="mt-2 flex gap-2">
+                <Button type="button" size="sm" variant="outline" onClick={() => { setNoteOpen(false); setNote(""); }}>Cancel</Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  data-testid={`photo-edit-submit-${selectedId}`}
+                  disabled={saving || !note.trim()}
+                  onClick={() => {
+                    void onRequestPhotoEdit(selectedId, note).then((ok) => {
+                      if (!ok) return;
+                      setNote("");
+                      setNoteOpen(false);
+                    });
+                  }}
+                >
+                  Send request
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -152,7 +259,7 @@ export function PortalPhotoGallery({
                           onChange={(event) => setRename({ id: section.id, name: event.target.value })}
                           className="w-36 rounded-xl border border-gray-200 px-3 py-2 text-sm font-bold"
                         />
-                        <Button type="button" size="sm" variant="outline" disabled={saving || !rename.name.trim()} onClick={() => { onMedia({ kind: "photo", group: { action: "rename", id: section.id, name: rename.name.trim() } }); setRename(null); }}>
+                        <Button type="button" size="sm" variant="outline" disabled={saving || !rename.name.trim()} onClick={() => { void onMedia({ kind: "photo", group: { action: "rename", id: section.id, name: rename.name.trim() } }); setRename(null); }}>
                           Save name
                         </Button>
                       </>
@@ -161,7 +268,7 @@ export function PortalPhotoGallery({
                         Rename
                       </Button>
                     )}
-                    <Button type="button" size="sm" variant="outline" data-testid={`photo-group-remove-${section.id}`} disabled={saving} onClick={() => onMedia({ kind: "photo", group: { action: "remove", id: section.id } })}>
+                    <Button type="button" size="sm" variant="outline" data-testid={`photo-group-remove-${section.id}`} disabled={saving} onClick={() => void onMedia({ kind: "photo", group: { action: "remove", id: section.id } })}>
                       Remove group
                     </Button>
                   </div>
@@ -171,79 +278,47 @@ export function PortalPhotoGallery({
                 <p className="text-xs text-gray-400">No photos in this group.</p>
               ) : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {section.items.map((item, index) => (
-                    <article
-                      key={item.id}
-                      data-photo-id={item.id}
-                      data-testid={`media-photo-${item.id}`}
-                      className={`min-w-0 rounded-2xl border bg-white p-3 ${item.hidden ? "border-dashed border-gray-300" : "border-gray-100"} ${dropId === item.id ? "ring-2 ring-[#0d9488]" : ""}`}
-                    >
-                      {canEdit && (
-                        <div className="mb-2 flex items-center justify-between gap-2">
-                          <label className="inline-flex min-h-11 items-center gap-2 text-xs font-bold">
-                            <input
-                              type="checkbox"
-                              data-testid={`photo-select-${item.id}`}
-                              checked={selected.includes(item.id)}
-                              onChange={() => toggle(item.id)}
-                            />
-                            Select
-                          </label>
+                  {section.items.map((item) => {
+                    const isSelected = selected.includes(item.id);
+                    return (
+                      <article
+                        key={item.id}
+                        data-photo-id={item.id}
+                        data-testid={`media-photo-${item.id}`}
+                        className={`min-w-0 rounded-2xl border bg-white p-3 ${item.hidden ? "border-dashed border-gray-300" : "border-gray-100"} ${dropId === item.id ? "ring-2 ring-[#0d9488]" : ""} ${isSelected ? "ring-2 ring-black" : ""}`}
+                      >
+                        {canEdit ? (
                           <button
                             type="button"
-                            data-testid={`photo-drag-${item.id}`}
-                            aria-label={`Drag to reorder ${item.name}`}
-                            className="inline-flex min-h-11 min-w-11 cursor-grab items-center justify-center rounded-xl border border-gray-200 touch-none"
-                            style={{ touchAction: "none" }}
-                            onPointerDown={(event) => {
-                              if (event.button !== 0) return;
-                              dragId.current = item.id;
-                              event.currentTarget.setPointerCapture(event.pointerId);
-                            }}
-                            onPointerMove={(event) => {
-                              if (dragId.current !== item.id) return;
-                              const hit = document.elementFromPoint(event.clientX, event.clientY);
-                              const card = hit instanceof Element ? hit.closest("[data-photo-id]") : null;
-                              setDropId(card?.getAttribute("data-photo-id") || "");
-                            }}
-                            onPointerUp={(event) => {
-                              const hit = document.elementFromPoint(event.clientX, event.clientY);
-                              const card = hit instanceof Element ? hit.closest("[data-photo-id]") : null;
-                              finishDrag(card?.getAttribute("data-photo-id") || dropId);
-                            }}
-                            onPointerCancel={() => {
-                              dragId.current = "";
-                              setDropId("");
+                            data-testid={`photo-select-${item.id}`}
+                            aria-pressed={isSelected}
+                            aria-label={`${isSelected ? "Deselect" : "Select"} ${item.name}`}
+                            className="relative block w-full touch-manipulation text-left"
+                            onPointerDown={(event) => pointerDown(event, item.id)}
+                            onClick={() => {
+                              if (suppressClick.current) {
+                                suppressClick.current = false;
+                                return;
+                              }
+                              toggle(item.id);
                             }}
                           >
-                            <GripVertical className="h-4 w-4" />
+                            <ClientGalleryMediaFrame item={toGalleryItem(item)} />
+                            {isSelected && (
+                              <span className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-white text-black shadow-md ring-2 ring-black" aria-hidden="true">
+                                <Check className="h-4 w-4" />
+                              </span>
+                            )}
                           </button>
-                        </div>
-                      )}
-                      <button type="button" className="block w-full text-left" onClick={() => canEdit && toggle(item.id)}>
-                        <ClientGalleryMediaFrame item={toGalleryItem(item)} />
-                      </button>
-                      <p className="mt-3 truncate text-sm font-bold">{item.name}</p>
-                      {item.hidden && <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Hidden</p>}
-                      {showEditor && (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <Button type="button" size="sm" variant="outline" disabled={saving} onClick={() => onMedia({ kind: "photo", id: item.id, hidden: !item.hidden })}>
-                            {item.hidden ? <Eye className="mr-1 h-3.5 w-3.5" /> : <EyeOff className="mr-1 h-3.5 w-3.5" />}
-                            {item.hidden ? "Show" : "Hide"}
-                          </Button>
-                          <Button type="button" size="sm" variant="outline" disabled={saving || index === 0} onClick={() => onMedia({ kind: "photo", id: item.id, move: "earlier" })}>Earlier</Button>
-                          <Button type="button" size="sm" variant="outline" disabled={saving || index === section.items.length - 1} onClick={() => onMedia({ kind: "photo", id: item.id, move: "later" })}>Later</Button>
-                        </div>
-                      )}
-                      <PhotoEditNote
-                        item={item}
-                        requests={photoEditRequests}
-                        saving={saving}
-                        onRequest={onRequestPhotoEdit}
-                        onOpen={setLightbox}
-                      />
-                    </article>
-                  ))}
+                        ) : (
+                          <ClientGalleryMediaFrame item={toGalleryItem(item)} />
+                        )}
+                        <p className="mt-3 truncate text-sm font-bold">{item.name}</p>
+                        {item.hidden && <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Hidden</p>}
+                        <PhotoStatus item={item} requests={photoEditRequests} onOpen={setLightbox} />
+                      </article>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -316,37 +391,23 @@ function toGalleryItem(item: PortalMediaItem): ClientGalleryItem {
   };
 }
 
-function PhotoEditNote({
+function PhotoStatus({
   item,
   requests,
-  saving,
-  onRequest,
   onOpen,
 }: {
   item: PortalMediaItem;
   requests: PhotoEditRequest[];
-  saving: boolean;
-  onRequest?: (photoId: string, note: string) => Promise<boolean>;
   onOpen: (request: PhotoEditRequest) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [note, setNote] = useState("");
   const mine = requests.filter((request) => request.photoId === item.id);
-  const pending = mine.some((request) => request.status !== "received_back");
-  if (!onRequest && mine.length === 0) return null;
+  if (mine.length === 0) return null;
   return (
     <div className="mt-3 space-y-2">
       {mine.map((request) => (
         <div key={request.id} data-testid={`photo-edit-status-${request.id}`} className="rounded-xl bg-gray-50 px-3 py-2">
           <p className="text-[10px] font-black uppercase tracking-widest text-[#0d9488]">{photoEditStatusLabel(request.status)}</p>
           <p className="mt-1 text-sm text-gray-700">{request.note}</p>
-          <ol className="mt-2 space-y-1">
-            {request.timeline.map((entry) => (
-              <li key={`${entry.status}-${entry.at}`} className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                {photoEditStatusLabel(entry.status)}
-              </li>
-            ))}
-          </ol>
           {request.replacement && (
             <button type="button" className="mt-2 block w-full overflow-hidden rounded-lg" onClick={() => onOpen(request)} data-testid={`revision-thumb-${request.id}`}>
               <img src={request.replacement.url} alt={request.replacement.name} className="aspect-video w-full object-cover" />
@@ -354,47 +415,6 @@ function PhotoEditNote({
           )}
         </div>
       ))}
-      {onRequest && !pending && !open && (
-        <Button type="button" size="sm" variant="outline" data-testid={`photo-edit-open-${item.id}`} onClick={() => setOpen(true)}>
-          Request edit
-        </Button>
-      )}
-      {onRequest && !pending && open && (
-        <div>
-          <label className="text-[10px] font-black uppercase tracking-widest text-gray-400" htmlFor={`photo-edit-note-${item.id}`}>
-            Note
-          </label>
-          <textarea
-            id={`photo-edit-note-${item.id}`}
-            data-testid={`photo-edit-note-${item.id}`}
-            value={note}
-            maxLength={PHOTO_EDIT_NOTE_LIMIT}
-            rows={3}
-            placeholder="What should change on this photo?"
-            onChange={(event) => setNote(event.target.value)}
-            className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
-          />
-          <p className="mt-1 text-[10px] text-gray-400">The note is saved on this photo. It does not send a message or create a charge.</p>
-          <div className="mt-2 flex gap-2">
-            <Button type="button" size="sm" variant="outline" onClick={() => { setOpen(false); setNote(""); }}>Cancel</Button>
-            <Button
-              type="button"
-              size="sm"
-              data-testid={`photo-edit-submit-${item.id}`}
-              disabled={saving || !note.trim()}
-              onClick={() => {
-                void onRequest(item.id, note).then((ok) => {
-                  if (!ok) return;
-                  setNote("");
-                  setOpen(false);
-                });
-              }}
-            >
-              Send request
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
