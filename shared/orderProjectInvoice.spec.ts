@@ -187,6 +187,22 @@ describe("admin invoice drafts copy stored totals", () => {
     expect(draftInvoiceNumber("ordreq_req1", new Date("2026-10-01T00:00:00Z"))).toBe("INV-2026-EQREQ1");
   });
 
+  it("reprices a managed order when processing is included", () => {
+    const draft = buildLinkedInvoiceDraft(invoiceDraftFromOrder({
+      id: "req-show",
+      lineItems: [{ name: "The Showcase", price: 549 }],
+      total: 549,
+      pricing: { subtotal: 549, tax: 0, total: 549 },
+      email: "agent@example.com",
+      clientName: "Ada Lovelace",
+      processingPolicy: "included",
+    }));
+    expect(draft.subtotal).toBe(549);
+    expect(draft.processing).toBe(15.37);
+    expect(draft.total).toBe(564.37);
+    expect(draft.amountDue).toBe(564.37);
+  });
+
   it("uses the project total for project-only billing", () => {
     const draft = buildLinkedInvoiceDraft(invoiceDraftFromProject({
       services: ["Headshots", "Brand film"],

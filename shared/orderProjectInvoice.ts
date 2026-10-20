@@ -322,6 +322,7 @@ export function invoiceDraftFromOrder(order: {
   lastName?: unknown;
   promoCode?: unknown;
   promoDiscount?: unknown;
+  processingPolicy?: unknown;
 }): BookingInvoiceDraftInput {
   const named = `${order.firstName || ""} ${order.lastName || ""}`.trim();
   return {
@@ -334,6 +335,7 @@ export function invoiceDraftFromOrder(order: {
     orderRequestId: order.id,
     promoCode: typeof order.promoCode === "string" ? order.promoCode : null,
     promoDiscount: order.promoDiscount,
+    applyProcessing: order.processingPolicy === "included",
   };
 }
 

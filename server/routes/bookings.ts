@@ -43,6 +43,7 @@ import { buildAdminOrderTile } from "../../shared/adminOrderTile";
 import { nextOrderNumber } from "../services/orderNumbers";
 import { refuseQaStaffAssignment } from "../services/qaStaffAssign";
 import { preferenceFromRequest, preferenceName, publicBookingPhotographers, NO_PREFERENCE_ID, NO_PREFERENCE_NAME } from "../services/bookingPhotographers";
+import { travelBufferMinutes } from "../../shared/bookingAvailability";
 import {
   createBookingCalendarHold,
   deleteBookingCalendarHold,
@@ -880,6 +881,7 @@ router.get("/photographers", (_req, res) => {
   return res.json({
     noPreference: { id: NO_PREFERENCE_ID, name: NO_PREFERENCE_NAME },
     photographers: publicBookingPhotographers(),
+    bufferMinutes: travelBufferMinutes(),
   });
 });
 
