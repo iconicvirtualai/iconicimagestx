@@ -75,6 +75,18 @@ describe("portal listing detail routes", () => {
       body: JSON.stringify({ photoId: "front", note: "Warm the sky on the left." }),
     });
     expect(photoEdit.status).toBe(401);
+    const uploadUrl = await fetch(`${baseUrl}/api/clients/me/listings/listing1234/uploads/url`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "video", fileName: "tour.mp4", contentType: "video/mp4", byteSize: 1000 }),
+    });
+    expect(uploadUrl.status).toBe(401);
+    const uploadSave = await fetch(`${baseUrl}/api/clients/me/listings/listing1234/uploads`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "file", fileName: "plan.pdf", storagePath: "listings/listing1234/client-uploads/file/plan.pdf" }),
+    });
+    expect(uploadSave.status).toBe(401);
     const sent = await fetch(`${baseUrl}/api/listings/listing1234/photo-edit-requests/req-front1/sent`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -149,6 +149,9 @@ describe("portal listing detail page", () => {
     expect(owner).toContain("Warm the sky on the left.");
     expect(owner).toContain("Requested");
     expect(owner).not.toContain("photo-edit-open-front");
+    expect(owner).toContain("photo-select-all");
+    expect(owner).toContain("photo-clear-selection");
+    expect(owner).toContain("photo-group-name");
 
     const visitor = renderToString(
       <MemoryRouter>
@@ -178,6 +181,67 @@ describe("portal listing detail page", () => {
     expect(visitor).not.toContain("photo-edit-open-front");
   });
 
+  it("shows a returned revision as a thumbnail in the Revisions section", () => {
+    const revised = buildPortalListingDetail({
+      listing: {
+        id: "listing1234",
+        images: [{ id: "front", name: "front.jpg", url: "https://cdn.example/front.jpg", contentType: "image/jpeg" }],
+        photoEditRequests: [{
+          id: "req-front1",
+          listingId: "listing1234",
+          photoId: "front",
+          photoName: "front.jpg",
+          photoUrl: "https://cdn.example/front.jpg",
+          note: "Warm the sky on the left.",
+          status: "received_back",
+          timeline: [
+            { status: "requested", at: "2026-04-02T15:00:00.000Z", actor: "client", actorId: "client123" },
+            { status: "received_back", at: "2026-04-03T15:00:00.000Z", actor: "staff", actorId: "staff123" },
+          ],
+          replacement: {
+            name: "front-revised.jpg",
+            url: "https://cdn.example/front-revised.jpg",
+            path: "listings/listing1234/replacements/front-revised.jpg",
+            contentType: "image/jpeg",
+            attachedAt: "2026-04-03T15:00:00.000Z",
+            attachedBy: "staff123",
+          },
+          clientId: "client123",
+          createdAt: "2026-04-02T15:00:00.000Z",
+          updatedAt: "2026-04-03T15:00:00.000Z",
+        }],
+      },
+    });
+    const html = renderToString(
+      <MemoryRouter>
+        <PortalListingDetailView
+          detail={revised}
+          tab="photos"
+          editing={null}
+          saving={false}
+          canEdit
+          dataEditing={false}
+          dataDraft={portalFactsDraftFromDetail(revised)}
+          website={defaultPortalWebsite()}
+          onTab={() => undefined}
+          onToggleEditing={() => undefined}
+          onMedia={() => undefined}
+          onWebsite={() => undefined}
+          onWebsiteSave={() => undefined}
+          onDataEditing={() => undefined}
+          onDataDraft={() => undefined}
+          onDataSave={() => undefined}
+          onRequestPhotoEdit={async () => false}
+        />
+      </MemoryRouter>,
+    );
+    expect(html).toContain("gallery-revisions");
+    expect(html).toContain("Revisions");
+    expect(html).toContain('alt="front-revised.jpg"');
+    expect(html).toContain("<img");
+    expect(html).not.toContain(">https://cdn.example/front-revised.jpg<");
+  });
+
   it("shows a hidden photo only while editing", () => {
     expect(render("photos")).not.toContain("back.jpg");
     const editing = render("photos", "photo");
@@ -201,6 +265,12 @@ describe("portal listing detail page", () => {
     expect(render("activity")).toContain("Booking request received");
     expect(render("website")).toContain("Save site style");
     expect(render("website")).toContain("View site");
+    expect(render("website")).toContain("listing-site-preview");
+    expect(render("website")).toContain("portal-tile-skins");
+    expect(render("website")).toContain("tile-skin-showcase");
+    expect(render("marketing")).toContain("portal-upload-social");
+    expect(render("marketing")).toContain("portal-upload-file");
+    expect(render("video")).toContain("portal-upload-input-video");
     expect(render("website")).toContain("/l/18-oak-hollow-spring");
     expect(render("website")).toContain("Index");
     expect(render("website")).toContain("Two-Up");
@@ -270,11 +340,12 @@ describe("portal listing detail page", () => {
         contentType: "video/mp4",
         hidden: false,
         order: 0,
+        groupId: "",
         uploadedAt: "",
       }],
       floorplans: [
-        { id: "png", kind: "floorplan" as const, name: "level1.png", url: "https://cdn.example/level1.png", contentType: "image/png", hidden: false, order: 0, uploadedAt: "" },
-        { id: "pdf", kind: "floorplan" as const, name: "level2.pdf", url: "https://cdn.example/level2.pdf", contentType: "application/pdf", hidden: false, order: 1, uploadedAt: "" },
+        { id: "png", kind: "floorplan" as const, name: "level1.png", url: "https://cdn.example/level1.png", contentType: "image/png", hidden: false, order: 0, groupId: "", uploadedAt: "" },
+        { id: "pdf", kind: "floorplan" as const, name: "level2.pdf", url: "https://cdn.example/level2.pdf", contentType: "application/pdf", hidden: false, order: 1, groupId: "", uploadedAt: "" },
       ],
       tours: [{
         id: "mp",
@@ -284,6 +355,7 @@ describe("portal listing detail page", () => {
         contentType: "",
         hidden: false,
         order: 0,
+        groupId: "",
         uploadedAt: "",
         provider: "Matterport",
         embedUrl: "https://my.matterport.com/show/?m=abc123",
