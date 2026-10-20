@@ -7,7 +7,7 @@ import { createOrder } from "@/lib/createOrder";
 import { readClientNotificationsLive, type BookingSubmitResult } from "@/lib/bookingFollowUp";
 import { trackConversion } from "@/lib/tracking";
 import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "@shared/businessContact";
-import { APPRENTICESHIP_OVERAGE_LABEL, APPRENTICESHIP_RULES } from "@shared/bookingCatalog";
+import { APPRENTICESHIP_OVERAGE_LABEL } from "@shared/bookingCatalog";
 import {
   RE75_DURATION_MINUTES,
   RE75_LEAD_SOURCE,
@@ -29,6 +29,7 @@ import type { ApprenticeshipSlot } from "@shared/apprenticeship";
 const GCLID_KEY = "re75-gclid";
 const DRAFT_KEY = "re75-booking-draft";
 const CONVERSION_PREFIX = "re75-conversion-";
+const HERO_ALT = "25 listing photos for $75, 20-minute shoot by Iconic apprentices";
 
 const SAMPLES = [
   {
@@ -68,13 +69,9 @@ const SAMPLES = [
   },
 ] as const;
 
-const STEPS = ["Address", "Size", "Home", "Time", "Agent", "Summary"] as const;
-type StepIndex = 0 | 1 | 2 | 3 | 4 | 5;
-
 type LiveSlot = ApprenticeshipSlot & { photographerId?: string; photographerName?: string };
 
 interface Draft {
-  step: StepIndex;
   address: string;
   sqft: string;
   occupancy: string;
@@ -89,7 +86,6 @@ interface Draft {
 }
 
 const EMPTY_DRAFT: Draft = {
-  step: 0,
   address: "",
   sqft: "",
   occupancy: "",
@@ -107,12 +103,7 @@ function readDraft(): Draft {
   if (typeof sessionStorage === "undefined") return EMPTY_DRAFT;
   try {
     const parsed = JSON.parse(sessionStorage.getItem(DRAFT_KEY) || "") as Partial<Draft>;
-    const step = parsed.step;
-    return {
-      ...EMPTY_DRAFT,
-      ...parsed,
-      step: step === 0 || step === 1 || step === 2 || step === 3 || step === 4 || step === 5 ? step : 0,
-    };
+    return { ...EMPTY_DRAFT, ...parsed };
   } catch {
     return EMPTY_DRAFT;
   }
@@ -134,7 +125,6 @@ export default function RealEstate75() {
   const [gclid, setGclid] = useState("");
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [processingOn, setProcessingOn] = useState(true);
-  const [areaError, setAreaError] = useState("");
   const [formError, setFormError] = useState("");
   const [slots, setSlots] = useState<LiveSlot[]>([]);
   const [slotsLive, setSlotsLive] = useState(false);
@@ -142,6 +132,8 @@ export default function RealEstate75() {
   const [pending, setPending] = useState(false);
   const [confirmation, setConfirmation] = useState<BookingSubmitResult | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [barHidden, setBarHidden] = useState(false);
+  const [scheduleVisible, setScheduleVisible] = useState(false);
   const formStarted = useRef(false);
   const quote = useMemo(() => realEstate75Quote(processingOn), [processingOn]);
   const area = useMemo(() => classifyRealEstate75Area(draft.address), [draft.address]);
@@ -187,6 +179,38 @@ export default function RealEstate75() {
   }, []);
 
   useEffect(() => {
+    if (area.status !== "inside") {
+      setSlots([]);
+      setSlotsLive(false);
+      setSlotsReady(false);
+      return;
+    }
+    if (!formStarted.current && !sessionStorage.getItem("re75-form-start")) {
+      formStarted.current = true;
+      sessionStorage.setItem("re75-form-start", "1");
+      trackConversion({ name: "re75_form_start", packageId: RE75_PACKAGE_ID });
+    }
+    const address = draft.address;
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams({ address });
+      fetch(`/api/bookings/realestate-75/slots?${params.toString()}`)
+        .then((response) => (response.ok ? response.json() : null))
+        .then((data: { live?: boolean; slots?: LiveSlot[] } | null) => {
+          const live = data?.live === true;
+          setSlotsLive(live);
+          setSlots(live && Array.isArray(data?.slots) ? data.slots : []);
+          setSlotsReady(true);
+        })
+        .catch(() => {
+          setSlotsLive(false);
+          setSlots([]);
+          setSlotsReady(true);
+        });
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [area.status, draft.address]);
+
+  useEffect(() => {
     if (!confirmation) return;
     const bookingId = confirmation.requestId || confirmation.orderNumber || "";
     if (!bookingId) return;
@@ -204,31 +228,46 @@ export default function RealEstate75() {
     });
   }, [confirmation, draft.email, draft.phone]);
 
+  useEffect(() => {
+    const node = document.getElementById("schedule");
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setScheduleVisible(entry.isIntersecting),
+      { threshold: 0.08 },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [confirmation]);
+
+  useEffect(() => {
+    const onFocus = (event: FocusEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      const field = target.closest("input, textarea, select, button");
+      setBarHidden(Boolean(field && target.closest("#schedule form")));
+    };
+    const onBlur = () => {
+      window.setTimeout(() => {
+        const active = document.activeElement;
+        const field = active instanceof HTMLElement && active.closest("input, textarea, select, button");
+        const inForm = active instanceof HTMLElement && active.closest("#schedule form");
+        setBarHidden(Boolean(field && inForm));
+      }, 0);
+    };
+    document.addEventListener("focusin", onFocus);
+    document.addEventListener("focusout", onBlur);
+    return () => {
+      document.removeEventListener("focusin", onFocus);
+      document.removeEventListener("focusout", onBlur);
+    };
+  }, []);
+
   function href(path: string) {
     return withGclid(path, gclid);
   }
 
   function patch(partial: Partial<Draft>) {
     setDraft((current) => ({ ...current, ...partial }));
-  }
-
-  function loadSlots(address: string) {
-    setSlotsReady(false);
-    const params = new URLSearchParams({ address });
-    fetch(`/api/bookings/realestate-75/slots?${params.toString()}`)
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data: { live?: boolean; slots?: LiveSlot[] } | null) => {
-        const live = data?.live === true;
-        const next = live && Array.isArray(data?.slots) ? data.slots : [];
-        setSlotsLive(live);
-        setSlots(next);
-        setSlotsReady(true);
-      })
-      .catch(() => {
-        setSlotsLive(false);
-        setSlots([]);
-        setSlotsReady(true);
-      });
   }
 
   const days = useMemo(() => {
@@ -245,26 +284,17 @@ export default function RealEstate75() {
   const daySlots = days.find(([date]) => date === draft.slotDate)?.[1] || [];
 
   useEffect(() => {
-    if (draft.step !== 3 || draft.slotDate || !days.length) return;
+    if (draft.slotDate || !days.length) return;
     setDraft((current) => (current.slotDate ? current : { ...current, slotDate: days[0][0] }));
-  }, [draft.step, draft.slotDate, days]);
+  }, [draft.slotDate, days]);
 
-  function continueAddress() {
-    const next = classifyRealEstate75Area(draft.address);
-    if (next.status !== "inside") {
-      setAreaError(next.message);
+  async function submitBooking(event: FormEvent) {
+    event.preventDefault();
+    const current = classifyRealEstate75Area(draft.address);
+    if (current.status !== "inside") {
+      setFormError(current.message);
       return;
     }
-    setAreaError("");
-    if (!formStarted.current && !sessionStorage.getItem("re75-form-start")) {
-      formStarted.current = true;
-      sessionStorage.setItem("re75-form-start", "1");
-      trackConversion({ name: "re75_form_start", packageId: RE75_PACKAGE_ID });
-    }
-    patch({ step: 1 });
-  }
-
-  function continueDetails() {
     const sqft = Number(draft.sqft.replace(/,/g, ""));
     if (!Number.isFinite(sqft) || sqft < 200 || sqft > 20000) {
       setFormError("Enter an approximate square footage between 200 and 20,000.");
@@ -274,12 +304,6 @@ export default function RealEstate75() {
       setFormError("Tell us if the home is occupied, vacant, or a lease.");
       return;
     }
-    setFormError("");
-    loadSlots(draft.address);
-    patch({ step: 3 });
-  }
-
-  function continueTime() {
     if (slotsLive && !draft.slotStart) {
       setFormError("Pick an open time.");
       return;
@@ -288,11 +312,6 @@ export default function RealEstate75() {
       setFormError(`Open times are not on the calendar right now. ${RE75_OUTSIDE_MESSAGE}`);
       return;
     }
-    setFormError("");
-    patch({ step: 4 });
-  }
-
-  function continueAgent() {
     if (!draft.firstName.trim() || !draft.lastName.trim()) {
       setFormError("Enter the agent's first and last name.");
       return;
@@ -301,25 +320,12 @@ export default function RealEstate75() {
       setFormError("Enter an email address.");
       return;
     }
-    const digits = draft.phone.replace(/\D/g, "");
-    if (digits.length < 10) {
+    if (draft.phone.replace(/\D/g, "").length < 10) {
       setFormError("Enter a phone number.");
       return;
     }
     if (!draft.brokerage.trim()) {
       setFormError("Enter the brokerage.");
-      return;
-    }
-    setFormError("");
-    patch({ step: 5 });
-  }
-
-  async function submitBooking(event: FormEvent) {
-    event.preventDefault();
-    const current = classifyRealEstate75Area(draft.address);
-    if (current.status !== "inside") {
-      setFormError(current.message);
-      patch({ step: 0 });
       return;
     }
     setPending(true);
@@ -365,16 +371,14 @@ export default function RealEstate75() {
         }),
         readClientNotificationsLive(),
       ]);
-      const saved: BookingSubmitResult = {
+      setConfirmation({
         ...result,
         selectedService: RE75_PACKAGE_ID,
         clientNotificationsLive,
-      };
-      setConfirmation(saved);
+      });
       sessionStorage.removeItem(DRAFT_KEY);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "We could not save that booking.";
-      setFormError(message);
+      setFormError(error instanceof Error ? error.message : "We could not save that booking.");
     } finally {
       setPending(false);
     }
@@ -382,14 +386,23 @@ export default function RealEstate75() {
 
   return (
     <Layout>
-      <div className="overflow-x-clip bg-white text-neutral-950">
-        <Hero href={href} quoteLine={quote.priceLine} total={quote.total} processing={quote.processing} processingOn={processingOn} />
+      <div className="overflow-x-clip bg-white pb-24 text-neutral-950 md:pb-0">
+        <Hero href={href} quote={quote} processingOn={processingOn} />
+        <Benefits />
+        <OfferCta href={href} />
+        <WhatYouGet quoteLine={quote.priceLine} />
+        <OfferCta href={href} />
+        <Comparison />
+        <OfferCta href={href} />
         <HowItWorks />
+        <OfferCta href={href} />
         <Samples />
+        <OfferCta href={href} />
+        <Faq />
+        <OfferCta href={href} />
         <Schedule
           draft={draft}
           area={area}
-          areaError={areaError}
           formError={formError}
           quote={quote}
           days={days}
@@ -398,93 +411,188 @@ export default function RealEstate75() {
           slotsReady={slotsReady}
           pending={pending}
           confirmation={confirmation}
-          onAddress={continueAddress}
-          onDetails={continueDetails}
-          onTime={continueTime}
-          onAgent={continueAgent}
           onSubmit={submitBooking}
           onPatch={patch}
-          onBack={() => {
-            setFormError("");
-            patch({ step: Math.max(0, draft.step - 1) as StepIndex });
-          }}
         />
+        <FinalCta href={href} quoteLine={quote.priceLine} />
+        <ReviewsSlot />
         <PageContact />
+        <MobileBar href={href} hidden={barHidden || scheduleVisible} />
       </div>
     </Layout>
   );
 }
 
+function OfferCta({ href }: { href: (path: string) => string }) {
+  return (
+    <div className="px-4 md:px-8">
+      <div className="mx-auto flex max-w-3xl flex-col gap-3 border-t border-neutral-200 py-8 sm:flex-row">
+        <Link
+          to={href(RE75_PATHS.schedule)}
+          className="inline-flex min-h-12 flex-1 items-center justify-center rounded-xl bg-black px-5 text-base font-semibold text-white hover:bg-neutral-800"
+        >
+          Schedule My $75 Shoot
+        </Link>
+        <a
+          href={BUSINESS_CONTACT.phoneHref}
+          className="inline-flex min-h-12 items-center justify-center rounded-xl border border-neutral-300 px-5 text-base font-semibold text-neutral-950 hover:bg-neutral-50"
+        >
+          Call {BUSINESS_CONTACT.phoneDisplay}
+        </a>
+      </div>
+    </div>
+  );
+}
+
 function Hero({
   href,
-  quoteLine,
-  total,
-  processing,
+  quote,
   processingOn,
 }: {
   href: (path: string) => string;
-  quoteLine: string;
-  total: number;
-  processing: number;
+  quote: ReturnType<typeof realEstate75Quote>;
   processingOn: boolean;
 }) {
   return (
-    <section className="px-4 pb-16 pt-28 md:px-8 md:pb-24 md:pt-36">
-      <div className="mx-auto grid max-w-6xl items-center gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-12">
-        <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#0d9488]">Preview · Apprentice shoot</p>
-          <h1 className="mt-4 text-4xl font-black leading-[1.05] tracking-tight text-neutral-950 sm:text-5xl lg:text-6xl">
-            25 Listing Photos for $75
-          </h1>
-          <p className="mt-5 max-w-xl text-lg leading-relaxed text-neutral-700">
-            A {RE75_DURATION_MINUTES}-minute shoot by Iconic Images apprentices. Made for listing refreshes, relists and lease listings in The Woodlands, Spring, Conroe, Willis and Cypress.
-          </p>
-          <ul className="mt-6 flex flex-wrap gap-2">
-            {["25 photos", "20-minute appointment", "$75", "Shot by Iconic apprentices", "Photos only"].map((item) => (
-              <li key={item} className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-sm font-semibold text-neutral-800">
-                {item}
-              </li>
-            ))}
-          </ul>
-          <div className="mt-6 max-w-xl rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
-            <p className="text-sm font-semibold text-neutral-950">{quoteLine}</p>
-            <p className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-neutral-800">
-              <span>{RE75_PACKAGE_NAME}</span>
-              <MoneyAmount>${total.toFixed(2)}</MoneyAmount>
-              {processingOn ? <span className="text-sm text-neutral-600">includes ${processing.toFixed(2)} processing</span> : null}
-            </p>
-            <p className="mt-3 text-sm leading-relaxed text-neutral-600">{RE75_TRAVEL_TBD_NOTE}</p>
-          </div>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Link
-              to={href(RE75_PATHS.schedule)}
-              className="inline-flex min-h-12 items-center justify-center rounded-xl bg-black px-6 text-base font-semibold text-white hover:bg-neutral-800"
-            >
-              Schedule now
-            </Link>
-            <a
-              href={BUSINESS_CONTACT.phoneHref}
-              className="inline-flex min-h-12 items-center justify-center rounded-xl border border-neutral-300 px-6 text-base font-semibold text-neutral-950 hover:bg-neutral-50"
-            >
-              {BUSINESS_CONTACT.phoneDisplay}
-            </a>
-          </div>
-          <nav className="mt-6 flex flex-wrap gap-x-4 gap-y-2 text-sm font-semibold">
-            <Link className="underline underline-offset-4" to={href(RE75_PATHS.how)}>How it works</Link>
-            <Link className="underline underline-offset-4" to={href(RE75_PATHS.samples)}>Samples</Link>
-            <Link className="underline underline-offset-4" to={href(RE75_PATHS.schedule)}>Pick a time</Link>
-          </nav>
-        </div>
-        <picture>
-          <source type="image/webp" srcSet="/realestate-75/hero.webp" />
+    <section className="pt-28 md:pt-36">
+      <div className="mx-auto w-full max-w-[1200px]">
+        <Link to={href(RE75_PATHS.schedule)} className="block" aria-label="Schedule the $75 shoot">
           <img
-            src="/realestate-75/hero.jpg"
-            alt="Covered outdoor living area with a stone fireplace at a listing"
+            src="/realestate-75-hero.png"
+            alt={HERO_ALT}
             width={1200}
             height={628}
-            className="h-auto w-full rounded-3xl object-cover"
+            fetchPriority="high"
+            className="block h-auto w-full"
           />
-        </picture>
+        </Link>
+      </div>
+      <div className="mx-auto max-w-3xl px-4 pt-4 md:px-8">
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Link
+            to={href(RE75_PATHS.schedule)}
+            className="inline-flex min-h-14 flex-1 items-center justify-center rounded-xl bg-black px-6 text-lg font-semibold text-white hover:bg-neutral-800"
+          >
+            Schedule My $75 Shoot
+          </Link>
+          <a
+            href={BUSINESS_CONTACT.phoneHref}
+            className="inline-flex min-h-14 items-center justify-center rounded-xl border border-neutral-300 px-6 text-lg font-semibold text-neutral-950 hover:bg-neutral-50"
+          >
+            Call {BUSINESS_CONTACT.phoneDisplay}
+          </a>
+        </div>
+        <h1 className="mt-8 text-4xl font-black leading-[1.05] tracking-tight text-neutral-950 sm:text-5xl">
+          25 Listing Photos for $75
+        </h1>
+        <p className="mt-4 text-lg leading-relaxed text-neutral-700">
+          A {RE75_DURATION_MINUTES}-minute shoot by Iconic Images apprentices. Made for listing refreshes, relists and lease listings in The Woodlands, Spring, Conroe, Willis and Cypress.
+        </p>
+        <p className="mt-4 text-base font-semibold text-neutral-950">{quote.priceLine}</p>
+        <p className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-neutral-800">
+          <span>{RE75_PACKAGE_NAME}</span>
+          <MoneyAmount>${quote.total.toFixed(2)}</MoneyAmount>
+          {processingOn ? <span className="text-sm text-neutral-600">includes ${quote.processing.toFixed(2)} processing</span> : null}
+        </p>
+        <ul className="mt-5 flex flex-wrap gap-2">
+          {["25 photos", "20-minute appointment", "$75", "Shot by Iconic apprentices", "Photos only"].map((item) => (
+            <li key={item} className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-sm font-semibold text-neutral-800">
+              {item}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+function Benefits() {
+  const items = [
+    {
+      title: "A current look for the listing",
+      body: "Use it for a refresh, a relist, or a lease when the old photos no longer match the home.",
+    },
+    {
+      title: "Buyers can see the home first",
+      body: "Listing photos are what a buyer looks at before they ask for a showing.",
+    },
+    {
+      title: "Twenty minutes at the house",
+      body: "The appointment is 20 minutes. Have the home ready when we arrive.",
+    },
+    {
+      title: "25 edited photos",
+      body: "You get 25 edited photos. We confirm the requested time within 1 business day.",
+    },
+  ];
+  return (
+    <section className="px-4 py-14 md:px-8">
+      <div className="mx-auto max-w-6xl">
+        <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Built for a listing that needs photos now</h2>
+        <ul className="mt-8 grid gap-4 md:grid-cols-2">
+          {items.map((item) => (
+            <li key={item.title} className="rounded-2xl border border-neutral-200 p-5">
+              <h3 className="text-lg font-bold text-neutral-950">{item.title}</h3>
+              <p className="mt-2 leading-relaxed text-neutral-700">{item.body}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+function WhatYouGet({ quoteLine }: { quoteLine: string }) {
+  const items = [
+    ["25 photos", "Edited listing photos. Photos only."],
+    ["20-minute shoot", "The appointment is 20 minutes. Overages are " + APPRENTICESHIP_OVERAGE_LABEL + "."],
+    ["Service area", "The Woodlands, Spring, Conroe, Willis, and Cypress."],
+    ["Price", quoteLine],
+  ];
+  return (
+    <section className="border-t border-neutral-200 px-4 py-14 md:px-8">
+      <div className="mx-auto max-w-6xl">
+        <h2 className="text-3xl font-black tracking-tight sm:text-4xl">What you get</h2>
+        <ul className="mt-8 grid gap-4 sm:grid-cols-2">
+          {items.map(([title, body]) => (
+            <li key={title} className="rounded-2xl bg-neutral-50 p-5">
+              <h3 className="text-lg font-bold">{title}</h3>
+              <p className="mt-2 leading-relaxed text-neutral-700">{body}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+function Comparison() {
+  return (
+    <section className="border-t border-neutral-200 px-4 py-14 md:px-8">
+      <div className="mx-auto max-w-6xl">
+        <h2 className="text-3xl font-black tracking-tight sm:text-4xl">$75 shoot or full service</h2>
+        <div className="mt-8 grid gap-4 md:grid-cols-2">
+          <article className="rounded-2xl border-2 border-black p-5">
+            <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#0d9488]">This page</p>
+            <h3 className="mt-2 text-2xl font-black">Apprentice 25 / $75</h3>
+            <ul className="mt-4 space-y-2 leading-relaxed text-neutral-800">
+              <li>25 photos in a 20-minute appointment</li>
+              <li>Shot by Iconic apprentices</li>
+              <li>Photos only. No aerials, video, or twilight</li>
+              <li>$75 + 2.8% processing fee ($77.10 total by card)</li>
+            </ul>
+          </article>
+          <article className="rounded-2xl border border-neutral-200 p-5">
+            <p className="text-sm font-bold uppercase tracking-[0.16em] text-neutral-500">When you need more</p>
+            <h3 className="mt-2 text-2xl font-black">Full-service packages</h3>
+            <p className="mt-4 leading-relaxed text-neutral-700">
+              Aerials, video, and twilight are on the full-service packages. This $75 shoot does not include them.
+            </p>
+            <Link to="/pricing" className="mt-4 inline-flex font-semibold underline underline-offset-4">
+              See full-service packages
+            </Link>
+          </article>
+        </div>
       </div>
     </section>
   );
@@ -493,34 +601,27 @@ function Hero({
 function HowItWorks() {
   const steps = [
     "Pick a time.",
-    "Have the home prepped (lights on, clutter put away, ready when we arrive).",
-    "The apprentice shoots for 20 minutes.",
-    "You get 25 edited photos.",
+    "Have the home prepped. Lights on, clutter put away, ready when we arrive.",
+    "The apprentice shoots for 20 minutes. You get 25 edited photos.",
   ];
   return (
-    <section id="how-it-works" className="scroll-mt-28 border-t border-neutral-200 px-4 py-16 md:scroll-mt-32 md:px-8">
+    <section id="how-it-works" className="scroll-mt-28 border-t border-neutral-200 px-4 py-14 md:scroll-mt-32 md:px-8">
       <div className="mx-auto max-w-6xl">
         <h2 className="text-3xl font-black tracking-tight sm:text-4xl">How it works</h2>
-        <ol className="mt-8 grid gap-4 md:grid-cols-2">
+        <ol className="mt-8 grid gap-4 md:grid-cols-3">
           {steps.map((step, index) => (
             <li key={step} className="rounded-2xl border border-neutral-200 p-5">
               <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#0d9488]">Step {index + 1}</p>
-              <p className="mt-2 text-lg leading-relaxed text-neutral-900">{step}</p>
+              <p className="mt-2 text-lg leading-relaxed">{step}</p>
             </li>
           ))}
         </ol>
-        <ul className="mt-8 max-w-3xl space-y-2 text-base leading-relaxed text-neutral-700">
-          {APPRENTICESHIP_RULES.map((rule) => (
-            <li key={rule}>{rule}</li>
-          ))}
+        <ul className="mt-8 max-w-3xl space-y-2 leading-relaxed text-neutral-700">
           <li>Photos only. No extra trips. No extra edits. Be prepped.</li>
           <li>Overages are {APPRENTICESHIP_OVERAGE_LABEL}.</li>
           <li>Apprentice photos aren&apos;t eligible for Iconic Polish.</li>
+          <li>Apprentices are learning. Graduates become vetted Iconic shooters.</li>
         </ul>
-        <p className="mt-8 text-base leading-relaxed text-neutral-800">
-          Need aerials, video or twilight?{" "}
-          <Link to="/pricing" className="font-semibold underline underline-offset-4">See full-service packages</Link>
-        </p>
       </div>
     </section>
   );
@@ -528,7 +629,7 @@ function HowItWorks() {
 
 function Samples() {
   return (
-    <section id="samples" className="scroll-mt-28 border-t border-neutral-200 bg-neutral-50 px-4 py-16 md:scroll-mt-32 md:px-8">
+    <section id="samples" className="scroll-mt-28 border-t border-neutral-200 bg-neutral-50 px-4 py-14 md:scroll-mt-32 md:px-8">
       <div className="mx-auto max-w-6xl">
         <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Samples</h2>
         <p className="mt-3 text-lg text-neutral-700">{RE75_SAMPLES_CAPTION}</p>
@@ -554,10 +655,59 @@ function Samples() {
   );
 }
 
+function Faq() {
+  const items = [
+    {
+      q: "Who takes the photos?",
+      a: "Iconic Images apprentices. They are learning. Graduates become vetted Iconic shooters.",
+    },
+    {
+      q: "What is included, and what is not?",
+      a: `25 edited photos from a 20-minute appointment. Photos only. No extra trips, no extra edits, and no Iconic Polish. Overages are ${APPRENTICESHIP_OVERAGE_LABEL}. Aerials, video, and twilight are on the full-service packages.`,
+    },
+    {
+      q: "How should the home be prepped?",
+      a: "Lights on, clutter put away, and the home ready when we arrive. We do not make an extra trip if it is not ready.",
+    },
+    {
+      q: "Where do you shoot, and is there a travel fee?",
+      a: `The Woodlands, Spring, and Conroe are included. ${RE75_TRAVEL_TBD_NOTE} Anywhere else: ${RE75_OUTSIDE_MESSAGE}.`,
+    },
+    {
+      q: "When do I pay?",
+      a: "The card total is on this page before you schedule: $75 plus a 2.8% processing fee, $77.10. This form saves the booking. Iconic Images invoices after the shoot, the same way our other bookings work. We confirm the requested time within 1 business day.",
+    },
+    {
+      q: "Can I reschedule?",
+      a: `Call or email us as soon as you need to move or cancel the shoot so we can adjust the calendar. If weather, access, or safety prevents the shoot, we will work with you to reschedule. ${BUSINESS_CONTACT.phoneDisplay} · ${BUSINESS_CONTACT.email}`,
+    },
+  ];
+  return (
+    <section className="border-t border-neutral-200 px-4 py-14 md:px-8">
+      <div className="mx-auto max-w-3xl">
+        <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Questions</h2>
+        <div className="mt-6 divide-y divide-neutral-200 border-y border-neutral-200">
+          {items.map((item) => (
+            <details key={item.q} className="group py-4">
+              <summary className="cursor-pointer list-none text-lg font-bold marker:content-none [&::-webkit-details-marker]:hidden">
+                <span className="flex items-start justify-between gap-4">
+                  {item.q}
+                  <span className="text-neutral-400 group-open:hidden" aria-hidden="true">+</span>
+                  <span className="hidden text-neutral-400 group-open:inline" aria-hidden="true">–</span>
+                </span>
+              </summary>
+              <p className="mt-3 leading-relaxed text-neutral-700">{item.a}</p>
+            </details>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function Schedule(props: {
   draft: Draft;
   area: RealEstate75Area;
-  areaError: string;
   formError: string;
   quote: ReturnType<typeof realEstate75Quote>;
   days: Array<[string, LiveSlot[]]>;
@@ -566,81 +716,125 @@ function Schedule(props: {
   slotsReady: boolean;
   pending: boolean;
   confirmation: BookingSubmitResult | null;
-  onAddress: () => void;
-  onDetails: () => void;
-  onTime: () => void;
-  onAgent: () => void;
   onSubmit: (event: FormEvent) => void;
   onPatch: (partial: Partial<Draft>) => void;
-  onBack: () => void;
 }) {
-  const { draft, confirmation } = props;
+  const { draft, confirmation, area } = props;
   return (
-    <section id="schedule" className="scroll-mt-28 border-t border-neutral-200 px-4 py-16 md:scroll-mt-32 md:px-8">
+    <section id="schedule" className="scroll-mt-28 border-t border-neutral-200 px-4 py-14 md:scroll-mt-32 md:px-8">
       <div className="mx-auto max-w-3xl">
-        <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Schedule now</h2>
-        <p className="mt-3 text-lg text-neutral-700">One package: {RE75_PACKAGE_NAME}.</p>
+        <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Schedule My $75 Shoot</h2>
+        <p className="mt-3 text-lg text-neutral-700">One package: {RE75_PACKAGE_NAME}. {props.quote.priceLine}</p>
         {confirmation ? (
           <div className="mt-8">
-            <p className="mb-4 text-base leading-relaxed text-neutral-800">
-              Card total {props.quote.priceLine} Payment is collected the same way as our other bookings.
+            <p className="mb-4 leading-relaxed text-neutral-800">
+              We confirm the requested time within 1 business day. Iconic Images invoices after the shoot. Card total {props.quote.priceLine}
             </p>
             <BookingConfirmation result={confirmation} onBookAnother={() => window.location.assign(RE75_PATHS.schedule)} />
           </div>
         ) : (
           <form className="mt-8 space-y-6" onSubmit={props.onSubmit}>
-            <ol className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-              {STEPS.map((label, index) => (
-                <li
-                  key={label}
-                  className={`rounded-full px-2 py-1 text-center text-xs font-semibold ${index === draft.step ? "bg-black text-white" : "bg-neutral-100 text-neutral-600"}`}
-                >
-                  {label}
-                </li>
-              ))}
-            </ol>
-            {draft.step === 0 ? (
-              <AddressStep {...props} />
-            ) : null}
-            {draft.step === 1 || draft.step === 2 ? (
-              <DetailsStep {...props} />
-            ) : null}
-            {draft.step === 3 ? <TimeStep {...props} /> : null}
-            {draft.step === 4 ? <AgentStep {...props} /> : null}
-            {draft.step === 5 ? <SummaryStep {...props} /> : null}
-            {props.formError ? <p className="text-sm font-semibold text-red-700">{props.formError}</p> : null}
-            <div className="flex flex-col gap-3 sm:flex-row">
-              {draft.step > 0 ? (
-                <button type="button" onClick={props.onBack} className="min-h-12 rounded-xl border border-neutral-300 px-5 font-semibold">
-                  Back
-                </button>
+            <div>
+              <label className="block text-sm font-semibold" htmlFor="re75-address">Property address</label>
+              <textarea
+                id="re75-address"
+                value={draft.address}
+                onChange={(event) => props.onPatch({ address: event.target.value })}
+                className={`${fieldClass()} min-h-24 scroll-mb-28`}
+                placeholder="123 Oak Dr, Spring, TX 77379"
+              />
+              {area.status === "inside" ? (
+                <p className="mt-3 text-sm text-neutral-700">
+                  {area.city}
+                  {area.travelFee === "tbd" ? `. ${RE75_TRAVEL_TBD_NOTE}` : ". Travel is included with this package."}
+                </p>
               ) : null}
-              {draft.step === 0 ? (
-                <button type="button" onClick={props.onAddress} className="min-h-12 flex-1 rounded-xl bg-black px-5 font-semibold text-white">
-                  Continue
-                </button>
-              ) : null}
-              {draft.step === 1 || draft.step === 2 ? (
-                <button type="button" onClick={props.onDetails} className="min-h-12 flex-1 rounded-xl bg-black px-5 font-semibold text-white">
-                  Continue
-                </button>
-              ) : null}
-              {draft.step === 3 ? (
-                <button type="button" onClick={props.onTime} className="min-h-12 flex-1 rounded-xl bg-black px-5 font-semibold text-white">
-                  Continue
-                </button>
-              ) : null}
-              {draft.step === 4 ? (
-                <button type="button" onClick={props.onAgent} className="min-h-12 flex-1 rounded-xl bg-black px-5 font-semibold text-white">
-                  Review
-                </button>
-              ) : null}
-              {draft.step === 5 ? (
-                <button type="submit" disabled={props.pending} className="min-h-12 flex-1 rounded-xl bg-black px-5 font-semibold text-white disabled:opacity-60">
-                  {props.pending ? "Saving…" : "Schedule this shoot"}
-                </button>
+              {area.status === "outside" && draft.address.trim().length >= 5 ? (
+                <p className="mt-3 text-sm font-semibold" data-testid="re75-outside">
+                  <a href={BUSINESS_CONTACT.phoneHref} className="underline underline-offset-4">{RE75_OUTSIDE_MESSAGE}</a>
+                </p>
               ) : null}
             </div>
+            <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+              <div>
+                <label className="block text-sm font-semibold" htmlFor="re75-sqft">Approximate square feet</label>
+                <input
+                  id="re75-sqft"
+                  inputMode="numeric"
+                  value={draft.sqft}
+                  onChange={(event) => props.onPatch({ sqft: event.target.value })}
+                  className={`${fieldClass()} scroll-mb-28`}
+                />
+              </div>
+              <fieldset>
+                <legend className="text-sm font-semibold">Occupied, vacant, or lease</legend>
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  {["Occupied", "Vacant", "Lease"].map((option) => (
+                    <label key={option} className={`flex min-h-12 items-center justify-center rounded-xl border px-2 text-sm font-semibold ${draft.occupancy === option ? "border-black bg-black text-white" : "border-neutral-300"}`}>
+                      <input
+                        type="radio"
+                        name="occupancy"
+                        value={option}
+                        checked={draft.occupancy === option}
+                        onChange={() => props.onPatch({ occupancy: option })}
+                        className="sr-only"
+                      />
+                      {option}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            </div>
+            <TimePicker {...props} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block text-sm font-semibold">
+                First name
+                <input value={draft.firstName} onChange={(event) => props.onPatch({ firstName: event.target.value })} className={`${fieldClass()} scroll-mb-28`} autoComplete="given-name" />
+              </label>
+              <label className="block text-sm font-semibold">
+                Last name
+                <input value={draft.lastName} onChange={(event) => props.onPatch({ lastName: event.target.value })} className={`${fieldClass()} scroll-mb-28`} autoComplete="family-name" />
+              </label>
+              <label className="block text-sm font-semibold sm:col-span-2">
+                Email
+                <input type="email" value={draft.email} onChange={(event) => props.onPatch({ email: event.target.value })} className={`${fieldClass()} scroll-mb-28`} autoComplete="email" />
+              </label>
+              <label className="block text-sm font-semibold">
+                Phone
+                <input type="tel" value={draft.phone} onChange={(event) => props.onPatch({ phone: event.target.value })} className={`${fieldClass()} scroll-mb-28`} autoComplete="tel" />
+              </label>
+              <label className="block text-sm font-semibold">
+                Brokerage
+                <input value={draft.brokerage} onChange={(event) => props.onPatch({ brokerage: event.target.value })} className={`${fieldClass()} scroll-mb-28`} />
+              </label>
+            </div>
+            <div className="space-y-3 rounded-2xl border border-neutral-200 p-5">
+              <h3 className="text-xl font-black">{RE75_PACKAGE_NAME}</h3>
+              <p className="flex items-center justify-between gap-4">
+                <span>Package</span>
+                <MoneyAmount>${props.quote.subtotal.toFixed(2)}</MoneyAmount>
+              </p>
+              {props.quote.processing > 0 ? (
+                <p className="flex items-center justify-between gap-4">
+                  <span>Processing (2.8%)</span>
+                  <MoneyAmount>${props.quote.processing.toFixed(2)}</MoneyAmount>
+                </p>
+              ) : null}
+              <p className="flex items-center justify-between gap-4 text-lg font-black">
+                <span>Total by card</span>
+                <MoneyAmount>${props.quote.total.toFixed(2)}</MoneyAmount>
+              </p>
+              <p className="text-sm leading-relaxed text-neutral-700">{props.quote.priceLine}</p>
+              {area.status === "inside" && area.travelFee === "tbd" ? (
+                <p className="text-sm leading-relaxed text-neutral-700">{RE75_TRAVEL_TBD_NOTE}</p>
+              ) : (
+                <p className="text-sm leading-relaxed text-neutral-700">Travel is included for The Woodlands, Spring, and Conroe.</p>
+              )}
+            </div>
+            {props.formError ? <p className="text-sm font-semibold text-red-700">{props.formError}</p> : null}
+            <button type="submit" disabled={props.pending} className="min-h-14 w-full rounded-xl bg-black px-5 text-lg font-semibold text-white disabled:opacity-60">
+              {props.pending ? "Saving…" : "Schedule My $75 Shoot"}
+            </button>
           </form>
         )}
       </div>
@@ -648,77 +842,7 @@ function Schedule(props: {
   );
 }
 
-function AddressStep({ draft, area, areaError, onPatch }: {
-  draft: Draft;
-  area: RealEstate75Area;
-  areaError: string;
-  onPatch: (partial: Partial<Draft>) => void;
-}) {
-  return (
-    <div>
-      <label className="block text-sm font-semibold" htmlFor="re75-address">Property address</label>
-      <textarea
-        id="re75-address"
-        value={draft.address}
-        onChange={(event) => onPatch({ address: event.target.value })}
-        className={`${fieldClass()} min-h-24`}
-        placeholder="123 Oak Dr, Spring, TX 77379"
-      />
-      {area.status === "inside" ? (
-        <p className="mt-3 text-sm text-neutral-700">
-          {area.city}
-          {area.travelFee === "tbd" ? `. ${RE75_TRAVEL_TBD_NOTE}` : ". Travel is included with this package."}
-        </p>
-      ) : null}
-      {area.status === "outside" && draft.address.trim().length >= 5 ? (
-        <p className="mt-3 text-sm font-semibold" data-testid="re75-outside">
-          <a href={BUSINESS_CONTACT.phoneHref} className="underline underline-offset-4">{RE75_OUTSIDE_MESSAGE}</a>
-        </p>
-      ) : areaError ? (
-        <p className="mt-3 text-sm font-semibold">
-          <a href={BUSINESS_CONTACT.phoneHref} className="underline underline-offset-4">{areaError}</a>
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function DetailsStep({ draft, onPatch }: { draft: Draft; onPatch: (partial: Partial<Draft>) => void }) {
-  return (
-    <div className="space-y-5">
-      <div>
-        <label className="block text-sm font-semibold" htmlFor="re75-sqft">Approximate square feet</label>
-        <input
-          id="re75-sqft"
-          inputMode="numeric"
-          value={draft.sqft}
-          onChange={(event) => onPatch({ sqft: event.target.value, step: 1 })}
-          className={fieldClass()}
-        />
-      </div>
-      <fieldset>
-        <legend className="text-sm font-semibold">Occupied, vacant, or lease</legend>
-        <div className="mt-2 grid gap-2 sm:grid-cols-3">
-          {["Occupied", "Vacant", "Lease"].map((option) => (
-            <label key={option} className={`flex min-h-12 items-center justify-center rounded-xl border px-3 text-sm font-semibold ${draft.occupancy === option ? "border-black bg-black text-white" : "border-neutral-300"}`}>
-              <input
-                type="radio"
-                name="occupancy"
-                value={option}
-                checked={draft.occupancy === option}
-                onChange={() => onPatch({ occupancy: option, step: 2 })}
-                className="sr-only"
-              />
-              {option}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-    </div>
-  );
-}
-
-function TimeStep({
+function TimePicker({
   draft,
   days,
   daySlots,
@@ -735,17 +859,13 @@ function TimeStep({
 }) {
   return (
     <div>
-      <p className="text-sm leading-relaxed text-neutral-700">
+      <p className="text-sm font-semibold">Date and time</p>
+      <p className="mt-1 text-sm leading-relaxed text-neutral-700">
         {slotsLive
-          ? "20-minute openings from the same calendar as our other bookings. Weekdays 8:00–5:00, Saturday 9:00–12:00, Sunday closed."
+          ? "20-minute openings. Weekdays 8:00–5:00, Saturday 9:00–12:00, Sunday closed."
           : slotsReady
-            ? (
-              <>
-                The calendar is not listing openings right now. Pick a requested time and we will confirm it, or{" "}
-                <a href={BUSINESS_CONTACT.phoneHref} className="font-semibold underline underline-offset-4">{RE75_OUTSIDE_MESSAGE}</a>.
-              </>
-            )
-            : "Checking the calendar…"}
+            ? "The calendar is not listing openings right now. Pick a requested time and we will confirm it."
+            : "Add an address in the service area to see times."}
       </p>
       {slotsReady ? (
         <>
@@ -774,76 +894,42 @@ function TimeStep({
             ))}
           </div>
         </>
-      ) : (
-        <p className="mt-4 text-sm text-neutral-600">Checking the calendar…</p>
-      )}
+      ) : null}
     </div>
   );
 }
 
-function AgentStep({ draft, onPatch }: { draft: Draft; onPatch: (partial: Partial<Draft>) => void }) {
+function FinalCta({ href, quoteLine }: { href: (path: string) => string; quoteLine: string }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      <label className="block text-sm font-semibold">
-        First name
-        <input value={draft.firstName} onChange={(event) => onPatch({ firstName: event.target.value })} className={fieldClass()} autoComplete="given-name" />
-      </label>
-      <label className="block text-sm font-semibold">
-        Last name
-        <input value={draft.lastName} onChange={(event) => onPatch({ lastName: event.target.value })} className={fieldClass()} autoComplete="family-name" />
-      </label>
-      <label className="block text-sm font-semibold sm:col-span-2">
-        Email
-        <input type="email" value={draft.email} onChange={(event) => onPatch({ email: event.target.value })} className={fieldClass()} autoComplete="email" />
-      </label>
-      <label className="block text-sm font-semibold">
-        Phone
-        <input type="tel" value={draft.phone} onChange={(event) => onPatch({ phone: event.target.value })} className={fieldClass()} autoComplete="tel" />
-      </label>
-      <label className="block text-sm font-semibold">
-        Brokerage
-        <input value={draft.brokerage} onChange={(event) => onPatch({ brokerage: event.target.value })} className={fieldClass()} />
-      </label>
-    </div>
-  );
-}
-
-function SummaryStep({ draft, area, quote }: {
-  draft: Draft;
-  area: RealEstate75Area;
-  quote: ReturnType<typeof realEstate75Quote>;
-}) {
-  return (
-    <div className="space-y-3 rounded-2xl border border-neutral-200 p-5">
-      <h3 className="text-xl font-black">{RE75_PACKAGE_NAME}</h3>
-      <p>{draft.address}</p>
-      <p>{draft.sqft} sq ft · {draft.occupancy}</p>
-      <p>{draft.slotDate} · {draft.slotTime}</p>
-      <p>{draft.firstName} {draft.lastName} · {draft.brokerage}</p>
-      <p>{draft.email} · {draft.phone}</p>
-      <div className="border-t border-neutral-200 pt-3">
-        <p className="flex items-center justify-between gap-4">
-          <span>Package</span>
-          <MoneyAmount>${quote.subtotal.toFixed(2)}</MoneyAmount>
-        </p>
-        {quote.processing > 0 ? (
-          <p className="mt-2 flex items-center justify-between gap-4">
-            <span>Processing (2.8%)</span>
-            <MoneyAmount>${quote.processing.toFixed(2)}</MoneyAmount>
-          </p>
-        ) : null}
-        <p className="mt-3 flex items-center justify-between gap-4 text-lg font-black">
-          <span>Total by card</span>
-          <MoneyAmount>${quote.total.toFixed(2)}</MoneyAmount>
-        </p>
-        <p className="mt-3 text-sm leading-relaxed text-neutral-700">{quote.priceLine}</p>
-        {area.status === "inside" && area.travelFee === "tbd" ? (
-          <p className="mt-3 text-sm leading-relaxed text-neutral-700">{RE75_TRAVEL_TBD_NOTE}</p>
-        ) : (
-          <p className="mt-3 text-sm leading-relaxed text-neutral-700">Travel is included for The Woodlands, Spring, and Conroe.</p>
-        )}
+    <section className="border-t border-neutral-200 bg-neutral-950 px-4 py-16 text-white md:px-8">
+      <div className="mx-auto max-w-3xl text-center">
+        <h2 className="text-3xl font-black tracking-tight sm:text-5xl">Schedule the $75 shoot</h2>
+        <p className="mt-4 text-lg text-neutral-200">{quoteLine}</p>
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+          <Link
+            to={href(RE75_PATHS.schedule)}
+            className="inline-flex min-h-14 items-center justify-center rounded-xl bg-white px-8 text-lg font-semibold text-black hover:bg-neutral-200"
+          >
+            Schedule My $75 Shoot
+          </Link>
+          <a
+            href={BUSINESS_CONTACT.phoneHref}
+            className="inline-flex min-h-14 items-center justify-center rounded-xl border border-white/40 px-8 text-lg font-semibold text-white hover:bg-white/10"
+          >
+            Call {BUSINESS_CONTACT.phoneDisplay}
+          </a>
+        </div>
       </div>
-    </div>
+    </section>
+  );
+}
+
+function ReviewsSlot() {
+  return (
+    <section id="reviews" hidden data-review-slot="awaiting-real-reviews">
+      <h2>Client reviews</h2>
+      <p>Hidden until real client reviews are added. Do not invent testimonials, counts, stars, or guarantees.</p>
+    </section>
   );
 }
 
@@ -860,5 +946,27 @@ function PageContact() {
         <a href={BUSINESS_CONTACT.emailHref} className="font-semibold underline underline-offset-4">{BUSINESS_CONTACT.email}</a>
       </p>
     </footer>
+  );
+}
+
+function MobileBar({ href, hidden }: { href: (path: string) => string; hidden: boolean }) {
+  if (hidden) return null;
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-200 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(0,0,0,0.06)] md:hidden">
+      <div className="mx-auto flex max-w-lg gap-2">
+        <Link
+          to={href(RE75_PATHS.schedule)}
+          className="inline-flex min-h-12 flex-1 items-center justify-center rounded-xl bg-black px-3 text-sm font-semibold text-white"
+        >
+          Schedule
+        </Link>
+        <a
+          href={BUSINESS_CONTACT.phoneHref}
+          className="inline-flex min-h-12 flex-1 items-center justify-center rounded-xl border border-neutral-300 px-3 text-sm font-semibold text-neutral-950"
+        >
+          Call
+        </a>
+      </div>
+    </div>
   );
 }
