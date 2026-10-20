@@ -2,11 +2,14 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { MoneyAmount } from "@/components/MoneyAmount";
 import { BookingConfirmation } from "@/components/BookingConfirmation";
+import ApprenticeSchedulePicker from "@/components/ApprenticeSchedulePicker";
+import PropertyAddressField from "@/components/PropertyAddressField";
 import { createOrder } from "@/lib/createOrder";
 import { readClientNotificationsLive, type BookingSubmitResult } from "@/lib/bookingFollowUp";
 import { trackConversion } from "@/lib/tracking";
 import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "@shared/businessContact";
 import { APPRENTICESHIP_OVERAGE_LABEL } from "@shared/bookingCatalog";
+import type { PickedServiceLocation } from "@shared/serviceLocation";
 import {
   RE75_LEAD_SOURCE,
   RE75_OUTSIDE_MESSAGE,
@@ -14,10 +17,11 @@ import {
   RE75_PATHS,
   RE75_GALLERY_CAPTION,
   RE75_GALLERY_DISCLAIMER,
+  RE75_TIME_MESSAGE,
   RE75_TRAVEL_TBD_NOTE,
   classifyRealEstate75Area,
   isRealEstate75PackageId,
-  openRealEstate75Slots,
+  realEstate75AppointmentChoice,
   realEstate75Package,
   realEstate75Quote,
   sanitizeGclid,
@@ -26,7 +30,6 @@ import {
   type RealEstate75Package,
   type RealEstate75PackageId,
 } from "@shared/realestate75";
-import type { ApprenticeshipSlot } from "@shared/apprenticeship";
 
 const GCLID_KEY = "re75-gclid";
 const DRAFT_KEY = "re75-booking-draft";
@@ -58,14 +61,12 @@ const LISTING_GALLERY = [
   height: item.height,
 }));
 
-type LiveSlot = ApprenticeshipSlot & { photographerId?: string; photographerName?: string };
-
 interface Draft {
   packageId: RealEstate75PackageId;
   address: string;
+  servicePlace: PickedServiceLocation | null;
   sqft: string;
   occupancy: string;
-  slotStart: string;
   slotDate: string;
   slotTime: string;
   firstName: string;
@@ -78,9 +79,9 @@ interface Draft {
 const EMPTY_DRAFT: Draft = {
   packageId: "apprentice-25",
   address: "",
+  servicePlace: null,
   sqft: "",
   occupancy: "",
-  slotStart: "",
   slotDate: "",
   slotTime: "",
   firstName: "",
@@ -95,7 +96,10 @@ function readDraft(): Draft {
   try {
     const parsed = JSON.parse(sessionStorage.getItem(DRAFT_KEY) || "") as Partial<Draft>;
     const packageId = isRealEstate75PackageId(parsed.packageId) ? parsed.packageId : EMPTY_DRAFT.packageId;
-    return { ...EMPTY_DRAFT, ...parsed, packageId };
+    const servicePlace = parsed.servicePlace && parsed.servicePlace.placeId && parsed.servicePlace.formatted
+      ? parsed.servicePlace
+      : null;
+    return { ...EMPTY_DRAFT, ...parsed, packageId, servicePlace };
   } catch {
     return EMPTY_DRAFT;
   }
@@ -122,9 +126,6 @@ export default function RealEstate75() {
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [processingOn, setProcessingOn] = useState(true);
   const [formError, setFormError] = useState("");
-  const [slots, setSlots] = useState<LiveSlot[]>([]);
-  const [slotsLive, setSlotsLive] = useState(false);
-  const [slotsReady, setSlotsReady] = useState(false);
   const [pending, setPending] = useState(false);
   const [confirmation, setConfirmation] = useState<BookingSubmitResult | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -155,7 +156,7 @@ export default function RealEstate75() {
     setDraft((current) => (
       current.packageId === fromUrl
         ? current
-        : { ...current, packageId: fromUrl, slotStart: "", slotTime: "" }
+        : { ...current, packageId: fromUrl, slotTime: "" }
     ));
   }, [hydrated, location.search]);
 
@@ -187,46 +188,13 @@ export default function RealEstate75() {
   }, []);
 
   useEffect(() => {
-    if (area.status !== "inside") {
-      setSlots([]);
-      setSlotsLive(false);
-      setSlotsReady(false);
-      return;
-    }
+    if (area.status !== "inside") return;
     if (!formStarted.current && !sessionStorage.getItem("re75-form-start")) {
       formStarted.current = true;
       sessionStorage.setItem("re75-form-start", "1");
       trackConversion({ name: "re75_form_start", packageId: draft.packageId });
     }
-    setSlots([]);
-    setSlotsLive(false);
-    setSlotsReady(false);
-    const address = draft.address;
-    const packageId = draft.packageId;
-    let cancelled = false;
-    const timer = window.setTimeout(() => {
-      const params = new URLSearchParams({ address, package: packageId });
-      fetch(`/api/bookings/realestate-75/slots?${params.toString()}`)
-        .then((response) => (response.ok ? response.json() : null))
-        .then((data: { live?: boolean; slots?: LiveSlot[] } | null) => {
-          if (cancelled) return;
-          const live = data?.live === true;
-          setSlotsLive(live);
-          setSlots(live && Array.isArray(data?.slots) ? data.slots : []);
-          setSlotsReady(true);
-        })
-        .catch(() => {
-          if (cancelled) return;
-          setSlotsLive(false);
-          setSlots([]);
-          setSlotsReady(true);
-        });
-    }, 350);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [area.status, draft.address, draft.packageId]);
+  }, [area.status, draft.packageId]);
 
   useEffect(() => {
     if (!confirmation) return;
@@ -328,26 +296,6 @@ export default function RealEstate75() {
     setDraft((current) => ({ ...current, ...partial }));
   }
 
-  const days = useMemo(() => {
-    const source = slotsLive || !slotsReady
-      ? slots
-      : openRealEstate75Slots({ now: new Date(), durationMinutes: pkg.durationMinutes });
-    const groups = new Map<string, LiveSlot[]>();
-    for (const slot of source) {
-      const list = groups.get(slot.date) || [];
-      list.push(slot);
-      groups.set(slot.date, list);
-    }
-    return [...groups.entries()];
-  }, [slots, slotsLive, slotsReady, pkg.durationMinutes]);
-
-  const daySlots = days.find(([date]) => date === draft.slotDate)?.[1] || [];
-
-  useEffect(() => {
-    if (draft.slotDate || !days.length) return;
-    setDraft((current) => (current.slotDate ? current : { ...current, slotDate: days[0][0] }));
-  }, [draft.slotDate, days]);
-
   async function submitBooking(event: FormEvent) {
     event.preventDefault();
     const current = classifyRealEstate75Area(draft.address);
@@ -364,12 +312,13 @@ export default function RealEstate75() {
       setFormError("Tell us if the home is occupied, vacant, or a lease.");
       return;
     }
-    if (slotsLive && !draft.slotStart) {
-      setFormError("Pick an open time.");
-      return;
-    }
-    if (!slotsLive && !draft.slotTime) {
-      setFormError(`Open times are not on the calendar right now. ${RE75_OUTSIDE_MESSAGE}`);
+    const appointment = realEstate75AppointmentChoice({
+      date: draft.slotDate,
+      time: draft.slotTime,
+      durationMinutes: pkg.durationMinutes,
+    });
+    if (!appointment) {
+      setFormError(RE75_TIME_MESSAGE);
       return;
     }
     if (!draft.firstName.trim() || !draft.lastName.trim()) {
@@ -398,16 +347,15 @@ export default function RealEstate75() {
           email: draft.email.trim(),
           phone: draft.phone.trim(),
           address: draft.address.trim(),
+          servicePlace: draft.servicePlace,
           sqft: draft.sqft.replace(/,/g, ""),
           propertyStatus: draft.occupancy,
           furnishingStatus: draft.occupancy === "Vacant" ? "Vacant" : "Furnished",
           accessMethod: "Not collected on this form",
-          serviceDate: draft.slotDate,
-          serviceTime: draft.slotTime,
-          slotStart: slotsLive ? draft.slotStart : "",
-          photographerId: slotsLive
-            ? slots.find((slot) => slot.start === draft.slotStart)?.photographerId || ""
-            : "",
+          serviceDate: appointment.date,
+          serviceTime: appointment.time,
+          slotStart: "",
+          photographerId: "",
           leadSource: RE75_LEAD_SOURCE,
           gclid,
           brokerage: draft.brokerage.trim(),
@@ -466,10 +414,6 @@ export default function RealEstate75() {
           area={area}
           formError={formError}
           quote={quote}
-          days={days}
-          daySlots={daySlots}
-          slotsLive={slotsLive}
-          slotsReady={slotsReady}
           pending={pending}
           confirmation={confirmation}
           onSubmit={submitBooking}
@@ -860,10 +804,6 @@ function Schedule(props: {
   area: RealEstate75Area;
   formError: string;
   quote: ReturnType<typeof realEstate75Quote>;
-  days: Array<[string, LiveSlot[]]>;
-  daySlots: LiveSlot[];
-  slotsLive: boolean;
-  slotsReady: boolean;
   pending: boolean;
   confirmation: BookingSubmitResult | null;
   onSubmit: (event: FormEvent) => void;
@@ -899,7 +839,6 @@ function Schedule(props: {
                       checked={draft.packageId === item.id}
                       onChange={() => props.onPatch({
                         packageId: item.id,
-                        slotStart: "",
                         slotTime: "",
                       })}
                       className="sr-only"
@@ -914,12 +853,11 @@ function Schedule(props: {
             </fieldset>
             <div>
               <label className="block text-sm font-semibold" htmlFor="re75-address">Property address</label>
-              <textarea
+              <PropertyAddressField
                 id="re75-address"
                 value={draft.address}
-                onChange={(event) => props.onPatch({ address: event.target.value })}
-                className={`${fieldClass()} min-h-24 scroll-mb-28`}
-                placeholder="123 Oak Dr, Spring, TX 77379"
+                onChange={({ address, place }) => props.onPatch({ address, servicePlace: place })}
+                className={`${fieldClass()} scroll-mb-28`}
               />
               {area.status === "inside" ? (
                 <p className="mt-3 text-sm text-neutral-700">
@@ -963,15 +901,11 @@ function Schedule(props: {
                 </div>
               </fieldset>
             </div>
-            <TimePicker
-              draft={draft}
-              pkg={pkg}
-              days={props.days}
-              daySlots={props.daySlots}
-              slotsLive={props.slotsLive}
-              slotsReady={props.slotsReady}
-              checking={area.status === "inside" && !props.slotsReady}
-              onPatch={props.onPatch}
+            <ApprenticeSchedulePicker
+              date={draft.slotDate}
+              time={draft.slotTime}
+              durationMinutes={pkg.durationMinutes}
+              onChange={({ date, time }) => props.onPatch({ slotDate: date, slotTime: time })}
             />
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block text-sm font-semibold">
@@ -1027,72 +961,6 @@ function Schedule(props: {
         )}
       </div>
     </section>
-  );
-}
-
-function TimePicker({
-  draft,
-  pkg,
-  days,
-  daySlots,
-  slotsLive,
-  slotsReady,
-  checking,
-  onPatch,
-}: {
-  draft: Draft;
-  pkg: RealEstate75Package;
-  days: Array<[string, LiveSlot[]]>;
-  daySlots: LiveSlot[];
-  slotsLive: boolean;
-  slotsReady: boolean;
-  checking: boolean;
-  onPatch: (partial: Partial<Draft>) => void;
-}) {
-  const lastWeekday = pkg.durationMinutes === 60 ? "4:00" : "4:40";
-  const lastSaturday = pkg.durationMinutes === 60 ? "11:00" : "11:40";
-  const length = pkg.durationMinutes === 60 ? "1-hour" : "20-minute";
-  return (
-    <div>
-      <p className="text-sm font-semibold">Date and time</p>
-      <p className="mt-1 text-sm leading-relaxed text-neutral-700">
-        {slotsLive
-          ? `${length} openings. Weekdays 8:00–5:00 (last start ${lastWeekday}), Saturday 9:00–12:00 (last start ${lastSaturday}), Sunday closed.`
-          : slotsReady
-            ? `The calendar is not listing openings right now. Pick a requested ${length} time and we will confirm it.`
-            : checking
-              ? "Checking open times."
-              : "Add an address in the service area to see times."}
-      </p>
-      {slotsReady ? (
-        <>
-          <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
-            {days.map(([date, list]) => (
-              <button
-                key={date}
-                type="button"
-                onClick={() => onPatch({ slotDate: date, slotStart: "", slotTime: "" })}
-                className={`shrink-0 rounded-xl border px-3 py-2 text-sm font-semibold ${draft.slotDate === date ? "border-black bg-black text-white" : "border-neutral-300"}`}
-              >
-                {list[0]?.label.split(" · ")[0] || date}
-              </button>
-            ))}
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {daySlots.map((slot) => (
-              <button
-                key={slot.start}
-                type="button"
-                onClick={() => onPatch({ slotStart: slotsLive ? slot.start : "", slotDate: slot.date, slotTime: slot.time })}
-                className={`min-h-12 rounded-xl border text-sm font-semibold ${draft.slotTime === slot.time && draft.slotDate === slot.date ? "border-black bg-black text-white" : "border-neutral-300"}`}
-              >
-                {slot.time}
-              </button>
-            ))}
-          </div>
-        </>
-      ) : null}
-    </div>
   );
 }
 

@@ -4,10 +4,13 @@ import {
   RE75_OUTSIDE_MESSAGE,
   RE75_PACKAGE_NAME,
   RE75_SUBTOTAL,
+  RE75_TIME_MESSAGE,
   classifyRealEstate75Area,
   isRealEstate75Holiday,
   isRealEstate75PackageId,
   openRealEstate75Slots,
+  realEstate75AppointmentChoice,
+  realEstate75OpenSchedule,
   realEstate75Package,
   realEstate75Quote,
   realEstate75Week,
@@ -193,5 +196,77 @@ describe("real estate $75 slots", () => {
       horizonDays: 10,
     }).filter((slot) => slot.date === "2027-12-24" || slot.date === "2027-12-25");
     expect(christmas).toEqual([]);
+  });
+});
+
+describe("real estate $75 requested appointment", () => {
+  const now = new Date("2026-10-20T15:00:00.000Z");
+
+  function times(date: string, durationMinutes: number) {
+    return realEstate75OpenSchedule({ now, durationMinutes }).find((day) => day.date === date)?.times || [];
+  }
+
+  it("offers weekday starts from 8:00 through 4:40 and nothing on Sunday", () => {
+    const wednesday = times("2026-10-21", 20);
+    expect(wednesday[0]).toBe("8:00 AM");
+    expect(wednesday[wednesday.length - 1]).toBe("4:40 PM");
+    expect(wednesday).not.toContain("5:00 PM");
+    expect(times("2026-10-25", 20)).toEqual([]);
+    expect(times("2026-10-25", 60)).toEqual([]);
+  });
+
+  it("limits Saturday to starts before noon", () => {
+    expect(times("2026-10-24", 20)[times("2026-10-24", 20).length - 1]).toBe("11:40 AM");
+    expect(times("2026-10-24", 20)).not.toContain("12:00 PM");
+    expect(times("2026-10-24", 60)).toEqual(["9:00 AM", "10:00 AM", "11:00 AM"]);
+  });
+
+  it("accepts a requested clock time and the label the order form stores", () => {
+    expect(realEstate75AppointmentChoice({
+      date: "2026-10-21",
+      time: "9:00 AM",
+      durationMinutes: 20,
+      now,
+    })).toEqual({ date: "2026-10-21", time: "9:00 AM" });
+    expect(realEstate75AppointmentChoice({
+      date: "Oct 21, 2026",
+      time: "4:00 PM",
+      durationMinutes: 60,
+      now,
+    })).toEqual({ date: "2026-10-21", time: "4:00 PM" });
+    expect(realEstate75AppointmentChoice({
+      date: "2026-10-24",
+      time: "11:00 AM",
+      durationMinutes: 60,
+      now,
+    })).toEqual({ date: "2026-10-24", time: "11:00 AM" });
+  });
+
+  it("rejects Sunday, Saturday noon, and a Saturday hour that would end after noon", () => {
+    expect(RE75_TIME_MESSAGE).toMatch(/Sunday/);
+    expect(realEstate75AppointmentChoice({
+      date: "2026-10-25",
+      time: "10:00 AM",
+      durationMinutes: 20,
+      now,
+    })).toBeNull();
+    expect(realEstate75AppointmentChoice({
+      date: "2026-10-24",
+      time: "12:00 PM",
+      durationMinutes: 20,
+      now,
+    })).toBeNull();
+    expect(realEstate75AppointmentChoice({
+      date: "2026-10-24",
+      time: "11:40 AM",
+      durationMinutes: 60,
+      now,
+    })).toBeNull();
+    expect(realEstate75AppointmentChoice({
+      date: "2026-10-21",
+      time: "5:00 PM",
+      durationMinutes: 20,
+      now,
+    })).toBeNull();
   });
 });

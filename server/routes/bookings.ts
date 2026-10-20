@@ -52,9 +52,11 @@ import {
 import {
   RE75_LEAD_SOURCE,
   RE75_OUTSIDE_MESSAGE,
+  RE75_TIME_MESSAGE,
   classifyRealEstate75Area,
   isRealEstate75PackageId,
   quoteRealEstate75Travel,
+  realEstate75AppointmentChoice,
   realEstate75Package,
   sanitizeGclid,
 } from "../../shared/realestate75";
@@ -279,6 +281,18 @@ router.post("/", async (req, res) => {
     // That is not a calendar slot. Save it for the office to confirm, and do not
     // ask Google Calendar first. /book still has to pick an open time when live.
     const preferredWindow = isPreferredWindowBooking(req.body);
+    const postedSlotStart = typeof req.body.slotStart === "string" ? req.body.slotStart.trim() : "";
+    // The apprentice order form asks for a date and time. The office confirms it
+    // and assigns the photographer. It is not a live calendar hold.
+    const apprenticeRequest = Boolean(realEstate75Lead && !postedSlotStart);
+    if (apprenticeRequest) {
+      const requested = realEstate75AppointmentChoice({
+        date: scheduledDate,
+        time: scheduledTime,
+        durationMinutes: realEstate75Package(resolved.selectedBasics[0]).durationMinutes,
+      });
+      if (!requested) return res.status(400).json({ error: RE75_TIME_MESSAGE });
+    }
     let availability: Awaited<ReturnType<typeof readBookingAvailability>> = {
       live: false,
       slots: [],
@@ -286,7 +300,7 @@ router.post("/", async (req, res) => {
       bufferMinutes: 30,
       driveMode: "buffer",
     };
-    if (!preferredWindow) {
+    if (!preferredWindow && !apprenticeRequest) {
       try {
         availability = realEstate75Lead
           ? await readRealEstate75Availability({
@@ -304,11 +318,13 @@ router.post("/", async (req, res) => {
         console.error("[Bookings] Availability check failed — keeping the standard time list:", err);
       }
     }
-    const decision = resolveBookingAssignment({
-      live: preferredWindow ? false : availability.live,
-      slotStart: typeof req.body.slotStart === "string" ? req.body.slotStart : "",
-      slots: availability.slots,
-    });
+    const decision = apprenticeRequest
+      ? { ok: true as const, slot: null }
+      : resolveBookingAssignment({
+        live: preferredWindow ? false : availability.live,
+        slotStart: postedSlotStart,
+        slots: availability.slots,
+      });
     if (decision.ok === false) return res.status(decision.status).json({ error: decision.error });
 
     let reservedOrderNumber: string | null = null;

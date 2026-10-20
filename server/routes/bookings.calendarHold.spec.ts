@@ -141,6 +141,7 @@ vi.mock("../services/bookingListing", () => ({
   ensureBookingListingForRequest: vi.fn(async () => null),
 }));
 
+import { realEstate75OpenSchedule } from "../../shared/realestate75";
 import { chicagoDateKey, SOCIAL_RATE_BY_DATE } from "../../shared/thankfulEvent";
 import bookingsRouter, { resetPublicBookingRateLimit } from "./bookings";
 
@@ -381,6 +382,102 @@ describe("public booking calendar hold", () => {
     expect(listed.status).toBe(401);
     expect(listedBody).toEqual({ error: "No authentication token provided." });
     expect(sent.some((message) => message.subject?.includes("password") || message.html.includes("setup"))).toBe(false);
+  });
+
+  it("saves an apprentice date and time without a live slot or a photographer", async () => {
+    const weekday = realEstate75OpenSchedule({ durationMinutes: 20 })
+      .find((day) => new Date(`${day.date}T00:00:00Z`).getUTCDay() !== 6);
+    expect(weekday?.times.length).toBeGreaterThan(0);
+    const response = await fetch(`${baseUrl}/api/bookings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        firstName: "Ada",
+        lastName: "Lovelace",
+        email: "ada@example.com",
+        phone: "281-555-0199",
+        address: "100 Oak St, Spring, TX 77380",
+        selectedBasics: ["apprentice-25"],
+        scheduledDate: weekday?.date,
+        scheduledTime: weekday?.times[0],
+        leadSource: "Real Estate $75 apprentice (Google Ads)",
+        brokerage: "Iconic Realty",
+        squareFootage: "1800",
+        propertyStatus: "Vacant",
+      }),
+    });
+    const body = await response.json();
+    const saved = savedOrder();
+
+    expect(response.status).toBe(201);
+    expect(body.success).toBe(true);
+    expect(saved.scheduledDate).toBe(weekday?.date);
+    expect(saved.scheduledTime).toBe(weekday?.times[0]);
+    expect(saved.calendarHold).toBe("none");
+    expect(saved.assignedPhotographerName).toBeNull();
+    expect(saved.bookingPhotographerId).toBeNull();
+    expect(availability).not.toHaveBeenCalled();
+    expect(createHold).not.toHaveBeenCalled();
+    expect(JSON.stringify(saved)).not.toContain("Mike Luna");
+  });
+
+  it("rejects an apprentice Sunday and a Saturday time after noon", async () => {
+    const todayKey = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Chicago",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+    const [year, month, day] = todayKey.split("-").map(Number);
+    let sundayKey = "";
+    for (let offset = 0; offset < 14; offset += 1) {
+      const next = new Date(Date.UTC(year, month - 1, day + offset));
+      if (next.getUTCDay() !== 0) continue;
+      sundayKey = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
+      break;
+    }
+    const sunday = await fetch(`${baseUrl}/api/bookings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        firstName: "Ada",
+        lastName: "Lovelace",
+        email: "ada@example.com",
+        phone: "281-555-0199",
+        address: "100 Oak St, Spring, TX 77380",
+        selectedBasics: ["apprentice-25"],
+        scheduledDate: sundayKey,
+        scheduledTime: "10:00 AM",
+        leadSource: "Real Estate $75 apprentice (Google Ads)",
+      }),
+    });
+    const sundayBody = await sunday.json();
+    expect(sunday.status).toBe(400);
+    expect(sundayBody.error).toMatch(/Sunday/);
+    expect(docs("orderRequests").size).toBe(0);
+    expect(createHold).not.toHaveBeenCalled();
+
+    const saturday = realEstate75OpenSchedule({ durationMinutes: 60 })
+      .find((entry) => new Date(`${entry.date}T00:00:00Z`).getUTCDay() === 6);
+    const noon = await fetch(`${baseUrl}/api/bookings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        firstName: "Ada",
+        lastName: "Lovelace",
+        email: "ada@example.com",
+        phone: "281-555-0199",
+        address: "100 Oak St, Spring, TX 77380",
+        selectedBasics: ["apprentice-50"],
+        scheduledDate: saturday?.date || sundayKey,
+        scheduledTime: "12:00 PM",
+        leadSource: "Real Estate $75 apprentice (Google Ads)",
+      }),
+    });
+    const noonBody = await noon.json();
+    expect(noon.status).toBe(400);
+    expect(noonBody.error).toMatch(/Saturday/);
+    expect(docs("orderRequests").size).toBe(0);
   });
 
   it("still requires an open time on /book when the calendar is live", async () => {
