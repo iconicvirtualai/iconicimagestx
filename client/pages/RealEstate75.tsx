@@ -34,44 +34,28 @@ const DRAFT_KEY = "re75-booking-draft";
 const CONVERSION_PREFIX = "re75-conversion-";
 const HERO_ALT = "25 listing photos for $75, 20-minute shoot by Iconic apprentices";
 
-/** Recent listing photos. Append more files here, up to about 12. */
+/** Twelve listing photos, in file order. Cities come from the shoot notes. Unknown cities stay off the alt text. */
 const LISTING_GALLERY = [
-  {
-    src: "/realestate-75/gallery/pool-backyard.jpg",
-    webp: "/realestate-75/gallery/pool-backyard.webp",
-    alt: "Pool and backyard at a Spring listing",
-    width: 1200,
-    height: 801,
-  },
-  {
-    src: "/realestate-75/gallery/kitchen.jpg",
-    webp: "/realestate-75/gallery/kitchen.webp",
-    alt: "Kitchen at a Spring listing",
-    width: 1200,
-    height: 801,
-  },
-  {
-    src: "/realestate-75/gallery/living-room.jpg",
-    webp: "/realestate-75/gallery/living-room.webp",
-    alt: "Living room at a Spring listing",
-    width: 1200,
-    height: 801,
-  },
-  {
-    src: "/realestate-75/gallery/lake-view.jpg",
-    webp: "/realestate-75/gallery/lake-view.webp",
-    alt: "Living room with a lake view at a Conroe listing",
-    width: 1200,
-    height: 801,
-  },
-  {
-    src: "/realestate-75/gallery/outdoor-living.jpg",
-    webp: "/realestate-75/gallery/outdoor-living.webp",
-    alt: "Covered outdoor living area at a Spring listing",
-    width: 1200,
-    height: 801,
-  },
-] as const;
+  { file: "01-front-exterior-spring", alt: "Front exterior of a Spring listing", height: 1069 },
+  { file: "02-front-exterior-new-country-dr", alt: "Front exterior of a listing home", height: 1067 },
+  { file: "03-front-exterior-stetson-heights", alt: "Front exterior of a listing home", height: 1068 },
+  { file: "04-kitchen-cypress", alt: "Kitchen at a Cypress listing", height: 1069 },
+  { file: "05-kitchen-new-country-dr", alt: "Kitchen at a listing home", height: 1066 },
+  { file: "06-living-room-spring", alt: "Living room at a Spring listing", height: 1069 },
+  { file: "07-dining-room-spring", alt: "Dining room at a Spring listing", height: 1069 },
+  { file: "08-primary-bedroom-jessica-rose", alt: "Primary bedroom at a Spring listing", height: 1067 },
+  { file: "09-primary-bath-spring", alt: "Primary bathroom at a Spring listing", height: 1069 },
+  { file: "10-pool-backyard-spring", alt: "Pool and backyard at a Spring listing", height: 1069 },
+  { file: "11-covered-patio-stetson-heights", alt: "Covered patio at a listing home", height: 1068 },
+  { file: "12-backyard-patio-jessica-rose", alt: "Backyard patio at a Spring listing", height: 1067 },
+].map((item) => ({
+  src: `/realestate-75/steven/${item.file}.jpg`,
+  webp: `/realestate-75/steven/${item.file}.webp`,
+  avif: `/realestate-75/steven/${item.file}.avif`,
+  alt: item.alt,
+  width: 1600,
+  height: item.height,
+}));
 
 type LiveSlot = ApprenticeshipSlot & { photographerId?: string; photographerName?: string };
 
@@ -761,6 +745,7 @@ function ListingGallery() {
                 aria-label={`Open photo: ${item.alt}`}
               >
                 <picture>
+                  <source type="image/avif" srcSet={item.avif} />
                   <source type="image/webp" srcSet={item.webp} />
                   <img
                     src={item.src}
