@@ -133,7 +133,7 @@ const App = () => (
             <Route path="/book" element={<Book />} />
             <Route path="/senior-living" element={<SeniorLiving />} />
             <Route path="/apprenticeship" element={<Apprenticeship />} />
-            {/* Preview only. Not linked from the public menu. noindex until Cadi approves. */}
+            {/* Standalone embed, like /thankful. No site header or footer. */}
             <Route path="/realestate-75" element={<RealEstate75 />} />
             <Route path="/realestate-75/schedule" element={<RealEstate75 />} />
             <Route path="/realestate-75/samples" element={<RealEstate75 />} />
