@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { saturdayDeliveryNote } from "@shared/bookingHours";
+import { SuggestedAppointmentPills } from "@/components/SuggestedAppointments";
 
 export interface BookingSlotChoice {
   start: string;
@@ -13,6 +14,7 @@ export interface BookingSlotChoice {
 
 export function BookingSlotPicker({
   slots,
+  suggestions = [],
   selectedStart,
   onSelect,
   loading,
@@ -20,6 +22,7 @@ export function BookingSlotPicker({
   emptyMessage,
 }: {
   slots: BookingSlotChoice[];
+  suggestions?: BookingSlotChoice[];
   selectedStart: string;
   onSelect: (slot: BookingSlotChoice) => void;
   loading: boolean;
@@ -41,12 +44,30 @@ export function BookingSlotPicker({
     if (!days.some(([date]) => date === day)) setDay(days[0]?.[0] || "");
   }, [days, day]);
 
+  useEffect(() => {
+    const match = slots.find((slot) => slot.start === selectedStart);
+    if (match) setDay(match.date);
+  }, [selectedStart, slots]);
+
   const daySlots = days.find(([date]) => date === day)?.[1] || [];
   const selected = slots.find((slot) => slot.start === selectedStart);
   const saturdayNote = saturdayDeliveryNote(selected?.date);
 
+  const offered = suggestions.filter((slot) => slots.some((item) => item.start === slot.start)).slice(0, 3);
+
   return (
     <div data-testid="booking-slot-picker" className="space-y-4">
+      {!loading && (
+        <SuggestedAppointmentPills
+          suggestions={offered}
+          selectedStart={selectedStart}
+          showPhotographer={showPhotographer}
+          onSelect={(slot) => {
+            setDay(slot.date);
+            onSelect(slot);
+          }}
+        />
+      )}
       <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2 px-1">
         Open times (CST)
       </label>

@@ -40,6 +40,7 @@ export default function AdminSettings() {
     requireDepositForBooking: false,
     depositPercentage: 0,
     defaultAppointmentDuration: 60,
+    suggestedAppointments: true,
 
     // Security defaults (new projects)
     defaultLockDownloads: true,
@@ -168,6 +169,7 @@ export default function AdminSettings() {
                 <div><p className={labelCls}>Change Cutoff (hours before appt)</p><input type="number" value={settings.appointmentChangeCutoffHours} onChange={e => set("appointmentChangeCutoffHours", Number(e.target.value))} className={inputCls} /></div>
                 <div><p className={labelCls}>Default Appointment Duration (min)</p><input type="number" value={settings.defaultAppointmentDuration} onChange={e => set("defaultAppointmentDuration", Number(e.target.value))} className={inputCls} /></div>
               </div>
+              <Toggle label="Suggested appointments" description="Show up to 3 times next to existing shoots when booking or rescheduling. Off hides them without a deploy." value={settings.suggestedAppointments !== false} onChange={v => set("suggestedAppointments", v)} />
               <Toggle label="Auto-confirm bookings" description="Skip manual review for returning clients" value={settings.autoConfirmBookings} onChange={v => set("autoConfirmBookings", v)} />
               <Toggle label="Require deposit" description="Require upfront payment to confirm booking" value={settings.requireDepositForBooking} onChange={v => set("requireDepositForBooking", v)} />
               {settings.requireDepositForBooking && (
