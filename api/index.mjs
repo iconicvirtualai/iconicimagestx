@@ -7606,9 +7606,11 @@ const RE75_PACKAGES = [
     nudge: "More rooms? Go 50."
   }
 ];
+const RE75_DURATION_MINUTES = 20;
 const RE75_TIME_ZONE = "America/Chicago";
 const RE75_HORIZON_DAYS = 14;
 const RE75_OUTSIDE_MESSAGE = "Call us 281.356.0965";
+const RE75_TIME_MESSAGE = "Choose a weekday or Saturday morning. Sunday is closed, and Saturday shoots start before noon.";
 function isRealEstate75PackageId(value) {
   return value === "apprentice-25" || value === "apprentice-50";
 }
@@ -7727,6 +7729,80 @@ function isRealEstate75Holiday(date) {
   const match = date.match(/^(\d{4})-\d{2}-\d{2}$/);
   if (!match) return false;
   return realEstate75HolidayDates(Number(match[1])).has(date);
+}
+function openRealEstate75Slots(input) {
+  const week = realEstate75Week(input.horizonDays ?? RE75_HORIZON_DAYS);
+  const durationMinutes = input.durationMinutes && input.durationMinutes > 0 ? input.durationMinutes : RE75_DURATION_MINUTES;
+  return openBookingSlots({
+    now: input.now,
+    busy: input.busy ?? [],
+    durationMinutes,
+    week
+  }).filter((slot) => !isRealEstate75Holiday(slot.date));
+}
+function realEstate75OpenSchedule(input) {
+  const slots = openRealEstate75Slots({
+    now: input.now ?? /* @__PURE__ */ new Date(),
+    durationMinutes: input.durationMinutes,
+    horizonDays: input.horizonDays ?? RE75_HORIZON_DAYS
+  });
+  const groups = /* @__PURE__ */ new Map();
+  for (const slot of slots) {
+    const times = groups.get(slot.date) || [];
+    if (!times.includes(slot.time)) times.push(slot.time);
+    groups.set(slot.date, times);
+  }
+  return [...groups.entries()].map(([date, times]) => ({ date, times }));
+}
+const DATE_MONTHS = {
+  jan: 1,
+  january: 1,
+  feb: 2,
+  february: 2,
+  mar: 3,
+  march: 3,
+  apr: 4,
+  april: 4,
+  may: 5,
+  jun: 6,
+  june: 6,
+  jul: 7,
+  july: 7,
+  aug: 8,
+  august: 8,
+  sep: 9,
+  sept: 9,
+  september: 9,
+  oct: 10,
+  october: 10,
+  nov: 11,
+  november: 11,
+  dec: 12,
+  december: 12
+};
+function realEstate75DateKey(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  const match = trimmed.match(/^(?:[A-Za-z]+,\s+)?([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})$/);
+  if (!match) return null;
+  const month = DATE_MONTHS[match[1].toLowerCase()];
+  const day = Number(match[2]);
+  const year = Number(match[3]);
+  if (!month || day < 1 || day > 31 || year < 2e3 || year > 2100) return null;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+function realEstate75AppointmentChoice(input) {
+  const date = realEstate75DateKey(input.date);
+  if (!date || typeof input.time !== "string") return null;
+  const wanted = input.time.trim().toLowerCase().replace(/\s+/g, " ");
+  if (!wanted) return null;
+  const day = realEstate75OpenSchedule({
+    now: input.now,
+    durationMinutes: input.durationMinutes
+  }).find((entry2) => entry2.date === date);
+  const time = day?.times.find((choice) => choice.toLowerCase() === wanted) || null;
+  return time ? { date, time } : null;
 }
 function sanitizeGclid(value) {
   if (typeof value !== "string") return "";
@@ -8490,6 +8566,16 @@ router$r.post("/", async (req, res) => {
     const selectedAddOns = resolved.selectedAddOns;
     const preferenceId = preferenceFromRequest(req.body.photographerId, photographerPreference);
     const preferredWindow = isPreferredWindowBooking(req.body);
+    const postedSlotStart = typeof req.body.slotStart === "string" ? req.body.slotStart.trim() : "";
+    const apprenticeRequest = Boolean(realEstate75Lead && !postedSlotStart);
+    if (apprenticeRequest) {
+      const requested = realEstate75AppointmentChoice({
+        date: scheduledDate,
+        time: scheduledTime,
+        durationMinutes: realEstate75Package(resolved.selectedBasics[0]).durationMinutes
+      });
+      if (!requested) return res.status(400).json({ error: RE75_TIME_MESSAGE });
+    }
     let availability = {
       live: false,
       slots: [],
@@ -8497,7 +8583,7 @@ router$r.post("/", async (req, res) => {
       bufferMinutes: 30,
       driveMode: "buffer"
     };
-    if (!preferredWindow) {
+    if (!preferredWindow && !apprenticeRequest) {
       try {
         availability = realEstate75Lead ? await readRealEstate75Availability({
           address: displayAddress,
@@ -8513,9 +8599,9 @@ router$r.post("/", async (req, res) => {
         console.error("[Bookings] Availability check failed — keeping the standard time list:", err);
       }
     }
-    const decision = resolveBookingAssignment({
+    const decision = apprenticeRequest ? { ok: true, slot: null } : resolveBookingAssignment({
       live: preferredWindow ? false : availability.live,
-      slotStart: typeof req.body.slotStart === "string" ? req.body.slotStart : "",
+      slotStart: postedSlotStart,
       slots: availability.slots
     });
     if (decision.ok === false) return res.status(decision.status).json({ error: decision.error });
