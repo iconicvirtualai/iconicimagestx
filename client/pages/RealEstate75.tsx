@@ -1,6 +1,5 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import Layout from "@/components/Layout";
 import { MoneyAmount } from "@/components/MoneyAmount";
 import { BookingConfirmation } from "@/components/BookingConfirmation";
 import { createOrder } from "@/lib/createOrder";
@@ -33,6 +32,8 @@ const GCLID_KEY = "re75-gclid";
 const DRAFT_KEY = "re75-booking-draft";
 const CONVERSION_PREFIX = "re75-conversion-";
 const HERO_ALT = "25 listing photos for $75, 20-minute shoot by Iconic apprentices";
+/** Wix parent site. Links that leave this landing page open there, not inside the embed. */
+const MAIN_SITE = "https://www.iconicimagestx.com";
 
 /** Twelve listing photos, in file order. Cities come from the shoot notes. Unknown cities stay off the alt text. */
 const LISTING_GALLERY = [
@@ -247,6 +248,22 @@ export default function RealEstate75() {
   }, [confirmation, draft.email, draft.packageId, draft.phone]);
 
   useEffect(() => {
+    if (window.parent === window) return;
+    const post = () => {
+      const height = Math.ceil(document.documentElement.scrollHeight);
+      window.parent.postMessage({ source: "realestate-75", type: "iconic-embed-height", height }, "*");
+    };
+    post();
+    const observer = new ResizeObserver(post);
+    observer.observe(document.documentElement);
+    window.addEventListener("resize", post);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", post);
+    };
+  }, [confirmation, draft.packageId]);
+
+  useEffect(() => {
     const root = document.documentElement;
     const previousPadding = root.style.scrollPaddingBottom;
     const previousBody = document.body.style.paddingBottom;
@@ -429,11 +446,10 @@ export default function RealEstate75() {
   }
 
   return (
-    <Layout>
       <div className="overflow-x-clip bg-white text-neutral-950">
         <Hero scheduleHref={scheduleHref} processingOn={processingOn} />
         <OfferCards scheduleHref={scheduleHref} processingOn={processingOn} />
-        <NeedMore />
+        <NeedMore gclid={gclid} />
         <OfferCta scheduleHref={scheduleHref} />
         <Benefits />
         <WhatYouGet processingOn={processingOn} />
@@ -443,7 +459,7 @@ export default function RealEstate75() {
         <ListingGallery />
         <OfferCta scheduleHref={scheduleHref} />
         <Faq processingOn={processingOn} />
-        <NeedMore />
+        <NeedMore gclid={gclid} />
         <Schedule
           draft={draft}
           pkg={pkg}
@@ -464,7 +480,6 @@ export default function RealEstate75() {
         <PageContact />
         <MobileBar to={scheduleHref(draft.packageId)} hidden={barHidden || scheduleVisible} />
       </div>
-    </Layout>
   );
 }
 
@@ -499,7 +514,7 @@ function Hero({
   const starter = realEstate75Quote(processingOn, "apprentice-25");
   const upgrade = realEstate75Quote(processingOn, "apprentice-50");
   return (
-    <section className="pt-28 md:pt-36">
+    <section>
       <div className="mx-auto w-full max-w-[1200px]">
         <Link to={scheduleHref("apprentice-25")} className="block" aria-label="Schedule the $75 shoot">
           <img
@@ -591,7 +606,7 @@ function OfferCards({
   );
 }
 
-function NeedMore() {
+function NeedMore({ gclid }: { gclid: string }) {
   return (
     <section className="px-4 pb-4 md:px-8">
       <div className="mx-auto max-w-6xl rounded-2xl border border-neutral-200 bg-neutral-50 p-6 md:p-8">
@@ -600,18 +615,20 @@ function NeedMore() {
           Aerials, video, twilight, and full-service packages are the regular Iconic services. These apprentice options are photos only.
         </p>
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-          <Link
-            to="/pricing"
+          <a
+            href={withGclid(`${MAIN_SITE}/pricing`, gclid)}
+            target="_top"
             className="inline-flex min-h-12 items-center justify-center rounded-xl bg-black px-5 text-base font-semibold text-white hover:bg-neutral-800"
           >
             See pricing
-          </Link>
-          <Link
-            to="/book"
+          </a>
+          <a
+            href={withGclid(`${MAIN_SITE}/book`, gclid)}
+            target="_top"
             className="inline-flex min-h-12 items-center justify-center rounded-xl border border-neutral-300 bg-white px-5 text-base font-semibold text-neutral-950 hover:bg-neutral-50"
           >
             Book full service
-          </Link>
+          </a>
         </div>
       </div>
     </section>
@@ -687,7 +704,7 @@ function HowItWorks() {
     "The apprentice shoots for 20 minutes (25 photos) or 1 hour (50 photos). You get the edited photos for that option.",
   ];
   return (
-    <section id="how-it-works" className="scroll-mt-28 border-t border-neutral-200 px-4 py-14 md:scroll-mt-32 md:px-8">
+    <section id="how-it-works" className="scroll-mt-4 border-t border-neutral-200 px-4 py-14 md:px-8">
       <div className="mx-auto max-w-6xl">
         <h2 className="text-3xl font-black tracking-tight sm:text-4xl">How it works</h2>
         <ol className="mt-8 grid gap-4 md:grid-cols-3">
@@ -731,7 +748,7 @@ function ListingGallery() {
   }, [index, count]);
 
   return (
-    <section id="samples" className="scroll-mt-28 border-t border-neutral-200 bg-neutral-50 px-4 py-14 md:scroll-mt-32 md:px-8">
+    <section id="samples" className="scroll-mt-4 border-t border-neutral-200 bg-neutral-50 px-4 py-14 md:px-8">
       <div className="mx-auto max-w-6xl">
         <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Listing photos</h2>
         <p className="mt-3 text-lg text-neutral-700">{RE75_GALLERY_CAPTION}</p>
@@ -854,7 +871,7 @@ function Schedule(props: {
 }) {
   const { draft, confirmation, area, pkg } = props;
   return (
-    <section id="schedule" className="scroll-mt-28 border-t border-neutral-200 px-4 py-14 md:scroll-mt-32 md:px-8">
+    <section id="schedule" className="scroll-mt-4 border-t border-neutral-200 px-4 py-14 md:px-8">
       <div className="mx-auto max-w-3xl">
         <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Schedule your shoot</h2>
         <p className="mt-3 text-lg text-neutral-700">{pkg.name}. {pkg.photos} photos · {appointmentLabel(pkg)}. {props.quote.priceLine}</p>
