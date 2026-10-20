@@ -229,6 +229,25 @@ export default function RealEstate75() {
   }, [confirmation, draft.email, draft.phone]);
 
   useEffect(() => {
+    const root = document.documentElement;
+    const previousPadding = root.style.scrollPaddingBottom;
+    const previousBody = document.body.style.paddingBottom;
+    const query = window.matchMedia("(max-width: 767px)");
+    const apply = () => {
+      const reserve = query.matches ? "6rem" : "";
+      root.style.scrollPaddingBottom = reserve;
+      document.body.style.paddingBottom = reserve;
+    };
+    apply();
+    query.addEventListener("change", apply);
+    return () => {
+      query.removeEventListener("change", apply);
+      root.style.scrollPaddingBottom = previousPadding;
+      document.body.style.paddingBottom = previousBody;
+    };
+  }, []);
+
+  useEffect(() => {
     const node = document.getElementById("schedule");
     if (!node) return;
     const observer = new IntersectionObserver(
@@ -386,7 +405,7 @@ export default function RealEstate75() {
 
   return (
     <Layout>
-      <div className="overflow-x-clip bg-white pb-24 text-neutral-950 md:pb-0">
+      <div className="overflow-x-clip bg-white text-neutral-950">
         <Hero href={href} quote={quote} processingOn={processingOn} />
         <Benefits />
         <OfferCta href={href} />
