@@ -98,7 +98,7 @@ Square is the processor for Iconic client orders and invoices. Stripe stays on S
 2. URL: `https://iconicimagestx.vercel.app/api/payments/square-webhook`
 3. Subscribe to `payment.updated`
 4. Set `SQUARE_ACCESS_TOKEN`, `SQUARE_LOCATION_ID`, and `SQUARE_WEBHOOK_SIGNATURE_KEY` in Vercel
-5. If the webhook URL is not exactly `{APP_URL}/api/payments/square-webhook`, also set `SQUARE_WEBHOOK_NOTIFICATION_URL` to the full URL Square has on file. Signature checks use that URL plus the raw body.
+5. Signature checks use that notification URL plus the raw body. They accept `SQUARE_WEBHOOK_NOTIFICATION_URL` when it is set, `https://$VERCEL_PROJECT_PRODUCTION_URL/api/payments/square-webhook`, `https://iconicimagestx.vercel.app/api/payments/square-webhook`, and the `APP_URL` / `FRONTEND_URL` webhook URLs, including `https://iconicimagestx.com/api/payments/square-webhook`. The current vercel.app subscription does not need `SQUARE_WEBHOOK_NOTIFICATION_URL`.
 
 Unsigned Square webhooks are rejected. A paid invoice unlocks gallery delivery and writes the transaction.
 

@@ -14274,6 +14274,83 @@ async function followInvoiceRedirect(hit, byId) {
   }
   return current;
 }
+const WEBHOOK_PATH = "/api/payments/square-webhook";
+const SQUARE_WEBHOOK_VERCEL_URL = `https://iconicimagestx.vercel.app${WEBHOOK_PATH}`;
+const SQUARE_WEBHOOK_CUSTOM_DOMAIN_URL = `https://iconicimagestx.com${WEBHOOK_PATH}`;
+function squareWebhookNotificationUrl(env = process.env) {
+  return (env.SQUARE_WEBHOOK_NOTIFICATION_URL || "").trim();
+}
+function squareWebhookUrlFromOrigin(value) {
+  const trimmed = (value || "").trim().replace(/\/+$/, "");
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed) && trimmed.includes(WEBHOOK_PATH)) return trimmed;
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  return `${withScheme}${WEBHOOK_PATH}`;
+}
+function squareWebhookNotificationUrls(env = process.env) {
+  const appOrigin = (env.APP_URL || "").trim() || "https://iconicimagestx.com";
+  const urls = [
+    squareWebhookNotificationUrl(env),
+    squareWebhookUrlFromOrigin(env.VERCEL_PROJECT_PRODUCTION_URL),
+    SQUARE_WEBHOOK_VERCEL_URL,
+    squareWebhookUrlFromOrigin(appOrigin),
+    squareWebhookUrlFromOrigin(env.FRONTEND_URL),
+    SQUARE_WEBHOOK_CUSTOM_DOMAIN_URL
+  ];
+  return [...new Set(urls.filter((url) => url.length > 0))];
+}
+function signSquareWebhook(rawBody, key, notificationUrl) {
+  return crypto.createHmac("sha256", key).update(notificationUrl + rawBody).digest("base64");
+}
+function squareWebhookSignatureValid(rawBody, received, key, notificationUrl) {
+  if (!received || !key || !notificationUrl) return false;
+  const expected = signSquareWebhook(rawBody, key, notificationUrl);
+  const expectedBuf = Buffer.from(expected);
+  const receivedBuf = Buffer.from(received);
+  if (expectedBuf.length !== receivedBuf.length) return false;
+  return crypto.timingSafeEqual(expectedBuf, receivedBuf);
+}
+function squareWebhookRawBody(body) {
+  if (Buffer.isBuffer(body)) return body.toString("utf8");
+  if (body instanceof Uint8Array) return Buffer.from(body).toString("utf8");
+  if (typeof body === "string") return body;
+  return null;
+}
+function squareWebhookOwnedRawBody(req) {
+  const desc = Object.getOwnPropertyDescriptor(req, "body");
+  if (!desc || !("value" in desc)) return void 0;
+  return squareWebhookRawBody(desc.value);
+}
+function readSquareWebhookRawBody(req) {
+  const owned = squareWebhookOwnedRawBody(req);
+  if (owned !== void 0) return Promise.resolve(owned);
+  if (req.readable !== false) return Promise.resolve(squareWebhookRawBody(req.body));
+  return new Promise((resolve) => {
+    const chunks = [];
+    let settled2 = false;
+    const finish = () => {
+      if (settled2) return;
+      settled2 = true;
+      req.off?.("data", onData);
+      req.off?.("end", finish);
+      req.off?.("error", finish);
+      if (!chunks.length) {
+        resolve(squareWebhookRawBody(req.body));
+        return;
+      }
+      const buf = Buffer.concat(chunks);
+      req.body = buf;
+      resolve(buf.toString("utf8"));
+    };
+    const onData = (chunk2) => {
+      chunks.push(Buffer.isBuffer(chunk2) ? chunk2 : Buffer.from(chunk2));
+    };
+    req.on("data", onData);
+    req.on("end", finish);
+    req.on("error", finish);
+    setImmediate(finish);
+  });
+}
 const SENIOR_FACILITY_RATE_PER_SQFT = 0.1;
 const SENIOR_TOUR_PRICE = 250;
 const SENIOR_ROOM_RATES = [
@@ -15570,24 +15647,16 @@ router$o.post("/webhook", async (req, res) => {
     return res.status(500).json({ error: "Webhook handler failed." });
   }
 });
-function squareNotificationUrls() {
-  const explicit = process.env.SQUARE_WEBHOOK_NOTIFICATION_URL;
-  const urls = [
-    explicit,
-    `${appUrl$2()}/api/payments/square-webhook`,
-    process.env.FRONTEND_URL ? `${process.env.FRONTEND_URL.replace(/\/$/, "")}/api/payments/square-webhook` : ""
-  ].filter((url) => Boolean(url));
-  return [...new Set(urls)];
+function squareWebhookRequestPath(req) {
+  const raw = req.originalUrl || req.url || req.path || "";
+  return raw.split("?")[0];
 }
-function squareSignatureValid(rawBody, received, key) {
-  if (!received) return false;
-  const receivedBuf = Buffer.from(received);
-  return squareNotificationUrls().some((url) => {
-    const expected = crypto.createHmac("sha256", key).update(url + rawBody).digest("base64");
-    const expectedBuf = Buffer.from(expected);
-    if (expectedBuf.length !== receivedBuf.length) return false;
-    return crypto.timingSafeEqual(expectedBuf, receivedBuf);
-  });
+function squareSignatureHeader(req) {
+  const header = req.headers["x-square-hmacsha256-signature"];
+  return Array.isArray(header) ? header[0] : header;
+}
+function squareSignatureValid(rawBody, received, key, urls = squareWebhookNotificationUrls()) {
+  return urls.some((url) => squareWebhookSignatureValid(rawBody, received, key, url));
 }
 async function findInvoiceForSquarePayment(payment) {
   const hit = await matchSquarePaymentInvoice(payment, {
@@ -15609,14 +15678,31 @@ async function findInvoiceForSquarePayment(payment) {
 }
 router$o.post("/square-webhook", async (req, res) => {
   try {
-    const rawBody = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : JSON.stringify(req.body || {});
     const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
     if (!signatureKey) {
       console.error("[Payments] Square webhook rejected: SQUARE_WEBHOOK_SIGNATURE_KEY is not set.");
       return res.status(401).json({ error: "Square webhook signature key is not configured." });
     }
-    const received = Array.isArray(req.headers["x-square-hmacsha256-signature"]) ? req.headers["x-square-hmacsha256-signature"][0] : req.headers["x-square-hmacsha256-signature"];
-    if (!squareSignatureValid(rawBody, received, signatureKey)) {
+    const received = squareSignatureHeader(req);
+    const rawBody = await readSquareWebhookRawBody(req);
+    if (rawBody === null) {
+      console.error("[Payments] Square webhook rejected: raw request body is unavailable.", {
+        path: squareWebhookRequestPath(req),
+        signatureHeaderPresent: Boolean(received),
+        bodyIsBuffer: Buffer.isBuffer(req.body),
+        bodyType: req.body === null ? "null" : typeof req.body
+      });
+      return res.status(400).json({ error: "Square webhook raw body is unavailable." });
+    }
+    const candidateUrls = squareWebhookNotificationUrls();
+    if (!squareSignatureValid(rawBody, received, signatureKey, candidateUrls)) {
+      console.warn("[Payments] Square webhook signature rejected.", {
+        path: squareWebhookRequestPath(req),
+        signatureHeaderPresent: Boolean(received),
+        bodyLength: Buffer.isBuffer(req.body) ? req.body.length : Buffer.byteLength(rawBody),
+        bodyIsBuffer: Buffer.isBuffer(req.body),
+        candidateUrls
+      });
       return res.status(400).json({ error: "Invalid Square webhook signature." });
     }
     const event = JSON.parse(rawBody);
