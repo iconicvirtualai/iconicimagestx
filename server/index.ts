@@ -103,7 +103,8 @@ export function createServer() {
   }));
 
   // Payment webhooks need the raw body — mount BEFORE express.json().
-  // Square signs SQUARE_WEBHOOK_NOTIFICATION_URL + these exact bytes.
+  // Square signs the subscription notification URL plus these exact bytes.
+  // A parsed object cannot be signed; the route rejects it instead of re-serializing.
   app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
   app.use("/api/payments/square-webhook", express.raw({ type: "application/json" }));
 

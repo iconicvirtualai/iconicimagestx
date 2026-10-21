@@ -7,7 +7,6 @@
 import { Router, type Request, type Response } from "express";
 import Stripe from "stripe";
 import admin from "firebase-admin";
-import crypto from "crypto";
 import { requireCoordinator, requireAuth, type AuthenticatedRequest } from "../middleware/auth";
 import { appFirestore } from "../lib/appFirestore";
 import { sendEmail, type EmailDelivery } from "../services/email";
@@ -37,6 +36,11 @@ import { isTempAdminEnabled, liveServerEnv } from "../../shared/tempAdmin";
 import { payTokenMatches } from "../lib/payToken";
 import { resolveClientIdentity } from "../services/clientAccounts";
 import { matchSquarePaymentInvoice } from "../services/squarePaymentMatch";
+import {
+  readSquareWebhookRawBody,
+  squareWebhookNotificationUrls,
+  squareWebhookSignatureValid,
+} from "../services/squareWebhook";
 import { APPRENTICESHIP_ORDER_SOURCE, apprenticeshipBookingReturnPath } from "../../shared/apprenticeship";
 import { seniorDepositCheckoutLive, seniorLivingDepositReturnPath } from "../../shared/seniorLiving";
 
@@ -1161,27 +1165,23 @@ router.post("/webhook", async (req: Request, res: Response) => {
   }
 });
 
-function squareNotificationUrls(): string[] {
-  const explicit = process.env.SQUARE_WEBHOOK_NOTIFICATION_URL;
-  const urls = [
-    explicit,
-    `${appUrl()}/api/payments/square-webhook`,
-    process.env.FRONTEND_URL
-      ? `${process.env.FRONTEND_URL.replace(/\/$/, "")}/api/payments/square-webhook`
-      : "",
-  ].filter((url): url is string => Boolean(url));
-  return [...new Set(urls)];
+function squareWebhookRequestPath(req: Request): string {
+  const raw = req.originalUrl || req.url || req.path || "";
+  return raw.split("?")[0];
 }
 
-function squareSignatureValid(rawBody: string, received: string | undefined, key: string): boolean {
-  if (!received) return false;
-  const receivedBuf = Buffer.from(received);
-  return squareNotificationUrls().some((url) => {
-    const expected = crypto.createHmac("sha256", key).update(url + rawBody).digest("base64");
-    const expectedBuf = Buffer.from(expected);
-    if (expectedBuf.length !== receivedBuf.length) return false;
-    return crypto.timingSafeEqual(expectedBuf, receivedBuf);
-  });
+function squareSignatureHeader(req: Request): string | undefined {
+  const header = req.headers["x-square-hmacsha256-signature"];
+  return Array.isArray(header) ? header[0] : header;
+}
+
+function squareSignatureValid(
+  rawBody: string,
+  received: string | undefined,
+  key: string,
+  urls: string[] = squareWebhookNotificationUrls(),
+): boolean {
+  return urls.some((url) => squareWebhookSignatureValid(rawBody, received, key, url));
 }
 
 async function findInvoiceForSquarePayment(payment: Record<string, unknown>) {
@@ -1205,19 +1205,33 @@ async function findInvoiceForSquarePayment(payment: Record<string, unknown>) {
 
 router.post("/square-webhook", async (req: Request, res: Response) => {
   try {
-    const rawBody = Buffer.isBuffer(req.body)
-      ? req.body.toString("utf8")
-      : JSON.stringify(req.body || {});
     const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
     if (!signatureKey) {
       console.error("[Payments] Square webhook rejected: SQUARE_WEBHOOK_SIGNATURE_KEY is not set.");
       return res.status(401).json({ error: "Square webhook signature key is not configured." });
     }
 
-    const received = Array.isArray(req.headers["x-square-hmacsha256-signature"])
-      ? req.headers["x-square-hmacsha256-signature"][0]
-      : req.headers["x-square-hmacsha256-signature"];
-    if (!squareSignatureValid(rawBody, received, signatureKey)) {
+    const received = squareSignatureHeader(req);
+    const rawBody = await readSquareWebhookRawBody(req);
+    if (rawBody === null) {
+      console.error("[Payments] Square webhook rejected: raw request body is unavailable.", {
+        path: squareWebhookRequestPath(req),
+        signatureHeaderPresent: Boolean(received),
+        bodyIsBuffer: Buffer.isBuffer(req.body),
+        bodyType: req.body === null ? "null" : typeof req.body,
+      });
+      return res.status(400).json({ error: "Square webhook raw body is unavailable." });
+    }
+
+    const candidateUrls = squareWebhookNotificationUrls();
+    if (!squareSignatureValid(rawBody, received, signatureKey, candidateUrls)) {
+      console.warn("[Payments] Square webhook signature rejected.", {
+        path: squareWebhookRequestPath(req),
+        signatureHeaderPresent: Boolean(received),
+        bodyLength: Buffer.isBuffer(req.body) ? req.body.length : Buffer.byteLength(rawBody),
+        bodyIsBuffer: Buffer.isBuffer(req.body),
+        candidateUrls,
+      });
       return res.status(400).json({ error: "Invalid Square webhook signature." });
     }
 

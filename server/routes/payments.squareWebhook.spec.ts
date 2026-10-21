@@ -35,6 +35,9 @@ const ENV_KEYS = [
   "PUBLIC_SITE_URL",
   "VITE_PUBLIC_SITE_URL",
   "APP_URL",
+  "FRONTEND_URL",
+  "VERCEL_PROJECT_PRODUCTION_URL",
+  "BOOKING_NOTIFY_LIVE",
 ] as const;
 const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
 
@@ -203,13 +206,94 @@ describe("Square webhook paid unlock", () => {
     expect(memory.get("orders", "playtest-delivery-qa-order")?.history).toEqual([]);
 
     useEnv({});
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const bad = await postEvent(event, "bad-signature");
     expect(bad.status).toBe(400);
     expect(bad.json.error).toMatch(/signature/i);
+    const details = warn.mock.calls.find((call) => String(call[0]).includes("signature rejected"))?.[1] as {
+      path: string;
+      signatureHeaderPresent: boolean;
+      bodyLength: number;
+      bodyIsBuffer: boolean;
+      candidateUrls: string[];
+    };
+    expect(details).toMatchObject({
+      path: "/api/payments/square-webhook",
+      signatureHeaderPresent: true,
+      bodyIsBuffer: true,
+      bodyLength: Buffer.byteLength(JSON.stringify(event)),
+    });
+    expect(details.candidateUrls).toContain(NOTIFICATION_URL);
+    expect(details.candidateUrls).toContain("https://iconicimagestx.com/api/payments/square-webhook");
+    const logged = JSON.stringify(warn.mock.calls);
+    expect(logged).not.toContain(KEY);
+    expect(logged).not.toContain("bad-signature");
+    expect(logged).not.toContain("pay-missing-key");
     expect(memory.get("invoices", "playtest-delivery-qa-invoice")?.amountPaid).toBe(0);
     expect(memory.get("listings", "playtest-delivery-qa-listing")?.downloadEnabled).toBe(false);
     expect(sent).toHaveLength(0);
     error.mockRestore();
+    warn.mockRestore();
+  });
+
+  it("accepts the vercel.app URL Square signs when the app origins are iconicimagestx.com", async () => {
+    seedPaidWorld();
+    useEnv({
+      SQUARE_WEBHOOK_NOTIFICATION_URL: undefined,
+      APP_URL: "https://iconicimagestx.com",
+      FRONTEND_URL: "https://iconicimagestx.com",
+      VERCEL_PROJECT_PRODUCTION_URL: undefined,
+    });
+    const event = paymentEvent({
+      eventId: "evt-vercel-url",
+      paymentId: "pay-vercel-url",
+      amountCents: 100,
+      invoiceId: "playtest-delivery-qa-invoice",
+    });
+    const result = await postEvent(event);
+    expect(result.status).toBe(200);
+    expect(result.json).toMatchObject({ received: true, applied: true, unlocked: true });
+    expect(memory.get("invoices", "playtest-delivery-qa-invoice")?.status).toBe("paid");
+
+    memory.clear();
+    seedPaidWorld();
+    const custom = paymentEvent({
+      eventId: "evt-custom-domain",
+      paymentId: "pay-custom-domain",
+      amountCents: 100,
+      invoiceId: "playtest-delivery-qa-invoice",
+    });
+    const signedCustom = signSquareWebhook(
+      JSON.stringify(custom),
+      KEY,
+      "https://iconicimagestx.com/api/payments/square-webhook",
+    );
+    const cutover = await postEvent(custom, signedCustom);
+    expect(cutover.status).toBe(200);
+    expect(cutover.json.unlocked).toBe(true);
+
+    memory.clear();
+    seedPaidWorld();
+    useEnv({
+      SQUARE_WEBHOOK_NOTIFICATION_URL: undefined,
+      APP_URL: "https://iconicimagestx.com",
+      FRONTEND_URL: "https://iconicimagestx.com",
+      VERCEL_PROJECT_PRODUCTION_URL: "iconic-preview.vercel.app",
+    });
+    const preview = paymentEvent({
+      eventId: "evt-preview-host",
+      paymentId: "pay-preview-host",
+      amountCents: 100,
+      invoiceId: "playtest-delivery-qa-invoice",
+    });
+    const signedPreview = signSquareWebhook(
+      JSON.stringify(preview),
+      KEY,
+      "https://iconic-preview.vercel.app/api/payments/square-webhook",
+    );
+    const hosted = await postEvent(preview, signedPreview);
+    expect(hosted.status).toBe(200);
+    expect(hosted.json.unlocked).toBe(true);
   });
 
   it("unlocks a fully paid playtest invoice and treats a replay as a no-op", async () => {
