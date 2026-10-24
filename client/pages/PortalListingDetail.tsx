@@ -16,6 +16,7 @@ import {
   type PortalListingDetail as PortalListingDetailModel,
   type PortalListingFactsDraft,
   type PortalListingTabId,
+  type PortalMediaChange,
   type PortalMediaItem,
   type PortalMediaKind,
   type PortalTourItem,
@@ -31,7 +32,12 @@ import { MoneyAmount } from "@/components/MoneyAmount";
 import { Button } from "@/components/ui/button";
 import { ClientGalleryMediaFrame } from "@/components/gallery/ClientGalleryMedia";
 import type { ClientGalleryItem } from "@/components/gallery/clientGalleryMedia";
-import { ArrowLeft, Eye, EyeOff, MapPin } from "lucide-react";
+import { PortalFileUpload } from "@/components/portal/PortalFileUpload";
+import { PortalPhotoGallery } from "@/components/portal/PortalPhotoGallery";
+import { PortalTemplatePicker } from "@/components/portal/PortalTemplatePicker";
+import { uploadPortalClientFile } from "@/lib/portalClientUpload";
+import type { PortalUploadKind } from "@shared/portalClientUpload";
+import { ArrowLeft, Download, Eye, EyeOff, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import NotFound from "./NotFound";
 
@@ -53,6 +59,7 @@ export function PortalListingDetailView({
   onDataDraft,
   onDataSave,
   onRequestPhotoEdit,
+  onUpload,
 }: {
   detail: PortalListingDetailModel;
   tab: PortalListingTabId;
@@ -64,13 +71,14 @@ export function PortalListingDetailView({
   dataDraft: PortalListingFactsDraft;
   onTab: (tab: PortalListingTabId) => void;
   onToggleEditing: (kind: PortalMediaKind) => void;
-  onMedia: (change: { kind: PortalMediaKind; id: string; hidden?: boolean; move?: "earlier" | "later" }) => void;
+  onMedia: (change: PortalMediaChange) => void;
   onWebsite: (next: PortalWebsiteSettings) => void;
   onWebsiteSave: () => void;
   onDataEditing: (editing: boolean) => void;
   onDataDraft: (draft: PortalListingFactsDraft) => void;
   onDataSave: () => void;
   onRequestPhotoEdit: (photoId: string, note: string) => Promise<boolean>;
+  onUpload?: (kind: PortalUploadKind, file: File, onProgress: (pct: number) => void) => Promise<void>;
 }) {
   const mediaEditing = canEdit ? editing : null;
   const shown = canEdit ? detail : visitorPortalListingDetail(detail);
@@ -123,30 +131,42 @@ export function PortalListingDetailView({
           />
         )}
         {tab === "photos" && (
-          <MediaTab
-            title="Photos"
-            empty="No photos on this listing yet."
+          <PortalPhotoGallery
+            items={shown.photos}
+            groups={shown.photoGroups || []}
             canEdit={canEdit}
             editing={mediaEditing === "photo"}
             saving={saving}
-            items={shown.photos}
+            photoEditRequests={shown.photoEditRequests || []}
             onToggleEditing={() => onToggleEditing("photo")}
             onMedia={onMedia}
-            photoEditRequests={shown.photoEditRequests || []}
             onRequestPhotoEdit={canEdit ? onRequestPhotoEdit : undefined}
           />
         )}
         {tab === "video" && (
-          <MediaTab
-            title="Video"
-            empty="No mp4 or mov files on this listing yet."
-            canEdit={canEdit}
-            editing={mediaEditing === "video"}
-            saving={saving}
-            items={shown.videos}
-            onToggleEditing={() => onToggleEditing("video")}
-            onMedia={onMedia}
-          />
+          <div>
+            {canEdit && (
+              <PortalFileUpload
+                kind="video"
+                title="Upload a video"
+                hint="MP4 or MOV. Large videos upload directly to storage and do not pass through the server."
+                disabled={saving}
+                onFile={async (file, onProgress) => {
+                  if (onUpload) await onUpload("video", file, onProgress);
+                }}
+              />
+            )}
+            <MediaTab
+              title="Video"
+              empty="No mp4 or mov files on this listing yet."
+              canEdit={canEdit}
+              editing={mediaEditing === "video"}
+              saving={saving}
+              items={shown.videos}
+              onToggleEditing={() => onToggleEditing("video")}
+              onMedia={onMedia}
+            />
+          </div>
         )}
         {tab === "tours" && (
           <ToursTab
@@ -170,11 +190,18 @@ export function PortalListingDetailView({
             onMedia={onMedia}
           />
         )}
-        {tab === "marketing" && <MarketingTab detail={shown} />}
+        {tab === "marketing" && (
+          <MarketingTab
+            detail={shown}
+            canEdit={canEdit}
+            saving={saving}
+            onUpload={onUpload}
+          />
+        )}
         {tab === "website" && (
-          <WebsiteTab
+          <PortalTemplatePicker
+            detail={shown}
             website={website}
-            address={shown.address}
             canEdit={canEdit}
             saving={saving}
             onWebsite={onWebsite}
@@ -345,6 +372,13 @@ export default function PortalListingDetail() {
           onRequestPhotoEdit={async (photoId, note) => {
             const saved = await send(`${ownerApi}/photo-edit-requests`, { photoId, note }, "POST");
             return Boolean(saved);
+          }}
+          onUpload={async (kind, file, onProgress) => {
+            if (!user) throw new Error("Sign in again before uploading.");
+            const token = await user.getIdToken();
+            const saved = await uploadPortalClientFile({ listingId: id, kind, file, token, onProgress });
+            setDetail(saved);
+            setWebsite(saved.website);
           }}
           onDataSave={() => {
             void (async () => {
@@ -631,7 +665,7 @@ function MediaTab({
   editing: boolean;
   saving: boolean;
   onToggleEditing: () => void;
-  onMedia: (change: { kind: PortalMediaKind; id: string; hidden?: boolean; move?: "earlier" | "later" }) => void;
+  onMedia: (change: PortalMediaChange) => void;
   photoEditRequests?: PhotoEditRequest[];
   onRequestPhotoEdit?: (photoId: string, note: string) => Promise<boolean>;
 }) {
@@ -707,7 +741,7 @@ function ToursTab({
   editing: boolean;
   saving: boolean;
   onToggleEditing: () => void;
-  onMedia: (change: { kind: PortalMediaKind; id: string; hidden?: boolean }) => void;
+  onMedia: (change: PortalMediaChange) => void;
 }) {
   const showEditor = canEdit && editing;
   const visible = showEditor ? tours : tours.filter((tour) => !tour.hidden);
@@ -754,21 +788,82 @@ function ToursTab({
   );
 }
 
-function MarketingTab({ detail }: { detail: PortalListingDetailModel }) {
+function MarketingTab({
+  detail,
+  canEdit,
+  saving,
+  onUpload,
+}: {
+  detail: PortalListingDetailModel;
+  canEdit: boolean;
+  saving: boolean;
+  onUpload?: (kind: PortalUploadKind, file: File, onProgress: (pct: number) => void) => Promise<void>;
+}) {
   return (
-    <section>
-      <h2 className="text-xs font-black uppercase tracking-widest text-[#0d9488] mb-1">Marketing kit</h2>
-      <p className="text-xs text-gray-500 mb-4">Pick a flyer, social post, or reel here once design tools are connected.</p>
-      <div className="grid sm:grid-cols-3 gap-3">
-        {detail.marketing.map((card) => (
-          <article key={card.id} className="bg-white rounded-2xl border border-dashed border-gray-200 p-5" data-testid={`marketing-${card.id}`}>
-            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Not connected</p>
-            <h3 className="font-black mt-2">{card.title}</h3>
-            <p className="text-sm text-gray-500 mt-2">{card.note}</p>
-          </article>
-        ))}
+    <section className="space-y-8">
+      <div>
+        <h2 className="text-xs font-black uppercase tracking-widest text-[#0d9488] mb-1">Marketing kit</h2>
+        <p className="text-xs text-gray-500 mb-4">Pick a flyer, social post, or reel here once design tools are connected.</p>
+        <div className="grid sm:grid-cols-3 gap-3">
+          {detail.marketing.map((card) => (
+            <article key={card.id} className="bg-white rounded-2xl border border-dashed border-gray-200 p-5" data-testid={`marketing-${card.id}`}>
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Not connected</p>
+              <h3 className="font-black mt-2">{card.title}</h3>
+              <p className="text-sm text-gray-500 mt-2">{card.note}</p>
+            </article>
+          ))}
+        </div>
+      </div>
+      <div>
+        <h2 className="text-xs font-black uppercase tracking-widest text-[#0d9488] mb-1">Social media</h2>
+        <p className="text-xs text-gray-500 mb-4">Images, reels, and graphics for this listing.</p>
+        {canEdit && (
+          <PortalFileUpload
+            kind="social"
+            title="Upload social media"
+            hint="JPG, PNG, WebP, GIF, HEIC, SVG, MP4, or MOV."
+            disabled={saving}
+            onFile={async (file, onProgress) => {
+              if (onUpload) await onUpload("social", file, onProgress);
+            }}
+          />
+        )}
+        <UploadGrid items={detail.socialAssets || []} empty="No social files yet." />
+      </div>
+      <div>
+        <h2 className="text-xs font-black uppercase tracking-widest text-[#0d9488] mb-1">Files</h2>
+        <p className="text-xs text-gray-500 mb-4">PDFs and other documents.</p>
+        {canEdit && (
+          <PortalFileUpload
+            kind="file"
+            title="Upload a file"
+            hint="PDF, Word, or text. The file uploads directly to storage."
+            disabled={saving}
+            onFile={async (file, onProgress) => {
+              if (onUpload) await onUpload("file", file, onProgress);
+            }}
+          />
+        )}
+        <UploadGrid items={detail.clientFiles || []} empty="No documents yet." />
       </div>
     </section>
+  );
+}
+
+function UploadGrid({ items, empty }: { items: PortalMediaItem[]; empty: string }) {
+  if (items.length === 0) return <p className="text-sm text-gray-400">{empty}</p>;
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {items.map((item) => (
+        <article key={item.id} className="min-w-0 rounded-2xl border border-gray-100 bg-white p-3" data-testid={`upload-${item.id}`}>
+          <ClientGalleryMediaFrame item={portalMediaToGalleryItem(item)} />
+          <p className="mt-2 truncate text-sm font-bold">{item.name}</p>
+          <a href={item.url} download={item.name} className="mt-2 inline-flex min-h-11 items-center gap-2 text-xs font-black uppercase tracking-widest text-[#0d9488]">
+            <Download className="h-3.5 w-3.5" /> Download
+          </a>
+        </article>
+      ))}
+    </div>
   );
 }
 

@@ -80,6 +80,7 @@ describe("listing card package looks", () => {
     })).toBe("just-photos");
     expect(resolveListingCardLook({ package: "Custom order", services: ["The Showcase"] })).toBeNull();
     expect(resolveListingCardLook({})).toBeNull();
+    expect(resolveListingCardLook({ portalWebsite: { tileLook: "showcase" }, package: "Custom order" })).toBe("showcase");
   });
 });
 
