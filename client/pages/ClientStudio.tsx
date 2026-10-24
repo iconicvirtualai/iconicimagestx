@@ -1,11 +1,12 @@
 import * as React from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { doc, serverTimestamp } from "firebase/firestore";
 import { fetchListing } from "@/lib/listingUpload";
 import { Lock } from "lucide-react";
 import { ClientStudioView } from "@/components/gallery/ClientStudioView";
+import { studioGalleryTabFromSearch } from "@shared/videoGalleryAttach";
 
 function failureCopy(status: number, data: { code?: string; message?: string; error?: string }, id: string) {
   const message = data.message || data.error || "";
@@ -28,6 +29,7 @@ function failureCopy(status: number, data: { code?: string; message?: string; er
 
 export default function ClientStudio() {
   const { listingId } = useParams<{ listingId: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const [project, setProject] = React.useState<any>(null);
@@ -142,6 +144,7 @@ export default function ClientStudio() {
       project={project}
       listingId={listingId}
       signedIn={Boolean(user)}
+      initialTab={studioGalleryTabFromSearch(location.search)}
       onPersistRevision={async (revisions) => {
         if (!listingId) throw new Error("Missing listing");
         const { updateDoc } = await import("firebase/firestore");

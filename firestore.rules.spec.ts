@@ -10,4 +10,8 @@ describe("communications firestore rules", () => {
     expect(rules).toContain("request.auth.uid in resource.data.participantIds");
     expect(rules).toMatch(/match \/contactThreads\/\{threadId\}[\s\S]*allow read, write: if false/);
   });
+
+  it("lets staff read video jobs and keeps writes on the server", () => {
+    expect(rules).toMatch(/match \/videoJobs\/\{jobId\}[\s\S]*resource\.data\.kind in \['template', 'timeline'\][\s\S]*allow write: if false/);
+  });
 });

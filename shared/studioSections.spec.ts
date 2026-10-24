@@ -8,6 +8,7 @@ import {
   STUDIO_MARKETING_KITS,
   STUDIO_MARKETING_PATH,
   STUDIO_PHOTO_EDITING_ALIAS,
+  STUDIO_VIDEO_PATH,
   STUDIO_PROJECT_PATHWAYS,
   STUDIO_PROJECTS_PATH,
   STUDIO_SECTIONS,
@@ -15,18 +16,21 @@ import {
 } from "./studioSections";
 
 describe("studio sections", () => {
-  it("keeps one home and three subsections, with scratch as photo editing", () => {
+  it("keeps one home and the studio subsections, with scratch as photo editing", () => {
     expect(STUDIO_SECTIONS.map((section) => section.label)).toEqual([
       "Photo editing",
       "Projects",
       "Marketing kits",
+      "Video editor",
     ]);
-    expect(STUDIO_SECTIONS.map((section) => section.id)).toEqual(["editing", "projects", "marketing"]);
+    expect(STUDIO_SECTIONS.map((section) => section.id)).toEqual(["editing", "projects", "marketing", "video"]);
+    expect(STUDIO_VIDEO_PATH).toBe("/admin/studio/video");
     expect(STUDIO_SECTIONS[0].href).toBe(STUDIO_SCRATCH_PATH);
     expect(STUDIO_SECTIONS[0].match).toContain(STUDIO_PHOTO_EDITING_ALIAS);
     expect(STUDIO_HOME_PATH).toBe("/admin/studio");
     expect(STUDIO_PROJECTS_PATH).toBe("/admin/studio/projects");
     expect(STUDIO_MARKETING_PATH).toBe("/admin/studio/marketing");
+    expect(studioSectionForPath("/admin/studio/video")).toBe("video");
   });
 
   it("points projects at the existing delivery and listings pathways", () => {

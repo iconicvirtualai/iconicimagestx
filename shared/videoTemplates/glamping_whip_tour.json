@@ -1,0 +1,604 @@
+{
+ "id": "glamping_whip_tour",
+ "name": "Glamping Whip Tour",
+ "version": 1,
+ "description": "Fast beat-cut property tour recreated from Cadi's reference (50.8 s, 123 BPM): whip pans with directional blur, foreground mask wipes, flash/light-leak, B&W->colour glitch hit, zoom-through spin, 3-up split screen, tracked neon script title, drone open and fade-to-black outro.",
+ "reference": "/workspace/templates/ref/ref_orig.mp4",
+ "output": {
+  "w": 1080,
+  "h": 1920,
+  "fps": 60,
+  "alt_sizes": [
+   [
+    1920,
+    1080
+   ]
+  ],
+  "crf": 22
+ },
+ "music": {
+  "track": "music/heartbeat_mixkit1000.mp3",
+  "bpm": 123.05,
+  "beat_offset": 0.511,
+  "start": 0.0,
+  "first_cut_beat": 3,
+  "fade_out_beats": 6,
+  "gain": 0.9,
+  "license": "Mixkit Stock Music Free License (commercial OK, no attribution)"
+ },
+ "grade": {
+  "contrast": 1.12,
+  "saturation": 1.22,
+  "teal_orange": 0.6,
+  "lift": 0.0,
+  "vignette": 0.12,
+  "sharpen": 0.25
+ },
+ "fade_in_beats": 0.6,
+ "fade_out_beats": 4,
+ "defaults": {
+  "trans_beats": 0.42,
+  "out": {
+   "type": "whip",
+   "dir": "auto"
+  },
+  "speed": {
+   "base": 1.0,
+   "auto_ramps": true
+  },
+  "whip_out_ramp": {
+   "peak": 2.2,
+   "beats": 0.6
+  },
+  "whip_in_ramp": {
+   "peak": 1.9,
+   "beats": 0.5
+  }
+ },
+ "slots": [
+  {
+   "id": "s01",
+   "label": "Aerial establishing \u2014 drone push over the property",
+   "out": {
+    "type": "whip",
+    "dir": "down",
+    "beats": 0.45
+   },
+   "kind": "aerial",
+   "hit_beat": 0,
+   "point": "auto"
+  },
+  {
+   "id": "s02",
+   "label": "Wide exterior / arrival",
+   "beats": 4,
+   "out": {
+    "type": "flash",
+    "beats": 0.5
+   },
+   "kind": "exterior",
+   "point": "auto"
+  },
+  {
+   "id": "s03",
+   "label": "Signage / logo detail",
+   "beats": 2,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "detail",
+   "point": "auto"
+  },
+  {
+   "id": "s04",
+   "label": "Framed wide (through a door / post)",
+   "beats": 1,
+   "out": {
+    "type": "mask_wipe",
+    "dir": "auto",
+    "beats": 0.45
+   },
+   "kind": "exterior",
+   "point": "auto"
+  },
+  {
+   "id": "s05",
+   "label": "Framed wide #2",
+   "beats": 1,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "exterior",
+   "optional": true,
+   "drop_priority": 9,
+   "point": "auto"
+  },
+  {
+   "id": "s06",
+   "label": "Feature exterior + sign",
+   "beats": 2,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "exterior",
+   "point": "auto"
+  },
+  {
+   "id": "s07",
+   "label": "Amenity wide (pergola / patio)",
+   "beats": 2,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "exterior",
+   "optional": true,
+   "drop_priority": 6,
+   "point": "auto"
+  },
+  {
+   "id": "s08",
+   "label": "Amenity detail (doors / entry)",
+   "beats": 2,
+   "out": {
+    "type": "cut"
+   },
+   "kind": "detail",
+   "point": "auto"
+  },
+  {
+   "id": "s09",
+   "label": "TITLE shot \u2014 neon script name over the hero amenity",
+   "beats": 2,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "hero",
+   "effects": [
+    {
+     "type": "punch",
+     "at_beat": 0,
+     "beats": 0.6,
+     "amount": 0.06
+    }
+   ],
+   "point": "auto"
+  },
+  {
+   "id": "s10",
+   "label": "Lounge / seating",
+   "beats": 2.5,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "exterior",
+   "optional": true,
+   "drop_priority": 4,
+   "point": "auto"
+  },
+  {
+   "id": "s11",
+   "label": "Interior detail (heater / fixture)",
+   "beats": 1.5,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "detail",
+   "optional": true,
+   "drop_priority": 8,
+   "point": "auto"
+  },
+  {
+   "id": "s12",
+   "label": "Amenity #2 (tub / pool)",
+   "beats": 2.5,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "exterior",
+   "point": "auto"
+  },
+  {
+   "id": "s13",
+   "label": "Amenity #3",
+   "beats": 2,
+   "out": {
+    "type": "cut"
+   },
+   "kind": "exterior",
+   "optional": true,
+   "drop_priority": 7,
+   "point": "auto"
+  },
+  {
+   "id": "s14",
+   "label": "Approach \u2014 buildings in the trees",
+   "beats": 3,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "exterior",
+   "point": "auto"
+  },
+  {
+   "id": "s15",
+   "label": "Hero exterior of the unit",
+   "beats": 3,
+   "out": {
+    "type": "cut"
+   },
+   "kind": "exterior",
+   "point": "auto"
+  },
+  {
+   "id": "s16",
+   "label": "SPLIT-SCREEN: 3 stacked shots, centre grows to full frame",
+   "beats": 5.5,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "hero",
+   "layout": "split3",
+   "clips": 3,
+   "expand_center_beats": 1.5,
+   "point": "auto"
+  },
+  {
+   "id": "s17",
+   "label": "Deck / outdoor table",
+   "beats": 2.5,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "exterior",
+   "optional": true,
+   "drop_priority": 3,
+   "point": "auto"
+  },
+  {
+   "id": "s18",
+   "label": "Interior reveal",
+   "beats": 2,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "interior",
+   "point": "auto"
+  },
+  {
+   "id": "s19",
+   "label": "Exterior push-in (hit into flash)",
+   "beats": 2,
+   "out": {
+    "type": "flash_bw",
+    "beats": 0.4,
+    "hit": "sub_boom"
+   },
+   "kind": "exterior",
+   "effects": [
+    {
+     "type": "punch",
+     "at_beat": 1.4,
+     "beats": 0.6,
+     "amount": 0.1
+    }
+   ],
+   "point": "auto"
+  },
+  {
+   "id": "s20",
+   "label": "B&W hit -> colour pop (glitch)",
+   "beats": 2.5,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "interior",
+   "effects": [
+    {
+     "type": "bw",
+     "from_beat": 0,
+     "to_beat": 1.0
+    },
+    {
+     "type": "rgb_split",
+     "at_beat": 0.85,
+     "beats": 0.3,
+     "amount": 24,
+     "slices": 6,
+     "sfx": "glitch"
+    }
+   ],
+   "point": "auto"
+  },
+  {
+   "id": "s21",
+   "label": "Living",
+   "beats": 2,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "interior",
+   "optional": true,
+   "drop_priority": 2,
+   "point": "auto"
+  },
+  {
+   "id": "s22",
+   "label": "Dining / kitchen wide",
+   "beats": 4,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "interior",
+   "point": "auto"
+  },
+  {
+   "id": "s23",
+   "label": "Detail (desk / cabinet)",
+   "beats": 2,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "detail",
+   "optional": true,
+   "drop_priority": 5,
+   "point": "auto"
+  },
+  {
+   "id": "s24",
+   "label": "Bedroom with view",
+   "beats": 2,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "interior",
+   "point": "auto"
+  },
+  {
+   "id": "s25",
+   "label": "Bed",
+   "beats": 2,
+   "out": {
+    "type": "mask_wipe",
+    "dir": "auto",
+    "beats": 0.45
+   },
+   "kind": "interior",
+   "point": "auto"
+  },
+  {
+   "id": "s26",
+   "label": "Bed close / foreground",
+   "beats": 2,
+   "out": {
+    "type": "zoom_through",
+    "beats": 0.5,
+    "rot": 24,
+    "zoom": 1.0
+   },
+   "kind": "interior",
+   "point": "auto"
+  },
+  {
+   "id": "s27",
+   "label": "Overhead / spin hero (skylight, pool, stairs)",
+   "beats": 6,
+   "out": {
+    "type": "mirror_whip",
+    "dir": "auto",
+    "beats": 0.5,
+    "hit": "sub_boom"
+   },
+   "kind": "hero",
+   "speed": {
+    "base": 0.85
+   },
+   "point": "auto"
+  },
+  {
+   "id": "s28",
+   "label": "Kitchen",
+   "beats": 4,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "interior",
+   "point": "auto"
+  },
+  {
+   "id": "s29",
+   "label": "Kitchen detail #1",
+   "beats": 2,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "detail",
+   "optional": true,
+   "drop_priority": 6,
+   "point": "auto"
+  },
+  {
+   "id": "s30",
+   "label": "Kitchen detail #2",
+   "beats": 2,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "detail",
+   "optional": true,
+   "drop_priority": 7,
+   "point": "auto"
+  },
+  {
+   "id": "s31",
+   "label": "Sunroom / dining",
+   "beats": 2,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "interior",
+   "point": "auto"
+  },
+  {
+   "id": "s32",
+   "label": "Bathroom",
+   "beats": 4,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "interior",
+   "point": "auto"
+  },
+  {
+   "id": "s33",
+   "label": "Window view",
+   "beats": 2.5,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "interior",
+   "optional": true,
+   "drop_priority": 5,
+   "point": "auto"
+  },
+  {
+   "id": "s34",
+   "label": "Bath amenities",
+   "beats": 2,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "detail",
+   "optional": true,
+   "drop_priority": 8,
+   "point": "auto"
+  },
+  {
+   "id": "s35",
+   "label": "Fixture detail (into glitch)",
+   "beats": 1.5,
+   "out": {
+    "type": "glitch",
+    "beats": 0.3
+   },
+   "kind": "detail",
+   "optional": true,
+   "drop_priority": 9,
+   "point": "auto"
+  },
+  {
+   "id": "s36",
+   "label": "Exterior detail (cladding / lights)",
+   "beats": 2.5,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "exterior",
+   "point": "auto"
+  },
+  {
+   "id": "s37",
+   "label": "Path / walkway",
+   "beats": 2,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "exterior",
+   "point": "auto"
+  },
+  {
+   "id": "s38",
+   "label": "Drone over the property",
+   "beats": 3.5,
+   "out": {
+    "type": "whip",
+    "dir": "down",
+    "beats": 0.5
+   },
+   "kind": "aerial",
+   "point": "auto"
+  },
+  {
+   "id": "s39",
+   "label": "Aerial outro (fades to black)",
+   "beats": 7,
+   "out": {
+    "type": "none"
+   },
+   "kind": "aerial",
+   "speed": {
+    "base": 0.9
+   },
+   "point": "auto"
+  }
+ ],
+ "layers": [
+  {
+   "type": "text",
+   "id": "title",
+   "label": "Property name (neon script)",
+   "style": "neon_script",
+   "text": "Cameron Ranch\nGlamping",
+   "font": "Sacramento",
+   "color": "#7ff6ff",
+   "size": 0.3,
+   "pos": [
+    0.52,
+    0.42
+   ],
+   "slot": "s09",
+   "start_beat": 0.1,
+   "end_beat": 2.2,
+   "track": true,
+   "follow": 0.7,
+   "backing": 0.55,
+   "line_height": 0.82,
+   "track_limit": 0.07
+  },
+  {
+   "type": "logo",
+   "id": "logo",
+   "label": "Optional logo (end)",
+   "path": null,
+   "slot": "last",
+   "pos": [
+    0.5,
+    0.5
+   ],
+   "width": 0.42,
+   "start_beat": 2,
+   "end_beat": 6
+  }
+ ],
+ "sfx": {
+  "whoosh_gain": 0.55,
+  "shimmer_gain": 0.45,
+  "glitch_gain": 0.35,
+  "hit_gain": 0.9
+ }
+}

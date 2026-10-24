@@ -1,0 +1,207 @@
+{
+ "id": "twilight_aerial_drone",
+ "name": "Twilight / Aerial Drone",
+ "version": 1,
+ "description": "Drone-led film: long aerial holds with fast-slow-fast speed ramps, vertical 'dive' whips, push-through transitions and a cool twilight grade. Built for drone + twilight exteriors (8 clips).",
+ "output": {
+  "w": 1080,
+  "h": 1920,
+  "fps": 60,
+  "alt_sizes": [
+   [
+    1920,
+    1080
+   ]
+  ]
+ },
+ "music": {
+  "track": "music/offmymind_mixkit1210.mp3",
+  "bpm": 152.0,
+  "beat_offset": 0.0,
+  "start": 10.26,
+  "gain": 0.9,
+  "license": "Mixkit Stock Music Free License",
+  "first_cut_beat": 12,
+  "fade_out_beats": 8
+ },
+ "grade": {
+  "contrast": 1.1,
+  "saturation": 1.12,
+  "teal_orange": 0.7,
+  "lift": 0.02,
+  "vignette": 0.16,
+  "sharpen": 0.2
+ },
+ "fade_in_beats": 3,
+ "fade_out_beats": 6,
+ "defaults": {
+  "trans_beats": 0.9,
+  "out": {
+   "type": "whip",
+   "dir": "down"
+  },
+  "speed": {
+   "curve": "slow_mid",
+   "base": 0.7,
+   "edge": 2.4,
+   "auto_ramps": false
+  }
+ },
+ "slots": [
+  {
+   "id": "s01",
+   "label": "Wide establishing aerial (title)",
+   "out": {
+    "type": "whip",
+    "dir": "down",
+    "beats": 0.9
+   },
+   "kind": "aerial",
+   "speed": {
+    "base": 0.75
+   },
+   "point": "auto"
+  },
+  {
+   "id": "s02",
+   "label": "Orbit / reveal of the home",
+   "beats": 12,
+   "out": {
+    "type": "zoom_through",
+    "beats": 1.0,
+    "zoom": 0.5,
+    "rot": 0
+   },
+   "kind": "aerial",
+   "point": "auto"
+  },
+  {
+   "id": "s03",
+   "label": "Front elevation (twilight)",
+   "beats": 8,
+   "out": {
+    "type": "whip",
+    "dir": "auto",
+    "beats": 0.8
+   },
+   "kind": "exterior",
+   "point": "auto"
+  },
+  {
+   "id": "s04",
+   "label": "Top-down",
+   "beats": 8,
+   "out": {
+    "type": "whip",
+    "dir": "down",
+    "beats": 0.9
+   },
+   "kind": "aerial",
+   "point": "auto"
+  },
+  {
+   "id": "s05",
+   "label": "Backyard / pool aerial",
+   "beats": 8,
+   "out": {
+    "type": "flash",
+    "beats": 0.8
+   },
+   "kind": "aerial",
+   "point": "auto"
+  },
+  {
+   "id": "s06",
+   "label": "Neighborhood / amenities",
+   "beats": 8,
+   "out": {
+    "type": "whip",
+    "dir": "auto",
+    "beats": 0.8
+   },
+   "kind": "aerial",
+   "optional": true,
+   "drop_priority": 4,
+   "point": "auto"
+  },
+  {
+   "id": "s07",
+   "label": "Low fly-by",
+   "beats": 8,
+   "out": {
+    "type": "whip",
+    "dir": "up",
+    "beats": 0.9
+   },
+   "kind": "aerial",
+   "optional": true,
+   "drop_priority": 5,
+   "point": "auto"
+  },
+  {
+   "id": "s08",
+   "label": "Pull-away outro",
+   "beats": 14,
+   "out": {
+    "type": "none"
+   },
+   "kind": "aerial",
+   "speed": {
+    "base": 0.7
+   },
+   "point": "auto"
+  }
+ ],
+ "layers": [
+  {
+   "type": "text",
+   "id": "title",
+   "label": "Address / community",
+   "style": "title",
+   "text": "High Meadow Ridge",
+   "size": 0.085,
+   "pos": [
+    0.5,
+    0.47
+   ],
+   "slot": "s01",
+   "start_beat": 2,
+   "end_beat": 11,
+   "rise": 0.02,
+   "tracking": 0.2
+  },
+  {
+   "type": "text",
+   "id": "sub",
+   "label": "Sub line",
+   "style": "title",
+   "text": "Montgomery, Texas",
+   "size": 0.038,
+   "pos": [
+    0.5,
+    0.52
+   ],
+   "slot": "s01",
+   "start_beat": 3,
+   "end_beat": 11,
+   "tracking": 0.35
+  },
+  {
+   "type": "logo",
+   "id": "logo",
+   "path": null,
+   "slot": "last",
+   "pos": [
+    0.5,
+    0.5
+   ],
+   "width": 0.4,
+   "start_beat": 4,
+   "end_beat": 12
+  }
+ ],
+ "sfx": {
+  "whoosh_gain": 0.4,
+  "shimmer_gain": 0.35
+ }
+}

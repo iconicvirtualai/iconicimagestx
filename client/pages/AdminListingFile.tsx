@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +20,7 @@ import {
 import { ensureLinkedInvoice } from "@/lib/orderProjectInvoice";
 import { readProjectSurface } from "@/lib/projectSurfaceRead";
 import { addressText, recordAddressText } from "@shared/addressText";
+import { listingFileTabFromSearch } from "@shared/videoGalleryAttach";
 import { calendarDateKey, formatChicagoDate } from "@shared/clientHome";
 import { lockDownloadsOn, requirePaymentOn } from "@shared/paymentAccess";
 import { staffInvoicePath } from "@shared/staffInvoice";
@@ -272,11 +273,12 @@ export default function AdminListingFile({
 } = {}) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const routeLocation = useLocation();
   const { user } = useAuth();
   const getPresentationToken = () => user?.getIdToken();
   const [project, setProject] = React.useState<any>(initialProject);
   const [loading, setLoading] = React.useState(!initialProject);
-  const [activeTab, setActiveTab] = React.useState(initialTab);
+  const [activeTab, setActiveTab] = React.useState(listingFileTabFromSearch(routeLocation.search) ?? initialTab);
   const [updating, setUpdating] = React.useState(false);
   const [statusLocked, setStatusLocked] = React.useState(true);
 
