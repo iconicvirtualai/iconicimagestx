@@ -7,12 +7,16 @@
 import { Router } from "express";
 import admin from "firebase-admin";
 import {
+  APPRENTICESHIP_AWAITING_DEPOSIT_STATUS,
   APPRENTICESHIP_BALANCE_LINE,
   APPRENTICESHIP_BOOKING_FEE,
   APPRENTICESHIP_BOOKING_FEE_LINE,
   APPRENTICESHIP_CALENDAR_FALLBACK,
   APPRENTICESHIP_ORDER_SOURCE,
+  APPRENTICESHIP_DEPOSIT_REQUIRED_LINE,
+  apprenticeshipHoldExpiresAt,
   apprenticeshipHoursFromEnv,
+  apprenticeshipLeadSource,
   findApprenticeshipPackage,
   parseApprenticeshipOrder,
   quoteApprenticeship,
@@ -32,6 +36,10 @@ import {
   readApprenticeshipAvailability,
 } from "../services/apprenticeshipCalendar";
 import { notifyOfficeOfOrder } from "../services/officeOrderNotify";
+import {
+  maybeReleaseExpiredApprenticeshipHolds,
+  releaseExpiredApprenticeshipHolds,
+} from "../services/apprenticeshipHolds";
 import { nextOrderNumber } from "../services/orderNumbers";
 
 const router = Router();
@@ -93,11 +101,32 @@ router.get("/config", (_req, res) => {
   res.json({ depositCheckoutLive: seniorDepositCheckoutLive() });
 });
 
+function cronAuthorized(req: { headers: Record<string, string | string[] | undefined> }) {
+  const secret = typeof process.env.CRON_SECRET === "string" ? process.env.CRON_SECRET.trim() : "";
+  return Boolean(secret) && req.headers.authorization === `Bearer ${secret}`;
+}
+
+/** Vercel cron (and manual staff/ops runs with the cron secret): release unpaid holds. */
+async function releaseHolds(req: { headers: Record<string, string | string[] | undefined> }, res: import("express").Response) {
+  if (!cronAuthorized(req)) return res.status(401).json({ error: "Unauthorized" });
+  try {
+    const result = await releaseExpiredApprenticeshipHolds();
+    return res.json({ ok: true, ...result });
+  } catch (error) {
+    console.error("[Apprenticeship] Hold release failed:", error);
+    return res.status(500).json({ error: "Hold release failed." });
+  }
+}
+router.get("/release-holds", releaseHolds);
+router.post("/release-holds", releaseHolds);
+
 router.get("/slots", async (req, res) => {
   const packageId = typeof req.query.package === "string" ? req.query.package : "apprentice-25";
   if (!findApprenticeshipPackage(packageId)) {
     return res.status(400).json({ error: "Choose an apprenticeship package." });
   }
+  // Expired unpaid HOLDs are deleted first so their slots show as open.
+  await maybeReleaseExpiredApprenticeshipHolds();
   const result = await readApprenticeshipAvailability({ packageId });
   return res.json(publicAvailability(result, packageId));
 });
@@ -138,6 +167,15 @@ router.post("/order", async (req, res) => {
       error: `Orders are not available on this server yet. Please call ${BUSINESS_CONTACT.phoneDisplay}.`,
     });
   }
+  // Every apprentice booking takes the $25 booking fee online. Without the
+  // Square deposit checkout there is no way to collect it, so do not save a
+  // booking (or hold a calendar slot) that could never be confirmed.
+  const checkoutLive = seniorDepositCheckoutLive();
+  if (!checkoutLive) {
+    return res.status(503).json({
+      error: `Online booking is paused. Call ${BUSINESS_CONTACT.phoneDisplay} to book and pay the $25 booking fee.`,
+    });
+  }
 
   const catalog = await loadCatalog();
   const quoted = quoteApprenticeship({
@@ -149,6 +187,7 @@ router.post("/order", async (req, res) => {
   if (quoted.ok === false) return res.status(400).json({ error: quoted.error });
   const { quote } = quoted;
   const pkg = findApprenticeshipPackage(parsed.value.packageId, catalog);
+  await maybeReleaseExpiredApprenticeshipHolds();
   const availability = await readApprenticeshipAvailability({ packageId: parsed.value.packageId });
   const slot = parsed.value.slotStart
     ? availability.slots.find((item) => item.start === parsed.value.slotStart) || null
@@ -189,6 +228,7 @@ router.post("/order", async (req, res) => {
         packageName: quote.packageName,
         slot,
         notes: value.preferredTime,
+        hold: true,
       });
       if (!calendarEvent?.eventId) {
         return res.status(503).json({ error: APPRENTICESHIP_CALENDAR_FALLBACK });
@@ -200,12 +240,20 @@ router.post("/order", async (req, res) => {
   }
 
   const now = admin.firestore.FieldValue.serverTimestamp();
-  const checkoutLive = seniorDepositCheckoutLive();
+  const leadSource = apprenticeshipLeadSource(value.returnPage);
+  const holdFields = {
+    packageId: value.packageId,
+    slotStart: slot?.start || null,
+    slotEnd: slot?.end || null,
+    holdExpiresAt: apprenticeshipHoldExpiresAt(new Date()),
+  };
   const note = [
     APPRENTICESHIP_BOOKING_FEE_LINE,
+    "Not confirmed until the $25 booking fee is paid.",
     APPRENTICESHIP_BALANCE_LINE,
     value.preferredTime ? `Preferred time: ${value.preferredTime}` : "",
     pkg?.appointmentLimit || "",
+    value.details,
   ].filter(Boolean).join("\n");
 
   try {
@@ -235,6 +283,8 @@ router.post("/order", async (req, res) => {
       depositRequired: true,
       depositAmount: APPRENTICESHIP_BOOKING_FEE,
       depositPaid: 0,
+      depositStatus: "awaiting",
+      ...holdFields,
       balanceDue: quote.total,
       scheduledDate: slot?.date || null,
       scheduledTime: slot?.time || value.preferredTime || null,
@@ -242,7 +292,8 @@ router.post("/order", async (req, res) => {
       vibeNote: note,
       status: "new",
       source: APPRENTICESHIP_ORDER_SOURCE,
-      leadSource: "Apprenticeship page",
+      leadSource,
+      ...(value.gclid ? { gclid: value.gclid } : {}),
       orderNumber,
       packageName: quote.packageName,
       calendarEventId: calendarEvent?.eventId || null,
@@ -273,12 +324,16 @@ router.post("/order", async (req, res) => {
       depositRequired: true,
       depositAmount: APPRENTICESHIP_BOOKING_FEE,
       depositPaid: 0,
+      depositStatus: "awaiting",
+      ...holdFields,
       balanceDue: quote.total,
       scheduledDate: slot?.date || null,
       scheduledTime: slot?.time || value.preferredTime || null,
       notes: note,
-      status: "confirmed",
+      // Confirmed by the Square deposit webhook once the $25 lands.
+      status: APPRENTICESHIP_AWAITING_DEPOSIT_STATUS,
       source: APPRENTICESHIP_ORDER_SOURCE,
+      leadSource,
       orderNumber,
       packageName: quote.packageName,
       calendarEventId: calendarEvent?.eventId || null,
@@ -312,6 +367,7 @@ router.post("/order", async (req, res) => {
       status: "draft",
       paymentProvider: "square",
       payToken,
+      depositReturn: value.returnPage,
       invoiceNumber,
       orderNumber,
       notes: note,
@@ -352,7 +408,7 @@ router.post("/order", async (req, res) => {
           total: quote.total,
           processing: quote.processing,
           source: APPRENTICESHIP_ORDER_SOURCE,
-          leadSource: "Apprenticeship page",
+          leadSource,
           notes: note,
           scheduledDate: slot?.date || null,
           scheduledTime: slot?.time || value.preferredTime || null,
@@ -374,6 +430,9 @@ router.post("/order", async (req, res) => {
       total: quote.total,
       balanceDue: quote.balanceDue,
       checkoutReady: checkoutLive,
+      status: APPRENTICESHIP_AWAITING_DEPOSIT_STATUS,
+      message: APPRENTICESHIP_DEPOSIT_REQUIRED_LINE,
+      holdExpiresAt: holdFields.holdExpiresAt,
     });
   } catch (error) {
     console.error("[Apprenticeship] Order failed:", error);

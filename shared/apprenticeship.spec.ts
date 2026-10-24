@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  apprenticeshipHoldExpired,
+  apprenticeshipHoldExpiresAt,
   APPRENTICESHIP_BALANCE_LINE,
   APPRENTICESHIP_BOOKING_FEE,
   APPRENTICESHIP_BOOKING_FEE_LINE,
@@ -181,5 +183,24 @@ describe("book package deep link", () => {
       selectedService: "listing-essentials",
       showBasics: false,
     });
+  });
+});
+
+describe("apprentice 60-minute hold", () => {
+  const now = new Date("2026-10-24T15:00:00.000Z");
+  const base = { source: "apprenticeship", status: "awaiting_deposit", depositPaid: 0 };
+
+  it("expires at holdExpiresAt", () => {
+    expect(apprenticeshipHoldExpiresAt(new Date("2026-10-24T14:00:00.000Z"))).toBe("2026-10-24T15:00:00.000Z");
+    expect(apprenticeshipHoldExpired({ ...base, holdExpiresAt: "2026-10-24T15:00:00.000Z" }, now)).toBe(true);
+    expect(apprenticeshipHoldExpired({ ...base, holdExpiresAt: "2026-10-24T15:00:01.000Z" }, now)).toBe(false);
+  });
+
+  it("ignores paid, confirmed, and non-apprentice orders", () => {
+    const old = { holdExpiresAt: "2026-10-24T13:00:00.000Z" };
+    expect(apprenticeshipHoldExpired({ ...base, ...old, depositPaid: 25 }, now)).toBe(false);
+    expect(apprenticeshipHoldExpired({ ...base, ...old, status: "confirmed" }, now)).toBe(false);
+    expect(apprenticeshipHoldExpired({ ...base, ...old, source: "senior-living" }, now)).toBe(false);
+    expect(apprenticeshipHoldExpired({ ...base }, now)).toBe(false);
   });
 });

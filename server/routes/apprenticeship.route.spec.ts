@@ -11,6 +11,8 @@ const store = vi.hoisted(() => ({
 const availability = vi.hoisted(() => vi.fn());
 const createEvent = vi.hoisted(() => vi.fn());
 const notify = vi.hoisted(() => vi.fn(async () => ({ sent: true })));
+const lazyRelease = vi.hoisted(() => vi.fn(async () => undefined));
+const cronRelease = vi.hoisted(() => vi.fn(async () => ({ checked: 1, released: 1, eventsDeleted: 1, eventErrors: 0 })));
 
 function docs(name: string) {
   if (!store.collections[name]) store.collections[name] = new Map();
@@ -103,6 +105,11 @@ vi.mock("../services/apprenticeshipCalendar", () => ({
   createApprenticeshipEvent: createEvent,
 }));
 
+vi.mock("../services/apprenticeshipHolds", () => ({
+  maybeReleaseExpiredApprenticeshipHolds: lazyRelease,
+  releaseExpiredApprenticeshipHolds: cronRelease,
+}));
+
 vi.mock("../services/officeOrderNotify", () => ({
   notifyOfficeOfOrder: notify,
 }));
@@ -129,7 +136,10 @@ const SLOT = {
 let server: Server;
 let baseUrl = "";
 
+const flagBackup = process.env.SENIOR_DEPOSIT_CHECKOUT_LIVE;
+
 beforeAll(async () => {
+  process.env.SENIOR_DEPOSIT_CHECKOUT_LIVE = "true";
   const app = express();
   app.use(express.json());
   app.use("/api/apprenticeship", apprenticeshipRouter);
@@ -142,6 +152,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  if (flagBackup === undefined) delete process.env.SENIOR_DEPOSIT_CHECKOUT_LIVE;
+  else process.env.SENIOR_DEPOSIT_CHECKOUT_LIVE = flagBackup;
   if (!server) return;
   await new Promise<void>((resolve, reject) => {
     server.close((err) => (err ? reject(err) : resolve()));
@@ -149,10 +161,13 @@ afterAll(async () => {
 });
 
 beforeEach(() => {
+  process.env.SENIOR_DEPOSIT_CHECKOUT_LIVE = "true";
   store.collections = {};
   store.seq = 0;
   resetApprenticeshipRateLimit();
   notify.mockClear();
+  lazyRelease.mockClear();
+  cronRelease.mockClear();
   createEvent.mockClear();
   availability.mockClear();
   docs("counters").set("orderNumbers", { last: 41 });
@@ -272,9 +287,13 @@ describe("apprenticeship order", () => {
     expect(orders[0]).toMatchObject({
       orderNumber: "#042",
       source: "apprenticeship",
-      status: "confirmed",
+      status: "awaiting_deposit",
+      depositStatus: "awaiting",
       depositAmount: 25,
     });
+    expect(createEvent).toHaveBeenCalledWith(expect.objectContaining({ hold: true }));
+    expect(body.status).toBe("awaiting_deposit");
+    expect(body.checkoutReady).toBe(true);
     expect(invoices[0]).toMatchObject({
       orderNumber: "#042",
       status: "draft",
@@ -314,5 +333,106 @@ describe("apprenticeship order", () => {
     expect(requested.status).toBe(201);
     expect(createEvent).not.toHaveBeenCalled();
     expect([...docs("orderRequests").values()][0].orderNumber).toBe("#042");
+  });
+
+  it("refuses to save a booking when the $25 booking fee cannot be collected online", async () => {
+    delete process.env.SENIOR_DEPOSIT_CHECKOUT_LIVE;
+    const response = await fetch(`${baseUrl}/api/apprenticeship/order`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(booking),
+    });
+    expect(response.status).toBe(503);
+    expect((await response.json()).error).toMatch(/\$25 booking fee/);
+    expect(docs("orders").size).toBe(0);
+    expect(docs("invoices").size).toBe(0);
+    expect(createEvent).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it("tags /realestate-75 orders with its lead source, notes, and Square return page", async () => {
+    const response = await fetch(`${baseUrl}/api/apprenticeship/order`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...booking,
+        packageId: "apprentice-50",
+        name: "",
+        firstName: "Ada",
+        lastName: "Lovelace",
+        returnPage: "realestate-75",
+        gclid: "abc_123-XYZ",
+        details: "Brokerage: QA Realty\nHome: Vacant\nApprox sq ft: 1800",
+      }),
+    });
+    expect(response.status).toBe(201);
+    const request = [...docs("orderRequests").values()][0];
+    const order = [...docs("orders").values()][0];
+    const invoice = [...docs("invoices").values()][0];
+    expect(request.leadSource).toBe("Real Estate $75 apprentice (Google Ads)");
+    expect(request.gclid).toBe("abc_123-XYZ");
+    expect(String(request.notes)).toContain("Brokerage: QA Realty");
+    expect(String(request.notes)).toContain("Not confirmed until the $25 booking fee is paid.");
+    expect(order.status).toBe("awaiting_deposit");
+    expect(invoice.depositReturn).toBe("realestate-75");
+  });
+
+  it("ignores an unknown return page and a junk gclid", async () => {
+    await fetch(`${baseUrl}/api/apprenticeship/order`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...booking, returnPage: "https://evil.example", gclid: "<script>" }),
+    });
+    const request = [...docs("orderRequests").values()][0];
+    const invoice = [...docs("invoices").values()][0];
+    expect(invoice.depositReturn).toBe("apprenticeship");
+    expect(request.leadSource).toBe("Apprenticeship page");
+    expect(request.gclid).toBeUndefined();
+  });
+
+  it("stores the slot and a 60-minute hold expiry, and releases expired holds before booking", async () => {
+    const before = Date.now();
+    const response = await fetch(`${baseUrl}/api/apprenticeship/order`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(booking),
+    });
+    const body = await response.json();
+    expect(lazyRelease).toHaveBeenCalled();
+    const order = [...docs("orders").values()][0];
+    expect(order).toMatchObject({ slotStart: SLOT.start, slotEnd: SLOT.end, packageId: "apprentice-25" });
+    const expires = Date.parse(String(order.holdExpiresAt));
+    expect(expires - before).toBeGreaterThanOrEqual(59 * 60 * 1000);
+    expect(expires - before).toBeLessThanOrEqual(61 * 60 * 1000);
+    expect(body.holdExpiresAt).toBe(order.holdExpiresAt);
+  });
+});
+
+describe("unpaid hold release", () => {
+  it("releases expired holds before reading open slots", async () => {
+    await fetch(`${baseUrl}/api/apprenticeship/slots?package=apprentice-25`);
+    expect(lazyRelease).toHaveBeenCalled();
+    expect(lazyRelease.mock.invocationCallOrder[0]).toBeLessThan(availability.mock.invocationCallOrder[0]);
+  });
+
+  it("runs the cron sweep only with the cron secret", async () => {
+    const backup = process.env.CRON_SECRET;
+    process.env.CRON_SECRET = "cron-test";
+    try {
+      const anonymous = await fetch(`${baseUrl}/api/apprenticeship/release-holds`);
+      expect(anonymous.status).toBe(401);
+      const wrong = await fetch(`${baseUrl}/api/apprenticeship/release-holds`, { headers: { Authorization: "Bearer nope" } });
+      expect(wrong.status).toBe(401);
+      expect(cronRelease).not.toHaveBeenCalled();
+      const ok = await fetch(`${baseUrl}/api/apprenticeship/release-holds`, { headers: { Authorization: "Bearer cron-test" } });
+      expect(ok.status).toBe(200);
+      expect(await ok.json()).toMatchObject({ ok: true, released: 1 });
+      delete process.env.CRON_SECRET;
+      const unset = await fetch(`${baseUrl}/api/apprenticeship/release-holds`, { headers: { Authorization: "Bearer " } });
+      expect(unset.status).toBe(401);
+    } finally {
+      if (backup === undefined) delete process.env.CRON_SECRET;
+      else process.env.CRON_SECRET = backup;
+    }
   });
 });

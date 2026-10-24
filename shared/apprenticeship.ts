@@ -19,6 +19,7 @@ import {
   type StaffCatalogPackage,
 } from "./bookingCatalog.ts";
 import { BOOKING_PROCESSING_LABEL } from "./invoiceProcessing.ts";
+import { RE75_LEAD_SOURCE } from "./realestate75.ts";
 import { applyServerTravel, travelCustomerLine, type TravelAssessment } from "./travelZones.ts";
 
 export const APPRENTICESHIP_ORDER_SOURCE = "apprenticeship";
@@ -27,6 +28,70 @@ export const APPRENTICESHIP_TIME_ZONE = "America/Chicago";
 export const APPRENTICESHIP_BOOKING_FEE = 25;
 export const APPRENTICESHIP_BOOKING_FEE_LINE = "Booking fee $25, credited toward your package";
 export const APPRENTICESHIP_BALANCE_LINE = "The balance is invoiced after the shoot.";
+/**
+ * Every apprentice booking needs the $25 booking fee before it is confirmed.
+ * The order sits in this status (and the calendar event stays a tentative hold)
+ * until the Square deposit webhook records the fee.
+ */
+export const APPRENTICESHIP_AWAITING_DEPOSIT_STATUS = "awaiting_deposit";
+/** Unpaid holds are released after this many minutes. */
+export const APPRENTICESHIP_HOLD_MINUTES = 60;
+/** An unpaid hold that timed out. The calendar slot is released. */
+export const APPRENTICESHIP_EXPIRED_STATUS = "expired_unpaid";
+/** Paid after the hold expired and the time was taken. Office follows up. */
+export const APPRENTICESHIP_PAID_NEEDS_RESCHEDULE_STATUS = "paid_needs_reschedule";
+
+export function apprenticeshipHoldExpiresAt(created: Date, minutes = APPRENTICESHIP_HOLD_MINUTES): string {
+  return new Date(created.getTime() + minutes * 60 * 1000).toISOString();
+}
+
+function timeValue(value: unknown): number | null {
+  if (!value) return null;
+  if (typeof value === "string" || typeof value === "number") {
+    const parsed = new Date(value).getTime();
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "object" && value !== null && typeof (value as { toDate?: unknown }).toDate === "function") {
+    return (value as { toDate: () => Date }).toDate().getTime();
+  }
+  return null;
+}
+
+/**
+ * True when an apprentice order is still waiting on the $25 fee and its
+ * 60-minute hold has run out. Uses holdExpiresAt, else createdAt + 60 min.
+ */
+export function apprenticeshipHoldExpired(order: Record<string, unknown>, now: Date): boolean {
+  if (order.source !== APPRENTICESHIP_ORDER_SOURCE) return false;
+  if (order.status !== APPRENTICESHIP_AWAITING_DEPOSIT_STATUS) return false;
+  if ((Number(order.depositPaid) || 0) > 0) return false;
+  const explicit = timeValue(order.holdExpiresAt);
+  const created = timeValue(order.createdAt);
+  const expires = explicit ?? (created == null ? null : created + APPRENTICESHIP_HOLD_MINUTES * 60 * 1000);
+  return expires != null && expires <= now.getTime();
+}
+
+export const APPRENTICESHIP_DEPOSIT_REQUIRED_LINE =
+  "Your time is held for 60 minutes and confirmed once the $25 booking fee is paid.";
+/** Pages that may send apprentice orders. Picks the lead source and the Square return page. */
+export const APPRENTICESHIP_RETURN_PAGES = ["apprenticeship", "realestate-75", "ordericonic"] as const;
+export type ApprenticeshipReturnPage = (typeof APPRENTICESHIP_RETURN_PAGES)[number];
+const APPRENTICESHIP_LEAD_SOURCES: Record<ApprenticeshipReturnPage, string> = {
+  apprenticeship: "Apprenticeship page",
+  "realestate-75": RE75_LEAD_SOURCE,
+  ordericonic: "Order Now (apprentice)",
+};
+
+export function apprenticeshipReturnPage(value: unknown): ApprenticeshipReturnPage {
+  return (APPRENTICESHIP_RETURN_PAGES as readonly string[]).includes(String(value))
+    ? value as ApprenticeshipReturnPage
+    : "apprenticeship";
+}
+
+export function apprenticeshipLeadSource(page: unknown): string {
+  return APPRENTICESHIP_LEAD_SOURCES[apprenticeshipReturnPage(page)];
+}
 export const APPRENTICESHIP_CALENDAR_FALLBACK =
   "Open times are not listed right now. Call or email and we will set the appointment with you.";
 export const APPRENTICESHIP_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar";
@@ -358,6 +423,12 @@ export interface ApprenticeshipOrderInput {
   address: string;
   slotStart: string | null;
   preferredTime: string;
+  /** Which public page sent the order. Whitelisted. */
+  returnPage: ApprenticeshipReturnPage;
+  /** Short office-only notes from the page (brokerage, occupancy, sq ft). */
+  details: string;
+  /** Google Ads click id, when the page had one. */
+  gclid: string;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -385,6 +456,8 @@ export function parseApprenticeshipOrder(
   const packageId = text(raw.packageId);
   const slotStart = text(raw.slotStart);
   const preferredTime = text(raw.preferredTime);
+  const details = text(raw.details);
+  const gclid = text(raw.gclid);
 
   if (!isApprenticeshipPackage(packageId) || !findApprenticeshipPackage(packageId)) {
     return { ok: false, error: "Choose an apprenticeship package." };
@@ -398,6 +471,7 @@ export function parseApprenticeshipOrder(
   if (address.length > 200) return { ok: false, error: "Address is too long." };
   if (slotStart && Number.isNaN(Date.parse(slotStart))) return { ok: false, error: "Choose an open time." };
   if (preferredTime.length > 160) return { ok: false, error: "Preferred time is too long." };
+  if (details.length > 600) return { ok: false, error: "Notes are too long." };
 
   return {
     ok: true,
@@ -410,15 +484,21 @@ export function parseApprenticeshipOrder(
       address,
       slotStart: slotStart || null,
       preferredTime,
+      returnPage: apprenticeshipReturnPage(raw.returnPage),
+      details,
+      gclid: /^[A-Za-z0-9_-]{1,200}$/.test(gclid) ? gclid : "",
     },
   };
 }
 
-export function apprenticeshipBookingReturnPath(orderNumber: string): string {
+export function apprenticeshipBookingReturnPath(orderNumber: string, page?: unknown): string {
   const params = new URLSearchParams({
     booking: "received",
     order: orderNumber,
   });
+  if (apprenticeshipReturnPage(page) === "realestate-75") {
+    return `/realestate-75/schedule?${params.toString()}`;
+  }
   return `/apprenticeship?${params.toString()}`;
 }
 
