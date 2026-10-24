@@ -41,7 +41,15 @@ import {
   squareWebhookNotificationUrls,
   squareWebhookSignatureValid,
 } from "../services/squareWebhook";
-import { APPRENTICESHIP_ORDER_SOURCE, apprenticeshipBookingReturnPath } from "../../shared/apprenticeship";
+import {
+  APPRENTICESHIP_AWAITING_DEPOSIT_STATUS,
+  APPRENTICESHIP_EXPIRED_STATUS,
+  APPRENTICESHIP_HOLD_MINUTES,
+  APPRENTICESHIP_ORDER_SOURCE,
+  apprenticeshipBookingReturnPath,
+} from "../../shared/apprenticeship";
+import { confirmApprenticeshipEvent } from "../services/apprenticeshipCalendar";
+import { resolveLateApprenticeshipPayment } from "../services/apprenticeshipHolds";
 import { seniorDepositCheckoutLive, seniorLivingDepositReturnPath } from "../../shared/seniorLiving";
 
 const router = Router();
@@ -567,6 +575,8 @@ async function applyDepositPayment({
     paymentKey ? `square-${paymentKey}` : `deposit-${invoiceId}`,
   );
 
+  let confirmEvent: { calendarId: string | null; eventId: string; orderNumber: string } | null = null;
+  let lateApprenticeOrderId = "";
   await db().runTransaction(async (tx) => {
     const invoiceSnap = await tx.get(invoiceRef);
     if (!invoiceSnap.exists) return;
@@ -605,16 +615,40 @@ async function applyDepositPayment({
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
     if (orderRef && orderSnap?.exists) {
+      const order = (orderSnap.data() || {}) as Record<string, unknown>;
+      // Apprentice bookings are only confirmed once the $25 booking fee lands.
+      const confirmsBooking = order.source === APPRENTICESHIP_ORDER_SOURCE
+        && order.status === APPRENTICESHIP_AWAITING_DEPOSIT_STATUS;
+      // Paid after the 60-minute hold expired: re-confirm only if the time is still open.
+      if (order.source === APPRENTICESHIP_ORDER_SOURCE && order.status === APPRENTICESHIP_EXPIRED_STATUS && orderId) {
+        lateApprenticeOrderId = orderId;
+      }
       tx.update(orderRef, {
         depositPaid,
         balanceDue: amountDue,
         paymentStatus: amountDue <= 0 ? "paid" : "partial",
+        ...(confirmsBooking
+          ? {
+            status: "confirmed",
+            depositStatus: "paid",
+            confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }
+          : {}),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
+      if (confirmsBooking && typeof order.calendarEventId === "string" && order.calendarEventId) {
+        confirmEvent = {
+          calendarId: typeof order.calendarId === "string" ? order.calendarId : null,
+          eventId: order.calendarEventId,
+          orderNumber: String(order.orderNumber || ""),
+        };
+      }
     }
     if (requestRef && requestSnap?.exists) {
+      const request = (requestSnap.data() || {}) as Record<string, unknown>;
       tx.update(requestRef, {
         depositPaid,
+        ...(request.source === APPRENTICESHIP_ORDER_SOURCE ? { depositStatus: "paid" } : {}),
         balanceDue: amountDue,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -635,6 +669,23 @@ async function applyDepositPayment({
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
   });
+
+  if (lateApprenticeOrderId) {
+    try {
+      await resolveLateApprenticeshipPayment(lateApprenticeOrderId);
+    } catch (error) {
+      console.error("[Payments] Late apprenticeship payment follow-up failed:", error);
+    }
+  }
+
+  const held = confirmEvent as { calendarId: string | null; eventId: string; orderNumber: string } | null;
+  if (held) {
+    try {
+      await confirmApprenticeshipEvent(held);
+    } catch (error) {
+      console.error("[Payments] Apprenticeship calendar confirm failed:", error);
+    }
+  }
 }
 
 // Legacy/private Stripe intent route. Keep this available for Studio Noir tools only.
@@ -1045,6 +1096,11 @@ router.post("/invoice/:id/deposit-checkout", async (req: Request, res: Response)
     if (alreadyPaid) {
       return res.status(409).json({ error: "The deposit is already paid." });
     }
+    if (orderSource === APPRENTICESHIP_ORDER_SOURCE && order.status === APPRENTICESHIP_EXPIRED_STATUS) {
+      return res.status(409).json({
+        error: `This hold expired after ${APPRENTICESHIP_HOLD_MINUTES} minutes without the $25 booking fee. Please book a new time.`,
+      });
+    }
     if (String(invoice.status || "draft") !== "draft") {
       return res.status(409).json({ error: "The deposit can only be paid while the invoice is a draft." });
     }
@@ -1090,7 +1146,7 @@ router.post("/invoice/:id/deposit-checkout", async (req: Request, res: Response)
         checkout_options: {
           redirect_url: `${appUrl()}${
             orderSource === APPRENTICESHIP_ORDER_SOURCE
-              ? apprenticeshipBookingReturnPath(orderNumber)
+              ? apprenticeshipBookingReturnPath(orderNumber, invoice.depositReturn)
               : seniorLivingDepositReturnPath(orderNumber)
           }`,
         },

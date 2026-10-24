@@ -1,14 +1,17 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { MoneyAmount } from "@/components/MoneyAmount";
-import { BookingConfirmation } from "@/components/BookingConfirmation";
-import ApprenticeSchedulePicker from "@/components/ApprenticeSchedulePicker";
+import ApprenticeLiveSlotPicker, { type LiveSlotState } from "@/components/ApprenticeLiveSlotPicker";
 import PropertyAddressField from "@/components/PropertyAddressField";
-import { createOrder } from "@/lib/createOrder";
-import { readClientNotificationsLive, type BookingSubmitResult } from "@/lib/bookingFollowUp";
 import { trackConversion } from "@/lib/tracking";
 import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "@shared/businessContact";
 import { APPRENTICESHIP_OVERAGE_LABEL } from "@shared/bookingCatalog";
+import {
+  APPRENTICESHIP_BALANCE_LINE,
+  APPRENTICESHIP_BOOKING_FEE,
+  APPRENTICESHIP_BOOKING_FEE_LINE,
+  APPRENTICESHIP_DEPOSIT_REQUIRED_LINE,
+} from "@shared/apprenticeship";
 import type { PickedServiceLocation } from "@shared/serviceLocation";
 import {
   RE75_LEAD_SOURCE,
@@ -17,11 +20,9 @@ import {
   RE75_PATHS,
   RE75_GALLERY_CAPTION,
   RE75_GALLERY_DISCLAIMER,
-  RE75_TIME_MESSAGE,
   RE75_TRAVEL_TBD_NOTE,
   classifyRealEstate75Area,
   isRealEstate75PackageId,
-  realEstate75AppointmentChoice,
   realEstate75Package,
   realEstate75Quote,
   sanitizeGclid,
@@ -35,6 +36,8 @@ const GCLID_KEY = "re75-gclid";
 const DRAFT_KEY = "re75-booking-draft";
 const CONVERSION_PREFIX = "re75-conversion-";
 const HERO_ALT = "25 listing photos for $75, 20-minute shoot by Iconic apprentices";
+/** Where /realestate-75 is embedded. Return from Square lands on /realestate-75/schedule?booking=received. */
+const RETURN_PAGE = "realestate-75";
 /** Wix parent site. Links that leave this landing page open there, not inside the embed. */
 const MAIN_SITE = "https://www.iconicimagestx.com";
 
@@ -68,7 +71,10 @@ interface Draft {
   sqft: string;
   occupancy: string;
   slotDate: string;
-  slotTime: string;
+  /** ISO start of an open slot from /api/apprenticeship/slots. */
+  slotStart: string;
+  /** Only when the apprentice calendar cannot be read. */
+  preferredTime: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -83,7 +89,8 @@ const EMPTY_DRAFT: Draft = {
   sqft: "",
   occupancy: "",
   slotDate: "",
-  slotTime: "",
+  slotStart: "",
+  preferredTime: "",
   firstName: "",
   lastName: "",
   email: "",
@@ -99,7 +106,9 @@ function readDraft(): Draft {
     const servicePlace = parsed.servicePlace && parsed.servicePlace.placeId && parsed.servicePlace.formatted
       ? parsed.servicePlace
       : null;
-    return { ...EMPTY_DRAFT, ...parsed, packageId, servicePlace };
+    const slotStart = typeof parsed.slotStart === "string" ? parsed.slotStart : "";
+    const preferredTime = typeof parsed.preferredTime === "string" ? parsed.preferredTime : "";
+    return { ...EMPTY_DRAFT, ...parsed, packageId, servicePlace, slotStart, preferredTime };
   } catch {
     return EMPTY_DRAFT;
   }
@@ -108,6 +117,33 @@ function readDraft(): Draft {
 function appointmentLabel(pkg: RealEstate75Package): string {
   return pkg.durationMinutes === 60 ? "1 hour" : `${pkg.durationMinutes} minutes`;
 }
+
+/** Saved order waiting on the $25 booking fee. */
+interface DepositStep {
+  orderNumber: string;
+  checkoutUrl: string;
+  error: string;
+  slotLabel: string;
+  packageId: RealEstate75PackageId;
+}
+
+/**
+ * Square checkout cannot run inside the Wix embed. Leave the frame when we
+ * are allowed to; otherwise the Pay button (new tab) is the way through.
+ */
+function openCheckout(url: string) {
+  try {
+    if (window.top && window.top !== window) {
+      window.top.location.href = url;
+      return;
+    }
+  } catch {
+    return;
+  }
+  window.location.assign(url);
+}
+
+export const re75CheckoutNavigation = { open: openCheckout };
 
 function sectionId(pathname: string): string {
   if (pathname.endsWith("/schedule")) return "schedule";
@@ -127,7 +163,14 @@ export default function RealEstate75() {
   const [processingOn, setProcessingOn] = useState(true);
   const [formError, setFormError] = useState("");
   const [pending, setPending] = useState(false);
-  const [confirmation, setConfirmation] = useState<BookingSubmitResult | null>(null);
+  const [confirmation, setConfirmation] = useState<DepositStep | null>(null);
+  const [slotState, setSlotState] = useState<LiveSlotState>({ available: null, slots: [], fallback: "" });
+  const [slotReload, setSlotReload] = useState(0);
+  const [website, setWebsite] = useState("");
+  const feeReceived = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get("booking") === "received" ? (params.get("order") || "").slice(0, 20) || "received" : "";
+  }, [location.search]);
   const [hydrated, setHydrated] = useState(false);
   const [barHidden, setBarHidden] = useState(false);
   const [scheduleVisible, setScheduleVisible] = useState(false);
@@ -156,7 +199,7 @@ export default function RealEstate75() {
     setDraft((current) => (
       current.packageId === fromUrl
         ? current
-        : { ...current, packageId: fromUrl, slotTime: "" }
+        : { ...current, packageId: fromUrl, slotStart: "" }
     ));
   }, [hydrated, location.search]);
 
@@ -198,12 +241,12 @@ export default function RealEstate75() {
 
   useEffect(() => {
     if (!confirmation) return;
-    const bookingId = confirmation.requestId || confirmation.orderNumber || "";
+    const bookingId = confirmation.orderNumber || "";
     if (!bookingId) return;
     const key = `${CONVERSION_PREFIX}${bookingId}`;
     if (sessionStorage.getItem(key)) return;
     sessionStorage.setItem(key, "1");
-    const booked = realEstate75Package(draft.packageId);
+    const booked = realEstate75Package(confirmation.packageId);
     trackConversion({
       name: "re75_booking",
       packageId: booked.id,
@@ -213,7 +256,7 @@ export default function RealEstate75() {
       email: draft.email,
       phone: draft.phone,
     });
-  }, [confirmation, draft.email, draft.packageId, draft.phone]);
+  }, [confirmation, draft.email, draft.phone]);
 
   useEffect(() => {
     if (window.parent === window) return;
@@ -312,13 +355,18 @@ export default function RealEstate75() {
       setFormError("Tell us if the home is occupied, vacant, or a lease.");
       return;
     }
-    const appointment = realEstate75AppointmentChoice({
-      date: draft.slotDate,
-      time: draft.slotTime,
-      durationMinutes: pkg.durationMinutes,
-    });
-    if (!appointment) {
-      setFormError(RE75_TIME_MESSAGE);
+    const calendarOpen = slotState.available === true;
+    const slot = calendarOpen ? slotState.slots.find((item) => item.start === draft.slotStart) || null : null;
+    if (slotState.available === null) {
+      setFormError("Still checking open times. Try again in a moment.");
+      return;
+    }
+    if (calendarOpen && !slot) {
+      setFormError("Choose an open date and time.");
+      return;
+    }
+    if (!calendarOpen && draft.preferredTime.trim().length < 3) {
+      setFormError("Tell us a preferred day and time.");
       return;
     }
     if (!draft.firstName.trim() || !draft.lastName.trim()) {
@@ -340,54 +388,66 @@ export default function RealEstate75() {
     setPending(true);
     setFormError("");
     try {
-      const [result, clientNotificationsLive] = await Promise.all([
-        createOrder({
+      const response = await fetch("/api/apprenticeship/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          packageId: pkg.id,
           firstName: draft.firstName.trim(),
           lastName: draft.lastName.trim(),
           email: draft.email.trim(),
           phone: draft.phone.trim(),
           address: draft.address.trim(),
-          servicePlace: draft.servicePlace,
-          sqft: draft.sqft.replace(/,/g, ""),
-          propertyStatus: draft.occupancy,
-          furnishingStatus: draft.occupancy === "Vacant" ? "Vacant" : "Furnished",
-          accessMethod: "Not collected on this form",
-          serviceDate: appointment.date,
-          serviceTime: appointment.time,
-          slotStart: "",
-          photographerId: "",
-          leadSource: RE75_LEAD_SOURCE,
+          slotStart: slot ? slot.start : "",
+          preferredTime: slot ? "" : draft.preferredTime.trim(),
+          website,
+          returnPage: RETURN_PAGE,
           gclid,
-          brokerage: draft.brokerage.trim(),
-          selectedBasics: [pkg.id],
-          selectedAddOns: [],
-          selectedService: "",
-          lineItems: [{
-            id: pkg.id,
-            name: pkg.name,
-            unitPrice: quote.subtotal,
-            qty: 1,
-            price: quote.subtotal,
-          }],
-          total: quote.subtotal,
-          vibeNote: [
-            `Package: ${pkg.name}`,
+          details: [
+            `Page: /realestate-75`,
             `Brokerage: ${draft.brokerage.trim()}`,
             `Home: ${draft.occupancy}`,
             `Approx sq ft: ${draft.sqft.trim()}`,
             current.travelFee === "tbd" ? RE75_TRAVEL_TBD_NOTE : "",
           ].filter(Boolean).join("\n"),
         }),
-        readClientNotificationsLive(),
-      ]);
+      });
+      const data = await response.json().catch(() => null) as {
+        success?: boolean;
+        orderNumber?: string;
+        invoiceId?: string;
+        payToken?: string;
+        checkoutReady?: boolean;
+        error?: string;
+      } | null;
+      if (response.status === 409) setSlotReload((value) => value + 1);
+      if (!response.ok || !data?.success) {
+        setFormError(data?.error || `We could not save that booking. Please call ${BUSINESS_CONTACT.phoneDisplay}.`);
+        return;
+      }
+      let checkoutUrl = "";
+      let payError = "";
+      if (data.checkoutReady && data.invoiceId && data.payToken) {
+        const checkout = await fetch(`/api/payments/invoice/${encodeURIComponent(data.invoiceId)}/deposit-checkout`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ t: data.payToken }),
+        });
+        const payment = await checkout.json().catch(() => null) as { checkoutUrl?: string; error?: string } | null;
+        if (checkout.ok && payment?.checkoutUrl && /^https:\/\//.test(payment.checkoutUrl)) checkoutUrl = payment.checkoutUrl;
+        else payError = payment?.error || "";
+      }
       setConfirmation({
-        ...result,
-        selectedService: pkg.id,
-        clientNotificationsLive,
+        orderNumber: data.orderNumber || "",
+        checkoutUrl,
+        error: checkoutUrl ? "" : payError || `Call ${BUSINESS_CONTACT.phoneDisplay} to pay the $25 booking fee and lock in your time.`,
+        slotLabel: slot ? slot.label : draft.preferredTime.trim(),
+        packageId: pkg.id,
       });
       sessionStorage.removeItem(DRAFT_KEY);
-    } catch (error) {
-      setFormError(error instanceof Error ? error.message : "We could not save that booking.");
+      if (checkoutUrl) re75CheckoutNavigation.open(checkoutUrl);
+    } catch {
+      setFormError(`We could not save that booking. Please call ${BUSINESS_CONTACT.phoneDisplay}.`);
     } finally {
       setPending(false);
     }
@@ -416,6 +476,11 @@ export default function RealEstate75() {
           quote={quote}
           pending={pending}
           confirmation={confirmation}
+          feeReceived={feeReceived}
+          slotReload={slotReload}
+          onSlotState={setSlotState}
+          website={website}
+          onWebsite={setWebsite}
           onSubmit={submitBooking}
           onPatch={patch}
         />
@@ -595,7 +660,7 @@ function Benefits() {
     },
     {
       title: "25 or 50 edited photos",
-      body: "You get the edited photos in the option you schedule. We confirm the requested time within 1 business day.",
+      body: "You get the edited photos in the option you schedule. Pick an open time and the $25 booking fee locks it in.",
     },
   ];
   return (
@@ -643,7 +708,7 @@ function WhatYouGet({ processingOn }: { processingOn: boolean }) {
 
 function HowItWorks() {
   const steps = [
-    "Pick 25 photos or 50 photos, then pick a time.",
+    "Pick 25 photos or 50 photos, pick an open time, and pay the $25 booking fee to lock it in.",
     "Have the home prepped. Lights on, clutter put away, ready when we arrive.",
     "The apprentice shoots for 20 minutes (25 photos) or 1 hour (50 photos). You get the edited photos for that option.",
   ];
@@ -768,7 +833,7 @@ function Faq({ processingOn }: { processingOn: boolean }) {
     },
     {
       q: "When do I pay?",
-      a: `The card total is on this page before you schedule. ${starter.priceLine} ${upgrade.priceLine} This form saves the booking. Iconic Images invoices after the shoot, the same way our other bookings work. We confirm the requested time within 1 business day.`,
+      a: `A $25 booking fee by card when you schedule. It is credited toward your package, and your time is confirmed once it is paid. ${starter.priceLine} ${upgrade.priceLine} The balance is invoiced after the shoot.`,
     },
     {
       q: "Can I reschedule?",
@@ -805,22 +870,60 @@ function Schedule(props: {
   formError: string;
   quote: ReturnType<typeof realEstate75Quote>;
   pending: boolean;
-  confirmation: BookingSubmitResult | null;
+  confirmation: DepositStep | null;
+  feeReceived: string;
+  slotReload: number;
+  onSlotState: (state: LiveSlotState) => void;
+  website: string;
+  onWebsite: (value: string) => void;
   onSubmit: (event: FormEvent) => void;
   onPatch: (partial: Partial<Draft>) => void;
 }) {
   const { draft, confirmation, area, pkg } = props;
+  const balance = Math.max(0, Math.round((props.quote.total - APPRENTICESHIP_BOOKING_FEE) * 100) / 100);
   return (
     <section id="schedule" className="scroll-mt-4 border-t border-neutral-200 px-4 py-14 md:px-8">
       <div className="mx-auto max-w-3xl">
         <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Schedule your shoot</h2>
         <p className="mt-3 text-lg text-neutral-700">{pkg.name}. {pkg.photos} photos · {appointmentLabel(pkg)}. {props.quote.priceLine}</p>
+        {props.feeReceived ? (
+          <p data-testid="re75-fee-received" className="mt-6 rounded-2xl bg-neutral-950 px-5 py-4 text-base leading-relaxed text-white">
+            Booking fee received{props.feeReceived !== "received" ? ` for order ${props.feeReceived}` : ""}. Your shoot is confirmed. {APPRENTICESHIP_BALANCE_LINE}
+          </p>
+        ) : null}
         {confirmation ? (
-          <div className="mt-8">
-            <p className="mb-4 leading-relaxed text-neutral-800">
-              We confirm the requested time within 1 business day. Iconic Images invoices after the shoot. Card total {props.quote.priceLine}
+          <div className="mt-8 rounded-2xl border-2 border-black p-6" data-testid="re75-deposit-step">
+            <p className="text-sm font-bold uppercase tracking-[0.14em] text-[#0d9488]">Step 2 of 2 · Booking fee</p>
+            <h3 className="mt-2 text-2xl font-black">
+              {confirmation.checkoutUrl ? "One step left: the $25 booking fee." : "Your time is on hold."}
+            </h3>
+            <p className="mt-3 leading-relaxed text-neutral-800">
+              {confirmation.orderNumber ? `Order ${confirmation.orderNumber}. ` : ""}
+              {realEstate75Package(confirmation.packageId).name}
+              {confirmation.slotLabel ? ` · ${confirmation.slotLabel}` : ""}. Photographed by an Iconic Images apprentice.
             </p>
-            <BookingConfirmation result={confirmation} onBookAnother={() => window.location.assign(RE75_PATHS.schedule)} />
+            <p className="mt-2 font-semibold text-neutral-950">{APPRENTICESHIP_DEPOSIT_REQUIRED_LINE}</p>
+            {confirmation.checkoutUrl ? (
+              <>
+                <a
+                  href={confirmation.checkoutUrl}
+                  target="_blank"
+                  rel="noopener"
+                  data-testid="re75-pay-fee"
+                  className="mt-5 inline-flex min-h-14 w-full items-center justify-center rounded-xl bg-black px-5 text-lg font-semibold text-white hover:bg-neutral-800"
+                >
+                  Pay $25 booking fee
+                </a>
+                <p className="mt-3 text-sm leading-relaxed text-neutral-700">
+                  Secure card checkout by Square. {APPRENTICESHIP_BOOKING_FEE_LINE}. Balance after the shoot: ${balance.toFixed(2)}.
+                </p>
+              </>
+            ) : (
+              <p className="mt-4 font-semibold text-red-700">{confirmation.error}</p>
+            )}
+            <p className="mt-4 text-sm text-neutral-700">
+              Questions? <a href={BUSINESS_CONTACT.phoneHref} className="font-semibold underline underline-offset-4">{BUSINESS_CONTACT.phoneDisplay}</a>
+            </p>
           </div>
         ) : (
           <form className="mt-8 space-y-6" onSubmit={props.onSubmit}>
@@ -839,7 +942,7 @@ function Schedule(props: {
                       checked={draft.packageId === item.id}
                       onChange={() => props.onPatch({
                         packageId: item.id,
-                        slotTime: "",
+                        slotStart: "",
                       })}
                       className="sr-only"
                     />
@@ -901,11 +1004,15 @@ function Schedule(props: {
                 </div>
               </fieldset>
             </div>
-            <ApprenticeSchedulePicker
-              date={draft.slotDate}
-              time={draft.slotTime}
+            <ApprenticeLiveSlotPicker
+              packageId={pkg.id}
               durationMinutes={pkg.durationMinutes}
-              onChange={({ date, time }) => props.onPatch({ slotDate: date, slotTime: time })}
+              date={draft.slotDate}
+              slotStart={draft.slotStart}
+              preferredTime={draft.preferredTime}
+              reloadKey={props.slotReload}
+              onState={props.onSlotState}
+              onChange={({ date, slotStart, preferredTime }) => props.onPatch({ slotDate: date, slotStart, preferredTime })}
             />
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block text-sm font-semibold">
@@ -924,11 +1031,20 @@ function Schedule(props: {
                 Phone
                 <input type="tel" value={draft.phone} onChange={(event) => props.onPatch({ phone: event.target.value })} className={`${fieldClass()} scroll-mb-28`} autoComplete="tel" />
               </label>
-              <label className="block text-sm font-semibold">
+              <label className="block text-sm font-semibold" htmlFor="re75-brokerage">
                 Brokerage
-                <input value={draft.brokerage} onChange={(event) => props.onPatch({ brokerage: event.target.value })} className={`${fieldClass()} scroll-mb-28`} />
+                <input id="re75-brokerage" value={draft.brokerage} onChange={(event) => props.onPatch({ brokerage: event.target.value })} className={`${fieldClass()} scroll-mb-28`} />
               </label>
             </div>
+            <input
+              name="website"
+              value={props.website}
+              onChange={(event) => props.onWebsite(event.target.value)}
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden="true"
+              className="absolute -left-[9999px] h-0 w-0"
+            />
             <div className="space-y-3 rounded-2xl border border-neutral-200 p-5" data-testid="re75-summary">
               <h3 className="text-xl font-black">{pkg.name}</h3>
               <p className="text-sm text-neutral-700">{pkg.photos} photos · {appointmentLabel(pkg)}</p>
@@ -946,16 +1062,28 @@ function Schedule(props: {
                 <span>Total by card</span>
                 <MoneyAmount>${props.quote.total.toFixed(2)}</MoneyAmount>
               </p>
-              <p className="text-sm leading-relaxed text-neutral-700">{props.quote.priceLine}</p>
+              <div className="rounded-xl bg-neutral-950 p-4 text-white" data-testid="re75-deposit-due">
+                <p className="flex items-center justify-between gap-4 text-lg font-black">
+                  <span>Due now: booking fee</span>
+                  <span>${APPRENTICESHIP_BOOKING_FEE.toFixed(2)}</span>
+                </p>
+                <p className="mt-1 flex items-center justify-between gap-4 text-sm text-white/80">
+                  <span>Balance after the shoot</span>
+                  <span>${balance.toFixed(2)}</span>
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-white/80">
+                  {APPRENTICESHIP_BOOKING_FEE_LINE}. Secure card checkout by Square. {APPRENTICESHIP_DEPOSIT_REQUIRED_LINE}
+                </p>
+              </div>
               {area.status === "inside" && area.travelFee === "tbd" ? (
                 <p className="text-sm leading-relaxed text-neutral-700">{RE75_TRAVEL_TBD_NOTE}</p>
               ) : (
                 <p className="text-sm leading-relaxed text-neutral-700">Travel is included for The Woodlands, Spring, and Conroe.</p>
               )}
             </div>
-            {props.formError ? <p className="text-sm font-semibold text-red-700">{props.formError}</p> : null}
+            {props.formError ? <p className="text-sm font-semibold text-red-700" role="alert">{props.formError}</p> : null}
             <button type="submit" disabled={props.pending} className="min-h-14 w-full rounded-xl bg-black px-5 text-lg font-semibold text-white disabled:opacity-60">
-              {props.pending ? "Saving…" : `Schedule · $${pkg.subtotal}`}
+              {props.pending ? "Booking…" : "Book & pay $25 booking fee"}
             </button>
           </form>
         )}
