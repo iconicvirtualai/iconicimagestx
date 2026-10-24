@@ -1,6 +1,7 @@
 /**
  * Staff Studio information architecture.
- * One Studio home, three subsections. Photo editing is the existing scratch pad.
+ * One Studio home. Photo editing is the existing scratch pad.
+ * The video editor is a separate section and does not change the photo editor.
  * Job links open /admin/studio/editing. Old Iconic Studio and operations URLs redirect there.
  */
 
@@ -10,6 +11,7 @@ export const STUDIO_HOME_PATH = "/admin/studio";
 export const STUDIO_PHOTO_EDITING_ALIAS = "/admin/studio/editing";
 export const STUDIO_PROJECTS_PATH = "/admin/studio/projects";
 export const STUDIO_MARKETING_PATH = "/admin/studio/marketing";
+export const STUDIO_VIDEO_PATH = "/admin/studio/video";
 
 /** Previous operations upload screen. The route redirects to the editor. */
 export const STUDIO_OPERATIONS_PATH = "/admin/studio/operations";
@@ -20,7 +22,7 @@ export const STUDIO_LISTINGS_PATH = "/admin/listings";
 /** Previous Iconic Studio index. The route redirects to the editor. */
 export const ICONIC_STUDIO_INDEX_PATH = "/admin/iconic-studio";
 
-export type StudioSectionId = "editing" | "projects" | "marketing";
+export type StudioSectionId = "editing" | "projects" | "marketing" | "video";
 
 export interface StudioSection {
   id: StudioSectionId;
@@ -52,6 +54,13 @@ export const STUDIO_SECTIONS: readonly StudioSection[] = [
     href: STUDIO_MARKETING_PATH,
     match: [STUDIO_MARKETING_PATH],
     detail: "Social graphics, listing-site packs, and extras. Not wired yet.",
+  },
+  {
+    id: "video",
+    label: "Video editor",
+    href: STUDIO_VIDEO_PATH,
+    match: [STUDIO_VIDEO_PATH],
+    detail: "Templates and a free timeline. Renders stay queued until the worker is connected.",
   },
 ] as const;
 

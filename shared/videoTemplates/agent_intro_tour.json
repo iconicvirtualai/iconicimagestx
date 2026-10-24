@@ -1,0 +1,276 @@
+{
+ "id": "agent_intro_tour",
+ "name": "Agent Intro + Tour",
+ "version": 1,
+ "description": "Agent on camera first (name + brokerage lower third), then a beat-cut tour with whips and one flash, ending on an agent contact card over the hero exterior.",
+ "output": {
+  "w": 1080,
+  "h": 1920,
+  "fps": 60,
+  "alt_sizes": [
+   [
+    1920,
+    1080
+   ]
+  ]
+ },
+ "music": {
+  "track": "music/heartbeat_mixkit1000.mp3",
+  "bpm": 123.05,
+  "beat_offset": 0.511,
+  "start": 0.0,
+  "gain": 0.9,
+  "license": "Mixkit Stock Music Free License",
+  "first_cut_beat": 11,
+  "fade_out_beats": 6
+ },
+ "grade": {
+  "contrast": 1.08,
+  "saturation": 1.12,
+  "teal_orange": 0.4,
+  "vignette": 0.1,
+  "sharpen": 0.2
+ },
+ "fade_in_beats": 0.5,
+ "fade_out_beats": 4,
+ "defaults": {
+  "trans_beats": 0.42,
+  "out": {
+   "type": "whip",
+   "dir": "auto"
+  },
+  "speed": {
+   "base": 1.0,
+   "auto_ramps": true
+  }
+ },
+ "slots": [
+  {
+   "id": "s01",
+   "label": "Agent intro on camera (talking, keep audio-free framing)",
+   "out": {
+    "type": "flash",
+    "beats": 0.5
+   },
+   "kind": "agent",
+   "speed": {
+    "base": 1.0,
+    "auto_ramps": false
+   },
+   "point": "auto"
+  },
+  {
+   "id": "s02",
+   "label": "Exterior hero",
+   "beats": 4,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "exterior",
+   "point": "auto"
+  },
+  {
+   "id": "s03",
+   "label": "Entry",
+   "beats": 2,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "exterior",
+   "point": "auto"
+  },
+  {
+   "id": "s04",
+   "label": "Living",
+   "beats": 4,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "interior",
+   "point": "auto"
+  },
+  {
+   "id": "s05",
+   "label": "Kitchen",
+   "beats": 4,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "interior",
+   "point": "auto"
+  },
+  {
+   "id": "s06",
+   "label": "Kitchen detail",
+   "beats": 2,
+   "out": {
+    "type": "mask_wipe",
+    "dir": "auto",
+    "beats": 0.45
+   },
+   "kind": "detail",
+   "optional": true,
+   "drop_priority": 4,
+   "point": "auto"
+  },
+  {
+   "id": "s07",
+   "label": "Dining",
+   "beats": 2,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "interior",
+   "optional": true,
+   "drop_priority": 5,
+   "point": "auto"
+  },
+  {
+   "id": "s08",
+   "label": "Primary suite",
+   "beats": 4,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "interior",
+   "point": "auto"
+  },
+  {
+   "id": "s09",
+   "label": "Primary bath",
+   "beats": 4,
+   "out": {
+    "type": "zoom_through",
+    "beats": 0.5,
+    "rot": 15
+   },
+   "kind": "interior",
+   "point": "auto"
+  },
+  {
+   "id": "s10",
+   "label": "Backyard",
+   "beats": 4,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "exterior",
+   "point": "auto"
+  },
+  {
+   "id": "s11",
+   "label": "Aerial",
+   "beats": 4,
+   "out": {
+    "type": "whip",
+    "dir": "down"
+   },
+   "kind": "aerial",
+   "point": "auto"
+  },
+  {
+   "id": "s12",
+   "label": "Contact card over hero exterior",
+   "beats": 8,
+   "out": {
+    "type": "none"
+   },
+   "kind": "exterior",
+   "speed": {
+    "base": 0.8
+   },
+   "point": "auto"
+  }
+ ],
+ "layers": [
+  {
+   "type": "text",
+   "id": "agent_name",
+   "label": "Agent name",
+   "style": "title",
+   "text": "Your Name",
+   "size": 0.075,
+   "pos": [
+    0.5,
+    0.8
+   ],
+   "slot": "s01",
+   "start_beat": 1,
+   "end_beat": 9,
+   "rise": 0.015,
+   "tracking": 0.1
+  },
+  {
+   "type": "text",
+   "id": "brokerage",
+   "label": "Brokerage",
+   "style": "title",
+   "text": "Brokerage",
+   "size": 0.04,
+   "pos": [
+    0.5,
+    0.85
+   ],
+   "slot": "s01",
+   "start_beat": 1.5,
+   "end_beat": 9,
+   "tracking": 0.25
+  },
+  {
+   "type": "text",
+   "id": "cta",
+   "label": "Call to action",
+   "style": "title",
+   "text": "Schedule a tour",
+   "size": 0.065,
+   "pos": [
+    0.5,
+    0.42
+   ],
+   "slot": "last",
+   "start_beat": 1,
+   "end_beat": 8,
+   "tracking": 0.1
+  },
+  {
+   "type": "text",
+   "id": "phone",
+   "label": "Phone / email",
+   "style": "title",
+   "text": "(000) 000-0000",
+   "size": 0.05,
+   "pos": [
+    0.5,
+    0.48
+   ],
+   "slot": "last",
+   "start_beat": 1.5,
+   "end_beat": 8,
+   "tracking": 0.15
+  },
+  {
+   "type": "logo",
+   "id": "logo",
+   "path": null,
+   "slot": "last",
+   "pos": [
+    0.5,
+    0.62
+   ],
+   "width": 0.35,
+   "start_beat": 2,
+   "end_beat": 8
+  }
+ ],
+ "sfx": {
+  "whoosh_gain": 0.5,
+  "shimmer_gain": 0.4
+ }
+}

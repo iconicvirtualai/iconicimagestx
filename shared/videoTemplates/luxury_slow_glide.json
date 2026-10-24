@@ -1,0 +1,243 @@
+{
+ "id": "luxury_slow_glide",
+ "name": "Luxury Slow Glide",
+ "version": 1,
+ "description": "Calm, high-end walkthrough: slow-motion gimbal glides (0.6x from 60 fps sources), long holds, soft white dips and gentle push-throughs, clean serif-free uppercase titles. 30-40 s.",
+ "output": {
+  "w": 1080,
+  "h": 1920,
+  "fps": 60,
+  "alt_sizes": [
+   [
+    1920,
+    1080
+   ]
+  ]
+ },
+ "music": {
+  "track": "music/offmymind_mixkit1210.mp3",
+  "bpm": 152.0,
+  "beat_offset": 0.0,
+  "start": 10.26,
+  "gain": 0.9,
+  "license": "Mixkit Stock Music Free License",
+  "first_cut_beat": 8,
+  "fade_out_beats": 8
+ },
+ "grade": {
+  "contrast": 1.05,
+  "saturation": 1.06,
+  "teal_orange": 0.25,
+  "vignette": 0.1,
+  "sharpen": 0.15
+ },
+ "fade_in_beats": 2,
+ "fade_out_beats": 6,
+ "defaults": {
+  "trans_beats": 1.6,
+  "out": {
+   "type": "fade"
+  },
+  "speed": {
+   "base": 0.6,
+   "auto_ramps": false
+  }
+ },
+ "slots": [
+  {
+   "id": "s01",
+   "label": "Exterior hero (slow glide)",
+   "out": {
+    "type": "fade",
+    "beats": 2
+   },
+   "kind": "exterior",
+   "push": 0.03,
+   "point": "auto"
+  },
+  {
+   "id": "s02",
+   "label": "Entry / front door",
+   "beats": 8,
+   "out": {
+    "type": "zoom_through",
+    "beats": 1.2,
+    "zoom": 0.3,
+    "rot": 0
+   },
+   "kind": "exterior",
+   "point": "auto"
+  },
+  {
+   "id": "s03",
+   "label": "Foyer reveal",
+   "beats": 8,
+   "out": {
+    "type": "fade"
+   },
+   "kind": "interior",
+   "push": 0.03,
+   "point": "auto"
+  },
+  {
+   "id": "s04",
+   "label": "Living room",
+   "beats": 8,
+   "out": {
+    "type": "dip_white",
+    "beats": 1.6
+   },
+   "kind": "interior",
+   "point": "auto"
+  },
+  {
+   "id": "s05",
+   "label": "Kitchen wide",
+   "beats": 8,
+   "out": {
+    "type": "fade"
+   },
+   "kind": "interior",
+   "push": 0.03,
+   "point": "auto"
+  },
+  {
+   "id": "s06",
+   "label": "Kitchen detail",
+   "beats": 6,
+   "out": {
+    "type": "fade"
+   },
+   "kind": "detail",
+   "optional": true,
+   "drop_priority": 5,
+   "point": "auto"
+  },
+  {
+   "id": "s07",
+   "label": "Dining",
+   "beats": 6,
+   "out": {
+    "type": "fade"
+   },
+   "kind": "interior",
+   "optional": true,
+   "drop_priority": 4,
+   "point": "auto"
+  },
+  {
+   "id": "s08",
+   "label": "Primary suite",
+   "beats": 8,
+   "out": {
+    "type": "dip_white",
+    "beats": 1.6
+   },
+   "kind": "interior",
+   "point": "auto"
+  },
+  {
+   "id": "s09",
+   "label": "Primary bath",
+   "beats": 8,
+   "out": {
+    "type": "fade"
+   },
+   "kind": "interior",
+   "point": "auto"
+  },
+  {
+   "id": "s10",
+   "label": "Outdoor living / pool",
+   "beats": 8,
+   "out": {
+    "type": "zoom_through",
+    "beats": 1.2,
+    "zoom": 0.3
+   },
+   "kind": "exterior",
+   "point": "auto"
+  },
+  {
+   "id": "s11",
+   "label": "Aerial pull-away",
+   "beats": 10,
+   "out": {
+    "type": "none"
+   },
+   "kind": "aerial",
+   "speed": {
+    "base": 0.7
+   },
+   "point": "auto"
+  }
+ ],
+ "layers": [
+  {
+   "type": "text",
+   "id": "address",
+   "label": "Address",
+   "style": "title",
+   "text": "8104 High Meadow Ridge",
+   "size": 0.075,
+   "pos": [
+    0.5,
+    0.78
+   ],
+   "slot": "s01",
+   "start_beat": 1,
+   "end_beat": 7,
+   "rise": 0.02,
+   "tracking": 0.14
+  },
+  {
+   "type": "text",
+   "id": "city",
+   "label": "City line",
+   "style": "title",
+   "text": "Montgomery, Texas",
+   "size": 0.04,
+   "pos": [
+    0.5,
+    0.83
+   ],
+   "slot": "s01",
+   "start_beat": 1.5,
+   "end_beat": 7,
+   "tracking": 0.3
+  },
+  {
+   "type": "text",
+   "id": "agent",
+   "label": "Agent / brokerage",
+   "style": "title",
+   "text": "Presented by Your Name",
+   "size": 0.05,
+   "pos": [
+    0.5,
+    0.8
+   ],
+   "slot": "last",
+   "start_beat": 2,
+   "end_beat": 9,
+   "tracking": 0.18
+  },
+  {
+   "type": "logo",
+   "id": "logo",
+   "path": null,
+   "slot": "last",
+   "pos": [
+    0.5,
+    0.45
+   ],
+   "width": 0.4,
+   "start_beat": 2,
+   "end_beat": 9
+  }
+ ],
+ "sfx": {
+  "whoosh_gain": 0.25,
+  "shimmer_gain": 0.3
+ }
+}

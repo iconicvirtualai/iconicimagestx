@@ -216,3 +216,14 @@ The virtual staging API routes are now in `server/routes/vsai.ts`. You no longer
 | `packages` | Admin | Public |
 | `promoCodes` | Admin | Public |
 | `siteSettings` | Admin | Public |
+| `videoJobs` | Server only (rules deny client writes) | Staff |
+
+---
+
+## Studio video editor (not live)
+
+The editor at `/admin/studio/video` queues renders. It does not run ffmpeg on Vercel, and adding a video to a gallery does not email or text the client.
+
+Leave `VIDEO_EDITOR_ENABLED` and `VIDEO_TEMPLATES_ENABLED` unset in production until the owner turns them on. Preview can leave them unset (the server treats unset preview as on). The browser build also needs `VITE_VIDEO_EDITOR_ENABLED` and `VITE_VIDEO_TEMPLATES_ENABLED`, because Vite inlines `VITE_` variables.
+
+The render container, Cloud Tasks queue, and cost are documented in `workers/video-render/README.md`. Do not deploy that service, publish the new Firebase rules, or set production env vars as part of shipping this branch. `CLIENT_NOTIFY_LIVE` and `BOOKING_NOTIFY_LIVE` stay off.

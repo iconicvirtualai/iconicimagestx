@@ -314,6 +314,14 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // ─── Studio video jobs ───────────────────────────────────────────────────
+    // Staff can watch render progress. The server writes these with the Admin SDK.
+    // Publish this file in the Firebase console. Vercel does not deploy rules.
+    match /videoJobs/{jobId} {
+      allow read: if isStaff() && resource.data.kind in ['template', 'timeline'];
+      allow write: if false;
+    }
+
     // ─── Catch-all: deny everything else ─────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;

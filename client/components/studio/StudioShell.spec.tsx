@@ -19,6 +19,9 @@ describe("studio shell", () => {
     expect(html).toContain("Photo editing");
     expect(html).toContain("Projects");
     expect(html).toContain("Marketing kits");
+    expect(html).toContain("Video editor");
+    expect(html).toContain('data-testid="studio-section-video"');
+    expect(html).toContain('href="/admin/studio/video"');
     expect(html).toContain(`href="${STUDIO_SCRATCH_PATH}"`);
     expect(html).toContain('href="/admin/studio/projects"');
     expect(html).toContain('href="/admin/studio/marketing"');

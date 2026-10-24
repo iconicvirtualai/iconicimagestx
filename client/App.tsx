@@ -94,6 +94,7 @@ import AdminStudioHome from "./pages/AdminStudioHome";
 import AdminStudioProjects from "./pages/AdminStudioProjects";
 import AdminStudioMarketing from "./pages/AdminStudioMarketing";
 import AdminStudioScratch from "./pages/AdminStudioScratch";
+import AdminStudioVideo from "./pages/AdminStudioVideo";
 import LegacyStudioRedirect from "./components/studio/LegacyStudioRedirect";
 import AdminDeliveryQueue from "./pages/AdminDeliveryQueue";
 import AdminInsights from "./pages/AdminInsights";
@@ -186,6 +187,7 @@ const App = () => (
             <Route path="/admin/studio/scratch" element={<ProtectedRoute requiredRole="staff"><AdminStudioScratch /></ProtectedRoute>} />
             <Route path="/admin/studio/projects" element={<ProtectedRoute requiredRole="staff"><AdminStudioProjects /></ProtectedRoute>} />
             <Route path="/admin/studio/marketing" element={<ProtectedRoute requiredRole="staff"><AdminStudioMarketing /></ProtectedRoute>} />
+            <Route path="/admin/studio/video" element={<ProtectedRoute requiredRole="staff"><AdminStudioVideo /></ProtectedRoute>} />
             <Route path="/admin/insights" element={<ProtectedRoute requiredRole="admin"><AdminInsights /></ProtectedRoute>} />
             <Route path="/admin/insights/social" element={<ProtectedRoute requiredRole="admin"><AdminInsights /></ProtectedRoute>} />
             <Route path="/admin/studio/operations" element={<LegacyStudioRedirect />} />

@@ -6,10 +6,11 @@ const scratch = readFileSync(new URL("../pages/AdminStudioScratch.tsx", import.m
 const redirect = readFileSync(new URL("../components/studio/LegacyStudioRedirect.tsx", import.meta.url), "utf8");
 
 describe("studio information architecture routes", () => {
-  it("lands staff on one Studio home with three subsections", () => {
+  it("lands staff on one Studio home with the studio subsections", () => {
     expect(app).toContain('path="/admin/studio" element={<ProtectedRoute requiredRole="staff"><AdminStudioHome /></ProtectedRoute>}');
     expect(app).toContain('path="/admin/studio/projects" element={<ProtectedRoute requiredRole="staff"><AdminStudioProjects /></ProtectedRoute>}');
     expect(app).toContain('path="/admin/studio/marketing" element={<ProtectedRoute requiredRole="staff"><AdminStudioMarketing /></ProtectedRoute>}');
+    expect(app).toContain('path="/admin/studio/video" element={<ProtectedRoute requiredRole="staff"><AdminStudioVideo /></ProtectedRoute>}');
   });
 
   it("keeps the scratch editor on its pathway and on the photo editing alias", () => {

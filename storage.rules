@@ -27,6 +27,13 @@ service firebase.storage {
       allow read, write: if isActiveStaff();
     }
 
+    // Studio video uploads, analysis, and renders. Staff can read.
+    // Writes go through signed URLs from the server.
+    match /studio-video/{allPaths=**} {
+      allow read: if isActiveStaff();
+      allow write: if false;
+    }
+
     // Default deny
     match /{allPaths=**} {
       allow read, write: if false;

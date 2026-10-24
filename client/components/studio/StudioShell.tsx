@@ -34,9 +34,9 @@ export function StudioSectionNav({ active }: { active: StudioSectionId | null })
 export function StudioHomePanel() {
   return (
     <div data-testid="studio-home">
-      <p className="mb-8 text-xs text-gray-400">Photo editing, client projects, and marketing kits.</p>
+      <p className="mb-8 text-xs text-gray-400">Photo editing, the video editor, client projects, and marketing kits.</p>
       <StudioSectionNav active={null} />
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {STUDIO_SECTIONS.map((section) => (
           <Link
             key={section.id}

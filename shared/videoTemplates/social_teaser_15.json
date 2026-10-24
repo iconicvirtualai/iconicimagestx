@@ -1,0 +1,254 @@
+{
+ "id": "social_teaser_15",
+ "name": "15s Social Teaser",
+ "version": 1,
+ "description": "15-second hook for Reels/TikTok/Shorts: 'JUST LISTED' hook, 2-beat whip cuts, a glitch and a flash hit, price/CTA end frame. 11 clips.",
+ "output": {
+  "w": 1080,
+  "h": 1920,
+  "fps": 60,
+  "alt_sizes": [
+   [
+    1920,
+    1080
+   ]
+  ]
+ },
+ "music": {
+  "track": "music/heartbeat_mixkit1000.mp3",
+  "bpm": 123.05,
+  "beat_offset": 0.511,
+  "start": 0.0,
+  "gain": 0.9,
+  "license": "Mixkit Stock Music Free License",
+  "first_cut_beat": 3,
+  "fade_out_beats": 2
+ },
+ "grade": {
+  "contrast": 1.12,
+  "saturation": 1.22,
+  "teal_orange": 0.55,
+  "vignette": 0.12,
+  "sharpen": 0.25
+ },
+ "fade_in_beats": 0.25,
+ "fade_out_beats": 1.5,
+ "defaults": {
+  "trans_beats": 0.38,
+  "out": {
+   "type": "whip",
+   "dir": "auto"
+  },
+  "speed": {
+   "base": 1.1,
+   "auto_ramps": true
+  }
+ },
+ "slots": [
+  {
+   "id": "s01",
+   "label": "Hook: best exterior",
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "exterior",
+   "effects": [
+    {
+     "type": "punch",
+     "at_beat": 0,
+     "beats": 0.6,
+     "amount": 0.07
+    }
+   ],
+   "point": "auto"
+  },
+  {
+   "id": "s02",
+   "label": "Kitchen",
+   "beats": 2,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "interior",
+   "point": "auto"
+  },
+  {
+   "id": "s03",
+   "label": "Living",
+   "beats": 2,
+   "out": {
+    "type": "glitch",
+    "beats": 0.25
+   },
+   "kind": "interior",
+   "point": "auto"
+  },
+  {
+   "id": "s04",
+   "label": "Primary",
+   "beats": 2,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "interior",
+   "point": "auto"
+  },
+  {
+   "id": "s05",
+   "label": "Bath",
+   "beats": 2,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "interior",
+   "point": "auto"
+  },
+  {
+   "id": "s06",
+   "label": "Detail",
+   "beats": 2,
+   "out": {
+    "type": "flash",
+    "beats": 0.4,
+    "hit": "sub_boom"
+   },
+   "kind": "detail",
+   "point": "auto"
+  },
+  {
+   "id": "s07",
+   "label": "Backyard",
+   "beats": 2,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "exterior",
+   "point": "auto"
+  },
+  {
+   "id": "s08",
+   "label": "Feature",
+   "beats": 2,
+   "out": {
+    "type": "whip",
+    "dir": "auto"
+   },
+   "kind": "interior",
+   "optional": true,
+   "drop_priority": 3,
+   "point": "auto"
+  },
+  {
+   "id": "s09",
+   "label": "Detail 2",
+   "beats": 2,
+   "out": {
+    "type": "zoom_through",
+    "beats": 0.45,
+    "rot": 20
+   },
+   "kind": "detail",
+   "optional": true,
+   "drop_priority": 4,
+   "point": "auto"
+  },
+  {
+   "id": "s10",
+   "label": "Aerial",
+   "beats": 2,
+   "out": {
+    "type": "whip",
+    "dir": "down"
+   },
+   "kind": "aerial",
+   "point": "auto"
+  },
+  {
+   "id": "s11",
+   "label": "End frame: hero + price",
+   "beats": 9,
+   "out": {
+    "type": "none"
+   },
+   "kind": "exterior",
+   "speed": {
+    "base": 0.85
+   },
+   "point": "auto"
+  }
+ ],
+ "layers": [
+  {
+   "type": "text",
+   "id": "hook",
+   "label": "Hook",
+   "style": "title",
+   "text": "Just Listed",
+   "size": 0.11,
+   "pos": [
+    0.5,
+    0.45
+   ],
+   "slot": "s01",
+   "start_beat": 0.25,
+   "end_beat": 3,
+   "tracking": 0.12
+  },
+  {
+   "type": "text",
+   "id": "price",
+   "label": "Price",
+   "style": "title",
+   "text": "$000,000",
+   "size": 0.1,
+   "pos": [
+    0.5,
+    0.42
+   ],
+   "slot": "last",
+   "start_beat": 0.5,
+   "end_beat": 9,
+   "rise": 0.02
+  },
+  {
+   "type": "text",
+   "id": "cta",
+   "label": "CTA",
+   "style": "title",
+   "text": "Link in bio",
+   "size": 0.05,
+   "pos": [
+    0.5,
+    0.49
+   ],
+   "slot": "last",
+   "start_beat": 1,
+   "end_beat": 9,
+   "tracking": 0.25
+  },
+  {
+   "type": "logo",
+   "id": "logo",
+   "path": null,
+   "slot": "last",
+   "pos": [
+    0.5,
+    0.62
+   ],
+   "width": 0.32,
+   "start_beat": 1.5,
+   "end_beat": 9
+  }
+ ],
+ "sfx": {
+  "whoosh_gain": 0.55,
+  "shimmer_gain": 0.45,
+  "glitch_gain": 0.35,
+  "hit_gain": 0.9
+ }
+}
