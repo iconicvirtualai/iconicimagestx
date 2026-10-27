@@ -394,6 +394,18 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // ─── BotRoom ─────────────────────────────────────────────────────────────
+    // Conversations between Iconic bots. The Admin SDK writes these.
+    // Direct client access stays closed, including staff browsers.
+    // Publish this file in the Firebase console. Vercel does not deploy rules.
+    match /botRoomMessages/{messageId} {
+      allow read, write: if false;
+    }
+
+    match /botRoomKeys/{keyId} {
+      allow read, write: if false;
+    }
+
     // ─── Catch-all: deny everything else ─────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;

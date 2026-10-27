@@ -420,6 +420,19 @@ const BOOKING_PACKAGE_CATEGORY_ORDER = [
 new Set(BOOKING_PACKAGE_CATEGORY_ORDER);
 const PHOTO_EDIT_REPLACEMENT_TYPES = ["image/jpeg", "image/png", "image/webp"];
 new Set(PHOTO_EDIT_REPLACEMENT_TYPES);
+const PORTAL_WEBSITE_DESIGNS = [
+  "issue",
+  "premiere",
+  "product-drop",
+  "gallery-wall",
+  "field-guide",
+  "two-up",
+  "golden-hour",
+  "index",
+  "dossier",
+  "stories"
+];
+new Set(PORTAL_WEBSITE_DESIGNS);
 function hiddenPresentationKeys(listing) {
   const keys = /* @__PURE__ */ new Set();
   const photos = readMediaStore(listing?.portalMedia).photos;
@@ -435,14 +448,47 @@ function rowHiddenFromPresentation(row, hiddenKeys) {
   const url = text$1(row.url) || text$1(row.shareUrl);
   return [id, path2, url].some((key) => Boolean(key) && hiddenKeys.has(key));
 }
+function clipText(value, max) {
+  let raw = "";
+  if (typeof value === "string") raw = value;
+  else if (typeof value === "number" && Number.isFinite(value)) raw = String(value);
+  else if (typeof value === "boolean") raw = value ? "Yes" : "No";
+  else return "";
+  return raw.replace(/\u0000/g, "").trim().slice(0, max);
+}
 function readMediaStore(value) {
   const row = value && typeof value === "object" ? value : {};
   return {
     photos: readPrefs(row.photos),
     videos: readPrefs(row.videos),
     floorplans: readPrefs(row.floorplans),
-    tours: readPrefs(row.tours)
+    tours: readPrefs(row.tours),
+    photoGroups: readPhotoGroups(row.photoGroups)
   };
+}
+function groupIdText(value) {
+  if (typeof value !== "string") return "";
+  const id = value.trim();
+  return /^g[a-z0-9]{4,16}$/.test(id) ? id : "";
+}
+function readPhotoGroups(value) {
+  if (!Array.isArray(value)) return [];
+  const groups = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const item of value) {
+    const row = asRecord(item);
+    if (!row) continue;
+    const id = groupIdText(row.id);
+    const name = clipText(row.name, 60);
+    if (!id || !name || seen.has(id)) continue;
+    seen.add(id);
+    groups.push({
+      id,
+      name,
+      order: typeof row.order === "number" && Number.isFinite(row.order) ? row.order : groups.length
+    });
+  }
+  return groups.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name)).slice(0, 24);
 }
 function readPrefs(value) {
   if (!value || typeof value !== "object") return {};
@@ -452,13 +498,17 @@ function readPrefs(value) {
     const row = prefs;
     out[id] = {
       hidden: row.hidden === true,
-      order: typeof row.order === "number" && Number.isFinite(row.order) ? row.order : 0
+      order: typeof row.order === "number" && Number.isFinite(row.order) ? row.order : 0,
+      groupId: groupIdText(row.groupId)
     };
   }
   return out;
 }
 function text$1(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+function asRecord(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : null;
 }
 const BUSINESS_CONTACT_LINE = "26410 Oakridge Dr. Ste 105 - 108, Spring, TX 77380 | 281.356.0965 | photos@iconicimagestx.com";
 const LEGAL_BUSINESS_NAME = "Iconic Images Photography, LLC";
@@ -542,6 +592,12 @@ const PUBLIC_PAGES = [
     file: "seo/socials.html",
     title: "Socials | Iconic Images",
     description: "Instagram, Facebook, and TikTok from Iconic Images, a real estate media studio in Spring, The Woodlands, and Houston."
+  },
+  {
+    path: "/insights",
+    file: "seo/insights.html",
+    title: "Iconic Insights | Iconic Images",
+    description: "Field notes from Iconic Images on listing photography, video, and marketing in Spring, The Woodlands, and Houston."
   },
   {
     path: "/book",
@@ -1359,6 +1415,7 @@ const PAGES = [
       linkItem("pricing", "Pricing", "/pricing"),
       linkItem("studio", "Studio 105", "/studio-105"),
       linkItem("portfolio", "Portfolio", "/portfolio"),
+      linkItem("insights", "Insights", "/insights"),
       linkItem("stock", "Stock Footage", "/stock-footage"),
       linkItem("contact", "Contact Us", "/contact")
     ]),
@@ -1373,6 +1430,7 @@ const PAGES = [
       linkItem("pricing", "Pricing", "/pricing"),
       linkItem("socials", "Socials", "/socials"),
       linkItem("portfolio", "Portfolio", "/portfolio"),
+      linkItem("insights", "Insights", "/insights"),
       linkItem("studio", "Studio 105", "/studio-105"),
       linkItem("contact", "Contact Us", "/contact"),
       linkItem("login", "Client Login", "/login")
@@ -2235,14 +2293,21 @@ router.post("/:id/revert", gate("publish"), async (req, res) => {
   });
   return res.json({ page: stripPage(source) });
 });
+function mediaFolder(pageIdRaw) {
+  const pageId = String(pageIdRaw || "page");
+  if (pageId === "insights") return "insights";
+  if (pageId === "page") return "page";
+  if (defaultPage(pageId)) return pageId;
+  return null;
+}
 router.post("/media", gate("edit"), async (req, res) => {
   try {
-    const pageId = String(req.body?.pageId || "page");
-    if (!defaultPage(pageId) && pageId !== "page") return res.status(404).json({ error: "Unknown page." });
+    const folder = mediaFolder(req.body?.pageId);
+    if (!folder) return res.status(404).json({ error: "Unknown page." });
     const raw = String(req.body?.dataBase64 || "");
     const bytes = Buffer.from(raw, "base64");
     if (!bytes.length) return res.status(400).json({ error: "No file was received." });
-    const stored = await storeSiteUpload(defaultPage(pageId) ? pageId : "page", bytes);
+    const stored = await storeSiteUpload(folder, bytes);
     return res.json(stored);
   } catch (err) {
     const status = err.status || 400;
@@ -2251,9 +2316,10 @@ router.post("/media", gate("edit"), async (req, res) => {
 });
 router.post("/dropbox", gate("edit"), async (req, res) => {
   try {
-    const pageId = String(req.body?.pageId || "page");
+    const folder = mediaFolder(req.body?.pageId);
+    if (!folder) return res.status(404).json({ error: "Unknown page." });
     const imported = await importDropboxFile(String(req.body?.url || ""));
-    const stored = await storeSiteUpload(defaultPage(pageId) ? pageId : "page", imported.bytes);
+    const stored = await storeSiteUpload(folder, imported.bytes);
     return res.json(stored);
   } catch (err) {
     const status = err.status || 400;

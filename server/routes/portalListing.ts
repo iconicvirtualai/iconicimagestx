@@ -26,6 +26,7 @@ import { invoiceRedirectTarget, legacyInvoiceDocIds } from "../../shared/invoice
 import { jsonSafe } from "../lib/firestoreJson";
 import { resolveClientIdentity } from "../services/clientAccounts";
 import { filePhotoEditRequest, PhotoEditRequestError } from "../services/photoEditRequests";
+import { createPortalClientUploadUrl, PortalUploadError, registerPortalClientUpload } from "../services/portalClientUpload";
 
 const db = () => admin.firestore();
 
@@ -46,7 +47,9 @@ function text(value: unknown): string {
 }
 
 function sendKnownError(res: { status: (code: number) => { json: (body: unknown) => unknown } }, err: unknown, fallback: string) {
-  const status = err instanceof PhotoEditRequestError ? err.status : (err as { status?: number }).status;
+  const status = err instanceof PhotoEditRequestError || err instanceof PortalUploadError
+    ? err.status
+    : (err as { status?: number }).status;
   if (status && status >= 400 && status < 500) {
     return res.status(status).json({ error: err instanceof Error ? err.message : fallback });
   }
@@ -168,6 +171,27 @@ async function authorizedListing(req: AuthenticatedRequest, listingId: string) {
 function mediaChange(body: unknown): PortalMediaChange | null {
   const row = body && typeof body === "object" ? body as Record<string, unknown> : {};
   const kind = text(row.kind);
+  if (kind === "photo" && Array.isArray(row.layout)) {
+    const layout = row.layout.flatMap((entry) => {
+      const item = entry && typeof entry === "object" ? entry as Record<string, unknown> : null;
+      const id = text(item?.id);
+      if (!id) return [];
+      const groupId = text(item?.groupId);
+      return [{ id, groupId }];
+    });
+    if (layout.length) return { kind: "photo", layout };
+  }
+  if (kind === "photo" && row.group && typeof row.group === "object") {
+    const group = row.group as Record<string, unknown>;
+    const action = text(group.action);
+    const name = text(group.name).slice(0, 60);
+    const id = text(group.id);
+    const photoIds = Array.isArray(group.photoIds) ? group.photoIds.map((item) => text(item)).filter(Boolean).slice(0, 200) : [];
+    if (action === "create" && name && photoIds.length) return { kind: "photo", group: { action: "create", name, photoIds } };
+    if (action === "rename" && id && name) return { kind: "photo", group: { action: "rename", id, name } };
+    if (action === "remove" && id) return { kind: "photo", group: { action: "remove", id } };
+    return null;
+  }
   const id = text(row.id);
   if (!KINDS.has(kind as PortalMediaKind) || !id) return null;
   if (typeof row.hidden === "boolean") return { kind: kind as PortalMediaKind, id, hidden: row.hidden };
@@ -270,6 +294,56 @@ export const handlePatchPortalData: RequestHandler = async (req: AuthenticatedRe
   }
 };
 
+/** Ticket for a direct storage upload. The file bytes never pass through this server. */
+export const handleCreatePortalUploadUrl: RequestHandler = async (req: AuthenticatedRequest, res) => {
+  if (!adminReady(res)) return;
+  const listingId = listingIdFrom(req.params.id);
+  if (!listingId) return res.status(400).json({ error: "Listing id is not valid." });
+  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  if (typeof body.dataBase64 === "string" && body.dataBase64) {
+    return res.status(400).json({ error: "Send this file directly to storage. The portal does not accept the file in the request body." });
+  }
+  try {
+    await authorizedListing(req, listingId);
+    const ticket = await createPortalClientUploadUrl({
+      listingId,
+      kind: body.kind,
+      fileName: body.fileName,
+      contentType: body.contentType,
+      byteSize: body.byteSize,
+    });
+    return res.json(ticket);
+  } catch (err) {
+    return sendKnownError(res, err, "Could not start that upload.");
+  }
+};
+
+/** Record a file after the browser finished the direct upload. */
+export const handleRegisterPortalUpload: RequestHandler = async (req: AuthenticatedRequest, res) => {
+  if (!adminReady(res)) return;
+  const listingId = listingIdFrom(req.params.id);
+  if (!listingId) return res.status(400).json({ error: "Listing id is not valid." });
+  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  if (typeof body.dataBase64 === "string" && body.dataBase64) {
+    return res.status(400).json({ error: "Send this file directly to storage. The portal does not accept the file in the request body." });
+  }
+  try {
+    await authorizedListing(req, listingId);
+    await registerPortalClientUpload({
+      listingId,
+      kind: body.kind,
+      fileName: body.fileName,
+      contentType: body.contentType,
+      storagePath: body.storagePath,
+      uploadedBy: req.user!.uid,
+    });
+    const refreshed = await authorizedListing(req, listingId);
+    return res.status(201).json(buildPortalListingDetail(await loadSources(listingId, refreshed)));
+  } catch (err) {
+    return sendKnownError(res, err, "Could not save that upload.");
+  }
+};
+
 /** Owner files a note on one photo already shown on this listing. */
 export const handleCreatePhotoEditRequest: RequestHandler = async (req: AuthenticatedRequest, res) => {
   if (!adminReady(res)) return;
@@ -301,6 +375,17 @@ export const handleCreatePhotoEditRequest: RequestHandler = async (req: Authenti
   }
 };
 
+function storedTileLook(value: unknown): string {
+  if (!value || typeof value !== "object") return "";
+  const tile = (value as { tileLook?: unknown }).tileLook;
+  return typeof tile === "string" ? tile.trim() : "";
+}
+
+/**
+ * Owning client saves the listing-site style and the publish flag.
+ * `/l/:slug` reads `portalWebsite.published`. This write does not email or text.
+ * A client `tileLook` is ignored. Portal tiles stay on the shoot or package.
+ */
 export const handlePatchPortalWebsite: RequestHandler = async (req: AuthenticatedRequest, res) => {
   if (!adminReady(res)) return;
   const listingId = listingIdFrom(req.params.id);
@@ -309,9 +394,15 @@ export const handlePatchPortalWebsite: RequestHandler = async (req: Authenticate
     const listing = await authorizedListing(req, listingId);
     const current = sanitizeWebsiteSettings(listing.portalWebsite);
     const next = sanitizeWebsiteSettings(req.body, current);
-    const changed = JSON.stringify(next) !== JSON.stringify(current);
+    const leftoverTile = storedTileLook(listing.portalWebsite);
+    const changed = JSON.stringify(next) !== JSON.stringify(current) || leftoverTile !== "";
     if (changed) {
       const detail = buildPortalListingDetail({ listing });
+      const summary = next.published && !current.published
+        ? "Listing site published"
+        : !next.published && current.published
+          ? "Listing site unpublished"
+          : "Listing site style updated";
       await appendPortalWrite(listingId, {
         portalWebsite: next,
         listingSiteSlug: listingSiteSlug({ line1: detail.address.line1, city: detail.address.city }),
@@ -319,7 +410,7 @@ export const handlePatchPortalWebsite: RequestHandler = async (req: Authenticate
           id: `portal-website-${new Date().toISOString()}`,
           at: new Date().toISOString(),
           kind: "website",
-          summary: "Listing site style updated",
+          summary,
         },
       });
     }

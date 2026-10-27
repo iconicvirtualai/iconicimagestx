@@ -81,6 +81,24 @@ describe("listing card package looks", () => {
     expect(resolveListingCardLook({ package: "Custom order", services: ["The Showcase"] })).toBeNull();
     expect(resolveListingCardLook({})).toBeNull();
   });
+
+  it("client cannot set tileLook", () => {
+    expect(resolveListingCardLook({
+      portalWebsite: { tileLook: "showcase" },
+      package: "Photos Only",
+    })).toBe("just-photos");
+    expect(resolveListingCardLook({
+      portalWebsite: { tileLook: "legacy" },
+      services: ["The Showcase"],
+    })).toBe("showcase");
+    expect(resolveListingCardLook({
+      portalWebsite: { tileLook: "showcase" },
+      package: "Custom order",
+    })).toBeNull();
+    expect(resolveListingCardLook({
+      portalWebsite: { tileLook: "essentials" },
+    })).toBeNull();
+  });
 });
 
 describe("listing card address, date, and counts", () => {

@@ -11,6 +11,8 @@ describe("admin nav highlight", () => {
     expect(mostSpecificNavHref("/admin/delivery", hrefs)).toBe("/admin/delivery");
     expect(mostSpecificNavHref("/admin/communications", hrefs)).toBe("/admin/communications");
     expect(mostSpecificNavHref("/admin/communications/email/contacts", hrefs)).toBe("/admin/communications/email");
+    expect(mostSpecificNavHref("/admin/botroom", hrefs)).toBe("/admin/botroom");
+    expect(mostSpecificNavHref("/admin/botroom/connect", hrefs)).toBe("/admin/botroom");
   });
 });
 

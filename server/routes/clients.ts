@@ -19,7 +19,7 @@ import {
 import { resolveClientIdentity, upsertPortalClient } from "../services/clientAccounts";
 import { ensurePortalListingsForClient } from "../services/bookingListing";
 import { jsonSafe } from "../lib/firestoreJson";
-import { handleCreatePhotoEditRequest, handleGetPortalListing, handlePatchPortalData, handlePatchPortalMedia, handlePatchPortalWebsite } from "./portalListing";
+import { handleCreatePhotoEditRequest, handleCreatePortalUploadUrl, handleGetPortalListing, handlePatchPortalData, handlePatchPortalMedia, handlePatchPortalWebsite, handleRegisterPortalUpload } from "./portalListing";
 
 const router = Router();
 const db = () => admin.firestore();
@@ -302,6 +302,8 @@ router.patch("/me/listings/:id/data", requireAuth, handlePatchPortalData);
 router.patch("/me/listings/:id/media", requireAuth, handlePatchPortalMedia);
 router.patch("/me/listings/:id/website", requireAuth, handlePatchPortalWebsite);
 router.post("/me/listings/:id/photo-edit-requests", requireAuth, handleCreatePhotoEditRequest);
+router.post("/me/listings/:id/uploads/url", requireAuth, handleCreatePortalUploadUrl);
+router.post("/me/listings/:id/uploads", requireAuth, handleRegisterPortalUpload);
 
 // GET /api/clients/me — client gets their own profile
 router.get("/me", requireAuth, async (req: AuthenticatedRequest, res) => {

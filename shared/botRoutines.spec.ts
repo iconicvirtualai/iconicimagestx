@@ -3,7 +3,7 @@ import { BOT_ROUTINES } from "./botRoutines";
 
 describe("bot routines", () => {
   it("lists each bot in plain language", () => {
-    expect(BOT_ROUTINES.map((bot) => bot.name)).toEqual(["Rex", "Quinn", "Cadi 2.0", "Sam", "Sasha", "Cody"]);
+    expect(BOT_ROUTINES.map((bot) => bot.name)).toEqual(["Rex", "Quinn", "Cadi 2.0", "Sam", "Sasha", "Cody", "Cora"]);
     for (const bot of BOT_ROUTINES) {
       expect(bot.summary.endsWith(".")).toBe(true);
       expect(["Active", "Paused", "On request"]).toContain(bot.status);
@@ -12,6 +12,10 @@ describe("bot routines", () => {
       when: "On request",
       status: "On request",
     });
-    expect(BOT_ROUTINES.filter((bot) => bot.name !== "Rex").every((bot) => bot.when === "Schedule to confirm")).toBe(true);
+    expect(BOT_ROUTINES.find((bot) => bot.name === "Cora")).toMatchObject({
+      when: "Daily",
+      status: "Active",
+    });
+    expect(BOT_ROUTINES.filter((bot) => bot.name !== "Rex" && bot.name !== "Cora").every((bot) => bot.when === "Schedule to confirm")).toBe(true);
   });
 });

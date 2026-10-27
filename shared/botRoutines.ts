@@ -50,4 +50,10 @@ export const BOT_ROUTINES: BotRoutine[] = [
     when: "Schedule to confirm",
     status: "Active",
   },
+  {
+    name: "Cora",
+    summary: "Sends daily appointment reminders and edits the shooter calendar.",
+    when: "Daily",
+    status: "Active",
+  },
 ];

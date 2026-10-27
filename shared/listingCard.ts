@@ -29,7 +29,9 @@ export function listingCardLookFromValue(value: unknown): ListingCardLook | null
   return resolvePackageSkin(value)?.look ?? null;
 }
 
-/** The listing package, or the service list when no package field is stored. */
+/**
+ * Portal tiles follow the shoot or package. A saved `tileLook` never overrides that.
+ */
 export function resolveListingCardLook(data: Record<string, unknown>): ListingCardLook | null {
   return resolvePackageSkinFromOrder(data)?.look ?? null;
 }
