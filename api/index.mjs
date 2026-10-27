@@ -27463,6 +27463,7 @@ const handleListingPhotoUpload = async (req, res) => {
   }
 };
 const DEFAULT_SITE_ORIGIN = "https://iconicimagestx.vercel.app";
+const CANONICAL_WWW_ORIGIN = "https://www.iconicimagestx.com";
 const OG_IMAGE_PATH = "/media/photos/drone-hero.jpg";
 const GENERIC_TITLE = "Iconic Images - Creative Media Partners";
 const PUBLIC_PAGES = [
@@ -27562,6 +27563,22 @@ function readConfiguredOrigin() {
   return String(nodeOrigin || "").trim().replace(/\/$/, "");
 }
 const SITE_ORIGIN = readConfiguredOrigin() || DEFAULT_SITE_ORIGIN;
+function hostnameOf(host) {
+  const first = String(host || "").split(",")[0].trim().toLowerCase().replace(/\.$/, "");
+  if (!first) return "";
+  if (first.startsWith("[")) {
+    const end = first.indexOf("]");
+    return end >= 0 ? first.slice(1, end) : first;
+  }
+  return first.replace(/:\d+$/, "");
+}
+function isCustomDomainHost(host) {
+  const name = hostnameOf(host);
+  return name === "iconicimagestx.com" || name === "www.iconicimagestx.com";
+}
+function originForHost(host, fallback = SITE_ORIGIN) {
+  return isCustomDomainHost(host) ? CANONICAL_WWW_ORIGIN : fallback;
+}
 function canonicalUrl(path2, origin = SITE_ORIGIN) {
   return path2 === "/" ? `${origin}/` : `${origin}${path2}`;
 }
@@ -27585,6 +27602,30 @@ function injectHead(html, tags) {
   }
   return `${tags}
 ${next}`;
+}
+function sitemapXml(origin = DEFAULT_SITE_ORIGIN) {
+  const urls = PUBLIC_PAGES.map(
+    (page2) => `  <url><loc>${escapeHtml$3(canonicalUrl(page2.path, origin))}</loc></url>`
+  ).join("\n");
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls}
+</urlset>
+`;
+}
+function robotsTxt(origin = DEFAULT_SITE_ORIGIN) {
+  return `User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /portal
+Disallow: /owners
+Disallow: /studio/
+Disallow: /gallery/
+Disallow: /api
+Disallow: /invoice
+
+Sitemap: ${origin}/sitemap.xml
+`;
 }
 const PRESENTATION_PREVIEW_TOKEN = "preview";
 const PRESENTATION_PATH = "/present";
@@ -31491,7 +31532,7 @@ function readSpaShell() {
   }
   return "";
 }
-async function renderInsightShell(slug) {
+async function renderInsightShell(slug, origin) {
   if (!isInsightSlug(slug)) {
     return { status: 404, html: "<!doctype html><title>Insight</title><p>This insight is not published.</p>" };
   }
@@ -31502,12 +31543,12 @@ async function renderInsightShell(slug) {
     const html2 = shell2 ? injectHead(shell2, tags2) : `<!doctype html><html><head>${tags2}</head><body><p>This insight is not published.</p></body></html>`;
     return { status: 404, html: html2 };
   }
-  const tags = insightHeadTags(toPublicInsight(post));
+  const tags = insightHeadTags(toPublicInsight(post), origin);
   const html = shell2 ? injectHead(shell2, tags) : `<!doctype html><html><head>${tags}</head><body><div id="root"></div></body></html>`;
   return { status: 200, html };
 }
 const handleInsightShell = async (req, res) => {
-  const rendered = await renderInsightShell(String(req.params.slug || ""));
+  const rendered = await renderInsightShell(String(req.params.slug || ""), originForHost(req.get("host")));
   res.setHeader("Cache-Control", "no-store");
   res.status(rendered.status).type("html").send(rendered.html);
 };
@@ -31549,6 +31590,19 @@ function createServer() {
   app.use("/api/site-content/dropbox", express.json({ limit: "1mb" }));
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: true }));
+  const sendPublicSeoFile = (kind) => (req, res) => {
+    const origin = originForHost(req.get("host"));
+    res.setHeader("Vary", "Host");
+    res.setHeader("Cache-Control", "public, max-age=300");
+    if (kind === "sitemap") {
+      res.type("application/xml");
+      return res.send(sitemapXml(origin));
+    }
+    res.type("text/plain");
+    return res.send(robotsTxt(origin));
+  };
+  app.get(["/sitemap.xml", "/sitemap.xml/"], sendPublicSeoFile("sitemap"));
+  app.get(["/robots.txt", "/robots.txt/"], sendPublicSeoFile("robots"));
   app.post(
     "/api/listings/:id/photos",
     (req, _res, next) => {
