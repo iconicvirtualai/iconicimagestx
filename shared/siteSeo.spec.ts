@@ -6,7 +6,11 @@ import {
   OG_IMAGE_PATH,
   PUBLIC_PAGES,
   canonicalUrl,
+  hostnameOf,
   injectNoIndex,
+  isCustomDomainHost,
+  originForHost,
+  CANONICAL_WWW_ORIGIN,
   injectPublicPage,
   isNoIndexPath,
   metaPlan,
@@ -29,6 +33,23 @@ describe("public page meta", () => {
     expect(DEFAULT_SITE_ORIGIN).toBe("https://iconicimagestx.vercel.app");
     expect(canonicalUrl("/about", DEFAULT_SITE_ORIGIN)).toBe("https://iconicimagestx.vercel.app/about");
     expect(canonicalUrl("/", DEFAULT_SITE_ORIGIN)).toBe("https://iconicimagestx.vercel.app/");
+  });
+
+  it("uses www only for the custom domain hosts", () => {
+    expect(CANONICAL_WWW_ORIGIN).toBe("https://www.iconicimagestx.com");
+    expect(hostnameOf("WWW.iconicimagestx.com:443")).toBe("www.iconicimagestx.com");
+    expect(isCustomDomainHost("iconicimagestx.com")).toBe(true);
+    expect(isCustomDomainHost("www.iconicimagestx.com")).toBe(true);
+    expect(isCustomDomainHost("iconicimagestx.vercel.app")).toBe(false);
+    expect(isCustomDomainHost("iconic-images-git-main-team.vercel.app")).toBe(false);
+    expect(isCustomDomainHost("iconicimagestx.com.evil.test")).toBe(false);
+    expect(originForHost("www.iconicimagestx.com")).toBe(CANONICAL_WWW_ORIGIN);
+    expect(originForHost("iconicimagestx.com")).toBe(CANONICAL_WWW_ORIGIN);
+    expect(originForHost("iconicimagestx.vercel.app")).toBe(DEFAULT_SITE_ORIGIN);
+    expect(originForHost("preview-abc.vercel.app")).toBe(DEFAULT_SITE_ORIGIN);
+    expect(originForHost("localhost:8080")).toBe(DEFAULT_SITE_ORIGIN);
+    expect(canonicalUrl("/about", originForHost("www.iconicimagestx.com"))).toBe(`${CANONICAL_WWW_ORIGIN}/about`);
+    expect(canonicalUrl("/", originForHost("iconicimagestx.vercel.app"))).toBe(`${DEFAULT_SITE_ORIGIN}/`);
   });
 
   it("writes a plain description for each public page and skips prices and Iconic Credits", () => {

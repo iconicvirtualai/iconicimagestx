@@ -5,7 +5,7 @@ import { applyMetaPlan } from "@/components/SiteMeta";
 import { InsightArticle } from "@/components/insights/InsightFrames";
 import { fetchPublicInsight } from "@/lib/insightsApi";
 import { absoluteInsightImage, coverOf, type PublicInsight } from "@shared/insights";
-import { canonicalUrl } from "@shared/siteSeo";
+import { canonicalUrl, originForHost } from "@shared/siteSeo";
 
 export default function InsightPost() {
   const { slug = "" } = useParams();
@@ -34,12 +34,13 @@ export default function InsightPost() {
 
   useEffect(() => {
     if (!post) return;
+    const origin = originForHost(window.location.host);
     applyMetaPlan(document, {
       kind: "public",
       title: post.seoTitle || `${post.title} | Iconic Insights`,
       description: post.seoDescription || post.excerpt,
-      canonical: canonicalUrl(`/insights/${post.slug}`),
-      image: absoluteInsightImage(coverOf(post)),
+      canonical: canonicalUrl(`/insights/${post.slug}`, origin),
+      image: absoluteInsightImage(coverOf(post), origin),
     });
   }, [post]);
 
