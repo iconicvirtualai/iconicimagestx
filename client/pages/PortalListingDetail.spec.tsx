@@ -273,10 +273,12 @@ describe("portal listing detail page", () => {
     expect(orders).not.toContain("/invoice/");
     expect(orders).not.toContain("Pay now");
     expect(render("activity")).toContain("Booking request received");
+    expect(render("website")).toContain('data-testid="listing-site-status-row"');
     expect(render("website")).toContain('data-testid="listing-site-publish-bar"');
-    expect(render("website")).toContain("fixed");
-    expect(render("website")).toContain("right-3");
-    expect(render("website")).toContain("top-3");
+    expect(render("website")).toContain("sm:justify-end");
+    expect(render("website")).toContain("w-full flex-col gap-2 sm:w-auto");
+    expect(render("website")).not.toContain("fixed right-3");
+    expect(render("website")).not.toContain("at the top right");
     expect(render("website")).toContain(">Save style<");
     expect(render("website")).toContain(">Publish<");
     expect(render("website")).toContain("Not published yet");
@@ -337,7 +339,7 @@ describe("portal listing detail page", () => {
     expect(visitor).not.toContain(">Unpublish<");
   });
 
-  it("puts Select and Publish at the top right when the chosen style differs", () => {
+  it("puts Select and Publish on the unpublished status row when the chosen style differs", () => {
     const saved = defaultPortalWebsite();
     const html = render("website", null, true, false, { ...saved, design: "premiere" }, saved);
     expect(html).toContain('data-testid="listing-site-publish-bar"');
