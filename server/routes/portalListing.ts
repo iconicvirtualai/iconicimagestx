@@ -375,6 +375,17 @@ export const handleCreatePhotoEditRequest: RequestHandler = async (req: Authenti
   }
 };
 
+function storedTileLook(value: unknown): string {
+  if (!value || typeof value !== "object") return "";
+  const tile = (value as { tileLook?: unknown }).tileLook;
+  return typeof tile === "string" ? tile.trim() : "";
+}
+
+/**
+ * Owning client saves the listing-site style and the publish flag.
+ * `/l/:slug` reads `portalWebsite.published`. This write does not email or text.
+ * A client `tileLook` is ignored. Portal tiles stay on the shoot or package.
+ */
 export const handlePatchPortalWebsite: RequestHandler = async (req: AuthenticatedRequest, res) => {
   if (!adminReady(res)) return;
   const listingId = listingIdFrom(req.params.id);
@@ -383,9 +394,15 @@ export const handlePatchPortalWebsite: RequestHandler = async (req: Authenticate
     const listing = await authorizedListing(req, listingId);
     const current = sanitizeWebsiteSettings(listing.portalWebsite);
     const next = sanitizeWebsiteSettings(req.body, current);
-    const changed = JSON.stringify(next) !== JSON.stringify(current);
+    const leftoverTile = storedTileLook(listing.portalWebsite);
+    const changed = JSON.stringify(next) !== JSON.stringify(current) || leftoverTile !== "";
     if (changed) {
       const detail = buildPortalListingDetail({ listing });
+      const summary = next.published && !current.published
+        ? "Listing site published"
+        : !next.published && current.published
+          ? "Listing site unpublished"
+          : "Listing site style updated";
       await appendPortalWrite(listingId, {
         portalWebsite: next,
         listingSiteSlug: listingSiteSlug({ line1: detail.address.line1, city: detail.address.city }),
@@ -393,7 +410,7 @@ export const handlePatchPortalWebsite: RequestHandler = async (req: Authenticate
           id: `portal-website-${new Date().toISOString()}`,
           at: new Date().toISOString(),
           kind: "website",
-          summary: "Listing site style updated",
+          summary,
         },
       });
     }

@@ -73,7 +73,7 @@ export function PortalListingDetailView({
   onToggleEditing: (kind: PortalMediaKind) => void;
   onMedia: (change: PortalMediaChange) => void;
   onWebsite: (next: PortalWebsiteSettings) => void;
-  onWebsiteSave: () => void;
+  onWebsiteSave: (next: PortalWebsiteSettings) => void;
   onDataEditing: (editing: boolean) => void;
   onDataDraft: (draft: PortalListingFactsDraft) => void;
   onDataSave: () => void;
@@ -202,6 +202,7 @@ export function PortalListingDetailView({
           <PortalTemplatePicker
             detail={shown}
             website={website}
+            savedWebsite={detail.website}
             canEdit={canEdit}
             saving={saving}
             onWebsite={onWebsite}
@@ -362,7 +363,10 @@ export default function PortalListingDetail() {
           }}
           onMedia={(change) => send(`${ownerApi}/media`, change)}
           onWebsite={setWebsite}
-          onWebsiteSave={() => send(`${ownerApi}/website`, website)}
+          onWebsiteSave={(next) => {
+            setWebsite(next);
+            void send(`${ownerApi}/website`, next);
+          }}
           onDataEditing={(on) => {
             if (!canEdit || saving) return;
             setDataEditing(on);
