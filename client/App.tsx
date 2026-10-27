@@ -119,6 +119,19 @@ function ScrollToTop() {
   return null;
 }
 
+/** /thankful is a static page, so this leaves the SPA. The Vercel 301 does the same before JS runs. */
+function ThankfulRsvpRedirect() {
+  const { search } = useLocation();
+  useEffect(() => {
+    window.location.replace(`/thankful${search}#rsvp`);
+  }, [search]);
+  return (
+    <p style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>
+      <a href={`/thankful${search}#rsvp`}>Continue to the Thankful RSVP</a>
+    </p>
+  );
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -139,6 +152,7 @@ const App = () => (
             <Route path="/studio-105" element={<Studio105 />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/book" element={<Book />} />
+            <Route path="/thankful-rsvp" element={<ThankfulRsvpRedirect />} />
             <Route path="/senior-living" element={<SeniorLiving />} />
             <Route path="/apprenticeship" element={<Apprenticeship />} />
             {/* Standalone embed, like /thankful. No site header or footer. */}
