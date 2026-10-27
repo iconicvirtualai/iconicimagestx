@@ -49,6 +49,8 @@ export interface PhotographerStudioJob {
   status?: unknown;
   origin?: unknown;
   sourcePath?: unknown;
+  type?: unknown;
+  label?: unknown;
 }
 
 export interface PhotographerStudioCount {

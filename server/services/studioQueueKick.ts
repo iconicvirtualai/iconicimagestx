@@ -8,7 +8,7 @@
  */
 
 /**
- * AdminUpload and AdminPhotographer call drainOrderEditQueue after a
+ * ShootUploader and AdminPhotographer call drainOrderEditQueue after a
  * successful photo register. While that is true, the upload route does
  * not call kickStudioQueue.
  */

@@ -1,3 +1,4 @@
+/** Not mounted. /admin/upload redirects and keeps the query. The live drop zone is ShootUploader. */
 import * as React from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";

@@ -71,6 +71,7 @@ export function PhotographerPortal({
   payRate,
   onUpload,
   shareSlot,
+  readOnly = false,
 }: {
   firstName?: string;
   jobs: PhotographerJobCard[];
@@ -87,6 +88,8 @@ export function PhotographerPortal({
   payRate: number;
   onUpload: (jobId: string) => void;
   shareSlot?: (job: PhotographerJobCard) => ReactNode;
+  /** Admin preview. Controls stay visible and do not upload, open Studio, or send. */
+  readOnly?: boolean;
 }) {
   const summary = photographerSummary(jobs);
   const visible = filterPhotographerJobs(jobs, tab);
@@ -166,7 +169,10 @@ export function PhotographerPortal({
             type="checkbox"
             className="mt-1"
             checked={iconicPolish}
-            onChange={(event) => onIconicPolish(event.target.checked)}
+            disabled={readOnly}
+            onChange={(event) => {
+              if (!readOnly) onIconicPolish(event.target.checked);
+            }}
           />
           <span>
             <span className="block text-xs font-black uppercase tracking-widest">Iconic Polish</span>
@@ -184,7 +190,13 @@ export function PhotographerPortal({
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#0d9488] border-t-transparent" />
         </div>
       ) : tab === "messages" ? (
-        <PortalMessages />
+        readOnly ? (
+          <p data-testid="preview-messages" className="rounded-2xl border border-gray-100 bg-white px-4 py-6 text-sm text-gray-500">
+            Messages stay on the photographer login. This preview does not load or send them.
+          </p>
+        ) : (
+          <PortalMessages />
+        )
       ) : tab === "pay" ? (
         <PayEstimate
           jobs={visible}
@@ -204,6 +216,7 @@ export function PhotographerPortal({
               iconicPolish={iconicPolish}
               onUpload={onUpload}
               shareSlot={shareSlot}
+              readOnly={readOnly}
             />
           ))}
         </div>
@@ -307,13 +320,16 @@ function JobCard({
   iconicPolish,
   onUpload,
   shareSlot,
+  readOnly = false,
 }: {
   job: PhotographerJobCard;
   iconicPolish: boolean;
   onUpload: (jobId: string) => void;
   shareSlot?: (job: PhotographerJobCard) => ReactNode;
+  readOnly?: boolean;
 }) {
   const uploadHref = photographerUploadHref(job.id, iconicPolish);
+  const locked = " cursor-not-allowed opacity-40";
   return (
     <article data-testid={`job-${job.id}`} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
       <div className="mb-3 flex items-start justify-between gap-3">
@@ -367,14 +383,26 @@ function JobCard({
 
       <div className="flex flex-wrap gap-2">
         {job.action.kind === "upload" && (
-          <button type="button" data-testid={`upload-${job.id}`} className={primaryBtn} onClick={() => onUpload(job.id)}>
+          <button
+            type="button"
+            data-testid={`upload-${job.id}`}
+            className={primaryBtn + (readOnly ? locked : "")}
+            disabled={readOnly}
+            onClick={() => {
+              if (!readOnly) onUpload(job.id);
+            }}
+          >
             <Upload className="h-3.5 w-3.5" /> {job.action.label}
           </button>
         )}
         {job.action.kind === "review" && (
-          <Link to={job.studioHref} className={primaryBtn}>
-            <Camera className="h-3.5 w-3.5" /> {job.action.label}
-          </Link>
+          readOnly ? (
+            <span className={primaryBtn + locked} aria-disabled="true"><Camera className="h-3.5 w-3.5" /> {job.action.label}</span>
+          ) : (
+            <Link to={job.studioHref} className={primaryBtn}>
+              <Camera className="h-3.5 w-3.5" /> {job.action.label}
+            </Link>
+          )
         )}
         {job.action.kind === "shoot" && job.mapsHref && (
           <a href={job.mapsHref} target="_blank" rel="noopener noreferrer" className={primaryBtn}>
@@ -382,7 +410,14 @@ function JobCard({
           </a>
         )}
         {job.action.kind !== "upload" && job.action.kind !== "closed" && (
-          <button type="button" className={quietBtn} onClick={() => onUpload(job.id)}>
+          <button
+            type="button"
+            className={quietBtn + (readOnly ? locked : "")}
+            disabled={readOnly}
+            onClick={() => {
+              if (!readOnly) onUpload(job.id);
+            }}
+          >
             <Upload className="h-3.5 w-3.5" /> {job.imageCount > 0 ? "Add photos" : "Upload the shoot"}
           </button>
         )}
@@ -392,14 +427,24 @@ function JobCard({
           </a>
         )}
         {job.action.kind !== "review" && (
-          <Link to={job.studioHref} className={studioBtn}>
-            <Camera className="h-3.5 w-3.5" /> Studio
+          readOnly ? (
+            <span className={studioBtn + locked} aria-disabled="true"><Camera className="h-3.5 w-3.5" /> Studio</span>
+          ) : (
+            <Link to={job.studioHref} className={studioBtn}>
+              <Camera className="h-3.5 w-3.5" /> Studio
+            </Link>
+          )
+        )}
+        {readOnly ? (
+          <span className={quietBtn + locked} aria-disabled="true">Full uploader</span>
+        ) : (
+          <Link to={uploadHref} className={quietBtn}>
+            Full uploader
           </Link>
         )}
-        <Link to={uploadHref} className={quietBtn}>
-          Full uploader
-        </Link>
-        {shareSlot?.(job)}
+        {readOnly ? (
+          <span className={quietBtn + locked} aria-disabled="true">Share</span>
+        ) : shareSlot?.(job)}
       </div>
     </article>
   );
