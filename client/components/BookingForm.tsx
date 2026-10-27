@@ -121,9 +121,23 @@ const consultQuestions = [
   }
 ];
 
+export interface PortalOrderPrefill {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  brokerage?: string;
+  billingEmail?: string;
+  billingPhone?: string;
+  billToAddress?: string;
+  cardLabel?: string;
+}
+
 interface BookingFormProps {
   initialServiceId?: string;
   initialCategoryId?: string;
+  prefill?: PortalOrderPrefill;
+  source?: "portal";
 }
 
 function ProcessingEstimateLine({ amount }: { amount: number }) {
@@ -147,7 +161,7 @@ function TravelFeeLine({ travel }: { travel: TravelAssessment }) {
   );
 }
 
-export default function BookingForm({ initialServiceId, initialCategoryId }: BookingFormProps = {}) {
+export default function BookingForm({ initialServiceId, initialCategoryId, prefill, source }: BookingFormProps = {}) {
   const settings = useSiteSettings();
   const isMobile = useIsMobile();
   const [searchParams] = useSearchParams();
@@ -171,10 +185,15 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
   const [showBasics, setShowBasics] = useState(seededSelection.showBasics);
 
   const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
+    firstName: prefill?.firstName || "",
+    lastName: prefill?.lastName || "",
+    email: prefill?.email || "",
+    phone: prefill?.phone || "",
+    brokerage: prefill?.brokerage || "",
+    billingEmail: prefill?.billingEmail || "",
+    billingPhone: prefill?.billingPhone || "",
+    billToAddress: prefill?.billToAddress || "",
+    source: source || "",
     address: "",
     servicePlace: null as PickedServiceLocation | null,
     sqft: "",
@@ -1601,6 +1620,15 @@ export default function BookingForm({ initialServiceId, initialCategoryId }: Boo
                     />
                   </div>
                </div>
+               {source === "portal" ? (
+                 <div data-testid="portal-order-prefill" className="rounded-2xl border border-gray-100 bg-gray-50 p-4 space-y-2">
+                   <p className="text-[10px] font-black uppercase tracking-widest text-[#0d9488]">From your portal</p>
+                   <p className="text-sm text-gray-600">Profile and billing details are filled in. This is the same order form as the public booking page.</p>
+                   {prefill?.brokerage ? <p className="text-sm font-bold">Brokerage: {prefill.brokerage}</p> : null}
+                   {prefill?.billToAddress ? <p className="text-sm text-gray-600">Bill to: {prefill.billToAddress}</p> : null}
+                   {prefill?.cardLabel ? <p className="text-sm text-gray-600">Card on file: {prefill.cardLabel}</p> : null}
+                 </div>
+               ) : null}
 
                <SmsConsentField
                  checked={formData.smsConsent}

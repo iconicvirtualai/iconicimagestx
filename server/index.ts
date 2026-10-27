@@ -20,6 +20,7 @@ import paymentsRouter from "./routes/payments";
 import vsaiRouter from "./routes/vsai";
 import messagingRouter from "./routes/messaging";
 import clientsRouter from "./routes/clients";
+import clientHubRouter from "./routes/clientHub";
 import staffRouter from "./routes/staff";
 import listingsRouter from "./routes/listings";
 import campaignsRouter from "./routes/campaigns";
@@ -230,6 +231,7 @@ export function createServer() {
   app.use("/api/vsai", vsaiRouter);
   app.use("/api/messages", messagingRouter);
   app.use("/api/communications", communicationsRouter);
+  app.use("/api/clients", clientHubRouter);
   app.use("/api/clients", clientsRouter);
   app.get("/api/portal/listings/:id", handleGetPublicPortalListing);
   app.get("/api/listing-sites/:slug", handleGetListingSite);

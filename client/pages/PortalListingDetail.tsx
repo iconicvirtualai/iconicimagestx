@@ -34,6 +34,9 @@ import type { ClientGalleryItem } from "@/components/gallery/clientGalleryMedia"
 import { ArrowLeft, Eye, EyeOff, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import NotFound from "./NotFound";
+import { marketingMaterialFromProfile, type ClientHubProfile, type HubAgentBranding } from "@shared/clientHubSettings";
+import { MarketingAgentCard } from "@/components/client-hub/MarketingAgentCard";
+import { ExampleListingFile } from "@/components/client-hub/ExampleListingFile";
 
 export function PortalListingDetailView({
   detail,
@@ -53,6 +56,7 @@ export function PortalListingDetailView({
   onDataDraft,
   onDataSave,
   onRequestPhotoEdit,
+  marketingAgent = null,
 }: {
   detail: PortalListingDetailModel;
   tab: PortalListingTabId;
@@ -71,6 +75,7 @@ export function PortalListingDetailView({
   onDataDraft: (draft: PortalListingFactsDraft) => void;
   onDataSave: () => void;
   onRequestPhotoEdit: (photoId: string, note: string) => Promise<boolean>;
+  marketingAgent?: HubAgentBranding | null;
 }) {
   const mediaEditing = canEdit ? editing : null;
   const shown = canEdit ? detail : visitorPortalListingDetail(detail);
@@ -170,7 +175,7 @@ export function PortalListingDetailView({
             onMedia={onMedia}
           />
         )}
-        {tab === "marketing" && <MarketingTab detail={shown} />}
+        {tab === "marketing" && <MarketingTab detail={shown} agent={marketingAgent} />}
         {tab === "website" && (
           <WebsiteTab
             website={website}
@@ -203,14 +208,16 @@ export default function PortalListingDetail() {
   const [canEdit, setCanEdit] = useState(false);
   const [dataEditing, setDataEditing] = useState(false);
   const [dataDraft, setDataDraft] = useState<PortalListingFactsDraft | null>(null);
+  const [marketingAgent, setMarketingAgent] = useState<HubAgentBranding | null>(null);
   const tab = portalListingTab(searchParams.get("tab"));
+  const exampleListing = searchParams.get("example") === "1" && id === "example-listing";
   const mode = portalListingPageMode({
     loading,
     isClient: Boolean(user) && userType === "client",
   });
 
   useEffect(() => {
-    if (!id || mode === "pending") return;
+    if (exampleListing || !id || mode === "pending") return;
     let cancelled = false;
     setFetching(true);
     setError("");
@@ -264,8 +271,26 @@ export default function PortalListingDetail() {
     return () => {
       cancelled = true;
     };
-  }, [id, mode, user]);
+  }, [exampleListing, id, mode, user]);
 
+  useEffect(() => {
+    if (exampleListing || mode !== "owner-check" || !user) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const token = await user.getIdToken();
+        const response = await fetch("/api/clients/me/hub/profile", { headers: { Authorization: `Bearer ${token}` } });
+        if (!response.ok) return;
+        const body = await response.json() as { profile?: ClientHubProfile };
+        if (!cancelled) setMarketingAgent(marketingMaterialFromProfile(body.profile));
+      } catch {
+        if (!cancelled) setMarketingAgent(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [exampleListing, mode, user]);
+
+  if (exampleListing) return <ExampleListingFile />;
   if (!id || missing) return <NotFound />;
   if (loading || fetching) return <Pending />;
 
@@ -342,6 +367,7 @@ export default function PortalListingDetail() {
             setDataDraft(portalFactsDraftFromDetail(detail));
           }}
           onDataDraft={setDataDraft}
+          marketingAgent={marketingAgent}
           onRequestPhotoEdit={async (photoId, note) => {
             const saved = await send(`${ownerApi}/photo-edit-requests`, { photoId, note }, "POST");
             return Boolean(saved);
@@ -754,11 +780,18 @@ function ToursTab({
   );
 }
 
-function MarketingTab({ detail }: { detail: PortalListingDetailModel }) {
+function MarketingTab({ detail, agent }: { detail: PortalListingDetailModel; agent?: HubAgentBranding | null }) {
   return (
     <section>
       <h2 className="text-xs font-black uppercase tracking-widest text-[#0d9488] mb-1">Marketing kit</h2>
       <p className="text-xs text-gray-500 mb-4">Pick a flyer, social post, or reel here once design tools are connected.</p>
+      {agent ? (
+        <div className="grid lg:grid-cols-3 gap-3 mb-4">
+          <MarketingAgentCard agent={agent} title="Flyer" note={detail.marketing.find((card) => card.id === "flyer")?.note || "Flyer branding comes from your profile."} />
+          <MarketingAgentCard agent={agent} title="Social post" note={detail.marketing.find((card) => card.id === "social")?.note || "Social branding comes from your profile."} />
+          <MarketingAgentCard agent={agent} title="Reel" note={detail.marketing.find((card) => card.id === "reel")?.note || "Reel branding comes from your profile."} />
+        </div>
+      ) : null}
       <div className="grid sm:grid-cols-3 gap-3">
         {detail.marketing.map((card) => (
           <article key={card.id} className="bg-white rounded-2xl border border-dashed border-gray-200 p-5" data-testid={`marketing-${card.id}`}>

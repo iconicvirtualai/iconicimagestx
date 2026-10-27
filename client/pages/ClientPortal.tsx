@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { clientPortalAction, staffHomePath } from "@shared/staffAccess";
 import { calendarDateKey, type ClientAppointment, type ClientInvoiceStatement, type ClientListingCard } from "@shared/clientHome";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { ClientHomeView, type ClientHomeSection } from "@/components/client-home/ClientHomeDashboard";
+import { portalHref } from "@/components/client-hub/PortalShell";
+import { exampleListing } from "@/lib/exampleHub";
 
 interface PortalHome {
   profile?: { firstName?: string; lastName?: string; email?: string };
@@ -21,13 +23,18 @@ interface PortalHome {
 export default function ClientPortal() {
   const { user, userType, staffProfile, clientProfile, loading, signOutUser } = useAuth();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const example = params.get("example") === "1";
+  const requested = params.get("section");
   const [home, setHome] = useState<PortalHome | null>(null);
   const [error, setError] = useState("");
-  const [fetching, setFetching] = useState(true);
-  const [section, setSection] = useState<ClientHomeSection>("listings");
+  const [fetching, setFetching] = useState(!example);
+  const [section, setSection] = useState<ClientHomeSection>(
+    requested === "schedule" || requested === "messages" || requested === "orders" ? requested : "listings",
+  );
 
   useEffect(() => {
-    if (loading || !user || userType !== "client") return;
+    if (example || loading || !user || userType !== "client") return;
 
     let cancelled = false;
     (async () => {
@@ -49,27 +56,33 @@ export default function ClientPortal() {
     return () => {
       cancelled = true;
     };
-  }, [user, userType, loading]);
+  }, [user, userType, loading, example]);
 
-  if (loading) {
+  if (requested === "orders") {
+    return <Navigate to={portalHref("/portal/settings/billing", example)} replace />;
+  }
+
+  if (!example && loading) {
     return <PortalPending />;
   }
 
-  if (user && userType === "staff") {
+  if (!example && user && userType === "staff") {
     return <Navigate to={staffHomePath(staffProfile?.role)} replace />;
   }
 
-  const gate = clientPortalAction({
-    loading,
-    hasUser: Boolean(user),
-    isClient: userType === "client",
-  });
-  if (gate.type !== "show-home" || !user) {
-    return <Navigate to="/portal" replace />;
+  if (!example) {
+    const gate = clientPortalAction({
+      loading,
+      hasUser: Boolean(user),
+      isClient: userType === "client",
+    });
+    if (gate.type !== "show-home" || !user) {
+      return <Navigate to="/portal" replace />;
+    }
   }
 
-  const firstName = home?.profile?.firstName || clientProfile?.firstName || "there";
-  const listings = home?.listings?.length ? home.listings : home?.projects || [];
+  const firstName = example ? "Example" : home?.profile?.firstName || clientProfile?.firstName || "there";
+  const listings = example ? [exampleListing()] : home?.listings?.length ? home.listings : home?.projects || [];
   const today = calendarDateKey(new Date()) || "1970-01-01";
 
   return (
@@ -102,6 +115,7 @@ export default function ClientPortal() {
             today={today}
             loading={fetching}
             error={error}
+            example={example}
           />
         )}
       </div>

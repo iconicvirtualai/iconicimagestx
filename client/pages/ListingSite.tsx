@@ -294,10 +294,23 @@ function AgentBand({ site }: { site: PublicListingSite }) {
   const agent = site.agent;
   return (
     <section className="ls-agent">
+      <div className="ls-agent-brand">
+        {agent.headshotUrl ? <img src={agent.headshotUrl} alt="" width={72} height={72} /> : null}
+        {agent.companyLogoUrl ? <img src={agent.companyLogoUrl} alt="" width={36} height={36} /> : null}
+        {agent.brokerageLogoUrl ? <img src={agent.brokerageLogoUrl} alt="" width={36} height={36} /> : null}
+      </div>
       <h2>{agent.name || "Listing agent"}</h2>
       <p>
         {[agent.brokerage, agent.license ? `TX Lic. #${agent.license}` : "", agent.phone, agent.email].filter(Boolean).join(" · ")}
       </p>
+      {agent.website ? <p><a href={agent.website}>{agent.website.replace(/^https?:\/\//, "")}</a></p> : null}
+      {agent.socials && agent.socials.length > 0 ? (
+        <p>
+          {agent.socials.map((item) => (
+            <a key={`${item.label}-${item.url}`} href={item.url}>{item.label}</a>
+          ))}
+        </p>
+      ) : null}
       <p className="ls-legal">
         <a href="https://www.trec.texas.gov/forms/information-about-brokerage-services">TREC Information About Brokerage Services</a>
         {" · "}
