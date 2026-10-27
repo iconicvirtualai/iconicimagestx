@@ -7,7 +7,6 @@ import {
   HEADSHOTS_H1,
   HEADSHOTS_HOLD_MINUTES,
   HEADSHOTS_ORDER_SOURCE,
-  HEADSHOTS_PARKING_PLACEHOLDER,
   HEADSHOTS_SEO_DESCRIPTION,
   HEADSHOTS_STUDIO_LINE,
   HEADSHOT_PHOTOS,
@@ -84,7 +83,8 @@ describe("$10 Tuesday headshot quote", () => {
     expect(HEADSHOTS_SEO_DESCRIPTION).not.toMatch(/processing fee/i);
     expect(HEADSHOTS_FACTS.join(" ")).not.toMatch(/2\.8%|processing fee/i);
     expect(pageSource).not.toMatch(/processing fee/i);
-    expect(pageSource).not.toContain("[CONFIRM: 10-minute slots");
+    expect(pageSource).not.toMatch(/\[CONFIRM|\[parking/);
+    expect(readFileSync(new URL("./headshots10.ts", import.meta.url), "utf8")).not.toMatch(/\[CONFIRM|\[parking/);
     expect(pageSource).toContain("HEADSHOTS_H1");
   });
 });
@@ -228,8 +228,8 @@ describe("headshot booking conversion and mail", () => {
     expect(html).toContain("Due today: $10.28");
     expect(html).toContain("Balance on delivery: $20.00 + 2.8%");
     expect(html).toContain(HEADSHOTS_STUDIO_LINE);
-    expect(html).toContain(HEADSHOTS_PARKING_PLACEHOLDER);
     expect(html).toContain(HEADSHOTS_H1);
+    expect(html).not.toMatch(/\[CONFIRM|\[parking/);
     expect(html).not.toMatch(/processing fee/i);
     expect(html.toLowerCase()).not.toContain(["cadi", "@"].join(""));
     expect(html).not.toContain("Iconic Credits");

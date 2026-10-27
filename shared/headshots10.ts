@@ -8,7 +8,7 @@
  *
  * Slots are Tuesdays 10:00 AM–2:00 PM America/Chicago, 10 minutes, last start
  * 1:50 PM. Those lengths, the per-person cap, and the two-slot threshold are
- * config. Unconfirmed copy stays marked [CONFIRM].
+ * config. Unconfirmed copy is omitted, not shown as placeholder text.
  */
 
 import type { ApprenticeshipSlot } from "./apprenticeship.ts";
@@ -59,18 +59,6 @@ export const HEADSHOTS_FULL_LINE = "This Tuesday is full. Pick the next one.";
 export const HEADSHOTS_CALENDAR_FALLBACK =
   "Open times are not listed right now. Call or email and we will set the time with you.";
 export const HEADSHOTS_MAPS_QUERY = "26410 Oakridge Dr Ste 105, Spring, TX 77380";
-export const HEADSHOTS_PARKING_PLACEHOLDER = "[parking and entrance note]";
-export const HEADSHOTS_DELIVERY_PLACEHOLDER = "[CONFIRM: delivery time and retouching]";
-export const HEADSHOTS_POLICY_PLACEHOLDER = "[CONFIRM: reschedule/cancel policy]";
-export const HEADSHOTS_HEADSHOT_MEANING_PLACEHOLDER =
-  "[CONFIRM: how many frames or looks are included in each $10 headshot]";
-export const HEADSHOTS_MAX_PLACEHOLDER = "[CONFIRM: maximum 10 headshots per booking]";
-export const HEADSHOTS_WALKIN_PLACEHOLDER = "[CONFIRM: walk-ins]";
-export const HEADSHOTS_BACKGROUND_PLACEHOLDER = "[CONFIRM: background options]";
-export const HEADSHOTS_GROUP_PLACEHOLDER = "[CONFIRM: max per person / group bookings]";
-export const HEADSHOTS_DELIVERY_FAQ_PLACEHOLDER = "[CONFIRM: delivery time]";
-export const HEADSHOTS_RETOUCH_PLACEHOLDER = "[CONFIRM: retouching included]";
-export const HEADSHOTS_OTHER_SERVICES_PLACEHOLDER = "[CONFIRM: wording]";
 
 export const HEADSHOT_PATHS = {
   home: "/headshots-10",
@@ -518,9 +506,7 @@ export function headshotConfirmationEmailHtml(input: {
     Order total ${escapeHtml(money(input.quote.total))}</p>
     ${balance}
     <p>${escapeHtml(HEADSHOTS_STUDIO_LINE)}</p>
-    <p>${escapeHtml(HEADSHOTS_PARKING_PLACEHOLDER)}</p>
     <p><a href="${escapeHtml(input.wearUrl)}">What to wear</a></p>
-    <p>${escapeHtml(HEADSHOTS_POLICY_PLACEHOLDER)}</p>
     <p>Confirmation: <strong>${escapeHtml(input.orderNumber)}</strong></p>
     <p style="font-size:13px;">${escapeHtml(LEGAL_BUSINESS_NAME)} · ${escapeHtml(BUSINESS_CONTACT.line)}</p>
     <p><a href="${escapeHtml(input.pageUrl)}">${escapeHtml(input.pageUrl)}</a></p>
@@ -555,7 +541,7 @@ export function headshotCalendarIcs(input: {
     `DTEND:${icsStamp(input.end)}`,
     `SUMMARY:${icsText(`$10 Tuesday Headshots (${input.quantity})`)}`,
     `LOCATION:${icsText(HEADSHOTS_STUDIO_LINE)}`,
-    `DESCRIPTION:${icsText(`${input.quantity} headshot${input.quantity === 1 ? "" : "s"} at ${HEADSHOTS_STUDIO_LINE}. ${HEADSHOTS_PARKING_PLACEHOLDER}`)}`,
+    `DESCRIPTION:${icsText(`${input.quantity} headshot${input.quantity === 1 ? "" : "s"} at ${HEADSHOTS_STUDIO_LINE}.`)}`,
     "END:VEVENT",
     "END:VCALENDAR",
   ].join("\r\n");

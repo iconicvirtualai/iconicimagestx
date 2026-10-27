@@ -6,30 +6,19 @@ import { BUSINESS_CONTACT, LEGAL_BUSINESS_NAME } from "@shared/businessContact";
 import {
   HEADSHOT_PATHS,
   HEADSHOT_PAY_FAQ,
-  HEADSHOTS_BACKGROUND_PLACEHOLDER,
   HEADSHOTS_CALENDAR_FALLBACK,
   HEADSHOTS_DATE_COUNT,
-  HEADSHOTS_DELIVERY_FAQ_PLACEHOLDER,
-  HEADSHOTS_DELIVERY_PLACEHOLDER,
   HEADSHOTS_DOUBLE_SLOT_AT,
   HEADSHOTS_FACTS,
   HEADSHOTS_FULL_LINE,
-  HEADSHOTS_GROUP_PLACEHOLDER,
   HEADSHOTS_H1,
-  HEADSHOTS_HEADSHOT_MEANING_PLACEHOLDER,
   HEADSHOTS_HOLD_MINUTES,
   HEADSHOTS_MAPS_QUERY,
-  HEADSHOTS_MAX_PLACEHOLDER,
   HEADSHOTS_MAX_QUANTITY,
-  HEADSHOTS_OTHER_SERVICES_PLACEHOLDER,
-  HEADSHOTS_PARKING_PLACEHOLDER,
-  HEADSHOTS_POLICY_PLACEHOLDER,
   HEADSHOTS_RESERVE_LINE,
-  HEADSHOTS_RETOUCH_PLACEHOLDER,
   HEADSHOTS_STUDIO_ADDRESS,
   HEADSHOTS_STUDIO_LINE,
   HEADSHOTS_STUDIO_NAME,
-  HEADSHOTS_WALKIN_PLACEHOLDER,
   headshotHeroGroup,
   headshotPhotoStrip,
   headshotCalendarIcs,
@@ -440,14 +429,9 @@ export default function Headshots10() {
     { q: "How much is a headshot?", a: "Headshots are $10 each. Buy as many as you like." },
     { q: "When is it?", a: "Every Tuesday, 10am to 2pm." },
     { q: "Where is it?", a: `${HEADSHOTS_STUDIO_LINE}.` },
-    { q: "Do I need to book?", a: `${HEADSHOTS_RESERVE_LINE} ${HEADSHOTS_WALKIN_PLACEHOLDER}` },
-    { q: "When do I get my photos?", a: HEADSHOTS_DELIVERY_FAQ_PLACEHOLDER },
-    { q: "Are the photos retouched?", a: HEADSHOTS_RETOUCH_PLACEHOLDER },
-    { q: "Can I bring a team or a friend?", a: HEADSHOTS_GROUP_PLACEHOLDER },
-    { q: "What backgrounds do you have?", a: HEADSHOTS_BACKGROUND_PLACEHOLDER },
+    { q: "Do I need to book?", a: HEADSHOTS_RESERVE_LINE },
     { q: "Can I pay at the event?", a: HEADSHOT_PAY_FAQ },
-    { q: "Can I reschedule or cancel?", a: HEADSHOTS_POLICY_PLACEHOLDER },
-    { q: "Do you do other photography?", a: `Yes. See all Iconic Images services. ${HEADSHOTS_OTHER_SERVICES_PLACEHOLDER}` },
+    { q: "Do you do other photography?", a: "Yes. See all Iconic Images services." },
   ];
 
   return (
@@ -521,7 +505,6 @@ export default function Headshots10() {
               <p className="mt-3 text-2xl font-bold leading-tight">Every Tuesday, 10am to 2pm</p>
               <p className="mt-3 text-base leading-relaxed">{HEADSHOTS_STUDIO_LINE}</p>
               <p className="mt-4 text-base">{HEADSHOTS_RESERVE_LINE}</p>
-              <p className="mt-4 text-sm">{HEADSHOTS_HEADSHOT_MEANING_PLACEHOLDER}</p>
             </aside>
           </div>
         </section>
@@ -559,7 +542,6 @@ export default function Headshots10() {
         <section id="pricing" className="mx-auto w-full max-w-6xl px-4 pb-14" data-testid="headshots-pricing">
           <h2 className="text-3xl font-extrabold tracking-tight">$10 per headshot</h2>
           <p className="mt-2 text-lg">Buy as many as you like.</p>
-          <p className="mt-2 text-sm">{HEADSHOTS_MAX_PLACEHOLDER}</p>
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <div className="inline-flex items-center rounded-full border border-[#081228]/20 bg-white" role="group" aria-label="Number of headshots">
               <button
@@ -629,7 +611,6 @@ export default function Headshots10() {
               </li>
             ))}
           </ol>
-          <p className="mt-4 text-sm font-semibold">{HEADSHOTS_DELIVERY_PLACEHOLDER}</p>
           <div id="what-to-wear" className="mt-8">
             <h3 className="text-2xl font-extrabold">What to wear</h3>
             <ul className="mt-3 max-w-2xl list-disc space-y-2 pl-5">
@@ -658,7 +639,7 @@ export default function Headshots10() {
                     <div className="pb-4 pr-8">
                       {item.q === "Do you do other photography?" ? (
                         <p>
-                          Yes. <Link to="/pricing" className="font-semibold underline decoration-[#00B4C8] decoration-2 underline-offset-4">See all Iconic Images services</Link>. {HEADSHOTS_OTHER_SERVICES_PLACEHOLDER}
+                          Yes. <Link to="/pricing" className="font-semibold underline decoration-[#00B4C8] decoration-2 underline-offset-4">See all Iconic Images services</Link>.
                         </p>
                       ) : <p>{item.a}</p>}
                     </div>
@@ -673,7 +654,6 @@ export default function Headshots10() {
           <h2 className="text-3xl font-extrabold tracking-tight">Map and parking</h2>
           <p className="mt-3 text-lg">{HEADSHOTS_STUDIO_LINE}</p>
           <p className="mt-2">Tuesdays 10am-2pm</p>
-          <p className="mt-3 text-sm font-semibold">{HEADSHOTS_PARKING_PLACEHOLDER}</p>
           <div className="mt-4 flex flex-wrap gap-3">
             <a
               className="inline-flex min-h-12 items-center rounded-full bg-[#081228] px-5 font-bold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00B4C8]"
@@ -719,8 +699,6 @@ export default function Headshots10() {
               {confirmedQuote.balanceLine ? <p className="text-xl font-bold">{confirmedQuote.balanceLine}</p> : null}
               {confirmedQuote.balanceLine ? <p>That balance is {money(confirmedQuote.balanceTotal)}.</p> : null}
               <p className="mt-4">{HEADSHOTS_STUDIO_LINE}</p>
-              <p className="mt-2 text-sm font-semibold">{HEADSHOTS_PARKING_PLACEHOLDER}</p>
-              <p className="mt-2 text-sm font-semibold">{HEADSHOTS_POLICY_PLACEHOLDER}</p>
               <div className="mt-5 flex flex-wrap gap-3">
                 {confirmed.slotStart && confirmed.slotEnd ? (
                   <button
