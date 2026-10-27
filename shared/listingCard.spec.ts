@@ -80,7 +80,24 @@ describe("listing card package looks", () => {
     })).toBe("just-photos");
     expect(resolveListingCardLook({ package: "Custom order", services: ["The Showcase"] })).toBeNull();
     expect(resolveListingCardLook({})).toBeNull();
-    expect(resolveListingCardLook({ portalWebsite: { tileLook: "showcase" }, package: "Custom order" })).toBe("showcase");
+  });
+
+  it("client cannot set tileLook", () => {
+    expect(resolveListingCardLook({
+      portalWebsite: { tileLook: "showcase" },
+      package: "Photos Only",
+    })).toBe("just-photos");
+    expect(resolveListingCardLook({
+      portalWebsite: { tileLook: "legacy" },
+      services: ["The Showcase"],
+    })).toBe("showcase");
+    expect(resolveListingCardLook({
+      portalWebsite: { tileLook: "showcase" },
+      package: "Custom order",
+    })).toBeNull();
+    expect(resolveListingCardLook({
+      portalWebsite: { tileLook: "essentials" },
+    })).toBeNull();
   });
 });
 

@@ -1,16 +1,12 @@
 import { useState } from "react";
-import { ListingPackageCard } from "@/components/listing-card/ListingPackageCard";
 import { ListingSiteView } from "@/pages/ListingSite";
-import type { ClientListingCard } from "@shared/clientHome";
-import { clientListingPath } from "@shared/clientHome";
-import type { ListingCardLook } from "@shared/listingCard";
-import { packageSkinsInDisplayOrder } from "@shared/packageSkins";
 import { LISTING_SITE_TEMPLATES, listingSitePath, listingSiteSlug, type ListingSiteDesign, type PublicListingSite } from "@shared/listingSite";
-import type { PortalListingDetail, PortalWebsiteSettings } from "@shared/portalListingDetail";
+import { listingSiteActionState, type PortalListingDetail, type PortalWebsiteSettings } from "@shared/portalListingDetail";
 
 export function PortalTemplatePicker({
   detail,
   website,
+  savedWebsite,
   canEdit,
   saving,
   onWebsite,
@@ -18,22 +14,34 @@ export function PortalTemplatePicker({
 }: {
   detail: PortalListingDetail;
   website: PortalWebsiteSettings;
+  savedWebsite?: PortalWebsiteSettings;
   canEdit: boolean;
   saving: boolean;
   onWebsite: (next: PortalWebsiteSettings) => void;
-  onSave: () => void;
+  onSave: (next: PortalWebsiteSettings) => void;
 }) {
   const slug = listingSiteSlug({ line1: detail.address.line1, city: detail.address.city });
+  const saved = savedWebsite ?? website;
   const [fullPreview, setFullPreview] = useState<ListingSiteDesign | null>(null);
   const preview = previewSite(detail, website);
   const current = LISTING_SITE_TEMPLATES.find((item) => item.id === website.design) || LISTING_SITE_TEMPLATES.find((item) => item.id === "index")!;
 
   return (
     <section className="space-y-6" data-testid="portal-templates">
+      {canEdit && (
+        <ListingSiteActionBar
+          website={website}
+          saved={saved}
+          slug={slug}
+          saving={saving}
+          onCommit={onSave}
+        />
+      )}
       <div className="rounded-2xl border border-gray-100 bg-white p-5">
         <h2 className="text-xs font-black uppercase tracking-widest text-[#0d9488]">Listing site styles</h2>
         <p className="mt-1 text-xs text-gray-500">
-          Ten listing sites. Each card is that design on this listing’s photos. Pick one, open the full preview, then save.
+          Ten listing sites. Each card is that design on this listing’s photos.
+          {canEdit ? " Pick one, then Select, Save style, or Publish at the top right." : ""}
         </p>
         {slug && website.published ? (
           <a href={listingSitePath(slug)} className="mt-3 inline-flex min-h-12 items-center text-sm font-black underline" data-testid="listing-site-view">View site</a>
@@ -105,45 +113,15 @@ export function PortalTemplatePicker({
       </div>
 
       {canEdit && (
-        <details className="rounded-2xl border border-gray-100 bg-white p-5" data-testid="portal-tile-skins">
-          <summary className="cursor-pointer text-xs font-black uppercase tracking-widest text-gray-400">Portal tile</summary>
-          <p className="mt-3 text-xs text-gray-500">Optional. This only changes the project tile in the portal, not the public listing site.</p>
-          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-            {packageSkinsInDisplayOrder().map((skin) => {
-              const selected = website.tileLook === skin.look;
-              return (
-                <div key={skin.look} className={`min-w-0 rounded-[20px] p-2 ${selected ? "ring-2 ring-black" : ""}`} data-testid={`tile-skin-${skin.look}`}>
-                  <div className="pointer-events-none">
-                    <ListingPackageCard listing={skinCard(detail, skin.look)} />
-                  </div>
-                  <button
-                    type="button"
-                    aria-pressed={selected}
-                    className="mt-2 min-h-11 w-full rounded-xl bg-black text-xs font-black uppercase tracking-widest text-white"
-                    onClick={() => onWebsite({ ...website, tileLook: skin.look })}
-                  >
-                    {selected ? "Selected" : `Use ${skin.skinLabel}`}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </details>
-      )}
-
-      {canEdit && (
         <div className="rounded-2xl border border-gray-100 bg-white p-5">
           <p className="text-xs font-black uppercase tracking-widest text-gray-400">Site options</p>
+          <p className="mt-2 text-xs text-gray-500">Show or hide sections, then save them with the buttons at the top right.</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <Toggle label="Publish site" checked={website.published} onChange={(published) => onWebsite({ ...website, published })} />
             <Toggle label="Show photos" checked={website.showPhotos} onChange={(showPhotos) => onWebsite({ ...website, showPhotos })} />
             <Toggle label="Show video" checked={website.showVideo} onChange={(showVideo) => onWebsite({ ...website, showVideo })} />
             <Toggle label="Show virtual tours" checked={website.showTours} onChange={(showTours) => onWebsite({ ...website, showTours })} />
             <Toggle label="Show floorplans" checked={website.showFloorplans} onChange={(showFloorplans) => onWebsite({ ...website, showFloorplans })} />
           </div>
-          <button type="button" className="mt-6 min-h-11 rounded-xl bg-black px-4 text-sm font-black text-white disabled:opacity-60" disabled={saving} onClick={onSave}>
-            Save site style
-          </button>
         </div>
       )}
 
@@ -161,6 +139,79 @@ export function PortalTemplatePicker({
         </div>
       )}
     </section>
+  );
+}
+
+const primaryAction = "inline-flex min-h-11 items-center justify-center rounded-xl bg-black px-4 text-[11px] font-black uppercase tracking-widest text-white disabled:opacity-60";
+const quietAction = "inline-flex min-h-11 items-center justify-center rounded-xl border border-black/15 bg-white px-3 text-[11px] font-black uppercase tracking-widest text-black disabled:opacity-60";
+
+function ListingSiteActionBar({
+  website,
+  saved,
+  slug,
+  saving,
+  onCommit,
+}: {
+  website: PortalWebsiteSettings;
+  saved: PortalWebsiteSettings;
+  slug: string;
+  saving: boolean;
+  onCommit: (next: PortalWebsiteSettings) => void;
+}) {
+  const state = listingSiteActionState(saved, website);
+  const view = slug ? listingSitePath(slug) : "";
+  return (
+    <div
+      className="fixed right-3 top-3 z-40 flex max-w-[calc(100vw-1.5rem)] flex-wrap items-center justify-end gap-1.5 rounded-2xl border border-black/10 bg-white p-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.18)] sm:right-5 sm:top-5"
+      data-testid="listing-site-publish-bar"
+      data-listing-action={state.mode}
+      role="region"
+      aria-label="Listing site actions"
+    >
+      {state.mode === "live" && (
+        <>
+          <p className="px-2 text-[11px] font-black uppercase tracking-widest text-[#0d9488]" data-testid="listing-site-published-state">Published</p>
+          {view ? (
+            <a href={view} className="inline-flex min-h-11 items-center rounded-xl px-3 text-[11px] font-black uppercase tracking-widest text-black" data-testid="listing-site-view-action">View site</a>
+          ) : null}
+          <button type="button" className={quietAction} disabled={saving} data-testid="listing-site-unpublish" onClick={() => onCommit({ ...website, published: false })}>
+            Unpublish
+          </button>
+        </>
+      )}
+      {state.mode === "update" && (
+        <>
+          {view ? (
+            <a href={view} className="inline-flex min-h-11 items-center rounded-xl px-3 text-[11px] font-black uppercase tracking-widest text-black" data-testid="listing-site-view-action">View site</a>
+          ) : null}
+          <button type="button" className={primaryAction} disabled={saving} data-testid="listing-site-update" onClick={() => onCommit({ ...website, published: true })}>
+            Update
+          </button>
+        </>
+      )}
+      {state.mode === "choose" && (
+        <>
+          <button
+            type="button"
+            className={quietAction}
+            disabled={saving}
+            data-testid="listing-site-save-style"
+            onClick={() => onCommit({ ...website, published: saved.published })}
+          >
+            {state.saveLabel}
+          </button>
+          <button
+            type="button"
+            className={primaryAction}
+            disabled={saving}
+            data-testid="listing-site-publish"
+            onClick={() => onCommit({ ...website, published: true })}
+          >
+            Publish
+          </button>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -191,31 +242,6 @@ function previewSite(detail: PortalListingDetail, website: PortalWebsiteSettings
     tourEmbedUrl: tour?.embedUrl || "",
     floorplan: floor ? { name: floor.name, url: floor.url } : null,
     agent: { name: "", brokerage: "", license: "", phone: "", email: "" },
-  };
-}
-
-function skinCard(detail: PortalListingDetail, look: ListingCardLook): ClientListingCard {
-  const beds = detail.facts.find((fact) => fact.id === "beds");
-  const baths = detail.facts.find((fact) => fact.id === "baths");
-  const pool = detail.facts.find((fact) => fact.id === "pool");
-  return {
-    id: detail.id || look,
-    address: detail.address.formatted || "Listing",
-    status: detail.status || "delivered",
-    projectType: "real_estate",
-    imageCount: detail.photos.length,
-    coverUrl: detail.photos.find((item) => !item.hidden)?.url || "",
-    createdAt: "",
-    appointmentDate: null,
-    href: clientListingPath(detail.id || look),
-    look,
-    street: detail.address.line1 || detail.address.formatted || "Listing",
-    locality: [detail.address.city, detail.address.state, detail.address.zip].filter(Boolean).join(", "),
-    shootDateLabel: "",
-    beds: beds && !beds.empty ? beds.value : "",
-    baths: baths && !baths.empty ? baths.value : "",
-    garage: "",
-    pool: pool && !pool.empty ? pool.value : "",
   };
 }
 

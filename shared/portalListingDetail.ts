@@ -8,7 +8,7 @@
 
 import { addressText } from "./addressText.ts";
 import { orderHistoryInvoiceNumber } from "./orderProjectInvoice.ts";
-import { LISTING_CARD_LOOKS, type ListingCardLook } from "./packageSkins.ts";
+import type { ListingCardLook } from "./packageSkins.ts";
 import { readPhotoEditRequests, type PhotoEditRequest } from "./photoEditRequest";
 
 export const PORTAL_LISTING_TABS = [
@@ -132,7 +132,10 @@ export interface PortalWebsiteSettings {
   showVideo: boolean;
   showTours: boolean;
   showFloorplans: boolean;
-  /** Client-chosen project tile. Empty keeps the package skin. */
+  /**
+   * Ignored. Portal tiles come from the shoot or package.
+   * Clients cannot set this, and a stored value is discarded on read and write.
+   */
   tileLook: ListingCardLook | "";
 }
 
@@ -331,6 +334,26 @@ export function defaultPortalWebsite(): PortalWebsiteSettings {
     showFloorplans: true,
     tileLook: "",
   };
+}
+
+export type ListingSiteActionMode = "choose" | "live" | "update";
+
+/** Which top-right listing-site control to show. `tileLook` is not a choice. */
+export function listingSiteActionState(
+  saved: PortalWebsiteSettings,
+  draft: PortalWebsiteSettings,
+): { mode: ListingSiteActionMode; saveLabel: "Select" | "Save style" } {
+  const dirty = saved.design !== draft.design
+    || saved.font !== draft.font
+    || saved.color !== draft.color
+    || saved.style !== draft.style
+    || saved.showPhotos !== draft.showPhotos
+    || saved.showVideo !== draft.showVideo
+    || saved.showTours !== draft.showTours
+    || saved.showFloorplans !== draft.showFloorplans;
+  if (saved.published && !dirty) return { mode: "live", saveLabel: "Save style" };
+  if (saved.published && dirty) return { mode: "update", saveLabel: "Save style" };
+  return { mode: "choose", saveLabel: saved.design !== draft.design ? "Select" : "Save style" };
 }
 
 export function hiddenPresentationKeys(listing: Record<string, unknown> | null | undefined): Set<string> {
@@ -703,12 +726,8 @@ export function sanitizeWebsiteSettings(value: unknown, base = defaultPortalWebs
     showVideo: boolOr(row.showVideo, base.showVideo),
     showTours: boolOr(row.showTours, base.showTours),
     showFloorplans: boolOr(row.showFloorplans, base.showFloorplans),
-    tileLook: isListingCardLook(row.tileLook) ? row.tileLook : base.tileLook,
+    tileLook: "",
   };
-}
-
-function isListingCardLook(value: unknown): value is ListingCardLook {
-  return typeof value === "string" && (LISTING_CARD_LOOKS as readonly string[]).includes(value);
 }
 
 export function readMediaStore(value: unknown): PortalMediaStore {

@@ -6,7 +6,6 @@
 
 import { addressText } from "./addressText.ts";
 import {
-  LISTING_CARD_LOOKS,
   resolvePackageSkin,
   resolvePackageSkinFromOrder,
   type ListingCardLook,
@@ -30,15 +29,10 @@ export function listingCardLookFromValue(value: unknown): ListingCardLook | null
   return resolvePackageSkin(value)?.look ?? null;
 }
 
-/** A portal tile choice wins. Otherwise the listing package, or the service list. */
+/**
+ * Portal tiles follow the shoot or package. A saved `tileLook` never overrides that.
+ */
 export function resolveListingCardLook(data: Record<string, unknown>): ListingCardLook | null {
-  const website = data.portalWebsite;
-  if (website && typeof website === "object") {
-    const chosen = (website as { tileLook?: unknown }).tileLook;
-    if (typeof chosen === "string" && (LISTING_CARD_LOOKS as readonly string[]).includes(chosen)) {
-      return chosen as ListingCardLook;
-    }
-  }
   return resolvePackageSkinFromOrder(data)?.look ?? null;
 }
 
