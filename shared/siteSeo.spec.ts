@@ -137,8 +137,8 @@ describe("public page meta", () => {
     expect(isNoIndexPath("/headshots-10/faq")).toBe(true);
     expect(metaPlan("/headshots-10")).toEqual({
       kind: "noindex",
-      title: "$10 Headshots Every Tuesday | Iconic Images",
-      description: "Tuesdays 10am-2pm at Iconic Studios in Spring. $10 per headshot + 2.8% processing fee. Buy as many as you like.",
+      title: "$10 Tuesdays! Headshots for $10/Ea. | Iconic Images",
+      description: "$10 Tuesdays at Iconic Studios in Spring. Headshots for $10 each, 10am-2pm. Buy as many as you like.",
     });
     expect(metaPlan("/pricing").kind).toBe("public");
   });

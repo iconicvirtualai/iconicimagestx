@@ -7,6 +7,7 @@
  */
 
 import { LEGAL_BUSINESS_NAME } from "./businessContact.ts";
+import { HEADSHOTS_SEO_DESCRIPTION, HEADSHOTS_SEO_TITLE } from "./headshots10.ts";
 
 export const DEFAULT_SITE_ORIGIN = "https://iconicimagestx.vercel.app";
 
@@ -190,8 +191,8 @@ export function metaPlan(pathname: string, origin = SITE_ORIGIN): MetaPlan {
   if (path === "/headshots-10" || path.startsWith("/headshots-10/")) {
     return {
       kind: "noindex",
-      title: "$10 Headshots Every Tuesday | Iconic Images",
-      description: "Tuesdays 10am-2pm at Iconic Studios in Spring. $10 per headshot + 2.8% processing fee. Buy as many as you like.",
+      title: HEADSHOTS_SEO_TITLE,
+      description: HEADSHOTS_SEO_DESCRIPTION,
     };
   }
   if (path === "/present" || path.startsWith("/present/")) return { kind: "hands-off" };

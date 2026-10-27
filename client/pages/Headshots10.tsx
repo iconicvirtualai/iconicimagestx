@@ -12,9 +12,10 @@ import {
   HEADSHOTS_DELIVERY_FAQ_PLACEHOLDER,
   HEADSHOTS_DELIVERY_PLACEHOLDER,
   HEADSHOTS_DOUBLE_SLOT_AT,
-  HEADSHOTS_FEE_NOTE,
+  HEADSHOTS_FACTS,
   HEADSHOTS_FULL_LINE,
   HEADSHOTS_GROUP_PLACEHOLDER,
+  HEADSHOTS_H1,
   HEADSHOTS_HEADSHOT_MEANING_PLACEHOLDER,
   HEADSHOTS_HOLD_MINUTES,
   HEADSHOTS_MAPS_QUERY,
@@ -23,14 +24,14 @@ import {
   HEADSHOTS_OTHER_SERVICES_PLACEHOLDER,
   HEADSHOTS_PARKING_PLACEHOLDER,
   HEADSHOTS_POLICY_PLACEHOLDER,
-  HEADSHOTS_PRICE_LINE,
   HEADSHOTS_RESERVE_LINE,
   HEADSHOTS_RETOUCH_PLACEHOLDER,
-  HEADSHOTS_SLOT_PLACEHOLDER,
   HEADSHOTS_STUDIO_ADDRESS,
   HEADSHOTS_STUDIO_LINE,
   HEADSHOTS_STUDIO_NAME,
   HEADSHOTS_WALKIN_PLACEHOLDER,
+  headshotHeroPhoto,
+  headshotPhotoStrip,
   headshotCalendarIcs,
   headshotConversionKey,
   headshotConversionValue,
@@ -96,7 +97,8 @@ const WEAR = [
   "Arrive 5 minutes early.",
 ];
 
-const FACTS = ["Every Tuesday", "10am-2pm", "$10 per headshot", "Buy as many as you like", "Spring, TX"];
+const heroPhoto = headshotHeroPhoto();
+const photoStrip = headshotPhotoStrip();
 
 function readJson<T>(key: string): T | null {
   if (typeof sessionStorage === "undefined") return null;
@@ -429,7 +431,7 @@ export default function Headshots10() {
   const chips = [1, 3, 5, 10].filter((count) => count <= maxQuantity);
 
   const faqs: Array<{ q: string; a: string }> = [
-    { q: "How much is a headshot?", a: "$10 per headshot, plus a 2.8% processing fee. Buy as many as you like at $10 each." },
+    { q: "How much is a headshot?", a: "Headshots are $10 each. Buy as many as you like." },
     { q: "When is it?", a: "Every Tuesday, 10am to 2pm." },
     { q: "Where is it?", a: `${HEADSHOTS_STUDIO_LINE}.` },
     { q: "Do I need to book?", a: `${HEADSHOTS_RESERVE_LINE} ${HEADSHOTS_WALKIN_PLACEHOLDER}` },
@@ -464,12 +466,11 @@ export default function Headshots10() {
           <div>
             <div className="mb-4 h-2 w-24 bg-[#00B4C8]" aria-hidden="true" />
             <h1 className="max-w-xl text-[2rem] font-extrabold leading-tight tracking-tight sm:text-5xl">
-              $10 Headshots Every Tuesday
+              {HEADSHOTS_H1}
             </h1>
             <p className="mt-4 max-w-xl text-lg leading-snug">
-              Tuesdays 10am-2pm at Iconic Studios in Spring. Buy as many headshots as you like at $10 each.
+              Tuesdays 10am-2pm at Iconic Studios in Spring. Buy as many headshots as you like.
             </p>
-            <p className="mt-4 text-base font-semibold">{HEADSHOTS_PRICE_LINE}</p>
             <div className="mt-5 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
               <a
                 href={href(`${HEADSHOT_PATHS.book}`)}
@@ -482,22 +483,55 @@ export default function Headshots10() {
               </a>
             </div>
           </div>
-          <aside className="border-t-4 border-[#00B4C8] bg-white/70 p-6">
-            <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#081228]">At the studio</p>
-            <p className="mt-3 text-2xl font-bold leading-tight">Every Tuesday, 10am to 2pm</p>
-            <p className="mt-3 text-base leading-relaxed">{HEADSHOTS_STUDIO_LINE}</p>
-            <p className="mt-4 text-base">{HEADSHOTS_RESERVE_LINE}</p>
-            <p className="mt-4 text-sm">{HEADSHOTS_HEADSHOT_MEANING_PLACEHOLDER}</p>
-          </aside>
+          <div>
+            {heroPhoto ? (
+              <img
+                src={heroPhoto.src}
+                alt={heroPhoto.alt}
+                width={1600}
+                height={1280}
+                fetchPriority="high"
+                className="mb-4 aspect-[5/4] w-full object-cover object-center"
+                data-testid="headshots-hero-photo"
+              />
+            ) : null}
+            <aside className="border-t-4 border-[#00B4C8] bg-white/70 p-6">
+              <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#081228]">At the studio</p>
+              <p className="mt-3 text-2xl font-bold leading-tight">Every Tuesday, 10am to 2pm</p>
+              <p className="mt-3 text-base leading-relaxed">{HEADSHOTS_STUDIO_LINE}</p>
+              <p className="mt-4 text-base">{HEADSHOTS_RESERVE_LINE}</p>
+              <p className="mt-4 text-sm">{HEADSHOTS_HEADSHOT_MEANING_PLACEHOLDER}</p>
+            </aside>
+          </div>
         </section>
 
         <ul className="mx-auto flex w-full max-w-6xl flex-wrap gap-2 px-4 pb-10">
-          {FACTS.map((fact) => (
+          {HEADSHOTS_FACTS.map((fact) => (
             <li key={fact} className="rounded-full border border-[#00B4C8] px-3 py-2 text-sm font-semibold">
               {fact}
             </li>
           ))}
         </ul>
+        {photoStrip.length >= 3 ? (
+          <section className="mx-auto w-full max-w-6xl px-4 pb-10" data-testid="headshots-photo-strip" aria-label="Studio headshots">
+            <h2 className="text-sm font-bold uppercase tracking-[0.16em]">Studio headshots</h2>
+            <ul className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
+              {photoStrip.map((photo) => (
+                <li key={photo.src}>
+                  <img
+                    src={photo.src}
+                    alt={photo.alt}
+                    width={1600}
+                    height={1600}
+                    loading="lazy"
+                    decoding="async"
+                    className={`aspect-square w-full object-cover ${photo.objectPosition === "top" ? "object-top" : "object-center"}`}
+                  />
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
 
         <section id="pricing" className="mx-auto w-full max-w-6xl px-4 pb-14" data-testid="headshots-pricing">
           <h2 className="text-3xl font-extrabold tracking-tight">$10 per headshot</h2>
@@ -547,8 +581,6 @@ export default function Headshots10() {
             <p className="mt-2 text-xl font-bold">{quote.dueTodayLine}</p>
             {quote.balanceLine ? <p className="mt-1 text-xl font-bold">{quote.balanceLine}</p> : null}
             {quote.balanceLine ? <p className="mt-1">That balance is {money(quote.balanceTotal)}.</p> : null}
-            <p className="mt-3 text-sm font-semibold">{HEADSHOTS_FEE_NOTE}</p>
-            <p className="mt-1 text-sm">{quote.priceLine}</p>
           </div>
           <a
             href={href(HEADSHOT_PATHS.book)}
@@ -647,7 +679,6 @@ export default function Headshots10() {
         <section id="book" className="scroll-mt-6 mx-auto w-full max-w-6xl px-4 pb-20" data-testid="headshots-booking">
           <h2 className="text-3xl font-extrabold tracking-tight">Book a Tuesday slot</h2>
           <p className="mt-2">{HEADSHOTS_RESERVE_LINE}</p>
-          <p className="mt-2 text-sm">{HEADSHOTS_SLOT_PLACEHOLDER}</p>
           {showingConfirmation && confirmed ? (
             <div className="mt-6 max-w-xl bg-white p-6" data-testid="headshots-confirmation">
               <h3 className="text-2xl font-extrabold">
@@ -664,7 +695,6 @@ export default function Headshots10() {
               <p className="mt-3 text-xl font-bold">{confirmedQuote.dueTodayLine}</p>
               {confirmedQuote.balanceLine ? <p className="text-xl font-bold">{confirmedQuote.balanceLine}</p> : null}
               {confirmedQuote.balanceLine ? <p>That balance is {money(confirmedQuote.balanceTotal)}.</p> : null}
-              <p className="mt-2 text-sm font-semibold">{HEADSHOTS_FEE_NOTE}</p>
               <p className="mt-4">{HEADSHOTS_STUDIO_LINE}</p>
               <p className="mt-2 text-sm font-semibold">{HEADSHOTS_PARKING_PLACEHOLDER}</p>
               <p className="mt-2 text-sm font-semibold">{HEADSHOTS_POLICY_PLACEHOLDER}</p>
@@ -767,8 +797,6 @@ export default function Headshots10() {
                   <p className="mt-3 text-xl font-bold">{quote.dueTodayLine}</p>
                   {quote.balanceLine ? <p className="text-xl font-bold">{quote.balanceLine}</p> : null}
                   {quote.balanceLine ? <p className="mt-1">That balance is {money(quote.balanceTotal)}.</p> : null}
-                  <p className="mt-3 text-sm font-semibold">{HEADSHOTS_FEE_NOTE}</p>
-                  <p className="mt-1 text-sm">{quote.priceLine}</p>
                   <p className="mt-3 text-sm">The $10 counts toward your headshots. Your time is held for {HEADSHOTS_HOLD_MINUTES} minutes once the booking fee checkout starts.</p>
                 </div>
               ) : null}
@@ -817,7 +845,6 @@ export default function Headshots10() {
         <p className="mx-auto max-w-6xl leading-relaxed">
           {LEGAL_BUSINESS_NAME} · {BUSINESS_CONTACT.address} · {BUSINESS_CONTACT.phoneDisplay} · {BUSINESS_CONTACT.email}
         </p>
-        <p className="mx-auto mt-2 max-w-6xl">A 2.8% processing fee is added to all prices.</p>
       </footer>
     </div>
   );

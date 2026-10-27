@@ -3,10 +3,15 @@ import { describe, expect, it } from "vitest";
 import { processingFee } from "./invoiceProcessing";
 import {
   HEADSHOT_PAY_FAQ,
+  HEADSHOTS_FACTS,
+  HEADSHOTS_H1,
   HEADSHOTS_HOLD_MINUTES,
   HEADSHOTS_ORDER_SOURCE,
   HEADSHOTS_PARKING_PLACEHOLDER,
+  HEADSHOTS_SEO_DESCRIPTION,
   HEADSHOTS_STUDIO_LINE,
+  headshotHeroPhoto,
+  headshotPhotoStrip,
   headshotClientMailEnabled,
   headshotConfirmationEmailHtml,
   headshotConversionValue,
@@ -22,6 +27,7 @@ import {
 } from "./headshots10";
 
 const routeSource = readFileSync(new URL("../server/routes/headshots10.ts", import.meta.url), "utf8");
+const pageSource = readFileSync(new URL("../client/pages/Headshots10.tsx", import.meta.url), "utf8");
 
 describe("$10 Tuesday headshot quote", () => {
   it("charges $10.28 today and hides the balance when one headshot pays the order", () => {
@@ -72,6 +78,13 @@ describe("$10 Tuesday headshot quote", () => {
     expect(HEADSHOT_PAY_FAQ).toContain("$10.28");
     expect(HEADSHOT_PAY_FAQ).toContain("balance is due on delivery");
     expect(HEADSHOT_PAY_FAQ).not.toContain("[CONFIRM");
+    expect(HEADSHOT_PAY_FAQ).not.toMatch(/processing fee/i);
+    expect(HEADSHOTS_H1).toBe("$10 Tuesdays! Headshots for $10/Ea.");
+    expect(HEADSHOTS_SEO_DESCRIPTION).not.toMatch(/processing fee/i);
+    expect(HEADSHOTS_FACTS.join(" ")).not.toMatch(/2\.8%|processing fee/i);
+    expect(pageSource).not.toMatch(/processing fee/i);
+    expect(pageSource).not.toContain("[CONFIRM: 10-minute slots");
+    expect(pageSource).toContain("HEADSHOTS_H1");
   });
 });
 
@@ -117,6 +130,54 @@ describe("Tuesday headshot slots", () => {
   });
 });
 
+describe("headshot photos", () => {
+  const photos = [
+    { src: "/media/headshots/one.jpg", alt: "Tuesday headshot one" },
+    { src: "/media/headshots/two.jpg", alt: "Tuesday headshot two" },
+    { src: "  ", alt: "Missing file" },
+    { src: "/media/headshots/three.jpg", alt: "Tuesday headshot three" },
+    { src: "/media/headshots/four.jpg", alt: "Tuesday headshot four" },
+    { src: "/media/headshots/five.jpg", alt: "Tuesday headshot five" },
+    { src: "/media/headshots/six.jpg", alt: "Tuesday headshot six" },
+  ];
+
+  it("hides the hero and the strip when no photos are passed", () => {
+    expect(headshotHeroPhoto([])).toBeNull();
+    expect(headshotPhotoStrip([])).toEqual([]);
+  });
+
+  it("keeps the hero out of a three-to-five sample strip", () => {
+    expect(headshotHeroPhoto(photos.slice(0, 2))?.src).toBe("/media/headshots/one.jpg");
+    expect(headshotPhotoStrip(photos.slice(0, 2))).toEqual([]);
+    const strip = headshotPhotoStrip(photos);
+    expect(strip.map((photo) => photo.src)).toEqual([
+      "/media/headshots/two.jpg",
+      "/media/headshots/three.jpg",
+      "/media/headshots/four.jpg",
+      "/media/headshots/five.jpg",
+      "/media/headshots/six.jpg",
+    ]);
+    expect(strip.some((photo) => photo.alt === "Missing file")).toBe(false);
+  });
+
+  it("uses the light-backdrop headshot as the hero and mixes the other five", () => {
+    expect(headshotHeroPhoto()?.src).toBe("/images/headshots-10/headshot-4.jpg");
+    expect(headshotPhotoStrip().map((photo) => photo.src)).toEqual([
+      "/images/headshots-10/headshot-3.jpg",
+      "/images/headshots-10/headshot-5.jpg",
+      "/images/headshots-10/headshot-2.jpg",
+      "/images/headshots-10/headshot-6.jpg",
+      "/images/headshots-10/headshot-1.jpg",
+    ]);
+    expect(headshotHeroPhoto()?.alt).toBe("Studio headshot by Iconic Images");
+    expect(headshotPhotoStrip().every((photo) => photo.alt === "Studio headshot by Iconic Images")).toBe(true);
+    expect(headshotPhotoStrip().filter((photo) => photo.objectPosition === "top").map((photo) => photo.src)).toEqual([
+      "/images/headshots-10/headshot-3.jpg",
+      "/images/headshots-10/headshot-2.jpg",
+    ]);
+  });
+});
+
 describe("headshot booking conversion and mail", () => {
   it("values the conversion at quantity times 10 and only after a paid booking", () => {
     expect(headshotConversionValue(3)).toBe(30);
@@ -156,6 +217,8 @@ describe("headshot booking conversion and mail", () => {
     expect(html).toContain("Balance on delivery: $20.00 + 2.8%");
     expect(html).toContain(HEADSHOTS_STUDIO_LINE);
     expect(html).toContain(HEADSHOTS_PARKING_PLACEHOLDER);
+    expect(html).toContain(HEADSHOTS_H1);
+    expect(html).not.toMatch(/processing fee/i);
     expect(html.toLowerCase()).not.toContain(["cadi", "@"].join(""));
     expect(html).not.toContain("Iconic Credits");
   });

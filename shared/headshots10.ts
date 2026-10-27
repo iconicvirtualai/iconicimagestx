@@ -41,8 +41,19 @@ export const HEADSHOTS_PAID_NOTE = "Booking fee PAID. The $10 counts toward the 
 export const HEADSHOTS_STUDIO_NAME = "Iconic Studios";
 export const HEADSHOTS_STUDIO_ADDRESS = "26410 Oakridge Dr. Ste 105, Spring, TX 77380";
 export const HEADSHOTS_STUDIO_LINE = `${HEADSHOTS_STUDIO_NAME}, ${HEADSHOTS_STUDIO_ADDRESS}`;
+export const HEADSHOTS_H1 = "$10 Tuesdays! Headshots for $10/Ea.";
+export const HEADSHOTS_SEO_TITLE = `${HEADSHOTS_H1} | Iconic Images`;
+export const HEADSHOTS_SEO_DESCRIPTION =
+  "$10 Tuesdays at Iconic Studios in Spring. Headshots for $10 each, 10am-2pm. Buy as many as you like.";
+export const HEADSHOTS_FACTS = [
+  "$10 Tuesdays",
+  "Headshots $10/Ea.",
+  "10am-2pm",
+  "Buy as many as you like",
+  "Spring, TX",
+] as const;
+/** Kept for the quote object. The page prints the fee only inside Due today and Balance on delivery. */
 export const HEADSHOTS_PRICE_LINE = "$10 per headshot + 2.8% processing fee.";
-export const HEADSHOTS_FEE_NOTE = "Includes the 2.8% processing fee.";
 export const HEADSHOTS_RESERVE_LINE = "Reserve a time to hold your spot.";
 export const HEADSHOTS_FULL_LINE = "This Tuesday is full. Pick the next one.";
 export const HEADSHOTS_CALENDAR_FALLBACK =
@@ -53,8 +64,6 @@ export const HEADSHOTS_DELIVERY_PLACEHOLDER = "[CONFIRM: delivery time and retou
 export const HEADSHOTS_POLICY_PLACEHOLDER = "[CONFIRM: reschedule/cancel policy]";
 export const HEADSHOTS_HEADSHOT_MEANING_PLACEHOLDER =
   "[CONFIRM: how many frames or looks are included in each $10 headshot]";
-export const HEADSHOTS_SLOT_PLACEHOLDER =
-  "[CONFIRM: 10-minute slots, last start 1:50 PM. Orders of 6 or more take two consecutive slots. One booking per slot.]";
 export const HEADSHOTS_MAX_PLACEHOLDER = "[CONFIRM: maximum 10 headshots per booking]";
 export const HEADSHOTS_WALKIN_PLACEHOLDER = "[CONFIRM: walk-ins]";
 export const HEADSHOTS_BACKGROUND_PLACEHOLDER = "[CONFIRM: background options]";
@@ -88,6 +97,43 @@ const WEEKDAY: Record<string, number> = {
   Fri: 5,
   Sat: 6,
 };
+
+export interface HeadshotPhoto {
+  src: string;
+  alt: string;
+  /** Portrait frames use a top crop so the face stays in the cover. */
+  objectPosition?: "top" | "center";
+}
+
+const HEADSHOT_ALT = "Studio headshot by Iconic Images";
+
+/**
+ * Real Iconic studio finals. The page is light, so the hero is the
+ * white-backdrop photo. The strip is the other five, alternating dark and light.
+ */
+export const HEADSHOT_PHOTOS: readonly HeadshotPhoto[] = [
+  { src: "/images/headshots-10/headshot-4.jpg", alt: HEADSHOT_ALT },
+  { src: "/images/headshots-10/headshot-3.jpg", alt: HEADSHOT_ALT, objectPosition: "top" },
+  { src: "/images/headshots-10/headshot-5.jpg", alt: HEADSHOT_ALT },
+  { src: "/images/headshots-10/headshot-2.jpg", alt: HEADSHOT_ALT, objectPosition: "top" },
+  { src: "/images/headshots-10/headshot-6.jpg", alt: HEADSHOT_ALT },
+  { src: "/images/headshots-10/headshot-1.jpg", alt: HEADSHOT_ALT },
+];
+
+export function visibleHeadshotPhotos(photos: readonly HeadshotPhoto[] = HEADSHOT_PHOTOS): HeadshotPhoto[] {
+  return photos.filter((photo) => photo.src.trim().length > 0 && photo.alt.trim().length > 0);
+}
+
+export function headshotHeroPhoto(photos: readonly HeadshotPhoto[] = HEADSHOT_PHOTOS): HeadshotPhoto | null {
+  return visibleHeadshotPhotos(photos)[0] ?? null;
+}
+
+/** The samples after the hero. Hidden until three remain, and never more than five. */
+export function headshotPhotoStrip(photos: readonly HeadshotPhoto[] = HEADSHOT_PHOTOS): HeadshotPhoto[] {
+  const rest = visibleHeadshotPhotos(photos).slice(1, 6);
+  if (rest.length < 3) return [];
+  return rest;
+}
 
 export interface HeadshotQuote {
   quantity: number;
@@ -450,7 +496,7 @@ export function headshotConfirmationEmailHtml(input: {
     ? `<p>${escapeHtml(input.quote.balanceLine)}. That charge is ${escapeHtml(money(input.quote.balanceTotal))}.</p>`
     : "<p>This booking is paid in full once the booking fee is received. Nothing further is due on delivery.</p>";
   return `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#081228;">
-    <h1 style="font-size:24px;">$10 Headshots Every Tuesday</h1>
+    <h1 style="font-size:24px;">${escapeHtml(HEADSHOTS_H1)}</h1>
     <p>Hi ${escapeHtml(input.clientName)},</p>
     <p>Your Tuesday time is reserved once the $10 booking fee is paid. The $10 counts toward your headshots.</p>
     <p><strong>${escapeHtml(input.whenDate)}</strong> at <strong>${escapeHtml(input.whenTime)}</strong><br/>
@@ -463,7 +509,6 @@ export function headshotConfirmationEmailHtml(input: {
     <p><a href="${escapeHtml(input.wearUrl)}">What to wear</a></p>
     <p>${escapeHtml(HEADSHOTS_POLICY_PLACEHOLDER)}</p>
     <p>Confirmation: <strong>${escapeHtml(input.orderNumber)}</strong></p>
-    <p style="font-size:13px;">${escapeHtml(HEADSHOTS_FEE_NOTE)} A 2.8% processing fee is added to all prices.</p>
     <p style="font-size:13px;">${escapeHtml(LEGAL_BUSINESS_NAME)} · ${escapeHtml(BUSINESS_CONTACT.line)}</p>
     <p><a href="${escapeHtml(input.pageUrl)}">${escapeHtml(input.pageUrl)}</a></p>
   </div>`;
@@ -504,4 +549,4 @@ export function headshotCalendarIcs(input: {
 }
 
 export const HEADSHOT_PAY_FAQ =
-  "A $10 booking fee is due when you book. With the 2.8% processing fee that charge is $10.28. The $10 counts toward your headshots. One headshot is paid in full. If you buy more, the balance is due on delivery, plus 2.8% on that balance.";
+  "A $10 booking fee is due when you book. That charge is $10.28. The $10 counts toward your headshots. One headshot is paid in full. If you buy more, the balance is due on delivery.";
