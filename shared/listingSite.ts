@@ -3,6 +3,7 @@
  * Photos are display-route indexes. Original, zip, and PDF urls stay off the payload.
  */
 
+import { applyProfileToAgent, profileFromClient } from "./clientHubSettings.ts";
 import {
   PORTAL_WEBSITE_DESIGNS,
   readMediaStore,
@@ -66,6 +67,11 @@ export interface PublicListingSite {
     license: string;
     phone: string;
     email: string;
+    headshotUrl?: string;
+    companyLogoUrl?: string;
+    brokerageLogoUrl?: string;
+    website?: string;
+    socials?: Array<{ label: string; url: string }>;
   };
 }
 
@@ -153,13 +159,21 @@ function factValue(listing: Record<string, unknown>, keys: string[]): string {
 function agentOf(listing: Record<string, unknown>): PublicListingSite["agent"] {
   const agent = record(listing.agent);
   const name = text(listing.agentName) || text(listing.listingAgent) || text(agent?.name);
-  return {
+  const profile = listing.clientHubProfile
+    ? profileFromClient({ hubProfile: listing.clientHubProfile, ...record(listing.clientContact) })
+    : null;
+  return applyProfileToAgent({
     name,
     brokerage: text(listing.brokerage) || text(listing.brokerageName) || text(agent?.brokerage),
     license: text(listing.licenseNumber) || text(listing.agentLicense) || text(agent?.license),
     phone: text(listing.agentPhone) || text(agent?.phone),
     email: text(listing.agentEmail) || text(agent?.email),
-  };
+    headshotUrl: text(agent?.headshotUrl),
+    companyLogoUrl: text(agent?.companyLogoUrl),
+    brokerageLogoUrl: text(agent?.brokerageLogoUrl),
+    website: text(agent?.website),
+    socials: Array.isArray(agent?.socials) ? agent.socials as Array<{ label: string; url: string }> : [],
+  }, profile);
 }
 
 function matterportEmbed(value: string): string {

@@ -101,8 +101,15 @@ import AdminInsights from "./pages/AdminInsights";
 import Login from "./pages/Login";
 import ClientPortal from "./pages/ClientPortal";
 import PortalListingDetail from "./pages/PortalListingDetail";
+import PortalSettings from "./pages/PortalSettings";
+import PortalOrder from "./pages/PortalOrder";
 
 const queryClient = new QueryClient();
+
+function PortalQueryRedirect({ to }: { to: string }) {
+  const { search } = useLocation();
+  return <Navigate to={`${to}${search}`} replace />;
+}
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -176,6 +183,11 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/portal" element={<Login />} />
             <Route path="/portal/home" element={<ClientPortal />} />
+            <Route path="/portal/order" element={<PortalOrder />} />
+            <Route path="/portal/orders" element={<PortalQueryRedirect to="/portal/settings/billing" />} />
+            <Route path="/portal/order-history" element={<PortalQueryRedirect to="/portal/settings/billing" />} />
+            <Route path="/portal/settings" element={<PortalQueryRedirect to="/portal/settings/profile" />} />
+            <Route path="/portal/settings/:section" element={<PortalSettings />} />
             <Route path="/portal/listings/:listingId" element={<PortalListingDetail />} />
             <Route path="/admin/login" element={<AdminLogin />} />
 

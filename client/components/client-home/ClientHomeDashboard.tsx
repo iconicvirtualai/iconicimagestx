@@ -8,12 +8,8 @@ import {
   ChevronRight,
   Download,
   Home,
-  LayoutGrid,
-  LogOut,
-  MessageSquare,
-  Receipt,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { PortalShell, type PortalHomeSection } from "@/components/client-hub/PortalShell";
 import { MoneyAmount } from "@/components/MoneyAmount";
 import { downloadBrandedInvoice } from "@/lib/downloadBrandedInvoice";
 import {
@@ -32,7 +28,7 @@ import {
 import { ListingPackageCard } from "@/components/listing-card/ListingPackageCard";
 import { PortalMessages } from "@/components/communications/PortalMessages";
 
-export type ClientHomeSection = "listings" | "orders" | "schedule" | "messages";
+export type ClientHomeSection = PortalHomeSection;
 
 const TONE_CLASS: Record<AppointmentTone, string> = {
   past: "bg-gray-200 text-gray-600 border-gray-200",
@@ -58,13 +54,6 @@ const LISTING_BADGE: Record<string, { label: string; badge: string }> = {
   canceled: { label: "Cancelled", badge: "bg-red-100 text-red-700" },
 };
 
-const PANELS: { id: ClientHomeSection; label: string; icon: typeof LayoutGrid }[] = [
-  { id: "listings", label: "Listings", icon: LayoutGrid },
-  { id: "orders", label: "Order history", icon: Receipt },
-  { id: "schedule", label: "Schedule", icon: CalendarClock },
-  { id: "messages", label: "Messages", icon: MessageSquare },
-];
-
 export function ClientHomeView({
   firstName,
   listings,
@@ -79,6 +68,7 @@ export function ClientHomeView({
   today,
   loading = false,
   error = "",
+  example = false,
 }: {
   firstName: string;
   listings: ClientListingCard[];
@@ -93,75 +83,48 @@ export function ClientHomeView({
   today: string;
   loading?: boolean;
   error?: string;
+  example?: boolean;
 }) {
   const orderedListings = useMemo(() => sortNewestFirst(listings), [listings]);
-  const orderedInvoices = useMemo(() => sortNewestFirst(invoices), [invoices]);
 
   return (
-    <div className="flex-1 bg-[#f6f7f8] text-black flex flex-col">
-      <header className="bg-black text-white">
-        <div className="px-4 sm:px-6 lg:px-8 py-6 flex items-start justify-between gap-4">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Iconic Images</p>
-            <h1 className="text-2xl sm:text-3xl font-black mt-2">Hello, {firstName}</h1>
+    <PortalShell
+      firstName={firstName}
+      onSignOut={onSignOut}
+      active={section === "orders" ? "billing" : section}
+      example={example}
+      onSection={onSection}
+      counts={{ listings: orderedListings.length, schedule: appointments.length }}
+    >
+      <div data-section={section}>
+        {loading ? (
+          <div className="flex justify-center py-24">
+            <div className="w-8 h-8 border-4 border-[#0d9488] border-t-transparent rounded-full animate-spin" />
           </div>
-          <Button
-            variant="outline"
-            className="border-zinc-700 bg-transparent text-white hover:bg-zinc-900"
-            onClick={onSignOut}
-          >
-            <LogOut className="w-4 h-4 mr-2" /> Sign out
-          </Button>
-        </div>
-      </header>
-
-      <div className="flex-1 flex flex-col lg:flex-row">
-        <aside className="lg:w-72 lg:shrink-0 lg:sticky lg:top-0 lg:self-start lg:max-h-screen lg:overflow-y-auto bg-white border-b lg:border-b-0 lg:border-r border-gray-200">
-          <nav aria-label="Client home" className="p-3 flex flex-col gap-2">
-            {PANELS.map((panel) => {
-              const Icon = panel.icon;
-              const active = section === panel.id;
-              const count = panel.id === "listings" ? orderedListings.length : panel.id === "orders" ? orderedInvoices.length : panel.id === "schedule" ? appointments.length : "";
-              return (
-                <button
-                  key={panel.id}
-                  type="button"
-                  aria-current={active ? "page" : undefined}
-                  onClick={() => onSection(panel.id)}
-                  className={`w-full flex items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left transition-colors ${active ? "bg-black text-white" : "text-gray-600 hover:bg-gray-50"}`}
-                >
-                  <span className="flex items-center gap-2 min-w-0">
-                    <Icon className={`w-4 h-4 shrink-0 ${active ? "text-white" : "text-[#0d9488]"}`} />
-                    <span className="text-xs font-black uppercase tracking-widest truncate">{panel.label}</span>
-                  </span>
-                  <span className="text-[10px] font-black text-gray-400">{count}</span>
-                </button>
-              );
-            })}
-          </nav>
-        </aside>
-
-        <main className="flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-6 lg:py-8" data-section={section}>
-          {loading ? (
-            <div className="flex justify-center py-24">
-              <div className="w-8 h-8 border-4 border-[#0d9488] border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : error ? (
-            <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
-              <p className="font-bold">{error}</p>
-            </div>
-          ) : section === "listings" ? (
-            <ListingGrid listings={orderedListings} truncated={listingsTruncated} />
-          ) : section === "orders" ? (
-            <OrderHistory invoices={orderedInvoices} truncated={invoicesTruncated} />
-          ) : section === "messages" ? (
-            <PortalMessages />
-          ) : (
-            <ScheduleCalendar appointments={appointments} today={today} truncated={appointmentsTruncated} />
-          )}
-        </main>
+        ) : error ? (
+          <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
+            <p className="font-bold">{error}</p>
+          </div>
+        ) : section === "listings" ? (
+          <ListingGrid listings={orderedListings} truncated={listingsTruncated} />
+        ) : section === "orders" ? (
+          <div className="bg-white rounded-2xl border border-gray-100 p-8">
+            <h2 className="font-black text-xl">Order history</h2>
+            <p className="text-sm text-gray-500 mt-2">
+              {invoices.length === 0 ? "No invoices are stored on this account yet." : `${invoices.length} invoice${invoices.length === 1 ? "" : "s"} on file.`}
+              {invoicesTruncated ? " Showing the latest invoices." : ""}
+            </p>
+            <Link to="/portal/settings/billing" className="inline-flex mt-4 rounded-xl bg-black text-white px-4 py-3 text-[10px] font-black uppercase tracking-widest">
+              Open billing
+            </Link>
+          </div>
+        ) : section === "messages" ? (
+          <PortalMessages />
+        ) : (
+          <ScheduleCalendar appointments={appointments} today={today} truncated={appointmentsTruncated} />
+        )}
       </div>
-    </div>
+    </PortalShell>
   );
 }
 
@@ -242,15 +205,28 @@ export function OrderHistory({
   truncated = false,
   openId,
   onToggle,
+  filterable = false,
 }: {
   invoices: ClientInvoiceStatement[];
   truncated?: boolean;
   openId?: string | null;
   onToggle?: (id: string) => void;
+  filterable?: boolean;
 }) {
   const [localOpen, setLocalOpen] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("all");
   const opened = openId !== undefined ? openId : localOpen;
   const toggle = onToggle || ((id: string) => setLocalOpen((current) => (current === id ? null : id)));
+  const needle = query.trim().toLowerCase();
+  const shown = filterable
+    ? invoices.filter((invoice) => {
+      const statusOk = status === "all" || (invoice.status || "").toLowerCase() === status;
+      if (!statusOk) return false;
+      if (!needle) return true;
+      return [invoice.invoiceNumber, invoice.clientName, invoice.address, invoice.status].join(" ").toLowerCase().includes(needle);
+    })
+    : invoices;
 
   if (invoices.length === 0) {
     return (
@@ -264,8 +240,31 @@ export function OrderHistory({
   return (
     <div>
       <SectionHeading title="Order history" note={truncated ? "Showing the latest invoices stored for this account." : "Download the invoice that is already on file."} />
+      {filterable ? (
+        <div className="mb-4 flex flex-col sm:flex-row gap-2">
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search orders"
+            aria-label="Search orders"
+            className="h-11 flex-1 rounded-xl border border-gray-200 px-3 text-sm"
+          />
+          <select
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+            aria-label="Order status"
+            className="h-11 rounded-xl border border-gray-200 px-3 text-sm bg-white"
+          >
+            <option value="all">All statuses</option>
+            {[...new Set(invoices.map((invoice) => (invoice.status || "").toLowerCase()).filter(Boolean))].map((item) => (
+              <option key={item} value={item}>{item.replace(/_/g, " ")}</option>
+            ))}
+          </select>
+        </div>
+      ) : null}
+      {shown.length === 0 ? <p className="text-sm text-gray-500">No orders match that search.</p> : null}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        {invoices.map((invoice) => {
+        {shown.map((invoice) => {
           const open = opened === invoice.id;
           return (
             <div key={invoice.id} className="border-b border-gray-100 last:border-b-0">

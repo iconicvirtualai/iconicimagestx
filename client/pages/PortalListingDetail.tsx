@@ -10,6 +10,8 @@ import {
   portalListingDataApiPath,
   portalListingId,
   portalListingOwnerApiPath,
+  buildPortalListingDetail,
+  defaultPortalWebsite,
   portalListingPageMode,
   portalListingTab,
   visitorPortalListingDetail,
@@ -22,7 +24,6 @@ import {
   type PortalTourItem,
   type PortalWebsiteSettings,
 } from "@shared/portalListingDetail";
-import { listingSitePath, listingSiteSlug } from "@shared/listingSite";
 import {
   PHOTO_EDIT_NOTE_LIMIT,
   photoEditStatusLabel,
@@ -40,6 +41,10 @@ import type { PortalUploadKind } from "@shared/portalClientUpload";
 import { ArrowLeft, Download, Eye, EyeOff, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import NotFound from "./NotFound";
+import { marketingMaterialFromProfile, type ClientHubProfile, type HubAgentBranding } from "@shared/clientHubSettings";
+import { MarketingAgentCard } from "@/components/client-hub/MarketingAgentCard";
+import { ExampleListingFile } from "@/components/client-hub/ExampleListingFile";
+import { exampleProfile } from "@/lib/exampleHub";
 
 export function PortalListingDetailView({
   detail,
@@ -59,6 +64,7 @@ export function PortalListingDetailView({
   onDataDraft,
   onDataSave,
   onRequestPhotoEdit,
+  marketingAgent = null,
   onUpload,
 }: {
   detail: PortalListingDetailModel;
@@ -78,6 +84,7 @@ export function PortalListingDetailView({
   onDataDraft: (draft: PortalListingFactsDraft) => void;
   onDataSave: () => void;
   onRequestPhotoEdit: (photoId: string, note: string) => Promise<boolean>;
+  marketingAgent?: HubAgentBranding | null;
   onUpload?: (kind: PortalUploadKind, file: File, onProgress: (pct: number) => void) => Promise<void>;
 }) {
   const mediaEditing = canEdit ? editing : null;
@@ -193,6 +200,7 @@ export function PortalListingDetailView({
         {tab === "marketing" && (
           <MarketingTab
             detail={shown}
+            agent={marketingAgent}
             canEdit={canEdit}
             saving={saving}
             onUpload={onUpload}
@@ -231,14 +239,16 @@ export default function PortalListingDetail() {
   const [canEdit, setCanEdit] = useState(false);
   const [dataEditing, setDataEditing] = useState(false);
   const [dataDraft, setDataDraft] = useState<PortalListingFactsDraft | null>(null);
+  const [marketingAgent, setMarketingAgent] = useState<HubAgentBranding | null>(null);
   const tab = portalListingTab(searchParams.get("tab"));
+  const exampleListing = searchParams.get("example") === "1" && id === "example-listing";
   const mode = portalListingPageMode({
     loading,
     isClient: Boolean(user) && userType === "client",
   });
 
   useEffect(() => {
-    if (!id || mode === "pending") return;
+    if (exampleListing || !id || mode === "pending") return;
     let cancelled = false;
     setFetching(true);
     setError("");
@@ -292,8 +302,27 @@ export default function PortalListingDetail() {
     return () => {
       cancelled = true;
     };
-  }, [id, mode, user]);
+  }, [exampleListing, id, mode, user]);
 
+  useEffect(() => {
+    if (exampleListing || mode !== "owner-check" || !user) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const token = await user.getIdToken();
+        const response = await fetch("/api/clients/me/hub/profile", { headers: { Authorization: `Bearer ${token}` } });
+        if (!response.ok) return;
+        const body = await response.json() as { profile?: ClientHubProfile };
+        if (!cancelled) setMarketingAgent(marketingMaterialFromProfile(body.profile));
+      } catch {
+        if (!cancelled) setMarketingAgent(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [exampleListing, mode, user]);
+
+  if (exampleListing && tab === "website") return <ExampleWebsitePreview />;
+  if (exampleListing) return <ExampleListingFile />;
   if (!id || missing) return <NotFound />;
   if (loading || fetching) return <Pending />;
 
@@ -373,6 +402,7 @@ export default function PortalListingDetail() {
             setDataDraft(portalFactsDraftFromDetail(detail));
           }}
           onDataDraft={setDataDraft}
+          marketingAgent={marketingAgent}
           onRequestPhotoEdit={async (photoId, note) => {
             const saved = await send(`${ownerApi}/photo-edit-requests`, { photoId, note }, "POST");
             return Boolean(saved);
@@ -794,11 +824,13 @@ function ToursTab({
 
 function MarketingTab({
   detail,
+  agent,
   canEdit,
   saving,
   onUpload,
 }: {
   detail: PortalListingDetailModel;
+  agent?: HubAgentBranding | null;
   canEdit: boolean;
   saving: boolean;
   onUpload?: (kind: PortalUploadKind, file: File, onProgress: (pct: number) => void) => Promise<void>;
@@ -808,6 +840,13 @@ function MarketingTab({
       <div>
         <h2 className="text-xs font-black uppercase tracking-widest text-[#0d9488] mb-1">Marketing kit</h2>
         <p className="text-xs text-gray-500 mb-4">Pick a flyer, social post, or reel here once design tools are connected.</p>
+        {agent ? (
+          <div className="grid lg:grid-cols-3 gap-3 mb-4">
+            <MarketingAgentCard agent={agent} title="Flyer" note={detail.marketing.find((card) => card.id === "flyer")?.note || "Flyer branding comes from your profile."} />
+            <MarketingAgentCard agent={agent} title="Social post" note={detail.marketing.find((card) => card.id === "social")?.note || "Social branding comes from your profile."} />
+            <MarketingAgentCard agent={agent} title="Reel" note={detail.marketing.find((card) => card.id === "reel")?.note || "Reel branding comes from your profile."} />
+          </div>
+        ) : null}
         <div className="grid sm:grid-cols-3 gap-3">
           {detail.marketing.map((card) => (
             <article key={card.id} className="bg-white rounded-2xl border border-dashed border-gray-200 p-5" data-testid={`marketing-${card.id}`}>
@@ -871,154 +910,48 @@ function UploadGrid({ items, empty }: { items: PortalMediaItem[]; empty: string 
   );
 }
 
-function WebsiteTab({
-  website,
-  address,
-  canEdit,
-  saving,
-  onWebsite,
-  onSave,
-}: {
-  website: PortalWebsiteSettings;
-  address: PortalListingDetailModel["address"];
-  canEdit: boolean;
-  saving: boolean;
-  onWebsite: (next: PortalWebsiteSettings) => void;
-  onSave: () => void;
-}) {
-  const slug = listingSiteSlug({ line1: address.line1, city: address.city });
-  const swatch = website.color === "teal" ? "#0d9488" : website.color === "warm" ? "#9a3412" : "#111111";
-  const fontLabel = website.font === "serif" ? "Serif" : website.font === "modern" ? "Modern" : "Sans";
-  const colorLabel = website.color === "teal" ? "Teal" : website.color === "warm" ? "Warm" : "Ink";
-  const styleLabel = website.style === "editorial" ? "Editorial" : website.style === "minimal" ? "Minimal" : "Classic";
-  const designs: Array<{ id: PortalWebsiteSettings["design"]; name: string; note: string }> = [
-    { id: "index", name: "Index", note: "Numbered rows" },
-    { id: "two-up", name: "Two-Up", note: "Media and story" },
-    { id: "premiere", name: "Premiere", note: "Film first" },
-  ];
-  return (
-    <section className="bg-white rounded-2xl border border-gray-100 p-5">
-      <h2 className="text-xs font-black uppercase tracking-widest text-[#0d9488] mb-1">Listing site</h2>
-      {slug ? (
-        <a href={listingSitePath(slug)} className="inline-flex min-h-12 items-center text-sm font-black underline">View site</a>
-      ) : (
-        <p className="text-xs text-gray-500">Add a street and city on the Data tab to open the site.</p>
-      )}
-      <p className="text-xs font-black uppercase tracking-widest text-gray-400 mt-5 mb-2">Design</p>
-      <div className="grid gap-3 sm:grid-cols-3">
-        {designs.map((design) => {
-          const selected = website.design === design.id;
-          return (
-            <button
-              key={design.id}
-              type="button"
-              disabled={!canEdit}
-              aria-pressed={selected}
-              onClick={() => onWebsite({ ...website, design: design.id })}
-              className={`min-h-12 rounded-2xl border p-3 text-left ${selected ? "border-black bg-gray-50" : "border-gray-200"}`}
-            >
-              <DesignThumb id={design.id} />
-              <span className="mt-2 block text-sm font-black">{design.name}</span>
-              <span className="block text-xs text-gray-500">{design.note}</span>
-            </button>
-          );
-        })}
-      </div>
-      {canEdit ? (
-        <div className="grid sm:grid-cols-3 gap-4 mt-5">
-          <Choice label="Font" value={website.font} options={[["sans", "Sans"], ["serif", "Serif"], ["modern", "Modern"]]} onChange={(font) => onWebsite({ ...website, font: font as PortalWebsiteSettings["font"] })} />
-          <Choice label="Color" value={website.color} options={[["ink", "Ink"], ["teal", "Teal"], ["warm", "Warm"]]} onChange={(color) => onWebsite({ ...website, color: color as PortalWebsiteSettings["color"] })} />
-          <Choice label="Style" value={website.style} options={[["classic", "Classic"], ["editorial", "Editorial"], ["minimal", "Minimal"]]} onChange={(style) => onWebsite({ ...website, style: style as PortalWebsiteSettings["style"] })} />
-        </div>
-      ) : (
-        <div className="grid sm:grid-cols-3 gap-4 mt-5">
-          <Field label="Font" value={fontLabel} />
-          <Field label="Color" value={colorLabel} />
-          <Field label="Style" value={styleLabel} />
-        </div>
-      )}
-      <div className="mt-5 rounded-2xl border border-gray-100 p-5" style={{ color: swatch }}>
-        <p className={`text-lg font-black ${website.font === "serif" ? "font-serif" : "font-sans"}`}>Sample listing title</p>
-        <p className="text-xs uppercase tracking-widest mt-1">{website.style} · {website.color}</p>
-      </div>
-      <div className="mt-5 grid sm:grid-cols-2 gap-3">
-        {canEdit ? (
-          <>
-            <Toggle label="Publish site" checked={website.published} onChange={(published) => onWebsite({ ...website, published })} />
-            <Toggle label="Show photos" checked={website.showPhotos} onChange={(showPhotos) => onWebsite({ ...website, showPhotos })} />
-            <Toggle label="Show video" checked={website.showVideo} onChange={(showVideo) => onWebsite({ ...website, showVideo })} />
-            <Toggle label="Show virtual tours" checked={website.showTours} onChange={(showTours) => onWebsite({ ...website, showTours })} />
-            <Toggle label="Show floorplans" checked={website.showFloorplans} onChange={(showFloorplans) => onWebsite({ ...website, showFloorplans })} />
-          </>
-        ) : (
-          <>
-            <Field label="Published" value={website.published ? "Yes" : "No"} />
-            <Field label="Photos" value={website.showPhotos ? "Shown" : "Hidden"} />
-            <Field label="Video" value={website.showVideo ? "Shown" : "Hidden"} />
-            <Field label="Virtual tours" value={website.showTours ? "Shown" : "Hidden"} />
-            <Field label="Floorplans" value={website.showFloorplans ? "Shown" : "Hidden"} />
-          </>
-        )}
-      </div>
-      {canEdit && (
-        <Button type="button" className="mt-6 bg-black text-white" disabled={saving} onClick={onSave}>Save site style</Button>
-      )}
-    </section>
-  );
-}
+const EXAMPLE_WEBSITE_DETAIL = buildPortalListingDetail({
+  listing: {
+    id: "example-listing",
+    status: "delivered",
+    address: { street: "100 Example Street", city: "Spring", state: "TX", zip: "77373" },
+    images: [{ id: "example-front", name: "example-front.jpg", url: "/media/photos/headshot-gracepoint-1.jpg", contentType: "image/jpeg" }],
+  },
+});
 
-function DesignThumb({ id }: { id: PortalWebsiteSettings["design"] }) {
-  if (id === "two-up") {
-    return (
-      <span className="grid h-16 grid-cols-2 overflow-hidden rounded-lg border border-gray-200" aria-hidden="true">
-        <span className="bg-[#1E2124]" />
-        <span className="bg-[#F2EFEA]" />
-      </span>
-    );
-  }
-  if (id === "premiere") {
-    return (
-      <span className="grid h-16 place-items-center overflow-hidden rounded-lg bg-[#0B0B0C] text-[10px] tracking-[0.2em] text-[#E8DCC4]" aria-hidden="true">
-        FILM
-      </span>
-    );
-  }
+function ExampleWebsitePreview() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const saved = defaultPortalWebsite();
+  const [website, setWebsite] = useState<PortalWebsiteSettings>({ ...saved, design: "premiere" });
+  const agent = marketingMaterialFromProfile(exampleProfile());
   return (
-    <span className="grid h-16 content-center gap-1 rounded-lg bg-[#F7F7F5] px-2" aria-hidden="true">
-      <span className="h-1.5 bg-[#0E0E0E]" />
-      <span className="h-1.5 w-2/3 bg-[#0E0E0E]" />
-      <span className="h-1.5 w-1/2 bg-[#0E0E0E]" />
-    </span>
-  );
-}
-
-function Choice({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: Array<[string, string]>;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="block">
-      <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{label}</span>
-      <select value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold">
-        {options.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-      </select>
-    </label>
-  );
-}
-
-function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
-  return (
-    <label className="flex items-center justify-between gap-3 bg-gray-50 rounded-xl px-3 py-3">
-      <span className="text-sm font-bold">{label}</span>
-      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
-    </label>
+    <PortalListingDetailView
+      detail={EXAMPLE_WEBSITE_DETAIL}
+      tab="website"
+      editing={null}
+      saving={false}
+      website={website}
+      canEdit
+      dataEditing={false}
+      dataDraft={portalFactsDraftFromDetail(EXAMPLE_WEBSITE_DETAIL)}
+      marketingAgent={agent}
+      onTab={(next) => {
+        const params = new URLSearchParams(searchParams);
+        params.set("example", "1");
+        params.set("tab", next);
+        setSearchParams(params, { replace: true });
+      }}
+      onToggleEditing={() => undefined}
+      onMedia={() => undefined}
+      onWebsite={setWebsite}
+      onWebsiteSave={() => {
+        toast.message("Example preview — this site was not published.");
+      }}
+      onDataEditing={() => undefined}
+      onDataDraft={() => undefined}
+      onDataSave={() => undefined}
+      onRequestPhotoEdit={async () => false}
+    />
   );
 }
 
