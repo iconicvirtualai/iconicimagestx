@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { onSnapshot, collection, query, orderBy, limit, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import AdminLayout from "@/components/AdminLayout";
@@ -28,7 +29,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Link } from "react-router-dom";
+import BotRoomPanel from "@/components/communications/BotRoomPanel";
 import OperationsStatsGrid from "@/components/OperationsStatsGrid";
 import ContactLiveChat from "@/components/ContactLiveChat";
 import { useAuth } from "@/contexts/AuthContext";
@@ -77,7 +78,7 @@ interface MailchimpList {
   unsubscribeCount: number;
 }
 
-type Tab = "sweep" | "contact" | "inbox" | "sms" | "compose" | "campaigns" | "assistants";
+type Tab = "sweep" | "contact" | "inbox" | "sms" | "compose" | "campaigns" | "assistants" | "botroom";
 
 const sweepChannels = [
   {
@@ -103,10 +104,10 @@ const sweepChannels = [
   },
   {
     label: "Team Notes",
-    status: "Internal routing needed",
-    detail: "Coordinator, photographer, editor, billing, and AICON follow-up notes in one timeline.",
+    status: "Bot Room",
+    detail: "Cora, the Grok bots, and Cadi share one timeline. Owners and admins open the Bot Room tab.",
     icon: Inbox,
-    ready: false,
+    ready: true,
   },
   {
     label: "Social Media",
@@ -137,10 +138,17 @@ function timeAgo(ts: { seconds: number } | null) {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+function initialCommunicationsTab(pathname: string, search: string): Tab {
+  const params = new URLSearchParams(search);
+  if (pathname.startsWith("/admin/botroom") || params.get("tab") === "botroom") return "botroom";
+  return "sweep";
+}
+
 export default function AdminMessages() {
   const { toast } = useToast();
   const { user, isAdmin } = useAuth();
-  const [tab, setTab] = useState<Tab>("sweep");
+  const location = useLocation();
+  const [tab, setTab] = useState<Tab>(() => initialCommunicationsTab(location.pathname, location.search));
   const [threads, setThreads] = useState<OrderThread[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConvo, setSelectedConvo] = useState<Conversation | null>(null);
@@ -181,6 +189,11 @@ export default function AdminMessages() {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
   }
+
+  useEffect(() => {
+    const next = initialCommunicationsTab(location.pathname, location.search);
+    if (next === "botroom") setTab("botroom");
+  }, [location.pathname, location.search]);
 
   // ─── Real-time messages ───────────────────────────────────────────────────
 
@@ -407,10 +420,10 @@ export default function AdminMessages() {
       <div className="pb-8">
         <OperationsStatsGrid />
       </div>
-      <div className="flex min-h-[32rem] flex-col overflow-hidden rounded-2xl border border-gray-800 lg:min-h-[calc(100vh-16rem)] lg:flex-row">
+      <div className={`flex min-h-[32rem] flex-col overflow-hidden rounded-2xl border border-gray-800 lg:min-h-[calc(100vh-16rem)] ${tab === "botroom" ? "" : "lg:flex-row"}`}>
 
         {/* ─── Left sidebar: tabs + thread list ─────────────────────────── */}
-        <div className="flex w-full min-w-0 flex-col border-b border-gray-700 bg-gray-900 lg:w-80 lg:shrink-0 lg:border-b-0 lg:border-r">
+        <div className={`flex w-full min-w-0 flex-col border-b border-gray-700 bg-gray-900 ${tab === "botroom" ? "" : "lg:w-80 lg:shrink-0 lg:border-b-0 lg:border-r"}`}>
           {/* Tabs */}
           <div className="flex flex-wrap border-b border-gray-700">
             {[
@@ -421,6 +434,7 @@ export default function AdminMessages() {
               { id: "compose" as Tab, icon: Send, label: "Compose" },
               { id: "campaigns" as Tab, icon: Megaphone, label: "Campaigns" },
               { id: "assistants" as Tab, icon: Sparkles, label: "Assistants" },
+              ...(isAdmin ? [{ id: "botroom" as Tab, icon: Bot, label: "Bot Room" }] : []),
             ].map(({ id, icon: Icon, label }) => (
               <button
                 key={id}
@@ -516,7 +530,12 @@ export default function AdminMessages() {
         </div>
 
         {/* ─── Right panel ─────────────────────────────────────────────────── */}
-        <div className="flex-1 flex flex-col bg-gray-950 min-w-0">
+        <div className={`flex min-w-0 flex-1 flex-col ${tab === "botroom" ? "bg-[#f4f7f8]" : "bg-gray-950"}`}>
+
+          {tab === "botroom" && isAdmin ? <BotRoomPanel /> : null}
+          {tab === "botroom" && !isAdmin ? (
+            <p className="p-6 text-sm text-gray-600">Bot Room is for owners and admins.</p>
+          ) : null}
 
           {tab === "contact" && <ContactLiveChat />}
 
@@ -559,7 +578,16 @@ export default function AdminMessages() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
                   {sweepChannels.map(({ label, status, detail, icon: Icon, ready }) => (
-                    <div key={label} className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                    <div
+                      key={label}
+                      className={`bg-gray-900 border border-gray-800 rounded-xl p-4 ${label === "Team Notes" && isAdmin ? "cursor-pointer hover:border-teal-500" : ""}`}
+                      onClick={label === "Team Notes" && isAdmin ? () => setTab("botroom") : undefined}
+                      onKeyDown={label === "Team Notes" && isAdmin ? (event) => {
+                        if (event.key === "Enter" || event.key === " ") setTab("botroom");
+                      } : undefined}
+                      role={label === "Team Notes" && isAdmin ? "button" : undefined}
+                      tabIndex={label === "Team Notes" && isAdmin ? 0 : undefined}
+                    >
                       <div className="flex items-center justify-between mb-3">
                         <Icon className="w-5 h-5 text-teal-300" />
                         {ready ? <CheckCircle2 className="w-4 h-4 text-green-400" /> : <CircleDashed className="w-4 h-4 text-yellow-400" />}
