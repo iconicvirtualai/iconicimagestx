@@ -58,6 +58,8 @@ describe("tracking config", () => {
         call_click: "callLabel",
         re75_booking: "",
         re75_form_start: "",
+        headshot_booking: "",
+        headshot_form_start: "",
       },
     });
     expect(readTrackingConfig({})).toEqual({
@@ -71,6 +73,8 @@ describe("tracking config", () => {
         call_click: "",
         re75_booking: "",
         re75_form_start: "",
+        headshot_booking: "",
+        headshot_form_start: "",
       },
     });
     expect(readTrackingConfig({
@@ -442,6 +446,71 @@ describe("real estate $75 conversions", () => {
     expect(calls).toContainEqual({
       target: "gtag",
       args: ["event", "conversion", { send_to: "AW-999/re75Start" }],
+    });
+  });
+});
+
+describe("headshot booking conversion", () => {
+  it("stays dormant until VITE_GADS_HEADSHOT_LABEL is set", () => {
+    const dormant = readTrackingConfig({ VITE_GOOGLE_ADS_ID: "AW-444627499" });
+    expect(dormant.adsLabels.headshot_booking).toBe("");
+    const calls = planConversion(dormant, {
+      name: "headshot_booking",
+      value: 30,
+      currency: "USD",
+      transactionId: "hs-3",
+      quantity: 3,
+      email: "ada@example.com",
+      phone: "2813560965",
+    });
+    expect(calls.some((call) => call.args[1] === "conversion")).toBe(false);
+    expect(calls).toContainEqual({
+      target: "gtag",
+      args: ["set", "user_data", { email: "ada@example.com", phone_number: "+12813560965" }],
+    });
+    expect(calls).toContainEqual({
+      target: "gtag",
+      args: ["event", "headshot_booking", {
+        send_to: "AW-444627499",
+        value: 30,
+        currency: "USD",
+        transaction_id: "hs-3",
+        quantity: 3,
+      }],
+    });
+  });
+
+  it("fires one conversion for qty times 10 when the label exists", () => {
+    const labeled = readTrackingConfig({
+      VITE_GOOGLE_ADS_ID: "AW-444627499",
+      VITE_GADS_HEADSHOT_LABEL: "headshotLabel",
+    });
+    const calls = planConversion(labeled, {
+      name: "headshot_booking",
+      value: 30,
+      currency: "USD",
+      transactionId: "hs-3",
+      quantity: 3,
+    });
+    const conversions = calls.filter((call) => call.args[1] === "conversion");
+    expect(conversions).toEqual([{
+      target: "gtag",
+      args: ["event", "conversion", {
+        send_to: "AW-444627499/headshotLabel",
+        value: 30,
+        currency: "USD",
+        transaction_id: "hs-3",
+      }],
+    }]);
+  });
+
+  it("records headshot_form_start as an observation event, not a conversion", () => {
+    const config = readTrackingConfig({ VITE_GOOGLE_ADS_ID: "AW-444627499" });
+    const calls = planConversion(config, { name: "headshot_form_start" });
+    expect(calls.some((call) => call.args[1] === "conversion")).toBe(false);
+    expect(calls).toContainEqual({
+      target: "gtag",
+      args: ["event", "headshot_form_start", { send_to: "AW-444627499" }],
     });
   });
 });

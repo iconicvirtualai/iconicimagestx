@@ -33,6 +33,7 @@ import Book from "./pages/Book";
 import SeniorLiving from "./pages/SeniorLiving";
 import Apprenticeship from "./pages/Apprenticeship";
 import RealEstate75 from "./pages/RealEstate75";
+import Headshots10 from "./pages/Headshots10";
 import Pricing from "./pages/Pricing";
 import AIPricingAssistant from "./pages/AIPricingAssistant";
 import Socials from "./pages/Socials";
@@ -139,6 +140,11 @@ const App = () => (
             <Route path="/realestate-75/schedule" element={<RealEstate75 />} />
             <Route path="/realestate-75/samples" element={<RealEstate75 />} />
             <Route path="/realestate-75/how-it-works" element={<RealEstate75 />} />
+            <Route path="/headshots-10" element={<Headshots10 />} />
+            <Route path="/headshots-10/book" element={<Headshots10 />} />
+            <Route path="/headshots-10/how-it-works" element={<Headshots10 />} />
+            <Route path="/headshots-10/faq" element={<Headshots10 />} />
+            <Route path="/headshots-10/location" element={<Headshots10 />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/pricing/ai-assistant" element={<AIPricingAssistant />} />
             <Route path="/socials" element={<Socials />} />

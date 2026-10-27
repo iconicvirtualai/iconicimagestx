@@ -132,6 +132,14 @@ describe("public page meta", () => {
       title: "Listing Photos From $75 | Iconic Images",
       description: "Apprentice listing photos from $75. 25 photos in 20 minutes, or 50 photos in 1 hour.",
     });
+    expect(isNoIndexPath("/headshots-10")).toBe(true);
+    expect(isNoIndexPath("/headshots-10/book")).toBe(true);
+    expect(isNoIndexPath("/headshots-10/faq")).toBe(true);
+    expect(metaPlan("/headshots-10")).toEqual({
+      kind: "noindex",
+      title: "$10 Headshots Every Tuesday | Iconic Images",
+      description: "Tuesdays 10am-2pm at Iconic Studios in Spring. $10 per headshot + 2.8% processing fee. Buy as many as you like.",
+    });
     expect(metaPlan("/pricing").kind).toBe("public");
   });
 

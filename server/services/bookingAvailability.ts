@@ -27,6 +27,11 @@ import { bookingHoursFromEnv, type BookingHoursConfig } from "../../shared/booki
 import { suggestAppointmentTimes } from "../../shared/suggestedAppointments";
 import type { StaffCatalogPackage } from "../../shared/bookingCatalog";
 import {
+  HEADSHOTS_SLOT_MINUTES,
+  HEADSHOTS_STUDIO_ADDRESS,
+  headshotsWeek,
+} from "../../shared/headshots10";
+import {
   isRealEstate75Holiday,
   realEstate75Package,
   realEstate75Week,
@@ -423,6 +428,29 @@ export async function readRealEstate75Availability(input: {
   });
 }
 
+/** Same photographer calendars /book uses, limited to the Tuesday headshot window. */
+export async function readHeadshotAvailability(input: {
+  now?: Date;
+  env?: Record<string, string | undefined>;
+  listEvents?: (person: BookingPhotographer, timeMin: string, timeMax: string) => Promise<CalendarBlock[]>;
+  fetchImpl?: typeof fetch;
+  cache?: DriveTimeCache;
+} = {}): Promise<BookingAvailabilityResult> {
+  const env = input.env ?? process.env;
+  return readBookingAvailability({
+    address: HEADSHOTS_STUDIO_ADDRESS,
+    preferenceId: "no-preference",
+    now: input.now,
+    env,
+    durationMinutes: HEADSHOTS_SLOT_MINUTES,
+    schedule: { company: headshotsWeek(), photographers: {} },
+    slotFilter: (slot) => !isRealEstate75Holiday(slot.date),
+    listEvents: input.listEvents,
+    fetchImpl: input.fetchImpl,
+    cache: input.cache,
+  });
+}
+
 export async function createBookingCalendarHold(input: {
   photographerId: string;
   orderNumber: string;
@@ -433,6 +461,8 @@ export async function createBookingCalendarHold(input: {
   serviceSummary: string;
   slot: { start: string; end: string };
   notes?: string;
+  /** Prepended to the event title. Headshot holds use this until the fee is paid. */
+  summaryPrefix?: string;
   env?: Record<string, string | undefined>;
   insert?: (calendarId: string, body: Record<string, unknown>) => Promise<{ id: string | null; htmlLink: string | null }>;
 }): Promise<{ calendarId: string; eventId: string | null; htmlLink: string | null } | null> {
@@ -441,7 +471,7 @@ export async function createBookingCalendarHold(input: {
   const env = input.env ?? process.env;
   const hours = bookingScheduleFor({ env }).company;
   const body = {
-    summary: `Iconic Images: ${input.clientName}`,
+    summary: `${input.summaryPrefix || ""}Iconic Images: ${input.clientName}`,
     location: input.address,
     description: [
       `Order: ${input.orderNumber}`,
@@ -479,6 +509,31 @@ export async function createBookingCalendarHold(input: {
     eventId: response.data.id || null,
     htmlLink: response.data.htmlLink || null,
   };
+}
+
+/** Drop a hold prefix and replace the unpaid note once the deposit is recorded. */
+export async function confirmBookingCalendarHold(input: {
+  calendarId: string;
+  eventId: string;
+  summaryPrefix: string;
+  unpaidNote: string;
+  paidNote: string;
+  env?: Record<string, string | undefined>;
+}): Promise<boolean> {
+  const env = input.env ?? process.env;
+  const auth = calendarAuthFromAccount(firebaseServiceAccount(env), env);
+  if (!auth || !input.eventId || !input.calendarId) return false;
+  const calendar = google.calendar({ version: "v3", auth });
+  const current = await calendar.events.get({ calendarId: input.calendarId, eventId: input.eventId });
+  const summary = String(current.data.summary || "").replace(input.summaryPrefix, "");
+  const description = String(current.data.description || "").replace(input.unpaidNote, input.paidNote);
+  await calendar.events.patch({
+    calendarId: input.calendarId,
+    eventId: input.eventId,
+    sendUpdates: "none",
+    requestBody: { summary, description },
+  });
+  return true;
 }
 
 export async function deleteBookingCalendarHold(input: {

@@ -50,6 +50,8 @@ import {
 } from "../../shared/apprenticeship";
 import { confirmApprenticeshipEvent } from "../services/apprenticeshipCalendar";
 import { resolveLateApprenticeshipPayment } from "../services/apprenticeshipHolds";
+import { HEADSHOTS_ORDER_SOURCE, headshotBookingReturnPath } from "../../shared/headshots10";
+import { confirmHeadshotHold, resolveLateHeadshotPayment } from "../services/headshotHolds";
 import { seniorDepositCheckoutLive, seniorLivingDepositReturnPath } from "../../shared/seniorLiving";
 
 const router = Router();
@@ -576,7 +578,9 @@ async function applyDepositPayment({
   );
 
   let confirmEvent: { calendarId: string | null; eventId: string; orderNumber: string } | null = null;
+  let confirmHeadshot: { calendarId: string | null; eventId: string } | null = null;
   let lateApprenticeOrderId = "";
+  let lateHeadshotOrderId = "";
   await db().runTransaction(async (tx) => {
     const invoiceSnap = await tx.get(invoiceRef);
     if (!invoiceSnap.exists) return;
@@ -617,17 +621,21 @@ async function applyDepositPayment({
     if (orderRef && orderSnap?.exists) {
       const order = (orderSnap.data() || {}) as Record<string, unknown>;
       // Apprentice bookings are only confirmed once the $25 booking fee lands.
-      const confirmsBooking = order.source === APPRENTICESHIP_ORDER_SOURCE
-        && order.status === APPRENTICESHIP_AWAITING_DEPOSIT_STATUS;
+      const awaitingFee = order.status === APPRENTICESHIP_AWAITING_DEPOSIT_STATUS;
+      const confirmsBooking = order.source === APPRENTICESHIP_ORDER_SOURCE && awaitingFee;
+      const confirmsHeadshot = order.source === HEADSHOTS_ORDER_SOURCE && awaitingFee;
       // Paid after the 60-minute hold expired: re-confirm only if the time is still open.
       if (order.source === APPRENTICESHIP_ORDER_SOURCE && order.status === APPRENTICESHIP_EXPIRED_STATUS && orderId) {
         lateApprenticeOrderId = orderId;
+      }
+      if (order.source === HEADSHOTS_ORDER_SOURCE && order.status === APPRENTICESHIP_EXPIRED_STATUS && orderId) {
+        lateHeadshotOrderId = orderId;
       }
       tx.update(orderRef, {
         depositPaid,
         balanceDue: amountDue,
         paymentStatus: amountDue <= 0 ? "paid" : "partial",
-        ...(confirmsBooking
+        ...((confirmsBooking || confirmsHeadshot)
           ? {
             status: "confirmed",
             depositStatus: "paid",
@@ -643,12 +651,20 @@ async function applyDepositPayment({
           orderNumber: String(order.orderNumber || ""),
         };
       }
+      if (confirmsHeadshot && typeof order.calendarEventId === "string" && order.calendarEventId) {
+        confirmHeadshot = {
+          calendarId: typeof order.calendarId === "string" ? order.calendarId : null,
+          eventId: order.calendarEventId,
+        };
+      }
     }
     if (requestRef && requestSnap?.exists) {
       const request = (requestSnap.data() || {}) as Record<string, unknown>;
       tx.update(requestRef, {
         depositPaid,
-        ...(request.source === APPRENTICESHIP_ORDER_SOURCE ? { depositStatus: "paid" } : {}),
+        ...((request.source === APPRENTICESHIP_ORDER_SOURCE || request.source === HEADSHOTS_ORDER_SOURCE)
+          ? { depositStatus: "paid" }
+          : {}),
         balanceDue: amountDue,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -677,6 +693,13 @@ async function applyDepositPayment({
       console.error("[Payments] Late apprenticeship payment follow-up failed:", error);
     }
   }
+  if (lateHeadshotOrderId) {
+    try {
+      await resolveLateHeadshotPayment(lateHeadshotOrderId);
+    } catch (error) {
+      console.error("[Payments] Late headshot payment follow-up failed:", error);
+    }
+  }
 
   const held = confirmEvent as { calendarId: string | null; eventId: string; orderNumber: string } | null;
   if (held) {
@@ -684,6 +707,14 @@ async function applyDepositPayment({
       await confirmApprenticeshipEvent(held);
     } catch (error) {
       console.error("[Payments] Apprenticeship calendar confirm failed:", error);
+    }
+  }
+  const headshotHeld = confirmHeadshot as { calendarId: string | null; eventId: string } | null;
+  if (headshotHeld) {
+    try {
+      await confirmHeadshotHold(headshotHeld);
+    } catch (error) {
+      console.error("[Payments] Headshot calendar confirm failed:", error);
     }
   }
 }
@@ -1089,7 +1120,7 @@ router.post("/invoice/:id/deposit-checkout", async (req: Request, res: Response)
     const orderSnap = orderId ? await db().collection("orders").doc(orderId).get() : null;
     const order = orderSnap && orderSnap.exists ? orderSnap.data() || {} : null;
     const orderSource = String(order?.source || "");
-    if (!order || (orderSource !== "senior-living" && orderSource !== APPRENTICESHIP_ORDER_SOURCE)) {
+    if (!order || (orderSource !== "senior-living" && orderSource !== APPRENTICESHIP_ORDER_SOURCE && orderSource !== HEADSHOTS_ORDER_SOURCE)) {
       return res.status(403).json({ error: "Deposits are only for senior living orders." });
     }
     const alreadyPaid = (Number(invoice.depositPaid) || 0) > 0 || Boolean(invoice.depositPaidAt);
@@ -1099,6 +1130,11 @@ router.post("/invoice/:id/deposit-checkout", async (req: Request, res: Response)
     if (orderSource === APPRENTICESHIP_ORDER_SOURCE && order.status === APPRENTICESHIP_EXPIRED_STATUS) {
       return res.status(409).json({
         error: `This hold expired after ${APPRENTICESHIP_HOLD_MINUTES} minutes without the $25 booking fee. Please book a new time.`,
+      });
+    }
+    if (orderSource === HEADSHOTS_ORDER_SOURCE && order.status === APPRENTICESHIP_EXPIRED_STATUS) {
+      return res.status(409).json({
+        error: `This hold expired after ${APPRENTICESHIP_HOLD_MINUTES} minutes without the $10 booking fee. Please book a new time.`,
       });
     }
     if (String(invoice.status || "draft") !== "draft") {
@@ -1134,7 +1170,7 @@ router.post("/invoice/:id/deposit-checkout", async (req: Request, res: Response)
       body: JSON.stringify({
         idempotency_key: `${invoiceDoc.id}-deposit`,
         quick_pay: {
-          name: orderSource === APPRENTICESHIP_ORDER_SOURCE
+          name: orderSource === APPRENTICESHIP_ORDER_SOURCE || orderSource === HEADSHOTS_ORDER_SOURCE
             ? `Iconic Images booking fee ${orderNumber || invoice.invoiceNumber || invoiceDoc.id}`
             : `Iconic Images deposit ${invoice.invoiceNumber || invoiceDoc.id}`,
           price_money: {
@@ -1145,9 +1181,11 @@ router.post("/invoice/:id/deposit-checkout", async (req: Request, res: Response)
         },
         checkout_options: {
           redirect_url: `${appUrl()}${
-            orderSource === APPRENTICESHIP_ORDER_SOURCE
-              ? apprenticeshipBookingReturnPath(orderNumber, invoice.depositReturn)
-              : seniorLivingDepositReturnPath(orderNumber)
+            orderSource === HEADSHOTS_ORDER_SOURCE
+              ? headshotBookingReturnPath(orderNumber)
+              : orderSource === APPRENTICESHIP_ORDER_SOURCE
+                ? apprenticeshipBookingReturnPath(orderNumber, invoice.depositReturn)
+                : seniorLivingDepositReturnPath(orderNumber)
           }`,
         },
         pre_populated_data: {

@@ -415,6 +415,46 @@
       "destination": "/seo/private.html"
     },
     {
+      "source": "/headshots-10",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/headshots-10/",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/headshots-10/book",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/headshots-10/book/",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/headshots-10/how-it-works",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/headshots-10/how-it-works/",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/headshots-10/faq",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/headshots-10/faq/",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/headshots-10/location",
+      "destination": "/seo/private.html"
+    },
+    {
+      "source": "/headshots-10/location/",
+      "destination": "/seo/private.html"
+    },
+    {
       "source": "/studio/:listingId",
       "destination": "/seo/private.html"
     },
@@ -656,6 +696,96 @@
     },
     {
       "source": "/realestate-75/how-it-works/",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/headshots-10",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/headshots-10/",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/headshots-10/book",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/headshots-10/book/",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/headshots-10/how-it-works",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/headshots-10/how-it-works/",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/headshots-10/faq",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/headshots-10/faq/",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/headshots-10/location",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/headshots-10/location/",
       "headers": [
         {
           "key": "X-Robots-Tag",
