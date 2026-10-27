@@ -8,7 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { Router, type RequestHandler } from "express";
 import { isOwnerEmail, ownerAllowlist } from "../../shared/ownerAccess.ts";
-import { injectHead } from "../../shared/siteSeo.ts";
+import { injectHead, originForHost } from "../../shared/siteSeo.ts";
 import {
   claimSlug,
   createInsightPost,
@@ -206,7 +206,7 @@ function readSpaShell(): string {
   return "";
 }
 
-export async function renderInsightShell(slug: string): Promise<{ status: number; html: string }> {
+export async function renderInsightShell(slug: string, origin?: string): Promise<{ status: number; html: string }> {
   if (!isInsightSlug(slug)) {
     return { status: 404, html: "<!doctype html><title>Insight</title><p>This insight is not published.</p>" };
   }
@@ -219,7 +219,7 @@ export async function renderInsightShell(slug: string): Promise<{ status: number
       : `<!doctype html><html><head>${tags}</head><body><p>This insight is not published.</p></body></html>`;
     return { status: 404, html };
   }
-  const tags = insightHeadTags(toPublicInsight(post));
+  const tags = insightHeadTags(toPublicInsight(post), origin);
   const html = shell
     ? injectHead(shell, tags)
     : `<!doctype html><html><head>${tags}</head><body><div id="root"></div></body></html>`;
@@ -227,7 +227,7 @@ export async function renderInsightShell(slug: string): Promise<{ status: number
 }
 
 export const handleInsightShell: RequestHandler = async (req, res) => {
-  const rendered = await renderInsightShell(String(req.params.slug || ""));
+  const rendered = await renderInsightShell(String(req.params.slug || ""), originForHost(req.get("host")));
   res.setHeader("Cache-Control", "no-store");
   res.status(rendered.status).type("html").send(rendered.html);
 };

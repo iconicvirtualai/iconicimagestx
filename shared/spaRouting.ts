@@ -4,16 +4,19 @@
  * Owner pages stay on the API function, ahead of the /admin prefix.
  */
 
-import { PUBLIC_PAGES } from "./siteSeo";
+import { hostnameOf, PUBLIC_PAGES, wwwShellFile } from "./siteSeo";
 import { HEADSHOT_PREVIEW_SOURCES } from "./headshots10";
 import { RE75_PREVIEW_SOURCES } from "./realestate75";
+import { wixPathRedirects } from "./wixLaunch";
 
-export type Rewrite = { source: string; destination: string };
+export type HostCondition = { type: "host"; value: string };
+export type Rewrite = { source: string; destination: string; has?: HostCondition[] };
 export type Redirect = {
   source: string;
   destination: string;
   permanent?: boolean;
   statusCode?: number;
+  has?: HostCondition[];
 };
 export type HeaderRule = { source: string; headers: { key: string; value: string }[] };
 
@@ -57,6 +60,8 @@ const RESERVED: Rewrite[] = [
   { source: "/l/:slug", destination: "/api/index" },
   { source: "/admin/owners", destination: "/api/index" },
   { source: "/owners", destination: "/api/index" },
+  { source: "/sitemap.xml", destination: "/api/index" },
+  { source: "/robots.txt", destination: "/api/index" },
   { source: "/podcast-guest-prep", destination: "/podcast-guest-prep.html" },
   { source: "/thankful", destination: "/thankful.html" },
   { source: "/tis-the-season", destination: "/tis-the-season.html" },
@@ -74,6 +79,24 @@ function withSlashVariants(rules: Rewrite[]): Rewrite[] {
     out.push({ ...rule, source: `${rule.source}/` });
   }
   return out;
+}
+
+const CUSTOM_DOMAIN_HOSTS = ["www.iconicimagestx.com", "iconicimagestx.com"] as const;
+
+/** www canonical shells. Matched only on the custom domains, ahead of the vercel.app shells. */
+function customDomainRewrites(): Rewrite[] {
+  const pages: { source: string; destination: string }[] = [
+    ...PUBLIC_PAGES.map((page) => ({ source: page.path, destination: `/${wwwShellFile(page.file)}` })),
+    { source: "/thankful", destination: "/seo/www/thankful.html" },
+    { source: "/tis-the-season", destination: "/seo/www/tis-the-season.html" },
+  ];
+  const rules: Rewrite[] = [];
+  for (const host of CUSTOM_DOMAIN_HOSTS) {
+    for (const page of pages) {
+      rules.push({ source: page.source, destination: page.destination, has: [{ type: "host", value: host }] });
+    }
+  }
+  return rules;
 }
 
 export function buildVercelRewrites(): Rewrite[] {
@@ -101,17 +124,34 @@ export function buildVercelRewrites(): Rewrite[] {
     { source: "/portal", destination: PRIVATE_SHELL },
     { source: "/portal/(.*)", destination: PRIVATE_SHELL },
   );
-  return [...withSlashVariants(RESERVED), ...withSlashVariants(spa)];
+  return [...withSlashVariants(customDomainRewrites()), ...withSlashVariants(RESERVED), ...withSlashVariants(spa)];
 }
 
+/** Apex → www. Path redirects for old Wix URLs follow, and apply on every host. */
 export function buildVercelRedirects(): Redirect[] {
+  const apex: Redirect[] = [
+    {
+      source: "/",
+      has: [{ type: "host", value: "iconicimagestx.com" }],
+      destination: "https://www.iconicimagestx.com/",
+      statusCode: 301,
+    },
+    {
+      source: "/:path*",
+      has: [{ type: "host", value: "iconicimagestx.com" }],
+      destination: "https://www.iconicimagestx.com/:path*",
+      statusCode: 301,
+    },
+  ];
   return [
+    ...apex,
     { source: "/pricing-v1", destination: "/pricing", statusCode: 301 },
     { source: "/pricing-v1/", destination: "/pricing", statusCode: 301 },
     { source: "/studio", destination: "/studio-105", permanent: false },
     { source: "/studio/", destination: "/studio-105", permanent: false },
     { source: "/gallery", destination: "/portal", permanent: false },
     { source: "/gallery/", destination: "/portal", permanent: false },
+    ...wixPathRedirects(),
   ];
 }
 
@@ -173,13 +213,46 @@ export function compileVercelSource(source: string): RegExp {
   return new RegExp(`^${regex}$`);
 }
 
-export function firstMatchingRewrite(pathname: string, rules = buildVercelRewrites()): Rewrite | undefined {
-  return rules.find((rule) => compileVercelSource(rule.source).test(pathname));
+/** Unconditional rules match any host. Host rules match only that hostname. No host skips them. */
+export function hostRuleMatches(has: HostCondition[] | undefined, host?: string | null): boolean {
+  if (!has?.length) return true;
+  if (!host) return false;
+  const name = hostnameOf(host);
+  return has.every((cond) => cond.type !== "host" || cond.value === name);
 }
 
-export function htmlFileForRequestPath(pathname: string, rules = buildVercelRewrites()): string | null {
+export function firstMatchingRewrite(pathname: string, rules = buildVercelRewrites(), host?: string | null): Rewrite | undefined {
+  return rules.find((rule) => compileVercelSource(rule.source).test(pathname) && hostRuleMatches(rule.has, host));
+}
+
+export function redirectStatus(rule: Redirect): number {
+  if (typeof rule.statusCode === "number") return rule.statusCode;
+  return rule.permanent === false ? 307 : 308;
+}
+
+/** Fill `:path*` and keep a query string in front of a hash. */
+export function redirectLocation(rule: Redirect, pathname: string, originalUrl = pathname): string {
+  let dest = rule.destination;
+  if (dest.includes(":path*")) {
+    const captured = pathname.startsWith("/") ? pathname.slice(1) : pathname;
+    dest = dest.split(":path*").join(captured);
+  }
+  const queryAt = originalUrl.indexOf("?");
+  if (queryAt >= 0 && !dest.includes("?")) {
+    const search = originalUrl.slice(queryAt).split("#")[0];
+    const hashAt = dest.indexOf("#");
+    dest = hashAt >= 0 ? `${dest.slice(0, hashAt)}${search}${dest.slice(hashAt)}` : `${dest}${search}`;
+  }
+  return dest;
+}
+
+export function matchingRedirect(pathname: string, host?: string | null, rules = buildVercelRedirects()): Redirect | undefined {
+  return rules.find((rule) => compileVercelSource(rule.source).test(pathname) && hostRuleMatches(rule.has, host));
+}
+
+export function htmlFileForRequestPath(pathname: string, rules = buildVercelRewrites(), host?: string | null): string | null {
   const pathOnly = pathname.split("?")[0].split("#")[0] || "/";
-  const rule = firstMatchingRewrite(pathOnly, rules);
+  const rule = firstMatchingRewrite(pathOnly, rules, host);
   if (!rule?.destination.endsWith(".html")) return null;
   return rule.destination.replace(/^\//, "");
 }
@@ -202,13 +275,17 @@ export function probesForRoute(routePath: string): string[] {
 
 export function routeCovered(
   routePath: string,
-  rewrites = buildVercelRewrites(),
-  redirects = buildVercelRedirects(),
+  rewrites: { source: string; destination: string; has?: HostCondition[] }[] = buildVercelRewrites(),
+  redirects: { source: string; has?: unknown }[] = buildVercelRedirects(),
 ): boolean {
   const probes = probesForRoute(routePath);
   if (probes.length === 0) return false;
   return probes.every((probe) => {
     if (firstMatchingRewrite(probe, rewrites)) return true;
-    return redirects.some((rule) => compileVercelSource(rule.source).test(probe));
+    return redirects.some((rule) => {
+      const hostCondition = rule.has;
+      if (Array.isArray(hostCondition) && hostCondition.length > 0) return false;
+      return compileVercelSource(rule.source).test(probe);
+    });
   });
 }

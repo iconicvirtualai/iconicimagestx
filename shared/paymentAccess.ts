@@ -150,6 +150,7 @@ export interface PublicGalleryMedia {
   width: number | string | null;
   height: number | string | null;
   fileSize: number | null;
+  sortOrder?: number;
   canDownload: boolean;
   locked: boolean;
   url: string | null;
@@ -167,12 +168,14 @@ export interface PublicGalleryMedia {
 export function publicMediaItem(item: Record<string, unknown>, canDownload: boolean): PublicGalleryMedia {
   const type = publicText(item.type) || "photo";
   const title = publicText(item.title) || publicText(item.fileName) || "Media";
-  const fileName = publicText(item.fileName) || title;
+  const fileName = publicText(item.deliveryName) || publicText(item.fileName) || title;
+  const sortOrder = typeof item.sortOrder === "number" && Number.isFinite(item.sortOrder) ? item.sortOrder : undefined;
   const base = {
     id: publicText(item.id) || undefined,
     fileName,
-    title,
-    name: publicText(item.name) || fileName,
+    title: publicText(item.deliveryName) || title,
+    name: publicText(item.deliveryName) || publicText(item.name) || fileName,
+    ...(sortOrder == null ? {} : { sortOrder }),
     type,
     category: publicText(item.category),
     contentType: publicText(item.contentType),

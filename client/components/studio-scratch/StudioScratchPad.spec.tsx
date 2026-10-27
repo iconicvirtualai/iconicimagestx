@@ -1,3 +1,8 @@
+/**
+ * @vitest-environment happy-dom
+ */
+import { act } from "react";
+import { createRoot } from "react-dom/client";
 import { describe, expect, it } from "vitest";
 import { renderToString } from "react-dom/server";
 import { ICONIC_POLISH_TREATMENTS } from "@shared/orderEditPlan";
@@ -55,6 +60,84 @@ function render(mode: ScratchDeskMode = "upload", grassReady = true) {
 }
 
 describe("scratch pad desk", () => {
+  it("opens a frame in the upload workspace and shrinks the drop target", () => {
+    const html = renderToString(
+      <StudioScratchPad
+        initialExpandedId="front"
+        frames={frames}
+        busy={false}
+        progress=""
+        grassReady
+        grassNote="ok"
+        onAddFiles={() => undefined}
+        onAddFloorplan={() => undefined}
+        onSelect={() => undefined}
+        onSelectAll={() => undefined}
+        onClearSelection={() => undefined}
+        onSort={() => undefined}
+        onProcess={() => undefined}
+        onStage={() => undefined}
+        onCommitJpeg={() => undefined}
+        onRevert={() => undefined}
+        onDownload={() => undefined}
+        onExport={() => undefined}
+        onRemove={() => undefined}
+      />,
+    );
+    expect(html).toContain('data-testid="scratch-expanded"');
+    expect(html).toContain('data-testid="scratch-back-grid"');
+    expect(html).toContain('data-testid="scratch-prev"');
+    expect(html).toContain('data-testid="scratch-next"');
+    expect(html).toContain("+ Add files");
+    expect(html).toContain('data-compact="true"');
+    expect(html).toContain("still a drop target");
+    expect(html).not.toContain("Drag and drop your files to begin");
+  });
+
+  it("moves the expanded frame with the arrow keys and returns to the grid on escape", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <StudioScratchPad
+          initialExpandedId="front"
+          frames={frames}
+          busy={false}
+          progress=""
+          grassReady
+          grassNote="ok"
+          onAddFiles={() => undefined}
+          onAddFloorplan={() => undefined}
+          onSelect={() => undefined}
+          onSelectAll={() => undefined}
+          onClearSelection={() => undefined}
+          onSort={() => undefined}
+          onProcess={() => undefined}
+          onStage={() => undefined}
+          onCommitJpeg={() => undefined}
+          onRevert={() => undefined}
+          onDownload={() => undefined}
+          onExport={() => undefined}
+          onRemove={() => undefined}
+        />,
+      );
+    });
+    expect(container.querySelector("[data-testid='scratch-expanded']")?.getAttribute("alt")).toBe("front.jpg");
+    expect(container.querySelector("[data-testid='scratch-drop']")?.getAttribute("data-compact")).toBe("true");
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
+    });
+    expect(container.querySelector("[data-testid='scratch-expanded']")?.getAttribute("alt")).toBe("yard.jpg");
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    });
+    expect(container.querySelector("[data-testid='scratch-upload-grid']")).toBeTruthy();
+    expect(container.querySelector("[data-testid='scratch-expanded']")).toBeNull();
+    root.unmount();
+    container.remove();
+  });
+
   it("names the listing whose photos were opened", () => {
     const html = renderToString(
       <StudioScratchPad

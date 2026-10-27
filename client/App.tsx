@@ -102,8 +102,15 @@ import AdminInsights from "./pages/AdminInsights";
 import Login from "./pages/Login";
 import ClientPortal from "./pages/ClientPortal";
 import PortalListingDetail from "./pages/PortalListingDetail";
+import PortalSettings from "./pages/PortalSettings";
+import PortalOrder from "./pages/PortalOrder";
 
 const queryClient = new QueryClient();
+
+function PortalQueryRedirect({ to }: { to: string }) {
+  const { search } = useLocation();
+  return <Navigate to={`${to}${search}`} replace />;
+}
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -111,6 +118,19 @@ function ScrollToTop() {
     window.scrollTo(0, 0);
   }, [pathname]);
   return null;
+}
+
+/** /thankful is a static page, so this leaves the SPA. The Vercel 301 does the same before JS runs. */
+function ThankfulRsvpRedirect() {
+  const { search } = useLocation();
+  useEffect(() => {
+    window.location.replace(`/thankful${search}#rsvp`);
+  }, [search]);
+  return (
+    <p style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>
+      <a href={`/thankful${search}#rsvp`}>Continue to the Thankful RSVP</a>
+    </p>
+  );
 }
 
 const App = () => (
@@ -133,6 +153,7 @@ const App = () => (
             <Route path="/studio-105" element={<Studio105 />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/book" element={<Book />} />
+            <Route path="/thankful-rsvp" element={<ThankfulRsvpRedirect />} />
             <Route path="/senior-living" element={<SeniorLiving />} />
             <Route path="/apprenticeship" element={<Apprenticeship />} />
             {/* Standalone embed, like /thankful. No site header or footer. */}
@@ -182,6 +203,11 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/portal" element={<Login />} />
             <Route path="/portal/home" element={<ClientPortal />} />
+            <Route path="/portal/order" element={<PortalOrder />} />
+            <Route path="/portal/orders" element={<PortalQueryRedirect to="/portal/settings/billing" />} />
+            <Route path="/portal/order-history" element={<PortalQueryRedirect to="/portal/settings/billing" />} />
+            <Route path="/portal/settings" element={<PortalQueryRedirect to="/portal/settings/profile" />} />
+            <Route path="/portal/settings/:section" element={<PortalSettings />} />
             <Route path="/portal/listings/:listingId" element={<PortalListingDetail />} />
             <Route path="/admin/login" element={<AdminLogin />} />
 

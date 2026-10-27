@@ -27,6 +27,28 @@
   },
   "redirects": [
     {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ],
+      "destination": "https://www.iconicimagestx.com/",
+      "statusCode": 301
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ],
+      "destination": "https://www.iconicimagestx.com/:path*",
+      "statusCode": 301
+    },
+    {
       "source": "/pricing-v1",
       "destination": "/pricing",
       "statusCode": 301
@@ -55,9 +77,1259 @@
       "source": "/gallery/",
       "destination": "/portal",
       "permanent": false
+    },
+    {
+      "source": "/home",
+      "destination": "/",
+      "statusCode": 301
+    },
+    {
+      "source": "/home/",
+      "destination": "/",
+      "statusCode": 301
+    },
+    {
+      "source": "/homev1",
+      "destination": "/",
+      "statusCode": 301
+    },
+    {
+      "source": "/homev1/",
+      "destination": "/",
+      "statusCode": 301
+    },
+    {
+      "source": "/new-home",
+      "destination": "/",
+      "statusCode": 301
+    },
+    {
+      "source": "/new-home/",
+      "destination": "/",
+      "statusCode": 301
+    },
+    {
+      "source": "/pricingv1",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/pricingv1/",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/oldpricing",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/oldpricing/",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/order",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/order/",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/ordericonic",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/ordericonic/",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/orderbridge",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/orderbridge/",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/thankful-rsvp",
+      "destination": "/thankful#rsvp",
+      "statusCode": 301
+    },
+    {
+      "source": "/thankful-rsvp/",
+      "destination": "/thankful#rsvp",
+      "statusCode": 301
+    },
+    {
+      "source": "/thankful-social-saves",
+      "destination": "/thankful#social-saves",
+      "statusCode": 301
+    },
+    {
+      "source": "/thankful-social-saves/",
+      "destination": "/thankful#social-saves",
+      "statusCode": 301
+    },
+    {
+      "source": "/thankful-vote",
+      "destination": "/thankful#vote",
+      "statusCode": 301
+    },
+    {
+      "source": "/thankful-vote/",
+      "destination": "/thankful#vote",
+      "statusCode": 301
+    },
+    {
+      "source": "/virtual-staging",
+      "destination": "/services/virtual-staging",
+      "statusCode": 301
+    },
+    {
+      "source": "/virtual-staging/",
+      "destination": "/services/virtual-staging",
+      "statusCode": 301
+    },
+    {
+      "source": "/termsandconditions",
+      "destination": "/terms",
+      "statusCode": 301
+    },
+    {
+      "source": "/termsandconditions/",
+      "destination": "/terms",
+      "statusCode": 301
+    },
+    {
+      "source": "/privacypolicy",
+      "destination": "/privacy",
+      "statusCode": 301
+    },
+    {
+      "source": "/privacypolicy/",
+      "destination": "/privacy",
+      "statusCode": 301
+    },
+    {
+      "source": "/prep",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/prep/",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/homeprepv1",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/homeprepv1/",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/faq",
+      "destination": "/",
+      "statusCode": 301
+    },
+    {
+      "source": "/faq/",
+      "destination": "/",
+      "statusCode": 301
+    },
+    {
+      "source": "/faqv1",
+      "destination": "/",
+      "statusCode": 301
+    },
+    {
+      "source": "/faqv1/",
+      "destination": "/",
+      "statusCode": 301
+    },
+    {
+      "source": "/crew",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/crew/",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/teamv1",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/teamv1/",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/aboutcadi",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/aboutcadi/",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/aboutmike",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/aboutmike/",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/aboutarmando",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/aboutarmando/",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/aboutalex",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/aboutalex/",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/aboutmichael",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/aboutmichael/",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/aboutdaniel",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/aboutdaniel/",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/pedro",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/pedro/",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/cameronx",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/cameronx/",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/copy-of-aboutnathan",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/copy-of-aboutnathan/",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/copy-of-aboutjazmin",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/copy-of-aboutjazmin/",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/copy-of-aboutcameron",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/copy-of-aboutcameron/",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/media",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/media/",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/mediav1",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/mediav1/",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/marketing",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/marketing/",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/v1marketing",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/v1marketing/",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/copy-of-services",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/copy-of-services/",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/2025-4th-qtr-menu",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/2025-4th-qtr-menu/",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/3dextension",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/3dextension/",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/bulkorder",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/bulkorder/",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/specialoffer",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/specialoffer/",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/smallbusiness2024",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/smallbusiness2024/",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/livingston",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/livingston/",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/coverage",
+      "destination": "/contact",
+      "statusCode": 301
+    },
+    {
+      "source": "/coverage/",
+      "destination": "/contact",
+      "statusCode": 301
+    },
+    {
+      "source": "/zone-map",
+      "destination": "/contact",
+      "statusCode": 301
+    },
+    {
+      "source": "/zone-map/",
+      "destination": "/contact",
+      "statusCode": 301
+    },
+    {
+      "source": "/vendors",
+      "destination": "/contact",
+      "statusCode": 301
+    },
+    {
+      "source": "/vendors/",
+      "destination": "/contact",
+      "statusCode": 301
+    },
+    {
+      "source": "/joinourcrew",
+      "destination": "/contact",
+      "statusCode": 301
+    },
+    {
+      "source": "/joinourcrew/",
+      "destination": "/contact",
+      "statusCode": 301
+    },
+    {
+      "source": "/thank-you-iconic",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/thank-you-iconic/",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/nanproperties",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/nanproperties/",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/gtsg",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/gtsg/",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/bsg",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/bsg/",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/larson",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/larson/",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/blank",
+      "destination": "/",
+      "statusCode": 301
+    },
+    {
+      "source": "/blank/",
+      "destination": "/",
+      "statusCode": 301
+    },
+    {
+      "source": "/fullscreen-page",
+      "destination": "/",
+      "statusCode": 301
+    },
+    {
+      "source": "/fullscreen-page/",
+      "destination": "/",
+      "statusCode": 301
+    },
+    {
+      "source": "/_files/ugd/af5b97_46d42cc1f3ff45548e1a5ad44ee4eee3.pdf",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/_files/ugd/af5b97_46d42cc1f3ff45548e1a5ad44ee4eee3.pdf/",
+      "destination": "/book",
+      "statusCode": 301
+    },
+    {
+      "source": "/_files/ugd/af5b97_43f960af85be4154ad2e20604610f966.pdf",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/_files/ugd/af5b97_43f960af85be4154ad2e20604610f966.pdf/",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/_files/ugd/af5b97_4fb2b1154d014ff094f4e3f0c7efe82b.pdf",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/_files/ugd/af5b97_4fb2b1154d014ff094f4e3f0c7efe82b.pdf/",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/_files/ugd/af5b97_f330f7bfcfff4c55806c531d2271100a.pdf",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/_files/ugd/af5b97_f330f7bfcfff4c55806c531d2271100a.pdf/",
+      "destination": "/pricing",
+      "statusCode": 301
+    },
+    {
+      "source": "/_files/ugd/af5b97_b1af2359c4b34575b669d579f0384d31.pdf",
+      "destination": "/contact",
+      "statusCode": 301
+    },
+    {
+      "source": "/_files/ugd/af5b97_b1af2359c4b34575b669d579f0384d31.pdf/",
+      "destination": "/contact",
+      "statusCode": 301
+    },
+    {
+      "source": "/_files/ugd/af5b97_0c62fac2f8a347718bb7238f12241fb1.pdf",
+      "destination": "/contact",
+      "statusCode": 301
+    },
+    {
+      "source": "/_files/ugd/af5b97_0c62fac2f8a347718bb7238f12241fb1.pdf/",
+      "destination": "/contact",
+      "statusCode": 301
     }
   ],
   "rewrites": [
+    {
+      "source": "/",
+      "destination": "/seo/www/index.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/about",
+      "destination": "/seo/www/about.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/about/",
+      "destination": "/seo/www/about.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/pricing",
+      "destination": "/seo/www/pricing.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/pricing/",
+      "destination": "/seo/www/pricing.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/studio-105",
+      "destination": "/seo/www/studio-105.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/studio-105/",
+      "destination": "/seo/www/studio-105.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/portfolio",
+      "destination": "/seo/www/portfolio.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/portfolio/",
+      "destination": "/seo/www/portfolio.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/stock-footage",
+      "destination": "/seo/www/stock-footage.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/stock-footage/",
+      "destination": "/seo/www/stock-footage.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/contact",
+      "destination": "/seo/www/contact.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/contact/",
+      "destination": "/seo/www/contact.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/socials",
+      "destination": "/seo/www/socials.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/socials/",
+      "destination": "/seo/www/socials.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/insights",
+      "destination": "/seo/www/insights.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/insights/",
+      "destination": "/seo/www/insights.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/book",
+      "destination": "/seo/www/book.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/book/",
+      "destination": "/seo/www/book.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/apprenticeship",
+      "destination": "/seo/www/apprenticeship.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/apprenticeship/",
+      "destination": "/seo/www/apprenticeship.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/senior-living",
+      "destination": "/seo/www/senior-living.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/senior-living/",
+      "destination": "/seo/www/senior-living.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/privacy",
+      "destination": "/seo/www/privacy.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/privacy/",
+      "destination": "/seo/www/privacy.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/terms",
+      "destination": "/seo/www/terms.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/terms/",
+      "destination": "/seo/www/terms.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/login",
+      "destination": "/seo/www/login.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/login/",
+      "destination": "/seo/www/login.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/thankful",
+      "destination": "/seo/www/thankful.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/thankful/",
+      "destination": "/seo/www/thankful.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/tis-the-season",
+      "destination": "/seo/www/tis-the-season.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/tis-the-season/",
+      "destination": "/seo/www/tis-the-season.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/",
+      "destination": "/seo/www/index.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/about",
+      "destination": "/seo/www/about.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/about/",
+      "destination": "/seo/www/about.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/pricing",
+      "destination": "/seo/www/pricing.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/pricing/",
+      "destination": "/seo/www/pricing.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/studio-105",
+      "destination": "/seo/www/studio-105.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/studio-105/",
+      "destination": "/seo/www/studio-105.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/portfolio",
+      "destination": "/seo/www/portfolio.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/portfolio/",
+      "destination": "/seo/www/portfolio.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/stock-footage",
+      "destination": "/seo/www/stock-footage.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/stock-footage/",
+      "destination": "/seo/www/stock-footage.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/contact",
+      "destination": "/seo/www/contact.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/contact/",
+      "destination": "/seo/www/contact.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/socials",
+      "destination": "/seo/www/socials.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/socials/",
+      "destination": "/seo/www/socials.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/insights",
+      "destination": "/seo/www/insights.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/insights/",
+      "destination": "/seo/www/insights.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/book",
+      "destination": "/seo/www/book.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/book/",
+      "destination": "/seo/www/book.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/apprenticeship",
+      "destination": "/seo/www/apprenticeship.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/apprenticeship/",
+      "destination": "/seo/www/apprenticeship.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/senior-living",
+      "destination": "/seo/www/senior-living.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/senior-living/",
+      "destination": "/seo/www/senior-living.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/privacy",
+      "destination": "/seo/www/privacy.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/privacy/",
+      "destination": "/seo/www/privacy.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/terms",
+      "destination": "/seo/www/terms.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/terms/",
+      "destination": "/seo/www/terms.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/login",
+      "destination": "/seo/www/login.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/login/",
+      "destination": "/seo/www/login.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/thankful",
+      "destination": "/seo/www/thankful.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/thankful/",
+      "destination": "/seo/www/thankful.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/tis-the-season",
+      "destination": "/seo/www/tis-the-season.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
+    {
+      "source": "/tis-the-season/",
+      "destination": "/seo/www/tis-the-season.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "iconicimagestx.com"
+        }
+      ]
+    },
     {
       "source": "/api/media/display/p/(.*)",
       "destination": "/api/media-display"
@@ -128,6 +1400,22 @@
     },
     {
       "source": "/owners/",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/sitemap.xml/",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/robots.txt",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/robots.txt/",
       "destination": "/api/index"
     },
     {

@@ -11,6 +11,8 @@ import {
   portalListingPageMode,
   portalListingTab,
   readMediaStore,
+  defaultPortalWebsite,
+  listingSiteActionState,
   sanitizePortalListingFacts,
   sanitizeWebsiteSettings,
   visitorPortalListingDetail,
@@ -255,6 +257,38 @@ describe("portal listing detail", () => {
     expect(sanitizeWebsiteSettings({ design: "not-a-design" }).design).toBe("index");
     expect(portalListingTab("photos")).toBe("photos");
     expect(portalListingTab("har")).toBe("data");
+  });
+
+  it("client cannot set tileLook", () => {
+    const saved = sanitizeWebsiteSettings({
+      design: "premiere",
+      published: true,
+      tileLook: "showcase",
+    }, { ...defaultPortalWebsite(), tileLook: "legacy" });
+    expect(saved.tileLook).toBe("");
+    expect(saved.design).toBe("premiere");
+    expect(saved.published).toBe(true);
+    expect(sanitizeWebsiteSettings({ tileLook: "not-a-skin" }).tileLook).toBe("");
+    expect(buildPortalListingDetail({
+      listing: {
+        id: "listing1234",
+        package: "Photos Only",
+        portalWebsite: { tileLook: "showcase", design: "index" },
+      },
+    }).website.tileLook).toBe("");
+  });
+
+  it("shows Select or Save style with Publish, and Update after a live site changes", () => {
+    const saved = defaultPortalWebsite();
+    expect(listingSiteActionState(saved, saved)).toEqual({ mode: "choose", saveLabel: "Save style" });
+    expect(listingSiteActionState(saved, { ...saved, design: "premiere", tileLook: "showcase" })).toEqual({
+      mode: "choose",
+      saveLabel: "Select",
+    });
+    expect(listingSiteActionState(saved, { ...saved, font: "serif" }).saveLabel).toBe("Save style");
+    const live = { ...saved, published: true, tileLook: "legacy" as const };
+    expect(listingSiteActionState(live, { ...live, tileLook: "" })).toEqual({ mode: "live", saveLabel: "Save style" });
+    expect(listingSiteActionState(live, { ...live, design: "stories" })).toEqual({ mode: "update", saveLabel: "Save style" });
   });
 
   it("treats a listing link as public and keeps a malformed id off the page", () => {

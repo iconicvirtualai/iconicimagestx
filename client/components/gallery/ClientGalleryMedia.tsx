@@ -5,6 +5,7 @@ import {
   FileText,
   Lock,
 } from "lucide-react";
+import { orderedGalleryMedia } from "@shared/gallerySequence";
 import {
   classifyClientGalleryItem,
   formatGalleryFileSize,
@@ -28,22 +29,36 @@ import {
 export function ClientGalleryBoard({
   items,
   onCopyLink,
+  zipHref,
 }: {
   items: ClientGalleryItem[];
   onCopyLink?: (url: string) => void;
+  zipHref?: string;
 }) {
+  const ordered = orderedGalleryMedia(items);
+  const canZip = Boolean(zipHref) && ordered.some((item) => galleryOffersDownload(item));
   return (
-    <div
-      className="grid grid-cols-2 gap-3 lg:grid-cols-4"
-      data-testid="client-gallery-board"
-    >
-      {items.map((item, index) => (
+    <div data-testid="client-gallery-board">
+      {canZip && zipHref ? (
+        <div className="mb-4 flex justify-end">
+          <a
+            href={zipHref}
+            data-testid="gallery-download-zip"
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-black px-4 text-[10px] font-black uppercase tracking-widest text-white"
+          >
+            <Download className="h-3.5 w-3.5" /> Download all
+          </a>
+        </div>
+      ) : null}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {ordered.map((item, index) => (
         <ClientGalleryMediaCard
           key={item.id || index}
           item={item}
           onCopyLink={onCopyLink}
         />
       ))}
+      </div>
     </div>
   );
 }
@@ -108,7 +123,7 @@ export function ClientGalleryMediaCard({
       {downloadUrl && (
         <a
           href={downloadUrl}
-          download
+          download={name}
           data-testid={`gallery-download-${item.id || kind}`}
           className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-black px-3 text-[10px] font-black uppercase tracking-widest text-white"
         >

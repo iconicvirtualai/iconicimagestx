@@ -4,7 +4,7 @@ import AdminLayout from "@/components/AdminLayout";
 import { Button } from "@/components/ui/button";
 import {
   ChevronLeft, Home, Building2, User, Calendar, Clock,
-  Upload, Download, Trash2, Plus, Check, X, Edit3, FileText,
+  Upload, Download, Plus, Check, X, Edit3, FileText,
   History, CreditCard, Lock, Video, Smartphone, Layers, Camera,
   ExternalLink, Copy, MapPin, Image, Unlock,
 } from "lucide-react";
@@ -27,6 +27,9 @@ import { publicClientUrl } from "@shared/publicSiteUrl";
 import { projectStatusLabel, projectSurfaceStatus, type ProjectSurface } from "@shared/projectSurfaceStatus";
 import { PresentationShareButton, PresentationSharePanel } from "@/components/PresentationSharePanel";
 import { PhotoEditRequestStaff } from "@/components/PhotoEditRequestStaff";
+import { StaffMediaBoard } from "@/components/listing/StaffMediaBoard";
+import { saveListingMediaArrangement } from "@/lib/listingUpload";
+import { collectArrangementMedia, readMediaArrangement } from "@shared/mediaArrangement";
 
 // ─── Status systems ───────────────────────────────────────────────────────────
 const RE_STATUSES = ["unscheduled", "scheduled", "in_progress", "delivered", "paid", "archived", "cancelled"];
@@ -588,28 +591,23 @@ export default function AdminListingFile({
                   )}
                 </div>
                 <PhotoUploader projectId={id!} onUpload={() => {}} />
-                {images.length > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-6">
-                    {images.map((img: any, i: number) => (
-                      <div key={i} className="aspect-square rounded-xl overflow-hidden relative group bg-gray-100">
-                        <img src={img.url} alt={img.name || `Photo ${i + 1}`} className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                          <a href={img.url} target="_blank" rel="noopener noreferrer" className="p-2 bg-white rounded-lg">
-                            <Download className="w-4 h-4 text-black" />
-                          </a>
-                          <button onClick={() => deletePhoto(i)} className="p-2 bg-white rounded-lg">
-                            <Trash2 className="w-4 h-4 text-red-500" />
-                          </button>
-                        </div>
-                        {i === 0 && (
-                          <div className="absolute top-2 left-2">
-                            <span className="px-2 py-0.5 bg-[#0d9488] text-white text-[8px] font-black uppercase tracking-widest rounded-full">Cover</span>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <StaffMediaBoard
+                  userId={user?.uid || "staff"}
+                  address={recordAddressText(project) || "listing"}
+                  media={collectArrangementMedia(project)}
+                  arrangement={readMediaArrangement(project.mediaArrangement)}
+                  onSave={async (next) => {
+                    if (!id) return;
+                    const saved = await saveListingMediaArrangement(id, next);
+                    toast.success(saved.note || "Gallery order saved.");
+                  }}
+                  onRemove={(mediaId) => {
+                    const index = images.findIndex((img: { id?: string; path?: string; url?: string }, imageIndex: number) => (
+                      img?.id || img?.path || img?.url || `photo-${imageIndex}`
+                    ) === mediaId);
+                    if (index >= 0) void deletePhoto(index);
+                  }}
+                />
                 {id && (
                   <PhotoEditRequestStaff
                     listingId={id}

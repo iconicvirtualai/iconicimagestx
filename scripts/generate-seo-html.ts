@@ -1,6 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
-import { PUBLIC_PAGES, injectNoIndex, injectPublicPage, robotsTxt, sitemapXml, SITE_ORIGIN } from "../shared/siteSeo";
+import {
+  CANONICAL_WWW_ORIGIN,
+  PUBLIC_PAGES,
+  injectNoIndex,
+  injectPublicPage,
+  stampCanonical,
+  wwwShellFile,
+  SITE_ORIGIN,
+} from "../shared/siteSeo";
 
 const dist = path.resolve("dist/spa");
 const shellPath = path.join(dist, "index.html");
@@ -20,10 +28,28 @@ for (const page of PUBLIC_PAGES) {
   const target = path.join(dist, page.file);
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.writeFileSync(target, html);
+  const wwwHtml = injectPublicPage(shell, page, CANONICAL_WWW_ORIGIN);
+  const wwwTarget = path.join(dist, wwwShellFile(page.file));
+  fs.mkdirSync(path.dirname(wwwTarget), { recursive: true });
+  fs.writeFileSync(wwwTarget, wwwHtml);
 }
 
-fs.writeFileSync(path.join(dist, "sitemap.xml"), sitemapXml(SITE_ORIGIN));
-fs.writeFileSync(path.join(dist, "robots.txt"), robotsTxt(SITE_ORIGIN));
+// Holiday pages keep their vercel.app HTML. The www copy only adds a canonical
+// link so the custom domain does not inherit the app origin.
+for (const name of ["thankful.html", "tis-the-season.html"]) {
+  const source = path.join(dist, name);
+  if (!fs.existsSync(source)) continue;
+  const href = `${CANONICAL_WWW_ORIGIN}/${name.replace(/\.html$/, "")}`;
+  const wwwTarget = path.join(dist, "seo/www", name);
+  fs.mkdirSync(path.dirname(wwwTarget), { recursive: true });
+  fs.writeFileSync(wwwTarget, stampCanonical(fs.readFileSync(source, "utf8"), href));
+}
+
+// public/sitemap.xml and robots.txt are copied into dist by Vite and are the
+// vercel.app copies. Leaving them here would beat the host-aware API route.
+for (const name of ["sitemap.xml", "robots.txt"]) {
+  fs.rmSync(path.join(dist, name), { force: true });
+}
 
 const home = fs.readFileSync(path.join(dist, "index.html"), "utf8");
 if (!home.includes('property="og:title"') || !home.includes('rel="canonical"')) {

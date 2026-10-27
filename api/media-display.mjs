@@ -9,6 +9,25 @@ import fs from "fs/promises";
 import os from "os";
 import path$1 from "path";
 import { lookup } from "node:dns/promises";
+function finiteOrder(value) {
+  const n = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+function isCulledShot(shot) {
+  return shot.culled === true;
+}
+function keptShots(items) {
+  const rows = items.map((item, index) => ({ item, index })).filter(({ item }) => !isCulledShot(item));
+  const any = rows.some(({ item }) => finiteOrder(item.sortOrder) != null);
+  if (!any) return rows.map(({ item }) => item);
+  return rows.sort((a, b) => {
+    const ao = finiteOrder(a.item.sortOrder);
+    const bo = finiteOrder(b.item.sortOrder);
+    const aKey = ao == null ? Number.MAX_SAFE_INTEGER : ao;
+    const bKey = bo == null ? Number.MAX_SAFE_INTEGER : bo;
+    return aKey - bKey || a.index - b.index;
+  }).map(({ item }) => item);
+}
 const RAW_EXT$1 = /\.(cr2|cr3|nef|nrw|arw|srf|sr2|dng|raw|rw2|orf|raf|pef|3fr|fff|iiq)$/i;
 const PREVIEW_EXT = /\.(jpe?g|png|webp|gif)$/i;
 function isRawStudioFile(name, contentType) {
@@ -103,36 +122,36 @@ const VIDEO_FILE = /\.(mp4|m4v|mov|webm)(\?|#|$)/i;
 const BLOCKED_EXT = /\.(zip|pdf|dng|cr2|cr3|nef|nrw|arw|srf|sr2|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic|heif|mp4|m4v|mov|webm)(\?|#|$)/i;
 const FILE_KEYS = ["downloadUrl", "fileUrl", "originalUrl", "fullResUrl", "mlsUrl", "zipUrl", "printUrl", "reelUrl", "mp4Url", "rawUrl", "src"];
 const DISPLAY_KEYS = ["previewUrl", "displayUrl", "webUrl", "thumbnailUrl"];
-function text$2(value) {
+function text$3(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function rowOf(item) {
   return item && typeof item === "object" ? item : null;
 }
 function shareableUrl(value) {
-  const url = text$2(value);
+  const url = text$3(value);
   if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
   if (url.startsWith("/")) return url;
   if (url.startsWith("https://") || url.startsWith("http://")) return url;
   return "";
 }
 function mediaName(row, fallback) {
-  return text$2(row.name) || text$2(row.fileName) || text$2(row.title) || fallback;
+  return text$3(row.deliveryName) || text$3(row.name) || text$3(row.fileName) || text$3(row.title) || fallback;
 }
 function labelOf(row) {
-  return `${text$2(row.fileName)} ${text$2(row.name)} ${text$2(row.title)} ${text$2(row.path)} ${text$2(row.storagePath)}`.toLowerCase();
+  return `${text$3(row.fileName)} ${text$3(row.name)} ${text$3(row.title)} ${text$3(row.path)} ${text$3(row.storagePath)}`.toLowerCase();
 }
 function isMls(row) {
-  const category = text$2(row.category).toLowerCase();
-  const type = text$2(row.type).toLowerCase();
+  const category = text$3(row.category).toLowerCase();
+  const type = text$3(row.type).toLowerCase();
   if (category === "mls" || type === "mls") return true;
   const label = labelOf(row);
   if (/(^|[^a-z0-9])mls([^a-z0-9]|$)/.test(label)) return true;
   return /\/mls\//.test(label);
 }
 function isFullRes(row) {
-  const category = text$2(row.category).toLowerCase();
-  const type = text$2(row.type).toLowerCase();
+  const category = text$3(row.category).toLowerCase();
+  const type = text$3(row.type).toLowerCase();
   if (category === "full-res" || category === "fullres" || type === "full-res" || type === "fullres") return true;
   const label = labelOf(row);
   if (/(^|[^a-z0-9])full[\s_-]?res([^a-z0-9]|$)/.test(label)) return true;
@@ -141,7 +160,7 @@ function isFullRes(row) {
 function isRasterUrl(url, row) {
   if (!url || BLOCKED_EXT.test(url.split("#")[0]) || VIDEO_FILE.test(url.split("#")[0])) return false;
   if (RASTER.test(url.split("#")[0])) return true;
-  const content = text$2(row.contentType).toLowerCase();
+  const content = text$3(row.contentType).toLowerCase();
   return /^image\/(jpeg|jpg|png|webp|gif)/.test(content);
 }
 function blockedFileUrls(row, includeOwnUrl) {
@@ -170,11 +189,11 @@ function separateDisplay(row) {
 }
 function rasterShareSource(row, legacyDropTagged = false) {
   if (legacyDropTagged && isMls(row)) return "";
-  const type = text$2(row.type).toLowerCase();
+  const type = text$3(row.type).toLowerCase();
   if (type === "video" || type === "reel" || type === "file" || type === "matterport") return "";
-  const content = text$2(row.contentType).toLowerCase();
+  const content = text$3(row.contentType).toLowerCase();
   if (content.startsWith("video/") || content === "application/pdf" || content === "application/zip") return "";
-  const path2 = `${text$2(row.path)} ${text$2(row.storagePath)}`.toLowerCase();
+  const path2 = `${text$3(row.path)} ${text$3(row.storagePath)}`.toLowerCase();
   if (/\/(raw|downloads?|print|zips?)\//.test(path2)) return "";
   const display = separateDisplay(row);
   if (legacyDropTagged && isFullRes(row)) return display;
@@ -204,11 +223,11 @@ function videoFileUrl(row) {
 function videoPlaceholderSource(row) {
   if (rasterPoster(row)) return "";
   const file = videoFileUrl(row);
-  const type = text$2(row.type).toLowerCase();
-  const content = text$2(row.contentType).toLowerCase();
+  const type = text$3(row.type).toLowerCase();
+  const content = text$3(row.contentType).toLowerCase();
   const named = type === "video" || type === "reel" || content.startsWith("video/");
   if (!file && !named) return "";
-  const id = text$2(row.id) || file || text$2(row.path) || text$2(row.storagePath) || text$2(row.name) || text$2(row.fileName);
+  const id = text$3(row.id) || file || text$3(row.path) || text$3(row.storagePath) || text$3(row.name) || text$3(row.fileName);
   if (!id) return "";
   return `${VIDEO_PLACEHOLDER_PREFIX}${encodeURIComponent(id)}`;
 }
@@ -229,22 +248,23 @@ function shareDisplayItems(listing, options = {}) {
   const items = [];
   const seen = /* @__PURE__ */ new Set();
   if (Array.isArray(listing.images)) {
-    listing.images.forEach((item, index) => {
+    keptShots(listing.images).forEach((item, index) => {
       const row = rowOf(item);
       if (!row) return;
-      pushDisplay(items, seen, mediaName(row, `Photo ${index + 1}`), rasterShareSource(row, legacy), "image");
+      const deliveryName = typeof row.deliveryName === "string" ? row.deliveryName.trim() : "";
+      pushDisplay(items, seen, deliveryName || mediaName(row, `Photo ${index + 1}`), rasterShareSource(row, legacy), "image");
     });
   }
   for (const group of [listing.floorplans, listing.floorPlans]) {
     if (!Array.isArray(group)) continue;
-    group.forEach((item, index) => {
+    keptShots(group).forEach((item, index) => {
       const row = rowOf(item);
       if (!row) return;
       pushDisplay(items, seen, mediaName(row, `Floor plan ${index + 1}`), floorSource(row, legacy), "floorPlan");
     });
   }
   if (Array.isArray(listing.videos)) {
-    listing.videos.forEach((item) => {
+    keptShots(listing.videos).forEach((item) => {
       const row = rowOf(item);
       if (!row) return;
       const poster = rasterPoster(row, legacy) || videoPlaceholderSource(row);
@@ -265,8 +285,8 @@ function listingOwnerDisplayItems(listing) {
   return items;
 }
 function isGalleryFloor(row) {
-  const type = text$2(row.type).toLowerCase();
-  const category = text$2(row.category).toLowerCase();
+  const type = text$3(row.type).toLowerCase();
+  const category = text$3(row.category).toLowerCase();
   return type === "floorplan" || type === "floor-plan" || category === "floorplan" || category === "floor-plan";
 }
 function galleryOwnerDisplayItems(media) {
@@ -274,7 +294,7 @@ function galleryOwnerDisplayItems(media) {
   const seen = /* @__PURE__ */ new Set();
   const rows = media.map(rowOf).filter((row) => Boolean(row));
   for (const row of rows) {
-    const type = text$2(row.type).toLowerCase();
+    const type = text$3(row.type).toLowerCase();
     if (type === "video" || type === "reel" || type === "matterport" || type === "tour" || type === "file" || type === "pdf") continue;
     const source = rasterShareSource(row);
     if (!source) continue;
@@ -282,7 +302,7 @@ function galleryOwnerDisplayItems(media) {
     pushDisplay(items, seen, mediaName(row, floor ? "Floor plan" : "Photo"), source, floor ? "floorPlan" : "image");
   }
   for (const row of rows) {
-    const type = text$2(row.type).toLowerCase();
+    const type = text$3(row.type).toLowerCase();
     if (type !== "video" && type !== "reel") continue;
     const poster = rasterPoster(row) || videoPlaceholderSource(row);
     pushDisplay(items, seen, mediaName(row, "Video"), poster, "poster");
@@ -315,6 +335,89 @@ function listingBlock(listing, related) {
     };
   }
   return null;
+}
+const SECTION_ID = /^s[a-z0-9]{4,16}$/;
+const SECTION_LIMIT = 24;
+const PLACEMENT_LIMIT = 400;
+function sectionIdOk(value) {
+  return SECTION_ID.test(value);
+}
+function text$2(value, limit = 180) {
+  if (typeof value !== "string") return "";
+  return value.replace(/\u0000/g, "").trim().slice(0, limit);
+}
+function sectionName(value) {
+  return text$2(value, 60);
+}
+function readMediaArrangement(value) {
+  const row = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const sections = [];
+  const seenSections = /* @__PURE__ */ new Set();
+  if (Array.isArray(row.sections)) {
+    for (const item of row.sections) {
+      if (!item || typeof item !== "object") continue;
+      const section = item;
+      const id = text$2(section.id, 32);
+      const name = sectionName(section.name);
+      if (!sectionIdOk(id) || !name || seenSections.has(id)) continue;
+      seenSections.add(id);
+      sections.push({
+        id,
+        name,
+        order: typeof section.order === "number" && Number.isFinite(section.order) ? section.order : sections.length,
+        hideFromListingSites: section.hideFromListingSites === true
+      });
+      if (sections.length >= SECTION_LIMIT) break;
+    }
+  }
+  sections.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+  sections.forEach((section, order) => {
+    section.order = order;
+  });
+  const known = new Set(sections.map((section) => section.id));
+  const placements = [];
+  const seenIds = /* @__PURE__ */ new Set();
+  const counters = /* @__PURE__ */ new Map();
+  if (Array.isArray(row.placements)) {
+    const draft = [];
+    for (const item of row.placements) {
+      if (!item || typeof item !== "object") continue;
+      const placement = item;
+      const id = text$2(placement.id);
+      if (!id || seenIds.has(id)) continue;
+      seenIds.add(id);
+      const sectionId = text$2(placement.sectionId, 32);
+      draft.push({
+        id,
+        sectionId: known.has(sectionId) ? sectionId : "",
+        order: typeof placement.order === "number" && Number.isFinite(placement.order) ? placement.order : draft.length,
+        index: draft.length
+      });
+      if (draft.length >= PLACEMENT_LIMIT) break;
+    }
+    draft.sort((a, b) => a.order - b.order || a.index - b.index);
+    for (const placement of draft) {
+      const order = counters.get(placement.sectionId) || 0;
+      counters.set(placement.sectionId, order + 1);
+      placements.push({ id: placement.id, sectionId: placement.sectionId, order });
+    }
+  }
+  return { sections, placements };
+}
+function hiddenSectionIdSet(arrangement) {
+  return new Set(
+    readMediaArrangement(arrangement).sections.filter((section) => section.hideFromListingSites).map((section) => section.id)
+  );
+}
+function isHiddenFromListingSites(listing, row) {
+  const arrangement = readMediaArrangement(listing?.mediaArrangement);
+  const hidden = hiddenSectionIdSet(arrangement);
+  if (hidden.size === 0) return false;
+  const sectionId = text$2(row.sectionId, 32);
+  if (sectionId && hidden.has(sectionId)) return true;
+  const id = text$2(row.id) || text$2(row.path) || text$2(row.storagePath) || text$2(row.url);
+  if (!id) return false;
+  return arrangement.placements.some((placement) => placement.id === id && hidden.has(placement.sectionId));
 }
 const APPRENTICESHIP_RULES = [
   "Apprentices are learning.",
@@ -418,348 +521,6 @@ const BOOKING_PACKAGE_CATEGORY_ORDER = [
   "addon"
 ];
 new Set(BOOKING_PACKAGE_CATEGORY_ORDER);
-const PACKAGE_SKINS = [
-  skin({
-    look: "apprenticeship",
-    ids: ["apprentice-25", "apprentice-50"],
-    category: "listing",
-    skinLabel: "Apprenticeship",
-    title: "Apprenticeship",
-    accent: "",
-    badge: "Apprenticeship",
-    features: "25 photos · 20 min · the cheap one",
-    chips: [],
-    price: "$75",
-    priceNote: "",
-    priceDisplay: "$75",
-    tier: "entry",
-    rank: 1,
-    matchPriority: 20,
-    match: /apprentice/,
-    foot: "shoot",
-    amenities: false
-  }),
-  skin({
-    look: "just-photos",
-    ids: ["photos-20", "photos-35", "photos-50"],
-    category: "listing",
-    skinLabel: "Just Photos",
-    title: "Just Photos",
-    accent: "",
-    badge: "Just Photos",
-    features: "Photo package · next-day basics",
-    chips: [],
-    price: "Basics",
-    priceNote: "",
-    priceDisplay: "Basics",
-    tier: "entry",
-    rank: 2,
-    matchPriority: 10,
-    match: /\bjust\s+photos\b|\bphotos?\s+only\b|^photos\s+\d+\b|\b\d+\s+photos?\b/,
-    foot: "shoot",
-    amenities: false
-  }),
-  skin({
-    look: "essentials",
-    ids: ["listing-essentials"],
-    category: "listing",
-    skinLabel: "Essentials",
-    title: "The Essentials",
-    accent: "",
-    badge: "Essentials",
-    features: "30 images · Snap Reel · twilight render",
-    chips: [{ label: "Same-day" }, { label: "Reel" }],
-    price: "$249",
-    priceNote: "per listing",
-    priceDisplay: "$249",
-    tier: "mid",
-    rank: 3,
-    matchPriority: 30,
-    match: /essentials\b/,
-    foot: "shoot",
-    amenities: false
-  }),
-  skin({
-    look: "showcase",
-    ids: ["listing-showcase"],
-    category: "listing",
-    skinLabel: "Showcase",
-    title: "The Showcase",
-    accent: "",
-    badge: "The Showcase",
-    features: "50 images · 5 aerials · 3D reel · floorplan",
-    chips: [{ label: "Aerials" }, { label: "3D Reel" }],
-    price: "$549",
-    priceNote: "per listing",
-    priceDisplay: "$549",
-    tier: "mid",
-    rank: 4,
-    matchPriority: 40,
-    match: /showcase/,
-    foot: "shoot",
-    amenities: true
-  }),
-  skin({
-    look: "legacy",
-    ids: ["listing-legacy"],
-    category: "listing",
-    skinLabel: "Legacy",
-    title: "The Legacy",
-    accent: "Legacy",
-    badge: "Signature",
-    features: "Full aerials · 90s 4K cinema · agent on camera",
-    chips: [{ label: "4K Cinema" }, { label: "On Camera" }],
-    price: "$899",
-    priceNote: "per listing",
-    priceDisplay: "$899",
-    tier: "top",
-    rank: 5,
-    matchPriority: 50,
-    match: /\blegacy\b/,
-    foot: "shoot",
-    amenities: true
-  }),
-  skin({
-    look: "market-leader",
-    ids: ["listing-market-leader"],
-    category: "listing",
-    skinLabel: "Market Leader",
-    title: "Market Leader",
-    accent: "Leader",
-    badge: "VIP Priority",
-    features: "Full-cycle takeover · VR · post-sale pack",
-    chips: [
-      { label: "VR / Matterport" },
-      { label: "Post-Sale", tone: "gold" },
-      { label: "Iconic Polish", tone: "gold" }
-    ],
-    price: "$1,599",
-    priceNote: "per listing",
-    priceDisplay: "$1,599",
-    tier: "top",
-    rank: 6,
-    matchPriority: 160,
-    match: /market\s+leader/,
-    foot: "shoot",
-    amenities: true
-  }),
-  skin({
-    look: "refresh",
-    ids: ["branding-refresh"],
-    category: "human-brand",
-    skinLabel: "Refresh",
-    title: "The Refresh",
-    accent: "",
-    badge: "Portrait",
-    features: "60-min session · 10 lifestyle portraits · AI Twin Lite",
-    chips: [{ label: "Lifestyle" }, { label: "Locations" }],
-    price: "$349",
-    priceNote: "per session",
-    priceDisplay: "$349",
-    tier: "entry",
-    rank: 7,
-    matchPriority: 70,
-    match: /\brefresh\b/,
-    foot: "shoot",
-    amenities: false
-  }),
-  skin({
-    look: "content-partner",
-    ids: ["branding-content-partner"],
-    category: "human-brand",
-    skinLabel: "Content Partner",
-    title: "Content Partner",
-    accent: "",
-    badge: "Monthly",
-    features: "2-hr film day · 20 custom reels · strategy & scripts",
-    chips: [{ label: "20 Reels" }, { label: "Trending Audio" }, { label: "Direction" }],
-    price: "$999",
-    priceNote: "per month",
-    priceDisplay: "$999/mo",
-    tier: "mid",
-    rank: 8,
-    matchPriority: 80,
-    match: /content\s+partner/,
-    foot: "ongoing",
-    amenities: false
-  }),
-  skin({
-    look: "local-legend",
-    ids: ["branding-local-legend"],
-    category: "human-brand",
-    skinLabel: "Local Legend",
-    title: "The Local Legend",
-    accent: "Legend",
-    badge: "Market Takeover",
-    features: "6–8 hr production · 90s 4K bio film · 5 neighborhood spotlights",
-    chips: [{ label: "Day-in-the-Life" }, { label: "Authority Spots" }, { label: "Scripted" }],
-    price: "$2,499",
-    priceNote: "per campaign",
-    priceDisplay: "$2,499",
-    tier: "top",
-    rank: 9,
-    matchPriority: 150,
-    match: /local\s+legend/,
-    foot: "campaign",
-    amenities: false
-  }),
-  skin({
-    look: "baseline",
-    ids: ["business-baseline"],
-    category: "social",
-    skinLabel: "Baseline",
-    title: "The Baseline",
-    accent: "",
-    badge: "Baseline",
-    features: "8 professionally edited reels · 2× / week",
-    chips: [{ label: "Consistency" }],
-    price: "$500",
-    priceNote: "per month",
-    priceDisplay: "$500/mo",
-    tier: "entry",
-    rank: 10,
-    matchPriority: 60,
-    match: /\bbaseline\b/,
-    foot: "none",
-    amenities: false
-  }),
-  skin({
-    look: "growth-engine",
-    ids: ["business-growth-engine"],
-    category: "social",
-    skinLabel: "Growth Engine",
-    title: "Growth Engine",
-    accent: "",
-    badge: "Growth",
-    features: "12 reels · hook suite · conversion captions",
-    chips: [{ label: "12 Reels" }, { label: "Hooks" }],
-    price: "$850",
-    priceNote: "per month",
-    priceDisplay: "$850/mo",
-    tier: "mid",
-    rank: 11,
-    matchPriority: 90,
-    match: /growth\s+engine/,
-    foot: "none",
-    amenities: false
-  }),
-  skin({
-    look: "professional-suite",
-    ids: ["business-professional-suite"],
-    category: "social",
-    skinLabel: "Professional Suite",
-    title: "Professional Suite",
-    accent: "",
-    badge: "Pro Suite",
-    features: "12 reels · full scheduling · multi-platform",
-    chips: [{ label: "IG / FB / TikTok" }, { label: "Hands-off" }],
-    price: "$1,500",
-    priceNote: "per month",
-    priceDisplay: "$1,500/mo",
-    tier: "mid",
-    rank: 12,
-    matchPriority: 100,
-    match: /professional\s+suite|\bpro\s+suite\b/,
-    foot: "none",
-    amenities: false
-  }),
-  skin({
-    look: "connected-core",
-    ids: ["business-connected-core"],
-    category: "social",
-    skinLabel: "Connected Core",
-    title: "Connected Core",
-    accent: "",
-    badge: "Connected",
-    features: "12 reels + management · SOI email · newsletter",
-    chips: [{ label: "Social" }, { label: "Database" }],
-    price: "$2,000",
-    priceNote: "per month",
-    priceDisplay: "$2,000/mo",
-    tier: "mid",
-    rank: 13,
-    matchPriority: 110,
-    match: /connected\s+core/,
-    foot: "none",
-    amenities: false
-  }),
-  skin({
-    look: "signature-tier",
-    ids: ["business-signature-tier"],
-    category: "social",
-    skinLabel: "Signature Tier",
-    title: "Signature Tier",
-    accent: "",
-    badge: "Signature",
-    features: "20 reels · monthly field shoot · lead flagging",
-    chips: [{ label: "Daily M–F" }, { label: "Field Shoot" }],
-    price: "$2,800",
-    priceNote: "per month",
-    priceDisplay: "$2,800/mo",
-    tier: "mid",
-    rank: 14,
-    matchPriority: 120,
-    match: /signature\s+tier/,
-    foot: "none",
-    amenities: false
-  }),
-  skin({
-    look: "authority-stack",
-    ids: ["business-authority-stack"],
-    category: "social",
-    skinLabel: "Authority Stack",
-    title: "Authority Stack",
-    accent: "Stack",
-    badge: "Omni",
-    features: "20+ reels · pro film · SMS + email automation",
-    chips: [
-      { label: "20+ Reels", tone: "teal" },
-      { label: "SMS / Email" },
-      { label: "Omni" }
-    ],
-    price: "$3,200",
-    priceNote: "per month",
-    priceDisplay: "$3,200/mo",
-    tier: "top",
-    rank: 15,
-    matchPriority: 130,
-    match: /authority\s+stack/,
-    foot: "none",
-    amenities: false
-  }),
-  skin({
-    look: "iconic-partnership",
-    ids: ["business-iconic-partnership"],
-    category: "social",
-    skinLabel: "Iconic Partnership",
-    title: "Iconic Partnership",
-    accent: "Partnership",
-    badge: "Agency",
-    features: "Unlimited reels · 2 field shoots · CRM + polish",
-    chips: [{ label: "Unlimited" }, { label: "CRM" }, { label: "Polish" }],
-    price: "$4,500",
-    priceNote: "per month",
-    priceDisplay: "$4,500/mo",
-    tier: "top",
-    rank: 16,
-    matchPriority: 140,
-    match: /iconic\s+partnership/,
-    foot: "none",
-    amenities: false
-  })
-];
-new Map(PACKAGE_SKINS.map((item) => [item.look, item]));
-[...PACKAGE_SKINS].sort((a, b) => b.matchPriority - a.matchPriority);
-const ID_INDEX = /* @__PURE__ */ new Map();
-for (const item of PACKAGE_SKINS) {
-  for (const id of item.ids) ID_INDEX.set(normalizePackageText(id), item.look);
-}
-function skin(item) {
-  return item;
-}
-function normalizePackageText(raw) {
-  return raw.trim().toLowerCase().replace(/[—–]/g, " ").replace(/[_-]+/g, " ").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
-}
 const PHOTO_EDIT_REPLACEMENT_TYPES = ["image/jpeg", "image/png", "image/webp"];
 new Set(PHOTO_EDIT_REPLACEMENT_TYPES);
 const PORTAL_WEBSITE_DESIGNS = [
@@ -781,10 +542,29 @@ function hiddenPresentationKeys(listing) {
   for (const [id, prefs] of Object.entries(photos)) {
     if (prefs.hidden && id) keys.add(id);
   }
+  const arrangement = readMediaArrangement(listing?.mediaArrangement);
+  for (const section of arrangement.sections) {
+    if (section.hideFromListingSites) keys.add(`section:${section.id}`);
+  }
+  const buckets = [listing?.images, listing?.videos, listing?.floorplans, listing?.floorPlans, listing?.files, listing?.tours];
+  for (const bucket of buckets) {
+    if (!Array.isArray(bucket)) continue;
+    for (const item of bucket) {
+      if (!item || typeof item !== "object") continue;
+      const row = item;
+      if (!isHiddenFromListingSites(listing, row)) continue;
+      for (const key of [row.id, row.path, row.storagePath, row.url, row.shareUrl]) {
+        if (typeof key === "string" && key.trim()) keys.add(key.trim());
+      }
+    }
+  }
   return keys;
 }
 function rowHiddenFromPresentation(row, hiddenKeys) {
+  if (row.culled === true) return true;
   if (row.hiddenFromPresentation === true || row.portalHidden === true) return true;
+  const sectionId = text$1(row.sectionId);
+  if (sectionId && hiddenKeys.has(`section:${sectionId}`)) return true;
   const id = text$1(row.id);
   const path2 = text$1(row.path) || text$1(row.storagePath);
   const url = text$1(row.url) || text$1(row.shareUrl);
@@ -811,7 +591,7 @@ function readMediaStore(value) {
 function groupIdText(value) {
   if (typeof value !== "string") return "";
   const id = value.trim();
-  return /^g[a-z0-9]{4,16}$/.test(id) ? id : "";
+  return /^(?:g|s)[a-z0-9]{4,16}$/.test(id) ? id : "";
 }
 function readPhotoGroups(value) {
   if (!Array.isArray(value)) return [];
@@ -885,6 +665,17 @@ function parseContactLine(line) {
   };
 }
 parseContactLine(BUSINESS_CONTACT_LINE);
+const PLACES = [
+  { city: "The Woodlands", travelFee: "standard", zips: ["77380", "77381", "77382", "77384", "77385"] },
+  { city: "Spring", travelFee: "standard", zips: ["77373", "77379", "77386", "77388", "77389"] },
+  { city: "Conroe", travelFee: "standard", zips: ["77301", "77302", "77303", "77304", "77306"] },
+  { city: "Willis", travelFee: "tbd", zips: ["77318", "77378"] },
+  { city: "Cypress", travelFee: "tbd", zips: ["77410", "77429", "77433"] }
+];
+const ZIP_PLACES = /* @__PURE__ */ new Map();
+for (const place of PLACES) {
+  for (const zip of place.zips) ZIP_PLACES.set(zip, { city: place.city, travelFee: place.travelFee });
+}
 const DEFAULT_SITE_ORIGIN = "https://iconicimagestx.vercel.app";
 const PUBLIC_PAGES = [
   {

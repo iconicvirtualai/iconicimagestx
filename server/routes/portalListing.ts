@@ -344,7 +344,7 @@ export const handleRegisterPortalUpload: RequestHandler = async (req: Authentica
   }
 };
 
-/** Owner files a note on one photo already shown on this listing. */
+/** Owner files a note on one photo, video, tour, floor plan, or file already shown on this listing. */
 export const handleCreatePhotoEditRequest: RequestHandler = async (req: AuthenticatedRequest, res) => {
   if (!adminReady(res)) return;
   const listingId = listingIdFrom(req.params.id);
@@ -352,20 +352,28 @@ export const handleCreatePhotoEditRequest: RequestHandler = async (req: Authenti
   const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
   const photoId = text(body.photoId);
   const note = typeof body.note === "string" ? body.note : "";
-  if (!photoId) return res.status(400).json({ error: "Choose one photo." });
+  if (!photoId) return res.status(400).json({ error: "Choose a file." });
   try {
     const listing = await authorizedListing(req, listingId);
     const detail = buildPortalListingDetail(await loadSources(listingId, listing));
-    const photo = detail.photos.find((item) => item.id === photoId);
-    if (!photo) return res.status(400).json({ error: "That photo is not on this listing." });
+    const media = [
+      ...detail.photos,
+      ...detail.videos,
+      ...detail.floorplans,
+      ...detail.tours,
+      ...(detail.socialAssets || []),
+      ...(detail.clientFiles || []),
+    ];
+    const file = media.find((item) => item.id === photoId);
+    if (!file) return res.status(400).json({ error: "That file is not on this listing." });
     await filePhotoEditRequest({
       listingId,
       photoId,
-      photoName: photo.name,
-      photoUrl: photo.url,
+      photoName: file.name,
+      photoUrl: file.url,
       note,
       clientId: req.user!.uid,
-      knownPhotoIds: detail.photos.map((item) => item.id),
+      knownPhotoIds: media.map((item) => item.id),
       at: new Date().toISOString(),
     });
     const refreshed = await authorizedListing(req, listingId);
@@ -375,6 +383,17 @@ export const handleCreatePhotoEditRequest: RequestHandler = async (req: Authenti
   }
 };
 
+function storedTileLook(value: unknown): string {
+  if (!value || typeof value !== "object") return "";
+  const tile = (value as { tileLook?: unknown }).tileLook;
+  return typeof tile === "string" ? tile.trim() : "";
+}
+
+/**
+ * Owning client saves the listing-site style and the publish flag.
+ * `/l/:slug` reads `portalWebsite.published`. This write does not email or text.
+ * A client `tileLook` is ignored. Portal tiles stay on the shoot or package.
+ */
 export const handlePatchPortalWebsite: RequestHandler = async (req: AuthenticatedRequest, res) => {
   if (!adminReady(res)) return;
   const listingId = listingIdFrom(req.params.id);
@@ -383,9 +402,15 @@ export const handlePatchPortalWebsite: RequestHandler = async (req: Authenticate
     const listing = await authorizedListing(req, listingId);
     const current = sanitizeWebsiteSettings(listing.portalWebsite);
     const next = sanitizeWebsiteSettings(req.body, current);
-    const changed = JSON.stringify(next) !== JSON.stringify(current);
+    const leftoverTile = storedTileLook(listing.portalWebsite);
+    const changed = JSON.stringify(next) !== JSON.stringify(current) || leftoverTile !== "";
     if (changed) {
       const detail = buildPortalListingDetail({ listing });
+      const summary = next.published && !current.published
+        ? "Listing site published"
+        : !next.published && current.published
+          ? "Listing site unpublished"
+          : "Listing site style updated";
       await appendPortalWrite(listingId, {
         portalWebsite: next,
         listingSiteSlug: listingSiteSlug({ line1: detail.address.line1, city: detail.address.city }),
@@ -393,7 +418,7 @@ export const handlePatchPortalWebsite: RequestHandler = async (req: Authenticate
           id: `portal-website-${new Date().toISOString()}`,
           at: new Date().toISOString(),
           kind: "website",
-          summary: "Listing site style updated",
+          summary,
         },
       });
     }

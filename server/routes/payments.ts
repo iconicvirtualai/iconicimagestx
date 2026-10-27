@@ -19,6 +19,7 @@ import { bookingDateLabel } from "../../shared/clientHome";
 import { amountStillDue, invoiceAllowsDownload, squarePaymentNote } from "../../shared/paymentAccess";
 import { invoiceEmailNumber, invoicePageInvoiceNumber, receiptEmailNumber } from "../../shared/orderProjectInvoice";
 import { fetchPublishedSquareInvoiceUrl, resolveSquareCheckoutUrl, squareApiBaseUrl } from "../../shared/squareInvoice";
+import { squareBuyerPrefill } from "../../shared/clientHubSettings";
 import { clientInvoiceUrl } from "../../shared/invoicePayLink";
 import { publicClientUrl } from "../../shared/publicSiteUrl";
 import {
@@ -1007,9 +1008,7 @@ router.post("/invoice/:id/checkout", async (req: Request, res: Response) => {
               status: invoice.status,
             }, undefined, { paid: "1" }) || invoiceUrl,
           },
-          pre_populated_data: {
-            buyer_email: invoice.clientEmail || undefined,
-          },
+          pre_populated_data: squareBuyerPrefill(invoice),
           payment_note: squarePaymentNote(invoiceDoc.id, invoice.invoiceNumber),
         }),
       });
@@ -1188,9 +1187,7 @@ router.post("/invoice/:id/deposit-checkout", async (req: Request, res: Response)
                 : seniorLivingDepositReturnPath(orderNumber)
           }`,
         },
-        pre_populated_data: {
-          buyer_email: invoice.clientEmail || undefined,
-        },
+        pre_populated_data: squareBuyerPrefill(invoice),
         payment_note: squarePaymentNote(invoiceDoc.id, invoice.invoiceNumber),
       }),
     });

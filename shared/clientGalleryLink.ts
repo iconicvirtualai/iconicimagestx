@@ -5,6 +5,7 @@
  */
 
 import { addressText } from "./addressText.ts";
+import { deliveryFileName, keptShots } from "./gallerySequence.ts";
 import { frameFromListingImage } from "./iconicStudio";
 import { studioDownloadsUnlocked } from "./lockImpact.ts";
 import { ownerDisplayPath, signOwnerDisplayToken } from "./ownerDisplayGrant";
@@ -51,6 +52,8 @@ export interface StudioMedia {
   embedUrl?: string;
   poster?: string | null;
   thumbnailUrl?: string | null;
+  /** Filename the client's device should save. */
+  downloadName?: string;
   /** Public share display route. Same bytes as `url` for photos and floor plans. */
   displayUrl?: string;
   /** Share player hint. The UI sets controlsList=nodownload. */
@@ -214,12 +217,13 @@ function mediaName(row: Record<string, unknown>, fallback: string): string {
 function publicImages(listing: GalleryLinkDoc): StudioMedia[] {
   if (!Array.isArray(listing.images)) return [];
   const images: StudioMedia[] = [];
-  listing.images.forEach((item, index) => {
+  keptShots(listing.images as Array<Record<string, unknown>>).forEach((item, index) => {
     const frame = frameFromListingImage(item, index);
     const url = httpUrl(frame?.url);
     if (!frame || frame.raw || !url) return;
     if (isPrivateMedia(frame.path, frame.name, url)) return;
-    images.push({ url, name: frame.name });
+    const downloadName = deliveryFileName(item, index);
+    images.push({ url, name: downloadName, downloadName });
   });
   return images.slice(0, 200);
 }
@@ -227,14 +231,16 @@ function publicImages(listing: GalleryLinkDoc): StudioMedia[] {
 function publicVideos(listing: GalleryLinkDoc): StudioMedia[] {
   if (!Array.isArray(listing.videos)) return [];
   const videos: StudioMedia[] = [];
-  for (const item of listing.videos) {
+  keptShots(listing.videos as Array<Record<string, unknown>>).forEach((item, index) => {
     const row = rowOf(item);
-    if (!row) continue;
+    if (!row) return;
     const url = httpUrl(row.url);
-    const name = mediaName(row, "Video");
-    if (!url || isPrivateMedia(text(row.path) || text(row.storagePath), name, url)) continue;
-    videos.push({ url, name });
-  }
+    const original = mediaName(row, "Video");
+    const name = deliveryFileName(row, index);
+    const path = text(row.path) || text(row.storagePath);
+    if (!url || isPrivateMedia(path, original, url) || isPrivateMedia(path, name, url)) return;
+    videos.push({ url, name, downloadName: name });
+  });
   return videos.slice(0, 40);
 }
 
@@ -260,15 +266,16 @@ function publicFloorPlans(listing: GalleryLinkDoc): StudioMedia[] {
   const plans: StudioMedia[] = [];
   for (const group of groups) {
     if (!Array.isArray(group)) continue;
-    for (const item of group) {
+    keptShots(group as Array<Record<string, unknown>>).forEach((item, index) => {
       const row = rowOf(item);
-      if (!row) continue;
+      if (!row) return;
       const url = httpUrl(row.url) || httpUrl(row.shareUrl);
-      const name = mediaName(row, "Floor plan");
+      const original = mediaName(row, "Floor plan");
+      const name = deliveryFileName(row, index);
       const path = text(row.path) || text(row.storagePath);
-      if (!url || isPrivateMedia(path, name, url)) continue;
-      plans.push({ url, name });
-    }
+      if (!url || isPrivateMedia(path, original, url) || isPrivateMedia(path, name, url)) return;
+      plans.push({ url, name, downloadName: name });
+    });
   }
   return plans.slice(0, 40);
 }

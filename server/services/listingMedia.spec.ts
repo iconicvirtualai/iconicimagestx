@@ -15,6 +15,17 @@ describe("listing uploads meet the delivery gallery", () => {
     expect(fn).not.toContain("status:");
     expect(source).toContain("await syncListingGallery(listing, image)");
 
+    const sequence = source.slice(source.indexOf("export async function publishListingGallerySequence"));
+    expect(sequence).toContain("addressOverride");
+    expect(sequence).toContain("sequenceKeptShots");
+    expect(sequence).not.toMatch(/sendMail|sendSms|twilio|CLIENT_NOTIFY|BOOKING_NOTIFY/);
+
+    const arrangement = source.slice(source.indexOf("export async function saveListingMediaArrangement"));
+    expect(arrangement).toContain("stampListingArrangement");
+    expect(arrangement).toContain("stampGalleryMediaItems");
+    expect(arrangement).toContain("No client email was sent.");
+    expect(arrangement).not.toMatch(/sendMail|sendSms|twilio|CLIENT_NOTIFY|BOOKING_NOTIFY/);
+
     const deliver = readFileSync(new URL("./galleryDeliver.ts", import.meta.url), "utf8");
     expect(deliver).toContain("deliverGalleryToClient");
 
