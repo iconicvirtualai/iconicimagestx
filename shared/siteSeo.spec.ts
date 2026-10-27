@@ -159,7 +159,8 @@ describe("public page meta", () => {
     expect(metaPlan("/headshots-10")).toEqual({
       kind: "noindex",
       title: "$10 Tuesdays! Headshots for $10/Ea. | Iconic Images",
-      description: "$10 Tuesdays at Iconic Studios in Spring. Headshots for $10 each, 10am-2pm. Buy as many as you like.",
+      description: "$10 Tuesdays at Iconic Studios in The Woodlands. Headshots for $10 each, 10am-2pm. Buy as many as you like.",
+      openGraph: true,
     });
     expect(metaPlan("/pricing").kind).toBe("public");
   });

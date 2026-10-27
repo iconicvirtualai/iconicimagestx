@@ -1,19 +1,25 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { BUSINESS_CONTACT } from "./businessContact";
 import { processingFee } from "./invoiceProcessing";
 import {
   HEADSHOT_PAY_FAQ,
   HEADSHOTS_FACTS,
+  HEADSHOTS_FOOTER_ADDRESS,
   HEADSHOTS_H1,
   HEADSHOTS_HOLD_MINUTES,
+  HEADSHOTS_MAPS_QUERY,
   HEADSHOTS_ORDER_SOURCE,
   HEADSHOTS_SEO_DESCRIPTION,
+  HEADSHOTS_STUDIO_ADDRESS,
   HEADSHOTS_STUDIO_LINE,
   HEADSHOT_PHOTOS,
   headshotHeroGroup,
   headshotPhotoStrip,
+  headshotCalendarIcs,
   headshotClientMailEnabled,
   headshotConfirmationEmailHtml,
+  headshotPlaceJsonLd,
   headshotConversionValue,
   headshotHoldExpired,
   headshotHoldExpiresAt,
@@ -131,6 +137,34 @@ describe("Tuesday headshot slots", () => {
   });
 });
 
+describe("headshot location", () => {
+  it("says The Woodlands and keeps the street, suite, and ZIP", () => {
+    expect(HEADSHOTS_STUDIO_ADDRESS).toBe("26410 Oakridge Dr. Ste 105, The Woodlands, TX 77380");
+    expect(HEADSHOTS_FOOTER_ADDRESS).toBe("26410 Oakridge Dr. Ste 105 - 108, The Woodlands, TX 77380");
+    expect(HEADSHOTS_MAPS_QUERY).toBe("26410 Oakridge Dr Ste 105, The Woodlands, TX 77380");
+    expect(HEADSHOTS_SEO_DESCRIPTION).toContain("in The Woodlands");
+    expect(HEADSHOTS_FACTS).toContain("The Woodlands, TX");
+    expect(BUSINESS_CONTACT.city).toBe("Spring");
+    expect(BUSINESS_CONTACT.address).toContain("Spring, TX 77380");
+    const ics = headshotCalendarIcs({
+      start: "2026-10-27T15:00:00.000Z",
+      end: "2026-10-27T15:10:00.000Z",
+      orderNumber: "#044",
+      quantity: 1,
+    });
+    expect(ics).toContain("The Woodlands\\, TX 77380");
+    expect(ics).not.toMatch(/Spring/);
+    expect(headshotPlaceJsonLd().address).toMatchObject({
+      streetAddress: "26410 Oakridge Dr. Ste 105",
+      addressLocality: "The Woodlands",
+      addressRegion: "TX",
+      postalCode: "77380",
+    });
+    expect(pageSource).not.toMatch(/Spring/);
+    expect(pageSource).toContain("HEADSHOTS_FOOTER_ADDRESS");
+  });
+});
+
 describe("headshot photos", () => {
   const photos = [
     { src: "/media/headshots/one.jpg", alt: "Tuesday headshot one" },
@@ -228,6 +262,8 @@ describe("headshot booking conversion and mail", () => {
     expect(html).toContain("Due today: $10.28");
     expect(html).toContain("Balance on delivery: $20.00 + 2.8%");
     expect(html).toContain(HEADSHOTS_STUDIO_LINE);
+    expect(html).toContain("The Woodlands, TX 77380");
+    expect(html).not.toMatch(/Spring/);
     expect(html).toContain(HEADSHOTS_H1);
     expect(html).not.toMatch(/\[CONFIRM|\[parking/);
     expect(html).not.toMatch(/processing fee/i);
