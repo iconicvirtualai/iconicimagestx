@@ -100,6 +100,8 @@ const WEEKDAY: Record<string, number> = {
 
 export interface HeadshotPhoto {
   src: string;
+  /** Transparent cutout used in the hero. Circles keep the original frame. */
+  cutout?: string;
   alt: string;
   /** Portrait frames use a top crop so the face stays in the cover. */
   objectPosition?: "top" | "center";
@@ -108,31 +110,42 @@ export interface HeadshotPhoto {
 const HEADSHOT_ALT = "Studio headshot by Iconic Images";
 
 /**
- * Real Iconic studio finals. The page is light, so the hero is the
- * white-backdrop photo. The strip is the other five, alternating dark and light.
+ * The five studio finals Cadi picked. Strip order mixes backdrops.
+ * The hero is a staggered cutout of three of them (left, center, right).
  */
 export const HEADSHOT_PHOTOS: readonly HeadshotPhoto[] = [
-  { src: "/images/headshots-10/headshot-4.jpg", alt: HEADSHOT_ALT },
-  { src: "/images/headshots-10/headshot-3.jpg", alt: HEADSHOT_ALT, objectPosition: "top" },
-  { src: "/images/headshots-10/headshot-5.jpg", alt: HEADSHOT_ALT },
-  { src: "/images/headshots-10/headshot-2.jpg", alt: HEADSHOT_ALT, objectPosition: "top" },
-  { src: "/images/headshots-10/headshot-6.jpg", alt: HEADSHOT_ALT },
-  { src: "/images/headshots-10/headshot-1.jpg", alt: HEADSHOT_ALT },
+  { src: "/images/headshots-10/headshot-3.jpg", cutout: "/images/headshots-10/headshot-3.webp", alt: HEADSHOT_ALT, objectPosition: "top" },
+  { src: "/images/headshots-10/headshot-7.jpg", cutout: "/images/headshots-10/headshot-7.webp", alt: HEADSHOT_ALT, objectPosition: "top" },
+  { src: "/images/headshots-10/headshot-2.jpg", cutout: "/images/headshots-10/headshot-2.webp", alt: HEADSHOT_ALT, objectPosition: "top" },
+  { src: "/images/headshots-10/headshot-12.jpg", cutout: "/images/headshots-10/headshot-12.webp", alt: HEADSHOT_ALT, objectPosition: "top" },
+  { src: "/images/headshots-10/headshot-10.jpg", cutout: "/images/headshots-10/headshot-10.webp", alt: HEADSHOT_ALT, objectPosition: "top" },
+];
+
+const HEADSHOT_HERO_SRCS = [
+  "/images/headshots-10/headshot-10.jpg",
+  "/images/headshots-10/headshot-12.jpg",
+  "/images/headshots-10/headshot-7.jpg",
 ];
 
 export function visibleHeadshotPhotos(photos: readonly HeadshotPhoto[] = HEADSHOT_PHOTOS): HeadshotPhoto[] {
   return photos.filter((photo) => photo.src.trim().length > 0 && photo.alt.trim().length > 0);
 }
 
-export function headshotHeroPhoto(photos: readonly HeadshotPhoto[] = HEADSHOT_PHOTOS): HeadshotPhoto | null {
-  return visibleHeadshotPhotos(photos)[0] ?? null;
+/** Three cutouts for the staggered hero. Hidden until three photos exist. */
+export function headshotHeroGroup(photos: readonly HeadshotPhoto[] = HEADSHOT_PHOTOS): HeadshotPhoto[] {
+  const visible = visibleHeadshotPhotos(photos);
+  if (visible.length < 3) return [];
+  const bySrc = new Map(visible.map((photo) => [photo.src, photo]));
+  const picked = HEADSHOT_HERO_SRCS.map((src) => bySrc.get(src)).filter((photo): photo is HeadshotPhoto => Boolean(photo));
+  if (picked.length === 3) return picked;
+  return visible.slice(0, 3);
 }
 
-/** The samples after the hero. Hidden until three remain, and never more than five. */
+/** Circular samples. Hidden until three photos exist, and never more than five. */
 export function headshotPhotoStrip(photos: readonly HeadshotPhoto[] = HEADSHOT_PHOTOS): HeadshotPhoto[] {
-  const rest = visibleHeadshotPhotos(photos).slice(1, 6);
-  if (rest.length < 3) return [];
-  return rest;
+  const visible = visibleHeadshotPhotos(photos);
+  if (visible.length < 3) return [];
+  return visible.slice(0, 5);
 }
 
 export interface HeadshotQuote {

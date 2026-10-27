@@ -30,7 +30,7 @@ import {
   HEADSHOTS_STUDIO_LINE,
   HEADSHOTS_STUDIO_NAME,
   HEADSHOTS_WALKIN_PLACEHOLDER,
-  headshotHeroPhoto,
+  headshotHeroGroup,
   headshotPhotoStrip,
   headshotCalendarIcs,
   headshotConversionKey,
@@ -97,8 +97,14 @@ const WEAR = [
   "Arrive 5 minutes early.",
 ];
 
-const heroPhoto = headshotHeroPhoto();
+const heroGroup = headshotHeroGroup();
 const photoStrip = headshotPhotoStrip();
+
+const HERO_FIGURE = [
+  "left-0 z-10 h-auto w-[42%]",
+  "left-1/2 z-30 h-auto w-[48%] -translate-x-1/2",
+  "right-0 z-20 h-auto w-[42%]",
+] as const;
 
 function readJson<T>(key: string): T | null {
   if (typeof sessionStorage === "undefined") return null;
@@ -484,16 +490,31 @@ export default function Headshots10() {
             </div>
           </div>
           <div>
-            {heroPhoto ? (
-              <img
-                src={heroPhoto.src}
-                alt={heroPhoto.alt}
-                width={1600}
-                height={1280}
-                fetchPriority="high"
-                className="mb-4 aspect-[5/4] w-full object-cover object-center"
+            {heroGroup.length === 3 ? (
+              <div
+                className="relative mx-auto mb-4 h-[300px] w-full max-w-[420px] sm:mb-6 sm:h-[480px] sm:max-w-[520px] lg:h-[460px] lg:max-w-none"
                 data-testid="headshots-hero-photo"
-              />
+              >
+                <div className="pointer-events-none absolute left-[8%] top-[10%] h-40 w-40 rounded-full bg-[#00B4C8]/45 blur-3xl sm:h-56 sm:w-56" aria-hidden="true" />
+                <div className="pointer-events-none absolute right-[2%] top-[22%] h-44 w-44 rounded-full bg-[#E81060]/30 blur-3xl sm:h-60 sm:w-60" aria-hidden="true" />
+                <div className="pointer-events-none absolute bottom-[12%] left-[28%] h-24 w-40 rounded-full bg-[#00B4C8]/25 blur-2xl" aria-hidden="true" />
+                <div className="pointer-events-none absolute bottom-2 left-1/2 h-8 w-[72%] -translate-x-1/2 rounded-full bg-[#081228]/10 blur-md" aria-hidden="true" />
+                {heroGroup.map((photo, index) => (
+                  <img
+                    key={photo.cutout || photo.src}
+                    src={photo.cutout || photo.src}
+                    alt={photo.alt}
+                    width={900}
+                    height={1400}
+                    fetchPriority="high"
+                    className={`absolute bottom-0 object-contain object-bottom drop-shadow-[0_22px_18px_rgba(8,18,40,0.16)] ${HERO_FIGURE[index]}`}
+                    style={{
+                      WebkitMaskImage: "linear-gradient(to bottom, #000 84%, transparent 100%)",
+                      maskImage: "linear-gradient(to bottom, #000 84%, transparent 100%)",
+                    }}
+                  />
+                ))}
+              </div>
             ) : null}
             <aside className="border-t-4 border-[#00B4C8] bg-white/70 p-6">
               <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#081228]">At the studio</p>
@@ -513,20 +534,22 @@ export default function Headshots10() {
           ))}
         </ul>
         {photoStrip.length >= 3 ? (
-          <section className="mx-auto w-full max-w-6xl px-4 pb-10" data-testid="headshots-photo-strip" aria-label="Studio headshots">
+          <section className="mx-auto w-full max-w-6xl px-4 pb-12" data-testid="headshots-photo-strip" aria-label="Studio headshots">
             <h2 className="text-sm font-bold uppercase tracking-[0.16em]">Studio headshots</h2>
-            <ul className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
-              {photoStrip.map((photo) => (
-                <li key={photo.src}>
-                  <img
-                    src={photo.src}
-                    alt={photo.alt}
-                    width={1600}
-                    height={1600}
-                    loading="lazy"
-                    decoding="async"
-                    className={`aspect-square w-full object-cover ${photo.objectPosition === "top" ? "object-top" : "object-center"}`}
-                  />
+            <ul className="mt-4 flex items-center">
+              {photoStrip.map((photo, index) => (
+                <li key={photo.src} className={index === 0 ? "relative" : "relative -ml-4 sm:-ml-7"} style={{ zIndex: index + 1 }}>
+                  <div className="rounded-full bg-gradient-to-br from-[#00B4C8] via-[#F5F2EA] to-[#E81060] p-[3px] shadow-[0_14px_28px_rgba(8,18,40,0.16)]">
+                    <img
+                      src={photo.src}
+                      alt={photo.alt}
+                      width={400}
+                      height={400}
+                      loading="lazy"
+                      decoding="async"
+                      className={`h-[4.65rem] w-[4.65rem] rounded-full object-cover sm:h-[7.25rem] sm:w-[7.25rem] ${photo.objectPosition === "top" ? "object-top" : "object-center"}`}
+                    />
+                  </div>
                 </li>
               ))}
             </ul>

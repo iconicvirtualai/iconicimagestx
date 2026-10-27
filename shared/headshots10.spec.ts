@@ -10,7 +10,8 @@ import {
   HEADSHOTS_PARKING_PLACEHOLDER,
   HEADSHOTS_SEO_DESCRIPTION,
   HEADSHOTS_STUDIO_LINE,
-  headshotHeroPhoto,
+  HEADSHOT_PHOTOS,
+  headshotHeroGroup,
   headshotPhotoStrip,
   headshotClientMailEnabled,
   headshotConfirmationEmailHtml,
@@ -141,40 +142,51 @@ describe("headshot photos", () => {
     { src: "/media/headshots/six.jpg", alt: "Tuesday headshot six" },
   ];
 
-  it("hides the hero and the strip when no photos are passed", () => {
-    expect(headshotHeroPhoto([])).toBeNull();
+  it("hides the hero and the strip until three photos are available", () => {
+    expect(headshotHeroGroup([])).toEqual([]);
     expect(headshotPhotoStrip([])).toEqual([]);
+    expect(headshotHeroGroup(photos.slice(0, 2))).toEqual([]);
+    expect(headshotPhotoStrip(photos.slice(0, 2))).toEqual([]);
   });
 
-  it("keeps the hero out of a three-to-five sample strip", () => {
-    expect(headshotHeroPhoto(photos.slice(0, 2))?.src).toBe("/media/headshots/one.jpg");
-    expect(headshotPhotoStrip(photos.slice(0, 2))).toEqual([]);
+  it("builds a three-person hero and a strip of up to five", () => {
+    expect(headshotHeroGroup(photos).map((photo) => photo.src)).toEqual([
+      "/media/headshots/one.jpg",
+      "/media/headshots/two.jpg",
+      "/media/headshots/three.jpg",
+    ]);
     const strip = headshotPhotoStrip(photos);
     expect(strip.map((photo) => photo.src)).toEqual([
+      "/media/headshots/one.jpg",
       "/media/headshots/two.jpg",
       "/media/headshots/three.jpg",
       "/media/headshots/four.jpg",
       "/media/headshots/five.jpg",
-      "/media/headshots/six.jpg",
     ]);
     expect(strip.some((photo) => photo.alt === "Missing file")).toBe(false);
   });
 
-  it("uses the light-backdrop headshot as the hero and mixes the other five", () => {
-    expect(headshotHeroPhoto()?.src).toBe("/images/headshots-10/headshot-4.jpg");
-    expect(headshotPhotoStrip().map((photo) => photo.src)).toEqual([
+  it("uses the five approved studio headshots and cutouts", () => {
+    expect(HEADSHOT_PHOTOS.map((photo) => photo.src)).toEqual([
       "/images/headshots-10/headshot-3.jpg",
-      "/images/headshots-10/headshot-5.jpg",
+      "/images/headshots-10/headshot-7.jpg",
       "/images/headshots-10/headshot-2.jpg",
-      "/images/headshots-10/headshot-6.jpg",
-      "/images/headshots-10/headshot-1.jpg",
+      "/images/headshots-10/headshot-12.jpg",
+      "/images/headshots-10/headshot-10.jpg",
     ]);
-    expect(headshotHeroPhoto()?.alt).toBe("Studio headshot by Iconic Images");
-    expect(headshotPhotoStrip().every((photo) => photo.alt === "Studio headshot by Iconic Images")).toBe(true);
-    expect(headshotPhotoStrip().filter((photo) => photo.objectPosition === "top").map((photo) => photo.src)).toEqual([
-      "/images/headshots-10/headshot-3.jpg",
-      "/images/headshots-10/headshot-2.jpg",
+    expect(headshotHeroGroup().map((photo) => photo.cutout)).toEqual([
+      "/images/headshots-10/headshot-10.webp",
+      "/images/headshots-10/headshot-12.webp",
+      "/images/headshots-10/headshot-7.webp",
     ]);
+    expect(headshotPhotoStrip()).toHaveLength(5);
+    expect(HEADSHOT_PHOTOS.every((photo) => photo.alt === "Studio headshot by Iconic Images")).toBe(true);
+    expect(HEADSHOT_PHOTOS.every((photo) => photo.objectPosition === "top")).toBe(true);
+    expect(HEADSHOT_PHOTOS.map((photo) => photo.src).join(" ")).not.toMatch(/headshot-[1456]\.jpg/);
+    expect(pageSource).toContain('data-testid="headshots-hero-photo"');
+    expect(pageSource).toContain("rounded-full");
+    expect(pageSource).not.toContain("aspect-[5/4]");
+    expect(pageSource).not.toMatch(/headshot-[1456]\.jpg/);
   });
 });
 
