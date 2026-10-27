@@ -36,6 +36,8 @@ import {
   type OrderEditPlan,
 } from "../../shared/orderEditPlan";
 import { jsonSafe } from "../lib/firestoreJson";
+import { recordAddressText } from "../../shared/addressText";
+import { sequenceKeptShots, shotKey, type SequenceShot } from "../../shared/gallerySequence";
 import { firebaseDownloadUrl, registerListingPhoto, saveListingBytes } from "./listingMedia";
 import {
   INSPECTION_FAILED_NOTE,
@@ -706,6 +708,8 @@ async function addFinalToGalleries(listingId: string, listing: FirebaseFirestore
   path: string;
   contentType?: string;
   uploadedBy: string;
+  deliveryName?: string;
+  sortOrder?: number;
 }) {
   const ids = new Set<string>();
   if (typeof listing.galleryId === "string" && listing.galleryId) ids.add(listing.galleryId);
@@ -724,12 +728,14 @@ async function addFinalToGalleries(listingId: string, listing: FirebaseFirestore
       updated.push(galleryId);
       continue;
     }
-    const mediaItem = {
+    const fileName = image.deliveryName || image.name;
+    const mediaItem: Record<string, unknown> = {
       id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       url: image.url,
       shareUrl: image.url,
-      fileName: image.name,
-      title: image.name,
+      fileName,
+      title: fileName,
+      name: fileName,
       type: "photo",
       storagePath: image.path,
       downloadable: true,
@@ -738,6 +744,7 @@ async function addFinalToGalleries(listingId: string, listing: FirebaseFirestore
       uploadedBy: image.uploadedBy,
       uploadedAt: new Date().toISOString(),
     };
+    if (Number.isFinite(image.sortOrder)) mediaItem.sortOrder = image.sortOrder;
     await ref.update({
       mediaItems: [...items, mediaItem],
       status: galleryStatusAfterStudioAdd(typeof data.status === "string" ? data.status : undefined),
@@ -756,7 +763,17 @@ export async function approveStudioFinal(input: {
   jobId?: string;
 }) {
   const listing = await loadListing(input.listingId);
-  const name = safeStorageFileName(input.fileName || input.sourcePath.split("/").pop() || "final.jpg");
+  const listingImages = (Array.isArray(listing.data.images) ? listing.data.images : []) as SequenceShot[];
+  const source = listingImages.find((image) => image.path === input.sourcePath);
+  if (source?.culled === true) {
+    throw httpError(400, "That shot was culled. It stays off the gallery.");
+  }
+  const address = recordAddressText(listing.data);
+  const sequenced = address
+    ? sequenceKeptShots(listingImages, address).find((row) => shotKey(row.shot) === shotKey(source || { path: input.sourcePath }))
+    : undefined;
+  const preferred = sequenced?.deliveryName || (typeof source?.deliveryName === "string" ? source.deliveryName : "");
+  const name = safeStorageFileName(preferred || input.fileName || input.sourcePath.split("/").pop() || "final.jpg");
   const copied = await copyToFinals(input.listingId, input.sourcePath, name);
   const registered = await registerListingPhoto({
     listingId: input.listingId,
@@ -773,6 +790,8 @@ export async function approveStudioFinal(input: {
     path: copied.storagePath,
     contentType: copied.contentType,
     uploadedBy: input.uploadedBy,
+    deliveryName: preferred || name,
+    sortOrder: sequenced?.sortOrder ?? (typeof source?.sortOrder === "number" ? source.sortOrder : undefined),
   });
   if (input.jobId) {
     await db().collection("editJobs").doc(input.jobId).set({

@@ -105,7 +105,7 @@ describe("client gallery media render paths", () => {
     expect(html).toContain("MLS photo");
     expect(tag(html, "img")).toContain("https://cdn.example/01-mls.jpg");
     expect(tag(html, "img")).toContain("object-contain");
-    expect(html).toContain('download=""');
+    expect(html).toContain('download="01-mls.jpg"');
     expect(html).not.toContain("<video");
     expect(html).not.toContain("<iframe");
   });
@@ -338,7 +338,7 @@ describe("client gallery media render paths", () => {
     });
     expect(zip).toContain("documents.zip");
     expect(zip).toContain("ZIP · 2.3 MB");
-    expect(zip).toContain('download=""');
+    expect(zip).toContain('download="documents.zip"');
     expect(zip).not.toContain("<iframe");
     expect(zip).not.toContain("Open file");
   });

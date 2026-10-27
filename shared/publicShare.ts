@@ -8,6 +8,7 @@
  */
 
 import type { StudioMedia } from "./clientGalleryLink.ts";
+import { keptShots } from "./gallerySequence.ts";
 
 export interface ShareListing {
   id: string;
@@ -203,10 +204,11 @@ export function shareDisplayItems(listing: ShareListing, options: ShareDisplayOp
   const seen = new Set<string>();
 
   if (Array.isArray(listing.images)) {
-    listing.images.forEach((item, index) => {
+    keptShots(listing.images as Array<Record<string, unknown>>).forEach((item, index) => {
       const row = rowOf(item);
       if (!row) return;
-      pushDisplay(items, seen, mediaName(row, `Photo ${index + 1}`), rasterShareSource(row, legacy), "image");
+      const deliveryName = typeof row.deliveryName === "string" ? row.deliveryName.trim() : "";
+      pushDisplay(items, seen, deliveryName || mediaName(row, `Photo ${index + 1}`), rasterShareSource(row, legacy), "image");
     });
   }
   for (const group of [listing.floorplans, listing.floorPlans]) {

@@ -1520,12 +1520,14 @@ function publicFileSize(value) {
 function publicMediaItem(item, canDownload) {
   const type = publicText(item.type) || "photo";
   const title = publicText(item.title) || publicText(item.fileName) || "Media";
-  const fileName2 = publicText(item.fileName) || title;
+  const fileName2 = publicText(item.deliveryName) || publicText(item.fileName) || title;
+  const sortOrder = typeof item.sortOrder === "number" && Number.isFinite(item.sortOrder) ? item.sortOrder : void 0;
   const base = {
     id: publicText(item.id) || void 0,
     fileName: fileName2,
-    title,
-    name: publicText(item.name) || fileName2,
+    title: publicText(item.deliveryName) || title,
+    name: publicText(item.deliveryName) || publicText(item.name) || fileName2,
+    ...sortOrder == null ? {} : { sortOrder },
     type,
     category: publicText(item.category),
     contentType: publicText(item.contentType),
@@ -10897,6 +10899,99 @@ async function save(req, res, by) {
   if (!saved) return res.status(404).json({ error: "Order not found." });
   return res.json({ approval: saved });
 }
+function addressSlug(address) {
+  const street = address.split(",")[0] || address;
+  const slug = street.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48);
+  return slug || "listing";
+}
+function fileExtension(name) {
+  const match = name.toLowerCase().match(/\.([a-z0-9]{1,8})$/);
+  const ext = match?.[1] || "jpg";
+  if (ext === "jpeg") return "jpg";
+  if (ext === "tiff") return "tif";
+  if (["jpg", "png", "webp", "gif", "tif"].includes(ext)) return ext;
+  return "jpg";
+}
+function sequenceFileName(index, addressOrSlug, originalName) {
+  const n = Math.max(1, Math.floor(Number.isFinite(index) ? index : 1));
+  const padded = String(n).padStart(3, "0");
+  return `${padded}_${addressSlug(addressOrSlug)}.${fileExtension(originalName)}`;
+}
+function shotKey(shot, index = 0) {
+  for (const value of [shot.id, shot.path, shot.url, shot.fileName, shot.name]) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return `idx-${index}`;
+}
+function shotName(shot, index = 0) {
+  for (const value of [shot.name, shot.fileName, shot.title]) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  const path2 = typeof shot.path === "string" ? shot.path.split("/").pop() : "";
+  return path2 || `photo-${index + 1}.jpg`;
+}
+function finiteOrder(value) {
+  const n = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+function isCulledShot(shot) {
+  return shot.culled === true;
+}
+function keptShots(items) {
+  const rows = items.map((item, index) => ({ item, index })).filter(({ item }) => !isCulledShot(item));
+  const any = rows.some(({ item }) => finiteOrder(item.sortOrder) != null);
+  if (!any) return rows.map(({ item }) => item);
+  return rows.sort((a, b) => {
+    const ao = finiteOrder(a.item.sortOrder);
+    const bo = finiteOrder(b.item.sortOrder);
+    const aKey = ao == null ? Number.MAX_SAFE_INTEGER : ao;
+    const bKey = bo == null ? Number.MAX_SAFE_INTEGER : bo;
+    return aKey - bKey || a.index - b.index;
+  }).map(({ item }) => item);
+}
+function sequenceKeptShots(items, address) {
+  return keptShots(items).map((shot, index) => ({
+    shot,
+    sortOrder: index + 1,
+    deliveryName: sequenceFileName(index + 1, address, shotName(shot, index))
+  }));
+}
+function deliveryFileName(shot, index = 0) {
+  if (typeof shot.deliveryName === "string" && shot.deliveryName.trim()) return shot.deliveryName.trim();
+  return shotName(shot, index);
+}
+function applyPhotoOrder(images, order) {
+  const byKey = /* @__PURE__ */ new Map();
+  images.forEach((image, index) => {
+    byKey.set(shotKey(image, index), { image, index });
+  });
+  const used = /* @__PURE__ */ new Set();
+  const next = [];
+  for (const entry2 of order) {
+    const found = byKey.get(entry2.key);
+    if (!found || used.has(entry2.key)) continue;
+    used.add(entry2.key);
+    next.push({ ...found.image, culled: entry2.culled === true });
+  }
+  images.forEach((image, index) => {
+    const key = shotKey(image, index);
+    if (used.has(key)) return;
+    next.push(image);
+  });
+  let kept = 0;
+  return next.map((image) => {
+    if (image.culled === true) {
+      const rest = { ...image };
+      delete rest.deliveryName;
+      return { ...rest, culled: true };
+    }
+    kept += 1;
+    return { ...image, culled: false, sortOrder: kept };
+  });
+}
+function orderedGalleryMedia(items) {
+  return keptShots(items);
+}
 const OWNER_DISPLAY_TTL_MS = 4 * 60 * 60 * 1e3;
 const DEV_SECRET = "iconic-owner-display-dev-v1";
 const ID_PATTERN$2 = /^[A-Za-z0-9_-]{8,128}$/;
@@ -11060,10 +11155,11 @@ function shareDisplayItems(listing, options = {}) {
   const items = [];
   const seen = /* @__PURE__ */ new Set();
   if (Array.isArray(listing.images)) {
-    listing.images.forEach((item, index) => {
+    keptShots(listing.images).forEach((item, index) => {
       const row = rowOf$2(item);
       if (!row) return;
-      pushDisplay(items, seen, mediaName$1(row, `Photo ${index + 1}`), rasterShareSource(row, legacy), "image");
+      const deliveryName = typeof row.deliveryName === "string" ? row.deliveryName.trim() : "";
+      pushDisplay(items, seen, deliveryName || mediaName$1(row, `Photo ${index + 1}`), rasterShareSource(row, legacy), "image");
     });
   }
   for (const group of [listing.floorplans, listing.floorPlans]) {
@@ -11238,6 +11334,96 @@ function lockedClientGalleryMedia(galleryId, items, canDownload) {
     if (!image) return base;
     return { ...base, url: image };
   });
+}
+function crc32(data) {
+  let crc = 4294967295;
+  for (let i = 0; i < data.length; i += 1) {
+    crc ^= data[i];
+    for (let bit = 0; bit < 8; bit += 1) {
+      const mask = -(crc & 1);
+      crc = crc >>> 1 ^ 3988292384 & mask;
+    }
+  }
+  return (crc ^ 4294967295) >>> 0;
+}
+function dosStamp(date) {
+  const time = date.getHours() << 11 | date.getMinutes() << 5 | Math.floor(date.getSeconds() / 2);
+  const day = date.getFullYear() - 1980 << 9 | date.getMonth() + 1 << 5 | date.getDate();
+  return { time, day };
+}
+function zipName(name) {
+  const base = (name.split(/[/\\]/).pop() || "edit.jpg").replace(/[^\w.\- ]+/g, "").trim().slice(0, 80);
+  return base || "edit.jpg";
+}
+function uniqueName(name, used) {
+  const clean2 = zipName(name);
+  if (!used.has(clean2)) {
+    used.add(clean2);
+    return clean2;
+  }
+  const dot = clean2.lastIndexOf(".");
+  const stem = dot > 0 ? clean2.slice(0, dot) : clean2;
+  const ext = dot > 0 ? clean2.slice(dot) : "";
+  let index = 2;
+  while (used.has(`${stem}-${index}${ext}`)) index += 1;
+  const next = `${stem}-${index}${ext}`;
+  used.add(next);
+  return next;
+}
+function zipStored(entries, now = /* @__PURE__ */ new Date()) {
+  const { time, day } = dosStamp(now);
+  const used = /* @__PURE__ */ new Set();
+  const locals = [];
+  const centrals = [];
+  let offset = 0;
+  for (const entry2 of entries) {
+    const name = uniqueName(entry2.name, used);
+    const nameBytes = new TextEncoder().encode(name);
+    const crc = crc32(entry2.data);
+    const local = new Uint8Array(30 + nameBytes.length);
+    const view = new DataView(local.buffer);
+    view.setUint32(0, 67324752, true);
+    view.setUint16(4, 20, true);
+    view.setUint16(8, 0, true);
+    view.setUint16(10, time, true);
+    view.setUint16(12, day, true);
+    view.setUint32(14, crc, true);
+    view.setUint32(18, entry2.data.length, true);
+    view.setUint32(22, entry2.data.length, true);
+    view.setUint16(26, nameBytes.length, true);
+    local.set(nameBytes, 30);
+    const central = new Uint8Array(46 + nameBytes.length);
+    const centralView = new DataView(central.buffer);
+    centralView.setUint32(0, 33639248, true);
+    centralView.setUint16(4, 20, true);
+    centralView.setUint16(6, 20, true);
+    centralView.setUint16(12, time, true);
+    centralView.setUint16(14, day, true);
+    centralView.setUint32(16, crc, true);
+    centralView.setUint32(20, entry2.data.length, true);
+    centralView.setUint32(24, entry2.data.length, true);
+    centralView.setUint16(28, nameBytes.length, true);
+    centralView.setUint32(42, offset, true);
+    central.set(nameBytes, 46);
+    locals.push(local, entry2.data);
+    centrals.push(central);
+    offset += local.length + entry2.data.length;
+  }
+  const centralSize = centrals.reduce((sum, part) => sum + part.length, 0);
+  const end = new Uint8Array(22);
+  const endView = new DataView(end.buffer);
+  endView.setUint32(0, 101010256, true);
+  endView.setUint16(8, entries.length, true);
+  endView.setUint16(10, entries.length, true);
+  endView.setUint32(12, centralSize, true);
+  endView.setUint32(16, offset, true);
+  const out = new Uint8Array(offset + centralSize + end.length);
+  let cursor = 0;
+  for (const part of [...locals, ...centrals, end]) {
+    out.set(part, cursor);
+    cursor += part.length;
+  }
+  return out;
 }
 async function readInvoiceDoc(get, startId) {
   const seen = /* @__PURE__ */ new Set();
@@ -11513,12 +11699,13 @@ function mediaName(row, fallback) {
 function publicImages(listing) {
   if (!Array.isArray(listing.images)) return [];
   const images = [];
-  listing.images.forEach((item, index) => {
+  keptShots(listing.images).forEach((item, index) => {
     const frame = frameFromListingImage(item, index);
     const url = httpUrl(frame?.url);
     if (!frame || frame.raw || !url) return;
     if (isPrivateMedia(frame.path, frame.name, url)) return;
-    images.push({ url, name: frame.name });
+    const downloadName = deliveryFileName(item, index);
+    images.push({ url, name: downloadName, downloadName });
   });
   return images.slice(0, 200);
 }
@@ -12723,17 +12910,24 @@ async function registerListingPhoto(options) {
     }
     url = firebaseDownloadUrl(bucket$2().name, storagePath, token);
   }
+  const listing = listingSnap.data() || {};
+  const images = Array.isArray(listing.images) ? listing.images : [];
+  const maxOrder = images.reduce((max, item) => {
+    const value = Number(item?.sortOrder);
+    return Number.isFinite(value) ? Math.max(max, value) : max;
+  }, 0);
   const image = {
+    id: storagePath,
     url,
     name: safeStorageFileName(fileName2),
     path: storagePath,
     contentType: contentTypeForUpload(fileName2, options.contentType),
     uploadedAt: (/* @__PURE__ */ new Date()).toISOString(),
     uploadedBy,
+    sortOrder: maxOrder + 1,
+    culled: false,
     ...studioImageExtra(options.extra)
   };
-  const listing = listingSnap.data() || {};
-  const images = Array.isArray(listing.images) ? listing.images : [];
   const already = images.find((item) => item?.path === storagePath);
   if (!already) {
     await listingRef.update({
@@ -12755,18 +12949,22 @@ function studioImageExtra(extra) {
   return out;
 }
 function galleryMediaItem(image) {
-  return {
+  const fileName2 = image.deliveryName || image.name;
+  const item = {
     id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     url: image.url,
     shareUrl: image.url,
-    fileName: image.name,
-    title: image.name,
+    fileName: fileName2,
+    title: fileName2,
+    name: fileName2,
     type: image.contentType?.startsWith("video/") ? "video" : "photo",
     storagePath: image.path,
     downloadable: true,
     uploadedBy: image.uploadedBy,
     uploadedAt: image.uploadedAt
   };
+  if (Number.isFinite(image.sortOrder)) item.sortOrder = image.sortOrder;
+  return item;
 }
 async function syncListingGallery(listing, image) {
   const galleryId = typeof listing.galleryId === "string" ? listing.galleryId.trim() : "";
@@ -12806,6 +13004,99 @@ async function syncPlaytestGallery(listingId, listing, image) {
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
   }
+}
+async function saveListingPhotoOrder(listingId, order) {
+  const ref = db$p().collection("listings").doc(listingId);
+  const snap = await ref.get();
+  if (!snap.exists) throw Object.assign(new Error("Listing not found."), { status: 404 });
+  const images = Array.isArray(snap.data()?.images) ? snap.data().images : [];
+  const next = applyPhotoOrder(images, order);
+  await ref.update({
+    images: next,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  return { images: next };
+}
+async function linkedGalleryIds(listingId, listing) {
+  const ids = /* @__PURE__ */ new Set();
+  if (typeof listing.galleryId === "string" && listing.galleryId.trim()) ids.add(listing.galleryId.trim());
+  if (typeof listing.playtestGalleryId === "string" && listing.playtestGalleryId.trim()) ids.add(listing.playtestGalleryId.trim());
+  const snap = await db$p().collection("galleries").where("listingId", "==", listingId).limit(10).get();
+  snap.docs.forEach((doc) => ids.add(doc.id));
+  return [...ids];
+}
+async function publishListingGallerySequence(listingId, uploadedBy, addressOverride = "") {
+  const ref = db$p().collection("listings").doc(listingId);
+  const snap = await ref.get();
+  if (!snap.exists) throw Object.assign(new Error("Listing not found."), { status: 404 });
+  const listing = snap.data() || {};
+  const images = Array.isArray(listing.images) ? listing.images : [];
+  const address = addressOverride.trim().slice(0, 180) || recordAddressText(listing) || "listing";
+  const sequenced = sequenceKeptShots(images, address);
+  const byKey = new Map(sequenced.map((row) => [shotKey(row.shot), row]));
+  const nextImages = images.map((image, index) => {
+    const row = byKey.get(shotKey(image, index));
+    if (!row) {
+      const rest = { ...image };
+      delete rest.deliveryName;
+      return { ...rest, culled: true };
+    }
+    return {
+      ...image,
+      culled: false,
+      sortOrder: row.sortOrder,
+      deliveryName: row.deliveryName
+    };
+  });
+  await ref.update({
+    images: nextImages,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  const culledPaths = new Set(
+    nextImages.filter((image) => image.culled === true && typeof image.path === "string").map((image) => String(image.path))
+  );
+  const galleryIds = await linkedGalleryIds(listingId, listing);
+  for (const galleryId of galleryIds) {
+    const galleryRef = db$p().collection("galleries").doc(galleryId);
+    const gallerySnap = await galleryRef.get();
+    if (!gallerySnap.exists) continue;
+    const data = gallerySnap.data() || {};
+    const current = Array.isArray(data.mediaItems) ? data.mediaItems : [];
+    const sequencedPaths = new Set(
+      sequenced.map((row) => typeof row.shot.path === "string" ? row.shot.path : "").filter(Boolean)
+    );
+    const kept = current.filter((item) => {
+      const path2 = typeof item?.storagePath === "string" ? item.storagePath : "";
+      if (!path2) return true;
+      if (sequencedPaths.has(path2) || culledPaths.has(path2)) return false;
+      return true;
+    });
+    const additions = sequenced.filter((row) => typeof row.shot.path === "string" && typeof row.shot.url === "string").map((row) => {
+      const shot = row.shot;
+      return galleryMediaItem({
+        url: String(shot.url),
+        name: typeof shot.name === "string" ? shot.name : row.deliveryName,
+        path: String(shot.path),
+        contentType: typeof shot.contentType === "string" ? shot.contentType : "image/jpeg",
+        uploadedAt: typeof shot.uploadedAt === "string" ? shot.uploadedAt : (/* @__PURE__ */ new Date()).toISOString(),
+        uploadedBy: typeof shot.uploadedBy === "string" ? shot.uploadedBy : uploadedBy,
+        deliveryName: row.deliveryName,
+        sortOrder: row.sortOrder
+      });
+    });
+    await galleryRef.update({
+      mediaItems: [...kept, ...additions],
+      status: galleryStatusAfterStudioAdd(typeof data.status === "string" ? data.status : void 0),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+  }
+  const names = sequenced.map((row) => row.deliveryName);
+  return {
+    names,
+    galleries: galleryIds,
+    addressSlug: addressSlug(address),
+    note: galleryIds.length ? "Gallery files follow the photographer order. Culled shots were left out. No client email was sent." : "Order saved on the listing. No gallery is linked yet, and no client email was sent."
+  };
 }
 function serializeDoc(id, data) {
   return jsonSafe({ id, ...data });
@@ -13666,12 +13957,14 @@ async function addFinalToGalleries(listingId, listing, image) {
       updated.push(galleryId);
       continue;
     }
+    const fileName2 = image.deliveryName || image.name;
     const mediaItem = {
       id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       url: image.url,
       shareUrl: image.url,
-      fileName: image.name,
-      title: image.name,
+      fileName: fileName2,
+      title: fileName2,
+      name: fileName2,
       type: "photo",
       storagePath: image.path,
       downloadable: true,
@@ -13680,6 +13973,7 @@ async function addFinalToGalleries(listingId, listing, image) {
       uploadedBy: image.uploadedBy,
       uploadedAt: (/* @__PURE__ */ new Date()).toISOString()
     };
+    if (Number.isFinite(image.sortOrder)) mediaItem.sortOrder = image.sortOrder;
     await ref.update({
       mediaItems: [...items, mediaItem],
       status: galleryStatusAfterStudioAdd(typeof data.status === "string" ? data.status : void 0),
@@ -13691,7 +13985,15 @@ async function addFinalToGalleries(listingId, listing, image) {
 }
 async function approveStudioFinal(input) {
   const listing = await loadListing$1(input.listingId);
-  const name = safeStorageFileName(input.fileName || input.sourcePath.split("/").pop() || "final.jpg");
+  const listingImages = Array.isArray(listing.data.images) ? listing.data.images : [];
+  const source = listingImages.find((image) => image.path === input.sourcePath);
+  if (source?.culled === true) {
+    throw httpError$3(400, "That shot was culled. It stays off the gallery.");
+  }
+  const address = recordAddressText(listing.data);
+  const sequenced = address ? sequenceKeptShots(listingImages, address).find((row) => shotKey(row.shot) === shotKey(source || { path: input.sourcePath })) : void 0;
+  const preferred = sequenced?.deliveryName || (typeof source?.deliveryName === "string" ? source.deliveryName : "");
+  const name = safeStorageFileName(preferred || input.fileName || input.sourcePath.split("/").pop() || "final.jpg");
   const copied = await copyToFinals(input.listingId, input.sourcePath, name);
   const registered = await registerListingPhoto({
     listingId: input.listingId,
@@ -13707,7 +14009,9 @@ async function approveStudioFinal(input) {
     name,
     path: copied.storagePath,
     contentType: copied.contentType,
-    uploadedBy: input.uploadedBy
+    uploadedBy: input.uploadedBy,
+    deliveryName: preferred || name,
+    sortOrder: sequenced?.sortOrder ?? (typeof source?.sortOrder === "number" ? source.sortOrder : void 0)
   });
   if (input.jobId) {
     await db$o().collection("editJobs").doc(input.jobId).set({
@@ -14354,11 +14658,11 @@ function clientGalleryPayload(id, gallery, gate2) {
   const unlocked = clientGalleryDownloadsUnlocked(gate2);
   const invoice = gate2.invoice;
   const showMedia = ["delivered", "approved"].includes(String(gallery.status || ""));
-  const media = [
+  const media = orderedGalleryMedia([
     ...Array.isArray(gallery.mediaItems) ? gallery.mediaItems : [],
     ...Array.isArray(gallery.videoLinks) ? gallery.videoLinks : [],
     ...Array.isArray(gallery.tourLinks) ? gallery.tourLinks : []
-  ];
+  ]);
   return {
     id,
     title: gallery.title,
@@ -14403,6 +14707,67 @@ function malformedPublicGalleryId(id) {
   if (/^__.*__$/.test(id)) return true;
   return /[\u0000-\u001F\u007F]/.test(id);
 }
+async function readGalleryPhotoBytes(item) {
+  const storagePath = typeof item.storagePath === "string" ? item.storagePath : "";
+  if (storagePath && !storagePath.includes("..") && !storagePath.startsWith("/")) {
+    try {
+      const [bytes] = await storage().file(storagePath).download();
+      return bytes;
+    } catch {
+    }
+  }
+  const url = typeof item.shareUrl === "string" ? item.shareUrl : typeof item.url === "string" ? item.url : "";
+  if (!url.startsWith("https://")) return null;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const length = Number(response.headers.get("content-length") || 0);
+    if (length > 25e6) return null;
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.length > 25e6) return null;
+    return bytes;
+  } catch {
+    return null;
+  }
+}
+router$r.get("/public/:id/photos.zip", async (req, res) => {
+  const id = typeof req.params.id === "string" ? req.params.id : "";
+  if (malformedPublicGalleryId(id)) return publicGalleryNotFound(res);
+  if (!admin.apps.length) return publicGalleryNotFound(res);
+  try {
+    const doc = await db$k().collection("galleries").doc(id).get();
+    if (!doc.exists) return publicGalleryNotFound(res);
+    const gallery = doc.data() || {};
+    if (!["delivered", "approved"].includes(String(gallery.status || ""))) {
+      return res.status(403).json({ error: "Gallery not yet available." });
+    }
+    const gate2 = await downloadGateForGallery(gallery);
+    if (!clientGalleryDownloadsUnlocked(gate2)) {
+      return res.status(403).json({ error: ICONIC_DOWNLOAD_LOCK.message });
+    }
+    const photos = orderedGalleryMedia(Array.isArray(gallery.mediaItems) ? gallery.mediaItems : []).filter((item) => {
+      const type = String(item.type || "photo").toLowerCase();
+      return type === "photo" || type === "aerial" || type === "mls" || type === "image";
+    }).slice(0, 80);
+    const entries = [];
+    for (const item of photos) {
+      const bytes = await readGalleryPhotoBytes(item);
+      if (!bytes?.length) continue;
+      entries.push({
+        name: deliveryFileName(item),
+        data: new Uint8Array(bytes)
+      });
+    }
+    if (!entries.length) return res.status(404).json({ error: "No photos are ready to download." });
+    const slug = addressSlug(recordAddressText(gallery) || "gallery");
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", `attachment; filename="${slug}-photos.zip"`);
+    return res.send(Buffer.from(zipStored(entries)));
+  } catch (err) {
+    console.error("[Galleries] Photo zip error:", err instanceof Error ? err.message : "zip failed");
+    return res.status(500).json({ error: "We couldn't build that download." });
+  }
+});
 router$r.get("/public/:id", async (req, res) => {
   const id = typeof req.params.id === "string" ? req.params.id : "";
   if (malformedPublicGalleryId(id)) {
@@ -20972,6 +21337,35 @@ router$k.post("/:id/photos", requirePhotographer, async (req, res) => {
     return res.status(201).json({ success: true, ...registered, autoQueue });
   } catch (err) {
     return sendKnownError$2(res, err, "Failed to save the uploaded photo.");
+  }
+});
+router$k.patch("/:id/photo-order", requirePhotographer, async (req, res) => {
+  if (!adminReady$2(res)) return;
+  try {
+    await assertListingAccess(req, req.params.id);
+    const order = Array.isArray(req.body?.order) ? req.body.order : null;
+    if (!order) return res.status(400).json({ error: "order is required." });
+    const shots = order.slice(0, 400).flatMap((entry2) => {
+      if (!entry2 || typeof entry2 !== "object") return [];
+      const key = typeof entry2.key === "string" ? entry2.key.trim() : "";
+      if (!key || key.length > 500) return [];
+      return [{ key, culled: entry2.culled === true }];
+    });
+    const saved = await saveListingPhotoOrder(req.params.id, shots);
+    return res.json({ success: true, images: saved.images });
+  } catch (err) {
+    return sendKnownError$2(res, err, "Failed to save the photo order.");
+  }
+});
+router$k.post("/:id/gallery-sequence", requirePhotographer, async (req, res) => {
+  if (!adminReady$2(res)) return;
+  try {
+    await assertListingAccess(req, req.params.id);
+    const address = typeof req.body?.address === "string" ? req.body.address : "";
+    const result = await publishListingGallerySequence(req.params.id, req.user.uid, address);
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    return sendKnownError$2(res, err, "Failed to upload the gallery in order.");
   }
 });
 const router$j = Router();
@@ -31174,96 +31568,6 @@ function claimSlug(desired, selfId, posts) {
     if (!taken(next)) return next;
   }
   return `${stem}-${Date.now().toString(36)}`;
-}
-function crc32(data) {
-  let crc = 4294967295;
-  for (let i = 0; i < data.length; i += 1) {
-    crc ^= data[i];
-    for (let bit = 0; bit < 8; bit += 1) {
-      const mask = -(crc & 1);
-      crc = crc >>> 1 ^ 3988292384 & mask;
-    }
-  }
-  return (crc ^ 4294967295) >>> 0;
-}
-function dosStamp(date) {
-  const time = date.getHours() << 11 | date.getMinutes() << 5 | Math.floor(date.getSeconds() / 2);
-  const day = date.getFullYear() - 1980 << 9 | date.getMonth() + 1 << 5 | date.getDate();
-  return { time, day };
-}
-function zipName(name) {
-  const base = (name.split(/[/\\]/).pop() || "edit.jpg").replace(/[^\w.\- ]+/g, "").trim().slice(0, 80);
-  return base || "edit.jpg";
-}
-function uniqueName(name, used) {
-  const clean2 = zipName(name);
-  if (!used.has(clean2)) {
-    used.add(clean2);
-    return clean2;
-  }
-  const dot = clean2.lastIndexOf(".");
-  const stem = dot > 0 ? clean2.slice(0, dot) : clean2;
-  const ext = dot > 0 ? clean2.slice(dot) : "";
-  let index = 2;
-  while (used.has(`${stem}-${index}${ext}`)) index += 1;
-  const next = `${stem}-${index}${ext}`;
-  used.add(next);
-  return next;
-}
-function zipStored(entries, now = /* @__PURE__ */ new Date()) {
-  const { time, day } = dosStamp(now);
-  const used = /* @__PURE__ */ new Set();
-  const locals = [];
-  const centrals = [];
-  let offset = 0;
-  for (const entry2 of entries) {
-    const name = uniqueName(entry2.name, used);
-    const nameBytes = new TextEncoder().encode(name);
-    const crc = crc32(entry2.data);
-    const local = new Uint8Array(30 + nameBytes.length);
-    const view = new DataView(local.buffer);
-    view.setUint32(0, 67324752, true);
-    view.setUint16(4, 20, true);
-    view.setUint16(8, 0, true);
-    view.setUint16(10, time, true);
-    view.setUint16(12, day, true);
-    view.setUint32(14, crc, true);
-    view.setUint32(18, entry2.data.length, true);
-    view.setUint32(22, entry2.data.length, true);
-    view.setUint16(26, nameBytes.length, true);
-    local.set(nameBytes, 30);
-    const central = new Uint8Array(46 + nameBytes.length);
-    const centralView = new DataView(central.buffer);
-    centralView.setUint32(0, 33639248, true);
-    centralView.setUint16(4, 20, true);
-    centralView.setUint16(6, 20, true);
-    centralView.setUint16(12, time, true);
-    centralView.setUint16(14, day, true);
-    centralView.setUint32(16, crc, true);
-    centralView.setUint32(20, entry2.data.length, true);
-    centralView.setUint32(24, entry2.data.length, true);
-    centralView.setUint16(28, nameBytes.length, true);
-    centralView.setUint32(42, offset, true);
-    central.set(nameBytes, 46);
-    locals.push(local, entry2.data);
-    centrals.push(central);
-    offset += local.length + entry2.data.length;
-  }
-  const centralSize = centrals.reduce((sum, part) => sum + part.length, 0);
-  const end = new Uint8Array(22);
-  const endView = new DataView(end.buffer);
-  endView.setUint32(0, 101010256, true);
-  endView.setUint16(8, entries.length, true);
-  endView.setUint16(10, entries.length, true);
-  endView.setUint32(12, centralSize, true);
-  endView.setUint32(16, offset, true);
-  const out = new Uint8Array(offset + centralSize + end.length);
-  let cursor = 0;
-  for (const part of [...locals, ...centrals, end]) {
-    out.set(part, cursor);
-    cursor += part.length;
-  }
-  return out;
 }
 const memory = /* @__PURE__ */ new Map();
 function insightsUseMemory() {

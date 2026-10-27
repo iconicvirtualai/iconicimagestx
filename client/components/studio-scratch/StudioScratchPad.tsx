@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { visibleStudioNote } from "@shared/iconicStudio";
 import { ICONIC_POLISH_TREATMENTS } from "@shared/orderEditPlan";
 import type { StudioOrderTrayJob } from "@shared/studioOrderTray";
@@ -103,6 +103,7 @@ export default function StudioScratchPad({
   initialMode = "upload",
   initialStudioTool = "sky",
   floorplanUrl,
+  initialExpandedId = null,
   onAddFiles,
   onAddFloorplan,
   onSelect,
@@ -133,6 +134,7 @@ export default function StudioScratchPad({
   initialMode?: ScratchDeskMode;
   initialStudioTool?: ScratchStudioTool;
   floorplanUrl?: string;
+  initialExpandedId?: string | null;
   onAddFiles: (files: File[]) => void;
   onAddFloorplan: (file: File) => void;
   onSelect: (id: string, mode: "replace" | "toggle" | "range") => void;
@@ -170,6 +172,7 @@ export default function StudioScratchPad({
   const [autoLabel, setAutoLabel] = useState(true);
   const [brandedFloor, setBrandedFloor] = useState<string>();
   const [dragOver, setDragOver] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(initialExpandedId);
   const [roomId, setRoomId] = useState("living");
   const [furnitureId, setFurnitureId] = useState("sofa");
   const [angleId, setAngleId] = useState("single");
@@ -182,6 +185,39 @@ export default function StudioScratchPad({
   const drawing = useRef(false);
 
   const focus = frames.find((frame) => frame.focused) || frames[0] || null;
+  const expanded = mode === "upload" ? frames.find((frame) => frame.id === expandedId) || null : null;
+  const expandedIndex = expanded ? frames.findIndex((frame) => frame.id === expanded.id) : -1;
+
+  const openUploadFrame = (id: string) => {
+    onSelect(id, "replace");
+    if (mode === "upload") setExpandedId(id);
+  };
+
+  const stepUploadFrame = (delta: number) => {
+    if (!frames.length || expandedIndex < 0) return;
+    const next = frames[(expandedIndex + delta + frames.length) % frames.length];
+    if (next) openUploadFrame(next.id);
+  };
+
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable) return;
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        stepUploadFrame(-1);
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        stepUploadFrame(1);
+      } else if (event.key === "Escape") {
+        setExpandedId(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
   const checked = frames.filter((frame) => frame.selected).length;
   const displayUrl = focus ? (showAfter && focus.afterUrl ? focus.afterUrl : focus.beforeUrl) : "";
   const preferenceMeta = PREFERENCES.find((item) => item.id === preference) || PREFERENCES[1];
@@ -478,35 +514,17 @@ export default function StudioScratchPad({
               onCompare={setCompare}
             />
           ) : mode === "upload" ? (
-            <div className="flex min-h-0 flex-1 flex-col p-4">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                  Upload workspace
-                </p>
-                <span className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white" style={{ backgroundColor: teal }}>
-                  {preferenceMeta.kicker ? `${preferenceMeta.kicker} · ` : ""}{preferenceMeta.label}
-                </span>
-              </div>
-              <button
-                type="button"
-                data-testid="scratch-drop"
-                onClick={() => photoInput.current?.click()}
-                className="flex min-h-0 flex-1 flex-col items-center justify-center rounded-3xl border-2 border-transparent px-6 text-center"
-                style={{
-                  background: dragOver
-                    ? "linear-gradient(#10211f,#10211f) padding-box, linear-gradient(120deg,#0d9488,#5eead4,#14b8a6,#0f766e) border-box"
-                    : "linear-gradient(#0c1214,#0c1214) padding-box, linear-gradient(120deg,#0d9488,#5eead4,#14b8a6,#0f766e) border-box",
-                }}
-              >
-                <span className="text-sm font-black uppercase tracking-widest">Drag and drop your files to begin</span>
-                <span className="mt-2 text-xs text-gray-400">or click here to upload</span>
-                <span className="mt-4 text-[10px] font-black uppercase tracking-widest text-gray-500">JPG · PNG · RAW · TIFF</span>
-                <span className="mt-3 max-w-md text-[11px] leading-snug text-gray-500">Photos stay in this browser. Nothing is added to an order or a gallery. JPEG and PNG enter the edit queue. RAW and TIFF wait for a JPEG.</span>
-              </button>
-              <p className="mt-3 text-right text-[10px] font-bold uppercase tracking-widest text-teal-200">
-                {checked > 0 ? `Ready to queue · ${preferenceMeta.label} on ${checked} frame${checked === 1 ? "" : "s"}` : "Add frames, then Process the checked set"}
-              </p>
-            </div>
+            <UploadWorkspace
+              frames={frames}
+              expanded={expanded}
+              dragOver={dragOver}
+              preferenceLabel={`${preferenceMeta.kicker ? `${preferenceMeta.kicker} · ` : ""}${preferenceMeta.label}`}
+              readyNote={checked > 0 ? `Ready to queue · ${preferenceMeta.label} on ${checked} frame${checked === 1 ? "" : "s"}` : "Add frames, then Process the checked set"}
+              onBrowse={() => photoInput.current?.click()}
+              onOpen={openUploadFrame}
+              onClose={() => setExpandedId(null)}
+              onStep={stepUploadFrame}
+            />
           ) : (
             <div className="flex min-h-0 flex-1 flex-col p-3">
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -661,7 +679,7 @@ export default function StudioScratchPad({
                 data-testid={`scratch-frame-${frame.id}`}
                 data-selected={frame.selected ? "true" : "false"}
                 data-focused={frame.focused ? "true" : "false"}
-                onClick={() => onSelect(frame.id, "replace")}
+                onClick={() => openUploadFrame(frame.id)}
                 className={`h-full w-full overflow-hidden rounded-lg border-2 ${frame.focused ? "border-white" : frame.selected ? "border-[#0d9488]" : "border-transparent"}`}
               >
                 <img src={frame.afterUrl || frame.beforeUrl} alt="" className="h-full w-full object-cover" />
@@ -693,6 +711,107 @@ export default function StudioScratchPad({
 
       <input ref={photoInput} data-testid="scratch-file" type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp,.tif,.tiff,.raw,.cr2,.nef,.arw,.dng" multiple className="hidden" onChange={(event) => { takePhotos(event.target.files); event.target.value = ""; }} />
       <input ref={floorInput} data-testid="scratch-floorplan-file" type="file" accept="image/jpeg,image/png,image/svg+xml,.pdf,.jpg,.png,.svg" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) onAddFloorplan(file); event.target.value = ""; }} />
+    </div>
+  );
+}
+
+function UploadWorkspace({
+  frames,
+  expanded,
+  dragOver,
+  preferenceLabel,
+  readyNote,
+  onBrowse,
+  onOpen,
+  onClose,
+  onStep,
+}: {
+  frames: ScratchFrameView[];
+  expanded: ScratchFrameView | null;
+  dragOver: boolean;
+  preferenceLabel: string;
+  readyNote: string;
+  onBrowse: () => void;
+  onOpen: (id: string) => void;
+  onClose: () => void;
+  onStep: (delta: number) => void;
+}) {
+  const compact = frames.length > 0;
+  return (
+    <div className="flex min-h-0 flex-1 flex-col p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+          Upload workspace
+        </p>
+        <span className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white" style={{ backgroundColor: teal }}>
+          {preferenceLabel}
+        </span>
+      </div>
+      <button
+        type="button"
+        data-testid="scratch-drop"
+        data-compact={compact ? "true" : "false"}
+        onClick={onBrowse}
+        className={compact
+          ? "mb-3 flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-dashed border-[#0d9488]/70 px-4 py-3 text-[11px] font-black uppercase tracking-widest text-teal-100"
+          : "flex min-h-0 flex-1 flex-col items-center justify-center rounded-3xl border-2 border-transparent px-6 text-center"}
+        style={compact ? undefined : {
+          background: dragOver
+            ? "linear-gradient(#10211f,#10211f) padding-box, linear-gradient(120deg,#0d9488,#5eead4,#14b8a6,#0f766e) border-box"
+            : "linear-gradient(#0c1214,#0c1214) padding-box, linear-gradient(120deg,#0d9488,#5eead4,#14b8a6,#0f766e) border-box",
+        }}
+      >
+        {compact ? (
+          <>
+            <span>+ Add files</span>
+            <span className="text-[10px] font-bold normal-case tracking-normal text-gray-400">JPG · PNG · RAW · TIFF · still a drop target</span>
+          </>
+        ) : (
+          <>
+            <span className="text-sm font-black uppercase tracking-widest">Drag and drop your files to begin</span>
+            <span className="mt-2 text-xs text-gray-400">or click here to upload</span>
+            <span className="mt-4 text-[10px] font-black uppercase tracking-widest text-gray-500">JPG · PNG · RAW · TIFF</span>
+          </>
+        )}
+      </button>
+      {compact ? (
+        expanded ? (
+          <div data-testid="scratch-upload-stage" className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-3xl bg-[#101618]">
+            <button type="button" data-testid="scratch-back-grid" onClick={onClose} className="absolute left-3 top-3 z-10 rounded-full bg-black/70 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white">
+              Back to grid
+            </button>
+            <button type="button" data-testid="scratch-prev" aria-label="Previous photo" onClick={() => onStep(-1)} className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/70 px-3 py-3 text-lg font-black text-white">
+              ‹
+            </button>
+            <img data-testid="scratch-expanded" src={expanded.afterUrl || expanded.beforeUrl} alt={expanded.name} className="max-h-full max-w-full object-contain" />
+            <button type="button" data-testid="scratch-next" aria-label="Next photo" onClick={() => onStep(1)} className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/70 px-3 py-3 text-lg font-black text-white">
+              ›
+            </button>
+            <p className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/75 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white">
+              {expanded.name}
+            </p>
+          </div>
+        ) : (
+          <div data-testid="scratch-upload-grid" className="grid min-h-0 flex-1 grid-cols-2 gap-3 overflow-auto sm:grid-cols-3 lg:grid-cols-4">
+            {frames.map((frame) => (
+              <button
+                key={frame.id}
+                type="button"
+                data-testid={`scratch-open-${frame.id}`}
+                onClick={() => onOpen(frame.id)}
+                className={`overflow-hidden rounded-2xl border-2 bg-[#101618] text-left ${frame.focused ? "border-white" : "border-transparent"}`}
+              >
+                <img src={frame.afterUrl || frame.beforeUrl} alt={frame.name} className="aspect-[4/3] w-full object-cover" />
+                <span className="block truncate px-2 py-1 text-[10px] font-bold text-gray-200">{frame.name}</span>
+              </button>
+            ))}
+          </div>
+        )
+      ) : null}
+      <p className="mt-3 text-[11px] leading-snug text-gray-500">
+        Photos stay in this browser. Nothing is added to an order or a gallery. JPEG and PNG enter the edit queue. RAW and TIFF wait for a JPEG.
+      </p>
+      <p className="mt-1 text-right text-[10px] font-bold uppercase tracking-widest text-teal-200">{readyNote}</p>
     </div>
   );
 }

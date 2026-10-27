@@ -22,8 +22,10 @@ import { resolveClientIdentity } from "../services/clientAccounts";
 import { shouldBumpStudioQueue } from "../../shared/iconicStudio";
 import {
   createListingUploadUrl,
+  publishListingGallerySequence,
   registerListingPhoto,
   saveListingBytes,
+  saveListingPhotoOrder,
   serializeDoc,
 } from "../services/listingMedia";
 import { bumpRawIngestJob, enqueueOrderEditsFromUpload } from "../services/studioJobs";
@@ -231,6 +233,37 @@ router.post("/:id/photos", requirePhotographer, async (req: AuthenticatedRequest
     return res.status(201).json({ success: true, ...registered, autoQueue });
   } catch (err) {
     return sendKnownError(res, err, "Failed to save the uploaded photo.");
+  }
+});
+
+router.patch("/:id/photo-order", requirePhotographer, async (req: AuthenticatedRequest, res) => {
+  if (!adminReady(res)) return;
+  try {
+    await assertListingAccess(req, req.params.id);
+    const order = Array.isArray(req.body?.order) ? req.body.order : null;
+    if (!order) return res.status(400).json({ error: "order is required." });
+    const shots = order.slice(0, 400).flatMap((entry: unknown) => {
+      if (!entry || typeof entry !== "object") return [];
+      const key = typeof (entry as { key?: unknown }).key === "string" ? (entry as { key: string }).key.trim() : "";
+      if (!key || key.length > 500) return [];
+      return [{ key, culled: (entry as { culled?: unknown }).culled === true }];
+    });
+    const saved = await saveListingPhotoOrder(req.params.id, shots);
+    return res.json({ success: true, images: saved.images });
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to save the photo order.");
+  }
+});
+
+router.post("/:id/gallery-sequence", requirePhotographer, async (req: AuthenticatedRequest, res) => {
+  if (!adminReady(res)) return;
+  try {
+    await assertListingAccess(req, req.params.id);
+    const address = typeof req.body?.address === "string" ? req.body.address : "";
+    const result = await publishListingGallerySequence(req.params.id, req.user!.uid, address);
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to upload the gallery in order.");
   }
 });
 

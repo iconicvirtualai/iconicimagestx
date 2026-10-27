@@ -9,6 +9,25 @@ import fs from "fs/promises";
 import os from "os";
 import path$1 from "path";
 import { lookup } from "node:dns/promises";
+function finiteOrder(value) {
+  const n = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+function isCulledShot(shot) {
+  return shot.culled === true;
+}
+function keptShots(items) {
+  const rows = items.map((item, index) => ({ item, index })).filter(({ item }) => !isCulledShot(item));
+  const any = rows.some(({ item }) => finiteOrder(item.sortOrder) != null);
+  if (!any) return rows.map(({ item }) => item);
+  return rows.sort((a, b) => {
+    const ao = finiteOrder(a.item.sortOrder);
+    const bo = finiteOrder(b.item.sortOrder);
+    const aKey = ao == null ? Number.MAX_SAFE_INTEGER : ao;
+    const bKey = bo == null ? Number.MAX_SAFE_INTEGER : bo;
+    return aKey - bKey || a.index - b.index;
+  }).map(({ item }) => item);
+}
 const RAW_EXT$1 = /\.(cr2|cr3|nef|nrw|arw|srf|sr2|dng|raw|rw2|orf|raf|pef|3fr|fff|iiq)$/i;
 const PREVIEW_EXT = /\.(jpe?g|png|webp|gif)$/i;
 function isRawStudioFile(name, contentType) {
@@ -229,10 +248,11 @@ function shareDisplayItems(listing, options = {}) {
   const items = [];
   const seen = /* @__PURE__ */ new Set();
   if (Array.isArray(listing.images)) {
-    listing.images.forEach((item, index) => {
+    keptShots(listing.images).forEach((item, index) => {
       const row = rowOf(item);
       if (!row) return;
-      pushDisplay(items, seen, mediaName(row, `Photo ${index + 1}`), rasterShareSource(row, legacy), "image");
+      const deliveryName = typeof row.deliveryName === "string" ? row.deliveryName.trim() : "";
+      pushDisplay(items, seen, deliveryName || mediaName(row, `Photo ${index + 1}`), rasterShareSource(row, legacy), "image");
     });
   }
   for (const group of [listing.floorplans, listing.floorPlans]) {

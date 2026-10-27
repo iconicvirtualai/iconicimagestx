@@ -12,7 +12,9 @@ import {
   clientGalleryDownloadsUnlocked,
   type GalleryDownloadGate,
 } from "../../shared/paymentAccess";
+import { addressSlug, deliveryFileName, orderedGalleryMedia } from "../../shared/gallerySequence";
 import { lockedClientGalleryMedia } from "../../shared/lockedClientMedia";
+import { zipStored } from "../../shared/zipStore";
 import { recordAddressText } from "../../shared/addressText";
 import { invoicePayLinkFor } from "../../shared/invoicePayLink";
 import { readInvoiceDoc } from "../lib/invoiceDoc";
@@ -101,11 +103,11 @@ function clientGalleryPayload(id: string, gallery: Record<string, unknown>, gate
   const unlocked = clientGalleryDownloadsUnlocked(gate);
   const invoice = gate.invoice;
   const showMedia = ["delivered", "approved"].includes(String(gallery.status || ""));
-  const media = [
+  const media = orderedGalleryMedia([
     ...(Array.isArray(gallery.mediaItems) ? gallery.mediaItems : []),
     ...(Array.isArray(gallery.videoLinks) ? gallery.videoLinks : []),
     ...(Array.isArray(gallery.tourLinks) ? gallery.tourLinks : []),
-  ];
+  ]);
   return {
     id,
     title: gallery.title,
@@ -162,6 +164,74 @@ function malformedPublicGalleryId(id: string): boolean {
   if (/^__.*__$/.test(id)) return true;
   return /[\u0000-\u001F\u007F]/.test(id);
 }
+
+async function readGalleryPhotoBytes(item: Record<string, unknown>): Promise<Buffer | null> {
+  const storagePath = typeof item.storagePath === "string" ? item.storagePath : "";
+  if (storagePath && !storagePath.includes("..") && !storagePath.startsWith("/")) {
+    try {
+      const [bytes] = await storage().file(storagePath).download();
+      return bytes;
+    } catch {
+      // Fall through to the stored https URL.
+    }
+  }
+  const url = typeof item.shareUrl === "string" ? item.shareUrl : typeof item.url === "string" ? item.url : "";
+  if (!url.startsWith("https://")) return null;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const length = Number(response.headers.get("content-length") || 0);
+    if (length > 25_000_000) return null;
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.length > 25_000_000) return null;
+    return bytes;
+  } catch {
+    return null;
+  }
+}
+
+// ─── GET /api/galleries/public/:id/photos.zip — ordered client download ─────
+
+router.get("/public/:id/photos.zip", async (req, res) => {
+  const id = typeof req.params.id === "string" ? req.params.id : "";
+  if (malformedPublicGalleryId(id)) return publicGalleryNotFound(res);
+  if (!admin.apps.length) return publicGalleryNotFound(res);
+  try {
+    const doc = await db().collection("galleries").doc(id).get();
+    if (!doc.exists) return publicGalleryNotFound(res);
+    const gallery = doc.data() || {};
+    if (!["delivered", "approved"].includes(String(gallery.status || ""))) {
+      return res.status(403).json({ error: "Gallery not yet available." });
+    }
+    const gate = await downloadGateForGallery(gallery);
+    if (!clientGalleryDownloadsUnlocked(gate)) {
+      return res.status(403).json({ error: ICONIC_DOWNLOAD_LOCK.message });
+    }
+    const photos = orderedGalleryMedia(Array.isArray(gallery.mediaItems) ? gallery.mediaItems : [])
+      .filter((item) => {
+        const type = String(item.type || "photo").toLowerCase();
+        return type === "photo" || type === "aerial" || type === "mls" || type === "image";
+      })
+      .slice(0, 80);
+    const entries: Array<{ name: string; data: Uint8Array }> = [];
+    for (const item of photos) {
+      const bytes = await readGalleryPhotoBytes(item as Record<string, unknown>);
+      if (!bytes?.length) continue;
+      entries.push({
+        name: deliveryFileName(item),
+        data: new Uint8Array(bytes),
+      });
+    }
+    if (!entries.length) return res.status(404).json({ error: "No photos are ready to download." });
+    const slug = addressSlug(recordAddressText(gallery) || "gallery");
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", `attachment; filename="${slug}-photos.zip"`);
+    return res.send(Buffer.from(zipStored(entries)));
+  } catch (err) {
+    console.error("[Galleries] Photo zip error:", err instanceof Error ? err.message : "zip failed");
+    return res.status(500).json({ error: "We couldn't build that download." });
+  }
+});
 
 // ─── GET /api/galleries/public/:id — Public delivery link ───────────────────
 

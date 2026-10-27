@@ -3,9 +3,30 @@ import { Link, useSearchParams } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { PhotographerJobBanner } from "@/components/photographer/PhotographerPortal";
-import { fetchAssignedListings, uploadListingFile } from "@/lib/listingUpload";
+import {
+  fetchAssignedListings,
+  fetchListing,
+  publishGallerySequence,
+  saveListingPhotoOrder,
+  uploadListingFile,
+} from "@/lib/listingUpload";
 import { drainOrderEditQueue, fetchStudioWorkspace, postIconicPolish } from "@/lib/studioApi";
 import { addressText } from "@shared/addressText";
+import { addressSlug } from "@shared/gallerySequence";
+import PhotographerSetBoard from "@/components/photographer/PhotographerSetBoard";
+import { mergeBracketToJpeg } from "@/lib/hdrMergeImage";
+import {
+  cullWorkingShot,
+  mergeStoredOrder,
+  readStoredPhotoOrder,
+  readStoredSequenceAddress,
+  reorderWorkingShots,
+  shotsFromListingImages,
+  writeStoredPhotoOrder,
+  zipWorkingShots,
+  type WorkingShot,
+} from "@/lib/photoOrder";
+import { readJpegShotTime } from "@/lib/scratchPhoto";
 import {
   PHOTOGRAPHER_UPLOAD_ACCEPT,
   buildPhotographerPortal,
@@ -32,7 +53,24 @@ export default function AdminUpload() {
   const [iconicPolish, setIconicPolish] = React.useState(params.get("polish") === "1");
   const [queueNote, setQueueNote] = React.useState("");
   const [jobsError, setJobsError] = React.useState("");
+  const [shots, setShots] = React.useState<WorkingShot[]>([]);
+  const [sequenceAddress, setSequenceAddress] = React.useState("");
+  const [boardBusy, setBoardBusy] = React.useState(false);
   const fileRef = React.useRef<HTMLInputElement>(null);
+  const shotsRef = React.useRef<WorkingShot[]>([]);
+  const loadedJob = React.useRef("");
+  shotsRef.current = shots;
+
+  const rememberShots = React.useCallback((next: WorkingShot[], address = sequenceAddress) => {
+    shotsRef.current = next;
+    setShots(next);
+    if (!selectedJob) return;
+    writeStoredPhotoOrder(selectedJob, next, address);
+    const order = next.flatMap((shot) => (shot.path ? [{ key: shot.path, culled: shot.culled }] : []));
+    if (order.length) {
+      void saveListingPhotoOrder(selectedJob, order).catch(() => undefined);
+    }
+  }, [selectedJob, sequenceAddress]);
 
   const loadJobs = React.useCallback(async () => {
     if (!user) return;
@@ -51,14 +89,52 @@ export default function AdminUpload() {
     if (studio.status === "fulfilled") setStudioJobs((studio.value.jobs || []) as PhotographerStudioJob[]);
   }, [user]);
 
-  React.useEffect(() => {
-    loadJobs();
-  }, [loadJobs]);
-
   const jobs = React.useMemo(
     () => buildPhotographerPortal({ listings, studioJobs, today: chicagoDateKey(new Date()) }),
     [listings, studioJobs],
   );
+
+  React.useEffect(() => {
+    loadJobs();
+  }, [loadJobs]);
+
+  const addressJob = React.useRef("");
+  React.useEffect(() => {
+    if (!selectedJob) return;
+    const stored = readStoredSequenceAddress(selectedJob);
+    const fromJob = addressText(jobs.find((job) => job.id === selectedJob)?.address);
+    setSequenceAddress((current) => {
+      if (addressJob.current === selectedJob && current) return current;
+      addressJob.current = selectedJob;
+      return stored || fromJob || current;
+    });
+  }, [selectedJob, jobs]);
+
+  React.useEffect(() => {
+    if (!selectedJob || loadedJob.current === selectedJob) return;
+    loadedJob.current = selectedJob;
+    let cancelled = false;
+    const apply = (next: WorkingShot[]) => {
+      if (cancelled) return;
+      shotsRef.current = next;
+      setShots(next);
+      writeStoredPhotoOrder(selectedJob, next);
+    };
+    fetchListing(selectedJob)
+      .then((listing) => {
+        const fromServer = shotsFromListingImages(listing.images);
+        const stored = readStoredPhotoOrder(selectedJob);
+        const locals = shotsRef.current.filter((shot) => !shot.path && !fromServer.some((item) => item.key === shot.key));
+        apply(mergeStoredOrder([...fromServer, ...locals], stored));
+      })
+      .catch(() => {
+        const stored = readStoredPhotoOrder(selectedJob);
+        if (stored.length) apply(mergeStoredOrder(shotsRef.current, stored));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedJob]);
 
   React.useEffect(() => {
     if (!jobs.length) return;
@@ -80,10 +156,38 @@ export default function AdminUpload() {
     setParams(next, { replace: true });
   };
 
-  const addFiles = (list: File[]) => {
+  const addFiles = async (list: File[]) => {
     const accepted = list.filter((file) => photographerAcceptsFile(file.name, file.type));
     if (accepted.length !== list.length) toast.error("Only photos and RAW frames can be uploaded.");
-    if (accepted.length) setFiles((prev) => [...prev, ...accepted]);
+    if (!accepted.length) return;
+    setFiles((prev) => [...prev, ...accepted]);
+    const additions: WorkingShot[] = [];
+    for (const file of accepted) {
+      const shotAt = await readJpegShotTime(file).catch(() => null);
+      additions.push({
+        key: `local:${file.name}:${file.size}:${file.lastModified}:${additions.length}:${Date.now()}`,
+        name: file.name,
+        url: URL.createObjectURL(file),
+        culled: false,
+        file,
+        shotAt: shotAt ?? file.lastModified,
+      });
+    }
+    rememberShots([...shotsRef.current, ...additions]);
+  };
+
+  const adoptUploadedFile = (file: File, image: { path?: unknown; url?: unknown; name?: unknown }) => {
+    const path = typeof image.path === "string" ? image.path : "";
+    if (!path) return;
+    const next = shotsRef.current.map((shot) => shot.file === file ? {
+      ...shot,
+      key: path,
+      path,
+      url: typeof image.url === "string" && image.url ? image.url : shot.url,
+      name: typeof image.name === "string" && image.name ? image.name : shot.name,
+      file: undefined,
+    } : shot);
+    rememberShots(next);
   };
 
   const handleFiles = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,13 +212,16 @@ export default function AdminUpload() {
         await postIconicPolish(() => user.getIdToken(), { listingId: selectedJob, iconicPolish });
       }
       for (const file of files) {
-        await uploadListingFile({
+        const saved = await uploadListingFile({
           listingId: selectedJob,
           file,
           folder: photographerUploadFolder(file.name, file.type),
           onProgress: (pct) => setUploads((prev) => ({ ...prev, [file.name]: pct })),
         });
+        adoptUploadedFile(file, saved?.image || {});
       }
+      const order = shotsRef.current.flatMap((shot) => (shot.path ? [{ key: shot.path, culled: shot.culled }] : []));
+      if (order.length) await saveListingPhotoOrder(selectedJob, order);
       toast.success(`${files.length} file${files.length === 1 ? "" : "s"} uploaded.`);
       setFiles([]);
       setUploads({});
@@ -138,6 +245,104 @@ export default function AdminUpload() {
       toast.error(err instanceof Error ? err.message : "Some uploads failed. Please try again.");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const uploadOrderedSet = async () => {
+    if (!selectedJob) return;
+    setBoardBusy(true);
+    try {
+      let current = shotsRef.current.slice();
+      for (const shot of current) {
+        if (shot.path || !shot.file) continue;
+        const saved = await uploadListingFile({
+          listingId: selectedJob,
+          file: shot.file,
+          folder: photographerUploadFolder(shot.file.name, shot.file.type),
+        });
+        const image = saved?.image || {};
+        const path = typeof image.path === "string" ? image.path : "";
+        if (!path) continue;
+        current = current.map((item) => item.key === shot.key ? {
+          ...item,
+          key: path,
+          path,
+          url: typeof image.url === "string" && image.url ? image.url : item.url,
+          name: typeof image.name === "string" && image.name ? image.name : item.name,
+          file: undefined,
+        } : item);
+      }
+      rememberShots(current);
+      const order = current.flatMap((shot) => (shot.path ? [{ key: shot.path, culled: shot.culled }] : []));
+      if (order.length) await saveListingPhotoOrder(selectedJob, order);
+      const result = await publishGallerySequence(selectedJob, sequenceAddress);
+      toast.success(result.note || "Gallery files follow the photographer order.");
+      setFiles([]);
+      setUploads({});
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Could not upload the gallery in order.");
+    } finally {
+      setBoardBusy(false);
+    }
+  };
+
+  const exportSequenceZip = async () => {
+    setBoardBusy(true);
+    try {
+      const bytes = await zipWorkingShots(shotsRef.current, sequenceAddress || "listing");
+      const copy = new Uint8Array(bytes.byteLength);
+      copy.set(bytes);
+      const blob = new Blob([copy], { type: "application/zip" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${addressSlug(sequenceAddress || "listing")}-photos.zip`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Could not export that zip.");
+    } finally {
+      setBoardBusy(false);
+    }
+  };
+
+  const mergeBracket = async (ids: string[]) => {
+    const frames = ids.flatMap((id) => {
+      const shot = shotsRef.current.find((item) => item.key === id);
+      return shot ? [shot] : [];
+    });
+    setBoardBusy(true);
+    try {
+      const file = await mergeBracketToJpeg(frames.map((shot) => ({ name: shot.name, url: shot.url })));
+      const merged: WorkingShot = {
+        key: `local:${file.name}:${file.size}:${Date.now()}`,
+        name: file.name,
+        url: URL.createObjectURL(file),
+        culled: false,
+        file,
+        shotAt: Date.now(),
+      };
+      const idSet = new Set(ids);
+      const next: WorkingShot[] = [];
+      let inserted = false;
+      for (const shot of shotsRef.current) {
+        if (!idSet.has(shot.key)) {
+          next.push(shot);
+          continue;
+        }
+        if (!inserted) {
+          next.push(merged);
+          inserted = true;
+        }
+        next.push({ ...shot, culled: true });
+      }
+      setFiles((prev) => [...prev, file]);
+      rememberShots(next);
+      toast.success("HDR bracket merged. The source frames are culled.");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Could not merge that bracket.");
+    } finally {
+      setBoardBusy(false);
     }
   };
 
@@ -218,6 +423,22 @@ export default function AdminUpload() {
           </p>
           <p className="text-xs text-gray-400">JPEG, PNG, WebP, and RAW. RAW stays in the raw folder until a preview exists.</p>
         </div>
+
+        <PhotographerSetBoard
+          listingId={selectedJob}
+          address={sequenceAddress}
+          shots={shots}
+          busy={boardBusy || uploading}
+          onAddress={(value) => {
+            setSequenceAddress(value);
+            if (selectedJob) writeStoredPhotoOrder(selectedJob, shotsRef.current, value);
+          }}
+          onReorder={(fromKey, toKey) => rememberShots(reorderWorkingShots(shotsRef.current, fromKey, toKey))}
+          onCull={(key, culled) => rememberShots(cullWorkingShot(shotsRef.current, key, culled))}
+          onMerge={(ids) => { void mergeBracket(ids); }}
+          onUploadGallery={() => { void uploadOrderedSet(); }}
+          onExportZip={() => { void exportSequenceZip(); }}
+        />
 
         {files.length > 0 && (
           <div className="mb-6 rounded-[2rem] border border-gray-100 bg-white p-6 shadow-sm">
