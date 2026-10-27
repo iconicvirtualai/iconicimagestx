@@ -104,6 +104,8 @@ describe("client home dashboard", () => {
     expect(html).toContain("Listings");
     expect(html).toContain("Place Order");
     expect(html).toContain('href="/portal/order"');
+    expect(html).toContain("lg:hidden");
+    expect(html).toContain("hidden lg:block");
     expect(html).toContain('href="/portal/settings/profile"');
     expect(html).toContain('href="/portal/settings/team"');
     expect(html).toContain('href="/portal/settings/clients"');
