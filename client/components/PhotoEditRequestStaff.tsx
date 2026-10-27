@@ -40,10 +40,10 @@ export function PhotoEditRequestStaffView({
 }) {
   return (
     <section className="mt-8 border-t border-gray-100 pt-6" data-testid="staff-photo-edit-requests">
-      <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Photo edit requests</h3>
-      <p className="text-xs text-gray-500 mt-1 mb-4">Mark a request sent out, then received back. Attach the returned file here. This does not message the client.</p>
+      <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Edit requests</h3>
+      <p className="text-xs text-gray-500 mt-1 mb-4">Photos, video, 3D tours, floor plans, and files land in this queue. Mark a request sent out, then received back. Attach the returned file here. This does not message the client.</p>
       {requests.length === 0 ? (
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">No photo edit requests yet.</p>
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">No edit requests yet.</p>
       ) : (
         <div className="space-y-3">
           {requests.map((request) => {

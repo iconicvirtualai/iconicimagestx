@@ -395,7 +395,7 @@ export default function StudioScratchPad({
       ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
-        <aside className="scrollbar-hide flex w-full shrink-0 flex-col border-b border-white/10 bg-[#0c1214] p-3 lg:w-60 lg:overflow-y-auto lg:border-b-0 lg:border-r">
+        <aside className="scrollbar-hide order-2 flex w-full shrink-0 flex-col border-b border-white/10 bg-[#0c1214] p-3 lg:order-1 lg:w-60 lg:overflow-y-auto lg:border-b-0 lg:border-r">
           {mode === "upload" ? (
             <UploadPrefs
               preference={preference}
@@ -490,7 +490,7 @@ export default function StudioScratchPad({
 
         <section
           data-testid="scratch-canvas"
-          className="flex min-h-[280px] min-w-0 flex-1 flex-col lg:min-h-0"
+          className="order-1 flex min-h-[320px] min-w-0 flex-1 flex-col lg:order-2 lg:min-h-0"
           onDragOver={(event) => { event.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
           onDrop={(event) => {
@@ -776,7 +776,7 @@ function UploadWorkspace({
       </button>
       {compact ? (
         expanded ? (
-          <div data-testid="scratch-upload-stage" className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-3xl bg-[#101618]">
+          <div data-testid="scratch-upload-stage" className="relative flex min-h-[52vh] flex-1 items-center justify-center overflow-hidden rounded-3xl bg-[#101618] lg:min-h-0">
             <button type="button" data-testid="scratch-back-grid" onClick={onClose} className="absolute left-3 top-3 z-10 rounded-full bg-black/70 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white">
               Back to grid
             </button>

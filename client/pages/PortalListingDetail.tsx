@@ -172,6 +172,8 @@ export function PortalListingDetailView({
               items={shown.videos}
               onToggleEditing={() => onToggleEditing("video")}
               onMedia={onMedia}
+              photoEditRequests={shown.photoEditRequests || []}
+              onRequestPhotoEdit={canEdit ? onRequestPhotoEdit : undefined}
             />
           </div>
         )}
@@ -183,6 +185,8 @@ export function PortalListingDetailView({
             saving={saving}
             onToggleEditing={() => onToggleEditing("tour")}
             onMedia={onMedia}
+            photoEditRequests={shown.photoEditRequests || []}
+            onRequestPhotoEdit={canEdit ? onRequestPhotoEdit : undefined}
           />
         )}
         {tab === "floorplans" && (
@@ -195,6 +199,8 @@ export function PortalListingDetailView({
             items={shown.floorplans}
             onToggleEditing={() => onToggleEditing("floorplan")}
             onMedia={onMedia}
+            photoEditRequests={shown.photoEditRequests || []}
+            onRequestPhotoEdit={canEdit ? onRequestPhotoEdit : undefined}
           />
         )}
         {tab === "marketing" && (
@@ -204,6 +210,8 @@ export function PortalListingDetailView({
             canEdit={canEdit}
             saving={saving}
             onUpload={onUpload}
+            photoEditRequests={shown.photoEditRequests || []}
+            onRequestPhotoEdit={canEdit ? onRequestPhotoEdit : undefined}
           />
         )}
         {tab === "website" && (
@@ -634,11 +642,11 @@ function PhotoEditNote({
             value={note}
             maxLength={PHOTO_EDIT_NOTE_LIMIT}
             rows={3}
-            placeholder="What should change on this photo?"
+            placeholder="What should change?"
             onChange={(event) => setNote(event.target.value)}
             className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
           />
-          <p className="mt-1 text-[10px] text-gray-400">The note is saved on this photo. It does not send a message or create a charge.</p>
+          <p className="mt-1 text-[10px] text-gray-400">The note is saved on this file. It does not send a message or create a charge.</p>
           <div className="mt-2 flex gap-2">
             <Button type="button" size="sm" variant="outline" onClick={() => { setOpen(false); setNote(""); }}>Cancel</Button>
             <Button
@@ -733,6 +741,9 @@ function MediaTab({
               <div className="mt-3 flex items-start justify-between gap-2">
                 <div>
                   <p className="text-sm font-bold truncate">{item.name}</p>
+                  {item.downloadName && (
+                    <a href={item.url} download={item.downloadName} data-testid={`media-download-name-${item.id}`} className="block truncate text-[10px] font-bold text-gray-500">{item.downloadName}</a>
+                  )}
                   {item.hidden && <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Hidden</p>}
                 </div>
               </div>
@@ -746,14 +757,12 @@ function MediaTab({
                   <Button type="button" size="sm" variant="outline" disabled={saving || index === visible.length - 1} onClick={() => onMedia({ kind: item.kind, id: item.id, move: "later" })}>Later</Button>
                 </div>
               )}
-              {item.kind === "photo" && (
-                <PhotoEditNote
-                  item={item}
-                  requests={photoEditRequests}
-                  saving={saving}
-                  onRequest={onRequestPhotoEdit}
-                />
-              )}
+              <PhotoEditNote
+                item={item}
+                requests={photoEditRequests}
+                saving={saving}
+                onRequest={onRequestPhotoEdit}
+              />
             </article>
           ))}
         </div>
@@ -769,6 +778,8 @@ function ToursTab({
   saving,
   onToggleEditing,
   onMedia,
+  photoEditRequests = [],
+  onRequestPhotoEdit,
 }: {
   tours: PortalTourItem[];
   canEdit: boolean;
@@ -776,6 +787,8 @@ function ToursTab({
   saving: boolean;
   onToggleEditing: () => void;
   onMedia: (change: PortalMediaChange) => void;
+  photoEditRequests?: PhotoEditRequest[];
+  onRequestPhotoEdit?: (photoId: string, note: string) => Promise<boolean>;
 }) {
   const showEditor = canEdit && editing;
   const visible = showEditor ? tours : tours.filter((tour) => !tour.hidden);
@@ -814,6 +827,12 @@ function ToursTab({
                   </Button>
                 </div>
               )}
+              <PhotoEditNote
+                item={tour}
+                requests={photoEditRequests}
+                saving={saving}
+                onRequest={onRequestPhotoEdit}
+              />
             </article>
           ))}
         </div>
@@ -828,12 +847,16 @@ function MarketingTab({
   canEdit,
   saving,
   onUpload,
+  photoEditRequests = [],
+  onRequestPhotoEdit,
 }: {
   detail: PortalListingDetailModel;
   agent?: HubAgentBranding | null;
   canEdit: boolean;
   saving: boolean;
   onUpload?: (kind: PortalUploadKind, file: File, onProgress: (pct: number) => void) => Promise<void>;
+  photoEditRequests?: PhotoEditRequest[];
+  onRequestPhotoEdit?: (photoId: string, note: string) => Promise<boolean>;
 }) {
   return (
     <section className="space-y-8">
@@ -871,7 +894,7 @@ function MarketingTab({
             }}
           />
         )}
-        <UploadGrid items={detail.socialAssets || []} empty="No social files yet." />
+        <UploadGrid items={detail.socialAssets || []} empty="No social files yet." photoEditRequests={photoEditRequests} onRequestPhotoEdit={onRequestPhotoEdit} saving={saving} />
       </div>
       <div>
         <h2 className="text-xs font-black uppercase tracking-widest text-[#0d9488] mb-1">Files</h2>
@@ -887,13 +910,25 @@ function MarketingTab({
             }}
           />
         )}
-        <UploadGrid items={detail.clientFiles || []} empty="No documents yet." />
+        <UploadGrid items={detail.clientFiles || []} empty="No documents yet." photoEditRequests={photoEditRequests} onRequestPhotoEdit={onRequestPhotoEdit} saving={saving} />
       </div>
     </section>
   );
 }
 
-function UploadGrid({ items, empty }: { items: PortalMediaItem[]; empty: string }) {
+function UploadGrid({
+  items,
+  empty,
+  photoEditRequests = [],
+  onRequestPhotoEdit,
+  saving = false,
+}: {
+  items: PortalMediaItem[];
+  empty: string;
+  photoEditRequests?: PhotoEditRequest[];
+  onRequestPhotoEdit?: (photoId: string, note: string) => Promise<boolean>;
+  saving?: boolean;
+}) {
   if (items.length === 0) return <p className="text-sm text-gray-400">{empty}</p>;
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -901,9 +936,10 @@ function UploadGrid({ items, empty }: { items: PortalMediaItem[]; empty: string 
         <article key={item.id} className="min-w-0 rounded-2xl border border-gray-100 bg-white p-3" data-testid={`upload-${item.id}`}>
           <ClientGalleryMediaFrame item={portalMediaToGalleryItem(item)} />
           <p className="mt-2 truncate text-sm font-bold">{item.name}</p>
-          <a href={item.url} download={item.name} className="mt-2 inline-flex min-h-11 items-center gap-2 text-xs font-black uppercase tracking-widest text-[#0d9488]">
-            <Download className="h-3.5 w-3.5" /> Download
+          <a href={item.url} download={item.downloadName || item.name} className="mt-2 inline-flex min-h-11 items-center gap-2 text-xs font-black uppercase tracking-widest text-[#0d9488]">
+            <Download className="h-3.5 w-3.5" /> {item.downloadName || "Download"}
           </a>
+          <PhotoEditNote item={item} requests={photoEditRequests} saving={saving} onRequest={onRequestPhotoEdit} />
         </article>
       ))}
     </div>

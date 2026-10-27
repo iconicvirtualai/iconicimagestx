@@ -11,7 +11,8 @@ import {
   type PortalWebsiteDesign,
   type PortalWebsiteSettings,
 } from "./portalListingDetail.ts";
-import { rasterShareSource, shareDisplayItems, shareDisplayPath, type ShareListing } from "./publicShare.ts";
+import { isHiddenFromListingSites } from "./mediaArrangement.ts";
+import { rasterShareSource, shareDisplayItems, shareDisplayPath, videoPlaceholderSource, type ShareListing } from "./publicShare.ts";
 
 export const LISTING_SITE_DESIGNS = PORTAL_WEBSITE_DESIGNS;
 export type ListingSiteDesign = PortalWebsiteDesign;
@@ -191,21 +192,27 @@ function matterportEmbed(value: string): string {
 }
 
 function tourUrl(listing: Record<string, unknown>): string {
-  const direct = [
-    text(listing.matterportUrl),
-    text(listing.virtualTourUrl),
-    text(listing.tourUrl),
-  ];
+  const blockedUrls = new Set<string>();
+  const direct: string[] = [];
+  for (const key of ["matterportUrl", "virtualTourUrl", "tourUrl"] as const) {
+    const url = text(listing[key]);
+    if (!url) continue;
+    if (isHiddenFromListingSites(listing, { id: key, url })) blockedUrls.add(url);
+    else direct.push(url);
+  }
   const tours = Array.isArray(listing.tours) ? listing.tours : [];
   for (const tour of tours) {
     const row = record(tour);
     if (!row) continue;
-    direct.push(text(row.embedUrl), text(row.url));
+    const url = text(row.embedUrl) || text(row.url);
+    if (!url) continue;
+    if (isHiddenFromListingSites(listing, row)) blockedUrls.add(url);
+    else direct.push(url);
   }
   const hidden = readMediaStore(listing.portalMedia).tours;
   for (const candidate of direct) {
     const embed = matterportEmbed(candidate);
-    if (!embed) continue;
+    if (!embed || blockedUrls.has(candidate)) continue;
     const model = new URL(embed).searchParams.get("m") || "";
     const blocked = Object.entries(hidden).some(([id, prefs]) => prefs.hidden && (id === model || id === candidate));
     if (!blocked) return embed;
@@ -228,8 +235,9 @@ function hiddenSources(listing: ShareListing): Set<string> {
       const row = record(item);
       if (!row) continue;
       const id = text(row.id);
-      if (!id || !prefs[id]?.hidden) continue;
-      const source = rasterShareSource(row);
+      const sectionHidden = isHiddenFromListingSites(listing, row);
+      if (!sectionHidden && (!id || !prefs[id]?.hidden)) continue;
+      const source = rasterShareSource(row) || videoPlaceholderSource(row) || text(row.url);
       if (source) hidden.add(source);
     }
   }

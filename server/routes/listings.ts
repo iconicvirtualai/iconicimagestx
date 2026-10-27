@@ -9,6 +9,7 @@ import admin from "firebase-admin";
 import {
   requireAuth,
   requirePhotographer,
+  requireStaff,
   type AuthenticatedRequest,
 } from "../middleware/auth";
 import {
@@ -25,6 +26,7 @@ import {
   publishListingGallerySequence,
   registerListingPhoto,
   saveListingBytes,
+  saveListingMediaArrangement,
   saveListingPhotoOrder,
   serializeDoc,
 } from "../services/listingMedia";
@@ -252,6 +254,17 @@ router.patch("/:id/photo-order", requirePhotographer, async (req: AuthenticatedR
     return res.json({ success: true, images: saved.images });
   } catch (err) {
     return sendKnownError(res, err, "Failed to save the photo order.");
+  }
+});
+
+router.patch("/:id/media-arrangement", requireStaff, async (req: AuthenticatedRequest, res) => {
+  if (!adminReady(res)) return;
+  try {
+    await assertListingAccess(req, req.params.id);
+    const saved = await saveListingMediaArrangement(req.params.id, req.body);
+    return res.json({ success: true, ...saved });
+  } catch (err) {
+    return sendKnownError(res, err, "Failed to save the media order.");
   }
 });
 

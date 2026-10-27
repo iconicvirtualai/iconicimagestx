@@ -122,36 +122,36 @@ const VIDEO_FILE = /\.(mp4|m4v|mov|webm)(\?|#|$)/i;
 const BLOCKED_EXT = /\.(zip|pdf|dng|cr2|cr3|nef|nrw|arw|srf|sr2|raw|rw2|orf|raf|pef|3fr|fff|iiq|heic|heif|mp4|m4v|mov|webm)(\?|#|$)/i;
 const FILE_KEYS = ["downloadUrl", "fileUrl", "originalUrl", "fullResUrl", "mlsUrl", "zipUrl", "printUrl", "reelUrl", "mp4Url", "rawUrl", "src"];
 const DISPLAY_KEYS = ["previewUrl", "displayUrl", "webUrl", "thumbnailUrl"];
-function text$2(value) {
+function text$3(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function rowOf(item) {
   return item && typeof item === "object" ? item : null;
 }
 function shareableUrl(value) {
-  const url = text$2(value);
+  const url = text$3(value);
   if (!url || url.startsWith("//") || url.includes("\\") || url.includes("..")) return "";
   if (url.startsWith("/")) return url;
   if (url.startsWith("https://") || url.startsWith("http://")) return url;
   return "";
 }
 function mediaName(row, fallback) {
-  return text$2(row.name) || text$2(row.fileName) || text$2(row.title) || fallback;
+  return text$3(row.deliveryName) || text$3(row.name) || text$3(row.fileName) || text$3(row.title) || fallback;
 }
 function labelOf(row) {
-  return `${text$2(row.fileName)} ${text$2(row.name)} ${text$2(row.title)} ${text$2(row.path)} ${text$2(row.storagePath)}`.toLowerCase();
+  return `${text$3(row.fileName)} ${text$3(row.name)} ${text$3(row.title)} ${text$3(row.path)} ${text$3(row.storagePath)}`.toLowerCase();
 }
 function isMls(row) {
-  const category = text$2(row.category).toLowerCase();
-  const type = text$2(row.type).toLowerCase();
+  const category = text$3(row.category).toLowerCase();
+  const type = text$3(row.type).toLowerCase();
   if (category === "mls" || type === "mls") return true;
   const label = labelOf(row);
   if (/(^|[^a-z0-9])mls([^a-z0-9]|$)/.test(label)) return true;
   return /\/mls\//.test(label);
 }
 function isFullRes(row) {
-  const category = text$2(row.category).toLowerCase();
-  const type = text$2(row.type).toLowerCase();
+  const category = text$3(row.category).toLowerCase();
+  const type = text$3(row.type).toLowerCase();
   if (category === "full-res" || category === "fullres" || type === "full-res" || type === "fullres") return true;
   const label = labelOf(row);
   if (/(^|[^a-z0-9])full[\s_-]?res([^a-z0-9]|$)/.test(label)) return true;
@@ -160,7 +160,7 @@ function isFullRes(row) {
 function isRasterUrl(url, row) {
   if (!url || BLOCKED_EXT.test(url.split("#")[0]) || VIDEO_FILE.test(url.split("#")[0])) return false;
   if (RASTER.test(url.split("#")[0])) return true;
-  const content = text$2(row.contentType).toLowerCase();
+  const content = text$3(row.contentType).toLowerCase();
   return /^image\/(jpeg|jpg|png|webp|gif)/.test(content);
 }
 function blockedFileUrls(row, includeOwnUrl) {
@@ -189,11 +189,11 @@ function separateDisplay(row) {
 }
 function rasterShareSource(row, legacyDropTagged = false) {
   if (legacyDropTagged && isMls(row)) return "";
-  const type = text$2(row.type).toLowerCase();
+  const type = text$3(row.type).toLowerCase();
   if (type === "video" || type === "reel" || type === "file" || type === "matterport") return "";
-  const content = text$2(row.contentType).toLowerCase();
+  const content = text$3(row.contentType).toLowerCase();
   if (content.startsWith("video/") || content === "application/pdf" || content === "application/zip") return "";
-  const path2 = `${text$2(row.path)} ${text$2(row.storagePath)}`.toLowerCase();
+  const path2 = `${text$3(row.path)} ${text$3(row.storagePath)}`.toLowerCase();
   if (/\/(raw|downloads?|print|zips?)\//.test(path2)) return "";
   const display = separateDisplay(row);
   if (legacyDropTagged && isFullRes(row)) return display;
@@ -223,11 +223,11 @@ function videoFileUrl(row) {
 function videoPlaceholderSource(row) {
   if (rasterPoster(row)) return "";
   const file = videoFileUrl(row);
-  const type = text$2(row.type).toLowerCase();
-  const content = text$2(row.contentType).toLowerCase();
+  const type = text$3(row.type).toLowerCase();
+  const content = text$3(row.contentType).toLowerCase();
   const named = type === "video" || type === "reel" || content.startsWith("video/");
   if (!file && !named) return "";
-  const id = text$2(row.id) || file || text$2(row.path) || text$2(row.storagePath) || text$2(row.name) || text$2(row.fileName);
+  const id = text$3(row.id) || file || text$3(row.path) || text$3(row.storagePath) || text$3(row.name) || text$3(row.fileName);
   if (!id) return "";
   return `${VIDEO_PLACEHOLDER_PREFIX}${encodeURIComponent(id)}`;
 }
@@ -257,14 +257,14 @@ function shareDisplayItems(listing, options = {}) {
   }
   for (const group of [listing.floorplans, listing.floorPlans]) {
     if (!Array.isArray(group)) continue;
-    group.forEach((item, index) => {
+    keptShots(group).forEach((item, index) => {
       const row = rowOf(item);
       if (!row) return;
       pushDisplay(items, seen, mediaName(row, `Floor plan ${index + 1}`), floorSource(row, legacy), "floorPlan");
     });
   }
   if (Array.isArray(listing.videos)) {
-    listing.videos.forEach((item) => {
+    keptShots(listing.videos).forEach((item) => {
       const row = rowOf(item);
       if (!row) return;
       const poster = rasterPoster(row, legacy) || videoPlaceholderSource(row);
@@ -285,8 +285,8 @@ function listingOwnerDisplayItems(listing) {
   return items;
 }
 function isGalleryFloor(row) {
-  const type = text$2(row.type).toLowerCase();
-  const category = text$2(row.category).toLowerCase();
+  const type = text$3(row.type).toLowerCase();
+  const category = text$3(row.category).toLowerCase();
   return type === "floorplan" || type === "floor-plan" || category === "floorplan" || category === "floor-plan";
 }
 function galleryOwnerDisplayItems(media) {
@@ -294,7 +294,7 @@ function galleryOwnerDisplayItems(media) {
   const seen = /* @__PURE__ */ new Set();
   const rows = media.map(rowOf).filter((row) => Boolean(row));
   for (const row of rows) {
-    const type = text$2(row.type).toLowerCase();
+    const type = text$3(row.type).toLowerCase();
     if (type === "video" || type === "reel" || type === "matterport" || type === "tour" || type === "file" || type === "pdf") continue;
     const source = rasterShareSource(row);
     if (!source) continue;
@@ -302,7 +302,7 @@ function galleryOwnerDisplayItems(media) {
     pushDisplay(items, seen, mediaName(row, floor ? "Floor plan" : "Photo"), source, floor ? "floorPlan" : "image");
   }
   for (const row of rows) {
-    const type = text$2(row.type).toLowerCase();
+    const type = text$3(row.type).toLowerCase();
     if (type !== "video" && type !== "reel") continue;
     const poster = rasterPoster(row) || videoPlaceholderSource(row);
     pushDisplay(items, seen, mediaName(row, "Video"), poster, "poster");
@@ -335,6 +335,89 @@ function listingBlock(listing, related) {
     };
   }
   return null;
+}
+const SECTION_ID = /^s[a-z0-9]{4,16}$/;
+const SECTION_LIMIT = 24;
+const PLACEMENT_LIMIT = 400;
+function sectionIdOk(value) {
+  return SECTION_ID.test(value);
+}
+function text$2(value, limit = 180) {
+  if (typeof value !== "string") return "";
+  return value.replace(/\u0000/g, "").trim().slice(0, limit);
+}
+function sectionName(value) {
+  return text$2(value, 60);
+}
+function readMediaArrangement(value) {
+  const row = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const sections = [];
+  const seenSections = /* @__PURE__ */ new Set();
+  if (Array.isArray(row.sections)) {
+    for (const item of row.sections) {
+      if (!item || typeof item !== "object") continue;
+      const section = item;
+      const id = text$2(section.id, 32);
+      const name = sectionName(section.name);
+      if (!sectionIdOk(id) || !name || seenSections.has(id)) continue;
+      seenSections.add(id);
+      sections.push({
+        id,
+        name,
+        order: typeof section.order === "number" && Number.isFinite(section.order) ? section.order : sections.length,
+        hideFromListingSites: section.hideFromListingSites === true
+      });
+      if (sections.length >= SECTION_LIMIT) break;
+    }
+  }
+  sections.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+  sections.forEach((section, order) => {
+    section.order = order;
+  });
+  const known = new Set(sections.map((section) => section.id));
+  const placements = [];
+  const seenIds = /* @__PURE__ */ new Set();
+  const counters = /* @__PURE__ */ new Map();
+  if (Array.isArray(row.placements)) {
+    const draft = [];
+    for (const item of row.placements) {
+      if (!item || typeof item !== "object") continue;
+      const placement = item;
+      const id = text$2(placement.id);
+      if (!id || seenIds.has(id)) continue;
+      seenIds.add(id);
+      const sectionId = text$2(placement.sectionId, 32);
+      draft.push({
+        id,
+        sectionId: known.has(sectionId) ? sectionId : "",
+        order: typeof placement.order === "number" && Number.isFinite(placement.order) ? placement.order : draft.length,
+        index: draft.length
+      });
+      if (draft.length >= PLACEMENT_LIMIT) break;
+    }
+    draft.sort((a, b) => a.order - b.order || a.index - b.index);
+    for (const placement of draft) {
+      const order = counters.get(placement.sectionId) || 0;
+      counters.set(placement.sectionId, order + 1);
+      placements.push({ id: placement.id, sectionId: placement.sectionId, order });
+    }
+  }
+  return { sections, placements };
+}
+function hiddenSectionIdSet(arrangement) {
+  return new Set(
+    readMediaArrangement(arrangement).sections.filter((section) => section.hideFromListingSites).map((section) => section.id)
+  );
+}
+function isHiddenFromListingSites(listing, row) {
+  const arrangement = readMediaArrangement(listing?.mediaArrangement);
+  const hidden = hiddenSectionIdSet(arrangement);
+  if (hidden.size === 0) return false;
+  const sectionId = text$2(row.sectionId, 32);
+  if (sectionId && hidden.has(sectionId)) return true;
+  const id = text$2(row.id) || text$2(row.path) || text$2(row.storagePath) || text$2(row.url);
+  if (!id) return false;
+  return arrangement.placements.some((placement) => placement.id === id && hidden.has(placement.sectionId));
 }
 const APPRENTICESHIP_RULES = [
   "Apprentices are learning.",
@@ -459,10 +542,29 @@ function hiddenPresentationKeys(listing) {
   for (const [id, prefs] of Object.entries(photos)) {
     if (prefs.hidden && id) keys.add(id);
   }
+  const arrangement = readMediaArrangement(listing?.mediaArrangement);
+  for (const section of arrangement.sections) {
+    if (section.hideFromListingSites) keys.add(`section:${section.id}`);
+  }
+  const buckets = [listing?.images, listing?.videos, listing?.floorplans, listing?.floorPlans, listing?.files, listing?.tours];
+  for (const bucket of buckets) {
+    if (!Array.isArray(bucket)) continue;
+    for (const item of bucket) {
+      if (!item || typeof item !== "object") continue;
+      const row = item;
+      if (!isHiddenFromListingSites(listing, row)) continue;
+      for (const key of [row.id, row.path, row.storagePath, row.url, row.shareUrl]) {
+        if (typeof key === "string" && key.trim()) keys.add(key.trim());
+      }
+    }
+  }
   return keys;
 }
 function rowHiddenFromPresentation(row, hiddenKeys) {
+  if (row.culled === true) return true;
   if (row.hiddenFromPresentation === true || row.portalHidden === true) return true;
+  const sectionId = text$1(row.sectionId);
+  if (sectionId && hiddenKeys.has(`section:${sectionId}`)) return true;
   const id = text$1(row.id);
   const path2 = text$1(row.path) || text$1(row.storagePath);
   const url = text$1(row.url) || text$1(row.shareUrl);
@@ -489,7 +591,7 @@ function readMediaStore(value) {
 function groupIdText(value) {
   if (typeof value !== "string") return "";
   const id = value.trim();
-  return /^g[a-z0-9]{4,16}$/.test(id) ? id : "";
+  return /^(?:g|s)[a-z0-9]{4,16}$/.test(id) ? id : "";
 }
 function readPhotoGroups(value) {
   if (!Array.isArray(value)) return [];

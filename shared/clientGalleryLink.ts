@@ -231,14 +231,16 @@ function publicImages(listing: GalleryLinkDoc): StudioMedia[] {
 function publicVideos(listing: GalleryLinkDoc): StudioMedia[] {
   if (!Array.isArray(listing.videos)) return [];
   const videos: StudioMedia[] = [];
-  for (const item of listing.videos) {
+  keptShots(listing.videos as Array<Record<string, unknown>>).forEach((item, index) => {
     const row = rowOf(item);
-    if (!row) continue;
+    if (!row) return;
     const url = httpUrl(row.url);
-    const name = mediaName(row, "Video");
-    if (!url || isPrivateMedia(text(row.path) || text(row.storagePath), name, url)) continue;
-    videos.push({ url, name });
-  }
+    const original = mediaName(row, "Video");
+    const name = deliveryFileName(row, index);
+    const path = text(row.path) || text(row.storagePath);
+    if (!url || isPrivateMedia(path, original, url) || isPrivateMedia(path, name, url)) return;
+    videos.push({ url, name, downloadName: name });
+  });
   return videos.slice(0, 40);
 }
 
@@ -264,15 +266,16 @@ function publicFloorPlans(listing: GalleryLinkDoc): StudioMedia[] {
   const plans: StudioMedia[] = [];
   for (const group of groups) {
     if (!Array.isArray(group)) continue;
-    for (const item of group) {
+    keptShots(group as Array<Record<string, unknown>>).forEach((item, index) => {
       const row = rowOf(item);
-      if (!row) continue;
+      if (!row) return;
       const url = httpUrl(row.url) || httpUrl(row.shareUrl);
-      const name = mediaName(row, "Floor plan");
+      const original = mediaName(row, "Floor plan");
+      const name = deliveryFileName(row, index);
       const path = text(row.path) || text(row.storagePath);
-      if (!url || isPrivateMedia(path, name, url)) continue;
-      plans.push({ url, name });
-    }
+      if (!url || isPrivateMedia(path, original, url) || isPrivateMedia(path, name, url)) return;
+      plans.push({ url, name, downloadName: name });
+    });
   }
   return plans.slice(0, 40);
 }

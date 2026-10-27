@@ -8,6 +8,12 @@ import {
   shotKey,
   type SequenceShot,
 } from "../../shared/gallerySequence";
+import {
+  collectArrangementMedia,
+  readMediaArrangement,
+  stampGalleryMediaItems,
+  stampListingArrangement,
+} from "../../shared/mediaArrangement";
 import { galleryStatusAfterStudioAdd } from "../../shared/iconicStudio";
 import {
   contentTypeForUpload,
@@ -355,6 +361,56 @@ export async function publishListingGallerySequence(listingId: string, uploadedB
     note: galleryIds.length
       ? "Gallery files follow the photographer order. Culled shots were left out. No client email was sent."
       : "Order saved on the listing. No gallery is linked yet, and no client email was sent.",
+  };
+}
+
+/**
+ * Staff arrangement for every file on the listing.
+ * Writes sortOrder and deliveryName on the listing and on linked galleries.
+ * Does not email or text the client.
+ */
+export async function saveListingMediaArrangement(listingId: string, raw: unknown) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw Object.assign(new Error("Say how to arrange this media."), { status: 400 });
+  }
+  const ref = db().collection("listings").doc(listingId);
+  const snap = await ref.get();
+  if (!snap.exists) throw Object.assign(new Error("Listing not found."), { status: 404 });
+  const listing = snap.data() || {};
+  const media = collectArrangementMedia(listing);
+  const known = new Set(media.map((item) => item.id));
+  const arrangement = readMediaArrangement(raw);
+  arrangement.placements = arrangement.placements.filter((placement) => known.has(placement.id));
+  const address = recordAddressText(listing) || "listing";
+  const stamped = stampListingArrangement(listing, arrangement, address);
+  const update: Record<string, unknown> = {
+    mediaArrangement: stamped.listing.mediaArrangement,
+    portalMedia: stamped.listing.portalMedia,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+  for (const key of ["images", "videos", "floorplans", "floorPlans", "tours", "files", "clientPortalUploads"] as const) {
+    if (Array.isArray(listing[key])) update[key] = stamped.listing[key];
+  }
+  await ref.update(update);
+
+  const galleryIds = await linkedGalleryIds(listingId, listing);
+  for (const galleryId of galleryIds) {
+    const galleryRef = db().collection("galleries").doc(galleryId);
+    const gallerySnap = await galleryRef.get();
+    if (!gallerySnap.exists) continue;
+    const data = gallerySnap.data() || {};
+    const current = Array.isArray(data.mediaItems) ? data.mediaItems : [];
+    await galleryRef.update({
+      mediaItems: stampGalleryMediaItems(current, stamped.sequenced),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  }
+
+  return {
+    arrangement: stamped.listing.mediaArrangement,
+    names: stamped.names,
+    galleries: galleryIds,
+    note: "Gallery order saved. No client email was sent.",
   };
 }
 
