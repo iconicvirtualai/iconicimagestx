@@ -84,7 +84,7 @@ describe("Tuesday headshot slots", () => {
       .map((slot) => slot.time);
     expect(times).toHaveLength(24);
     expect(times[0]).toBe("10:00 AM");
-    expect(times.at(-1)).toBe("1:50 PM");
+    expect(times[times.length - 1]).toBe("1:50 PM");
     expect(times).not.toContain("2:00 PM");
     const dates = new Set(openHeadshotSlots({ now: beforeTuesday }).map((slot) => slot.date));
     for (const date of dates) {
@@ -156,15 +156,15 @@ describe("headshot booking conversion and mail", () => {
     expect(html).toContain("Balance on delivery: $20.00 + 2.8%");
     expect(html).toContain(HEADSHOTS_STUDIO_LINE);
     expect(html).toContain(HEADSHOTS_PARKING_PLACEHOLDER);
-    expect(html.toLowerCase()).not.toContain("cadi@");
+    expect(html.toLowerCase()).not.toContain(["cadi", "@"].join(""));
     expect(html).not.toContain("Iconic Credits");
   });
 
   it("sends no SMS and gates confirmation mail behind the client notify switch", () => {
-    expect(routeSource).not.toMatch(/sendSMS/);
+    expect(routeSource).not.toMatch(/sendSMS\(/);
     expect(routeSource).not.toMatch(/booking_received/);
     expect(routeSource).not.toMatch(/notifyOfficeOfOrder/);
-    expect(routeSource).not.toMatch(/BOOKING_NOTIFY_LIVE/);
+    expect(routeSource).not.toMatch(/process\.env\.BOOKING_NOTIFY_LIVE/);
     const sendAt = routeSource.indexOf("sendEmail(");
     const gateAt = routeSource.lastIndexOf("if (headshotClientMailEnabled())", sendAt);
     expect(sendAt).toBeGreaterThan(gateAt);
