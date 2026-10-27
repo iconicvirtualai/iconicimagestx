@@ -91,6 +91,7 @@ export const navGroups: { label: string; items: AdminNavItem[] }[] = [
     label: "AICON",
     items: [
       { label: "AI Agents", href: "/admin/aicon", icon: Bot, roles: COORD_UP },
+      { label: "Bot Room", href: "/admin/botroom", icon: Bot, roles: ADMIN_ONLY },
       { label: "Automation", href: "/admin/automation", icon: Settings, roles: ADMIN_ONLY },
     ],
   },

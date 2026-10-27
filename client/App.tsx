@@ -75,6 +75,7 @@ import AdminBookingCatalog from "./pages/AdminBookingCatalog";
 import AdminInvoicePresets from "./pages/AdminInvoicePresets";
 import AdminListings from "./pages/AdminListings";
 import AdminMessages from "./pages/AdminMessages";
+import AdminBotRoomConnect from "./pages/AdminBotRoomConnect";
 import EmailHome from "./pages/marketing/EmailHome";
 import ContactsPage from "./pages/marketing/ContactsPage";
 import ImportPage from "./pages/marketing/ImportPage";
@@ -204,6 +205,8 @@ const App = () => (
             <Route path="/admin/invoice-presets" element={<ProtectedRoute requiredRole="coordinator"><AdminInvoicePresets /></ProtectedRoute>} />
             <Route path="/admin/messages" element={<ProtectedRoute requiredRole="coordinator"><AdminMessages /></ProtectedRoute>} />
             <Route path="/admin/communications" element={<ProtectedRoute requiredRole="coordinator"><AdminMessages /></ProtectedRoute>} />
+            <Route path="/admin/botroom" element={<ProtectedRoute requiredRole="admin"><AdminMessages /></ProtectedRoute>} />
+            <Route path="/admin/botroom/connect" element={<ProtectedRoute requiredRole="admin"><AdminBotRoomConnect /></ProtectedRoute>} />
             <Route path="/admin/communications/email" element={<ProtectedRoute requiredRole="admin"><EmailHome /></ProtectedRoute>} />
             <Route path="/admin/communications/email/contacts" element={<ProtectedRoute requiredRole="admin"><ContactsPage /></ProtectedRoute>} />
             <Route path="/admin/communications/email/contacts/view" element={<ProtectedRoute requiredRole="admin"><ContactDetailPage /></ProtectedRoute>} />
