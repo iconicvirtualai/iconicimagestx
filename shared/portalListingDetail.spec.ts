@@ -248,6 +248,11 @@ describe("portal listing detail", () => {
       showPhotos: false,
       showVideo: true,
     });
+    expect(sanitizeWebsiteSettings({ design: "golden-hour" }).design).toBe("golden-hour");
+    expect(sanitizeWebsiteSettings({ design: "stories" }).design).toBe("stories");
+    expect(sanitizeWebsiteSettings({ design: "issue" }).design).toBe("issue");
+    expect(sanitizeWebsiteSettings({ design: "index" }).design).toBe("index");
+    expect(sanitizeWebsiteSettings({ design: "not-a-design" }).design).toBe("index");
     expect(portalListingTab("photos")).toBe("photos");
     expect(portalListingTab("har")).toBe("data");
   });

@@ -1,13 +1,16 @@
-import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import {
   isListingSiteDesign,
+  LISTING_SITE_TEMPLATES,
   type ListingSiteDesign,
   type PublicListingSite,
 } from "@shared/listingSite";
+import { ExtraDesign, LISTING_EXTRA_CSS } from "@/components/listing-site/extraDesigns";
+import { AgentBand, LeadForm, Plan, TourPoster } from "@/components/listing-site/pieces";
 import NotFound from "@/pages/NotFound";
 
-const FONT_HREF = "https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75,400;75,700;75,800&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Space+Grotesk:wght@500;700&display=swap";
+const FONT_HREF = "https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75,400;75,700;75,800&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=DM+Sans:wght@500;700&family=DM+Serif+Display&family=EB+Garamond:ital,wght@0,500;1,500&family=Fraunces:opsz,wght@9..144,560;9..144,700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Manrope:wght@500;700&family=Playfair+Display:ital,wght@1,600;1,700&family=Source+Sans+3:wght@400;600&family=Space+Grotesk:wght@500;700&family=Work+Sans:wght@400;500&display=swap";
 
 export default function ListingSite() {
   const { slug = "" } = useParams();
@@ -50,10 +53,11 @@ export function ListingSiteView({ site, inquiry = true }: { site: PublicListingS
   return (
     <div data-listing-design={site.design} className="ls-frame" style={theme}>
       <link rel="stylesheet" href={FONT_HREF} />
-      <style>{LISTING_CSS}</style>
+      <style>{LISTING_CSS}{LISTING_EXTRA_CSS}</style>
       {site.design === "two-up" ? <TwoUp site={site} inquiry={inquiry} /> : null}
       {site.design === "premiere" ? <Premiere site={site} inquiry={inquiry} /> : null}
       {site.design === "index" ? <IndexDesign site={site} inquiry={inquiry} /> : null}
+      <ExtraDesign site={site} inquiry={inquiry} />
       <PoweredBy />
     </div>
   );
@@ -222,93 +226,6 @@ function Accordion({ title, open, onToggle, children }: { title: string; open: b
   );
 }
 
-function TourPoster({ site }: { site: PublicListingSite }) {
-  const [loaded, setLoaded] = useState(false);
-  if (!site.tourEmbedUrl) return <p className="ls-empty">No 3D tour on this listing yet.</p>;
-  if (!loaded) {
-    return (
-      <button type="button" className="ls-tour" onClick={() => setLoaded(true)}>
-        Open 3D tour
-      </button>
-    );
-  }
-  return <iframe title="3D tour" src={site.tourEmbedUrl} loading="lazy" allowFullScreen />;
-}
-
-function Plan({ site }: { site: PublicListingSite }) {
-  if (site.floorplan) return <img src={site.floorplan.url} alt={site.floorplan.name} />;
-  if (site.photos.length === 0) return <p className="ls-empty">No floorplan on this listing yet.</p>;
-  return (
-    <ul className="ls-plan-list">
-      {site.photos.map((photo) => <li key={photo.url}>{photo.name}</li>)}
-    </ul>
-  );
-}
-
-function LeadForm({ site, variant }: { site: PublicListingSite; variant: ListingSiteDesign }) {
-  const [name, setName] = useState("");
-  const [contact, setContact] = useState("");
-  const [when, setWhen] = useState("Saturday");
-  const [consent, setConsent] = useState(false);
-  const [message, setMessage] = useState("");
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    if (!consent) {
-      setMessage("Consent is required.");
-      return;
-    }
-    const response = await fetch(`/api/listing-sites/${encodeURIComponent(site.slug)}/inquiry`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, contact, when, consent: true }),
-    });
-    const body = await response.json().catch(() => null) as { error?: string } | null;
-    setMessage(response.ok ? "Sent to the listing agent." : body?.error || "The request could not be saved.");
-  }
-
-  return (
-    <form id="visit" className={`ls-lead ls-lead-${variant}`} onSubmit={(event) => void submit(event)}>
-      <h2>{variant === "premiere" ? "Book a screening" : variant === "two-up" ? "Request a showing" : "Visit"}</h2>
-      {variant === "index" ? (
-        <p className="ls-madlib">I would like to see this home on {when}. My name is {name || "…"}. Reach me at {contact || "…"}.</p>
-      ) : null}
-      <label>Name<input value={name} onChange={(event) => setName(event.target.value)} required autoComplete="name" /></label>
-      <label>Email or phone<input value={contact} onChange={(event) => setContact(event.target.value)} required autoComplete="email" /></label>
-      <label>Preferred time
-        <select value={when} onChange={(event) => setWhen(event.target.value)}>
-          {["Saturday", "Sunday", "Morning", "Afternoon", "Evening"].map((slot) => <option key={slot}>{slot}</option>)}
-        </select>
-      </label>
-      <label className="ls-consent">
-        <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
-        <span>I agree to be contacted by the listing agent by call or text about this property. Consent is not a condition of purchase.</span>
-      </label>
-      <button type="submit">Send</button>
-      {message ? <p role="status">{message}</p> : null}
-    </form>
-  );
-}
-
-function AgentBand({ site }: { site: PublicListingSite }) {
-  const agent = site.agent;
-  return (
-    <section className="ls-agent">
-      <h2>{agent.name || "Listing agent"}</h2>
-      <p>
-        {[agent.brokerage, agent.license ? `TX Lic. #${agent.license}` : "", agent.phone, agent.email].filter(Boolean).join(" · ")}
-      </p>
-      <p className="ls-legal">
-        <a href="https://www.trec.texas.gov/forms/information-about-brokerage-services">TREC Information About Brokerage Services</a>
-        {" · "}
-        <a href="https://www.trec.texas.gov/forms/consumer-protection-notice">TREC Consumer Protection Notice</a>
-        {" · Equal Housing Opportunity"}
-      </p>
-      <p>Photography & film: Iconic Images</p>
-    </section>
-  );
-}
-
 function PoweredBy() {
   return (
     <footer className="ls-powered">
@@ -321,15 +238,16 @@ function PoweredBy() {
 }
 
 function previewListing(design: ListingSiteDesign): PublicListingSite {
+  const template = LISTING_SITE_TEMPLATES.find((item) => item.id === design) || LISTING_SITE_TEMPLATES[7];
   return {
-    slug: "18-lantern-oak-pl-the-woodlands",
+    slug: "100-sample-lane-austin",
     design,
-    font: design === "premiere" ? "serif" : design === "two-up" ? "modern" : "sans",
-    color: design === "two-up" ? "teal" : "ink",
-    style: design === "premiere" ? "editorial" : "classic",
-    address: "18 Lantern Oak Pl, The Woodlands, TX",
-    street: "18 Lantern Oak Pl",
-    city: "The Woodlands",
+    font: template.font,
+    color: template.color,
+    style: template.style,
+    address: "100 Sample Lane, Austin, TX",
+    street: "100 Sample Lane",
+    city: "Austin",
     price: "$1,185,000",
     facts: [
       { label: "Beds", value: "4" },

@@ -278,15 +278,20 @@ describe("portal listing detail page", () => {
     expect(render("website")).not.toContain("listing-site-view");
     expect(render("website")).not.toContain('href="/l/18-oak-hollow-spring"');
     expect(render("website")).toContain("listing-site-preview");
-    expect(render("website")).toContain("listing-style-classic");
-    expect(render("website")).toContain("listing-style-editorial");
-    expect(render("website")).toContain("listing-style-minimal");
-    expect(render("website")).toContain("listing-style-thumb-classic");
+    expect(render("website")).toContain('data-testid="listing-style-index"');
+    expect(render("website")).toContain('data-legacy-style="classic"');
+    expect(render("website")).toContain('data-testid="listing-style-premiere"');
+    expect(render("website")).toContain('data-legacy-style="editorial"');
+    expect(render("website")).toContain('data-testid="listing-style-two-up"');
+    expect(render("website")).toContain('data-legacy-style="minimal"');
+    expect(render("website")).toContain("listing-style-thumb-index");
+    expect(render("website")).toContain("listing-style-preview-stories");
     expect(render("website")).toContain("style-card-thumb-page");
     expect(render("website")).toContain("100cqw / 960px");
-    expect(render("website")).toContain('data-listing-design="index"');
-    expect(render("website")).toContain('data-listing-design="premiere"');
-    expect(render("website")).toContain('data-listing-design="two-up"');
+    for (const design of ["issue", "premiere", "product-drop", "gallery-wall", "field-guide", "two-up", "golden-hour", "index", "dossier", "stories"]) {
+      expect(render("website")).toContain(`data-listing-design="${design}"`);
+      expect(render("website")).toContain(`listing-style-${design}`);
+    }
     expect(render("website")).toContain("Portal tile");
     expect(render("website")).toContain("portal-tile-skins");
     expect(render("website")).toContain("tile-skin-showcase");
@@ -294,9 +299,18 @@ describe("portal listing detail page", () => {
     expect(render("marketing")).toContain("portal-upload-file");
     expect(render("video")).toContain("portal-upload-input-video");
     expect(render("website")).not.toContain("/l/18-oak-hollow-spring");
-    expect(render("website")).toContain("Classic");
-    expect(render("website")).toContain("Editorial");
-    expect(render("website")).toContain("Minimal");
+    expect(render("website")).toContain("The Issue");
+    expect(render("website")).toContain("Premiere");
+    expect(render("website")).toContain("Product Drop");
+    expect(render("website")).toContain("Gallery Wall");
+    expect(render("website")).toContain("Field Guide");
+    expect(render("website")).toContain("Two-Up");
+    expect(render("website")).toContain("Golden Hour");
+    expect(render("website")).toContain("Index");
+    expect(render("website")).toContain("The Dossier");
+    expect(render("website")).toContain("Stories Deck");
+    expect(render("website")).toContain("Luxury editorial magazine");
+    expect(render("website")).toContain("Swipeable social cards");
     expect(render("website")).not.toContain("not generated");
   });
 

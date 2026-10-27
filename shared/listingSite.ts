@@ -3,11 +3,39 @@
  * Photos are display-route indexes. Original, zip, and PDF urls stay off the payload.
  */
 
-import { readMediaStore, sanitizeWebsiteSettings, type PortalWebsiteSettings } from "./portalListingDetail.ts";
+import {
+  PORTAL_WEBSITE_DESIGNS,
+  readMediaStore,
+  sanitizeWebsiteSettings,
+  type PortalWebsiteDesign,
+  type PortalWebsiteSettings,
+} from "./portalListingDetail.ts";
 import { rasterShareSource, shareDisplayItems, shareDisplayPath, type ShareListing } from "./publicShare.ts";
 
-export const LISTING_SITE_DESIGNS = ["index", "two-up", "premiere"] as const;
-export type ListingSiteDesign = (typeof LISTING_SITE_DESIGNS)[number];
+export const LISTING_SITE_DESIGNS = PORTAL_WEBSITE_DESIGNS;
+export type ListingSiteDesign = PortalWebsiteDesign;
+
+/** Design-pack names. Saved index, two-up, and premiere values stay on those ids. */
+export const LISTING_SITE_TEMPLATES: Array<{
+  id: ListingSiteDesign;
+  name: string;
+  vibe: string;
+  font: PortalWebsiteSettings["font"];
+  color: PortalWebsiteSettings["color"];
+  style: PortalWebsiteSettings["style"];
+  marker: string;
+}> = [
+  { id: "issue", name: "The Issue", vibe: "Luxury editorial magazine", font: "serif", color: "warm", style: "editorial", marker: "The spread" },
+  { id: "premiere", name: "Premiere", vibe: "Cinematic film release", font: "serif", color: "ink", style: "editorial", marker: "Feature presentation" },
+  { id: "product-drop", name: "Product Drop", vibe: "Sleek launch page", font: "modern", color: "teal", style: "minimal", marker: "Tech specs" },
+  { id: "gallery-wall", name: "Gallery Wall", vibe: "Quiet museum walls", font: "serif", color: "ink", style: "editorial", marker: "The exhibition" },
+  { id: "field-guide", name: "Field Guide", vibe: "Warm woodlands guide", font: "serif", color: "warm", style: "minimal", marker: "Specimen" },
+  { id: "two-up", name: "Two-Up", vibe: "Split-screen story", font: "modern", color: "teal", style: "minimal", marker: "Opening" },
+  { id: "golden-hour", name: "Golden Hour", vibe: "Sunrise to twilight", font: "serif", color: "warm", style: "editorial", marker: "6:42" },
+  { id: "index", name: "Index", vibe: "Swiss numbered type", font: "sans", color: "ink", style: "classic", marker: "Rooms" },
+  { id: "dossier", name: "The Dossier", vibe: "Exclusive coming soon", font: "serif", color: "warm", style: "editorial", marker: "Request the full dossier" },
+  { id: "stories", name: "Stories Deck", vibe: "Swipeable social cards", font: "modern", color: "teal", style: "minimal", marker: "Stories deck" },
+];
 
 const DESIGN_SET = new Set<string>(LISTING_SITE_DESIGNS);
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;

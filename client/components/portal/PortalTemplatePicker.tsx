@@ -5,22 +5,8 @@ import type { ClientListingCard } from "@shared/clientHome";
 import { clientListingPath } from "@shared/clientHome";
 import type { ListingCardLook } from "@shared/listingCard";
 import { packageSkinsInDisplayOrder } from "@shared/packageSkins";
-import { listingSitePath, listingSiteSlug, type PublicListingSite } from "@shared/listingSite";
+import { LISTING_SITE_TEMPLATES, listingSitePath, listingSiteSlug, type ListingSiteDesign, type PublicListingSite } from "@shared/listingSite";
 import type { PortalListingDetail, PortalWebsiteSettings } from "@shared/portalListingDetail";
-
-/** The only listing-site style set in the product: classic, editorial, minimal. */
-const SITE_STYLES: Array<{
-  id: PortalWebsiteSettings["style"];
-  name: string;
-  note: string;
-  design: PortalWebsiteSettings["design"];
-  font: PortalWebsiteSettings["font"];
-  color: PortalWebsiteSettings["color"];
-}> = [
-  { id: "classic", name: "Classic", note: "Numbered index", design: "index", font: "sans", color: "ink" },
-  { id: "editorial", name: "Editorial", note: "Film-first serif", design: "premiere", font: "serif", color: "ink" },
-  { id: "minimal", name: "Minimal", note: "Open two-up", design: "two-up", font: "modern", color: "teal" },
-];
 
 export function PortalTemplatePicker({
   detail,
@@ -38,15 +24,16 @@ export function PortalTemplatePicker({
   onSave: () => void;
 }) {
   const slug = listingSiteSlug({ line1: detail.address.line1, city: detail.address.city });
-  const [fullPreview, setFullPreview] = useState(false);
+  const [fullPreview, setFullPreview] = useState<ListingSiteDesign | null>(null);
   const preview = previewSite(detail, website);
+  const current = LISTING_SITE_TEMPLATES.find((item) => item.id === website.design) || LISTING_SITE_TEMPLATES.find((item) => item.id === "index")!;
 
   return (
     <section className="space-y-6" data-testid="portal-templates">
       <div className="rounded-2xl border border-gray-100 bg-white p-5">
         <h2 className="text-xs font-black uppercase tracking-widest text-[#0d9488]">Listing site styles</h2>
         <p className="mt-1 text-xs text-gray-500">
-          Classic, Editorial, and Minimal. Each card is that style on this listing’s photos. Pick one, open the full preview, then save.
+          Ten listing sites. Each card is that design on this listing’s photos. Pick one, open the full preview, then save.
         </p>
         {slug && website.published ? (
           <a href={listingSitePath(slug)} className="mt-3 inline-flex min-h-12 items-center text-sm font-black underline" data-testid="listing-site-view">View site</a>
@@ -55,24 +42,25 @@ export function PortalTemplatePicker({
         ) : (
           <p className="mt-3 text-xs text-gray-500">Add a street and city on the Data tab to open the public site. The preview below still works.</p>
         )}
-        <p className="mt-2 text-xs text-gray-500">{styleLabel(website.style)} · {fontLabel(website.font)} · {website.published ? "Published" : "Preview stays on this page until you publish."}</p>
+        <p className="mt-2 text-xs text-gray-500">{current.name} · {fontLabel(website.font)} · {website.published ? "Published" : "Preview stays on this page until you publish."}</p>
         <style>{STYLE_CARD_THUMB_CSS}</style>
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {SITE_STYLES.map((style) => {
-            const selected = website.style === style.id && website.design === style.design;
-            const preset = { ...website, design: style.design, font: style.font, color: style.color, style: style.id };
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {LISTING_SITE_TEMPLATES.map((template) => {
+            const selected = website.design === template.id;
+            const preset = { ...website, design: template.id, font: template.font, color: template.color, style: template.style };
             return (
               <div
-                key={style.id}
+                key={template.id}
                 className={`min-w-0 overflow-hidden rounded-2xl border bg-white ${selected ? "border-black" : "border-gray-200"}`}
-                data-testid={`listing-style-${style.id}`}
+                data-testid={`listing-style-${template.id}`}
+                data-legacy-style={template.style}
               >
                 <div
                   className="style-card-thumb"
-                  style={{ background: THUMB_BG[style.id] }}
+                  style={{ background: THUMB_BG[template.id] }}
                   aria-hidden="true"
                   ref={markThumbInert}
-                  data-testid={`listing-style-thumb-${style.id}`}
+                  data-testid={`listing-style-thumb-${template.id}`}
                 >
                   <div className="style-card-thumb-scale">
                     <div className="style-card-thumb-page">
@@ -84,12 +72,20 @@ export function PortalTemplatePicker({
                   type="button"
                   disabled={!canEdit}
                   aria-pressed={selected}
-                  data-testid={`listing-style-pick-${style.id}`}
+                  data-testid={`listing-style-pick-${template.id}`}
                   onClick={() => onWebsite(preset)}
                   className="block min-h-11 w-full px-3 py-3 text-left"
                 >
-                  <span className="block text-sm font-black">{style.name}</span>
-                  <span className="block text-xs text-gray-500">{style.note}</span>
+                  <span className="block text-sm font-black">{template.name}</span>
+                  <span className="block text-xs text-gray-500">{template.vibe}</span>
+                </button>
+                <button
+                  type="button"
+                  className="block min-h-11 w-full border-t border-gray-100 px-3 text-left text-xs font-black uppercase tracking-widest text-[#0d9488]"
+                  data-testid={`listing-style-preview-${template.id}`}
+                  onClick={() => setFullPreview(template.id)}
+                >
+                  Open full preview
                 </button>
               </div>
             );
@@ -98,7 +94,7 @@ export function PortalTemplatePicker({
         <div className="mt-4 overflow-hidden rounded-2xl border border-gray-100" data-testid="listing-site-preview">
           <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
             <p className="text-xs font-black uppercase tracking-widest text-gray-500">Preview</p>
-            <button type="button" className="min-h-11 text-xs font-black uppercase tracking-widest text-[#0d9488]" onClick={() => setFullPreview(true)}>
+            <button type="button" className="min-h-11 text-xs font-black uppercase tracking-widest text-[#0d9488]" onClick={() => setFullPreview(website.design)}>
               Open full preview
             </button>
           </div>
@@ -152,18 +148,27 @@ export function PortalTemplatePicker({
       )}
 
       {fullPreview && (
-        <div className="fixed inset-0 z-50 overflow-auto bg-white" data-testid="listing-site-full-preview">
+        <div className="fixed inset-0 z-50 overflow-auto bg-white" data-testid="listing-site-full-preview" data-preview-design={fullPreview}>
           <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3">
-            <p className="text-xs font-black uppercase tracking-widest">Listing site preview</p>
-            <button type="button" className="min-h-11 rounded-xl bg-black px-4 text-xs font-black uppercase tracking-widest text-white" onClick={() => setFullPreview(false)}>
+            <p className="text-xs font-black uppercase tracking-widest">
+              {LISTING_SITE_TEMPLATES.find((item) => item.id === fullPreview)?.name || "Listing site"} preview
+            </p>
+            <button type="button" className="min-h-11 rounded-xl bg-black px-4 text-xs font-black uppercase tracking-widest text-white" onClick={() => setFullPreview(null)}>
               Close preview
             </button>
           </div>
-          <ListingSiteView inquiry={false} site={preview} />
+          <ListingSiteView inquiry={false} site={previewSite(detail, presetFor(website, fullPreview))} />
         </div>
       )}
     </section>
   );
+}
+
+function presetFor(website: PortalWebsiteSettings, design: ListingSiteDesign): PortalWebsiteSettings {
+  if (website.design === design) return website;
+  const template = LISTING_SITE_TEMPLATES.find((item) => item.id === design);
+  if (!template) return { ...website, design };
+  return { ...website, design, font: template.font, color: template.color, style: template.style };
 }
 
 function previewSite(detail: PortalListingDetail, website: PortalWebsiteSettings): PublicListingSite {
@@ -222,10 +227,17 @@ function markThumbInert(node: HTMLDivElement | null) {
 const THUMB_PAGE_WIDTH = 960;
 const THUMB_PAGE_HEIGHT = 1000;
 
-const THUMB_BG: Record<PortalWebsiteSettings["style"], string> = {
-  classic: "#F7F7F5",
-  editorial: "#0B0B0C",
-  minimal: "#F2EFEA",
+const THUMB_BG: Record<ListingSiteDesign, string> = {
+  issue: "#F4F0E8",
+  premiere: "#0B0B0C",
+  "product-drop": "#FFFFFF",
+  "gallery-wall": "#FAFAF7",
+  "field-guide": "#EFE8D8",
+  "two-up": "#F2EFEA",
+  "golden-hour": "#F6EBDD",
+  index: "#F7F7F5",
+  dossier: "#1A1C1E",
+  stories: "#F5F3EF",
 };
 
 const STYLE_CARD_THUMB_CSS = `
@@ -249,10 +261,23 @@ const STYLE_CARD_THUMB_CSS = `
 }
 .style-card-thumb .ls-index,
 .style-card-thumb .ls-two,
-.style-card-thumb .ls-premiere{min-height:0}
+.style-card-thumb .ls-premiere,
+.style-card-thumb .ls-issue,
+.style-card-thumb .ls-drop,
+.style-card-thumb .ls-gallery,
+.style-card-thumb .ls-field,
+.style-card-thumb .ls-gold,
+.style-card-thumb .ls-dossier,
+.style-card-thumb .ls-stories{min-height:0}
 .style-card-thumb .ls-index-hero h1,
 .style-card-thumb .ls-story h1,
-.style-card-thumb .ls-premiere .ls-letterbox h1{
+.style-card-thumb .ls-premiere .ls-letterbox h1,
+.style-card-thumb .ls-issue h1,
+.style-card-thumb .ls-drop h1,
+.style-card-thumb .ls-field h1,
+.style-card-thumb .ls-gold h1,
+.style-card-thumb .ls-dossier h1,
+.style-card-thumb .ls-stories h1{
   line-height:1;
   overflow-wrap:anywhere;
   display:-webkit-box;
@@ -261,12 +286,6 @@ const STYLE_CARD_THUMB_CSS = `
   overflow:hidden;
 }
 `;
-
-function styleLabel(style: PortalWebsiteSettings["style"]): string {
-  if (style === "editorial") return "Editorial";
-  if (style === "minimal") return "Minimal";
-  return "Classic";
-}
 
 function fontLabel(font: PortalWebsiteSettings["font"]): string {
   if (font === "serif") return "Serif";

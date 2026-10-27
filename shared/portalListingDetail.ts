@@ -107,8 +107,23 @@ export interface PortalMediaStore {
   photoGroups: PortalPhotoGroup[];
 }
 
+export const PORTAL_WEBSITE_DESIGNS = [
+  "issue",
+  "premiere",
+  "product-drop",
+  "gallery-wall",
+  "field-guide",
+  "two-up",
+  "golden-hour",
+  "index",
+  "dossier",
+  "stories",
+] as const;
+
+export type PortalWebsiteDesign = (typeof PORTAL_WEBSITE_DESIGNS)[number];
+
 export interface PortalWebsiteSettings {
-  design: "index" | "two-up" | "premiere";
+  design: PortalWebsiteDesign;
   font: "sans" | "serif" | "modern";
   color: "ink" | "teal" | "warm";
   style: "classic" | "editorial" | "minimal";
@@ -226,7 +241,7 @@ export const PORTAL_MARKETING_KIT: PortalMarketingCard[] = [
   },
 ];
 
-const WEBSITE_DESIGNS = new Set(["index", "two-up", "premiere"]);
+const WEBSITE_DESIGNS = new Set<string>(PORTAL_WEBSITE_DESIGNS);
 const WEBSITE_FONTS = new Set(["sans", "serif", "modern"]);
 const WEBSITE_COLORS = new Set(["ink", "teal", "warm"]);
 const WEBSITE_STYLES = new Set(["classic", "editorial", "minimal"]);
